@@ -101,7 +101,7 @@ export class CreateInteracaoDto {
   agenda_evento?: CreateInlineAgendaEventoDto;
 }
 
-export class UpdateInteracaoDto extends PartialType(CreateInteracaoDto) { }
+export class UpdateInteracaoDto extends PartialType(CreateInteracaoDto) {}
 
 export class InteracaoFiltroDto extends PaginationDto {
   @IsEnum(TipoInteracao)
@@ -132,4 +132,3 @@ export class InteracaoFiltroDto extends PaginationDto {
   @IsOptional()
   busca?: string;
 }
-

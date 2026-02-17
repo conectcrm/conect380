@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { ChevronDown, ChevronRight, Dot } from 'lucide-react';
+import { UI_LAYERS } from '../../config/uiLayers';
 
 export interface NavigationItem {
   name: string;
@@ -126,7 +127,9 @@ const AdvancedNavGroup: React.FC<AdvancedNavGroupProps> = ({
             )}
 
             {/* Tooltip do grupo */}
-            <div className="absolute left-full ml-3 px-3 py-2 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[60] shadow-lg">
+            <div
+              className={`absolute left-full ml-3 px-3 py-2 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap ${UI_LAYERS.OVERLAY_DROPDOWN} shadow-lg`}
+            >
               <div className="font-semibold">{title}</div>
               <div className="text-xs text-gray-300">{items.length} módulos</div>
               {activeItem && (
@@ -176,7 +179,9 @@ const AdvancedNavGroup: React.FC<AdvancedNavGroupProps> = ({
               )}
 
               {/* Tooltip */}
-              <div className="absolute left-full ml-3 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[60] shadow-lg">
+              <div
+                className={`absolute left-full ml-3 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap ${UI_LAYERS.OVERLAY_DROPDOWN} shadow-lg`}
+              >
                 {item.name}
                 {item.notifications > 0 && (
                   <span className="ml-2 text-red-300">({item.notifications})</span>

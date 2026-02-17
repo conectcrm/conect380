@@ -51,7 +51,7 @@ export class CreateFilaDto {
    * - ROUND_ROBIN: Rotação circular entre atendentes
    * - MENOR_CARGA: Atribui para quem tem menos tickets
    * - PRIORIDADE: Atribui baseado na prioridade configurada
-   * 
+   *
    * Padrão: ROUND_ROBIN
    */
   @IsOptional()

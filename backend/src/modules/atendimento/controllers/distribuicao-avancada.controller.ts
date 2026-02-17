@@ -13,6 +13,8 @@ import {
   Logger,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { EmpresaId } from '../../../common/decorators/empresa.decorator';
 import { DistribuicaoAvancadaService } from '../services/distribuicao-avancada.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
@@ -28,7 +30,7 @@ import { UpdateAtendenteSkillDto } from '../dto/distribuicao/update-atendente-sk
  * Controller responsável pela gestão de distribuição automática avançada
  */
 @Controller('distribuicao-avancada')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class DistribuicaoAvancadaController {
   private readonly logger = new Logger(DistribuicaoAvancadaController.name);
 
@@ -43,7 +45,7 @@ export class DistribuicaoAvancadaController {
 
     @InjectRepository(DistribuicaoLog)
     private readonly distribuicaoLogRepo: Repository<DistribuicaoLog>,
-  ) { }
+  ) {}
 
   // ========================================
   // DISTRIBUIÇÃO DE TICKETS
@@ -56,6 +58,7 @@ export class DistribuicaoAvancadaController {
   @Post('distribuir/:ticketId')
   @HttpCode(HttpStatus.OK)
   async distribuirTicket(
+    @EmpresaId() empresaId: string,
     @Param('ticketId') ticketId: string,
     @Body() body: { requiredSkills?: string[] },
   ) {
@@ -64,6 +67,7 @@ export class DistribuicaoAvancadaController {
     const atendente = await this.distribuicaoService.distribuirTicket(
       ticketId,
       body.requiredSkills,
+      empresaId,
     );
 
     return {
@@ -84,6 +88,7 @@ export class DistribuicaoAvancadaController {
   @Post('realocar/:ticketId')
   @HttpCode(HttpStatus.OK)
   async realocarTicket(
+    @EmpresaId() empresaId: string,
     @Param('ticketId') ticketId: string,
     @Body() body: { novoAtendenteId: string; motivoRealocacao: string },
   ) {
@@ -93,6 +98,7 @@ export class DistribuicaoAvancadaController {
       ticketId,
       body.novoAtendenteId,
       body.motivoRealocacao,
+      empresaId,
     );
 
     return {
@@ -110,8 +116,8 @@ export class DistribuicaoAvancadaController {
    * Lista todas as configurações de distribuição
    */
   @Get('configuracoes')
-  async listarConfiguracoes(@Query('filaId') filaId?: string) {
-    const where = filaId ? { filaId } : {};
+  async listarConfiguracoes(@EmpresaId() empresaId: string, @Query('filaId') filaId?: string) {
+    const where = filaId ? { filaId, empresaId } : { empresaId };
 
     const configuracoes = await this.distribuicaoConfigRepo.find({
       where,
@@ -131,9 +137,9 @@ export class DistribuicaoAvancadaController {
    * Busca configuração específica por ID
    */
   @Get('configuracoes/:id')
-  async buscarConfiguracao(@Param('id') id: string) {
+  async buscarConfiguracao(@EmpresaId() empresaId: string, @Param('id') id: string) {
     const config = await this.distribuicaoConfigRepo.findOne({
-      where: { id },
+      where: { id, empresaId },
       relations: ['fila', 'filaBackup'],
     });
 
@@ -156,10 +162,10 @@ export class DistribuicaoAvancadaController {
    */
   @Post('configuracoes')
   @HttpCode(HttpStatus.CREATED)
-  async criarConfiguracao(@Body() dto: CreateDistribuicaoConfigDto) {
+  async criarConfiguracao(@EmpresaId() empresaId: string, @Body() dto: CreateDistribuicaoConfigDto) {
     this.logger.log(`Criando configuração para fila ${dto.filaId}`);
 
-    const config = this.distribuicaoConfigRepo.create(dto);
+    const config = this.distribuicaoConfigRepo.create({ ...dto, empresaId });
     const saved = await this.distribuicaoConfigRepo.save(config);
 
     return {
@@ -175,13 +181,14 @@ export class DistribuicaoAvancadaController {
    */
   @Put('configuracoes/:id')
   async atualizarConfiguracao(
+    @EmpresaId() empresaId: string,
     @Param('id') id: string,
     @Body() dto: UpdateDistribuicaoConfigDto,
   ) {
     this.logger.log(`Atualizando configuração ${id}`);
 
     const config = await this.distribuicaoConfigRepo.findOne({
-      where: { id },
+      where: { id, empresaId },
     });
 
     if (!config) {
@@ -206,10 +213,10 @@ export class DistribuicaoAvancadaController {
    * Deleta configuração
    */
   @Delete('configuracoes/:id')
-  async deletarConfiguracao(@Param('id') id: string) {
+  async deletarConfiguracao(@EmpresaId() empresaId: string, @Param('id') id: string) {
     this.logger.log(`Deletando configuração ${id}`);
 
-    const result = await this.distribuicaoConfigRepo.delete(id);
+    const result = await this.distribuicaoConfigRepo.delete({ id, empresaId });
 
     if (result.affected === 0) {
       return {
@@ -233,8 +240,8 @@ export class DistribuicaoAvancadaController {
    * Lista skills dos atendentes
    */
   @Get('skills')
-  async listarSkills(@Query('atendenteId') atendenteId?: string) {
-    const where = atendenteId ? { atendenteId } : {};
+  async listarSkills(@EmpresaId() empresaId: string, @Query('atendenteId') atendenteId?: string) {
+    const where = atendenteId ? { atendenteId, empresaId } : { empresaId };
 
     const skills = await this.atendenteSkillRepo.find({
       where,
@@ -254,9 +261,12 @@ export class DistribuicaoAvancadaController {
    * Lista todas as skills de um atendente específico
    */
   @Get('skills/atendente/:atendenteId')
-  async listarSkillsPorAtendente(@Param('atendenteId') atendenteId: string) {
+  async listarSkillsPorAtendente(
+    @EmpresaId() empresaId: string,
+    @Param('atendenteId') atendenteId: string,
+  ) {
     const skills = await this.atendenteSkillRepo.find({
-      where: { atendenteId },
+      where: { atendenteId, empresaId },
       order: { skill: 'ASC' },
     });
 
@@ -273,7 +283,7 @@ export class DistribuicaoAvancadaController {
    */
   @Post('skills')
   @HttpCode(HttpStatus.CREATED)
-  async criarSkill(@Body() dto: CreateAtendenteSkillDto) {
+  async criarSkill(@EmpresaId() empresaId: string, @Body() dto: CreateAtendenteSkillDto) {
     this.logger.log(`Criando skill ${dto.skill} para atendente ${dto.atendenteId}`);
 
     // Verificar se skill já existe
@@ -281,6 +291,7 @@ export class DistribuicaoAvancadaController {
       where: {
         atendenteId: dto.atendenteId,
         skill: dto.skill,
+        empresaId,
       },
     });
 
@@ -291,7 +302,7 @@ export class DistribuicaoAvancadaController {
       };
     }
 
-    const skill = this.atendenteSkillRepo.create(dto);
+    const skill = this.atendenteSkillRepo.create({ ...dto, empresaId });
     const saved = await this.atendenteSkillRepo.save(skill);
 
     return {
@@ -307,13 +318,14 @@ export class DistribuicaoAvancadaController {
    */
   @Put('skills/:id')
   async atualizarSkill(
+    @EmpresaId() empresaId: string,
     @Param('id') id: string,
     @Body() dto: UpdateAtendenteSkillDto,
   ) {
     this.logger.log(`Atualizando skill ${id}`);
 
     const skill = await this.atendenteSkillRepo.findOne({
-      where: { id },
+      where: { id, empresaId },
     });
 
     if (!skill) {
@@ -338,10 +350,10 @@ export class DistribuicaoAvancadaController {
    * Deleta skill
    */
   @Delete('skills/:id')
-  async deletarSkill(@Param('id') id: string) {
+  async deletarSkill(@EmpresaId() empresaId: string, @Param('id') id: string) {
     this.logger.log(`Deletando skill ${id}`);
 
-    const result = await this.atendenteSkillRepo.delete(id);
+    const result = await this.atendenteSkillRepo.delete({ id, empresaId });
 
     if (result.affected === 0) {
       return {
@@ -366,6 +378,7 @@ export class DistribuicaoAvancadaController {
    */
   @Get('logs')
   async listarLogs(
+    @EmpresaId() empresaId: string,
     @Query('ticketId') ticketId?: string,
     @Query('atendenteId') atendenteId?: string,
     @Query('filaId') filaId?: string,
@@ -374,7 +387,7 @@ export class DistribuicaoAvancadaController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 50,
   ) {
-    const where: any = {};
+    const where: any = { empresaId };
 
     if (ticketId) where.ticketId = ticketId;
     if (atendenteId) where.atendenteId = atendenteId;
@@ -409,8 +422,8 @@ export class DistribuicaoAvancadaController {
    * Retorna métricas de distribuição
    */
   @Get('metricas')
-  async obterMetricas(@Query('filaId') filaId?: string) {
-    const where = filaId ? { filaId } : {};
+  async obterMetricas(@EmpresaId() empresaId: string, @Query('filaId') filaId?: string) {
+    const where = filaId ? { filaId, empresaId } : { empresaId };
 
     // Total de distribuições
     const totalDistribuicoes = await this.distribuicaoLogRepo.count({ where });
@@ -420,7 +433,8 @@ export class DistribuicaoAvancadaController {
       .createQueryBuilder('log')
       .select('log.algoritmo', 'algoritmo')
       .addSelect('COUNT(log.id)', 'total')
-      .where(filaId ? 'log.filaId = :filaId' : '1=1', { filaId })
+      .where('log.empresaId = :empresaId', { empresaId })
+      .andWhere(filaId ? 'log.filaId = :filaId' : '1=1', { filaId })
       .groupBy('log.algoritmo')
       .getRawMany();
 
@@ -486,11 +500,12 @@ export class DistribuicaoAvancadaController {
    * Lista todas as skills cadastradas no sistema (únicas)
    */
   @Get('skills-disponiveis')
-  async listarSkillsDisponiveis() {
+  async listarSkillsDisponiveis(@EmpresaId() empresaId: string) {
     const skills = await this.atendenteSkillRepo
       .createQueryBuilder('skill')
       .select('DISTINCT skill.skill', 'skill')
-      .where('skill.ativo = :ativo', { ativo: true })
+      .where('skill.empresaId = :empresaId', { empresaId })
+      .andWhere('skill.ativo = :ativo', { ativo: true })
       .orderBy('skill.skill', 'ASC')
       .getRawMany();
 

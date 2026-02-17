@@ -1,7 +1,7 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class AddPendenteToStatusEnum1763406000000 implements MigrationInterface {
-  name = 'AddPendenteToStatusEnum1763406000000'
+  name = 'AddPendenteToStatusEnum1763406000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Adicionar 'pendente' ao enum cotacoes_status_enum (se ainda não existir)

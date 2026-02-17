@@ -534,8 +534,8 @@ export function NovoAtendimentoModal({ isOpen, onClose, onSucesso }: NovoAtendim
             />
           </div>
 
-          {/* Prioridade */
-            <div>
+          {/* Prioridade */}
+          <div>
               <label className="block text-sm font-medium text-[#002333] mb-2">Prioridade</label>
               <div className="grid grid-cols-4 gap-3">
                 {[
@@ -575,7 +575,7 @@ export function NovoAtendimentoModal({ isOpen, onClose, onSucesso }: NovoAtendim
                   </button>
                 ))}
               </div>
-            </div>
+          </div>
 
           {/* Actions */}
           <div className="flex items-center gap-3 pt-4 border-t">

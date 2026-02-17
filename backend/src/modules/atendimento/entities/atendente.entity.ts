@@ -30,6 +30,9 @@ export class Atendente {
   @Column({ type: 'varchar', length: 100 })
   email: string;
 
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  telefone: string;
+
   @Column({ type: 'uuid', name: 'usuarioId', nullable: true })
   usuarioId: string;
 
@@ -48,6 +51,9 @@ export class Atendente {
 
   @Column({ type: 'integer', default: 0, name: 'ticketsAtivos' })
   ticketsAtivos: number;
+
+  @Column({ type: 'boolean', default: true })
+  ativo: boolean;
 
   @CreateDateColumn({ name: 'createdAt' })
   createdAt: Date;

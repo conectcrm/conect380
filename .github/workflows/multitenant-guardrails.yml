@@ -4,8 +4,18 @@ on:
   pull_request:
     paths:
       - 'backend/**'
-      - 'scripts/ci/**'
+      - 'scripts/**'
       - '.github/**'
+  push:
+    branches:
+      - main
+      - master
+      - develop
+    paths:
+      - 'backend/**'
+      - 'scripts/**'
+      - '.github/**'
+  workflow_dispatch:
 
 jobs:
   guardrails:
@@ -18,9 +28,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Guardrails (multi-tenant)
+      - name: Guardrails (diff-based)
         shell: pwsh
         run: |
-          ./scripts/ci/multitenant-guardrails.ps1 \
-            -BaseSha '${{ github.event.pull_request.base.sha }}' \
-            -HeadSha '${{ github.sha }}'
+          $baseSha = ''
+
+          if ('${{ github.event_name }}' -eq 'pull_request') {
+            $baseSha = '${{ github.event.pull_request.base.sha }}'
+          }
+          else {
+            $baseSha = '${{ github.event.before }}'
+          }
+
+          ./scripts/ci/multitenant-guardrails.ps1 -BaseSha $baseSha -HeadSha '${{ github.sha }}'

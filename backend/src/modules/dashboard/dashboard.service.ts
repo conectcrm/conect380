@@ -361,12 +361,18 @@ export class DashboardService {
   /**
    * Obter alertas inteligentes
    */
-  async getAlertasInteligentes(): Promise<AlertaInteligente[]> {
+  async getAlertasInteligentes(
+    periodo: string = 'mensal',
+    precomputed?: {
+      ranking?: VendedorRanking[];
+      kpis?: DashboardKPIs;
+    },
+  ): Promise<AlertaInteligente[]> {
     const alertas: AlertaInteligente[] = [];
     const agora = new Date();
 
     // Verificar metas em risco
-    const ranking = await this.getVendedoresRanking('mensal');
+    const ranking = precomputed?.ranking ?? (await this.getVendedoresRanking(periodo));
     const vendedoresEmRisco = ranking.filter((v) => v.vendas / v.meta < 0.7);
 
     for (const vendedor of vendedoresEmRisco) {
@@ -414,7 +420,7 @@ export class DashboardService {
     }
 
     // Verificar conquistas
-    const kpis = await this.getKPIs('mensal');
+    const kpis = precomputed?.kpis ?? (await this.getKPIs(periodo));
     if (kpis.faturamentoTotal.valor >= kpis.faturamentoTotal.meta) {
       alertas.push({
         id: 'meta-superada',

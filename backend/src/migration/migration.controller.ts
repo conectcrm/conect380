@@ -1,11 +1,14 @@
-import { Controller, Post } from '@nestjs/common';
+import { Logger, Controller, Post, UseGuards } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../modules/users/user.entity';
 import { Empresa } from '../empresas/entities/empresa.entity';
+import { JwtAuthGuard } from '../modules/auth/jwt-auth.guard';
 
 @Controller('migration')
+@UseGuards(JwtAuthGuard)
 export class MigrationController {
+  private readonly logger = new Logger(MigrationController.name);
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
@@ -16,7 +19,7 @@ export class MigrationController {
   @Post('update-domains')
   async updateDomains() {
     try {
-      console.log('🚀 Iniciando migração de domínios Fênix → Conect CRM...');
+      this.logger.log('🚀 Iniciando migração de domínios Fênix → Conect CRM...');
 
       // 1. Atualizar empresa padrão
       const empresaResult = await this.empresaRepository
@@ -34,7 +37,7 @@ export class MigrationController {
         })
         .execute();
 
-      console.log('📊 Empresa atualizada:', empresaResult.affected, 'linhas afetadas');
+      this.logger.log('📊 Empresa atualizada:', empresaResult.affected, 'linhas afetadas');
 
       // 2. Atualizar usuários
       const usuariosUpdates = [
@@ -57,7 +60,7 @@ export class MigrationController {
           .execute();
 
         if (result.affected > 0) {
-          console.log(`✅ Usuário atualizado: ${update.old} → ${update.new}`);
+          this.logger.log(`✅ Usuário atualizado: ${update.old} → ${update.new}`);
           resultados.push(`${update.old} → ${update.new}`);
         }
       }
@@ -90,7 +93,7 @@ export class MigrationController {
         ],
       };
     } catch (error) {
-      console.error('❌ Erro durante a migração:', error);
+      this.logger.error('❌ Erro durante a migração:', error);
       return {
         success: false,
         message: 'Erro durante a migração',

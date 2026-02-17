@@ -8,7 +8,9 @@ export class EnsureDepartamentoNucleoForeignKey1765000001000 implements Migratio
     const nucleosExists = await queryRunner.hasTable('nucleos_atendimento');
 
     if (!departamentosExists || !nucleosExists) {
-      console.log('ℹ️ [Migration] departamentos ou nucleos_atendimento ausentes. Nenhuma FK criada.');
+      console.log(
+        'ℹ️ [Migration] departamentos ou nucleos_atendimento ausentes. Nenhuma FK criada.',
+      );
       return;
     }
 
@@ -39,7 +41,9 @@ export class EnsureDepartamentoNucleoForeignKey1765000001000 implements Migratio
     }
 
     const table = await queryRunner.getTable('departamentos');
-    const fk = table?.foreignKeys.find((foreignKey) => foreignKey.name === 'fk_departamentos_nucleo');
+    const fk = table?.foreignKeys.find(
+      (foreignKey) => foreignKey.name === 'fk_departamentos_nucleo',
+    );
 
     if (fk) {
       await queryRunner.dropForeignKey('departamentos', fk);

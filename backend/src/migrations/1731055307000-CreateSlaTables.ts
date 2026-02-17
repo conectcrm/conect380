@@ -258,10 +258,7 @@ export class CreateSlaTables20251108074147 implements MigrationInterface {
     await queryRunner.dropTable('sla_event_logs');
 
     // Remover índices de sla_configs
-    await queryRunner.dropIndex(
-      'sla_configs',
-      'IDX_SLA_CONFIG_EMPRESA_PRIORIDADE',
-    );
+    await queryRunner.dropIndex('sla_configs', 'IDX_SLA_CONFIG_EMPRESA_PRIORIDADE');
     await queryRunner.dropIndex('sla_configs', 'IDX_SLA_CONFIG_ATIVO');
     await queryRunner.dropIndex('sla_configs', 'IDX_SLA_CONFIG_PRIORIDADE');
     await queryRunner.dropIndex('sla_configs', 'IDX_SLA_CONFIG_EMPRESA');

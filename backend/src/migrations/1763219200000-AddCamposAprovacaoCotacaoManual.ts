@@ -46,7 +46,9 @@ export class AddCamposAprovacaoCotacaoManual1763219200000 implements MigrationIn
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE "cotacoes" DROP COLUMN IF EXISTS "justificativa_aprovacao"`);
+    await queryRunner.query(
+      `ALTER TABLE "cotacoes" DROP COLUMN IF EXISTS "justificativa_aprovacao"`,
+    );
     await queryRunner.query(`ALTER TABLE "cotacoes" DROP COLUMN IF EXISTS "status_aprovacao"`);
     await queryRunner.query(`ALTER TABLE "cotacoes" DROP COLUMN IF EXISTS "data_aprovacao"`);
   }

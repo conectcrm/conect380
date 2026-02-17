@@ -8,7 +8,7 @@ import { User } from '../../users/user.entity';
 
 /**
  * Service responsável pela distribuição automática de tickets
- * 
+ *
  * Implementa 3 algoritmos:
  * 1. ROUND_ROBIN: Revezamento circular entre atendentes
  * 2. MENOR_CARGA: Atribui para quem tem menos tickets ativos
@@ -30,20 +30,20 @@ export class DistribuicaoService {
 
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-  ) { }
+  ) {}
 
   /**
    * Distribui um ticket para um atendente disponível
-   * 
+   *
    * @param ticketId - ID do ticket a ser distribuído
    * @returns Ticket atualizado com atendenteId
    */
-  async distribuirTicket(ticketId: string): Promise<Ticket> {
+  async distribuirTicket(ticketId: string, empresaId: string): Promise<Ticket> {
     this.logger.log(`🎯 Iniciando distribuição do ticket ${ticketId}`);
 
     // 1. Buscar ticket
     const ticket = await this.ticketRepository.findOne({
-      where: { id: ticketId },
+      where: { id: ticketId, empresaId },
       relations: ['fila'],
     });
 
@@ -62,7 +62,7 @@ export class DistribuicaoService {
 
     // 2. Buscar fila e validar se distribuição automática está ativada
     const fila = await this.filaRepository.findOne({
-      where: { id: ticket.filaId },
+      where: { id: ticket.filaId, empresaId },
     });
 
     if (!fila) {
@@ -75,7 +75,7 @@ export class DistribuicaoService {
     }
 
     // 3. Buscar atendente disponível usando algoritmo configurado
-    const atendenteId = await this.calcularProximoAtendente(fila.id, fila.estrategiaDistribuicao);
+    const atendenteId = await this.calcularProximoAtendente(fila.id, fila.estrategiaDistribuicao, empresaId);
 
     if (!atendenteId) {
       this.logger.warn(`Nenhum atendente disponível na fila ${fila.nome}`);
@@ -94,18 +94,19 @@ export class DistribuicaoService {
 
   /**
    * Redistribui todos os tickets pendentes de uma fila
-   * 
+   *
    * @param filaId - ID da fila
    * @returns Número de tickets redistribuídos
    */
-  async redistribuirFila(filaId: string): Promise<{ distribuidos: number }> {
+  async redistribuirFila(filaId: string, empresaId: string): Promise<{ distribuidos: number }> {
     this.logger.log(`🔄 Redistribuindo tickets da fila ${filaId}`);
 
     const ticketsPendentes = await this.ticketRepository.find({
       where: {
         filaId,
+        empresaId,
         atendenteId: null,
-        status: StatusTicket.ABERTO,
+        status: StatusTicket.FILA,
       },
     });
 
@@ -113,21 +114,23 @@ export class DistribuicaoService {
 
     for (const ticket of ticketsPendentes) {
       try {
-        await this.distribuirTicket(ticket.id);
+        await this.distribuirTicket(ticket.id, empresaId);
         distribuidos++;
       } catch (error) {
         this.logger.error(`Erro ao distribuir ticket ${ticket.id}: ${error.message}`);
       }
     }
 
-    this.logger.log(`✅ Redistribuição concluída: ${distribuidos}/${ticketsPendentes.length} tickets`);
+    this.logger.log(
+      `✅ Redistribuição concluída: ${distribuidos}/${ticketsPendentes.length} tickets`,
+    );
 
     return { distribuidos };
   }
 
   /**
    * Calcula o próximo atendente a receber um ticket baseado no algoritmo configurado
-   * 
+   *
    * @param filaId - ID da fila
    * @param estrategia - Algoritmo de distribuição
    * @returns ID do atendente escolhido ou null se nenhum disponível
@@ -135,9 +138,10 @@ export class DistribuicaoService {
   async calcularProximoAtendente(
     filaId: string,
     estrategia: EstrategiaDistribuicao,
+    empresaId: string,
   ): Promise<string | null> {
     // 1. Buscar atendentes disponíveis
-    const atendentesDisponiveis = await this.buscarAtendentesDisponiveis(filaId);
+    const atendentesDisponiveis = await this.buscarAtendentesDisponiveis(filaId, empresaId);
 
     if (atendentesDisponiveis.length === 0) {
       this.logger.warn(`Nenhum atendente disponível na fila ${filaId}`);
@@ -149,37 +153,39 @@ export class DistribuicaoService {
 
     switch (estrategia) {
       case EstrategiaDistribuicao.ROUND_ROBIN:
-        atendenteEscolhido = await this.algoritmoRoundRobin(atendentesDisponiveis, filaId);
+        atendenteEscolhido = await this.algoritmoRoundRobin(atendentesDisponiveis, filaId, empresaId);
         break;
 
       case EstrategiaDistribuicao.MENOR_CARGA:
-        atendenteEscolhido = await this.algoritmoMenorCarga(atendentesDisponiveis);
+        atendenteEscolhido = await this.algoritmoMenorCarga(atendentesDisponiveis, empresaId);
         break;
 
       case EstrategiaDistribuicao.PRIORIDADE:
-        atendenteEscolhido = await this.algoritmoPrioridade(atendentesDisponiveis);
+        atendenteEscolhido = await this.algoritmoPrioridade(atendentesDisponiveis, empresaId);
         break;
 
       default:
-        atendenteEscolhido = await this.algoritmoMenorCarga(atendentesDisponiveis);
+        atendenteEscolhido = await this.algoritmoMenorCarga(atendentesDisponiveis, empresaId);
     }
 
-    this.logger.log(`🎯 Algoritmo ${estrategia}: Escolhido atendente ${atendenteEscolhido.atendenteId}`);
+    this.logger.log(
+      `🎯 Algoritmo ${estrategia}: Escolhido atendente ${atendenteEscolhido.atendenteId}`,
+    );
 
     return atendenteEscolhido.atendenteId;
   }
 
   /**
    * Busca atendentes disponíveis para receber tickets
-   * 
+   *
    * Critérios:
    * - Atendente está ativo na fila (FilaAtendente.ativo = true)
    * - Atendente não atingiu capacidade máxima
    */
-  private async buscarAtendentesDisponiveis(filaId: string): Promise<FilaAtendente[]> {
+  private async buscarAtendentesDisponiveis(filaId: string, empresaId: string): Promise<FilaAtendente[]> {
     // Buscar todos atendentes da fila
     const filasAtendentes = await this.filaAtendenteRepository.find({
-      where: { filaId, ativo: true },
+      where: { filaId, empresaId, ativo: true },
       relations: ['atendente'],
     });
 
@@ -194,6 +200,7 @@ export class DistribuicaoService {
       const ticketsAtivos = await this.ticketRepository.count({
         where: {
           atendenteId: filaAtendente.atendenteId,
+          empresaId,
           status: StatusTicket.EM_ATENDIMENTO,
         },
       });
@@ -209,7 +216,7 @@ export class DistribuicaoService {
 
   /**
    * Algoritmo ROUND_ROBIN: Revezamento circular
-   * 
+   *
    * Lógica:
    * 1. Busca último atendente que recebeu ticket
    * 2. Escolhe o próximo na lista
@@ -218,10 +225,11 @@ export class DistribuicaoService {
   private async algoritmoRoundRobin(
     atendentes: FilaAtendente[],
     filaId: string,
+    empresaId: string,
   ): Promise<FilaAtendente> {
     // Buscar último ticket distribuído nesta fila
     const ultimoTicket = await this.ticketRepository.findOne({
-      where: { filaId },
+      where: { filaId, empresaId },
       order: { createdAt: 'DESC' },
     });
 
@@ -231,34 +239,31 @@ export class DistribuicaoService {
     }
 
     // Encontrar índice do último atendente
-    const indexUltimo = atendentes.findIndex(
-      (a) => a.atendenteId === ultimoTicket.atendenteId,
-    );
+    const indexUltimo = atendentes.findIndex((a) => a.atendenteId === ultimoTicket.atendenteId);
 
     // Próximo atendente (circular)
-    const proximoIndex = indexUltimo >= 0
-      ? (indexUltimo + 1) % atendentes.length
-      : 0;
+    const proximoIndex = indexUltimo >= 0 ? (indexUltimo + 1) % atendentes.length : 0;
 
     return atendentes[proximoIndex];
   }
 
   /**
    * Algoritmo MENOR_CARGA: Atribui para quem tem menos tickets ativos
-   * 
+   *
    * Lógica:
    * 1. Conta tickets ativos de cada atendente
    * 2. Retorna o que tem menos
    * 3. Em caso de empate, usa prioridade
    */
-  private async algoritmoMenorCarga(atendentes: FilaAtendente[]): Promise<FilaAtendente> {
+  private async algoritmoMenorCarga(atendentes: FilaAtendente[], empresaId: string): Promise<FilaAtendente> {
     const atendentesComCarga = await Promise.all(
       atendentes.map(async (atendente) => {
         const carga = await this.ticketRepository.count({
           where: {
-            atendenteId: atendente.atendenteId,
-            status: StatusTicket.EM_ATENDIMENTO,
-          },
+              atendenteId: atendente.atendenteId,
+              empresaId,
+              status: StatusTicket.EM_ATENDIMENTO,
+            },
         });
 
         return { atendente, carga };
@@ -278,20 +283,21 @@ export class DistribuicaoService {
 
   /**
    * Algoritmo PRIORIDADE: Atribui baseado na prioridade configurada
-   * 
+   *
    * Lógica:
    * 1. Ordena atendentes por prioridade (1 = maior)
    * 2. Retorna o de maior prioridade
    * 3. Em caso de empate, usa menor carga
    */
-  private async algoritmoPrioridade(atendentes: FilaAtendente[]): Promise<FilaAtendente> {
+  private async algoritmoPrioridade(atendentes: FilaAtendente[], empresaId: string): Promise<FilaAtendente> {
     const atendentesComCarga = await Promise.all(
       atendentes.map(async (atendente) => {
         const carga = await this.ticketRepository.count({
           where: {
-            atendenteId: atendente.atendenteId,
-            status: StatusTicket.EM_ATENDIMENTO,
-          },
+              atendenteId: atendente.atendenteId,
+              empresaId,
+              status: StatusTicket.EM_ATENDIMENTO,
+            },
         });
 
         return { atendente, carga };
@@ -311,7 +317,7 @@ export class DistribuicaoService {
 
   /**
    * Busca estatísticas de distribuição para o dashboard
-   * 
+   *
    * @param empresaId - ID da empresa
    * @returns Estatísticas de tickets e filas
    */
@@ -322,7 +328,7 @@ export class DistribuicaoService {
     const totalAguardando = await this.ticketRepository.count({
       where: {
         empresaId,
-        status: StatusTicket.AGUARDANDO,
+        status: StatusTicket.AGUARDANDO_CLIENTE,
         atendenteId: null,
       },
     });
@@ -339,15 +345,16 @@ export class DistribuicaoService {
     const totalFinalizados = await this.ticketRepository.count({
       where: {
         empresaId,
-        status: StatusTicket.FECHADO,
+        status: StatusTicket.ENCERRADO,
       },
     });
 
     // Atendentes disponíveis
     const atendentesDisponiveis = await this.filaAtendenteRepository.count({
       where: {
-        ativo: true,
-      },
+         ativo: true,
+         empresaId,
+       },
     });
 
     return {
@@ -360,7 +367,7 @@ export class DistribuicaoService {
 
   /**
    * Lista todas as filas disponíveis para configuração
-   * 
+   *
    * @param empresaId - ID da empresa
    * @returns Lista de filas
    */
@@ -387,7 +394,7 @@ export class DistribuicaoService {
 
   /**
    * Busca configuração de auto-distribuição de uma fila
-   * 
+   *
    * @param filaId - ID da fila
    * @param empresaId - ID da empresa
    * @returns Configuração da fila
@@ -422,7 +429,7 @@ export class DistribuicaoService {
 
   /**
    * Atualiza configuração de auto-distribuição de uma fila
-   * 
+   *
    * @param filaId - ID da fila
    * @param empresaId - ID da empresa
    * @param autoDistribuicao - Habilitar/desabilitar auto-distribuição
@@ -451,7 +458,7 @@ export class DistribuicaoService {
     }
 
     fila.distribuicaoAutomatica = autoDistribuicao;
-    fila.estrategiaDistribuicao = algoritmo as any;
+    fila.estrategiaDistribuicao = algoritmo as EstrategiaDistribuicao;
 
     await this.filaRepository.save(fila);
 
@@ -463,3 +470,4 @@ export class DistribuicaoService {
     };
   }
 }
+

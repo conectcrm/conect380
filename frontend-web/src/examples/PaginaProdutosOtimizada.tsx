@@ -298,7 +298,7 @@ export const PaginaProdutosOtimizada: React.FC = () => {
         isOpen={showModal}
         onClose={handleCloseModal}
         onSave={handleSaveProduto}
-        produto={produtoSelecionado}
+        produto={produtoSelecionado as any}
         isLoading={isLoading}
       />
     </div>

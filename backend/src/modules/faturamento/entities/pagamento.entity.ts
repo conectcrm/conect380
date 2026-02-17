@@ -32,6 +32,7 @@ export class Pagamento {
   id: number;
 
   @Column({ type: 'uuid', name: 'empresa_id' })
+  @Index('idx_pagamentos_empresa_id')
   empresaId: string;
 
   @ManyToOne(() => Empresa)
@@ -44,14 +45,6 @@ export class Pagamento {
   @ManyToOne(() => Fatura, (fatura) => fatura.pagamentos)
   @JoinColumn({ name: 'faturaId' })
   fatura: Fatura;
-
-  @Column('uuid')
-  @Index('idx_pagamentos_empresa_id')
-  empresa_id: string;
-
-  @ManyToOne(() => Empresa)
-  @JoinColumn({ name: 'empresa_id' })
-  empresa: Empresa;
 
   @Column({ unique: true })
   transacaoId: string;

@@ -1,4 +1,13 @@
-import { IsString, IsNotEmpty, IsOptional, IsInt, IsBoolean, Matches, MinLength, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsInt,
+  IsBoolean,
+  Matches,
+  MinLength,
+  MaxLength,
+} from 'class-validator';
 
 export class CreateTipoServicoDto {
   @IsString({ message: 'Nome deve ser uma string' })

@@ -150,7 +150,7 @@ const BillingIntegration: React.FC<BillingIntegrationProps> = ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
         },
       });
 
@@ -171,7 +171,7 @@ const BillingIntegration: React.FC<BillingIntegrationProps> = ({
     try {
       const response = await fetch(`/api/faturas/${fatura.id}/pdf`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
         },
       });
 

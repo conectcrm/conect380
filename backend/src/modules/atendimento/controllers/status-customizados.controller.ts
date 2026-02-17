@@ -1,21 +1,20 @@
-import { Controller, Get, Param, Query, UseGuards, Req } from '@nestjs/common';
+import { Logger, Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { EmpresaId } from '../../../common/decorators/empresa.decorator';
 import { StatusCustomizadosService } from '../services/status-customizados.service';
 
 @Controller('atendimento/status-customizados')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class StatusCustomizadosController {
-  constructor(
-    private readonly statusService: StatusCustomizadosService,
-  ) { }
+  private readonly logger = new Logger(StatusCustomizadosController.name);
+  constructor(private readonly statusService: StatusCustomizadosService) {}
 
   @Get()
-  async listar(
-    @Req() req: any,
-    @Query('nivelId') nivelId?: string,
-  ) {
-    const empresaId = req.user?.empresa_id;
-    console.log(`[StatusController] 📥 GET /status - empresaId: ${empresaId}, nivelId: ${nivelId || 'todos'}`);
+  async listar(@EmpresaId() empresaId: string, @Query('nivelId') nivelId?: string) {
+    this.logger.log(
+      `[StatusController] 📥 GET /status - empresaId: ${empresaId}, nivelId: ${nivelId || 'todos'}`,
+    );
     if (nivelId) {
       return this.statusService.listarPorNivel(empresaId, nivelId);
     }
@@ -23,7 +22,7 @@ export class StatusCustomizadosController {
   }
 
   @Get(':id')
-  async buscar(@Param('id') id: string) {
-    return this.statusService.buscarPorId(id);
+  async buscar(@Param('id') id: string, @EmpresaId() empresaId: string) {
+    return this.statusService.buscarPorId(id, empresaId);
   }
 }

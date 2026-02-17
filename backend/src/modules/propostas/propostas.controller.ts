@@ -1,4 +1,4 @@
-import {
+import { Logger,
   Controller,
   Put,
   Param,
@@ -8,6 +8,7 @@ import {
   Get,
   Post,
   Delete,
+  UseGuards,
 } from '@nestjs/common';
 import { PropostasService, Proposta } from './propostas.service';
 import {
@@ -16,9 +17,14 @@ import {
   CriarPropostaDto,
   PropostaDto,
 } from './dto/proposta.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { EmpresaId } from '../../common/decorators/empresa.decorator';
 
 @Controller('propostas')
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class PropostasController {
+  private readonly logger = new Logger(PropostasController.name);
   constructor(private readonly propostasService: PropostasService) {}
 
   // Helper para converter Proposta para PropostaDto
@@ -33,7 +39,7 @@ export class PropostasController {
           ? proposta.cliente.nome
           : typeof proposta.cliente === 'string'
             ? proposta.cliente
-            : 'Cliente não informado',
+            : 'Cliente nao informado',
       valor: proposta.valor,
       createdAt: proposta.createdAt,
       updatedAt: proposta.updatedAt,
@@ -49,9 +55,9 @@ export class PropostasController {
    * Lista todas as propostas
    */
   @Get()
-  async listarPropostas(): Promise<any> {
+  async listarPropostas(@EmpresaId() empresaId: string): Promise<any> {
     try {
-      const propostas = await this.propostasService.listarPropostas();
+      const propostas = await this.propostasService.listarPropostas(empresaId);
 
       return {
         success: true,
@@ -75,20 +81,22 @@ export class PropostasController {
    */
   @Put(':id/status')
   async atualizarStatus(
+    @EmpresaId() empresaId: string,
     @Param('id') propostaId: string,
     @Body() updateData: AtualizarStatusDto,
   ): Promise<PropostaResponseDto> {
     try {
-      console.log(`📝 Atualizando status da proposta ${propostaId} para: ${updateData.status}`);
+      this.logger.log(`[PROPOSTAS] Atualizando status da proposta ${propostaId} para: ${updateData.status}`);
 
       const resultado = await this.propostasService.atualizarStatus(
         propostaId,
         updateData.status,
         updateData.source || 'api',
         updateData.observacoes,
+        empresaId,
       );
 
-      console.log('✅ Status atualizado com sucesso');
+      this.logger.log('[PROPOSTAS] Status atualizado com sucesso');
 
       return {
         success: true,
@@ -97,7 +105,7 @@ export class PropostasController {
         timestamp: new Date().toISOString(),
       };
     } catch (error) {
-      console.error('❌ Erro ao atualizar status:', error);
+      this.logger.error('[PROPOSTAS] Erro ao atualizar status:', error);
 
       throw new HttpException(
         {
@@ -111,18 +119,21 @@ export class PropostasController {
   }
 
   /**
-   * Obtém uma proposta por ID
+   * Obtem uma proposta por ID
    */
   @Get(':id')
-  async obterProposta(@Param('id') propostaId: string): Promise<PropostaResponseDto> {
+  async obterProposta(
+    @EmpresaId() empresaId: string,
+    @Param('id') propostaId: string,
+  ): Promise<PropostaResponseDto> {
     try {
-      const proposta = await this.propostasService.obterProposta(propostaId);
+      const proposta = await this.propostasService.obterProposta(propostaId, empresaId);
 
       if (!proposta) {
         throw new HttpException(
           {
             success: false,
-            message: 'Proposta não encontrada',
+            message: 'Proposta nao encontrada',
           },
           HttpStatus.NOT_FOUND,
         );
@@ -152,9 +163,12 @@ export class PropostasController {
    * Cria uma nova proposta
    */
   @Post()
-  async criarProposta(@Body() dadosProposta: any): Promise<PropostaResponseDto> {
+  async criarProposta(
+    @EmpresaId() empresaId: string,
+    @Body() dadosProposta: any,
+  ): Promise<PropostaResponseDto> {
     try {
-      console.log('📝 Criando nova proposta:', JSON.stringify(dadosProposta, null, 2));
+      this.logger.log('[PROPOSTAS] Criando nova proposta:', JSON.stringify(dadosProposta, null, 2));
 
       // Converter dados do frontend para formato interno
       const propostaParaCriar: Partial<Proposta> = {
@@ -173,7 +187,7 @@ export class PropostasController {
         vendedor: dadosProposta.vendedor,
       };
 
-      const proposta = await this.propostasService.criarProposta(propostaParaCriar);
+      const proposta = await this.propostasService.criarProposta(propostaParaCriar, empresaId);
 
       return {
         success: true,
@@ -182,7 +196,7 @@ export class PropostasController {
         timestamp: new Date().toISOString(),
       };
     } catch (error) {
-      console.error('❌ Erro ao criar proposta:', error);
+      this.logger.error('[PROPOSTAS] Erro ao criar proposta:', error);
 
       throw new HttpException(
         {
@@ -200,19 +214,20 @@ export class PropostasController {
    */
   @Delete(':id')
   async removerProposta(
+    @EmpresaId() empresaId: string,
     @Param('id') propostaId: string,
   ): Promise<{ success: boolean; message: string }> {
     try {
-      console.log(`🗑️ Removendo proposta: ${propostaId}`);
+      this.logger.log(`[PROPOSTAS] Removendo proposta: ${propostaId}`);
 
-      await this.propostasService.removerProposta(propostaId);
+      await this.propostasService.removerProposta(propostaId, empresaId);
 
       return {
         success: true,
         message: 'Proposta removida com sucesso',
       };
     } catch (error) {
-      console.error('❌ Erro ao remover proposta:', error);
+      this.logger.error('[PROPOSTAS] Erro ao remover proposta:', error);
 
       throw new HttpException(
         {

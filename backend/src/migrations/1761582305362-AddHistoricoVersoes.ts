@@ -19,6 +19,7 @@ export class AddHistoricoVersoes1761582305362 implements MigrationInterface {
     const atendimentoDemandasExists = await queryRunner.hasTable('atendimento_demandas');
     const canaisExists = await queryRunner.hasTable('canais');
     const fornecedoresExists = await queryRunner.hasTable('fornecedores');
+    const contratosExists = await queryRunner.hasTable('contratos');
 
     await queryRunner.query(
       `ALTER TABLE "contatos" DROP CONSTRAINT IF EXISTS "fk_contatos_cliente"`,
@@ -111,9 +112,11 @@ export class AddHistoricoVersoes1761582305362 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "atendente_atribuicoes" DROP CONSTRAINT IF EXISTS "fk_atendente_atribuicoes_departamento"`,
     );
-    await queryRunner.query(
-      `ALTER TABLE "contratos" DROP CONSTRAINT IF EXISTS "FK_contratos_proposta"`,
-    );
+    if (contratosExists) {
+      await queryRunner.query(
+        `ALTER TABLE "contratos" DROP CONSTRAINT IF EXISTS "FK_contratos_proposta"`,
+      );
+    }
     if (itensFaturaExists) {
       await queryRunner.query(
         `ALTER TABLE "itens_fatura" DROP CONSTRAINT IF EXISTS "itens_fatura_faturaId_fkey"`,
@@ -288,13 +291,17 @@ export class AddHistoricoVersoes1761582305362 implements MigrationInterface {
         `ALTER TABLE "pagamentos" DROP CONSTRAINT IF EXISTS "pagamentos_status_check"`,
       );
     }
-    await queryRunner.query(`ALTER TABLE "faturas" DROP CONSTRAINT IF EXISTS "faturas_tipo_check"`);
-    await queryRunner.query(
-      `ALTER TABLE "faturas" DROP CONSTRAINT IF EXISTS "faturas_status_check"`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "faturas" DROP CONSTRAINT IF EXISTS "faturas_formaPagamentoPreferida_check"`,
-    );
+    if (faturasExists) {
+      await queryRunner.query(
+        `ALTER TABLE "faturas" DROP CONSTRAINT IF EXISTS "faturas_tipo_check"`,
+      );
+      await queryRunner.query(
+        `ALTER TABLE "faturas" DROP CONSTRAINT IF EXISTS "faturas_status_check"`,
+      );
+      await queryRunner.query(
+        `ALTER TABLE "faturas" DROP CONSTRAINT IF EXISTS "faturas_formaPagamentoPreferida_check"`,
+      );
+    }
     if (contasPagarExists) {
       await queryRunner.query(
         `ALTER TABLE "contas_pagar" DROP CONSTRAINT IF EXISTS "contas_pagar_status_check"`,
@@ -361,15 +368,48 @@ export class AddHistoricoVersoes1761582305362 implements MigrationInterface {
     await queryRunner.query(
       `CREATE INDEX "IDX_c2c7135bba968bf7a704f83571" ON "itens_cotacao" ("cotacao_id") `,
     );
-    await queryRunner.query(
-      `CREATE TYPE "public"."cotacoes_status_enum" AS ENUM('rascunho', 'enviada', 'em_analise', 'aprovada', 'rejeitada', 'vencida', 'convertida', 'cancelada')`,
-    );
-    await queryRunner.query(
-      `CREATE TYPE "public"."cotacoes_prioridade_enum" AS ENUM('baixa', 'media', 'alta', 'urgente')`,
-    );
-    await queryRunner.query(
-      `CREATE TYPE "public"."cotacoes_origem_enum" AS ENUM('manual', 'website', 'email', 'telefone', 'whatsapp', 'indicacao')`,
-    );
+    await queryRunner.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_type t
+          JOIN pg_namespace n ON n.oid = t.typnamespace
+          WHERE t.typname = 'cotacoes_status_enum' AND n.nspname = 'public'
+        ) THEN
+          CREATE TYPE "public"."cotacoes_status_enum" AS ENUM('rascunho', 'enviada', 'em_analise', 'aprovada', 'rejeitada', 'vencida', 'convertida', 'cancelada');
+        END IF;
+      END
+      $$;
+    `);
+    await queryRunner.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_type t
+          JOIN pg_namespace n ON n.oid = t.typnamespace
+          WHERE t.typname = 'cotacoes_prioridade_enum' AND n.nspname = 'public'
+        ) THEN
+          CREATE TYPE "public"."cotacoes_prioridade_enum" AS ENUM('baixa', 'media', 'alta', 'urgente');
+        END IF;
+      END
+      $$;
+    `);
+    await queryRunner.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_type t
+          JOIN pg_namespace n ON n.oid = t.typnamespace
+          WHERE t.typname = 'cotacoes_origem_enum' AND n.nspname = 'public'
+        ) THEN
+          CREATE TYPE "public"."cotacoes_origem_enum" AS ENUM('manual', 'website', 'email', 'telefone', 'whatsapp', 'indicacao');
+        END IF;
+      END
+      $$;
+    `);
     await queryRunner.query(
       `CREATE TABLE "cotacoes" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "numero" character varying(20) NOT NULL, "titulo" character varying(200) NOT NULL, "descricao" text, "status" "public"."cotacoes_status_enum" NOT NULL DEFAULT 'rascunho', "prioridade" "public"."cotacoes_prioridade_enum" NOT NULL DEFAULT 'media', "origem" "public"."cotacoes_origem_enum" NOT NULL DEFAULT 'manual', "valorTotal" numeric(15,2) NOT NULL DEFAULT '0', "prazoResposta" date, "observacoes" text, "condicoesPagamento" text, "prazoEntrega" character varying(100), "localEntrega" character varying(200), "validadeOrcamento" integer DEFAULT '30', "fornecedor_id" uuid NOT NULL, "responsavel_id" uuid NOT NULL, "data_criacao" TIMESTAMP NOT NULL DEFAULT now(), "data_atualizacao" TIMESTAMP NOT NULL DEFAULT now(), "deletado_em" TIMESTAMP, "criado_por" uuid NOT NULL, "atualizado_por" uuid NOT NULL, "deletado_por" character varying, "data_envio" TIMESTAMP, "data_aprovacao" TIMESTAMP, "data_rejeicao" TIMESTAMP, "data_conversao" TIMESTAMP, "metadados" json, "desconto" numeric(5,2) DEFAULT '0', "valorDesconto" numeric(15,2) DEFAULT '0', "valorImposto" numeric(15,2) DEFAULT '0', "valorFrete" numeric(15,2) DEFAULT '0', "valorLiquido" numeric(15,2) DEFAULT '0', "moeda" character varying(100), "taxaCambio" numeric(10,4) DEFAULT '1', "versao" integer NOT NULL DEFAULT '1', "ultima_visualizacao" TIMESTAMP, "visualizado_por" character varying, "id_externo" character varying(100), "sistema_origem" character varying(100), "dados_sincronizacao" json, CONSTRAINT "UQ_a8cc61433ad56cc7353f281841c" UNIQUE ("numero"), CONSTRAINT "PK_5bf611a523f8c37582a65a767c0" PRIMARY KEY ("id"))`,
     );
@@ -406,18 +446,51 @@ export class AddHistoricoVersoes1761582305362 implements MigrationInterface {
     // await queryRunner.query(`CREATE INDEX "idx_triagem_logs_fluxo" ON "triagem_logs" ("fluxo_id") `);
     // await queryRunner.query(`CREATE INDEX "idx_triagem_logs_sessao" ON "triagem_logs" ("sessao_id") `);
     // await queryRunner.query(`CREATE INDEX "idx_triagem_logs_empresa" ON "triagem_logs" ("empresa_id") `);
-    await queryRunner.query(
-      `CREATE TYPE "public"."fluxos_automatizados_status_enum" AS ENUM('proposta_aceita', 'contrato_gerado', 'contrato_enviado', 'contrato_assinado', 'fatura_gerada', 'pagamento_processado', 'workflow_concluido', 'erro_processamento', 'pausado', 'cancelado')`,
-    );
+    await queryRunner.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_type t
+          JOIN pg_namespace n ON n.oid = t.typnamespace
+          WHERE t.typname = 'fluxos_automatizados_status_enum' AND n.nspname = 'public'
+        ) THEN
+          CREATE TYPE "public"."fluxos_automatizados_status_enum" AS ENUM('proposta_aceita', 'contrato_gerado', 'contrato_enviado', 'contrato_assinado', 'fatura_gerada', 'pagamento_processado', 'workflow_concluido', 'erro_processamento', 'pausado', 'cancelado');
+        END IF;
+      END
+      $$;
+    `);
     await queryRunner.query(
       `CREATE TABLE "fluxos_automatizados" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "numeroFluxo" character varying(50) NOT NULL, "propostaId" uuid NOT NULL, "contratoId" uuid, "faturaId" uuid, "status" "public"."fluxos_automatizados_status_enum" NOT NULL DEFAULT 'proposta_aceita', "etapaAtual" integer NOT NULL DEFAULT '1', "totalEtapas" integer NOT NULL DEFAULT '6', "dataInicio" TIMESTAMP, "dataConclusao" TIMESTAMP, "dataProximaAcao" TIMESTAMP, "tentativasProcessamento" integer NOT NULL DEFAULT '0', "maxTentativas" integer NOT NULL DEFAULT '3', "configuracoes" json, "metadados" json, "observacoes" text, "ultimoErro" text, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_0e1071330540eb38be4c823e94f" PRIMARY KEY ("id"))`,
     );
-    await queryRunner.query(
-      `CREATE TYPE "public"."eventos_fluxo_tipoevento_enum" AS ENUM('proposta_aceita', 'contrato_criado', 'contrato_enviado', 'contrato_assinado', 'fatura_criada', 'pagamento_recebido', 'erro_ocorrido', 'workflow_pausado', 'workflow_retomado', 'workflow_cancelado')`,
-    );
-    await queryRunner.query(
-      `CREATE TYPE "public"."eventos_fluxo_status_enum" AS ENUM('pendente', 'processando', 'concluido', 'erro', 'cancelado')`,
-    );
+    await queryRunner.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_type t
+          JOIN pg_namespace n ON n.oid = t.typnamespace
+          WHERE t.typname = 'eventos_fluxo_tipoevento_enum' AND n.nspname = 'public'
+        ) THEN
+          CREATE TYPE "public"."eventos_fluxo_tipoevento_enum" AS ENUM('proposta_aceita', 'contrato_criado', 'contrato_enviado', 'contrato_assinado', 'fatura_criada', 'pagamento_recebido', 'erro_ocorrido', 'workflow_pausado', 'workflow_retomado', 'workflow_cancelado');
+        END IF;
+      END
+      $$;
+    `);
+    await queryRunner.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_type t
+          JOIN pg_namespace n ON n.oid = t.typnamespace
+          WHERE t.typname = 'eventos_fluxo_status_enum' AND n.nspname = 'public'
+        ) THEN
+          CREATE TYPE "public"."eventos_fluxo_status_enum" AS ENUM('pendente', 'processando', 'concluido', 'erro', 'cancelado');
+        END IF;
+      END
+      $$;
+    `);
     await queryRunner.query(
       `CREATE TABLE "eventos_fluxo" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenantId" uuid NOT NULL, "fluxoId" uuid NOT NULL, "tipoEvento" "public"."eventos_fluxo_tipoevento_enum" NOT NULL, "status" "public"."eventos_fluxo_status_enum" NOT NULL DEFAULT 'pendente', "titulo" character varying(255) NOT NULL, "descricao" text, "dadosEvento" json, "dataProcessamento" TIMESTAMP, "dataAgendamento" TIMESTAMP, "tentativas" integer NOT NULL DEFAULT '0', "maxTentativas" integer NOT NULL DEFAULT '3', "ultimoErro" text, "processadoPor" character varying(100), "tempoProcessamento" integer, "resultadoProcessamento" json, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), "fluxo_id" uuid, CONSTRAINT "PK_c69e700eeef3232957ce795f8f8" PRIMARY KEY ("id"))`,
     );
@@ -427,21 +500,65 @@ export class AddHistoricoVersoes1761582305362 implements MigrationInterface {
     await queryRunner.query(
       `CREATE INDEX "IDX_006aec56cd22a82d0fe68a18d9" ON "eventos_fluxo" ("fluxoId", "createdAt") `,
     );
-    await queryRunner.query(
-      `CREATE TYPE "public"."assinaturas_contrato_tipo_enum" AS ENUM('digital', 'eletronica', 'presencial')`,
-    );
-    await queryRunner.query(
-      `CREATE TYPE "public"."assinaturas_contrato_status_enum" AS ENUM('pendente', 'assinado', 'rejeitado', 'expirado')`,
-    );
+    await queryRunner.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_type t
+          JOIN pg_namespace n ON n.oid = t.typnamespace
+          WHERE t.typname = 'assinaturas_contrato_tipo_enum' AND n.nspname = 'public'
+        ) THEN
+          CREATE TYPE "public"."assinaturas_contrato_tipo_enum" AS ENUM('digital', 'eletronica', 'presencial');
+        END IF;
+      END
+      $$;
+    `);
+    await queryRunner.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_type t
+          JOIN pg_namespace n ON n.oid = t.typnamespace
+          WHERE t.typname = 'assinaturas_contrato_status_enum' AND n.nspname = 'public'
+        ) THEN
+          CREATE TYPE "public"."assinaturas_contrato_status_enum" AS ENUM('pendente', 'assinado', 'rejeitado', 'expirado');
+        END IF;
+      END
+      $$;
+    `);
     await queryRunner.query(
       `CREATE TABLE "assinaturas_contrato" ("id" SERIAL NOT NULL, "contratoId" integer NOT NULL, "usuarioId" uuid NOT NULL, "tipo" "public"."assinaturas_contrato_tipo_enum" NOT NULL DEFAULT 'digital', "status" "public"."assinaturas_contrato_status_enum" NOT NULL DEFAULT 'pendente', "certificadoDigital" text, "hashAssinatura" text, "ipAssinatura" text, "userAgent" text, "dataAssinatura" TIMESTAMP, "motivoRejeicao" text, "metadados" json, "tokenValidacao" text, "dataEnvio" TIMESTAMP, "dataExpiracao" TIMESTAMP, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_95d00342a5061709eac02dc3276" PRIMARY KEY ("id"))`,
     );
-    await queryRunner.query(
-      `CREATE TYPE "public"."planos_cobranca_tiporecorrencia_enum" AS ENUM('mensal', 'trimestral', 'semestral', 'anual', 'personalizado')`,
-    );
-    await queryRunner.query(
-      `CREATE TYPE "public"."planos_cobranca_status_enum" AS ENUM('ativo', 'pausado', 'cancelado', 'expirado')`,
-    );
+    await queryRunner.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_type t
+          JOIN pg_namespace n ON n.oid = t.typnamespace
+          WHERE t.typname = 'planos_cobranca_tiporecorrencia_enum' AND n.nspname = 'public'
+        ) THEN
+          CREATE TYPE "public"."planos_cobranca_tiporecorrencia_enum" AS ENUM('mensal', 'trimestral', 'semestral', 'anual', 'personalizado');
+        END IF;
+      END
+      $$;
+    `);
+    await queryRunner.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_type t
+          JOIN pg_namespace n ON n.oid = t.typnamespace
+          WHERE t.typname = 'planos_cobranca_status_enum' AND n.nspname = 'public'
+        ) THEN
+          CREATE TYPE "public"."planos_cobranca_status_enum" AS ENUM('ativo', 'pausado', 'cancelado', 'expirado');
+        END IF;
+      END
+      $$;
+    `);
     await queryRunner.query(
       `CREATE TABLE "planos_cobranca" ("id" SERIAL NOT NULL, "codigo" character varying NOT NULL, "contratoId" integer NOT NULL, "clienteId" uuid NOT NULL, "usuarioResponsavelId" uuid NOT NULL, "nome" text NOT NULL, "descricao" text, "tipoRecorrencia" "public"."planos_cobranca_tiporecorrencia_enum" NOT NULL DEFAULT 'mensal', "intervaloRecorrencia" integer NOT NULL DEFAULT '1', "status" "public"."planos_cobranca_status_enum" NOT NULL DEFAULT 'ativo', "valorRecorrente" numeric(10,2) NOT NULL, "diaVencimento" integer NOT NULL DEFAULT '5', "dataInicio" date NOT NULL, "dataFim" date, "proximaCobranca" date, "limiteCiclos" integer, "ciclosExecutados" integer NOT NULL DEFAULT '0', "jurosAtraso" numeric(5,2) NOT NULL DEFAULT '2', "multaAtraso" numeric(5,2) NOT NULL DEFAULT '10', "diasTolerancia" integer NOT NULL DEFAULT '5', "enviarLembrete" boolean NOT NULL DEFAULT true, "diasAntesLembrete" integer NOT NULL DEFAULT '3', "configuracoes" json, "ativo" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_fbf6f251734e26df72e77cc29f4" UNIQUE ("codigo"), CONSTRAINT "PK_701b3c93f0c885abac88f856f5d" PRIMARY KEY ("id"))`,
     );
@@ -491,7 +608,9 @@ export class AddHistoricoVersoes1761582305362 implements MigrationInterface {
       `ALTER TABLE "atendimento_tickets" DROP COLUMN IF EXISTS "proposta_id"`,
     );
     await queryRunner.query(`ALTER TABLE "atendimento_tickets" DROP COLUMN IF EXISTS "fatura_id"`);
-    await queryRunner.query(`ALTER TABLE "faturas" DROP COLUMN IF EXISTS "clienteId_old_numeric"`);
+    if (faturasExists) {
+      await queryRunner.query(`ALTER TABLE "faturas" DROP COLUMN IF EXISTS "clienteId_old_numeric"`);
+    }
     if (contasPagarExists) {
       await queryRunner.query(
         `ALTER TABLE "contas_pagar" DROP COLUMN IF EXISTS "valor_pago" CASCADE`,
@@ -680,29 +799,54 @@ export class AddHistoricoVersoes1761582305362 implements MigrationInterface {
       await queryRunner.query(`ALTER TABLE "faturas" ADD "atualizadoPor" uuid`);
     }
 
-    // Verificar nomenclatura de colunas em contatos (pode ser camelCase ou snake_case)
-    const contatosColumns = await queryRunner.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'contatos' 
-      AND column_name IN ('createdAt', 'created_at', 'updatedAt', 'updated_at', 'cargo', 'ativo', 'principal', 'clienteId')
-    `);
-    const hasCreatedAt = contatosColumns.some((col: any) => col.column_name === 'createdAt');
-    const hasUpdatedAt = contatosColumns.some((col: any) => col.column_name === 'updatedAt');
-    const hasCargo = contatosColumns.some((col: any) => col.column_name === 'cargo');
+    // Verificar nomenclatura/colunas em contatos antes de ALTER/COMMENT
+    const contatosExists = await queryRunner.hasTable('contatos');
+    if (contatosExists) {
+      const contatosColumns = await queryRunner.query(`
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name = 'contatos'
+        AND column_name IN (
+          'createdAt', 'created_at',
+          'updatedAt', 'updated_at',
+          'cargo', 'ativo', 'principal', 'clienteId'
+        )
+      `);
 
-    if (hasCargo) {
-      await queryRunner.query(`COMMENT ON COLUMN "contatos"."cargo" IS NULL`);
-    }
-    await queryRunner.query(`ALTER TABLE "contatos" ALTER COLUMN "ativo" SET NOT NULL`);
-    await queryRunner.query(`ALTER TABLE "contatos" ALTER COLUMN "principal" SET NOT NULL`);
-    await queryRunner.query(`COMMENT ON COLUMN "contatos"."principal" IS NULL`);
-    await queryRunner.query(`COMMENT ON COLUMN "contatos"."clienteId" IS NULL`);
-    if (hasCreatedAt) {
-      await queryRunner.query(`ALTER TABLE "contatos" ALTER COLUMN "createdAt" SET NOT NULL`);
-    }
-    if (hasUpdatedAt) {
-      await queryRunner.query(`ALTER TABLE "contatos" ALTER COLUMN "updatedAt" SET NOT NULL`);
+      const hasAtivo = contatosColumns.some((col: any) => col.column_name === 'ativo');
+      const hasPrincipal = contatosColumns.some((col: any) => col.column_name === 'principal');
+      const hasClienteId = contatosColumns.some((col: any) => col.column_name === 'clienteId');
+      const hasCargo = contatosColumns.some((col: any) => col.column_name === 'cargo');
+      const hasCreatedAt = contatosColumns.some((col: any) => col.column_name === 'createdAt');
+      const hasCreatedAtSnake = contatosColumns.some((col: any) => col.column_name === 'created_at');
+      const hasUpdatedAt = contatosColumns.some((col: any) => col.column_name === 'updatedAt');
+      const hasUpdatedAtSnake = contatosColumns.some((col: any) => col.column_name === 'updated_at');
+
+      if (hasCargo) {
+        await queryRunner.query(`COMMENT ON COLUMN "contatos"."cargo" IS NULL`);
+      }
+      if (hasAtivo) {
+        await queryRunner.query(`ALTER TABLE "contatos" ALTER COLUMN "ativo" SET NOT NULL`);
+      }
+      if (hasPrincipal) {
+        await queryRunner.query(`ALTER TABLE "contatos" ALTER COLUMN "principal" SET NOT NULL`);
+        await queryRunner.query(`COMMENT ON COLUMN "contatos"."principal" IS NULL`);
+      }
+      if (hasClienteId) {
+        await queryRunner.query(`COMMENT ON COLUMN "contatos"."clienteId" IS NULL`);
+      }
+      if (hasCreatedAt) {
+        await queryRunner.query(`ALTER TABLE "contatos" ALTER COLUMN "createdAt" SET NOT NULL`);
+      }
+      if (hasCreatedAtSnake) {
+        await queryRunner.query(`ALTER TABLE "contatos" ALTER COLUMN "created_at" SET NOT NULL`);
+      }
+      if (hasUpdatedAt) {
+        await queryRunner.query(`ALTER TABLE "contatos" ALTER COLUMN "updatedAt" SET NOT NULL`);
+      }
+      if (hasUpdatedAtSnake) {
+        await queryRunner.query(`ALTER TABLE "contatos" ALTER COLUMN "updated_at" SET NOT NULL`);
+      }
     }
     if (fornecedoresExists) {
       await queryRunner.query(
@@ -736,8 +880,8 @@ export class AddHistoricoVersoes1761582305362 implements MigrationInterface {
 
     // Verificar quais colunas existem em fluxos_triagem antes de ALTER
     const fluxosTriagemColumns = await queryRunner.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
+      SELECT column_name
+      FROM information_schema.columns
       WHERE table_name = 'fluxos_triagem'
     `);
     const fluxosTriagemColumnNames = fluxosTriagemColumns.map((col: any) => col.column_name);
@@ -756,9 +900,29 @@ export class AddHistoricoVersoes1761582305362 implements MigrationInterface {
     }
     if (fluxosTriagemColumnNames.includes('canais')) {
       await queryRunner.query(`ALTER TABLE "fluxos_triagem" ALTER COLUMN "canais" SET NOT NULL`);
-      await queryRunner.query(
-        `ALTER TABLE "fluxos_triagem" ALTER COLUMN "canais" SET DEFAULT '["whatsapp"]'`,
-      );
+
+      const canaisType = await queryRunner.query(`
+        SELECT data_type
+        FROM information_schema.columns
+        WHERE table_name = 'fluxos_triagem'
+          AND column_name = 'canais'
+        LIMIT 1
+      `);
+      const canaisDataType = canaisType?.[0]?.data_type as string | undefined;
+
+      if (canaisDataType === 'ARRAY') {
+        await queryRunner.query(
+          `ALTER TABLE "fluxos_triagem" ALTER COLUMN "canais" SET DEFAULT ARRAY['whatsapp']`,
+        );
+      } else if (canaisDataType === 'jsonb') {
+        await queryRunner.query(
+          `ALTER TABLE "fluxos_triagem" ALTER COLUMN "canais" SET DEFAULT '["whatsapp"]'::jsonb`,
+        );
+      } else if (canaisDataType === 'json') {
+        await queryRunner.query(
+          `ALTER TABLE "fluxos_triagem" ALTER COLUMN "canais" SET DEFAULT '["whatsapp"]'::json`,
+        );
+      }
     }
     if (fluxosTriagemColumnNames.includes('palavras_gatilho')) {
       await queryRunner.query(
@@ -831,8 +995,8 @@ export class AddHistoricoVersoes1761582305362 implements MigrationInterface {
 
     // Verificar quais colunas existem em nucleos_atendimento
     const nucleosAtendimentoColumns = await queryRunner.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
+      SELECT column_name
+      FROM information_schema.columns
       WHERE table_name = 'nucleos_atendimento'
     `);
     const nucleosColumnNames = nucleosAtendimentoColumns.map((col: any) => col.column_name);
@@ -952,8 +1116,8 @@ export class AddHistoricoVersoes1761582305362 implements MigrationInterface {
 
     // Verificar quais colunas existem em sessoes_triagem
     const sessoesTriagemColumns = await queryRunner.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
+      SELECT column_name
+      FROM information_schema.columns
       WHERE table_name = 'sessoes_triagem'
     `);
     const sessoesColumnNames = sessoesTriagemColumns.map((col: any) => col.column_name);
@@ -1073,28 +1237,30 @@ export class AddHistoricoVersoes1761582305362 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "atendente_atribuicoes" ALTER COLUMN "updated_at" SET NOT NULL`,
     );
-    const clienteIdColumn = await queryRunner.query(
-      `SELECT data_type FROM information_schema.columns WHERE table_name = 'contratos' AND column_name = 'clienteId'`,
-    );
-    if (clienteIdColumn.length > 0 && clienteIdColumn[0]?.data_type !== 'uuid') {
-      const mappingExists = await queryRunner.query(
-        `SELECT to_regclass('public.cliente_id_mapping') as reg`,
+    if (contratosExists) {
+      const clienteIdColumn = await queryRunner.query(
+        `SELECT data_type FROM information_schema.columns WHERE table_name = 'contratos' AND column_name = 'clienteId'`,
       );
-      await queryRunner.query(`ALTER TABLE "contratos" ADD "clienteId_uuid" uuid`);
-      if (mappingExists?.[0]?.reg) {
+      if (clienteIdColumn.length > 0 && clienteIdColumn[0]?.data_type !== 'uuid') {
+        const mappingExists = await queryRunner.query(
+          `SELECT to_regclass('public.cliente_id_mapping') as reg`,
+        );
+        await queryRunner.query(`ALTER TABLE "contratos" ADD "clienteId_uuid" uuid`);
+        if (mappingExists?.[0]?.reg) {
+          await queryRunner.query(
+            `UPDATE "contratos" c SET "clienteId_uuid" = cim.cliente_uuid FROM cliente_id_mapping cim WHERE c."clienteId" = cim.numeric_id`,
+          );
+        }
         await queryRunner.query(
-          `UPDATE "contratos" c SET "clienteId_uuid" = cim.cliente_uuid FROM cliente_id_mapping cim WHERE c."clienteId" = cim.numeric_id`,
+          `UPDATE "contratos" SET "clienteId_uuid" = uuid_generate_v4() WHERE "clienteId_uuid" IS NULL`,
+        );
+        await queryRunner.query(`ALTER TABLE "contratos" DROP COLUMN "clienteId"`);
+        await queryRunner.query(
+          `ALTER TABLE "contratos" RENAME COLUMN "clienteId_uuid" TO "clienteId"`,
         );
       }
-      await queryRunner.query(
-        `UPDATE "contratos" SET "clienteId_uuid" = uuid_generate_v4() WHERE "clienteId_uuid" IS NULL`,
-      );
-      await queryRunner.query(`ALTER TABLE "contratos" DROP COLUMN "clienteId"`);
-      await queryRunner.query(
-        `ALTER TABLE "contratos" RENAME COLUMN "clienteId_uuid" TO "clienteId"`,
-      );
+      await queryRunner.query(`ALTER TABLE "contratos" ALTER COLUMN "clienteId" SET NOT NULL`);
     }
-    await queryRunner.query(`ALTER TABLE "contratos" ALTER COLUMN "clienteId" SET NOT NULL`);
     if (itensFaturaExists) {
       await queryRunner.query(
         `ALTER TABLE "itens_fatura" ALTER COLUMN "percentualDesconto" SET NOT NULL`,
@@ -1105,16 +1271,28 @@ export class AddHistoricoVersoes1761582305362 implements MigrationInterface {
     }
     if (pagamentosExists) {
       await queryRunner.query(`ALTER TABLE "pagamentos" DROP COLUMN "tipo"`);
-      await queryRunner.query(
-        `CREATE TYPE "public"."pagamentos_tipo_enum" AS ENUM('pagamento', 'estorno', 'ajuste', 'desconto')`,
-      );
+      await queryRunner.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'pagamentos_tipo_enum') THEN
+            CREATE TYPE "public"."pagamentos_tipo_enum" AS ENUM('pagamento', 'estorno', 'ajuste', 'desconto');
+          END IF;
+        END
+        $$;
+      `);
       await queryRunner.query(
         `ALTER TABLE "pagamentos" ADD "tipo" "public"."pagamentos_tipo_enum" NOT NULL DEFAULT 'pagamento'`,
       );
       await queryRunner.query(`ALTER TABLE "pagamentos" DROP COLUMN "status"`);
-      await queryRunner.query(
-        `CREATE TYPE "public"."pagamentos_status_enum" AS ENUM('pendente', 'processando', 'aprovado', 'rejeitado', 'cancelado', 'estornado')`,
-      );
+      await queryRunner.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'pagamentos_status_enum') THEN
+            CREATE TYPE "public"."pagamentos_status_enum" AS ENUM('pendente', 'processando', 'aprovado', 'rejeitado', 'cancelado', 'estornado');
+          END IF;
+        END
+        $$;
+      `);
       await queryRunner.query(
         `ALTER TABLE "pagamentos" ADD "status" "public"."pagamentos_status_enum" NOT NULL DEFAULT 'pendente'`,
       );
@@ -1126,86 +1304,88 @@ export class AddHistoricoVersoes1761582305362 implements MigrationInterface {
         `ALTER TABLE "pagamentos" ALTER COLUMN "createdAt" SET DEFAULT now()`,
       );
     }
-    await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "contratoId" SET NOT NULL`);
-    await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "clienteId" SET NOT NULL`);
-    await queryRunner.query(`ALTER TABLE "faturas" DROP COLUMN IF EXISTS "tipo"`);
-    await queryRunner.query(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'faturas_tipo_enum') THEN
-          CREATE TYPE "public"."faturas_tipo_enum" AS ENUM('unica', 'recorrente', 'parcela', 'adicional');
-        END IF;
-      END
-      $$;
-    `);
-    await queryRunner.query(
-      `ALTER TABLE "faturas" ADD COLUMN IF NOT EXISTS "tipo" "public"."faturas_tipo_enum" NOT NULL DEFAULT 'unica'`,
-    );
-    await queryRunner.query(`ALTER TABLE "faturas" DROP COLUMN IF EXISTS "status"`);
-    await queryRunner.query(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'faturas_status_enum') THEN
-          CREATE TYPE "public"."faturas_status_enum" AS ENUM('pendente', 'enviada', 'paga', 'vencida', 'cancelada', 'parcialmente_paga');
-        END IF;
-      END
-      $$;
-    `);
-    await queryRunner.query(
-      `ALTER TABLE "faturas" ADD COLUMN IF NOT EXISTS "status" "public"."faturas_status_enum" NOT NULL DEFAULT 'pendente'`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "faturas" DROP COLUMN IF EXISTS "formaPagamentoPreferida"`,
-    );
-    await queryRunner.query(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'faturas_formapagamentopreferida_enum') THEN
-          CREATE TYPE "public"."faturas_formapagamentopreferida_enum" AS ENUM('pix', 'cartao_credito', 'cartao_debito', 'boleto', 'transferencia', 'dinheiro');
-        END IF;
-      END
-      $$;
-    `);
-    await queryRunner.query(
-      `ALTER TABLE "faturas" ADD COLUMN IF NOT EXISTS "formaPagamentoPreferida" "public"."faturas_formapagamentopreferida_enum"`,
-    );
 
-    // Verificar colunas existentes em faturas antes de ALTER COLUMN
     const faturasColumnNames = (
       await queryRunner.query(`
-      SELECT column_name
-      FROM information_schema.columns
-      WHERE table_name = 'faturas'
-      AND column_name IN ('valorPago', 'valorDesconto', 'valorJuros', 'valorMulta', 'metadados', 'ativo', 'createdAt', 'updatedAt', 'valorTotal', 'clienteId')
-    `)
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name = 'faturas'
+          AND column_name IN ('valorPago', 'valorDesconto', 'valorJuros', 'valorMulta', 'metadados', 'ativo', 'createdAt', 'updatedAt', 'valorTotal', 'clienteId')
+      `)
     ).map((row: any) => row.column_name);
 
-    if (faturasColumnNames.includes('valorPago')) {
-      await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "valorPago" SET NOT NULL`);
-    }
-    if (faturasColumnNames.includes('valorDesconto')) {
-      await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "valorDesconto" SET NOT NULL`);
-    }
-    if (faturasColumnNames.includes('valorJuros')) {
-      await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "valorJuros" SET NOT NULL`);
-    }
-    if (faturasColumnNames.includes('valorMulta')) {
-      await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "valorMulta" SET NOT NULL`);
-    }
-    if (faturasColumnNames.includes('metadados')) {
-      await queryRunner.query(`ALTER TABLE "faturas" DROP COLUMN "metadados"`);
-      await queryRunner.query(`ALTER TABLE "faturas" ADD "metadados" json`);
-    }
-    if (faturasColumnNames.includes('ativo')) {
-      await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "ativo" SET NOT NULL`);
-    }
-    if (faturasColumnNames.includes('createdAt')) {
-      await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "createdAt" SET NOT NULL`);
-      await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "createdAt" SET DEFAULT now()`);
-    }
-    if (faturasColumnNames.includes('updatedAt')) {
-      await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "updatedAt" SET NOT NULL`);
-      await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "updatedAt" SET DEFAULT now()`);
+    if (faturasExists) {
+      await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "contratoId" SET NOT NULL`);
+      await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "clienteId" SET NOT NULL`);
+      await queryRunner.query(`ALTER TABLE "faturas" DROP COLUMN IF EXISTS "tipo"`);
+      await queryRunner.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'faturas_tipo_enum') THEN
+            CREATE TYPE "public"."faturas_tipo_enum" AS ENUM('unica', 'recorrente', 'parcela', 'adicional');
+          END IF;
+        END
+        $$;
+      `);
+      await queryRunner.query(
+        `ALTER TABLE "faturas" ADD COLUMN IF NOT EXISTS "tipo" "public"."faturas_tipo_enum" NOT NULL DEFAULT 'unica'`,
+      );
+      await queryRunner.query(`ALTER TABLE "faturas" DROP COLUMN IF EXISTS "status"`);
+      await queryRunner.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'faturas_status_enum') THEN
+            CREATE TYPE "public"."faturas_status_enum" AS ENUM('pendente', 'enviada', 'paga', 'vencida', 'cancelada', 'parcialmente_paga');
+          END IF;
+        END
+        $$;
+      `);
+      await queryRunner.query(
+        `ALTER TABLE "faturas" ADD COLUMN IF NOT EXISTS "status" "public"."faturas_status_enum" NOT NULL DEFAULT 'pendente'`,
+      );
+      await queryRunner.query(
+        `ALTER TABLE "faturas" DROP COLUMN IF EXISTS "formaPagamentoPreferida"`,
+      );
+      await queryRunner.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'faturas_formapagamentopreferida_enum') THEN
+            CREATE TYPE "public"."faturas_formapagamentopreferida_enum" AS ENUM('pix', 'cartao_credito', 'cartao_debito', 'boleto', 'transferencia', 'dinheiro');
+          END IF;
+        END
+        $$;
+      `);
+      await queryRunner.query(
+        `ALTER TABLE "faturas" ADD COLUMN IF NOT EXISTS "formaPagamentoPreferida" "public"."faturas_formapagamentopreferida_enum"`,
+      );
+
+      if (faturasColumnNames.includes('valorPago')) {
+        await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "valorPago" SET NOT NULL`);
+      }
+      if (faturasColumnNames.includes('valorDesconto')) {
+        await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "valorDesconto" SET NOT NULL`);
+      }
+      if (faturasColumnNames.includes('valorJuros')) {
+        await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "valorJuros" SET NOT NULL`);
+      }
+      if (faturasColumnNames.includes('valorMulta')) {
+        await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "valorMulta" SET NOT NULL`);
+      }
+      if (faturasColumnNames.includes('metadados')) {
+        await queryRunner.query(`ALTER TABLE "faturas" DROP COLUMN "metadados"`);
+        await queryRunner.query(`ALTER TABLE "faturas" ADD "metadados" json`);
+      }
+      if (faturasColumnNames.includes('ativo')) {
+        await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "ativo" SET NOT NULL`);
+      }
+      if (faturasColumnNames.includes('createdAt')) {
+        await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "createdAt" SET NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "createdAt" SET DEFAULT now()`);
+      }
+      if (faturasColumnNames.includes('updatedAt')) {
+        await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "updatedAt" SET NOT NULL`);
+        await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "updatedAt" SET DEFAULT now()`);
+      }
     }
     if (contasPagarExists) {
       const contasPagarDescricaoColumn = await queryRunner.query(
@@ -1841,14 +2021,14 @@ export class AddHistoricoVersoes1761582305362 implements MigrationInterface {
     // contratos.id é uuid, mas assinaturas_contrato.contratoId e planos_cobranca.contratoId são integer
     // Só criar se os tipos forem compatíveis
     const contratosIdType = await queryRunner.query(`
-      SELECT data_type 
-      FROM information_schema.columns 
+      SELECT data_type
+      FROM information_schema.columns
       WHERE table_name = 'contratos' AND column_name = 'id'
     `);
 
     const assinaturasContratoIdType = await queryRunner.query(`
-      SELECT data_type 
-      FROM information_schema.columns 
+      SELECT data_type
+      FROM information_schema.columns
       WHERE table_name = 'assinaturas_contrato' AND column_name = 'contratoId'
     `);
 
@@ -1868,9 +2048,9 @@ export class AddHistoricoVersoes1761582305362 implements MigrationInterface {
 
     // Verificar colunas existentes em contratos para FKs
     const contratosColumns = await queryRunner.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'contratos' 
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = 'contratos'
       AND column_name IN ('propostaId', 'usuarioResponsavelId')
     `);
     const contratosColNames = contratosColumns.map((c) => c.column_name);
@@ -1904,14 +2084,14 @@ export class AddHistoricoVersoes1761582305362 implements MigrationInterface {
     if (faturasExists) {
       // Verificar colunas que existem em faturas para FK
       const faturasColumnsForFK = await queryRunner.query(`
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'faturas' 
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name = 'faturas'
         AND column_name IN ('contratoId', 'clienteId', 'usuarioResponsavelId')
       `);
       const faturasColForFK = faturasColumnsForFK.map((c) => c.column_name);
 
-      if (faturasColForFK.includes('contratoId')) {
+      if (faturasColForFK.includes('contratoId') && contratosExists) {
         await queryRunner.query(
           `ALTER TABLE "faturas" ADD CONSTRAINT "FK_9b8490bce74e62adb498b5ccbb6" FOREIGN KEY ("contratoId") REFERENCES "contratos"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
         );
@@ -1930,8 +2110,8 @@ export class AddHistoricoVersoes1761582305362 implements MigrationInterface {
 
     // Foreign key planos_cobranca -> contratos (verificar compatibilidade de tipos)
     const planosCobrancaContratoIdType = await queryRunner.query(`
-      SELECT data_type 
-      FROM information_schema.columns 
+      SELECT data_type
+      FROM information_schema.columns
       WHERE table_name = 'planos_cobranca' AND column_name = 'contratoId'
     `);
 
@@ -1947,8 +2127,8 @@ export class AddHistoricoVersoes1761582305362 implements MigrationInterface {
 
     // Verificar se usuarioResponsavelId existe em planos_cobranca
     const planosCobrancaColumns = await queryRunner.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
+      SELECT column_name
+      FROM information_schema.columns
       WHERE table_name = 'planos_cobranca' AND column_name = 'usuarioResponsavelId'
     `);
 

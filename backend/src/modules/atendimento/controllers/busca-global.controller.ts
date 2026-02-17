@@ -1,10 +1,12 @@
 import { Controller, Post, Body, UseGuards, Logger } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { EmpresaId } from '../../../common/decorators/empresa.decorator';
 import { BuscaGlobalService } from '../services/busca-global.service';
 import { BuscaGlobalRequestDto, BuscaGlobalResponseDto } from '../dto/busca-global.dto';
 
 @Controller('api/atendimento/busca-global')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class BuscaGlobalController {
   private readonly logger = new Logger(BuscaGlobalController.name);
 
@@ -15,9 +17,12 @@ export class BuscaGlobalController {
    * Realizar busca global em múltiplas entidades
    */
   @Post()
-  async buscar(@Body() dto: BuscaGlobalRequestDto): Promise<BuscaGlobalResponseDto> {
+  async buscar(
+    @EmpresaId() empresaId: string,
+    @Body() dto: BuscaGlobalRequestDto,
+  ): Promise<BuscaGlobalResponseDto> {
     this.logger.log(`🔍 POST /api/atendimento/busca-global: query="${dto.query}"`);
 
-    return this.buscaGlobalService.buscar(dto);
+    return this.buscaGlobalService.buscar(dto, empresaId);
   }
 }

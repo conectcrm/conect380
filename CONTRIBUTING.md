@@ -212,48 +212,23 @@ Usuários precisam fazer logout/login após deploy."
 
 ### Template de PR
 
-```markdown
-## 📋 Descrição
+Use sempre o template oficial em:
+- `.github/pull_request_template.md`
+- O preenchimento e validado automaticamente pelo workflow `.github/workflows/pr-template-guardrails.yml`.
 
-Breve descrição do que foi implementado/corrigido.
+Regras obrigatorias para PR com frontend:
+- Classificar a tela em Tipo A, B, C, D ou E.
+- Declarar se usou template padrao ou layout especifico.
+- Se usar layout especifico, justificar no proprio PR.
+- Validar checklist de UX minimo (loading, empty, erro, feedback, responsividade e acessibilidade).
 
-## 🎯 Tipo de mudança
-
-- [ ] 🚀 Nova feature
-- [ ] 🐛 Bugfix
-- [ ] 📝 Documentação
-- [ ] 🎨 Refatoração
-- [ ] ⚡ Performance
-- [ ] 🔒 Segurança
-
-## ✅ Checklist
-
-- [ ] Código segue os padrões do projeto
-- [ ] Testes escritos e passando
-- [ ] Documentação atualizada
-- [ ] Branch atualizada com main
-- [ ] Sem conflitos
-
-## 🧪 Como testar
-
-1. Passo a passo para testar a mudança
-2. Cenários de teste
-3. Comportamento esperado
-
-## 📸 Screenshots (se aplicável)
-
-(antes/depois para mudanças visuais)
-
-## 🔗 Issues relacionadas
-
-Closes #123
-Refs #456
-```
+Referencia de UX/padronizacao:
+- `frontend-web/src/components/templates/GUIA_PADRONIZACAO.md`
 
 ### Processo de Review
 
 1. **Auto-review**: Revise seu próprio código antes de criar o PR
-2. **Descrição completa**: Preencha o template completamente
+2. **Descrição completa**: Preencha o template oficial completamente
 3. **Testes**: Garanta que todos os testes passam
 4. **CI/CD**: Aguarde pipelines passarem
 5. **Feedback**: Responda aos comentários prontamente

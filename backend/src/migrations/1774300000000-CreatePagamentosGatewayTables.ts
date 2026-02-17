@@ -4,18 +4,54 @@ export class CreatePagamentosGatewayTables1774300000000 implements MigrationInte
   name = 'CreatePagamentosGatewayTables1774300000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `CREATE TYPE "public"."config_gateway_gateway_enum" AS ENUM('mercado_pago', 'stripe', 'pagseguro')`,
-    );
-    await queryRunner.query(
-      `CREATE TYPE "public"."config_gateway_modo_enum" AS ENUM('sandbox', 'producao')`,
-    );
-    await queryRunner.query(
-      `CREATE TYPE "public"."config_gateway_status_enum" AS ENUM('ativo', 'inativo', 'erro')`,
-    );
+    await queryRunner.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_type t
+          JOIN pg_namespace n ON n.oid = t.typnamespace
+          WHERE n.nspname = 'public'
+            AND t.typname = 'config_gateway_gateway_enum'
+        ) THEN
+          EXECUTE 'CREATE TYPE "public"."config_gateway_gateway_enum" AS ENUM(''mercado_pago'', ''stripe'', ''pagseguro'')';
+        END IF;
+      END
+      $$;
+    `);
+    await queryRunner.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_type t
+          JOIN pg_namespace n ON n.oid = t.typnamespace
+          WHERE n.nspname = 'public'
+            AND t.typname = 'config_gateway_modo_enum'
+        ) THEN
+          EXECUTE 'CREATE TYPE "public"."config_gateway_modo_enum" AS ENUM(''sandbox'', ''producao'')';
+        END IF;
+      END
+      $$;
+    `);
+    await queryRunner.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_type t
+          JOIN pg_namespace n ON n.oid = t.typnamespace
+          WHERE n.nspname = 'public'
+            AND t.typname = 'config_gateway_status_enum'
+        ) THEN
+          EXECUTE 'CREATE TYPE "public"."config_gateway_status_enum" AS ENUM(''ativo'', ''inativo'', ''erro'')';
+        END IF;
+      END
+      $$;
+    `);
 
     await queryRunner.query(`
-      CREATE TABLE "configuracoes_gateway_pagamento" (
+      CREATE TABLE IF NOT EXISTS "configuracoes_gateway_pagamento" (
         "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
         "empresa_id" uuid NOT NULL,
         "nome" character varying(120) NOT NULL,
@@ -38,29 +74,73 @@ export class CreatePagamentosGatewayTables1774300000000 implements MigrationInte
     `);
 
     await queryRunner.query(
-      `CREATE INDEX "IDX_configuracoes_gateway_empresa" ON "configuracoes_gateway_pagamento" ("empresa_id")`,
+      `CREATE INDEX IF NOT EXISTS "IDX_configuracoes_gateway_empresa" ON "configuracoes_gateway_pagamento" ("empresa_id")`,
     );
     await queryRunner.query(
-      `CREATE UNIQUE INDEX "UQ_config_gateway_empresa_tipo_modo" ON "configuracoes_gateway_pagamento" ("empresa_id", "gateway", "modo_operacao")`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS "UQ_config_gateway_empresa_tipo_modo" ON "configuracoes_gateway_pagamento" ("empresa_id", "gateway", "modo_operacao")`,
     );
 
     await queryRunner.query(`
-      ALTER TABLE "configuracoes_gateway_pagamento"
-      ADD CONSTRAINT "FK_config_gateway_empresa" FOREIGN KEY ("empresa_id") REFERENCES "empresas"("id") ON DELETE CASCADE ON UPDATE NO ACTION
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'FK_config_gateway_empresa'
+        ) THEN
+          ALTER TABLE "configuracoes_gateway_pagamento"
+          ADD CONSTRAINT "FK_config_gateway_empresa" FOREIGN KEY ("empresa_id") REFERENCES "empresas"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+        END IF;
+      END
+      $$;
     `);
 
-    await queryRunner.query(
-      `CREATE TYPE "public"."transacao_gateway_status_enum" AS ENUM('pendente', 'processando', 'aprovado', 'recusado', 'cancelado', 'erro')`,
-    );
-    await queryRunner.query(
-      `CREATE TYPE "public"."transacao_gateway_operacao_enum" AS ENUM('cobranca', 'estorno', 'webhook', 'validacao')`,
-    );
-    await queryRunner.query(
-      `CREATE TYPE "public"."transacao_gateway_metodo_enum" AS ENUM('pix', 'cartao_credito', 'cartao_debito', 'boleto', 'link_pagamento', 'transferencia')`,
-    );
+    await queryRunner.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_type t
+          JOIN pg_namespace n ON n.oid = t.typnamespace
+          WHERE n.nspname = 'public'
+            AND t.typname = 'transacao_gateway_status_enum'
+        ) THEN
+          EXECUTE 'CREATE TYPE "public"."transacao_gateway_status_enum" AS ENUM(''pendente'', ''processando'', ''aprovado'', ''recusado'', ''cancelado'', ''erro'')';
+        END IF;
+      END
+      $$;
+    `);
+    await queryRunner.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_type t
+          JOIN pg_namespace n ON n.oid = t.typnamespace
+          WHERE n.nspname = 'public'
+            AND t.typname = 'transacao_gateway_operacao_enum'
+        ) THEN
+          EXECUTE 'CREATE TYPE "public"."transacao_gateway_operacao_enum" AS ENUM(''cobranca'', ''estorno'', ''webhook'', ''validacao'')';
+        END IF;
+      END
+      $$;
+    `);
+    await queryRunner.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_type t
+          JOIN pg_namespace n ON n.oid = t.typnamespace
+          WHERE n.nspname = 'public'
+            AND t.typname = 'transacao_gateway_metodo_enum'
+        ) THEN
+          EXECUTE 'CREATE TYPE "public"."transacao_gateway_metodo_enum" AS ENUM(''pix'', ''cartao_credito'', ''cartao_debito'', ''boleto'', ''link_pagamento'', ''transferencia'')';
+        END IF;
+      END
+      $$;
+    `);
 
     await queryRunner.query(`
-      CREATE TABLE "transacoes_gateway_pagamento" (
+      CREATE TABLE IF NOT EXISTS "transacoes_gateway_pagamento" (
         "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
         "empresa_id" uuid NOT NULL,
         "configuracao_id" uuid NOT NULL,
@@ -85,73 +165,107 @@ export class CreatePagamentosGatewayTables1774300000000 implements MigrationInte
     `);
 
     await queryRunner.query(
-      `CREATE INDEX "IDX_transacoes_gateway_empresa" ON "transacoes_gateway_pagamento" ("empresa_id")`,
+      `CREATE INDEX IF NOT EXISTS "IDX_transacoes_gateway_empresa" ON "transacoes_gateway_pagamento" ("empresa_id")`,
     );
     await queryRunner.query(
-      `CREATE UNIQUE INDEX "UQ_transacoes_gateway_referencia" ON "transacoes_gateway_pagamento" ("empresa_id", "referencia_gateway")`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS "UQ_transacoes_gateway_referencia" ON "transacoes_gateway_pagamento" ("empresa_id", "referencia_gateway")`,
     );
     await queryRunner.query(
-      `CREATE INDEX "IDX_transacoes_gateway_config" ON "transacoes_gateway_pagamento" ("configuracao_id")`,
+      `CREATE INDEX IF NOT EXISTS "IDX_transacoes_gateway_config" ON "transacoes_gateway_pagamento" ("configuracao_id")`,
     );
     await queryRunner.query(
-      `CREATE INDEX "IDX_transacoes_gateway_fatura" ON "transacoes_gateway_pagamento" ("fatura_id")`,
+      `CREATE INDEX IF NOT EXISTS "IDX_transacoes_gateway_fatura" ON "transacoes_gateway_pagamento" ("fatura_id")`,
     );
     await queryRunner.query(
-      `CREATE INDEX "IDX_transacoes_gateway_pagamento" ON "transacoes_gateway_pagamento" ("pagamento_id")`,
+      `CREATE INDEX IF NOT EXISTS "IDX_transacoes_gateway_pagamento" ON "transacoes_gateway_pagamento" ("pagamento_id")`,
     );
 
     await queryRunner.query(`
-      ALTER TABLE "transacoes_gateway_pagamento"
-      ADD CONSTRAINT "FK_transacoes_gateway_empresa" FOREIGN KEY ("empresa_id") REFERENCES "empresas"("id") ON DELETE CASCADE ON UPDATE NO ACTION
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'FK_transacoes_gateway_empresa'
+        ) THEN
+          ALTER TABLE "transacoes_gateway_pagamento"
+          ADD CONSTRAINT "FK_transacoes_gateway_empresa" FOREIGN KEY ("empresa_id") REFERENCES "empresas"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+        END IF;
+      END
+      $$;
     `);
     await queryRunner.query(`
-      ALTER TABLE "transacoes_gateway_pagamento"
-      ADD CONSTRAINT "FK_transacoes_gateway_config" FOREIGN KEY ("configuracao_id") REFERENCES "configuracoes_gateway_pagamento"("id") ON DELETE CASCADE ON UPDATE NO ACTION
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'FK_transacoes_gateway_config'
+        ) THEN
+          ALTER TABLE "transacoes_gateway_pagamento"
+          ADD CONSTRAINT "FK_transacoes_gateway_config" FOREIGN KEY ("configuracao_id") REFERENCES "configuracoes_gateway_pagamento"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+        END IF;
+      END
+      $$;
     `);
     await queryRunner.query(`
-      ALTER TABLE "transacoes_gateway_pagamento"
-      ADD CONSTRAINT "FK_transacoes_gateway_fatura" FOREIGN KEY ("fatura_id") REFERENCES "faturas"("id") ON DELETE SET NULL ON UPDATE NO ACTION
+      DO $$
+      BEGIN
+        IF to_regclass('public.faturas') IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM pg_constraint WHERE conname = 'FK_transacoes_gateway_fatura'
+          ) THEN
+          ALTER TABLE "transacoes_gateway_pagamento"
+          ADD CONSTRAINT "FK_transacoes_gateway_fatura" FOREIGN KEY ("fatura_id") REFERENCES "faturas"("id") ON DELETE SET NULL ON UPDATE NO ACTION;
+        END IF;
+      END
+      $$;
     `);
     await queryRunner.query(`
-      ALTER TABLE "transacoes_gateway_pagamento"
-      ADD CONSTRAINT "FK_transacoes_gateway_pagamento" FOREIGN KEY ("pagamento_id") REFERENCES "pagamentos"("id") ON DELETE SET NULL ON UPDATE NO ACTION
+      DO $$
+      BEGIN
+        IF to_regclass('public.pagamentos') IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM pg_constraint WHERE conname = 'FK_transacoes_gateway_pagamento'
+          ) THEN
+          ALTER TABLE "transacoes_gateway_pagamento"
+          ADD CONSTRAINT "FK_transacoes_gateway_pagamento" FOREIGN KEY ("pagamento_id") REFERENCES "pagamentos"("id") ON DELETE SET NULL ON UPDATE NO ACTION;
+        END IF;
+      END
+      $$;
     `);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `ALTER TABLE "transacoes_gateway_pagamento" DROP CONSTRAINT "FK_transacoes_gateway_pagamento"`,
+      `ALTER TABLE "transacoes_gateway_pagamento" DROP CONSTRAINT IF EXISTS "FK_transacoes_gateway_pagamento"`,
     );
     await queryRunner.query(
-      `ALTER TABLE "transacoes_gateway_pagamento" DROP CONSTRAINT "FK_transacoes_gateway_fatura"`,
+      `ALTER TABLE "transacoes_gateway_pagamento" DROP CONSTRAINT IF EXISTS "FK_transacoes_gateway_fatura"`,
     );
     await queryRunner.query(
-      `ALTER TABLE "transacoes_gateway_pagamento" DROP CONSTRAINT "FK_transacoes_gateway_config"`,
+      `ALTER TABLE "transacoes_gateway_pagamento" DROP CONSTRAINT IF EXISTS "FK_transacoes_gateway_config"`,
     );
     await queryRunner.query(
-      `ALTER TABLE "transacoes_gateway_pagamento" DROP CONSTRAINT "FK_transacoes_gateway_empresa"`,
+      `ALTER TABLE "transacoes_gateway_pagamento" DROP CONSTRAINT IF EXISTS "FK_transacoes_gateway_empresa"`,
     );
 
-    await queryRunner.query(`DROP INDEX "public"."IDX_transacoes_gateway_pagamento"`);
-    await queryRunner.query(`DROP INDEX "public"."IDX_transacoes_gateway_fatura"`);
-    await queryRunner.query(`DROP INDEX "public"."IDX_transacoes_gateway_config"`);
-    await queryRunner.query(`DROP INDEX "public"."UQ_transacoes_gateway_referencia"`);
-    await queryRunner.query(`DROP INDEX "public"."IDX_transacoes_gateway_empresa"`);
-    await queryRunner.query(`DROP TABLE "transacoes_gateway_pagamento"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_transacoes_gateway_pagamento"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_transacoes_gateway_fatura"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_transacoes_gateway_config"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "public"."UQ_transacoes_gateway_referencia"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_transacoes_gateway_empresa"`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "transacoes_gateway_pagamento"`);
 
-    await queryRunner.query(`DROP TYPE "public"."transacao_gateway_metodo_enum"`);
-    await queryRunner.query(`DROP TYPE "public"."transacao_gateway_operacao_enum"`);
-    await queryRunner.query(`DROP TYPE "public"."transacao_gateway_status_enum"`);
+    await queryRunner.query(`DROP TYPE IF EXISTS "public"."transacao_gateway_metodo_enum"`);
+    await queryRunner.query(`DROP TYPE IF EXISTS "public"."transacao_gateway_operacao_enum"`);
+    await queryRunner.query(`DROP TYPE IF EXISTS "public"."transacao_gateway_status_enum"`);
 
     await queryRunner.query(
-      `ALTER TABLE "configuracoes_gateway_pagamento" DROP CONSTRAINT "FK_config_gateway_empresa"`,
+      `ALTER TABLE "configuracoes_gateway_pagamento" DROP CONSTRAINT IF EXISTS "FK_config_gateway_empresa"`,
     );
-    await queryRunner.query(`DROP INDEX "public"."UQ_config_gateway_empresa_tipo_modo"`);
-    await queryRunner.query(`DROP INDEX "public"."IDX_configuracoes_gateway_empresa"`);
-    await queryRunner.query(`DROP TABLE "configuracoes_gateway_pagamento"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "public"."UQ_config_gateway_empresa_tipo_modo"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_configuracoes_gateway_empresa"`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "configuracoes_gateway_pagamento"`);
 
-    await queryRunner.query(`DROP TYPE "public"."config_gateway_status_enum"`);
-    await queryRunner.query(`DROP TYPE "public"."config_gateway_modo_enum"`);
-    await queryRunner.query(`DROP TYPE "public"."config_gateway_gateway_enum"`);
+    await queryRunner.query(`DROP TYPE IF EXISTS "public"."config_gateway_status_enum"`);
+    await queryRunner.query(`DROP TYPE IF EXISTS "public"."config_gateway_modo_enum"`);
+    await queryRunner.query(`DROP TYPE IF EXISTS "public"."config_gateway_gateway_enum"`);
   }
 }

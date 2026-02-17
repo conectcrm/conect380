@@ -28,6 +28,7 @@ import demandaService from '../../../services/demandaService';
 import { useNotificacoesDesktop } from '../../../hooks/useNotificacoesDesktop';
 import { PopupNotifications, PopupNotificationItem } from './components/PopupNotifications';
 import { resolveAvatarUrl } from '../../../utils/avatar';
+import { resolverNomeExibicao } from './utils';
 
 const MAX_NOTIFICATION_PREVIEW = 140;
 
@@ -692,7 +693,7 @@ export const ChatOmnichannel: React.FC = () => {
 
   const handleTransferir = useCallback(() => {
     if (!ticketSelecionado) return;
-    if (ticketSelecionado.status === 'resolvido') {
+    if (ticketSelecionado.status === 'encerrado') {
       toast('Este atendimento já está resolvido.');
       return;
     }
@@ -732,7 +733,7 @@ export const ChatOmnichannel: React.FC = () => {
 
   const handleEncerrar = useCallback(() => {
     if (!ticketSelecionado) return;
-    if (ticketSelecionado.status === 'resolvido') {
+    if (ticketSelecionado.status === 'encerrado') {
       toast('Este atendimento já está resolvido.');
       return;
     }
@@ -769,13 +770,7 @@ export const ChatOmnichannel: React.FC = () => {
 
       try {
         // Se for resolver, abre modal de encerramento
-        if (novoStatus === 'resolvido') {
-          handleEncerrar();
-          return;
-        }
-
-        // Se for fechar, também abre modal
-        if (novoStatus === 'fechado') {
+        if (novoStatus === 'encerrado') {
           handleEncerrar();
           return;
         }
@@ -955,7 +950,7 @@ export const ChatOmnichannel: React.FC = () => {
           importante,
         });
 
-        toast.success('Nota adicionada com sucesso!', 2000);
+        toast.success('Nota adicionada com sucesso!', { duration: 2000 });
       } catch (error) {
         console.error('❌ Erro ao adicionar nota:', error);
         toast.error('Erro ao adicionar nota. Tente novamente.');
@@ -969,7 +964,7 @@ export const ChatOmnichannel: React.FC = () => {
       try {
         // ✅ Deletar nota no backend
         await deletarNota(notaId);
-        toast.success('Nota excluída com sucesso!', 2000);
+        toast.success('Nota excluída com sucesso!', { duration: 2000 });
       } catch (error) {
         console.error('❌ Erro ao excluir nota:', error);
         toast.error('Erro ao excluir nota. Tente novamente.');
@@ -1187,4 +1182,3 @@ export const ChatOmnichannel: React.FC = () => {
 };
 
 export default ChatOmnichannel;
-

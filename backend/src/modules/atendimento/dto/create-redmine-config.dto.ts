@@ -1,9 +1,6 @@
 import { IsString, IsInt, IsBoolean, IsOptional, IsUrl, IsObject } from 'class-validator';
 
 export class CreateRedmineConfigDto {
-  @IsString()
-  empresaId: string;
-
   @IsUrl()
   redmineUrl: string;
 

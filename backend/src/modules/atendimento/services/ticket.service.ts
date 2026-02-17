@@ -15,7 +15,6 @@ import {
   StatusTicket,
   TipoTicket,
   PrioridadeTicket,
-  OrigemTicket,
   SeveridadeTicket,
   NivelAtendimentoTicket,
 } from '../entities/ticket.entity';
@@ -37,7 +36,7 @@ import { notifyByPolicy } from '../../../notifications/channel-notifier';
 import { ChannelPolicyKey } from '../../../notifications/channel-policy';
 import { NotificationChannelsService } from '../../../notifications/notification-channels.service';
 // 🔍 OpenTelemetry imports
-import { trace, context, SpanStatusCode } from '@opentelemetry/api';
+import { SpanStatusCode } from '@opentelemetry/api';
 import { withSpan, addAttributes, recordException } from '../../../common/tracing/tracing.helpers';
 // 📊 Prometheus metrics imports
 import {
@@ -45,7 +44,6 @@ import {
   ticketsEncerradosTotal,
   ticketsTransferidosTotal,
   ticketTempoVidaHistogram,
-  MetricTimer,
   incrementCounter,
   observeHistogram,
 } from '../../../config/metrics';
@@ -61,7 +59,17 @@ export interface CriarTicketDto {
   descricao?: string;
   origem: string;
   prioridade?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
+  clienteId?: string;
+  titulo?: string;
+  tipo?: TipoTicket;
+  dataVencimento?: string | Date;
+  responsavelId?: string;
+  autorId?: string;
+  cliente_id?: string;
+  data_vencimento?: string | Date;
+  responsavel_id?: string;
+  autor_id?: string;
 }
 
 export interface BuscarOuCriarTicketDto {
@@ -109,7 +117,7 @@ export class TicketService {
     @Inject(forwardRef(() => AtribuicaoService))
     private readonly atribuicaoService: AtribuicaoService,
     private readonly notificationChannels: NotificationChannelsService,
-  ) { }
+  ) {}
 
   private readonly highPriorityPolicy: ChannelPolicyKey = 'ticket-priority-high';
   private readonly escalationPolicy: ChannelPolicyKey = 'ticket-escalation';
@@ -211,17 +219,24 @@ export class TicketService {
     }
   }
 
-  private async notificarEscalacao(ticket: Ticket, level: NivelAtendimentoTicket, reason: string): Promise<void> {
+  private async notificarEscalacao(
+    ticket: Ticket,
+    level: NivelAtendimentoTicket,
+    reason: string,
+  ): Promise<void> {
     try {
       const phone = this.getAdminPhone();
       if (!phone) {
-        this.logger.debug('[Ticket] NOTIFICATIONS_ADMIN_PHONE ausente; alerta de escalonamento não enviado');
+        this.logger.debug(
+          '[Ticket] NOTIFICATIONS_ADMIN_PHONE ausente; alerta de escalonamento não enviado',
+        );
         return;
       }
 
       const numero = ticket.numero ? `#${ticket.numero}` : ticket.id?.slice(0, 8) || 'ticket';
       const assunto = ticket.assunto || 'Ticket escalonado';
-      const message = `Ticket ${numero} escalonado para ${level}: ${assunto} (motivo: ${reason})`.slice(0, 280);
+      const message =
+        `Ticket ${numero} escalonado para ${level}: ${assunto} (motivo: ${reason})`.slice(0, 280);
 
       await notifyByPolicy({
         policyKey: this.highPriorityPolicy,
@@ -244,7 +259,10 @@ export class TicketService {
     }
   }
 
-  private resolverSlaExpiration(slaTargetMinutes?: number, slaExpiresAt?: Date | string | null): Date | undefined {
+  private resolverSlaExpiration(
+    slaTargetMinutes?: number,
+    slaExpiresAt?: Date | string | null,
+  ): Date | undefined {
     if (slaTargetMinutes && slaTargetMinutes > 0) {
       return new Date(Date.now() + slaTargetMinutes * 60 * 1000);
     }
@@ -372,7 +390,8 @@ export class TicketService {
       // 2. Se não existir, criar novo ticket
       if (!ticket) {
         addAttributes(span, { 'ticket.found': false, 'ticket.action': 'create' });
-        this.logger.log(`✨ Criando novo ticket para ${dados.clienteNumero}`); ticket = this.ticketRepository.create({
+        this.logger.log(`✨ Criando novo ticket para ${dados.clienteNumero}`);
+        ticket = this.ticketRepository.create({
           empresaId: dados.empresaId,
           canalId: dados.canalId,
           contatoTelefone: dados.clienteNumero,
@@ -471,7 +490,7 @@ export class TicketService {
     prioridade: string;
     assunto: string;
     descricao?: string;
-  }): Promise<any> {
+  }): Promise<Ticket & { atendenteNome?: string | null }> {
     return withSpan('ticket.criarParaTriagem', async (span) => {
       addAttributes(span, {
         'ticket.empresaId': dados.empresaId,
@@ -513,8 +532,8 @@ export class TicketService {
         contatoNome: nome,
         contatoFoto: null, // Contato não tem campo foto
         assunto: dados.assunto,
-        status: 'ABERTO' as any,
-        prioridade: dados.prioridade as any,
+        status: StatusTicket.FILA,
+        prioridade: dados.prioridade as PrioridadeTicket,
         data_abertura: new Date(),
         ultima_mensagem_em: new Date(),
       });
@@ -582,7 +601,11 @@ export class TicketService {
 
       // 🔔 Notificar sidebar em tempo real sobre novo ticket
       this.atendimentoGateway.notificarNovoTicket(ticketSalvo);
-      this.atendimentoGateway.notificarStatusTicket(ticketSalvo.id, ticketSalvo.status, ticketSalvo);
+      this.atendimentoGateway.notificarStatusTicket(
+        ticketSalvo.id,
+        ticketSalvo.status,
+        ticketSalvo,
+      );
 
       // ✅ Marcar span como bem-sucedido
       span.setStatus({ code: SpanStatusCode.OK });
@@ -600,7 +623,7 @@ export class TicketService {
    * 🆕 Popula relações User (autor, responsavel) para unificação
    */
   async buscarPorId(id: string, empresaId?: string): Promise<Ticket> {
-    const where: any = { id };
+    const where: { id: string; empresaId?: string } = { id };
     if (empresaId) {
       where.empresaId = empresaId;
     }
@@ -654,7 +677,20 @@ export class TicketService {
       totalMensagens,
       ultimaMensagem: ultimaMensagemObj?.conteudo || 'Sem mensagens',
       tempoAtendimento,
-    } as any;
+    } as Ticket & {
+      contato: {
+        id: string | null;
+        nome: string;
+        telefone: string;
+        email: string | null;
+        foto: string | null;
+        clienteVinculado: Contato['cliente'] | null;
+      };
+      mensagensNaoLidas: number;
+      totalMensagens: number;
+      ultimaMensagem: string;
+      tempoAtendimento: number;
+    };
   }
 
   /**
@@ -786,7 +822,10 @@ export class TicketService {
 
     this.logger.log(`📋 Listando ${tickets.length} de ${total} tickets (com campos calculados)`);
 
-    return { tickets: ticketsComCampos as any, total };
+    return {
+      tickets: ticketsComCampos as Ticket[],
+      total,
+    };
   }
 
   /**
@@ -804,17 +843,21 @@ export class TicketService {
       contatoFoto: dados.clienteFoto || null,
       assunto: dados.assunto || 'Novo ticket',
       status: StatusTicket.FILA,
-      prioridade: (dados.prioridade as any) || PrioridadeTicket.MEDIA,
+      prioridade: (dados.prioridade as PrioridadeTicket) || PrioridadeTicket.MEDIA,
       data_abertura: new Date(),
       ultima_mensagem_em: new Date(),
       // 🆕 Campos da unificação Tickets+Demandas
-      cliente_id: dados.cliente_id || null,
+      clienteId: dados.clienteId ?? dados.cliente_id ?? null,
       titulo: dados.titulo || null,
       descricao: dados.descricao || null,
       tipo: dados.tipo || null,
-      data_vencimento: dados.data_vencimento ? new Date(dados.data_vencimento) : null,
-      responsavel_id: dados.responsavel_id || null,
-      autor_id: dados.autor_id || null,
+      dataVencimento: dados.dataVencimento
+        ? new Date(dados.dataVencimento)
+        : dados.data_vencimento
+          ? new Date(dados.data_vencimento)
+          : null,
+      responsavelId: dados.responsavelId ?? dados.responsavel_id ?? null,
+      autorId: dados.autorId ?? dados.autor_id ?? null,
     });
 
     const ticketSalvo = await this.ticketRepository.save(ticket);
@@ -923,7 +966,7 @@ export class TicketService {
 
     if ((primeiraAtribuicao || enviarBoasVindas) && telefoneCliente) {
       // Buscar melhor nome possível para apresentar ao cliente
-      let nomeAtendente = (ticket as any).atendenteNome || null;
+      let nomeAtendente = (ticket as Ticket & { atendenteNome?: string }).atendenteNome || null;
 
       if ((!nomeAtendente || nomeAtendente.trim().length === 0) && atendenteId) {
         try {
@@ -985,14 +1028,18 @@ export class TicketService {
     dados: Partial<{
       atendenteId?: string;
       filaId?: string;
+      clienteId?: string;
       cliente_id?: string;
       titulo?: string;
       descricao?: string;
       tipo?: TipoTicket;
+      dataVencimento?: string | Date;
       data_vencimento?: string | Date;
+      responsavelId?: string;
       responsavel_id?: string;
+      autorId?: string;
       autor_id?: string;
-      [key: string]: any;
+      [key: string]: unknown;
     }>,
   ): Promise<Ticket> {
     const ticket = await this.ticketRepository.findOne({
@@ -1006,6 +1053,9 @@ export class TicketService {
     // 🆕 Tratamento especial para data_vencimento (string → Date)
     if (dados.data_vencimento) {
       dados.data_vencimento = new Date(dados.data_vencimento);
+    }
+    if (dados.dataVencimento) {
+      dados.dataVencimento = new Date(dados.dataVencimento);
     }
 
     // Atualizar campos
@@ -1158,7 +1208,12 @@ export class TicketService {
 
   async escalar(
     ticketId: string,
-    dados: { level: NivelAtendimentoTicket; reason: string; slaTargetMinutes?: number; slaExpiresAt?: Date },
+    dados: {
+      level: NivelAtendimentoTicket;
+      reason: string;
+      slaTargetMinutes?: number;
+      slaExpiresAt?: Date;
+    },
   ): Promise<Ticket> {
     const ticket = await this.buscarPorId(ticketId);
 
@@ -1176,21 +1231,21 @@ export class TicketService {
 
     if (dados.slaTargetMinutes || dados.slaExpiresAt) {
       ticket.slaTargetMinutes = dados.slaTargetMinutes ?? ticket.slaTargetMinutes;
-      ticket.slaExpiresAt = this.resolverSlaExpiration(dados.slaTargetMinutes, dados.slaExpiresAt) ?? ticket.slaExpiresAt;
+      ticket.slaExpiresAt =
+        this.resolverSlaExpiration(dados.slaTargetMinutes, dados.slaExpiresAt) ??
+        ticket.slaExpiresAt;
     }
 
     const salvo = await this.ticketRepository.save(ticket);
 
     try {
       await Promise.resolve(
-        this.atendimentoGateway.notificarStatusTicket(
-          salvo.id,
-          salvo.status,
-          salvo,
-        ),
+        this.atendimentoGateway.notificarStatusTicket(salvo.id, salvo.status, salvo),
       );
     } catch (error) {
-      this.logger.error(`⚠️ Erro ao notificar websocket após escalonamento: ${error?.message || error}`);
+      this.logger.error(
+        `⚠️ Erro ao notificar websocket após escalonamento: ${error?.message || error}`,
+      );
     }
 
     void this.notificarEscalacao(salvo, dados.level, dados.reason);
@@ -1211,22 +1266,31 @@ export class TicketService {
     const salvo = await this.ticketRepository.save(ticket);
 
     try {
-      await Promise.resolve(this.atendimentoGateway.notificarStatusTicket(salvo.id, salvo.status, salvo));
+      await Promise.resolve(
+        this.atendimentoGateway.notificarStatusTicket(salvo.id, salvo.status, salvo),
+      );
     } catch (error) {
-      this.logger.error(`⚠️ Erro ao notificar websocket após desescalada: ${error?.message || error}`);
+      this.logger.error(
+        `⚠️ Erro ao notificar websocket após desescalada: ${error?.message || error}`,
+      );
     }
 
     return salvo;
   }
 
-  async reatribuir(ticketId: string, dados: {
-    filaId?: string;
-    atendenteId?: string;
-    assignedLevel?: NivelAtendimentoTicket;
-    severity?: SeveridadeTicket;
-  }): Promise<Ticket> {
+  async reatribuir(
+    ticketId: string,
+    dados: {
+      filaId?: string;
+      atendenteId?: string;
+      assignedLevel?: NivelAtendimentoTicket;
+      severity?: SeveridadeTicket;
+    },
+  ): Promise<Ticket> {
     if (!dados.filaId && !dados.atendenteId && !dados.assignedLevel && !dados.severity) {
-      throw new BadRequestException('Informe pelo menos filaId, atendenteId, assignedLevel ou severity');
+      throw new BadRequestException(
+        'Informe pelo menos filaId, atendenteId, assignedLevel ou severity',
+      );
     }
 
     const ticket = await this.buscarPorId(ticketId);
@@ -1248,9 +1312,13 @@ export class TicketService {
     const salvo = await this.ticketRepository.save(ticket);
 
     try {
-      await Promise.resolve(this.atendimentoGateway.notificarStatusTicket(salvo.id, salvo.status, salvo));
+      await Promise.resolve(
+        this.atendimentoGateway.notificarStatusTicket(salvo.id, salvo.status, salvo),
+      );
     } catch (error) {
-      this.logger.error(`⚠️ Erro ao notificar websocket após reatribuição: ${error?.message || error}`);
+      this.logger.error(
+        `⚠️ Erro ao notificar websocket após reatribuição: ${error?.message || error}`,
+      );
     }
 
     return salvo;
@@ -1259,7 +1327,10 @@ export class TicketService {
   /**
    * Transfere ticket para outro atendente
    */
-  async transferir(ticketId: string, dados: any): Promise<Ticket> {
+  async transferir(
+    ticketId: string,
+    dados: { atendenteId: string; motivo?: string; notaInterna?: string },
+  ): Promise<Ticket> {
     return withSpan('ticket.transferir', async (span) => {
       try {
         addAttributes(span, {
@@ -1284,8 +1355,7 @@ export class TicketService {
         const ticketAtualizado = await this.ticketRepository.save(ticket);
 
         this.logger.log(
-          `🔄 Ticket ${ticketId} transferido de ${atendenteAnterior || 'fila'} para ${dados.atendenteId}. ` +
-          `Motivo: ${dados.motivo}`,
+          `🔄 Ticket ${ticketId} transferido de ${atendenteAnterior || 'fila'} para ${dados.atendenteId}. Motivo: ${dados.motivo}`,
         );
 
         // 📊 Incrementar métrica de transferências
@@ -1311,7 +1381,20 @@ export class TicketService {
   /**
    * Encerra um ticket
    */
-  async encerrar(ticketId: string, dados: any): Promise<any> {
+  async encerrar(
+    ticketId: string,
+    dados: {
+      motivo?: string;
+      solicitarAvaliacao?: boolean;
+      criarFollowUp?: boolean;
+      dataFollowUp?: string;
+      observacoes?: string;
+    },
+  ): Promise<{
+    ticket: Ticket;
+    followUp?: { id: string; dataAgendamento: Date };
+    csatEnviado: boolean;
+  }> {
     return withSpan('ticket.encerrar', async (span) => {
       try {
         addAttributes(span, {
@@ -1365,14 +1448,10 @@ export class TicketService {
         if (ticket.data_abertura) {
           const tempoVidaSegundos =
             (ticketAtualizado.data_fechamento.getTime() - ticket.data_abertura.getTime()) / 1000;
-          observeHistogram(
-            ticketTempoVidaHistogram,
-            tempoVidaSegundos,
-            {
-              empresaId: ticket.empresaId,
-              departamentoId: 'unknown', // TODO: buscar do ticket
-            },
-          );
+          observeHistogram(ticketTempoVidaHistogram, tempoVidaSegundos, {
+            empresaId: ticket.empresaId,
+            departamentoId: 'unknown', // TODO: buscar do ticket
+          });
         }
 
         span.setStatus({ code: SpanStatusCode.OK });
@@ -1473,7 +1552,10 @@ export class TicketService {
     return StatusTicket.ENCERRADO;
   }
 
-  private async criarFollowUpCasoNecessario(ticket: Ticket, dados: any) {
+  private async criarFollowUpCasoNecessario(
+    ticket: Ticket,
+    dados: { criarFollowUp?: boolean; dataFollowUp?: string; observacoes?: string },
+  ) {
     if (!dados?.criarFollowUp || !dados?.dataFollowUp) {
       return null;
     }

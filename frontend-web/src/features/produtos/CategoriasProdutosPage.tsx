@@ -201,7 +201,8 @@ const CategoriasProdutosPage: React.FC = () => {
                     nome: conf.nome,
                     descricao: conf.descricao || '',
                     subcategoriaId: sub.id,
-                    precoBase: conf.precoBase || 0,
+                    precoBase: sub.precoBase || 0,
+                    multiplicador: conf.multiplicador || 1,
                     ativa: conf.ativo,
                   }))
                 : [],

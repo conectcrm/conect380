@@ -90,8 +90,8 @@ const FechamentoAutomaticoPage: React.FC = () => {
       }
 
       // Carregar departamentos
-      const deptos = await configuracaoInactividadeService.listarDepartamentos(empresaId);
-      setDepartamentos(deptos || []);
+      const deptosResponse = await configuracaoInactividadeService.listarDepartamentos(empresaId);
+      setDepartamentos(deptosResponse?.dados || []);
 
       // Carregar configuração global inicial
       await carregarConfiguracao();
@@ -113,7 +113,7 @@ const FechamentoAutomaticoPage: React.FC = () => {
 
       const departamentoId = modoConfig === 'departamento' ? departamentoSelecionado : undefined;
 
-      const response = await configuracaoInactividadeService.buscar(empresaId, departamentoId);
+      const response = await configuracaoInactividadeService.buscar(departamentoId);
 
       if (response.sucesso && response.dados) {
         setConfig(response.dados);
@@ -147,11 +147,11 @@ const FechamentoAutomaticoPage: React.FC = () => {
 
       if (config?.id) {
         // Atualizar existente
-        await configuracaoInactividadeService.atualizar(empresaId, formData);
+        await configuracaoInactividadeService.atualizar(formData);
         setSuccess('✅ Configuração atualizada com sucesso!');
       } else {
         // Criar nova
-        await configuracaoInactividadeService.criar(empresaId, formData);
+        await configuracaoInactividadeService.criar(formData);
         setSuccess('✅ Configuração criada com sucesso!');
       }
 
@@ -439,7 +439,7 @@ const FechamentoAutomaticoPage: React.FC = () => {
                   <option value="">-- Selecione --</option>
                   {departamentos.map((depto) => (
                     <option key={depto.id} value={depto.id}>
-                      {depto.nome} {depto.temConfiguracao && '(configurado)'}
+                      {depto.nome} {(depto as any).temConfiguracao && '(configurado)'}
                     </option>
                   ))}
                 </select>

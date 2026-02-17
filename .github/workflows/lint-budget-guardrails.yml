@@ -1,0 +1,51 @@
+name: Lint Budget Guardrails
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'frontend-web/**'
+      - 'scripts/ci/**'
+      - '.github/workflows/**'
+  push:
+    branches:
+      - main
+      - master
+      - develop
+    paths:
+      - 'backend/**'
+      - 'frontend-web/**'
+      - 'scripts/ci/**'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+jobs:
+  lint-budget:
+    name: Lint Budget Guardrails
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend-web/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Install frontend dependencies
+        working-directory: frontend-web
+        run: npm ci
+
+      - name: Lint budget check
+        shell: pwsh
+        run: |
+          ./scripts/ci/lint-budget-check.ps1

@@ -1,7 +1,7 @@
 /**
  * Utilitário para detectar atalhos de palavras-chave
  * Permite que usuários escrevam livremente ao invés de apenas usar menus
- * 
+ *
  * Exemplo: "quero boleto" → detecta automaticamente núcleo Financeiro
  */
 
@@ -22,11 +22,36 @@ export class KeywordShortcuts {
   private static readonly ATALHOS = {
     financeiro: {
       keywords: [
-        'boleto', 'fatura', 'pagamento', 'cobrança', 'cobranca', 'nota fiscal',
-        'nf', 'danfe', '2 via', '2via', 'segunda via', 'vencimento', 'venceu',
-        'débito', 'debito', 'crédito', 'credito', 'cancelar assinatura',
-        'reembolso', 'dinheiro', 'pagar', 'valor', 'preço', 'preco',
-        'mensalidade', 'anuidade', 'cobrando', 'cartão', 'cartao', 'pix'
+        'boleto',
+        'fatura',
+        'pagamento',
+        'cobrança',
+        'cobranca',
+        'nota fiscal',
+        'nf',
+        'danfe',
+        '2 via',
+        '2via',
+        'segunda via',
+        'vencimento',
+        'venceu',
+        'débito',
+        'debito',
+        'crédito',
+        'credito',
+        'cancelar assinatura',
+        'reembolso',
+        'dinheiro',
+        'pagar',
+        'valor',
+        'preço',
+        'preco',
+        'mensalidade',
+        'anuidade',
+        'cobrando',
+        'cartão',
+        'cartao',
+        'pix',
       ],
       tipo: 'nucleo' as const,
       codigo: 'NUC_FINANCEIRO',
@@ -34,11 +59,36 @@ export class KeywordShortcuts {
     },
     suporte: {
       keywords: [
-        'erro', 'bug', 'problema', 'não funciona', 'nao funciona', 'lento',
-        'travou', 'travando', 'caiu', 'offline', 'integração', 'integracao',
-        'api', 'webhook', 'suporte', 'técnico', 'tecnico', 'ajuda', 'dúvida',
-        'duvida', 'como fazer', 'tutorial', 'não consigo', 'nao consigo',
-        'não abre', 'nao abre', 'quebrou', 'parou', 'instável', 'instavel'
+        'erro',
+        'bug',
+        'problema',
+        'não funciona',
+        'nao funciona',
+        'lento',
+        'travou',
+        'travando',
+        'caiu',
+        'offline',
+        'integração',
+        'integracao',
+        'api',
+        'webhook',
+        'suporte',
+        'técnico',
+        'tecnico',
+        'ajuda',
+        'dúvida',
+        'duvida',
+        'como fazer',
+        'tutorial',
+        'não consigo',
+        'nao consigo',
+        'não abre',
+        'nao abre',
+        'quebrou',
+        'parou',
+        'instável',
+        'instavel',
       ],
       tipo: 'nucleo' as const,
       codigo: 'NUC_SUPORTE',
@@ -46,11 +96,33 @@ export class KeywordShortcuts {
     },
     comercial: {
       keywords: [
-        'plano', 'upgrade', 'downgrade', 'proposta', 'orçamento', 'orcamento',
-        'contratar', 'renovar', 'contrato', 'preço', 'preco', 'valor',
-        'demonstração', 'demonstracao', 'demo', 'apresentação', 'apresentacao',
-        'trial', 'teste', 'testar', 'conhecer', 'comprar', 'vender',
-        'novidades', 'recursos', 'funcionalidades', 'plano novo'
+        'plano',
+        'upgrade',
+        'downgrade',
+        'proposta',
+        'orçamento',
+        'orcamento',
+        'contratar',
+        'renovar',
+        'contrato',
+        'preço',
+        'preco',
+        'valor',
+        'demonstração',
+        'demonstracao',
+        'demo',
+        'apresentação',
+        'apresentacao',
+        'trial',
+        'teste',
+        'testar',
+        'conhecer',
+        'comprar',
+        'vender',
+        'novidades',
+        'recursos',
+        'funcionalidades',
+        'plano novo',
       ],
       tipo: 'nucleo' as const,
       codigo: 'NUC_COMERCIAL',
@@ -58,10 +130,22 @@ export class KeywordShortcuts {
     },
     humano: {
       keywords: [
-        'humano', 'atendente', 'pessoa', 'gente', 'falar com alguém',
-        'falar com alguem', 'representante', 'operador', 'não quero bot',
-        'nao quero bot', 'sair do bot', 'chat humano', 'atendimento humano',
-        'quero uma pessoa', 'alguém real', 'alguem real'
+        'humano',
+        'atendente',
+        'pessoa',
+        'gente',
+        'falar com alguém',
+        'falar com alguem',
+        'representante',
+        'operador',
+        'não quero bot',
+        'nao quero bot',
+        'sair do bot',
+        'chat humano',
+        'atendimento humano',
+        'quero uma pessoa',
+        'alguém real',
+        'alguem real',
       ],
       tipo: 'acao' as const,
       acao: 'transferir_geral',
@@ -69,10 +153,25 @@ export class KeywordShortcuts {
     },
     status: {
       keywords: [
-        'status', 'protocolo', 'ticket', 'número', 'numero', 'chamado',
-        'acompanhar', 'andamento', 'atendimento', 'meu ticket', 'meu protocolo',
-        'consultar', 'verificar', 'onde está', 'onde esta', 'solicitação',
-        'solicitacao', 'abertura', 'aberto'
+        'status',
+        'protocolo',
+        'ticket',
+        'número',
+        'numero',
+        'chamado',
+        'acompanhar',
+        'andamento',
+        'atendimento',
+        'meu ticket',
+        'meu protocolo',
+        'consultar',
+        'verificar',
+        'onde está',
+        'onde esta',
+        'solicitação',
+        'solicitacao',
+        'abertura',
+        'aberto',
       ],
       tipo: 'etapa' as const,
       etapaId: 'coleta-protocolo',
@@ -80,9 +179,22 @@ export class KeywordShortcuts {
     },
     sair: {
       keywords: [
-        'sair', 'cancelar', 'desistir', 'não quero mais', 'nao quero mais',
-        'deixa pra lá', 'deixa pra la', 'esquece', 'depois', 'agora não',
-        'agora nao', 'tchau', 'até logo', 'ate logo', 'obrigado', 'valeu'
+        'sair',
+        'cancelar',
+        'desistir',
+        'não quero mais',
+        'nao quero mais',
+        'deixa pra lá',
+        'deixa pra la',
+        'esquece',
+        'depois',
+        'agora não',
+        'agora nao',
+        'tchau',
+        'até logo',
+        'ate logo',
+        'obrigado',
+        'valeu',
       ],
       tipo: 'acao' as const,
       acao: 'finalizar',
@@ -144,7 +256,7 @@ export class KeywordShortcuts {
     const resultados = Array.from(matches.entries())
       .map(([categoria, data]) => ({
         ...this.construirMatch(categoria, data.config, data.palavras),
-        confianca: Math.min(0.98, data.config.confianca + (data.score * 0.03)),
+        confianca: Math.min(0.98, data.config.confianca + data.score * 0.03),
       }))
       .sort((a, b) => b.confianca - a.confianca)
       .slice(0, limite);
@@ -157,14 +269,25 @@ export class KeywordShortcuts {
    */
   static detectarUrgencia(mensagem: string): boolean {
     const palavrasUrgencia = [
-      'urgente', 'agora', 'imediato', 'rápido', 'rapido',
-      'já', 'ja', 'crítico', 'critico', 'parado', 'emergência',
-      'emergencia', 'socorro', 'ajuda urgente'
+      'urgente',
+      'agora',
+      'imediato',
+      'rápido',
+      'rapido',
+      'já',
+      'ja',
+      'crítico',
+      'critico',
+      'parado',
+      'emergência',
+      'emergencia',
+      'socorro',
+      'ajuda urgente',
     ];
 
     const texto = this.normalizarTexto(mensagem);
 
-    return palavrasUrgencia.some(palavra => {
+    return palavrasUrgencia.some((palavra) => {
       const regex = new RegExp(`\\b${this.escapeRegex(palavra)}\\b`, 'i');
       return regex.test(texto);
     });
@@ -175,15 +298,31 @@ export class KeywordShortcuts {
    */
   static detectarFrustracao(mensagem: string): boolean {
     const palavrasFrustracao = [
-      'ridículo', 'ridiculo', 'péssimo', 'pessimo', 'horrível', 'horrivel',
-      'nunca funciona', 'sempre quebra', 'não aguento', 'nao aguento',
-      'cansado', 'frustrado', 'irritado', 'indignado', 'revoltado',
-      'absurdo', 'inadmissível', 'inadmissivel', 'inaceitável', 'inaceitavel'
+      'ridículo',
+      'ridiculo',
+      'péssimo',
+      'pessimo',
+      'horrível',
+      'horrivel',
+      'nunca funciona',
+      'sempre quebra',
+      'não aguento',
+      'nao aguento',
+      'cansado',
+      'frustrado',
+      'irritado',
+      'indignado',
+      'revoltado',
+      'absurdo',
+      'inadmissível',
+      'inadmissivel',
+      'inaceitável',
+      'inaceitavel',
     ];
 
     const texto = this.normalizarTexto(mensagem);
 
-    return palavrasFrustracao.some(palavra => {
+    return palavrasFrustracao.some((palavra) => {
       const regex = new RegExp(`\\b${this.escapeRegex(palavra)}\\b`, 'i');
       return regex.test(texto);
     });
@@ -191,11 +330,7 @@ export class KeywordShortcuts {
 
   // ========== Métodos Privados ==========
 
-  private static construirMatch(
-    categoria: string,
-    config: any,
-    palavras: string[],
-  ): ShortcutMatch {
+  private static construirMatch(categoria: string, config: any, palavras: string[]): ShortcutMatch {
     const match: ShortcutMatch = {
       categoria,
       confianca: config.confianca,
@@ -238,24 +373,26 @@ export class KeywordShortcuts {
   static gerarMensagemAmbiguidade(matches: ShortcutMatch[]): string {
     if (matches.length === 0) return '';
 
-    const opcoes = matches.map((match, idx) => {
-      let descricao = '';
+    const opcoes = matches
+      .map((match, idx) => {
+        let descricao = '';
 
-      if (match.nucleoCodigo) {
-        const nomes = {
-          NUC_FINANCEIRO: 'Financeiro',
-          NUC_SUPORTE: 'Suporte Técnico',
-          NUC_COMERCIAL: 'Comercial',
-        };
-        descricao = nomes[match.nucleoCodigo] || match.nucleoCodigo;
-      } else if (match.acao === 'transferir_geral') {
-        descricao = 'Falar com atendente humano';
-      } else if (match.acao === 'finalizar') {
-        descricao = 'Cancelar atendimento';
-      }
+        if (match.nucleoCodigo) {
+          const nomes = {
+            NUC_FINANCEIRO: 'Financeiro',
+            NUC_SUPORTE: 'Suporte Técnico',
+            NUC_COMERCIAL: 'Comercial',
+          };
+          descricao = nomes[match.nucleoCodigo] || match.nucleoCodigo;
+        } else if (match.acao === 'transferir_geral') {
+          descricao = 'Falar com atendente humano';
+        } else if (match.acao === 'finalizar') {
+          descricao = 'Cancelar atendimento';
+        }
 
-      return `${idx + 1}️⃣ ${descricao}`;
-    }).join('\n');
+        return `${idx + 1}️⃣ ${descricao}`;
+      })
+      .join('\n');
 
     return `Entendi! Você pode estar se referindo a:\n\n${opcoes}\n\nQual opção você prefere?`;
   }

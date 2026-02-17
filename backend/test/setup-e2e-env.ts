@@ -1,0 +1,9 @@
+process.env.NODE_ENV ??= 'test';
+process.env.JWT_SECRET ??= 'test-jwt-secret';
+process.env.DATABASE_HOST ??= 'localhost';
+process.env.DATABASE_PORT ??= '5434';
+process.env.DATABASE_USERNAME ??= 'conectcrm';
+process.env.DATABASE_PASSWORD ??= 'conectcrm123';
+process.env.DATABASE_NAME ??= 'conectcrm_test';
+process.env.REDIS_HOST ??= 'localhost';
+process.env.REDIS_PORT ??= '6379';

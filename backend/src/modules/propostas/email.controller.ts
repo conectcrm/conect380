@@ -1,9 +1,23 @@
-import { Controller, Post, Body, Get, HttpStatus, HttpException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  HttpStatus,
+  HttpException,
+  UseGuards,
+  Logger,
+} from '@nestjs/common';
 import { EmailIntegradoService } from './email-integrado.service';
 import { PortalService } from './portal.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../common/guards/empresa.guard';
 
 @Controller('email')
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class EmailController {
+  private readonly logger = new Logger(EmailController.name);
+
   constructor(
     private readonly emailService: EmailIntegradoService,
     private readonly portalService: PortalService,
@@ -15,7 +29,7 @@ export class EmailController {
   @Post('notificar-aceite')
   async notificarAceite(@Body() dadosProposta: any) {
     try {
-      console.log('📧 Recebida solicitação de notificação de aceite:', dadosProposta.numero);
+      this.logger.log('[EMAIL] Recebida solicitacao de notificacao de aceite:', dadosProposta.numero);
 
       const sucesso = await this.emailService.notificarPropostaAceita(dadosProposta);
 
@@ -35,7 +49,7 @@ export class EmailController {
         );
       }
     } catch (error) {
-      console.error('❌ Erro no endpoint de notificação:', error);
+      this.logger.error('[EMAIL] Erro no endpoint de notificacao:', error);
       throw new HttpException(
         {
           success: false,
@@ -61,11 +75,11 @@ export class EmailController {
     },
   ) {
     try {
-      console.log('📧 Enviando proposta para:', dados.emailCliente);
+      this.logger.log('[EMAIL] Enviando proposta para:', dados.emailCliente);
 
-      // ✅ Se solicitado, registrar o token no portal service
+      // Se solicitado, registrar o token no portal service
       if (dados.registrarToken && dados.proposta.token) {
-        console.log('🎫 Registrando token no sistema de portal:', dados.proposta.token);
+        this.logger.log('[EMAIL] Registrando token no sistema de portal:', dados.proposta.token);
         await this.portalService.registrarTokenProposta(
           dados.proposta.token,
           dados.proposta.numero || dados.proposta.id,
@@ -96,7 +110,7 @@ export class EmailController {
         );
       }
     } catch (error) {
-      console.error('❌ Erro no envio de proposta:', error);
+      this.logger.error('[EMAIL] Erro no envio de proposta:', error);
       throw new HttpException(
         {
           success: false,
@@ -109,69 +123,26 @@ export class EmailController {
   }
 
   /**
-   * Testa configuração de email
-   */
-  @Get('testar')
-  async testarEmail() {
-    try {
-      const configuracaoValida = await this.emailService.testarConfiguracao();
-
-      if (configuracaoValida) {
-        return {
-          success: true,
-          message: 'Configuração de email está funcionando',
-          config: {
-            smtp_host: process.env.SMTP_HOST,
-            smtp_port: process.env.SMTP_PORT,
-            smtp_user: process.env.SMTP_USER
-              ? '***' + process.env.SMTP_USER.slice(-10)
-              : 'não configurado',
-            gmail_user: process.env.GMAIL_USER
-              ? '***' + process.env.GMAIL_USER.slice(-10)
-              : 'não configurado',
-          },
-        };
-      } else {
-        return {
-          success: false,
-          message: 'Problema na configuração de email',
-          config: {
-            smtp_configured: !!process.env.SMTP_USER,
-            gmail_configured: !!process.env.GMAIL_USER,
-          },
-        };
-      }
-    } catch (error) {
-      console.error('❌ Erro no teste de email:', error);
-      return {
-        success: false,
-        message: 'Erro ao testar configuração de email',
-        error: error.message,
-      };
-    }
-  }
-
-  /**
    * Envia email genérico (agora com envio real)
    */
   @Post('enviar')
   async enviarEmailGenerico(@Body() dados: any) {
     try {
-      console.log('📧 Dados completos recebidos:', JSON.stringify(dados, null, 2));
+      this.logger.log('[EMAIL] Dados completos recebidos:', JSON.stringify(dados, null, 2));
 
-      // ✅ CORREÇÃO: Suportar tanto formato antigo (para/assunto/corpo) quanto novo (to/subject/message)
+      // CORRECAO: Suportar tanto formato antigo (para/assunto/corpo) quanto novo (to/subject/message)
       const para = dados.para || dados.to;
       const assunto = dados.assunto || dados.subject;
       const corpo = dados.corpo || dados.message || dados.html || dados.text;
 
-      // ✅ VALIDAÇÃO: Verificar se dados necessários estão presentes
+      // VALIDACAO: Verificar se dados necessarios estao presentes
       if (!para || !Array.isArray(para) || para.length === 0) {
         throw new Error(`Dados inválidos: para=${para}, tipo=${typeof para}`);
       }
 
-      console.log('📧 Enviando email genérico para:', para);
+      this.logger.log('[EMAIL] Enviando email generico para:', para);
 
-      // ✅ CORREÇÃO: Usar o EmailIntegradoService real para envio
+      // CORRECAO: Usar o EmailIntegradoService real para envio
       const emailData = {
         to: para[0], // Usar o primeiro destinatário
         cc: para.slice(1).join(','), // Outros como cópia se houver
@@ -180,7 +151,7 @@ export class EmailController {
         text: (corpo || '').replace(/<[^>]*>/g, ''), // Remover HTML para versão texto
       };
 
-      console.log('📧 Dados preparados para envio:', JSON.stringify(emailData, null, 2));
+      this.logger.log('[EMAIL] Dados preparados para envio:', JSON.stringify(emailData, null, 2));
 
       // Usar o serviço real de email
       const sucesso = await this.emailService.enviarEmailGenerico(emailData);
@@ -198,7 +169,7 @@ export class EmailController {
         throw new Error('Falha no envio do email');
       }
     } catch (error) {
-      console.error('❌ Erro no envio de email genérico:', error);
+      this.logger.error('[EMAIL] Erro no envio de email generico:', error);
       throw new HttpException(
         {
           success: false,
@@ -222,7 +193,6 @@ export class EmailController {
       endpoints: [
         'POST /email/notificar-aceite',
         'POST /email/enviar-proposta',
-        'GET /email/testar',
         'GET /email/status',
       ],
     };

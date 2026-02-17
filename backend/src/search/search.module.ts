@@ -6,11 +6,9 @@ import { Cliente } from '../modules/clientes/cliente.entity';
 import { Produto } from '../modules/produtos/produto.entity';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Cliente, Produto]),
-  ],
+  imports: [TypeOrmModule.forFeature([Cliente, Produto])],
   controllers: [SearchController],
   providers: [SearchService],
   exports: [SearchService],
 })
-export class SearchModule { }
+export class SearchModule {}

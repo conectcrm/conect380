@@ -24,7 +24,7 @@ import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 @Controller('pagamentos/gateways/configuracoes')
 @UseGuards(JwtAuthGuard, EmpresaGuard)
 export class ConfiguracaoGatewayController {
-  constructor(private readonly configuracaoGatewayService: ConfiguracaoGatewayService) { }
+  constructor(private readonly configuracaoGatewayService: ConfiguracaoGatewayService) {}
 
   @Get()
   async listar(
@@ -36,10 +36,7 @@ export class ConfiguracaoGatewayController {
   }
 
   @Get(':id')
-  async obter(
-    @EmpresaId() empresaId: string,
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  async obter(@EmpresaId() empresaId: string, @Param('id', ParseUUIDPipe) id: string) {
     return this.configuracaoGatewayService.findOne(id, empresaId);
   }
 
@@ -63,10 +60,7 @@ export class ConfiguracaoGatewayController {
   }
 
   @Delete(':id')
-  async remover(
-    @EmpresaId() empresaId: string,
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  async remover(@EmpresaId() empresaId: string, @Param('id', ParseUUIDPipe) id: string) {
     await this.configuracaoGatewayService.remove(id, empresaId);
     return { message: 'Configuração removida com sucesso' };
   }

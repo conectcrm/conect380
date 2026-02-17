@@ -11,14 +11,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Fila, EstrategiaDistribuicao } from '../entities/fila.entity';
 import { FilaAtendente } from '../entities/fila-atendente.entity';
+import { Ticket, StatusTicket } from '../entities/ticket.entity';
 import { User } from '../../users/user.entity';
-import { Ticket } from '../entities/ticket.entity';
-import {
-  CreateFilaDto,
-  UpdateFilaDto,
-  AddAtendenteFilaDto,
-  AtribuirTicketDto,
-} from '../dto/fila';
+import { CreateFilaDto, UpdateFilaDto, AddAtendenteFilaDto, AtribuirTicketDto } from '../dto/fila';
 import { DistribuicaoAvancadaService } from './distribuicao-avancada.service';
 
 export interface MetricasFila {
@@ -55,7 +50,7 @@ export class FilaService {
 
     @Inject(forwardRef(() => DistribuicaoAvancadaService))
     private readonly distribuicaoAvancadaService: DistribuicaoAvancadaService,
-  ) { }
+  ) {}
 
   /**
    * Lista todas as filas da empresa
@@ -92,10 +87,7 @@ export class FilaService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      this.logger.error(
-        `Erro ao buscar fila ${id}: ${error.message}`,
-        error.stack,
-      );
+      this.logger.error(`Erro ao buscar fila ${id}: ${error.message}`, error.stack);
       throw new InternalServerErrorException('Erro ao buscar fila');
     }
   }
@@ -116,8 +108,7 @@ export class FilaService {
       const fila = this.filaRepository.create({
         ...dto,
         empresaId,
-        estrategiaDistribuicao:
-          dto.estrategiaDistribuicao || EstrategiaDistribuicao.ROUND_ROBIN,
+        estrategiaDistribuicao: dto.estrategiaDistribuicao || EstrategiaDistribuicao.ROUND_ROBIN,
         capacidadeMaxima: dto.capacidadeMaxima || 10,
         distribuicaoAutomatica: dto.distribuicaoAutomatica || false,
         ordem: dto.ordem || 0,
@@ -129,10 +120,7 @@ export class FilaService {
 
       return filaSalva;
     } catch (error) {
-      this.logger.error(
-        `Erro ao criar fila: ${error.message}`,
-        error.stack,
-      );
+      this.logger.error(`Erro ao criar fila: ${error.message}`, error.stack);
       throw new InternalServerErrorException('Erro ao criar fila');
     }
   }
@@ -140,11 +128,7 @@ export class FilaService {
   /**
    * Atualiza uma fila existente
    */
-  async atualizar(
-    id: string,
-    empresaId: string,
-    dto: UpdateFilaDto,
-  ): Promise<Fila> {
+  async atualizar(id: string, empresaId: string, dto: UpdateFilaDto): Promise<Fila> {
     try {
       this.logger.log(`Atualizando fila: ${id}`);
 
@@ -160,10 +144,7 @@ export class FilaService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      this.logger.error(
-        `Erro ao atualizar fila ${id}: ${error.message}`,
-        error.stack,
-      );
+      this.logger.error(`Erro ao atualizar fila ${id}: ${error.message}`, error.stack);
       throw new InternalServerErrorException('Erro ao atualizar fila');
     }
   }
@@ -181,7 +162,7 @@ export class FilaService {
       const ticketsAtivos = await this.ticketRepository.count({
         where: {
           filaId: id,
-          status: 'Em atendimento',
+          status: StatusTicket.EM_ATENDIMENTO,
         },
       });
 
@@ -194,16 +175,10 @@ export class FilaService {
       await this.filaRepository.softDelete(id);
       this.logger.log(`Fila removida com sucesso: ${id}`);
     } catch (error) {
-      if (
-        error instanceof NotFoundException ||
-        error instanceof BadRequestException
-      ) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
       }
-      this.logger.error(
-        `Erro ao remover fila ${id}: ${error.message}`,
-        error.stack,
-      );
+      this.logger.error(`Erro ao remover fila ${id}: ${error.message}`, error.stack);
       throw new InternalServerErrorException('Erro ao remover fila');
     }
   }
@@ -217,9 +192,7 @@ export class FilaService {
     dto: AddAtendenteFilaDto,
   ): Promise<FilaAtendente> {
     try {
-      this.logger.log(
-        `Adicionando atendente ${dto.atendenteId} à fila ${filaId}`,
-      );
+      this.logger.log(`Adicionando atendente ${dto.atendenteId} à fila ${filaId}`);
 
       // Verificar se fila existe
       await this.buscarPorId(filaId, empresaId);
@@ -255,36 +228,22 @@ export class FilaService {
       });
 
       const resultado = await this.filaAtendenteRepository.save(filaAtendente);
-      this.logger.log(
-        `Atendente ${dto.atendenteId} adicionado à fila ${filaId}`,
-      );
+      this.logger.log(`Atendente ${dto.atendenteId} adicionado à fila ${filaId}`);
 
       return resultado;
     } catch (error) {
-      if (
-        error instanceof NotFoundException ||
-        error instanceof BadRequestException
-      ) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
       }
-      this.logger.error(
-        `Erro ao adicionar atendente à fila: ${error.message}`,
-        error.stack,
-      );
-      throw new InternalServerErrorException(
-        'Erro ao adicionar atendente à fila',
-      );
+      this.logger.error(`Erro ao adicionar atendente à fila: ${error.message}`, error.stack);
+      throw new InternalServerErrorException('Erro ao adicionar atendente à fila');
     }
   }
 
   /**
    * Remove um atendente de uma fila
    */
-  async removerAtendente(
-    filaId: string,
-    atendenteId: string,
-    empresaId: string,
-  ): Promise<void> {
+  async removerAtendente(filaId: string, atendenteId: string, empresaId: string): Promise<void> {
     try {
       this.logger.log(`Removendo atendente ${atendenteId} da fila ${filaId}`);
 
@@ -304,7 +263,7 @@ export class FilaService {
         where: {
           filaId,
           atendenteId,
-          status: 'Em atendimento',
+          status: StatusTicket.EM_ATENDIMENTO,
         },
       });
 
@@ -317,19 +276,11 @@ export class FilaService {
       await this.filaAtendenteRepository.remove(filaAtendente);
       this.logger.log(`Atendente ${atendenteId} removido da fila ${filaId}`);
     } catch (error) {
-      if (
-        error instanceof NotFoundException ||
-        error instanceof BadRequestException
-      ) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
       }
-      this.logger.error(
-        `Erro ao remover atendente da fila: ${error.message}`,
-        error.stack,
-      );
-      throw new InternalServerErrorException(
-        'Erro ao remover atendente da fila',
-      );
+      this.logger.error(`Erro ao remover atendente da fila: ${error.message}`, error.stack);
+      throw new InternalServerErrorException('Erro ao remover atendente da fila');
     }
   }
 
@@ -358,9 +309,7 @@ export class FilaService {
       // Se distribuição manual, atribuir diretamente
       if (dto.distribuicaoAutomatica === false) {
         if (!dto.atendenteId) {
-          throw new BadRequestException(
-            'atendenteId é obrigatório quando distribuição é manual',
-          );
+          throw new BadRequestException('atendenteId é obrigatório quando distribuição é manual');
         }
 
         const atendente = await this.userRepository.findOne({
@@ -387,12 +336,10 @@ export class FilaService {
         // Atribuir ticket
         ticket.filaId = dto.filaId;
         ticket.atendenteId = dto.atendenteId;
-        ticket.status = 'Em atendimento';
+        ticket.status = StatusTicket.EM_ATENDIMENTO;
         await this.ticketRepository.save(ticket);
 
-        this.logger.log(
-          `Ticket ${dto.ticketId} atribuído manualmente para ${dto.atendenteId}`,
-        );
+        this.logger.log(`Ticket ${dto.ticketId} atribuído manualmente para ${dto.atendenteId}`);
 
         return { ticket, atendente };
       }
@@ -412,7 +359,7 @@ export class FilaService {
           // Atribuir ticket
           ticket.filaId = dto.filaId;
           ticket.atendenteId = atendente.id;
-          ticket.status = 'Em atendimento';
+          ticket.status = StatusTicket.EM_ATENDIMENTO;
           await this.ticketRepository.save(ticket);
 
           // Atualizar contador de tickets do atendente
@@ -454,15 +401,13 @@ export class FilaService {
       }
 
       if (!atendente) {
-        throw new BadRequestException(
-          'Nenhum atendente disponível nesta fila',
-        );
+        throw new BadRequestException('Nenhum atendente disponível nesta fila');
       }
 
       // Atribuir ticket
       ticket.filaId = dto.filaId;
       ticket.atendenteId = atendente.id;
-      ticket.status = 'Em atendimento';
+      ticket.status = StatusTicket.EM_ATENDIMENTO;
       await this.ticketRepository.save(ticket);
 
       // Atualizar contador de tickets do atendente
@@ -476,16 +421,10 @@ export class FilaService {
 
       return { ticket, atendente };
     } catch (error) {
-      if (
-        error instanceof NotFoundException ||
-        error instanceof BadRequestException
-      ) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
       }
-      this.logger.error(
-        `Erro ao distribuir ticket: ${error.message}`,
-        error.stack,
-      );
+      this.logger.error(`Erro ao distribuir ticket: ${error.message}`, error.stack);
       throw new InternalServerErrorException('Erro ao distribuir ticket');
     }
   }
@@ -515,10 +454,7 @@ export class FilaService {
 
     for (const fa of filasAtendentes) {
       const atendente = fa.atendente;
-      if (
-        atendente.status_atendente === 'DISPONIVEL' &&
-        atendente.tickets_ativos < fa.capacidade
-      ) {
+      if (atendente.status_atendente === 'DISPONIVEL' && atendente.tickets_ativos < fa.capacidade) {
         atendentesDisponiveis.push(atendente);
       }
     }
@@ -603,10 +539,7 @@ export class FilaService {
     // Percorrer atendentes por ordem de prioridade
     for (const fa of filasAtendentes) {
       const atendente = fa.atendente;
-      if (
-        atendente.status_atendente === 'DISPONIVEL' &&
-        atendente.tickets_ativos < fa.capacidade
-      ) {
+      if (atendente.status_atendente === 'DISPONIVEL' && atendente.tickets_ativos < fa.capacidade) {
         this.logger.log(
           `PRIORIDADE: Atendente ${atendente.id} escolhido (prioridade ${fa.prioridade}, ${atendente.tickets_ativos} tickets ativos)`,
         );
@@ -614,19 +547,14 @@ export class FilaService {
       }
     }
 
-    this.logger.warn(
-      `Nenhum atendente disponível na fila ${fila.id} (todos em capacidade máxima)`,
-    );
+    this.logger.warn(`Nenhum atendente disponível na fila ${fila.id} (todos em capacidade máxima)`);
     return null;
   }
 
   /**
    * Obter métricas de uma fila
    */
-  async obterMetricas(
-    filaId: string,
-    empresaId: string,
-  ): Promise<MetricasFila> {
+  async obterMetricas(filaId: string, empresaId: string): Promise<MetricasFila> {
     try {
       this.logger.log(`Obtendo métricas da fila ${filaId}`);
 
@@ -640,17 +568,17 @@ export class FilaService {
 
       // Tickets aguardando
       const ticketsAguardando = await this.ticketRepository.count({
-        where: { filaId, status: 'Novo' },
+        where: { filaId, status: StatusTicket.AGUARDANDO_CLIENTE },
       });
 
       // Tickets em atendimento
       const ticketsEmAtendimento = await this.ticketRepository.count({
-        where: { filaId, status: 'Em atendimento' },
+        where: { filaId, status: StatusTicket.EM_ATENDIMENTO },
       });
 
       // Tickets finalizados
       const ticketsFinalizados = await this.ticketRepository.count({
-        where: { filaId, status: 'Fechado' },
+        where: { filaId, status: StatusTicket.ENCERRADO },
       });
 
       // Atendentes disponíveis
@@ -676,8 +604,7 @@ export class FilaService {
       const tempoMedioAtendimento = 0;
 
       // Taxa de resolução
-      const taxaResolucao =
-        totalTickets > 0 ? (ticketsFinalizados / totalTickets) * 100 : 0;
+      const taxaResolucao = totalTickets > 0 ? (ticketsFinalizados / totalTickets) * 100 : 0;
 
       return {
         totalTickets,
@@ -694,13 +621,8 @@ export class FilaService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      this.logger.error(
-        `Erro ao obter métricas da fila ${filaId}: ${error.message}`,
-        error.stack,
-      );
-      throw new InternalServerErrorException(
-        'Erro ao obter métricas da fila',
-      );
+      this.logger.error(`Erro ao obter métricas da fila ${filaId}: ${error.message}`, error.stack);
+      throw new InternalServerErrorException('Erro ao obter métricas da fila');
     }
   }
 
@@ -724,9 +646,7 @@ export class FilaService {
     try {
       // Validar que pelo menos um foi fornecido
       if (!nucleoId && !departamentoId) {
-        throw new BadRequestException(
-          'É necessário fornecer nucleoId ou departamentoId',
-        );
+        throw new BadRequestException('É necessário fornecer nucleoId ou departamentoId');
       }
 
       // Buscar fila
@@ -749,19 +669,14 @@ export class FilaService {
 
       return filaAtualizada;
     } catch (error) {
-      if (
-        error instanceof NotFoundException ||
-        error instanceof BadRequestException
-      ) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
       }
       this.logger.error(
         `Erro ao atribuir núcleo/departamento à fila ${filaId}: ${error.message}`,
         error.stack,
       );
-      throw new InternalServerErrorException(
-        'Erro ao atribuir núcleo/departamento à fila',
-      );
+      throw new InternalServerErrorException('Erro ao atribuir núcleo/departamento à fila');
     }
   }
 
@@ -787,9 +702,7 @@ export class FilaService {
         `Erro ao listar filas do núcleo ${nucleoId}: ${error.message}`,
         error.stack,
       );
-      throw new InternalServerErrorException(
-        'Erro ao listar filas por núcleo',
-      );
+      throw new InternalServerErrorException('Erro ao listar filas por núcleo');
     }
   }
 
@@ -799,10 +712,7 @@ export class FilaService {
    * @param empresaId - ID da empresa
    * @returns Lista de filas
    */
-  async listarPorDepartamento(
-    departamentoId: string,
-    empresaId: string,
-  ): Promise<Fila[]> {
+  async listarPorDepartamento(departamentoId: string, empresaId: string): Promise<Fila[]> {
     try {
       return await this.filaRepository.find({
         where: {
@@ -818,9 +728,7 @@ export class FilaService {
         `Erro ao listar filas do departamento ${departamentoId}: ${error.message}`,
         error.stack,
       );
-      throw new InternalServerErrorException(
-        'Erro ao listar filas por departamento',
-      );
+      throw new InternalServerErrorException('Erro ao listar filas por departamento');
     }
   }
 
@@ -831,10 +739,7 @@ export class FilaService {
    * @param empresaId - ID da empresa
    * @returns Fila com menor carga ou null
    */
-  async buscarFilaIdealPorNucleo(
-    nucleoId: string,
-    empresaId: string,
-  ): Promise<Fila | null> {
+  async buscarFilaIdealPorNucleo(nucleoId: string, empresaId: string): Promise<Fila | null> {
     try {
       const filas = await this.listarPorNucleo(nucleoId, empresaId);
 
@@ -844,9 +749,7 @@ export class FilaService {
       }
 
       // Filtrar filas com distribuição automática ativa
-      const filasAutomaticas = filas.filter(
-        (fila) => fila.distribuicaoAutomatica,
-      );
+      const filasAutomaticas = filas.filter((fila) => fila.distribuicaoAutomatica);
 
       if (filasAutomaticas.length === 0) {
         // Se nenhuma tem distribuição automática, retornar primeira
@@ -888,16 +791,13 @@ export class FilaService {
     try {
       return await this.ticketRepository.count({
         where: [
-          { filaId: filaId, status: 'aguardando' },
-          { filaId: filaId, status: 'em_atendimento' },
+          { filaId: filaId, status: StatusTicket.AGUARDANDO_CLIENTE },
+          { filaId: filaId, status: StatusTicket.EM_ATENDIMENTO },
         ],
       });
     } catch (error) {
-      this.logger.error(
-        `Erro ao contar tickets ativos da fila ${filaId}: ${error.message}`,
-      );
+      this.logger.error(`Erro ao contar tickets ativos da fila ${filaId}: ${error.message}`);
       return 0;
     }
   }
 }
-

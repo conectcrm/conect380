@@ -108,9 +108,7 @@ export class CreateNotificationsTable1763334700000 implements MigrationInterface
     // Dropar foreign key
     const table = await queryRunner.getTable('notifications');
     if (table) {
-      const foreignKey = table.foreignKeys.find(
-        (fk) => fk.columnNames.indexOf('user_id') !== -1,
-      );
+      const foreignKey = table.foreignKeys.find((fk) => fk.columnNames.indexOf('user_id') !== -1);
       if (foreignKey) {
         await queryRunner.dropForeignKey('notifications', foreignKey);
       }

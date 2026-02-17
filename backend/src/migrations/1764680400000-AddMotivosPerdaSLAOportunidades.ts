@@ -1,7 +1,7 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class AddMotivosPerdaSLAOportunidades1764680400000 implements MigrationInterface {
-  name = 'AddMotivosPerdaSLAOportunidades1764680400000'
+  name = 'AddMotivosPerdaSLAOportunidades1764680400000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Adicionar coluna motivo_perda (enum)
@@ -93,7 +93,9 @@ export class AddMotivosPerdaSLAOportunidades1764680400000 implements MigrationIn
     // Remover colunas
     await queryRunner.query(`ALTER TABLE "oportunidades" DROP COLUMN "precisa_atencao"`);
     await queryRunner.query(`ALTER TABLE "oportunidades" DROP COLUMN "dias_no_estagio_atual"`);
-    await queryRunner.query(`ALTER TABLE "oportunidades" DROP COLUMN "data_ultima_mudanca_estagio"`);
+    await queryRunner.query(
+      `ALTER TABLE "oportunidades" DROP COLUMN "data_ultima_mudanca_estagio"`,
+    );
     await queryRunner.query(`ALTER TABLE "oportunidades" DROP COLUMN "data_revisao"`);
     await queryRunner.query(`ALTER TABLE "oportunidades" DROP COLUMN "concorrente_nome"`);
     await queryRunner.query(`ALTER TABLE "oportunidades" DROP COLUMN "motivo_perda_detalhes"`);

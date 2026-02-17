@@ -23,4 +23,4 @@ import { PropostasModule } from '../propostas/propostas.module';
     TypeOrmModule, // Exporta os repositórios
   ],
 })
-export class ContratosModule { }
+export class ContratosModule {}

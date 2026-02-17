@@ -300,7 +300,7 @@ const PaymentComponent: React.FC<PaymentComponentProps> = ({
                   value={pixData.point_of_interaction.transaction_data.qr_code}
                   className="font-mono text-xs"
                 />
-                <Button variant="outline" size="icon" onClick={copiarPixCode} disabled={copied}>
+                <Button variant="outline" size="sm" onClick={copiarPixCode} disabled={copied}>
                   {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                 </Button>
               </div>

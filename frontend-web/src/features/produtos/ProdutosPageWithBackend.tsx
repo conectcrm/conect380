@@ -629,9 +629,11 @@ const ProdutosPage: React.FC = () => {
           setShowModalAvancado(false);
           setProdutoParaEditar(null);
         }}
-        onSubmit={handleSaveProduto}
-        produtoParaEditar={produtoParaEditar}
-        isLoading={isLoadingSave}
+        onSubmit={(data) => {
+          void handleSaveProduto(data as any);
+        }}
+        produtoEditando={produtoParaEditar as any}
+        loading={isLoadingSave}
       />
 
       {/* Modal de Confirmação de Exclusão */}

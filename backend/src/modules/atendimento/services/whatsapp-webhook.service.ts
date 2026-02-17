@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { createHmac } from 'crypto';
 import { IntegracoesConfig } from '../entities/integracoes-config.entity';
-import { Canal, TipoCanal } from '../entities/canal.entity';
+import { Canal, TipoCanal, StatusCanal } from '../entities/canal.entity';
 import { AIResponseService } from './ai-response.service';
 import { WhatsAppSenderService } from './whatsapp-sender.service';
 import { TicketService } from './ticket.service';
@@ -35,7 +35,7 @@ export class WhatsAppWebhookService {
   async validarTokenVerificacao(empresaId: string, verifyToken: string): Promise<boolean> {
     try {
       // 1. Tentar validar com token do .env (fallback)
-      const tokenEnv = process.env.WHATSAPP_VERIFY_TOKEN || 'conectcrm_webhook_token_123';
+      const tokenEnv = process.env.WHATSAPP_VERIFY_TOKEN?.trim();
       if (verifyToken === tokenEnv) {
         this.logger.log(`✅ Token validado via .env`);
         return true;
@@ -66,12 +66,17 @@ export class WhatsAppWebhookService {
     } catch (error) {
       this.logger.error('Erro ao validar token:', error.message);
       // Em caso de erro, validar pelo .env
-      const tokenEnv = process.env.WHATSAPP_VERIFY_TOKEN || 'conectcrm_webhook_token_123';
+      const tokenEnv = process.env.WHATSAPP_VERIFY_TOKEN?.trim();
       return verifyToken === tokenEnv;
     }
   }
 
-  async validarAssinatura(empresaId: string, payload: any, signature: string): Promise<boolean> {
+  async validarAssinatura(
+    empresaId: string,
+    payload: any,
+    signature: string,
+    rawBody?: Buffer,
+  ): Promise<boolean> {
     try {
       if (!signature) return false;
 
@@ -84,9 +89,11 @@ export class WhatsAppWebhookService {
       const appSecret = integracao.credenciais?.whatsapp_app_secret;
       if (!appSecret) return process.env.NODE_ENV === 'development';
 
-      const payloadString = JSON.stringify(payload);
+      const payloadBuffer = Buffer.isBuffer(rawBody)
+        ? rawBody
+        : Buffer.from(JSON.stringify(payload));
       const expectedSignature =
-        'sha256=' + createHmac('sha256', appSecret).update(payloadString).digest('hex');
+        'sha256=' + createHmac('sha256', appSecret).update(payloadBuffer).digest('hex');
 
       return signature === expectedSignature;
     } catch (error) {
@@ -141,6 +148,36 @@ export class WhatsAppWebhookService {
       this.logger.error(`❌ Erro ao processar webhook: ${error.message}`, error.stack);
       throw error;
     }
+  }
+
+  async receberEntradaWebhook(input: {
+    empresaIdHint: string;
+    payload: any;
+    signature: string;
+    rawBody?: Buffer;
+  }): Promise<{ success: boolean; empresaId: string; message?: string }> {
+    const empresaId = input.empresaIdHint;
+    const assinaturaValida = await this.validarAssinatura(
+      empresaId,
+      input.payload,
+      input.signature,
+      input.rawBody,
+    );
+
+    if (!assinaturaValida) {
+      return {
+        success: false,
+        empresaId,
+        message: 'Assinatura invalida',
+      };
+    }
+
+    await this.processar(empresaId, input.payload);
+
+    return {
+      success: true,
+      empresaId,
+    };
   }
 
   /**
@@ -529,7 +566,7 @@ export class WhatsAppWebhookService {
         conteudo,
         idExterno: messageId,
         midia: message[type], // Dados originais da mídia (se houver)
-      });
+      }, empresaId);
 
       console.log(`✅ [WEBHOOK DEBUG] Mensagem salva: ${mensagem ? mensagem.id : 'NULL'}`);
       this.logger.log(`💾 Mensagem salva: ${mensagem.id}`);
@@ -609,7 +646,7 @@ export class WhatsAppWebhookService {
               remetente: RemetenteMensagem.BOT as string,
               conteudo: resposta,
               idExterno: resultadoEnvio.messageId,
-            });
+            }, empresaId);
 
             this.logger.log(`💾 Resposta IA salva no banco`);
           } else {
@@ -698,14 +735,32 @@ export class WhatsAppWebhookService {
     phoneNumberId: string,
   ): Promise<Canal | null> {
     try {
+      const phoneIdNormalizado = (phoneNumberId || '').trim();
+      if (!phoneIdNormalizado) {
+        return null;
+      }
+
       // Buscar canal onde a configuração contenha o phone_number_id
       const canais = await this.canalRepo.find({
-        where: { empresaId, tipo: TipoCanal.WHATSAPP, ativo: true },
+        where: { empresaId, tipo: TipoCanal.WHATSAPP },
       });
 
       for (const canal of canais) {
-        const phoneId = canal.configuracao?.credenciais?.whatsapp_phone_number_id;
-        if (phoneId === phoneNumberId) {
+        const configuracao = canal.configuracao || {};
+        const credenciais = (configuracao as any)?.credenciais || {};
+        const phoneId = String(credenciais.whatsapp_phone_number_id || '').trim();
+        const phoneIdAlternativo = String(
+          (configuracao as any)?.whatsapp_phone_number_id ||
+            (configuracao as any)?.phone_number_id ||
+            '',
+        ).trim();
+
+        const canalAtivo = Boolean(canal.ativo) || canal.status === StatusCanal.ATIVO;
+        const matchPhoneId =
+          (phoneId && phoneId === phoneIdNormalizado) ||
+          (phoneIdAlternativo && phoneIdAlternativo === phoneIdNormalizado);
+
+        if (canalAtivo && matchPhoneId) {
           return canal;
         }
       }

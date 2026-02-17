@@ -64,7 +64,6 @@ interface FunilData {
 interface VendedorData {
   nome: string;
   vendas: number;
-  valor: number;
 }
 
 interface AtividadesData {
@@ -250,7 +249,7 @@ export const VendedoresChart: React.FC<{ data?: VendedorData[] }> = ({ data }) =
                 borderRadius: '8px',
               }}
             />
-            <Bar dataKey="valor" fill={COLORS.success} radius={[0, 4, 4, 0]} />
+            <Bar dataKey="vendas" fill={COLORS.success} radius={[0, 4, 4, 0]} />
           </BarChart>
         </ResponsiveContainer>
       ) : (

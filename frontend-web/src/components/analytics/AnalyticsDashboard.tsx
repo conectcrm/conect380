@@ -121,7 +121,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ periodo = '30d'
         `/api/analytics/dashboard?periodo=${selectedPeriodo}&vendedor=${selectedVendedor}`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+            Authorization: `Bearer ${localStorage.getItem('authToken')}`,
           },
         },
       );
@@ -161,7 +161,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ periodo = '30d'
         `/api/analytics/export?periodo=${selectedPeriodo}&vendedor=${selectedVendedor}`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+            Authorization: `Bearer ${localStorage.getItem('authToken')}`,
           },
         },
       );

@@ -341,7 +341,7 @@ const ModalConfirmacao: React.FC<ModalConfirmacaoProps> = ({
 
   const config = getConfirmationConfig(tipo, dados);
   const IconComponent = config.icon;
-  const showCancel = config.showCancel !== false;
+  const showCancel = (config as { showCancel?: boolean }).showCancel !== false;
 
   const getSeverityColors = (severity: string) => {
     switch (severity) {

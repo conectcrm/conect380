@@ -11,7 +11,6 @@ import {
 } from 'typeorm';
 import { Empresa } from '../../../empresas/entities/empresa.entity';
 import * as crypto from 'crypto';
-import { Empresa } from '../../empresas/entities/empresa.entity';
 
 @Entity('atendimento_redmine_configs')
 export class RedmineConfig {
@@ -20,10 +19,6 @@ export class RedmineConfig {
 
   @Column({ type: 'uuid', name: 'empresa_id', unique: true })
   empresaId: string;
-
-  @ManyToOne(() => Empresa)
-  @JoinColumn({ name: 'empresa_id' })
-  empresa: Empresa;
 
   @ManyToOne(() => Empresa, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'empresa_id' })
@@ -114,10 +109,7 @@ export class RedmineConfig {
 
   private encrypt(text: string): string {
     const algorithm = 'aes-256-cbc';
-    const key = Buffer.from(
-      process.env.ENCRYPTION_KEY || '0'.repeat(64),
-      'hex',
-    );
+    const key = Buffer.from(process.env.ENCRYPTION_KEY || '0'.repeat(64), 'hex');
     const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv(algorithm, key, iv);
     let encrypted = cipher.update(text, 'utf8', 'hex');
@@ -128,10 +120,7 @@ export class RedmineConfig {
   private decrypt(text: string): string {
     try {
       const algorithm = 'aes-256-cbc';
-      const key = Buffer.from(
-        process.env.ENCRYPTION_KEY || '0'.repeat(64),
-        'hex',
-      );
+      const key = Buffer.from(process.env.ENCRYPTION_KEY || '0'.repeat(64), 'hex');
       const [ivHex, encryptedHex] = text.split(':');
       const iv = Buffer.from(ivHex, 'hex');
       const decipher = crypto.createDecipheriv(algorithm, key, iv);

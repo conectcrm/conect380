@@ -1,12 +1,9 @@
 import { Controller, Get, Param } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { ensureDevelopmentOnly } from '../../../common/utils/dev-only.util';
 import { Contato } from '../contato.entity';
 
-/**
- * Controller de teste para debug
- * Remove guards e validações para isolar o problema
- */
 @Controller('api/test/contatos')
 export class ContatosTestController {
   constructor(
@@ -14,17 +11,25 @@ export class ContatosTestController {
     private contatoRepository: Repository<Contato>,
   ) {}
 
+  private ensureDev(route: string): void {
+    ensureDevelopmentOnly(route);
+  }
+
   @Get('health')
   async health() {
+    this.ensureDev('GET /api/test/contatos/health');
+
     return {
       status: 'ok',
-      message: 'Controller está funcionando',
+      message: 'Controller esta funcionando',
       timestamp: new Date().toISOString(),
     };
   }
 
   @Get('repository-check')
   async checkRepository() {
+    this.ensureDev('GET /api/test/contatos/repository-check');
+
     try {
       const exists = this.contatoRepository !== undefined;
       return {
@@ -32,33 +37,36 @@ export class ContatosTestController {
         repositoryInjected: exists,
         repositoryType: typeof this.contatoRepository,
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
         status: 'error',
-        error: error.message,
+        error: error?.message ?? 'Erro ao verificar repository',
       };
     }
   }
 
   @Get('count')
   async count() {
+    this.ensureDev('GET /api/test/contatos/count');
+
     try {
       const count = await this.contatoRepository.count();
       return {
         status: 'ok',
         totalContatos: count,
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
         status: 'error',
-        error: error.message,
-        stack: error.stack,
+        error: error?.message ?? 'Erro ao contar contatos',
       };
     }
   }
 
   @Get('list')
   async list() {
+    this.ensureDev('GET /api/test/contatos/list');
+
     try {
       const contatos = await this.contatoRepository.find({
         take: 10,
@@ -68,17 +76,18 @@ export class ContatosTestController {
         count: contatos.length,
         contatos,
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
         status: 'error',
-        error: error.message,
-        stack: error.stack,
+        error: error?.message ?? 'Erro ao listar contatos',
       };
     }
   }
 
   @Get('by-cliente/:clienteId')
   async byCliente(@Param('clienteId') clienteId: string) {
+    this.ensureDev('GET /api/test/contatos/by-cliente/:clienteId');
+
     try {
       const contatos = await this.contatoRepository.find({
         where: { clienteId },
@@ -89,11 +98,10 @@ export class ContatosTestController {
         count: contatos.length,
         contatos,
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
         status: 'error',
-        error: error.message,
-        stack: error.stack,
+        error: error?.message ?? 'Erro ao buscar contatos por cliente',
       };
     }
   }

@@ -7,7 +7,7 @@ import {
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
-import { Empresa } from '../../../empresas/entities/empresa.entity';
+import { Empresa } from '../../empresas/entities/empresa.entity';
 
 export enum TipoEvento {
   REUNIAO = 'reuniao',
@@ -57,11 +57,11 @@ export class Evento {
   @Column({ name: 'usuarioId', type: 'uuid' })
   usuarioId: string;
 
-  @Column({ name: 'empresaId', type: 'uuid' })
+  @Column({ type: 'uuid', name: 'empresa_id' })
   empresaId: string;
 
   @ManyToOne(() => Empresa)
-  @JoinColumn({ name: 'empresaId' })
+  @JoinColumn({ name: 'empresa_id' })
   empresa: Empresa;
 
   @CreateDateColumn({ name: 'criadoEm', type: 'timestamp with time zone' })

@@ -226,8 +226,8 @@ class PropostasService {
         nome: proposta.vendedor.nome,
         email: proposta.vendedor.email,
         telefone: (proposta.vendedor as any)?.telefone || '',
-        tipo: (proposta.vendedor.tipo as any) || 'vendedor',
-        ativo: proposta.vendedor.ativo ?? true,
+        tipo: (proposta.vendedor as any)?.tipo || 'vendedor',
+        ativo: (proposta.vendedor as any)?.ativo ?? true,
       };
     }
 
@@ -242,31 +242,32 @@ class PropostasService {
   }
 
   private mapPropostaBasica(proposta: PropostaBasica): PropostaCompleta {
+    const propostaAny = proposta as any;
     const cliente = this.mapCliente(proposta);
     const produtos = this.mapProdutos(proposta);
     const vendedor = this.mapVendedor(proposta);
 
     return {
-      id: proposta.id,
-      numero: proposta.numero,
-      titulo: proposta.titulo || proposta.numero || cliente.nome || 'Proposta Comercial',
-      status: (proposta.status as any) || 'rascunho',
+      id: propostaAny.id,
+      numero: propostaAny.numero,
+      titulo: propostaAny.titulo || propostaAny.numero || cliente.nome || 'Proposta Comercial',
+      status: (propostaAny.status as any) || 'rascunho',
       cliente,
       vendedor,
       produtos,
-      descontoGlobal: proposta.descontoGlobal ?? 0,
-      impostos: proposta.impostos ?? 0,
-      formaPagamento: (proposta.formaPagamento as any) || 'avista',
-      validadeDias: proposta.validadeDias ?? 30,
-      observacoes: proposta.observacoes || '',
-      incluirImpostosPDF: Boolean(proposta.incluirImpostosPDF),
-      subtotal: proposta.subtotal ?? proposta.total ?? proposta.valor ?? 0,
-      total: proposta.total ?? proposta.valor ?? 0,
-      dataValidade: proposta.dataVencimento
-        ? new Date(proposta.dataVencimento)
-        : new Date(Date.now() + (proposta.validadeDias ?? 30) * 24 * 60 * 60 * 1000),
-      criadaEm: proposta.criadaEm ? new Date(proposta.criadaEm) : new Date(),
-      atualizadaEm: proposta.atualizadaEm ? new Date(proposta.atualizadaEm) : new Date(),
+      descontoGlobal: propostaAny.descontoGlobal ?? 0,
+      impostos: propostaAny.impostos ?? 0,
+      formaPagamento: (propostaAny.formaPagamento as any) || 'avista',
+      validadeDias: propostaAny.validadeDias ?? 30,
+      observacoes: propostaAny.observacoes || '',
+      incluirImpostosPDF: Boolean(propostaAny.incluirImpostosPDF),
+      subtotal: propostaAny.subtotal ?? propostaAny.total ?? propostaAny.valor ?? 0,
+      total: propostaAny.total ?? propostaAny.valor ?? 0,
+      dataValidade: propostaAny.dataVencimento
+        ? new Date(propostaAny.dataVencimento)
+        : new Date(Date.now() + (propostaAny.validadeDias ?? 30) * 24 * 60 * 60 * 1000),
+      criadaEm: propostaAny.criadaEm ? new Date(propostaAny.criadaEm) : new Date(),
+      atualizadaEm: propostaAny.atualizadaEm ? new Date(propostaAny.atualizadaEm) : new Date(),
     };
   }
 

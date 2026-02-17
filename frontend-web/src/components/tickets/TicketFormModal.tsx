@@ -14,10 +14,9 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, AlertCircle, Clock, HelpCircle, Check, XCircle, Search, ChevronDown, Paperclip, FileText, Image as ImageIcon, File, Trash2, Upload, BookTemplate, Download, Calendar, UserPlus, Copy, Eye, EyeOff, Plus, Bell, Link, History, GitBranch } from 'lucide-react';
+import { X, Save, AlertCircle, Clock, HelpCircle, Check, XCircle, Search, ChevronDown, FileText, Image as ImageIcon, File, Trash2, Upload, BookTemplate, Download, Calendar, UserPlus, Copy, Eye, EyeOff, Plus, Bell, Link, History, GitBranch } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { ticketsService, TipoTicket, PrioridadeTicketApi } from '../../services/ticketsService';
-import type { Ticket } from '../../services/ticketsService';
+import { ticketsService, TipoTicket, PrioridadeTicketApi, type Ticket } from '../../services/ticketsService';
 import { clientesService, Cliente } from '../../services/clientesService';
 import usersService, { User } from '../../services/usersService';
 import tagsService, { Tag } from '../../services/tagsService';
@@ -83,13 +82,39 @@ interface TicketFormData {
   ticketsRelacionados: TicketRelacionado[]; // Tickets relacionados/duplicados/bloqueados
 }
 
+interface TicketDraftPayload {
+  formData: TicketFormData;
+  clienteSearchTerm: string;
+  responsavelSearchTerm: string;
+  slaMinutes: number | null;
+  updatedAt: string;
+}
+
 interface TicketFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (savedTicket?: Ticket) => void;
   ticket?: Ticket | null;
   mode: 'create' | 'edit';
+  layout?: 'modal' | 'page';
+  draftStorageKey?: string;
 }
+
+const createEmptyFormData = (): TicketFormData => ({
+  titulo: '',
+  clienteId: '',
+  nivelAtendimentoId: '',
+  statusCustomizadoId: '',
+  tipoServicoId: '',
+  prioridade: 'MEDIA',
+  responsavelId: '',
+  tagIds: [],
+  descricao: '',
+  prazoCustomizado: undefined,
+  observadorIds: [],
+  notificarCliente: false,
+  ticketsRelacionados: [],
+});
 
 export const TicketFormModal: React.FC<TicketFormModalProps> = ({
   isOpen,
@@ -97,22 +122,10 @@ export const TicketFormModal: React.FC<TicketFormModalProps> = ({
   onSuccess,
   ticket,
   mode,
+  layout = 'modal',
+  draftStorageKey,
 }) => {
-  const [formData, setFormData] = useState<TicketFormData>({
-    titulo: '',
-    clienteId: '',
-    nivelAtendimentoId: '',
-    statusCustomizadoId: '',
-    tipoServicoId: '',
-    prioridade: 'MEDIA',
-    responsavelId: '',
-    tagIds: [],
-    descricao: '',
-    prazoCustomizado: undefined,
-    observadorIds: [],
-    notificarCliente: false,
-    ticketsRelacionados: [],
-  });
+  const [formData, setFormData] = useState<TicketFormData>(createEmptyFormData);
 
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
@@ -184,6 +197,9 @@ export const TicketFormModal: React.FC<TicketFormModalProps> = ({
   const [loadingStatus, setLoadingStatus] = useState(false);
 
   const [slaMinutes, setSlaMinutes] = useState<number | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const isPageLayout = layout === 'page';
+  const shouldPersistDraft = mode === 'create' && Boolean(draftStorageKey);
 
   useEffect(() => {
     if (isOpen) {
@@ -196,8 +212,8 @@ export const TicketFormModal: React.FC<TicketFormModalProps> = ({
     if (!isOpen) return;
 
     const handleKeyboard = (e: KeyboardEvent) => {
-      // Esc para fechar
-      if (e.key === 'Escape' && !loading) {
+      // Esc para fechar apenas em modo modal
+      if (e.key === 'Escape' && !loading && !isPageLayout) {
         onClose();
       }
       // Ctrl+Enter ou Cmd+Enter para salvar
@@ -209,7 +225,7 @@ export const TicketFormModal: React.FC<TicketFormModalProps> = ({
 
     window.addEventListener('keydown', handleKeyboard);
     return () => window.removeEventListener('keydown', handleKeyboard);
-  }, [isOpen, loading, onClose]);
+  }, [isOpen, loading, onClose, isPageLayout]);
 
   // Filtrar clientes em tempo real
   useEffect(() => {
@@ -271,6 +287,8 @@ export const TicketFormModal: React.FC<TicketFormModalProps> = ({
     setObservadoresFiltrados(filtrados);
   }, [observadoresSearch, usuarios, formData.observadorIds]);
   useEffect(() => {
+    if (!isOpen) return;
+
     if (mode === 'edit' && ticket) {
       setFormData({
         titulo: ticket.titulo || ticket.assunto || '',
@@ -279,7 +297,7 @@ export const TicketFormModal: React.FC<TicketFormModalProps> = ({
         nivelAtendimentoId: (ticket as any).nivelAtendimentoId || '',
         statusCustomizadoId: (ticket as any).statusCustomizadoId || '',
         tipoServicoId: (ticket as any).tipoServicoId || '',
-        prioridade: ticket.prioridade as any || 'MEDIA',
+        prioridade: (ticket.prioridade as PrioridadeTicketApi) || 'MEDIA',
         responsavelId: ticket.responsavelId || '',
         tagIds: [], // TODO: Backend não retorna tags ainda, implementar relacionamento
         descricao: ticket.descricao || '',
@@ -289,41 +307,126 @@ export const TicketFormModal: React.FC<TicketFormModalProps> = ({
         ticketsRelacionados: [],
       });
       setSlaMinutes(ticket.slaTargetMinutes || null);
-      // Preencher campos de busca no modo edição
-      if (ticket.clienteId) {
-        const clienteNome = getClienteNome(ticket.clienteId);
-        if (clienteNome) setClienteSearchTerm(clienteNome);
-      }
-      if (ticket.responsavelId) {
-        const responsavelNome = getResponsavelNome(ticket.responsavelId);
-        if (responsavelNome) setResponsavelSearchTerm(responsavelNome);
-      }
-    } else {
-      setFormData({
-        titulo: '',
-        clienteId: '',
-        nivelAtendimentoId: '',
-        statusCustomizadoId: '',
-        tipoServicoId: '',
-        prioridade: 'MEDIA',
-        responsavelId: '',
-        tagIds: [],
-        descricao: '',
-        prazoCustomizado: undefined,
-        observadorIds: [],
-        notificarCliente: false,
-        ticketsRelacionados: [],
-      });
-      setSlaMinutes(null);
       setClienteSearchTerm('');
       setResponsavelSearchTerm('');
-      setAnexos([]);
+      setDraftRestored(false);
+    } else {
+      const emptyForm = createEmptyFormData();
+      let restored = false;
+
+      if (shouldPersistDraft && draftStorageKey) {
+        const draftRaw = localStorage.getItem(draftStorageKey);
+        if (draftRaw) {
+          try {
+            const parsedDraft = JSON.parse(draftRaw) as TicketDraftPayload;
+            if (parsedDraft && parsedDraft.formData) {
+              const safeDraftForm: TicketFormData = {
+                ...emptyForm,
+                ...parsedDraft.formData,
+                tagIds: Array.isArray(parsedDraft.formData.tagIds) ? parsedDraft.formData.tagIds : [],
+                observadorIds: Array.isArray(parsedDraft.formData.observadorIds)
+                  ? parsedDraft.formData.observadorIds
+                  : [],
+                ticketsRelacionados: Array.isArray(parsedDraft.formData.ticketsRelacionados)
+                  ? parsedDraft.formData.ticketsRelacionados
+                  : [],
+              };
+              setFormData(safeDraftForm);
+              setClienteSearchTerm(parsedDraft.clienteSearchTerm || '');
+              setResponsavelSearchTerm(parsedDraft.responsavelSearchTerm || '');
+              setSlaMinutes(typeof parsedDraft.slaMinutes === 'number' ? parsedDraft.slaMinutes : null);
+              restored = true;
+              setDraftRestored(true);
+              toast.success('Rascunho restaurado com sucesso.');
+            }
+          } catch (error) {
+            console.error('Erro ao restaurar rascunho do ticket:', error);
+            localStorage.removeItem(draftStorageKey);
+          }
+        }
+      }
+
+      if (!restored) {
+        setFormData(emptyForm);
+        setClienteSearchTerm('');
+        setResponsavelSearchTerm('');
+        setSlaMinutes(null);
+        setDraftRestored(false);
+      }
     }
+
     setErrors({});
     setSubmitError(null);
     setShowClienteDropdown(false);
     setShowResponsavelDropdown(false);
-  }, [mode, ticket, isOpen, clientes, usuarios]);
+    setAnexos([]);
+  }, [mode, ticket, isOpen, shouldPersistDraft, draftStorageKey]);
+
+  useEffect(() => {
+    if (!isOpen || mode !== 'edit' || !ticket) return;
+
+    if (ticket.clienteId && !clienteSearchTerm && clientes.length > 0) {
+      const clienteNome = getClienteNome(ticket.clienteId);
+      if (clienteNome) setClienteSearchTerm(clienteNome);
+    }
+
+    if (ticket.responsavelId && !responsavelSearchTerm && usuarios.length > 0) {
+      const responsavelNome = getResponsavelNome(ticket.responsavelId);
+      if (responsavelNome) setResponsavelSearchTerm(responsavelNome);
+    }
+  }, [
+    isOpen,
+    mode,
+    ticket,
+    clientes,
+    usuarios,
+    clienteSearchTerm,
+    responsavelSearchTerm,
+  ]);
+
+  useEffect(() => {
+    if (!isOpen || !shouldPersistDraft || !draftStorageKey) return;
+
+    const hasDraftContent =
+      Boolean(formData.titulo.trim()) ||
+      Boolean(formData.descricao.trim()) ||
+      Boolean(formData.clienteId) ||
+      Boolean(formData.nivelAtendimentoId) ||
+      Boolean(formData.statusCustomizadoId) ||
+      Boolean(formData.tipoServicoId) ||
+      Boolean(formData.responsavelId) ||
+      Boolean(formData.prazoCustomizado) ||
+      formData.tagIds.length > 0 ||
+      formData.observadorIds.length > 0 ||
+      formData.ticketsRelacionados.length > 0;
+
+    const timer = setTimeout(() => {
+      if (!hasDraftContent) {
+        localStorage.removeItem(draftStorageKey);
+        return;
+      }
+
+      const draftPayload: TicketDraftPayload = {
+        formData,
+        clienteSearchTerm,
+        responsavelSearchTerm,
+        slaMinutes,
+        updatedAt: new Date().toISOString(),
+      };
+
+      localStorage.setItem(draftStorageKey, JSON.stringify(draftPayload));
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [
+    isOpen,
+    shouldPersistDraft,
+    draftStorageKey,
+    formData,
+    clienteSearchTerm,
+    responsavelSearchTerm,
+    slaMinutes,
+  ]);
 
   const carregarDadosIniciais = async () => {
     try {
@@ -374,7 +477,9 @@ export const TicketFormModal: React.FC<TicketFormModalProps> = ({
       // ✅ Se tiver níveis, selecionar o primeiro por padrão (modo create)
       if (mode === 'create' && niveisArray.length > 0) {
         const primeiroNivel = niveisArray[0];
-        setFormData(prev => ({ ...prev, nivelAtendimentoId: primeiroNivel.id }));
+        setFormData((prev) =>
+          prev.nivelAtendimentoId ? prev : { ...prev, nivelAtendimentoId: primeiroNivel.id },
+        );
       }
     } catch (err) {
       console.error('Erro ao carregar dados do formulário:', err);
@@ -728,7 +833,7 @@ export const TicketFormModal: React.FC<TicketFormModalProps> = ({
   const renderMarkdown = (texto: string): string => {
     if (!texto) return '<p class="text-[#002333]/40 text-sm">Nenhum conteúdo para visualizar</p>';
 
-    let html = texto
+    const html = texto
       // Headers
       .replace(/^### (.*$)/gim, '<h3 class="text-lg font-semibold text-[#002333] mt-4 mb-2">$1</h3>')
       .replace(/^## (.*$)/gim, '<h2 class="text-xl font-semibold text-[#002333] mt-4 mb-2">$1</h2>')
@@ -996,6 +1101,27 @@ export const TicketFormModal: React.FC<TicketFormModalProps> = ({
     return `${Math.floor(minutos / 1440)} dias`;
   };
 
+  const handleDiscardDraft = () => {
+    if (!shouldPersistDraft || !draftStorageKey) return;
+
+    localStorage.removeItem(draftStorageKey);
+    setFormData(createEmptyFormData());
+    setClienteSearchTerm('');
+    setResponsavelSearchTerm('');
+    setSlaMinutes(null);
+    setAnexos([]);
+    setErrors({});
+    setTouched({});
+    setSubmitError(null);
+    setDraftRestored(false);
+
+    if (niveis.length > 0) {
+      setFormData((prev) => ({ ...prev, nivelAtendimentoId: niveis[0].id }));
+    }
+
+    toast.success('Rascunho descartado.');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -1019,22 +1145,26 @@ export const TicketFormModal: React.FC<TicketFormModalProps> = ({
         tagIds: formData.tagIds,
         descricao: formData.descricao,
         slaTargetMinutes: slaMinutes || undefined,
-        tipo: 'suporte', // ✅ FASE 4 - Enum em minúsculas
+        tipo: 'suporte' as TipoTicket, // ✅ FASE 4 - Enum em minúsculas
         prazoCustomizado: formData.prazoCustomizado,
         observadorIds: formData.observadorIds,
         notificarCliente: formData.notificarCliente,
         ticketsRelacionados: formData.ticketsRelacionados,
       };
 
+      let savedTicket: Ticket | undefined;
+
       if (mode === 'edit' && ticket) {
-        await ticketsService.atualizar(ticket.id, empresaId, payload);
+        const response = await ticketsService.atualizar(ticket.id, empresaId, payload);
+        savedTicket = response.data;
         if (formData.notificarCliente) {
           toast.success('Ticket atualizado e cliente notificado!');
         } else {
           toast.success('Ticket atualizado com sucesso!');
         }
       } else {
-        await ticketsService.criar(empresaId, payload);
+        const response = await ticketsService.criar(empresaId, payload);
+        savedTicket = response.data;
         if (formData.notificarCliente) {
           toast.success('Ticket criado e cliente notificado!');
         } else {
@@ -1042,7 +1172,12 @@ export const TicketFormModal: React.FC<TicketFormModalProps> = ({
         }
       }
 
-      onSuccess();
+      if (shouldPersistDraft && draftStorageKey) {
+        localStorage.removeItem(draftStorageKey);
+        setDraftRestored(false);
+      }
+
+      onSuccess(savedTicket);
       onClose();
     } catch (err: unknown) {
       console.error('Erro ao salvar ticket:', err);
@@ -1062,20 +1197,46 @@ export const TicketFormModal: React.FC<TicketFormModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b px-6 py-4 z-10">
+    <div
+      className={
+        isPageLayout
+          ? 'w-full'
+          : 'fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50'
+      }
+    >
+      <div
+        className={
+          isPageLayout
+            ? 'bg-white rounded-lg shadow-sm border w-full'
+            : 'bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto'
+        }
+      >
+        <div className={isPageLayout ? 'bg-white border-b px-6 py-4' : 'sticky top-0 bg-white border-b px-6 py-4 z-10'}>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-xl font-bold text-[#002333]">
               {mode === 'edit' ? `Editar Ticket #${ticket?.numero}` : 'Criar Novo Ticket'}
             </h2>
-            <button onClick={onClose} disabled={loading} className="p-2 text-[#002333]/60 hover:text-[#002333] hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50">
-              <X className="h-5 w-5" />
-            </button>
+            {isPageLayout ? (
+              <button
+                onClick={onClose}
+                disabled={loading}
+                className="px-3 py-1.5 bg-white border border-[#B4BEC9] text-[#002333] rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+            ) : (
+              <button
+                onClick={onClose}
+                disabled={loading}
+                className="p-2 text-[#002333]/60 hover:text-[#002333] hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            )}
           </div>
 
           {/* Botões de Template */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Botão Duplicar (só em modo edição) */}
             {mode === 'edit' && (
               <button
@@ -1086,6 +1247,19 @@ export const TicketFormModal: React.FC<TicketFormModalProps> = ({
               >
                 <Copy className="h-4 w-4" />
                 Duplicar Ticket
+              </button>
+            )}
+
+            {shouldPersistDraft && (
+              <button
+                type="button"
+                onClick={handleDiscardDraft}
+                disabled={loading}
+                className="px-3 py-1.5 bg-white border border-[#B4BEC9] text-[#002333] rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+                title="Descartar dados salvos em rascunho"
+              >
+                <Trash2 className="h-4 w-4" />
+                Descartar Rascunho
               </button>
             )}
 
@@ -1187,6 +1361,12 @@ export const TicketFormModal: React.FC<TicketFormModalProps> = ({
             </div>
           )}
         </div>
+
+        {shouldPersistDraft && draftRestored && (
+          <div className="mx-6 mt-4 rounded-lg border border-[#159A9C]/30 bg-[#159A9C]/5 px-4 py-3 text-sm text-[#002333]">
+            Rascunho restaurado automaticamente. Os anexos precisam ser adicionados novamente.
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {loadingData && (
@@ -2178,10 +2358,12 @@ export const TicketFormModal: React.FC<TicketFormModalProps> = ({
 
               <div className="flex items-center justify-between pt-4 border-t">
                 <div className="flex items-center gap-4 text-xs text-[#002333]/60">
-                  <span className="flex items-center gap-1">
-                    <kbd className="px-1.5 py-0.5 bg-gray-100 border border-[#B4BEC9] rounded text-xs">Esc</kbd>
-                    <span>Fechar</span>
-                  </span>
+                  {!isPageLayout && (
+                    <span className="flex items-center gap-1">
+                      <kbd className="px-1.5 py-0.5 bg-gray-100 border border-[#B4BEC9] rounded text-xs">Esc</kbd>
+                      <span>Fechar</span>
+                    </span>
+                  )}
                   <span className="flex items-center gap-1">
                     <kbd className="px-1.5 py-0.5 bg-gray-100 border border-[#B4BEC9] rounded text-xs">Ctrl</kbd>
                     <span>+</span>

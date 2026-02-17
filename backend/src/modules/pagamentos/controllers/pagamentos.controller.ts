@@ -23,7 +23,7 @@ import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 @Controller('pagamentos/gateways/transacoes')
 @UseGuards(JwtAuthGuard, EmpresaGuard)
 export class GatewayTransacoesController {
-  constructor(private readonly pagamentosGatewayService: PagamentosGatewayService) { }
+  constructor(private readonly pagamentosGatewayService: PagamentosGatewayService) {}
 
   @Get()
   async listar(
@@ -35,10 +35,7 @@ export class GatewayTransacoesController {
   }
 
   @Get(':id')
-  async obter(
-    @EmpresaId() empresaId: string,
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  async obter(@EmpresaId() empresaId: string, @Param('id', ParseUUIDPipe) id: string) {
     return this.pagamentosGatewayService.obterTransacao(id, empresaId);
   }
 

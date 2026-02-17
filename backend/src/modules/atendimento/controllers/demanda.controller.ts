@@ -6,13 +6,14 @@ import {
   Delete,
   Body,
   Param,
-  Query,
   UseGuards,
   Request,
   Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { EmpresaId } from '../../../common/decorators/empresa.decorator';
 import { DemandaService } from '../services/demanda.service';
 import { CreateDemandaDto } from '../dto/create-demanda.dto';
 import { UpdateDemandaDto } from '../dto/update-demanda.dto';
@@ -37,7 +38,7 @@ import { UpdateDemandaDto } from '../dto/update-demanda.dto';
  */
 @ApiTags('Demandas Cliente')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 @Controller('demandas')
 export class DemandaController {
   private readonly logger = new Logger(DemandaController.name);
@@ -49,11 +50,10 @@ export class DemandaController {
    */
   @Post()
   @ApiOperation({ summary: 'Criar nova demanda para cliente/ticket' })
-  async criar(@Body() dto: CreateDemandaDto, @Request() req) {
+  async criar(@Body() dto: CreateDemandaDto, @Request() req, @EmpresaId() empresaId: string) {
     this.logger.log(`📋 Criando demanda - User: ${req.user.email}`);
 
     const autorId = req.user.id;
-    const empresaId = req.user.empresa_id;
 
     return await this.demandaService.criar(dto, autorId, empresaId);
   }
@@ -65,7 +65,7 @@ export class DemandaController {
   @ApiOperation({ summary: 'Buscar todas as demandas de um cliente' })
   async buscarPorCliente(
     @Param('clienteId') clienteId: string,
-    @Query('empresaId') empresaId?: string,
+    @EmpresaId() empresaId: string,
   ) {
     return await this.demandaService.buscarPorCliente(clienteId, empresaId);
   }
@@ -77,7 +77,7 @@ export class DemandaController {
   @ApiOperation({ summary: 'Buscar demandas por telefone (fallback)' })
   async buscarPorTelefone(
     @Param('telefone') telefone: string,
-    @Query('empresaId') empresaId?: string,
+    @EmpresaId() empresaId: string,
   ) {
     return await this.demandaService.buscarPorTelefone(telefone, empresaId);
   }
@@ -89,7 +89,7 @@ export class DemandaController {
   @ApiOperation({ summary: 'Buscar demandas de um ticket específico' })
   async buscarPorTicket(
     @Param('ticketId') ticketId: string,
-    @Query('empresaId') empresaId?: string,
+    @EmpresaId() empresaId: string,
   ) {
     return await this.demandaService.buscarPorTicket(ticketId, empresaId);
   }
@@ -101,7 +101,7 @@ export class DemandaController {
   @ApiOperation({ summary: 'Buscar demandas por status' })
   async buscarPorStatus(
     @Param('status') status: 'aberta' | 'em_andamento' | 'aguardando' | 'concluida' | 'cancelada',
-    @Query('empresaId') empresaId?: string,
+    @EmpresaId() empresaId: string,
   ) {
     return await this.demandaService.buscarPorStatus(status, empresaId);
   }
@@ -111,8 +111,8 @@ export class DemandaController {
    */
   @Get(':id')
   @ApiOperation({ summary: 'Buscar demanda por ID' })
-  async buscarPorId(@Param('id') id: string) {
-    return await this.demandaService.buscarPorId(id);
+  async buscarPorId(@Param('id') id: string, @EmpresaId() empresaId: string) {
+    return await this.demandaService.buscarPorId(id, empresaId);
   }
 
   /**
@@ -120,8 +120,8 @@ export class DemandaController {
    */
   @Patch(':id')
   @ApiOperation({ summary: 'Atualizar demanda' })
-  async atualizar(@Param('id') id: string, @Body() dto: UpdateDemandaDto) {
-    return await this.demandaService.atualizar(id, dto);
+  async atualizar(@Param('id') id: string, @Body() dto: UpdateDemandaDto, @EmpresaId() empresaId: string) {
+    return await this.demandaService.atualizar(id, dto, empresaId);
   }
 
   /**
@@ -129,8 +129,12 @@ export class DemandaController {
    */
   @Patch(':id/responsavel')
   @ApiOperation({ summary: 'Atribuir responsável à demanda' })
-  async atribuirResponsavel(@Param('id') id: string, @Body('responsavelId') responsavelId: string) {
-    return await this.demandaService.atribuirResponsavel(id, responsavelId);
+  async atribuirResponsavel(
+    @Param('id') id: string,
+    @Body('responsavelId') responsavelId: string,
+    @EmpresaId() empresaId: string,
+  ) {
+    return await this.demandaService.atribuirResponsavel(id, responsavelId, empresaId);
   }
 
   /**
@@ -141,8 +145,9 @@ export class DemandaController {
   async alterarStatus(
     @Param('id') id: string,
     @Body('status') status: 'aberta' | 'em_andamento' | 'aguardando' | 'concluida' | 'cancelada',
+    @EmpresaId() empresaId: string,
   ) {
-    return await this.demandaService.alterarStatus(id, status);
+    return await this.demandaService.alterarStatus(id, status, empresaId);
   }
 
   /**
@@ -150,8 +155,8 @@ export class DemandaController {
    */
   @Patch(':id/iniciar')
   @ApiOperation({ summary: 'Iniciar demanda (status → em_andamento)' })
-  async iniciar(@Param('id') id: string) {
-    return await this.demandaService.iniciar(id);
+  async iniciar(@Param('id') id: string, @EmpresaId() empresaId: string) {
+    return await this.demandaService.iniciar(id, empresaId);
   }
 
   /**
@@ -159,8 +164,8 @@ export class DemandaController {
    */
   @Patch(':id/concluir')
   @ApiOperation({ summary: 'Concluir demanda (status → concluida)' })
-  async concluir(@Param('id') id: string) {
-    return await this.demandaService.concluir(id);
+  async concluir(@Param('id') id: string, @EmpresaId() empresaId: string) {
+    return await this.demandaService.concluir(id, empresaId);
   }
 
   /**
@@ -168,8 +173,8 @@ export class DemandaController {
    */
   @Patch(':id/cancelar')
   @ApiOperation({ summary: 'Cancelar demanda' })
-  async cancelar(@Param('id') id: string) {
-    return await this.demandaService.cancelar(id);
+  async cancelar(@Param('id') id: string, @EmpresaId() empresaId: string) {
+    return await this.demandaService.cancelar(id, empresaId);
   }
 
   /**
@@ -177,8 +182,8 @@ export class DemandaController {
    */
   @Delete(':id')
   @ApiOperation({ summary: 'Deletar demanda' })
-  async deletar(@Param('id') id: string) {
-    await this.demandaService.deletar(id);
+  async deletar(@Param('id') id: string, @EmpresaId() empresaId: string) {
+    await this.demandaService.deletar(id, empresaId);
     return { message: 'Demanda deletada com sucesso' };
   }
 
@@ -189,7 +194,7 @@ export class DemandaController {
   @ApiOperation({ summary: 'Contar demandas de um cliente' })
   async contarPorCliente(
     @Param('clienteId') clienteId: string,
-    @Query('empresaId') empresaId?: string,
+    @EmpresaId() empresaId: string,
   ) {
     const total = await this.demandaService.contarPorCliente(clienteId, empresaId);
     const abertas = await this.demandaService.contarAbertasPorCliente(clienteId, empresaId);
@@ -198,3 +203,4 @@ export class DemandaController {
     return { total, abertas, urgentes };
   }
 }
+

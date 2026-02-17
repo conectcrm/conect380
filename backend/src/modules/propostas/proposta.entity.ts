@@ -8,7 +8,6 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { User } from '../users/user.entity';
-import { Empresa } from '../../empresas/entities/empresa.entity';
 
 export interface ProdutoProposta {
   id: string;
@@ -33,12 +32,9 @@ export class Proposta {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid', name: 'empresa_id' })
+  // Mantido como string para compatibilidade com schema legado atual (varchar).
+  @Column({ type: 'varchar', name: 'empresa_id', nullable: true })
   empresaId: string;
-
-  @ManyToOne(() => Empresa)
-  @JoinColumn({ name: 'empresa_id' })
-  empresa: Empresa;
 
   @Column({ unique: true })
   numero: string;
@@ -103,8 +99,14 @@ export class Proposta {
   @JoinColumn({ name: 'vendedor_id' })
   vendedor: User;
 
-  @Column({ nullable: true })
-  empresa_id: string;
+  // Alias de compatibilidade (sem mapear coluna duplicada no TypeORM).
+  get empresa_id(): string {
+    return this.empresaId;
+  }
+
+  set empresa_id(value: string) {
+    this.empresaId = value;
+  }
 
   @Column('jsonb', { nullable: true })
   portalAccess: {

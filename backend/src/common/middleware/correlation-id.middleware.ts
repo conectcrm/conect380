@@ -10,17 +10,17 @@ export const correlationIdStorage = new AsyncLocalStorage<string>();
 
 /**
  * Middleware para gerar/extrair correlation ID de requisições HTTP
- * 
+ *
  * Funcionalidade:
  * - Extrai X-Correlation-ID do header (se presente)
  * - Gera novo UUID se não fornecido
  * - Propaga via AsyncLocalStorage (disponível em toda a requisição)
  * - Adiciona ao response header para rastreamento client-side
- * 
+ *
  * Uso com AsyncLocalStorage:
  * ```typescript
  * import { correlationIdStorage } from './correlation-id.middleware';
- * 
+ *
  * const correlationId = correlationIdStorage.getStore();
  * logger.log({ correlationId, message: 'Processando...' });
  * ```
@@ -48,7 +48,7 @@ export class CorrelationIdMiddleware implements NestMiddleware {
 
 /**
  * Helper para obter correlation ID do contexto atual
- * 
+ *
  * @returns correlationId ou undefined se fora de contexto de requisição
  */
 export function getCorrelationId(): string | undefined {

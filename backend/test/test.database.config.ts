@@ -3,7 +3,7 @@ import { DataSource } from 'typeorm';
 
 /**
  * 🧪 Configuração de Banco de Dados para Testes E2E
- * 
+ *
  * Usa banco separado para isolar testes de dados de desenvolvimento
  * Database: conectcrm_test (criado automaticamente se não existir)
  */

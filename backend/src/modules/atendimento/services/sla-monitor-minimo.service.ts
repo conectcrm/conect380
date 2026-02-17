@@ -8,9 +8,11 @@ import {
   SeveridadeTicket,
   NivelAtendimentoTicket,
 } from '../entities/ticket.entity';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 import { NotificationChannelsService } from '../../../notifications/notification-channels.service';
 import { notifyByPolicy } from '../../../notifications/channel-notifier';
 import { ChannelPolicyKey } from '../../../notifications/channel-policy';
+import { runWithTenant } from '../../../common/tenant/tenant-context';
 
 /**
  * Monitor mínimo de SLA baseado em campos do ticket (priority/severity/assignedLevel/slaTargetMinutes/slaExpiresAt).
@@ -21,7 +23,8 @@ export class SlaMonitorMinimoService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(SlaMonitorMinimoService.name);
   private intervalId: NodeJS.Timeout | null = null;
   private readonly policy: ChannelPolicyKey = 'sla-alert';
-  private readonly enabled = process.env.SLA_MONITOR_ENABLED !== 'false' && process.env.NODE_ENV !== 'test';
+  private readonly enabled =
+    process.env.SLA_MONITOR_ENABLED !== 'false' && process.env.NODE_ENV !== 'test';
   private readonly intervalMs = Number(process.env.SLA_MONITOR_INTERVAL_MS ?? 60_000); // 1 min padrão
   private readonly batchSize = Number(process.env.SLA_MONITOR_BATCH ?? 500);
   private readonly warningThreshold = Number(process.env.SLA_WARNING_THRESHOLD ?? 0.7);
@@ -34,12 +37,16 @@ export class SlaMonitorMinimoService implements OnModuleInit, OnModuleDestroy {
   constructor(
     @InjectRepository(Ticket)
     private readonly ticketRepository: Repository<Ticket>,
+    @InjectRepository(Empresa)
+    private readonly empresaRepository: Repository<Empresa>,
     private readonly channels: NotificationChannelsService,
-  ) { }
+  ) {}
 
   onModuleInit() {
     if (!this.enabled) {
-      this.logger.log('⏸️ SLA monitor desabilitado (SLA_MONITOR_ENABLED=false ou ambiente de teste)');
+      this.logger.log(
+        '⏸️ SLA monitor desabilitado (SLA_MONITOR_ENABLED=false ou ambiente de teste)',
+      );
       return;
     }
     this.start();
@@ -51,16 +58,25 @@ export class SlaMonitorMinimoService implements OnModuleInit, OnModuleDestroy {
 
   private start() {
     if (this.intervalId) return;
-    this.intervalId = setInterval(() => this.executarCiclo().catch((err) => {
-      this.logger.error('❌ Erro no ciclo do SLA monitor:', err?.stack || err?.message || err);
-    }), this.intervalMs);
+    this.intervalId = setInterval(
+      () =>
+        this.executarCiclo().catch((err) => {
+          this.logger.error('❌ Erro no ciclo do SLA monitor:', err?.stack || err?.message || err);
+        }),
+      this.intervalMs,
+    );
 
     // Rodar uma vez imediatamente para não esperar o primeiro intervalo
     this.executarCiclo().catch((err) => {
-      this.logger.error('❌ Erro no ciclo inicial do SLA monitor:', err?.stack || err?.message || err);
+      this.logger.error(
+        '❌ Erro no ciclo inicial do SLA monitor:',
+        err?.stack || err?.message || err,
+      );
     });
 
-    this.logger.log(`🚀 SLA monitor iniciado (intervalo=${this.intervalMs}ms, batch=${this.batchSize})`);
+    this.logger.log(
+      `🚀 SLA monitor iniciado (intervalo=${this.intervalMs}ms, batch=${this.batchSize})`,
+    );
   }
 
   private stop() {
@@ -73,42 +89,58 @@ export class SlaMonitorMinimoService implements OnModuleInit, OnModuleDestroy {
 
   private async executarCiclo() {
     this.cleanupCache();
-    const tickets = await this.ticketRepository.find({
-      where: {
-        status: Not(In([StatusTicket.ENCERRADO])),
-      },
-      take: this.batchSize,
-      order: { updatedAt: 'DESC' },
-    });
 
-    if (!tickets.length) return;
+    const empresas = await this.empresaRepository.find({
+      where: { ativo: true },
+      select: { id: true } as any,
+    });
 
     const agora = Date.now();
 
-    for (const ticket of tickets) {
-      const calculo = this.calcularDeadline(ticket);
-      if (!calculo) continue;
+    for (const empresa of empresas) {
+      await runWithTenant(empresa.id, async () => {
+        const tickets = await this.ticketRepository.find({
+          where: {
+            empresaId: empresa.id,
+            status: Not(In([StatusTicket.ENCERRADO])),
+          },
+          take: this.batchSize,
+          order: { updatedAt: 'DESC' },
+        });
 
-      const { deadline, totalMinutes } = calculo;
-      const remainingMs = deadline.getTime() - agora;
-      const totalMs = totalMinutes * 60_000;
-      if (totalMs <= 0) continue;
+        if (!tickets.length) return;
 
-      const percentualConsumido = 1 - remainingMs / totalMs;
-      const event = remainingMs <= 0 ? 'SLA_BREACH' : percentualConsumido >= this.warningThreshold ? 'SLA_WARNING' : null;
+        for (const ticket of tickets) {
+          const calculo = this.calcularDeadline(ticket);
+          if (!calculo) continue;
 
-      if (!event) continue;
-      if (this.isSuppressed(ticket.id, event)) continue;
+          const { deadline, totalMinutes } = calculo;
+          const remainingMs = deadline.getTime() - agora;
+          const totalMs = totalMinutes * 60_000;
+          if (totalMs <= 0) continue;
 
-      try {
-        await this.notificar(ticket, event, remainingMs);
-        this.registerEvent(ticket.id, event);
-      } catch (notifyErr) {
-        this.logger.error(
-          `⚠️ Falha ao notificar SLA para ticket=${ticket.id} event=${event}:`,
-          notifyErr?.stack || notifyErr?.message || notifyErr,
-        );
-      }
+          const percentualConsumido = 1 - remainingMs / totalMs;
+          const event =
+            remainingMs <= 0
+              ? 'SLA_BREACH'
+              : percentualConsumido >= this.warningThreshold
+                ? 'SLA_WARNING'
+                : null;
+
+          if (!event) continue;
+          if (this.isSuppressed(ticket.id, event)) continue;
+
+          try {
+            await this.notificar(ticket, event, remainingMs);
+            this.registerEvent(ticket.id, event);
+          } catch (notifyErr) {
+            this.logger.error(
+              `⚠️ Falha ao notificar SLA para ticket=${ticket.id} event=${event}:`,
+              notifyErr?.stack || notifyErr?.message || notifyErr,
+            );
+          }
+        }
+      });
     }
   }
 
@@ -182,13 +214,18 @@ export class SlaMonitorMinimoService implements OnModuleInit, OnModuleDestroy {
     return `${ticketId}|${event}`;
   }
 
-  private async notificar(ticket: Ticket, event: 'SLA_WARNING' | 'SLA_BREACH', remainingMs: number) {
+  private async notificar(
+    ticket: Ticket,
+    event: 'SLA_WARNING' | 'SLA_BREACH',
+    remainingMs: number,
+  ) {
     const remainingMinutes = Math.max(0, Math.round(remainingMs / 60_000));
     const deadline = new Date(Date.now() + remainingMs);
 
-    const message = event === 'SLA_BREACH'
-      ? `🚨 SLA VIOLADO no ticket ${ticket.id} (${ticket.prioridade}/${ticket.severity}/${ticket.assignedLevel}). Deadline ultrapassado. Empresa=${ticket.empresaId}`
-      : `⚠️ SLA em risco no ticket ${ticket.id} (${ticket.prioridade}/${ticket.severity}/${ticket.assignedLevel}). Restam ~${remainingMinutes} min até ${deadline.toISOString()}. Empresa=${ticket.empresaId}`;
+    const message =
+      event === 'SLA_BREACH'
+        ? `🚨 SLA VIOLADO no ticket ${ticket.id} (${ticket.prioridade}/${ticket.severity}/${ticket.assignedLevel}). Deadline ultrapassado. Empresa=${ticket.empresaId}`
+        : `⚠️ SLA em risco no ticket ${ticket.id} (${ticket.prioridade}/${ticket.severity}/${ticket.assignedLevel}). Restam ~${remainingMinutes} min até ${deadline.toISOString()}. Empresa=${ticket.empresaId}`;
 
     await notifyByPolicy({
       policyKey: this.policy,

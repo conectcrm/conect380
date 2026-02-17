@@ -110,6 +110,9 @@ export enum OrigemCotacao {
   MANUAL = 'manual',
   WEBSITE = 'website',
   EMAIL = 'email',
+  TELEFONE = 'telefone',
+  WHATSAPP = 'whatsapp',
+  INDICACAO = 'indicacao',
   API = 'api',
   IMPORTACAO = 'importacao',
 }
@@ -139,6 +142,7 @@ export interface CriarCotacaoRequest {
   prazoEntrega?: string;
   localEntrega?: string;
   validadeOrcamento?: number;
+  aprovadorId?: string;
   itens: Omit<ItemCotacao, 'id' | 'valorTotal'>[];
   tags?: string[];
   origem: OrigemCotacao;

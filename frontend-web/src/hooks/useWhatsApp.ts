@@ -78,10 +78,7 @@ export function useWhatsApp(options: UseWhatsAppOptions) {
           status: filtros?.status || ['ABERTO', 'EM_ATENDIMENTO', 'AGUARDANDO'],
         };
 
-        const ticketsCarregados = await atendimentoService.listarTickets(
-          empresaId,
-          filtrosComStatus,
-        );
+        const ticketsCarregados = await atendimentoService.listarTickets(filtrosComStatus);
         setTickets(ticketsCarregados);
 
         console.log(

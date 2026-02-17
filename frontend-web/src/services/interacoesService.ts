@@ -103,7 +103,7 @@ class InteracoesService {
   private readonly baseUrl = '/interacoes';
   private readonly errorPrefix = '[InteracoesService]';
 
-  private buildQueryString(params: Record<string, unknown> = {}): string {
+  private buildQueryString(params: any = {}): string {
     const searchParams = new URLSearchParams();
 
     Object.entries(params).forEach(([key, value]) => {

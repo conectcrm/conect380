@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useNotifications } from './NotificationContext';
+import { useAuth } from './AuthContext';
 import {
   minhasEmpresasService,
   EmpresaCompleta,
@@ -44,9 +45,18 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { addNotification } = useNotifications();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
   // Carregar empresas do usuário
-  const loadEmpresas = async () => {
+  const loadEmpresas = useCallback(async () => {
+    if (!isAuthenticated) {
+      setEmpresas([]);
+      setEmpresaAtiva(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -86,7 +96,7 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
     } finally {
       setLoading(false);
     }
-  };
+  }, [addNotification, isAuthenticated]);
 
   // Alternar empresa ativa
   const switchEmpresa = async (empresaId: string) => {
@@ -277,8 +287,12 @@ export const EmpresaProvider: React.FC<EmpresaProviderProps> = ({ children }) =>
 
   // Carregar empresas na inicialização
   useEffect(() => {
-    loadEmpresas();
-  }, []);
+    if (isAuthLoading) {
+      return;
+    }
+
+    void loadEmpresas();
+  }, [isAuthLoading, loadEmpresas]);
 
   const value: EmpresaContextType = {
     empresas,

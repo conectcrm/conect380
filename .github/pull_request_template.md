@@ -1,119 +1,120 @@
-## 📋 Descrição
+## Descricao
 
-Descreva as mudanças implementadas neste PR.
+Descreva objetivamente o que mudou e por que.
 
-## 🎯 Tipo de Mudança
+## Tipo de Mudanca
 
-- [ ] 🐛 Bug fix (mudança que corrige um problema)
-- [ ] ✨ Nova feature (mudança que adiciona funcionalidade)
-- [ ] 💥 Breaking change (mudança que quebra compatibilidade)
-- [ ] 📝 Documentação
-- [ ] 🎨 Refatoração (mudança que não afeta funcionalidade)
-- [ ] ⚡ Performance
-- [ ] 🧪 Testes
+- [ ] Bug fix
+- [ ] Nova feature
+- [ ] Breaking change
+- [ ] Refatoracao
+- [ ] Documentacao
+- [ ] Performance
+- [ ] Testes
 
-## 🔗 Issue Relacionada
+## Modulos Afetados
 
-Closes #(issue)
-
-## 🧪 Como Testar
-
-Descreva os passos para testar as mudanças:
-
-1. 
-2. 
-3. 
-
-## 📸 Screenshots/Vídeos
-
-Se aplicável, adicione screenshots ou vídeos.
-
-## ✅ Checklist
-
-- [ ] Meu código segue o style guide do projeto
-- [ ] Realizei self-review do meu código
-- [ ] Comentei código complexo/difícil de entender
-- [ ] Atualizei a documentação correspondente
-- [ ] Minhas mudanças não geram novos warnings
-- [ ] Adicionei testes que provam que meu fix/feature funciona
-- [ ] Testes unitários novos e existentes passam localmente
-- [ ] Atualizei o CHANGELOG.md
-- [ ] Testei em diferentes browsers (se frontend)
-- [ ] Testei responsividade (se frontend)
-- [ ] Validei migration (se backend)
-
-## 🧱 Guardrails Conect360 (obrigatório quando aplicável)
-
-- [ ] Não expandi escopo/posicionamento sem aprovação explícita
-- [ ] Multi-tenant: entidades de negócio possuem `empresa_id` e estão protegidas por RLS
-- [ ] Migrations: tabela com `empresa_id` habilita RLS + policy `tenant_isolation_*` + índice em `empresa_id`
-- [ ] Frontend: mantive o tema Crevasse (não alterei paleta global)
-- [ ] Frontend: usei `ConfirmationModal`/`useConfirmation` para confirmações e `react-hot-toast` para feedback
-- [ ] Frontend: páginas novas partiram de `_TemplatePage.tsx` ou `_TemplateSimplePage.tsx` (sem criar do zero)
-
-## 🗄️ Mudanças no Banco de Dados
-
-- [ ] Nenhuma mudança no banco
-- [ ] Migration criada e testada
-- [ ] Seeds atualizadas (se necessário)
-- [ ] Rollback testado
-
-## 📦 Dependências
-
-- [ ] Nenhuma nova dependência
-- [ ] Novas dependências adicionadas (listar abaixo):
-  - 
-
-## 🔒 Segurança
-
-- [ ] Sem impacto em segurança
-- [ ] Validações de input adicionadas
-- [ ] Autenticação/Autorização verificada
-- [ ] Sanitização de dados implementada
-- [ ] CORS configurado corretamente
-- [ ] Rate limiting considerado
-
-## ⚡ Performance
-
-- [ ] Sem impacto em performance
-- [ ] Queries otimizadas
-- [ ] Cache implementado
-- [ ] Lazy loading aplicado (se frontend)
-- [ ] Bundle size considerado (se frontend)
-
-## 🌐 Módulo Afetado
-
-- [ ] Backend (NestJS)
-- [ ] Frontend (React)
+- [ ] Backend
+- [ ] Frontend
 - [ ] Banco de Dados
-- [ ] WhatsApp Integration
-- [ ] Triagem/Bot
-- [ ] Infraestrutura/DevOps
-- [ ] Documentação
+- [ ] Integracoes
+- [ ] Infra/DevOps
+- [ ] Documentacao
 
-## 🚀 Deploy
+## Issue Relacionada
 
-- [ ] Pode ser deployado imediatamente
-- [ ] Requer configuração adicional
-- [ ] Requer variáveis de ambiente novas (documentar em .env.example)
-- [ ] Requer migração manual do banco
-- [ ] Requer restart de serviços
+Closes #<numero-da-issue>
 
-## 📝 Notas Adicionais
+## Escopo de UX (Frontend) - Obrigatorio se houver tela
 
-Adicione notas, avisos ou considerações importantes para os reviewers.
+### Classificacao da tela
 
----
+- [ ] Tipo A - Gestao em Lista (CRUD)
+- [ ] Tipo B - Operacao em Tempo Real
+- [ ] Tipo C - Analytics/Dashboard
+- [ ] Tipo D - Configuracao/Administracao
+- [ ] Tipo E - Fluxo Guiado (Wizard)
+- [ ] Nao se aplica (sem tela)
 
-## 👀 Reviewers Checklist
+### Decisao de layout
 
-Para os revisores:
+- [ ] Usei template padrao (`StandardPageTemplate`/`StandardDataTable`)
+- [ ] Usei layout especifico por necessidade de fluxo
+- [ ] Nao se aplica
 
-- [ ] Código está limpo e legível
-- [ ] Lógica está correta
-- [ ] Testes cobrem casos edge
-- [ ] Documentação está adequada
-- [ ] Performance é aceitável
-- [ ] Segurança foi considerada
-- [ ] UX/UI está consistente (se frontend)
-- [ ] Aprovado para merge
+Se escolheu layout especifico, explique o motivo:
+
+<!-- Exemplo: fluxo em tempo real, alta densidade operacional, template padrao piora execucao -->
+
+### Checklist UX minimo (Obrigatorio se houver tela)
+
+- [ ] Loading inicial implementado
+- [ ] Loading de acao pontual implementado
+- [ ] Empty state com CTA implementado
+- [ ] Error state com recuperacao implementado
+- [ ] Feedback de sucesso/erro implementado
+- [ ] Responsividade desktop/mobile validada
+- [ ] Acessibilidade basica (teclado, foco visivel, labels) validada
+
+## Checklist Tecnico (Obrigatorio)
+
+- [ ] Fiz self-review do codigo
+- [ ] Atualizei documentacao relevante
+- [ ] Nao deixei TODO/HACK sem justificativa
+- [ ] Nao inclui dados sensiveis
+- [ ] Nao introduzi warnings novos relevantes
+
+## Multi-tenant e Seguranca (Obrigatorio quando aplicavel)
+
+- [ ] Nenhuma mudanca multi-tenant
+- [ ] Validado isolamento por `empresa_id` no backend
+- [ ] Guardas/decorators de empresa validados (`EmpresaGuard`, `@EmpresaId`)
+- [ ] Sem dependencia de filtro manual no frontend para isolamento
+- [ ] Caches/fallbacks/upload local nao vazam dados entre tenants
+
+## Banco de Dados (Obrigatorio quando aplicavel)
+
+- [ ] Sem mudanca de banco
+- [ ] Migration criada
+- [ ] Migration testada localmente
+- [ ] Rollback validado
+- [ ] Indices relevantes revisados
+- [ ] RLS/policy `tenant_isolation_*` revisada (se tabela multi-tenant)
+
+## Testes
+
+Descreva como validar:
+
+1.
+2.
+3.
+
+### Evidencias de teste
+
+- [ ] Unitarios
+- [ ] Integracao
+- [ ] E2E
+- [ ] Manual
+
+Comandos executados:
+
+```bash
+# exemplo
+npm run test
+```
+
+## Deploy
+
+- [ ] Pode fazer deploy imediato
+- [ ] Requer configuracao adicional
+- [ ] Requer variaveis de ambiente novas
+- [ ] Requer migration manual
+- [ ] Requer restart de servicos
+
+## Evidencias Visuais (se frontend)
+
+Inclua screenshots/gif quando houver alteracao de interface.
+
+## Notas para Revisao
+
+Liste riscos, pontos de atencao e decisoes tecnicas relevantes.

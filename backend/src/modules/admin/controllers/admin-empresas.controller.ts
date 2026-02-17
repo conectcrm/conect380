@@ -26,9 +26,9 @@ import { UserRole } from '../../users/user.entity';
 
 @Controller('admin/empresas')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.SUPERADMIN)
+@Roles(UserRole.ADMIN)
 export class AdminEmpresasController {
-  constructor(private readonly adminEmpresasService: AdminEmpresasService) { }
+  constructor(private readonly adminEmpresasService: AdminEmpresasService) {}
 
   /**
    * GET /api/admin/empresas

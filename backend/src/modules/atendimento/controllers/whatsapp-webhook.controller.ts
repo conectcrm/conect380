@@ -1,22 +1,27 @@
 import {
-  Controller,
-  Post,
-  Get,
   Body,
-  Query,
-  Req,
-  Res,
+  Controller,
+  Get,
   HttpStatus,
   Logger,
   Param,
+  Post,
+  Query,
+  Req,
+  Res,
+  UseGuards,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { WhatsAppWebhookService } from '../services/whatsapp-webhook.service';
-import { WhatsAppSenderService } from '../services/whatsapp-sender.service';
+import { Public } from '../../auth/decorators/public.decorator';
+import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { EmpresaId } from '../../../common/decorators/empresa.decorator';
+import { RemetenteMensagem } from '../entities/mensagem.entity'; // ✨ NOVO: Import do enum
+import { StatusTicket } from '../entities/ticket.entity';
 import { MensagemService } from '../services/mensagem.service';
 import { TicketService } from '../services/ticket.service';
-import { StatusTicket } from '../entities/ticket.entity';
-import { RemetenteMensagem } from '../entities/mensagem.entity'; // ✨ NOVO: Import do enum
+import { WhatsAppSenderService } from '../services/whatsapp-sender.service';
+import { WhatsAppWebhookService } from '../services/whatsapp-webhook.service';
 
 /**
  * 📱 WEBHOOK WHATSAPP BUSINESS API
@@ -46,6 +51,7 @@ export class WhatsAppWebhookController {
    * Chamado pelo Meta durante a configuração do webhook
    * ⚠️ DEPRECATED: Use /api/atendimento/webhooks/whatsapp/:empresaId
    */
+  @Public()
   @Get()
   async verificarWebhook(
     @Query('hub.mode') mode: string,
@@ -64,7 +70,11 @@ export class WhatsAppWebhookController {
       }
 
       // 2. Validar token de verificação (usando empresa padrão UUID)
-      const empresaId = process.env.DEFAULT_EMPRESA_ID || 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+      const empresaId = process.env.DEFAULT_EMPRESA_ID;
+      if (!empresaId) {
+        this.logger.error('DEFAULT_EMPRESA_ID nao configurado para endpoint legado de webhook');
+        return res.status(HttpStatus.BAD_REQUEST).send('Empresa padrao nao configurada');
+      }
       const tokenValido = await this.webhookService.validarTokenVerificacao(empresaId, verifyToken);
 
       if (!tokenValido) {
@@ -86,6 +96,7 @@ export class WhatsAppWebhookController {
    *
    * Endpoint de verificação do webhook com empresaId específico
    */
+  @Public()
   @Get(':empresaId')
   async verificarWebhookEmpresa(
     @Param('empresaId') empresaId: string,
@@ -127,12 +138,19 @@ export class WhatsAppWebhookController {
    * ⚠️ DEPRECATED: Use /api/atendimento/webhooks/whatsapp/:empresaId
    * Este endpoint tenta identificar a empresa pelo phone_number_id do payload
    */
+  @Public()
   @Post()
   async receberWebhook(@Body() body: any, @Req() req: Request, @Res() res: Response) {
     try {
       // Tentar extrair phone_number_id do payload para identificar empresa
-      const empresaId: string =
-        process.env.DEFAULT_EMPRESA_ID || 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+      const empresaId: string | undefined = process.env.DEFAULT_EMPRESA_ID;
+      if (!empresaId) {
+        this.logger.error('DEFAULT_EMPRESA_ID nao configurado para endpoint legado de webhook');
+        return res.status(HttpStatus.BAD_REQUEST).json({
+          success: false,
+          message: 'Empresa padrao nao configurada',
+        });
+      }
 
       try {
         const phoneNumberId = body?.entry?.[0]?.changes?.[0]?.value?.metadata?.phone_number_id;
@@ -172,50 +190,12 @@ export class WhatsAppWebhookController {
       });
     }
   }
-
-  /**
-   * POST /webhooks/whatsapp/:empresaId/test
-   *
-   * Endpoint para testar webhook manualmente (desenvolvimento)
-   * ⚠️ DEVE VIR ANTES DE @Post(':empresaId') para evitar conflito de rotas
-   */
-  @Post(':empresaId/test')
-  async testarWebhook(@Param('empresaId') empresaId: string, @Body() body: any) {
-    console.log('═══════════════════════════════════════════════════════════');
-    console.log('🧪 [WEBHOOK TEST] Endpoint atingido!');
-    console.log(`📋 [WEBHOOK TEST] Empresa ID: ${empresaId}`);
-    console.log(`📦 [WEBHOOK TEST] Body: ${JSON.stringify(body, null, 2)}`);
-    console.log('═══════════════════════════════════════════════════════════');
-
-    this.logger.log(`🧪 Teste de webhook - Empresa: ${empresaId}`);
-
-    try {
-      console.log('🔄 [WEBHOOK TEST] Chamando webhookService.processar...');
-      const resultado = await this.webhookService.processar(empresaId, body);
-      console.log(`✅ [WEBHOOK TEST] Processamento concluído:`, resultado);
-
-      return {
-        success: true,
-        message: 'Webhook processado (teste)',
-        data: resultado,
-      };
-    } catch (error) {
-      console.error('❌ [WEBHOOK TEST] Erro ao processar:', error);
-      this.logger.error(`Erro no teste de webhook: ${error.message}`);
-
-      return {
-        success: false,
-        message: error.message,
-        error: error.stack,
-      };
-    }
-  }
-
   /**
    * POST /api/atendimento/webhooks/whatsapp/:empresaId
    *
    * Endpoint para receber eventos do WhatsApp (empresa específica)
    */
+  @Public()
   @Post(':empresaId')
   async receberWebhookEmpresa(
     @Param('empresaId') empresaId: string,
@@ -292,9 +272,11 @@ export class WhatsAppWebhookController {
    *   "mensagemId": "uuid-da-mensagem-no-banco"
    * }
    */
+  @UseGuards(JwtAuthGuard, EmpresaGuard)
   @Post(':empresaId/enviar')
   async enviarMensagem(
-    @Param('empresaId') empresaId: string,
+    @EmpresaId() empresaId: string,
+    @Param('empresaId') _empresaIdIgnorado: string,
     @Body()
     body: {
       ticketId: string;
@@ -319,7 +301,7 @@ export class WhatsAppWebhookController {
       }
 
       // 1. Verificar se ticket existe
-      const ticket = await this.ticketService.buscarPorId(body.ticketId);
+      const ticket = await this.ticketService.buscarPorId(body.ticketId, empresaId);
       if (!ticket) {
         return res.status(HttpStatus.NOT_FOUND).json({
           success: false,
@@ -351,17 +333,17 @@ export class WhatsAppWebhookController {
         conteudo: body.mensagem,
         remetente: RemetenteMensagem.ATENDENTE, // ✅ CORRIGIDO: Usando enum ao invés de string
         idExterno: resultadoEnvio.messageId,
-      });
+      }, empresaId);
 
       this.logger.log(`💾 Mensagem salva no banco: ${mensagemSalva.id}`);
 
       // 4. Atualizar timestamp do ticket
       await this.ticketService.atualizarUltimaMensagem(body.ticketId);
 
-      // 5. Atualizar status do ticket para EM_ATENDIMENTO se estiver ABERTO
-      if (ticket.status === StatusTicket.ABERTO) {
+      // 5. Atualizar status do ticket para EM_ATENDIMENTO se estiver FILA
+      if (ticket.status === StatusTicket.FILA) {
         await this.ticketService.atualizarStatus(body.ticketId, StatusTicket.EM_ATENDIMENTO);
-        this.logger.log(`🔄 Status do ticket atualizado: ABERTO → EM_ATENDIMENTO`);
+        this.logger.log(`🔄 Status do ticket atualizado: FILA → EM_ATENDIMENTO`);
       }
 
       this.logger.log('✅ Mensagem enviada e registrada com sucesso!');
@@ -372,7 +354,7 @@ export class WhatsAppWebhookController {
         messageId: resultadoEnvio.messageId,
         mensagemId: mensagemSalva.id,
         ticketStatus:
-          ticket.status === StatusTicket.ABERTO ? StatusTicket.EM_ATENDIMENTO : ticket.status,
+          ticket.status === StatusTicket.FILA ? StatusTicket.EM_ATENDIMENTO : ticket.status,
       });
     } catch (error) {
       this.logger.error(`❌ Erro ao enviar mensagem: ${error.message}`, error.stack);

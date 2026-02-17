@@ -1,6 +1,7 @@
 import { Controller, Post, Body, Get, UseGuards, Logger } from '@nestjs/common';
 import { IAService, ContextoConversa } from './ia.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../common/guards/empresa.guard';
 
 class GerarRespostaDto {
   ticketId: string;
@@ -14,7 +15,7 @@ class GerarRespostaDto {
 }
 
 @Controller('ia')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class IAController {
   private readonly logger = new Logger(IAController.name);
 

@@ -1,8 +1,8 @@
-import { MigrationInterface, QueryRunner, Table, TableColumn, TableIndex, TableForeignKey } from 'typeorm';
+import { MigrationInterface, QueryRunner, Table } from 'typeorm';
 
 /**
  * Migration: Sistema de Filas - ETAPA 5
- * 
+ *
  * Cria:
  * 1. Tabela filas_atendentes (junction table Fila ↔ User)
  * 2. Adiciona novas colunas na tabela filas:
@@ -10,7 +10,7 @@ import { MigrationInterface, QueryRunner, Table, TableColumn, TableIndex, TableF
  *    - capacidade_maxima (int, default 10)
  *    - distribuicao_automatica (boolean, default false)
  *    - configuracoes (jsonb)
- * 
+ *
  * Data: Janeiro 2025
  */
 export class CreateSistemaFilas1736380000000 implements MigrationInterface {
@@ -19,60 +19,132 @@ export class CreateSistemaFilas1736380000000 implements MigrationInterface {
 
     // 1. Criar ENUM para estratégia de distribuição
     await queryRunner.query(`
-      CREATE TYPE estrategia_distribuicao_enum AS ENUM (
-        'ROUND_ROBIN',
-        'MENOR_CARGA',
-        'PRIORIDADE'
-      );
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'estrategia_distribuicao_enum') THEN
+          CREATE TYPE estrategia_distribuicao_enum AS ENUM (
+            'ROUND_ROBIN',
+            'MENOR_CARGA',
+            'PRIORIDADE'
+          );
+        END IF;
+      END $$;
     `);
     console.log('✅ ENUM estrategia_distribuicao_enum criado');
 
-    // 2. Adicionar novas colunas na tabela filas
-    await queryRunner.addColumn(
-      'filas',
-      new TableColumn({
-        name: 'estrategia_distribuicao',
-        type: 'estrategia_distribuicao_enum',
-        default: "'ROUND_ROBIN'",
-        comment: 'Estratégia de distribuição de tickets',
-      }),
-    );
+    // 2. Garantir que a tabela filas exista (em alguns históricos ela não é criada antes)
+    const filasExists = await queryRunner.hasTable('filas');
+    if (!filasExists) {
+      console.warn(
+        '⚠️  Migration: tabela "filas" não existe - criando estrutura mínima para desbloquear migrations posteriores',
+      );
+
+      await queryRunner.createTable(
+        new Table({
+          name: 'filas',
+          columns: [
+            {
+              name: 'id',
+              type: 'uuid',
+              isPrimary: true,
+              default: 'uuid_generate_v4()',
+            },
+            {
+              name: 'empresaId',
+              type: 'uuid',
+              isNullable: false,
+            },
+            {
+              name: 'nome',
+              type: 'varchar',
+              length: '100',
+              isNullable: false,
+            },
+            {
+              name: 'descricao',
+              type: 'text',
+              isNullable: true,
+            },
+            {
+              name: 'ativo',
+              type: 'boolean',
+              default: true,
+            },
+            {
+              name: 'ordem',
+              type: 'integer',
+              default: 0,
+            },
+            {
+              name: 'horarioAtendimento',
+              type: 'jsonb',
+              isNullable: true,
+            },
+            {
+              name: 'createdAt',
+              type: 'timestamp',
+              default: 'now()',
+            },
+            {
+              name: 'updatedAt',
+              type: 'timestamp',
+              default: 'now()',
+            },
+            {
+              name: 'deletedAt',
+              type: 'timestamp',
+              isNullable: true,
+            },
+          ],
+        }),
+        true,
+      );
+
+      // FK empresaId -> empresas(id) (se existir)
+      const empresasExists = await queryRunner.hasTable('empresas');
+      if (empresasExists) {
+        await queryRunner.query(`
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_filas_empresa') THEN
+              ALTER TABLE "filas"
+              ADD CONSTRAINT "FK_filas_empresa" FOREIGN KEY ("empresaId") REFERENCES "empresas"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+            END IF;
+          END $$;
+        `);
+      }
+
+      await queryRunner.query(
+        `CREATE INDEX IF NOT EXISTS "IDX_filas_empresaId" ON "filas" ("empresaId")`,
+      );
+    }
+
+    // 3. Adicionar novas colunas na tabela filas (idempotente)
+    await queryRunner.query(`
+      ALTER TABLE "filas" ADD COLUMN IF NOT EXISTS "estrategia_distribuicao" estrategia_distribuicao_enum NOT NULL DEFAULT 'ROUND_ROBIN';
+      COMMENT ON COLUMN "filas"."estrategia_distribuicao" IS 'Estratégia de distribuição de tickets';
+    `);
     console.log('✅ Coluna estrategia_distribuicao adicionada em filas');
 
-    await queryRunner.addColumn(
-      'filas',
-      new TableColumn({
-        name: 'capacidade_maxima',
-        type: 'integer',
-        default: 10,
-        comment: 'Capacidade máxima de tickets por atendente',
-      }),
-    );
+    await queryRunner.query(`
+      ALTER TABLE "filas" ADD COLUMN IF NOT EXISTS "capacidade_maxima" integer NOT NULL DEFAULT 10;
+      COMMENT ON COLUMN "filas"."capacidade_maxima" IS 'Capacidade máxima de tickets por atendente';
+    `);
     console.log('✅ Coluna capacidade_maxima adicionada em filas');
 
-    await queryRunner.addColumn(
-      'filas',
-      new TableColumn({
-        name: 'distribuicao_automatica',
-        type: 'boolean',
-        default: false,
-        comment: 'Se true, tickets são distribuídos automaticamente',
-      }),
-    );
+    await queryRunner.query(`
+      ALTER TABLE "filas" ADD COLUMN IF NOT EXISTS "distribuicao_automatica" boolean NOT NULL DEFAULT false;
+      COMMENT ON COLUMN "filas"."distribuicao_automatica" IS 'Se true, tickets são distribuídos automaticamente';
+    `);
     console.log('✅ Coluna distribuicao_automatica adicionada em filas');
 
-    await queryRunner.addColumn(
-      'filas',
-      new TableColumn({
-        name: 'configuracoes',
-        type: 'jsonb',
-        isNullable: true,
-        comment: 'Configurações adicionais (tempoMaximoEspera, prioridadePadrao, notificarAposMinutos)',
-      }),
-    );
+    await queryRunner.query(`
+      ALTER TABLE "filas" ADD COLUMN IF NOT EXISTS "configuracoes" jsonb;
+      COMMENT ON COLUMN "filas"."configuracoes" IS 'Configurações adicionais (tempoMaximoEspera, prioridadePadrao, notificarAposMinutos)';
+    `);
     console.log('✅ Coluna configuracoes adicionada em filas');
 
-    // 3. Criar tabela filas_atendentes (junction table)
+    // 4. Criar tabela filas_atendentes (junction table)
     await queryRunner.createTable(
       new Table({
         name: 'filas_atendentes',
@@ -86,11 +158,13 @@ export class CreateSistemaFilas1736380000000 implements MigrationInterface {
           {
             name: 'filaId',
             type: 'uuid',
+            isNullable: false,
             comment: 'ID da fila',
           },
           {
             name: 'atendenteId',
             type: 'uuid',
+            isNullable: false,
             comment: 'ID do atendente (User)',
           },
           {
@@ -127,61 +201,54 @@ export class CreateSistemaFilas1736380000000 implements MigrationInterface {
     );
     console.log('✅ Tabela filas_atendentes criada');
 
-    // 4. Criar índice único composto (filaId, atendenteId)
-    await queryRunner.createIndex(
-      'filas_atendentes',
-      new TableIndex({
-        name: 'IDX_filas_atendentes_fila_atendente',
-        columnNames: ['filaId', 'atendenteId'],
-        isUnique: true,
-      }),
+    // 5. Criar índices (idempotente)
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS "IDX_filas_atendentes_fila_atendente" ON "filas_atendentes" ("filaId", "atendenteId")`,
     );
     console.log('✅ Índice único (filaId, atendenteId) criado');
 
-    // 5. Criar índices individuais para performance
-    await queryRunner.createIndex(
-      'filas_atendentes',
-      new TableIndex({
-        name: 'IDX_filas_atendentes_filaId',
-        columnNames: ['filaId'],
-      }),
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_filas_atendentes_filaId" ON "filas_atendentes" ("filaId")`,
     );
     console.log('✅ Índice filaId criado');
 
-    await queryRunner.createIndex(
-      'filas_atendentes',
-      new TableIndex({
-        name: 'IDX_filas_atendentes_atendenteId',
-        columnNames: ['atendenteId'],
-      }),
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_filas_atendentes_atendenteId" ON "filas_atendentes" ("atendenteId")`,
     );
     console.log('✅ Índice atendenteId criado');
 
-    // 6. Criar foreign keys
-    await queryRunner.createForeignKey(
-      'filas_atendentes',
-      new TableForeignKey({
-        name: 'FK_filas_atendentes_fila',
-        columnNames: ['filaId'],
-        referencedTableName: 'filas',
-        referencedColumnNames: ['id'],
-        onDelete: 'CASCADE',
-        onUpdate: 'CASCADE',
-      }),
-    );
+    // 6. Criar foreign keys (condicional)
+    const usersExists = await queryRunner.hasTable('users');
+    const filasNowExists = await queryRunner.hasTable('filas');
+
+    if (filasNowExists) {
+      await queryRunner.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_filas_atendentes_fila') THEN
+            ALTER TABLE "filas_atendentes"
+            ADD CONSTRAINT "FK_filas_atendentes_fila" FOREIGN KEY ("filaId") REFERENCES "filas"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+          END IF;
+        END $$;
+      `);
+    } else {
+      console.warn('⚠️  Migration: tabela "filas" ainda não existe - pulando FK filas_atendentes.filaId');
+    }
     console.log('✅ Foreign key para filas criada');
 
-    await queryRunner.createForeignKey(
-      'filas_atendentes',
-      new TableForeignKey({
-        name: 'FK_filas_atendentes_user',
-        columnNames: ['atendenteId'],
-        referencedTableName: 'users',
-        referencedColumnNames: ['id'],
-        onDelete: 'CASCADE',
-        onUpdate: 'CASCADE',
-      }),
-    );
+    if (usersExists) {
+      await queryRunner.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_filas_atendentes_user') THEN
+            ALTER TABLE "filas_atendentes"
+            ADD CONSTRAINT "FK_filas_atendentes_user" FOREIGN KEY ("atendenteId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+          END IF;
+        END $$;
+      `);
+    } else {
+      console.warn('⚠️  Migration: tabela "users" não existe - pulando FK filas_atendentes.atendenteId');
+    }
     console.log('✅ Foreign key para users criada');
 
     console.log('🎉 [Migration] Sistema de Filas criado com sucesso!');
@@ -190,31 +257,23 @@ export class CreateSistemaFilas1736380000000 implements MigrationInterface {
   public async down(queryRunner: QueryRunner): Promise<void> {
     console.log('⏪ [Migration] Revertendo Sistema de Filas...');
 
-    // Remover foreign keys
-    await queryRunner.dropForeignKey('filas_atendentes', 'FK_filas_atendentes_user');
-    await queryRunner.dropForeignKey('filas_atendentes', 'FK_filas_atendentes_fila');
-    console.log('✅ Foreign keys removidas');
+    // Remover FKs/índices/tabela (tudo defensivo)
+    await queryRunner.query(`ALTER TABLE IF EXISTS "filas_atendentes" DROP CONSTRAINT IF EXISTS "FK_filas_atendentes_user";`);
+    await queryRunner.query(`ALTER TABLE IF EXISTS "filas_atendentes" DROP CONSTRAINT IF EXISTS "FK_filas_atendentes_fila";`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_filas_atendentes_atendenteId";`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_filas_atendentes_filaId";`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_filas_atendentes_fila_atendente";`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "filas_atendentes";`);
 
-    // Remover índices
-    await queryRunner.dropIndex('filas_atendentes', 'IDX_filas_atendentes_atendenteId');
-    await queryRunner.dropIndex('filas_atendentes', 'IDX_filas_atendentes_filaId');
-    await queryRunner.dropIndex('filas_atendentes', 'IDX_filas_atendentes_fila_atendente');
-    console.log('✅ Índices removidos');
-
-    // Remover tabela filas_atendentes
-    await queryRunner.dropTable('filas_atendentes');
-    console.log('✅ Tabela filas_atendentes removida');
-
-    // Remover colunas da tabela filas
-    await queryRunner.dropColumn('filas', 'configuracoes');
-    await queryRunner.dropColumn('filas', 'distribuicao_automatica');
-    await queryRunner.dropColumn('filas', 'capacidade_maxima');
-    await queryRunner.dropColumn('filas', 'estrategia_distribuicao');
-    console.log('✅ Colunas removidas de filas');
+    // Remover colunas adicionadas na tabela filas
+    await queryRunner.query(`ALTER TABLE IF EXISTS "filas" DROP COLUMN IF EXISTS "configuracoes";`);
+    await queryRunner.query(`ALTER TABLE IF EXISTS "filas" DROP COLUMN IF EXISTS "distribuicao_automatica";`);
+    await queryRunner.query(`ALTER TABLE IF EXISTS "filas" DROP COLUMN IF EXISTS "capacidade_maxima";`);
+    await queryRunner.query(`ALTER TABLE IF EXISTS "filas" DROP COLUMN IF EXISTS "estrategia_distribuicao";`);
 
     // Remover ENUM
-    await queryRunner.query('DROP TYPE estrategia_distribuicao_enum;');
-    console.log('✅ ENUM estrategia_distribuicao_enum removido');
+    await queryRunner.query('DROP TYPE IF EXISTS estrategia_distribuicao_enum;');
+    console.log('✅ Estruturas removidas');
 
     console.log('✅ [Migration] Sistema de Filas revertido com sucesso!');
   }

@@ -275,7 +275,7 @@ export const ExemploHeaderSemLogo: React.FC = () => {
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         onSave={handleSaveProduto}
-        produto={produtoSelecionado}
+        produto={produtoSelecionado as any}
       />
     </div>
   );

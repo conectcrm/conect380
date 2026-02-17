@@ -6,7 +6,7 @@ export class AddEmpresaIdToAtividades1773770000000 implements MigrationInterface
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
       ALTER TABLE "atividades"
-      ADD COLUMN "empresa_id" uuid
+      ADD COLUMN IF NOT EXISTS "empresa_id" uuid
     `);
 
     await queryRunner.query(`
@@ -14,6 +14,7 @@ export class AddEmpresaIdToAtividades1773770000000 implements MigrationInterface
       SET empresa_id = o.empresa_id
       FROM oportunidades o
       WHERE a."oportunidade_id" = o.id
+        AND a.empresa_id IS NULL
     `);
 
     await queryRunner.query(`
@@ -28,23 +29,33 @@ export class AddEmpresaIdToAtividades1773770000000 implements MigrationInterface
     `);
 
     await queryRunner.query(`
-      ALTER TABLE "atividades"
-      ADD CONSTRAINT "FK_atividades_empresa"
-      FOREIGN KEY ("empresa_id")
-      REFERENCES "empresas"("id")
-      ON DELETE NO ACTION
-      ON UPDATE NO ACTION
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'FK_atividades_empresa'
+        ) THEN
+          ALTER TABLE "atividades"
+            ADD CONSTRAINT "FK_atividades_empresa"
+            FOREIGN KEY ("empresa_id")
+            REFERENCES "empresas"("id")
+            ON DELETE NO ACTION
+            ON UPDATE NO ACTION;
+        END IF;
+      END
+      $$;
     `);
 
     await queryRunner.query(`
-      CREATE INDEX "IDX_atividades_empresa_id"
+      CREATE INDEX IF NOT EXISTS "IDX_atividades_empresa_id"
       ON "atividades" ("empresa_id")
     `);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP INDEX "public"."IDX_atividades_empresa_id"`);
-    await queryRunner.query(`ALTER TABLE "atividades" DROP CONSTRAINT "FK_atividades_empresa"`);
-    await queryRunner.query(`ALTER TABLE "atividades" DROP COLUMN "empresa_id"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_atividades_empresa_id"`);
+    await queryRunner.query(
+      `ALTER TABLE "atividades" DROP CONSTRAINT IF EXISTS "FK_atividades_empresa"`,
+    );
+    await queryRunner.query(`ALTER TABLE "atividades" DROP COLUMN IF EXISTS "empresa_id"`);
   }
 }

@@ -52,17 +52,21 @@ export class DistribuicaoAvancadaService {
 
     @InjectRepository(Ticket)
     private readonly ticketRepo: Repository<Ticket>,
-  ) { }
+  ) {}
 
   /**
    * Busca configuração com cache
    */
-  private async buscarConfiguracaoComCache(filaId: string): Promise<DistribuicaoConfig | null> {
-    const cached = this.configCache.get(filaId);
+  private async buscarConfiguracaoComCache(
+    filaId: string,
+    empresaId: string,
+  ): Promise<DistribuicaoConfig | null> {
+    const cacheKey = `${empresaId}:${filaId}`;
+    const cached = this.configCache.get(cacheKey);
     const now = Date.now();
 
     // Verifica se cache é válido
-    if (cached && (now - cached.timestamp) < this.CACHE_TTL_MS) {
+    if (cached && now - cached.timestamp < this.CACHE_TTL_MS) {
       this.logger.debug(`✅ Cache hit para configuração da fila ${filaId}`);
       this.metricas.cacheHits++;
       return cached.config;
@@ -72,11 +76,11 @@ export class DistribuicaoAvancadaService {
     this.logger.debug(`❌ Cache miss para configuração da fila ${filaId}`);
     this.metricas.cacheMisses++;
     const config = await this.distribuicaoConfigRepo.findOne({
-      where: { filaId, ativo: true },
+      where: { filaId, empresaId, ativo: true },
     });
 
     if (config) {
-      this.configCache.set(filaId, { config, timestamp: now });
+      this.configCache.set(cacheKey, { config, timestamp: now });
     }
 
     return config;
@@ -85,11 +89,12 @@ export class DistribuicaoAvancadaService {
   /**
    * Busca skills do atendente com cache
    */
-  private async buscarSkillsComCache(atendenteId: string): Promise<AtendenteSkill[]> {
-    const cached = this.skillsCache.get(atendenteId);
+  private async buscarSkillsComCache(atendenteId: string, empresaId: string): Promise<AtendenteSkill[]> {
+    const cacheKey = `${empresaId}:${atendenteId}`;
+    const cached = this.skillsCache.get(cacheKey);
     const now = Date.now();
 
-    if (cached && (now - cached.timestamp) < this.SKILLS_CACHE_TTL_MS) {
+    if (cached && now - cached.timestamp < this.SKILLS_CACHE_TTL_MS) {
       this.logger.debug(`✅ Cache hit para skills do atendente ${atendenteId}`);
       this.metricas.cacheHits++;
       return cached.skills;
@@ -98,10 +103,10 @@ export class DistribuicaoAvancadaService {
     this.logger.debug(`❌ Cache miss para skills do atendente ${atendenteId}`);
     this.metricas.cacheMisses++;
     const skills = await this.atendenteSkillRepo.find({
-      where: { atendenteId },
+      where: { atendenteId, empresaId },
     });
 
-    this.skillsCache.set(atendenteId, { skills, timestamp: now });
+    this.skillsCache.set(cacheKey, { skills, timestamp: now });
     return skills;
   }
 
@@ -109,7 +114,11 @@ export class DistribuicaoAvancadaService {
    * Invalida cache de configuração
    */
   invalidarCacheConfig(filaId: string): void {
-    this.configCache.delete(filaId);
+    for (const key of this.configCache.keys()) {
+      if (key.endsWith(`:${filaId}`)) {
+        this.configCache.delete(key);
+      }
+    }
     this.logger.log(`🗑️ Cache de configuração invalidado para fila ${filaId}`);
   }
 
@@ -117,7 +126,11 @@ export class DistribuicaoAvancadaService {
    * Invalida cache de skills
    */
   invalidarCacheSkills(atendenteId: string): void {
-    this.skillsCache.delete(atendenteId);
+    for (const key of this.skillsCache.keys()) {
+      if (key.endsWith(`:${atendenteId}`)) {
+        this.skillsCache.delete(key);
+      }
+    }
     this.logger.log(`🗑️ Cache de skills invalidado para atendente ${atendenteId}`);
   }
 
@@ -134,17 +147,20 @@ export class DistribuicaoAvancadaService {
    * Retorna métricas de performance do service
    */
   obterMetricas() {
-    const taxaSucesso = this.metricas.distribuicoesTotais > 0
-      ? (this.metricas.distribuicoesComSucesso / this.metricas.distribuicoesTotais) * 100
-      : 0;
+    const taxaSucesso =
+      this.metricas.distribuicoesTotais > 0
+        ? (this.metricas.distribuicoesComSucesso / this.metricas.distribuicoesTotais) * 100
+        : 0;
 
-    const tempoMedio = this.metricas.distribuicoesComSucesso > 0
-      ? this.metricas.tempoTotalMs / this.metricas.distribuicoesComSucesso
-      : 0;
+    const tempoMedio =
+      this.metricas.distribuicoesComSucesso > 0
+        ? this.metricas.tempoTotalMs / this.metricas.distribuicoesComSucesso
+        : 0;
 
-    const taxaCacheHit = (this.metricas.cacheHits + this.metricas.cacheMisses) > 0
-      ? (this.metricas.cacheHits / (this.metricas.cacheHits + this.metricas.cacheMisses)) * 100
-      : 0;
+    const taxaCacheHit =
+      this.metricas.cacheHits + this.metricas.cacheMisses > 0
+        ? (this.metricas.cacheHits / (this.metricas.cacheHits + this.metricas.cacheMisses)) * 100
+        : 0;
 
     return {
       distribuicoes: {
@@ -191,6 +207,7 @@ export class DistribuicaoAvancadaService {
   async distribuirTicket(
     ticketId: string,
     requiredSkills?: string[],
+    empresaId?: string,
   ): Promise<User> {
     const inicioMs = Date.now();
     this.metricas.distribuicoesTotais++;
@@ -200,7 +217,7 @@ export class DistribuicaoAvancadaService {
 
       // 1. Buscar ticket
       const ticket = await this.ticketRepo.findOne({
-        where: { id: ticketId },
+        where: { id: ticketId, ...(empresaId ? { empresaId } : {}) },
         relations: ['fila'],
       });
 
@@ -209,15 +226,13 @@ export class DistribuicaoAvancadaService {
       }
 
       if (!ticket.fila) {
-        throw new BadRequestException(
-          `Ticket ${ticketId} não está associado a uma fila`,
-        );
+        throw new BadRequestException(`Ticket ${ticketId} não está associado a uma fila`);
       }
 
       const filaId = ticket.fila.id;
 
       // 2. Buscar configuração de distribuição da fila (COM CACHE)
-      const config = await this.buscarConfiguracaoComCache(filaId);
+      const config = await this.buscarConfiguracaoComCache(filaId, ticket.empresaId);
 
       if (!config) {
         throw new NotFoundException(
@@ -225,9 +240,7 @@ export class DistribuicaoAvancadaService {
         );
       }
 
-      this.logger.log(
-        `Usando algoritmo: ${config.algoritmo} para fila ${filaId}`,
-      );
+      this.logger.log(`Usando algoritmo: ${config.algoritmo} para fila ${filaId}`);
 
       // 3. Selecionar algoritmo e executar distribuição
       let atendente: User;
@@ -236,12 +249,12 @@ export class DistribuicaoAvancadaService {
       try {
         switch (config.algoritmo) {
           case 'round-robin':
-            atendente = await this.roundRobin(filaId, config);
+            atendente = await this.roundRobin(filaId, config, ticket.empresaId);
             motivo = 'Distribuição circular (Round-Robin)';
             break;
 
           case 'menor-carga':
-            atendente = await this.menorCarga(filaId, config);
+            atendente = await this.menorCarga(filaId, config, ticket.empresaId);
             motivo = 'Atendente com menor carga de trabalho';
             break;
 
@@ -250,52 +263,41 @@ export class DistribuicaoAvancadaService {
               this.logger.warn(
                 'Skills requeridas não fornecidas, usando menor-carga como fallback',
               );
-              atendente = await this.menorCarga(filaId, config);
+              atendente = await this.menorCarga(filaId, config, ticket.empresaId);
               motivo = 'Menor carga (fallback - sem skills requeridas)';
             } else {
-              atendente = await this.skillsBased(filaId, requiredSkills, config);
+              atendente = await this.skillsBased(filaId, requiredSkills, config, ticket.empresaId);
               motivo = `Skills-based: ${requiredSkills.join(', ')}`;
             }
             break;
 
           case 'hibrido':
-            atendente = await this.hibrido(filaId, requiredSkills, config);
+            atendente = await this.hibrido(filaId, requiredSkills, config, ticket.empresaId);
             motivo = requiredSkills?.length
               ? `Híbrido: skills (${requiredSkills.join(', ')}) + menor carga`
               : 'Híbrido: menor carga (sem skills)';
             break;
 
           default:
-            throw new BadRequestException(
-              `Algoritmo desconhecido: ${config.algoritmo}`,
-            );
+            throw new BadRequestException(`Algoritmo desconhecido: ${config.algoritmo}`);
         }
       } catch (error) {
         // Se nenhum atendente disponível e overflow permitido
-        if (
-          error instanceof NotFoundException &&
-          config.permitirOverflow &&
-          config.filaBackupId
-        ) {
+        if (error instanceof NotFoundException && config.permitirOverflow && config.filaBackupId) {
           this.logger.warn(
             `Nenhum atendente disponível na fila ${filaId}, tentando fila de backup ${config.filaBackupId}`,
           );
 
           // Tentar fila de backup
           const backupConfig = await this.distribuicaoConfigRepo.findOne({
-            where: { filaId: config.filaBackupId, ativo: true },
+            where: { filaId: config.filaBackupId, empresaId: ticket.empresaId, ativo: true },
           });
 
           if (backupConfig) {
-            atendente = await this.menorCarga(
-              config.filaBackupId,
-              backupConfig,
-            );
+            atendente = await this.menorCarga(config.filaBackupId, backupConfig, ticket.empresaId);
             motivo = `Overflow para fila backup (${config.filaBackupId})`;
           } else {
-            throw new NotFoundException(
-              'Nenhum atendente disponível na fila principal ou backup',
-            );
+            throw new NotFoundException('Nenhum atendente disponível na fila principal ou backup');
           }
         } else {
           throw error;
@@ -303,10 +305,11 @@ export class DistribuicaoAvancadaService {
       }
 
       // 4. Obter carga atual do atendente
-      const cargaAtual = await this.obterCargaAtendente(atendente.id);
+      const cargaAtual = await this.obterCargaAtendente(atendente.id, ticket.empresaId);
 
       // 5. Registrar log de auditoria
       await this.registrarLog({
+        empresaId: ticket.empresaId,
         ticketId,
         atendenteId: atendente.id,
         filaId,
@@ -341,35 +344,33 @@ export class DistribuicaoAvancadaService {
   private async roundRobin(
     filaId: string,
     config: DistribuicaoConfig,
+    empresaId: string,
   ): Promise<User> {
     this.logger.debug(`Executando Round-Robin para fila ${filaId}`);
 
     const fila = await this.filaRepo.findOne({
-      where: { id: filaId },
+      where: { id: filaId, empresaId },
       relations: ['atendentes', 'atendentes.atendente'],
     });
 
     if (!fila || !fila.atendentes || fila.atendentes.length === 0) {
-      throw new NotFoundException(
-        `Nenhum atendente vinculado à fila ${filaId}`,
-      );
+      throw new NotFoundException(`Nenhum atendente vinculado à fila ${filaId}`);
     }
 
     const atendentesDisponiveis = await this.filtrarAtendentesDisponiveis(
       fila.atendentes.map((fa) => fa.atendente),
       filaId,
       config,
+      empresaId,
     );
 
     if (atendentesDisponiveis.length === 0) {
-      throw new NotFoundException(
-        'Nenhum atendente disponível na fila para Round-Robin',
-      );
+      throw new NotFoundException('Nenhum atendente disponível na fila para Round-Robin');
     }
 
     // Buscar último atendente que recebeu ticket
     const ultimaDistribuicao = await this.distribuicaoLogRepo.findOne({
-      where: { filaId },
+      where: { filaId, empresaId },
       order: { timestamp: 'DESC' },
     });
 
@@ -394,30 +395,28 @@ export class DistribuicaoAvancadaService {
   private async menorCarga(
     filaId: string,
     config: DistribuicaoConfig,
+    empresaId: string,
   ): Promise<User> {
     this.logger.debug(`Executando Menor Carga para fila ${filaId}`);
 
     const fila = await this.filaRepo.findOne({
-      where: { id: filaId },
+      where: { id: filaId, empresaId },
       relations: ['atendentes', 'atendentes.atendente'],
     });
 
     if (!fila || !fila.atendentes || fila.atendentes.length === 0) {
-      throw new NotFoundException(
-        `Nenhum atendente vinculado à fila ${filaId}`,
-      );
+      throw new NotFoundException(`Nenhum atendente vinculado à fila ${filaId}`);
     }
 
     const atendentesDisponiveis = await this.filtrarAtendentesDisponiveis(
       fila.atendentes.map((fa) => fa.atendente),
       filaId,
       config,
+      empresaId,
     );
 
     if (atendentesDisponiveis.length === 0) {
-      throw new NotFoundException(
-        'Nenhum atendente disponível na fila para Menor Carga',
-      );
+      throw new NotFoundException('Nenhum atendente disponível na fila para Menor Carga');
     }
 
     // Contar tickets em aberto por atendente
@@ -428,6 +427,7 @@ export class DistribuicaoAvancadaService {
       .where('ticket.status NOT IN (:...statusFinalizados)', {
         statusFinalizados: ['fechado', 'resolvido', 'cancelado'],
       })
+      .andWhere('ticket.empresaId = :empresaId', { empresaId })
       .andWhere('ticket.atendenteId IN (:...atendenteIds)', {
         atendenteIds: atendentesDisponiveis.map((a) => a.id),
       })
@@ -440,9 +440,7 @@ export class DistribuicaoAvancadaService {
     }
 
     // Atendentes sem tickets têm prioridade
-    const atendentesComTickets = cargasPorAtendente.map(
-      (c) => c.atendenteId,
-    );
+    const atendentesComTickets = cargasPorAtendente.map((c) => c.atendenteId);
     const atendenteSemTicket = atendentesDisponiveis.find(
       (a) => !atendentesComTickets.includes(a.id),
     );
@@ -462,32 +460,30 @@ export class DistribuicaoAvancadaService {
     filaId: string,
     requiredSkills: string[],
     config: DistribuicaoConfig,
+    empresaId: string,
   ): Promise<User> {
     this.logger.debug(
       `Executando Skills-Based para fila ${filaId} com skills: ${requiredSkills.join(', ')}`,
     );
 
     const fila = await this.filaRepo.findOne({
-      where: { id: filaId },
+      where: { id: filaId, empresaId },
       relations: ['atendentes', 'atendentes.atendente'],
     });
 
     if (!fila || !fila.atendentes || fila.atendentes.length === 0) {
-      throw new NotFoundException(
-        `Nenhum atendente vinculado à fila ${filaId}`,
-      );
+      throw new NotFoundException(`Nenhum atendente vinculado à fila ${filaId}`);
     }
 
     const atendentesDisponiveis = await this.filtrarAtendentesDisponiveis(
       fila.atendentes.map((fa) => fa.atendente),
       filaId,
       config,
+      empresaId,
     );
 
     if (atendentesDisponiveis.length === 0) {
-      throw new NotFoundException(
-        'Nenhum atendente disponível na fila para Skills-Based',
-      );
+      throw new NotFoundException('Nenhum atendente disponível na fila para Skills-Based');
     }
 
     const atendenteIdsDisponiveis = atendentesDisponiveis.map((a) => a.id);
@@ -495,6 +491,7 @@ export class DistribuicaoAvancadaService {
     const skillsAtendentes = await this.atendenteSkillRepo
       .createQueryBuilder('skill')
       .where('skill.atendenteId IN (:...ids)', { ids: atendenteIdsDisponiveis })
+      .andWhere('skill.empresaId = :empresaId', { empresaId })
       .andWhere('skill.skill IN (:...requiredSkills)', { requiredSkills })
       .andWhere('skill.ativo = :ativo', { ativo: true })
       .orderBy('skill.nivel', 'DESC')
@@ -529,34 +526,32 @@ export class DistribuicaoAvancadaService {
     filaId: string,
     requiredSkills: string[] | undefined,
     config: DistribuicaoConfig,
+    empresaId: string,
   ): Promise<User> {
     this.logger.debug(`Executando Híbrido para fila ${filaId}`);
 
     if (!requiredSkills || requiredSkills.length === 0) {
-      return this.menorCarga(filaId, config);
+      return this.menorCarga(filaId, config, empresaId);
     }
 
     const fila = await this.filaRepo.findOne({
-      where: { id: filaId },
+      where: { id: filaId, empresaId },
       relations: ['atendentes', 'atendentes.atendente'],
     });
 
     if (!fila || !fila.atendentes || fila.atendentes.length === 0) {
-      throw new NotFoundException(
-        `Nenhum atendente vinculado à fila ${filaId}`,
-      );
+      throw new NotFoundException(`Nenhum atendente vinculado à fila ${filaId}`);
     }
 
     const atendentesDisponiveis = await this.filtrarAtendentesDisponiveis(
       fila.atendentes.map((fa) => fa.atendente),
       filaId,
       config,
+      empresaId,
     );
 
     if (atendentesDisponiveis.length === 0) {
-      throw new NotFoundException(
-        'Nenhum atendente disponível na fila para Híbrido',
-      );
+      throw new NotFoundException('Nenhum atendente disponível na fila para Híbrido');
     }
 
     const atendenteIdsDisponiveis = atendentesDisponiveis.map((a) => a.id);
@@ -564,6 +559,7 @@ export class DistribuicaoAvancadaService {
     const skillsAtendentes = await this.atendenteSkillRepo
       .createQueryBuilder('skill')
       .where('skill.atendenteId IN (:...ids)', { ids: atendenteIdsDisponiveis })
+      .andWhere('skill.empresaId = :empresaId', { empresaId })
       .andWhere('skill.skill IN (:...requiredSkills)', { requiredSkills })
       .andWhere('skill.ativo = :ativo', { ativo: true })
       .getMany();
@@ -572,16 +568,12 @@ export class DistribuicaoAvancadaService {
       this.logger.warn(
         `Nenhum atendente com skills ${requiredSkills.join(', ')}, usando menor-carga`,
       );
-      return this.menorCarga(filaId, config);
+      return this.menorCarga(filaId, config, empresaId);
     }
 
-    const atendentesComSkills = [
-      ...new Set(skillsAtendentes.map((s) => s.atendenteId)),
-    ];
+    const atendentesComSkills = [...new Set(skillsAtendentes.map((s) => s.atendenteId))];
 
-    const candidatos = atendentesDisponiveis.filter((a) =>
-      atendentesComSkills.includes(a.id),
-    );
+    const candidatos = atendentesDisponiveis.filter((a) => atendentesComSkills.includes(a.id));
 
     // Entre os que têm skills, aplicar menor carga
     const cargasPorAtendente = await this.ticketRepo
@@ -591,6 +583,7 @@ export class DistribuicaoAvancadaService {
       .where('ticket.status NOT IN (:...statusFinalizados)', {
         statusFinalizados: ['fechado', 'resolvido', 'cancelado'],
       })
+      .andWhere('ticket.empresaId = :empresaId', { empresaId })
       .andWhere('ticket.atendenteId IN (:...atendenteIds)', {
         atendenteIds: candidatos.map((a) => a.id),
       })
@@ -603,9 +596,7 @@ export class DistribuicaoAvancadaService {
     }
 
     const atendentesComTickets = cargasPorAtendente.map((c) => c.atendenteId);
-    const candidatoSemTicket = candidatos.find(
-      (a) => !atendentesComTickets.includes(a.id),
-    );
+    const candidatoSemTicket = candidatos.find((a) => !atendentesComTickets.includes(a.id));
 
     if (candidatoSemTicket) {
       return candidatoSemTicket;
@@ -622,6 +613,7 @@ export class DistribuicaoAvancadaService {
     atendentes: User[],
     filaId: string,
     config: DistribuicaoConfig,
+    empresaId: string,
   ): Promise<User[]> {
     const disponiveis: User[] = [];
 
@@ -643,6 +635,7 @@ export class DistribuicaoAvancadaService {
         atendente.id,
         filaId,
         config.capacidadeMaxima,
+        empresaId,
       );
 
       if (atingiuCapacidade) {
@@ -662,9 +655,11 @@ export class DistribuicaoAvancadaService {
     atendenteId: string,
     filaId: string,
     capacidadeMaxima: number,
+    empresaId: string,
   ): Promise<boolean> {
     const cargaAtual = await this.ticketRepo.count({
       where: {
+        empresaId,
         atendenteId,
         filaId,
         status: Not(In(['fechado', 'resolvido', 'cancelado'])),
@@ -677,9 +672,10 @@ export class DistribuicaoAvancadaService {
   /**
    * Obtém carga atual do atendente
    */
-  private async obterCargaAtendente(atendenteId: string): Promise<number> {
+  private async obterCargaAtendente(atendenteId: string, empresaId: string): Promise<number> {
     return this.ticketRepo.count({
       where: {
+        empresaId,
         atendenteId,
         status: Not(In(['fechado', 'resolvido', 'cancelado'])),
       },
@@ -690,6 +686,7 @@ export class DistribuicaoAvancadaService {
    * Registra log de auditoria
    */
   private async registrarLog(data: {
+    empresaId: string;
     ticketId: string;
     atendenteId: string;
     filaId: string;
@@ -701,6 +698,7 @@ export class DistribuicaoAvancadaService {
   }): Promise<void> {
     try {
       const logData = this.distribuicaoLogRepo.create({
+        empresaId: data.empresaId,
         ticketId: data.ticketId,
         atendenteId: data.atendenteId,
         filaId: data.filaId,
@@ -712,13 +710,9 @@ export class DistribuicaoAvancadaService {
       });
 
       await this.distribuicaoLogRepo.save(logData);
-      this.logger.debug(
-        `Log de distribuição registrado para ticket ${data.ticketId}`,
-      );
+      this.logger.debug(`Log de distribuição registrado para ticket ${data.ticketId}`);
     } catch (error) {
-      this.logger.error(
-        `Erro ao registrar log de distribuição: ${error.message}`,
-      );
+      this.logger.error(`Erro ao registrar log de distribuição: ${error.message}`);
     }
   }
 
@@ -729,13 +723,12 @@ export class DistribuicaoAvancadaService {
     ticketId: string,
     novoAtendenteId: string,
     motivoRealocacao: string,
+    empresaId?: string,
   ): Promise<void> {
-    this.logger.log(
-      `Realocando ticket ${ticketId} para atendente ${novoAtendenteId}`,
-    );
+    this.logger.log(`Realocando ticket ${ticketId} para atendente ${novoAtendenteId}`);
 
     const ticket = await this.ticketRepo.findOne({
-      where: { id: ticketId },
+      where: { id: ticketId, ...(empresaId ? { empresaId } : {}) },
       relations: ['fila'],
     });
 
@@ -744,18 +737,20 @@ export class DistribuicaoAvancadaService {
     }
 
     const novoAtendente = await this.userRepo.findOne({
-      where: { id: novoAtendenteId },
+      where: {
+        id: novoAtendenteId,
+        ...(ticket?.empresaId ? { empresa_id: ticket.empresaId } : {}),
+      },
     });
 
     if (!novoAtendente) {
-      throw new NotFoundException(
-        `Atendente ${novoAtendenteId} não encontrado`,
-      );
+      throw new NotFoundException(`Atendente ${novoAtendenteId} não encontrado`);
     }
 
-    const cargaAtual = await this.obterCargaAtendente(novoAtendenteId);
+    const cargaAtual = await this.obterCargaAtendente(novoAtendenteId, ticket.empresaId);
 
     await this.registrarLog({
+      empresaId: ticket.empresaId,
       ticketId,
       atendenteId: novoAtendenteId,
       filaId: ticket.fila.id,
@@ -766,8 +761,6 @@ export class DistribuicaoAvancadaService {
       motivoRealocacao,
     });
 
-    this.logger.log(
-      `Ticket ${ticketId} realocado com sucesso para ${novoAtendente.nome}`,
-    );
+    this.logger.log(`Ticket ${ticketId} realocado com sucesso para ${novoAtendente.nome}`);
   }
 }

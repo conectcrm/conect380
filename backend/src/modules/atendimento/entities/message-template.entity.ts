@@ -21,27 +21,27 @@ export class MessageTemplate {
   conteudo: string;
 
   @Column({ type: 'varchar', length: 100, nullable: true })
-  categoria: string;
+  categoria?: string;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
-  atalho: string; // Atalho para uso rápido no chat (ex: /boas-vindas)
+  atalho?: string; // Atalho para uso rápido no chat (ex: /boas-vindas)
 
   @Column({ type: 'simple-json', nullable: true })
-  variaveis: string[]; // Lista de variáveis disponíveis (ex: ['{{nome}}', '{{ticket}}', '{{empresa}}'])
+  variaveis?: string[]; // Lista de variáveis disponíveis
 
   @Column({ type: 'boolean', default: true })
   ativo: boolean;
 
-  @Column({ type: 'varchar', length: 36 })
+  @Column({ type: 'uuid', name: 'empresa_id' })
   empresaId: string;
 
   @ManyToOne(() => Empresa)
-  @JoinColumn({ name: 'empresaId' })
+  @JoinColumn({ name: 'empresa_id' })
   empresa: Empresa;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'createdAt' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updatedAt' })
   updatedAt: Date;
 }

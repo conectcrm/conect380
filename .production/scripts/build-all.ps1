@@ -125,5 +125,7 @@ Write-Host "✅ BUILD CONCLUÍDO COM SUCESSO!" -ForegroundColor Green
 Write-Host ""
 Write-Host "Próximos passos:" -ForegroundColor Cyan
 Write-Host "  1. Testar localmente: docker-compose -f .production/docker-compose.yml up" -ForegroundColor White
-Write-Host "  2. Deploy na AWS: .\.production\scripts\deploy-aws.ps1" -ForegroundColor White
+Write-Host "  2. Validar backend: curl http://localhost:3500/health" -ForegroundColor White
+Write-Host "  3. Validar frontend: http://localhost:3000" -ForegroundColor White
 Write-Host ""
+

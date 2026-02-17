@@ -108,7 +108,32 @@ interface PropostaFormData {
   incluirImpostosPDF: boolean;
 }
 
-// Schema de validação
+
+const clientesMockFallback: Cliente[] = [
+  {
+    id: 'mock-1',
+    nome: 'Cliente Exemplo',
+    documento: '00.000.000/0001-00',
+    email: 'cliente@exemplo.com',
+    telefone: '(11) 99999-9999',
+    endereco: 'Rua Exemplo, 100',
+    cidade: 'Sao Paulo',
+    estado: 'SP',
+    cep: '01000-000',
+    tipoPessoa: 'juridica',
+  },
+  {
+    id: 'mock-2',
+    nome: 'Maria Oliveira',
+    documento: '123.456.789-00',
+    email: 'maria@exemplo.com',
+    telefone: '(11) 98888-8888',
+    cidade: 'Sao Paulo',
+    estado: 'SP',
+    tipoPessoa: 'fisica',
+  },
+];
+// Schema de validacao
 const propostaSchema = yup.object().shape({
   vendedor: yup.object().nullable().required('Vendedor responsável é obrigatório'),
   cliente: yup.object().nullable().required('Cliente é obrigatório'),
@@ -482,7 +507,7 @@ const NovaPropostaPage: React.FC = () => {
         status: 'rascunho' as const,
         numero: `PROP-${Date.now().toString().slice(-6)}`,
       };
-      const propostaCriada = await propostasService.criarProposta(propostaData);
+      const propostaCriada = await propostasService.criarProposta(propostaData as any);
       toastNotify.dismiss(loadingToastId);
       toastNotify.success(`Proposta ${propostaCriada.numero} criada com sucesso!`);
       reset();
@@ -1471,3 +1496,4 @@ const NovaPropostaPage: React.FC = () => {
 };
 
 export default NovaPropostaPage;
+

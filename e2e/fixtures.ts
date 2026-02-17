@@ -21,6 +21,24 @@ const ATENDENTE_USER = {
   senha: process.env.TEST_ATENDENTE_PASSWORD || 'atendente123',
 };
 
+async function performLogin(page: any, email: string, senha: string) {
+  const emailInput = page
+    .locator('input[name="email"], input[type="email"], input[placeholder*="empresa" i]')
+    .first();
+  const passwordInput = page
+    .locator('input[name="password"], input[type="password"], input[placeholder*="senha" i]')
+    .first();
+  const submitButton = page.locator('button[type="submit"], button:has-text("Entrar")').first();
+
+  await expect(emailInput).toBeVisible({ timeout: 15000 });
+  await expect(passwordInput).toBeVisible({ timeout: 15000 });
+  await expect(submitButton).toBeVisible({ timeout: 15000 });
+
+  await emailInput.fill(email);
+  await passwordInput.fill(senha);
+  await submitButton.click();
+}
+
 // Estender test com fixtures
 export const test = base.extend<CustomFixtures>({
   // Fixture: usuário admin
@@ -39,9 +57,7 @@ export const test = base.extend<CustomFixtures>({
     await page.goto('/login');
 
     // Fazer login
-    await page.fill('input[name="email"]', ADMIN_USER.email);
-    await page.fill('input[type="password"]', ADMIN_USER.senha);
-    await page.click('button[type="submit"]');
+    await performLogin(page, ADMIN_USER.email, ADMIN_USER.senha);
 
     // Aguardar redirecionamento
     await page.waitForURL('**/dashboard', { timeout: 10000 });
@@ -64,9 +80,7 @@ export { expect };
  */
 export async function login(page: any, email: string, senha: string) {
   await page.goto('/login');
-  await page.fill('input[name="email"]', email);
-  await page.fill('input[type="password"]', senha);
-  await page.click('button[type="submit"]');
+  await performLogin(page, email, senha);
   await page.waitForURL('**/dashboard', { timeout: 10000 });
 }
 

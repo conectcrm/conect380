@@ -153,7 +153,7 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
                   }}
                   onFocus={() => setShowSearchResults(searchQuery.length > 0)}
                   placeholder="Buscar clientes, propostas, contratos..."
-                  className="block w-full pl-10 pr-16 py-2.5 border border-gray-300 rounded-xl bg-gray-50 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white text-sm transition-all duration-200"
+                  className="block w-full pl-10 pr-16 py-2.5 border border-gray-300 rounded-xl bg-gray-50 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#159A9C] focus:border-transparent focus:bg-white text-sm transition-all duration-200"
                 />
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3">
                   <kbd className="inline-flex items-center px-2 py-1 border border-gray-300 rounded-md text-xs bg-white text-gray-600 font-medium">
@@ -189,12 +189,7 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
                           >
                             <div className="flex items-center gap-3">
                               <div
-                                className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-medium ${result.type === 'cliente'
-                                    ? 'bg-blue-500'
-                                    : result.type === 'proposta'
-                                      ? 'bg-green-500'
-                                      : 'bg-purple-500'
-                                  }`}
+                                className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-medium bg-[#159A9C]"
                               >
                                 {result.type === 'cliente'
                                   ? 'C'
@@ -227,7 +222,7 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
                     </div>
 
                     <div className="p-3 border-t bg-gray-50">
-                      <button className="w-full text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors">
+                      <button className="w-full text-xs text-[#159A9C] hover:text-[#0F7B7D] font-medium transition-colors">
                         Ver todos os resultados
                       </button>
                     </div>
@@ -262,9 +257,9 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
                   className="relative p-3 rounded-full hover:bg-gray-100 transition-colors group"
                   title="Notificações"
                 >
-                  <Bell className="w-5 h-5 text-gray-600 group-hover:text-blue-600 transition-colors" />
+                  <Bell className="w-5 h-5 text-gray-600 group-hover:text-[#159A9C] transition-colors" />
                   {notifications.length > 0 && (
-                    <span className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-md animate-pulse">
+                    <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-600 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-md animate-pulse">
                       {notifications.length > 9 ? '9+' : notifications.length}
                     </span>
                   )}
@@ -273,11 +268,11 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
                 {/* Dropdown de Notificações */}
                 {showNotifications && (
                   <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl border shadow-xl z-50 overflow-hidden">
-                    <div className="p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
+                    <div className="p-4 border-b bg-gray-50">
                       <div className="flex items-center justify-between">
                         <h3 className="font-semibold text-gray-900">Notificações</h3>
                         {notifications.length > 0 && (
-                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
+                          <span className="text-xs bg-[#159A9C]/10 text-[#159A9C] px-2 py-1 rounded-full font-medium">
                             {notifications.length} nova{notifications.length !== 1 ? 's' : ''}
                           </span>
                         )}
@@ -292,7 +287,7 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
                             className="p-3 border-b last:border-b-0 hover:bg-gray-50 transition-colors cursor-pointer"
                           >
                             <div className="flex items-start gap-3">
-                              <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                              <div className="w-2 h-2 bg-[#159A9C] rounded-full mt-2 flex-shrink-0"></div>
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm text-gray-900 leading-relaxed">
                                   {notification.message}
@@ -313,7 +308,7 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
 
                     {notifications.length > 0 && (
                       <div className="p-3 border-t bg-gray-50">
-                        <button className="w-full text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors">
+                        <button className="w-full text-sm text-[#159A9C] hover:text-[#0F7B7D] font-medium transition-colors">
                           Ver todas as notificações
                         </button>
                       </div>
@@ -337,7 +332,7 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
                   className="flex items-center gap-3 px-3 py-2 rounded-full hover:bg-gray-100 transition-colors"
                   title={`${formatUserName(user?.nome || 'Admin Sistema')} - ${formatCompanyName(user?.empresa?.nome || 'Fênix CRM Demo')}`}
                 >
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-md">
+                  <div className="w-10 h-10 bg-[#159A9C] rounded-full flex items-center justify-center shadow-md">
                     <User className="w-5 h-5 text-white" />
                   </div>
                   <div className="hidden xl:block text-left">
@@ -355,9 +350,9 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
                 {showUserMenu && (
                   <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl border shadow-xl z-50 overflow-hidden">
                     {/* Header do Profile */}
-                    <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
+                    <div className="p-4 bg-gray-50 border-b">
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-md">
+                        <div className="w-12 h-12 bg-[#159A9C] rounded-full flex items-center justify-center shadow-md">
                           <User className="w-6 h-6 text-white" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -380,8 +375,8 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
                     {/* Menu Options */}
                     <div className="p-2">
                       <button className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 rounded-lg transition-colors group">
-                        <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                          <Settings className="w-4 h-4 text-gray-600 group-hover:text-blue-600" />
+                        <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-[#159A9C]/10 transition-colors">
+                          <Settings className="w-4 h-4 text-gray-600 group-hover:text-[#159A9C]" />
                         </div>
                         <div>
                           <span className="text-sm font-medium text-gray-700">Configurações</span>
@@ -389,8 +384,8 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
                         </div>
                       </button>
                       <button className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 rounded-lg transition-colors group">
-                        <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                          <MessageCircle className="w-4 h-4 text-gray-600 group-hover:text-blue-600" />
+                        <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-[#159A9C]/10 transition-colors">
+                          <MessageCircle className="w-4 h-4 text-gray-600 group-hover:text-[#159A9C]" />
                         </div>
                         <div>
                           <span className="text-sm font-medium text-gray-700">

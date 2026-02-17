@@ -1,6 +1,32 @@
 import { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../services/api';
 
+const DASHBOARD_FETCH_TIMEOUT_MS = 20_000;
+
+const fetchJsonWithTimeout = async <T,>(
+  url: string,
+  options: RequestInit,
+  timeoutMs: number,
+): Promise<T> => {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Erro ${response.status}: ${response.statusText}`);
+    }
+
+    return (await response.json()) as T;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+};
+
 // Interfaces
 export interface DashboardKPIs {
   faturamentoTotal: {
@@ -34,6 +60,18 @@ export interface DashboardKPIs {
   };
   propostasEnviadas: {
     valor: number;
+    variacao: number;
+  };
+  cicloMedio: {
+    dias: number;
+    variacao: number;
+  };
+  tempoEtapa: {
+    dias: number;
+    variacao: number;
+  };
+  followUpsPendentes: {
+    quantidade: number;
     variacao: number;
   };
   taxaSucessoGeral: {
@@ -107,6 +145,16 @@ interface UseDashboardReturn {
   updateFilters: (filters: Partial<UseDashboardOptions>) => void;
 }
 
+const createEmptyDashboardData = (): DashboardData => ({
+  kpis: null,
+  vendedoresRanking: [],
+  alertas: [],
+  chartsData: undefined,
+  metadata: null,
+});
+
+const getAuthToken = (): string | null => localStorage.getItem('authToken');
+
 /**
  * Hook customizado para gerenciar dados do dashboard
  * Consome APIs reais do backend e gerencia estado
@@ -121,13 +169,7 @@ export const useDashboard = (options: UseDashboardOptions = {}): UseDashboardRet
   } = options;
 
   // Estados
-  const [data, setData] = useState<DashboardData>({
-    kpis: null,
-    vendedoresRanking: [],
-    alertas: [],
-    chartsData: undefined,
-    metadata: null,
-  });
+  const [data, setData] = useState<DashboardData>(createEmptyDashboardData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState({ periodo, vendedorId, regiao });
@@ -138,6 +180,13 @@ export const useDashboard = (options: UseDashboardOptions = {}): UseDashboardRet
       setLoading(true);
       setError(null);
 
+      const token = getAuthToken();
+      if (!token) {
+        setData(createEmptyDashboardData());
+        setError('Sessao nao autenticada. Faca login novamente.');
+        return;
+      }
+
       // Construir query parameters
       const params = new URLSearchParams();
       params.append('periodo', filters.periodo);
@@ -145,22 +194,17 @@ export const useDashboard = (options: UseDashboardOptions = {}): UseDashboardRet
       if (filters.regiao) params.append('regiao', filters.regiao);
 
       // Buscar dados do resumo completo
-      const response = await fetch(`${API_BASE_URL}/dashboard/resumo?${params.toString()}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          // Adicionar token de autenticação se necessário
-          ...(localStorage.getItem('token') && {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          }),
+      const result = await fetchJsonWithTimeout<any>(
+        `${API_BASE_URL}/dashboard/resumo?${params.toString()}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
         },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erro ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
+        DASHBOARD_FETCH_TIMEOUT_MS,
+      );
 
       // Converter timestamps dos alertas
       const alertasComData = result.alertas.map((alerta: any) => ({
@@ -179,21 +223,21 @@ export const useDashboard = (options: UseDashboardOptions = {}): UseDashboardRet
 
       const metadata = result.metadata
         ? {
-          ...metadataDefaults,
-          ...result.metadata,
-          periodosDisponiveis:
-            result.metadata.periodosDisponiveis ?? metadataDefaults.periodosDisponiveis,
-          vendedoresDisponiveis:
-            result.metadata.vendedoresDisponiveis ??
-            result.vendedoresRanking?.map(({ id, nome }: VendedorRanking) => ({ id, nome })),
-          regioesDisponiveis: result.metadata.regioesDisponiveis,
-        }
+            ...metadataDefaults,
+            ...result.metadata,
+            periodosDisponiveis:
+              result.metadata.periodosDisponiveis ?? metadataDefaults.periodosDisponiveis,
+            vendedoresDisponiveis:
+              result.metadata.vendedoresDisponiveis ??
+              result.vendedoresRanking?.map(({ id, nome }: VendedorRanking) => ({ id, nome })),
+            regioesDisponiveis: result.metadata.regioesDisponiveis,
+          }
         : {
-          ...metadataDefaults,
-          vendedoresDisponiveis: result.vendedoresRanking?.map(
-            ({ id, nome }: VendedorRanking) => ({ id, nome }),
-          ),
-        };
+            ...metadataDefaults,
+            vendedoresDisponiveis: result.vendedoresRanking?.map(
+              ({ id, nome }: VendedorRanking) => ({ id, nome }),
+            ),
+          };
 
       setData({
         kpis: result.kpis,
@@ -204,10 +248,21 @@ export const useDashboard = (options: UseDashboardOptions = {}): UseDashboardRet
       });
     } catch (err) {
       console.error('❌ Erro ao buscar dados do dashboard:', err);
-      setError(err instanceof Error ? err.message : 'Erro desconhecido');
+      const isAbortError =
+        err instanceof DOMException ? err.name === 'AbortError' : (err as any)?.name === 'AbortError';
+      const errorMessage = isAbortError
+        ? 'Tempo limite ao carregar o dashboard. Verifique se o backend está rodando.'
+        : err instanceof Error
+          ? err.message
+          : 'Erro desconhecido';
 
-      // Em caso de erro, usar dados mock como fallback
-      setData(getMockData());
+      setError(errorMessage);
+
+      if (errorMessage.includes('401')) {
+        setData(createEmptyDashboardData());
+      } else {
+        setData(getMockData());
+      }
     } finally {
       setLoading(false);
     }
@@ -268,6 +323,12 @@ export const useDashboardKPIs = (
       setLoading(true);
       setError(null);
 
+      const token = getAuthToken();
+      if (!token) {
+        setKpis(null);
+        return;
+      }
+
       const params = new URLSearchParams();
       params.append('periodo', periodo);
       if (vendedorId) params.append('vendedor', vendedorId);
@@ -276,9 +337,7 @@ export const useDashboardKPIs = (
       const response = await fetch(`${API_BASE_URL}/dashboard/kpis?${params.toString()}`, {
         headers: {
           'Content-Type': 'application/json',
-          ...(localStorage.getItem('token') && {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          }),
+          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -316,12 +375,16 @@ export const useDashboardAlertas = () => {
       setLoading(true);
       setError(null);
 
+      const token = getAuthToken();
+      if (!token) {
+        setAlertas([]);
+        return;
+      }
+
       const response = await fetch(`${API_BASE_URL}/dashboard/alertas`, {
         headers: {
           'Content-Type': 'application/json',
-          ...(localStorage.getItem('token') && {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          }),
+          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -382,6 +445,9 @@ const getMockData = (): DashboardData => ({
     novosClientesMes: { quantidade: 248, variacao: 12.5 },
     leadsQualificados: { quantidade: 32, variacao: 8.3 },
     propostasEnviadas: { valor: 125000, variacao: 15.2 },
+    cicloMedio: { dias: 18, variacao: -3.4 },
+    tempoEtapa: { dias: 7, variacao: -1.2 },
+    followUpsPendentes: { quantidade: 14, variacao: -9.5 },
     taxaSucessoGeral: { percentual: 68, variacao: -2.1 },
   },
   vendedoresRanking: [

@@ -18,7 +18,12 @@ import {
   ImportLeadResult,
 } from './dto/lead.dto';
 import { User } from '../users/user.entity';
-import { Oportunidade, EstagioOportunidade } from '../oportunidades/oportunidade.entity';
+import {
+  Oportunidade,
+  EstagioOportunidade,
+  OrigemOportunidade,
+  PrioridadeOportunidade,
+} from '../oportunidades/oportunidade.entity';
 import * as Papa from 'papaparse';
 
 @Injectable()
@@ -28,9 +33,11 @@ export class LeadsService {
     private readonly leadsRepository: Repository<Lead>,
     @InjectRepository(Oportunidade)
     private readonly oportunidadesRepository: Repository<Oportunidade>,
-  ) { }
+  ) {}
 
-  private sanitizeLeadInput<T extends Partial<CreateLeadDto> | Partial<UpdateLeadDto>>(payload: T): T {
+  private sanitizeLeadInput<T extends Partial<CreateLeadDto> | Partial<UpdateLeadDto>>(
+    payload: T,
+  ): T {
     const sanitized = { ...payload } as Record<string, unknown>;
 
     if (typeof sanitized.nome === 'string') {
@@ -63,6 +70,57 @@ export class LeadsService {
     return sanitized as T;
   }
 
+  private mapearEstagioParaBanco(estagio: EstagioOportunidade): EstagioOportunidade {
+    if (Object.values(EstagioOportunidade).includes(estagio)) {
+      return estagio;
+    }
+
+    return EstagioOportunidade.LEADS;
+  }
+
+  private mapearOrigemParaBanco(origem?: string): OrigemOportunidade {
+    if (!origem) {
+      return OrigemOportunidade.WEBSITE;
+    }
+
+    switch (origem) {
+      case OrigemLead.FORMULARIO:
+        return OrigemOportunidade.WEBSITE;
+      case OrigemLead.IMPORTACAO:
+        return OrigemOportunidade.CAMPANHA;
+      case OrigemLead.API:
+      case OrigemLead.MANUAL:
+        return OrigemOportunidade.WEBSITE;
+      case OrigemLead.WHATSAPP:
+        return OrigemOportunidade.REDES_SOCIAIS;
+      case OrigemLead.INDICACAO:
+        return OrigemOportunidade.INDICACAO;
+      case OrigemLead.OUTRO:
+        return OrigemOportunidade.PARCEIRO;
+      case 'website':
+        return OrigemOportunidade.WEBSITE;
+      case 'indicacao':
+        return OrigemOportunidade.INDICACAO;
+      case 'evento':
+        return OrigemOportunidade.EVENTO;
+      case 'telefone':
+        return OrigemOportunidade.TELEFONE;
+      case 'email':
+        return OrigemOportunidade.EMAIL;
+      case 'redes_sociais':
+      case 'midia_social':
+        return OrigemOportunidade.REDES_SOCIAIS;
+      case 'campanha':
+      case 'publicidade':
+        return OrigemOportunidade.CAMPANHA;
+      case 'parceiro':
+      case 'outro':
+        return OrigemOportunidade.PARCEIRO;
+      default:
+        return OrigemOportunidade.WEBSITE;
+    }
+  }
+
   /**
    * Criar novo lead
    */
@@ -77,15 +135,15 @@ export class LeadsService {
 
       const lead = this.leadsRepository.create({
         ...sanitizedDto,
-        empresa_id: empresaId,
+        empresaId,
         status: sanitizedDto.status || StatusLead.NOVO,
-        origem: sanitizedDto.origem || OrigemLead.MANUAL,
+        origem: (this.mapearOrigemParaBanco(sanitizedDto.origem as string) || 'website') as OrigemLead,
       });
 
       console.log('🔍 [LeadsService.create] Lead criado (antes do save):', {
         nome: lead.nome,
         email: lead.email,
-        empresa_id: lead.empresa_id,
+        empresa_id: lead.empresaId,
         status: lead.status,
         origem: lead.origem,
         score: lead.score,
@@ -126,23 +184,13 @@ export class LeadsService {
    */
   async captureFromPublic(dto: CaptureLeadDto): Promise<Lead> {
     try {
-      // Por enquanto, vamos usar uma empresa padrão para leads públicos
-      // Em produção, isso deveria vir de um subdomínio ou parâmetro na URL
-      const lead = this.leadsRepository.create({
-        nome: dto.nome,
-        email: dto.email,
-        telefone: dto.telefone,
-        empresa_nome: dto.empresa_nome,
-        observacoes: dto.mensagem,
-        origem: OrigemLead.FORMULARIO,
-        status: StatusLead.NOVO,
-        empresa_id: 'public-leads', // TODO: Implementar lógica de roteamento por empresa
-      });
-
-      lead.score = this.calcularScore(lead);
-
-      return await this.leadsRepository.save(lead);
+      throw new BadRequestException(
+        'Captura pública de lead requer identificação da empresa (roteamento por subdomínio/parâmetro).',
+      );
     } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
       console.error('Erro ao capturar lead público:', error);
       throw new InternalServerErrorException('Erro ao capturar lead', error.message);
     }
@@ -173,7 +221,9 @@ export class LeadsService {
       }
 
       if (filtros?.origem) {
-        query.andWhere('lead.origem = :origem', { origem: filtros.origem });
+        query.andWhere('lead.origem = :origem', {
+          origem: this.mapearOrigemParaBanco(filtros.origem as string),
+        });
       }
 
       if (filtros?.responsavel_id) {
@@ -193,7 +243,7 @@ export class LeadsService {
       if (filtros?.busca) {
         query.andWhere(
           '(lead.nome ILIKE :busca OR lead.email ILIKE :busca OR lead.empresa_nome ILIKE :busca)',
-          { busca: `%${filtros.busca}%` }
+          { busca: `%${filtros.busca}%` },
         );
       }
 
@@ -209,7 +259,7 @@ export class LeadsService {
         limit,
         totalPages: Math.ceil(total / limit),
         retornados: leads.length,
-        ids: leads.map(l => l.id),
+        ids: leads.map((l) => l.id),
       });
 
       return {
@@ -233,9 +283,9 @@ export class LeadsService {
       const lead = await this.leadsRepository.findOne({
         where: {
           id,
-          empresa_id: empresaId,
+          empresaId,
         },
-        relations: ['responsavel', 'oportunidade'],
+        relations: ['responsavel'],
       });
 
       if (!lead) {
@@ -324,13 +374,16 @@ export class LeadsService {
         titulo: `${lead.nome}${lead.empresa_nome ? ` - ${lead.empresa_nome}` : ''}`,
         descricao: dto.descricao || lead.observacoes || `Lead convertido: ${lead.nome}`,
         valor: dto.valor || 0,
-        estagio: (dto.estagio as EstagioOportunidade) || EstagioOportunidade.LEADS,
+        estagio: this.mapearEstagioParaBanco((dto.estagio as EstagioOportunidade) || EstagioOportunidade.LEADS),
+        prioridade: PrioridadeOportunidade.MEDIA,
+        origem: this.mapearOrigemParaBanco(lead.origem),
+        empresa_id: empresaId,
+        responsavel_id: lead.responsavel_id,
+        probabilidade: 20, // Probabilidade inicial baixa
         nomeContato: lead.nome,
         emailContato: lead.email,
         telefoneContato: lead.telefone,
         empresaContato: lead.empresa_nome,
-        responsavel_id: lead.responsavel_id,
-        probabilidade: 20, // Probabilidade inicial baixa
       });
 
       const savedOportunidade = await this.oportunidadesRepository.save(oportunidade);
@@ -356,7 +409,10 @@ export class LeadsService {
    */
   async getEstatisticas(empresaId: string): Promise<LeadEstatisticas> {
     try {
-      console.log('🔍 [LeadsService.getEstatisticas] Calculando estatísticas para empresa:', empresaId);
+      console.log(
+        '🔍 [LeadsService.getEstatisticas] Calculando estatísticas para empresa:',
+        empresaId,
+      );
 
       // Buscar todos os leads (sem paginação para estatísticas)
       const result = await this.findAll(empresaId, { limit: 10000 }); // Limite alto para pegar todos
@@ -365,21 +421,20 @@ export class LeadsService {
       console.log('🔍 [LeadsService.getEstatisticas] Leads encontrados:', leads.length);
 
       const total = leads.length;
-      const novos = leads.filter(l => l.status === StatusLead.NOVO).length;
-      const contatados = leads.filter(l => l.status === StatusLead.CONTATADO).length;
-      const qualificados = leads.filter(l => l.status === StatusLead.QUALIFICADO).length;
-      const desqualificados = leads.filter(l => l.status === StatusLead.DESQUALIFICADO).length;
-      const convertidos = leads.filter(l => l.status === StatusLead.CONVERTIDO).length;
+      const novos = leads.filter((l) => l.status === StatusLead.NOVO).length;
+      const contatados = leads.filter((l) => l.status === StatusLead.CONTATADO).length;
+      const qualificados = leads.filter((l) => l.status === StatusLead.QUALIFICADO).length;
+      const desqualificados = leads.filter((l) => l.status === StatusLead.DESQUALIFICADO).length;
+      const convertidos = leads.filter((l) => l.status === StatusLead.CONVERTIDO).length;
 
       const taxaConversao = total > 0 ? (convertidos / total) * 100 : 0;
 
-      const scoreMedio = total > 0
-        ? Math.round(leads.reduce((sum, lead) => sum + lead.score, 0) / total)
-        : 0;
+      const scoreMedio =
+        total > 0 ? Math.round(leads.reduce((sum, lead) => sum + lead.score, 0) / total) : 0;
 
       // Agrupamento por origem
       const origemMap = new Map<string, number>();
-      leads.forEach(lead => {
+      leads.forEach((lead) => {
         const origem = lead.origem || 'outro';
         origemMap.set(origem, (origemMap.get(origem) || 0) + 1);
       });
@@ -390,7 +445,7 @@ export class LeadsService {
 
       // Agrupamento por responsável
       const responsavelMap = new Map<string, { nome: string; quantidade: number }>();
-      leads.forEach(lead => {
+      leads.forEach((lead) => {
         if (lead.responsavel_id) {
           const key = lead.responsavel_id;
           const existing = responsavelMap.get(key);
@@ -404,13 +459,11 @@ export class LeadsService {
           }
         }
       });
-      const porResponsavel = Array.from(responsavelMap.entries()).map(
-        ([responsavel_id, data]) => ({
-          responsavel_id,
-          responsavel_nome: data.nome,
-          quantidade: data.quantidade,
-        }),
-      );
+      const porResponsavel = Array.from(responsavelMap.entries()).map(([responsavel_id, data]) => ({
+        responsavel_id,
+        responsavel_nome: data.nome,
+        quantidade: data.quantidade,
+      }));
 
       const estatisticas = {
         total,
@@ -454,10 +507,7 @@ export class LeadsService {
   /**
    * Import de leads via CSV
    */
-  async importFromCsv(
-    csvContent: string,
-    empresaId: string,
-  ): Promise<ImportLeadResult> {
+  async importFromCsv(csvContent: string, empresaId: string): Promise<ImportLeadResult> {
     const result: ImportLeadResult = {
       total: 0,
       importados: 0,
@@ -525,7 +575,7 @@ export class LeadsService {
             origem,
             observacoes: row.observacoes?.trim() || undefined,
             responsavel_id,
-            empresa_id: empresaId,
+            empresaId,
             status: StatusLead.NOVO,
           });
 

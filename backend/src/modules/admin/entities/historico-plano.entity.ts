@@ -4,7 +4,7 @@ import {
   Column,
   ManyToOne,
   JoinColumn,
-  CreateDateColumn
+  CreateDateColumn,
 } from 'typeorm';
 import { Empresa } from '../../../empresas/entities/empresa.entity';
 
@@ -23,14 +23,14 @@ export class HistoricoPlano {
   @Column({
     type: 'varchar',
     length: 50,
-    name: 'plano_anterior'
+    name: 'plano_anterior',
   })
   planoAnterior: string;
 
   @Column({
     type: 'varchar',
     length: 50,
-    name: 'plano_novo'
+    name: 'plano_novo',
   })
   planoNovo: string;
 
@@ -38,7 +38,7 @@ export class HistoricoPlano {
     type: 'decimal',
     precision: 10,
     scale: 2,
-    name: 'valor_anterior'
+    name: 'valor_anterior',
   })
   valorAnterior: number;
 
@@ -46,14 +46,14 @@ export class HistoricoPlano {
     type: 'decimal',
     precision: 10,
     scale: 2,
-    name: 'valor_novo'
+    name: 'valor_novo',
   })
   valorNovo: number;
 
   @Column({
     type: 'text',
     nullable: true,
-    comment: 'Motivo da mudança de plano'
+    comment: 'Motivo da mudança de plano',
   })
   motivo: string;
 
@@ -61,7 +61,7 @@ export class HistoricoPlano {
     type: 'uuid',
     nullable: true,
     name: 'alterado_por',
-    comment: 'ID do admin que fez a alteração'
+    comment: 'ID do admin que fez a alteração',
   })
   alteradoPor: string;
 

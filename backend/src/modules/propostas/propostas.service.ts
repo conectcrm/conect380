@@ -80,13 +80,18 @@ export class PropostasService {
 
   private async inicializarContador() {
     try {
-      const ultimaProposta = await this.propostaRepository.findOne({
-        order: { criadaEm: 'DESC' },
-        where: {},
-      });
+      // Importante: não usar findOne() aqui.
+      // Em ambientes com schema legado, o entity atual pode conter colunas ainda não existentes
+      // (ex.: cliente/produtos em JSONB). Então buscamos apenas o campo `numero`.
+      const ultima = await this.propostaRepository
+        .createQueryBuilder('p')
+        .select('p.numero', 'numero')
+        .orderBy('p.numero', 'DESC')
+        .limit(1)
+        .getRawOne<{ numero?: string }>();
 
-      if (ultimaProposta?.numero) {
-        const numeroMatch = ultimaProposta.numero.match(/(\d+)$/);
+      if (ultima?.numero) {
+        const numeroMatch = ultima.numero.match(/(\d+)$/);
         if (numeroMatch) {
           this.contadorId = parseInt(numeroMatch[1]) + 1;
         }
@@ -154,9 +159,10 @@ export class PropostasService {
   /**
    * Lista todas as propostas
    */
-  async listarPropostas(): Promise<Proposta[]> {
+  async listarPropostas(empresaId?: string): Promise<Proposta[]> {
     try {
       const entities = await this.propostaRepository.find({
+        where: empresaId ? { empresaId } : undefined,
         order: { criadaEm: 'DESC' },
         relations: ['vendedor'],
       });
@@ -172,10 +178,10 @@ export class PropostasService {
   /**
    * Obtém uma proposta específica
    */
-  async obterProposta(id: string): Promise<Proposta | null> {
+  async obterProposta(id: string, empresaId?: string): Promise<Proposta | null> {
     try {
       const entity = await this.propostaRepository.findOne({
-        where: { id },
+        where: empresaId ? { id, empresaId } : { id },
         relations: ['vendedor'],
       });
 
@@ -189,10 +195,12 @@ export class PropostasService {
   /**
    * Cria uma nova proposta
    */
-  async criarProposta(dadosProposta: Partial<Proposta>): Promise<Proposta> {
+  async criarProposta(dadosProposta: Partial<Proposta>, empresaId?: string): Promise<Proposta> {
     try {
       const numero = this.gerarNumero();
       this.contadorId++;
+      const empresaIdProposta =
+        empresaId ?? (dadosProposta as any).empresaId ?? (dadosProposta as any).empresa_id;
 
       // Buscar vendedor pelo nome para obter o UUID
       let vendedorId = null;
@@ -211,7 +219,9 @@ export class PropostasService {
               : dadosProposta.vendedor.nome;
 
           const vendedor = await this.userRepository.findOne({
-            where: { nome: nomeVendedor },
+            where: empresaIdProposta
+              ? { nome: nomeVendedor, empresa_id: empresaIdProposta }
+              : { nome: nomeVendedor },
           });
 
           if (vendedor) {
@@ -233,7 +243,12 @@ export class PropostasService {
         try {
           // Buscar cliente real pelo nome (busca flexível)
           const clienteReal = await this.clienteRepository.findOne({
-            where: [{ nome: Like(`%${nomeCliente}%`) }, { nome: nomeCliente }],
+            where: empresaIdProposta
+              ? [
+                  { nome: Like(`%${nomeCliente}%`), empresaId: empresaIdProposta },
+                  { nome: nomeCliente, empresaId: empresaIdProposta },
+                ]
+              : [{ nome: Like(`%${nomeCliente}%`) }, { nome: nomeCliente }],
           });
 
           if (clienteReal) {
@@ -286,6 +301,7 @@ export class PropostasService {
       }
 
       const novaProposta = this.propostaRepository.create({
+        empresaId: empresaIdProposta,
         numero,
         titulo: dadosProposta.titulo || `Proposta ${numero}`,
         cliente: clienteProcessado,
@@ -320,9 +336,11 @@ export class PropostasService {
   /**
    * Remove uma proposta
    */
-  async removerProposta(id: string): Promise<boolean> {
+  async removerProposta(id: string, empresaId?: string): Promise<boolean> {
     try {
-      const resultado = await this.propostaRepository.delete(id);
+      const resultado = await this.propostaRepository.delete(
+        empresaId ? { id, empresaId } : { id },
+      );
       return resultado.affected > 0;
     } catch (error) {
       console.error('❌ Erro ao remover proposta:', error);
@@ -338,6 +356,7 @@ export class PropostasService {
     status: string,
     source?: string,
     observacoes?: string,
+    empresaId?: string,
   ): Promise<Proposta> {
     try {
       console.log(
@@ -346,7 +365,7 @@ export class PropostasService {
       console.log(`🔧 DEBUG: Tentando buscar proposta por ID: ${propostaId}`);
 
       const proposta = await this.propostaRepository.findOne({
-        where: { id: propostaId },
+        where: empresaId ? { id: propostaId, empresaId } : { id: propostaId },
       });
 
       if (!proposta) {
@@ -375,10 +394,11 @@ export class PropostasService {
     status: string,
     source?: string,
     observacoes?: string,
+    empresaId?: string,
   ): Promise<Proposta> {
     try {
       const proposta = await this.propostaRepository.findOne({
-        where: { id: propostaId },
+        where: empresaId ? { id: propostaId, empresaId } : { id: propostaId },
       });
 
       if (!proposta) {
@@ -415,10 +435,11 @@ export class PropostasService {
     propostaId: string,
     ip?: string,
     userAgent?: string,
+    empresaId?: string,
   ): Promise<Proposta> {
     try {
       const proposta = await this.propostaRepository.findOne({
-        where: { id: propostaId },
+        where: empresaId ? { id: propostaId, empresaId } : { id: propostaId },
       });
 
       if (!proposta) {
@@ -449,10 +470,11 @@ export class PropostasService {
     propostaId: string,
     emailCliente: string,
     linkPortal?: string,
+    empresaId?: string,
   ): Promise<Proposta> {
     try {
       const proposta = await this.propostaRepository.findOne({
-        where: { id: propostaId },
+        where: empresaId ? { id: propostaId, empresaId } : { id: propostaId },
       });
 
       if (!proposta) {
@@ -483,6 +505,7 @@ export class PropostasService {
     propostaIdOuNumero: string,
     emailCliente: string,
     linkPortal?: string,
+    empresaId?: string,
   ): Promise<Proposta> {
     try {
       console.log(`🔄 Marcando proposta ${propostaIdOuNumero} como enviada automaticamente`);
@@ -490,14 +513,18 @@ export class PropostasService {
       // Tentar encontrar por ID (UUID) primeiro, depois por número
       let proposta = await this.propostaRepository
         .findOne({
-          where: { id: propostaIdOuNumero },
+          where: empresaId
+            ? { id: propostaIdOuNumero, empresaId }
+            : { id: propostaIdOuNumero },
         })
         .catch(() => null); // Capturar erro de UUID inválido
 
       // Se não encontrou por ID, tentar por número
       if (!proposta) {
         proposta = await this.propostaRepository.findOne({
-          where: { numero: propostaIdOuNumero },
+          where: empresaId
+            ? { numero: propostaIdOuNumero, empresaId }
+            : { numero: propostaIdOuNumero },
         });
       }
 

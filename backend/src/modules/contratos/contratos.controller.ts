@@ -37,13 +37,16 @@ export class ContratosController {
     private readonly contratosService: ContratosService,
     private readonly assinaturaService: AssinaturaDigitalService,
     private readonly pdfService: PdfContratoService,
-  ) { }
+  ) {}
 
   /**
    * Criar novo contrato
    */
   @Post()
-  async criarContrato(@Body() createContratoDto: CreateContratoDto, @EmpresaId() empresaId: string) {
+  async criarContrato(
+    @Body() createContratoDto: CreateContratoDto,
+    @EmpresaId() empresaId: string,
+  ) {
     try {
       const contrato = await this.contratosService.criarContrato(createContratoDto, empresaId);
 
@@ -104,10 +107,7 @@ export class ContratosController {
    * Buscar contrato por ID
    */
   @Get(':id')
-  async buscarContrato(
-    @Param('id', ParseIntPipe) id: number,
-    @EmpresaId() empresaId: string,
-  ) {
+  async buscarContrato(@Param('id', ParseIntPipe) id: number, @EmpresaId() empresaId: string) {
     // 🔒 MULTI-TENANCY: Passar empresa_id para validar isolamento
     const contrato = await this.contratosService.buscarContratoPorId(id, empresaId);
     // Se não encontrar, buscarContratoPorId lança NotFoundException automaticamente
@@ -123,10 +123,7 @@ export class ContratosController {
    * Buscar contrato por número
    */
   @Get('numero/:numero')
-  async buscarContratoPorNumero(
-    @Param('numero') numero: string,
-    @EmpresaId() empresaId: string,
-  ) {
+  async buscarContratoPorNumero(@Param('numero') numero: string, @EmpresaId() empresaId: string) {
     // 🔒 MULTI-TENANCY: Passar empresa_id para validar isolamento
     const contrato = await this.contratosService.buscarContratoPorNumero(numero, empresaId);
 
@@ -148,7 +145,11 @@ export class ContratosController {
   ) {
     try {
       // 🔒 MULTI-TENANCY: Passar empresa_id
-      const contrato = await this.contratosService.atualizarContrato(id, updateContratoDto, empresaId);
+      const contrato = await this.contratosService.atualizarContrato(
+        id,
+        updateContratoDto,
+        empresaId,
+      );
 
       this.logger.log(`Contrato atualizado: ${contrato.numero}`);
 

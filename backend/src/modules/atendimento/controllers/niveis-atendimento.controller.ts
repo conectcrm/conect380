@@ -1,23 +1,23 @@
-import { Controller, Get, Param, UseGuards, Req } from '@nestjs/common';
+import { Logger, Controller, Get, Param, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { EmpresaId } from '../../../common/decorators/empresa.decorator';
 import { NiveisAtendimentoService } from '../services/niveis-atendimento.service';
 
 @Controller('atendimento/niveis')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class NiveisAtendimentoController {
-  constructor(
-    private readonly niveisService: NiveisAtendimentoService,
-  ) { }
+  private readonly logger = new Logger(NiveisAtendimentoController.name);
+  constructor(private readonly niveisService: NiveisAtendimentoService) {}
 
   @Get()
-  async listar(@Req() req: any) {
-    const empresaId = req.user?.empresa_id;
-    console.log(`[NiveisController] 📥 GET /niveis - empresaId do JWT: ${empresaId}`);
+  async listar(@EmpresaId() empresaId: string) {
+    this.logger.log(`[NiveisController] 📥 GET /niveis - empresaId do JWT: ${empresaId}`);
     return this.niveisService.listarPorEmpresa(empresaId);
   }
 
   @Get(':id')
-  async buscar(@Param('id') id: string) {
-    return this.niveisService.buscarPorId(id);
+  async buscar(@Param('id') id: string, @EmpresaId() empresaId: string) {
+    return this.niveisService.buscarPorId(id, empresaId);
   }
 }

@@ -242,56 +242,20 @@ Closes #123"
 
 ## 🔀 Pull Requests
 
-### Template de PR
+### Template de PR (obrigatorio)
 
-Ao criar PR, preencha:
+Ao criar PR, preencha o template oficial em:
+- `.github/pull_request_template.md`
+- O preenchimento e validado automaticamente pelo workflow `.github/workflows/pr-template-guardrails.yml`.
 
-```markdown
-## 📋 Descrição
+Para PR com frontend, e obrigatorio informar:
+- Classificacao da tela (Tipo A/B/C/D/E)
+- Decisao de layout (template padrao ou layout especifico)
+- Justificativa quando houver layout especifico
+- Checklist UX minimo (loading, empty, erro, feedback, responsividade, acessibilidade)
 
-[Explique o que essa PR faz]
-
-## 🎯 Motivação e Contexto
-
-[Por que essa mudança é necessária? Que problema resolve?]
-
-## 🧪 Como Testar
-
-1. Fazer checkout da branch: `git checkout feature/minha-feature`
-2. Instalar dependências: `npm install`
-3. Rodar migrations: `npm run migration:run`
-4. Iniciar backend: `npm run start:dev`
-5. Testar funcionalidade X, Y, Z
-
-## ✅ Checklist
-
-- [ ] Código segue padrões de [CODE_PATTERNS.md](./docs/CODE_PATTERNS.md)
-- [ ] Testes unitários adicionados/atualizados
-- [ ] Testes passando (`npm test`)
-- [ ] Documentação atualizada (se necessário)
-- [ ] Build sem erros (`npm run build`)
-- [ ] Sem console.log esquecidos
-- [ ] TypeScript sem erros (`npm run type-check`)
-- [ ] Commits seguem Conventional Commits
-- [ ] PR tem título descritivo
-
-## 🔗 Issues Relacionadas
-
-Closes #123
-Fixes #456
-Related to #789
-
-## 📸 Screenshots (se UI)
-
-[Adicionar prints antes/depois]
-
-## 🚨 Breaking Changes
-
-- [ ] Sim (descrever abaixo)
-- [x] Não
-
-[Se sim, descrever o que quebra e como migrar]
-```
+Referencia de padronizacao:
+- `frontend-web/src/components/templates/GUIA_PADRONIZACAO.md`
 
 ---
 
@@ -674,6 +638,8 @@ Antes de abrir PR, verifique:
 - [ ] Mensagens de commit descritivas
 - [ ] Branch atualizada com develop/main
 - [ ] Conflitos resolvidos
+- [ ] Template oficial de PR preenchido (`.github/pull_request_template.md`)
+- [ ] Frontend: tipo de tela (A/B/C/D/E) e decisao de layout documentados no PR
 
 ### Documentação
 - [ ] JSDoc em código novo (se complexo)

@@ -30,38 +30,50 @@ const correlationFormat = winston.format((info) => {
 })();
 
 // Formato customizado para desenvolvimento (legível)
-const devFormat = printf(({ timestamp, level, message, context, correlationId, trace_id, span_id, trace, ...metadata }) => {
-  let msg = `${timestamp} [${level}] [${context || 'Application'}]`;
+const devFormat = printf(
+  ({
+    timestamp,
+    level,
+    message,
+    context,
+    correlationId,
+    trace_id,
+    span_id,
+    trace,
+    ...metadata
+  }) => {
+    let msg = `${timestamp} [${level}] [${context || 'Application'}]`;
 
-  // Adicionar correlationId se existir
-  if (correlationId && typeof correlationId === 'string') {
-    msg += ` [CID:${correlationId.substring(0, 8)}]`;
-  }
+    // Adicionar correlationId se existir
+    if (correlationId && typeof correlationId === 'string') {
+      msg += ` [CID:${correlationId.substring(0, 8)}]`;
+    }
 
-  // Adicionar trace_id se existir (primeiros 8 chars)
-  if (trace_id && typeof trace_id === 'string') {
-    msg += ` [TID:${trace_id.substring(0, 8)}]`;
-  }
+    // Adicionar trace_id se existir (primeiros 8 chars)
+    if (trace_id && typeof trace_id === 'string') {
+      msg += ` [TID:${trace_id.substring(0, 8)}]`;
+    }
 
-  msg += ` ${message}`;
+    msg += ` ${message}`;
 
-  if (Object.keys(metadata).length > 0) {
-    msg += ` ${JSON.stringify(metadata)}`;
-  }
+    if (Object.keys(metadata).length > 0) {
+      msg += ` ${JSON.stringify(metadata)}`;
+    }
 
-  if (trace) {
-    msg += `\n${trace}`;
-  }
+    if (trace) {
+      msg += `\n${trace}`;
+    }
 
-  return msg;
-});
+    return msg;
+  },
+);
 
 // Formato JSON para produção (estruturado)
 const prodFormat = combine(
   timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   errors({ stack: true }),
   correlationFormat, // 🔗 Adicionar correlationId e trace_id/span_id
-  json()
+  json(),
 );
 
 // Transport para logs de erro (rotação diária)
@@ -99,18 +111,14 @@ const consoleTransport = new winston.transports.Console({
     winston.format.colorize(),
     timestamp({ format: 'HH:mm:ss' }),
     correlationFormat, // 🔗 Adicionar correlationId mesmo no console
-    devFormat
+    devFormat,
   ),
 });
 
 // Configuração do Winston
 export const winstonConfig = {
   level: process.env.LOG_LEVEL || 'info',
-  format: combine(
-    timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-    errors({ stack: true }),
-    json()
-  ),
+  format: combine(timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }), errors({ stack: true }), json()),
   defaultMeta: {
     service: 'conectcrm-backend',
     environment: process.env.NODE_ENV || 'development',

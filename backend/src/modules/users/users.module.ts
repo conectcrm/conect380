@@ -10,10 +10,12 @@ import { UsersDebugController } from './users-debug.controller';
 import { UserActivitiesService } from './services/user-activities.service';
 import { UserActivitiesController } from './user-activities.controller';
 
+const usersDevControllers = process.env.NODE_ENV === 'development' ? [UsersDebugController] : [];
+
 @Module({
   imports: [TypeOrmModule.forFeature([User, Empresa, UserActivity]), MulterModule.register({})],
   providers: [UsersService, UserActivitiesService],
-  controllers: [UsersController, UsersDebugController, UserActivitiesController],
+  controllers: [UsersController, ...usersDevControllers, UserActivitiesController],
   exports: [UsersService, UserActivitiesService, TypeOrmModule],
 })
-export class UsersModule { }
+export class UsersModule {}

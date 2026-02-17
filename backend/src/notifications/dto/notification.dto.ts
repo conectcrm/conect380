@@ -2,6 +2,10 @@ import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validato
 import { NotificationType } from '../entities/notification.entity';
 
 export class CreateNotificationDto {
+  @IsOptional()
+  @IsUUID()
+  empresaId?: string;
+
   @IsUUID()
   @IsNotEmpty()
   userId: string;

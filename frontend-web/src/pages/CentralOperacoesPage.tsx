@@ -240,7 +240,7 @@ const CentralOperacoesPage: React.FC = () => {
       case 'completed':
         return <CheckCircle className="w-5 h-5 text-green-600" />;
       case 'current':
-        return <Clock className="w-5 h-5 text-blue-600 animate-pulse" />;
+        return <Clock className="w-5 h-5 text-[#159A9C] animate-pulse" />;
       case 'upcoming':
         return <ArrowRight className="w-5 h-5 text-gray-400" />;
       default:
@@ -251,13 +251,13 @@ const CentralOperacoesPage: React.FC = () => {
   const getActivityIcon = (tipo: string) => {
     switch (tipo) {
       case 'cliente':
-        return <Users className="w-4 h-4 text-blue-600" />;
+        return <Users className="w-4 h-4 text-[#159A9C]" />;
       case 'produto':
         return <Package className="w-4 h-4 text-green-600" />;
       case 'proposta':
         return <FileText className="w-4 h-4 text-orange-600" />;
       case 'venda':
-        return <DollarSign className="w-4 h-4 text-purple-600" />;
+        return <DollarSign className="w-4 h-4 text-green-600" />;
       default:
         return <Activity className="w-4 h-4 text-gray-600" />;
     }
@@ -275,10 +275,10 @@ const CentralOperacoesPage: React.FC = () => {
             {metricas.map((metrica, index) => {
               const IconComponent = metrica.icone;
               const corClasses = {
-                blue: 'bg-blue-50 text-blue-600',
-                green: 'bg-green-50 text-green-600',
-                orange: 'bg-orange-50 text-orange-600',
-                purple: 'bg-purple-50 text-purple-600',
+                blue: 'bg-[#159A9C]/10 text-[#159A9C]',
+                green: 'bg-[#159A9C]/10 text-[#159A9C]',
+                orange: 'bg-[#159A9C]/10 text-[#159A9C]',
+                purple: 'bg-[#159A9C]/10 text-[#159A9C]',
               }[metrica.cor];
 
               return (
@@ -312,7 +312,10 @@ const CentralOperacoesPage: React.FC = () => {
               <div className="flex items-center space-x-3">
                 <span className="text-sm text-gray-500">Progresso geral:</span>
                 <div className="w-32 bg-gray-200 rounded-full h-2">
-                  <div className="bg-blue-600 h-2 rounded-full" style={{ width: '25%' }}></div>
+                  <div
+                    className="bg-[#159A9C] h-2 rounded-full"
+                    style={{ width: '25%' }}
+                  ></div>
                 </div>
                 <span className="text-sm font-medium text-gray-900">25%</span>
               </div>
@@ -329,7 +332,7 @@ const CentralOperacoesPage: React.FC = () => {
                     key={step.id}
                     className={`relative p-4 rounded-lg border-2 transition-all hover:shadow-md ${
                       isActive
-                        ? 'border-blue-500 bg-blue-50'
+                        ? 'border-[#159A9C] bg-[#159A9C]/5'
                         : isCompleted
                           ? 'border-green-500 bg-green-50'
                           : 'border-gray-200 bg-gray-50'
@@ -343,13 +346,17 @@ const CentralOperacoesPage: React.FC = () => {
                     <div className="flex items-center space-x-3 mb-3">
                       <div
                         className={`p-2 rounded-lg ${
-                          isActive ? 'bg-blue-100' : isCompleted ? 'bg-green-100' : 'bg-gray-100'
+                          isActive
+                            ? 'bg-[#159A9C]/10'
+                            : isCompleted
+                              ? 'bg-green-100'
+                              : 'bg-gray-100'
                         }`}
                       >
                         <IconComponent
                           className={`w-5 h-5 ${
                             isActive
-                              ? 'text-blue-600'
+                              ? 'text-[#159A9C]'
                               : isCompleted
                                 ? 'text-green-600'
                                 : 'text-gray-500'
@@ -366,7 +373,7 @@ const CentralOperacoesPage: React.FC = () => {
                       <div className="mb-3">
                         <div className="w-full bg-gray-200 rounded-full h-1.5">
                           <div
-                            className="bg-blue-600 h-1.5 rounded-full transition-all duration-500"
+                            className="bg-[#159A9C] h-1.5 rounded-full transition-all duration-500"
                             style={{ width: `${step.progress}%` }}
                           ></div>
                         </div>
@@ -382,7 +389,7 @@ const CentralOperacoesPage: React.FC = () => {
                         disabled={step.status === 'upcoming' && step.id !== 'produtos'}
                         className={`w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                           isActive || step.id === 'produtos'
-                            ? 'bg-blue-600 text-white hover:bg-blue-700'
+                            ? 'bg-[#159A9C] text-white hover:bg-[#0F7B7D]'
                             : isCompleted
                               ? 'bg-green-600 text-white hover:bg-green-700'
                               : 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -404,7 +411,7 @@ const CentralOperacoesPage: React.FC = () => {
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-semibold text-gray-900">Atividades Recentes</h3>
-                <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+                <button className="text-[#159A9C] hover:text-[#0F7B7D] text-sm font-medium">
                   Ver todas
                 </button>
               </div>
@@ -438,12 +445,12 @@ const CentralOperacoesPage: React.FC = () => {
               <div className="space-y-3">
                 <button
                   onClick={() => setShowClienteModal(true)}
-                  className="w-full flex items-center space-x-3 p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors text-left"
+                  className="w-full flex items-center space-x-3 p-4 bg-[#159A9C]/5 hover:bg-[#159A9C]/10 rounded-lg transition-colors text-left"
                 >
-                  <Users className="w-5 h-5 text-blue-600" />
+                  <Users className="w-5 h-5 text-[#159A9C]" />
                   <div>
-                    <p className="font-medium text-blue-900">Novo Cliente</p>
-                    <p className="text-sm text-blue-600">Cadastrar novo cliente no sistema</p>
+                    <p className="font-medium text-[#002333]">Novo Cliente</p>
+                    <p className="text-sm text-[#159A9C]">Cadastrar novo cliente no sistema</p>
                   </div>
                 </button>
 
@@ -471,12 +478,12 @@ const CentralOperacoesPage: React.FC = () => {
 
                 <button
                   onClick={() => navigate('/dashboard')}
-                  className="w-full flex items-center space-x-3 p-4 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors text-left"
+                  className="w-full flex items-center space-x-3 p-4 bg-[#159A9C]/5 hover:bg-[#159A9C]/10 rounded-lg transition-colors text-left"
                 >
-                  <TrendingUp className="w-5 h-5 text-purple-600" />
+                  <TrendingUp className="w-5 h-5 text-[#159A9C]" />
                   <div>
-                    <p className="font-medium text-purple-900">Dashboard</p>
-                    <p className="text-sm text-purple-600">Ver métricas e relatórios</p>
+                    <p className="font-medium text-[#002333]">Dashboard</p>
+                    <p className="text-sm text-[#159A9C]">Ver métricas e relatórios</p>
                   </div>
                 </button>
               </div>

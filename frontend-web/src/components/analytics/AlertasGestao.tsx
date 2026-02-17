@@ -46,7 +46,7 @@ const AlertasGestao: React.FC<AlertasGestaoProps> = ({ onAlertaClick, maxAlertas
     try {
       const response = await fetch('/api/analytics/alertas-gestao', {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
         },
       });
 

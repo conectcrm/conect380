@@ -20,7 +20,7 @@ export class PagamentoService {
     @InjectRepository(Fatura)
     private faturaRepository: Repository<Fatura>,
     private faturamentoService: FaturamentoService,
-  ) { }
+  ) {}
 
   async criarPagamento(
     createPagamentoDto: CreatePagamentoDto,
@@ -29,7 +29,7 @@ export class PagamentoService {
     try {
       // Verificar se a fatura existe
       const fatura = await this.faturaRepository.findOne({
-        where: { id: createPagamentoDto.faturaId, empresa_id: empresaId },
+        where: { id: createPagamentoDto.faturaId, empresaId },
       });
 
       if (!fatura) {
@@ -45,7 +45,7 @@ export class PagamentoService {
       const pagamentoExistente = await this.pagamentoRepository.findOne({
         where: {
           transacaoId: createPagamentoDto.transacaoId,
-          empresa_id: empresaId,
+          empresaId,
         },
       });
 
@@ -61,7 +61,7 @@ export class PagamentoService {
         ...createPagamentoDto,
         valorLiquido,
         status: StatusPagamento.PENDENTE,
-        empresa_id: empresaId,
+        empresaId,
       });
 
       const pagamentoSalvo = await this.pagamentoRepository.save(pagamento);
@@ -86,7 +86,7 @@ export class PagamentoService {
       const pagamento = await this.pagamentoRepository.findOne({
         where: {
           gatewayTransacaoId: processarPagamentoDto.gatewayTransacaoId,
-          empresa_id: empresaId,
+          empresaId,
         },
         relations: ['fatura'],
       });
@@ -179,7 +179,7 @@ export class PagamentoService {
 
   async buscarPagamentoPorId(id: number, empresaId: string): Promise<Pagamento> {
     const pagamento = await this.pagamentoRepository.findOne({
-      where: { id, empresa_id: empresaId },
+      where: { id, empresaId },
       relations: ['fatura', 'fatura.contrato'],
     });
 
@@ -190,12 +190,9 @@ export class PagamentoService {
     return pagamento;
   }
 
-  async buscarPagamentoPorTransacao(
-    transacaoId: string,
-    empresaId: string,
-  ): Promise<Pagamento> {
+  async buscarPagamentoPorTransacao(transacaoId: string, empresaId: string): Promise<Pagamento> {
     const pagamento = await this.pagamentoRepository.findOne({
-      where: { transacaoId, empresa_id: empresaId },
+      where: { transacaoId, empresaId },
       relations: ['fatura', 'fatura.contrato'],
     });
 
@@ -211,7 +208,7 @@ export class PagamentoService {
     empresaId: string,
   ): Promise<Pagamento> {
     const pagamento = await this.pagamentoRepository.findOne({
-      where: { gatewayTransacaoId, empresa_id: empresaId },
+      where: { gatewayTransacaoId, empresaId },
       relations: ['fatura', 'fatura.contrato'],
     });
 
@@ -262,7 +259,7 @@ export class PagamentoService {
       observacoes: `Estorno do pagamento ${pagamento.transacaoId}: ${motivo}`,
       dataProcessamento: new Date(),
       dataAprovacao: new Date(),
-      empresa_id: empresaId,
+      empresaId,
     });
 
     const estornoSalvo = await this.pagamentoRepository.save(estorno);
@@ -349,7 +346,7 @@ export class PagamentoService {
     empresaId: string,
   ): Promise<void> {
     const fatura = await this.faturaRepository.findOne({
-      where: { id: faturaId, empresa_id: empresaId },
+      where: { id: faturaId, empresaId },
       relations: ['pagamentos'],
     });
 

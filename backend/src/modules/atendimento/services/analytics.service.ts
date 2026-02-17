@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, MoreThanOrEqual, In } from 'typeorm';
+import { Repository, Between } from 'typeorm';
 import { Ticket, StatusTicket } from '../entities/ticket.entity';
 import { Mensagem } from '../entities/mensagem.entity';
 import { User } from '../../users/user.entity';
@@ -34,7 +34,7 @@ export interface TendenciasDto {
 /**
  * Service para Analytics e Dashboard de Atendimento
  * Calcula métricas agregadas, estatísticas e tendências
- * 
+ *
  * @author ConectCRM
  * @date 2025-11-18
  */
@@ -51,7 +51,7 @@ export class AnalyticsService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Canal)
     private readonly canalRepository: Repository<Canal>,
-  ) { }
+  ) {}
 
   /**
    * Calcula período de datas baseado no filtro
@@ -99,16 +99,21 @@ export class AnalyticsService {
 
       // Métricas básicas
       const ticketsAbertos = tickets.filter((t) =>
-        [StatusTicket.ABERTO, StatusTicket.AGUARDANDO, StatusTicket.EM_ATENDIMENTO].includes(
-          t.status as StatusTicket,
-        ),
+        [
+          StatusTicket.FILA,
+          StatusTicket.AGUARDANDO_CLIENTE,
+          StatusTicket.AGUARDANDO_INTERNO,
+          StatusTicket.EM_ATENDIMENTO,
+        ].includes(t.status as StatusTicket),
       ).length;
 
       const ticketsResolvidos = tickets.filter(
-        (t) => t.status === StatusTicket.RESOLVIDO || t.status === StatusTicket.FECHADO,
+        (t) => t.status === StatusTicket.CONCLUIDO || t.status === StatusTicket.ENCERRADO,
       ).length;
 
-      const ticketsPendentes = tickets.filter((t) => t.status === StatusTicket.AGUARDANDO).length;
+      const ticketsPendentes = tickets.filter(
+        (t) => t.status === StatusTicket.AGUARDANDO_CLIENTE,
+      ).length;
 
       // Tempo médio de primeira resposta (em minutos)
       let tempoMedioResposta = 0;
@@ -117,25 +122,27 @@ export class AnalyticsService {
       );
 
       if (ticketsComResposta.length > 0) {
-        const temposResposta = ticketsComResposta.map((ticket) => {
-          if (ticket.data_abertura && ticket.data_primeira_resposta) {
-            const diff =
-              ticket.data_primeira_resposta.getTime() - ticket.data_abertura.getTime();
-            return diff / (1000 * 60); // Converter para minutos
-          }
-          return 0;
-        }).filter(t => t > 0);
+        const temposResposta = ticketsComResposta
+          .map((ticket) => {
+            if (ticket.data_abertura && ticket.data_primeira_resposta) {
+              const diff = ticket.data_primeira_resposta.getTime() - ticket.data_abertura.getTime();
+              return diff / (1000 * 60); // Converter para minutos
+            }
+            return 0;
+          })
+          .filter((t) => t > 0);
 
-        tempoMedioResposta = temposResposta.length > 0
-          ? temposResposta.reduce((acc, val) => acc + val, 0) / temposResposta.length
-          : 0;
+        tempoMedioResposta =
+          temposResposta.length > 0
+            ? temposResposta.reduce((acc, val) => acc + val, 0) / temposResposta.length
+            : 0;
       }
 
       // Tempo médio de resolução (em horas)
       let tempoMedioResolucao = 0;
       const ticketsResolvidosComTempo = tickets.filter(
         (t) =>
-          (t.status === StatusTicket.RESOLVIDO || t.status === StatusTicket.FECHADO) &&
+          (t.status === StatusTicket.CONCLUIDO || t.status === StatusTicket.ENCERRADO) &&
           t.data_fechamento,
       );
 
@@ -275,10 +282,7 @@ export class AnalyticsService {
         }
 
         // SLA (tickets resolvidos dentro de 24h)
-        if (
-          ticket.status === StatusTicket.RESOLVIDO ||
-          ticket.status === StatusTicket.FECHADO
-        ) {
+        if (ticket.status === StatusTicket.CONCLUIDO || ticket.status === StatusTicket.ENCERRADO) {
           desempenho.ticketsResolvidosTotal++;
 
           if (ticket.data_fechamento) {
@@ -303,27 +307,27 @@ export class AnalyticsService {
           tempoMedioResposta:
             desempenho.temposResposta.length > 0
               ? Math.round(
-                desempenho.temposResposta.reduce((a, b) => a + b, 0) /
-                desempenho.temposResposta.length,
-              )
+                  desempenho.temposResposta.reduce((a, b) => a + b, 0) /
+                    desempenho.temposResposta.length,
+                )
               : 0,
           satisfacaoMedia:
             desempenho.satisfacoes.length > 0
               ? parseFloat(
-                (
-                  desempenho.satisfacoes.reduce((a, b) => a + b, 0) /
-                  desempenho.satisfacoes.length
-                ).toFixed(1),
-              )
+                  (
+                    desempenho.satisfacoes.reduce((a, b) => a + b, 0) /
+                    desempenho.satisfacoes.length
+                  ).toFixed(1),
+                )
               : 0,
           slaAtingido:
             desempenho.ticketsResolvidosTotal > 0
               ? parseFloat(
-                (
-                  (desempenho.ticketsResolvidosSLA / desempenho.ticketsResolvidosTotal) *
-                  100
-                ).toFixed(1),
-              )
+                  (
+                    (desempenho.ticketsResolvidosSLA / desempenho.ticketsResolvidosTotal) *
+                    100
+                  ).toFixed(1),
+                )
               : 0,
         }))
         .sort((a, b) => b.ticketsAtendidos - a.ticketsAtendidos)
@@ -365,13 +369,16 @@ export class AnalyticsService {
           });
 
           const ticketsAbertos = tickets.filter((t) =>
-            [StatusTicket.ABERTO, StatusTicket.AGUARDANDO, StatusTicket.EM_ATENDIMENTO].includes(
-              t.status as StatusTicket,
-            ),
+            [
+              StatusTicket.FILA,
+              StatusTicket.AGUARDANDO_CLIENTE,
+              StatusTicket.AGUARDANDO_INTERNO,
+              StatusTicket.EM_ATENDIMENTO,
+            ].includes(t.status as StatusTicket),
           ).length;
 
           const ticketsResolvidos = tickets.filter(
-            (t) => t.status === StatusTicket.RESOLVIDO || t.status === StatusTicket.FECHADO,
+            (t) => t.status === StatusTicket.CONCLUIDO || t.status === StatusTicket.ENCERRADO,
           ).length;
 
           // Tempo médio de resposta (usando data_primeira_resposta)
@@ -425,7 +432,9 @@ export class AnalyticsService {
    * Retorna tendências ao longo do tempo
    */
   async getTendencias(params: TendenciasDto) {
-    this.logger.log(`📈 Calculando tendências de ${params.metrica} para empresa ${params.empresaId}`);
+    this.logger.log(
+      `📈 Calculando tendências de ${params.metrica} para empresa ${params.empresaId}`,
+    );
 
     const { dataInicio, dataFim } = this.calcularPeriodo(params.periodo);
 

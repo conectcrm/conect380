@@ -1,129 +1,93 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
+﻿import {
   Body,
-  Param,
-  UseGuards,
-  Request,
+  Controller,
+  Delete,
+  Get,
   HttpCode,
   HttpStatus,
+  Param,
+  Post,
+  Put,
+  UseGuards,
 } from '@nestjs/common';
+import { EmpresaId } from '../../../common/decorators/empresa.decorator';
+import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { JwtAuthGuard } from '../../../modules/auth/jwt-auth.guard';
-import { AtribuicaoService } from '../services/atribuicao.service';
 import {
+  AdicionarAtendenteEquipeDto,
   CreateEquipeDto,
   UpdateEquipeDto,
-  AdicionarAtendenteEquipeDto,
-  RemoverAtendenteEquipeDto,
 } from '../dto';
+import { AtribuicaoService } from '../services/atribuicao.service';
 
 @Controller('equipes')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class EquipeController {
   constructor(private readonly atribuicaoService: AtribuicaoService) {}
 
-  // ========================================================================
-  // GESTÃO DE EQUIPES
-  // ========================================================================
-
-  /**
-   * POST /equipes
-   * Cria uma nova equipe
-   */
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async criar(@Request() req, @Body() dto: CreateEquipeDto) {
-    const empresaId = req.user.empresa_id;
+  async criar(@EmpresaId() empresaId: string, @Body() dto: CreateEquipeDto) {
     return this.atribuicaoService.criarEquipe(empresaId, dto);
   }
 
-  /**
-   * GET /equipes
-   * Lista todas as equipes da empresa
-   */
   @Get()
-  async listar(@Request() req) {
-    const empresaId = req.user.empresa_id;
+  async listar(@EmpresaId() empresaId: string) {
     return this.atribuicaoService.listarEquipes(empresaId);
   }
 
-  /**
-   * GET /equipes/:id
-   * Busca uma equipe específica
-   */
   @Get(':id')
-  async buscar(@Param('id') id: string) {
-    return this.atribuicaoService.buscarEquipe(id);
+  async buscar(@EmpresaId() empresaId: string, @Param('id') id: string) {
+    return this.atribuicaoService.buscarEquipe(empresaId, id);
   }
 
-  /**
-   * PUT /equipes/:id
-   * Atualiza uma equipe
-   */
   @Put(':id')
-  async atualizar(@Param('id') id: string, @Body() dto: UpdateEquipeDto) {
-    return this.atribuicaoService.atualizarEquipe(id, dto);
+  async atualizar(
+    @EmpresaId() empresaId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateEquipeDto,
+  ) {
+    return this.atribuicaoService.atualizarEquipe(empresaId, id, dto);
   }
 
-  /**
-   * DELETE /equipes/:id
-   * Remove uma equipe
-   */
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remover(@Param('id') id: string) {
-    await this.atribuicaoService.removerEquipe(id);
+  async remover(@EmpresaId() empresaId: string, @Param('id') id: string) {
+    await this.atribuicaoService.removerEquipe(empresaId, id);
   }
 
-  // ========================================================================
-  // GESTÃO DE MEMBROS
-  // ========================================================================
-
-  /**
-   * POST /equipes/:id/atendentes
-   * Adiciona um atendente à equipe
-   */
   @Post(':id/atendentes')
   @HttpCode(HttpStatus.CREATED)
   async adicionarAtendente(
+    @EmpresaId() empresaId: string,
     @Param('id') equipeId: string,
     @Body() dto: AdicionarAtendenteEquipeDto,
   ) {
     return this.atribuicaoService.adicionarAtendenteNaEquipe(
+      empresaId,
       equipeId,
       dto.atendenteId,
       dto.funcao || 'membro',
     );
   }
 
-  /**
-   * DELETE /equipes/:id/atendentes/:atendenteId
-   * Remove um atendente da equipe
-   */
   @Delete(':id/atendentes/:atendenteId')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async removerAtendente(@Param('id') equipeId: string, @Param('atendenteId') atendenteId: string) {
-    await this.atribuicaoService.removerAtendenteDaEquipe(equipeId, atendenteId);
+  async removerAtendente(
+    @EmpresaId() empresaId: string,
+    @Param('id') equipeId: string,
+    @Param('atendenteId') atendenteId: string,
+  ) {
+    await this.atribuicaoService.removerAtendenteDaEquipe(empresaId, equipeId, atendenteId);
   }
 
-  /**
-   * GET /equipes/:id/atendentes
-   * Lista atendentes de uma equipe
-   */
   @Get(':id/atendentes')
-  async listarAtendentes(@Param('id') equipeId: string) {
-    return this.atribuicaoService.listarAtendentesEquipe(equipeId);
+  async listarAtendentes(@EmpresaId() empresaId: string, @Param('id') equipeId: string) {
+    return this.atribuicaoService.listarAtendentesEquipe(empresaId, equipeId);
   }
 
-  /**
-   * GET /equipes/:id/atribuicoes
-   * Lista atribuições de uma equipe
-   */
   @Get(':id/atribuicoes')
-  async listarAtribuicoes(@Param('id') equipeId: string) {
-    return this.atribuicaoService.listarAtribuicoesEquipe(equipeId);
+  async listarAtribuicoes(@EmpresaId() empresaId: string, @Param('id') equipeId: string) {
+    return this.atribuicaoService.listarAtribuicoesEquipe(empresaId, equipeId);
   }
 }

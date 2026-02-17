@@ -10,6 +10,7 @@ import { JwtStrategy } from './jwt.strategy';
 import { LocalStrategy } from './local.strategy';
 import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { MailModule } from '../../mail/mail.module';
+import { resolveJwtSecret } from '../../config/jwt.config';
 
 @Module({
   imports: [
@@ -19,10 +20,14 @@ import { MailModule } from '../../mail/mail.module';
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET') || 'seu_jwt_secret_super_seguro_aqui_2024',
-        signOptions: { expiresIn: '24h' },
-      }),
+      useFactory: async (configService: ConfigService) => {
+        const jwtSecret = resolveJwtSecret(configService);
+
+        return {
+          secret: jwtSecret,
+          signOptions: { expiresIn: '24h' },
+        };
+      },
       inject: [ConfigService],
     }),
   ],

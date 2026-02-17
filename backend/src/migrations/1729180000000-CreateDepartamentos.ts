@@ -160,16 +160,21 @@ export class CreateDepartamentos1729180000000 implements MigrationInterface {
       }),
     );
 
-    await queryRunner.createForeignKey(
-      'departamentos',
-      new TableForeignKey({
-        columnNames: ['nucleo_id'],
-        referencedColumnNames: ['id'],
-        referencedTableName: 'nucleos_atendimento',
-        onDelete: 'CASCADE',
-        name: 'fk_departamentos_nucleo',
-      }),
-    );
+    // Nem sempre a tabela `nucleos_atendimento` existe nesta etapa do histórico.
+    // Se ela ainda não existir, pulamos a FK aqui e ela será criada por migrations posteriores.
+    const hasNucleosTable = await queryRunner.hasTable('nucleos_atendimento');
+    if (hasNucleosTable) {
+      await queryRunner.createForeignKey(
+        'departamentos',
+        new TableForeignKey({
+          columnNames: ['nucleo_id'],
+          referencedColumnNames: ['id'],
+          referencedTableName: 'nucleos_atendimento',
+          onDelete: 'CASCADE',
+          name: 'fk_departamentos_nucleo',
+        }),
+      );
+    }
 
     await queryRunner.createForeignKey(
       'departamentos',
@@ -184,10 +189,24 @@ export class CreateDepartamentos1729180000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    // Remover foreign keys
-    await queryRunner.dropForeignKey('departamentos', 'fk_departamentos_supervisor');
-    await queryRunner.dropForeignKey('departamentos', 'fk_departamentos_nucleo');
-    await queryRunner.dropForeignKey('departamentos', 'fk_departamentos_empresa');
+    // Remover foreign keys (de forma segura, pois algumas podem não existir)
+    const table = await queryRunner.getTable('departamentos');
+    if (table) {
+      const fkSupervisor = table.foreignKeys.find((fk) => fk.name === 'fk_departamentos_supervisor');
+      if (fkSupervisor) {
+        await queryRunner.dropForeignKey('departamentos', fkSupervisor);
+      }
+
+      const fkNucleo = table.foreignKeys.find((fk) => fk.name === 'fk_departamentos_nucleo');
+      if (fkNucleo) {
+        await queryRunner.dropForeignKey('departamentos', fkNucleo);
+      }
+
+      const fkEmpresa = table.foreignKeys.find((fk) => fk.name === 'fk_departamentos_empresa');
+      if (fkEmpresa) {
+        await queryRunner.dropForeignKey('departamentos', fkEmpresa);
+      }
+    }
 
     // Remover índices
     await queryRunner.query(`DROP INDEX IF EXISTS idx_departamentos_ativo`);

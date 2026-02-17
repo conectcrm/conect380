@@ -10,11 +10,9 @@ import { ConfiguracaoGatewayService } from './services/configuracao-gateway.serv
 import { PagamentosGatewayService } from './services/pagamentos.service';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([ConfiguracaoGateway, TransacaoGateway, Fatura, Pagamento]),
-  ],
+  imports: [TypeOrmModule.forFeature([ConfiguracaoGateway, TransacaoGateway, Fatura, Pagamento])],
   controllers: [ConfiguracaoGatewayController, GatewayTransacoesController],
   providers: [ConfiguracaoGatewayService, PagamentosGatewayService],
   exports: [ConfiguracaoGatewayService, PagamentosGatewayService],
 })
-export class PagamentosModule { }
+export class PagamentosModule {}

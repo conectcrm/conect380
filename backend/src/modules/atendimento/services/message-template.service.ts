@@ -9,7 +9,7 @@ export class MessageTemplateService {
   constructor(
     @InjectRepository(MessageTemplate)
     private readonly templateRepository: Repository<MessageTemplate>,
-  ) { }
+  ) {}
 
   /**
    * Criar novo template
@@ -103,7 +103,11 @@ export class MessageTemplateService {
   /**
    * Atualizar template
    */
-  async atualizar(id: string, updateDto: AtualizarTemplateDto, empresaId: string): Promise<MessageTemplate> {
+  async atualizar(
+    id: string,
+    updateDto: AtualizarTemplateDto,
+    empresaId: string,
+  ): Promise<MessageTemplate> {
     const template = await this.buscarPorId(id, empresaId);
 
     // Validar nome único (se mudou)

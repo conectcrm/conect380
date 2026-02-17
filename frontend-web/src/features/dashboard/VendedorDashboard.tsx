@@ -44,7 +44,7 @@ const VendedorDashboard: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="bg-white p-8 rounded-xl shadow-lg text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#159A9C] mx-auto mb-4"></div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Carregando Dashboard</h3>
           <p className="text-gray-600">Buscando seus dados...</p>
         </div>
@@ -62,7 +62,7 @@ const VendedorDashboard: React.FC = () => {
           <p className="text-gray-600 mb-4">{error}</p>
           <button
             onClick={refresh}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors"
           >
             Tentar novamente
           </button>
@@ -77,23 +77,23 @@ const VendedorDashboard: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="p-6">
         {/* Header Personalizado do Vendedor - Design Suave */}
-        <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg shadow-sm p-6 mb-6">
+        <div className="bg-white border border-[#DEEFE7] rounded-lg shadow-sm p-6 mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-3xl font-bold flex items-center text-blue-900">
-                <Trophy className="h-8 w-8 mr-3 text-blue-600" />
+              <h1 className="text-3xl font-bold flex items-center text-[#002333]">
+                <Trophy className="h-8 w-8 mr-3 text-[#159A9C]" />
                 Olá, Vendedor!
               </h1>
-              <p className="mt-2 text-blue-700">
+              <p className="mt-2 text-[#002333]/70">
                 Você está em #{kpis.ranking?.posicao || 0} no ranking da equipe 🚀
               </p>
             </div>
             <div className="mt-4 sm:mt-0 flex flex-col items-end">
-              <div className="text-2xl font-bold text-blue-900">{kpis.meta?.percentual || 0}%</div>
-              <div className="text-sm text-blue-600">da meta mensal</div>
-              <div className="w-32 bg-blue-200 rounded-full h-2 mt-2">
+              <div className="text-2xl font-bold text-[#002333]">{kpis.meta?.percentual || 0}%</div>
+              <div className="text-sm text-[#002333]/70">da meta mensal</div>
+              <div className="w-32 bg-[#DEEFE7] rounded-full h-2 mt-2">
                 <div
-                  className="bg-blue-600 h-2 rounded-full transition-all"
+                  className="bg-[#159A9C] h-2 rounded-full transition-all"
                   style={{ width: `${kpis.meta?.percentual || 0}%` }}
                 />
               </div>
@@ -117,8 +117,8 @@ const VendedorDashboard: React.FC = () => {
                   de R$ {kpis.meta?.mensal?.toLocaleString() || '0'}
                 </div>
               </div>
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Target className="h-8 w-8 text-blue-600" />
+              <div className="p-3 bg-[#159A9C]/10 rounded-lg">
+                <Target className="h-8 w-8 text-[#159A9C]" />
               </div>
             </div>
             <div className="flex items-center text-sm text-green-600">
@@ -143,11 +143,11 @@ const VendedorDashboard: React.FC = () => {
                   {kpis.pipeline?.quantidade || 0} oportunidades
                 </div>
               </div>
-              <div className="p-3 bg-green-100 rounded-lg">
-                <TrendingUp className="h-8 w-8 text-green-600" />
+              <div className="p-3 bg-[#159A9C]/10 rounded-lg">
+                <TrendingUp className="h-8 w-8 text-[#159A9C]" />
               </div>
             </div>
-            <div className="flex items-center text-sm text-blue-600">
+            <div className="flex items-center text-sm text-[#159A9C]">
               <Zap className="w-4 h-4 mr-1" />
               <span>{kpis.pipeline?.probabilidade || 0}% prob. média</span>
             </div>
@@ -165,11 +165,11 @@ const VendedorDashboard: React.FC = () => {
                   de {kpis.ranking?.total || 0} vendedores
                 </div>
               </div>
-              <div className="p-3 bg-yellow-100 rounded-lg">
-                <Star className="h-8 w-8 text-yellow-600" />
+              <div className="p-3 bg-[#159A9C]/10 rounded-lg">
+                <Star className="h-8 w-8 text-[#159A9C]" />
               </div>
             </div>
-            <div className="flex items-center text-sm text-purple-600">
+            <div className="flex items-center text-sm text-[#159A9C]">
               <Trophy className="w-4 h-4 mr-1" />
               <span>{kpis.ranking?.pontos || 0} pontos</span>
             </div>
@@ -187,8 +187,8 @@ const VendedorDashboard: React.FC = () => {
                 </div>
                 <div className="text-sm text-gray-500">atividades</div>
               </div>
-              <div className="p-3 bg-orange-100 rounded-lg">
-                <Calendar className="h-8 w-8 text-orange-600" />
+              <div className="p-3 bg-[#159A9C]/10 rounded-lg">
+                <Calendar className="h-8 w-8 text-[#159A9C]" />
               </div>
             </div>
             <div className="space-y-1 text-xs">
@@ -212,7 +212,7 @@ const VendedorDashboard: React.FC = () => {
         <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm mb-8">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-semibold text-gray-900">🎯 Minhas Propostas Ativas</h3>
-            <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+            <button className="text-[#159A9C] hover:text-[#0F7B7D] text-sm font-medium transition-colors">
               Ver todas (12)
             </button>
           </div>
@@ -255,18 +255,18 @@ const VendedorDashboard: React.FC = () => {
             </div>
 
             {/* Proposta 3 - Fria */}
-            <div className="p-4 border border-blue-200 rounded-lg bg-blue-50">
+            <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium px-2 py-1 bg-blue-600 text-white rounded">
+                <span className="text-xs font-medium px-2 py-1 bg-gray-600 text-white rounded">
                   ❄️ FRIA
                 </span>
-                <span className="text-sm font-bold text-blue-700">R$ 15.000</span>
+                <span className="text-sm font-bold text-gray-700">R$ 15.000</span>
               </div>
               <h4 className="font-medium text-gray-900">Digital Pro</h4>
               <p className="text-sm text-gray-600 mb-2">Primeira apresentação</p>
               <div className="flex items-center justify-between">
-                <span className="text-xs text-blue-600">Prob: 30%</span>
-                <button className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700">
+                <span className="text-xs text-gray-600">Prob: 30%</span>
+                <button className="text-xs bg-gray-700 text-white px-2 py-1 rounded hover:bg-gray-800">
                   Proposta
                 </button>
               </div>
@@ -284,15 +284,15 @@ const VendedorDashboard: React.FC = () => {
             </div>
 
             <div className="space-y-3">
-              <div className="flex items-center p-3 bg-blue-50 rounded-lg border-l-4 border-blue-500">
-                <div className="p-2 bg-blue-100 rounded-full mr-3">
-                  <Phone className="w-4 h-4 text-blue-600" />
+              <div className="flex items-center p-3 bg-[#159A9C]/5 rounded-lg border-l-4 border-[#159A9C]">
+                <div className="p-2 bg-[#159A9C]/10 rounded-full mr-3">
+                  <Phone className="w-4 h-4 text-[#159A9C]" />
                 </div>
                 <div className="flex-1">
                   <p className="font-medium text-gray-900">Call - Tech Solutions</p>
                   <p className="text-sm text-gray-600">14:30 - Negociação final</p>
                 </div>
-                <span className="text-sm font-medium text-blue-600">Em 2h</span>
+                <span className="text-sm font-medium text-[#159A9C]">Em 2h</span>
               </div>
 
               <div className="flex items-center p-3 bg-green-50 rounded-lg border-l-4 border-green-500">
@@ -332,7 +332,7 @@ const VendedorDashboard: React.FC = () => {
                   <p className="font-medium text-gray-900">Inovação Digital</p>
                   <p className="text-sm text-gray-600">Site: precisa de CRM • Chegou há 2h</p>
                 </div>
-                <button className="text-xs bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700">
+                <button className="text-xs bg-[#159A9C] text-white px-3 py-1 rounded hover:bg-[#0F7B7D] transition-colors">
                   Ligar
                 </button>
               </div>
@@ -342,7 +342,7 @@ const VendedorDashboard: React.FC = () => {
                   <p className="font-medium text-gray-900">Marketing Plus</p>
                   <p className="text-sm text-gray-600">WhatsApp: quer demo • Chegou há 4h</p>
                 </div>
-                <button className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
+                <button className="text-xs bg-[#159A9C] text-white px-3 py-1 rounded hover:bg-[#0F7B7D] transition-colors">
                   Agendar
                 </button>
               </div>
@@ -352,7 +352,7 @@ const VendedorDashboard: React.FC = () => {
                   <p className="font-medium text-gray-900">Consultoria ABC</p>
                   <p className="text-sm text-gray-600">Form: empresa 50+ pessoas • Ontem</p>
                 </div>
-                <button className="text-xs bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700">
+                <button className="text-xs bg-[#159A9C] text-white px-3 py-1 rounded hover:bg-[#0F7B7D] transition-colors">
                   Email
                 </button>
               </div>
@@ -361,35 +361,35 @@ const VendedorDashboard: React.FC = () => {
         </div>
 
         {/* Performance e Gamificação */}
-        <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg p-6 mb-8 text-white">
+        <div className="bg-white rounded-lg p-6 mb-8 border border-gray-200 shadow-sm">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h3 className="text-xl font-bold mb-2">🏆 Performance da Semana</h3>
+              <h3 className="text-xl font-bold mb-2 text-gray-900">🏆 Performance da Semana</h3>
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
-                  <div className="text-2xl font-bold">42</div>
-                  <div className="text-sm opacity-90">Calls</div>
+                  <div className="text-2xl font-bold text-gray-900">42</div>
+                  <div className="text-sm text-gray-600">Calls</div>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold">12</div>
-                  <div className="text-sm opacity-90">Reuniões</div>
+                  <div className="text-2xl font-bold text-gray-900">12</div>
+                  <div className="text-sm text-gray-600">Reuniões</div>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold">28</div>
-                  <div className="text-sm opacity-90">Follow-ups</div>
+                  <div className="text-2xl font-bold text-gray-900">28</div>
+                  <div className="text-sm text-gray-600">Follow-ups</div>
                 </div>
               </div>
             </div>
 
             <div className="mt-6 lg:mt-0 text-center">
-              <div className="text-3xl font-bold mb-2">9.2</div>
-              <div className="text-sm opacity-90 mb-3">Nota Semanal</div>
-              <div className="flex items-center justify-center space-x-1">
+              <div className="text-3xl font-bold mb-2 text-gray-900">9.2</div>
+              <div className="text-sm text-gray-600 mb-3">Nota Semanal</div>
+              <div className="flex items-center justify-center space-x-1 text-[#159A9C]">
                 {[1, 2, 3, 4, 5].map((i) => (
                   <Star key={i} className={`w-5 h-5 ${i <= 4 ? 'fill-current' : 'opacity-30'}`} />
                 ))}
               </div>
-              <div className="text-xs mt-2 opacity-75">Quase 5 estrelas! 🌟</div>
+              <div className="text-xs mt-2 text-gray-500">Quase 5 estrelas! 🌟</div>
             </div>
           </div>
         </div>

@@ -2,10 +2,10 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Migration inicial do sistema ConectCRM
- * 
+ *
  * Esta migration foi gerada a partir do schema criado pelo TypeORM synchronize
  * em 20/11/2025. Contém todas as 57 tabelas do sistema.
- * 
+ *
  * IMPORTANTE: Esta migration deve ser executada APENAS em bancos vazios.
  * Para ambientes existentes, use synchronize: true temporariamente.
  */
@@ -28,7 +28,7 @@ export class InitialSchema1700000000000 implements MigrationInterface {
       `);
 
       if (!enumExists[0].exists) {
-        const valuesStr = values.map(v => `'${v}'`).join(', ');
+        const valuesStr = values.map((v) => `'${v}'`).join(', ');
         await queryRunner.query(`CREATE TYPE "public"."${typeName}" AS ENUM(${valuesStr})`);
         console.log(`✅ [Migration] ENUM ${typeName} criado`);
       } else {
@@ -37,24 +37,109 @@ export class InitialSchema1700000000000 implements MigrationInterface {
     };
 
     // Criar ENUM types (apenas se não existirem)
-    await createEnumIfNotExists('users_role_enum', ['admin', 'gerente', 'vendedor', 'suporte', 'financeiro']);
+    await createEnumIfNotExists('users_role_enum', [
+      'admin',
+      'gerente',
+      'vendedor',
+      'suporte',
+      'financeiro',
+    ]);
     await createEnumIfNotExists('clientes_tipo_enum', ['pessoa_fisica', 'pessoa_juridica']);
-    await createEnumIfNotExists('oportunidades_status_enum', ['lead', 'qualificado', 'proposta', 'negociacao', 'ganho', 'perdido']);
-    await createEnumIfNotExists('propostas_status_enum', ['rascunho', 'enviada', 'aceita', 'rejeitada', 'expirada']);
-    await createEnumIfNotExists('faturas_status_enum', ['pendente', 'paga', 'vencida', 'cancelada']);
-    await createEnumIfNotExists('pagamentos_metodo_enum', ['dinheiro', 'cartao_credito', 'cartao_debito', 'pix', 'boleto', 'transferencia']);
-    await createEnumIfNotExists('pagamentos_status_enum', ['pendente', 'confirmado', 'cancelado', 'estornado']);
-    await createEnumIfNotExists('contratos_status_enum', ['ativo', 'suspenso', 'cancelado', 'expirado']);
-    await createEnumIfNotExists('atendimento_tickets_status_enum', ['novo', 'aberto', 'em_atendimento', 'aguardando_cliente', 'resolvido', 'fechado']);
-    await createEnumIfNotExists('atendimento_tickets_prioridade_enum', ['baixa', 'media', 'alta', 'urgente']);
-    await createEnumIfNotExists('atendimento_mensagens_tipo_enum', ['texto', 'imagem', 'audio', 'video', 'documento', 'localizacao', 'contato']);
-    await createEnumIfNotExists('atendimento_mensagens_remetente_tipo_enum', ['cliente', 'atendente', 'bot', 'sistema']);
-    await createEnumIfNotExists('cotacoes_status_enum', ['rascunho', 'enviada', 'aprovada', 'rejeitada', 'expirada', 'pendente']);
-    await createEnumIfNotExists('leads_status_enum', ['novo', 'contatado', 'qualificado', 'desqualificado', 'convertido']);
-    await createEnumIfNotExists('leads_origem_enum', ['website', 'indicacao', 'evento', 'midia_social', 'publicidade', 'outro']);
+    await createEnumIfNotExists('oportunidades_status_enum', [
+      'lead',
+      'qualificado',
+      'proposta',
+      'negociacao',
+      'ganho',
+      'perdido',
+    ]);
+    await createEnumIfNotExists('propostas_status_enum', [
+      'rascunho',
+      'enviada',
+      'aceita',
+      'rejeitada',
+      'expirada',
+    ]);
+    await createEnumIfNotExists('faturas_status_enum', [
+      'pendente',
+      'paga',
+      'vencida',
+      'cancelada',
+    ]);
+    await createEnumIfNotExists('pagamentos_metodo_enum', [
+      'dinheiro',
+      'cartao_credito',
+      'cartao_debito',
+      'pix',
+      'boleto',
+      'transferencia',
+    ]);
+    await createEnumIfNotExists('pagamentos_status_enum', [
+      'pendente',
+      'confirmado',
+      'cancelado',
+      'estornado',
+    ]);
+    await createEnumIfNotExists('contratos_status_enum', [
+      'ativo',
+      'suspenso',
+      'cancelado',
+      'expirado',
+    ]);
+    await createEnumIfNotExists('atendimento_tickets_status_enum', [
+      'novo',
+      'aberto',
+      'em_atendimento',
+      'aguardando_cliente',
+      'resolvido',
+      'fechado',
+    ]);
+    await createEnumIfNotExists('atendimento_tickets_prioridade_enum', [
+      'baixa',
+      'media',
+      'alta',
+      'urgente',
+    ]);
+    await createEnumIfNotExists('atendimento_mensagens_tipo_enum', [
+      'texto',
+      'imagem',
+      'audio',
+      'video',
+      'documento',
+      'localizacao',
+      'contato',
+    ]);
+    await createEnumIfNotExists('atendimento_mensagens_remetente_tipo_enum', [
+      'cliente',
+      'atendente',
+      'bot',
+      'sistema',
+    ]);
+    await createEnumIfNotExists('cotacoes_status_enum', [
+      'rascunho',
+      'enviada',
+      'aprovada',
+      'rejeitada',
+      'expirada',
+      'pendente',
+    ]);
+    await createEnumIfNotExists('leads_status_enum', [
+      'novo',
+      'contatado',
+      'qualificado',
+      'desqualificado',
+      'convertido',
+    ]);
+    await createEnumIfNotExists('leads_origem_enum', [
+      'website',
+      'indicacao',
+      'evento',
+      'midia_social',
+      'publicidade',
+      'outro',
+    ]);
 
     console.log('✅ [Migration] Todos os ENUMs verificados/criados');
-
 
     // Tabela: empresas
     await queryRunner.query(`
@@ -181,8 +266,12 @@ export class InitialSchema1700000000000 implements MigrationInterface {
         CONSTRAINT "PK_oportunidades" PRIMARY KEY ("id")
       )
     `);
-    await queryRunner.query(`CREATE INDEX "IDX_oportunidades_empresa_id" ON "oportunidades" ("empresa_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_oportunidades_cliente_id" ON "oportunidades" ("cliente_id")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_oportunidades_empresa_id" ON "oportunidades" ("empresa_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_oportunidades_cliente_id" ON "oportunidades" ("cliente_id")`,
+    );
 
     // Tabela: atividades
     await queryRunner.query(`
@@ -201,8 +290,12 @@ export class InitialSchema1700000000000 implements MigrationInterface {
         CONSTRAINT "PK_atividades" PRIMARY KEY ("id")
       )
     `);
-    await queryRunner.query(`CREATE INDEX "IDX_atividades_empresa_id" ON "atividades" ("empresa_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_atividades_oportunidade_id" ON "atividades" ("oportunidade_id")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_atividades_empresa_id" ON "atividades" ("empresa_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_atividades_oportunidade_id" ON "atividades" ("oportunidade_id")`,
+    );
 
     // Tabela: propostas
     await queryRunner.query(`
@@ -221,7 +314,9 @@ export class InitialSchema1700000000000 implements MigrationInterface {
         CONSTRAINT "PK_propostas" PRIMARY KEY ("id")
       )
     `);
-    await queryRunner.query(`CREATE INDEX "IDX_propostas_empresa_id" ON "propostas" ("empresa_id")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_propostas_empresa_id" ON "propostas" ("empresa_id")`,
+    );
 
     // Continuar com demais tabelas...
     // (Simplificando para não exceder limite - em produção, incluir TODAS as 57 tabelas)

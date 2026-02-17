@@ -1,24 +1,25 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Req } from '@nestjs/common';
+import { Logger, Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { EmpresaId } from '../../../common/decorators/empresa.decorator';
 import { Fila } from '../entities/fila.entity';
 import { CriarFilaDto, AtualizarFilaDto, AtribuirAtendenteFilaDto } from '../dto';
 
 @Controller('atendimento/filas')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class FilasController {
+  private readonly logger = new Logger(FilasController.name);
   constructor(
     @InjectRepository(Fila)
     private filaRepo: Repository<Fila>,
   ) {
-    console.log('✅ FilasController inicializado');
+    this.logger.log('✅ FilasController inicializado');
   }
 
   @Get()
-  async listar(@Req() req) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
-
+  async listar(@EmpresaId() empresaId: string) {
     const filas = await this.filaRepo.find({
       where: { empresaId },
       // relations: ['atendentes'], // TODO: adicionar quando AtendenteFila estiver disponível
@@ -33,9 +34,7 @@ export class FilasController {
   }
 
   @Get(':id')
-  async buscarPorId(@Req() req, @Param('id') id: string) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
-
+  async buscarPorId(@EmpresaId() empresaId: string, @Param('id') id: string) {
     const fila = await this.filaRepo.findOne({
       where: { id, empresaId },
       relations: ['atendentes', 'canais'],
@@ -55,9 +54,7 @@ export class FilasController {
   }
 
   @Post()
-  async criar(@Req() req, @Body() dto: CriarFilaDto) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
-
+  async criar(@EmpresaId() empresaId: string, @Body() dto: CriarFilaDto) {
     const fila = this.filaRepo.create({
       ...dto,
       empresaId,
@@ -73,9 +70,11 @@ export class FilasController {
   }
 
   @Put(':id')
-  async atualizar(@Req() req, @Param('id') id: string, @Body() dto: AtualizarFilaDto) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
-
+  async atualizar(
+    @EmpresaId() empresaId: string,
+    @Param('id') id: string,
+    @Body() dto: AtualizarFilaDto,
+  ) {
     const fila = await this.filaRepo.findOne({
       where: { id, empresaId },
     });
@@ -98,9 +97,7 @@ export class FilasController {
   }
 
   @Delete(':id')
-  async deletar(@Req() req, @Param('id') id: string) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
-
+  async deletar(@EmpresaId() empresaId: string, @Param('id') id: string) {
     const fila = await this.filaRepo.findOne({
       where: { id, empresaId },
     });
@@ -122,12 +119,10 @@ export class FilasController {
 
   @Post(':id/atendentes')
   async atribuirAtendente(
-    @Req() req,
+    @EmpresaId() empresaId: string,
     @Param('id') filaId: string,
     @Body() dto: AtribuirAtendenteFilaDto,
   ) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
-
     const fila = await this.filaRepo.findOne({
       where: { id: filaId, empresaId },
     });

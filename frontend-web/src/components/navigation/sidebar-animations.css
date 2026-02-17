@@ -1,5 +1,11 @@
 /* Animações Premium para Sidebar - Estilo iOS/macOS + Zoho CRM */
 
+:root {
+  --premium-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --premium-fast: 180ms;
+  --premium-base: 240ms;
+}
+
 /* Animação de slide-in para painel suspenso */
 @keyframes slideIn {
   from {
@@ -14,22 +20,139 @@
 }
 
 .animate-slide-in {
-  animation: slideIn 0.25s ease-out;
+  animation: slideIn var(--premium-base) var(--premium-ease);
 }
 
-/* Remove qualquer outline/focus padrão dos links da sidebar */
+@keyframes submenuItemReveal {
+  from {
+    opacity: 0;
+    transform: translateX(-6px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.submenu-item-reveal {
+  animation: submenuItemReveal 320ms var(--premium-ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .submenu-item-reveal {
+    animation: none;
+  }
+}
+
+/* Foco visivel para navegacao por teclado na sidebar */
 .sidebar-nav-link {
-  outline: none !important;
-  box-shadow: none !important;
-  border: none !important;
+  border: none;
 }
 
 .sidebar-nav-link:focus,
-.sidebar-nav-link:focus-visible,
 .sidebar-nav-link:active {
-  outline: none !important;
-  box-shadow: none !important;
-  border: none !important;
+  outline: none;
+}
+
+.sidebar-nav-link:focus-visible {
+  outline: 2px solid #159a9c;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(21, 154, 156, 0.16);
+  background: rgba(21, 154, 156, 0.08);
+}
+
+.premium-sidebar-item {
+  transform: translateY(0) scale(1);
+  transition:
+    transform var(--premium-base) var(--premium-ease),
+    box-shadow var(--premium-fast) ease,
+    border-color var(--premium-fast) ease,
+    background-color var(--premium-fast) ease;
+}
+
+.premium-sidebar-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px -16px rgba(0, 35, 51, 0.6);
+}
+
+@media (max-width: 767px) {
+  .premium-sidebar-item:hover {
+    transform: translateX(1px);
+    box-shadow: none;
+  }
+}
+
+.premium-sidebar-item:active {
+  transform: translateY(0) scale(0.99);
+}
+
+.premium-submenu-panel {
+  background: linear-gradient(180deg, #ffffff 0%, #fbfefe 100%);
+  box-shadow:
+    0 30px 56px -38px rgba(0, 35, 51, 0.6),
+    12px 0 30px -26px rgba(0, 35, 51, 0.35);
+}
+
+.premium-submenu-panel::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(180deg, rgba(21, 154, 156, 0.35), rgba(21, 154, 156, 0.05));
+  pointer-events: none;
+}
+
+.premium-submenu-item {
+  border: 1px solid transparent;
+  transition:
+    transform var(--premium-fast) var(--premium-ease),
+    border-color var(--premium-fast) ease,
+    background-color var(--premium-fast) ease,
+    box-shadow var(--premium-fast) ease;
+}
+
+.premium-submenu-item:hover {
+  border-color: rgba(21, 154, 156, 0.2);
+  transform: translateX(1px);
+  box-shadow: 0 10px 20px -16px rgba(0, 35, 51, 0.45);
+}
+
+.premium-submenu-item:active {
+  transform: translateX(1px) scale(0.995);
+}
+
+.premium-submenu-item:focus-visible {
+  outline: 2px solid #159a9c;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px rgba(21, 154, 156, 0.12);
+}
+
+.submenu-child-item:hover {
+  border-color: var(--submenu-accent-border);
+  background: var(--submenu-accent-soft);
+  color: #002333;
+  box-shadow: 0 12px 20px -20px var(--submenu-accent-shadow);
+}
+
+.submenu-child-item:hover .submenu-child-icon {
+  background: var(--submenu-accent-soft-alt);
+  color: var(--submenu-accent);
+}
+
+.submenu-child-item:hover .submenu-child-chevron {
+  color: var(--submenu-accent);
+}
+
+.submenu-close-btn:hover {
+  border-color: var(--submenu-accent-border);
+  background: var(--submenu-accent-soft);
+}
+
+.submenu-close-btn:hover svg {
+  color: var(--submenu-accent);
 }
 
 /* Animação de hover melhorada para sidebar colapsada */
@@ -53,7 +176,7 @@
 
 .sidebar-collapsed .sidebar-nav-link:hover .nav-icon {
   filter: drop-shadow(0 4px 8px rgba(21, 154, 156, 0.25));
-  color: #159A9C !important;
+  color: #159a9c !important;
 }
 
 /* Animação de "pulse" mais sutil para badges */
@@ -62,7 +185,6 @@
 }
 
 @keyframes subtle-pulse {
-
   0%,
   100% {
     opacity: 1;
@@ -94,7 +216,9 @@
   visibility: hidden;
   transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
   z-index: 9999;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
 }
 
@@ -131,7 +255,7 @@
 /* Animação para o estado ativo */
 .sidebar-nav-link.active {
   background: linear-gradient(90deg, rgba(21, 154, 156, 0.1) 0%, rgba(21, 154, 156, 0.05) 100%);
-  border-right: 2px solid #159A9C;
+  border-right: 2px solid #159a9c;
 }
 
 /* Melhoria para transição de estado expandido/colapsado */
@@ -159,18 +283,6 @@
 /* Efeito de "glow" sutil para item ativo na sidebar colapsada */
 .sidebar-collapsed .sidebar-nav-link.active .nav-icon {
   filter: drop-shadow(0 0 8px rgba(21, 154, 156, 0.4));
-}
-
-/* Remove qualquer estilo de foco do navegador */
-*:focus {
-  outline: none !important;
-}
-
-/* Mas mantém acessibilidade com indicador customizado */
-.sidebar-nav-link:focus-visible {
-  outline: none !important;
-  box-shadow: none !important;
-  background: rgba(21, 154, 156, 0.08) !important;
 }
 
 /* Animação mais suave para expansão/colapso */

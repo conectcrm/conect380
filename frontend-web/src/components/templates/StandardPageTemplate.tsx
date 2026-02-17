@@ -70,34 +70,34 @@ interface StandardPageTemplateProps {
 
 const colorConfigs = {
   blue: {
-    text: 'text-blue-600',
-    bg: 'from-blue-100 to-blue-200',
-    icon: 'text-blue-600',
+    text: 'text-[#159A9C]',
+    bg: 'bg-[#159A9C]/10',
+    icon: 'text-[#159A9C]',
   },
   green: {
     text: 'text-green-600',
-    bg: 'from-green-100 to-green-200',
+    bg: 'bg-green-500/10',
     icon: 'text-green-600',
   },
   red: {
     text: 'text-red-600',
-    bg: 'from-red-100 to-red-200',
+    bg: 'bg-red-500/10',
     icon: 'text-red-600',
   },
   purple: {
-    text: 'text-purple-600',
-    bg: 'from-purple-100 to-purple-200',
-    icon: 'text-purple-600',
+    text: 'text-[#159A9C]',
+    bg: 'bg-[#159A9C]/10',
+    icon: 'text-[#159A9C]',
   },
   yellow: {
     text: 'text-yellow-600',
-    bg: 'from-yellow-100 to-yellow-200',
+    bg: 'bg-yellow-500/10',
     icon: 'text-yellow-600',
   },
   indigo: {
-    text: 'text-indigo-600',
-    bg: 'from-indigo-100 to-indigo-200',
-    icon: 'text-indigo-600',
+    text: 'text-[#159A9C]',
+    bg: 'bg-[#159A9C]/10',
+    icon: 'text-[#159A9C]',
   },
 };
 
@@ -139,7 +139,7 @@ export const StandardPageTemplate: React.FC<StandardPageTemplateProps> = ({
               <div className="mt-4 lg:mt-0">
                 <button
                   onClick={primaryAction.onClick}
-                  className="bg-[#159A9C] text-white px-6 py-3 rounded-lg hover:bg-[#138A8C] transition-colors duration-200 flex items-center space-x-2 font-medium shadow-sm"
+                  className="bg-[#159A9C] text-white px-6 py-3 rounded-lg hover:bg-[#0F7B7D] transition-colors duration-200 flex items-center space-x-2 font-medium shadow-sm"
                 >
                   {primaryAction.icon && <primaryAction.icon className="w-5 h-5" />}
                   <span>{primaryAction.label}</span>
@@ -155,6 +155,11 @@ export const StandardPageTemplate: React.FC<StandardPageTemplateProps> = ({
             {dashboardCards.map((card, index) => {
               const config = colorConfigs[card.color];
               const IconComponent = card.icon;
+              const iconBgClass = card.bgGradient || config.bg;
+              const iconUsesGradient =
+                iconBgClass.includes('from-') ||
+                iconBgClass.includes('to-') ||
+                iconBgClass.includes('bg-gradient');
 
               return (
                 <div
@@ -172,7 +177,7 @@ export const StandardPageTemplate: React.FC<StandardPageTemplateProps> = ({
                       )}
                     </div>
                     <div
-                      className={`p-4 bg-gradient-to-br ${card.bgGradient || config.bg} rounded-xl`}
+                      className={`p-4 rounded-xl ${iconUsesGradient ? 'bg-gradient-to-br' : ''} ${iconBgClass}`}
                     >
                       <IconComponent className={`w-8 h-8 ${config.icon}`} />
                     </div>
@@ -185,21 +190,21 @@ export const StandardPageTemplate: React.FC<StandardPageTemplateProps> = ({
 
         {/* Bulk Actions Bar */}
         {bulkActions && bulkActions.selectedCount > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="bg-[#159A9C]/5 border border-[#159A9C]/20 rounded-lg p-4 mb-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="flex items-center space-x-4">
-                <span className="text-blue-800 font-medium">
+                <span className="text-[#002333] font-medium">
                   {bulkActions.selectedCount} item(s) selecionado(s)
                 </span>
                 <button
                   onClick={bulkActions.onSelectAll}
-                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                  className="text-[#159A9C] hover:text-[#0F7B7D] text-sm font-medium"
                 >
                   Selecionar todos
                 </button>
                 <button
                   onClick={bulkActions.onDeselectAll}
-                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                  className="text-[#159A9C] hover:text-[#0F7B7D] text-sm font-medium"
                 >
                   Desmarcar todos
                 </button>
@@ -214,8 +219,8 @@ export const StandardPageTemplate: React.FC<StandardPageTemplateProps> = ({
                       action.variant === 'danger'
                         ? 'bg-red-600 text-white hover:bg-red-700'
                         : action.variant === 'outline'
-                          ? 'bg-white border border-blue-600 text-blue-600 hover:bg-blue-50'
-                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                          ? 'bg-white border border-[#159A9C] text-[#159A9C] hover:bg-[#159A9C]/10'
+                          : 'bg-[#159A9C] text-white hover:bg-[#0F7B7D]'
                     }`}
                   >
                     {action.label}
@@ -295,7 +300,7 @@ export const StandardPageTemplate: React.FC<StandardPageTemplateProps> = ({
                           ? 'bg-red-600 text-white hover:bg-red-700'
                           : action.variant === 'outline'
                             ? 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-                            : 'bg-[#159A9C] text-white hover:bg-[#138A8C]'
+                            : 'bg-[#159A9C] text-white hover:bg-[#0F7B7D]'
                       }`}
                     >
                       {action.icon && <action.icon className="w-4 h-4" />}

@@ -51,6 +51,8 @@ const WEBSOCKET_URL = SOCKET_BASE_URL.endsWith('/')
   ? `${SOCKET_BASE_URL}atendimento`
   : `${SOCKET_BASE_URL}/atendimento`;
 const TOKEN_STORAGE_KEY = 'authToken';
+const AUTH_TOKEN_EVENT_NAME = 'authTokenChanged';
+const EMPRESA_EVENT_NAME = 'empresaAtivaChanged';
 const DEBUG = process.env.REACT_APP_DEBUG_WS === 'true';
 
 // 🔒 SINGLETON: Garantir apenas 1 instância WebSocket
@@ -182,6 +184,27 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
       setConnecting(false);
       setError(null);
     }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated || typeof window === 'undefined') {
+      return;
+    }
+
+    const handleRealtimeContextChange = () => {
+      if (DEBUG) {
+        console.log('🔄 [WebSocketContext] Contexto alterado, forçando reconexão do socket');
+      }
+      reconnect();
+    };
+
+    window.addEventListener(AUTH_TOKEN_EVENT_NAME, handleRealtimeContextChange);
+    window.addEventListener(EMPRESA_EVENT_NAME, handleRealtimeContextChange);
+
+    return () => {
+      window.removeEventListener(AUTH_TOKEN_EVENT_NAME, handleRealtimeContextChange);
+      window.removeEventListener(EMPRESA_EVENT_NAME, handleRealtimeContextChange);
+    };
   }, [isAuthenticated]);
 
   // Cleanup ao desmontar

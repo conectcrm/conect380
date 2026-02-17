@@ -11,11 +11,13 @@
 
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, In, Not } from 'typeorm';
+import { Repository, In, Not } from 'typeorm';
 // import { Cron, CronExpression } from '@nestjs/schedule'; // TODO: Instalar @nestjs/schedule
 import { Ticket, StatusTicket } from '../entities/ticket.entity';
 import { ConfiguracaoInatividade } from '../entities/configuracao-inatividade.entity';
 import { WhatsAppSenderService } from './whatsapp-sender.service';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
+import { runWithTenant } from '../../../common/tenant/tenant-context';
 
 @Injectable()
 export class InactivityMonitorService implements OnModuleInit, OnModuleDestroy {
@@ -25,10 +27,12 @@ export class InactivityMonitorService implements OnModuleInit, OnModuleDestroy {
   constructor(
     @InjectRepository(Ticket)
     private readonly ticketRepository: Repository<Ticket>,
+    @InjectRepository(Empresa)
+    private readonly empresaRepository: Repository<Empresa>,
     @InjectRepository(ConfiguracaoInatividade)
     private readonly configuracaoRepository: Repository<ConfiguracaoInatividade>,
     private readonly whatsappSenderService: WhatsAppSenderService,
-  ) { }
+  ) {}
 
   onModuleInit() {
     this.iniciarMonitoramento();
@@ -74,30 +78,42 @@ export class InactivityMonitorService implements OnModuleInit, OnModuleDestroy {
     this.logger.log('🕐 Iniciando verificação de tickets inativos...');
 
     try {
-      // Buscar todas as configurações ativas
-      const configuracoes = await this.configuracaoRepository.find({
-        where: { ativo: true },
-      });
-
-      if (configuracoes.length === 0) {
-        this.logger.log('⚠️ Nenhuma configuração de inatividade ativa');
-        return;
-      }
-
       let totalProcessados = 0;
       let totalFechados = 0;
       let totalAvisados = 0;
 
-      for (const config of configuracoes) {
-        const resultado = await this.processarEmpresa(config);
-        totalProcessados += resultado.processados;
-        totalFechados += resultado.fechados;
-        totalAvisados += resultado.avisados;
+      const empresas = await this.empresaRepository.find({
+        where: { ativo: true },
+        select: { id: true } as any,
+      });
+
+      for (const empresa of empresas) {
+        await runWithTenant(empresa.id, async () => {
+          const configuracoes = await this.configuracaoRepository.find({
+            where: { ativo: true, empresaId: empresa.id },
+          });
+
+          if (configuracoes.length === 0) {
+            return;
+          }
+
+          for (const config of configuracoes) {
+            const resultado = await this.processarEmpresa(config);
+            totalProcessados += resultado.processados;
+            totalFechados += resultado.fechados;
+            totalAvisados += resultado.avisados;
+          }
+        });
+      }
+
+      if (totalProcessados === 0 && totalFechados === 0 && totalAvisados === 0) {
+        this.logger.log('⚠️ Nenhuma configuração de inatividade ativa');
+        return;
       }
 
       this.logger.log(
         `✅ Verificação concluída: ${totalProcessados} tickets processados, ` +
-        `${totalFechados} fechados, ${totalAvisados} avisados`,
+          `${totalFechados} fechados, ${totalAvisados} avisados`,
       );
     } catch (error) {
       this.logger.error('❌ Erro ao verificar tickets inativos:', error);
@@ -114,7 +130,7 @@ export class InactivityMonitorService implements OnModuleInit, OnModuleDestroy {
     const statusFiltro =
       config.statusAplicaveis && config.statusAplicaveis.length > 0
         ? In(config.statusAplicaveis)
-        : Not(In([StatusTicket.FECHADO, StatusTicket.RESOLVIDO])); // Não processar já fechados/resolvidos
+        : Not(In([StatusTicket.ENCERRADO, StatusTicket.CONCLUIDO])); // Não processar já fechados/resolvidos
 
     // Buscar todos os tickets ativos da empresa (sem filtrar por tempo ainda)
     const ticketsAtivos = await this.ticketRepository.find({
@@ -170,7 +186,7 @@ export class InactivityMonitorService implements OnModuleInit, OnModuleDestroy {
 
     this.logger.log(
       `📊 Empresa ${config.empresaId}: ${processados} inativos, ` +
-      `${fechados} fechados, ${avisados} avisados`,
+        `${fechados} fechados, ${avisados} avisados`,
     );
 
     return {
@@ -226,7 +242,7 @@ export class InactivityMonitorService implements OnModuleInit, OnModuleDestroy {
   /**
    * Verifica se ticket já recebeu aviso de fechamento
    */
-  private async verificarSeJaFoiAvisado(ticketId: string): Promise<boolean> {
+  private async verificarSeJaFoiAvisado(_ticketId: string): Promise<boolean> {
     // TODO: Implementar verificação em tabela de logs ou metadata do ticket
     // Por enquanto, retorna false (sempre avisa)
     return false;
@@ -247,9 +263,9 @@ export class InactivityMonitorService implements OnModuleInit, OnModuleDestroy {
     // ✅ Enviar mensagem via WhatsApp
     try {
       await this.whatsappSenderService.enviarMensagem(
+        ticket.empresaId,
         ticket.contatoTelefone,
         mensagem,
-        ticket.empresaId,
       );
       this.logger.log(`✅ Aviso enviado com sucesso para ${ticket.contatoTelefone}`);
     } catch (error) {
@@ -273,7 +289,7 @@ export class InactivityMonitorService implements OnModuleInit, OnModuleDestroy {
     this.logger.log(`🔒 Fechando ticket ${ticket.numero} por inatividade`);
 
     // Atualizar status
-    ticket.status = StatusTicket.FECHADO;
+    ticket.status = StatusTicket.ENCERRADO;
     ticket.data_fechamento = new Date();
 
     await this.ticketRepository.save(ticket);
@@ -281,9 +297,9 @@ export class InactivityMonitorService implements OnModuleInit, OnModuleDestroy {
     // Enviar mensagem de fechamento
     try {
       await this.whatsappSenderService.enviarMensagem(
+        ticket.empresaId,
         ticket.contatoTelefone,
         mensagem,
-        ticket.empresaId,
       );
       this.logger.log(
         `✅ Mensagem de fechamento enviada com sucesso para ${ticket.contatoTelefone}`,
@@ -304,8 +320,18 @@ export class InactivityMonitorService implements OnModuleInit, OnModuleDestroy {
   async verificarImediatamente(empresaId?: string, departamentoId?: string) {
     this.logger.log('🚀 Verificação manual solicitada');
 
+    if (empresaId) {
+      return await runWithTenant(empresaId, async () => {
+        return await this.verificarImediatamenteDentroTenant(empresaId, departamentoId);
+      });
+    }
+
+    return await this.verificarImediatamenteDentroTenant(undefined, departamentoId);
+  }
+
+  private async verificarImediatamenteDentroTenant(empresaId?: string, departamentoId?: string) {
     // Construir filtro dinamicamente
-    const where: any = { ativo: true };
+    const where: Record<string, unknown> = { ativo: true };
 
     if (empresaId) {
       where.empresaId = empresaId;

@@ -1,12 +1,7 @@
-import {
-  Controller,
-  Get,
-  Query,
-  UseGuards,
-  Request,
-} from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../modules/auth/jwt-auth.guard';
 import { SearchService } from './search.service';
+import { EmpresaGuard } from '../common/guards/empresa.guard';
 
 export interface SearchResultDto {
   id: string;
@@ -18,9 +13,9 @@ export interface SearchResultDto {
 }
 
 @Controller('search')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class SearchController {
-  constructor(private readonly searchService: SearchService) { }
+  constructor(private readonly searchService: SearchService) {}
 
   /**
    * GET /search?q=termo&tipos=cliente,produto
@@ -32,17 +27,20 @@ export class SearchController {
     @Query('q') query: string,
     @Query('tipos') tipos?: string,
   ): Promise<SearchResultDto[]> {
-    const empresaId = req.user?.empresa_id;
+    const empresaId = req.user?.empresa_id ?? req.user?.empresaId;
     const tiposArray = tipos ? tipos.split(',') : undefined;
 
     if (!query || query.trim().length < 2) {
       return [];
     }
 
-    return await this.searchService.searchGlobal(
-      query.trim(),
-      empresaId,
-      tiposArray,
-    );
+    try {
+      return await this.searchService.searchGlobal(query.trim(), empresaId, tiposArray);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'erro desconhecido durante busca global';
+      console.warn('[SearchController] Falha ao processar busca global:', errorMessage);
+      return [];
+    }
   }
 }

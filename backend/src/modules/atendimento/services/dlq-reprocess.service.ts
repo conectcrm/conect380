@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
-import { Queue, Job } from 'bull';
+import { Queue, Job, JobCounts } from 'bull';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
 import { appendFile } from 'fs/promises';
@@ -38,7 +38,7 @@ interface ReprocessResult {
   sampleJobs: Array<Record<string, unknown>>;
 }
 
-interface DlqStatus {
+export interface DlqStatus {
   fila: FilaReprocessavel;
   waiting: number;
   delayed: number;
@@ -60,7 +60,7 @@ export class DlqReprocessService {
     @InjectRepository(DlqReprocessAudit)
     private readonly dlqAuditRepo: Repository<DlqReprocessAudit>,
     private readonly httpService: HttpService,
-  ) { }
+  ) {}
 
   private readonly webhookUrl = process.env.DLQ_ALERT_WEBHOOK_URL;
 
@@ -81,8 +81,7 @@ export class DlqReprocessService {
 
     if (filtrados.length >= DLQ_ALERT_THRESHOLD) {
       this.emitAlert(
-        DLQ_ALERT_MESSAGE
-          .replace('{fila}', fila)
+        DLQ_ALERT_MESSAGE.replace('{fila}', fila)
           .replace('{count}', String(filtrados.length))
           .replace('{action}', 'reprocessamento'),
       );
@@ -170,8 +169,7 @@ export class DlqReprocessService {
     });
 
     this.emitAlert(
-      DLQ_ALERT_MESSAGE
-        .replace('{fila}', fila)
+      DLQ_ALERT_MESSAGE.replace('{fila}', fila)
         .replace('{count}', String(filtrados.length))
         .replace('{action}', 'reprocessamento'),
       {
@@ -278,14 +276,16 @@ export class DlqReprocessService {
       await this.dlqAuditRepo.save(entry);
     } catch (err) {
       // Fallback para arquivo em caso de falha no banco.
-      const auditFile = process.env.DLQ_AUDIT_FILE || join(process.cwd(), 'logs', 'dlq-reprocess.log');
+      const auditFile =
+        process.env.DLQ_AUDIT_FILE || join(process.cwd(), 'logs', 'dlq-reprocess.log');
       const line = `${JSON.stringify({ ...entry, fallback: true, at: new Date().toISOString() })}\n`;
       await appendFile(auditFile, line, { encoding: 'utf-8' });
       throw err;
     }
 
     // Sempre registrar também em arquivo para trilha paralela.
-    const auditFile = process.env.DLQ_AUDIT_FILE || join(process.cwd(), 'logs', 'dlq-reprocess.log');
+    const auditFile =
+      process.env.DLQ_AUDIT_FILE || join(process.cwd(), 'logs', 'dlq-reprocess.log');
     const line = `${JSON.stringify({ ...entry, at: new Date().toISOString() })}\n`;
     await appendFile(auditFile, line, { encoding: 'utf-8' });
   }
@@ -329,7 +329,11 @@ export class DlqReprocessService {
     jobNamePadrao?: string;
   } {
     if (fila === 'webhooks-in') {
-      return { main: this.webhooksIn, dlq: this.webhooksInDlq, jobNamePadrao: 'process-whatsapp-webhook' };
+      return {
+        main: this.webhooksIn,
+        dlq: this.webhooksInDlq,
+        jobNamePadrao: 'process-whatsapp-webhook',
+      };
     }
 
     if (fila === 'messages-out') {

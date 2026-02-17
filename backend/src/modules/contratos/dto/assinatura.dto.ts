@@ -6,6 +6,7 @@ import {
   IsObject,
   IsIP,
   IsDateString,
+  IsUUID,
 } from 'class-validator';
 import { TipoAssinatura } from '../entities/assinatura-contrato.entity';
 
@@ -13,8 +14,8 @@ export class CreateAssinaturaDto {
   @IsNumber()
   contratoId: number;
 
-  @IsNumber()
-  usuarioId: number;
+  @IsUUID('4')
+  usuarioId: string;
 
   @IsEnum(TipoAssinatura)
   tipo: TipoAssinatura;

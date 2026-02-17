@@ -28,11 +28,11 @@ export class Tag {
   @Column({ type: 'boolean', default: true })
   ativo: boolean;
 
-  @Column({ type: 'varchar', length: 36, nullable: true })
+  @Column({ type: 'uuid', name: 'empresa_id', nullable: true })
   empresaId: string;
 
   @ManyToOne(() => Empresa)
-  @JoinColumn({ name: 'empresaId' })
+  @JoinColumn({ name: 'empresa_id' })
   empresa: Empresa;
 
   @CreateDateColumn()

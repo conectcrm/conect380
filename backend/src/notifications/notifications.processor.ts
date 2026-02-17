@@ -14,6 +14,7 @@ import { CreateNotificationDto } from './dto/notification.dto';
 import { NotificationsQueueProducer } from './notifications.queue-producer';
 import { NotificationType } from './entities/notification.entity';
 import { IntegracoesConfig } from '../modules/atendimento/entities/integracoes-config.entity'; // 🔐 NOVO
+import { runWithTenant } from '../common/tenant/tenant-context';
 
 type SendEmailJobPayload = {
   to: string;
@@ -29,6 +30,7 @@ export class NotificationsProcessor {
   private readonly logger = new Logger(NotificationsProcessor.name);
 
   private readonly adminNotifyUserId = process.env.NOTIFICATIONS_ADMIN_USER_ID;
+  private readonly adminNotifyEmpresaId = process.env.NOTIFICATIONS_ADMIN_EMPRESA_ID;
   private fcmInitialized = false;
 
   private readonly MAX_RETRY_AFTER_MS = 120_000; // 2min cap
@@ -38,10 +40,11 @@ export class NotificationsProcessor {
     private readonly notificationsProducer: NotificationsQueueProducer,
     @InjectRepository(IntegracoesConfig) // 🔐 NOVO - Para buscar credenciais WhatsApp
     private readonly integracaoRepo: Repository<IntegracoesConfig>,
-  ) { }
+  ) {}
 
   private parseRetryAfterMs(error: any): number | undefined {
-    const header = error?.response?.headers?.['retry-after'] || error?.response?.headers?.['Retry-After'];
+    const header =
+      error?.response?.headers?.['retry-after'] || error?.response?.headers?.['Retry-After'];
     if (!header) return undefined;
 
     if (!Number.isNaN(Number(header))) {
@@ -63,6 +66,7 @@ export class NotificationsProcessor {
     if (!this.adminNotifyUserId) return;
     try {
       await this.notificationsProducer.enqueueNotifyUser({
+        empresaId: this.adminNotifyEmpresaId,
         userId: this.adminNotifyUserId,
         type: NotificationType.SISTEMA,
         title,
@@ -70,9 +74,7 @@ export class NotificationsProcessor {
         data,
       });
     } catch (notifyErr) {
-      this.logger.warn(
-        `Falha ao notificar admin (${title}): ${notifyErr?.message || notifyErr}`,
-      );
+      this.logger.warn(`Falha ao notificar admin (${title}): ${notifyErr?.message || notifyErr}`);
     }
   }
 
@@ -88,7 +90,8 @@ export class NotificationsProcessor {
       throw new Error(`Número de telefone inválido após normalização (${digits})`);
     }
 
-    const warning = digits.length === 12 ? 'Formato com 12 dígitos; valide se há nono dígito' : undefined;
+    const warning =
+      digits.length === 12 ? 'Formato com 12 dígitos; valide se há nono dígito' : undefined;
 
     return { normalized: digits, warning };
   }
@@ -140,10 +143,14 @@ export class NotificationsProcessor {
   async handleNotify(job: Job<CreateNotificationDto>) {
     const data = job.data;
     try {
+      if (!(data as any)?.empresaId) {
+        this.logger.warn(
+          `NOTIFY_USER sem empresaId (jobId=${job.id}) - NotificationService irá resolver empresaId a partir do userId`,
+        );
+      }
+
       await this.notificationService.create(data);
-      this.logger.log(
-        `Notificação criada via queue (jobId=${job.id}) para user=${data.userId}`,
-      );
+      this.logger.log(`Notificação criada via queue (jobId=${job.id}) para user=${data.userId}`);
     } catch (error: any) {
       // Deixar Bull aplicar retries/backoff já configurados
       this.logger.error(
@@ -201,23 +208,26 @@ export class NotificationsProcessor {
       const isLastAttempt = job.attemptsMade + 1 >= attempts;
 
       if (isLastAttempt && this.adminNotifyUserId) {
-        void this.notificationsProducer.enqueueNotifyUser({
-          userId: this.adminNotifyUserId,
-          type: NotificationType.SISTEMA,
-          title: 'Falha ao enviar e-mail',
-          message: `Não foi possível enviar e-mail para ${data.to} após ${attempts} tentativas`,
-          data: {
-            context: 'send-email',
-            jobId: job.id,
-            to: data.to,
-            subject: data.subject,
-            error: error?.message || String(error),
-          },
-        }).catch((notifyErr) => {
-          this.logger.warn(
-            `Falha ao notificar admin sobre erro de e-mail (jobId=${job.id}): ${notifyErr?.message || notifyErr}`,
-          );
-        });
+        void this.notificationsProducer
+          .enqueueNotifyUser({
+            empresaId: this.adminNotifyEmpresaId,
+            userId: this.adminNotifyUserId,
+            type: NotificationType.SISTEMA,
+            title: 'Falha ao enviar e-mail',
+            message: `Não foi possível enviar e-mail para ${data.to} após ${attempts} tentativas`,
+            data: {
+              context: 'send-email',
+              jobId: job.id,
+              to: data.to,
+              subject: data.subject,
+              error: error?.message || String(error),
+            },
+          })
+          .catch((notifyErr) => {
+            this.logger.warn(
+              `Falha ao notificar admin sobre erro de e-mail (jobId=${job.id}): ${notifyErr?.message || notifyErr}`,
+            );
+          });
       }
 
       throw error;
@@ -242,7 +252,9 @@ export class NotificationsProcessor {
     }
 
     if (!empresaId) {
-      throw new Error('Payload WhatsApp inválido: empresaId ausente (necessário para buscar credenciais)');
+      throw new Error(
+        'Payload WhatsApp inválido: empresaId ausente (necessário para buscar credenciais)',
+      );
     }
 
     // 🔐 Buscar credenciais do banco de dados (fonte única de verdade)
@@ -250,16 +262,20 @@ export class NotificationsProcessor {
     let phoneNumberId: string | undefined;
 
     try {
-      const config = await this.integracaoRepo.findOne({
-        where: { 
-          empresaId, 
-          tipo: 'whatsapp_business_api', 
-          ativo: true 
-        },
+      const config = await runWithTenant(empresaId, async () => {
+        return await this.integracaoRepo.findOne({
+          where: {
+            empresaId,
+            tipo: 'whatsapp_business_api',
+            ativo: true,
+          },
+        });
       });
 
       if (!config) {
-        this.logger.warn(`⚠️ Nenhuma configuração WhatsApp ativa encontrada para empresa ${empresaId}`);
+        this.logger.warn(
+          `⚠️ Nenhuma configuração WhatsApp ativa encontrada para empresa ${empresaId}`,
+        );
       } else {
         this.logger.log(`✅ Configuração WhatsApp encontrada: ${config.id}`);
 
@@ -292,7 +308,7 @@ export class NotificationsProcessor {
 
       throw new Error(
         `WhatsApp não configurado para empresa ${empresaId}. ` +
-        `Configure na tela de Integrações: ${!accessToken ? 'Access Token' : ''} ${!phoneNumberId ? 'Phone Number ID' : ''}`
+          `Configure na tela de Integrações: ${!accessToken ? 'Access Token' : ''} ${!phoneNumberId ? 'Phone Number ID' : ''}`,
       );
     }
 
@@ -355,12 +371,13 @@ export class NotificationsProcessor {
       const attempts = job.opts.attempts ?? 1;
       const isLastAttempt = job.attemptsMade + 1 >= attempts;
 
-      // Se 429 e Retry-After presente, reagendar o job antes de consumir tentativa
+      // Se 429 e Retry-After presente, aguardar localmente para o próximo retry
       if (httpStatus === 429 && retryAfterMs && retryAfterMs > 0) {
-        await job.moveToDelayed(Date.now() + retryAfterMs);
+        await new Promise((resolve) => setTimeout(resolve, retryAfterMs));
         this.logger.warn(
-          `Retry-After WhatsApp (jobId=${job.id}) httpStatus=429 delay=${retryAfterMs}ms`);
-        return;
+          `Retry-After WhatsApp (jobId=${job.id}) httpStatus=429 delay=${retryAfterMs}ms`,
+        );
+        throw error;
       }
 
       if (isLastAttempt) {
@@ -467,11 +484,11 @@ export class NotificationsProcessor {
       const isLastAttempt = job.attemptsMade + 1 >= attempts;
 
       if ((status === 429 || code === 20429) && retryAfterMs && retryAfterMs > 0) {
-        await job.moveToDelayed(Date.now() + retryAfterMs);
+        await new Promise((resolve) => setTimeout(resolve, retryAfterMs));
         this.logger.warn(
           `Retry-After SMS (jobId=${job.id}) status=${status ?? code} delay=${retryAfterMs}ms`,
         );
-        return;
+        throw error;
       }
 
       if (isLastAttempt) {
@@ -555,7 +572,9 @@ export class NotificationsProcessor {
 
     try {
       const response = await getMessaging().send(message);
-      this.logger.log(`Push enviado (jobId=${job.id}) token=${token.slice(0, 8)}... id=${response}`);
+      this.logger.log(
+        `Push enviado (jobId=${job.id}) token=${token.slice(0, 8)}... id=${response}`,
+      );
     } catch (error: any) {
       const code = error?.code;
       const status = error?.status;
@@ -570,11 +589,11 @@ export class NotificationsProcessor {
       const isLastAttempt = job.attemptsMade + 1 >= attempts;
 
       if (status === 429 && retryAfterMs && retryAfterMs > 0) {
-        await job.moveToDelayed(Date.now() + retryAfterMs);
+        await new Promise((resolve) => setTimeout(resolve, retryAfterMs));
         this.logger.warn(
           `Retry-After push (jobId=${job.id}) status=${status} delay=${retryAfterMs}ms`,
         );
-        return;
+        throw error;
       }
 
       if (isLastAttempt) {

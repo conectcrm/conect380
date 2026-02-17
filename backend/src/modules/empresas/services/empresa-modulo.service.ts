@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException, Logger, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EmpresaModulo, ModuloEnum, PlanoEnum } from '../entities/empresa-modulo.entity';
@@ -12,7 +18,7 @@ export class EmpresaModuloService {
   constructor(
     @InjectRepository(EmpresaModulo)
     private readonly empresaModuloRepository: Repository<EmpresaModulo>,
-  ) { }
+  ) {}
 
   /**
    * Verifica se empresa tem módulo ativo
@@ -23,7 +29,7 @@ export class EmpresaModuloService {
   async isModuloAtivo(empresa_id: string, modulo: ModuloEnum): Promise<boolean> {
     try {
       const registro = await this.empresaModuloRepository.findOne({
-        where: { empresa_id, modulo, ativo: true },
+        where: { empresaId: empresa_id, modulo, ativo: true },
       });
 
       // Verificar se expirou
@@ -51,7 +57,7 @@ export class EmpresaModuloService {
   async listarModulosAtivos(empresa_id: string): Promise<ModuloEnum[]> {
     try {
       const modulos = await this.empresaModuloRepository.find({
-        where: { empresa_id, ativo: true },
+        where: { empresaId: empresa_id, ativo: true },
         select: ['modulo'],
       });
 
@@ -59,7 +65,7 @@ export class EmpresaModuloService {
       const modulosValidos: ModuloEnum[] = [];
       for (const m of modulos) {
         const registro = await this.empresaModuloRepository.findOne({
-          where: { empresa_id, modulo: m.modulo },
+          where: { empresaId: empresa_id, modulo: m.modulo },
         });
 
         if (registro && registro.data_expiracao) {
@@ -87,7 +93,7 @@ export class EmpresaModuloService {
    */
   async listar(empresa_id: string): Promise<EmpresaModulo[]> {
     return await this.empresaModuloRepository.find({
-      where: { empresa_id },
+      where: { empresaId: empresa_id },
       order: { modulo: 'ASC' },
     });
   }
@@ -102,7 +108,7 @@ export class EmpresaModuloService {
     try {
       // Verificar se já existe
       const existente = await this.empresaModuloRepository.findOne({
-        where: { empresa_id, modulo: dto.modulo },
+        where: { empresaId: empresa_id, modulo: dto.modulo },
       });
 
       if (existente) {
@@ -117,7 +123,7 @@ export class EmpresaModuloService {
       }
 
       const novoModulo = this.empresaModuloRepository.create({
-        empresa_id,
+        empresaId: empresa_id,
         modulo: dto.modulo,
         ativo: dto.ativo !== undefined ? dto.ativo : true,
         data_expiracao: dto.data_expiracao ? new Date(dto.data_expiracao) : null,
@@ -125,15 +131,12 @@ export class EmpresaModuloService {
       });
 
       return await this.empresaModuloRepository.save(novoModulo);
-
     } catch (error) {
       this.logger.error(
         `Erro ao ativar módulo ${dto.modulo} para empresa ${empresa_id}: ${error.message}`,
         error.stack,
       );
-      throw new InternalServerErrorException(
-        `Erro ao ativar módulo ${dto.modulo}`,
-      );
+      throw new InternalServerErrorException(`Erro ao ativar módulo ${dto.modulo}`);
     }
   }
 
@@ -144,7 +147,7 @@ export class EmpresaModuloService {
    */
   async desativar(empresa_id: string, modulo: ModuloEnum): Promise<void> {
     const registro = await this.empresaModuloRepository.findOne({
-      where: { empresa_id, modulo },
+      where: { empresaId: empresa_id, modulo },
     });
 
     if (!registro) {
@@ -166,7 +169,7 @@ export class EmpresaModuloService {
     dto: UpdateEmpresaModuloDto,
   ): Promise<EmpresaModulo> {
     const registro = await this.empresaModuloRepository.findOne({
-      where: { empresa_id, modulo },
+      where: { empresaId: empresa_id, modulo },
     });
 
     if (!registro) {
@@ -274,13 +277,13 @@ export class EmpresaModuloService {
         for (const modulo of modulos) {
           // Verificar se já existe
           const existe = await this.empresaModuloRepository.findOne({
-            where: { empresa_id: empresa.id, modulo },
+            where: { empresaId: empresa.id, modulo },
           });
 
           if (!existe) {
             // Criar novo registro
             const novoModulo = this.empresaModuloRepository.create({
-              empresa_id: empresa.id,
+              empresaId: empresa.id,
               modulo,
               ativo: true,
               plano: PlanoEnum.ENTERPRISE,

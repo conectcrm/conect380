@@ -1,4 +1,14 @@
-import { IsString, IsNotEmpty, IsOptional, IsInt, IsBoolean, IsUUID, Matches, MinLength, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsInt,
+  IsBoolean,
+  IsUUID,
+  Matches,
+  MinLength,
+  MaxLength,
+} from 'class-validator';
 
 export class CreateStatusCustomizadoDto {
   @IsString({ message: 'Nome deve ser uma string' })

@@ -28,7 +28,10 @@ export function initializeMetricsWithDemoData() {
   console.log('🔧 Inicializando métricas com dados de demonstração...');
 
   // Mensagens enviadas (simular 1000 mensagens em diferentes contextos)
-  mensagensEnviadasTotal.inc({ empresaId: '1', canalId: 'whatsapp-1', remetente: 'ATENDENTE' }, 450);
+  mensagensEnviadasTotal.inc(
+    { empresaId: '1', canalId: 'whatsapp-1', remetente: 'ATENDENTE' },
+    450,
+  );
   mensagensEnviadasTotal.inc({ empresaId: '1', canalId: 'whatsapp-1', remetente: 'BOT' }, 300);
   mensagensEnviadasTotal.inc({ empresaId: '1', canalId: 'whatsapp-1', remetente: 'SISTEMA' }, 250);
 
@@ -54,8 +57,14 @@ export function initializeMetricsWithDemoData() {
   ticketsAbertosAtual.set({ empresaId: '1', status: 'EM_ATENDIMENTO' }, 15);
   ticketsAbertosAtual.set({ empresaId: '1', status: 'AGUARDANDO' }, 10);
 
-  ticketsCriadosTotal.inc({ empresaId: '1', canalId: 'whatsapp-1', departamentoId: '1', origem: 'webhook' }, 60);
-  ticketsCriadosTotal.inc({ empresaId: '1', canalId: 'whatsapp-1', departamentoId: '1', origem: 'manual' }, 20);
+  ticketsCriadosTotal.inc(
+    { empresaId: '1', canalId: 'whatsapp-1', departamentoId: '1', origem: 'webhook' },
+    60,
+  );
+  ticketsCriadosTotal.inc(
+    { empresaId: '1', canalId: 'whatsapp-1', departamentoId: '1', origem: 'manual' },
+    20,
+  );
 
   ticketsEncerradosTotal.inc({ empresaId: '1', departamentoId: '1', motivo: 'resolvido' }, 55);
   ticketsEncerradosTotal.inc({ empresaId: '1', departamentoId: '1', motivo: 'cancelado' }, 5);
@@ -72,9 +81,11 @@ export function initializeMetricsWithDemoData() {
   // Simular requisições HTTP com diferentes latências
   // P50: ~150ms, P95: ~1.8s, P99: ~4.5s (dentro do SLO de 2s para P95)
   for (let i = 0; i < 100; i++) {
-    const route = ['/api/tickets', '/api/mensagens', '/api/atendentes', '/api/empresas'][Math.floor(Math.random() * 4)];
+    const route = ['/api/tickets', '/api/mensagens', '/api/atendentes', '/api/empresas'][
+      Math.floor(Math.random() * 4)
+    ];
     const method = ['GET', 'POST', 'PUT', 'DELETE'][Math.floor(Math.random() * 4)];
-    const statusCode = Math.random() < 0.97 ? 200 : (Math.random() < 0.5 ? 400 : 500); // 97% sucesso
+    const statusCode = Math.random() < 0.97 ? 200 : Math.random() < 0.5 ? 400 : 500; // 97% sucesso
 
     // Distribuição realista de latências:
     // 60% entre 50-200ms (rápido)
@@ -93,7 +104,10 @@ export function initializeMetricsWithDemoData() {
       latency = 1.5 + Math.random() * 3.5; // 1500-5000ms
     }
 
-    httpRequestDurationHistogram.observe({ method, route, status_code: statusCode.toString() }, latency);
+    httpRequestDurationHistogram.observe(
+      { method, route, status_code: statusCode.toString() },
+      latency,
+    );
     httpRequestsTotal.inc({ method, route, status_code: statusCode.toString() });
   }
 
@@ -121,7 +135,10 @@ export function startMetricsSimulation(intervalMs: number = 5000) {
   setInterval(() => {
     // Simular 5-15 mensagens a cada intervalo
     const mensagensCount = Math.floor(Math.random() * 10) + 5;
-    mensagensEnviadasTotal.inc({ empresaId: '1', canalId: 'whatsapp-1', remetente: 'ATENDENTE' }, mensagensCount);
+    mensagensEnviadasTotal.inc(
+      { empresaId: '1', canalId: 'whatsapp-1', remetente: 'ATENDENTE' },
+      mensagensCount,
+    );
 
     // Simular 3-10 mensagens recebidas
     const recebidasCount = Math.floor(Math.random() * 7) + 3;
@@ -136,8 +153,14 @@ export function startMetricsSimulation(intervalMs: number = 5000) {
     const ticketsVariation = Math.floor(Math.random() * 6) - 3;
     const currentTickets = Math.max(30, Math.min(60, 45 + ticketsVariation));
     ticketsAbertosAtual.set({ empresaId: '1', status: 'ABERTO' }, Math.floor(currentTickets * 0.4));
-    ticketsAbertosAtual.set({ empresaId: '1', status: 'EM_ATENDIMENTO' }, Math.floor(currentTickets * 0.4));
-    ticketsAbertosAtual.set({ empresaId: '1', status: 'AGUARDANDO' }, Math.floor(currentTickets * 0.2));
+    ticketsAbertosAtual.set(
+      { empresaId: '1', status: 'EM_ATENDIMENTO' },
+      Math.floor(currentTickets * 0.4),
+    );
+    ticketsAbertosAtual.set(
+      { empresaId: '1', status: 'AGUARDANDO' },
+      Math.floor(currentTickets * 0.2),
+    );
 
     // Variar capacidade (±1-2 atendentes)
     const capacidadeVariation = Math.floor(Math.random() * 4) - 2;
@@ -147,10 +170,12 @@ export function startMetricsSimulation(intervalMs: number = 5000) {
     // Simular requisições HTTP contínuas (2-5 por intervalo)
     const requestsCount = Math.floor(Math.random() * 3) + 2;
     for (let i = 0; i < requestsCount; i++) {
-      const route = ['/api/tickets', '/api/mensagens', '/api/atendentes', '/api/empresas'][Math.floor(Math.random() * 4)];
+      const route = ['/api/tickets', '/api/mensagens', '/api/atendentes', '/api/empresas'][
+        Math.floor(Math.random() * 4)
+      ];
       const method = ['GET', 'POST', 'PUT', 'DELETE'][Math.floor(Math.random() * 4)];
       const isSuccess = Math.random() < 0.97; // 97% sucesso
-      const statusCode = isSuccess ? 200 : (Math.random() < 0.5 ? 400 : 500);
+      const statusCode = isSuccess ? 200 : Math.random() < 0.5 ? 400 : 500;
 
       // Latência realista (maioria rápida, algumas lentas)
       let latency;
@@ -163,7 +188,10 @@ export function startMetricsSimulation(intervalMs: number = 5000) {
         latency = 0.7 + Math.random() * 2.3; // 5% lento (700-3000ms)
       }
 
-      httpRequestDurationHistogram.observe({ method, route, status_code: statusCode.toString() }, latency);
+      httpRequestDurationHistogram.observe(
+        { method, route, status_code: statusCode.toString() },
+        latency,
+      );
       httpRequestsTotal.inc({ method, route, status_code: statusCode.toString() });
     }
 

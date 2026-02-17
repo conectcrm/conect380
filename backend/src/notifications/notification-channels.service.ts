@@ -35,7 +35,7 @@ interface PushParams {
 export class NotificationChannelsService {
   private readonly logger = new Logger(NotificationChannelsService.name);
 
-  constructor(private readonly notificationsProducer: NotificationsQueueProducer) { }
+  constructor(private readonly notificationsProducer: NotificationsQueueProducer) {}
 
   private ensure(value: string | undefined, field: string): string {
     const trimmed = value?.trim();

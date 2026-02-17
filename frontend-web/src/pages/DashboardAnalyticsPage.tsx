@@ -10,7 +10,7 @@
  * - Gráfico de tendência de tickets (linha)
  * - Tabela de desempenho de atendentes
  * - Cards de estatísticas por canal
- * - Design Crevasse Professional (#9333EA purple)
+ * - Design Crevasse Professional (#159A9C)
  * - Responsivo (mobile-first)
  *
  * @author ConectCRM
@@ -152,7 +152,7 @@ const DashboardAnalyticsPage: React.FC = () => {
         </div>
         <div className="flex items-center justify-center h-96">
           <div className="text-center">
-            <RefreshCw className="h-12 w-12 text-[#9333EA] animate-spin mx-auto mb-4" />
+            <RefreshCw className="h-12 w-12 text-[#159A9C] animate-spin mx-auto mb-4" />
             <p className="text-[#002333]/60">Carregando dashboard...</p>
           </div>
         </div>
@@ -175,7 +175,7 @@ const DashboardAnalyticsPage: React.FC = () => {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
                 <h1 className="text-3xl font-bold text-[#002333] flex items-center">
-                  <BarChart3 className="h-8 w-8 mr-3 text-[#9333EA]" />
+                  <BarChart3 className="h-8 w-8 mr-3 text-[#159A9C]" />
                   Métricas & Analytics
                 </h1>
                 <p className="text-[#002333]/60 mt-1">Dashboards consolidados de atendimento</p>
@@ -187,7 +187,7 @@ const DashboardAnalyticsPage: React.FC = () => {
                 <select
                   value={periodo}
                   onChange={(e) => setPeriodo(e.target.value as '7d' | '30d' | '90d')}
-                  className="px-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#9333EA] focus:border-transparent text-sm"
+                  className="px-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
                 >
                   <option value="7d">Últimos 7 dias</option>
                   <option value="30d">Últimos 30 dias</option>
@@ -198,7 +198,7 @@ const DashboardAnalyticsPage: React.FC = () => {
                 <button
                   onClick={handleRefresh}
                   disabled={refreshing}
-                  className="px-4 py-2 bg-[#9333EA] text-white rounded-lg hover:bg-[#7928CA] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm font-medium"
+                  className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm font-medium"
                 >
                   <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
                   Atualizar
@@ -212,7 +212,7 @@ const DashboardAnalyticsPage: React.FC = () => {
                 <button
                   onClick={() => handleTabChange('geral')}
                   className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'geral'
-                    ? 'border-[#9333EA] text-[#9333EA]'
+                    ? 'border-[#159A9C] text-[#159A9C]'
                     : 'border-transparent text-[#002333]/60 hover:text-[#002333] hover:border-gray-300'
                     }`}
                 >
@@ -221,7 +221,7 @@ const DashboardAnalyticsPage: React.FC = () => {
                 <button
                   onClick={() => handleTabChange('sla')}
                   className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'sla'
-                    ? 'border-[#9333EA] text-[#9333EA]'
+                    ? 'border-[#159A9C] text-[#159A9C]'
                     : 'border-transparent text-[#002333]/60 hover:text-[#002333] hover:border-gray-300'
                     }`}
                 >
@@ -230,7 +230,7 @@ const DashboardAnalyticsPage: React.FC = () => {
                 <button
                   onClick={() => handleTabChange('distribuicao')}
                   className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'distribuicao'
-                    ? 'border-[#9333EA] text-[#9333EA]'
+                    ? 'border-[#159A9C] text-[#159A9C]'
                     : 'border-transparent text-[#002333]/60 hover:text-[#002333] hover:border-gray-300'
                     }`}
                 >
@@ -239,7 +239,7 @@ const DashboardAnalyticsPage: React.FC = () => {
                 <button
                   onClick={() => handleTabChange('desempenho')}
                   className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'desempenho'
-                    ? 'border-[#9333EA] text-[#9333EA]'
+                    ? 'border-[#159A9C] text-[#159A9C]'
                     : 'border-transparent text-[#002333]/60 hover:text-[#002333] hover:border-gray-300'
                     }`}
                 >
@@ -285,8 +285,8 @@ const DashboardAnalyticsPage: React.FC = () => {
                         Total de {formatarNumero(metrics.ticketsTotal)} tickets
                       </p>
                     </div>
-                    <div className="h-12 w-12 rounded-2xl bg-[#9333EA]/10 flex items-center justify-center shadow-sm">
-                      <MessageSquare className="h-6 w-6 text-[#9333EA]" />
+                    <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+                      <MessageSquare className="h-6 w-6 text-[#159A9C]" />
                     </div>
                   </div>
                 </div>
@@ -343,8 +343,8 @@ const DashboardAnalyticsPage: React.FC = () => {
                       </p>
                       <p className="mt-3 text-sm text-[#002333]/70">Primeira resposta ao cliente</p>
                     </div>
-                    <div className="h-12 w-12 rounded-2xl bg-blue-500/10 flex items-center justify-center shadow-sm">
-                      <Clock className="h-6 w-6 text-blue-600" />
+                    <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+                      <Clock className="h-6 w-6 text-[#159A9C]" />
                     </div>
                   </div>
                 </div>
@@ -387,8 +387,8 @@ const DashboardAnalyticsPage: React.FC = () => {
                         {'☆'.repeat(5 - Math.round(metrics.satisfacaoCliente))}
                       </p>
                     </div>
-                    <div className="h-12 w-12 rounded-2xl bg-[#9333EA]/10 flex items-center justify-center shadow-sm">
-                      <Activity className="h-6 w-6 text-[#9333EA]" />
+                    <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+                      <Activity className="h-6 w-6 text-[#159A9C]" />
                     </div>
                   </div>
                 </div>
@@ -398,7 +398,7 @@ const DashboardAnalyticsPage: React.FC = () => {
               {metrics.tendencia.tickets.length > 0 && (
                 <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
                   <h2 className="text-xl font-bold text-[#002333] mb-4 flex items-center">
-                    <TrendingUp className="h-5 w-5 mr-2 text-[#9333EA]" />
+                    <TrendingUp className="h-5 w-5 mr-2 text-[#159A9C]" />
                     Tendência de Tickets - {getLabelPeriodo(periodo)}
                   </h2>
                   <div className="h-64 flex items-end justify-between gap-2">
@@ -409,7 +409,7 @@ const DashboardAnalyticsPage: React.FC = () => {
                       return (
                         <div key={index} className="flex-1 flex flex-col items-center">
                           <div
-                            className="w-full bg-[#9333EA] rounded-t transition-all hover:bg-[#7928CA]"
+                            className="w-full bg-[#159A9C] rounded-t transition-all hover:bg-[#0F7B7D]"
                             style={{ height: `${altura}%`, minHeight: '4px' }}
                           ></div>
                           <div className="text-xs text-[#002333]/60 mt-2 text-center">
@@ -434,7 +434,7 @@ const DashboardAnalyticsPage: React.FC = () => {
           {atendentes.length > 0 && (
             <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
               <h2 className="text-xl font-bold text-[#002333] mb-4 flex items-center">
-                <Users className="h-5 w-5 mr-2 text-[#9333EA]" />
+                <Users className="h-5 w-5 mr-2 text-[#159A9C]" />
                 Desempenho de Atendentes
               </h2>
               <div className="overflow-x-auto">
@@ -498,7 +498,7 @@ const DashboardAnalyticsPage: React.FC = () => {
           {canais.length > 0 && (
             <div className="bg-white rounded-lg shadow-sm border p-6">
               <h2 className="text-xl font-bold text-[#002333] mb-4 flex items-center">
-                <MessageSquare className="h-5 w-5 mr-2 text-[#9333EA]" />
+                <MessageSquare className="h-5 w-5 mr-2 text-[#159A9C]" />
                 Estatísticas por Canal
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -520,7 +520,7 @@ const DashboardAnalyticsPage: React.FC = () => {
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-[#002333]/60">Abertos:</span>
-                        <span className="text-[#9333EA] font-semibold">
+                        <span className="text-[#159A9C] font-semibold">
                           {formatarNumero(canal.ticketsAbertos)}
                         </span>
                       </div>
@@ -560,8 +560,8 @@ const DashboardAnalyticsPage: React.FC = () => {
                 <p className="text-[#002333]/60 mb-6">
                   Rankings, comparativos e análise avançada de desempenho individual e por equipe.
                 </p>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-sm text-blue-800">
+                <div className="bg-[#159A9C]/5 border border-[#159A9C]/20 rounded-lg p-4">
+                  <p className="text-sm text-[#002333]">
                     🚧 <strong>Planejado</strong> - Esta aba será implementada em versões futuras com análises
                     comparativas.
                   </p>

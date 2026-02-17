@@ -1,7 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
 import { MercadoPagoConfig, Customer, Preference, Payment } from 'mercadopago';
 import * as crypto from 'crypto';
+import { Repository } from 'typeorm';
+import { AssinaturaEmpresa } from '../planos/entities/assinatura-empresa.entity';
+import { runWithTenant } from '../../common/tenant/tenant-context';
 
 @Injectable()
 export class MercadoPagoService {
@@ -11,8 +15,29 @@ export class MercadoPagoService {
   private preferenceApi: Preference;
   private paymentApi: Payment;
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    @InjectRepository(AssinaturaEmpresa)
+    private readonly assinaturaRepository: Repository<AssinaturaEmpresa>,
+  ) {
     this.initializeMercadoPago();
+  }
+
+  private parseExternalReference(externalReference?: string):
+    | { empresaId: string; assinaturaId: string }
+    | null {
+    if (!externalReference || typeof externalReference !== 'string') {
+      return null;
+    }
+
+    const match =
+      /^conectcrm:empresa:([0-9a-f-]{36}):assinatura:([0-9a-f-]{36})$/i.exec(externalReference);
+
+    if (!match) {
+      return null;
+    }
+
+    return { empresaId: match[1], assinaturaId: match[2] };
   }
 
   private initializeMercadoPago() {
@@ -40,6 +65,44 @@ export class MercadoPagoService {
     } catch (error) {
       this.logger.error('Erro ao inicializar Mercado Pago:', error);
     }
+  }
+
+  private isMockMode(): boolean {
+    const raw = this.configService.get<string>('MERCADO_PAGO_MOCK');
+    return raw === 'true' || raw === '1';
+  }
+
+  private buildMockPreference() {
+    const id = `mock_pref_${crypto.randomBytes(8).toString('hex')}`;
+    const initPoint = `https://mercadopago.mock/checkout/${id}`;
+
+    return {
+      id,
+      init_point: initPoint,
+      sandbox_init_point: initPoint,
+    };
+  }
+
+  private buildMockPayment(paymentId: string) {
+    const prefix = 'mock:';
+    if (typeof paymentId !== 'string' || !paymentId.startsWith(prefix)) {
+      return null;
+    }
+
+    const encodedExternalReference = paymentId.slice(prefix.length);
+
+    let externalReference: string;
+    try {
+      externalReference = decodeURIComponent(encodedExternalReference);
+    } catch {
+      externalReference = encodedExternalReference;
+    }
+
+    return {
+      id: paymentId,
+      status: 'approved',
+      external_reference: externalReference,
+    };
   }
 
   async createCustomer(customerData: any) {
@@ -79,6 +142,19 @@ export class MercadoPagoService {
 
   async createPreference(preferenceData: any) {
     try {
+      if (!this.preferenceApi) {
+        if (this.isMockMode()) {
+          this.logger.warn(
+            'Mercado Pago em modo MOCK: criando preferência fake (sem chamada externa)',
+          );
+          return this.buildMockPreference();
+        }
+
+        throw new Error(
+          'Mercado Pago não inicializado. Configure MERCADO_PAGO_ACCESS_TOKEN ou habilite MERCADO_PAGO_MOCK=true para desenvolvimento.',
+        );
+      }
+
       const preference = await this.preferenceApi.create({
         body: {
           items: preferenceData.items,
@@ -183,6 +259,27 @@ export class MercadoPagoService {
 
   async getPayment(paymentId: string) {
     try {
+      if (!this.paymentApi) {
+        if (this.isMockMode()) {
+          const mockPayment = this.buildMockPayment(paymentId);
+
+          if (!mockPayment) {
+            throw new Error(
+              'Mercado Pago em modo MOCK: para simular webhook use data.id no formato mock:<external_reference_urlencoded>.',
+            );
+          }
+
+          this.logger.warn(
+            `Mercado Pago em modo MOCK: retornando pagamento aprovado para id=${paymentId}`,
+          );
+          return mockPayment;
+        }
+
+        throw new Error(
+          'Mercado Pago não inicializado. Configure MERCADO_PAGO_ACCESS_TOKEN.',
+        );
+      }
+
       const payment = await this.paymentApi.get({ id: paymentId });
       return payment;
     } catch (error) {
@@ -329,28 +426,97 @@ export class MercadoPagoService {
   private async handleApprovedPayment(payment: any) {
     this.logger.log(`Pagamento aprovado: ${payment.id}`);
 
-    // Implementar lógica para pagamento aprovado
-    // - Atualizar status da fatura
-    // - Enviar email de confirmação
-    // - Ativar serviços
-    // - Registrar no sistema de faturamento
+    const resolved = this.parseExternalReference(payment?.external_reference);
+    if (!resolved) {
+      this.logger.warn(
+        `Pagamento ${payment.id} aprovado sem external_reference reconhecida: ${payment?.external_reference}`,
+      );
+      return;
+    }
+
+    const { empresaId, assinaturaId } = resolved;
+
+    await runWithTenant(empresaId, async () => {
+      const assinatura = await this.assinaturaRepository.findOne({
+        where: { id: assinaturaId },
+        relations: ['plano'],
+      });
+
+      if (!assinatura) {
+        this.logger.warn(
+          `Assinatura ${assinaturaId} não encontrada para empresa ${empresaId} (RLS pode ter bloqueado)`,
+        );
+        return;
+      }
+
+      if (assinatura.status === 'ativa') {
+        this.logger.log(`Assinatura ${assinatura.id} já está ativa (idempotente)`);
+        return;
+      }
+
+      const hoje = new Date();
+      const proximoVencimento = new Date(hoje);
+      proximoVencimento.setMonth(proximoVencimento.getMonth() + 1);
+
+      assinatura.status = 'ativa';
+      assinatura.dataInicio = hoje;
+      assinatura.proximoVencimento = proximoVencimento;
+      assinatura.renovacaoAutomatica = true;
+
+      const linha = `Ativada via Mercado Pago payment ${payment.id} em ${new Date().toISOString()}`;
+      assinatura.observacoes = assinatura.observacoes
+        ? `${assinatura.observacoes}\n${linha}`
+        : linha;
+
+      await this.assinaturaRepository.save(assinatura);
+      this.logger.log(`✅ Assinatura ${assinatura.id} ativada com sucesso`);
+    });
   }
 
   private async handleRejectedPayment(payment: any) {
     this.logger.log(`Pagamento rejeitado: ${payment.id}`);
 
-    // Implementar lógica para pagamento rejeitado
-    // - Notificar cliente
-    // - Sugerir novos métodos de pagamento
-    // - Registrar tentativa de pagamento
+    const resolved = this.parseExternalReference(payment?.external_reference);
+    if (!resolved) {
+      return;
+    }
+
+    const { empresaId, assinaturaId } = resolved;
+    await runWithTenant(empresaId, async () => {
+      const assinatura = await this.assinaturaRepository.findOne({ where: { id: assinaturaId } });
+      if (!assinatura) {
+        return;
+      }
+
+      const linha = `Pagamento rejeitado (MP ${payment.id}) em ${new Date().toISOString()}`;
+      assinatura.observacoes = assinatura.observacoes
+        ? `${assinatura.observacoes}\n${linha}`
+        : linha;
+      await this.assinaturaRepository.save(assinatura);
+    });
   }
 
   private async handlePendingPayment(payment: any) {
     this.logger.log(`Pagamento pendente: ${payment.id}`);
 
-    // Implementar lógica para pagamento pendente
-    // - Aguardar confirmação
-    // - Enviar instruções de pagamento (PIX, boleto)
+    const resolved = this.parseExternalReference(payment?.external_reference);
+    if (!resolved) {
+      return;
+    }
+
+    const { empresaId, assinaturaId } = resolved;
+    await runWithTenant(empresaId, async () => {
+      const assinatura = await this.assinaturaRepository.findOne({ where: { id: assinaturaId } });
+      if (!assinatura) {
+        return;
+      }
+
+      const linha = `Pagamento pendente (MP ${payment.id}) em ${new Date().toISOString()}`;
+      assinatura.observacoes = assinatura.observacoes
+        ? `${assinatura.observacoes}\n${linha}`
+        : linha;
+      await this.assinaturaRepository.save(assinatura);
+    });
   }
 
   private async handleProcessingPayment(payment: any) {
@@ -363,18 +529,63 @@ export class MercadoPagoService {
   private async handleCancelledPayment(payment: any) {
     this.logger.log(`Pagamento cancelado: ${payment.id}`);
 
-    // Implementar lógica para pagamento cancelado
-    // - Liberar reserva de produtos/serviços
-    // - Notificar cliente
+    const resolved = this.parseExternalReference(payment?.external_reference);
+    if (!resolved) {
+      return;
+    }
+
+    const { empresaId, assinaturaId } = resolved;
+    await runWithTenant(empresaId, async () => {
+      const assinatura = await this.assinaturaRepository.findOne({ where: { id: assinaturaId } });
+      if (!assinatura) {
+        return;
+      }
+
+      const linha = `Pagamento cancelado (MP ${payment.id}) em ${new Date().toISOString()}`;
+      assinatura.observacoes = assinatura.observacoes
+        ? `${assinatura.observacoes}\n${linha}`
+        : linha;
+      await this.assinaturaRepository.save(assinatura);
+    });
   }
 
   private async handleRefundedPayment(payment: any) {
     this.logger.log(`Pagamento estornado: ${payment.id}`);
 
-    // Implementar lógica para pagamento estornado
-    // - Desativar serviços
-    // - Processar reembolso
-    // - Notificar cliente
+    const resolved = this.parseExternalReference(payment?.external_reference);
+    if (!resolved) {
+      return;
+    }
+
+    const { empresaId, assinaturaId } = resolved;
+    await runWithTenant(empresaId, async () => {
+      const assinatura = await this.assinaturaRepository.findOne({
+        where: { id: assinaturaId },
+        relations: ['plano'],
+      });
+
+      if (!assinatura) {
+        return;
+      }
+
+      if (assinatura.status !== 'ativa') {
+        const linha = `Estorno recebido (MP ${payment.id}) com assinatura não-ativa em ${new Date().toISOString()}`;
+        assinatura.observacoes = assinatura.observacoes
+          ? `${assinatura.observacoes}\n${linha}`
+          : linha;
+        await this.assinaturaRepository.save(assinatura);
+        return;
+      }
+
+      assinatura.status = 'suspensa';
+      const linha = `Assinatura suspensa por estorno (MP ${payment.id}) em ${new Date().toISOString()}`;
+      assinatura.observacoes = assinatura.observacoes
+        ? `${assinatura.observacoes}\n${linha}`
+        : linha;
+
+      await this.assinaturaRepository.save(assinatura);
+      this.logger.log(`⚠️ Assinatura ${assinatura.id} suspensa por estorno`);
+    });
   }
 
   private async handlePlanWebhook(planId: string, action: string) {

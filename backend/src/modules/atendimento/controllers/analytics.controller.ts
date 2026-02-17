@@ -6,31 +6,32 @@ import {
   HttpStatus,
   HttpException,
   UseGuards,
-  Request,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { EmpresaId } from '../../../common/decorators/empresa.decorator';
 import { AnalyticsService } from '../services/analytics.service';
 
 /**
  * Controller REST para Analytics e Dashboard de Atendimento
  * Fornece métricas agregadas, estatísticas e dados para visualização
  * 🔐 SEGURANÇA: Todos os endpoints protegidos com JWT - empresa_id extraído do token
- * 
+ *
  * @author ConectCRM
  * @date 2025-11-18
  */
 @Controller('api/atendimento/analytics')
-@UseGuards(AuthGuard('jwt')) // 🔐 Proteção global - requer autenticação JWT
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class AnalyticsController {
   private readonly logger = new Logger(AnalyticsController.name);
 
-  constructor(private readonly analyticsService: AnalyticsService) { }
+  constructor(private readonly analyticsService: AnalyticsService) {}
 
   /**
    * GET /api/atendimento/analytics/dashboard
    * Retorna métricas principais para o dashboard
    * 🔐 SEGURANÇA: empresa_id extraído do JWT
-   * 
+   *
    * Query params:
    * - periodo: '7d' | '30d' | '90d' | 'custom' (opcional, padrão: '7d')
    * - dataInicio: ISO date string (obrigatório se periodo=custom)
@@ -38,15 +39,16 @@ export class AnalyticsController {
    */
   @Get('dashboard')
   async getDashboardMetrics(
-    @Request() req,
+    @EmpresaId() empresaId: string,
     @Query('periodo') periodo: string = '7d',
     @Query('dataInicio') dataInicio?: string,
     @Query('dataFim') dataFim?: string,
   ) {
     // 🔐 SEGURANÇA: empresa_id vem do JWT
-    const empresaId = req.user.empresa_id;
 
-    this.logger.log(`📊 [GET /analytics/dashboard] empresaId=${empresaId} user=${req.user.email} periodo=${periodo}`);
+    this.logger.log(
+      `📊 [GET /analytics/dashboard] empresaId=${empresaId} periodo=${periodo}`,
+    );
 
     if (!empresaId) {
       throw new HttpException('Usuário não possui empresa associada', HttpStatus.FORBIDDEN);
@@ -82,22 +84,21 @@ export class AnalyticsController {
    * GET /api/atendimento/analytics/desempenho-atendentes
    * Retorna métricas de desempenho por atendente
    * 🔐 SEGURANÇA: empresa_id extraído do JWT
-   * 
+   *
    * Query params:
    * - periodo: '7d' | '30d' | '90d' (opcional, padrão: '30d')
    * - limite: number (opcional, padrão: 10)
    */
   @Get('desempenho-atendentes')
   async getDesempenhoAtendentes(
-    @Request() req,
+    @EmpresaId() empresaId: string,
     @Query('periodo') periodo: string = '30d',
     @Query('limite') limite?: string,
   ) {
     // 🔐 SEGURANÇA: empresa_id vem do JWT
-    const empresaId = req.user.empresa_id;
 
     this.logger.log(
-      `👥 [GET /analytics/desempenho-atendentes] empresaId=${empresaId} user=${req.user.email} periodo=${periodo}`,
+      `👥 [GET /analytics/desempenho-atendentes] empresaId=${empresaId} periodo=${periodo}`,
     );
 
     if (!empresaId) {
@@ -129,19 +130,17 @@ export class AnalyticsController {
    * GET /api/atendimento/analytics/canais
    * Retorna estatísticas agrupadas por canal
    * 🔐 SEGURANÇA: empresa_id extraído do JWT
-   * 
+   *
    * Query params:
    * - periodo: '7d' | '30d' | '90d' (opcional, padrão: '30d')
    */
   @Get('canais')
-  async getEstatisticasCanais(
-    @Request() req,
-    @Query('periodo') periodo: string = '30d',
-  ) {
+  async getEstatisticasCanais(@EmpresaId() empresaId: string, @Query('periodo') periodo: string = '30d') {
     // 🔐 SEGURANÇA: empresa_id vem do JWT
-    const empresaId = req.user.empresa_id;
 
-    this.logger.log(`📱 [GET /analytics/canais] empresaId=${empresaId} user=${req.user.email} periodo=${periodo}`);
+    this.logger.log(
+      `📱 [GET /analytics/canais] empresaId=${empresaId} periodo=${periodo}`,
+    );
 
     if (!empresaId) {
       throw new HttpException('Usuário não possui empresa associada', HttpStatus.FORBIDDEN);
@@ -168,7 +167,7 @@ export class AnalyticsController {
    * GET /api/atendimento/analytics/tendencias
    * Retorna dados de tendências ao longo do tempo para gráficos
    * 🔐 SEGURANÇA: empresa_id extraído do JWT
-   * 
+   *
    * Query params:
    * - metrica: 'tickets' | 'tempo_resposta' | 'satisfacao' | 'sla' (obrigatório)
    * - periodo: '7d' | '30d' | '90d' (opcional, padrão: '30d')
@@ -176,16 +175,15 @@ export class AnalyticsController {
    */
   @Get('tendencias')
   async getTendencias(
-    @Request() req,
+    @EmpresaId() empresaId: string,
     @Query('metrica') metrica: string,
     @Query('periodo') periodo: string = '30d',
     @Query('granularidade') granularidade: string = 'dia',
   ) {
     // 🔐 SEGURANÇA: empresa_id vem do JWT
-    const empresaId = req.user.empresa_id;
 
     this.logger.log(
-      `📈 [GET /analytics/tendencias] empresaId=${empresaId} user=${req.user.email} metrica=${metrica} periodo=${periodo}`,
+      `📈 [GET /analytics/tendencias] empresaId=${empresaId} metrica=${metrica} periodo=${periodo}`,
     );
 
     if (!empresaId) {
@@ -216,10 +214,8 @@ export class AnalyticsController {
       return tendencias;
     } catch (error) {
       this.logger.error(`❌ Erro ao buscar tendências: ${error.message}`, error.stack);
-      throw new HttpException(
-        'Erro ao buscar tendências',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      throw new HttpException('Erro ao buscar tendências', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 }
+

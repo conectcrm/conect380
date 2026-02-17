@@ -88,7 +88,7 @@ export const HeaderLimpo: React.FC<HeaderLimpoProps> = ({
               <input
                 type="text"
                 placeholder="Buscar clientes, produtos, contratos..."
-                className="w-full pl-10 pr-4 py-2 bg-gray-50/80 border border-gray-200/50 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 focus:bg-white transition-all text-sm placeholder-gray-500"
+                className="w-full pl-10 pr-4 py-2 bg-gray-50/80 border border-gray-200/50 rounded-lg focus:ring-2 focus:ring-[#159A9C]/20 focus:border-[#159A9C]/50 focus:bg-white transition-all text-sm placeholder-gray-500"
                 onFocus={() => setShowSearch(true)}
                 onBlur={() => setTimeout(() => setShowSearch(false), 200)}
               />
@@ -136,7 +136,7 @@ export const HeaderLimpo: React.FC<HeaderLimpoProps> = ({
               className="p-2 rounded-lg hover:bg-gray-100/80 transition-colors group"
               title="Ajuda e suporte"
             >
-              <MessageCircle className="w-4 h-4 text-gray-600 group-hover:text-blue-500 transition-colors" />
+              <MessageCircle className="w-4 h-4 text-gray-600 group-hover:text-[#159A9C] transition-colors" />
             </button>
 
             {/* Notificações */}
@@ -146,7 +146,7 @@ export const HeaderLimpo: React.FC<HeaderLimpoProps> = ({
                 className="relative p-2 rounded-lg hover:bg-gray-100/80 transition-colors group"
                 title="Notificações"
               >
-                <Bell className="w-4 h-4 text-gray-600 group-hover:text-blue-500 transition-colors" />
+                <Bell className="w-4 h-4 text-gray-600 group-hover:text-[#159A9C] transition-colors" />
                 {unreadCount > 0 && (
                   <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
                     {unreadCount > 9 ? '9+' : unreadCount}
@@ -172,7 +172,7 @@ export const HeaderLimpo: React.FC<HeaderLimpoProps> = ({
                     {notifications.map((notification) => (
                       <div
                         key={notification.id}
-                        className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors ${notification.unread ? 'bg-blue-50/50' : ''
+                        className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors ${notification.unread ? 'bg-[#159A9C]/5' : ''
                           }`}
                       >
                         <div className="flex items-start justify-between">
@@ -187,7 +187,7 @@ export const HeaderLimpo: React.FC<HeaderLimpoProps> = ({
                             <p className="text-xs text-gray-500 mt-2">{notification.time}</p>
                           </div>
                           {notification.unread && (
-                            <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                            <div className="w-2 h-2 bg-[#159A9C] rounded-full mt-2 flex-shrink-0"></div>
                           )}
                         </div>
                       </div>
@@ -195,7 +195,7 @@ export const HeaderLimpo: React.FC<HeaderLimpoProps> = ({
                   </div>
 
                   <div className="p-3 border-t border-gray-100 bg-gray-50/50">
-                    <button className="w-full text-sm text-blue-600 hover:text-blue-700 font-medium">
+                    <button className="w-full text-sm text-[#159A9C] hover:text-[#0F7B7D] font-medium">
                       Ver todas as notificações
                     </button>
                   </div>
@@ -221,7 +221,7 @@ export const HeaderLimpo: React.FC<HeaderLimpoProps> = ({
                 className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100/80 transition-colors max-w-xs"
               >
                 {/* Avatar */}
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+                <div className="w-8 h-8 bg-[#159A9C] rounded-full flex items-center justify-center flex-shrink-0">
                   <span className="text-white font-medium text-sm">
                     {userInfo.name
                       .split(' ')
@@ -246,7 +246,7 @@ export const HeaderLimpo: React.FC<HeaderLimpoProps> = ({
                   {/* Cabeçalho do usuário */}
                   <div className="p-4 border-b border-gray-100">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                      <div className="w-10 h-10 bg-[#159A9C] rounded-full flex items-center justify-center">
                         <span className="text-white font-medium">
                           {userInfo.name
                             .split(' ')

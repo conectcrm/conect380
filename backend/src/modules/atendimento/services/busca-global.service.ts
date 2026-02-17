@@ -25,7 +25,7 @@ export class BuscaGlobalService {
   /**
    * Realizar busca global em múltiplas entidades
    */
-  async buscar(dto: BuscaGlobalRequestDto): Promise<BuscaGlobalResponseDto> {
+  async buscar(dto: BuscaGlobalRequestDto, empresaId: string): Promise<BuscaGlobalResponseDto> {
     const startTime = Date.now();
     this.logger.log(`🔍 Iniciando busca global: "${dto.query}"`);
 
@@ -37,11 +37,11 @@ export class BuscaGlobalService {
       const promises: Promise<ResultadoBuscaDto[]>[] = [];
 
       if (tipos.includes(TipoRecursoBusca.CLIENTE)) {
-        promises.push(this.buscarClientes(dto.query, dto.empresaId));
+        promises.push(this.buscarClientes(dto.query, empresaId));
       }
 
       if (tipos.includes(TipoRecursoBusca.TICKET)) {
-        promises.push(this.buscarTickets(dto.query, dto.empresaId));
+        promises.push(this.buscarTickets(dto.query, empresaId));
       }
 
       // TODO: Adicionar busca em PROPOSTAS quando integrar módulo

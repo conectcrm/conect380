@@ -82,13 +82,6 @@ export class Lead {
   @JoinColumn({ name: 'responsavel_id' })
   responsavel: User;
 
-  @Column('uuid')
-  empresa_id: string;
-
-  @ManyToOne(() => Empresa)
-  @JoinColumn({ name: 'empresa_id' })
-  empresa: Empresa;
-
   // Conversão
   @Column({ nullable: true })
   oportunidade_id: string;

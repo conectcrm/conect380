@@ -137,31 +137,31 @@ const FinanceiroDashboard: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="p-6">
         {/* Header Financeiro - Design Suave */}
-        <div className="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-lg shadow-sm p-6 mb-6">
+        <div className="bg-white border border-[#DEEFE7] rounded-lg shadow-sm p-6 mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-3xl font-bold flex items-center text-emerald-900">
-                <DollarSign className="h-8 w-8 mr-3 text-emerald-600" />
+              <h1 className="text-3xl font-bold flex items-center text-[#002333]">
+                <DollarSign className="h-8 w-8 mr-3 text-[#159A9C]" />
                 Dashboard Financeiro
               </h1>
-              <p className="mt-2 text-emerald-700">
+              <p className="mt-2 text-[#002333]/70">
                 Controle de fluxo de caixa e gestão financeira
               </p>
             </div>
             <div className="mt-4 sm:mt-0 flex items-center space-x-4">
               <div className="text-center">
-                <div className="text-2xl font-bold text-emerald-900">
+                <div className="text-2xl font-bold text-[#002333]">
                   {formatCurrency(financeiroData.fluxoCaixa.saldoAtual)}
                 </div>
-                <div className="text-sm text-emerald-600">Saldo Atual</div>
+                <div className="text-sm text-[#002333]/70">Saldo Atual</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-emerald-900">
+                <div className="text-2xl font-bold text-[#002333]">
                   {financeiroData.metas.percentual}%
                 </div>
-                <div className="text-sm text-emerald-600">Meta Mensal</div>
+                <div className="text-sm text-[#002333]/70">Meta Mensal</div>
               </div>
-              <button className="px-4 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg transition-colors flex items-center space-x-2">
+              <button className="px-4 py-2 bg-white text-[#002333] border border-[#B4BEC9] rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm font-medium">
                 <RefreshCw className="w-4 h-4" />
                 <span>Atualizar</span>
               </button>
@@ -183,8 +183,8 @@ const FinanceiroDashboard: React.FC = () => {
                 </div>
                 <div className="text-sm text-gray-500">Saldo atual em caixa</div>
               </div>
-              <div className="p-3 bg-green-100 rounded-lg">
-                <PiggyBank className="h-8 w-8 text-green-600" />
+              <div className="p-3 bg-[#159A9C]/10 rounded-lg">
+                <PiggyBank className="h-8 w-8 text-[#159A9C]" />
               </div>
             </div>
             <div className="flex items-center text-sm text-green-600">
@@ -205,8 +205,8 @@ const FinanceiroDashboard: React.FC = () => {
                 </div>
                 <div className="text-sm text-gray-500">Total em aberto</div>
               </div>
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <CreditCard className="h-8 w-8 text-blue-600" />
+              <div className="p-3 bg-[#159A9C]/10 rounded-lg">
+                <CreditCard className="h-8 w-8 text-[#159A9C]" />
               </div>
             </div>
             <div className="flex items-center text-sm text-red-600">
@@ -227,8 +227,8 @@ const FinanceiroDashboard: React.FC = () => {
                 </div>
                 <div className="text-sm text-gray-500">Total em aberto</div>
               </div>
-              <div className="p-3 bg-orange-100 rounded-lg">
-                <FileText className="h-8 w-8 text-orange-600" />
+              <div className="p-3 bg-[#159A9C]/10 rounded-lg">
+                <FileText className="h-8 w-8 text-[#159A9C]" />
               </div>
             </div>
             <div className="flex items-center text-sm text-orange-600">
@@ -252,13 +252,13 @@ const FinanceiroDashboard: React.FC = () => {
                   {formatCurrency(financeiroData.metas.receitaMensal)}
                 </div>
               </div>
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <Target className="h-8 w-8 text-purple-600" />
+              <div className="p-3 bg-[#159A9C]/10 rounded-lg">
+                <Target className="h-8 w-8 text-[#159A9C]" />
               </div>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+            <div className="w-full bg-[#DEEFE7] rounded-full h-2 mt-2">
               <div
-                className="bg-purple-500 h-2 rounded-full transition-all"
+                className="bg-[#159A9C] h-2 rounded-full transition-all"
                 style={{ width: `${financeiroData.metas.percentual}%` }}
               />
             </div>
@@ -271,7 +271,7 @@ const FinanceiroDashboard: React.FC = () => {
           <div className="lg:col-span-2 bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Contas Críticas</h3>
-              <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+              <button className="text-[#159A9C] hover:text-[#0F7B7D] text-sm font-medium transition-colors">
                 Ver todas
               </button>
             </div>
@@ -399,14 +399,14 @@ const FinanceiroDashboard: React.FC = () => {
               <div className="text-sm text-gray-600">Saídas do Mês</div>
               <div className="text-xs text-red-600 mt-1">+3% vs anterior</div>
             </div>
-            <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">
+            <div className="text-center p-4 bg-[#159A9C]/5 rounded-lg">
+              <div className="text-2xl font-bold text-[#159A9C]">
                 {formatCurrency(
                   financeiroData.fluxoCaixa.entradas - financeiroData.fluxoCaixa.saidas,
                 )}
               </div>
               <div className="text-sm text-gray-600">Resultado Líquido</div>
-              <div className="text-xs text-blue-600 mt-1">
+              <div className="text-xs text-[#159A9C] mt-1">
                 +
                 {(
                   ((financeiroData.fluxoCaixa.entradas - financeiroData.fluxoCaixa.saidas) /

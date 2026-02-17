@@ -12,55 +12,122 @@ export class AlterContratoPropostaIdToUuid1733500000000 implements MigrationInte
   name = 'AlterContratoPropostaIdToUuid1733500000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    const contratosTable = 'contratos';
+    const propostasTable = 'propostas';
+
+    const hasContratos = await queryRunner.hasTable(contratosTable);
+    if (!hasContratos) {
+      console.log(`⚠️  Migration: tabela "${contratosTable}" não existe - pulando`);
+      return;
+    }
+
+    const hasPropostaIdCamel = await queryRunner.hasColumn(contratosTable, 'propostaId');
+    const hasPropostaIdSnake = await queryRunner.hasColumn(contratosTable, 'proposta_id');
+    const columnName = hasPropostaIdCamel ? 'propostaId' : hasPropostaIdSnake ? 'proposta_id' : null;
+    if (!columnName) {
+      console.log(`⚠️  Migration: coluna propostaId/proposta_id não existe em "${contratosTable}" - pulando`);
+      return;
+    }
+
     // Verifica se a coluna já é uuid (idempotência básica)
     const col = await queryRunner.query(
-      `SELECT data_type FROM information_schema.columns WHERE table_name = 'contratos' AND column_name = 'propostaId'`,
+      `SELECT data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'contratos' AND column_name = $1`,
+      [columnName],
     );
     if (col?.[0]?.data_type === 'uuid') {
       return; // já aplicado
     }
 
-    await queryRunner.query(
-      `ALTER TABLE "contratos" RENAME COLUMN "propostaId" TO "propostaId_old"`,
-    );
-    await queryRunner.query(`ALTER TABLE "contratos" ADD COLUMN "propostaId" uuid`);
+    const oldColumnName = `${columnName}_old`;
+    const hasOldColumn = await queryRunner.hasColumn(contratosTable, oldColumnName);
+    if (!hasOldColumn) {
+      await queryRunner.query(
+        `ALTER TABLE "${contratosTable}" RENAME COLUMN "${columnName}" TO "${oldColumnName}"`,
+      );
+    }
 
-    // Tentar mapear valores: se havia correspondência numérica com propostas.numero (ou outra lógica), ajustar aqui.
-    // Como não há garantia, apenas tentamos converter integer->text->uuid se por acaso já eram armazenados como formato uuid textual numérico (improvável). Mantém nulo caso contrário.
-    // Se existirem contratos cujo propostaId_old corresponde ao campo numero único de propostas, podemos tentar mapear:
-    await queryRunner.query(
-      `UPDATE "contratos" c SET "propostaId" = p.id FROM "propostas" p WHERE CAST(c."propostaId_old" AS text) = p.numero`,
-    );
+    const hasNewColumn = await queryRunner.hasColumn(contratosTable, columnName);
+    if (!hasNewColumn) {
+      await queryRunner.query(`ALTER TABLE "${contratosTable}" ADD COLUMN "${columnName}" uuid`);
+    }
 
-    // Criar constraint FK (deixa ON DELETE SET NULL para segurança)
-    await queryRunner.query(
-      `ALTER TABLE "contratos" ADD CONSTRAINT "FK_contratos_proposta" FOREIGN KEY ("propostaId") REFERENCES "propostas"("id") ON DELETE SET NULL ON UPDATE CASCADE`,
-    );
+    // Mapear valores somente se propostas existir e tiver os campos esperados
+    const hasPropostas = await queryRunner.hasTable(propostasTable);
+    if (hasPropostas) {
+      const hasPropostasNumero = await queryRunner.hasColumn(propostasTable, 'numero');
+      const hasPropostasId = await queryRunner.hasColumn(propostasTable, 'id');
+      const hasOldForUpdate = await queryRunner.hasColumn(contratosTable, oldColumnName);
+      if (hasPropostasNumero && hasPropostasId && hasOldForUpdate) {
+        await queryRunner.query(
+          `UPDATE "${contratosTable}" c SET "${columnName}" = p.id FROM "${propostasTable}" p WHERE CAST(c."${oldColumnName}" AS text) = p.numero`,
+        );
+      }
 
-    await queryRunner.query(`ALTER TABLE "contratos" DROP COLUMN "propostaId_old"`);
+      // Criar constraint FK (deixa ON DELETE SET NULL para segurança)
+      await queryRunner.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint WHERE conname = 'FK_contratos_proposta'
+          ) THEN
+            EXECUTE 'ALTER TABLE "${contratosTable}" ADD CONSTRAINT "FK_contratos_proposta" FOREIGN KEY ("${columnName}") REFERENCES "${propostasTable}"("id") ON DELETE SET NULL ON UPDATE CASCADE';
+          END IF;
+        END $$;
+      `);
+    }
+
+    const hasOldForDrop = await queryRunner.hasColumn(contratosTable, oldColumnName);
+    if (hasOldForDrop) {
+      await queryRunner.query(`ALTER TABLE "${contratosTable}" DROP COLUMN "${oldColumnName}"`);
+    }
+
+    return;
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    const contratosTable = 'contratos';
+    const propostasTable = 'propostas';
+
+    const hasContratos = await queryRunner.hasTable(contratosTable);
+    if (!hasContratos) {
+      return;
+    }
+
+    const hasPropostaIdCamel = await queryRunner.hasColumn(contratosTable, 'propostaId');
+    const hasPropostaIdSnake = await queryRunner.hasColumn(contratosTable, 'proposta_id');
+    const columnName = hasPropostaIdCamel ? 'propostaId' : hasPropostaIdSnake ? 'proposta_id' : null;
+    if (!columnName) {
+      return;
+    }
+
     const col = await queryRunner.query(
-      `SELECT data_type FROM information_schema.columns WHERE table_name = 'contratos' AND column_name = 'propostaId'`,
+      `SELECT data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'contratos' AND column_name = $1`,
+      [columnName],
     );
     if (col?.[0]?.data_type !== 'uuid') {
       return; // nada a reverter
     }
 
-    await queryRunner.query(
-      `ALTER TABLE "contratos" DROP CONSTRAINT IF EXISTS "FK_contratos_proposta"`,
-    );
-    await queryRunner.query(`ALTER TABLE "contratos" ADD COLUMN "propostaId_old" integer`);
+    await queryRunner.query(`ALTER TABLE "${contratosTable}" DROP CONSTRAINT IF EXISTS "FK_contratos_proposta"`);
 
-    // Tentativa de reverter: se numero da proposta é puramente numérico e cabe, usar isso. Caso contrário ficará nulo
-    await queryRunner.query(
-      `UPDATE "contratos" c SET "propostaId_old" = CAST(p.numero AS integer) FROM "propostas" p WHERE c."propostaId" = p.id AND p.numero ~ '^\\d+$'`,
-    );
+    const oldColumnName = `${columnName}_old`;
+    const hasOldColumn = await queryRunner.hasColumn(contratosTable, oldColumnName);
+    if (!hasOldColumn) {
+      await queryRunner.query(`ALTER TABLE "${contratosTable}" ADD COLUMN "${oldColumnName}" integer`);
+    }
 
-    await queryRunner.query(`ALTER TABLE "contratos" DROP COLUMN "propostaId"`);
-    await queryRunner.query(
-      `ALTER TABLE "contratos" RENAME COLUMN "propostaId_old" TO "propostaId"`,
-    );
+    const hasPropostas = await queryRunner.hasTable(propostasTable);
+    if (hasPropostas) {
+      const hasPropostasNumero = await queryRunner.hasColumn(propostasTable, 'numero');
+      const hasPropostasId = await queryRunner.hasColumn(propostasTable, 'id');
+      if (hasPropostasNumero && hasPropostasId) {
+        await queryRunner.query(
+          `UPDATE "${contratosTable}" c SET "${oldColumnName}" = CAST(p.numero AS integer) FROM "${propostasTable}" p WHERE c."${columnName}" = p.id AND p.numero ~ '^\\d+$'`,
+        );
+      }
+    }
+
+    await queryRunner.query(`ALTER TABLE "${contratosTable}" DROP COLUMN "${columnName}"`);
+    await queryRunner.query(`ALTER TABLE "${contratosTable}" RENAME COLUMN "${oldColumnName}" TO "${columnName}"`);
   }
 }

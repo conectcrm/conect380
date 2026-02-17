@@ -713,23 +713,24 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const handleSelecionarTemplate = async (template: MessageTemplate) => {
     try {
       const empresaId = user?.empresa?.id || 'empresa-default';
+      const ticketAny = ticket as any;
 
       // Preparar dados para substituição de variáveis
       const dados = {
-        nome: ticket.nomeCliente || ticket.contato?.nome || 'Cliente',
+        nome: ticketAny.nomeCliente || ticket.contato?.nome || 'Cliente',
         email: ticket.contato?.email || '',
-        telefone: ticket.telefone || ticket.contato?.telefone || '',
+        telefone: ticketAny.telefone || ticket.contato?.telefone || '',
         ticket: ticket.numero || '',
-        atendente: ticket.atendente || 'Atendente',
+        atendente: ticketAny.atendente?.nome || ticketAny.atendente || 'Atendente',
         empresa: 'ConectCRM',
         data: new Date().toLocaleDateString('pt-BR'),
         hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
         protocolo: ticket.numero || '',
-        assunto: ticket.assunto || '',
-        prioridade: ticket.prioridade || 'Normal',
+        assunto: ticketAny.assunto || '',
+        prioridade: ticketAny.prioridade || 'Normal',
         status: ticket.status || '',
-        fila: ticket.fila || '',
-        departamento: ticket.departamento || '',
+        fila: ticketAny.fila || '',
+        departamento: ticketAny.departamento || '',
       };
 
       // Processar template (substituir variáveis)
@@ -1090,15 +1091,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   />
                 </div>
                 {/* Sprint 2: Badge de tipo do ticket */}
-                {ticket.tipo && (
-                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${ticket.tipo === 'comercial' ? 'bg-green-100 text-green-700' :
-                      ticket.tipo === 'tecnica' ? 'bg-blue-100 text-blue-700' :
-                        ticket.tipo === 'suporte' ? 'bg-purple-100 text-purple-700' :
-                          ticket.tipo === 'financeira' ? 'bg-yellow-100 text-yellow-700' :
-                            ticket.tipo === 'reclamacao' ? 'bg-red-100 text-red-700' :
+                {(ticket as any).tipo && (
+                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${(ticket as any).tipo === 'comercial' ? 'bg-green-100 text-green-700' :
+                      (ticket as any).tipo === 'tecnica' ? 'bg-blue-100 text-blue-700' :
+                        (ticket as any).tipo === 'suporte' ? 'bg-purple-100 text-purple-700' :
+                          (ticket as any).tipo === 'financeira' ? 'bg-yellow-100 text-yellow-700' :
+                            (ticket as any).tipo === 'reclamacao' ? 'bg-red-100 text-red-700' :
                               'bg-gray-100 text-gray-700'
                     }`}>
-                    {ticket.tipo.charAt(0).toUpperCase() + ticket.tipo.slice(1)}
+                    {(ticket as any).tipo.charAt(0).toUpperCase() + (ticket as any).tipo.slice(1)}
                   </span>
                 )}
               </div>
@@ -1107,11 +1108,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   {ticket.contato?.online ? 'Online' : 'Offline'}
                 </p>
                 {/* Sprint 2: Título do ticket (se preenchido) */}
-                {ticket.titulo && (
+                {(ticket as any).titulo && (
                   <>
                     <span className="text-gray-300">•</span>
-                    <p className="text-sm text-gray-600 font-medium max-w-md truncate" title={ticket.titulo}>
-                      {ticket.titulo}
+                    <p className="text-sm text-gray-600 font-medium max-w-md truncate" title={(ticket as any).titulo}>
+                      {(ticket as any).titulo}
                     </p>
                   </>
                 )}
@@ -1811,7 +1812,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       {/* ✅ SPRINT 2: Modal de Transferência de Tickets */}
       {mostrarTransferenciaModal && (
         <TransferenciaModal
-          ticket={ticket}
+          ticket={ticket as any}
           onClose={() => setMostrarTransferenciaModal(false)}
           onSuccess={(ticketAtualizado) => {
             setMostrarTransferenciaModal(false);

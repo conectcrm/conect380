@@ -1,6 +1,29 @@
 import { isAxiosError } from 'axios';
 import { api } from './api';
 
+const EMPRESA_EVENT_NAME = 'empresaAtivaChanged';
+const AUTH_TOKEN_EVENT_NAME = 'authTokenChanged';
+
+const dispatchEmpresaAtivaChanged = (empresaId?: string | null) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.dispatchEvent(
+    new CustomEvent(EMPRESA_EVENT_NAME, {
+      detail: { empresaId: empresaId || null },
+    }),
+  );
+};
+
+const dispatchAuthTokenChanged = () => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.dispatchEvent(new CustomEvent(AUTH_TOKEN_EVENT_NAME));
+};
+
 export interface EmpresaCoresConfig {
   primaria: string;
   secundaria: string;
@@ -274,12 +297,14 @@ class MinhasEmpresasService {
 
       // Atualizar token se fornecido
       if (response.data.token) {
-        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('authToken', response.data.token);
         api.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+        dispatchAuthTokenChanged();
       }
 
       // Salvar empresa ativa
       localStorage.setItem('empresaAtiva', empresaId);
+      dispatchEmpresaAtivaChanged(empresaId);
 
       return response.data;
     } catch (error) {

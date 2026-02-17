@@ -1,299 +1,179 @@
-# 🏗️ ConectCRM - Estrutura de Deploy Profissional
+# ConectCRM Production Workspace
 
-## 📖 Sobre Esta Pasta
+## Objetivo
+Este diretorio concentra o fluxo de build e execucao para ambiente de producao local (Docker), sem dependencia de AWS neste momento.
 
-Esta pasta contém **toda a infraestrutura de deploy profissional** do ConectCRM:
-- ✅ Dockerfiles otimizados
-- ✅ Scripts de build automatizados
-- ✅ Scripts de deploy AWS
-- ✅ Orquestração com Docker Compose
-- ✅ Configurações de produção
+## Escopo atual
+- Build backend + frontend + imagens Docker
+- Subida local com Docker Compose
+- Validacao basica de saude
+- Validacoes de isolamento multi-tenant
 
----
+## Requisitos
+- Node.js 20+
+- npm 10+
+- Docker 24+
+- Docker Compose 2+
+- PowerShell 7+
 
-## 🚀 Quick Start
+## Estrutura
+```text
+.production/
+  README.md
+  DEPLOY.md
+  docker-compose.yml
+  docker/
+    Dockerfile.backend
+    Dockerfile.frontend
+  configs/
+    nginx.conf
+  scripts/
+    build-all.ps1
+    test-rls.ps1
+    test-full-isolation.ps1
+```
 
-### 1️⃣ Build Completo Local
-
+## Quick start (local)
 ```powershell
 cd c:\Projetos\conectcrm\.production
 
-# Build backend + frontend + Docker images
+# 1) Build completo
 .\scripts\build-all.ps1
-```
 
-### 2️⃣ Testar Localmente
-
-```powershell
-# Copiar e configurar variáveis de ambiente
+# 2) Preparar variaveis locais
 cp .env.production .env.production.local
-# Editar .env.production.local com valores de teste
+# editar .env.production.local
 
-# Subir todos os serviços
-docker-compose up -d
+# 3) Subir stack
+docker compose up -d
 
-# Verificar
-docker-compose ps
+# 4) Verificar status
+docker compose ps
 ```
 
-**Acessar**:
-- Backend: http://localhost:3500
-- Frontend: http://localhost:3000
-- API Docs: http://localhost:3500/api-docs
+## Endpoints esperados
+- Backend: `http://localhost:3500`
+- Frontend: `http://localhost:3000`
+- Health: `http://localhost:3500/health`
+- API Docs: `http://localhost:3500/api-docs`
 
-### 3️⃣ Deploy na AWS
-
+## Validacoes recomendadas antes de producao
 ```powershell
-# Deploy automatizado
-.\scripts\deploy-aws.ps1 `
-  -KeyPath "c:\Projetos\conectcrm\conectcrm-key.pem" `
-  -ServerIP "56.124.63.239"
+# Executa checklist completo em um comando
+.\scripts\preflight-go-live.ps1
+
+# Opcional: sem E2E (mais rapido)
+.\scripts\preflight-go-live.ps1 -SkipE2E
 ```
 
----
-
-## 📁 Estrutura de Arquivos
-
-```
-.production/
-│
-├── 📄 README.md                    ← Este arquivo
-├── 📄 DEPLOY.md                    ← Guia completo de deploy
-├── 📄 docker-compose.yml           ← Orquestração (Postgres, Redis, Backend, Frontend, Nginx)
-├── 📄 .env.production              ← Template de variáveis (não commitar valores reais!)
-│
-├── docker/                         📦 Dockerfiles
-│   ├── Dockerfile.backend          ← Build otimizado NestJS (multi-stage)
-│   └── Dockerfile.frontend         ← Build otimizado React + Nginx
-│
-├── configs/                        ⚙️ Configurações
-│   └── nginx.conf                  ← Config nginx para React SPA
-│
-└── scripts/                        🛠️ Scripts Automatizados
-    ├── build-all.ps1               ← Build completo (backend + frontend + Docker)
-    └── deploy-aws.ps1              ← Deploy automatizado na AWS
-```
-
----
-
-## 📋 Pré-requisitos
-
-| Ferramenta | Versão | Verificar |
-|------------|--------|-----------|
-| Node.js | 20.x | `node --version` |
-| Docker | 24.x | `docker --version` |
-| Docker Compose | 2.x | `docker-compose --version` |
-| PowerShell | 7.x | `$PSVersionTable.PSVersion` |
-
----
-
-## 🎯 Por Que Esta Estrutura?
-
-### ❌ Problema Anterior
+## Modo MVP (go-live comercial)
+Para release do MVP comercial, habilitar escopo reduzido no frontend:
 ```powershell
-# Deploy manual (frágil e não reproduzível)
-scp arquivo.js → AWS
-docker cp → container
-docker restart
-# ⚠️ Mudanças são perdidas ao rebuild do container!
+$env:REACT_APP_MVP_MODE = "true"
 ```
 
-### ✅ Solução Profissional
+Checklist tecnico do MVP:
 ```powershell
-# Build + Deploy automatizado (reproduzível)
-.\scripts\build-all.ps1      # Build completo
-.\scripts\deploy-aws.ps1     # Deploy versionado
-# ✅ Mudanças permanentes, rollback facilitado, CI/CD pronto
+.\scripts\preflight-mvp-go-live.ps1
 ```
 
-**Vantagens**:
-1. ✅ **Reproduzível**: Mesmo resultado em qualquer ambiente
-2. ✅ **Versionado**: Imagens Docker taggeadas com timestamp
-3. ✅ **Rollback Fácil**: Voltar para imagem anterior em segundos
-4. ✅ **CI/CD Ready**: Pronto para GitHub Actions / GitLab CI
-5. ✅ **Testável**: Teste localmente antes de deploy
-6. ✅ **Documentado**: Guia completo em DEPLOY.md
-
----
-
-## 📚 Documentação
-
-- **[DEPLOY.md](./DEPLOY.md)** - Guia completo de deploy
-  - Pré-requisitos
-  - Deploy local
-  - Deploy AWS
-  - Troubleshooting
-  - Rollback
-  - Boas práticas
-
----
-
-## 🔐 Segurança
-
-### ⚠️ IMPORTANTE: Variáveis de Ambiente
-
-1. **NUNCA commite `.env.production.local`!**
-2. Template `.env.production` pode ser commitado (sem valores reais)
-3. Sempre use variáveis de ambiente para credenciais
-
+Smoke automatizado do MVP (fluxos core):
 ```powershell
-# ✅ CORRETO
-cp .env.production .env.production.local
-# Edite .env.production.local com valores reais
-# .gitignore já protege este arquivo
-
-# ❌ ERRADO
-# Colocar credenciais direto no .env.production
+.\scripts\smoke-mvp-core.ps1
 ```
 
----
-
-## 🎓 Como Funciona?
-
-### Fluxo de Deploy
-
-```mermaid
-graph LR
-    A[Código Fonte] --> B[build-all.ps1]
-    B --> C[npm install + build]
-    C --> D[Docker Build]
-    D --> E[Imagens Docker]
-    E --> F[deploy-aws.ps1]
-    F --> G[SCP para AWS]
-    G --> H[docker load]
-    H --> I[docker run]
-    I --> J[Produção AWS]
-```
-
-### Dockerfiles Multi-Stage
-
-**Backend** (`Dockerfile.backend`):
-```dockerfile
-Stage 1: Build
-  - npm ci (instalar deps)
-  - npm run build (compilar TypeScript)
-  - npm prune (remover devDependencies)
-
-Stage 2: Production
-  - Copiar apenas node_modules de produção
-  - Copiar dist/ compilado
-  - Usuário non-root (segurança)
-  - Health check configurado
-```
-
-**Frontend** (`Dockerfile.frontend`):
-```dockerfile
-Stage 1: Build
-  - npm ci (instalar deps)
-  - npm run build (build React)
-
-Stage 2: Nginx
-  - Copiar build/ para nginx
-  - Config nginx para SPA
-  - Health check configurado
-```
-
----
-
-## 🧪 Testes
-
-### Teste Local Rápido
-
+Smoke UI do MVP (login + rotas core):
 ```powershell
-# Build + Up
-.\scripts\build-all.ps1
-docker-compose up -d
-
-# Testes
-curl http://localhost:3500/health  # Backend
-curl http://localhost:3000         # Frontend
-
-# Logs
-docker-compose logs -f backend
-docker-compose logs -f frontend
-
-# Down
-docker-compose down
+.\scripts\smoke-mvp-ui.ps1
 ```
 
-### Teste AWS (Dry Run)
-
+Kickoff de sessao piloto (gera pasta com checklist/evidencias/status):
 ```powershell
-# Simular deploy sem executar
-.\scripts\deploy-aws.ps1 -DryRun
+.\scripts\start-mvp-pilot.ps1 -PilotName "piloto-comercial-lote-1" -SkipPreflight
 ```
 
----
-
-## 🔄 Atualizações Futuras
-
-### Roadmap
-
-- [ ] **CI/CD Automatizado** (GitHub Actions)
-  ```yaml
-  # .github/workflows/deploy.yml
-  on:
-    push:
-      branches: [main]
-  jobs:
-    build-and-deploy:
-      - Build Docker images
-      - Deploy na AWS automaticamente
-  ```
-
-- [ ] **Monitoramento** (Prometheus + Grafana)
-- [ ] **Backups Automatizados** (PostgreSQL + Redis)
-- [ ] **SSL/TLS** (Let's Encrypt)
-- [ ] **Load Balancer** (Nginx + múltiplos backends)
-
----
-
-## 💡 Dicas
-
-### Performance
-
+Sugestao automatica de clientes para a sessao (classifica `SUGERIDO`, `REVISAR_CONTATO` e `REVISAR_PERFIL`):
 ```powershell
-# Limpar cache Docker periodicamente
-docker builder prune -a -f
-
-# Verificar tamanho das imagens
-docker images | Select-String "conectcrm"
-
-# Otimizar node_modules (se imagem muito grande)
-# Use npm ci --production no Dockerfile
+.\scripts\recommend-mvp-pilot-clients.ps1 -RunDir ".production\pilot-runs\<sessao>"
 ```
 
-### Debug
-
+Finalizacao de contatos e janela do piloto (ajusta contato suspeito + agenda 48h):
 ```powershell
-# Entrar no container rodando
-docker exec -it conectcrm-backend-prod sh
-
-# Verificar variáveis de ambiente
-docker exec conectcrm-backend-prod env
-
-# Verificar arquivos
-docker exec conectcrm-backend-prod ls -la /app/dist
+.\scripts\finalize-mvp-pilot-clients.ps1 -RunDir ".production\pilot-runs\<sessao>" -WindowStart "2026-02-18 09:00" -WindowHours 48
 ```
 
----
+Revisao final de clientes em `REVISAR_PERFIL`:
+```powershell
+.\scripts\review-mvp-pilot-profiles.ps1 -RunDir ".production\pilot-runs\<sessao>" -Reviewer "time-comercial" -MinScore 1
+```
 
-## 📞 Suporte
+Plano de outreach comercial para os clientes do piloto:
+```powershell
+.\scripts\prepare-mvp-pilot-outreach.ps1 -RunDir ".production\pilot-runs\<sessao>" -Owner "time-comercial"
+```
 
-**Problemas?**
-1. Leia **[DEPLOY.md](./DEPLOY.md)** seção Troubleshooting
-2. Verifique logs: `docker-compose logs -f`
-3. Teste localmente antes de deploy AWS
+Registro rapido de evidencias do piloto:
+```powershell
+.\scripts\record-mvp-pilot-evidence.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -Cliente "Codexa LTDA" `
+  -Cenario "Criacao de lead" `
+  -Resultado PASS `
+  -Evidencia "screenshot://piloto/codexa-lead.png" `
+  -Responsavel "time-oncall"
+```
 
----
+Ciclo tecnico automatizado do piloto (health + logs + smoke + evidencias):
+```powershell
+.\scripts\run-mvp-pilot-cycle.ps1 -RunDir ".production\pilot-runs\<sessao>"
+```
 
-## 📝 Versionamento
+Relatorio de prontidao do piloto (blockers + decisao automatizada):
+```powershell
+.\scripts\assess-mvp-pilot-readiness.ps1 -RunDir ".production\pilot-runs\<sessao>" -BranchProtectionStatus Unknown
+```
 
-| Versão | Data | Mudanças |
-|--------|------|----------|
-| 1.0.0 | 2025-11-02 | Estrutura inicial de deploy profissional |
+Opcoes uteis:
+```powershell
+# Sem isolamento E2E (diagnostico rapido)
+.\scripts\preflight-mvp-go-live.ps1 -SkipIsolationE2E
 
----
+# Sem lint budget (somente troubleshooting)
+.\scripts\preflight-mvp-go-live.ps1 -SkipLintBudget
+```
 
-**Criado por**: Equipe ConectCRM  
-**Última atualização**: 2 de novembro de 2025
+## Operacao diaria
+```powershell
+# logs
+docker compose logs -f backend
+docker compose logs -f frontend
+
+# restart pontual
+docker compose restart backend
+docker compose restart frontend
+
+# parar stack
+docker compose down
+```
+
+## Observacao sobre AWS
+AWS foi retirado do fluxo atual por decisao de escopo. Quando for retomado, a estrategia de deploy remoto pode ser adicionada novamente em um guia separado.
+
+## Proximo passo sugerido
+Rodar o checklist de `DEPLOY.md` e registrar o resultado final de prontidao (backend, frontend e multi-tenant) antes do go-live.
+Para proteger merge em producao, aplicar tambem o guia `.production/BRANCH_PROTECTION.md`.
+Para rollout comercial por escopo reduzido, usar `.production/MVP_GO_LIVE_PLAN_2026-02-17.md`.
+Registrar decisao operacional em `.production/MVP_GO_NO_GO_2026-02-17.md`.
+Para piloto controlado com clientes, usar `.production/MVP_PILOT_CHECKLIST_2026-02-17.md`.
+Ver execucao de kickoff em `.production/MVP_PILOT_KICKOFF_2026-02-17.md`.
+
+## Branch protection (automatizado)
+```powershell
+# DryRun
+.\scripts\configure-branch-protection.ps1 -DryRun
+
+# Aplicar no repo novo (token necessario)
+$env:GITHUB_TOKEN = "ghp_xxx"
+.\scripts\configure-branch-protection.ps1 -Owner conectcrm -Repo conect380
+```
+

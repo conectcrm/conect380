@@ -12,13 +12,22 @@ export const useCalendarEvents = () => {
 
   // Carregar eventos do banco de dados
   const loadEvents = useCallback(
-    async (filtros?: { startDate?: Date; endDate?: Date; status?: string; type?: string }) => {
+    async (filtros?: {
+      startDate?: Date;
+      endDate?: Date;
+      status?: CalendarEvent['status'];
+      type?: string;
+    }) => {
       if (!user?.id) return;
 
       try {
         setLoading(true);
         setError(null);
-        const eventos = await agendaEventosService.listarEventos(filtros);
+        const eventos = await agendaEventosService.listarEventos({
+          startDate: filtros?.startDate,
+          endDate: filtros?.endDate,
+          status: filtros?.status,
+        });
         setEvents(eventos);
       } catch (error) {
         console.error('Erro ao carregar eventos:', error);
@@ -156,7 +165,7 @@ export const useCalendarEvents = () => {
 
   // Filtrar eventos por status
   const filterByStatus = useCallback(
-    async (status: string) => {
+    async (status: CalendarEvent['status']) => {
       await loadEvents({ status });
     },
     [loadEvents],

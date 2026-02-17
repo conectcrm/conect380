@@ -11,10 +11,10 @@ import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 /**
  * Skills/Habilidades de Atendentes
- * 
+ *
  * Define competências específicas de cada atendente para
  * distribuição inteligente baseada em skills.
- * 
+ *
  * Exemplos de skills:
  * - "suporte-tecnico"
  * - "vendas"

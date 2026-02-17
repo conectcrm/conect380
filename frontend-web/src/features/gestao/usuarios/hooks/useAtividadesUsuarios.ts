@@ -87,7 +87,7 @@ export const useAtividadesUsuarios = (): UseAtividadesUsuariosResult => {
 
       const response = await axios.get<AtividadeApi[]>(`${API_BASE_URL}/users/atividades`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
         },
       });
       const dados = response.data;

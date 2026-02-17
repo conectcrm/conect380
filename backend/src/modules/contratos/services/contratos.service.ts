@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+  Logger,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Contrato, StatusContrato } from '../entities/contrato.entity';
@@ -21,7 +27,7 @@ export class ContratosService {
     private propostaRepository: Repository<Proposta>,
     private pdfContratoService: PdfContratoService,
     private assinaturaDigitalService: AssinaturaDigitalService,
-  ) { }
+  ) {}
 
   async criarContrato(createContratoDto: CreateContratoDto, empresaId: string): Promise<Contrato> {
     try {
@@ -40,10 +46,10 @@ export class ContratosService {
         if (proposta.empresa_id !== empresaId) {
           this.logger.warn(
             `Tentativa de criar contrato com proposta de outra empresa. ` +
-            `Empresa do token: ${empresaId}, Empresa da proposta: ${proposta.empresa_id}`
+              `Empresa do token: ${empresaId}, Empresa da proposta: ${proposta.empresa_id}`,
           );
           throw new ForbiddenException(
-            'Você não tem permissão para criar contrato com esta proposta'
+            'Você não tem permissão para criar contrato com esta proposta',
           );
         }
       }
@@ -73,7 +79,7 @@ export class ContratosService {
 
       this.logger.log(
         `Contrato criado: ${contratoAtualizado.numero}` +
-        (proposta ? ` (vinculado à proposta ${proposta.id})` : ' (sem proposta vinculada)')
+          (proposta ? ` (vinculado à proposta ${proposta.id})` : ' (sem proposta vinculada)'),
       );
 
       return contratoAtualizado;
@@ -150,7 +156,11 @@ export class ContratosService {
     return contrato;
   }
 
-  async atualizarContrato(id: number, updateContratoDto: UpdateContratoDto, empresaId: string): Promise<Contrato> {
+  async atualizarContrato(
+    id: number,
+    updateContratoDto: UpdateContratoDto,
+    empresaId: string,
+  ): Promise<Contrato> {
     // 🔒 MULTI-TENANCY: Validar empresa_id
     const contrato = await this.buscarContratoPorId(id, empresaId);
 

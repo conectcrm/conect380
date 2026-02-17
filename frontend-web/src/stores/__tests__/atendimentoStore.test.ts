@@ -48,7 +48,7 @@ const mockTicket: Ticket = {
     online: false,
   },
   canal: 'whatsapp',
-  status: 'aberto',
+  status: 'fila',
   ultimaMensagem: 'Ticket de Teste',
   tempoUltimaMensagem: new Date('2025-11-06T10:00:00Z'),
   tempoAtendimento: 0,

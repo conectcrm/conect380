@@ -14,6 +14,7 @@ describe('DistribuicaoService', () => {
   let filaAtendenteRepository: Repository<FilaAtendente>;
   let ticketRepository: Repository<Ticket>;
   let userRepository: Repository<User>;
+  const EMPRESA_ID = 'empresa-1';
 
   // Mock data
   const mockFila: Partial<Fila> = {
@@ -68,7 +69,7 @@ describe('DistribuicaoService', () => {
     id: 'ticket-1',
     filaId: 'fila-1',
     atendenteId: null,
-    status: StatusTicket.ABERTO,
+    status: StatusTicket.FILA,
   };
 
   const mockTicketComAtendente: Partial<Ticket> = {
@@ -115,9 +116,7 @@ describe('DistribuicaoService', () => {
     filaAtendenteRepository = module.get<Repository<FilaAtendente>>(
       getRepositoryToken(FilaAtendente),
     );
-    ticketRepository = module.get<Repository<Ticket>>(
-      getRepositoryToken(Ticket),
-    );
+    ticketRepository = module.get<Repository<Ticket>>(getRepositoryToken(Ticket));
     userRepository = module.get<Repository<User>>(getRepositoryToken(User));
   });
 
@@ -131,21 +130,24 @@ describe('DistribuicaoService', () => {
       const ticketFresh = { ...mockTicket, id: 'ticket-dist' };
       jest.spyOn(ticketRepository, 'findOne').mockResolvedValue(ticketFresh as Ticket);
       jest.spyOn(filaRepository, 'findOne').mockResolvedValue({ ...mockFila } as Fila);
-      jest.spyOn(filaAtendenteRepository, 'find').mockResolvedValue([
-        { ...mockFilaAtendente1 } as FilaAtendente,
-        { ...mockFilaAtendente2 } as FilaAtendente,
-      ]);
+      jest
+        .spyOn(filaAtendenteRepository, 'find')
+        .mockResolvedValue([
+          { ...mockFilaAtendente1 } as FilaAtendente,
+          { ...mockFilaAtendente2 } as FilaAtendente,
+        ]);
       // count é chamado 4x: 2x em buscarAtendentesDisponiveis, 2x em algoritmoMenorCarga
-      jest.spyOn(ticketRepository, 'count')
-        .mockResolvedValueOnce(2)  // atendente-1 capacidade
-        .mockResolvedValueOnce(4)  // atendente-2 capacidade
-        .mockResolvedValueOnce(2)  // atendente-1 carga
+      jest
+        .spyOn(ticketRepository, 'count')
+        .mockResolvedValueOnce(2) // atendente-1 capacidade
+        .mockResolvedValueOnce(4) // atendente-2 capacidade
+        .mockResolvedValueOnce(2) // atendente-1 carga
         .mockResolvedValueOnce(4); // atendente-2 carga
       // save retorna o ticket modificado (primeiro argumento)
       jest.spyOn(ticketRepository, 'save').mockImplementation(async (ticket) => ticket as Ticket);
 
       // Act
-      const result = await service.distribuirTicket('ticket-dist');
+      const result = await service.distribuirTicket('ticket-dist', EMPRESA_ID);
 
       // Assert
       expect(result.atendenteId).toBe('atendente-1');
@@ -163,19 +165,17 @@ describe('DistribuicaoService', () => {
       jest.spyOn(ticketRepository, 'findOne').mockResolvedValue(null);
 
       // Act & Assert
-      await expect(service.distribuirTicket('ticket-inexistente')).rejects.toThrow(
+      await expect(service.distribuirTicket('ticket-inexistente', EMPRESA_ID)).rejects.toThrow(
         NotFoundException,
       );
     });
 
     it('deve retornar ticket sem redistribuir se já tiver atendente', async () => {
       // Arrange
-      jest
-        .spyOn(ticketRepository, 'findOne')
-        .mockResolvedValue(mockTicketComAtendente as Ticket);
+      jest.spyOn(ticketRepository, 'findOne').mockResolvedValue(mockTicketComAtendente as Ticket);
 
       // Act
-      const result = await service.distribuirTicket('ticket-2');
+      const result = await service.distribuirTicket('ticket-2', EMPRESA_ID);
 
       // Assert
       expect(result.atendenteId).toBe('atendente-1');
@@ -188,7 +188,9 @@ describe('DistribuicaoService', () => {
       jest.spyOn(ticketRepository, 'findOne').mockResolvedValue({ ...ticketSemFila } as Ticket);
 
       // Act & Assert
-      await expect(service.distribuirTicket('ticket-sem-fila')).rejects.toThrow(BadRequestException);
+      await expect(service.distribuirTicket('ticket-sem-fila', EMPRESA_ID)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('não deve distribuir se fila não tem distribuição automática', async () => {
@@ -200,11 +202,11 @@ describe('DistribuicaoService', () => {
         .mockResolvedValue({ ...mockFilaSemAutoDistribuicao } as Fila);
 
       // Act
-      const result = await service.distribuirTicket('ticket-auto-dist');
+      const result = await service.distribuirTicket('ticket-auto-dist', EMPRESA_ID);
 
       // Assert - ticket retorna inalterado
       expect(result.atendenteId).toBeNull();
-      expect(result.status).toBe(StatusTicket.ABERTO);
+      expect(result.status).toBe(StatusTicket.FILA);
       expect(ticketRepository.save).not.toHaveBeenCalled();
     });
 
@@ -216,11 +218,11 @@ describe('DistribuicaoService', () => {
       jest.spyOn(filaAtendenteRepository, 'find').mockResolvedValue([]);
 
       // Act
-      const result = await service.distribuirTicket('ticket-sem-atendente');
+      const result = await service.distribuirTicket('ticket-sem-atendente', EMPRESA_ID);
 
       // Assert - ticket retorna inalterado
       expect(result.atendenteId).toBeNull();
-      expect(result.status).toBe(StatusTicket.ABERTO);
+      expect(result.status).toBe(StatusTicket.FILA);
       expect(ticketRepository.save).not.toHaveBeenCalled();
     });
 
@@ -229,18 +231,18 @@ describe('DistribuicaoService', () => {
       const ticketFresh = { ...mockTicket, id: 'ticket-capacidade' };
       jest.spyOn(ticketRepository, 'findOne').mockResolvedValue({ ...ticketFresh } as Ticket);
       jest.spyOn(filaRepository, 'findOne').mockResolvedValue({ ...mockFila } as Fila);
-      jest.spyOn(filaAtendenteRepository, 'find').mockResolvedValue([
-        { ...mockFilaAtendente1 } as FilaAtendente,
-      ]);
+      jest
+        .spyOn(filaAtendenteRepository, 'find')
+        .mockResolvedValue([{ ...mockFilaAtendente1 } as FilaAtendente]);
       // Atendente com 5 tickets (capacidade máxima)
       jest.spyOn(ticketRepository, 'count').mockResolvedValue(5);
 
       // Act
-      const result = await service.distribuirTicket('ticket-capacidade');
+      const result = await service.distribuirTicket('ticket-capacidade', EMPRESA_ID);
 
       // Assert - ticket retorna inalterado
       expect(result.atendenteId).toBeNull();
-      expect(result.status).toBe(StatusTicket.ABERTO);
+      expect(result.status).toBe(StatusTicket.FILA);
       expect(ticketRepository.save).not.toHaveBeenCalled();
     });
   });
@@ -249,15 +251,15 @@ describe('DistribuicaoService', () => {
     it('deve redistribuir múltiplos tickets pendentes', async () => {
       // Arrange
       const ticketsPendentes = [
-        { id: 'ticket-1', filaId: 'fila-1', atendenteId: null, status: StatusTicket.ABERTO },
-        { id: 'ticket-2', filaId: 'fila-1', atendenteId: null, status: StatusTicket.ABERTO },
-        { id: 'ticket-3', filaId: 'fila-1', atendenteId: null, status: StatusTicket.ABERTO },
+        { id: 'ticket-1', filaId: 'fila-1', atendenteId: null, status: StatusTicket.FILA },
+        { id: 'ticket-2', filaId: 'fila-1', atendenteId: null, status: StatusTicket.FILA },
+        { id: 'ticket-3', filaId: 'fila-1', atendenteId: null, status: StatusTicket.FILA },
       ];
 
       jest.spyOn(ticketRepository, 'find').mockResolvedValue(ticketsPendentes as Ticket[]);
 
       // Mock para cada chamada de distribuirTicket
-      jest.spyOn(service, 'distribuirTicket').mockImplementation(async (ticketId) => {
+      jest.spyOn(service, 'distribuirTicket').mockImplementation(async (ticketId, _empresaId) => {
         return {
           id: ticketId,
           atendenteId: 'atendente-1',
@@ -266,7 +268,7 @@ describe('DistribuicaoService', () => {
       });
 
       // Act
-      const result = await service.redistribuirFila('fila-1');
+      const result = await service.redistribuirFila('fila-1', EMPRESA_ID);
 
       // Assert
       expect(result.distribuidos).toBe(3);
@@ -278,7 +280,7 @@ describe('DistribuicaoService', () => {
       jest.spyOn(ticketRepository, 'find').mockResolvedValue([]);
 
       // Act
-      const result = await service.redistribuirFila('fila-1');
+      const result = await service.redistribuirFila('fila-1', EMPRESA_ID);
 
       // Assert
       expect(result.distribuidos).toBe(0);
@@ -287,8 +289,8 @@ describe('DistribuicaoService', () => {
     it('deve continuar redistribuindo mesmo se alguns tickets falharem', async () => {
       // Arrange
       const ticketsPendentes = [
-        { id: 'ticket-1', filaId: 'fila-1', atendenteId: null, status: StatusTicket.ABERTO },
-        { id: 'ticket-2', filaId: 'fila-1', atendenteId: null, status: StatusTicket.ABERTO },
+        { id: 'ticket-1', filaId: 'fila-1', atendenteId: null, status: StatusTicket.FILA },
+        { id: 'ticket-2', filaId: 'fila-1', atendenteId: null, status: StatusTicket.FILA },
       ];
 
       jest.spyOn(ticketRepository, 'find').mockResolvedValue(ticketsPendentes as Ticket[]);
@@ -304,7 +306,7 @@ describe('DistribuicaoService', () => {
         } as Ticket);
 
       // Act
-      const result = await service.redistribuirFila('fila-1');
+      const result = await service.redistribuirFila('fila-1', EMPRESA_ID);
 
       // Assert
       expect(result.distribuidos).toBe(1);
@@ -314,19 +316,13 @@ describe('DistribuicaoService', () => {
   describe('algoritmoMenorCarga', () => {
     it('deve escolher atendente com menos tickets ativos', async () => {
       // Arrange
-      const atendentes = [
-        mockFilaAtendente1 as FilaAtendente,
-        mockFilaAtendente2 as FilaAtendente,
-      ];
+      const atendentes = [mockFilaAtendente1 as FilaAtendente, mockFilaAtendente2 as FilaAtendente];
 
       // Atendente 1 tem 3 tickets, Atendente 2 tem 1 ticket
-      jest
-        .spyOn(ticketRepository, 'count')
-        .mockResolvedValueOnce(3)
-        .mockResolvedValueOnce(1);
+      jest.spyOn(ticketRepository, 'count').mockResolvedValueOnce(3).mockResolvedValueOnce(1);
 
       // Act
-      const result = await service['algoritmoMenorCarga'](atendentes);
+      const result = await service['algoritmoMenorCarga'](atendentes, EMPRESA_ID);
 
       // Assert
       expect(result.atendenteId).toBe('atendente-2');
@@ -343,7 +339,7 @@ describe('DistribuicaoService', () => {
       jest.spyOn(ticketRepository, 'count').mockResolvedValue(2);
 
       // Act
-      const result = await service['algoritmoMenorCarga'](atendentes);
+      const result = await service['algoritmoMenorCarga'](atendentes, EMPRESA_ID);
 
       // Assert
       expect(result.atendenteId).toBe('atendente-2'); // Prioridade 3 (maior prioridade)
@@ -361,7 +357,7 @@ describe('DistribuicaoService', () => {
       jest.spyOn(ticketRepository, 'count').mockResolvedValue(1);
 
       // Act
-      const result = await service['algoritmoPrioridade'](atendentes);
+      const result = await service['algoritmoPrioridade'](atendentes, EMPRESA_ID);
 
       // Assert
       expect(result.atendenteId).toBe('atendente-2'); // Prioridade 2 (mais alta)
@@ -375,13 +371,10 @@ describe('DistribuicaoService', () => {
       ];
 
       // Atendente 1 tem 3 tickets, Atendente 2 tem 1 ticket
-      jest
-        .spyOn(ticketRepository, 'count')
-        .mockResolvedValueOnce(3)
-        .mockResolvedValueOnce(1);
+      jest.spyOn(ticketRepository, 'count').mockResolvedValueOnce(3).mockResolvedValueOnce(1);
 
       // Act
-      const result = await service['algoritmoPrioridade'](atendentes);
+      const result = await service['algoritmoPrioridade'](atendentes, EMPRESA_ID);
 
       // Assert
       expect(result.atendenteId).toBe('atendente-2'); // Menor carga
@@ -391,10 +384,7 @@ describe('DistribuicaoService', () => {
   describe('algoritmoRoundRobin', () => {
     it('deve escolher próximo atendente na lista (revezamento)', async () => {
       // Arrange
-      const atendentes = [
-        mockFilaAtendente1 as FilaAtendente,
-        mockFilaAtendente2 as FilaAtendente,
-      ];
+      const atendentes = [mockFilaAtendente1 as FilaAtendente, mockFilaAtendente2 as FilaAtendente];
 
       // Último ticket foi para atendente-1
       jest.spyOn(ticketRepository, 'findOne').mockResolvedValue({
@@ -403,7 +393,7 @@ describe('DistribuicaoService', () => {
       } as Ticket);
 
       // Act
-      const result = await service['algoritmoRoundRobin'](atendentes, 'fila-1');
+      const result = await service['algoritmoRoundRobin'](atendentes, 'fila-1', EMPRESA_ID);
 
       // Assert
       expect(result.atendenteId).toBe('atendente-2'); // Próximo na lista
@@ -411,10 +401,7 @@ describe('DistribuicaoService', () => {
 
     it('deve voltar para o início quando chegar no fim da lista', async () => {
       // Arrange
-      const atendentes = [
-        mockFilaAtendente1 as FilaAtendente,
-        mockFilaAtendente2 as FilaAtendente,
-      ];
+      const atendentes = [mockFilaAtendente1 as FilaAtendente, mockFilaAtendente2 as FilaAtendente];
 
       // Último ticket foi para atendente-2 (último da lista)
       jest.spyOn(ticketRepository, 'findOne').mockResolvedValue({
@@ -423,7 +410,7 @@ describe('DistribuicaoService', () => {
       } as Ticket);
 
       // Act
-      const result = await service['algoritmoRoundRobin'](atendentes, 'fila-1');
+      const result = await service['algoritmoRoundRobin'](atendentes, 'fila-1', EMPRESA_ID);
 
       // Assert
       expect(result.atendenteId).toBe('atendente-1'); // Volta pro começo
@@ -431,15 +418,12 @@ describe('DistribuicaoService', () => {
 
     it('deve escolher primeiro atendente se não houver histórico', async () => {
       // Arrange
-      const atendentes = [
-        mockFilaAtendente1 as FilaAtendente,
-        mockFilaAtendente2 as FilaAtendente,
-      ];
+      const atendentes = [mockFilaAtendente1 as FilaAtendente, mockFilaAtendente2 as FilaAtendente];
 
       jest.spyOn(ticketRepository, 'findOne').mockResolvedValue(null);
 
       // Act
-      const result = await service['algoritmoRoundRobin'](atendentes, 'fila-1');
+      const result = await service['algoritmoRoundRobin'](atendentes, 'fila-1', EMPRESA_ID);
 
       // Assert
       expect(result.atendenteId).toBe('atendente-1'); // Primeiro da lista
@@ -449,20 +433,19 @@ describe('DistribuicaoService', () => {
   describe('buscarAtendentesDisponiveis', () => {
     it('deve retornar apenas atendentes ativos com capacidade disponível', async () => {
       // Arrange
-      jest.spyOn(filaAtendenteRepository, 'find').mockResolvedValue([
-        mockFilaAtendente1 as FilaAtendente,
-        mockFilaAtendente2 as FilaAtendente,
-      ]);
+      jest
+        .spyOn(filaAtendenteRepository, 'find')
+        .mockResolvedValue([
+          mockFilaAtendente1 as FilaAtendente,
+          mockFilaAtendente2 as FilaAtendente,
+        ]);
 
       // Atendente 1 tem 2 tickets (capacidade 5 - OK)
       // Atendente 2 tem 5 tickets (capacidade 5 - CHEIO)
-      jest
-        .spyOn(ticketRepository, 'count')
-        .mockResolvedValueOnce(2)
-        .mockResolvedValueOnce(5);
+      jest.spyOn(ticketRepository, 'count').mockResolvedValueOnce(2).mockResolvedValueOnce(5);
 
       // Act
-      const result = await service['buscarAtendentesDisponiveis']('fila-1');
+      const result = await service['buscarAtendentesDisponiveis']('fila-1', EMPRESA_ID);
 
       // Assert
       expect(result).toHaveLength(1);
@@ -474,7 +457,7 @@ describe('DistribuicaoService', () => {
       jest.spyOn(filaAtendenteRepository, 'find').mockResolvedValue([]);
 
       // Act
-      const result = await service['buscarAtendentesDisponiveis']('fila-1');
+      const result = await service['buscarAtendentesDisponiveis']('fila-1', EMPRESA_ID);
 
       // Assert
       expect(result).toEqual([]);

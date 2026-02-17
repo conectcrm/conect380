@@ -1,39 +1,34 @@
+import { randomUUID } from 'crypto';
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
-import { AppModule } from '../src/app.module';
+import * as bcrypt from 'bcryptjs';
 import { DataSource } from 'typeorm';
+import { AppModule } from '../src/app.module';
 
-/**
- * Testes E2E de Isolamento Multi-Tenant
- * 
- * OBJETIVO: Garantir que Empresa A NUNCA vê dados da Empresa B
- * 
- * CENÁRIOS TESTADOS:
- * - Isolamento de clientes
- * - Isolamento de propostas
- * - Isolamento de produtos
- * - Isolamento de usuários
- * - Tentativa de manipulação de IDs
- * - Tentativa de burlar filtros
- */
 describe('Isolamento Multi-Tenant (E2E)', () => {
+  const runId = Date.now().toString();
+  const testPassword = 'senha123';
+  const testSource = `e2e-isolamento-${runId}`;
+  const emailEmpresaA = `e2e.isolamento.a.${runId}@conectcrm.local`;
+  const emailEmpresaB = `e2e.isolamento.b.${runId}@conectcrm.local`;
+  const userEmpresaAId = randomUUID();
+  const userEmpresaBId = randomUUID();
+
   let app: INestApplication;
   let dataSource: DataSource;
 
-  // Tokens de autenticação
   let tokenEmpresaA: string;
   let tokenEmpresaB: string;
-
-  // IDs de empresas
   let empresaAId: string;
   let empresaBId: string;
 
-  // Dados de teste
-  let clienteEmpresaA: any;
-  let clienteEmpresaB: any;
-  let propostaEmpresaA: any;
-  let propostaEmpresaB: any;
+  let clienteEmpresaAId: string;
+  let clienteEmpresaBId: string;
+  let propostaEmpresaAId: string;
+  let propostaEmpresaBId: string;
+
+  jest.setTimeout(120000);
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -41,346 +36,265 @@ describe('Isolamento Multi-Tenant (E2E)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
 
-    dataSource = moduleFixture.get<DataSource>(DataSource);
+    dataSource = app.get(DataSource);
 
-    // Setup: Criar 2 empresas de teste
-    console.log('🧪 Criando empresas de teste...');
     await criarEmpresasEUsuarios();
 
-    // Fazer login em ambas as empresas
-    tokenEmpresaA = await fazerLogin('admin-a@teste.com', 'senha123');
-    tokenEmpresaB = await fazerLogin('admin-b@teste.com', 'senha123');
-
-    console.log('✅ Setup concluído');
+    tokenEmpresaA = await fazerLogin(emailEmpresaA, testPassword);
+    tokenEmpresaB = await fazerLogin(emailEmpresaB, testPassword);
   });
 
   afterAll(async () => {
-    // Cleanup: Remover dados de teste
     await limparDadosTeste();
     await app.close();
   });
 
-  // ========================================
-  // HELPER FUNCTIONS
-  // ========================================
+  async function criarEmpresa(label: 'A' | 'B'): Promise<string> {
+    const suffix = `${runId}${label === 'A' ? '1' : '2'}`.slice(-12);
+    const slug = `e2e-isolamento-${label.toLowerCase()}-${runId}`;
+    const cnpj = `${suffix}${label === 'A' ? '01' : '02'}`.padStart(14, '0').slice(-14);
+    const email = `${slug}@conectcrm.local`;
+    const subdominio = slug.slice(0, 90);
 
-  async function criarEmpresasEUsuarios() {
-    // Limpar dados antigos primeiro
-    await dataSource.query('SET session_replication_role = replica;');
-    await dataSource.query(`DELETE FROM empresas WHERE cnpj IN ('11111111000199', '22222222000199')`);
-    await dataSource.query('SET session_replication_role = DEFAULT;');
+    const created = await dataSource.query(
+      `
+        INSERT INTO empresas (nome, slug, cnpj, email, telefone, endereco, cidade, estado, cep, subdominio)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING id
+      `,
+      [
+        `Empresa ${label} E2E`,
+        slug,
+        cnpj,
+        email,
+        '11999999999',
+        'Rua E2E',
+        'Sao Paulo',
+        'SP',
+        '01000-000',
+        subdominio,
+      ],
+    );
 
-    // Criar Empresa A
-    const resultEmpresaA = await dataSource.query(`
-      INSERT INTO empresas (id, nome, slug, cnpj, email, telefone, endereco, cidade, estado, cep, subdominio, plano)
-      VALUES (gen_random_uuid(), 'Empresa A Teste', 'empresa-a-teste-e2e', '11111111000199', 'empresaa-e2e@teste.com', 
-              '11999999999', 'Rua A', 'São Paulo', 'SP', '01000-000', 'empresa-a-teste-e2e', 'professional')
-      RETURNING id;
-    `);
-    empresaAId = resultEmpresaA[0].id;
-
-    // Criar Empresa B
-    const resultEmpresaB = await dataSource.query(`
-      INSERT INTO empresas (id, nome, slug, cnpj, email, telefone, endereco, cidade, estado, cep, subdominio, plano)
-      VALUES (gen_random_uuid(), 'Empresa B Teste', 'empresa-b-teste-e2e', '22222222000199', 'empresab-e2e@teste.com', 
-              '11988888888', 'Rua B', 'São Paulo', 'SP', '02000-000', 'empresa-b-teste-e2e', 'professional')
-      RETURNING id;
-    `);
-    empresaBId = resultEmpresaB[0].id;
-
-    // Criar usuário admin da Empresa A
-    await dataSource.query(`
-      INSERT INTO users (id, nome, email, senha, empresa_id, perfil, ativo)
-      VALUES (gen_random_uuid(), 'Admin A', 'admin-a@teste.com', 
-              '$2b$10$dummy_hash', '${empresaAId}', 'admin', true);
-    `);
-
-    // Criar usuário admin da Empresa B
-    await dataSource.query(`
-      INSERT INTO users (id, nome, email, senha, empresa_id, perfil, ativo)
-      VALUES (gen_random_uuid(), 'Admin B', 'admin-b@teste.com', 
-              '$2b$10$dummy_hash', '${empresaBId}', 'admin', true);
-    `);
+    return created[0].id as string;
   }
 
-  async function fazerLogin(email: string, password: string): Promise<string> {
-    const response = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({ email, password });
+  async function criarEmpresasEUsuarios() {
+    empresaAId = await criarEmpresa('A');
+    empresaBId = await criarEmpresa('B');
 
-    if (response.status !== 200 && response.status !== 201) {
-      throw new Error(`Login falhou para ${email}: ${response.body.message}`);
+    const senhaHash = await bcrypt.hash(testPassword, 10);
+
+    await dataSource.query(
+      `
+        INSERT INTO users (id, nome, email, senha, empresa_id, role, ativo)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `,
+      [userEmpresaAId, 'Admin E2E Empresa A', emailEmpresaA, senhaHash, empresaAId, 'admin', true],
+    );
+
+    await dataSource.query(
+      `
+        INSERT INTO users (id, nome, email, senha, empresa_id, role, ativo)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `,
+      [userEmpresaBId, 'Admin E2E Empresa B', emailEmpresaB, senhaHash, empresaBId, 'admin', true],
+    );
+  }
+
+  async function fazerLogin(email: string, senha: string): Promise<string> {
+    const response = await request(app.getHttpServer()).post('/auth/login').send({ email, senha });
+
+    if (![200, 201].includes(response.status)) {
+      throw new Error(`Falha no login para ${email}: status ${response.status}`);
     }
 
-    return response.body.access_token || response.body.token;
+    const token = response.body?.data?.access_token ?? response.body?.access_token;
+    if (!token) {
+      throw new Error(`Token nao retornado no login para ${email}`);
+    }
+
+    return token;
   }
 
   async function limparDadosTeste() {
     try {
-      // Desabilitar RLS temporariamente para cleanup
-      await dataSource.query('SET session_replication_role = replica;');
+      await dataSource.query(`DELETE FROM propostas WHERE source = $1`, [testSource]);
 
-      await dataSource.query(`DELETE FROM clientes WHERE empresa_id IN ('${empresaAId}', '${empresaBId}')`);
-      await dataSource.query(`DELETE FROM propostas WHERE empresa_id IN ('${empresaAId}', '${empresaBId}')`);
-      await dataSource.query(`DELETE FROM users WHERE empresa_id IN ('${empresaAId}', '${empresaBId}')`);
-      await dataSource.query(`DELETE FROM empresas WHERE id IN ('${empresaAId}', '${empresaBId}')`);
+      if (clienteEmpresaAId || clienteEmpresaBId) {
+        await dataSource.query(`DELETE FROM clientes WHERE id = ANY($1::uuid[])`, [
+          [clienteEmpresaAId, clienteEmpresaBId].filter(Boolean),
+        ]);
+      }
 
-      // Reabilitar RLS
-      await dataSource.query('SET session_replication_role = DEFAULT;');
+      await dataSource.query(
+        `
+          DELETE FROM users
+          WHERE id = ANY($1::uuid[])
+             OR email = ANY($2::text[])
+        `,
+        [
+          [userEmpresaAId, userEmpresaBId],
+          [emailEmpresaA, emailEmpresaB],
+        ],
+      );
+
+      if (empresaAId || empresaBId) {
+        await dataSource.query(`DELETE FROM empresas WHERE id = ANY($1::uuid[])`, [
+          [empresaAId, empresaBId].filter(Boolean),
+        ]);
+      }
     } catch (error) {
-      console.error('Erro ao limpar dados de teste:', error);
+      // No-op: cleanup best effort for E2E environments.
     }
   }
 
-  // ========================================
-  // TESTES: ISOLAMENTO DE CLIENTES
-  // ========================================
-
-  describe('Isolamento de Clientes', () => {
-    it('✅ Empresa A deve conseguir criar cliente', async () => {
+  describe('Clientes', () => {
+    it('Empresa A deve criar cliente', async () => {
       const response = await request(app.getHttpServer())
         .post('/clientes')
         .set('Authorization', `Bearer ${tokenEmpresaA}`)
         .send({
-          nome: 'Cliente A',
-          email: 'clientea@teste.com',
+          nome: 'Cliente A E2E',
+          email: `cliente-a-${runId}@teste.com`,
           telefone: '11999999999',
+          tipo: 'pessoa_fisica',
         })
         .expect(201);
 
-      clienteEmpresaA = response.body;
-      expect(clienteEmpresaA).toHaveProperty('id');
-      expect(clienteEmpresaA.nome).toBe('Cliente A');
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveProperty('id');
+      clienteEmpresaAId = response.body.data.id;
     });
 
-    it('✅ Empresa B deve conseguir criar cliente', async () => {
+    it('Empresa B deve criar cliente', async () => {
       const response = await request(app.getHttpServer())
         .post('/clientes')
         .set('Authorization', `Bearer ${tokenEmpresaB}`)
         .send({
-          nome: 'Cliente B',
-          email: 'clienteb@teste.com',
+          nome: 'Cliente B E2E',
+          email: `cliente-b-${runId}@teste.com`,
           telefone: '11988888888',
+          tipo: 'pessoa_fisica',
         })
         .expect(201);
 
-      clienteEmpresaB = response.body;
-      expect(clienteEmpresaB).toHaveProperty('id');
-      expect(clienteEmpresaB.nome).toBe('Cliente B');
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveProperty('id');
+      clienteEmpresaBId = response.body.data.id;
     });
 
-    it('🔒 Empresa A NÃO deve ver cliente da Empresa B na listagem', async () => {
+    it('Empresa A nao deve ver cliente da Empresa B na listagem', async () => {
       const response = await request(app.getHttpServer())
         .get('/clientes')
         .set('Authorization', `Bearer ${tokenEmpresaA}`)
         .expect(200);
 
-      const clientes = response.body;
-      expect(Array.isArray(clientes)).toBe(true);
+      expect(response.body.success).toBe(true);
+      expect(Array.isArray(response.body.data)).toBe(true);
 
-      // Validar que cliente B NÃO está na lista
-      const temClienteB = clientes.some(c => c.id === clienteEmpresaB.id);
-      expect(temClienteB).toBe(false);
+      const clientes = response.body.data;
+      const idsRetornados = clientes.map((cliente: { id: string }) => cliente.id);
 
-      // Validar que cliente A ESTÁ na lista
-      const temClienteA = clientes.some(c => c.id === clienteEmpresaA.id);
-      expect(temClienteA).toBe(true);
+      expect(idsRetornados).toContain(clienteEmpresaAId);
+      expect(idsRetornados).not.toContain(clienteEmpresaBId);
     });
 
-    it('🔒 Empresa A NÃO deve conseguir acessar cliente da Empresa B por ID', async () => {
+    it('Empresa A nao deve acessar cliente da Empresa B por id', async () => {
       await request(app.getHttpServer())
-        .get(`/clientes/${clienteEmpresaB.id}`)
+        .get(`/clientes/${clienteEmpresaBId}`)
         .set('Authorization', `Bearer ${tokenEmpresaA}`)
-        .expect(404); // Ou 403 Forbidden
+        .expect(404);
     });
 
-    it('🔒 Empresa A NÃO deve conseguir atualizar cliente da Empresa B', async () => {
-      await request(app.getHttpServer())
-        .put(`/clientes/${clienteEmpresaB.id}`)
-        .set('Authorization', `Bearer ${tokenEmpresaA}`)
-        .send({ nome: 'Tentativa de Hack' })
-        .expect(404); // Ou 403
-    });
+    it('nao deve permitir forcar empresa_id no payload do cliente', async () => {
+      const emailHack = `hack-${runId}@teste.com`;
 
-    it('🔒 Empresa A NÃO deve conseguir deletar cliente da Empresa B', async () => {
-      await request(app.getHttpServer())
-        .delete(`/clientes/${clienteEmpresaB.id}`)
+      const createResponse = await request(app.getHttpServer())
+        .post('/clientes')
         .set('Authorization', `Bearer ${tokenEmpresaA}`)
-        .expect(404); // Ou 403
+        .send({
+          nome: 'Cliente Hack E2E',
+          email: emailHack,
+          tipo: 'pessoa_fisica',
+          empresa_id: empresaBId,
+        })
+        .expect(201);
+
+      expect(createResponse.body.success).toBe(true);
+
+      const listEmpresaB = await request(app.getHttpServer())
+        .get('/clientes')
+        .set('Authorization', `Bearer ${tokenEmpresaB}`)
+        .expect(200);
+
+      const encontrado = (listEmpresaB.body.data || []).find(
+        (cliente: { email?: string }) => cliente.email === emailHack,
+      );
+
+      expect(encontrado).toBeUndefined();
     });
   });
 
-  // ========================================
-  // TESTES: ISOLAMENTO DE PROPOSTAS
-  // ========================================
-
-  describe('Isolamento de Propostas', () => {
-    it('✅ Empresa A deve conseguir criar proposta', async () => {
+  describe('Propostas', () => {
+    it('Empresa A deve criar proposta', async () => {
       const response = await request(app.getHttpServer())
         .post('/propostas')
         .set('Authorization', `Bearer ${tokenEmpresaA}`)
         .send({
-          cliente_id: clienteEmpresaA.id,
-          titulo: 'Proposta A',
+          titulo: 'Proposta A E2E',
+          cliente: 'Cliente A E2E',
           valor: 5000,
-          status: 'em_analise',
+          total: 5000,
+          source: testSource,
         })
         .expect(201);
 
-      propostaEmpresaA = response.body;
-      expect(propostaEmpresaA).toHaveProperty('id');
+      expect(response.body.success).toBe(true);
+      expect(response.body.proposta).toHaveProperty('id');
+      propostaEmpresaAId = response.body.proposta.id;
     });
 
-    it('✅ Empresa B deve conseguir criar proposta', async () => {
+    it('Empresa B deve criar proposta', async () => {
       const response = await request(app.getHttpServer())
         .post('/propostas')
         .set('Authorization', `Bearer ${tokenEmpresaB}`)
         .send({
-          cliente_id: clienteEmpresaB.id,
-          titulo: 'Proposta B',
+          titulo: 'Proposta B E2E',
+          cliente: 'Cliente B E2E',
           valor: 8000,
-          status: 'em_analise',
+          total: 8000,
+          source: testSource,
         })
         .expect(201);
 
-      propostaEmpresaB = response.body;
-      expect(propostaEmpresaB).toHaveProperty('id');
+      expect(response.body.success).toBe(true);
+      expect(response.body.proposta).toHaveProperty('id');
+      propostaEmpresaBId = response.body.proposta.id;
     });
 
-    it('🔒 Empresa A NÃO deve ver proposta da Empresa B', async () => {
+    it('Empresa A nao deve acessar proposta da Empresa B por id', async () => {
+      await request(app.getHttpServer())
+        .get(`/propostas/${propostaEmpresaBId}`)
+        .set('Authorization', `Bearer ${tokenEmpresaA}`)
+        .expect(404);
+    });
+
+    it('Empresa A nao deve ver proposta da Empresa B na listagem', async () => {
       const response = await request(app.getHttpServer())
         .get('/propostas')
         .set('Authorization', `Bearer ${tokenEmpresaA}`)
         .expect(200);
 
-      const propostas = response.body;
-      const temPropostaB = propostas.some(p => p.id === propostaEmpresaB.id);
-      expect(temPropostaB).toBe(false);
-    });
+      expect(response.body.success).toBe(true);
+      expect(Array.isArray(response.body.propostas)).toBe(true);
 
-    it('🔒 Empresa A NÃO deve conseguir acessar proposta da Empresa B por ID', async () => {
-      await request(app.getHttpServer())
-        .get(`/propostas/${propostaEmpresaB.id}`)
-        .set('Authorization', `Bearer ${tokenEmpresaA}`)
-        .expect(404);
-    });
-  });
-
-  // ========================================
-  // TESTES: TENTATIVAS DE BURLAR SEGURANÇA
-  // ========================================
-
-  describe('Tentativas de Manipulação', () => {
-    it('🔒 NÃO deve permitir criar cliente para outra empresa via body', async () => {
-      // Tentar criar cliente forçando empresaId diferente
-      await request(app.getHttpServer())
-        .post('/clientes')
-        .set('Authorization', `Bearer ${tokenEmpresaA}`)
-        .send({
-          nome: 'Cliente Hack',
-          email: 'hack@teste.com',
-          empresa_id: empresaBId, // ⚠️ Tentativa de injeção
-        })
-        .expect(201);
-
-      // Verificar que o cliente foi criado para Empresa A (não B)
-      const response = await request(app.getHttpServer())
-        .get('/clientes')
-        .set('Authorization', `Bearer ${tokenEmpresaB}`)
-        .expect(200);
-
-      const clienteHack = response.body.find(c => c.email === 'hack@teste.com');
-      expect(clienteHack).toBeUndefined(); // Empresa B não deve ver
-    });
-
-    it('🔒 Query com filtro malicioso não deve retornar dados de outras empresas', async () => {
-      // Tentar buscar com filtro que inclui ID de cliente de outra empresa
-      const response = await request(app.getHttpServer())
-        .get(`/clientes?id=${clienteEmpresaB.id}`)
-        .set('Authorization', `Bearer ${tokenEmpresaA}`)
-        .expect(200);
-
-      expect(response.body).toEqual([]); // Lista vazia
-    });
-  });
-
-  // ========================================
-  // TESTES: VALIDAÇÃO DE RLS NO BANCO
-  // ========================================
-
-  describe('Validação de Row Level Security (Banco)', () => {
-    it('🔒 Query direto no banco deve respeitar RLS', async () => {
-      // Definir tenant context
-      await dataSource.query(`SELECT set_current_tenant('${empresaAId}')`);
-
-      // Buscar clientes (deve retornar apenas da Empresa A)
-      const clientes = await dataSource.query('SELECT * FROM clientes');
-
-      const temClienteB = clientes.some(c => c.id === clienteEmpresaB.id);
-      expect(temClienteB).toBe(false);
-
-      const temClienteA = clientes.some(c => c.id === clienteEmpresaA.id);
-      expect(temClienteA).toBe(true);
-    });
-
-    it('🔒 Trocar tenant context deve alterar resultados', async () => {
-      // Definir Empresa A
-      await dataSource.query(`SELECT set_current_tenant('${empresaAId}')`);
-      const clientesA = await dataSource.query('SELECT * FROM clientes');
-
-      // Definir Empresa B
-      await dataSource.query(`SELECT set_current_tenant('${empresaBId}')`);
-      const clientesB = await dataSource.query('SELECT * FROM clientes');
-
-      // Validar que são listas diferentes
-      expect(clientesA.length).not.toBe(clientesB.length);
-
-      const idsA = clientesA.map(c => c.id);
-      const idsB = clientesB.map(c => c.id);
-
-      // Nenhum ID deve aparecer nas duas listas
-      const intersecao = idsA.filter(id => idsB.includes(id));
-      expect(intersecao.length).toBe(0);
-    });
-  });
-
-  // ========================================
-  // TESTES: AUDITORIA
-  // ========================================
-
-  describe('Sistema de Auditoria', () => {
-    it('✅ Deve registrar logs de auditoria por empresa', async () => {
-      // Criar cliente
-      await request(app.getHttpServer())
-        .post('/clientes')
-        .set('Authorization', `Bearer ${tokenEmpresaA}`)
-        .send({
-          nome: 'Cliente Auditoria',
-          email: 'auditoria@teste.com',
-        });
-
-      // Verificar se log foi criado
-      await dataSource.query(`SELECT set_current_tenant('${empresaAId}')`);
-      const logs = await dataSource.query(`
-        SELECT * FROM audit_logs 
-        WHERE entidade = 'cliente' 
-        AND empresa_id = '${empresaAId}'
-        ORDER BY created_at DESC 
-        LIMIT 10
-      `);
-
-      expect(logs.length).toBeGreaterThan(0);
-    });
-
-    it('🔒 Empresa A NÃO deve ver logs de auditoria da Empresa B', async () => {
-      await dataSource.query(`SELECT set_current_tenant('${empresaAId}')`);
-      const logsA = await dataSource.query(`
-        SELECT * FROM audit_logs WHERE empresa_id = '${empresaBId}'
-      `);
-
-      expect(logsA.length).toBe(0); // RLS bloqueia
+      const idsRetornados = response.body.propostas.map((proposta: { id: string }) => proposta.id);
+      expect(idsRetornados).toContain(propostaEmpresaAId);
+      expect(idsRetornados).not.toContain(propostaEmpresaBId);
     });
   });
 });

@@ -26,7 +26,7 @@ export class ContextoClienteService {
    */
   async obterContextoCompleto(
     clienteId: string,
-    empresaId?: string,
+    empresaId: string,
   ): Promise<ContextoClienteResponseDto> {
     this.logger.log(`📊 Obtendo contexto completo do cliente ${clienteId}`);
 
@@ -76,7 +76,7 @@ export class ContextoClienteService {
    */
   async obterContextoPorTelefone(
     telefone: string,
-    empresaId?: string,
+    empresaId: string,
   ): Promise<ContextoClienteResponseDto> {
     this.logger.log(`📞 Obtendo contexto do cliente por telefone ${telefone}`);
 
@@ -131,14 +131,8 @@ export class ContextoClienteService {
   /**
    * Buscar dados básicos do cliente
    */
-  private async buscarCliente(clienteId: string, empresaId?: string): Promise<Cliente> {
-    const where: any = { id: clienteId };
-
-    if (empresaId) {
-      where.empresa_id = empresaId;
-    }
-
-    return this.clienteRepository.findOne({ where });
+  private async buscarCliente(clienteId: string, empresaId: string): Promise<Cliente> {
+    return this.clienteRepository.findOne({ where: { id: clienteId, empresaId: empresaId } });
   }
 
   /**
@@ -146,15 +140,9 @@ export class ContextoClienteService {
    */
   private async buscarClientePorTelefone(
     telefone: string,
-    empresaId?: string,
+    empresaId: string,
   ): Promise<Cliente | null> {
-    const where: any = { telefone };
-
-    if (empresaId) {
-      where.empresa_id = empresaId;
-    }
-
-    return this.clienteRepository.findOne({ where });
+    return this.clienteRepository.findOne({ where: { telefone, empresaId: empresaId } });
   }
 
   /**
@@ -162,7 +150,7 @@ export class ContextoClienteService {
    */
   private async calcularEstatisticas(
     clienteId: string,
-    empresaId?: string,
+    empresaId: string,
     clienteCache?: Cliente,
   ): Promise<ContextoClienteResponseDto['estatisticas']> {
     this.logger.log(`📈 Calculando estatísticas do cliente ${clienteId}`);
@@ -227,7 +215,7 @@ export class ContextoClienteService {
    */
   private async obterHistorico(
     clienteId: string,
-    empresaId?: string,
+    empresaId: string,
     clienteCache?: Cliente,
   ): Promise<ContextoClienteResponseDto['historico']> {
     this.logger.log(`📜 Obtendo histórico do cliente ${clienteId}`);
@@ -312,7 +300,7 @@ export class ContextoClienteService {
    */
   async obterEstatisticas(
     clienteId: string,
-    empresaId?: string,
+    empresaId: string,
   ): Promise<ContextoClienteResponseDto['estatisticas']> {
     return this.calcularEstatisticas(clienteId, empresaId);
   }
@@ -322,7 +310,7 @@ export class ContextoClienteService {
    */
   async obterHistorico2(
     clienteId: string,
-    empresaId?: string,
+    empresaId: string,
   ): Promise<ContextoClienteResponseDto['historico']> {
     return this.obterHistorico(clienteId, empresaId);
   }
@@ -342,7 +330,7 @@ export class ContextoClienteService {
 
   private async coletarTelefonesRelacionados(
     clienteId: string,
-    empresaId?: string,
+    empresaId: string,
     clienteCache?: Cliente,
   ): Promise<string[]> {
     const telefones = new Set<string>();
@@ -357,7 +345,7 @@ export class ContextoClienteService {
       telefones.add(telefonePrincipal);
     }
 
-    const contatos = await this.contatoRepository.find({ where: { clienteId } });
+    const contatos = await this.contatoRepository.find({ where: { clienteId, empresaId } });
     contatos.forEach((contato) => {
       const telefoneContato = this.normalizarTelefone(contato.telefone);
       if (telefoneContato) {
@@ -370,7 +358,7 @@ export class ContextoClienteService {
 
   private async buscarTicketsDoCliente(
     clienteId: string,
-    empresaId: string | undefined,
+    empresaId: string,
     telefones: string[],
   ): Promise<Ticket[]> {
     const colunaClienteId = this.ticketRepository.metadata.findColumnWithPropertyName('clienteId');
@@ -386,7 +374,7 @@ export class ContextoClienteService {
 
     const query = this.ticketRepository.createQueryBuilder('ticket');
 
-    if (empresaId && colunaEmpresaId) {
+    if (colunaEmpresaId) {
       query.andWhere(`ticket.${colunaEmpresaId.databaseName} = :empresaId`, { empresaId });
     }
 
@@ -410,3 +398,5 @@ export class ContextoClienteService {
     return query.getMany();
   }
 }
+
+

@@ -10,24 +10,27 @@ export class TemplateMensagemService {
   constructor(
     @InjectRepository(TemplateMensagem)
     private readonly templateRepository: Repository<TemplateMensagem>,
-  ) { }
+  ) {}
 
-  async criar(dto: CreateTemplateMensagemDto): Promise<TemplateMensagem> {
-    // Validar se atalho já existe (se fornecido)
+  async criar(dto: CreateTemplateMensagemDto, empresaId: string): Promise<TemplateMensagem> {
     if (dto.atalho) {
       const existente = await this.templateRepository.findOne({
         where: {
-          empresaId: dto.empresaId,
+          empresaId,
           atalho: dto.atalho,
         },
       });
 
       if (existente) {
-        throw new ConflictException(`Atalho "${dto.atalho}" já está em uso`);
+        throw new ConflictException(`Atalho "${dto.atalho}" ja esta em uso`);
       }
     }
 
-    const template = this.templateRepository.create(dto);
+    const template = this.templateRepository.create({
+      ...dto,
+      empresaId,
+    });
+
     return await this.templateRepository.save(template);
   }
 
@@ -51,7 +54,7 @@ export class TemplateMensagemService {
     });
 
     if (!template) {
-      throw new NotFoundException(`Template ${id} não encontrado`);
+      throw new NotFoundException(`Template ${id} nao encontrado`);
     }
 
     return template;
@@ -70,7 +73,6 @@ export class TemplateMensagemService {
   ): Promise<TemplateMensagem> {
     const template = await this.buscarPorId(id, empresaId);
 
-    // Validar se novo atalho já existe (se fornecido e diferente do atual)
     if (dto.atalho && dto.atalho !== template.atalho) {
       const existente = await this.templateRepository.findOne({
         where: {
@@ -80,11 +82,15 @@ export class TemplateMensagemService {
       });
 
       if (existente && existente.id !== id) {
-        throw new ConflictException(`Atalho "${dto.atalho}" já está em uso`);
+        throw new ConflictException(`Atalho "${dto.atalho}" ja esta em uso`);
       }
     }
 
-    Object.assign(template, dto);
+    const { empresaId: _ignoredEmpresaId, ...safeDto } = dto as UpdateTemplateMensagemDto & {
+      empresaId?: string;
+    };
+
+    Object.assign(template, safeDto);
     return await this.templateRepository.save(template);
   }
 

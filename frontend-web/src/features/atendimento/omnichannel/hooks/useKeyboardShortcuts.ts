@@ -62,7 +62,7 @@ export const useKeyboardShortcuts = ({
       // ⌨️ MAPEAMENTO DE ATALHOS
 
       // A = Assumir (ABERTO → EM_ATENDIMENTO)
-      if (key === 'a' && statusAtual === 'aberto') {
+      if (key === 'a' && statusAtual === 'fila') {
         console.log('🎮 Atalho [A] - Assumir ticket');
         onMudarStatus('em_atendimento');
         return;
@@ -71,23 +71,23 @@ export const useKeyboardShortcuts = ({
       // G = aGuardar resposta (EM_ATENDIMENTO → AGUARDANDO)
       if (key === 'g' && statusAtual === 'em_atendimento') {
         console.log('🎮 Atalho [G] - Aguardar resposta');
-        onMudarStatus('aguardando');
+        onMudarStatus('envio_ativo');
         return;
       }
 
       // R = Resolver (EM_ATENDIMENTO/AGUARDANDO → RESOLVIDO)
       if (key === 'r') {
-        if (statusAtual === 'em_atendimento' || statusAtual === 'aguardando') {
+        if (statusAtual === 'em_atendimento' || statusAtual === 'envio_ativo') {
           console.log('🎮 Atalho [R] - Resolver ticket');
-          onMudarStatus('resolvido');
+          onMudarStatus('encerrado');
           return;
         }
       }
 
       // F = Fechar (RESOLVIDO → FECHADO)
-      if (key === 'f' && statusAtual === 'resolvido') {
+      if (key === 'f' && statusAtual === 'encerrado') {
         console.log('🎮 Atalho [F] - Fechar ticket');
-        onMudarStatus('fechado');
+        onMudarStatus('fila');
         return;
       }
     },
@@ -114,25 +114,25 @@ export const useKeyboardShortcuts = ({
     atalhos.push({
       tecla: 'A',
       acao: 'Assumir',
-      disponivel: statusAtual === 'aberto',
+      disponivel: statusAtual === 'fila',
     });
 
     atalhos.push({
       tecla: 'G',
-      acao: 'Aguardar',
+      acao: 'Envio Ativo',
       disponivel: statusAtual === 'em_atendimento',
     });
 
     atalhos.push({
       tecla: 'R',
-      acao: 'Resolver',
-      disponivel: statusAtual === 'em_atendimento' || statusAtual === 'aguardando',
+      acao: 'Encerrar',
+      disponivel: statusAtual === 'em_atendimento' || statusAtual === 'envio_ativo',
     });
 
     atalhos.push({
       tecla: 'F',
-      acao: 'Fechar',
-      disponivel: statusAtual === 'resolvido',
+      acao: 'Reabrir',
+      disponivel: statusAtual === 'encerrado',
     });
 
     return atalhos.filter((a) => a.disponivel);

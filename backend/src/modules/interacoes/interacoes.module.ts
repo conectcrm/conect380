@@ -14,5 +14,4 @@ import { AgendaModule } from '../agenda/agenda.module';
   providers: [InteracoesService],
   exports: [InteracoesService],
 })
-export class InteracoesModule { }
-
+export class InteracoesModule {}

@@ -57,7 +57,7 @@ const WhatsAppManager: React.FC = () => {
     try {
       const response = await fetch('/api/whatsapp/status', {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
         },
       });
 
@@ -79,7 +79,7 @@ const WhatsAppManager: React.FC = () => {
     try {
       const response = await fetch('/api/whatsapp/chats', {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
         },
       });
 
@@ -101,7 +101,7 @@ const WhatsAppManager: React.FC = () => {
       const response = await fetch('/api/whatsapp/initialize', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
           'Content-Type': 'application/json',
         },
       });
@@ -132,7 +132,7 @@ const WhatsAppManager: React.FC = () => {
       const response = await fetch('/api/whatsapp/disconnect', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
         },
       });
 
@@ -163,7 +163,7 @@ const WhatsAppManager: React.FC = () => {
       const response = await fetch('/api/whatsapp/test', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({

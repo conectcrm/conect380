@@ -13,13 +13,10 @@ import {
   Patch,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { EmpresaId } from '../../../common/decorators/empresa.decorator';
 import { FilaService, MetricasFila } from '../services/fila.service';
-import {
-  CreateFilaDto,
-  UpdateFilaDto,
-  AddAtendenteFilaDto,
-  AtribuirTicketDto,
-} from '../dto/fila';
+import { CreateFilaDto, UpdateFilaDto, AddAtendenteFilaDto, AtribuirTicketDto } from '../dto/fila';
 import {
   AtribuirNucleoDto,
   AtribuirDepartamentoDto,
@@ -31,7 +28,6 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
-  ApiQuery,
 } from '@nestjs/swagger';
 
 /**
@@ -41,16 +37,16 @@ import {
 @ApiTags('Filas')
 @ApiBearerAuth()
 @Controller('api/filas')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class FilaController {
-  constructor(private readonly filaService: FilaService) { }
+  constructor(private readonly filaService: FilaService) {}
 
   /**
    * GET /api/filas
    * Lista todas as filas da empresa
    */
   @Get()
-  async listar(@Query('empresaId') empresaId: string) {
+  async listar(@EmpresaId() empresaId: string) {
     return await this.filaService.listar(empresaId);
   }
 
@@ -59,10 +55,7 @@ export class FilaController {
    * Busca uma fila por ID
    */
   @Get(':id')
-  async buscarPorId(
-    @Param('id') id: string,
-    @Query('empresaId') empresaId: string,
-  ) {
+  async buscarPorId(@Param('id') id: string, @EmpresaId() empresaId: string) {
     return await this.filaService.buscarPorId(id, empresaId);
   }
 
@@ -72,10 +65,7 @@ export class FilaController {
    */
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async criar(
-    @Query('empresaId') empresaId: string,
-    @Body() dto: CreateFilaDto,
-  ) {
+  async criar(@EmpresaId() empresaId: string, @Body() dto: CreateFilaDto) {
     return await this.filaService.criar(empresaId, dto);
   }
 
@@ -86,7 +76,7 @@ export class FilaController {
   @Put(':id')
   async atualizar(
     @Param('id') id: string,
-    @Query('empresaId') empresaId: string,
+    @EmpresaId() empresaId: string,
     @Body() dto: UpdateFilaDto,
   ) {
     return await this.filaService.atualizar(id, empresaId, dto);
@@ -98,10 +88,7 @@ export class FilaController {
    */
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remover(
-    @Param('id') id: string,
-    @Query('empresaId') empresaId: string,
-  ) {
+  async remover(@Param('id') id: string, @EmpresaId() empresaId: string) {
     await this.filaService.remover(id, empresaId);
   }
 
@@ -113,7 +100,7 @@ export class FilaController {
   @HttpCode(HttpStatus.CREATED)
   async adicionarAtendente(
     @Param('id') filaId: string,
-    @Query('empresaId') empresaId: string,
+    @EmpresaId() empresaId: string,
     @Body() dto: AddAtendenteFilaDto,
   ) {
     return await this.filaService.adicionarAtendente(filaId, empresaId, dto);
@@ -128,7 +115,7 @@ export class FilaController {
   async removerAtendente(
     @Param('id') filaId: string,
     @Param('atendenteId') atendenteId: string,
-    @Query('empresaId') empresaId: string,
+    @EmpresaId() empresaId: string,
   ) {
     await this.filaService.removerAtendente(filaId, atendenteId, empresaId);
   }
@@ -139,10 +126,7 @@ export class FilaController {
    */
   @Post('distribuir')
   @HttpCode(HttpStatus.OK)
-  async distribuirTicket(
-    @Query('empresaId') empresaId: string,
-    @Body() dto: AtribuirTicketDto,
-  ) {
+  async distribuirTicket(@EmpresaId() empresaId: string, @Body() dto: AtribuirTicketDto) {
     return await this.filaService.distribuirTicket(empresaId, dto);
   }
 
@@ -151,10 +135,7 @@ export class FilaController {
    * Obter métricas de uma fila
    */
   @Get(':id/metricas')
-  async obterMetricas(
-    @Param('id') filaId: string,
-    @Query('empresaId') empresaId: string,
-  ) {
+  async obterMetricas(@Param('id') filaId: string, @EmpresaId() empresaId: string) {
     return await this.filaService.obterMetricas(filaId, empresaId);
   }
 
@@ -163,10 +144,7 @@ export class FilaController {
    * Lista atendentes de uma fila
    */
   @Get(':id/atendentes')
-  async listarAtendentes(
-    @Param('id') filaId: string,
-    @Query('empresaId') empresaId: string,
-  ) {
+  async listarAtendentes(@Param('id') filaId: string, @EmpresaId() empresaId: string) {
     const fila = await this.filaService.buscarPorId(filaId, empresaId);
     return fila.atendentes;
   }
@@ -179,7 +157,7 @@ export class FilaController {
   @ApiOperation({ summary: 'Listar tickets de uma fila' })
   async listarTickets(
     @Param('id') filaId: string,
-    @Query('empresaId') empresaId: string,
+    @EmpresaId() empresaId: string,
     @Query('status') status?: string,
   ) {
     // TODO: Implementar listagem de tickets por fila no TicketService
@@ -202,11 +180,9 @@ export class FilaController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Atribuir núcleo de atendimento a uma fila',
-    description:
-      'Associa a fila a um núcleo específico (ex: Suporte, Comercial, Financeiro)',
+    description: 'Associa a fila a um núcleo específico (ex: Suporte, Comercial, Financeiro)',
   })
   @ApiParam({ name: 'id', description: 'ID da fila' })
-  @ApiQuery({ name: 'empresaId', description: 'ID da empresa' })
   @ApiResponse({
     status: 200,
     description: 'Núcleo atribuído com sucesso',
@@ -217,7 +193,7 @@ export class FilaController {
   })
   async atribuirNucleo(
     @Param('id') filaId: string,
-    @Query('empresaId') empresaId: string,
+    @EmpresaId() empresaId: string,
     @Body() dto: AtribuirNucleoDto,
   ) {
     return await this.filaService.atribuirNucleoOuDepartamento(
@@ -236,11 +212,9 @@ export class FilaController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Atribuir departamento a uma fila',
-    description:
-      'Associa a fila a um departamento específico (ex: TI, Vendas, RH)',
+    description: 'Associa a fila a um departamento específico (ex: TI, Vendas, RH)',
   })
   @ApiParam({ name: 'id', description: 'ID da fila' })
-  @ApiQuery({ name: 'empresaId', description: 'ID da empresa' })
   @ApiResponse({
     status: 200,
     description: 'Departamento atribuído com sucesso',
@@ -251,7 +225,7 @@ export class FilaController {
   })
   async atribuirDepartamento(
     @Param('id') filaId: string,
-    @Query('empresaId') empresaId: string,
+    @EmpresaId() empresaId: string,
     @Body() dto: AtribuirDepartamentoDto,
   ) {
     return await this.filaService.atribuirNucleoOuDepartamento(
@@ -273,14 +247,13 @@ export class FilaController {
     description: 'Permite atribuir núcleo, departamento ou ambos simultaneamente',
   })
   @ApiParam({ name: 'id', description: 'ID da fila' })
-  @ApiQuery({ name: 'empresaId', description: 'ID da empresa' })
   @ApiResponse({
     status: 200,
     description: 'Atribuições realizadas com sucesso',
   })
   async atribuirNucleoEDepartamento(
     @Param('id') filaId: string,
-    @Query('empresaId') empresaId: string,
+    @EmpresaId() empresaId: string,
     @Body() dto: AtribuirNucleoEDepartamentoDto,
   ) {
     return await this.filaService.atribuirNucleoOuDepartamento(
@@ -301,14 +274,13 @@ export class FilaController {
     description: 'Retorna todas as filas ativas associadas a um núcleo',
   })
   @ApiParam({ name: 'nucleoId', description: 'ID do núcleo de atendimento' })
-  @ApiQuery({ name: 'empresaId', description: 'ID da empresa' })
   @ApiResponse({
     status: 200,
     description: 'Lista de filas retornada com sucesso',
   })
   async listarPorNucleo(
     @Param('nucleoId') nucleoId: string,
-    @Query('empresaId') empresaId: string,
+    @EmpresaId() empresaId: string,
   ) {
     return await this.filaService.listarPorNucleo(nucleoId, empresaId);
   }
@@ -323,19 +295,15 @@ export class FilaController {
     description: 'Retorna todas as filas ativas associadas a um departamento',
   })
   @ApiParam({ name: 'departamentoId', description: 'ID do departamento' })
-  @ApiQuery({ name: 'empresaId', description: 'ID da empresa' })
   @ApiResponse({
     status: 200,
     description: 'Lista de filas retornada com sucesso',
   })
   async listarPorDepartamento(
     @Param('departamentoId') departamentoId: string,
-    @Query('empresaId') empresaId: string,
+    @EmpresaId() empresaId: string,
   ) {
-    return await this.filaService.listarPorDepartamento(
-      departamentoId,
-      empresaId,
-    );
+    return await this.filaService.listarPorDepartamento(departamentoId, empresaId);
   }
 
   /**
@@ -346,11 +314,9 @@ export class FilaController {
   @Get('nucleo/:nucleoId/ideal')
   @ApiOperation({
     summary: 'Buscar fila ideal para um núcleo (menor carga)',
-    description:
-      'Retorna a fila com menor carga de trabalho para distribuição automática',
+    description: 'Retorna a fila com menor carga de trabalho para distribuição automática',
   })
   @ApiParam({ name: 'nucleoId', description: 'ID do núcleo de atendimento' })
-  @ApiQuery({ name: 'empresaId', description: 'ID da empresa' })
   @ApiResponse({
     status: 200,
     description: 'Fila ideal encontrada',
@@ -361,12 +327,9 @@ export class FilaController {
   })
   async buscarFilaIdeal(
     @Param('nucleoId') nucleoId: string,
-    @Query('empresaId') empresaId: string,
+    @EmpresaId() empresaId: string,
   ) {
-    const fila = await this.filaService.buscarFilaIdealPorNucleo(
-      nucleoId,
-      empresaId,
-    );
+    const fila = await this.filaService.buscarFilaIdealPorNucleo(nucleoId, empresaId);
 
     if (!fila) {
       return {
@@ -378,3 +341,4 @@ export class FilaController {
     return fila;
   }
 }
+

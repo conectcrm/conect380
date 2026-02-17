@@ -29,15 +29,20 @@ export class OnlineStatusService {
   /**
    * 📋 Busca dados de atividade de um contato
    */
-  async getContactActivityData(contatoId: number): Promise<{ last_activity: Date | null } | null> {
+  async getContactActivityData(
+    contatoId: number,
+    empresaId: string,
+  ): Promise<{ last_activity: Date | null } | null> {
     try {
       const result = await this.contatoRepository.query(
         `
-        SELECT last_activity 
-        FROM contatos 
-        WHERE id = $1
+        SELECT c.last_activity
+        FROM contatos c
+        INNER JOIN clientes cl ON c."clienteId" = cl.id
+        WHERE c.id = $1
+          AND cl.empresa_id = $2
       `,
-        [contatoId],
+        [contatoId, empresaId],
       );
 
       return result[0] || null;
@@ -50,15 +55,18 @@ export class OnlineStatusService {
   /**
    * 📞 Busca contato pelo telefone
    */
-  async findContactByPhone(telefone: string): Promise<{ id: number } | null> {
+  async findContactByPhone(telefone: string, empresaId: string): Promise<{ id: number } | null> {
     try {
       const result = await this.contatoRepository.query(
         `
-        SELECT id 
-        FROM contatos 
-        WHERE telefone = $1
+        SELECT c.id
+        FROM contatos c
+        INNER JOIN clientes cl ON c."clienteId" = cl.id
+        WHERE c.telefone = $1
+          AND cl.empresa_id = $2
+        LIMIT 1
       `,
-        [telefone],
+        [telefone, empresaId],
       );
 
       return result[0] || null;
@@ -95,19 +103,22 @@ export class OnlineStatusService {
       // Atualizar tabela de contatos
       await this.contatoRepository.query(
         `
-        UPDATE contatos 
-        SET last_activity = $1, 
+        UPDATE contatos c
+        SET last_activity = $1,
             online_status = $2,
             "updatedAt" = $1
-        WHERE id = $3
+        FROM clientes cl
+        WHERE c.id = $3
+          AND c."clienteId" = cl.id
+          AND cl.empresa_id = $4
       `,
-        [now, isOnline, contatoId],
+        [now, isOnline, contatoId, empresaId],
       );
 
       // Atualizar cache em tickets ativos
       await this.ticketRepository.query(
         `
-        UPDATE atendimento_tickets 
+        UPDATE atendimento_tickets
         SET contato_online = $1,
             contato_last_activity = $2
         WHERE (contato_dados->>'id' = $3 OR "clienteId" = $3)
@@ -171,7 +182,7 @@ export class OnlineStatusService {
     try {
       await this.ticketRepository.query(
         `
-        UPDATE atendimento_tickets 
+        UPDATE atendimento_tickets
         SET contato_online = $1,
             contato_last_activity = $2
         WHERE contato_telefone = $3
@@ -199,7 +210,7 @@ export class OnlineStatusService {
       const results = await this.contatoRepository.query(
         `
         SELECT id, last_activity, online_status
-        FROM contatos 
+        FROM contatos
         WHERE id = ANY($1)
       `,
         [contatoIds],
@@ -228,9 +239,9 @@ export class OnlineStatusService {
       // Marcar contatos antigos como offline
       const result = await this.contatoRepository.query(
         `
-        UPDATE contatos 
+        UPDATE contatos
         SET online_status = FALSE
-        WHERE last_activity < $1 
+        WHERE last_activity < $1
           AND online_status = TRUE
       `,
         [cutoffTime],
@@ -239,9 +250,9 @@ export class OnlineStatusService {
       // Atualizar cache em tickets
       await this.ticketRepository.query(
         `
-        UPDATE atendimento_tickets 
+        UPDATE atendimento_tickets
         SET contato_online = FALSE
-        WHERE contato_last_activity < $1 
+        WHERE contato_last_activity < $1
           AND contato_online = TRUE
           AND status IN ('aberto', 'pendente')
       `,
@@ -268,7 +279,7 @@ export class OnlineStatusService {
     try {
       const stats = await this.contatoRepository.query(
         `
-        SELECT 
+        SELECT
           COUNT(*) as total,
           COUNT(CASE WHEN online_status = true THEN 1 END) as online,
           COUNT(CASE WHEN online_status = false OR online_status IS NULL THEN 1 END) as offline

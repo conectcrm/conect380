@@ -1,22 +1,9 @@
-/**
- * 👤 Cliente Card - Componente de card de cliente com upload de avatar
+﻿/**
+ * ðŸ‘¤ Cliente Card - Componente de card de cliente com upload de avatar
  */
 
 import React, { useState } from 'react';
-import {
-  User,
-  Phone,
-  Mail,
-  Building,
-  MapPin,
-  Tag,
-  Edit,
-  Trash2,
-  Eye,
-  MoreVertical,
-  Camera,
-  Paperclip,
-} from 'lucide-react';
+import { Phone, Mail, Edit, Eye, Paperclip } from 'lucide-react';
 import { AvatarUpload } from '../upload/AvatarUpload';
 import { FileUpload } from '../upload/FileUpload';
 import { Cliente } from '../../services/clientesService';
@@ -34,7 +21,6 @@ interface ClienteCardProps {
 export const ClienteCard: React.FC<ClienteCardProps> = ({
   cliente,
   onEdit,
-  onDelete,
   onView,
   onAvatarUpdate,
   onAttachmentAdd,
@@ -107,6 +93,7 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({
               currentAvatar={cliente.avatar ?? cliente.avatarUrl}
               onAvatarChange={handleAvatarChange}
               size="sm"
+              context={{ clienteId: cliente.id }}
               className="border-2 border-gray-100 group-hover:border-[#159A9C] transition-colors"
             />
             {/* Status Indicator */}
@@ -132,7 +119,7 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({
             )}
           </div>
 
-          {/* Menu de ações - sempre visível em hover */}
+          {/* Menu de aÃ§Ãµes - sempre visÃ­vel em hover */}
           <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               onClick={(e) => {
@@ -157,7 +144,7 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({
           </div>
         </div>
 
-        {/* Informações de Contato Essenciais */}
+        {/* InformaÃ§Ãµes de Contato Essenciais */}
         <div className="space-y-1 mb-3">
           {cliente.email && (
             <div className="flex items-center text-xs text-gray-600">
@@ -173,7 +160,7 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({
           )}
         </div>
 
-        {/* Tags principais (máximo 2) */}
+        {/* Tags principais (mÃ¡ximo 2) */}
         {cliente.tags && cliente.tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-3">
             {cliente.tags.slice(0, 2).map((tag, index) => (
@@ -222,7 +209,7 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({
           </div>
         </div>
 
-        {/* Seção de Anexos (Expansível) - Simplificada */}
+        {/* SeÃ§Ã£o de Anexos (ExpansÃ­vel) - Simplificada */}
         {showAttachments && (
           <div className="mt-3 pt-3 border-t border-gray-200">
             <div className="flex items-center justify-between mb-2">
@@ -234,7 +221,7 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({
                 }}
                 className="text-xs text-gray-500 hover:text-gray-700"
               >
-                ✕
+                x
               </button>
             </div>
 
@@ -243,15 +230,9 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({
               onUploadSuccess={handleAttachmentAdd}
               multiple={true}
               compact={true}
+              context={{ clienteId: cliente.id }}
               className="mb-2"
             />
-
-            {/* Lista simplificada de anexos */}
-            <div className="flex flex-wrap gap-1">
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-50 text-blue-700">
-                📄 2 docs
-              </span>
-            </div>
           </div>
         )}
       </div>

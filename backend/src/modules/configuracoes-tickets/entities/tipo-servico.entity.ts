@@ -12,10 +12,10 @@ import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 /**
  * Entity: Tipos de Serviço Configuráveis
- * 
+ *
  * Substitui o enum TipoTicket por sistema gerenciado pelo gestor.
  * Permite adicionar/remover tipos como 'Bug', 'Melhoria', 'Atualização', etc.
- * 
+ *
  * Requisito: "Tipo do serviço deve ser configurável pelo gestor"
  */
 @Entity('tipos_servico')
@@ -66,14 +66,10 @@ export class TipoServico {
   /**
    * Empresa proprietária deste tipo
    */
-  @ManyToOne(() => Empresa, { nullable: false })
-  @JoinColumn({ name: 'empresa_id' })
-  empresa: Empresa;
-
-  @Column({ name: 'empresa_id' })
+  @Column({ type: 'uuid', name: 'empresa_id' })
   empresaId: string;
 
-  @ManyToOne(() => Empresa)
+  @ManyToOne(() => Empresa, { nullable: false })
   @JoinColumn({ name: 'empresa_id' })
   empresa: Empresa;
 

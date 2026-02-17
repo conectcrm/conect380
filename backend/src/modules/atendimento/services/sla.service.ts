@@ -49,7 +49,7 @@ export class SlaService {
     private readonly slaConfigRepository: Repository<SlaConfig>,
     @InjectRepository(SlaEventLog)
     private readonly slaEventLogRepository: Repository<SlaEventLog>,
-  ) { }
+  ) {}
 
   private ensureEmpresaId(empresaId?: string): string {
     const normalized = typeof empresaId === 'string' ? empresaId.trim() : '';
@@ -61,18 +61,13 @@ export class SlaService {
 
   // ==================== CRUD DE CONFIGURAÇÕES ====================
 
-  async criar(
-    dto: CreateSlaConfigDto,
-    empresaId: string,
-  ): Promise<SlaConfig> {
+  async criar(dto: CreateSlaConfigDto, empresaId: string): Promise<SlaConfig> {
     try {
       const tenantId = this.ensureEmpresaId(empresaId);
 
       // Validar que tempo de resposta < tempo de resolução
       if (dto.tempoRespostaMinutos >= dto.tempoResolucaoMinutos) {
-        throw new BadRequestException(
-          'Tempo de resposta deve ser menor que tempo de resolução',
-        );
+        throw new BadRequestException('Tempo de resposta deve ser menor que tempo de resolução');
       }
 
       // Verificar se já existe config para essa prioridade + canal
@@ -99,24 +94,14 @@ export class SlaService {
       const saved = await this.slaConfigRepository.save(config);
       return saved;
     } catch (error) {
-
-      if (
-        error instanceof BadRequestException ||
-        error instanceof NotFoundException
-      ) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
         throw error;
       }
-      throw new InternalServerErrorException(
-        'Erro ao criar configuração de SLA',
-        error.message,
-      );
+      throw new InternalServerErrorException('Erro ao criar configuração de SLA', error.message);
     }
   }
 
-  async listar(
-    empresaId: string,
-    apenasAtivas: boolean = true,
-  ): Promise<SlaConfig[]> {
+  async listar(empresaId: string, apenasAtivas: boolean = true): Promise<SlaConfig[]> {
     try {
       const tenantId = this.ensureEmpresaId(empresaId);
       const where: any = { empresaId: tenantId };
@@ -132,10 +117,7 @@ export class SlaService {
         },
       });
     } catch (error) {
-      throw new InternalServerErrorException(
-        'Erro ao listar configurações de SLA',
-        error.message,
-      );
+      throw new InternalServerErrorException('Erro ao listar configurações de SLA', error.message);
     }
   }
 
@@ -155,18 +137,11 @@ export class SlaService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      throw new InternalServerErrorException(
-        'Erro ao buscar configuração de SLA',
-        error.message,
-      );
+      throw new InternalServerErrorException('Erro ao buscar configuração de SLA', error.message);
     }
   }
 
-  async atualizar(
-    id: string,
-    dto: UpdateSlaConfigDto,
-    empresaId: string,
-  ): Promise<SlaConfig> {
+  async atualizar(id: string, dto: UpdateSlaConfigDto, empresaId: string): Promise<SlaConfig> {
     try {
       const tenantId = this.ensureEmpresaId(empresaId);
       const config = await this.buscarPorId(id, tenantId);
@@ -174,19 +149,14 @@ export class SlaService {
       // Validar tempos se ambos fornecidos
       if (dto.tempoRespostaMinutos && dto.tempoResolucaoMinutos) {
         if (dto.tempoRespostaMinutos >= dto.tempoResolucaoMinutos) {
-          throw new BadRequestException(
-            'Tempo de resposta deve ser menor que tempo de resolução',
-          );
+          throw new BadRequestException('Tempo de resposta deve ser menor que tempo de resolução');
         }
       }
 
       Object.assign(config, dto);
       return await this.slaConfigRepository.save(config);
     } catch (error) {
-      if (
-        error instanceof BadRequestException ||
-        error instanceof NotFoundException
-      ) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
         throw error;
       }
       throw new InternalServerErrorException(
@@ -205,10 +175,7 @@ export class SlaService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      throw new InternalServerErrorException(
-        'Erro ao deletar configuração de SLA',
-        error.message,
-      );
+      throw new InternalServerErrorException('Erro ao deletar configuração de SLA', error.message);
     }
   }
 
@@ -224,11 +191,7 @@ export class SlaService {
     try {
       const tenantId = this.ensureEmpresaId(empresaId);
       // Buscar configuração SLA apropriada
-      const config = await this.buscarConfigParaTicket(
-        prioridade,
-        canal,
-        tenantId,
-      );
+      const config = await this.buscarConfigParaTicket(prioridade, canal, tenantId);
 
       if (!config) {
         throw new NotFoundException(
@@ -257,15 +220,11 @@ export class SlaService {
       }
 
       // Calcular tempo restante
-      const tempoRestanteMinutos = Math.max(
-        0,
-        config.tempoRespostaMinutos - tempoDecorridoMinutos,
-      );
+      const tempoRestanteMinutos = Math.max(0, config.tempoRespostaMinutos - tempoDecorridoMinutos);
 
       // Calcular data limite
       const dataLimite = new Date(
-        ticketCriadoEm.getTime() +
-        config.tempoRespostaMinutos * 60 * 1000,
+        ticketCriadoEm.getTime() + config.tempoRespostaMinutos * 60 * 1000,
       );
 
       return {
@@ -284,10 +243,7 @@ export class SlaService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      throw new InternalServerErrorException(
-        'Erro ao calcular SLA do ticket',
-        error.message,
-      );
+      throw new InternalServerErrorException('Erro ao calcular SLA do ticket', error.message);
     }
   }
 
@@ -340,10 +296,7 @@ export class SlaService {
         take: 50,
       });
     } catch (error) {
-      throw new InternalServerErrorException(
-        'Erro ao verificar violações de SLA',
-        error.message,
-      );
+      throw new InternalServerErrorException('Erro ao verificar violações de SLA', error.message);
     }
   }
 
@@ -371,10 +324,7 @@ export class SlaService {
 
       return await this.slaEventLogRepository.save(alerta);
     } catch (error) {
-      throw new InternalServerErrorException(
-        'Erro ao gerar alerta de SLA',
-        error.message,
-      );
+      throw new InternalServerErrorException('Erro ao gerar alerta de SLA', error.message);
     }
   }
 
@@ -387,9 +337,7 @@ export class SlaService {
   ): Promise<SlaEventLog> {
     try {
       const tenantId = this.ensureEmpresaId(empresaId);
-      const percentualUsado = Math.floor(
-        (tempoRespostaMinutos / tempoLimiteMinutos) * 100,
-      );
+      const percentualUsado = Math.floor((tempoRespostaMinutos / tempoLimiteMinutos) * 100);
 
       const violacao = this.slaEventLogRepository.create({
         ticketId,
@@ -405,10 +353,7 @@ export class SlaService {
 
       return await this.slaEventLogRepository.save(violacao);
     } catch (error) {
-      throw new InternalServerErrorException(
-        'Erro ao registrar violação de SLA',
-        error.message,
-      );
+      throw new InternalServerErrorException('Erro ao registrar violação de SLA', error.message);
     }
   }
 
@@ -424,19 +369,13 @@ export class SlaService {
         take: 50,
       });
     } catch (error) {
-      throw new InternalServerErrorException(
-        'Erro ao buscar alertas de SLA',
-        error.message,
-      );
+      throw new InternalServerErrorException('Erro ao buscar alertas de SLA', error.message);
     }
   }
 
   // ==================== MÉTRICAS E RELATÓRIOS ====================
 
-  async buscarMetricas(
-    empresaId: string,
-    filtros?: SlaMetricasFilterDto,
-  ): Promise<SlaMetricas> {
+  async buscarMetricas(empresaId: string, filtros?: SlaMetricasFilterDto): Promise<SlaMetricas> {
     try {
       const tenantId = this.ensureEmpresaId(empresaId);
       // Query builder para métricas
@@ -460,17 +399,12 @@ export class SlaService {
 
       // Calcular métricas
       const totalTickets = logs.length;
-      const ticketsCumpridos = logs.filter((l) => l.status === 'cumprido')
-        .length;
-      const ticketsEmRisco = logs.filter((l) => l.status === 'em_risco')
-        .length;
-      const ticketsViolados = logs.filter((l) => l.status === 'violado')
-        .length;
+      const ticketsCumpridos = logs.filter((l) => l.status === 'cumprido').length;
+      const ticketsEmRisco = logs.filter((l) => l.status === 'em_risco').length;
+      const ticketsViolados = logs.filter((l) => l.status === 'violado').length;
 
       const percentualCumprimento =
-        totalTickets > 0
-          ? Math.round((ticketsCumpridos / totalTickets) * 100)
-          : 0;
+        totalTickets > 0 ? Math.round((ticketsCumpridos / totalTickets) * 100) : 0;
 
       // Tempo médio de resposta
       const temposResposta = logs
@@ -478,10 +412,7 @@ export class SlaService {
         .map((l) => l.tempoRespostaMinutos);
       const tempoMedioResposta =
         temposResposta.length > 0
-          ? Math.round(
-            temposResposta.reduce((a, b) => a + b, 0) /
-            temposResposta.length,
-          )
+          ? Math.round(temposResposta.reduce((a, b) => a + b, 0) / temposResposta.length)
           : 0;
 
       // Tempo médio de resolução
@@ -490,10 +421,7 @@ export class SlaService {
         .map((l) => l.tempoResolucaoMinutos);
       const tempoMedioResolucao =
         temposResolucao.length > 0
-          ? Math.round(
-            temposResolucao.reduce((a, b) => a + b, 0) /
-            temposResolucao.length,
-          )
+          ? Math.round(temposResolucao.reduce((a, b) => a + b, 0) / temposResolucao.length)
           : 0;
 
       // Violações por prioridade (buscar da config)
@@ -519,17 +447,11 @@ export class SlaService {
         violacoesPorCanal,
       };
     } catch (error) {
-      throw new InternalServerErrorException(
-        'Erro ao buscar métricas de SLA',
-        error.message,
-      );
+      throw new InternalServerErrorException('Erro ao buscar métricas de SLA', error.message);
     }
   }
 
-  async buscarHistorico(
-    ticketId: string,
-    empresaId: string,
-  ): Promise<SlaEventLog[]> {
+  async buscarHistorico(ticketId: string, empresaId: string): Promise<SlaEventLog[]> {
     try {
       const tenantId = this.ensureEmpresaId(empresaId);
       return await this.slaEventLogRepository.find({
@@ -540,10 +462,7 @@ export class SlaService {
         order: { createdAt: 'ASC' },
       });
     } catch (error) {
-      throw new InternalServerErrorException(
-        'Erro ao buscar histórico de SLA',
-        error.message,
-      );
+      throw new InternalServerErrorException('Erro ao buscar histórico de SLA', error.message);
     }
   }
 }

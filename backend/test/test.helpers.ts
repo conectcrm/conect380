@@ -25,7 +25,7 @@ import { Atendente } from '../src/modules/atendimento/entities/atendente.entity'
 
 /**
  * 🧪 Helper para criar aplicação de teste E2E
- * 
+ *
  * Inicializa app NestJS completo com:
  * - Database de teste (PostgreSQL test)
  * - Validation pipes
@@ -33,15 +33,15 @@ import { Atendente } from '../src/modules/atendimento/entities/atendente.entity'
  * - Módulos essenciais (Atendimento, Triagem, Empresas, Users, Clientes)
  * - Repositories registrados para factories
  * - Mocks de serviços externos (WhatsApp, OpenAI, etc.)
- * 
+ *
  * Uso:
  * ```typescript
  * let app: INestApplication;
- * 
+ *
  * beforeAll(async () => {
  *   app = await createTestApp();
  * });
- * 
+ *
  * afterAll(async () => {
  *   await app.close();
  * });
@@ -73,10 +73,10 @@ export async function createTestApp(): Promise<INestApplication> {
       }),
 
       // Módulos essenciais para testes de triagem/atendimento
-      EmpresasModule,  // Empresas (multi-tenant)
-      UsersModule,      // Usuários e autenticação
-      ClientesModule,   // Clientes e contatos
-      TriagemModule,    // Triagem de tickets
+      EmpresasModule, // Empresas (multi-tenant)
+      UsersModule, // Usuários e autenticação
+      ClientesModule, // Clientes e contatos
+      TriagemModule, // Triagem de tickets
       AtendimentoModule, // Atendimento e distribuição
     ],
     providers: [
@@ -103,7 +103,7 @@ export async function createTestApp(): Promise<INestApplication> {
 
 /**
  * 🧹 Helper para limpar dados de teste
- * 
+ *
  * Trunca todas as tabelas relevantes para testes isolados
  */
 export async function cleanDatabase(app: INestApplication): Promise<void> {

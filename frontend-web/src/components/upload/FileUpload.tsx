@@ -11,10 +11,10 @@
  */
 
 import React, { useState, useRef, useCallback } from 'react';
-import { Upload, X, Image, File, CheckCircle, AlertCircle, Loader2, Plus } from 'lucide-react';
+import { Upload, X, File, CheckCircle, AlertCircle, Loader2, Plus } from 'lucide-react';
 import {
   uploadService,
-  UploadOptions,
+  UploadContext,
   UploadProgress,
   UploadResult,
 } from '../../services/uploadService';
@@ -30,6 +30,7 @@ interface FileUploadProps {
   acceptedFileTypes?: string;
   className?: string;
   maxFiles?: number;
+  context?: UploadContext;
   children?: React.ReactNode;
 }
 
@@ -51,6 +52,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   acceptedFileTypes,
   className = '',
   maxFiles = 10,
+  context,
   children,
 }) => {
   const [files, setFiles] = useState<FileWithProgress[]>([]);
@@ -58,7 +60,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const config = uploadService['getConfig'](category);
+  const config = uploadService.getConfig(category);
 
   // Gerar accept attribute
   const getAcceptTypes = (): string => {
@@ -92,6 +94,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 
       setFiles((prev) => [...prev, ...newFiles]);
       setIsUploading(true);
+      const successfulUploads: UploadResult[] = [];
 
       try {
         // Upload sequencial para melhor controle
@@ -107,7 +110,9 @@ export const FileUpload: React.FC<FileUploadProps> = ({
                   prev.map((f) => (f.file === fileWithProgress.file ? { ...f, progress } : f)),
                 );
               },
+              context,
             );
+            successfulUploads.push(result);
 
             // Atualizar com resultado
             setFiles((prev) =>
@@ -135,8 +140,6 @@ export const FileUpload: React.FC<FileUploadProps> = ({
           }
         }
 
-        // Notificar sucesso apenas dos uploads bem-sucedidos
-        const successfulUploads = files.filter((f) => f.result).map((f) => f.result!);
         if (successfulUploads.length > 0) {
           onUploadSuccess?.(successfulUploads);
         }
@@ -146,7 +149,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
         setIsUploading(false);
       }
     },
-    [files, category, maxFiles, showPreview, onUploadSuccess, onUploadError],
+    [files, category, maxFiles, showPreview, onUploadSuccess, onUploadError, context],
   );
 
   // Handlers para drag & drop

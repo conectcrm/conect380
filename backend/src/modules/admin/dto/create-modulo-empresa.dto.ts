@@ -5,7 +5,7 @@ export class CreateModuloEmpresaDto {
   @ApiProperty({
     description: 'Nome do módulo a ser ativado',
     example: 'crm',
-    enum: ['crm', 'atendimento', 'comercial', 'financeiro', 'produtos', 'configuracoes']
+    enum: ['crm', 'atendimento', 'comercial', 'financeiro', 'produtos', 'configuracoes'],
   })
   @IsString()
   modulo: string;
@@ -16,8 +16,8 @@ export class CreateModuloEmpresaDto {
       usuarios: 10,
       leads: 1000,
       storage_mb: 5120,
-      api_calls_dia: 10000
-    }
+      api_calls_dia: 10000,
+    },
   })
   @IsOptional()
   @IsObject()
@@ -35,8 +35,8 @@ export class CreateModuloEmpresaDto {
     example: {
       habilitarIA: true,
       webhooksAtivos: false,
-      notificacoesEmail: true
-    }
+      notificacoesEmail: true,
+    },
   })
   @IsOptional()
   @IsObject()
@@ -45,7 +45,7 @@ export class CreateModuloEmpresaDto {
   @ApiPropertyOptional({
     description: 'Se o módulo deve ser ativado imediatamente',
     example: true,
-    default: true
+    default: true,
   })
   @IsOptional()
   @IsBoolean()

@@ -77,4 +77,3 @@ export class AgendaEvento {
   @UpdateDateColumn()
   updated_at: Date;
 }
-

@@ -91,10 +91,21 @@ export class Ticket {
   @Column({ type: 'varchar', length: 20, default: PrioridadeTicket.MEDIA })
   prioridade: PrioridadeTicket;
 
-  @Column({ type: 'varchar', length: 20, name: 'severity', nullable: true, default: SeveridadeTicket.MEDIA })
+  @Column({
+    type: 'varchar',
+    length: 20,
+    name: 'severity',
+    nullable: true,
+    default: SeveridadeTicket.MEDIA,
+  })
   severity?: SeveridadeTicket;
 
-  @Column({ type: 'varchar', length: 10, name: 'assigned_level', default: NivelAtendimentoTicket.N1 })
+  @Column({
+    type: 'varchar',
+    length: 10,
+    name: 'assigned_level',
+    default: NivelAtendimentoTicket.N1,
+  })
   assignedLevel: NivelAtendimentoTicket;
 
   @Column({ type: 'varchar', length: 255, name: 'escalation_reason', nullable: true })

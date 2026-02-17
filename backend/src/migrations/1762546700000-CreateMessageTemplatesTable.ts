@@ -1,70 +1,70 @@
-import { MigrationInterface, QueryRunner, Table } from "typeorm";
+import { MigrationInterface, QueryRunner, Table } from 'typeorm';
 
 export class CreateMessageTemplatesTable1762546700000 implements MigrationInterface {
-  name = 'CreateMessageTemplatesTable1762546700000'
+  name = 'CreateMessageTemplatesTable1762546700000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.createTable(
       new Table({
-        name: "message_templates",
+        name: 'message_templates',
         columns: [
           {
-            name: "id",
-            type: "uuid",
+            name: 'id',
+            type: 'uuid',
             isPrimary: true,
-            generationStrategy: "uuid",
-            default: "uuid_generate_v4()",
+            generationStrategy: 'uuid',
+            default: 'uuid_generate_v4()',
           },
           {
-            name: "nome",
-            type: "varchar",
-            length: "200",
+            name: 'nome',
+            type: 'varchar',
+            length: '200',
             isNullable: false,
           },
           {
-            name: "conteudo",
-            type: "text",
+            name: 'conteudo',
+            type: 'text',
             isNullable: false,
           },
           {
-            name: "categoria",
-            type: "varchar",
-            length: "100",
+            name: 'categoria',
+            type: 'varchar',
+            length: '100',
             isNullable: true,
           },
           {
-            name: "atalho",
-            type: "varchar",
-            length: "50",
+            name: 'atalho',
+            type: 'varchar',
+            length: '50',
             isNullable: true,
           },
           {
-            name: "variaveis",
-            type: "text",
+            name: 'variaveis',
+            type: 'text',
             isNullable: true,
           },
           {
-            name: "ativo",
-            type: "boolean",
+            name: 'ativo',
+            type: 'boolean',
             default: true,
             isNullable: false,
           },
           {
-            name: "empresaId",
-            type: "varchar",
-            length: "36",
+            name: 'empresaId',
+            type: 'varchar',
+            length: '36',
             isNullable: false,
           },
           {
-            name: "createdAt",
-            type: "timestamp",
-            default: "now()",
+            name: 'createdAt',
+            type: 'timestamp',
+            default: 'now()',
             isNullable: false,
           },
           {
-            name: "updatedAt",
-            type: "timestamp",
-            default: "now()",
+            name: 'updatedAt',
+            type: 'timestamp',
+            default: 'now()',
             isNullable: false,
           },
         ],
@@ -95,6 +95,6 @@ export class CreateMessageTemplatesTable1762546700000 implements MigrationInterf
     await queryRunner.query(`DROP INDEX "public"."IDX_MESSAGE_TEMPLATES_ATALHO"`);
     await queryRunner.query(`DROP INDEX "public"."IDX_MESSAGE_TEMPLATES_ATIVO"`);
     await queryRunner.query(`DROP INDEX "public"."IDX_MESSAGE_TEMPLATES_EMPRESA"`);
-    await queryRunner.dropTable("message_templates");
+    await queryRunner.dropTable('message_templates');
   }
 }

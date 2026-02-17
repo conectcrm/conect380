@@ -8,14 +8,20 @@ import { NotificationsQueueProducer } from './notifications.queue-producer';
 import { NotificationsProcessor } from './notifications.processor';
 import { NotificationChannelsService } from './notification-channels.service';
 import { IntegracoesConfig } from '../modules/atendimento/entities/integracoes-config.entity'; // 🔐 Para WhatsApp config
+import { User } from '../modules/users/user.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Notification, IntegracoesConfig]), // 🔐 Adicionado IntegracoesConfig
+    TypeOrmModule.forFeature([Notification, IntegracoesConfig, User]), // 🔐 Adicionado IntegracoesConfig
     BullModule.registerQueue({ name: 'notifications' }),
   ],
   controllers: [NotificationController],
-  providers: [NotificationService, NotificationsQueueProducer, NotificationsProcessor, NotificationChannelsService],
+  providers: [
+    NotificationService,
+    NotificationsQueueProducer,
+    NotificationsProcessor,
+    NotificationChannelsService,
+  ],
   exports: [NotificationService, NotificationsQueueProducer, NotificationChannelsService],
 })
-export class NotificationModule { }
+export class NotificationModule {}

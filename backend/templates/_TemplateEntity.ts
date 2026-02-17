@@ -1,9 +1,18 @@
-import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn, DeleteDateColumn } from 'typeorm';
-import { Empresa } from '../../empresas/entities/empresa.entity';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  ManyToOne,
+  JoinColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
+} from 'typeorm';
+import { Empresa } from '../src/empresas/entities/empresa.entity';
 
 /**
  * 📋 TEMPLATE DE ENTITY MULTI-TENANT
- * 
+ *
  * ⚠️ ANTES DE USAR:
  * 1. [ ] Renomear classe (ex: TemplateEntity → Produto)
  * 2. [ ] Renomear arquivo (ex: template.entity.ts → produto.entity.ts)
@@ -13,13 +22,13 @@ import { Empresa } from '../../empresas/entities/empresa.entity';
  * 6. [ ] Criar migration COM RLS habilitado (usar _TemplateMigration.ts)
  * 7. [ ] Registrar entity em backend/src/config/database.config.ts
  * 8. [ ] Criar DTO correspondente (CreateXDto, UpdateXDto)
- * 
+ *
  * ✅ O QUE JÁ ESTÁ CORRETO NESTE TEMPLATE:
  * - empresaId (OBRIGATÓRIO para multi-tenant)
  * - Relação com Empresa
  * - Timestamps (created_at, updated_at, deleted_at)
  * - Soft delete habilitado
- * 
+ *
  * 🚫 O QUE NÃO ESQUECER:
  * - Migration DEVE habilitar RLS!
  * - Migration DEVE criar política tenant_isolation_*
@@ -119,34 +128,34 @@ export class TemplateEntity {
 
 /**
  * 📝 EXEMPLO DE USO:
- * 
+ *
  * 1. Copiar este arquivo:
  *    cp backend/templates/_TemplateEntity.ts backend/src/modules/meu-modulo/entities/minha-entity.entity.ts
- * 
+ *
  * 2. Renomear classe:
  *    TemplateEntity → MinhaEntity
- * 
+ *
  * 3. Ajustar @Entity:
  *    @Entity('nome_da_tabela') → @Entity('minha_tabela')
- * 
+ *
  * 4. Adicionar campos:
  *    @Column({ length: 50 })
  *    codigo: string;
- * 
+ *
  * 5. Adicionar relacionamentos:
  *    @ManyToOne(() => Cliente)
  *    cliente: Cliente;
- * 
+ *
  * 6. Criar migration (copiar _TemplateMigration.ts):
  *    npm run migration:generate -- src/migrations/CreateMinhaTabela
- * 
+ *
  * 7. Registrar em database.config.ts:
  *    import { MinhaEntity } from '../modules/meu-modulo/entities/minha-entity.entity';
  *    entities: [..., MinhaEntity]
- * 
+ *
  * 8. Rodar migration:
  *    npm run migration:run
- * 
+ *
  * 9. Verificar RLS ativo:
  *    SELECT tablename, rowsecurity FROM pg_tables WHERE tablename = 'minha_tabela';
  *    → Deve retornar rowsecurity = true

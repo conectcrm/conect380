@@ -13,10 +13,10 @@ import { NivelAtendimento } from './nivel-atendimento.entity';
 
 /**
  * Entity: Status Customizados por Nível
- * 
+ *
  * Substitui o enum StatusTicket por sistema configurável.
  * Cada nível pode ter seus próprios status personalizados.
- * 
+ *
  * Requisito: "Status configuráveis vinculados a um nível"
  * Exemplo: N3 pode ter "Em Desenvolvimento", "Code Review", "Deploy"
  */
@@ -79,14 +79,10 @@ export class StatusCustomizado {
   /**
    * Empresa proprietária deste status
    */
-  @ManyToOne(() => Empresa, { nullable: false })
-  @JoinColumn({ name: 'empresa_id' })
-  empresa: Empresa;
-
-  @Column({ name: 'empresa_id' })
+  @Column({ type: 'uuid', name: 'empresa_id' })
   empresaId: string;
 
-  @ManyToOne(() => Empresa)
+  @ManyToOne(() => Empresa, { nullable: false })
   @JoinColumn({ name: 'empresa_id' })
   empresa: Empresa;
 

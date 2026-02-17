@@ -12,8 +12,8 @@
  * - Densidade configurável
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   RefreshCw,
   Plus,
@@ -23,19 +23,16 @@ import {
   CheckCircle,
   AlertCircle,
   User,
-  MessageSquare,
   Edit2,
   Trash2,
   List,
   Grid,
-  SlidersHorizontal,
   ChevronLeft,
   ChevronRight,
   UserPlus,
   Tag,
   Download,
   X,
-  Calendar,
   AlertTriangle,
   Filter,
   Layers,
@@ -46,10 +43,19 @@ import { useConfirmation } from '../hooks/useConfirmation';
 import { ConfirmationModal } from '../components/common/ConfirmationModal';
 import { BackToNucleus } from '../components/navigation/BackToNucleus';
 import { ticketsService, Ticket as TicketType, StatusTicketApi, TipoTicket, PrioridadeTicketApi } from '../services/ticketsService';
+import { api } from '../services/api';
 import { StatusTicket } from '../types/ticket';
 import { TicketFormModal } from '../components/tickets/TicketFormModal';
 import { AtribuirTicketModal } from '../components/tickets/AtribuirTicketModal';
 import { TicketsTable } from '../components/tickets/TicketsTable';
+import { useAuth } from '../hooks/useAuth';
+import {
+  TICKET_CREATE_DRAFT_QUERY_PARAM,
+  buildTicketCreateDraftStorageKey,
+  generateTicketCreateDraftId,
+  isTicketCreateDraftStorageKey,
+  parseTicketCreateDraftIdFromStorageKey,
+} from '../constants/tickets';
 
 interface TicketFiltros {
   empresaId: string;
@@ -70,9 +76,201 @@ interface TicketFiltros {
 
 type ViewMode = 'table' | 'cards';
 type Density = 'compact' | 'comfortable' | 'spacious';
+type SortDirection = 'asc' | 'desc';
+
+interface AtendenteOption {
+  id: string;
+  nome?: string;
+  name?: string;
+}
+
+interface FilaOption {
+  id: string;
+  nome: string;
+}
+
+interface TagOption {
+  id: string;
+  nome: string;
+  cor?: string;
+}
+
+interface TicketDraftResumo {
+  id: string;
+  storageKey: string;
+  titulo: string;
+  updatedAt?: string;
+}
+
+const DEFAULT_VISIBLE_COLUMNS = [
+  'numero',
+  'prioridade',
+  'titulo',
+  'status',
+  'tipo',
+  'cliente',
+  'responsavel',
+  'sla',
+  'criado',
+];
+
+const TIPO_LABELS: Record<TipoTicket, string> = {
+  tecnica: 'Técnica',
+  comercial: 'Comercial',
+  financeira: 'Financeira',
+  suporte: 'Suporte',
+  reclamacao: 'Reclamação',
+  solicitacao: 'Solicitação',
+  outros: 'Outros',
+};
+
+const TIPO_COLORS: Record<TipoTicket, string> = {
+  tecnica: 'bg-blue-100 text-blue-800',
+  comercial: 'bg-green-100 text-green-800',
+  financeira: 'bg-purple-100 text-purple-800',
+  suporte: 'bg-orange-100 text-orange-800',
+  reclamacao: 'bg-red-100 text-red-800',
+  solicitacao: 'bg-cyan-100 text-cyan-800',
+  outros: 'bg-gray-100 text-gray-800',
+};
+
+const STATUS_LABELS: Partial<Record<string, string>> = {
+  FILA: 'Fila',
+  ABERTO: 'Aberto',
+  EM_ATENDIMENTO: 'Em Atendimento',
+  AGUARDANDO: 'Aguardando',
+  AGUARDANDO_CLIENTE: 'Aguardando Cliente',
+  AGUARDANDO_INTERNO: 'Aguardando Interno',
+  CONCLUIDO: 'Concluído',
+  CANCELADO: 'Cancelado',
+  ENCERRADO: 'Encerrado',
+  RESOLVIDO: 'Resolvido',
+  FECHADO: 'Fechado',
+};
+
+const STATUS_COLORS: Partial<Record<string, string>> = {
+  FILA: 'bg-yellow-100 text-yellow-800',
+  ABERTO: 'bg-blue-100 text-blue-800',
+  EM_ATENDIMENTO: 'bg-blue-100 text-blue-800',
+  AGUARDANDO: 'bg-orange-100 text-orange-800',
+  AGUARDANDO_CLIENTE: 'bg-orange-100 text-orange-800',
+  AGUARDANDO_INTERNO: 'bg-purple-100 text-purple-800',
+  CONCLUIDO: 'bg-green-100 text-green-800',
+  CANCELADO: 'bg-red-100 text-red-800',
+  ENCERRADO: 'bg-gray-100 text-gray-800',
+  RESOLVIDO: 'bg-green-100 text-green-800',
+  FECHADO: 'bg-gray-100 text-gray-800',
+};
+
+const PRIORIDADE_OPTIONS: { value: PrioridadeTicketApi; label: string }[] = [
+  { value: 'URGENTE', label: 'Urgente' },
+  { value: 'ALTA', label: 'Alta' },
+  { value: 'MEDIA', label: 'Média' },
+  { value: 'BAIXA', label: 'Baixa' },
+];
+
+const TIPO_OPTIONS: { value: TipoTicket; label: string }[] = [
+  { value: 'suporte', label: 'Suporte' },
+  { value: 'tecnica', label: 'Técnica' },
+  { value: 'comercial', label: 'Comercial' },
+  { value: 'financeira', label: 'Financeira' },
+  { value: 'reclamacao', label: 'Reclamação' },
+  { value: 'solicitacao', label: 'Solicitação' },
+  { value: 'outros', label: 'Outros' },
+];
+
+const STATUS_OPTIONS: { value: StatusTicketApi; label: string }[] = [
+  { value: 'FILA', label: 'Fila' },
+  { value: 'EM_ATENDIMENTO', label: 'Em Atendimento' },
+  { value: 'AGUARDANDO_CLIENTE', label: 'Aguardando Cliente' },
+  { value: 'AGUARDANDO_INTERNO', label: 'Aguardando Interno' },
+  { value: 'CONCLUIDO', label: 'Concluído' },
+  { value: 'CANCELADO', label: 'Cancelado' },
+  { value: 'ENCERRADO', label: 'Encerrado' },
+];
+
+const PRIORIDADE_ORDER: Record<PrioridadeTicketApi, number> = {
+  URGENTE: 4,
+  ALTA: 3,
+  MEDIA: 2,
+  BAIXA: 1,
+};
+
+const normalizeSortField = (field?: string): string => {
+  if (!field) return 'createdAt';
+  return field === 'created_at' ? 'createdAt' : field;
+};
+
+const getStatusLabel = (status: StatusTicketApi | StatusTicket): string => {
+  const statusKey = status.toString().toUpperCase();
+  return STATUS_LABELS[statusKey] || statusKey;
+};
+
+const getStatusColor = (status: StatusTicketApi | StatusTicket): string => {
+  const statusKey = status.toString().toUpperCase();
+  return STATUS_COLORS[statusKey] || 'bg-gray-100 text-gray-800';
+};
+
+const getTipoLabel = (tipo?: TipoTicket): string => {
+  if (!tipo) return 'Sem tipo';
+  return TIPO_LABELS[tipo] || tipo;
+};
+
+const getTipoColor = (tipo?: TipoTicket): string => {
+  if (!tipo) return 'bg-gray-100 text-gray-800';
+  return TIPO_COLORS[tipo] || 'bg-gray-100 text-gray-800';
+};
+
+const getSlaStatus = (ticket: TicketType): 'vencido' | 'proximo' | 'em_dia' | 'sem_sla' => {
+  const referencia = ticket.slaExpiresAt || ticket.dataVencimento;
+  if (!referencia) {
+    return 'sem_sla';
+  }
+
+  const expiresAtMs = new Date(referencia).getTime();
+  if (!Number.isFinite(expiresAtMs)) {
+    return 'sem_sla';
+  }
+
+  const diffMs = expiresAtMs - new Date().getTime();
+  if (diffMs <= 0) {
+    return 'vencido';
+  }
+  if (diffMs <= 2 * 60 * 60 * 1000) {
+    return 'proximo';
+  }
+  return 'em_dia';
+};
+
+const getSortValue = (ticket: TicketType, field: string): number | string => {
+  switch (normalizeSortField(field)) {
+    case 'numero':
+      return Number(ticket.numero) || 0;
+    case 'prioridade':
+      return PRIORIDADE_ORDER[(ticket.prioridade as PrioridadeTicketApi) || 'BAIXA'] || 0;
+    case 'titulo':
+      return (ticket.titulo || ticket.assunto || '').toLowerCase();
+    case 'status':
+      return getStatusLabel(ticket.status).toLowerCase();
+    case 'tipo':
+      return getTipoLabel(ticket.tipo).toLowerCase();
+    case 'cliente':
+      return (ticket.cliente?.nome || '').toLowerCase();
+    case 'responsavel':
+      return (ticket.responsavel?.nome || '').toLowerCase();
+    case 'sla':
+      return ticket.slaExpiresAt ? new Date(ticket.slaExpiresAt).getTime() : Number.MAX_SAFE_INTEGER;
+    case 'createdAt':
+    default:
+      return new Date(ticket.createdAt).getTime();
+  }
+};
 
 const GestaoTicketsPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth();
+  const returnToTicketsPath = `${location.pathname}${location.search}${location.hash}`;
 
   // Estados principais
   const [tickets, setTickets] = useState<TicketType[]>([]);
@@ -86,17 +284,24 @@ const GestaoTicketsPage: React.FC = () => {
   const [showFiltrosAvancados, setShowFiltrosAvancados] = useState(false);
   const [showColumnMenu, setShowColumnMenu] = useState(false);
 
-  // Colunas disponíveis e suas configurações
+  // Colunas disponveis e suas configuraes
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
     const saved = localStorage.getItem('ticketsVisibleColumns');
-    return saved
-      ? JSON.parse(saved)
-      : ['numero', 'prioridade', 'titulo', 'status', 'tipo', 'cliente', 'responsavel', 'sla', 'criado'];
+    if (!saved) {
+      return DEFAULT_VISIBLE_COLUMNS;
+    }
+
+    try {
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_VISIBLE_COLUMNS;
+    } catch {
+      return DEFAULT_VISIBLE_COLUMNS;
+    }
   });
 
-  // Definição de todas as colunas disponíveis
+  // Definicao de todas as colunas disponveis
   const availableColumns = [
-    { id: 'numero', label: 'Número', required: true },
+    { id: 'numero', label: 'Numero', required: true },
     { id: 'prioridade', label: 'Prioridade' },
     { id: 'titulo', label: 'Título/Assunto', required: true },
     { id: 'status', label: 'Status' },
@@ -112,26 +317,26 @@ const GestaoTicketsPage: React.FC = () => {
     empresaId: localStorage.getItem('empresaAtiva') || '',
     pagina: 1,
     limite: 50,
-    sortField: 'created_at',
+    sortField: 'createdAt',
     sortDirection: 'desc',
   });
   const [busca, setBusca] = useState('');
   const [buscaDebounced, setBuscaDebounced] = useState('');
 
-  // Estados de seleção múltipla
+  // Estados de selecao multipla
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Estados de modais
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showAtribuirModal, setShowAtribuirModal] = useState(false);
+  const [showAtribuirTicketModal, setShowAtribuirTicketModal] = useState(false);
+  const [showAtribuirLoteModal, setShowAtribuirLoteModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showTagsModal, setShowTagsModal] = useState(false);
 
-  // Dados para modais de ações em lote
-  const [atendentes, setAtendentes] = useState<any[]>([]);
-  const [filas, setFilas] = useState<any[]>([]);
-  const [tagsDisponiveis, setTagsDisponiveis] = useState<any[]>([]);
+  // Dados para modais de aes em lote
+  const [atendentes, setAtendentes] = useState<AtendenteOption[]>([]);
+  const [filas, setFilas] = useState<FilaOption[]>([]);
+  const [tagsDisponiveis, setTagsDisponiveis] = useState<TagOption[]>([]);
   const [atendenteIdLote, setAtendenteIdLote] = useState<string>('');
   const [filaIdLote, setFilaIdLote] = useState<string>('');
   const [novoStatusLote, setNovoStatusLote] = useState<string>('');
@@ -140,6 +345,7 @@ const GestaoTicketsPage: React.FC = () => {
   // Estados dos modais
   const [selectedTicket, setSelectedTicket] = useState<TicketType | null>(null);
   const { confirmationState, showConfirmation } = useConfirmation();
+  const [ticketDraftsResumo, setTicketDraftsResumo] = useState<TicketDraftResumo[]>([]);
 
   // Debounce da busca (300ms)
   useEffect(() => {
@@ -159,14 +365,9 @@ const GestaoTicketsPage: React.FC = () => {
         pagina: 1,
       }));
     }
-  }, [buscaDebounced]);
+  }, [buscaDebounced, filtros.busca]);
 
-  // Carregar tickets ao montar componente ou quando filtros mudarem
-  useEffect(() => {
-    carregarTickets();
-  }, [filtros]);
-
-  // Carregar dados para os modais de ações em lote
+// Carregar dados para os modais de ações em lote
   useEffect(() => {
     const carregarDadosModais = async () => {
       try {
@@ -191,7 +392,7 @@ const GestaoTicketsPage: React.FC = () => {
     carregarDadosModais();
   }, []);
 
-  const carregarTickets = async () => {
+  const carregarTickets = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -202,7 +403,7 @@ const GestaoTicketsPage: React.FC = () => {
       let ticketsData = Array.isArray(resultado.data) ? resultado.data : (resultado.data as any)?.tickets || resultado.data || [];
       ticketsData = Array.isArray(ticketsData) ? ticketsData : [];
 
-      // ✅ Backend agora faz a ordenação - usar dados diretos
+      // Backend agora faz a ordenação - usar dados diretos
       setTickets(ticketsData);
       setTotal((resultado.data as any)?.total || (resultado as any).total || ticketsData.length);
     } catch (err: unknown) {
@@ -218,26 +419,125 @@ const GestaoTicketsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  }, [filtros]);
+
+  useEffect(() => {
+    carregarTickets();
+  }, [carregarTickets]);
+
+  const carregarResumoRascunho = useCallback(() => {
+    const drafts: TicketDraftResumo[] = [];
+
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const storageKey = localStorage.key(index);
+      if (!storageKey || !isTicketCreateDraftStorageKey(storageKey)) {
+        continue;
+      }
+
+      const draftId = parseTicketCreateDraftIdFromStorageKey(storageKey);
+      if (!draftId) {
+        continue;
+      }
+
+      const rawDraft = localStorage.getItem(storageKey);
+      if (!rawDraft) {
+        continue;
+      }
+
+      try {
+        const parsedDraft = JSON.parse(rawDraft) as {
+          updatedAt?: string;
+          formData?: { titulo?: string; descricao?: string };
+        };
+
+        const titulo = (parsedDraft.formData?.titulo || '').trim();
+        const descricao = (parsedDraft.formData?.descricao || '').trim();
+        if (!titulo && !descricao) {
+          continue;
+        }
+
+        drafts.push({
+          id: draftId,
+          storageKey,
+          titulo: titulo || `${descricao.slice(0, 70)}${descricao.length > 70 ? '...' : ''}`,
+          updatedAt: parsedDraft.updatedAt,
+        });
+      } catch (error) {
+        console.error('Erro ao carregar resumo de um rascunho de ticket:', error);
+      }
+    }
+
+    drafts.sort((a, b) => {
+      const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+      const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    setTicketDraftsResumo(drafts);
+  }, []);
+
+  useEffect(() => {
+    carregarResumoRascunho();
+
+    const handleWindowFocus = () => {
+      carregarResumoRascunho();
+    };
+
+    window.addEventListener('focus', handleWindowFocus);
+    return () => window.removeEventListener('focus', handleWindowFocus);
+  }, [carregarResumoRascunho]);
+
+  const abrirNovoTicketComRascunho = () => {
+    const draftId = generateTicketCreateDraftId();
+    navigate(`/atendimento/tickets/novo?${TICKET_CREATE_DRAFT_QUERY_PARAM}=${encodeURIComponent(draftId)}`);
+  };
+
+  const handleContinuarRascunho = (draftId: string) => {
+    navigate(`/atendimento/tickets/novo?${TICKET_CREATE_DRAFT_QUERY_PARAM}=${encodeURIComponent(draftId)}`);
+  };
+
+  const handleDescartarRascunho = (draftId: string) => {
+    localStorage.removeItem(buildTicketCreateDraftStorageKey(draftId));
+    setTicketDraftsResumo((prev) => prev.filter((draft) => draft.id !== draftId));
+    toast.success('Rascunho descartado.');
+  };
+
+  const formatarAtualizacaoRascunho = (updatedAt?: string): string => {
+    if (!updatedAt) {
+      return 'Rascunho sem data de atualização';
+    }
+
+    const parsedDate = new Date(updatedAt);
+    if (Number.isNaN(parsedDate.getTime())) {
+      return 'Rascunho sem data de atualização';
+    }
+
+    return `Atualizado em ${parsedDate.toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })}`;
   };
 
   // Funções de manipulação de ordenação
   const handleSort = (field: string) => {
-    setFiltros(prev => {
-      const currentField = prev.sortField || 'createdAt';
-      const currentDirection = prev.sortDirection || 'desc';
+    setFiltros((prev) => {
+      const currentField = normalizeSortField(prev.sortField);
+      const currentDirection: SortDirection = prev.sortDirection || 'desc';
+      const nextField = normalizeSortField(field);
 
       return {
         ...prev,
-        sortField: field === 'created_at' ? 'createdAt' : field,
-        sortDirection: currentField === field
-          ? (currentDirection === 'asc' ? 'desc' : 'asc')
-          : 'asc',
-        pagina: 1, // Reset para primeira página ao ordenar
+        sortField: nextField,
+        sortDirection: currentField === nextField ? (currentDirection === 'asc' ? 'desc' : 'asc') : 'asc',
+        pagina: 1,
       };
     });
   };
 
-  // Funções de seleção múltipla
+  // Funcoes de selecao multipla
   const handleSelectToggle = (ticketId: string) => {
     setSelectedIds((prev) =>
       prev.includes(ticketId) ? prev.filter((id) => id !== ticketId) : [...prev, ticketId]
@@ -245,10 +545,10 @@ const GestaoTicketsPage: React.FC = () => {
   };
 
   const handleSelectAll = () => {
-    if (selectedIds.length === tickets.length) {
+    if (selectedIds.length === ticketsProcessados.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(tickets.map((t) => t.id));
+      setSelectedIds(ticketsProcessados.map((ticket) => ticket.id));
     }
   };
 
@@ -269,9 +569,8 @@ const GestaoTicketsPage: React.FC = () => {
   };
 
   const handleResetColumns = () => {
-    const defaultColumns = ['numero', 'prioridade', 'titulo', 'status', 'tipo', 'cliente', 'responsavel', 'sla', 'criado'];
-    setVisibleColumns(defaultColumns);
-    localStorage.setItem('ticketsVisibleColumns', JSON.stringify(defaultColumns));
+    setVisibleColumns(DEFAULT_VISIBLE_COLUMNS);
+    localStorage.setItem('ticketsVisibleColumns', JSON.stringify(DEFAULT_VISIBLE_COLUMNS));
     toast.success('Colunas restauradas para padrão');
   };
 
@@ -279,7 +578,7 @@ const GestaoTicketsPage: React.FC = () => {
     setSelectedIds([]);
   };
 
-  // Funções de filtros
+  // Funcoes de filtros
   const handleFiltroRapido = (campo: string, valor: any) => {
     setFiltros((prev) => ({
       ...prev,
@@ -293,6 +592,8 @@ const GestaoTicketsPage: React.FC = () => {
       empresaId: localStorage.getItem('empresaAtiva') || '',
       pagina: 1,
       limite: filtros.limite,
+      sortField: 'createdAt',
+      sortDirection: 'desc',
     });
     setBusca('');
   };
@@ -306,7 +607,7 @@ const GestaoTicketsPage: React.FC = () => {
   const handleAtribuir = (ticket: TicketType, e?: React.MouseEvent) => {
     e?.stopPropagation();
     setSelectedTicket(ticket);
-    setShowAtribuirModal(true);
+    setShowAtribuirTicketModal(true);
   };
 
   const handleDeletar = (ticket: TicketType, e?: React.MouseEvent) => {
@@ -343,7 +644,7 @@ const GestaoTicketsPage: React.FC = () => {
 
     switch (acao) {
       case 'atribuir':
-        setShowAtribuirModal(true);
+        setShowAtribuirLoteModal(true);
         break;
 
       case 'status':
@@ -409,14 +710,14 @@ const GestaoTicketsPage: React.FC = () => {
       );
 
       if (resultado.successful > 0) {
-        toast.success(`${resultado.successful} ticket(s) atribuído(s) com sucesso!`);
+        toast.success(`${resultado.successful} ticket(s) atribuido(s) com sucesso!`);
       }
       if (resultado.failed > 0) {
         toast.error(`Falha ao atribuir ${resultado.failed} ticket(s)`);
         console.error('Erros:', resultado.errors);
       }
 
-      setShowAtribuirModal(false);
+      setShowAtribuirLoteModal(false);
       setAtendenteIdLote('');
       setFilaIdLote('');
       setSelectedIds([]);
@@ -465,7 +766,7 @@ const GestaoTicketsPage: React.FC = () => {
     }
   };
 
-  // Handler para confirmar adição de tags em lote
+  // Handler para confirmar adicao de tags em lote
   const handleConfirmarTags = async () => {
     if (tagsIdsSelecionadas.length === 0) {
       toast.error('Selecione pelo menos uma tag');
@@ -540,7 +841,7 @@ const GestaoTicketsPage: React.FC = () => {
   };
 
   // Paginação
-  const handlePaginacao = (novaPagina: number) => {
+  const handlePaginação = (novaPagina: number) => {
     setFiltros((prev) => ({ ...prev, pagina: novaPagina }));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -549,87 +850,105 @@ const GestaoTicketsPage: React.FC = () => {
     setFiltros((prev) => ({ ...prev, limite: novoLimite, pagina: 1 }));
   };
 
-  // Calcular métricas para KPI cards
+  // Calcular metricas para KPI cards
+  const ticketsProcessados = useMemo(() => {
+    const inicio = filtros.dataInicio ? new Date(`${filtros.dataInicio}T00:00:00`) : null;
+    const fim = filtros.dataFim ? new Date(`${filtros.dataFim}T23:59:59`) : null;
+    const sortField = normalizeSortField(filtros.sortField);
+    const sortDirection: SortDirection = filtros.sortDirection || 'desc';
+
+    const filtrados = tickets.filter((ticket) => {
+      if (inicio || fim) {
+        const criadoEm = new Date(ticket.createdAt);
+        if (!Number.isFinite(criadoEm.getTime())) {
+          return false;
+        }
+        if (inicio && criadoEm < inicio) {
+          return false;
+        }
+        if (fim && criadoEm > fim) {
+          return false;
+        }
+      }
+
+      if (filtros.slaStatus) {
+        const statusSla = getSlaStatus(ticket);
+        if (statusSla === 'sem_sla' || statusSla !== filtros.slaStatus) {
+          return false;
+        }
+      }
+
+      if (filtros.responsavelId === 'sem_responsavel') {
+        const responsavelId = ticket.responsavel?.id || ticket.responsavelId || ticket.atendenteId;
+        if (responsavelId) {
+          return false;
+        }
+      }
+
+      if (filtros.responsavelId === 'meus' && user?.id) {
+        const responsavelId = ticket.responsavel?.id || ticket.responsavelId || ticket.atendenteId;
+        if (responsavelId !== user.id) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    return [...filtrados].sort((a, b) => {
+      const aValue = getSortValue(a, sortField);
+      const bValue = getSortValue(b, sortField);
+
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
+      }
+
+      const aText = String(aValue || '');
+      const bText = String(bValue || '');
+      return sortDirection === 'asc' ? aText.localeCompare(bText) : bText.localeCompare(aText);
+    });
+  }, [
+    tickets,
+    filtros.dataInicio,
+    filtros.dataFim,
+    filtros.slaStatus,
+    filtros.responsavelId,
+    filtros.sortField,
+    filtros.sortDirection,
+    user?.id,
+  ]);
+
+  useEffect(() => {
+    setSelectedIds((prev) => prev.filter((id) => ticketsProcessados.some((ticket) => ticket.id === id)));
+  }, [ticketsProcessados]);
+
   const totalTickets = total;
-  const ticketsAbertos = tickets.filter((t) =>
-    ['FILA', 'EM_ATENDIMENTO', 'AGUARDANDO_CLIENTE', 'AGUARDANDO_INTERNO'].includes(t.status)
+  const ticketsAbertos = ticketsProcessados.filter((ticket) =>
+    ['FILA', 'EM_ATENDIMENTO', 'AGUARDANDO_CLIENTE', 'AGUARDANDO_INTERNO'].includes(
+      ticket.status.toString().toUpperCase(),
+    ),
   ).length;
-  const ticketsFechados = tickets.filter((t) =>
-    ['CONCLUIDO', 'CANCELADO', 'ENCERRADO'].includes(t.status)
+  const ticketsFechados = ticketsProcessados.filter((ticket) =>
+    ['CONCLUIDO', 'CANCELADO', 'ENCERRADO'].includes(ticket.status.toString().toUpperCase()),
   ).length;
-  const ticketsUrgentes = tickets.filter((t) => t.prioridade === 'URGENTE').length;
-
-  // Labels
-  const getStatusLabel = (status: StatusTicketApi | StatusTicket): string => {
-    const statusStr = status.toString().toUpperCase();
-    const labels: Partial<Record<string, string>> = {
-      FILA: 'Fila',
-      ABERTO: 'Aberto',
-      EM_ATENDIMENTO: 'Em Atendimento',
-      AGUARDANDO: 'Aguardando',
-      AGUARDANDO_CLIENTE: 'Aguardando Cliente',
-      AGUARDANDO_INTERNO: 'Aguardando Interno',
-      CONCLUIDO: 'Concluído',
-      CANCELADO: 'Cancelado',
-      ENCERRADO: 'Encerrado',
-      RESOLVIDO: 'Resolvido',
-      FECHADO: 'Fechado',
-    };
-    return labels[statusStr] || status;
-  };
-
-  const getTipoLabel = (tipo?: TipoTicket): string => {
-    if (!tipo) return 'Sem tipo';
-    const labels: Record<TipoTicket, string> = {
-      tecnica: 'Técnica',
-      comercial: 'Comercial',
-      financeira: 'Financeira',
-      suporte: 'Suporte',
-      reclamacao: 'Reclamação',
-      solicitacao: 'Solicitação',
-      outros: 'Outros',
-    };
-    return labels[tipo] || tipo;
-  };
-
-  const getTipoColor = (tipo?: TipoTicket): string => {
-    if (!tipo) return 'bg-gray-100 text-gray-800';
-    const colors: Record<TipoTicket, string> = {
-      tecnica: 'bg-blue-100 text-blue-800',
-      comercial: 'bg-green-100 text-green-800',
-      financeira: 'bg-purple-100 text-purple-800',
-      suporte: 'bg-orange-100 text-orange-800',
-      reclamacao: 'bg-red-100 text-red-800',
-      solicitacao: 'bg-cyan-100 text-cyan-800',
-      outros: 'bg-gray-100 text-gray-800',
-    };
-    return colors[tipo] || 'bg-gray-100 text-gray-800';
-  };
-
-  const getStatusColor = (status: StatusTicketApi | StatusTicket): string => {
-    const statusStr = status.toString().toUpperCase();
-    const colors: Partial<Record<string, string>> = {
-      FILA: 'bg-yellow-100 text-yellow-800',
-      ABERTO: 'bg-blue-100 text-blue-800',
-      EM_ATENDIMENTO: 'bg-blue-100 text-blue-800',
-      AGUARDANDO: 'bg-orange-100 text-orange-800',
-      AGUARDANDO_CLIENTE: 'bg-orange-100 text-orange-800',
-      AGUARDANDO_INTERNO: 'bg-purple-100 text-purple-800',
-      CONCLUIDO: 'bg-green-100 text-green-800',
-      CANCELADO: 'bg-red-100 text-red-800',
-      ENCERRADO: 'bg-gray-100 text-gray-800',
-      RESOLVIDO: 'bg-green-100 text-green-800',
-      FECHADO: 'bg-gray-100 text-gray-800',
-    };
-    return colors[statusStr] || 'bg-gray-100 text-gray-800';
-  };
+  const ticketsUrgentes = ticketsProcessados.filter(
+    (ticket) => ticket.prioridade.toString().toUpperCase() === 'URGENTE',
+  ).length;
 
   const totalPaginas = Math.ceil(total / (filtros.limite || 50));
   const paginaAtual = filtros.pagina || 1;
 
   const filtrosAtivos = Object.keys(filtros).filter((key) => {
-    if (key === 'empresaId' || key === 'pagina' || key === 'limite') return false;
-    return filtros[key as keyof TicketFiltros] !== undefined;
+    if (['empresaId', 'pagina', 'limite', 'sortField', 'sortDirection'].includes(key)) {
+      return false;
+    }
+
+    const value = filtros[key as keyof TicketFiltros];
+    if (Array.isArray(value)) {
+      return value.length > 0;
+    }
+
+    return value !== undefined && value !== '';
   }).length;
 
   return (
@@ -640,8 +959,8 @@ const GestaoTicketsPage: React.FC = () => {
       </div>
 
       <div className="p-6">
-        <div className="max-w-[1600px] mx-auto">
-          {/* Header da Página */}
+        <div className="max-w-7xl mx-auto">
+          {/* Header da Pagina */}
           <div className="bg-white rounded-lg shadow-sm border mb-6">
             <div className="px-6 py-6">
               <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
@@ -803,7 +1122,7 @@ const GestaoTicketsPage: React.FC = () => {
 
                   <button
                     onClick={handleExportarCSV}
-                    disabled={loading || tickets.length === 0}
+                    disabled={loading || ticketsProcessados.length === 0}
                     className="px-4 py-2 border border-[#159A9C] text-[#159A9C] rounded-lg hover:bg-[#159A9C]/10 transition-colors disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
                     title="Exportar para CSV"
                   >
@@ -812,7 +1131,7 @@ const GestaoTicketsPage: React.FC = () => {
                   </button>
 
                   <button
-                    onClick={() => setShowCreateModal(true)}
+                    onClick={abrirNovoTicketComRascunho}
                     className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm text-sm font-medium"
                   >
                     <Plus className="w-4 h-4" />
@@ -822,6 +1141,63 @@ const GestaoTicketsPage: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {ticketDraftsResumo.length > 0 && (
+            <div className="bg-[#159A9C]/5 border border-[#159A9C]/20 rounded-xl p-4 mb-6">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+                <div>
+                  <p className="text-sm font-semibold text-[#002333]">
+                    {ticketDraftsResumo.length === 1
+                      ? '1 rascunho de ticket disponível'
+                      : `${ticketDraftsResumo.length} rascunhos de ticket disponíveis`}
+                  </p>
+                  <p className="text-xs text-[#002333]/70 mt-1">
+                    Você pode retomar qualquer rascunho ou começar um ticket em branco.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={abrirNovoTicketComRascunho}
+                    className="px-3 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors text-sm font-medium"
+                  >
+                    Novo Ticket em Branco
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {ticketDraftsResumo.map((draft) => (
+                  <div
+                    key={draft.storageKey}
+                    className="bg-white rounded-lg border border-[#159A9C]/15 p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-[#002333] truncate">
+                        {draft.titulo || 'Rascunho sem título'}
+                      </p>
+                      <p className="text-xs text-[#002333]/60">
+                        {formatarAtualizacaoRascunho(draft.updatedAt)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleContinuarRascunho(draft.id)}
+                        className="px-3 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors text-sm font-medium"
+                      >
+                        Continuar
+                      </button>
+                      <button
+                        onClick={() => handleDescartarRascunho(draft.id)}
+                        className="px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                      >
+                        Descartar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Dashboard Cards (KPI Cards) */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
@@ -885,7 +1261,7 @@ const GestaoTicketsPage: React.FC = () => {
           {/* Barra de Busca e Filtros */}
           <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
             <div className="space-y-4">
-              {/* Primeira linha: Busca + Filtros Rápidos */}
+              {/* Primeira linha: Busca + Filtros Rapidos */}
               <div className="flex flex-col md:flex-row gap-4">
                 {/* Busca (em tempo real) */}
                 <div className="flex-1">
@@ -913,16 +1289,14 @@ const GestaoTicketsPage: React.FC = () => {
                 <select
                   value={filtros.tipo || ''}
                   onChange={(e) => handleFiltroRapido('tipo', (e.target.value as TipoTicket) || undefined)}
-                  className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors min-w-[180px]"
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors min-w-[180px] text-sm"
                 >
                   <option value="">Todos os tipos</option>
-                  <option value="suporte">Suporte</option>
-                  <option value="tecnica">Técnica</option>
-                  <option value="comercial">Comercial</option>
-                  <option value="financeira">Financeira</option>
-                  <option value="reclamacao">Reclamação</option>
-                  <option value="solicitacao">Solicitação</option>
-                  <option value="outros">Outros</option>
+                  {TIPO_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
 
                 {/* Filtro por Status */}
@@ -931,16 +1305,14 @@ const GestaoTicketsPage: React.FC = () => {
                   onChange={(e) =>
                     handleFiltroRapido('status', e.target.value ? [e.target.value as StatusTicketApi] : undefined)
                   }
-                  className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors min-w-[200px]"
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors min-w-[200px] text-sm"
                 >
                   <option value="">Todos os status</option>
-                  <option value="FILA">Fila</option>
-                  <option value="EM_ATENDIMENTO">Em Atendimento</option>
-                  <option value="AGUARDANDO_CLIENTE">Aguardando Cliente</option>
-                  <option value="AGUARDANDO_INTERNO">Aguardando Interno</option>
-                  <option value="CONCLUIDO">Concluído</option>
-                  <option value="CANCELADO">Cancelado</option>
-                  <option value="ENCERRADO">Encerrado</option>
+                  {STATUS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
 
                 {/* Filtro por Prioridade */}
@@ -949,13 +1321,14 @@ const GestaoTicketsPage: React.FC = () => {
                   onChange={(e) =>
                     handleFiltroRapido('prioridade', (e.target.value as PrioridadeTicketApi) || undefined)
                   }
-                  className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors min-w-[160px]"
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors min-w-[160px] text-sm"
                 >
                   <option value="">Todas prioridades</option>
-                  <option value="URGENTE">🔴 Urgente</option>
-                  <option value="ALTA">🟠 Alta</option>
-                  <option value="MEDIA">🟡 Média</option>
-                  <option value="BAIXA">🟢 Baixa</option>
+                  {PRIORIDADE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
 
                 {/* Botão Filtros Avançados */}
@@ -986,7 +1359,7 @@ const GestaoTicketsPage: React.FC = () => {
                 )}
               </div>
 
-              {/* Filtros Avançados (expansível) */}
+              {/* Filtros Avançados (expansivel) */}
               {showFiltrosAvancados && (
                 <div className="pt-4 border-t space-y-3">
                   <p className="text-sm font-medium text-gray-700 mb-3">Filtros Avançados</p>
@@ -1045,9 +1418,9 @@ const GestaoTicketsPage: React.FC = () => {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] text-sm"
                       >
                         <option value="">Todos os SLA</option>
-                        <option value="vencido">❌ Vencido</option>
-                        <option value="proximo">⚠️ Próximo do vencimento</option>
-                        <option value="em_dia">✅ Em dia</option>
+                        <option value="vencido">Vencido</option>
+                        <option value="proximo">Próximo do vencimento</option>
+                        <option value="em_dia">Em dia</option>
                       </select>
                     </div>
 
@@ -1132,7 +1505,7 @@ const GestaoTicketsPage: React.FC = () => {
           )}
 
           {/* Estado Vazio */}
-          {!loading && tickets.length === 0 && (
+          {!loading && ticketsProcessados.length === 0 && (
             <div className="bg-white rounded-lg shadow-sm border">
               <div className="text-center py-16 px-6">
                 <Ticket className="h-16 w-16 text-gray-400 mx-auto mb-4" />
@@ -1146,7 +1519,7 @@ const GestaoTicketsPage: React.FC = () => {
                 </p>
                 {!busca && filtrosAtivos === 0 && (
                   <button
-                    onClick={() => setShowCreateModal(true)}
+                    onClick={abrirNovoTicketComRascunho}
                     className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors shadow-sm mx-auto font-medium"
                   >
                     <Plus className="w-5 h-5" />
@@ -1158,9 +1531,9 @@ const GestaoTicketsPage: React.FC = () => {
           )}
 
           {/* Visualização em Tabela */}
-          {!loading && tickets.length > 0 && viewMode === 'table' && (
+          {!loading && ticketsProcessados.length > 0 && viewMode === 'table' && (
             <TicketsTable
-              tickets={tickets}
+              tickets={ticketsProcessados}
               onEdit={handleEditar}
               onDelete={handleDeletar}
               onAtribuir={handleAtribuir}
@@ -1176,15 +1549,21 @@ const GestaoTicketsPage: React.FC = () => {
           )}
 
           {/* Visualização em Cards */}
-          {!loading && tickets.length > 0 && viewMode === 'cards' && (
+          {!loading && ticketsProcessados.length > 0 && viewMode === 'cards' && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {tickets.map((ticket) => (
+              {ticketsProcessados.map((ticket) => (
                 <div
                   key={ticket.id}
                   className="bg-white rounded-lg shadow-sm border hover:shadow-lg transition-shadow cursor-pointer group relative"
-                  onClick={() => navigate(`/nuclei/atendimento/tickets/${ticket.id}`)}
+                  onClick={() =>
+                    navigate(`/atendimento/tickets/${ticket.id}`, {
+                      state: {
+                        returnTo: returnToTicketsPath,
+                      },
+                    })
+                  }
                 >
-                  {/* Checkbox de seleção (canto superior esquerdo) */}
+                  {/* Checkbox de selecao (canto superior esquerdo) */}
                   <div className="absolute top-4 left-4 z-10">
                     <input
                       type="checkbox"
@@ -1292,7 +1671,7 @@ const GestaoTicketsPage: React.FC = () => {
           )}
 
           {/* Paginação */}
-          {!loading && tickets.length > 0 && totalPaginas > 1 && (
+          {!loading && ticketsProcessados.length > 0 && totalPaginas > 1 && (
             <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
               {/* Info de exibição */}
               <div className="text-sm text-gray-600">
@@ -1304,7 +1683,7 @@ const GestaoTicketsPage: React.FC = () => {
               <div className="flex items-center gap-2">
                 {/* Botão Anterior */}
                 <button
-                  onClick={() => handlePaginacao(paginaAtual - 1)}
+                  onClick={() => handlePaginação(paginaAtual - 1)}
                   disabled={paginaAtual === 1}
                   className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                 >
@@ -1329,7 +1708,7 @@ const GestaoTicketsPage: React.FC = () => {
                     return (
                       <button
                         key={i}
-                        onClick={() => handlePaginacao(pageNum)}
+                        onClick={() => handlePaginação(pageNum)}
                         className={`px-3 py-2 rounded-lg transition-colors ${paginaAtual === pageNum
                           ? 'bg-[#159A9C] text-white'
                           : 'border border-gray-300 hover:bg-gray-50'
@@ -1343,7 +1722,7 @@ const GestaoTicketsPage: React.FC = () => {
 
                 {/* Botão Próximo */}
                 <button
-                  onClick={() => handlePaginacao(paginaAtual + 1)}
+                  onClick={() => handlePaginação(paginaAtual + 1)}
                   disabled={paginaAtual === totalPaginas}
                   className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                 >
@@ -1368,15 +1747,6 @@ const GestaoTicketsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal de Criação de Ticket */}
-      <TicketFormModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onSuccess={carregarTickets}
-        ticket={null}
-        mode="create"
-      />
-
       {/* Modal de Edição de Ticket */}
       <TicketFormModal
         isOpen={showEditModal}
@@ -1389,12 +1759,12 @@ const GestaoTicketsPage: React.FC = () => {
         mode="edit"
       />
 
-      {/* Modal de Atribuir (se existir) */}
-      {showAtribuirModal && selectedTicket && (
+      {/* Modal de Atribuir (ticket individual) */}
+      {showAtribuirTicketModal && selectedTicket && (
         <AtribuirTicketModal
-          isOpen={showAtribuirModal}
+          isOpen={showAtribuirTicketModal}
           onClose={() => {
-            setShowAtribuirModal(false);
+            setShowAtribuirTicketModal(false);
             setSelectedTicket(null);
           }}
           ticket={selectedTicket}
@@ -1403,7 +1773,7 @@ const GestaoTicketsPage: React.FC = () => {
       )}
 
       {/* Modal de Atribuir em Lote */}
-      {showAtribuirModal && (
+      {showAtribuirLoteModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
             <div className="px-6 py-4 border-b flex justify-between items-center">
@@ -1413,7 +1783,7 @@ const GestaoTicketsPage: React.FC = () => {
               </h3>
               <button
                 onClick={() => {
-                  setShowAtribuirModal(false);
+                  setShowAtribuirLoteModal(false);
                   setAtendenteIdLote('');
                   setFilaIdLote('');
                 }}
@@ -1466,7 +1836,7 @@ const GestaoTicketsPage: React.FC = () => {
             <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3">
               <button
                 onClick={() => {
-                  setShowAtribuirModal(false);
+                  setShowAtribuirLoteModal(false);
                   setAtendenteIdLote('');
                   setFilaIdLote('');
                 }}
@@ -1516,13 +1886,11 @@ const GestaoTicketsPage: React.FC = () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
               >
                 <option value="">Selecione um status</option>
-                <option value="FILA">Fila</option>
-                <option value="EM_ATENDIMENTO">Em Atendimento</option>
-                <option value="AGUARDANDO_CLIENTE">Aguardando Cliente</option>
-                <option value="AGUARDANDO_INTERNO">Aguardando Interno</option>
-                <option value="CONCLUIDO">Concluído</option>
-                <option value="CANCELADO">Cancelado</option>
-                <option value="ENCERRADO">Encerrado</option>
+                {STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </div>
 

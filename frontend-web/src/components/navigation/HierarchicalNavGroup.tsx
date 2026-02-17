@@ -1,9 +1,9 @@
-import React, { useEffect, useRef } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronRight, X } from 'lucide-react';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { ChevronRight, X } from 'lucide-react';
 import { MenuConfig } from '../../config/menuConfig';
+import { UI_LAYERS } from '../../config/uiLayers';
 import { useAuth } from '../../hooks/useAuth';
-import { useMenu } from '../../contexts/MenuContext';
 import { useSidebar } from '../../contexts/SidebarContext';
 import './sidebar-animations.css';
 import './menu-improvements.css';
@@ -11,16 +11,74 @@ import './menu-improvements.css';
 interface HierarchicalNavGroupProps {
   menuItems: MenuConfig[];
   sidebarCollapsed: boolean;
+  instanceId?: string;
 }
+
+interface SubmenuSection {
+  id: string;
+  title?: string;
+  items: MenuConfig[];
+}
+
+interface SubmenuTheme {
+  accent: string;
+  accentStrong: string;
+  accentSoft: string;
+  accentSoftAlt: string;
+  accentBorder: string;
+  accentShadow: string;
+}
+
+const SUBMENU_THEMES: Record<MenuConfig['color'], SubmenuTheme> = {
+  blue: {
+    accent: '#159A9C',
+    accentStrong: '#0F7B7D',
+    accentSoft: '#EEF7F3',
+    accentSoftAlt: '#DEEFE7',
+    accentBorder: 'rgba(21, 154, 156, 0.3)',
+    accentShadow: 'rgba(0, 35, 51, 0.7)',
+  },
+  green: {
+    accent: '#1E9E55',
+    accentStrong: '#157642',
+    accentSoft: '#EEF8F1',
+    accentSoftAlt: '#DDF0E3',
+    accentBorder: 'rgba(30, 158, 85, 0.28)',
+    accentShadow: 'rgba(18, 73, 42, 0.6)',
+  },
+  purple: {
+    accent: '#7C3AED',
+    accentStrong: '#5B21B6',
+    accentSoft: '#F3EEFD',
+    accentSoftAlt: '#E8DFFD',
+    accentBorder: 'rgba(124, 58, 237, 0.28)',
+    accentShadow: 'rgba(53, 23, 105, 0.62)',
+  },
+  orange: {
+    accent: '#EA580C',
+    accentStrong: '#C2410C',
+    accentSoft: '#FFF3EB',
+    accentSoftAlt: '#FFE5D6',
+    accentBorder: 'rgba(234, 88, 12, 0.28)',
+    accentShadow: 'rgba(109, 44, 16, 0.56)',
+  },
+  red: {
+    accent: '#DC2626',
+    accentStrong: '#991B1B',
+    accentSoft: '#FDEEED',
+    accentSoftAlt: '#FADDDD',
+    accentBorder: 'rgba(220, 38, 38, 0.28)',
+    accentShadow: 'rgba(92, 26, 26, 0.55)',
+  },
+};
 
 const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
   menuItems,
-  sidebarCollapsed,
+  sidebarCollapsed: _sidebarCollapsed,
+  instanceId,
 }) => {
   const location = useLocation();
-  const navigate = useNavigate();
   const { user } = useAuth();
-  const { expandedMenus, toggleMenu, isMenuExpanded, expandMenu } = useMenu();
   const { activeSubmenuPanel, toggleSubmenuPanel, setActiveSubmenuPanel } = useSidebar();
   const submenuPanelRef = useRef<HTMLDivElement>(null);
 
@@ -34,13 +92,19 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
   // Fechar painel ao clicar fora
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      const isClickInsideAnySubmenuPanel = Boolean(target.closest('[data-submenu-panel="true"]'));
+
+      if (isClickInsideAnySubmenuPanel) {
+        return;
+      }
+
       if (
         activeSubmenuPanel &&
         submenuPanelRef.current &&
         !submenuPanelRef.current.contains(event.target as Node)
       ) {
-        // Verificar se o clique não foi em um dos ícones da sidebar
-        const target = event.target as HTMLElement;
+        // Verificacao se o clique nao foi em um dos icones da sidebar
         const isClickOnSidebarIcon = target.closest('[data-sidebar-item]');
 
         if (!isClickOnSidebarIcon) {
@@ -57,28 +121,13 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
     }
   }, [activeSubmenuPanel, setActiveSubmenuPanel]);
 
-  // Auto-expandir menu baseado na rota atual (apenas se ainda não foi manualmente controlado)
+  // Fecha painel de submenu somente quando a rota muda
   useEffect(() => {
-    const currentPath = location.pathname;
+    setActiveSubmenuPanel(null);
+  }, [location.pathname, setActiveSubmenuPanel]);
 
-    // Encontrar qual menu pai deve estar expandido baseado na rota atual
-    const menuToExpand = menuItems.find((menu) => {
-      if (menu.children) {
-        return menu.children.some((child) => child.href && currentPath === child.href);
-      }
-      return false;
-    });
-
-    // Só auto-expandir se o menu não estiver expandido E se não foi manualmente fechado antes
-    if (menuToExpand && !expandedMenus.includes(menuToExpand.id)) {
-      // Verificar se não há uma intenção manual prévia armazenada
-      const manuallyClosedMenus = JSON.parse(localStorage.getItem('manually-closed-menus') || '[]');
-
-      if (!manuallyClosedMenus.includes(menuToExpand.id)) {
-        expandMenu(menuToExpand.id);
-      }
-    }
-  }, [location.pathname, menuItems, expandedMenus, expandMenu]);
+  const getSubmenuPanelId = (menuId: string): string =>
+    `${instanceId ? `${instanceId}-` : ''}submenu-panel-${menuId}`;
 
   const isMenuItemActive = (item: MenuConfig): boolean => {
     const currentPath = location.pathname;
@@ -106,80 +155,7 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
     });
   };
 
-  const getColorClasses = (color: string, active: boolean = false, isChild: boolean = false) => {
-    const crevassePalette = {
-      primary: '#159A9C',
-      primaryLight: '#DEEFE7',
-      neutral: '#B4BEC9',
-      dark: '#002333',
-      white: '#FFFFFF',
-    };
-
-    const baseClasses = {
-      blue: {
-        hover: 'hover:bg-[#DEEFE7]',
-        active: active ? 'bg-[#DEEFE7] border-r-2 border-[#159A9C]' : '',
-        text: active ? 'text-[#002333]' : 'text-[#002333]',
-        icon: active ? 'text-[#159A9C]' : 'text-[#B4BEC9]',
-        badge: 'bg-[#159A9C]',
-      },
-      green: {
-        hover: 'hover:bg-[#DEEFE7]',
-        active: active ? 'bg-[#DEEFE7] border-r-2 border-[#159A9C]' : '',
-        text: active ? 'text-[#002333]' : 'text-[#002333]',
-        icon: active ? 'text-[#159A9C]' : 'text-[#B4BEC9]',
-        badge: 'bg-[#159A9C]',
-      },
-      orange: {
-        hover: 'hover:bg-[#DEEFE7]',
-        active: active ? 'bg-[#DEEFE7] border-r-2 border-[#159A9C]' : '',
-        text: active ? 'text-[#002333]' : 'text-[#002333]',
-        icon: active ? 'text-[#159A9C]' : 'text-[#B4BEC9]',
-        badge: 'bg-[#159A9C]',
-      },
-      purple: {
-        hover: 'hover:bg-[#DEEFE7]',
-        active: active ? 'bg-[#DEEFE7] border-r-2 border-[#159A9C]' : '',
-        text: active ? 'text-[#002333]' : 'text-[#002333]',
-        icon: active ? 'text-[#159A9C]' : 'text-[#B4BEC9]',
-        badge: 'bg-[#159A9C]',
-      },
-      red: {
-        hover: 'hover:bg-[#DEEFE7]',
-        active: active ? 'bg-[#DEEFE7] border-r-2 border-[#159A9C]' : '',
-        text: active ? 'text-[#002333]' : 'text-[#002333]',
-        icon: active ? 'text-[#159A9C]' : 'text-[#B4BEC9]',
-        badge: 'bg-[#159A9C]',
-      },
-    };
-
-    return baseClasses[color as keyof typeof baseClasses] || baseClasses.blue;
-  };
-
-  // Função para lidar com toggle manual de menu
-  const handleMenuToggle = (menuId: string) => {
-    const isCurrentlyExpanded = isMenuExpanded(menuId);
-
-    // Se estiver expandindo para fechado, marcar como manualmente fechado
-    if (isCurrentlyExpanded) {
-      const manuallyClosedMenus = JSON.parse(localStorage.getItem('manually-closed-menus') || '[]');
-      if (!manuallyClosedMenus.includes(menuId)) {
-        localStorage.setItem(
-          'manually-closed-menus',
-          JSON.stringify([...manuallyClosedMenus, menuId]),
-        );
-      }
-    } else {
-      // Se estiver abrindo, remover da lista de fechados manualmente
-      const manuallyClosedMenus = JSON.parse(localStorage.getItem('manually-closed-menus') || '[]');
-      const filtered = manuallyClosedMenus.filter((id: string) => id !== menuId);
-      localStorage.setItem('manually-closed-menus', JSON.stringify(filtered));
-    }
-
-    toggleMenu(menuId);
-  };
-
-  const renderMenuItem = (item: MenuConfig, isChild: boolean = false) => {
+  const renderMenuItem = (item: MenuConfig) => {
     // Filtrar itens admin-only
     if (item.adminOnly && !isAdmin) {
       return null;
@@ -206,23 +182,25 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
           data-sidebar-item
           onClick={() => toggleSubmenuPanel(item.id)}
           className={`
-            group flex flex-col items-center justify-center relative
-            w-full py-2.5 px-1 rounded-lg
-            transition-all duration-200 ease-in-out
-            focus:outline-none focus:ring-2 focus:ring-[#159A9C]/20
-            ${shouldHighlight ? 'bg-[#159A9C]/20' : 'hover:bg-white/5'}
+            sidebar-nav-link premium-sidebar-item group relative flex w-full min-h-11 items-center justify-start gap-3 rounded-xl border border-transparent px-3 py-3
+            transition-all duration-200 ease-out
+            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white md:focus-visible:ring-offset-[#002333]
+            md:min-h-0 md:flex-col md:items-center md:justify-center md:gap-0 md:px-1 md:py-2.5
+            ${shouldHighlight ? 'bg-[#159A9C]/20 border-[#159A9C]/35 shadow-[inset_0_0_0_1px_rgba(21,154,156,0.15)]' : 'hover:bg-white/8 hover:border-white/10'}
           `}
           title={item.title}
+          aria-expanded={isPanelOpen}
+          aria-controls={getSubmenuPanelId(item.id)}
         >
           <Icon
             className={`
-            h-5 w-5 transition-colors duration-200 mb-1.5
+            h-5 w-5 transition-colors duration-200 mb-0 md:mb-1.5
             ${shouldHighlight ? 'text-[#159A9C]' : 'text-white/80 group-hover:text-white'}
           `}
           />
           <span
             className={`
-            text-[9px] font-semibold text-center leading-tight max-w-full px-1 truncate uppercase tracking-wide
+            text-xs md:text-[9px] font-semibold text-left md:text-center leading-tight max-w-full px-0 md:px-1 truncate uppercase tracking-wide
             ${shouldHighlight ? 'text-[#159A9C]' : 'text-white/90 group-hover:text-white'}
           `}
           >
@@ -230,7 +208,7 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
           </span>
           {/* Indicador de painel aberto ou filho ativo */}
           {shouldHighlight && (
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-10 bg-[#159A9C] rounded-l-full"></div>
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-9 md:h-10 bg-[#159A9C] rounded-l-full"></div>
           )}
         </button>
       );
@@ -245,24 +223,24 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
         key={item.id}
         to={item.href || '#'}
         className={`
-          group flex flex-col items-center justify-center relative
-          w-full py-2.5 px-1 rounded-lg
-          transition-all duration-200 ease-in-out
-          focus:outline-none focus:ring-2 focus:ring-[#159A9C]/20
-          ${shouldBeActive ? 'bg-[#159A9C]/20' : 'hover:bg-white/5'}
+          sidebar-nav-link premium-sidebar-item group relative flex w-full min-h-11 items-center justify-start gap-3 rounded-xl border border-transparent px-3 py-3
+          transition-all duration-200 ease-out
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white md:focus-visible:ring-offset-[#002333]
+          md:min-h-0 md:flex-col md:items-center md:justify-center md:gap-0 md:px-1 md:py-2.5
+          ${shouldBeActive ? 'bg-[#159A9C]/20 border-[#159A9C]/35 shadow-[inset_0_0_0_1px_rgba(21,154,156,0.15)]' : 'hover:bg-white/8 hover:border-white/10'}
         `}
         title={item.title}
         aria-current={shouldBeActive ? 'page' : undefined}
       >
         <Icon
           className={`
-          h-5 w-5 transition-colors duration-200 mb-1.5
+          h-5 w-5 transition-colors duration-200 mb-0 md:mb-1.5
           ${shouldBeActive ? 'text-[#159A9C]' : 'text-white/80 group-hover:text-white'}
         `}
         />
         <span
           className={`
-          text-[9px] font-semibold text-center leading-tight max-w-full px-1 truncate uppercase tracking-wide
+          text-xs md:text-[9px] font-semibold text-left md:text-center leading-tight max-w-full px-0 md:px-1 truncate uppercase tracking-wide
           ${shouldBeActive ? 'text-[#159A9C]' : 'text-white/90 group-hover:text-white'}
         `}
         >
@@ -273,7 +251,7 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
         )}
         {/* Indicador de ativo */}
         {shouldBeActive && (
-          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-10 bg-[#159A9C] rounded-l-full"></div>
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-9 md:h-10 bg-[#159A9C] rounded-l-full"></div>
         )}
       </Link>
     );
@@ -288,21 +266,180 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
   });
 
   // Encontrar o item ativo para renderizar painel suspenso
-  const activeItem = filteredMenuItems.find(item => item.id === activeSubmenuPanel);
+  const activeItem = filteredMenuItems.find((item) => item.id === activeSubmenuPanel);
+  const activeTheme = activeItem ? SUBMENU_THEMES[activeItem.color] : SUBMENU_THEMES.blue;
+  const panelThemeVars = {
+    '--submenu-accent': activeTheme.accent,
+    '--submenu-accent-strong': activeTheme.accentStrong,
+    '--submenu-accent-soft': activeTheme.accentSoft,
+    '--submenu-accent-soft-alt': activeTheme.accentSoftAlt,
+    '--submenu-accent-border': activeTheme.accentBorder,
+    '--submenu-accent-shadow': activeTheme.accentShadow,
+  } as React.CSSProperties;
+
+  const groupedChildren = useMemo<SubmenuSection[]>(() => {
+    if (!activeItem?.children?.length) {
+      return [];
+    }
+
+    const grouped = new Map<string, MenuConfig[]>();
+    const withoutGroup: MenuConfig[] = [];
+
+    activeItem.children.forEach((child) => {
+      if (child.group) {
+        if (!grouped.has(child.group)) {
+          grouped.set(child.group, []);
+        }
+        grouped.get(child.group)!.push(child);
+        return;
+      }
+
+      withoutGroup.push(child);
+    });
+
+    const sections: SubmenuSection[] = [];
+    let sectionIndex = 0;
+
+    grouped.forEach((items, title) => {
+      sections.push({
+        id: `section-${sectionIndex++}`,
+        title,
+        items,
+      });
+    });
+
+    if (withoutGroup.length > 0) {
+      sections.push({
+        id: `section-${sectionIndex++}`,
+        title: grouped.size > 0 ? 'Outros' : undefined,
+        items: withoutGroup,
+      });
+    }
+
+    return sections;
+  }, [activeItem]);
+
+  const renderSubmenuChild = (child: MenuConfig, itemIndex: number) => {
+    const isChildActive = isMenuItemActive(child);
+    const ChildIcon = child.icon;
+    const childHref = child.href ?? child.children?.[0]?.href;
+    const itemAnimationStyle = {
+      animationDelay: `${Math.min(itemIndex * 22, 220)}ms`,
+    };
+    const childClassName = `
+      sidebar-nav-link premium-submenu-item submenu-child-item submenu-item-reveal group relative flex min-h-10 items-center gap-3 rounded-xl border px-3 py-2.5 text-left md:min-h-11 md:px-4 md:py-3
+      transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35
+      ${isChildActive ? 'text-[#002333] font-semibold' : 'border-transparent text-[#334155] font-medium'}
+    `;
+    const activeItemStyle = isChildActive
+      ? {
+          borderColor: 'var(--submenu-accent-border)',
+          background:
+            'linear-gradient(90deg, var(--submenu-accent-soft) 0%, var(--submenu-accent-soft-alt) 45%, #F9FCFB 100%)',
+          boxShadow: '0 14px 24px -20px var(--submenu-accent-shadow)',
+        }
+      : undefined;
+    const itemStyle = {
+      ...itemAnimationStyle,
+      ...(activeItemStyle || {}),
+    } as React.CSSProperties;
+
+    const childContent = (
+      <>
+        {isChildActive && (
+          <div
+            className="absolute left-0 top-1/2 h-8 w-1 -translate-y-1/2 rounded-r-full"
+            style={{
+              background:
+                'linear-gradient(180deg, var(--submenu-accent) 0%, var(--submenu-accent-strong) 100%)',
+            }}
+          />
+        )}
+        <div
+          className={`submenu-child-icon flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg transition-all duration-200 ${
+            isChildActive
+              ? 'text-[color:var(--submenu-accent)] shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]'
+              : 'text-[#94A3B8]'
+          }`}
+          style={
+            isChildActive
+              ? {
+                  backgroundColor: 'var(--submenu-accent-soft-alt)',
+                }
+              : undefined
+          }
+        >
+          <ChildIcon
+            className={`h-4 w-4 transition-transform duration-200 ${
+              isChildActive ? 'scale-105' : 'group-hover:scale-110'
+            }`}
+          />
+        </div>
+        <span className="truncate text-[14px] leading-5">{child.title}</span>
+        <div className="ml-auto flex items-center gap-2 pl-2">
+          {child.badge && (
+            <span
+              className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm"
+              style={{ backgroundColor: 'var(--submenu-accent)' }}
+            >
+              {child.badge}
+            </span>
+          )}
+          <ChevronRight
+            className={`submenu-child-chevron h-4 w-4 transition-all duration-200 ${
+              isChildActive
+                ? 'translate-x-0 opacity-100'
+                : 'translate-x-0.5 opacity-45 text-[#8FA4AD] group-hover:translate-x-0 group-hover:opacity-100'
+            }`}
+            style={isChildActive ? { color: 'var(--submenu-accent)' } : undefined}
+          />
+        </div>
+      </>
+    );
+
+    if (childHref) {
+      return (
+        <Link
+          key={child.id}
+          to={childHref}
+          className={childClassName}
+          style={itemStyle}
+          aria-current={isChildActive ? 'page' : undefined}
+        >
+          {childContent}
+        </Link>
+      );
+    }
+
+    return (
+      <button
+        key={child.id}
+        type="button"
+        className={childClassName}
+        style={itemStyle}
+        onClick={() => setActiveSubmenuPanel(null)}
+      >
+        {childContent}
+      </button>
+    );
+  };
 
   return (
     <>
       {/* Barra de ícones verticais */}
-      <nav className="flex-1 px-1 py-2 space-y-1">
+      <nav
+        className="flex-1 px-2 py-2.5 space-y-1.5 md:px-1 md:space-y-1"
+        aria-label="Menu principal"
+      >
         {filteredMenuItems.map((item) => renderMenuItem(item))}
       </nav>
 
       {/* Backdrop */}
       {activeItem && activeItem.children && activeItem.children.length > 0 && (
         <div
-          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[9] transition-opacity duration-300"
+          className={`fixed inset-0 left-0 md:left-[75px] bg-[#002333]/35 backdrop-blur-[1px] ${UI_LAYERS.SUBMENU_BACKDROP} transition-opacity duration-300 pointer-events-auto`}
           onClick={() => setActiveSubmenuPanel(null)}
-          style={{ left: '75px', pointerEvents: 'auto' }}
+          aria-hidden="true"
         />
       )}
 
@@ -310,22 +447,52 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
       {activeItem && activeItem.children && activeItem.children.length > 0 && (
         <div
           ref={submenuPanelRef}
-          className="fixed left-[75px] top-0 bottom-0 w-[240px] bg-white border-r border-gray-200 shadow-2xl z-[50] overflow-y-auto animate-slide-in"
+          id={getSubmenuPanelId(activeItem.id)}
+          data-submenu-panel="true"
+          className={`premium-submenu-panel fixed inset-y-0 left-0 ${UI_LAYERS.SUBMENU_PANEL} w-[min(90vw,332px)] overflow-y-auto border-r border-[#cfe1e5]/90 bg-white/95 shadow-2xl backdrop-blur-sm animate-slide-in md:left-[75px] md:w-[264px]`}
           style={{
-            animation: 'slideIn 0.25s ease-out',
-            pointerEvents: 'auto'
+            animation: 'slideIn 0.24s cubic-bezier(0.22, 1, 0.36, 1)',
+            pointerEvents: 'auto',
+            ...panelThemeVars,
           }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header do painel */}
-          <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-4 flex items-center justify-between z-10">
-            <div className="flex items-center gap-2">
-              {React.createElement(activeItem.icon, { className: "h-5 w-5 text-[#159A9C]" })}
-              <h3 className="font-semibold text-[#002333]">{activeItem.title}</h3>
+          <div
+            className={`relative sticky top-0 flex items-center justify-between border-b border-gray-200/70 bg-white/95 px-4 py-4 backdrop-blur-sm ${UI_LAYERS.TOPBAR_HEADER}`}
+          >
+            <div
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-px"
+              style={{
+                background:
+                  'linear-gradient(90deg, transparent 0%, var(--submenu-accent-border) 50%, transparent 100%)',
+              }}
+            />
+            <div className="flex items-center gap-3">
+              <div
+                className="flex h-9 w-9 items-center justify-center rounded-xl border shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]"
+                style={{
+                  borderColor: 'var(--submenu-accent-border)',
+                  backgroundColor: 'var(--submenu-accent-soft-alt)',
+                }}
+              >
+                {React.createElement(activeItem.icon, {
+                  className: 'h-4 w-4',
+                  style: { color: 'var(--submenu-accent)' },
+                })}
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7B8794]">
+                  Modulos
+                </p>
+                <h3 className="truncate text-[18px] font-semibold leading-tight text-[#002333]">
+                  {activeItem.title}
+                </h3>
+              </div>
             </div>
             <button
               onClick={() => toggleSubmenuPanel(activeItem.id)}
-              className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+              className="submenu-close-btn min-h-11 min-w-11 rounded-xl border border-transparent p-2 transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35 md:min-h-0 md:min-w-0 md:p-1.5"
               title="Fechar painel"
             >
               <X className="h-4 w-4 text-gray-500" />
@@ -333,50 +500,28 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
           </div>
 
           {/* Lista de submenus */}
-          <div className="p-3">
-            {activeItem.children.map((child) => {
-              const isChildActive = isMenuItemActive(child);
-              const ChildIcon = child.icon;
-
-              return (
-                <div
-                  key={child.id}
-                  className={`
-                    group flex items-center gap-3 px-4 py-3 rounded-lg mb-1 relative
-                    transition-all duration-200 cursor-pointer
-                    ${isChildActive
-                      ? 'bg-[#DEEFE7] text-[#002333] font-semibold shadow-sm'
-                      : 'text-[#4B5563] hover:bg-[#DEEFE7]/50 hover:text-[#002333]'
-                    }
-                  `}
-                  style={{ zIndex: 20, pointerEvents: 'auto' }}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-
-                    if (child.href) {
-                      navigate(child.href);
-                      setTimeout(() => {
-                        setActiveSubmenuPanel(null);
-                      }, 100);
-                    }
-                  }}
-                >
-                  {/* Barra lateral indicadora (igual aos ícones principais) */}
-                  {isChildActive && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-[#159A9C] rounded-r-full" />
-                  )}
-
-                  <ChildIcon className={`h-5 w-5 flex-shrink-0 transition-transform group-hover:scale-110 ${isChildActive ? 'text-[#159A9C]' : 'text-gray-400 group-hover:text-[#159A9C]'}`} />
-                  <span className="text-[15px] truncate">{child.title}</span>
-                  {child.badge && (
-                    <span className="ml-auto text-xs bg-[#159A9C] text-white px-2 py-0.5 rounded-full font-medium">
-                      {child.badge}
-                    </span>
-                  )}
+          <div className="space-y-3 p-2.5 md:p-3">
+            {groupedChildren.map((section) => (
+              <section
+                key={section.id}
+                className="rounded-2xl border border-[#DFE9EC]/80 bg-white/72 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]"
+              >
+                {section.title && (
+                  <div className="mb-2 px-2">
+                    <div className="flex items-center gap-2">
+                      <span className="h-px flex-1 bg-gradient-to-r from-transparent via-[#d5e5e8] to-[#d5e5e8]" />
+                      <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-[#7B8794] md:text-[10px]">
+                        {section.title}
+                      </span>
+                      <span className="h-px flex-1 bg-gradient-to-l from-transparent via-[#d5e5e8] to-[#d5e5e8]" />
+                    </div>
+                  </div>
+                )}
+                <div className="space-y-1.5">
+                  {section.items.map((child, itemIndex) => renderSubmenuChild(child, itemIndex))}
                 </div>
-              );
-            })}
+              </section>
+            ))}
           </div>
         </div>
       )}

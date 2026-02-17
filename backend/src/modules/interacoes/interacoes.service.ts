@@ -12,7 +12,7 @@ export class InteracoesService {
     @InjectRepository(Interacao)
     private readonly interacoesRepository: Repository<Interacao>,
     private readonly agendaService: AgendaService,
-  ) { }
+  ) {}
 
   private sanitize<T extends Partial<CreateInteracaoDto | UpdateInteracaoDto>>(payload: T): T {
     const sanitized = { ...payload } as Record<string, unknown>;
@@ -196,4 +196,3 @@ export class InteracoesService {
     }
   }
 }
-

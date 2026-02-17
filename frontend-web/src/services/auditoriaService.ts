@@ -236,7 +236,7 @@ class AuditoriaService {
   }
 
   private getAuthToken(): string {
-    return localStorage.getItem('auth_token') || '';
+    return localStorage.getItem('authToken') || '';
   }
 
   private extractNewValues(changes?: Record<string, any>): Record<string, any> | undefined {

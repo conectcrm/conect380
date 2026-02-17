@@ -1,6 +1,6 @@
 /**
  * 📊 Metrics Controller
- * 
+ *
  * Controller para expor métricas do Prometheus.
  * Endpoint consumido pelo Prometheus Scraper.
  */

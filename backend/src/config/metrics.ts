@@ -1,9 +1,9 @@
 /**
  * 📊 Prometheus Metrics Configuration
- * 
+ *
  * Configuração centralizada de métricas para observabilidade do sistema.
  * Permite monitorar KPIs de negócio e performance técnica.
- * 
+ *
  * Features:
  * - Counters: Contadores crescentes (tickets criados, mensagens enviadas)
  * - Histograms: Distribuição de valores (tempo de atendimento, latência)
@@ -353,6 +353,46 @@ export const httpRequestsTotal = new promClient.Counter({
   name: 'conectcrm_http_requests_total',
   help: 'Total de requisições HTTP recebidas',
   labelNames: ['method', 'route', 'status_code'],
+  registers: [register],
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════
+ * 🧵 METRICAS DE FILAS (BULL)
+ * ═══════════════════════════════════════════════════════════════
+ */
+
+/**
+ * Counter: Total de jobs por fila e status
+ * Labels: fila, status (enqueued, completed, failed)
+ */
+export const filaJobsTotal = new promClient.Counter({
+  name: 'conectcrm_fila_jobs_total',
+  help: 'Total de jobs processados por fila e status',
+  labelNames: ['fila', 'status'],
+  registers: [register],
+});
+
+/**
+ * Histogram: Duracao de jobs por fila (segundos)
+ * Labels: fila
+ */
+export const filaJobDuracaoHistogram = new promClient.Histogram({
+  name: 'conectcrm_fila_job_duracao_segundos',
+  help: 'Duracao de jobs por fila (segundos)',
+  labelNames: ['fila'],
+  buckets: [0.1, 0.5, 1, 2, 5, 10, 30],
+  registers: [register],
+});
+
+/**
+ * Gauge: Jobs aguardando por fila
+ * Labels: fila
+ */
+export const filaWaitingGauge = new promClient.Gauge({
+  name: 'conectcrm_fila_jobs_waiting',
+  help: 'Quantidade de jobs aguardando por fila',
+  labelNames: ['fila'],
   registers: [register],
 });
 

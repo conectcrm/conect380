@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { ExternalLink, Globe, Copy, Mail, Loader2 } from 'lucide-react';
-import { portalClienteService } from '../services/portalClienteService';
+import { portalClienteService } from '../../services/portalClienteService';
 import toast from 'react-hot-toast';
 
 interface AcessoPortalProps {

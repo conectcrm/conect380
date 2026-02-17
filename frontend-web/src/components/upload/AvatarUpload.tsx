@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import { Camera, User, Loader2 } from 'lucide-react';
 import { FileUpload } from './FileUpload';
-import { UploadResult } from '../../services/uploadService';
+import { UploadContext, UploadResult } from '../../services/uploadService';
 
 interface AvatarUploadProps {
   currentAvatar?: string;
@@ -13,6 +13,7 @@ interface AvatarUploadProps {
   size?: 'sm' | 'md' | 'lg';
   disabled?: boolean;
   className?: string;
+  context?: UploadContext;
 }
 
 export const AvatarUpload: React.FC<AvatarUploadProps> = ({
@@ -21,6 +22,7 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
   size = 'md',
   disabled = false,
   className = '',
+  context,
 }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentAvatar || null);
@@ -82,6 +84,7 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
           disabled={disabled || isUploading}
           acceptedFileTypes="image/*"
           className="relative"
+          context={context}
         >
           <div
             className={`

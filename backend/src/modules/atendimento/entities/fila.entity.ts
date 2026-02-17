@@ -10,10 +10,10 @@ import {
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
-import { FilaAtendente } from './fila-atendente.entity';
 import { NucleoAtendimento } from '../../triagem/entities/nucleo-atendimento.entity';
 import { Departamento } from '../../triagem/entities/departamento.entity';
 import { Empresa } from '../../../empresas/entities/empresa.entity';
+import { FilaAtendente } from './fila-atendente.entity';
 
 export enum EstrategiaDistribuicao {
   ROUND_ROBIN = 'ROUND_ROBIN',
@@ -131,12 +131,7 @@ export class Fila {
   @Column({ type: 'jsonb', nullable: true })
   configuracoes: any;
 
-  /**
-   * Relacionamento com FilaAtendente (junction table)
-   */
-  @OneToMany(() => FilaAtendente, (filaAtendente) => filaAtendente.fila, {
-    cascade: true,
-  })
+  @OneToMany(() => FilaAtendente, (filaAtendente) => filaAtendente.fila)
   atendentes: FilaAtendente[];
 
   @CreateDateColumn({ name: 'createdAt' })

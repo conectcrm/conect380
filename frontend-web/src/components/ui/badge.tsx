@@ -11,7 +11,7 @@ export const Badge: React.FC<BadgeProps> = ({ children, variant = 'default', cla
     'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors';
 
   const variantClasses = {
-    default: 'bg-blue-100 text-blue-800 hover:bg-blue-200',
+    default: 'bg-[#159A9C]/10 text-[#159A9C] hover:bg-[#159A9C]/20',
     destructive: 'bg-red-100 text-red-800 hover:bg-red-200',
     outline: 'border border-gray-300 text-gray-700 bg-transparent',
     secondary: 'bg-gray-100 text-gray-800 hover:bg-gray-200',

@@ -361,13 +361,16 @@ export const ModalUsuarioModerno: React.FC<ModalUsuarioModernoProps> = ({
       // Ctrl+Enter para salvar
       if (e.ctrlKey && e.key === 'Enter') {
         e.preventDefault();
-        handleSubmit(onFormSubmit)();
+        const submitButton = document.querySelector(
+          'button[type="submit"]',
+        ) as HTMLButtonElement | null;
+        submitButton?.click();
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, handleClose, handleSubmit, onFormSubmit]);
+  }, [isOpen, handleClose]);
 
   // Submit do formulário
   const onFormSubmit = useCallback(

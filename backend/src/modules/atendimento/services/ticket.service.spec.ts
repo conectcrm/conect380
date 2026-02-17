@@ -175,10 +175,7 @@ describe('TicketService - Status Transitions', () => {
       });
 
       // Act
-      const resultado = await service.atualizarStatus(
-        ticketId,
-        StatusTicket.EM_ATENDIMENTO,
-      );
+      const resultado = await service.atualizarStatus(ticketId, StatusTicket.EM_ATENDIMENTO);
 
       // Assert
       expect(resultado.status).toBe(StatusTicket.EM_ATENDIMENTO);
@@ -212,10 +209,7 @@ describe('TicketService - Status Transitions', () => {
       });
 
       // Act
-      const resultado = await service.atualizarStatus(
-        ticketId,
-        StatusTicket.ENCERRADO,
-      );
+      const resultado = await service.atualizarStatus(ticketId, StatusTicket.ENCERRADO);
 
       // Assert
       expect(resultado.status).toBe(StatusTicket.ENCERRADO);
@@ -247,10 +241,7 @@ describe('TicketService - Status Transitions', () => {
       });
 
       // Act
-      const resultado = await service.atualizarStatus(
-        ticketId,
-        StatusTicket.ENCERRADO,
-      );
+      const resultado = await service.atualizarStatus(ticketId, StatusTicket.ENCERRADO);
 
       // Assert
       expect(resultado.status).toBe(StatusTicket.ENCERRADO);
@@ -284,10 +275,7 @@ describe('TicketService - Status Transitions', () => {
       });
 
       // Act
-      const resultado = await service.atualizarStatus(
-        ticketId,
-        StatusTicket.FILA,
-      );
+      const resultado = await service.atualizarStatus(ticketId, StatusTicket.FILA);
 
       // Assert
       expect(resultado.status).toBe(StatusTicket.FILA);
@@ -300,7 +288,7 @@ describe('TicketService - Status Transitions', () => {
       );
     });
 
-    it('deve lançar BadRequestException para transição inválida ABERTO → RESOLVIDO', async () => {
+    it('deve lançar BadRequestException para transição inválida FILA → CONCLUIDO', async () => {
       // Arrange
       const ticketId = 'ticket-123';
       const mockTicket: Partial<Ticket> = {
@@ -314,9 +302,9 @@ describe('TicketService - Status Transitions', () => {
       mockTicketRepository.findOne.mockResolvedValue(mockTicket);
 
       // Act & Assert
-      await expect(
-        service.atualizarStatus(ticketId, StatusTicket.ENCERRADO),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.atualizarStatus(ticketId, StatusTicket.CONCLUIDO)).rejects.toThrow(
+        BadRequestException,
+      );
 
       expect(mockTicketRepository.save).not.toHaveBeenCalled();
       expect(mockAtendimentoGateway.notificarStatusTicket).not.toHaveBeenCalled();
@@ -336,9 +324,9 @@ describe('TicketService - Status Transitions', () => {
       mockTicketRepository.findOne.mockResolvedValue(mockTicket);
 
       // Act & Assert
-      await expect(
-        service.atualizarStatus(ticketId, StatusTicket.EM_ATENDIMENTO),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.atualizarStatus(ticketId, StatusTicket.EM_ATENDIMENTO)).rejects.toThrow(
+        BadRequestException,
+      );
 
       expect(mockTicketRepository.save).not.toHaveBeenCalled();
     });
@@ -375,10 +363,7 @@ describe('TicketService - Status Transitions', () => {
       mockTicketRepository.save.mockResolvedValue(ticketAtualizado);
 
       // Act
-      await service.atualizarStatus(
-        ticketId,
-        StatusTicket.EM_ATENDIMENTO,
-      );
+      await service.atualizarStatus(ticketId, StatusTicket.EM_ATENDIMENTO);
 
       // Assert
       expect(mockAtendimentoGateway.notificarStatusTicket).toHaveBeenCalledTimes(1);
@@ -404,10 +389,7 @@ describe('TicketService - Status Transitions', () => {
       mockTicketRepository.save.mockResolvedValue(mockTicket);
 
       // Act
-      const resultado = await service.atualizarStatus(
-        ticketId,
-        StatusTicket.EM_ATENDIMENTO,
-      );
+      const resultado = await service.atualizarStatus(ticketId, StatusTicket.EM_ATENDIMENTO);
 
       // Assert
       expect(resultado.status).toBe(StatusTicket.EM_ATENDIMENTO);
@@ -432,9 +414,7 @@ describe('TicketService - Status Transitions', () => {
 
       mockTicketRepository.findOne.mockResolvedValue(mockTicket);
       mockTicketRepository.save.mockResolvedValue(ticketAtualizado);
-      mockAtendimentoGateway.notificarStatusTicket.mockRejectedValue(
-        new Error('WebSocket error'),
-      );
+      mockAtendimentoGateway.notificarStatusTicket.mockRejectedValue(new Error('WebSocket error'));
 
       // Act & Assert
       await expect(
@@ -489,7 +469,10 @@ describe('TicketService - Status Transitions', () => {
       } as any;
 
       jest.spyOn(service as any, 'buscarPorId').mockResolvedValue(ticket);
-      mockTicketRepository.save.mockResolvedValue({ ...ticket, prioridade: PrioridadeTicket.URGENTE });
+      mockTicketRepository.save.mockResolvedValue({
+        ...ticket,
+        prioridade: PrioridadeTicket.URGENTE,
+      });
 
       await service.atualizarPrioridade(ticketId, PrioridadeTicket.URGENTE);
 
@@ -532,6 +515,7 @@ describe('TicketService - Unificação Tickets + Demandas (Sprint 1)', () => {
 
   const mockContatoRepository: any = {
     findOne: jest.fn(),
+    createQueryBuilder: jest.fn(),
   };
 
   const mockUserRepository: any = {
@@ -552,7 +536,10 @@ describe('TicketService - Unificação Tickets + Demandas (Sprint 1)', () => {
         { provide: WhatsAppSenderService, useValue: { enviarMensagem: jest.fn() } },
         { provide: AtribuicaoService, useValue: { selecionarAtendenteParaRoteamento: jest.fn() } },
         { provide: MensagemService, useValue: { enviar: jest.fn() } },
-        { provide: NotificationChannelsService, useValue: { sendWhatsapp: jest.fn(), sendSms: jest.fn() } },
+        {
+          provide: NotificationChannelsService,
+          useValue: { sendWhatsapp: jest.fn(), sendSms: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -561,6 +548,14 @@ describe('TicketService - Unificação Tickets + Demandas (Sprint 1)', () => {
 
     // Reset mocks
     jest.clearAllMocks();
+
+    const contatoQueryBuilder = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getOne: jest.fn(async () => null),
+    };
+    mockContatoRepository.createQueryBuilder.mockReturnValue(contatoQueryBuilder);
   });
 
   /**
@@ -592,7 +587,11 @@ describe('TicketService - Unificação Tickets + Demandas (Sprint 1)', () => {
         prioridade: PrioridadeTicket.MEDIA,
         data_abertura: new Date(),
         ultima_mensagem_em: new Date(),
-        data_vencimento: new Date(mockDto.data_vencimento),
+        // Campos normalizados (o service grava em camelCase)
+        clienteId: mockDto.cliente_id,
+        dataVencimento: new Date(mockDto.data_vencimento),
+        responsavelId: mockDto.responsavel_id,
+        autorId: mockDto.autor_id,
       };
 
       mockTicketRepository.create.mockReturnValue(mockTicketCriado);
@@ -603,13 +602,13 @@ describe('TicketService - Unificação Tickets + Demandas (Sprint 1)', () => {
       expect(mockTicketRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           empresaId: 'empresa-123',
-          cliente_id: 'cliente-uuid-123',
+          clienteId: 'cliente-uuid-123',
           titulo: 'Problema no sistema',
           descricao: 'Descrição detalhada da demanda',
           tipo: 'demanda',
-          data_vencimento: expect.any(Date),
-          responsavel_id: 'user-responsavel-uuid',
-          autor_id: 'user-autor-uuid',
+          dataVencimento: expect.any(Date),
+          responsavelId: 'user-responsavel-uuid',
+          autorId: 'user-autor-uuid',
         }),
       );
 
@@ -728,7 +727,7 @@ describe('TicketService - Unificação Tickets + Demandas (Sprint 1)', () => {
         orderBy: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
         skip: jest.fn().mockReturnThis(),
-        getManyAndCount: jest.fn().mockResolvedValue([
+        getManyAndCount: (jest.fn() as any).mockResolvedValue([
           [
             { id: 'ticket-1', tipo: 'demanda', titulo: 'Demanda 1' },
             { id: 'ticket-2', tipo: 'demanda', titulo: 'Demanda 2' },
@@ -747,7 +746,9 @@ describe('TicketService - Unificação Tickets + Demandas (Sprint 1)', () => {
         tipo: 'demanda' as TipoTicket,
       });
 
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('ticket.tipo = :tipo', { tipo: 'demanda' });
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('ticket.tipo = :tipo', {
+        tipo: 'demanda',
+      });
       expect(resultado.tickets).toHaveLength(2);
       expect(resultado.total).toBe(2);
     });
@@ -759,7 +760,7 @@ describe('TicketService - Unificação Tickets + Demandas (Sprint 1)', () => {
         orderBy: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
         skip: jest.fn().mockReturnThis(),
-        getManyAndCount: jest.fn().mockResolvedValue([
+        getManyAndCount: (jest.fn() as any).mockResolvedValue([
           [
             { id: 'ticket-1', tipo: 'demanda' },
             { id: 'ticket-2', tipo: null },
@@ -872,7 +873,10 @@ describe('TicketService - Unificação Tickets + Demandas (Sprint 1)', () => {
         status: StatusTicket.AGUARDANDO_CLIENTE,
       });
 
-      const resultado = await service.atualizarStatus('ticket-status', StatusTicket.AGUARDANDO_CLIENTE);
+      const resultado = await service.atualizarStatus(
+        'ticket-status',
+        StatusTicket.AGUARDANDO_CLIENTE,
+      );
 
       expect(resultado.status).toBe(StatusTicket.AGUARDANDO_CLIENTE);
     });
@@ -886,7 +890,7 @@ describe('TicketService - Unificação Tickets + Demandas (Sprint 1)', () => {
       } as any;
 
       jest.spyOn(service as any, 'buscarPorId').mockResolvedValue(mockTicket);
-      
+
       const ticketConcluido = {
         ...mockTicket,
         status: StatusTicket.ENCERRADO,

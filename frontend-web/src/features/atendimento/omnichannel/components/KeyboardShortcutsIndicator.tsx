@@ -17,17 +17,17 @@ export const KeyboardShortcutsIndicator: React.FC<KeyboardShortcutsIndicatorProp
 }) => {
   const getAtalhos = () => {
     switch (ticketStatus) {
-      case 'aberto':
+      case 'fila':
         return [{ tecla: 'A', acao: 'Assumir' }];
       case 'em_atendimento':
         return [
-          { tecla: 'G', acao: 'Aguardar' },
-          { tecla: 'R', acao: 'Resolver' },
+          { tecla: 'G', acao: 'Envio Ativo' },
+          { tecla: 'R', acao: 'Encerrar' },
         ];
-      case 'aguardando':
-        return [{ tecla: 'R', acao: 'Resolver' }];
-      case 'resolvido':
-        return [{ tecla: 'F', acao: 'Fechar' }];
+      case 'envio_ativo':
+        return [{ tecla: 'R', acao: 'Encerrar' }];
+      case 'encerrado':
+        return [{ tecla: 'F', acao: 'Reabrir' }];
       default:
         return [];
     }

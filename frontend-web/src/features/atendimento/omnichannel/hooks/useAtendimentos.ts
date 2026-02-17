@@ -271,11 +271,10 @@ export const useAtendimentos = (options: UseAtendimentosOptions = {}): UseAtendi
   const [totalPaginas, setTotalPaginas] = useState(0);
   const [filtros, setFiltrosLocal] = useState<ListarTicketsParams>(filtroInicial);
   const [totaisPorStatus, setTotaisPorStatus] = useState<Record<StatusAtendimentoType, number>>({
-    aberto: 0,
+    fila: 0,
     em_atendimento: 0,
-    aguardando: 0,
-    resolvido: 0,
-    fechado: 0,
+    envio_ativo: 0,
+    encerrado: 0,
   });
 
   const podeVisualizarTicket = useCallback(
@@ -342,11 +341,10 @@ export const useAtendimentos = (options: UseAtendimentosOptions = {}): UseAtendi
         }));
       } else {
         const contagensCalculadas: Record<StatusAtendimentoType, number> = {
-          aberto: 0,
+          fila: 0,
           em_atendimento: 0,
-          aguardando: 0,
-          resolvido: 0,
-          fechado: 0,
+          envio_ativo: 0,
+          encerrado: 0,
         };
 
         ticketsVisiveis.forEach((ticketAtual) => {

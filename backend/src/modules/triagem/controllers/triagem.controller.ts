@@ -1,22 +1,23 @@
-import {
-  Controller,
-  Post,
+﻿import {
   Body,
-  UseGuards,
-  Request,
+  Controller,
+  Delete,
+  Get,
+  Headers,
   HttpCode,
   HttpStatus,
-  Get,
-  Param,
-  Delete,
   Logger,
-  Headers,
+  Param,
+  Post,
+  UseGuards,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../../../modules/auth/jwt-auth.guard';
-import { Public } from '../../../modules/auth/decorators/public.decorator';
-import { TriagemBotService, ResultadoProcessamentoWebhook } from '../services/triagem-bot.service';
-import { IniciarTriagemDto, ResponderTriagemDto } from '../dto';
 import * as crypto from 'crypto';
+import { EmpresaId } from '../../../common/decorators/empresa.decorator';
+import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { Public } from '../../../modules/auth/decorators/public.decorator';
+import { JwtAuthGuard } from '../../../modules/auth/jwt-auth.guard';
+import { IniciarTriagemDto, ResponderTriagemDto } from '../dto';
+import { ResultadoProcessamentoWebhook, TriagemBotService } from '../services/triagem-bot.service';
 
 @Controller('triagem')
 export class TriagemController {
@@ -24,44 +25,29 @@ export class TriagemController {
 
   constructor(private readonly triagemBotService: TriagemBotService) {}
 
-  /**
-   * POST /triagem/iniciar
-   * Inicia uma nova sessão de triagem
-   */
   @Post('iniciar')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, EmpresaGuard)
   @HttpCode(HttpStatus.OK)
-  async iniciar(@Request() req, @Body() iniciarDto: IniciarTriagemDto) {
-    const empresaId = req.user.empresa_id;
+  async iniciar(@EmpresaId() empresaId: string, @Body() iniciarDto: IniciarTriagemDto) {
     return this.triagemBotService.iniciarTriagem(empresaId, iniciarDto);
   }
 
-  /**
-   * POST /triagem/responder
-   * Processa resposta do usuário na triagem
-   */
   @Post('responder')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, EmpresaGuard)
   @HttpCode(HttpStatus.OK)
-  async responder(@Request() req, @Body() responderDto: ResponderTriagemDto) {
-    const empresaId = req.user.empresa_id;
+  async responder(@EmpresaId() empresaId: string, @Body() responderDto: ResponderTriagemDto) {
     return this.triagemBotService.processarResposta(empresaId, responderDto);
   }
 
-  /**
-   * GET /triagem/sessao/:telefone
-   * Busca sessão ativa por telefone
-   */
   @Get('sessao/:telefone')
-  @UseGuards(JwtAuthGuard)
-  async buscarSessao(@Request() req, @Param('telefone') telefone: string) {
-    const empresaId = req.user.empresa_id;
+  @UseGuards(JwtAuthGuard, EmpresaGuard)
+  async buscarSessao(@EmpresaId() empresaId: string, @Param('telefone') telefone: string) {
     const sessao = await this.triagemBotService.buscarSessaoAtiva(empresaId, telefone);
 
     if (!sessao) {
       return {
         ativa: false,
-        mensagem: 'Nenhuma sessão ativa encontrada',
+        mensagem: 'Nenhuma sessao ativa encontrada',
       };
     }
 
@@ -76,26 +62,13 @@ export class TriagemController {
     };
   }
 
-  /**
-   * DELETE /triagem/sessao/:sessaoId
-   * Cancela uma sessão de triagem
-   */
   @Delete('sessao/:sessaoId')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, EmpresaGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
-  async cancelarSessao(@Param('sessaoId') sessaoId: string) {
-    await this.triagemBotService.cancelarSessao(sessaoId);
+  async cancelarSessao(@EmpresaId() empresaId: string, @Param('sessaoId') sessaoId: string) {
+    await this.triagemBotService.cancelarSessao(empresaId, sessaoId);
   }
 
-  /**
-   * POST /triagem/webhook/whatsapp
-   * Endpoint para receber mensagens do WhatsApp
-   * (Público - sem autenticação JWT)
-   *
-   * Validação de Segurança:
-   * - Verifica assinatura X-Hub-Signature-256 do Meta
-   * - Previne ataques de replay/spoofing
-   */
   @Public()
   @Post('webhook/whatsapp')
   @HttpCode(HttpStatus.OK)
@@ -105,34 +78,35 @@ export class TriagemController {
   ): Promise<
     ({ success: true } & ResultadoProcessamentoWebhook) | { success: false; message: string }
   > {
-    const empresaId = process.env.DEFAULT_EMPRESA_ID || 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+    const empresaId = process.env.DEFAULT_EMPRESA_ID;
+    if (!empresaId) {
+      this.logger.error('DEFAULT_EMPRESA_ID nao configurado para webhook de triagem');
+      return {
+        success: false,
+        message: 'Empresa padrao nao configurada',
+      };
+    }
 
     try {
-      // 1. Validar assinatura do webhook (se configurada)
       const appSecret = process.env.WHATSAPP_APP_SECRET;
 
       if (appSecret && signature) {
         const isValid = this.validateWebhookSignature(body, signature, appSecret);
 
         if (!isValid) {
-          this.logger.warn(`⚠️ Assinatura inválida do webhook - empresaId: ${empresaId}`);
-
-          // Retornar 200 OK para não causar reenvio do Meta, mas não processar
+          this.logger.warn(`Assinatura invalida do webhook - empresaId: ${empresaId}`);
           return {
             success: true,
             ignorado: true,
-            motivo: 'Assinatura inválida - requisição rejeitada',
+            motivo: 'Assinatura invalida - requisicao rejeitada',
           } as any;
         }
 
-        this.logger.log('✅ Assinatura do webhook validada com sucesso');
+        this.logger.log('Assinatura do webhook validada com sucesso');
       } else if (!appSecret) {
-        this.logger.warn(
-          '⚠️ WHATSAPP_APP_SECRET não configurado - webhook sem validação de assinatura!',
-        );
+        this.logger.warn('WHATSAPP_APP_SECRET nao configurado - webhook sem validacao de assinatura');
       }
 
-      // 2. Processar mensagem normalmente
       const resultado = await this.triagemBotService.processarMensagemWhatsApp(empresaId, body);
 
       return {
@@ -149,23 +123,12 @@ export class TriagemController {
     }
   }
 
-  /**
-   * Valida assinatura HMAC SHA-256 do webhook do Meta
-   * @param body Payload do webhook
-   * @param signature Header X-Hub-Signature-256 (formato: sha256=<hash>)
-   * @param appSecret App Secret configurado no Meta Business
-   * @returns true se assinatura é válida
-   */
   private validateWebhookSignature(body: any, signature: string, appSecret: string): boolean {
     try {
-      // 1. Remover prefixo "sha256=" da assinatura
       const receivedHash = signature.replace('sha256=', '');
-
-      // 2. Calcular HMAC SHA-256 do body
       const bodyString = JSON.stringify(body);
       const expectedHash = crypto.createHmac('sha256', appSecret).update(bodyString).digest('hex');
 
-      // 3. Comparar hashes (timing-safe para prevenir ataques de timing)
       return crypto.timingSafeEqual(
         Buffer.from(receivedHash, 'hex'),
         Buffer.from(expectedHash, 'hex'),

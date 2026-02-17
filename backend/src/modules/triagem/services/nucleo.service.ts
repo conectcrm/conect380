@@ -12,7 +12,7 @@ export class NucleoService {
   constructor(
     @InjectRepository(NucleoAtendimento)
     private readonly nucleoRepository: Repository<NucleoAtendimento>,
-  ) { }
+  ) {}
 
   /**
    * Cria um novo núcleo de atendimento
@@ -209,35 +209,60 @@ export class NucleoService {
   /**
    * Incrementa tickets abertos do núcleo
    */
-  async incrementarTicketsAbertos(id: string): Promise<void> {
-    await this.nucleoRepository.increment({ id }, 'totalTicketsAbertos', 1);
+  async incrementarTicketsAbertos(empresaId: string, id: string): Promise<void> {
+    const result = await this.nucleoRepository.increment(
+      { id, empresaId },
+      'totalTicketsAbertos',
+      1,
+    );
+
+    if (!result.affected) {
+      throw new NotFoundException(`Nucleo com ID ${id} nao encontrado`);
+    }
   }
 
   /**
    * Decrementa tickets abertos do núcleo
    */
-  async decrementarTicketsAbertos(id: string): Promise<void> {
-    await this.nucleoRepository.decrement({ id }, 'totalTicketsAbertos', 1);
+  async decrementarTicketsAbertos(empresaId: string, id: string): Promise<void> {
+    const result = await this.nucleoRepository.decrement(
+      { id, empresaId },
+      'totalTicketsAbertos',
+      1,
+    );
+
+    if (!result.affected) {
+      throw new NotFoundException(`Nucleo com ID ${id} nao encontrado`);
+    }
   }
 
   /**
    * Incrementa tickets resolvidos
    */
-  async incrementarTicketsResolvidos(id: string): Promise<void> {
-    await this.nucleoRepository.increment({ id }, 'totalTicketsResolvidos', 1);
+  async incrementarTicketsResolvidos(empresaId: string, id: string): Promise<void> {
+    const result = await this.nucleoRepository.increment(
+      { id, empresaId },
+      'totalTicketsResolvidos',
+      1,
+    );
+
+    if (!result.affected) {
+      throw new NotFoundException(`Nucleo com ID ${id} nao encontrado`);
+    }
   }
 
   /**
    * Atualiza métricas do núcleo
    */
   async atualizarMetricas(
+    empresaId: string,
     id: string,
     metricas: {
       tempoMedioAtendimento?: number;
       taxaSatisfacao?: number;
     },
   ): Promise<void> {
-    const nucleo = await this.nucleoRepository.findOne({ where: { id } });
+    const nucleo = await this.nucleoRepository.findOne({ where: { id, empresaId } });
     if (!nucleo) return;
 
     if (metricas.tempoMedioAtendimento !== undefined) {

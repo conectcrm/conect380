@@ -13,7 +13,7 @@ import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 /**
  * Log de Distribuição de Tickets
- * 
+ *
  * Registra cada distribuição automática para auditoria,
  * métricas e troubleshooting.
  */

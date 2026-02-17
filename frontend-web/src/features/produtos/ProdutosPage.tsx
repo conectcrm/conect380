@@ -753,7 +753,9 @@ const ProdutosPage: React.FC = () => {
           setShowModalAvancado(false);
           setProdutoParaEditar(null);
         }}
-        onSubmit={handleSaveProduto}
+        onSubmit={(data) => {
+          void handleSaveProduto(data as any);
+        }}
         produtoEditando={produtoParaEditar}
         loading={isLoadingSave}
       />
@@ -801,3 +803,4 @@ const ProdutosPage: React.FC = () => {
 };
 
 export default ProdutosPage;
+

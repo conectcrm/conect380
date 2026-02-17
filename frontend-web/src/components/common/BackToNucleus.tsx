@@ -40,11 +40,12 @@ const BackToNucleus: React.FC<BackToNucleusProps> = ({
         <div className="flex items-center h-14">
           <button
             onClick={handleBack}
-            className="flex items-center text-white hover:text-gray-200 transition-colors duration-200"
+            className="flex md:hidden items-center text-white hover:text-gray-200 transition-colors duration-200"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />
             <span className="text-sm font-medium">Voltar para {nucleusName}</span>
           </button>
+          <span className="hidden md:block text-sm font-medium text-white/90">{nucleusName}</span>
         </div>
       </div>
     </div>

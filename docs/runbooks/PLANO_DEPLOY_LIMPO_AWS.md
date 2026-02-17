@@ -350,7 +350,7 @@ CORS_ORIGINS=https://seudominio.com,https://app.seudominio.com
 SMTP_HOST=smtp.sendgrid.net
 SMTP_PORT=587
 SMTP_USER=apikey
-SMTP_PASS=SG.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+SMTP_PASS=<SENDGRID_API_KEY>
 SMTP_FROM=noreply@seudominio.com
 
 # ============================================
@@ -363,14 +363,14 @@ WHATSAPP_VERIFY_TOKEN=token_verificacao_webhook
 # ============================================
 # OPENAI / ANTHROPIC (IA)
 # ============================================
-OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxx
+OPENAI_API_KEY=<OPENAI_API_KEY>
+ANTHROPIC_API_KEY=<ANTHROPIC_API_KEY>
 
 # ============================================
 # STRIPE (Pagamentos - opcional)
 # ============================================
-STRIPE_SECRET_KEY=sk_live_xxxxxxxxxxxxxxxxxxxxxxxx
-STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxxxxxxxxxx
+STRIPE_SECRET_KEY=<STRIPE_SECRET_KEY>
+STRIPE_WEBHOOK_SECRET=<STRIPE_WEBHOOK_SECRET>
 
 # ============================================
 # LOGS & MONITORING

@@ -8,7 +8,7 @@ export class NiveisAtendimentoService {
   constructor(
     @InjectRepository(NivelAtendimento)
     private readonly nivelRepository: Repository<NivelAtendimento>,
-  ) { }
+  ) {}
 
   async listarPorEmpresa(empresaId: string): Promise<NivelAtendimento[]> {
     if (!empresaId) {
@@ -25,7 +25,7 @@ export class NiveisAtendimentoService {
     return niveis;
   }
 
-  async buscarPorId(id: string): Promise<NivelAtendimento> {
-    return this.nivelRepository.findOne({ where: { id } });
+  async buscarPorId(id: string, empresaId: string): Promise<NivelAtendimento> {
+    return this.nivelRepository.findOne({ where: { id, empresaId } });
   }
 }

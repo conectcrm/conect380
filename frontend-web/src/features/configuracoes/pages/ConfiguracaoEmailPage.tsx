@@ -25,7 +25,10 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { emailServiceReal } from '../../../services/emailServiceReal';
-import { EMAIL_PROVIDERS } from '../../../config/emailConfig';
+import {
+  EMAIL_PROVIDERS,
+  resolveEmailProvider,
+} from '../../../config/emailConfig';
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
 
 const ConfiguracaoEmailPage: React.FC = () => {
@@ -196,15 +199,28 @@ const ConfiguracaoEmailPage: React.FC = () => {
   );
 
   useEffect(() => {
+    const envProvider = resolveEmailProvider(process.env.REACT_APP_EMAIL_PROVIDER);
     // Carregar configurações do localStorage ou variáveis de ambiente
     const configSalva = localStorage.getItem('conectcrm-email-config');
     if (configSalva) {
-      setConfiguracoes(JSON.parse(configSalva));
+      try {
+        const parsedConfig = JSON.parse(configSalva);
+        const savedProvider = resolveEmailProvider(parsedConfig?.provider);
+
+        setConfiguracoes((prev) => ({
+          ...prev,
+          ...parsedConfig,
+          provider: savedProvider,
+        }));
+        setProviderAtual(savedProvider);
+      } catch {
+        setProviderAtual(envProvider);
+      }
     } else {
       // Carregar das variáveis de ambiente
       setConfiguracoes((prev) => ({
         ...prev,
-        provider: process.env.REACT_APP_EMAIL_PROVIDER || 'gmail',
+        provider: envProvider,
         gmail: {
           user: process.env.REACT_APP_EMAIL_USER || '',
           password: process.env.REACT_APP_EMAIL_PASSWORD || '',
@@ -219,6 +235,7 @@ const ConfiguracaoEmailPage: React.FC = () => {
           endereco: process.env.REACT_APP_EMPRESA_ENDERECO || 'São Paulo/SP',
         },
       }));
+      setProviderAtual(envProvider);
     }
 
     // Carregar histórico de testes
@@ -226,8 +243,6 @@ const ConfiguracaoEmailPage: React.FC = () => {
     if (historicoSalvo) {
       setHistoricoTestes(JSON.parse(historicoSalvo));
     }
-
-    setProviderAtual(process.env.REACT_APP_EMAIL_PROVIDER || 'gmail');
     setEmailTeste(localStorage.getItem('conectcrm-email-teste') || '');
   }, []);
 
@@ -303,7 +318,7 @@ const ConfiguracaoEmailPage: React.FC = () => {
         setup:
           'Crie uma conta gratuita no SendGrid e gere uma API Key com permissões de envio de e-mail.',
       },
-      awsSes: {
+      'aws-ses': {
         setup: 'Configure suas credenciais AWS e ative o Amazon SES na região escolhida.',
       },
     };
@@ -433,7 +448,7 @@ const ConfiguracaoEmailPage: React.FC = () => {
                     return (
                       <div
                         key={key}
-                        onClick={() => setProviderAtual(key)}
+                        onClick={() => setProviderAtual(resolveEmailProvider(key))}
                         className={`relative p-4 border-2 rounded-lg cursor-pointer transition-all hover:shadow-md ${
                           isSelected
                             ? 'border-blue-500 bg-blue-50 shadow-sm'
@@ -452,7 +467,7 @@ const ConfiguracaoEmailPage: React.FC = () => {
                           <div className="flex items-center">
                             {key === 'gmail' && <Globe className="w-5 h-5 text-blue-600 mr-2" />}
                             {key === 'sendgrid' && <Zap className="w-5 h-5 text-blue-600 mr-2" />}
-                            {key === 'awsSes' && <Shield className="w-5 h-5 text-blue-600 mr-2" />}
+                            {key === 'aws-ses' && <Shield className="w-5 h-5 text-blue-600 mr-2" />}
                             <h4 className="font-medium">{provider.name}</h4>
                           </div>
                           {isSelected && <Check className="w-5 h-5 text-blue-600" />}
@@ -474,7 +489,7 @@ const ConfiguracaoEmailPage: React.FC = () => {
                               Freemium
                             </span>
                           )}
-                          {key === 'awsSes' && (
+                          {key === 'aws-ses' && (
                             <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
                               Pay per use
                             </span>
@@ -977,3 +992,4 @@ const ConfiguracaoEmailPage: React.FC = () => {
 };
 
 export default ConfiguracaoEmailPage;
+

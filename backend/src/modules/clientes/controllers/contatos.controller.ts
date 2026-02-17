@@ -30,7 +30,7 @@ import { CreateContatoDto, UpdateContatoDto, ResponseContatoDto } from '../dto/c
 @Controller('api/crm')
 @UseGuards(JwtAuthGuard, EmpresaGuard)
 export class ContatosController {
-  constructor(private readonly contatosService: ContatosService) { }
+  constructor(private readonly contatosService: ContatosService) {}
 
   /**
    * Lista TODOS os contatos da empresa (de todos os clientes)
@@ -58,8 +58,8 @@ export class ContatosController {
    * GET /api/crm/contatos/:id
    */
   @Get('contatos/:id')
-  async buscar(@Param('id') id: string): Promise<ResponseContatoDto> {
-    return this.contatosService.buscarPorId(id);
+  async buscar(@Param('id') id: string, @EmpresaId() empresaId: string): Promise<ResponseContatoDto> {
+    return this.contatosService.buscarPorId(id, empresaId);
   }
 
   /**
@@ -101,8 +101,9 @@ export class ContatosController {
   async atualizar(
     @Param('id') id: string,
     @Body() updateContatoDto: UpdateContatoDto,
+    @EmpresaId() empresaId: string,
   ): Promise<ResponseContatoDto> {
-    return this.contatosService.atualizar(id, updateContatoDto);
+    return this.contatosService.atualizar(id, updateContatoDto, empresaId);
   }
 
   /**
@@ -110,8 +111,11 @@ export class ContatosController {
    * PATCH /api/crm/contatos/:id/principal
    */
   @Patch('contatos/:id/principal')
-  async definirComoPrincipal(@Param('id') id: string): Promise<ResponseContatoDto> {
-    return this.contatosService.definirComoPrincipal(id);
+  async definirComoPrincipal(
+    @Param('id') id: string,
+    @EmpresaId() empresaId: string,
+  ): Promise<ResponseContatoDto> {
+    return this.contatosService.definirComoPrincipal(id, empresaId);
   }
 
   /**
@@ -120,7 +124,7 @@ export class ContatosController {
    */
   @Delete('contatos/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remover(@Param('id') id: string): Promise<void> {
-    return this.contatosService.remover(id);
+  async remover(@Param('id') id: string, @EmpresaId() empresaId: string): Promise<void> {
+    return this.contatosService.remover(id, empresaId);
   }
 }

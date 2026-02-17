@@ -1,13 +1,26 @@
-import { Controller, Get, Post, Put, Delete, Patch, Body, Param, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Patch,
+  Body,
+  Param,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
+import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { TiposServicoService } from '../services/tipos-servico.service';
 import { CreateTipoServicoDto } from '../dto/create-tipo-servico.dto';
 import { UpdateTipoServicoDto } from '../dto/update-tipo-servico.dto';
 
 @Controller('configuracoes-tickets/tipos-servico')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class TiposServicoController {
-  constructor(private readonly tiposService: TiposServicoService) { }
+  constructor(private readonly tiposService: TiposServicoService) {}
 
   @Get()
   @HttpCode(HttpStatus.OK)

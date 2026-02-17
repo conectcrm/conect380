@@ -8,9 +8,13 @@ import { PlanosService } from './planos.service';
 import { PlanosController } from './planos.controller';
 import { AssinaturasService } from './assinaturas.service';
 import { AssinaturasController } from './assinaturas.controller';
+import { MercadoPagoModule } from '../mercado-pago/mercado-pago.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Plano, ModuloSistema, PlanoModulo, AssinaturaEmpresa])],
+  imports: [
+    TypeOrmModule.forFeature([Plano, ModuloSistema, PlanoModulo, AssinaturaEmpresa]),
+    MercadoPagoModule,
+  ],
   controllers: [PlanosController, AssinaturasController],
   providers: [PlanosService, AssinaturasService],
   exports: [PlanosService, AssinaturasService],

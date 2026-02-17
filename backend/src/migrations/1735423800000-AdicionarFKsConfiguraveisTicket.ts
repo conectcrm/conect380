@@ -2,12 +2,12 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Migration: Adicionar FKs Configuráveis ao Ticket
- * 
+ *
  * Adiciona 3 novas colunas FK para substituir os enums:
  * - nivel_atendimento_id (FK niveis_atendimento) - substitui assignedLevel enum
  * - status_customizado_id (FK status_customizados) - NOVO campo (antes não tinha FK)
  * - tipo_servico_id (FK tipos_servico) - substitui tipo enum
- * 
+ *
  * ESTRATÉGIA: Migração gradual
  * 1. Adiciona novas colunas (nullable)
  * 2. Mantém enums antigos por enquanto
@@ -78,7 +78,9 @@ export class AdicionarFKsConfiguraveisTicket1735423800000 implements MigrationIn
     `);
 
     console.log('✅ Colunas FK adicionadas com sucesso!');
-    console.log('⚠️  NOTA: Enums antigos ainda estão presentes. Execute a próxima migration para migrar dados.');
+    console.log(
+      '⚠️  NOTA: Enums antigos ainda estão presentes. Execute a próxima migration para migrar dados.',
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

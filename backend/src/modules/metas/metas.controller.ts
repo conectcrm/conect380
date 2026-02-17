@@ -1,7 +1,10 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
 import { MetasService, CreateMetaDto, UpdateMetaDto } from './metas.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../common/guards/empresa.guard';
 
 @Controller('metas')
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class MetasController {
   constructor(private readonly metasService: MetasService) {}
 

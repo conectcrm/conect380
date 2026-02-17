@@ -38,8 +38,8 @@ export const ModalNovaOportunidade: React.FC<ModalNovaOportunidadeProps> = ({
     origem: OrigemOportunidade.WEBSITE,
     tags: [],
     dataFechamentoEsperado: undefined,
-    responsavelId: '',
-    clienteId: undefined,
+    responsavel_id: '',
+    cliente_id: undefined,
     nomeContato: '',
     emailContato: '',
     telefoneContato: '',
@@ -91,8 +91,8 @@ export const ModalNovaOportunidade: React.FC<ModalNovaOportunidadeProps> = ({
         origem: OrigemOportunidade.WEBSITE,
         tags: [],
         dataFechamentoEsperado: undefined,
-        responsavelId: '',
-        clienteId: undefined,
+        responsavel_id: '',
+        cliente_id: undefined,
         nomeContato: '',
         emailContato: '',
         telefoneContato: '',
@@ -330,8 +330,8 @@ export const ModalNovaOportunidade: React.FC<ModalNovaOportunidadeProps> = ({
                 <label className="block text-sm font-medium text-gray-700 mb-2">Responsável</label>
                 <input
                   type="text"
-                  value={formData.responsavelId}
-                  onChange={(e) => handleInputChange('responsavelId', e.target.value)}
+                  value={formData.responsavel_id}
+                  onChange={(e) => handleInputChange('responsavel_id', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Nome do responsável"
                 />
@@ -372,3 +372,4 @@ export const ModalNovaOportunidade: React.FC<ModalNovaOportunidadeProps> = ({
     </div>
   );
 };
+

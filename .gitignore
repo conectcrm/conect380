@@ -156,6 +156,11 @@ scripts/debug-*.js
 scripts/temp-*.js
 scripts/*.env
 
+# Artefatos gerados/local-only (não versionar)
+.production/pilot-runs/
+backend/test/tmp-*
+tmp-*.json
+
 # 🔐 SEGURANÇA: Arquivos com credenciais expostas
 *-with-credentials.js
 *-with-token.js

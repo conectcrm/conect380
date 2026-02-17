@@ -40,7 +40,6 @@ export interface TicketComponente {
   mensagensNaoLidas?: number;
   criadoEm: Date | string;
   atualizadoEm?: Date | string;
-  filaId?: string;
 }
 
 /**

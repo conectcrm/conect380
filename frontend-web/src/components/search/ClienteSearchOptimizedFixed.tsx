@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Search, User, X, Plus, RefreshCw, Building, Check } from 'lucide-react';
-import { useDebounced } from '../../hooks/useDebounced';
+import { useDebounce } from '../../hooks/useDebounce';
 
 interface Cliente {
   id: string;
@@ -42,7 +42,7 @@ const ClienteSearchOptimized: React.FC<ClienteSearchOptimizedProps> = ({
   const [isOpen, setIsOpen] = useState(false);
 
   // Usar nosso hook de debounce personalizado
-  const debouncedSearchTerm = useDebounced(searchTerm, 300);
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
   // Filtros e busca otimizada (removido filtro de tipo)
   const clientesFiltrados = useMemo(() => {

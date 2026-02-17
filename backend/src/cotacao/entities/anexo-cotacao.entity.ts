@@ -9,13 +9,22 @@ import {
 } from 'typeorm';
 import { Cotacao } from './cotacao.entity';
 import { User } from '../../modules/users/user.entity';
+import { Empresa } from '../../empresas/entities/empresa.entity';
 
 @Entity('anexos_cotacao')
 @Index(['cotacaoId'])
 @Index(['tipo'])
+@Index(['empresaId'])
 export class AnexoCotacao {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ type: 'uuid', name: 'empresa_id' })
+  empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   @Column({ name: 'cotacao_id' })
   cotacaoId: string;

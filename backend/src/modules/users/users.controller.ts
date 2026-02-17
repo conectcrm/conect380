@@ -1,4 +1,4 @@
-import {
+import { Logger,
   Controller,
   Get,
   Post,
@@ -23,28 +23,31 @@ import * as path from 'path';
 
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../common/guards/empresa.guard';
 import { CurrentUser } from '../../common/decorators/user.decorator';
 import { User } from './user.entity';
 
 const AVATAR_UPLOAD_SUBDIR = 'avatars';
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const AVATAR_SEGMENT = `/uploads/${AVATAR_UPLOAD_SUBDIR}/`;
+const avatarLogger = new Logger('UsersController');
 
 const ensureAvatarDirectory = (): string => {
   const uploadDir = path.resolve(__dirname, '../../../uploads', AVATAR_UPLOAD_SUBDIR);
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
-    console.log('[Uploads] Diretório de avatares criado:', uploadDir);
+    avatarLogger.log('[Uploads] Diretório de avatares criado:', uploadDir);
   }
   return uploadDir;
 };
 
 @ApiTags('users')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) { }
+  private readonly logger = new Logger(UsersController.name);
+  constructor(private readonly usersService: UsersService) {}
 
   private getAvatarUploadDir(): string {
     return ensureAvatarDirectory();
@@ -74,14 +77,14 @@ export class UsersController {
   async getProfile(@CurrentUser() user: User) {
     const empresa = user.empresa
       ? {
-        id: user.empresa.id,
-        nome: user.empresa.nome,
-        slug: user.empresa.slug,
-        cnpj: user.empresa.cnpj,
-        plano: user.empresa.plano,
-        ativo: user.empresa.ativo,
-        subdominio: user.empresa.subdominio,
-      }
+          id: user.empresa.id,
+          nome: user.empresa.nome,
+          slug: user.empresa.slug,
+          cnpj: user.empresa.cnpj,
+          plano: user.empresa.plano,
+          ativo: user.empresa.ativo,
+          subdominio: user.empresa.subdominio,
+        }
       : null;
 
     return {
@@ -169,7 +172,7 @@ export class UsersController {
         } catch (unlinkError) {
           const errorCode = (unlinkError as NodeJS.ErrnoException)?.code;
           if (errorCode !== 'ENOENT') {
-            console.warn(
+            this.logger.warn(
               '[Uploads] Falha ao remover avatar antigo:',
               previousAvatarPath,
               unlinkError,
@@ -194,7 +197,7 @@ export class UsersController {
       } catch (cleanupError) {
         const errorCode = (cleanupError as NodeJS.ErrnoException)?.code;
         if (errorCode !== 'ENOENT') {
-          console.error(
+          this.logger.error(
             '[Uploads] Falha ao remover avatar após erro:',
             newAvatarFullPath,
             cleanupError,
@@ -202,7 +205,7 @@ export class UsersController {
         }
       }
 
-      console.error('[Uploads] Erro ao atualizar avatar do usuário:', error);
+      this.logger.error('[Uploads] Erro ao atualizar avatar do usuário:', error);
       throw new InternalServerErrorException(
         'Não foi possível atualizar seu avatar. Tente novamente em instantes.',
       );
@@ -300,24 +303,6 @@ export class UsersController {
       success: true,
       data: novoUsuario,
       message: 'Usuário criado com sucesso',
-    };
-  }
-
-  @Post('debug-create')
-  @ApiOperation({ summary: 'ENDPOINT TEMPORÁRIO: Criar usuário para debug (sem autenticação)' })
-  @ApiResponse({ status: 201, description: 'Usuário criado com sucesso' })
-  async criarUsuarioDebug(@Body() dadosUsuario: any) {
-    const empresaIdPadrao = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
-
-    const novoUsuario = await this.usersService.criar({
-      ...dadosUsuario,
-      empresa_id: empresaIdPadrao,
-    });
-
-    return {
-      success: true,
-      data: novoUsuario,
-      message: 'Usuário DEBUG criado com sucesso',
     };
   }
 

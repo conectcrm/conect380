@@ -8,63 +8,156 @@ import {
   Param,
   Query,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import { AssinaturasService } from './assinaturas.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../common/guards/empresa.guard';
 import { CriarAssinaturaDto } from './dto/criar-assinatura.dto';
+import { CriarCheckoutDto } from './dto/criar-checkout.dto';
+import { MercadoPagoService } from '../mercado-pago/mercado-pago.service';
+import { EmpresaId } from '../../common/decorators/empresa.decorator';
+import type { Request } from 'express';
 
 @Controller('assinaturas')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class AssinaturasController {
-  constructor(private readonly assinaturasService: AssinaturasService) {}
+  constructor(
+    private readonly assinaturasService: AssinaturasService,
+    private readonly mercadoPagoService: MercadoPagoService,
+  ) {}
 
   @Get()
-  async listar(@Query('status') status?: 'ativa' | 'cancelada' | 'suspensa' | 'pendente') {
-    return this.assinaturasService.listarTodas(status);
+  async listar(
+    @EmpresaId() empresaId: string,
+    @Query('status') status?: 'ativa' | 'cancelada' | 'suspensa' | 'pendente',
+  ) {
+    const assinatura = await this.assinaturasService.buscarPorEmpresa(empresaId);
+    if (!assinatura) {
+      return [];
+    }
+    if (status && assinatura.status !== status) {
+      return [];
+    }
+    return [assinatura];
   }
 
   @Get('empresa/:empresaId')
-  async buscarPorEmpresa(@Param('empresaId') empresaId: string) {
+  async buscarPorEmpresa(
+    @EmpresaId() empresaId: string,
+    @Param('empresaId') _empresaIdIgnorado: string,
+  ) {
     return this.assinaturasService.buscarPorEmpresa(empresaId);
   }
 
   @Get('empresa/:empresaId/limites')
-  async verificarLimites(@Param('empresaId') empresaId: string) {
+  async verificarLimites(
+    @EmpresaId() empresaId: string,
+    @Param('empresaId') _empresaIdIgnorado: string,
+  ) {
     return this.assinaturasService.verificarLimites(empresaId);
   }
 
   @Post()
-  async criar(@Body() dados: CriarAssinaturaDto) {
-    return this.assinaturasService.criar(dados);
+  async criar(@EmpresaId() empresaId: string, @Body() dados: CriarAssinaturaDto) {
+    return this.assinaturasService.criar({
+      ...dados,
+      empresaId,
+    });
+  }
+
+  @Post('checkout')
+  async criarCheckout(
+    @EmpresaId() empresaId: string,
+    @Body() dados: CriarCheckoutDto,
+    @Req() req: Request,
+  ) {
+    const assinatura = await this.assinaturasService.criarAssinaturaPendenteParaCheckout(
+      empresaId,
+      dados.planoId,
+    );
+
+    const originHeader = req.headers.origin;
+    const frontendBaseUrl =
+      typeof originHeader === 'string' && originHeader.trim()
+        ? originHeader.trim()
+        : `${req.protocol}://${req.get('host')}`;
+
+    const backendBaseUrl = `${req.protocol}://${req.get('host')}`;
+
+    const externalReference = `conectcrm:empresa:${empresaId}:assinatura:${assinatura.id}`;
+    const preference = await this.mercadoPagoService.createPreference({
+      items: [
+        {
+          id: assinatura.id,
+          title: `Assinatura ${assinatura.plano?.nome ?? 'ConectCRM'}`,
+          currency_id: 'BRL',
+          quantity: 1,
+          unit_price: Number(assinatura.valorMensal),
+        },
+      ],
+      payer: {
+        name: '',
+        surname: '',
+        email: (req as any)?.user?.email || '',
+      },
+      back_urls: {
+        success: `${frontendBaseUrl}/billing?status=success`,
+        failure: `${frontendBaseUrl}/billing?status=error`,
+        pending: `${frontendBaseUrl}/billing?status=pending`,
+      },
+      auto_return: 'approved',
+      payment_methods: {},
+      notification_url: `${backendBaseUrl}/mercadopago/webhooks`,
+      statement_descriptor: 'ConectCRM',
+      external_reference: externalReference,
+      expires: false,
+      expiration_date_from: new Date().toISOString(),
+      expiration_date_to: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+
+    return {
+      assinaturaId: assinatura.id,
+      externalReference,
+      preferenceId: preference?.id,
+      initPoint: preference?.init_point,
+      sandboxInitPoint: preference?.sandbox_init_point,
+    };
   }
 
   @Patch('empresa/:empresaId/plano')
   async alterarPlano(
-    @Param('empresaId') empresaId: string,
+    @EmpresaId() empresaId: string,
+    @Param('empresaId') _empresaIdIgnorado: string,
     @Body('novoPlanoId') novoPlanoId: string,
   ) {
     return this.assinaturasService.alterarPlano(empresaId, novoPlanoId);
   }
 
   @Patch('empresa/:empresaId/cancelar')
-  async cancelar(@Param('empresaId') empresaId: string, @Body('dataFim') dataFim?: string) {
+  async cancelar(
+    @EmpresaId() empresaId: string,
+    @Param('empresaId') _empresaIdIgnorado: string,
+    @Body('dataFim') dataFim?: string,
+  ) {
     const dataFimParsed = dataFim ? new Date(dataFim) : undefined;
     return this.assinaturasService.cancelar(empresaId, dataFimParsed);
   }
 
   @Patch('empresa/:empresaId/suspender')
-  async suspender(@Param('empresaId') empresaId: string) {
+  async suspender(@EmpresaId() empresaId: string, @Param('empresaId') _empresaIdIgnorado: string) {
     return this.assinaturasService.suspender(empresaId);
   }
 
   @Patch('empresa/:empresaId/reativar')
-  async reativar(@Param('empresaId') empresaId: string) {
+  async reativar(@EmpresaId() empresaId: string, @Param('empresaId') _empresaIdIgnorado: string) {
     return this.assinaturasService.reativar(empresaId);
   }
 
   @Patch('empresa/:empresaId/contadores')
   async atualizarContadores(
-    @Param('empresaId') empresaId: string,
+    @EmpresaId() empresaId: string,
+    @Param('empresaId') _empresaIdIgnorado: string,
     @Body()
     dados: {
       usuariosAtivos?: number;
@@ -76,7 +169,10 @@ export class AssinaturasController {
   }
 
   @Post('empresa/:empresaId/api-call')
-  async registrarChamadaApi(@Param('empresaId') empresaId: string) {
+  async registrarChamadaApi(
+    @EmpresaId() empresaId: string,
+    @Param('empresaId') _empresaIdIgnorado: string,
+  ) {
     const permiteCall = await this.assinaturasService.registrarChamadaApi(empresaId);
 
     return {

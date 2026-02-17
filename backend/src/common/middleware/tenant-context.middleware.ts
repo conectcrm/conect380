@@ -29,8 +29,10 @@ export class TenantContextMiddleware implements NestMiddleware {
         const queryRunner = this.dataSource.createQueryRunner();
         await queryRunner.connect();
 
-        // Definir tenant context no PostgreSQL
-        await queryRunner.query('SELECT set_current_tenant($1)', [user.empresa_id]);
+        // Definir tenant context no PostgreSQL sem depender de função custom.
+        await queryRunner.query(`SELECT set_config('app.current_tenant_id', $1, false)`, [
+          user.empresa_id,
+        ]);
 
         // Log para debug (remover em produção ou usar logger apropriado)
         if (process.env.NODE_ENV === 'development') {

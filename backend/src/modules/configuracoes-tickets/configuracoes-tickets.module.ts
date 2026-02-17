@@ -17,27 +17,9 @@ import { StatusCustomizadosController } from './controllers/status-customizados.
 import { TiposServicoController } from './controllers/tipos-servico.controller';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([
-      NivelAtendimento,
-      StatusCustomizado,
-      TipoServico,
-    ]),
-  ],
-  controllers: [
-    NiveisAtendimentoController,
-    StatusCustomizadosController,
-    TiposServicoController,
-  ],
-  providers: [
-    NiveisAtendimentoService,
-    StatusCustomizadosService,
-    TiposServicoService,
-  ],
-  exports: [
-    NiveisAtendimentoService,
-    StatusCustomizadosService,
-    TiposServicoService,
-  ],
+  imports: [TypeOrmModule.forFeature([NivelAtendimento, StatusCustomizado, TipoServico])],
+  controllers: [NiveisAtendimentoController, StatusCustomizadosController, TiposServicoController],
+  providers: [NiveisAtendimentoService, StatusCustomizadosService, TiposServicoService],
+  exports: [NiveisAtendimentoService, StatusCustomizadosService, TiposServicoService],
 })
-export class ConfiguracoesTicketsModule { }
+export class ConfiguracoesTicketsModule {}

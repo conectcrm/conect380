@@ -8,24 +8,27 @@ import {
   HttpStatus,
   HttpException,
   Put,
+  UseGuards,
+  Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { EmpresasService } from './empresas.service';
 import { CreateEmpresaDto, VerificarEmailDto } from './dto/empresas.dto';
+import { JwtAuthGuard } from '../modules/auth/jwt-auth.guard';
 
 @ApiTags('empresas')
 @Controller('empresas')
 export class EmpresasController {
-  constructor(private readonly empresasService: EmpresasService) { }
+  constructor(private readonly empresasService: EmpresasService) {}
 
   @Post('registro')
   @ApiOperation({ summary: 'Registrar nova empresa' })
   @ApiResponse({ status: 201, description: 'Empresa registrada com sucesso' })
-  @ApiResponse({ status: 400, description: 'Dados inválidos' })
-  @ApiResponse({ status: 409, description: 'Empresa já existe' })
+  @ApiResponse({ status: 400, description: 'Dados invÃ¡lidos' })
+  @ApiResponse({ status: 409, description: 'Empresa jÃ¡ existe' })
   async registrarEmpresa(@Body() createEmpresaDto: CreateEmpresaDto) {
-    process.stdout.write('\n🎯 [CONTROLLER] POST /empresas/registro chamado\n');
-    process.stdout.write(`📦 [CONTROLLER] Plano: ${createEmpresaDto.plano}\n`);
+    process.stdout.write('\nðŸŽ¯ [CONTROLLER] POST /empresas/registro chamado\n');
+    process.stdout.write(`ðŸ“¦ [CONTROLLER] Plano: ${createEmpresaDto.plano}\n`);
 
     try {
       const empresa = await this.empresasService.registrarEmpresa(createEmpresaDto);
@@ -49,7 +52,7 @@ export class EmpresasController {
       const disponivel = await this.empresasService.verificarCNPJDisponivel(cnpj);
       return {
         disponivel,
-        message: disponivel ? 'CNPJ disponível' : 'CNPJ já cadastrado',
+        message: disponivel ? 'CNPJ disponÃ­vel' : 'CNPJ jÃ¡ cadastrado',
       };
     } catch (error) {
       throw new HttpException('Erro ao verificar CNPJ', HttpStatus.INTERNAL_SERVER_ERROR);
@@ -63,7 +66,7 @@ export class EmpresasController {
       const disponivel = await this.empresasService.verificarEmailDisponivel(email);
       return {
         disponivel,
-        message: disponivel ? 'Email disponível' : 'Email já cadastrado',
+        message: disponivel ? 'Email disponÃ­vel' : 'Email jÃ¡ cadastrado',
       };
     } catch (error) {
       throw new HttpException('Erro ao verificar email', HttpStatus.INTERNAL_SERVER_ERROR);
@@ -71,7 +74,7 @@ export class EmpresasController {
   }
 
   @Post('verificar-email')
-  @ApiOperation({ summary: 'Verificar email de ativação' })
+  @ApiOperation({ summary: 'Verificar email de ativaÃ§Ã£o' })
   async verificarEmailAtivacao(@Body() verificarEmailDto: VerificarEmailDto) {
     try {
       const resultado = await this.empresasService.verificarEmailAtivacao(verificarEmailDto.token);
@@ -82,20 +85,20 @@ export class EmpresasController {
       };
     } catch (error) {
       throw new HttpException(
-        error.message || 'Token inválido ou expirado',
+        error.message || 'Token invÃ¡lido ou expirado',
         HttpStatus.BAD_REQUEST,
       );
     }
   }
 
   @Post('reenviar-ativacao')
-  @ApiOperation({ summary: 'Reenviar email de ativação' })
+  @ApiOperation({ summary: 'Reenviar email de ativaÃ§Ã£o' })
   async reenviarEmailAtivacao(@Body() body: { email: string }) {
     try {
       await this.empresasService.reenviarEmailAtivacao(body.email);
       return {
         success: true,
-        message: 'Email de ativação reenviado com sucesso!',
+        message: 'Email de ativaÃ§Ã£o reenviado com sucesso!',
       };
     } catch (error) {
       throw new HttpException(error.message || 'Erro ao reenviar email', HttpStatus.BAD_REQUEST);
@@ -103,12 +106,12 @@ export class EmpresasController {
   }
 
   @Get('subdominio/:subdominio')
-  @ApiOperation({ summary: 'Obter empresa por subdomínio' })
+  @ApiOperation({ summary: 'Obter empresa por subdomÃ­nio' })
   async obterEmpresaPorSubdominio(@Param('subdominio') subdominio: string) {
     try {
       const empresa = await this.empresasService.obterPorSubdominio(subdominio);
       if (!empresa) {
-        throw new HttpException('Empresa não encontrada', HttpStatus.NOT_FOUND);
+        throw new HttpException('Empresa nÃ£o encontrada', HttpStatus.NOT_FOUND);
       }
       return empresa;
     } catch (error) {
@@ -119,13 +122,13 @@ export class EmpresasController {
     }
   }
 
-  @Get(':id')
+  @Get(':id([0-9a-fA-F-]{36})')
   @ApiOperation({ summary: 'Obter empresa por ID' })
   async obterEmpresaPorId(@Param('id') id: string) {
     try {
       const empresa = await this.empresasService.obterPorId(id);
       if (!empresa) {
-        throw new HttpException('Empresa não encontrada', HttpStatus.NOT_FOUND);
+        throw new HttpException('Empresa nÃ£o encontrada', HttpStatus.NOT_FOUND);
       }
       return empresa;
     } catch (error) {
@@ -137,9 +140,19 @@ export class EmpresasController {
   }
 
   @Put(':id')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Atualizar dados da empresa' })
-  async atualizarEmpresa(@Param('id') id: string, @Body() updateData: Partial<CreateEmpresaDto>) {
+  async atualizarEmpresa(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() updateData: Partial<CreateEmpresaDto>,
+  ) {
     try {
+      const empresaIdUsuario = req.user?.empresa_id;
+      if (!empresaIdUsuario || empresaIdUsuario !== id) {
+        throw new HttpException('Acesso negado para atualizar esta empresa', HttpStatus.FORBIDDEN);
+      }
+
       const empresa = await this.empresasService.atualizarEmpresa(id, updateData);
       return {
         success: true,
@@ -155,7 +168,7 @@ export class EmpresasController {
   }
 
   @Get('planos')
-  @ApiOperation({ summary: 'Listar planos disponíveis' })
+  @ApiOperation({ summary: 'Listar planos disponÃ­veis' })
   async listarPlanos() {
     try {
       const planos = await this.empresasService.listarPlanos();
@@ -183,45 +196,187 @@ export class EmpresasController {
 @Controller('minhas-empresas')
 @ApiTags('minhas-empresas')
 export class MinhasEmpresasController {
-  constructor(private readonly empresasService: EmpresasService) { }
+  constructor(private readonly empresasService: EmpresasService) {}
+
+  private mapPlano(planoRaw: string, valorMensal: number | null, limites?: Record<string, any>) {
+    const plano = (planoRaw || 'starter').toString().toLowerCase();
+
+    const limitesUsuarios =
+      typeof limites?.usuarios === 'number' ? limites.usuarios : plano === 'enterprise' ? -1 : 0;
+    const limitesClientes =
+      typeof limites?.clientes === 'number' ? limites.clientes : plano === 'enterprise' ? -1 : 0;
+    const limitesArmazenamento =
+      typeof limites?.armazenamento === 'string'
+        ? limites.armazenamento
+        : plano === 'enterprise'
+          ? 'Ilimitado'
+          : '0GB';
+
+    if (plano === 'enterprise') {
+      return {
+        id: 'enterprise',
+        nome: 'Enterprise',
+        preco: Number(valorMensal ?? 0),
+        features: [],
+        limitesUsuarios,
+        limitesClientes,
+        limitesArmazenamento,
+        limites: {
+          usuarios: limitesUsuarios,
+          clientes: limitesClientes,
+          armazenamento: limitesArmazenamento,
+        },
+      };
+    }
+
+    if (plano === 'professional' || plano === 'business' || plano === 'pro') {
+      return {
+        id: 'professional',
+        nome: 'Professional',
+        preco: Number(valorMensal ?? 0),
+        features: [],
+        limitesUsuarios,
+        limitesClientes,
+        limitesArmazenamento,
+        limites: {
+          usuarios: limitesUsuarios,
+          clientes: limitesClientes,
+          armazenamento: limitesArmazenamento,
+        },
+      };
+    }
+
+    return {
+      id: 'starter',
+      nome: 'Starter',
+      preco: Number(valorMensal ?? 0),
+      features: [],
+      limitesUsuarios,
+      limitesClientes,
+      limitesArmazenamento,
+      limites: {
+        usuarios: limitesUsuarios,
+        clientes: limitesClientes,
+        armazenamento: limitesArmazenamento,
+      },
+    };
+  }
+
+  private mapStatus(statusRaw: string | null | undefined, ativo: boolean): string {
+    const status = (statusRaw || '').toLowerCase();
+    if (status === 'ativa' || status === 'trial' || status === 'suspensa' || status === 'inativa') {
+      return status;
+    }
+    return ativo ? 'ativa' : 'inativa';
+  }
 
   @Get()
-  @ApiOperation({ summary: 'Obter empresas do usuário' })
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Obter empresas do usuario' })
   @ApiResponse({ status: 200, description: 'Lista de empresas retornada com sucesso' })
-  async getMinhasEmpresas() {
+  async getMinhasEmpresas(@Request() req) {
     try {
-      // Por enquanto vamos retornar dados mock
-      // TODO: Implementar busca real baseada no usuário autenticado
-      const empresasMock = [
-        {
-          id: '1',
-          nome: 'Empresa Exemplo',
-          cnpj: '12.345.678/0001-90',
-          email: 'contato@empresa.com',
-          telefone: '(11) 99999-9999',
-          endereco: {
-            logradouro: 'Rua Exemplo, 123',
-            cidade: 'São Paulo',
-            estado: 'SP',
-            cep: '01234-567',
-          },
-          plano: 'premium',
-          status: 'ativa',
-          dataVencimento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          configuracoes: {
-            whatsapp: true,
-            email: true,
-            sms: false,
-          },
-        },
-      ];
+      const empresaId = req.user?.empresa_id;
+      if (!empresaId) {
+        throw new HttpException('empresa_id ausente no token', HttpStatus.UNAUTHORIZED);
+      }
+
+      const empresa = await this.empresasService.obterPorId(empresaId);
+
+      const dataCriacao = empresa.created_at ? empresa.created_at.toISOString() : new Date().toISOString();
+      const dataVencimento = empresa.data_expiracao
+        ? empresa.data_expiracao.toISOString()
+        : dataCriacao;
+      const ultimoAcesso = empresa.ultimo_acesso ? empresa.ultimo_acesso.toISOString() : dataCriacao;
+      const plano = this.mapPlano(empresa.plano, empresa.valor_mensal, empresa.limites || {});
+      const status = this.mapStatus(empresa.status, empresa.ativo);
 
       return {
         success: true,
-        empresas: empresasMock,
+        empresas: [
+          {
+            id: empresa.id,
+            nome: empresa.nome,
+            descricao: null,
+            cnpj: empresa.cnpj,
+            email: empresa.email,
+            telefone: empresa.telefone,
+            endereco: empresa.endereco,
+            plano,
+            status,
+            isActive: true,
+            dataVencimento,
+            dataCriacao,
+            ultimoAcesso,
+            configuracoes: (empresa.configuracoes as Record<string, unknown>) || {},
+            estatisticas: {
+              usuariosAtivos: 0,
+              totalUsuarios: 0,
+              clientesCadastrados: 0,
+              propostasEsteAno: 0,
+              propostasEsteMes: 0,
+              faturaAcumulada: 0,
+              crescimentoMensal: 0,
+              armazenamentoUsado: '0GB',
+              armazenamentoTotal: plano.limitesArmazenamento,
+              ultimasAtividades: [],
+            },
+            permissoes: {
+              podeEditarConfiguracoes: true,
+              podeGerenciarUsuarios: true,
+              podeVerRelatorios: true,
+              podeExportarDados: true,
+              podeAlterarPlano: true,
+            },
+          },
+        ],
       };
     } catch (error) {
-      throw new HttpException('Erro ao buscar empresas', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        error.message || 'Erro ao buscar empresas',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('switch')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Alternar contexto da empresa ativa' })
+  @ApiResponse({ status: 200, description: 'Contexto da empresa atualizado com sucesso' })
+  async switchEmpresa(@Request() req, @Body() body: { empresaId?: string }) {
+    try {
+      const empresaIdUsuario = req.user?.empresa_id;
+      const empresaIdSolicitada = body?.empresaId;
+
+      if (!empresaIdUsuario) {
+        throw new HttpException('empresa_id ausente no token', HttpStatus.UNAUTHORIZED);
+      }
+
+      if (!empresaIdSolicitada) {
+        throw new HttpException('empresaId é obrigatório', HttpStatus.BAD_REQUEST);
+      }
+
+      // O modelo atual é 1 usuário -> 1 empresa.
+      // Mantemos a troca apenas para o próprio contexto do usuário.
+      if (empresaIdSolicitada !== empresaIdUsuario) {
+        throw new HttpException(
+          'Usuário não possui acesso à empresa informada',
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
+      const empresa = await this.empresasService.obterPorId(empresaIdSolicitada);
+
+      return {
+        success: true,
+        empresaId: empresa.id,
+        configuracoes: (empresa.configuracoes as Record<string, unknown>) || {},
+      };
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Erro ao alternar empresa',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 }

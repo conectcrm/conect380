@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import { Contato } from '../contato.entity';
 import { Cliente } from '../cliente.entity';
 import { CreateContatoDto, UpdateContatoDto, ResponseContatoDto } from '../dto/contato.dto';
@@ -23,17 +23,13 @@ export class ContatosService {
    */
   async listarTodos(empresaId: string): Promise<ResponseContatoDto[]> {
     const contatos = await this.contatoRepository.find({
-      where: { ativo: true },
+      where: { empresaId, ativo: true },
       relations: ['cliente'],
-      order: { nome: 'ASC' },
+      order: { principal: 'DESC', nome: 'ASC' },
     });
 
-    const contatosDaEmpresa = contatos.filter(
-      (contato) => contato.cliente?.empresa_id === empresaId,
-    );
-
     const contatosNormalizados = await Promise.all(
-      contatosDaEmpresa.map((contato) => this.garantirTelefoneNormalizado(contato)),
+      contatos.map((contato) => this.garantirTelefoneNormalizado(contato)),
     );
 
     return contatosNormalizados.map((contato) => new ResponseContatoDto(contato));
@@ -43,10 +39,10 @@ export class ContatosService {
    * Lista todos os contatos de um cliente
    * Ordenados por: principal DESC, nome ASC
    */
-  async listarPorCliente(clienteId: string, empresaId?: string): Promise<ResponseContatoDto[]> {
+  async listarPorCliente(clienteId: string, empresaId: string): Promise<ResponseContatoDto[]> {
     // Verifica se o cliente existe e pertence à empresa
     const cliente = await this.clienteRepository.findOne({
-      where: { id: clienteId, ...(empresaId && { empresa_id: empresaId }) },
+      where: { id: clienteId, empresaId },
     });
 
     if (!cliente) {
@@ -54,7 +50,7 @@ export class ContatosService {
     }
 
     const contatos = await this.contatoRepository.find({
-      where: { clienteId, ativo: true },
+      where: { clienteId, empresaId: cliente.empresaId, ativo: true },
       order: { principal: 'DESC', nome: 'ASC' },
     });
 
@@ -68,13 +64,10 @@ export class ContatosService {
   /**
    * Busca um contato por ID
    */
-  async buscarPorId(id: string, clienteId?: string): Promise<ResponseContatoDto> {
-    const where: any = { id };
-    if (clienteId) {
-      where.clienteId = clienteId;
-    }
-
-    const contato = await this.contatoRepository.findOne({ where });
+  async buscarPorId(id: string, empresaId: string): Promise<ResponseContatoDto> {
+    const contato = await this.contatoRepository.findOne({
+      where: { id, empresaId, ativo: true },
+    });
 
     if (!contato) {
       throw new NotFoundException('Contato não encontrado');
@@ -91,11 +84,11 @@ export class ContatosService {
   async criar(
     clienteId: string,
     createContatoDto: CreateContatoDto,
-    empresaId?: string,
+    empresaId: string,
   ): Promise<ResponseContatoDto> {
     // Verifica se o cliente existe
     const cliente = await this.clienteRepository.findOne({
-      where: { id: clienteId, ...(empresaId && { empresa_id: empresaId }) },
+      where: { id: clienteId, empresaId },
     });
 
     if (!cliente) {
@@ -116,6 +109,7 @@ export class ContatosService {
       ...createContatoDto,
       telefone: telefoneNormalizado,
       clienteId,
+      empresaId: cliente.empresaId,
     });
 
     const contatoSalvo = await this.contatoRepository.save(contato);
@@ -129,14 +123,11 @@ export class ContatosService {
   async atualizar(
     id: string,
     updateContatoDto: UpdateContatoDto,
-    clienteId?: string,
+    empresaId: string,
   ): Promise<ResponseContatoDto> {
-    const where: any = { id };
-    if (clienteId) {
-      where.clienteId = clienteId;
-    }
-
-    const contato = await this.contatoRepository.findOne({ where });
+    const contato = await this.contatoRepository.findOne({
+      where: { id, empresaId, ativo: true },
+    });
 
     if (!contato) {
       throw new NotFoundException('Contato não encontrado');
@@ -166,13 +157,10 @@ export class ContatosService {
   /**
    * Remove (soft delete) um contato
    */
-  async remover(id: string, clienteId?: string): Promise<void> {
-    const where: any = { id };
-    if (clienteId) {
-      where.clienteId = clienteId;
-    }
-
-    const contato = await this.contatoRepository.findOne({ where });
+  async remover(id: string, empresaId: string): Promise<void> {
+    const contato = await this.contatoRepository.findOne({
+      where: { id, empresaId, ativo: true },
+    });
 
     if (!contato) {
       throw new NotFoundException('Contato não encontrado');
@@ -185,13 +173,10 @@ export class ContatosService {
   /**
    * Define um contato como principal
    */
-  async definirComoPrincipal(id: string, clienteId?: string): Promise<ResponseContatoDto> {
-    const where: any = { id };
-    if (clienteId) {
-      where.clienteId = clienteId;
-    }
-
-    const contato = await this.contatoRepository.findOne({ where });
+  async definirComoPrincipal(id: string, empresaId: string): Promise<ResponseContatoDto> {
+    const contato = await this.contatoRepository.findOne({
+      where: { id, empresaId, ativo: true },
+    });
 
     if (!contato) {
       throw new NotFoundException('Contato não encontrado');
@@ -340,6 +325,3 @@ export class ContatosService {
     await this.contatoRepository.update(where, { principal: false });
   }
 }
-
-// Import necessário para o Not
-import { Not } from 'typeorm';

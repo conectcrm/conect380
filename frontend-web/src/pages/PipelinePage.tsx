@@ -63,6 +63,7 @@ import {
   EstagioOportunidade,
   PrioridadeOportunidade,
   OrigemOportunidade,
+  TipoAtividade,
 } from '../types/oportunidades/enums';
 import ModalOportunidadeRefatorado from '../components/oportunidades/ModalOportunidadeRefatorado';
 import ModalMudancaEstagio from '../components/oportunidades/ModalMudancaEstagio';
@@ -380,8 +381,8 @@ const PipelinePage: React.FC = () => {
       emailContato: oportunidade.emailContato,
       telefoneContato: oportunidade.telefoneContato,
       empresaContato: oportunidade.empresaContato,
-      clienteId: oportunidade.clienteId,
-      responsavelId: oportunidade.responsavelId,
+      clienteId: (oportunidade as any).clienteId || (oportunidade as any).cliente_id,
+      responsavelId: (oportunidade as any).responsavelId || (oportunidade as any).responsavel_id,
     };
 
     // Abrir modal de edição com dados clonados
@@ -775,7 +776,7 @@ const PipelinePage: React.FC = () => {
       try {
         await oportunidadesService.criarAtividade({
           oportunidadeId: oportunidade.id,
-          tipo: 'note',
+          tipo: TipoAtividade.NOTA,
           descricao: descricaoAtividade,
           dataAtividade: new Date(),
         });
@@ -1527,13 +1528,13 @@ const PipelinePage: React.FC = () => {
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <span className="text-2xl">
-                          {estagio.id === 'leads'
+                          {estagio.id === EstagioOportunidade.LEADS
                             ? '🎯'
-                            : estagio.id === 'qualificacao'
+                            : estagio.id === EstagioOportunidade.QUALIFICACAO
                               ? '✅'
-                              : estagio.id === 'proposta'
+                              : estagio.id === EstagioOportunidade.PROPOSTA
                                 ? '📄'
-                                : estagio.id === 'negociacao'
+                                : estagio.id === EstagioOportunidade.NEGOCIACAO
                                   ? '🤝'
                                   : '🎉'}
                         </span>
@@ -1562,13 +1563,13 @@ const PipelinePage: React.FC = () => {
                     {estagio.oportunidades.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-16 text-center">
                         <div className="text-6xl mb-4 opacity-20">
-                          {estagio.id === 'leads'
+                          {estagio.id === EstagioOportunidade.LEADS
                             ? '🎯'
-                            : estagio.id === 'qualificacao'
+                            : estagio.id === EstagioOportunidade.QUALIFICACAO
                               ? '✅'
-                              : estagio.id === 'proposta'
+                              : estagio.id === EstagioOportunidade.PROPOSTA
                                 ? '📄'
-                                : estagio.id === 'negociacao'
+                                : estagio.id === EstagioOportunidade.NEGOCIACAO
                                   ? '🤝'
                                   : '🎉'}
                         </div>
@@ -1631,12 +1632,12 @@ const PipelinePage: React.FC = () => {
                                   </div>
                                 )}
                                 {/* Badge de prioridade */}
-                                {oportunidade.prioridade === 'alta' && (
+                                {oportunidade.prioridade === PrioridadeOportunidade.ALTA && (
                                   <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-semibold">
                                     Alta
                                   </span>
                                 )}
-                                {oportunidade.prioridade === 'urgente' && (
+                                {(oportunidade as any).prioridade === 'urgente' && (
                                   <span className="px-2 py-0.5 bg-red-600 text-white rounded-full text-xs font-semibold">
                                     Urgente
                                   </span>
@@ -2619,3 +2620,4 @@ const PipelinePage: React.FC = () => {
 };
 
 export default PipelinePage;
+

@@ -12,7 +12,7 @@ import { Atendente } from '../../src/modules/atendimento/entities/atendente.enti
 
 /**
  * 🏭 Test Factories - Factory Pattern para Dados de Teste E2E
- * 
+ *
  * ⚠️ IMPORTANTE: Estrutura simplificada para testes E2E
  * Não cria relações complexas, apenas entidades mínimas funcionais
  */
@@ -49,7 +49,8 @@ export async function createTestEmpresa(
   app: INestApplication,
   override?: Partial<Empresa>,
 ): Promise<Empresa> {
-  const ds = app.get(DataSource); const repo = ds.getRepository(Empresa);
+  const ds = app.get(DataSource);
+  const repo = ds.getRepository(Empresa);
 
   // Usar timestamp + sequence para garantir unicidade absoluta
   const uniqueId = `${Date.now()}-${empresaSeq}`;
@@ -83,7 +84,8 @@ export async function createTestCanal(
   empresaId: string,
   override?: Partial<any>,
 ): Promise<any> {
-  const ds = app.get(DataSource); const repo = ds.getRepository('Canal');
+  const ds = app.get(DataSource);
+  const repo = ds.getRepository('Canal');
 
   const canal = repo.create({
     empresaId,
@@ -111,11 +113,13 @@ export async function createTestUsuario(
   empresaId: string,
   override?: Partial<User>,
 ): Promise<User> {
-  const ds = app.get(DataSource); const repo = ds.getRepository(User);
+  const ds = app.get(DataSource);
+  const repo = ds.getRepository(User);
+  const uniqueId = `${Date.now()}-${usuarioSeq}-${Math.floor(Math.random() * 10000)}`;
 
   const usuario = repo.create({
-    nome: `Usuário Teste ${usuarioSeq}`,
-    email: `usuario${usuarioSeq}@teste.com`,
+    nome: `Usuário Teste ${uniqueId}`,
+    email: `usuario-${uniqueId}@teste.com`,
     senha: '$2b$10$hashedpassword', // Hash fictício BCrypt
     empresa_id: empresaId, // ⚠️ Campo é empresa_id (snake_case)
     role: UserRole.USER, // ⚠️ Usar enum
@@ -135,16 +139,18 @@ export async function createTestCliente(
   empresaId: string,
   override?: Partial<Cliente>,
 ): Promise<Cliente> {
-  const ds = app.get(DataSource); const repo = ds.getRepository(Cliente);
+  const ds = app.get(DataSource);
+  const repo = ds.getRepository(Cliente);
+  const uniqueId = `${Date.now()}-${clienteSeq}-${Math.floor(Math.random() * 10000)}`;
 
   // Usar save() com casting explícito
   const clienteData = {
-    nome: `Cliente Teste ${clienteSeq}`,
+    nome: `Cliente Teste ${uniqueId}`,
     tipo: 'pessoa_juridica' as any,
     documento: `${String(clienteSeq + 10000).padStart(14, '0')}`,
-    email: `cliente${clienteSeq}@teste.com`,
+    email: `cliente-${uniqueId}@teste.com`,
     telefone: `+5511${String(clienteSeq + 900000000)}`,
-    empresa_id: empresaId,
+    empresaId,
     status: 'cliente' as any,
     ativo: true,
     ...override,
@@ -162,9 +168,21 @@ export async function createTestContato(
   clienteId: string,
   override?: Partial<Contato>,
 ): Promise<Contato> {
-  const ds = app.get(DataSource); const repo = ds.getRepository(Contato);
+  const ds = app.get(DataSource);
+  const repo = ds.getRepository(Contato);
+  const clienteRepo = ds.getRepository(Cliente);
+
+  const cliente = await clienteRepo.findOne({
+    where: { id: clienteId },
+    select: ['id', 'empresaId'],
+  });
+
+  if (!cliente) {
+    throw new Error(`Cliente ${clienteId} não encontrado para criação de contato`);
+  }
 
   const contato = repo.create({
+    empresaId: cliente.empresaId,
     nome: `Contato Teste ${contatoSeq}`,
     telefone: `+5511${String(contatoSeq + 988000000)}`,
     email: `contato${contatoSeq}@teste.com`,
@@ -181,7 +199,7 @@ export async function createTestContato(
 
 /**
  * 🎫 Criar Ticket de Teste
- * 
+ *
  * ⚠️ IMPORTANTE: Ticket NÃO usa contatoId diretamente
  * Usa contatoTelefone para identificar cliente
  */
@@ -191,24 +209,25 @@ export async function createTestTicket(
   contatoTelefone: string,
   override?: Partial<Ticket>,
 ): Promise<Ticket> {
-  const ds = app.get(DataSource); const repo = ds.getRepository(Ticket);
+  const ds = app.get(DataSource);
+  const repo = ds.getRepository(Ticket);
 
-  const ticket = repo.create({
+  const ticketData = {
     empresaId,
     contatoTelefone, // ⚠️ Usa telefone, não ID
     status: 'aguardando_atendente',
     prioridade: 'media',
     assunto: `Ticket de teste ${ticketSeq}`,
     ...override,
-  });
+  };
 
   ticketSeq++;
-  return await repo.save(ticket);
+  return await repo.save(ticketData as any);
 }
 
 /**
  * 💬 Criar Mensagem de Teste
- * 
+ *
  * ⚠️ IMPORTANTE: Mensagem também NÃO usa contatoId
  */
 export async function createTestMensagem(
@@ -216,7 +235,8 @@ export async function createTestMensagem(
   ticketId: string,
   override?: Partial<Mensagem>,
 ): Promise<Mensagem> {
-  const ds = app.get(DataSource); const repo = ds.getRepository(Mensagem);
+  const ds = app.get(DataSource);
+  const repo = ds.getRepository(Mensagem);
 
   const mensagem = repo.create({
     ticketId,
@@ -238,7 +258,8 @@ export async function createTestEquipe(
   empresaId: string,
   override?: Partial<Equipe>,
 ): Promise<Equipe> {
-  const ds = app.get(DataSource); const repo = ds.getRepository(Equipe);
+  const ds = app.get(DataSource);
+  const repo = ds.getRepository(Equipe);
 
   const equipe = repo.create({
     nome: `Equipe Teste ${equipeSeq}`,
@@ -261,12 +282,14 @@ export async function createTestAtendente(
   empresaId: string,
   override?: Partial<Atendente>,
 ): Promise<Atendente> {
-  const ds = app.get(DataSource); const repo = ds.getRepository(Atendente);
+  const ds = app.get(DataSource);
+  const repo = ds.getRepository(Atendente);
+  const uniqueId = `${Date.now()}-${atendenteSeq}-${Math.floor(Math.random() * 10000)}`;
 
   // Usar save() com casting explícito
   const atendenteData = {
     nome: `Atendente ${atendenteSeq}`,
-    email: `atendente${atendenteSeq}@teste.com`,
+    email: `atendente-${uniqueId}@teste.com`,
     usuarioId,
     empresaId,
     status: 'DISPONIVEL',
@@ -281,12 +304,12 @@ export async function createTestAtendente(
 
 /**
  * 🎭 Criar Cenário Completo de Atendimento
- * 
+ *
  * Cria TODA a cadeia de entidades necessárias:
  * Empresa → Usuario → Atendente → Equipe
  * Empresa → Cliente → Contato
  * Empresa + Contato → Ticket
- * 
+ *
  * @returns Objeto com todas as entidades criadas
  */
 export async function createFullAtendimentoScenario(app: INestApplication) {
@@ -309,11 +332,7 @@ export async function createFullAtendimentoScenario(app: INestApplication) {
   const contato = await createTestContato(app, cliente.id);
 
   // 7. Criar Ticket (usa telefone do contato)
-  const ticket = await createTestTicket(
-    app,
-    empresa.id,
-    contato.telefone,
-  );
+  const ticket = await createTestTicket(app, empresa.id, contato.telefone);
 
   return {
     empresa,

@@ -24,64 +24,64 @@ export class Produto {
   @Column({ type: 'varchar', length: 255 })
   nome: string;
 
-  @Column({ type: 'varchar', length: 50 })
+  @Column({ type: 'varchar', length: 50, nullable: true })
   categoria: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   preco: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  @Column({ type: 'decimal', name: 'custoUnitario', precision: 10, scale: 2, default: 0 })
   custoUnitario: number;
 
-  @Column({ type: 'varchar', length: 50, default: 'produto' })
+  @Column({ type: 'varchar', name: 'tipoItem', length: 100 })
   tipoItem: string;
 
-  @Column({ type: 'varchar', length: 50, default: 'unico' })
+  @Column({ type: 'varchar', length: 100 })
   frequencia: string;
 
-  @Column({ type: 'varchar', length: 50, default: 'unidade' })
+  @Column({ type: 'varchar', name: 'unidadeMedida', length: 100 })
   unidadeMedida: string;
 
-  @Column({ type: 'varchar', length: 20, default: 'ativo' })
+  @Column({ type: 'varchar', length: 100 })
   status: string;
 
   @Column({ type: 'text', nullable: true })
   descricao?: string;
 
-  @Column({ type: 'varchar', length: 100, unique: true })
+  @Column({ type: 'varchar', length: 100 })
   sku: string;
 
-  @Column({ type: 'varchar', length: 255, default: 'Interno' })
+  @Column({ type: 'varchar', length: 255 })
   fornecedor: string;
 
-  // Campos de estoque
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: 'int', name: 'estoqueAtual', default: 0 })
   estoqueAtual: number;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: 'int', name: 'estoqueMinimo', default: 0 })
   estoqueMinimo: number;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: 'int', name: 'estoqueMaximo', default: 0 })
   estoqueMaximo: number;
 
-  // Campos de vendas
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: 'int', name: 'vendasMes', default: 0 })
   vendasMes: number;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: 'int', name: 'vendasTotal', default: 0 })
   vendasTotal: number;
 
-  // Tags como JSON
   @Column({ type: 'json', nullable: true })
   tags?: string[];
 
-  // Variações como JSON
   @Column({ type: 'json', nullable: true })
   variacoes?: string[];
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'criadoEm' })
   criadoEm: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'atualizadoEm' })
   atualizadoEm: Date;
+
+  // Compatibilidade de resposta com clientes legados/testes.
+  empresa_id?: string;
+  ativo?: boolean;
 }

@@ -1,10 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  Logger,
-  InternalServerErrorException,
-} from '@nestjs/common';
+﻿import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, Brackets } from 'typeorm';
 import { Equipe } from '../entities/equipe.entity';
@@ -43,7 +37,7 @@ export interface AtribuirEquipeDto {
 }
 
 /**
- * Service para gerenciar equipes e atribuições de atendentes
+ * Service para gerenciar equipes e atribuiÃ§Ãµes de atendentes
  */
 @Injectable()
 export class AtribuicaoService {
@@ -68,8 +62,58 @@ export class AtribuicaoService {
     private readonly ticketRepository: Repository<Ticket>,
   ) {}
 
+  private async buscarEquipeDaEmpresa(empresaId: string, equipeId: string): Promise<Equipe> {
+    const equipe = await this.equipeRepository.findOne({
+      where: { id: equipeId, empresaId },
+      relations: ['atendenteEquipes', 'atendenteEquipes.atendente', 'atribuicoes'],
+    });
+
+    if (!equipe) {
+      throw new NotFoundException(`Equipe ${equipeId} nao encontrada para a empresa`);
+    }
+
+    return equipe;
+  }
+
+  private async validarAtendenteDaEmpresa(empresaId: string, atendenteId: string): Promise<User> {
+    const atendente = await this.userRepository.findOne({
+      where: { id: atendenteId, empresa_id: empresaId },
+    });
+
+    if (!atendente) {
+      throw new NotFoundException(`Atendente ${atendenteId} nao encontrado para a empresa`);
+    }
+
+    return atendente;
+  }
+
+  private async validarNucleoDaEmpresa(empresaId: string, nucleoId: string): Promise<void> {
+    const nucleo = await this.nucleoRepository.findOne({
+      where: { id: nucleoId, empresaId },
+    });
+
+    if (!nucleo) {
+      throw new NotFoundException(`Nucleo ${nucleoId} nao encontrado para a empresa`);
+    }
+  }
+
+  private async validarDepartamentoDaEmpresa(
+    empresaId: string,
+    departamentoId: string,
+  ): Promise<void> {
+    const departamento = await this.departamentoRepository.findOne({
+      where: { id: departamentoId, empresaId },
+    });
+
+    if (!departamento) {
+      throw new NotFoundException(
+        `Departamento ${departamentoId} nao encontrado para a empresa`,
+      );
+    }
+  }
+
   // ========================================================================
-  // GESTÃO DE EQUIPES
+  // GESTÃƒO DE EQUIPES
   // ========================================================================
 
   /**
@@ -94,7 +138,7 @@ export class AtribuicaoService {
         `${timestamp} - Tentativa de criar equipe "${dto.nome}" para empresa ${empresaId}\n`,
       );
     } catch (traceError) {
-      this.logger.warn(`Não foi possível gravar trace de criação de equipe: ${traceError.message}`);
+      this.logger.warn(`NÃ£o foi possÃ­vel gravar trace de criaÃ§Ã£o de equipe: ${traceError.message}`);
     }
     try {
       return await this.equipeRepository.save(equipe);
@@ -135,24 +179,15 @@ export class AtribuicaoService {
   /**
    * Busca uma equipe por ID
    */
-  async buscarEquipe(equipeId: string): Promise<Equipe> {
-    const equipe = await this.equipeRepository.findOne({
-      where: { id: equipeId },
-      relations: ['atendenteEquipes', 'atendenteEquipes.atendente', 'atribuicoes'],
-    });
-
-    if (!equipe) {
-      throw new NotFoundException(`Equipe ${equipeId} não encontrada`);
-    }
-
-    return equipe;
+  async buscarEquipe(empresaId: string, equipeId: string): Promise<Equipe> {
+    return this.buscarEquipeDaEmpresa(empresaId, equipeId);
   }
 
   /**
    * Atualiza uma equipe
    */
-  async atualizarEquipe(equipeId: string, dto: UpdateEquipeDto): Promise<Equipe> {
-    const equipe = await this.buscarEquipe(equipeId);
+  async atualizarEquipe(empresaId: string, equipeId: string, dto: UpdateEquipeDto): Promise<Equipe> {
+    const equipe = await this.buscarEquipeDaEmpresa(empresaId, equipeId);
 
     Object.assign(equipe, dto);
 
@@ -162,50 +197,38 @@ export class AtribuicaoService {
   /**
    * Remove uma equipe
    */
-  async removerEquipe(equipeId: string): Promise<void> {
-    const equipe = await this.buscarEquipe(equipeId);
+  async removerEquipe(empresaId: string, equipeId: string): Promise<void> {
+    const equipe = await this.buscarEquipeDaEmpresa(empresaId, equipeId);
     await this.equipeRepository.remove(equipe);
     this.logger.log(`Equipe ${equipeId} removida`);
   }
 
   // ========================================================================
-  // GESTÃO DE MEMBROS DA EQUIPE
+  // GESTÃƒO DE MEMBROS DA EQUIPE
   // ========================================================================
 
   /**
    * Adiciona um atendente a uma equipe
    */
   async adicionarAtendenteNaEquipe(
+    empresaId: string,
     equipeId: string,
     atendenteId: string,
     funcao: string = 'membro',
   ): Promise<AtendenteEquipe> {
-    const equipe = await this.equipeRepository.findOne({ where: { id: equipeId } });
+    const equipe = await this.buscarEquipeDaEmpresa(empresaId, equipeId);
+    await this.validarAtendenteDaEmpresa(empresaId, atendenteId);
 
-    if (!equipe) {
-      throw new NotFoundException('Equipe não encontrada');
-    }
-
-    const usuario = await this.userRepository.findOne({ where: { id: atendenteId } });
-
-    if (!usuario) {
-      throw new NotFoundException('Usuário do atendente não encontrado');
-    }
-
-    if (usuario.empresa_id !== equipe.empresaId) {
-      throw new BadRequestException('Atendente pertence a outra empresa');
-    }
-
-    // Verificar se já existe
     const existente = await this.atendenteEquipeRepository.findOne({
-      where: { equipeId, atendenteId },
+      where: { empresaId, equipeId, atendenteId },
     });
 
     if (existente) {
-      throw new BadRequestException('Atendente já está nessa equipe');
+      throw new BadRequestException('Atendente ja esta nessa equipe');
     }
 
     const atendenteEquipe = this.atendenteEquipeRepository.create({
+      empresaId: equipe.empresaId,
       equipeId,
       atendenteId,
       funcao,
@@ -217,13 +240,17 @@ export class AtribuicaoService {
   /**
    * Remove um atendente de uma equipe
    */
-  async removerAtendenteDaEquipe(equipeId: string, atendenteId: string): Promise<void> {
+  async removerAtendenteDaEquipe(
+    empresaId: string,
+    equipeId: string,
+    atendenteId: string,
+  ): Promise<void> {
     const atendenteEquipe = await this.atendenteEquipeRepository.findOne({
-      where: { equipeId, atendenteId },
+      where: { empresaId, equipeId, atendenteId },
     });
 
     if (!atendenteEquipe) {
-      throw new NotFoundException('Atendente não está nessa equipe');
+      throw new NotFoundException('Atendente nao esta nessa equipe');
     }
 
     await this.atendenteEquipeRepository.remove(atendenteEquipe);
@@ -232,60 +259,47 @@ export class AtribuicaoService {
   /**
    * Lista atendentes de uma equipe
    */
-  async listarAtendentesEquipe(equipeId: string): Promise<User[]> {
+  async listarAtendentesEquipe(empresaId: string, equipeId: string): Promise<User[]> {
+    await this.buscarEquipeDaEmpresa(empresaId, equipeId);
+
     const relacoes = await this.atendenteEquipeRepository.find({
-      where: { equipeId },
+      where: { empresaId, equipeId },
       relations: ['atendente'],
     });
 
-    return relacoes.map((r) => r.atendente);
+    return relacoes
+      .map((r) => r.atendente)
+      .filter((atendente) => atendente?.empresa_id === empresaId);
   }
 
   // ========================================================================
-  // ATRIBUIÇÕES DIRETAS (Atendente → Núcleo/Departamento)
+  // ATRIBUIÃ‡Ã•ES DIRETAS (Atendente â†’ NÃºcleo/Departamento)
   // ========================================================================
 
   /**
-   * Atribui um atendente diretamente a um núcleo ou departamento
+   * Atribui um atendente diretamente a um nÃºcleo ou departamento
    */
   async atribuirAtendenteANucleoDepartamento(
+    empresaId: string,
     dto: AtribuirAtendenteDto,
   ): Promise<AtendenteAtribuicao> {
     if (!dto.nucleoId && !dto.departamentoId) {
-      throw new BadRequestException('É necessário informar nucleoId ou departamentoId');
+      throw new BadRequestException('E necessario informar nucleoId ou departamentoId');
     }
 
-    // Verificar se o atendente existe
-    const atendente = await this.userRepository.findOne({
-      where: { id: dto.atendenteId },
-    });
-    if (!atendente) {
-      throw new NotFoundException(`Atendente ${dto.atendenteId} não encontrado`);
-    }
+    await this.validarAtendenteDaEmpresa(empresaId, dto.atendenteId);
 
-    // Verificar se o núcleo existe (se informado)
     if (dto.nucleoId) {
-      const nucleo = await this.nucleoRepository.findOne({
-        where: { id: dto.nucleoId },
-      });
-      if (!nucleo) {
-        throw new NotFoundException(`Núcleo ${dto.nucleoId} não encontrado`);
-      }
+      await this.validarNucleoDaEmpresa(empresaId, dto.nucleoId);
     }
 
-    // Verificar se o departamento existe (se informado)
     if (dto.departamentoId) {
-      const departamento = await this.departamentoRepository.findOne({
-        where: { id: dto.departamentoId },
-      });
-      if (!departamento) {
-        throw new NotFoundException(`Departamento ${dto.departamentoId} não encontrado`);
-      }
+      await this.validarDepartamentoDaEmpresa(empresaId, dto.departamentoId);
     }
 
-    // Verificar duplicata
     const existente = await this.atendenteAtribuicaoRepository.findOne({
       where: {
+        empresaId,
         atendenteId: dto.atendenteId,
         nucleoId: dto.nucleoId || null,
         departamentoId: dto.departamentoId || null,
@@ -293,10 +307,11 @@ export class AtribuicaoService {
     });
 
     if (existente) {
-      throw new BadRequestException('Atribuição já existe');
+      throw new BadRequestException('Atribuicao ja existe');
     }
 
     const atribuicao = this.atendenteAtribuicaoRepository.create({
+      empresaId,
       atendenteId: dto.atendenteId,
       nucleoId: dto.nucleoId || null,
       departamentoId: dto.departamentoId || null,
@@ -308,73 +323,64 @@ export class AtribuicaoService {
   }
 
   /**
-   * Remove uma atribuição direta de atendente
+   * Remove uma atribuiÃ§Ã£o direta de atendente
    */
-  async removerAtribuicaoAtendente(atribuicaoId: string): Promise<void> {
+  async removerAtribuicaoAtendente(empresaId: string, atribuicaoId: string): Promise<void> {
     const atribuicao = await this.atendenteAtribuicaoRepository.findOne({
-      where: { id: atribuicaoId },
+      where: { id: atribuicaoId, empresaId },
     });
 
     if (!atribuicao) {
-      throw new NotFoundException('Atribuição não encontrada');
+      throw new NotFoundException('Atribuicao nao encontrada');
     }
 
     await this.atendenteAtribuicaoRepository.remove(atribuicao);
   }
 
   /**
-   * Lista atribuições de um atendente
+   * Lista atribuiÃ§Ãµes de um atendente
    */
-  async listarAtribuicoesAtendente(atendenteId: string): Promise<AtendenteAtribuicao[]> {
+  async listarAtribuicoesAtendente(
+    empresaId: string,
+    atendenteId: string,
+  ): Promise<AtendenteAtribuicao[]> {
+    await this.validarAtendenteDaEmpresa(empresaId, atendenteId);
+
     return await this.atendenteAtribuicaoRepository.find({
-      where: { atendenteId, ativo: true },
+      where: { empresaId, atendenteId, ativo: true },
       relations: ['nucleo', 'departamento'],
       order: { prioridade: 'ASC' },
     });
   }
 
   // ========================================================================
-  // ATRIBUIÇÕES DE EQUIPE (Equipe → Núcleo/Departamento)
+  // ATRIBUIÃ‡Ã•ES DE EQUIPE (Equipe â†’ NÃºcleo/Departamento)
   // ========================================================================
 
   /**
-   * Atribui uma equipe a um núcleo ou departamento
+   * Atribui uma equipe a um nÃºcleo ou departamento
    */
-  async atribuirEquipeANucleoDepartamento(dto: AtribuirEquipeDto): Promise<EquipeAtribuicao> {
+  async atribuirEquipeANucleoDepartamento(
+    empresaId: string,
+    dto: AtribuirEquipeDto,
+  ): Promise<EquipeAtribuicao> {
     if (!dto.nucleoId && !dto.departamentoId) {
-      throw new BadRequestException('É necessário informar nucleoId ou departamentoId');
+      throw new BadRequestException('E necessario informar nucleoId ou departamentoId');
     }
 
-    // Verificar se a equipe existe
-    const equipe = await this.equipeRepository.findOne({
-      where: { id: dto.equipeId },
-    });
-    if (!equipe) {
-      throw new NotFoundException(`Equipe ${dto.equipeId} não encontrada`);
-    }
+    await this.buscarEquipeDaEmpresa(empresaId, dto.equipeId);
 
-    // Verificar se o núcleo existe (se informado)
     if (dto.nucleoId) {
-      const nucleo = await this.nucleoRepository.findOne({
-        where: { id: dto.nucleoId },
-      });
-      if (!nucleo) {
-        throw new NotFoundException(`Núcleo ${dto.nucleoId} não encontrado`);
-      }
+      await this.validarNucleoDaEmpresa(empresaId, dto.nucleoId);
     }
 
-    // Verificar se o departamento existe (se informado)
     if (dto.departamentoId) {
-      const departamento = await this.departamentoRepository.findOne({
-        where: { id: dto.departamentoId },
-      });
-      if (!departamento) {
-        throw new NotFoundException(`Departamento ${dto.departamentoId} não encontrado`);
-      }
+      await this.validarDepartamentoDaEmpresa(empresaId, dto.departamentoId);
     }
 
     const existente = await this.equipeAtribuicaoRepository.findOne({
       where: {
+        empresaId,
         equipeId: dto.equipeId,
         nucleoId: dto.nucleoId || null,
         departamentoId: dto.departamentoId || null,
@@ -382,10 +388,11 @@ export class AtribuicaoService {
     });
 
     if (existente) {
-      throw new BadRequestException('Atribuição já existe');
+      throw new BadRequestException('Atribuicao ja existe');
     }
 
     const atribuicao = this.equipeAtribuicaoRepository.create({
+      empresaId,
       equipeId: dto.equipeId,
       nucleoId: dto.nucleoId || null,
       departamentoId: dto.departamentoId || null,
@@ -397,50 +404,44 @@ export class AtribuicaoService {
   }
 
   /**
-   * Remove uma atribuição de equipe
+   * Remove uma atribuiÃ§Ã£o de equipe
    */
-  async removerAtribuicaoEquipe(atribuicaoId: string): Promise<void> {
+  async removerAtribuicaoEquipe(empresaId: string, atribuicaoId: string): Promise<void> {
     const atribuicao = await this.equipeAtribuicaoRepository.findOne({
-      where: { id: atribuicaoId },
+      where: { id: atribuicaoId, empresaId },
     });
 
     if (!atribuicao) {
-      throw new NotFoundException('Atribuição não encontrada');
+      throw new NotFoundException('Atribuicao nao encontrada');
     }
 
     await this.equipeAtribuicaoRepository.remove(atribuicao);
   }
 
   /**
-   * Lista atribuições de uma equipe
+   * Lista atribuiÃ§Ãµes de uma equipe
    */
-  async listarAtribuicoesEquipe(equipeId: string): Promise<EquipeAtribuicao[]> {
+  async listarAtribuicoesEquipe(empresaId: string, equipeId: string): Promise<EquipeAtribuicao[]> {
+    await this.buscarEquipeDaEmpresa(empresaId, equipeId);
+
     return await this.equipeAtribuicaoRepository.find({
-      where: { equipeId, ativo: true },
+      where: { empresaId, equipeId, ativo: true },
       relations: ['nucleo', 'departamento'],
       order: { prioridade: 'ASC' },
     });
   }
 
   // ========================================================================
-  // BUSCA DE ATENDENTES DISPONÍVEIS (usado pelo bot de triagem)
+  // BUSCA DE ATENDENTES DISPONIVEIS (usado pelo bot de triagem)
   // ========================================================================
 
-  /**
-   * Busca atendentes disponíveis para um núcleo/departamento
-   * Lógica hierárquica:
-   * 1. Atribuições diretas ao departamento (maior prioridade)
-   * 2. Atribuições diretas ao núcleo
-   * 3. Atribuições via equipe → departamento
-   * 4. Atribuições via equipe → núcleo
-   */
   async buscarAtendentesDisponiveis(
     empresaId: string,
     nucleoId: string,
     departamentoId?: string,
   ): Promise<User[]> {
     this.logger.log(
-      `Buscando atendentes disponíveis - Empresa: ${empresaId}, Núcleo: ${nucleoId}, Departamento: ${departamentoId || 'N/A'}`,
+      `Buscando atendentes disponiveis - Empresa: ${empresaId}, Nucleo: ${nucleoId}, Departamento: ${departamentoId || 'N/A'}`,
     );
 
     const query = this.userRepository
@@ -449,13 +450,17 @@ export class AtribuicaoService {
       .leftJoin(
         'atendente_atribuicoes',
         'atrib',
-        'atrib.atendente_id = user.id AND atrib.ativo = true',
+        'atrib.atendente_id = user.id AND atrib.ativo = true AND atrib.empresa_id = :empresaId',
       )
-      .leftJoin('atendente_equipes', 'ae', 'ae.atendente_id = user.id')
+      .leftJoin(
+        'atendente_equipes',
+        'ae',
+        'ae.atendente_id = user.id AND ae.empresa_id = :empresaId',
+      )
       .leftJoin(
         'equipe_atribuicoes',
         'equipeAtrib',
-        'equipeAtrib.equipe_id = ae.equipe_id AND equipeAtrib.ativo = true',
+        'equipeAtrib.equipe_id = ae.equipe_id AND equipeAtrib.ativo = true AND equipeAtrib.empresa_id = :empresaId',
       )
       .where('user.empresa_id = :empresaId', { empresaId })
       .andWhere('user.ativo = true')
@@ -500,7 +505,9 @@ export class AtribuicaoService {
       return [];
     }
 
-    const atendentes = await this.userRepository.find({ where: { id: In(ids) } });
+    const atendentes = await this.userRepository.find({
+      where: { id: In(ids), empresa_id: empresaId },
+    });
 
     this.logger.log(`${atendentes.length} atendentes encontrados`);
 
@@ -508,6 +515,7 @@ export class AtribuicaoService {
   }
 
   private async mapearPrioridadeDisponibilidade(
+    empresaId: string,
     ids: string[],
     nucleoId?: string,
     departamentoId?: string,
@@ -538,6 +546,7 @@ export class AtribuicaoService {
     if (departamentoId) {
       const diretasDepartamento = await this.atendenteAtribuicaoRepository.find({
         where: {
+          empresaId,
           atendenteId: In(ids),
           departamentoId,
           ativo: true,
@@ -550,6 +559,7 @@ export class AtribuicaoService {
     if (nucleoId) {
       const diretasNucleo = await this.atendenteAtribuicaoRepository.find({
         where: {
+          empresaId,
           atendenteId: In(ids),
           nucleoId,
           ativo: true,
@@ -563,8 +573,14 @@ export class AtribuicaoService {
       const equipeDepartamento = await this.atendenteEquipeRepository
         .createQueryBuilder('ae')
         .select('ae.atendenteId', 'atendenteId')
-        .innerJoin('equipe_atribuicoes', 'ea', 'ea.equipe_id = ae.equipe_id AND ea.ativo = true')
+        .innerJoin(
+          'equipe_atribuicoes',
+          'ea',
+          'ea.equipe_id = ae.equipe_id AND ea.ativo = true AND ea.empresa_id = :empresaId',
+          { empresaId },
+        )
         .where('ae.atendenteId IN (:...ids)', { ids })
+        .andWhere('ae.empresa_id = :empresaId', { empresaId })
         .andWhere('ea.departamento_id = :departamentoId', { departamentoId })
         .getRawMany();
 
@@ -575,8 +591,14 @@ export class AtribuicaoService {
       const equipeNucleo = await this.atendenteEquipeRepository
         .createQueryBuilder('ae')
         .select('ae.atendenteId', 'atendenteId')
-        .innerJoin('equipe_atribuicoes', 'ea', 'ea.equipe_id = ae.equipe_id AND ea.ativo = true')
+        .innerJoin(
+          'equipe_atribuicoes',
+          'ea',
+          'ea.equipe_id = ae.equipe_id AND ea.ativo = true AND ea.empresa_id = :empresaId',
+          { empresaId },
+        )
         .where('ae.atendenteId IN (:...ids)', { ids })
+        .andWhere('ae.empresa_id = :empresaId', { empresaId })
         .andWhere('ea.nucleo_id = :nucleoId', { nucleoId })
         .getRawMany();
 
@@ -588,7 +610,7 @@ export class AtribuicaoService {
 
   /**
    * Seleciona o atendente com menor carga de trabalho
-   * TODO: Implementar lógica de contagem de tickets ativos por atendente
+   * TODO: Implementar lÃ³gica de contagem de tickets ativos por atendente
    */
   async selecionarAtendentePorCarga(
     atendentes: User[],
@@ -607,9 +629,9 @@ export class AtribuicaoService {
 
     try {
       const statusAtivos = [
-        StatusTicket.ABERTO,
+        StatusTicket.FILA,
         StatusTicket.EM_ATENDIMENTO,
-        StatusTicket.AGUARDANDO,
+        StatusTicket.AGUARDANDO_CLIENTE,
       ];
 
       const query = this.ticketRepository
@@ -686,14 +708,16 @@ export class AtribuicaoService {
 
     if (candidatos.length === 0) {
       this.logger.warn(
-        `⚠️ Nenhum atendente disponível para roteamento automático (empresa ${empresaId}, núcleo ${nucleoId}, departamento ${departamentoId || 'N/A'})`,
+        `âš ï¸ Nenhum atendente disponÃ­vel para roteamento automÃ¡tico (empresa ${empresaId}, nÃºcleo ${nucleoId}, departamento ${departamentoId || 'N/A'})`,
       );
       return null;
     }
 
     const ids = candidatos.map((c) => c.id).filter(Boolean);
-    const prioridades = await this.mapearPrioridadeDisponibilidade(ids, nucleoId, departamentoId);
+    const prioridades = await this.mapearPrioridadeDisponibilidade(empresaId, ids, nucleoId, departamentoId);
 
     return this.selecionarAtendentePorCarga(candidatos, empresaId, prioridades);
   }
 }
+
+

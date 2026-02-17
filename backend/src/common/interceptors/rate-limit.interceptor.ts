@@ -11,14 +11,14 @@ import { catchError } from 'rxjs/operators';
 
 /**
  * Rate Limiting Interceptor
- * 
+ *
  * Protege contra abuso de API limitando requisições por IP/usuário.
- * 
+ *
  * CONFIGURAÇÃO:
  * - 100 requisições por minuto por IP
  * - 1000 requisições por minuto por empresa (autenticado)
  * - Bloqueio temporário após limite excedido
- * 
+ *
  * BENEFÍCIOS:
  * - Previne DDoS e brute force
  * - Protege recursos do servidor
@@ -53,12 +53,7 @@ export class RateLimitInterceptor implements NestInterceptor {
     const empresaId = request.headers['x-empresa-id'] || request.user?.empresaId;
 
     // Verificar rate limit por IP
-    const ipAllowed = this.checkRateLimit(
-      this.limitsByIP,
-      ip,
-      this.IP_LIMIT,
-      'IP',
-    );
+    const ipAllowed = this.checkRateLimit(this.limitsByIP, ip, this.IP_LIMIT, 'IP');
 
     if (!ipAllowed) {
       return throwError(
@@ -140,9 +135,7 @@ export class RateLimitInterceptor implements NestInterceptor {
       }
       // Ainda bloqueado
       console.log(
-        `🚫 [RateLimit] ${type} ${key} bloqueado (${Math.ceil(
-          (entry.resetAt - now) / 1000,
-        )}s)`,
+        `🚫 [RateLimit] ${type} ${key} bloqueado (${Math.ceil((entry.resetAt - now) / 1000)}s)`,
       );
       return false;
     }
@@ -154,17 +147,13 @@ export class RateLimitInterceptor implements NestInterceptor {
     if (entry.count > limit) {
       entry.blocked = true;
       entry.resetAt = now + this.BLOCK_DURATION_MS;
-      console.log(
-        `⚠️ [RateLimit] ${type} ${key} BLOQUEADO! (${entry.count} requisições)`,
-      );
+      console.log(`⚠️ [RateLimit] ${type} ${key} BLOQUEADO! (${entry.count} requisições)`);
       return false;
     }
 
     // Avisar quando estiver próximo do limite
     if (entry.count > limit * 0.8) {
-      console.log(
-        `⚠️ [RateLimit] ${type} ${key} próximo do limite (${entry.count}/${limit})`,
-      );
+      console.log(`⚠️ [RateLimit] ${type} ${key} próximo do limite (${entry.count}/${limit})`);
     }
 
     return true;
@@ -208,9 +197,7 @@ export class RateLimitInterceptor implements NestInterceptor {
     }
 
     if (cleanedIP > 0 || cleanedEmpresa > 0) {
-      console.log(
-        `🧹 [RateLimit] Limpou ${cleanedIP} IPs e ${cleanedEmpresa} empresas`,
-      );
+      console.log(`🧹 [RateLimit] Limpou ${cleanedIP} IPs e ${cleanedEmpresa} empresas`);
     }
   }
 

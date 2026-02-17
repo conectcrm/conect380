@@ -4,7 +4,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 export class UpdateModuloEmpresaDto {
   @ApiPropertyOptional({
     description: 'Se o módulo está ativo ou inativo',
-    example: true
+    example: true,
   })
   @IsOptional()
   @IsBoolean()
@@ -15,8 +15,8 @@ export class UpdateModuloEmpresaDto {
     example: {
       usuarios: 20,
       leads: 5000,
-      storage_mb: 10240
-    }
+      storage_mb: 10240,
+    },
   })
   @IsOptional()
   @IsObject()
@@ -33,8 +33,8 @@ export class UpdateModuloEmpresaDto {
     description: 'Configurações específicas do módulo',
     example: {
       habilitarIA: false,
-      webhooksAtivos: true
-    }
+      webhooksAtivos: true,
+    },
   })
   @IsOptional()
   @IsObject()

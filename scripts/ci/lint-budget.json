@@ -1,0 +1,10 @@
+{
+  "backend": {
+    "maxErrors": 908,
+    "maxWarnings": 151
+  },
+  "frontend": {
+    "maxErrors": 8003,
+    "maxWarnings": 2755
+  }
+}

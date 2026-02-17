@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { CheckCircle, Clock, MessageSquare, X, RotateCcw } from 'lucide-react';
+import { CheckCircle, Clock, MessageSquare, RotateCcw } from 'lucide-react';
 import { StatusAtendimentoType } from '../types';
 import { getAvailableActions } from '../utils/statusUtils';
 import { ThemePalette } from '../../../../contexts/ThemeContext';
@@ -34,13 +34,11 @@ export const StatusActionButtons: React.FC<StatusActionButtonsProps> = ({
     switch (status) {
       case 'em_atendimento':
         return MessageSquare;
-      case 'aguardando':
+      case 'envio_ativo':
         return Clock;
-      case 'resolvido':
+      case 'encerrado':
         return CheckCircle;
-      case 'fechado':
-        return X;
-      case 'aberto':
+            case 'fila':
         return RotateCcw;
       default:
         return MessageSquare;
@@ -129,13 +127,11 @@ export const StatusActionButtonsCompact: React.FC<StatusActionButtonsProps> = ({
     switch (status) {
       case 'em_atendimento':
         return MessageSquare;
-      case 'aguardando':
+      case 'envio_ativo':
         return Clock;
-      case 'resolvido':
+      case 'encerrado':
         return CheckCircle;
-      case 'fechado':
-        return X;
-      case 'aberto':
+            case 'fila':
         return RotateCcw;
       default:
         return MessageSquare;

@@ -197,7 +197,7 @@ export const useNotifications = (options?: {
    */
   const connect = () => {
     if (socketRef.current?.connected) {
-      if (DEBUG) console.log('🔌 WebSocket já está conectado');
+      if (DEBUG) console.warn('🔌 WebSocket já está conectado');
       return;
     }
 
@@ -211,7 +211,7 @@ export const useNotifications = (options?: {
         return; // ⚡ NÃO conectar sem token
       }
 
-      if (DEBUG) console.log('🔌 Conectando ao WebSocket:', WS_NAMESPACE_URL);
+      if (DEBUG) console.warn('🔌 Conectando ao WebSocket:', WS_NAMESPACE_URL);
 
       // Criar conexão Socket.io
       const socket = io(WS_NAMESPACE_URL, {
@@ -226,7 +226,7 @@ export const useNotifications = (options?: {
 
       // Event: connect
       socket.on('connect', () => {
-        if (DEBUG) console.log('✅ WebSocket conectado:', socket.id);
+        if (DEBUG) console.warn('✅ WebSocket conectado:', socket.id);
         setIsConnected(true);
         setError(null);
 
@@ -236,7 +236,7 @@ export const useNotifications = (options?: {
 
       // Event: disconnect
       socket.on('disconnect', (reason) => {
-        if (DEBUG) console.log('❌ WebSocket desconectado:', reason);
+        if (DEBUG) console.warn('❌ WebSocket desconectado:', reason);
         setIsConnected(false);
       });
 
@@ -249,7 +249,7 @@ export const useNotifications = (options?: {
 
       // Event: novo_ticket
       socket.on('novo_ticket', (data: NovoTicketEvento) => {
-        if (DEBUG) console.log('🆕 Novo ticket recebido:', data);
+        if (DEBUG) console.warn('🆕 Novo ticket recebido:', data);
 
         playNotificationSound();
         showToast({
@@ -264,7 +264,7 @@ export const useNotifications = (options?: {
 
       // Event: ticket_atualizado
       socket.on('ticket_atualizado', (data: TicketAtualizadoEvento) => {
-        if (DEBUG) console.log('🔄 Ticket atualizado:', data);
+        if (DEBUG) console.warn('🔄 Ticket atualizado:', data);
 
         showToast({
           tipo: 'info',
@@ -278,7 +278,7 @@ export const useNotifications = (options?: {
 
       // Event: ticket:atribuido
       socket.on('ticket:atribuido', (data: TicketAtribuidoEvento) => {
-        if (DEBUG) console.log('👤 Ticket atribuído:', data);
+        if (DEBUG) console.warn('👤 Ticket atribuído:', data);
 
         playNotificationSound();
         showToast({
@@ -293,7 +293,7 @@ export const useNotifications = (options?: {
 
       // Event: nova_mensagem
       socket.on('nova_mensagem', (data: NovaMensagemEvento) => {
-        if (DEBUG) console.log('💬 Nova mensagem:', data);
+        if (DEBUG) console.warn('💬 Nova mensagem:', data);
 
         // Só notificar se for mensagem do cliente
         if (data.remetente === 'CLIENTE') {
@@ -311,7 +311,7 @@ export const useNotifications = (options?: {
 
       // Event: notificacao (genérica)
       socket.on('notificacao', (data: Notificacao) => {
-        if (DEBUG) console.log('🔔 Notificação:', data);
+        if (DEBUG) console.warn('🔔 Notificação:', data);
 
         playNotificationSound();
         showToast(data);
@@ -335,14 +335,14 @@ export const useNotifications = (options?: {
         // ✅ Verificar se socket existe e está conectado antes de desconectar
         const socket = socketRef.current;
         if (socket && (socket.connected || socket.active)) {
-          if (DEBUG) console.log('🔌 Desconectando WebSocket...');
+          if (DEBUG) console.warn('🔌 Desconectando WebSocket...');
           socket.disconnect();
         } else {
-          if (DEBUG) console.log('🔌 WebSocket já estava desconectado');
+          if (DEBUG) console.warn('🔌 WebSocket já estava desconectado');
         }
       } catch (err) {
         // ✅ Ignorar erros de desconexão (socket já pode estar fechado)
-        if (DEBUG) console.log('⚠️ Erro ao desconectar (esperado em React StrictMode):', err);
+        if (DEBUG) console.warn('⚠️ Erro ao desconectar (esperado em React StrictMode):', err);
       } finally {
         socketRef.current = null;
         setIsConnected(false);

@@ -29,6 +29,7 @@ type ClienteContatoData = {
   nome: string;
   email: string;
   telefone: string;
+  empresa?: string;
 };
 
 const CLIENTE_DETAILS_TTL = 5 * 60 * 1000; // 5 minutos
@@ -181,6 +182,7 @@ type PropostaUI = {
 interface PropostaActionsProps {
   proposta: PropostaCompleta | PropostaUI;
   onViewProposta: (proposta: PropostaCompleta | PropostaUI) => void;
+  onPropostaUpdated?: () => void;
   className?: string;
   showLabels?: boolean;
 }
@@ -324,7 +326,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     } else {
       return {
         numero: proposta.numero || 'N/A',
-        total: proposta.valor || 0,
+        total: (proposta as any).valor || 0,
         dataValidade: proposta.data_vencimento || new Date().toISOString().split('T')[0],
         titulo: proposta.titulo || 'Proposta comercial',
         status: proposta.status || 'rascunho',
@@ -715,19 +717,19 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           nome: clienteData.nome,
           email: clienteData.email || '',
           telefone: clienteData.telefone,
-          empresa: clienteData.empresa,
+          empresa: (clienteData as any).empresa,
         },
         vendedor: {
           nome: 'Admin',
           email: 'admin@conectcrm.com',
           telefone: '(11) 99999-9999',
         },
-        itens: propostaData.produtos || [],
-        subtotal: propostaData.subtotal || 0,
+        itens: (propostaData as any).produtos || [],
+        subtotal: (propostaData as any).subtotal || 0,
         valorTotal: propostaData.total || 0,
-        formaPagamento: propostaData.formaPagamento || 'À vista',
+        formaPagamento: (propostaData as any).formaPagamento || 'A vista',
         prazoEntrega: '30 dias',
-        validadeProposta: `${propostaData.validadeDias || 30} dias`,
+        validadeProposta: `${(propostaData as any).validadeDias || 30} dias`,
       };
 
       await pdfPropostasService.downloadPdf('comercial', dadosPDF);
@@ -915,3 +917,5 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 };
 
 export default PropostaActions;
+
+

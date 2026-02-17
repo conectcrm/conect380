@@ -36,13 +36,27 @@ export class CreateInteracoesTable1764000000000 implements MigrationInterface {
     `);
 
     // Índices
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_interacoes_empresa_id" ON "interacoes" ("empresa_id")`);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_interacoes_tipo" ON "interacoes" ("tipo")`);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_interacoes_lead_id" ON "interacoes" ("lead_id")`);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_interacoes_contato_id" ON "interacoes" ("contato_id")`);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_interacoes_responsavel_id" ON "interacoes" ("responsavel_id")`);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_interacoes_data_referencia" ON "interacoes" ("data_referencia")`);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_interacoes_created_at" ON "interacoes" ("created_at")`);
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_interacoes_empresa_id" ON "interacoes" ("empresa_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_interacoes_tipo" ON "interacoes" ("tipo")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_interacoes_lead_id" ON "interacoes" ("lead_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_interacoes_contato_id" ON "interacoes" ("contato_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_interacoes_responsavel_id" ON "interacoes" ("responsavel_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_interacoes_data_referencia" ON "interacoes" ("data_referencia")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_interacoes_created_at" ON "interacoes" ("created_at")`,
+    );
 
     // Foreign keys
     await queryRunner.query(`
@@ -125,7 +139,8 @@ export class CreateInteracoesTable1764000000000 implements MigrationInterface {
     // ⚡ MULTI-TENANT: Criar política de isolamento
     await queryRunner.query(`
       CREATE POLICY tenant_isolation_interacoes ON interacoes
-        FOR ALL USING (empresa_id = get_current_tenant());
+        FOR ALL USING (empresa_id = get_current_tenant())
+        WITH CHECK (empresa_id = get_current_tenant());
     `);
 
     console.log('✅ Tabela interacoes criada com RLS ativo');
@@ -133,14 +148,22 @@ export class CreateInteracoesTable1764000000000 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Remover política RLS
-    await queryRunner.query(`DROP POLICY IF EXISTS interacoes_isolation_policy ON "interacoes"`);
+    await queryRunner.query(`DROP POLICY IF EXISTS tenant_isolation_interacoes ON "interacoes"`);
     await queryRunner.query(`ALTER TABLE "interacoes" DISABLE ROW LEVEL SECURITY`);
 
     // Remover FKs
-    await queryRunner.query(`ALTER TABLE "interacoes" DROP CONSTRAINT IF EXISTS "FK_interacoes_responsavel"`);
-    await queryRunner.query(`ALTER TABLE "interacoes" DROP CONSTRAINT IF EXISTS "FK_interacoes_contato"`);
-    await queryRunner.query(`ALTER TABLE "interacoes" DROP CONSTRAINT IF EXISTS "FK_interacoes_lead"`);
-    await queryRunner.query(`ALTER TABLE "interacoes" DROP CONSTRAINT IF EXISTS "FK_interacoes_empresa"`);
+    await queryRunner.query(
+      `ALTER TABLE "interacoes" DROP CONSTRAINT IF EXISTS "FK_interacoes_responsavel"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "interacoes" DROP CONSTRAINT IF EXISTS "FK_interacoes_contato"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "interacoes" DROP CONSTRAINT IF EXISTS "FK_interacoes_lead"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "interacoes" DROP CONSTRAINT IF EXISTS "FK_interacoes_empresa"`,
+    );
 
     // Remover índices
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_interacoes_created_at"`);

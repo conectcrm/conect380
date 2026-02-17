@@ -527,7 +527,7 @@ const NovaPropostaPage: React.FC = () => {
       };
 
       // Usar o serviço real de propostas
-      const propostaCriada = await propostasService.criarProposta(propostaData);
+      const propostaCriada = await propostasService.criarProposta(propostaData as any);
       toast.success(`Proposta ${propostaCriada.numero} criada com sucesso!`);
 
       // Reset do formulário

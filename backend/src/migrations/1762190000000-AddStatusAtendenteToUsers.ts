@@ -5,33 +5,50 @@ export class AddStatusAtendenteToUsers1762190000000 implements MigrationInterfac
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // 1. Criar enum para status de atendente
-    await queryRunner.query(`
-            CREATE TYPE "public"."users_status_atendente_enum" AS ENUM('DISPONIVEL', 'OCUPADO', 'AUSENTE', 'OFFLINE')
+        await queryRunner.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM pg_type t
+                    JOIN pg_namespace n ON n.oid = t.typnamespace
+                    WHERE t.typname = 'users_status_atendente_enum' AND n.nspname = 'public'
+                ) THEN
+                    CREATE TYPE "public"."users_status_atendente_enum" AS ENUM('DISPONIVEL', 'OCUPADO', 'AUSENTE', 'OFFLINE');
+                END IF;
+            END
+            $$;
         `);
 
     // 2. Adicionar colunas na tabela users
     await queryRunner.query(`
-            ALTER TABLE "users" 
-            ADD "status_atendente" "public"."users_status_atendente_enum"
+            ALTER TABLE "users"
+            ADD COLUMN IF NOT EXISTS "status_atendente" "public"."users_status_atendente_enum"
         `);
 
     await queryRunner.query(`
-            ALTER TABLE "users" 
-            ADD "capacidade_maxima" integer DEFAULT 5
+            ALTER TABLE "users"
+            ADD COLUMN IF NOT EXISTS "capacidade_maxima" integer DEFAULT 5
         `);
 
     await queryRunner.query(`
-            ALTER TABLE "users" 
-            ADD "tickets_ativos" integer DEFAULT 0
+            ALTER TABLE "users"
+            ADD COLUMN IF NOT EXISTS "tickets_ativos" integer DEFAULT 0
         `);
+
+    const atendentesExists = await queryRunner.hasTable('atendentes');
+    if (!atendentesExists) {
+      console.log('ℹ️  Tabela "atendentes" não existe; pulando migração de dados (apenas adicionando colunas em users).');
+      return;
+    }
 
     console.log('🔄 Migrando dados de atendentes para users...');
 
     // 3. Migrar atendentes que já têm usuarioId
     await queryRunner.query(`
             UPDATE users
-            SET 
-                status_atendente = CASE 
+            SET
+                status_atendente = CASE
                     WHEN atendentes.status = 'DISPONIVEL' THEN 'DISPONIVEL'::users_status_atendente_enum
                     WHEN atendentes.status = 'OCUPADO' THEN 'OCUPADO'::users_status_atendente_enum
                     WHEN atendentes.status = 'AUSENTE' THEN 'AUSENTE'::users_status_atendente_enum
@@ -39,7 +56,7 @@ export class AddStatusAtendenteToUsers1762190000000 implements MigrationInterfac
                 END,
                 capacidade_maxima = atendentes."capacidadeMaxima",
                 tickets_ativos = atendentes."ticketsAtivos",
-                permissoes = CASE 
+                permissoes = CASE
                     WHEN users.permissoes IS NULL THEN 'ATENDIMENTO'
                     WHEN users.permissoes NOT LIKE '%ATENDIMENTO%' THEN users.permissoes || ',ATENDIMENTO'
                     ELSE users.permissoes
@@ -69,7 +86,7 @@ export class AddStatusAtendenteToUsers1762190000000 implements MigrationInterfac
                 created_at,
                 updated_at
             )
-            SELECT 
+            SELECT
                 gen_random_uuid(),
                 atendentes.nome,
                 atendentes.email,
@@ -77,7 +94,7 @@ export class AddStatusAtendenteToUsers1762190000000 implements MigrationInterfac
                 'user',
                 atendentes."empresaId",
                 'ATENDIMENTO',
-                CASE 
+                CASE
                     WHEN atendentes.status = 'DISPONIVEL' THEN 'DISPONIVEL'::users_status_atendente_enum
                     WHEN atendentes.status = 'OCUPADO' THEN 'OCUPADO'::users_status_atendente_enum
                     WHEN atendentes.status = 'AUSENTE' THEN 'AUSENTE'::users_status_atendente_enum
@@ -101,8 +118,8 @@ export class AddStatusAtendenteToUsers1762190000000 implements MigrationInterfac
 
     // 5. Contagem final
     const result = await queryRunner.query(`
-            SELECT COUNT(*) as total 
-            FROM users 
+            SELECT COUNT(*) as total
+            FROM users
             WHERE permissoes LIKE '%ATENDIMENTO%'
         `);
 
@@ -113,10 +130,10 @@ export class AddStatusAtendenteToUsers1762190000000 implements MigrationInterfac
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Reverter mudanças
-    await queryRunner.query(`ALTER TABLE "users" DROP COLUMN "tickets_ativos"`);
-    await queryRunner.query(`ALTER TABLE "users" DROP COLUMN "capacidade_maxima"`);
-    await queryRunner.query(`ALTER TABLE "users" DROP COLUMN "status_atendente"`);
-    await queryRunner.query(`DROP TYPE "public"."users_status_atendente_enum"`);
+        await queryRunner.query(`ALTER TABLE "users" DROP COLUMN IF EXISTS "tickets_ativos"`);
+        await queryRunner.query(`ALTER TABLE "users" DROP COLUMN IF EXISTS "capacidade_maxima"`);
+        await queryRunner.query(`ALTER TABLE "users" DROP COLUMN IF EXISTS "status_atendente"`);
+        await queryRunner.query(`DROP TYPE IF EXISTS "public"."users_status_atendente_enum"`);
 
     console.log('⚠️  ATENÇÃO: Dados de atendentes migrados não foram revertidos!');
     console.log('   Usuários criados/modificados permanecem na tabela users.');

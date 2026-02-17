@@ -8,43 +8,38 @@ import {
   Param,
   Query,
   UseGuards,
-  Request,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { EmpresaId } from '../../../common/decorators/empresa.decorator';
 import { SlaService } from '../services/sla.service';
 import { CreateSlaConfigDto } from '../dto/sla/create-sla-config.dto';
 import { UpdateSlaConfigDto } from '../dto/sla/update-sla-config.dto';
 import { SlaMetricasFilterDto } from '../dto/sla/sla-metricas-filter.dto';
 
 @Controller('atendimento/sla')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class SlaController {
-  constructor(private readonly slaService: SlaService) { }
+  constructor(private readonly slaService: SlaService) {}
 
   // ==================== CRUD DE CONFIGURAÇÕES ====================
 
   @Post('configs')
   @HttpCode(HttpStatus.CREATED)
-  async criarConfig(@Body() dto: CreateSlaConfigDto, @Request() req) {
-    const empresaId = req.user?.empresa_id || req.user?.empresaId;
+  async criarConfig(@Body() dto: CreateSlaConfigDto, @EmpresaId() empresaId: string) {
     return await this.slaService.criar(dto, empresaId);
   }
 
   @Get('configs')
-  async listarConfigs(
-    @Request() req,
-    @Query('apenasAtivas') apenasAtivas?: string,
-  ) {
-    const empresaId = req.user?.empresa_id || req.user?.empresaId;
+  async listarConfigs(@EmpresaId() empresaId: string, @Query('apenasAtivas') apenasAtivas?: string) {
     const filtrarAtivas = apenasAtivas === 'true';
     return await this.slaService.listar(empresaId, filtrarAtivas);
   }
 
   @Get('configs/:id')
-  async buscarConfig(@Param('id') id: string, @Request() req) {
-    const empresaId = req.user?.empresa_id || req.user?.empresaId;
+  async buscarConfig(@Param('id') id: string, @EmpresaId() empresaId: string) {
     return await this.slaService.buscarPorId(id, empresaId);
   }
 
@@ -52,16 +47,14 @@ export class SlaController {
   async atualizarConfig(
     @Param('id') id: string,
     @Body() dto: UpdateSlaConfigDto,
-    @Request() req,
+    @EmpresaId() empresaId: string,
   ) {
-    const empresaId = req.user?.empresa_id || req.user?.empresaId;
     return await this.slaService.atualizar(id, dto, empresaId);
   }
 
   @Delete('configs/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deletarConfig(@Param('id') id: string, @Request() req) {
-    const empresaId = req.user?.empresa_id || req.user?.empresaId;
+  async deletarConfig(@Param('id') id: string, @EmpresaId() empresaId: string) {
     await this.slaService.deletar(id, empresaId);
   }
 
@@ -76,9 +69,8 @@ export class SlaController {
       canal: string;
       ticketCriadoEm: string;
     },
-    @Request() req,
+    @EmpresaId() empresaId: string,
   ) {
-    const empresaId = req.user?.empresa_id || req.user?.empresaId;
     const ticketCriadoEm = new Date(body.ticketCriadoEm);
 
     return await this.slaService.calcularSlaTicket(
@@ -91,31 +83,24 @@ export class SlaController {
   }
 
   @Get('violacoes')
-  async buscarViolacoes(@Request() req) {
-    const empresaId = req.user?.empresa_id || req.user?.empresaId;
+  async buscarViolacoes(@EmpresaId() empresaId: string) {
     return await this.slaService.verificarViolacoes(empresaId);
   }
 
   @Get('alertas')
-  async buscarAlertas(@Request() req) {
-    const empresaId = req.user?.empresa_id || req.user?.empresaId;
+  async buscarAlertas(@EmpresaId() empresaId: string) {
     return await this.slaService.buscarAlertas(empresaId);
   }
 
   // ==================== MÉTRICAS E RELATÓRIOS ====================
 
   @Get('metricas')
-  async buscarMetricas(
-    @Request() req,
-    @Query() filtros?: SlaMetricasFilterDto,
-  ) {
-    const empresaId = req.user?.empresa_id || req.user?.empresaId;
+  async buscarMetricas(@EmpresaId() empresaId: string, @Query() filtros?: SlaMetricasFilterDto) {
     return await this.slaService.buscarMetricas(empresaId, filtros);
   }
 
   @Get('tickets/:ticketId/historico')
-  async buscarHistorico(@Param('ticketId') ticketId: string, @Request() req) {
-    const empresaId = req.user?.empresa_id || req.user?.empresaId;
+  async buscarHistorico(@Param('ticketId') ticketId: string, @EmpresaId() empresaId: string) {
     return await this.slaService.buscarHistorico(ticketId, empresaId);
   }
 
@@ -132,9 +117,8 @@ export class SlaController {
       tempoRespostaMinutos: number;
       tempoLimiteMinutos: number;
     },
-    @Request() req,
+    @EmpresaId() empresaId: string,
   ) {
-    const empresaId = req.user?.empresa_id || req.user?.empresaId;
     return await this.slaService.gerarAlerta(
       ticketId,
       body.slaConfigId,
@@ -155,9 +139,8 @@ export class SlaController {
       tempoRespostaMinutos: number;
       tempoLimiteMinutos: number;
     },
-    @Request() req,
+    @EmpresaId() empresaId: string,
   ) {
-    const empresaId = req.user?.empresa_id || req.user?.empresaId;
     return await this.slaService.registrarViolacao(
       ticketId,
       body.slaConfigId,

@@ -1,9 +1,13 @@
-import { IsString, IsEnum, IsNumber, IsOptional, IsDateString } from 'class-validator';
+import { IsString, IsEnum, IsOptional, IsDateString, IsInt } from 'class-validator';
 import { TipoAtividade } from '../atividade.entity';
 
 export class CreateAtividadeDto {
   @IsEnum(TipoAtividade)
   tipo: TipoAtividade;
+
+  @IsOptional()
+  @IsString()
+  titulo?: string;
 
   @IsString()
   descricao: string;
@@ -13,6 +17,6 @@ export class CreateAtividadeDto {
   dataAtividade?: string;
 
   @IsOptional()
-  @IsNumber()
-  oportunidade_id: number;
+  @IsInt()
+  oportunidade_id?: number;
 }

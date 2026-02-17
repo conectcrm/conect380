@@ -29,6 +29,7 @@ type PropostaUI = {
 interface PropostaActionsProps {
   proposta: PropostaCompleta | PropostaUI;
   onViewProposta: (proposta: PropostaCompleta | PropostaUI) => void;
+  onPropostaUpdated?: () => void;
   className?: string;
   showLabels?: boolean;
 }
@@ -75,7 +76,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     } else {
       return {
         numero: proposta.numero || '',
-        total: proposta.valor || 0,
+        total: (proposta as any).valor || 0,
         dataValidade: proposta.data_vencimento || new Date().toISOString(),
         titulo: proposta.titulo || `Proposta ${proposta.numero}`,
       };
@@ -154,21 +155,39 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
     try {
       const propostaData = getPropostaData();
+      const token = generateAccessToken();
 
       const emailData = {
-        propostaNumero: propostaData.numero,
-        clienteNome: clienteData.nome,
-        clienteEmail: clienteData.email,
-        valorTotal: propostaData.total,
-        empresaNome: 'ConectCRM',
+        cliente: {
+          nome: clienteData.nome,
+          email: clienteData.email,
+        },
+        proposta: {
+          numero: propostaData.numero,
+          valorTotal: propostaData.total,
+          dataValidade: String(propostaData.dataValidade),
+          token,
+        },
+        vendedor: {
+          nome: 'ConectCRM',
+          email: 'vendedor@conectcrm.com',
+          telefone: '(11) 99999-9999',
+        },
+        empresa: {
+          nome: 'ConectCRM',
+          email: 'conectcrm@gmail.com',
+          telefone: '(11) 99999-9999',
+          endereco: 'Sao Paulo/SP',
+        },
+        portalUrl: `${window.location.origin}/portal`,
       };
 
       const resultado = await emailServiceReal.enviarPropostaParaCliente(emailData);
 
-      if (resultado.sucesso) {
-        toast.success(`✅ Email enviado para ${clienteData.nome}`);
+      if (resultado.success) {
+        toast.success(`Email enviado para ${clienteData.nome}`);
       } else {
-        toast.error(`❌ Erro ao enviar email: ${resultado.error}`);
+        toast.error(`Erro ao enviar email: ${resultado.error}`);
       }
     } catch (error) {
       console.error('Erro ao enviar email:', error);
@@ -190,7 +209,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     // Gerar PDF para anexar
     try {
       const propostaData = getPropostaData();
-      const pdfBlob = await pdfPropostasService.gerarPdf({
+      const pdfBlob = await pdfPropostasService.gerarPdf('proposta', {
         numero: propostaData.numero,
         cliente: {
           nome: cliente.nome,
@@ -201,7 +220,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         valorTotal: propostaData.total,
         produtos: [],
         observacoes: propostaData.titulo,
-      });
+      } as any);
 
       // Converter Blob para Uint8Array
       const arrayBuffer = await pdfBlob.arrayBuffer();
@@ -231,19 +250,19 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           nome: cliente.nome,
           email: cliente.email || '',
           telefone: cliente.telefone,
-          empresa: cliente.empresa,
+          empresa: (cliente as any).empresa,
         },
         vendedor: {
           nome: 'Admin',
           email: 'admin@conectcrm.com',
           telefone: '(11) 99999-9999',
         },
-        itens: propostaData.produtos || [],
-        subtotal: propostaData.subtotal || 0,
+        itens: (propostaData as any).produtos || [],
+        subtotal: (propostaData as any).subtotal || 0,
         valorTotal: propostaData.total || 0,
-        formaPagamento: propostaData.formaPagamento || 'À vista',
+        formaPagamento: (propostaData as any).formaPagamento || 'A vista',
         prazoEntrega: '30 dias',
-        validadeProposta: `${propostaData.validadeDias || 30} dias`,
+        validadeProposta: `${(propostaData as any).validadeDias || 30} dias`,
       };
 
       await pdfPropostasService.downloadPdf('comercial', dadosPDF);
@@ -381,3 +400,6 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 };
 
 export default PropostaActions;
+
+
+

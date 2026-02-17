@@ -576,7 +576,7 @@ class MercadoPagoService {
 
   // Utilitários
   private getAuthToken(): string {
-    return localStorage.getItem('auth_token') || '';
+    return localStorage.getItem('authToken') || '';
   }
 
   public formatarValor(valor: number): string {

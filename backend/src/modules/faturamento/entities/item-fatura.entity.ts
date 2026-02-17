@@ -8,19 +8,11 @@ import {
   BeforeUpdate,
 } from 'typeorm';
 import { Fatura } from './fatura.entity';
-import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 @Entity('itens_fatura')
 export class ItemFatura {
   @PrimaryGeneratedColumn()
   id: number;
-
-  @Column({ type: 'uuid', name: 'empresa_id' })
-  empresaId: string;
-
-  @ManyToOne(() => Empresa)
-  @JoinColumn({ name: 'empresa_id' })
-  empresa: Empresa;
 
   @Column()
   faturaId: number;

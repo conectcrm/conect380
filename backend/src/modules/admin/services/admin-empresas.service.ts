@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, Between, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Empresa } from '../../../empresas/entities/empresa.entity';
 import { User, UserRole } from '../../users/user.entity';
 import { EmpresaModuloService } from '../../empresas/services/empresa-modulo.service';
@@ -28,7 +28,7 @@ export class AdminEmpresasService {
     @InjectRepository(HistoricoPlano)
     private historicoPlanoRepository: Repository<HistoricoPlano>,
     private empresaModuloService: EmpresaModuloService,
-  ) { }
+  ) {}
 
   /**
    * Listar todas as empresas com filtros e paginação
@@ -296,14 +296,17 @@ export class AdminEmpresasService {
       ? Math.floor((Date.now() - empresa.ultimo_acesso.getTime()) / (1000 * 60 * 60 * 24))
       : 999;
 
-    if (diasSemUso === 0) score += 40; // Login hoje
-    else if (diasSemUso <= 2) score += 35; // Login nos últimos 2 dias
-    else if (diasSemUso <= 7) score += 25; // Login na semana
+    if (diasSemUso === 0)
+      score += 40; // Login hoje
+    else if (diasSemUso <= 2)
+      score += 35; // Login nos últimos 2 dias
+    else if (diasSemUso <= 7)
+      score += 25; // Login na semana
     else if (diasSemUso <= 30) score += 10; // Login no mês
     // else 0 pts
 
     // 2. Engajamento (30 pts)
-    const usuariosAtivos = empresa.usuarios?.filter(u => u.ativo).length || 0;
+    const usuariosAtivos = empresa.usuarios?.filter((u) => u.ativo).length || 0;
     const totalUsuarios = empresa.usuarios?.length || 1;
     const taxaAtivacao = usuariosAtivos / totalUsuarios;
     score += Math.round(taxaAtivacao * 30);
@@ -551,7 +554,9 @@ export class AdminEmpresasService {
       order: { dataAlteracao: 'DESC' },
     });
 
-    this.logger.log(`Listado histórico de ${historico.length} mudanças de plano para ${empresa.nome}`);
+    this.logger.log(
+      `Listado histórico de ${historico.length} mudanças de plano para ${empresa.nome}`,
+    );
 
     return historico;
   }
@@ -592,7 +597,9 @@ export class AdminEmpresasService {
 
     const empresaAtualizada = await this.empresaRepository.save(empresa);
 
-    this.logger.log(`Plano da empresa ${empresa.nome} alterado de ${planoAnterior} para ${dto.plano}`);
+    this.logger.log(
+      `Plano da empresa ${empresa.nome} alterado de ${planoAnterior} para ${dto.plano}`,
+    );
 
     return empresaAtualizada;
   }
@@ -600,7 +607,7 @@ export class AdminEmpresasService {
   /**
    * Obter limites padrão de um módulo baseado no plano
    */
-  private getLimitesPadraoModulo(modulo: string, plano: string): any {
+  private getLimitesPadraoModulo(modulo: string, plano: string): Record<string, number> {
     const limitesBasePorPlano = {
       starter: {
         usuarios: 5,

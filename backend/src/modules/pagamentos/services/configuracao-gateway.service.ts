@@ -17,7 +17,7 @@ export class ConfiguracaoGatewayService {
   constructor(
     @InjectRepository(ConfiguracaoGateway)
     private readonly configuracaoRepository: Repository<ConfiguracaoGateway>,
-  ) { }
+  ) {}
 
   async create(dto: CreateConfiguracaoGatewayDto, empresaId: string): Promise<ConfiguracaoGateway> {
     const modo = dto.modoOperacao ?? GatewayMode.SANDBOX;
@@ -81,11 +81,7 @@ export class ConfiguracaoGatewayService {
     const targetGateway = dto.gateway ?? configuracao.gateway;
     const targetModo = dto.modoOperacao ?? configuracao.modoOperacao;
 
-    if (
-      dto.gateway ||
-      dto.modoOperacao ||
-      (dto.status && dto.status !== configuracao.status)
-    ) {
+    if (dto.gateway || dto.modoOperacao || (dto.status && dto.status !== configuracao.status)) {
       await this.ensureUniqueCombination(empresaId, targetGateway, targetModo, configuracao.id);
     }
 
@@ -95,8 +91,7 @@ export class ConfiguracaoGatewayService {
       gateway: targetGateway,
       metodosPermitidos: dto.metodosPermitidos ?? configuracao.metodosPermitidos,
       credenciais: dto.credenciais ?? configuracao.credenciais,
-      configuracoesAdicionais:
-        dto.configuracoesAdicionais ?? configuracao.configuracoesAdicionais,
+      configuracoesAdicionais: dto.configuracoesAdicionais ?? configuracao.configuracoesAdicionais,
     });
 
     return this.configuracaoRepository.save(configuracao);

@@ -47,7 +47,9 @@ export class CotacaoEmailService {
         return false;
       }
 
-      console.log(`📤 Enviando notificação de aprovação da cotação #${cotacao.numero} para ${emailDestino}`);
+      console.log(
+        `📤 Enviando notificação de aprovação da cotação #${cotacao.numero} para ${emailDestino}`,
+      );
 
       const mailOptions = {
         from: {
@@ -93,7 +95,9 @@ export class CotacaoEmailService {
         return false;
       }
 
-      console.log(`📤 Enviando notificação de reprovação da cotação #${cotacao.numero} para ${emailDestino}`);
+      console.log(
+        `📤 Enviando notificação de reprovação da cotação #${cotacao.numero} para ${emailDestino}`,
+      );
 
       const mailOptions = {
         from: {
@@ -117,11 +121,7 @@ export class CotacaoEmailService {
   /**
    * Template HTML para email de aprovação
    */
-  private gerarTemplateAprovacao(
-    cotacao: any,
-    aprovador: any,
-    justificativa?: string,
-  ): string {
+  private gerarTemplateAprovacao(cotacao: any, aprovador: any, justificativa?: string): string {
     const dataAprovacao = new Date().toLocaleDateString('pt-BR', {
       day: '2-digit',
       month: 'long',
@@ -187,12 +187,16 @@ export class CotacaoEmailService {
         </div>
       </div>
 
-      ${justificativa ? `
+      ${
+        justificativa
+          ? `
       <div class="justificativa">
         <strong>Justificativa do Aprovador:</strong>
         <p style="margin: 10px 0 0 0; white-space: pre-wrap;">${justificativa}</p>
       </div>
-      ` : ''}
+      `
+          : ''
+      }
 
       <p>Você já pode prosseguir com as próximas etapas do processo.</p>
 
@@ -215,11 +219,7 @@ export class CotacaoEmailService {
   /**
    * Template HTML para email de reprovação
    */
-  private gerarTemplateReprovacao(
-    cotacao: any,
-    aprovador: any,
-    justificativa: string,
-  ): string {
+  private gerarTemplateReprovacao(cotacao: any, aprovador: any, justificativa: string): string {
     const dataReprovacao = new Date().toLocaleDateString('pt-BR', {
       day: '2-digit',
       month: 'long',

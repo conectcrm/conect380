@@ -11,6 +11,10 @@ import { Server, Socket } from 'socket.io';
 import { Logger, UseGuards } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { OnlineStatusService } from '../services/online-status.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Ticket } from '../entities/ticket.entity';
+import { runWithTenant } from '../../../common/tenant/tenant-context';
 
 @WebSocketGateway({
   cors: {
@@ -24,7 +28,7 @@ export class AtendimentoGateway implements OnGatewayConnection, OnGatewayDisconn
   server: Server;
 
   private readonly logger = new Logger(AtendimentoGateway.name);
-  private connectedClients = new Map<string, { userId: string; role: string }>();
+  private connectedClients = new Map<string, { userId: string; role: string; empresaId: string }>();
   private readonly DEBUG = process.env.NODE_ENV !== 'production'; // ✅ Controle de logs
   private readonly atendenteRoles = new Set([
     'atendente',
@@ -40,7 +44,32 @@ export class AtendimentoGateway implements OnGatewayConnection, OnGatewayDisconn
   constructor(
     private jwtService: JwtService,
     private onlineStatusService: OnlineStatusService,
+    @InjectRepository(Ticket)
+    private readonly ticketRepository: Repository<Ticket>,
   ) {}
+
+  private empresaRoom(empresaId: string): string {
+    return `empresa:${empresaId}`;
+  }
+
+  private atendentesRoom(empresaId: string): string {
+    return `empresa:${empresaId}:atendentes`;
+  }
+
+  private ticketRoom(empresaId: string, ticketId: string): string {
+    return `ticket:${empresaId}:${ticketId}`;
+  }
+
+  private extrairEmpresaId(dados: any): string | undefined {
+    if (!dados || typeof dados !== 'object') return undefined;
+    const empresaId = (dados as any).empresaId ?? (dados as any).empresa_id;
+    if (typeof empresaId === 'string' && empresaId.trim().length > 0) return empresaId;
+    if ((dados as any).ticket && typeof (dados as any).ticket === 'object') {
+      const empresaTicket = (dados as any).ticket.empresaId ?? (dados as any).ticket.empresa_id;
+      if (typeof empresaTicket === 'string' && empresaTicket.trim().length > 0) return empresaTicket;
+    }
+    return undefined;
+  }
 
   private normalizarRole(role: unknown): string {
     return (role ?? '').toString().trim().toLowerCase();
@@ -109,6 +138,13 @@ export class AtendimentoGateway implements OnGatewayConnection, OnGatewayDisconn
       // Validar token JWT
       const payload = await this.jwtService.verifyAsync(token);
       const roleNormalizado = this.normalizarRole(payload.role);
+      const empresaId = (payload as any).empresa_id;
+
+      if (!empresaId || typeof empresaId !== 'string') {
+        this.logger.warn(`❌ Cliente ${client.id} token sem empresa_id (User: ${payload.sub})`);
+        client.disconnect();
+        return;
+      }
       if (this.DEBUG)
         this.logger.log(`✅ Token válido! User: ${payload.sub}, Role: ${payload.role}`);
 
@@ -116,14 +152,18 @@ export class AtendimentoGateway implements OnGatewayConnection, OnGatewayDisconn
       this.connectedClients.set(client.id, {
         userId: payload.sub,
         role: roleNormalizado,
+        empresaId,
       });
 
       // Adicionar usuário a sala específica
       client.join(`user:${payload.sub}`);
 
+      // Isolamento por empresa (room base)
+      client.join(this.empresaRoom(empresaId));
+
       // Se for atendente, adicionar à sala de atendentes
       if (this.ehAtendenteRole(roleNormalizado)) {
-        client.join('atendentes');
+        client.join(this.atendentesRoom(empresaId));
       }
 
       this.logger.log(
@@ -132,7 +172,7 @@ export class AtendimentoGateway implements OnGatewayConnection, OnGatewayDisconn
 
       // Notificar outros atendentes sobre novo atendente online
       if (this.ehAtendenteRole(roleNormalizado)) {
-        this.server.to('atendentes').emit('atendente:online', {
+        this.server.to(this.atendentesRoom(empresaId)).emit('atendente:online', {
           userId: payload.sub,
           timestamp: new Date(),
         });
@@ -158,7 +198,7 @@ export class AtendimentoGateway implements OnGatewayConnection, OnGatewayDisconn
 
       // Notificar outros atendentes sobre atendente offline
       if (this.ehAtendenteRole(clientInfo.role)) {
-        this.server.to('atendentes').emit('atendente:offline', {
+        this.server.to(this.atendentesRoom(clientInfo.empresaId)).emit('atendente:offline', {
           userId: clientInfo.userId,
           timestamp: new Date(),
         });
@@ -184,7 +224,7 @@ export class AtendimentoGateway implements OnGatewayConnection, OnGatewayDisconn
 
     if (clientInfo) {
       // Notificar outros participantes do ticket
-      this.server.to(`ticket:${data.ticketId}`).emit('mensagem:digitando', {
+      this.server.to(this.ticketRoom(clientInfo.empresaId, data.ticketId)).emit('mensagem:digitando', {
         ticketId: data.ticketId,
         userId: clientInfo.userId,
         timestamp: new Date(),
@@ -201,8 +241,17 @@ export class AtendimentoGateway implements OnGatewayConnection, OnGatewayDisconn
     );
 
     try {
+      const empresaId = this.extrairEmpresaId(mensagem);
+      if (!empresaId) {
+        this.logger.warn(
+          `⚠️ Nova mensagem sem empresaId - emit ficará limitado ao room do ticket apenas (ticket=${mensagem?.ticketId})`,
+        );
+      }
+
       // 1️⃣ SEMPRE emitir para sala do ticket (atendente que está atendendo)
-      const ticketRoom = `ticket:${mensagem.ticketId}`;
+      const ticketRoom = empresaId
+        ? this.ticketRoom(empresaId, mensagem.ticketId)
+        : `ticket:${mensagem.ticketId}`;
       this.logger.log(`   🎯 Emitindo 'nova_mensagem' para sala '${ticketRoom}'...`);
       this.server.to(ticketRoom).emit('nova_mensagem', mensagem);
 
@@ -215,11 +264,13 @@ export class AtendimentoGateway implements OnGatewayConnection, OnGatewayDisconn
       // 2️⃣ Se ticket NÃO tem atendente, emitir para fila de atendentes disponíveis
       if (!mensagem.atendenteId) {
         this.logger.log(`   🎯 Ticket SEM atendente - emitindo para fila 'atendentes'...`);
-        this.server.to('atendentes').emit('mensagem:nao-atribuida', mensagem);
+        if (empresaId) {
+          this.server.to(this.atendentesRoom(empresaId)).emit('mensagem:nao-atribuida', mensagem);
+        }
 
         if (this.server?.sockets?.adapter) {
           this.logger.log(
-            `   → Sala 'atendentes' (fila): ${this.server.sockets.adapter.rooms.get('atendentes')?.size || 0} clientes`,
+            `   → Sala '${empresaId ? this.atendentesRoom(empresaId) : 'atendentes'}' (fila): ${empresaId ? this.server.sockets.adapter.rooms.get(this.atendentesRoom(empresaId))?.size || 0 : 0} clientes`,
           );
         }
       } else {
@@ -253,26 +304,50 @@ export class AtendimentoGateway implements OnGatewayConnection, OnGatewayDisconn
    * Entrar na sala de um ticket específico
    */
   @SubscribeMessage('ticket:entrar')
-  handleEntrarTicket(@MessageBody() data: { ticketId: string }, @ConnectedSocket() client: Socket) {
+  async handleEntrarTicket(
+    @MessageBody() data: { ticketId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
     try {
-      const roomName = `ticket:${data.ticketId}`;
-      client.join(roomName);
-
-      // 🔍 DEBUG: Verificar se realmente entrou
-      const isInRoom = client.rooms.has(roomName);
-
-      this.logger.log(`🚪 Cliente ${client.id} ENTROU no ticket ${data.ticketId}`);
-      this.logger.log(`   ✅ Cliente está na sala? ${isInRoom}`);
-
-      // Verificar adapter antes de acessar
-      if (this.server?.sockets?.adapter) {
-        const roomSize = this.server.sockets.adapter.rooms.get(roomName)?.size || 0;
-        this.logger.log(`   📊 Total de clientes na sala: ${roomSize}`);
+      const clientInfo = this.connectedClients.get(client.id);
+      if (!clientInfo?.empresaId) {
+        return { success: false, message: 'Não autenticado' };
       }
 
-      this.logger.log(`   🎫 Salas do cliente: ${Array.from(client.rooms).join(', ')}`);
+      return await runWithTenant(clientInfo.empresaId, async () => {
+        const ticket = await this.ticketRepository.findOne({
+          where: {
+            id: data.ticketId,
+            empresaId: clientInfo.empresaId,
+          },
+        });
 
-      return { success: true, ticketId: data.ticketId };
+        if (!ticket) {
+          this.logger.warn(
+            `🚫 Cliente ${client.id} tentou entrar em ticket fora do tenant (ticket=${data.ticketId}, empresa=${clientInfo.empresaId})`,
+          );
+          return { success: false, message: 'Ticket não encontrado' };
+        }
+
+        const roomName = this.ticketRoom(clientInfo.empresaId, data.ticketId);
+        client.join(roomName);
+
+        // 🔍 DEBUG: Verificar se realmente entrou
+        const isInRoom = client.rooms.has(roomName);
+
+        this.logger.log(`🚪 Cliente ${client.id} ENTROU no ticket ${data.ticketId}`);
+        this.logger.log(`   ✅ Cliente está na sala? ${isInRoom}`);
+
+        // Verificar adapter antes de acessar
+        if (this.server?.sockets?.adapter) {
+          const roomSize = this.server.sockets.adapter.rooms.get(roomName)?.size || 0;
+          this.logger.log(`   📊 Total de clientes na sala: ${roomSize}`);
+        }
+
+        this.logger.log(`   🎫 Salas do cliente: ${Array.from(client.rooms).join(', ')}`);
+
+        return { success: true, ticketId: data.ticketId };
+      });
     } catch (error) {
       this.logger.error(`❌ Erro ao entrar no ticket ${data.ticketId}: ${error.message}`);
       this.logger.error(error.stack);
@@ -286,6 +361,11 @@ export class AtendimentoGateway implements OnGatewayConnection, OnGatewayDisconn
   @SubscribeMessage('ticket:sair')
   handleSairTicket(@MessageBody() data: { ticketId: string }, @ConnectedSocket() client: Socket) {
     try {
+      const clientInfo = this.connectedClients.get(client.id);
+      if (clientInfo?.empresaId) {
+        client.leave(this.ticketRoom(clientInfo.empresaId, data.ticketId));
+      }
+      // Fallback (compat)
       client.leave(`ticket:${data.ticketId}`);
       this.logger.log(`🚪 Cliente ${client.id} SAIU do ticket ${data.ticketId}`);
       return { success: true, ticketId: data.ticketId };
@@ -299,6 +379,7 @@ export class AtendimentoGateway implements OnGatewayConnection, OnGatewayDisconn
    * Notificar novo ticket criado
    */
   notificarNovoTicket(ticket: any) {
+    const empresaId = this.extrairEmpresaId(ticket);
     const ticketId = ticket?.id ?? ticket?.ticketId;
     const status = (ticket?.status ?? 'aberto').toString();
     const payload = this.construirPayloadTicketAtualizado(ticketId, status, ticket);
@@ -313,13 +394,17 @@ export class AtendimentoGateway implements OnGatewayConnection, OnGatewayDisconn
       return;
     }
 
-    this.server.emit('novo_ticket', payload);
+    if (empresaId) {
+      this.server.to(this.empresaRoom(empresaId)).emit('novo_ticket', payload);
+    }
 
     if (this.DEBUG) {
       this.logger.log(`Novo ticket criado: ${payload.id}`);
 
       if (this.server.sockets?.adapter) {
-        const atendentesAtivos = this.server.sockets.adapter.rooms.get('atendentes')?.size || 0;
+        const atendentesAtivos = empresaId
+          ? this.server.sockets.adapter.rooms.get(this.atendentesRoom(empresaId))?.size || 0
+          : 0;
         this.logger.log(`   🎯 Evento enviado para ${atendentesAtivos} atendentes conectados`);
       }
     }
@@ -335,15 +420,30 @@ export class AtendimentoGateway implements OnGatewayConnection, OnGatewayDisconn
     }
 
     const payload = this.construirPayloadTicketAtualizado(ticketId, status, dados);
+    const empresaId = this.extrairEmpresaId(payload) ?? this.extrairEmpresaId(dados);
+
+    if (!empresaId) {
+      this.logger.warn(`⚠️ notificarStatusTicket sem empresaId (ticket=${ticketId})`);
+    }
 
     // Notificar sala do ticket
+    if (empresaId) {
+      this.server.to(this.ticketRoom(empresaId, ticketId)).emit('ticket:status', {
+        ...payload,
+        timestamp: new Date(),
+      });
+    }
+
+    // Fallback (compat)
     this.server.to(`ticket:${ticketId}`).emit('ticket:status', {
       ...payload,
       timestamp: new Date(),
     });
 
-    // Notificar todos os clientes conectados ao namespace
-    this.server.emit('ticket_atualizado', payload);
+    // Notificar clientes conectados da mesma empresa
+    if (empresaId) {
+      this.server.to(this.empresaRoom(empresaId)).emit('ticket_atualizado', payload);
+    }
 
     if (this.DEBUG) {
       this.logger.log(`Status do ticket ${ticketId} atualizado para ${status}`);
@@ -369,13 +469,16 @@ export class AtendimentoGateway implements OnGatewayConnection, OnGatewayDisconn
 
     // Notificar outros atendentes
     const payload = this.construirPayloadTicketAtualizado(ticketId, 'atribuido', dados);
+    const empresaId = this.extrairEmpresaId(payload) ?? this.extrairEmpresaId(dados);
 
-    this.server.emit('ticket_atualizado', {
-      ticketId,
-      atendenteId,
-      status: 'atribuido',
-      ...payload,
-    });
+    if (empresaId) {
+      this.server.to(this.empresaRoom(empresaId)).emit('ticket_atualizado', {
+        ticketId,
+        atendenteId,
+        status: 'atribuido',
+        ...payload,
+      });
+    }
 
     if (this.DEBUG) {
       this.logger.log(`Ticket ${ticketId} atribuído ao atendente ${atendenteId}`);
@@ -404,15 +507,15 @@ export class AtendimentoGateway implements OnGatewayConnection, OnGatewayDisconn
   /**
    * Enviar notificação para todos os atendentes
    */
-  notificarAtendentes(tipo: string, dados: any) {
-    this.server.to('atendentes').emit('notificacao', {
+  notificarAtendentes(empresaId: string, tipo: string, dados: any) {
+    this.server.to(this.atendentesRoom(empresaId)).emit('notificacao', {
       tipo,
       dados,
       timestamp: new Date(),
     });
 
     if (this.DEBUG) {
-      this.logger.log(`Notificação enviada a todos atendentes: ${tipo}`);
+      this.logger.log(`Notificação enviada a todos atendentes (${empresaId}): ${tipo}`);
     }
   }
 
@@ -432,7 +535,7 @@ export class AtendimentoGateway implements OnGatewayConnection, OnGatewayDisconn
 
     if (clientInfo && this.ehAtendenteRole(clientInfo.role)) {
       // Notificar outros atendentes sobre mudança de status
-      this.server.to('atendentes').emit('atendente:status:atualizado', {
+      this.server.to(this.atendentesRoom(clientInfo.empresaId)).emit('atendente:status:atualizado', {
         userId: clientInfo.userId,
         status: data.status,
         timestamp: new Date(),
@@ -455,7 +558,12 @@ export class AtendimentoGateway implements OnGatewayConnection, OnGatewayDisconn
   /**
    * Notificar mudança de status online de um contato
    */
-  async notificarMudancaStatusContato(contatoId: number, isOnline: boolean, lastActivity?: Date) {
+  async notificarMudancaStatusContato(
+    contatoId: number,
+    empresaId: string,
+    isOnline: boolean,
+    lastActivity?: Date,
+  ) {
     const statusData = {
       contatoId,
       isOnline,
@@ -463,12 +571,12 @@ export class AtendimentoGateway implements OnGatewayConnection, OnGatewayDisconn
       timestamp: new Date(),
     };
 
-    // Notificar todos os atendentes sobre a mudança de status
-    this.server.to('atendentes').emit('contato:status:atualizado', statusData);
+    // Notificar todos os atendentes da mesma empresa sobre a mudança de status
+    this.server.to(this.atendentesRoom(empresaId)).emit('contato:status:atualizado', statusData);
 
     if (this.DEBUG) {
       this.logger.log(
-        `📱 Status do contato ${contatoId} atualizado: ${isOnline ? 'ONLINE' : 'OFFLINE'}`,
+        `📱 Status do contato ${contatoId} atualizado (empresa=${empresaId}): ${isOnline ? 'ONLINE' : 'OFFLINE'}`,
       );
     }
   }
@@ -489,7 +597,10 @@ export class AtendimentoGateway implements OnGatewayConnection, OnGatewayDisconn
       }
 
       // Buscar dados do contato para obter última atividade
-      const contato = await this.onlineStatusService.getContactActivityData(data.contatoId);
+      const contato = await this.onlineStatusService.getContactActivityData(
+        data.contatoId,
+        clientInfo.empresaId,
+      );
       const isOnline = this.onlineStatusService.calculateOnlineStatus(
         contato?.last_activity || null,
       );
@@ -522,17 +633,22 @@ export class AtendimentoGateway implements OnGatewayConnection, OnGatewayDisconn
       await this.onlineStatusService.updateContactActivity(contatoId.toString(), empresaId);
 
       // Buscar dados atualizados e verificar status
-      const contato = await this.onlineStatusService.getContactActivityData(contatoId);
+      const contato = await this.onlineStatusService.getContactActivityData(contatoId, empresaId);
       const isOnline = this.onlineStatusService.calculateOnlineStatus(
         contato?.last_activity || null,
       );
 
       // Notificar mudança de status
-      await this.notificarMudancaStatusContato(
+      const statusData = {
         contatoId,
         isOnline,
-        contato?.last_activity || undefined,
-      );
+        lastActivity: contato?.last_activity || undefined,
+        timestamp: new Date(),
+      };
+
+      this.server
+        .to(this.atendentesRoom(empresaId))
+        .emit('contato:status:atualizado', statusData);
 
       if (this.DEBUG) {
         this.logger.log(

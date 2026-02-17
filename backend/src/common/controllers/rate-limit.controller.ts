@@ -1,17 +1,16 @@
-import { Controller, Get } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+﻿import { Controller, Get } from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 /**
  * Rate Limit Statistics Controller
- * 
- * Endpoint para monitorar estatísticas de rate limiting.
- * Útil para identificar padrões de abuso e ajustar limites.
+ *
+ * Endpoint para monitorar estatisticas de rate limiting.
+ * Util para identificar padroes de abuso e ajustar limites.
  */
-
 @ApiTags('monitoring')
 @Controller('rate-limit')
 export class RateLimitController {
-  // Referência ao interceptor é injetada via singleton pattern
+  // Referencia ao interceptor e injetada via singleton pattern
   private static stats = {
     totalRequests: 0,
     blockedRequests: 0,
@@ -19,8 +18,10 @@ export class RateLimitController {
     activeEmpresas: new Set<string>(),
   };
 
+  private static cleanupTimer: NodeJS.Timeout | null = null;
+
   /**
-   * Registrar requisição (chamado pelo interceptor)
+   * Registrar requisicao (chamado pelo interceptor)
    */
   static recordRequest(ip: string, empresaId?: string, blocked: boolean = false): void {
     this.stats.totalRequests++;
@@ -37,25 +38,37 @@ export class RateLimitController {
    * Limpar IPs/empresas inativos
    */
   static cleanupInactive(): void {
-    // Reset a cada hora para não acumular indefinidamente
-    setInterval(() => {
-      this.stats.activeIPs.clear();
-      this.stats.activeEmpresas.clear();
-    }, 60 * 60 * 1000);
+    if (this.cleanupTimer) {
+      return;
+    }
+
+    // Reset a cada hora para nao acumular indefinidamente
+    this.cleanupTimer = setInterval(
+      () => {
+        this.stats.activeIPs.clear();
+        this.stats.activeEmpresas.clear();
+      },
+      60 * 60 * 1000,
+    );
+
+    // Evita manter o processo vivo apenas por esse timer.
+    if (typeof this.cleanupTimer.unref === 'function') {
+      this.cleanupTimer.unref();
+    }
   }
 
   /**
    * GET /rate-limit/stats
-   * Obter estatísticas de rate limiting
+   * Obter estatisticas de rate limiting
    */
   @Get('stats')
   @ApiOperation({
-    summary: 'Estatísticas de rate limiting',
-    description: 'Retorna métricas sobre requisições, bloqueios e uso atual do sistema'
+    summary: 'Estatisticas de rate limiting',
+    description: 'Retorna metricas sobre requisicoes, bloqueios e uso atual do sistema',
   })
   @ApiResponse({
     status: 200,
-    description: 'Estatísticas retornadas com sucesso',
+    description: 'Estatisticas retornadas com sucesso',
     schema: {
       type: 'object',
       properties: {
@@ -71,16 +84,17 @@ export class RateLimitController {
             empresaLimit: { type: 'number', example: 1000 },
             windowMinutes: { type: 'number', example: 1 },
             blockDurationMinutes: { type: 'number', example: 5 },
-          }
-        }
-      }
-    }
+          },
+        },
+      },
+    },
   })
   async getStats() {
     const stats = RateLimitController.stats;
-    const blockRate = stats.totalRequests > 0
-      ? ((stats.blockedRequests / stats.totalRequests) * 100).toFixed(2)
-      : '0.00';
+    const blockRate =
+      stats.totalRequests > 0
+        ? ((stats.blockedRequests / stats.totalRequests) * 100).toFixed(2)
+        : '0.00';
 
     return {
       totalRequests: stats.totalRequests,
@@ -100,12 +114,12 @@ export class RateLimitController {
 
   /**
    * GET /rate-limit/health
-   * Verificar saúde do rate limiting
+   * Verificar saude do rate limiting
    */
   @Get('health')
   @ApiOperation({
     summary: 'Health check do rate limiting',
-    description: 'Verifica se o rate limiting está funcionando corretamente'
+    description: 'Verifica se o rate limiting esta funcionando corretamente',
   })
   @ApiResponse({
     status: 200,
@@ -116,8 +130,8 @@ export class RateLimitController {
         status: { type: 'string', example: 'healthy' },
         active: { type: 'boolean', example: true },
         uptime: { type: 'string', example: '2h 15m 30s' },
-      }
-    }
+      },
+    },
   })
   async getHealth() {
     return {

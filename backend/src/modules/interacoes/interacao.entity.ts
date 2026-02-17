@@ -80,4 +80,3 @@ export class Interacao {
   @UpdateDateColumn()
   updated_at: Date;
 }
-

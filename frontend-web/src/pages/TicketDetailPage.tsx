@@ -9,12 +9,11 @@
  * - Botões de ação (editar, fechar, atribuir, escalar)
  */
 
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
   Edit2,
-  X,
   CheckCircle,
   UserPlus,
   AlertTriangle,
@@ -30,14 +29,23 @@ import {
   Building,
 } from 'lucide-react';
 import { BackToNucleus } from '../components/navigation/BackToNucleus';
-import { ticketsService, Ticket, StatusTicketApi } from '../services/ticketsService';
-import { StatusTicket } from '../types/ticket';
+import { ticketsService, Ticket } from '../services/ticketsService';
 import { TicketFormModal } from '../components/tickets/TicketFormModal';
 import { AtribuirTicketModal } from '../components/tickets/AtribuirTicketModal';
+
+interface TicketDetailLocationState {
+  returnTo?: string;
+}
 
 const TicketDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const locationState = location.state as TicketDetailLocationState | null;
+  const returnToPath =
+    locationState?.returnTo && locationState.returnTo.startsWith('/')
+      ? locationState.returnTo
+      : '/atendimento/tickets';
 
   // Estados principais
   const [ticket, setTicket] = useState<Ticket | null>(null);
@@ -49,14 +57,7 @@ const TicketDetailPage: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAtribuirModal, setShowAtribuirModal] = useState(false);
 
-  // Carregar ticket ao montar
-  useEffect(() => {
-    if (id) {
-      carregarTicket();
-    }
-  }, [id]);
-
-  const carregarTicket = async () => {
+  const carregarTicket = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -75,11 +76,18 @@ const TicketDetailPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  // Carregar ticket ao montar
+  useEffect(() => {
+    if (id) {
+      carregarTicket();
+    }
+  }, [id, carregarTicket]);
 
   // Função para voltar à listagem
   const handleVoltar = () => {
-    navigate('/nuclei/atendimento/tickets');
+    navigate(returnToPath);
   };
 
   // Funções de ação (placeholder - implementação completa na Fase 8)
@@ -213,8 +221,8 @@ const TicketDetailPage: React.FC = () => {
         {/* Header com BackToNucleus */}
         <div className="bg-white border-b px-6 py-4">
           <BackToNucleus
-            nucleusName="Atendimento"
-            nucleusPath="/nuclei/atendimento"
+            nucleusName="Tickets"
+            nucleusPath={returnToPath}
           />
         </div>
 
@@ -237,8 +245,8 @@ const TicketDetailPage: React.FC = () => {
         {/* Header com BackToNucleus */}
         <div className="bg-white border-b px-6 py-4">
           <BackToNucleus
-            nucleusName="Atendimento"
-            nucleusPath="/nuclei/atendimento"
+            nucleusName="Tickets"
+            nucleusPath={returnToPath}
           />
         </div>
 
@@ -274,8 +282,8 @@ const TicketDetailPage: React.FC = () => {
       {/* Header com BackToNucleus */}
       <div className="bg-white border-b px-6 py-4">
         <BackToNucleus
-          nucleusName="Atendimento"
-          nucleusPath="/nuclei/atendimento"
+          nucleusName="Tickets"
+          nucleusPath={returnToPath}
         />
       </div>
 
@@ -288,10 +296,11 @@ const TicketDetailPage: React.FC = () => {
                 <div className="flex items-start gap-4">
                   <button
                     onClick={handleVoltar}
-                    className="p-2 text-[#159A9C] hover:bg-[#159A9C]/10 rounded-lg transition-colors"
-                    title="Voltar para lista"
+                    className="px-3 py-2 bg-white border border-[#B4BEC9] text-[#002333] rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium flex items-center gap-2"
+                    title="Voltar para a tela principal de tickets"
                   >
-                    <ArrowLeft className="h-5 w-5" />
+                    <ArrowLeft className="h-4 w-4" />
+                    Voltar
                   </button>
                   <div>
                     <h1 className="text-3xl font-bold text-[#002333] flex items-center gap-3">
@@ -485,7 +494,7 @@ const TicketDetailPage: React.FC = () => {
                 <div className="text-center py-8 text-[#002333]/60">
                   <MessageSquare className="h-12 w-12 mx-auto mb-3 text-[#B4BEC9]" />
                   <p className="text-sm">
-                    Histórico de mensagens será implementado na próxima fase
+                    Historico de mensagens sera implementado na próxima fase
                   </p>
                   <p className="text-xs mt-1">
                     Integração com atendimentoService em desenvolvimento

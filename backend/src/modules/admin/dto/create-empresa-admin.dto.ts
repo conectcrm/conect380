@@ -1,4 +1,13 @@
-import { IsString, IsEmail, IsOptional, IsEnum, IsNumber, IsObject, IsBoolean, MinLength } from 'class-validator';
+import {
+  IsString,
+  IsEmail,
+  IsOptional,
+  IsEnum,
+  IsNumber,
+  IsObject,
+  IsBoolean,
+  MinLength,
+} from 'class-validator';
 
 export enum StatusEmpresa {
   TRIAL = 'trial',

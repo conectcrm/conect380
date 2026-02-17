@@ -1,6 +1,18 @@
 import { PartialType } from '@nestjs/mapped-types';
-import { IsArray, IsEnum, IsObject, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
-import { GatewayMode, GatewayProvider, GatewayStatus } from '../entities/configuracao-gateway.entity';
+import {
+  IsArray,
+  IsEnum,
+  IsObject,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
+import {
+  GatewayMode,
+  GatewayProvider,
+  GatewayStatus,
+} from '../entities/configuracao-gateway.entity';
 
 export class CreateConfiguracaoGatewayDto {
   @IsString()
@@ -43,7 +55,7 @@ export class CreateConfiguracaoGatewayDto {
   configuracoesAdicionais?: Record<string, any>;
 }
 
-export class UpdateConfiguracaoGatewayDto extends PartialType(CreateConfiguracaoGatewayDto) { }
+export class UpdateConfiguracaoGatewayDto extends PartialType(CreateConfiguracaoGatewayDto) {}
 
 export class ListConfiguracoesGatewayDto {
   @IsOptional()

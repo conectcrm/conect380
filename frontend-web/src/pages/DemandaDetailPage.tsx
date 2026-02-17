@@ -410,10 +410,10 @@ export default function DemandaDetailPage() {
               <div className="bg-white rounded-lg shadow-sm border p-6">
                 <h2 className="text-lg font-semibold text-[#002333] mb-4">Informações</h2>
                 <div className="space-y-3 text-sm">
-                  {demanda.telefone && (
+                  {(demanda.contatoTelefone || (demanda as any).telefone) && (
                     <div className="flex items-center gap-2 text-[#002333]">
                       <Phone className="h-4 w-4 text-[#B4BEC9]" />
-                      <span>{demanda.telefone}</span>
+                      <span>{demanda.contatoTelefone || (demanda as any).telefone}</span>
                     </div>
                   )}
                   {demanda.responsavelId && (

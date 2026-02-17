@@ -86,7 +86,7 @@ export class CreateTransacaoGatewayDto {
   processadoEm?: string;
 }
 
-export class UpdateTransacaoGatewayDto extends PartialType(CreateTransacaoGatewayDto) { }
+export class UpdateTransacaoGatewayDto extends PartialType(CreateTransacaoGatewayDto) {}
 
 export class ListTransacoesGatewayDto {
   @IsOptional()

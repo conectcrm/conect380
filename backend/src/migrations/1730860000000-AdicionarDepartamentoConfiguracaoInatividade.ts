@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner, TableColumn, TableForeignKey, TableIndex } from 'typeorm';
 
-export class AdicionarDepartamentoConfiguracaoInatividade1730860000000
-  implements MigrationInterface
-{
+export class AdicionarDepartamentoConfiguracaoInatividade1730860000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // 1. Remover índice único anterior (apenas empresaId)
     await queryRunner.query(`

@@ -1,111 +1,78 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Delete,
+﻿import {
   Body,
-  Param,
-  Query,
-  UseGuards,
-  Request,
+  Controller,
+  Delete,
+  Get,
   HttpCode,
   HttpStatus,
+  Logger,
+  Param,
+  Post,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
+import { EmpresaId } from '../../../common/decorators/empresa.decorator';
+import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { JwtAuthGuard } from '../../../modules/auth/jwt-auth.guard';
-import { AtribuicaoService } from '../services/atribuicao.service';
 import { AtribuirAtendenteDto, AtribuirEquipeDto, BuscarAtendentesDisponiveisDto } from '../dto';
+import { AtribuicaoService } from '../services/atribuicao.service';
 
 @Controller('atribuicoes')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class AtribuicaoController {
+  private readonly logger = new Logger(AtribuicaoController.name);
+
   constructor(private readonly atribuicaoService: AtribuicaoService) {}
 
-  // ========================================================================
-  // ATRIBUIÇÕES DIRETAS DE ATENDENTE
-  // ========================================================================
-
-  /**
-   * POST /atribuicoes/atendente
-   * Atribui um atendente diretamente a um núcleo ou departamento
-   */
   @Post('atendente')
   @HttpCode(HttpStatus.CREATED)
-  async atribuirAtendente(@Body() dto: AtribuirAtendenteDto) {
-    return this.atribuicaoService.atribuirAtendenteANucleoDepartamento(dto);
+  async atribuirAtendente(@EmpresaId() empresaId: string, @Body() dto: AtribuirAtendenteDto) {
+    return this.atribuicaoService.atribuirAtendenteANucleoDepartamento(empresaId, dto);
   }
 
-  /**
-   * DELETE /atribuicoes/atendente/:id
-   * Remove uma atribuição de atendente
-   */
   @Delete('atendente/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async removerAtribuicaoAtendente(@Param('id') atribuicaoId: string) {
-    await this.atribuicaoService.removerAtribuicaoAtendente(atribuicaoId);
+  async removerAtribuicaoAtendente(
+    @EmpresaId() empresaId: string,
+    @Param('id') atribuicaoId: string,
+  ) {
+    await this.atribuicaoService.removerAtribuicaoAtendente(empresaId, atribuicaoId);
   }
 
-  /**
-   * GET /atribuicoes/atendente/:atendenteId
-   * Lista atribuições de um atendente específico
-   */
   @Get('atendente/:atendenteId')
-  async listarAtribuicoesAtendente(@Param('atendenteId') atendenteId: string) {
-    return this.atribuicaoService.listarAtribuicoesAtendente(atendenteId);
+  async listarAtribuicoesAtendente(
+    @EmpresaId() empresaId: string,
+    @Param('atendenteId') atendenteId: string,
+  ) {
+    return this.atribuicaoService.listarAtribuicoesAtendente(empresaId, atendenteId);
   }
 
-  // ========================================================================
-  // ATRIBUIÇÕES DE EQUIPE
-  // ========================================================================
-
-  /**
-   * POST /atribuicoes/equipe
-   * Atribui uma equipe a um núcleo ou departamento
-   */
   @Post('equipe')
   @HttpCode(HttpStatus.CREATED)
-  async atribuirEquipe(@Body() dto: AtribuirEquipeDto) {
-    console.log('🔍 [Controller] Recebido DTO:', JSON.stringify(dto, null, 2));
-    console.log('🔍 [Controller] Tipos:', {
-      equipeId: typeof dto.equipeId,
-      nucleoId: typeof dto.nucleoId,
-      departamentoId: typeof dto.departamentoId,
-    });
-    return this.atribuicaoService.atribuirEquipeANucleoDepartamento(dto);
+  async atribuirEquipe(@EmpresaId() empresaId: string, @Body() dto: AtribuirEquipeDto) {
+    this.logger.log('[AtribuicaoController] Recebido DTO de atribuicao de equipe', dto);
+    return this.atribuicaoService.atribuirEquipeANucleoDepartamento(empresaId, dto);
   }
 
-  /**
-   * DELETE /atribuicoes/equipe/:id
-   * Remove uma atribuição de equipe
-   */
   @Delete('equipe/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async removerAtribuicaoEquipe(@Param('id') atribuicaoId: string) {
-    await this.atribuicaoService.removerAtribuicaoEquipe(atribuicaoId);
+  async removerAtribuicaoEquipe(@EmpresaId() empresaId: string, @Param('id') atribuicaoId: string) {
+    await this.atribuicaoService.removerAtribuicaoEquipe(empresaId, atribuicaoId);
   }
 
-  /**
-   * GET /atribuicoes/equipe/:equipeId
-   * Lista atribuições de uma equipe específica
-   */
   @Get('equipe/:equipeId')
-  async listarAtribuicoesEquipe(@Param('equipeId') equipeId: string) {
-    return this.atribuicaoService.listarAtribuicoesEquipe(equipeId);
+  async listarAtribuicoesEquipe(
+    @EmpresaId() empresaId: string,
+    @Param('equipeId') equipeId: string,
+  ) {
+    return this.atribuicaoService.listarAtribuicoesEquipe(empresaId, equipeId);
   }
 
-  // ========================================================================
-  // CONSULTA DE DISPONIBILIDADE
-  // ========================================================================
-
-  /**
-   * GET /atribuicoes/disponiveis
-   * Busca atendentes disponíveis para um núcleo/departamento
-   */
   @Get('disponiveis')
   async buscarAtendentesDisponiveis(
-    @Request() req,
+    @EmpresaId() empresaId: string,
     @Query() query: BuscarAtendentesDisponiveisDto,
   ) {
-    const empresaId = req.user.empresa_id;
     return this.atribuicaoService.buscarAtendentesDisponiveis(
       empresaId,
       query.nucleoId,

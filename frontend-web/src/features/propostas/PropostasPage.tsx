@@ -371,15 +371,15 @@ const PropostasPage: React.FC = () => {
                 id: proposta.id,
                 numero: proposta.numero,
                 cliente: proposta.cliente, // O backend já retorna o objeto cliente correto
-                total: proposta.valor || proposta.total,
+                total: (proposta as any).valor || proposta.total,
                 status: proposta.status,
                 observacoes: proposta.observacoes,
-                criadaEm: proposta.criadaEm || new Date().toISOString(),
+                criadaEm: (proposta as any).criadaEm || new Date().toISOString(),
                 dataValidade:
-                  proposta.dataVencimento ||
+                  (proposta as any).dataVencimento ||
                   new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
                 vendedor: proposta.vendedor,
-                produtos: proposta.produtos || [],
+                produtos: (proposta as any).produtos || [],
               };
               return await converterPropostaParaUI(propostaFormatada);
             }),
@@ -404,7 +404,7 @@ const PropostasPage: React.FC = () => {
             data_criacao: safeRender(proposta.data_criacao),
             data_vencimento: safeRender(proposta.data_vencimento),
             data_aprovacao: proposta.data_aprovacao ? safeRender(proposta.data_aprovacao) : null,
-            valor: Number(proposta.valor) || 0,
+            valor: Number((proposta as any).valor) || 0,
             probabilidade: Number(proposta.probabilidade) || 0,
           }));
 
@@ -451,6 +451,9 @@ const PropostasPage: React.FC = () => {
     };
   }, []);
 
+  const handleVisualizarProposta = (proposta: any) => {
+    void handleViewProposta(proposta);
+  };
   // ✅ DETECTAR PROPOSTA RECÉM-GERADA DO PIPELINE
   useEffect(() => {
     const propostaId = searchParams.get('proposta');
@@ -618,7 +621,7 @@ const PropostasPage: React.FC = () => {
     // Filtros avançados - range de valores
     if (valueRange.min || valueRange.max) {
       filtered = filtered.filter((proposta) => {
-        const valor = proposta.valor;
+        const valor = (proposta as any).valor;
         const min = valueRange.min ? parseFloat(valueRange.min) : 0;
         const max = valueRange.max ? parseFloat(valueRange.max) : Infinity;
         return valor >= min && valor <= max;
@@ -1078,7 +1081,7 @@ const PropostasPage: React.FC = () => {
             {
               produto: {
                 nome: proposta.titulo || 'Produto/Serviço',
-                preco: proposta.valor || 0,
+                preco: (proposta as any).valor || 0,
                 categoria: proposta.categoria || 'Geral',
                 descricao: proposta.descricao || 'Produto/serviço da proposta',
                 unidade: 'un',
@@ -1260,8 +1263,8 @@ const PropostasPage: React.FC = () => {
         id: proposta.id || `prop_${Date.now()}`,
         numero: proposta.numero || 'N/A',
         titulo: proposta.titulo || 'Proposta comercial',
-        subtotal: proposta.valor || 0,
-        total: proposta.valor || 0,
+        subtotal: (proposta as any).valor || 0,
+        total: (proposta as any).valor || 0,
         dataValidade: new Date(proposta.data_vencimento || Date.now()),
         status: proposta.status as 'rascunho' | 'enviada' | 'aprovada' | 'rejeitada',
         criadaEm: proposta.data_criacao || new Date().toISOString(),
@@ -1289,13 +1292,13 @@ const PropostasPage: React.FC = () => {
             produto: {
               id: `produto_${proposta.id}`,
               nome: proposta.titulo || 'Produto/Serviço',
-              preco: proposta.valor || 0,
+              preco: (proposta as any).valor || 0,
               categoria: 'Geral',
               unidade: 'un',
             },
             quantidade: 1,
             desconto: 0,
-            subtotal: proposta.valor || 0,
+            subtotal: (proposta as any).valor || 0,
           },
         ],
         descontoGlobal: 0,
@@ -2162,7 +2165,7 @@ const PropostasPage: React.FC = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap" data-label="Valor">
                             <div className="valor-proposta text-sm font-medium">
-                              {formatCurrency(Number(proposta.valor) || 0)}
+                              {formatCurrency(Number((proposta as any).valor) || 0)}
                             </div>
                             <div className="subinfo capitalize">
                               {safeRender(proposta.categoria)}
@@ -2351,3 +2354,6 @@ const PropostasPage: React.FC = () => {
 };
 
 export default PropostasPage;
+
+
+

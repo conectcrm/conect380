@@ -4,16 +4,16 @@ import { DataSource } from 'typeorm';
 
 /**
  * Health Check Controller
- * 
+ *
  * Endpoints para monitoramento de saúde do sistema.
- * 
+ *
  * ENDPOINTS:
  * - GET /health - Status geral rápido
  * - GET /health/detailed - Diagnóstico completo
  * - GET /health/ready - Readiness probe (K8s)
  * - GET /health/live - Liveness probe (K8s)
  * - GET /health/metrics - Métricas Prometheus
- * 
+ *
  * USO EM PRODUÇÃO:
  * - ALB Target Group: /health (health check)
  * - K8s readinessProbe: /health/ready
@@ -49,7 +49,7 @@ interface HealthMetrics {
 
 @Controller('health')
 export class HealthController {
-  constructor(@InjectDataSource() private dataSource: DataSource) { }
+  constructor(@InjectDataSource() private dataSource: DataSource) {}
 
   /**
    * Health Check Básico (rápido)
@@ -157,9 +157,7 @@ export class HealthController {
       // Verificar se banco está respondendo (timeout 3s)
       await Promise.race([
         this.dataSource.query('SELECT 1'),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Timeout')), 3000),
-        ),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000)),
       ]);
 
       return { status: 'ready', timestamp: new Date().toISOString() };

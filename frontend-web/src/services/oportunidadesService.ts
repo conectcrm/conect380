@@ -94,7 +94,7 @@ class OportunidadesService {
     const dadosBackend = this.preparePayload({
       ...dados,
       dataFechamentoEsperado: dataFechamento,
-      responsavel_id: dados.responsavel_id || oportunidade.responsavel?.id || '',
+      responsavel_id: dados.responsavel_id || (oportunidade as any).responsavel?.id || '',
     });
 
     const response = await api.patch(this.getUrl(`/${id}`), dadosBackend);
@@ -183,7 +183,33 @@ class OportunidadesService {
     };
   }
 
-  // Utilitários
+  async obterResponsaveis(): Promise<Array<{ id: string; nome: string; email: string }>> {
+    try {
+      const response = await api.get('/usuarios', { params: { limite: 200, ativo: true } });
+      const data = Array.isArray(response.data) ? response.data : response.data?.usuarios || [];
+
+      return data.map((item: any) => ({
+        id: String(item.id ?? ''),
+        nome: item.nome ?? item.name ?? 'Usuario',
+        email: item.email ?? '',
+      }));
+    } catch (error) {
+      console.warn('Nao foi possivel carregar responsaveis para filtros de oportunidades.', error);
+      return [];
+    }
+  }
+
+  async obterSugestoesTags(): Promise<string[]> {
+    try {
+      const response = await api.get(this.getUrl('/tags/sugestoes'));
+      const data = response.data?.tags ?? response.data ?? [];
+      return Array.isArray(data) ? data.filter((tag) => typeof tag === 'string') : [];
+    } catch (error) {
+      console.warn('Nao foi possivel carregar sugestoes de tags para filtros de oportunidades.', error);
+      return [];
+    }
+  }
+  // Utilitarios
   private formatarOportunidade(oportunidade: any): Oportunidade {
     const createdAt = oportunidade.createdAt ? new Date(oportunidade.createdAt) : new Date();
     const updatedAt = oportunidade.updatedAt ? new Date(oportunidade.updatedAt) : createdAt;
@@ -310,3 +336,4 @@ class OportunidadesService {
 }
 
 export const oportunidadesService = new OportunidadesService();
+

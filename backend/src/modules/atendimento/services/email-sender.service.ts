@@ -44,7 +44,7 @@ export class EmailSenderService {
   constructor(
     @InjectRepository(IntegracoesConfig)
     private readonly integracaoRepo: Repository<IntegracoesConfig>,
-  ) { }
+  ) {}
 
   /**
    * Prepara credenciais e configurações de e-mail
@@ -143,23 +143,20 @@ export class EmailSenderService {
     if (payload.anexos && payload.anexos.length > 0) {
       sendgridPayload.attachments = payload.anexos.map((anexo) => ({
         filename: anexo.filename,
-        content: typeof anexo.content === 'string' ? anexo.content : anexo.content.toString('base64'),
+        content:
+          typeof anexo.content === 'string' ? anexo.content : anexo.content.toString('base64'),
         type: anexo.type || 'application/octet-stream',
         disposition: 'attachment',
       }));
     }
 
     try {
-      const response = await axios.post(
-        'https://api.sendgrid.com/v3/mail/send',
-        sendgridPayload,
-        {
-          headers: {
-            Authorization: `Bearer ${config.apiKey}`,
-            'Content-Type': 'application/json',
-          },
+      const response = await axios.post('https://api.sendgrid.com/v3/mail/send', sendgridPayload, {
+        headers: {
+          Authorization: `Bearer ${config.apiKey}`,
+          'Content-Type': 'application/json',
         },
-      );
+      });
 
       this.logger.log(`✅ E-mail enviado via SendGrid! Status: ${response.status}`);
 
@@ -277,9 +274,7 @@ export class EmailSenderService {
     }>,
     replyTo?: string,
   ): Promise<string> {
-    this.logger.log(
-      `📧 [enviarComAnexos] Para: ${para}, Anexos: ${anexos.length}`,
-    );
+    this.logger.log(`📧 [enviarComAnexos] Para: ${para}, Anexos: ${anexos.length}`);
 
     const config = await this.prepararEnvioEmail(empresaId, 'anexo');
 

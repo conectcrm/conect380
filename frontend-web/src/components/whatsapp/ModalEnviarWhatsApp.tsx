@@ -77,7 +77,7 @@ const ModalEnviarWhatsApp: React.FC<ModalEnviarWhatsAppProps> = ({
     try {
       const response = await fetch('/api/whatsapp/status', {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
         },
       });
 
@@ -104,7 +104,7 @@ const ModalEnviarWhatsApp: React.FC<ModalEnviarWhatsAppProps> = ({
       const response = await fetch('/api/whatsapp/initialize', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
           'Content-Type': 'application/json',
         },
       });
@@ -204,14 +204,15 @@ _Enviado automaticamente pelo sistema ${proposta.empresa.nome}_`;
 
       // Adicionar PDF se disponível
       if (pdfBuffer) {
-        const blob = new Blob([pdfBuffer], { type: 'application/pdf' });
+        const normalizedPdf = Uint8Array.from(pdfBuffer);
+        const blob = new Blob([normalizedPdf], { type: 'application/pdf' });
         formData.append('pdf', blob, `Proposta_${proposta.numero}.pdf`);
       }
 
       const response = await fetch('/api/whatsapp/send-proposal', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
         },
         body: formData,
       });

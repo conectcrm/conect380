@@ -884,7 +884,7 @@ export class MensagemService {
 **Secrets Management:**
 ```typescript
 // ❌ Não fazer:
-const apiKey = 'sk-1234567890abcdef';
+const apiKey = '<OPENAI_API_KEY>';
 
 // ✅ Usar:
 import { ConfigService } from '@nestjs/config';

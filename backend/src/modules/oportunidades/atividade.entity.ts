@@ -23,34 +23,6 @@ export class Atividade {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'uuid', name: 'empresa_id' })
-  empresaId: string;
-
-  @ManyToOne(() => Empresa)
-  @JoinColumn({ name: 'empresa_id' })
-  empresa_rel: Empresa;
-
-  @Column({
-    type: 'enum',
-    enum: TipoAtividade,
-    default: TipoAtividade.NOTA,
-  })
-  tipo: TipoAtividade;
-
-  @Column('text')
-  descricao: string;
-
-  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  dataAtividade: Date;
-
-  // Relacionamentos
-  @ManyToOne(() => Oportunidade, (oportunidade) => oportunidade.atividades, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'oportunidade_id' })
-  oportunidade: Oportunidade;
-
-  @Column('int')
-  oportunidade_id: number;
-
   @ManyToOne(() => Empresa, { nullable: false })
   @JoinColumn({ name: 'empresa_id' })
   empresa: Empresa;
@@ -58,13 +30,29 @@ export class Atividade {
   @Column('uuid')
   empresa_id: string;
 
+  @ManyToOne(() => Oportunidade, (oportunidade) => oportunidade.atividades, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'oportunidade_id' })
+  oportunidade: Oportunidade;
+
+  @Column('int')
+  oportunidade_id: number;
+
   @ManyToOne(() => User)
   @JoinColumn({ name: 'criado_por_id' })
   criadoPor: User;
 
-  @Column('varchar')
+  @Column('uuid', { name: 'criado_por_id' })
   criado_por_id: string;
 
-  @CreateDateColumn()
+  @Column({ type: 'varchar' })
+  tipo: TipoAtividade;
+
+  @Column('text')
+  descricao: string;
+
+  @Column({ type: 'timestamp', name: 'dataAtividade' })
+  dataAtividade: Date;
+
+  @CreateDateColumn({ name: 'createdAt' })
   createdAt: Date;
 }

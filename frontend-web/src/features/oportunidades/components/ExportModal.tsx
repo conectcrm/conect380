@@ -5,7 +5,7 @@ import { FiltrosOportunidade } from '../../../types/oportunidades/index';
 interface ExportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  filtros: FiltrosOportunidade;
+  filtros: Partial<FiltrosOportunidade>;
   totalOportunidades: number;
 }
 

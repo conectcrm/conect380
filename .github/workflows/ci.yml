@@ -217,7 +217,7 @@ jobs:
   # Job 5: Status Final
   # ==============================================================================
   final-status:
-    name: ✅ Status Final do CI
+    name: Status Final do CI
     runs-on: ubuntu-latest
     needs: [backend, frontend, security, check-temp-files]
     if: always()

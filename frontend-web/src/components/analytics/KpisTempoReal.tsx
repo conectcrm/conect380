@@ -71,10 +71,10 @@ const KpisTempoReal: React.FC<KpisTempoRealProps> = ({
     try {
       const [kpisResponse, metasResponse] = await Promise.all([
         fetch('/api/analytics/kpis-tempo-real', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+          headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
         }),
         fetch('/api/analytics/metas-progresso', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+          headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
         }),
       ]);
 

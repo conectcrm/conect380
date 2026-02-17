@@ -10,5 +10,4 @@ import { AgendaEvento } from './agenda-evento.entity';
   providers: [AgendaService],
   exports: [AgendaService],
 })
-export class AgendaModule { }
-
+export class AgendaModule {}

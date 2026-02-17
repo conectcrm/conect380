@@ -16,10 +16,11 @@ export const EstatisticasCards: React.FC<EstatisticasCardsProps> = ({
     usuariosAtivos: 0,
     usuariosInativos: 0,
     distribuicaoPorRole: {
-      admin: 0,
-      manager: 0,
-      vendedor: 0,
-      user: 0,
+      [UserRole.SUPERADMIN]: 0,
+      [UserRole.ADMIN]: 0,
+      [UserRole.MANAGER]: 0,
+      [UserRole.VENDEDOR]: 0,
+      [UserRole.USER]: 0,
     },
     ultimosLogins: 0,
   };

@@ -1,12 +1,12 @@
 /**
  * 📝 Structured Logger Helper
- * 
+ *
  * Logger customizado que produz JSON estruturado para Loki
  * com correlation IDs (trace_id, span_id) automáticos.
  */
 
-import { Logger as NestLogger, LogLevel } from '@nestjs/common';
-import { trace, context as otelContext } from '@opentelemetry/api';
+import { Logger as NestLogger } from '@nestjs/common';
+import { trace } from '@opentelemetry/api';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -18,7 +18,7 @@ interface LogMetadata {
   url?: string;
   statusCode?: number;
   duration?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export class StructuredLogger extends NestLogger {
@@ -58,7 +58,7 @@ export class StructuredLogger extends NestLogger {
   /**
    * Formatar log em JSON estruturado
    */
-  private formatLogEntry(level: string, message: any, metadata?: LogMetadata): string {
+  private formatLogEntry(level: string, message: unknown, metadata?: LogMetadata): string {
     const correlationIds = this.getCorrelationIds();
 
     const logEntry = {
@@ -90,7 +90,7 @@ export class StructuredLogger extends NestLogger {
   /**
    * Log genérico
    */
-  private logWithMetadata(level: string, message: any, metadata?: LogMetadata): void {
+  private logWithMetadata(level: string, message: unknown, metadata?: LogMetadata): void {
     const logEntry = this.formatLogEntry(level, message, metadata);
 
     // Console output
@@ -104,52 +104,49 @@ export class StructuredLogger extends NestLogger {
   // Public API (compatível com NestJS Logger)
   // ============================================================================
 
-  log(message: any, context?: string): void;
-  log(message: any, metadata?: LogMetadata): void;
-  log(message: any, contextOrMetadata?: string | LogMetadata): void {
-    const metadata = typeof contextOrMetadata === 'string'
-      ? { context: contextOrMetadata }
-      : contextOrMetadata;
+  log(message: unknown, context?: string): void;
+  log(message: unknown, metadata?: LogMetadata): void;
+  log(message: unknown, contextOrMetadata?: string | LogMetadata): void {
+    const metadata =
+      typeof contextOrMetadata === 'string' ? { context: contextOrMetadata } : contextOrMetadata;
     this.logWithMetadata('info', message, metadata);
   }
 
-  error(message: any, stack?: string, context?: string): void;
-  error(message: any, stack?: string, metadata?: LogMetadata): void;
-  error(message: any, stackOrContext?: string, contextOrMetadata?: string | LogMetadata): void {
+  error(message: unknown, stack?: string, context?: string): void;
+  error(message: unknown, stack?: string, metadata?: LogMetadata): void;
+  error(message: unknown, stackOrContext?: string, contextOrMetadata?: string | LogMetadata): void {
     const stack = typeof stackOrContext === 'string' ? stackOrContext : undefined;
-    const metadata = typeof contextOrMetadata === 'string'
-      ? { context: contextOrMetadata, stack }
-      : { ...contextOrMetadata, stack };
+    const metadata =
+      typeof contextOrMetadata === 'string'
+        ? { context: contextOrMetadata, stack }
+        : { ...contextOrMetadata, stack };
     this.logWithMetadata('error', message, metadata);
   }
 
-  warn(message: any, context?: string): void;
-  warn(message: any, metadata?: LogMetadata): void;
-  warn(message: any, contextOrMetadata?: string | LogMetadata): void {
-    const metadata = typeof contextOrMetadata === 'string'
-      ? { context: contextOrMetadata }
-      : contextOrMetadata;
+  warn(message: unknown, context?: string): void;
+  warn(message: unknown, metadata?: LogMetadata): void;
+  warn(message: unknown, contextOrMetadata?: string | LogMetadata): void {
+    const metadata =
+      typeof contextOrMetadata === 'string' ? { context: contextOrMetadata } : contextOrMetadata;
     this.logWithMetadata('warn', message, metadata);
   }
 
-  debug(message: any, context?: string): void;
-  debug(message: any, metadata?: LogMetadata): void;
-  debug(message: any, contextOrMetadata?: string | LogMetadata): void {
+  debug(message: unknown, context?: string): void;
+  debug(message: unknown, metadata?: LogMetadata): void;
+  debug(message: unknown, contextOrMetadata?: string | LogMetadata): void {
     if (process.env.LOG_LEVEL === 'debug') {
-      const metadata = typeof contextOrMetadata === 'string'
-        ? { context: contextOrMetadata }
-        : contextOrMetadata;
+      const metadata =
+        typeof contextOrMetadata === 'string' ? { context: contextOrMetadata } : contextOrMetadata;
       this.logWithMetadata('debug', message, metadata);
     }
   }
 
-  verbose(message: any, context?: string): void;
-  verbose(message: any, metadata?: LogMetadata): void;
-  verbose(message: any, contextOrMetadata?: string | LogMetadata): void {
+  verbose(message: unknown, context?: string): void;
+  verbose(message: unknown, metadata?: LogMetadata): void;
+  verbose(message: unknown, contextOrMetadata?: string | LogMetadata): void {
     if (['debug', 'verbose'].includes(process.env.LOG_LEVEL || '')) {
-      const metadata = typeof contextOrMetadata === 'string'
-        ? { context: contextOrMetadata }
-        : contextOrMetadata;
+      const metadata =
+        typeof contextOrMetadata === 'string' ? { context: contextOrMetadata } : contextOrMetadata;
       this.logWithMetadata('verbose', message, metadata);
     }
   }

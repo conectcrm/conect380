@@ -12,10 +12,10 @@ import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 /**
  * Entity: Níveis de Atendimento Configuráveis
- * 
+ *
  * Substitui o enum NivelAtendimentoTicket por sistema extensível.
  * Permite adicionar N1, N2, N3, N4, N5... dinamicamente por empresa.
- * 
+ *
  * Requisito: "Nível de atendimento modelado de forma extensível"
  */
 @Entity('niveis_atendimento')
@@ -69,14 +69,10 @@ export class NivelAtendimento {
    * Empresa proprietária deste nível
    * Cada empresa pode ter seus próprios níveis personalizados
    */
-  @ManyToOne(() => Empresa, { nullable: false })
-  @JoinColumn({ name: 'empresa_id' })
-  empresa: Empresa;
-
-  @Column({ name: 'empresa_id' })
+  @Column({ type: 'uuid', name: 'empresa_id' })
   empresaId: string;
 
-  @ManyToOne(() => Empresa)
+  @ManyToOne(() => Empresa, { nullable: false })
   @JoinColumn({ name: 'empresa_id' })
   empresa: Empresa;
 

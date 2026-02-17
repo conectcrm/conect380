@@ -20,7 +20,7 @@ export class AuthService {
     private mailService: MailService,
     @InjectRepository(PasswordResetToken)
     private passwordResetTokenRepository: Repository<PasswordResetToken>,
-  ) { }
+  ) {}
 
   private gerarTokenRecuperacao(): { token: string; hash: string } {
     const token = randomBytes(32).toString('hex');
@@ -291,8 +291,8 @@ export class AuthService {
         message: 'Usuário de teste atualizado com senha correta',
         credentials: {
           email: 'cache.test@conectcrm.com',
-          password: 'Test@123'
-        }
+          password: 'Test@123',
+        },
       };
     }
 
@@ -316,13 +316,13 @@ export class AuthService {
         message: 'Usuário de teste criado com sucesso!',
         credentials: {
           email: 'cache.test@conectcrm.com',
-          password: 'Test@123'
+          password: 'Test@123',
         },
         user: {
           id: user.id,
           email: user.email,
-          nome: user.nome
-        }
+          nome: user.nome,
+        },
       };
     } catch (error) {
       throw new BadRequestException('Erro ao criar usuário de teste: ' + error.message);

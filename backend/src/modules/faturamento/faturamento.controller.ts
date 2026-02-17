@@ -1,4 +1,4 @@
-import {
+import { Logger,
   Controller,
   Get,
   Post,
@@ -30,19 +30,17 @@ import { StatusPlanoCobranca } from './entities/plano-cobranca.entity';
 @Controller('faturamento')
 @UseGuards(JwtAuthGuard, EmpresaGuard)
 export class FaturamentoController {
+  private readonly logger = new Logger(FaturamentoController.name);
   constructor(
     private readonly faturamentoService: FaturamentoService,
     private readonly pagamentoService: PagamentoService,
     private readonly cobrancaService: CobrancaService,
-  ) { }
+  ) {}
 
   // ==================== FATURAS ====================
 
   @Post('faturas')
-  async criarFatura(
-    @Body() createFaturaDto: CreateFaturaDto,
-    @EmpresaId() empresaId: string,
-  ) {
+  async criarFatura(@Body() createFaturaDto: CreateFaturaDto, @EmpresaId() empresaId: string) {
     try {
       const fatura = await this.faturamentoService.criarFatura(createFaturaDto, empresaId);
       return {
@@ -162,10 +160,7 @@ export class FaturamentoController {
   }
 
   @Get('faturas/:id')
-  async buscarFaturaPorId(
-    @Param('id', ParseIntPipe) id: number,
-    @EmpresaId() empresaId: string,
-  ) {
+  async buscarFaturaPorId(@Param('id', ParseIntPipe) id: number, @EmpresaId() empresaId: string) {
     const fatura = await this.faturamentoService.buscarFaturaPorId(id, empresaId);
 
     return {
@@ -176,10 +171,7 @@ export class FaturamentoController {
   }
 
   @Get('faturas/numero/:numero')
-  async buscarFaturaPorNumero(
-    @Param('numero') numero: string,
-    @EmpresaId() empresaId: string,
-  ) {
+  async buscarFaturaPorNumero(@Param('numero') numero: string, @EmpresaId() empresaId: string) {
     const fatura = await this.faturamentoService.buscarFaturaPorNumero(numero, empresaId);
 
     return {
@@ -249,25 +241,22 @@ export class FaturamentoController {
   }
 
   @Delete('faturas/:id')
-  async excluirFatura(
-    @Param('id', ParseIntPipe) id: number,
-    @EmpresaId() empresaId: string,
-  ) {
-    console.log(`🔍 [CONTROLLER] DELETE /faturamento/faturas/${id} - Iniciando exclusão`);
+  async excluirFatura(@Param('id', ParseIntPipe) id: number, @EmpresaId() empresaId: string) {
+    this.logger.log(`🔍 [CONTROLLER] DELETE /faturamento/faturas/${id} - Iniciando exclusão`);
 
     try {
-      console.log(`🔍 [CONTROLLER] Chamando excluirFatura para ID: ${id}`);
+      this.logger.log(`🔍 [CONTROLLER] Chamando excluirFatura para ID: ${id}`);
       await this.faturamentoService.excluirFatura(id, empresaId);
 
-      console.log(`🔍 [CONTROLLER] Fatura ${id} excluída com sucesso`);
+      this.logger.log(`🔍 [CONTROLLER] Fatura ${id} excluída com sucesso`);
       return {
         status: HttpStatus.OK,
         message: 'Fatura excluída com sucesso',
         data: { id },
       };
     } catch (error) {
-      console.log(`🔍 [CONTROLLER] Erro ao excluir fatura ID ${id}: ${error.message}`);
-      console.log(`🔍 [CONTROLLER] Stack trace: ${error.stack}`);
+      this.logger.log(`🔍 [CONTROLLER] Erro ao excluir fatura ID ${id}: ${error.message}`);
+      this.logger.log(`🔍 [CONTROLLER] Stack trace: ${error.stack}`);
       throw new BadRequestException(error.message);
     }
   }
@@ -447,9 +436,12 @@ export class FaturamentoController {
   // ==================== PLANOS DE COBRANÇA ====================
 
   @Post('planos-cobranca')
-  async criarPlanoCobranca(@Body() createPlanoDto: CreatePlanoCobrancaDto) {
+  async criarPlanoCobranca(
+    @Body() createPlanoDto: CreatePlanoCobrancaDto,
+    @EmpresaId() empresaId: string,
+  ) {
     try {
-      const plano = await this.cobrancaService.criarPlanoCobranca(createPlanoDto);
+      const plano = await this.cobrancaService.criarPlanoCobranca(createPlanoDto, empresaId);
       return {
         status: HttpStatus.CREATED,
         message: 'Plano de cobrança criado com sucesso',
@@ -462,12 +454,13 @@ export class FaturamentoController {
 
   @Get('planos-cobranca')
   async buscarPlanosCobranca(
+    @EmpresaId() empresaId: string,
     @Query('status') status?: StatusPlanoCobranca,
     @Query('clienteId') clienteId?: number,
     @Query('contratoId') contratoId?: number,
   ) {
     const filtros = { status, clienteId, contratoId };
-    const planos = await this.cobrancaService.buscarPlanosCobranca(filtros);
+    const planos = await this.cobrancaService.buscarPlanosCobranca(empresaId, filtros);
 
     return {
       status: HttpStatus.OK,
@@ -478,8 +471,8 @@ export class FaturamentoController {
   }
 
   @Get('planos-cobranca/:id')
-  async buscarPlanoPorId(@Param('id', ParseIntPipe) id: number) {
-    const plano = await this.cobrancaService.buscarPlanoPorId(id);
+  async buscarPlanoPorId(@Param('id', ParseIntPipe) id: number, @EmpresaId() empresaId: string) {
+    const plano = await this.cobrancaService.buscarPlanoPorId(id, empresaId);
 
     return {
       status: HttpStatus.OK,
@@ -489,8 +482,8 @@ export class FaturamentoController {
   }
 
   @Get('planos-cobranca/codigo/:codigo')
-  async buscarPlanoPorCodigo(@Param('codigo') codigo: string) {
-    const plano = await this.cobrancaService.buscarPlanoPorCodigo(codigo);
+  async buscarPlanoPorCodigo(@Param('codigo') codigo: string, @EmpresaId() empresaId: string) {
+    const plano = await this.cobrancaService.buscarPlanoPorCodigo(codigo, empresaId);
 
     return {
       status: HttpStatus.OK,
@@ -503,8 +496,9 @@ export class FaturamentoController {
   async atualizarPlanoCobranca(
     @Param('id', ParseIntPipe) id: number,
     @Body() updatePlanoDto: UpdatePlanoCobrancaDto,
+    @EmpresaId() empresaId: string,
   ) {
-    const plano = await this.cobrancaService.atualizarPlanoCobranca(id, updatePlanoDto);
+    const plano = await this.cobrancaService.atualizarPlanoCobranca(id, updatePlanoDto, empresaId);
 
     return {
       status: HttpStatus.OK,
@@ -514,8 +508,8 @@ export class FaturamentoController {
   }
 
   @Put('planos-cobranca/:id/pausar')
-  async pausarPlanoCobranca(@Param('id', ParseIntPipe) id: number) {
-    const plano = await this.cobrancaService.pausarPlanoCobranca(id);
+  async pausarPlanoCobranca(@Param('id', ParseIntPipe) id: number, @EmpresaId() empresaId: string) {
+    const plano = await this.cobrancaService.pausarPlanoCobranca(id, empresaId);
 
     return {
       status: HttpStatus.OK,
@@ -525,8 +519,11 @@ export class FaturamentoController {
   }
 
   @Put('planos-cobranca/:id/reativar')
-  async reativarPlanoCobranca(@Param('id', ParseIntPipe) id: number) {
-    const plano = await this.cobrancaService.reativarPlanoCobranca(id);
+  async reativarPlanoCobranca(
+    @Param('id', ParseIntPipe) id: number,
+    @EmpresaId() empresaId: string,
+  ) {
+    const plano = await this.cobrancaService.reativarPlanoCobranca(id, empresaId);
 
     return {
       status: HttpStatus.OK,
@@ -538,9 +535,10 @@ export class FaturamentoController {
   @Put('planos-cobranca/:id/cancelar')
   async cancelarPlanoCobranca(
     @Param('id', ParseIntPipe) id: number,
+    @EmpresaId() empresaId: string,
     @Body('motivo') motivo?: string,
   ) {
-    const plano = await this.cobrancaService.cancelarPlanoCobranca(id, motivo);
+    const plano = await this.cobrancaService.cancelarPlanoCobranca(id, empresaId, motivo);
 
     return {
       status: HttpStatus.OK,
@@ -550,10 +548,10 @@ export class FaturamentoController {
   }
 
   @Post('planos-cobranca/:id/gerar-fatura')
-  async gerarFaturaRecorrente(@Param('id', ParseIntPipe) id: number) {
+  async gerarFaturaRecorrente(@Param('id', ParseIntPipe) id: number, @EmpresaId() empresaId: string) {
     try {
-      const plano = await this.cobrancaService.buscarPlanoPorId(id);
-      const fatura = await this.cobrancaService.gerarFaturaRecorrente(plano);
+      const plano = await this.cobrancaService.buscarPlanoPorId(id, empresaId);
+      const fatura = await this.cobrancaService.gerarFaturaRecorrente(plano, empresaId);
 
       return {
         status: HttpStatus.CREATED,
@@ -568,8 +566,8 @@ export class FaturamentoController {
   // ==================== UTILITÁRIOS ====================
 
   @Post('processar-cobrancas-recorrentes')
-  async processarCobrancasRecorrentes() {
-    await this.cobrancaService.processarCobrancasRecorrentes();
+  async processarCobrancasRecorrentes(@EmpresaId() empresaId: string) {
+    await this.cobrancaService.processarCobrancasRecorrentes(empresaId);
 
     return {
       status: HttpStatus.OK,
@@ -588,8 +586,8 @@ export class FaturamentoController {
   }
 
   @Post('enviar-lembretes-vencimento')
-  async enviarLembreteVencimento() {
-    await this.cobrancaService.enviarLembreteVencimento();
+  async enviarLembreteVencimento(@EmpresaId() empresaId: string) {
+    await this.cobrancaService.enviarLembreteVencimento(empresaId);
 
     return {
       status: HttpStatus.OK,

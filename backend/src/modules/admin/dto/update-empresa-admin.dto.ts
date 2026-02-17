@@ -1,4 +1,12 @@
-import { IsString, IsEmail, IsOptional, IsEnum, IsNumber, IsObject, IsBoolean } from 'class-validator';
+import {
+  IsString,
+  IsEmail,
+  IsOptional,
+  IsEnum,
+  IsNumber,
+  IsObject,
+  IsBoolean,
+} from 'class-validator';
 import { PartialType } from '@nestjs/mapped-types';
 import { CreateEmpresaAdminDto, StatusEmpresa } from './create-empresa-admin.dto';
 

@@ -131,7 +131,7 @@ export const useUsuarios = (): UseUsuariosResult => {
     try {
       const resultado = await usuariosService.resetarSenha(id);
       toast.success('Senha resetada com sucesso!');
-      return resultado.novaSenha;
+      return resultado;
     } catch (err) {
       const mensagem = getErrorMessage(err, 'Erro ao resetar senha');
       console.error('Erro ao resetar senha:', err);

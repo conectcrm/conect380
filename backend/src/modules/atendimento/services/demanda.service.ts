@@ -51,14 +51,16 @@ export class DemandaService {
     private readonly ticketRepository: Repository<Ticket>,
     @InjectRepository(Mensagem)
     private readonly mensagemRepository: Repository<Mensagem>,
-  ) { }
+  ) {}
 
   /**
    * Criar nova demanda
    * @deprecated Use TicketService.criar() com tipo: 'demanda'
    */
   async criar(dto: CreateDemandaDto, autorId: string, empresaId: string): Promise<Demanda> {
-    this.logger.warn(`⚠️ [DEPRECATED] DemandaService.criar() - Migre para TicketService.criar({ tipo: 'demanda' })`);
+    this.logger.warn(
+      `⚠️ [DEPRECATED] DemandaService.criar() - Migre para TicketService.criar({ tipo: 'demanda' })`,
+    );
     this.logger.log(`📋 Criando demanda: ${dto.titulo}`);
 
     // Validar que pelo menos um identificador foi fornecido
@@ -69,7 +71,7 @@ export class DemandaService {
     const demanda = this.demandaRepository.create({
       ...dto,
       autorId,
-      empresaId: dto.empresaId || empresaId,
+      empresaId,
       tipo: dto.tipo || 'outros',
       prioridade: dto.prioridade || 'media',
       status: dto.status || 'aberta',
@@ -79,15 +81,15 @@ export class DemandaService {
     this.logger.log(`✅ Demanda criada: ${demandaSalva.id}`);
 
     // Retornar com relações preenchidas
-    return await this.buscarPorId(demandaSalva.id);
+    return await this.buscarPorId(demandaSalva.id, empresaId);
   }
 
   /**
    * Buscar demanda por ID
    */
-  async buscarPorId(id: string): Promise<Demanda> {
+  async buscarPorId(id: string, empresaId: string): Promise<Demanda> {
     const demanda = await this.demandaRepository.findOne({
-      where: { id },
+      where: { id, empresaId },
       relations: ['autor', 'responsavel'],
     });
 
@@ -108,7 +110,9 @@ export class DemandaService {
     prioridade?: string,
     tipo?: string,
   ): Promise<Demanda[]> {
-    this.logger.warn(`⚠️ [DEPRECATED] DemandaService.listarTodas() - Migre para TicketService.listar({ tipo: 'demanda' })`);
+    this.logger.warn(
+      `⚠️ [DEPRECATED] DemandaService.listarTodas() - Migre para TicketService.listar({ tipo: 'demanda' })`,
+    );
     this.logger.log('📋 Listando todas as demandas');
 
     const where: any = {};
@@ -134,13 +138,10 @@ export class DemandaService {
    * Buscar todas as demandas de um cliente
    * Ordena por: urgente primeiro, depois por data de criação (mais recente)
    */
-  async buscarPorCliente(clienteId: string, empresaId?: string): Promise<Demanda[]> {
+  async buscarPorCliente(clienteId: string, empresaId: string): Promise<Demanda[]> {
     this.logger.log(`📋 Buscando demandas do cliente ${clienteId}`);
 
-    const where: any = { clienteId };
-    if (empresaId) {
-      where.empresaId = empresaId;
-    }
+    const where: any = { clienteId, empresaId };
 
     const demandas = await this.demandaRepository.find({
       where,
@@ -158,13 +159,10 @@ export class DemandaService {
   /**
    * Buscar demandas por telefone do contato
    */
-  async buscarPorTelefone(contatoTelefone: string, empresaId?: string): Promise<Demanda[]> {
+  async buscarPorTelefone(contatoTelefone: string, empresaId: string): Promise<Demanda[]> {
     this.logger.log(`📋 Buscando demandas do telefone ${contatoTelefone}`);
 
-    const where: any = { contatoTelefone };
-    if (empresaId) {
-      where.empresaId = empresaId;
-    }
+    const where: any = { contatoTelefone, empresaId };
 
     const demandas = await this.demandaRepository.find({
       where,
@@ -182,13 +180,10 @@ export class DemandaService {
   /**
    * Buscar demandas de um ticket específico
    */
-  async buscarPorTicket(ticketId: string, empresaId?: string): Promise<Demanda[]> {
+  async buscarPorTicket(ticketId: string, empresaId: string): Promise<Demanda[]> {
     this.logger.log(`📋 Buscando demandas do ticket ${ticketId}`);
 
-    const where: any = { ticketId };
-    if (empresaId) {
-      where.empresaId = empresaId;
-    }
+    const where: any = { ticketId, empresaId };
 
     const demandas = await this.demandaRepository.find({
       where,
@@ -206,11 +201,8 @@ export class DemandaService {
   /**
    * Buscar demandas por status
    */
-  async buscarPorStatus(status: Demanda['status'], empresaId?: string): Promise<Demanda[]> {
-    const where: any = { status };
-    if (empresaId) {
-      where.empresaId = empresaId;
-    }
+  async buscarPorStatus(status: Demanda['status'], empresaId: string): Promise<Demanda[]> {
+    const where: any = { status, empresaId };
 
     return await this.demandaRepository.find({
       where,
@@ -226,9 +218,11 @@ export class DemandaService {
    * Atualizar demanda
    * @deprecated Use TicketService.atualizar()
    */
-  async atualizar(id: string, dto: UpdateDemandaDto): Promise<Demanda> {
-    this.logger.warn(`⚠️ [DEPRECATED] DemandaService.atualizar() - Migre para TicketService.atualizar()`);
-    const demanda = await this.buscarPorId(id);
+  async atualizar(id: string, dto: UpdateDemandaDto, empresaId: string): Promise<Demanda> {
+    this.logger.warn(
+      `⚠️ [DEPRECATED] DemandaService.atualizar() - Migre para TicketService.atualizar()`,
+    );
+    const demanda = await this.buscarPorId(id, empresaId);
 
     // Atualizar campos permitidos
     if (dto.titulo !== undefined) demanda.titulo = dto.titulo;
@@ -247,49 +241,49 @@ export class DemandaService {
     const demandaAtualizada = await this.demandaRepository.save(demanda);
     this.logger.log(`✅ Demanda ${id} atualizada`);
 
-    return await this.buscarPorId(demandaAtualizada.id);
+    return await this.buscarPorId(demandaAtualizada.id, empresaId);
   }
 
   /**
    * Atribuir responsável
    */
-  async atribuirResponsavel(id: string, responsavelId: string): Promise<Demanda> {
-    return await this.atualizar(id, { responsavelId });
+  async atribuirResponsavel(id: string, responsavelId: string, empresaId: string): Promise<Demanda> {
+    return await this.atualizar(id, { responsavelId }, empresaId);
   }
 
   /**
    * Alterar status
    */
-  async alterarStatus(id: string, status: Demanda['status']): Promise<Demanda> {
-    return await this.atualizar(id, { status });
+  async alterarStatus(id: string, status: Demanda['status'], empresaId: string): Promise<Demanda> {
+    return await this.atualizar(id, { status }, empresaId);
   }
 
   /**
    * Iniciar demanda (status → em_andamento)
    */
-  async iniciar(id: string): Promise<Demanda> {
-    return await this.alterarStatus(id, 'em_andamento');
+  async iniciar(id: string, empresaId: string): Promise<Demanda> {
+    return await this.alterarStatus(id, 'em_andamento', empresaId);
   }
 
   /**
    * Concluir demanda (status → concluida + registrar data)
    */
-  async concluir(id: string): Promise<Demanda> {
-    return await this.alterarStatus(id, 'concluida');
+  async concluir(id: string, empresaId: string): Promise<Demanda> {
+    return await this.alterarStatus(id, 'concluida', empresaId);
   }
 
   /**
    * Cancelar demanda
    */
-  async cancelar(id: string): Promise<Demanda> {
-    return await this.alterarStatus(id, 'cancelada');
+  async cancelar(id: string, empresaId: string): Promise<Demanda> {
+    return await this.alterarStatus(id, 'cancelada', empresaId);
   }
 
   /**
    * Deletar demanda
    */
-  async deletar(id: string): Promise<void> {
-    const demanda = await this.buscarPorId(id);
+  async deletar(id: string, empresaId: string): Promise<void> {
+    const demanda = await this.buscarPorId(id, empresaId);
     await this.demandaRepository.remove(demanda);
     this.logger.log(`🗑️ Demanda ${id} deletada`);
   }
@@ -297,11 +291,8 @@ export class DemandaService {
   /**
    * Contar demandas de um cliente
    */
-  async contarPorCliente(clienteId: string, empresaId?: string): Promise<number> {
-    const where: any = { clienteId };
-    if (empresaId) {
-      where.empresaId = empresaId;
-    }
+  async contarPorCliente(clienteId: string, empresaId: string): Promise<number> {
+    const where: any = { clienteId, empresaId };
 
     return await this.demandaRepository.count({ where });
   }
@@ -309,11 +300,8 @@ export class DemandaService {
   /**
    * Contar demandas abertas de um cliente
    */
-  async contarAbertasPorCliente(clienteId: string, empresaId?: string): Promise<number> {
-    const where: any = { clienteId, status: 'aberta' };
-    if (empresaId) {
-      where.empresaId = empresaId;
-    }
+  async contarAbertasPorCliente(clienteId: string, empresaId: string): Promise<number> {
+    const where: any = { clienteId, status: 'aberta', empresaId };
 
     return await this.demandaRepository.count({ where });
   }
@@ -321,11 +309,8 @@ export class DemandaService {
   /**
    * Contar demandas urgentes de um cliente
    */
-  async contarUrgentesPorCliente(clienteId: string, empresaId?: string): Promise<number> {
-    const where: any = { clienteId, prioridade: 'urgente' };
-    if (empresaId) {
-      where.empresaId = empresaId;
-    }
+  async contarUrgentesPorCliente(clienteId: string, empresaId: string): Promise<number> {
+    const where: any = { clienteId, prioridade: 'urgente', empresaId };
 
     return await this.demandaRepository.count({ where });
   }
@@ -341,7 +326,9 @@ export class DemandaService {
     autorId: string,
   ): Promise<Demanda> {
     try {
-      this.logger.warn(`⚠️ [DEPRECATED] DemandaService.converterTicketEmDemanda() - Use TicketService.atualizar(ticketId, { tipo: 'demanda', titulo, descricao })`);
+      this.logger.warn(
+        `⚠️ [DEPRECATED] DemandaService.converterTicketEmDemanda() - Use TicketService.atualizar(ticketId, { tipo: 'demanda', titulo, descricao })`,
+      );
       this.logger.log(`🎫➡️📋 Convertendo ticket ${ticketId} em demanda`);
       this.logger.log(`Autor: ${autorId}, DTO: ${JSON.stringify(dto)}`);
 
@@ -382,10 +369,12 @@ export class DemandaService {
       const ultimaMensagem = ultimaMensagemObj?.conteudo || '';
       this.logger.log(`✅ Mensagem encontrada: ${ultimaMensagem.substring(0, 50)}...`);
 
-      const titulo = dto.titulo || `Demanda do ticket #${ticket.numero || ticketId.substring(0, 8)}`;
+      const titulo =
+        dto.titulo || `Demanda do ticket #${ticket.numero || ticketId.substring(0, 8)}`;
 
       this.logger.log(`📝 Montando descrição...`);
-      const descricao = dto.descricao || (await this.montarDescricaoDoTicket(ticket, ultimaMensagem));
+      const descricao =
+        dto.descricao || (await this.montarDescricaoDoTicket(ticket, ultimaMensagem));
 
       // 4. Determinar tipo de demanda baseado no contexto
       const tipo = dto.tipo || this.inferirTipoDemanda(ticket, ultimaMensagem);
@@ -415,11 +404,12 @@ export class DemandaService {
       this.logger.log(`💾 Salvando demanda no banco...`);
       const demandaSalva = await this.demandaRepository.save(demanda);
 
-      this.logger.log(`✅ Demanda ${demandaSalva.id} criada com sucesso a partir do ticket ${ticketId}!`);
+      this.logger.log(
+        `✅ Demanda ${demandaSalva.id} criada com sucesso a partir do ticket ${ticketId}!`,
+      );
 
       // Retornar com relações carregadas
-      return await this.buscarPorId(demandaSalva.id);
-
+      return await this.buscarPorId(demandaSalva.id, ticket.empresaId);
     } catch (error) {
       this.logger.error(`❌ Erro ao converter ticket em demanda: ${error.message}`);
       this.logger.error(`Stack trace: ${error.stack}`);
@@ -471,7 +461,7 @@ export class DemandaService {
 
     // Verificar keywords
     for (const [tipo, palavras] of Object.entries(keywords)) {
-      if (palavras.some(palavra => mensagemLower.includes(palavra))) {
+      if (palavras.some((palavra) => mensagemLower.includes(palavra))) {
         return tipo as Demanda['tipo'];
       }
     }
@@ -499,7 +489,8 @@ export class DemandaService {
 
     // Se ticket está há muito tempo aberto (> 3 dias)
     if (ticket.createdAt) {
-      const diasAberto = (new Date().getTime() - new Date(ticket.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+      const diasAberto =
+        (new Date().getTime() - new Date(ticket.createdAt).getTime()) / (1000 * 60 * 60 * 24);
       if (diasAberto > 3) {
         return 'alta';
       }
@@ -509,3 +500,4 @@ export class DemandaService {
     return 'media';
   }
 }
+

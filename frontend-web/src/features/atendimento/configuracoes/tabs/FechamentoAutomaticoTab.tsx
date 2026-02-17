@@ -163,7 +163,7 @@ export const FechamentoAutomaticoTab: React.FC = () => {
     try {
       setError(null);
 
-      const response = await buscarConfiguracao(empresaId, departamentoSelecionado);
+      const response = await buscarConfiguracao(departamentoSelecionado);
 
       if (response.sucesso && response.dados) {
         const dados = response.dados;
@@ -253,7 +253,7 @@ export const FechamentoAutomaticoTab: React.FC = () => {
         statusAplicaveis: statusSelecionados.length > 0 ? statusSelecionados : null,
       };
 
-      const response = await salvarConfiguracao(empresaId, dto);
+      const response = await salvarConfiguracao(dto);
 
       if (response.sucesso) {
         setSucesso('✅ Configuração salva com sucesso!');

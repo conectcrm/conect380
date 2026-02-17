@@ -2,7 +2,10 @@
 // Isso garante que a instrumentação automática funcione corretamente
 import { initializeTracing } from './config/tracing';
 import { initializeMetrics } from './config/metrics';
-import { initializeMetricsWithDemoData, startMetricsSimulation } from './scripts/initialize-metrics';
+import {
+  initializeMetricsWithDemoData,
+  startMetricsSimulation,
+} from './scripts/initialize-metrics';
 
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
@@ -15,6 +18,7 @@ import * as path from 'path';
 import helmet from 'helmet';
 import * as Sentry from '@sentry/node';
 import { nodeProfilingIntegration } from '@sentry/profiling-node';
+import { resolveJwtSecret } from './config/jwt.config';
 
 async function bootstrap() {
   // ============================================================================
@@ -38,6 +42,8 @@ async function bootstrap() {
 
   const customLogger = new StructuredLogger('Bootstrap');
 
+  resolveJwtSecret();
+
   console.log('🚀 [NestJS] Iniciando aplicação...');
 
   // ============================================================================
@@ -57,16 +63,10 @@ async function bootstrap() {
 
       // Profiling (análise de performance)
       profilesSampleRate: isProduction ? 0.1 : 1.0,
-      integrations: [
-        nodeProfilingIntegration(),
-      ],
+      integrations: [nodeProfilingIntegration()],
 
       // Filtros de erro
-      ignoreErrors: [
-        'AbortError',
-        'NetworkError',
-        'Non-Error promise rejection',
-      ],
+      ignoreErrors: ['AbortError', 'NetworkError', 'Non-Error promise rejection'],
 
       // Contexto adicional
       beforeSend(event, hint) {
@@ -148,25 +148,25 @@ async function bootstrap() {
         // HSTS (HTTP Strict Transport Security)
         hsts: isProduction
           ? {
-            maxAge: 31536000, // 1 ano em segundos
-            includeSubDomains: true,
-            preload: true,
-          }
+              maxAge: 31536000, // 1 ano em segundos
+              includeSubDomains: true,
+              preload: true,
+            }
           : false, // Desabilitado em desenvolvimento (permite HTTP)
 
         // CSP (Content Security Policy)
         contentSecurityPolicy: isProduction
           ? {
-            directives: {
-              defaultSrc: ["'self'"],
-              scriptSrc: ["'self'", "'unsafe-inline'"], // unsafe-inline necessário para alguns frameworks
-              styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-              fontSrc: ["'self'", 'https://fonts.gstatic.com'],
-              imgSrc: ["'self'", 'data:', 'https:'],
-              connectSrc: ["'self'", process.env.FRONTEND_URL || 'http://localhost:3000'],
-              frameSrc: ["'none'"], // Bloqueia iframes (previne clickjacking)
-            },
-          }
+              directives: {
+                defaultSrc: ["'self'"],
+                scriptSrc: ["'self'", "'unsafe-inline'"], // unsafe-inline necessário para alguns frameworks
+                styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+                fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+                imgSrc: ["'self'", 'data:', 'https:'],
+                connectSrc: ["'self'", process.env.FRONTEND_URL || 'http://localhost:3000'],
+                frameSrc: ["'none'"], // Bloqueia iframes (previne clickjacking)
+              },
+            }
           : false, // Desabilitado em dev (mais flexível)
 
         // X-Frame-Options: Previne clickjacking
@@ -200,7 +200,9 @@ async function bootstrap() {
       }),
     );
 
-    console.log(`🛡️  [Helmet] Security headers habilitados (${isProduction ? 'PRODUÇÃO' : 'DESENVOLVIMENTO'})`);
+    console.log(
+      `🛡️  [Helmet] Security headers habilitados (${isProduction ? 'PRODUÇÃO' : 'DESENVOLVIMENTO'})`,
+    );
     if (isProduction) {
       console.log('   ✅ HSTS: 1 ano, includeSubDomains, preload');
       console.log('   ✅ CSP: Política restritiva configurada');
@@ -209,23 +211,59 @@ async function bootstrap() {
     }
 
     // Configuração CORS (Restritivo em Produção)
-    const corsOrigins = process.env.CORS_ORIGINS?.split(',').map(origin => origin.trim()) || [
-      'http://localhost:3900',
-      'http://localhost:3000',
-    ];
+    const normalizeOrigin = (value: string): string => value.trim().replace(/\/$/, '');
+
+    const isPrivateNetworkOrigin = (value: string): boolean => {
+      try {
+        const hostname = new URL(value).hostname;
+
+        if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
+          return true;
+        }
+
+        if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) {
+          return true;
+        }
+
+        if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname)) {
+          return true;
+        }
+
+        const private172Range = hostname.match(/^172\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/);
+        if (private172Range) {
+          const secondOctet = Number(private172Range[1]);
+          return secondOctet >= 16 && secondOctet <= 31;
+        }
+
+        return false;
+      } catch {
+        return false;
+      }
+    };
+
+    const corsOrigins = (
+      process.env.CORS_ORIGINS?.split(',').map((origin) => normalizeOrigin(origin)) || [
+        'http://localhost:3900',
+        'http://localhost:3000',
+      ]
+    ).filter(Boolean);
+    const allowPrivateNetworkOrigins =
+      !isProduction || process.env.CORS_ALLOW_PRIVATE_NETWORK === 'true';
 
     app.enableCors({
       origin: (origin, callback) => {
         // Permitir requisições sem origem (ex: Postman, curl, apps mobile)
         if (!origin) return callback(null, true);
 
-        // Em desenvolvimento: permite qualquer localhost
-        if (!isProduction && origin.includes('localhost')) {
+        // Em desenvolvimento (ou com flag): permite localhost e rede local
+        const normalizedOrigin = normalizeOrigin(origin);
+
+        if (allowPrivateNetworkOrigins && isPrivateNetworkOrigin(normalizedOrigin)) {
           return callback(null, true);
         }
 
         // Em produção: apenas whitelist
-        if (corsOrigins.includes(origin)) {
+        if (corsOrigins.includes(normalizedOrigin)) {
           return callback(null, true);
         }
 
@@ -293,8 +331,8 @@ async function bootstrap() {
           // Envia erros de validação para Sentry (se habilitado)
           if (enableSentry && errors.length > 0) {
             Sentry.captureMessage(
-              `Validation errors: ${errors.map(e => Object.values(e.constraints || {}).join(', ')).join('; ')}`,
-              'warning'
+              `Validation errors: ${errors.map((e) => Object.values(e.constraints || {}).join(', ')).join('; ')}`,
+              'warning',
             );
           }
 
@@ -337,16 +375,19 @@ async function bootstrap() {
 
     if (enableUptimeMonitoring && uptimeCheckUrl) {
       // Envia heartbeat a cada 5 minutos
-      setInterval(async () => {
-        try {
-          const response = await fetch(uptimeCheckUrl, { method: 'GET' });
-          if (response.ok) {
-            console.log('💓 [Uptime] Heartbeat enviado');
+      setInterval(
+        async () => {
+          try {
+            const response = await fetch(uptimeCheckUrl, { method: 'GET' });
+            if (response.ok) {
+              console.log('💓 [Uptime] Heartbeat enviado');
+            }
+          } catch (error) {
+            console.error('❌ [Uptime] Falha ao enviar heartbeat:', error.message);
           }
-        } catch (error) {
-          console.error('❌ [Uptime] Falha ao enviar heartbeat:', error.message);
-        }
-      }, 5 * 60 * 1000); // 5 minutos
+        },
+        5 * 60 * 1000,
+      ); // 5 minutos
 
       console.log('💓 [Uptime] Monitoramento habilitado');
       console.log(`   URL: ${uptimeCheckUrl}`);

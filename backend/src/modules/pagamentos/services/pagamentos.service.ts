@@ -27,7 +27,7 @@ export class PagamentosGatewayService {
     private readonly faturaRepository: Repository<Fatura>,
     @InjectRepository(Pagamento)
     private readonly pagamentoRepository: Repository<Pagamento>,
-  ) { }
+  ) {}
 
   async registrarTransacao(
     dto: CreateTransacaoGatewayDto,
@@ -233,7 +233,7 @@ export class PagamentosGatewayService {
 
   private async getFatura(id: number, empresaId: string): Promise<Fatura> {
     const fatura = await this.faturaRepository.findOne({
-      where: { id, empresa_id: empresaId },
+      where: { id, empresaId },
     });
 
     if (!fatura) {
@@ -245,7 +245,7 @@ export class PagamentosGatewayService {
 
   private async getPagamento(id: number, empresaId: string): Promise<Pagamento> {
     const pagamento = await this.pagamentoRepository.findOne({
-      where: { id, empresa_id: empresaId },
+      where: { id, empresaId },
     });
 
     if (!pagamento) {

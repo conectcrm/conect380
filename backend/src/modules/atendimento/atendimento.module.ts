@@ -4,6 +4,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bull';
 import { JwtModule } from '@nestjs/jwt';
 import { MulterModule } from '@nestjs/platform-express';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { resolveJwtSecret } from '../../config/jwt.config';
 
 // Entities - Apenas as essenciais que estão sendo usadas
 import {
@@ -32,6 +34,7 @@ import { User } from '../users/user.entity'; // ✅ Para auto-criação de usuá
 import { SessaoTriagem } from '../triagem/entities/sessao-triagem.entity';
 import { Evento } from '../eventos/evento.entity';
 import { Departamento } from '../triagem/entities/departamento.entity'; // ✅ Para configuração por departamento
+import { Empresa } from '../../empresas/entities/empresa.entity';
 
 // Controllers
 import {
@@ -44,7 +47,7 @@ import {
   BuscaGlobalController,
 } from './controllers';
 import { FilaController } from './controllers/fila.controller'; // ✅ ETAPA 5 - Sistema de Filas
-import { TestCanaisController } from './controllers/test-canais.controller';
+import { TestCanaisController } from './controllers/canais-teste.controller';
 import { WhatsAppWebhookController } from './controllers/whatsapp-webhook.controller'; // ✅ Webhook
 import { TicketController } from './controllers/ticket.controller'; // ✅ REST API Tickets
 import { MensagemController } from './controllers/mensagem.controller'; // ✅ REST API Mensagens
@@ -96,6 +99,9 @@ import { AtendimentoGateway } from './gateways/atendimento.gateway';
 import { TriagemModule } from '../triagem/triagem.module';
 import { NotificationModule } from '../../notifications/notification.module';
 
+const atendimentoDevControllers =
+  process.env.NODE_ENV === 'development' ? [SetupController, TestCanaisController] : [];
+
 @Module({
   imports: [
     // Multer para upload de arquivos
@@ -122,6 +128,7 @@ import { NotificationModule } from '../../notifications/notification.module';
       SessaoTriagem,
       Evento,
       Departamento, // ✅ Para configuração de inatividade por departamento
+      Empresa, // ✅ Necessário para jobs/monitores iterarem tenants
       Tag, // ✅ Sistema de Tags (substitui departamentos)
       MessageTemplate, // ✅ Templates de Mensagens
       SlaConfig, // ✅ SLA Tracking - Configurações
@@ -201,9 +208,17 @@ import { NotificationModule } from '../../notifications/notification.module';
     ),
 
     // JWT para WebSocket (usando mesma secret do módulo de autenticação)
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'seu_jwt_secret_super_seguro_aqui_2024',
-      signOptions: { expiresIn: '24h' },
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) => {
+        const jwtSecret = resolveJwtSecret(configService);
+
+        return {
+          secret: jwtSecret,
+          signOptions: { expiresIn: '24h' },
+        };
+      },
     }),
     HttpModule,
     NotificationModule,
@@ -211,8 +226,7 @@ import { NotificationModule } from '../../notifications/notification.module';
   ],
 
   controllers: [
-    SetupController, // 🚀 Setup inicial (endpoints públicos)
-    TestCanaisController, // Controller de teste
+    ...atendimentoDevControllers,
     CanaisController, // ✅ Reabilitado
     FilasController, // ✅ Reabilitado
     FilaController, // ✅ ETAPA 5 - Sistema de Filas (REST API completa)
@@ -303,4 +317,4 @@ import { NotificationModule } from '../../notifications/notification.module';
     TypeOrmModule, // ✅ Exportar repositories para testes
   ],
 })
-export class AtendimentoModule { }
+export class AtendimentoModule {}

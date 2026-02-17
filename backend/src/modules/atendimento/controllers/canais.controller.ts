@@ -1,7 +1,9 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { EmpresaId } from '../../../common/decorators/empresa.decorator';
 import { Canal, TipoCanal, StatusCanal } from '../entities/canal.entity';
 import { IntegracoesConfig } from '../entities/integracoes-config.entity';
 // import { OrquestradorService } from '../services/orquestrador.service'; // Temporariamente desabilitado
@@ -10,8 +12,10 @@ import { ValidacaoIntegracoesService } from '../services/validacao-integracoes.s
 import { EmailSenderService } from '../services/email-sender.service';
 
 @Controller('api/atendimento/canais')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class CanaisController {
+  private readonly logger = new Logger(CanaisController.name);
+
   constructor(
     @InjectRepository(Canal)
     private canalRepo: Repository<Canal>,
@@ -21,31 +25,17 @@ export class CanaisController {
     private emailSenderService: EmailSenderService,
     // OrquestradorService temporariamente removido
   ) {
-    console.log('✅ CanaisController criado!');
-  }
-
-  // Endpoint de debug para verificar conteúdo do token
-  @Get('debug/token')
-  async debugToken(@Req() req) {
-    console.log('🔍 [CanaisController] DEBUG TOKEN - req.user:', JSON.stringify(req.user, null, 2));
-    return {
-      success: true,
-      user: req.user,
-      empresaId: req.user?.empresa_id || req.user?.empresaId,
-      availableFields: Object.keys(req.user || {}),
-    };
+    this.logger.log('✅ CanaisController criado!');
   }
 
   @Get()
-  async listar(@Req() req) {
-    console.log('🔍 [CanaisController] GET /atendimento/canais chamado');
-    console.log('🔍 [CanaisController] req.user:', req.user);
+  async listar(@EmpresaId() empresaId: string) {
+    this.logger.log('🔍 [CanaisController] GET /atendimento/canais chamado');
 
     try {
-      const empresaId = req.user.empresa_id || req.user.empresaId;
-      console.log('🔍 [CanaisController] empresaId:', empresaId);
+      this.logger.log('🔍 [CanaisController] empresaId:', empresaId);
       if (!empresaId) {
-        console.warn(
+        this.logger.warn(
           '⚠️ [CanaisController] empresaId ausente no token do usuário. Abortando listagem.',
         );
         return {
@@ -62,7 +52,7 @@ export class CanaisController {
         order: { createdAt: 'DESC' },
       });
 
-      console.log('🔍 [CanaisController] Canais de comunicação encontrados:', canais.length);
+      this.logger.log('🔍 [CanaisController] Canais de comunicação encontrados:', canais.length);
 
       // ✅ CORREÇÃO: Não misturar com configurações de IA (openai/anthropic)
       // Integrações de IA devem ter endpoint separado se necessário
@@ -73,8 +63,8 @@ export class CanaisController {
         total: canais.length,
       };
     } catch (error) {
-      console.error('❌ [CanaisController] Erro ao listar canais:', error);
-      console.error('❌ [CanaisController] Stack:', error.stack);
+      this.logger.error('❌ [CanaisController] Erro ao listar canais:', error);
+      this.logger.error('❌ [CanaisController] Stack:', error.stack);
       return {
         success: false,
         error: error.message,
@@ -88,11 +78,10 @@ export class CanaisController {
    * Não mistura com canais de comunicação (WhatsApp, Telegram, Email)
    */
   @Get('integracoes')
-  async listarIntegracoes(@Req() req) {
-    console.log('🤖 [CanaisController] GET /atendimento/canais/integracoes chamado');
+  async listarIntegracoes(@EmpresaId() empresaId: string) {
+    this.logger.log('🤖 [CanaisController] GET /atendimento/canais/integracoes chamado');
 
     try {
-      const empresaId = req.user.empresa_id || req.user.empresaId;
       if (!empresaId) {
         return {
           success: false,
@@ -106,7 +95,7 @@ export class CanaisController {
         order: { criadoEm: 'DESC' },
       });
 
-      console.log('🤖 [CanaisController] Integrações de IA encontradas:', integracoes.length);
+      this.logger.log('🤖 [CanaisController] Integrações de IA encontradas:', integracoes.length);
 
       return {
         success: true,
@@ -114,7 +103,7 @@ export class CanaisController {
         total: integracoes.length,
       };
     } catch (error) {
-      console.error('❌ [CanaisController] Erro ao listar integrações:', error);
+      this.logger.error('❌ [CanaisController] Erro ao listar integrações:', error);
       return {
         success: false,
         message: error.message || 'Erro ao listar integrações',
@@ -127,12 +116,11 @@ export class CanaisController {
    * 📧 Endpoint de teste de envio de e-mail
    * Envia um e-mail de teste para verificar se a configuração está correta
    */
-  @Post('testar-email')
-  async testarEmail(@Req() req, @Body() body: { emailTeste: string }) {
-    console.log('📧 [CanaisController] POST /atendimento/canais/testar-email chamado');
+  @Post('validar-email')
+  async testarEmail(@EmpresaId() empresaId: string, @Body() body: { emailTeste: string }) {
+    this.logger.log('📧 [CanaisController] POST /atendimento/canais/validar-email chamado');
 
     try {
-      const empresaId = req.user.empresa_id || req.user.empresaId;
       if (!empresaId) {
         return {
           success: false,
@@ -148,7 +136,7 @@ export class CanaisController {
         };
       }
 
-      console.log(`📧 Enviando e-mail de teste para: ${emailTeste}`);
+      this.logger.log(`📧 Enviando e-mail de teste para: ${emailTeste}`);
 
       const messageId = await this.emailSenderService.enviarTexto(
         empresaId,
@@ -158,21 +146,21 @@ export class CanaisController {
       );
 
       if (messageId) {
-        console.log('✅ E-mail de teste enviado com sucesso:', messageId);
+        this.logger.log('✅ E-mail de teste enviado com sucesso:', messageId);
         return {
           success: true,
           message: 'E-mail de teste enviado com sucesso!',
           messageId: messageId,
         };
       } else {
-        console.error('❌ Erro ao enviar e-mail de teste');
+        this.logger.error('❌ Erro ao enviar e-mail de teste');
         return {
           success: false,
           message: 'Erro ao enviar e-mail de teste',
         };
       }
     } catch (error) {
-      console.error('❌ [CanaisController] Erro ao testar e-mail:', error);
+      this.logger.error('❌ [CanaisController] Erro ao testar e-mail:', error);
       return {
         success: false,
         message: error.message || 'Erro ao testar e-mail',
@@ -185,11 +173,10 @@ export class CanaisController {
    * Usar: POST /api/atendimento/canais/criar-canal-email
    */
   @Post('criar-canal-email')
-  async criarCanalEmail(@Req() req) {
-    console.log('📧 [CanaisController] POST /atendimento/canais/criar-canal-email chamado');
+  async criarCanalEmail(@EmpresaId() empresaId: string) {
+    this.logger.log('📧 [CanaisController] POST /atendimento/canais/criar-canal-email chamado');
 
     try {
-      const empresaId = req.user.empresa_id || req.user.empresaId;
       if (!empresaId) {
         return {
           success: false,
@@ -203,7 +190,7 @@ export class CanaisController {
       });
 
       if (canalExistente) {
-        console.log('✅ Canal de e-mail já existe:', canalExistente.id);
+        this.logger.log('✅ Canal de e-mail já existe:', canalExistente.id);
         return {
           success: true,
           message: 'Canal de e-mail já existe',
@@ -227,7 +214,7 @@ export class CanaisController {
 
       await this.canalRepo.save(novoCanal);
 
-      console.log('✅ Canal de e-mail criado com sucesso:', novoCanal.id);
+      this.logger.log('✅ Canal de e-mail criado com sucesso:', novoCanal.id);
 
       return {
         success: true,
@@ -235,7 +222,7 @@ export class CanaisController {
         data: novoCanal,
       };
     } catch (error) {
-      console.error('❌ [CanaisController] Erro ao criar canal de e-mail:', error);
+      this.logger.error('❌ [CanaisController] Erro ao criar canal de e-mail:', error);
       return {
         success: false,
         message: error.message || 'Erro ao criar canal de e-mail',
@@ -244,8 +231,7 @@ export class CanaisController {
   }
 
   @Get(':id')
-  async buscarPorId(@Param('id') id: string, @Req() req) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
+  async buscarPorId(@Param('id') id: string, @EmpresaId() empresaId: string) {
 
     const canal = await this.canalRepo.findOne({
       where: { id, empresaId },
@@ -266,11 +252,10 @@ export class CanaisController {
   }
 
   @Post()
-  async criar(@Req() req, @Body() dto: any) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
+  async criar(@EmpresaId() empresaId: string, @Body() dto: any) {
     const tipo = dto.tipo || dto.nome?.toLowerCase();
     if (!empresaId) {
-      console.warn(
+      this.logger.warn(
         '⚠️ [CanaisController] empresaId ausente no token do usuário. Abortando criação.',
       );
       return {
@@ -279,14 +264,14 @@ export class CanaisController {
       };
     }
 
-    console.log('🔍 [CanaisController] POST /atendimento/canais chamado');
-    console.log('🔍 [CanaisController] Tipo:', tipo);
-    console.log('🔍 [CanaisController] DTO:', JSON.stringify(dto, null, 2));
+    this.logger.log('🔍 [CanaisController] POST /atendimento/canais chamado');
+    this.logger.log('🔍 [CanaisController] Tipo:', tipo);
+    this.logger.log('🔍 [CanaisController] DTO:', JSON.stringify(dto, null, 2));
 
     // Se for openai ou anthropic, salvar em integracoes_config
     if (tipo === 'openai' || tipo === 'anthropic') {
-      console.log('🤖 [CanaisController] Salvando configuração de IA:', tipo);
-      console.log('🤖 [CanaisController] empresaId:', empresaId);
+      this.logger.log('🤖 [CanaisController] Salvando configuração de IA:', tipo);
+      this.logger.log('🤖 [CanaisController] empresaId:', empresaId);
 
       try {
         // Buscar ou criar configuração
@@ -294,10 +279,10 @@ export class CanaisController {
           where: { empresaId, tipo },
         });
 
-        console.log('🔍 [CanaisController] Config existente encontrada?', config ? 'SIM' : 'NÃO');
+        this.logger.log('🔍 [CanaisController] Config existente encontrada?', config ? 'SIM' : 'NÃO');
 
         const credenciais = dto.configuracao?.credenciais || dto.credenciais || {};
-        console.log(
+        this.logger.log(
           '📝 [CanaisController] Credenciais recebidas:',
           JSON.stringify(credenciais, null, 2),
         );
@@ -323,21 +308,21 @@ export class CanaisController {
           credenciaisFormatadas.auto_responder = credenciais.auto_responder || false;
         }
 
-        console.log(
+        this.logger.log(
           '📝 [CanaisController] Credenciais formatadas:',
           JSON.stringify(credenciaisFormatadas, null, 2),
         );
 
         if (config) {
           // Atualizar existente
-          console.log('🔄 [CanaisController] Atualizando configuração existente...');
+          this.logger.log('🔄 [CanaisController] Atualizando configuração existente...');
           config.credenciais = credenciaisFormatadas;
           config.ativo = dto.ativo !== undefined ? dto.ativo : true;
           await this.integracaoRepo.save(config);
-          console.log('✅ [CanaisController] Configuração IA atualizada:', config.id);
+          this.logger.log('✅ [CanaisController] Configuração IA atualizada:', config.id);
         } else {
           // Criar nova
-          console.log('➕ [CanaisController] Criando nova configuração...');
+          this.logger.log('➕ [CanaisController] Criando nova configuração...');
           config = this.integracaoRepo.create({
             empresaId,
             tipo,
@@ -345,10 +330,10 @@ export class CanaisController {
             credenciais: credenciaisFormatadas,
           });
           await this.integracaoRepo.save(config);
-          console.log('✅ [CanaisController] Nova configuração IA criada:', config.id);
+          this.logger.log('✅ [CanaisController] Nova configuração IA criada:', config.id);
         }
 
-        console.log('✅ [CanaisController] Config final salva:', JSON.stringify(config, null, 2));
+        this.logger.log('✅ [CanaisController] Config final salva:', JSON.stringify(config, null, 2));
 
         return {
           success: true,
@@ -356,8 +341,8 @@ export class CanaisController {
           data: config,
         };
       } catch (error) {
-        console.error('❌ [CanaisController] Erro ao salvar config IA:', error);
-        console.error('❌ [CanaisController] Stack trace:', error.stack);
+        this.logger.error('❌ [CanaisController] Erro ao salvar config IA:', error);
+        this.logger.error('❌ [CanaisController] Stack trace:', error.stack);
         return {
           success: false,
           message: `Erro ao salvar configuração: ${error.message}`,
@@ -366,8 +351,8 @@ export class CanaisController {
     }
 
     // Caso contrário, criar canal normal
-    console.log('📝 [CanaisController] Criando canal normal:', tipo);
-    console.log(
+    this.logger.log('📝 [CanaisController] Criando canal normal:', tipo);
+    this.logger.log(
       '📝 [CanaisController] Configuracao recebida:',
       JSON.stringify(dto.configuracao, null, 2),
     );
@@ -377,6 +362,18 @@ export class CanaisController {
 
     if (tipo === 'whatsapp' || tipo?.toLowerCase() === 'whatsapp') {
       const credenciaisRecebidas = dto.configuracao?.credenciais || dto.configuracao || {};
+      const webhookVerifyToken =
+        credenciaisRecebidas.whatsapp_webhook_verify_token ||
+        credenciaisRecebidas.webhook_verify_token ||
+        process.env.WHATSAPP_VERIFY_TOKEN;
+
+      if (!webhookVerifyToken) {
+        return {
+          success: false,
+          message:
+            'whatsapp_webhook_verify_token obrigatorio para canais WhatsApp em ambiente seguro',
+        };
+      }
 
       configuracaoFinal = {
         credenciais: {
@@ -386,14 +383,11 @@ export class CanaisController {
           whatsapp_business_account_id:
             credenciaisRecebidas.whatsapp_business_account_id ||
             credenciaisRecebidas.business_account_id,
-          whatsapp_webhook_verify_token:
-            credenciaisRecebidas.whatsapp_webhook_verify_token ||
-            credenciaisRecebidas.webhook_verify_token ||
-            'conectcrm_webhook_token_123',
+          whatsapp_webhook_verify_token: webhookVerifyToken,
         },
       };
 
-      console.log(
+      this.logger.log(
         '✅ [CanaisController] WhatsApp - Configuração normalizada:',
         JSON.stringify(configuracaoFinal, null, 2),
       );
@@ -409,8 +403,8 @@ export class CanaisController {
 
     await this.canalRepo.save(canal);
 
-    console.log('✅ [CanaisController] Canal salvo com ID:', canal.id);
-    console.log(
+    this.logger.log('✅ [CanaisController] Canal salvo com ID:', canal.id);
+    this.logger.log(
       '✅ [CanaisController] Configuracao salva:',
       JSON.stringify(canal.configuracao, null, 2),
     );
@@ -423,12 +417,15 @@ export class CanaisController {
   }
 
   @Put(':id')
-  async atualizar(@Req() req, @Param('id') id: string, @Body() dto: AtualizarCanalDto) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
+  async atualizar(
+    @EmpresaId() empresaId: string,
+    @Param('id') id: string,
+    @Body() dto: AtualizarCanalDto,
+  ) {
 
-    console.log('🔍 [CanaisController] PUT /atendimento/canais/:id chamado');
-    console.log('🔍 [CanaisController] ID:', id);
-    console.log('🔍 [CanaisController] DTO:', JSON.stringify(dto, null, 2));
+    this.logger.log('🔍 [CanaisController] PUT /atendimento/canais/:id chamado');
+    this.logger.log('🔍 [CanaisController] ID:', id);
+    this.logger.log('🔍 [CanaisController] DTO:', JSON.stringify(dto, null, 2));
 
     const canal = await this.canalRepo.findOne({
       where: { id, empresaId },
@@ -445,7 +442,7 @@ export class CanaisController {
     if (dto.nome !== undefined) canal.nome = dto.nome;
     if (dto.ativo !== undefined) canal.ativo = dto.ativo;
     if (dto.configuracao !== undefined) {
-      console.log(
+      this.logger.log(
         '📝 [CanaisController] Atualizando configuracao:',
         JSON.stringify(dto.configuracao, null, 2),
       );
@@ -479,15 +476,15 @@ export class CanaisController {
           }
         });
 
-        console.log(
+        this.logger.log(
           '🔄 [CanaisController] Merge WhatsApp - Credenciais antes:',
           JSON.stringify(credenciaisExistentes, null, 2),
         );
-        console.log(
+        this.logger.log(
           '🔄 [CanaisController] Merge WhatsApp - Credenciais novas:',
           JSON.stringify(novasCredenciais, null, 2),
         );
-        console.log(
+        this.logger.log(
           '✅ [CanaisController] Merge WhatsApp - Credenciais mescladas:',
           JSON.stringify(credenciaisMerged, null, 2),
         );
@@ -505,8 +502,8 @@ export class CanaisController {
 
     await this.canalRepo.save(canal);
 
-    console.log('✅ [CanaisController] Canal atualizado');
-    console.log(
+    this.logger.log('✅ [CanaisController] Canal atualizado');
+    this.logger.log(
       '✅ [CanaisController] Configuracao atualizada:',
       JSON.stringify(canal.configuracao, null, 2),
     );
@@ -514,7 +511,7 @@ export class CanaisController {
     // 🔧 CRÍTICO: Se for WhatsApp, atualizar TAMBÉM atendimento_integracoes_config
     const tipoCanal = canal.tipo?.toString().toLowerCase();
     if (tipoCanal === 'whatsapp' || tipoCanal === 'whatsapp_business_api') {
-      console.log(
+      this.logger.log(
         '🔄 [CanaisController] Atualizando atendimento_integracoes_config para WhatsApp...',
       );
 
@@ -529,14 +526,14 @@ export class CanaisController {
 
         const credenciais = canal.configuracao?.credenciais || {};
 
-        console.log(
+        this.logger.log(
           '📝 [CanaisController] Credenciais a salvar:',
           JSON.stringify(credenciais, null, 2),
         );
 
         if (integracao) {
           // Atualizar configuração existente
-          console.log('🔄 [CanaisController] Atualizando integração existente:', integracao.id);
+          this.logger.log('🔄 [CanaisController] Atualizando integração existente:', integracao.id);
 
           // ⚠️ IMPORTANTE: Atualizar AMBOS os campos (JSONB E colunas diretas)
           // O whatsapp-sender.service usa campo JSONB, mas colunas servem como backup
@@ -564,18 +561,18 @@ export class CanaisController {
           integracao.whatsappAtivo = canal.ativo;
 
           await this.integracaoRepo.save(integracao);
-          console.log('✅ [CanaisController] Integração atualizada com sucesso!');
-          console.log(
+          this.logger.log('✅ [CanaisController] Integração atualizada com sucesso!');
+          this.logger.log(
             '✅ [CanaisController] Credenciais JSONB:',
             JSON.stringify(integracao.credenciais, null, 2),
           );
-          console.log(
+          this.logger.log(
             '✅ [CanaisController] Token coluna:',
             integracao.whatsappApiToken?.substring(0, 20) + '...',
           );
         } else {
           // Criar nova configuração
-          console.log('➕ [CanaisController] Criando nova integração...');
+          this.logger.log('➕ [CanaisController] Criando nova integração...');
 
           integracao = this.integracaoRepo.create({
             empresaId,
@@ -590,11 +587,11 @@ export class CanaisController {
           });
 
           await this.integracaoRepo.save(integracao);
-          console.log('✅ [CanaisController] Nova integração criada:', integracao.id);
+          this.logger.log('✅ [CanaisController] Nova integração criada:', integracao.id);
         }
       } catch (error) {
-        console.error('❌ [CanaisController] Erro ao atualizar integração:', error.message);
-        console.error(error.stack);
+        this.logger.error('❌ [CanaisController] Erro ao atualizar integração:', error.message);
+        this.logger.error(error.stack);
         // Não falha a atualização do canal, apenas loga o erro
       }
     }
@@ -623,8 +620,7 @@ export class CanaisController {
   }
 
   @Delete(':id')
-  async deletar(@Req() req, @Param('id') id: string) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
+  async deletar(@EmpresaId() empresaId: string, @Param('id') id: string) {
 
     const canal = await this.canalRepo.findOne({
       where: { id, empresaId },
@@ -646,8 +642,7 @@ export class CanaisController {
   }
 
   @Post(':id/ativar')
-  async ativar(@Req() req, @Param('id') id: string) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
+  async ativar(@EmpresaId() empresaId: string, @Param('id') id: string) {
 
     const canal = await this.canalRepo.findOne({
       where: { id, empresaId },
@@ -681,8 +676,7 @@ export class CanaisController {
   }
 
   @Post(':id/desativar')
-  async desativar(@Req() req, @Param('id') id: string) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
+  async desativar(@EmpresaId() empresaId: string, @Param('id') id: string) {
 
     const canal = await this.canalRepo.findOne({
       where: { id, empresaId },
@@ -712,20 +706,20 @@ export class CanaisController {
    */
   @Post('validar')
   async validarIntegracao(@Body() dto: { tipo: string; credenciais: any }) {
-    console.log('🔍 [CanaisController] POST /atendimento/canais/validar chamado');
-    console.log('🔍 [CanaisController] Tipo:', dto.tipo);
+    this.logger.log('🔍 [CanaisController] POST /atendimento/canais/validar chamado');
+    this.logger.log('🔍 [CanaisController] Tipo:', dto.tipo);
 
     try {
       const resultado = await this.validacaoService.validarIntegracao(dto.tipo, dto.credenciais);
 
-      console.log('✅ [CanaisController] Validação concluída:', resultado.valido);
+      this.logger.log('✅ [CanaisController] Validação concluída:', resultado.valido);
 
       return {
         success: true,
         data: resultado,
       };
     } catch (error) {
-      console.error('❌ [CanaisController] Erro na validação:', error.message);
+      this.logger.error('❌ [CanaisController] Erro na validação:', error.message);
 
       return {
         success: false,
@@ -740,16 +734,16 @@ export class CanaisController {
 
   /**
    * 📱 Endpoint para testar envio de mensagem
-   * POST /atendimento/canais/testar-mensagem
+   * POST /atendimento/canais/validar-mensagem
    * Body: { tipo: 'whatsapp', numero: string, mensagem: string, credenciais: object }
    */
-  @Post('testar-mensagem')
+  @Post('validar-mensagem')
   async testarMensagem(
     @Body() dto: { tipo: string; numero: string; mensagem: string; credenciais: any },
   ) {
-    console.log('🔍 [CanaisController] POST /atendimento/canais/testar-mensagem chamado');
-    console.log('🔍 [CanaisController] Tipo:', dto.tipo);
-    console.log('🔍 [CanaisController] Número:', dto.numero);
+    this.logger.log('🔍 [CanaisController] POST /atendimento/canais/validar-mensagem chamado');
+    this.logger.log('🔍 [CanaisController] Tipo:', dto.tipo);
+    this.logger.log('🔍 [CanaisController] Número:', dto.numero);
 
     try {
       const resultado = await this.validacaoService.testarEnvioMensagem(
@@ -759,7 +753,7 @@ export class CanaisController {
         dto.credenciais,
       );
 
-      console.log('✅ [CanaisController] Mensagem enviada com sucesso!');
+      this.logger.log('✅ [CanaisController] Mensagem enviada com sucesso!');
 
       return {
         success: true,
@@ -767,7 +761,7 @@ export class CanaisController {
         data: resultado,
       };
     } catch (error) {
-      console.error('❌ [CanaisController] Erro ao enviar mensagem:', error.message);
+      this.logger.error('❌ [CanaisController] Erro ao enviar mensagem:', error.message);
 
       return {
         success: false,
@@ -776,3 +770,4 @@ export class CanaisController {
     }
   }
 }
+

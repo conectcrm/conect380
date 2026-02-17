@@ -11,21 +11,10 @@ import { AdminEmpresasService } from './services/admin-empresas.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      Empresa,
-      User,
-      EmpresaModulo,
-      ModuloEmpresa,
-      HistoricoPlano
-    ]),
+    TypeOrmModule.forFeature([Empresa, User, EmpresaModulo, ModuloEmpresa, HistoricoPlano]),
   ],
-  controllers: [
-    AdminEmpresasController,
-  ],
-  providers: [
-    AdminEmpresasService,
-    EmpresaModuloService,
-  ],
+  controllers: [AdminEmpresasController],
+  providers: [AdminEmpresasService, EmpresaModuloService],
   exports: [AdminEmpresasService],
 })
-export class AdminModule { }
+export class AdminModule {}

@@ -7,18 +7,21 @@
   "rootDir": ".",
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
+  "setupFiles": [
+    "<rootDir>/setup-e2e-env.ts"
+  ],
   "transform": {
-    "^.+\\.(t|j)s$": "ts-jest"
-  },
-  "globals": {
-    "ts-jest": {
-      "tsconfig": {
-        "types": [
-          "jest",
-          "node"
-        ]
+    "^.+\\.(t|j)s$": [
+      "ts-jest",
+      {
+        "tsconfig": {
+          "types": [
+            "jest",
+            "node"
+          ]
+        }
       }
-    }
+    ]
   },
   "moduleNameMapper": {
     "^src/(.*)$": "<rootDir>/../src/$1"

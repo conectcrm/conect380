@@ -8,13 +8,13 @@ import {
   JoinColumn,
   Index,
 } from 'typeorm';
-import { Fila } from './fila.entity';
 import { User } from '../../users/user.entity';
 import { Empresa } from '../../../empresas/entities/empresa.entity';
+import { Fila } from './fila.entity';
 
 /**
  * Entity que representa a relação Many-to-Many entre Fila e User (Atendente)
- * 
+ *
  * Permite configurar:
  * - Capacidade individual do atendente nesta fila
  * - Prioridade do atendente para receber tickets
@@ -38,7 +38,7 @@ export class FilaAtendente {
   @Column({ type: 'uuid', name: 'filaId' })
   filaId: string;
 
-  @ManyToOne(() => Fila, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Fila, (fila) => fila.atendentes, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'filaId' })
   fila: Fila;
 
@@ -57,7 +57,7 @@ export class FilaAtendente {
   @Column({
     type: 'integer',
     default: 10,
-    comment: 'Tickets simultâneos que este atendente pode ter nesta fila'
+    comment: 'Tickets simultâneos que este atendente pode ter nesta fila',
   })
   capacidade: number;
 
@@ -65,13 +65,13 @@ export class FilaAtendente {
    * Prioridade para distribuição de tickets
    * 1 = maior prioridade (recebe primeiro)
    * 10 = menor prioridade (recebe por último)
-   * 
+   *
    * Usado na estratégia PRIORIDADE e como desempate em outras
    */
   @Column({
     type: 'integer',
     default: 5,
-    comment: '1=alta prioridade, 10=baixa prioridade'
+    comment: '1=alta prioridade, 10=baixa prioridade',
   })
   prioridade: number;
 

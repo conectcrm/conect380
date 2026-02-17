@@ -35,11 +35,6 @@ export const PlanosAdmin: React.FC<PlanosAdminProps> = ({ onEdit }) => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Token temporário para testes - REMOVER EM PRODUÇÃO
-    if (!localStorage.getItem('auth_token')) {
-      localStorage.setItem('auth_token', 'mock-token-for-testing');
-    }
-
     carregarPlanos();
   }, []);
 
@@ -71,7 +66,7 @@ export const PlanosAdmin: React.FC<PlanosAdminProps> = ({ onEdit }) => {
   const handleSalvarPlano = async (dadosPlano: Partial<Plano>) => {
     try {
       console.log('Dados sendo enviados:', dadosPlano);
-      console.log('Token no localStorage:', localStorage.getItem('auth_token'));
+      console.log('Token no localStorage:', localStorage.getItem('authToken'));
 
       if (editingPlano) {
         // Atualizar plano existente

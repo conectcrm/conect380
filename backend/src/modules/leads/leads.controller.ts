@@ -30,7 +30,7 @@ import { StatusLead, OrigemLead } from './lead.entity';
 @Controller('leads')
 @UseGuards(JwtAuthGuard, EmpresaGuard)
 export class LeadsController {
-  constructor(private readonly leadsService: LeadsService) { }
+  constructor(private readonly leadsService: LeadsService) {}
 
   /**
    * Capturar lead de formulário público (SEM autenticação)
@@ -130,10 +130,7 @@ export class LeadsController {
    */
   @Post('import')
   @UseInterceptors(FileInterceptor('file'))
-  async importCsv(
-    @UploadedFile() file: Express.Multer.File,
-    @EmpresaId() empresaId: string,
-  ) {
+  async importCsv(@UploadedFile() file: Express.Multer.File, @EmpresaId() empresaId: string) {
     if (!file) {
       throw new BadRequestException('Arquivo CSV não fornecido');
     }

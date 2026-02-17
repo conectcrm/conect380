@@ -312,26 +312,23 @@ export const ModalOportunidadeAvancado: React.FC<ModalOportunidadeAvancadoProps>
         return;
       }
 
-      // Limpeza dos dados: remove campos undefined, null ou string vazia
-      const oportunidadeData = Object.fromEntries(
-        Object.entries({
-          titulo: data.titulo,
-          descricao: data.descricao || '',
-          valor: data.valor,
-          probabilidade: data.probabilidade,
-          estagio: data.estagio,
-          prioridade: data.prioridade,
-          origem: data.origem,
-          tags: data.tags,
-          dataFechamentoEsperado: data.dataFechamentoEsperado,
-          responsavelId: data.responsavelId,
-          clienteId: data.clienteId || null,
-          nomeContato: data.nomeContato,
-          emailContato: data.emailContato,
-          telefoneContato: data.telefoneContato,
-          empresaContato: data.empresaContato,
-        }).filter(([_, v]) => v !== undefined && v !== null && v !== ''),
-      );
+      const oportunidadeData: NovaOportunidade = {
+        titulo: data.titulo,
+        descricao: data.descricao || undefined,
+        valor: data.valor,
+        probabilidade: data.probabilidade,
+        estagio: data.estagio,
+        prioridade: data.prioridade,
+        origem: data.origem,
+        tags: data.tags?.length ? data.tags : undefined,
+        dataFechamentoEsperado: data.dataFechamentoEsperado || undefined,
+        responsavel_id: data.responsavelId,
+        cliente_id: data.clienteId || undefined,
+        nomeContato: data.nomeContato || undefined,
+        emailContato: data.emailContato || undefined,
+        telefoneContato: data.telefoneContato || undefined,
+        empresaContato: data.empresaContato || undefined,
+      };
 
       console.log('Dados limpos a serem enviados:', oportunidadeData);
 

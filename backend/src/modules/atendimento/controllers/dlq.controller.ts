@@ -1,12 +1,27 @@
-import { Body, Controller, HttpException, HttpStatus, Logger, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpException,
+  HttpStatus,
+  Logger,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { DlqReprocessService, FilaReprocessavel } from '../services/dlq-reprocess.service';
+import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { RolesGuard } from '../../../common/guards/roles.guard';
+import { Roles } from '../../../common/decorators/roles.decorator';
+import { UserRole } from '../../users/user.entity';
 
 @Controller('api/atendimento/filas/dlq')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN)
 export class DlqController {
   private readonly logger = new Logger(DlqController.name);
 
-  constructor(private readonly dlqService: DlqReprocessService) { }
+  constructor(private readonly dlqService: DlqReprocessService) {}
 
   @Post('status')
   async status(@Body() body: { fila?: FilaReprocessavel }) {
@@ -23,8 +38,12 @@ export class DlqController {
   }
 
   @Post('reprocessar')
-  async reprocessar(@Body() body: { fila: FilaReprocessavel; limit?: number; filtros?: any; actor?: string }) {
-    const { fila, limit, filtros, actor } = body || {};
+  async reprocessar(
+    @Req() req: any,
+    @Body() body: { fila: FilaReprocessavel; limit?: number; filtros?: any },
+  ) {
+    const { fila, limit, filtros } = body || {};
+    const actor = req?.user?.id || req?.user?.email || req?.user?.sub || null;
 
     if (!fila) {
       throw new HttpException(
@@ -39,7 +58,7 @@ export class DlqController {
         fila,
         limit ?? 50,
         filtros ?? {},
-        actor || null,
+        actor,
         actionId,
       );
       this.logger.log(

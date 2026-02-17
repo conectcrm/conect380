@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { InteracoesService } from './interacoes.service';
 import { CreateInteracaoDto, UpdateInteracaoDto, InteracaoFiltroDto } from './dto/interacao.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -11,7 +21,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 @UseGuards(JwtAuthGuard, EmpresaGuard)
 @Controller('interacoes')
 export class InteracoesController {
-  constructor(private readonly interacoesService: InteracoesService) { }
+  constructor(private readonly interacoesService: InteracoesService) {}
 
   @Post()
   create(@Body() dto: CreateInteracaoDto, @EmpresaId() empresaId: string) {
@@ -34,11 +44,7 @@ export class InteracoesController {
   }
 
   @Patch(':id')
-  update(
-    @Param('id') id: string,
-    @Body() dto: UpdateInteracaoDto,
-    @EmpresaId() empresaId: string,
-  ) {
+  update(@Param('id') id: string, @Body() dto: UpdateInteracaoDto, @EmpresaId() empresaId: string) {
     return this.interacoesService.update(id, dto, empresaId);
   }
 
@@ -47,4 +53,3 @@ export class InteracoesController {
     return this.interacoesService.remove(id, empresaId);
   }
 }
-

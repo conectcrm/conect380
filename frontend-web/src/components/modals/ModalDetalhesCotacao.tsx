@@ -164,7 +164,12 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
   const isVencida = () => {
     const hoje = new Date();
     const vencimento = new Date(cotacao.dataVencimento);
-    return vencimento < hoje && !['aprovada', 'convertida', 'cancelada'].includes(cotacao.status);
+    return (
+      vencimento < hoje &&
+      ![StatusCotacao.APROVADA, StatusCotacao.CONVERTIDA, StatusCotacao.CANCELADA].includes(
+        cotacao.status,
+      )
+    );
   };
 
   return (
@@ -229,10 +234,10 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
               <span>Enviar</span>
             </button>
 
-            {cotacao.status === 'em_analise' && (
+            {cotacao.status === StatusCotacao.EM_ANALISE && (
               <>
                 <button
-                  onClick={() => handleStatusChange('aprovada')}
+                  onClick={() => handleStatusChange(StatusCotacao.APROVADA)}
                   disabled={isChangingStatus}
                   className="flex items-center space-x-2 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm disabled:opacity-50"
                 >
@@ -241,7 +246,7 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
                 </button>
 
                 <button
-                  onClick={() => handleStatusChange('rejeitada')}
+                  onClick={() => handleStatusChange(StatusCotacao.REJEITADA)}
                   disabled={isChangingStatus}
                   className="flex items-center space-x-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm disabled:opacity-50"
                 >

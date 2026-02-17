@@ -15,6 +15,16 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$DatabasePassword = $env:DATABASE_PASSWORD
+$JwtSecret = $env:JWT_SECRET
+
+if ([string]::IsNullOrWhiteSpace($DatabasePassword)) {
+  throw "DATABASE_PASSWORD não está definido no ambiente local."
+}
+
+if ([string]::IsNullOrWhiteSpace($JwtSecret)) {
+  throw "JWT_SECRET não está definido no ambiente local."
+}
 
 Write-Host "🚀 ConectCRM - Deploy AWS Script v1.0" -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
@@ -112,14 +122,15 @@ sudo docker run -d \
   --name conectcrm-backend-prod \
   --restart unless-stopped \
   --network conectcrm-network \
-  -p 3500:3500 \
+  -p 3500:3001 \
   -e NODE_ENV=production \
+  -e APP_PORT=3001 \
   -e DATABASE_HOST=conectcrm-postgres-prod \
   -e DATABASE_PORT=5432 \
   -e DATABASE_USERNAME=postgres \
-  -e DATABASE_PASSWORD='$DATABASE_PASSWORD' \
+  -e DATABASE_PASSWORD='$DatabasePassword' \
   -e DATABASE_NAME=conectcrm \
-  -e JWT_SECRET='$JWT_SECRET' \
+  -e JWT_SECRET='$JwtSecret' \
   conectcrm-backend:latest
 
 # Frontend

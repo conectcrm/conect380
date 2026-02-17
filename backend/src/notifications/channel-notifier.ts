@@ -29,7 +29,9 @@ export async function notifyByPolicy(params: NotifyByPolicyParams) {
     switch (entry.channel) {
       case 'whatsapp': {
         if (!phone) {
-          params.logger?.debug?.(`Canal whatsapp ignorado: phone ausente para policy=${params.policyKey}`);
+          params.logger?.debug?.(
+            `Canal whatsapp ignorado: phone ausente para policy=${params.policyKey}`,
+          );
           return;
         }
         senders.push(
@@ -44,7 +46,9 @@ export async function notifyByPolicy(params: NotifyByPolicyParams) {
       }
       case 'sms': {
         if (!phone) {
-          params.logger?.debug?.(`Canal sms ignorado: phone ausente para policy=${params.policyKey}`);
+          params.logger?.debug?.(
+            `Canal sms ignorado: phone ausente para policy=${params.policyKey}`,
+          );
           return;
         }
         senders.push(
@@ -59,7 +63,9 @@ export async function notifyByPolicy(params: NotifyByPolicyParams) {
       }
       case 'push': {
         if (!pushToken) {
-          params.logger?.debug?.(`Canal push ignorado: pushToken ausente para policy=${params.policyKey}`);
+          params.logger?.debug?.(
+            `Canal push ignorado: pushToken ausente para policy=${params.policyKey}`,
+          );
           return;
         }
         senders.push(
@@ -74,7 +80,9 @@ export async function notifyByPolicy(params: NotifyByPolicyParams) {
         return;
       }
       default:
-        params.logger?.debug?.(`Canal não suportado em policy=${params.policyKey}: ${entry.channel}`);
+        params.logger?.debug?.(
+          `Canal não suportado em policy=${params.policyKey}: ${entry.channel}`,
+        );
     }
   };
 
@@ -84,6 +92,8 @@ export async function notifyByPolicy(params: NotifyByPolicyParams) {
     await Promise.allSettled(senders);
   } catch (err) {
     // Todas as promises já foram tratadas com settled; este catch é defensivo
-    params.logger?.debug?.(`Falha ao notificar canais de policy=${params.policyKey}: ${err?.message || err}`);
+    params.logger?.debug?.(
+      `Falha ao notificar canais de policy=${params.policyKey}: ${err?.message || err}`,
+    );
   }
 }

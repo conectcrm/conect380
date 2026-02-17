@@ -11,7 +11,7 @@ import { Atendente } from '../../src/modules/triagem/entities/atendente.entity';
 
 /**
  * 🏭 Test Factories - Factory Pattern para Dados de Teste
- * 
+ *
  * Facilita criação de entidades de teste com dados realistas e reutilizáveis
  */
 
@@ -44,7 +44,7 @@ export async function createTestEmpresa(
   override?: Partial<Empresa>,
 ): Promise<Empresa> {
   const repo: Repository<Empresa> = app.get(getRepositoryToken(Empresa));
-  
+
   const empresa = repo.create({
     nome: `Empresa Teste ${empresaSeq}`,
     slug: `empresa-teste-${empresaSeq}`,
@@ -60,7 +60,7 @@ export async function createTestEmpresa(
     plano: 'professional',
     ...override,
   });
-  
+
   empresaSeq++;
   return await repo.save(empresa);
 }
@@ -74,7 +74,7 @@ export async function createTestUsuario(
   override?: Partial<User>,
 ): Promise<User> {
   const repo: Repository<User> = app.get(getRepositoryToken(User));
-  
+
   const usuario = repo.create({
     nome: `Usuário Teste ${usuarioSeq}`,
     email: `usuario${usuarioSeq}@teste.com`,
@@ -84,7 +84,7 @@ export async function createTestUsuario(
     ativo: true,
     ...override,
   });
-  
+
   usuarioSeq++;
   return await repo.save(usuario);
 }
@@ -98,7 +98,7 @@ export async function createTestContato(
   override?: Partial<Contato>,
 ): Promise<Contato> {
   const repo: Repository<Contato> = app.get(getRepositoryToken(Contato));
-  
+
   const contato = repo.create({
     nome: `Contato Teste ${contatoSeq}`,
     telefone: `+5511988${String(contatoSeq).padStart(6, '0')}`,
@@ -107,7 +107,7 @@ export async function createTestContato(
     ativo: true,
     ...override,
   });
-  
+
   contatoSeq++;
   return await repo.save(contato);
 }
@@ -122,7 +122,7 @@ export async function createTestTicket(
   override?: Partial<Ticket>,
 ): Promise<Ticket> {
   const repo: Repository<Ticket> = app.get(getRepositoryToken(Ticket));
-  
+
   const ticket = repo.create({
     contatoId,
     empresaId,
@@ -132,7 +132,7 @@ export async function createTestTicket(
     origem: 'atendimento',
     ...override,
   });
-  
+
   ticketSeq++;
   return await repo.save(ticket);
 }
@@ -147,7 +147,7 @@ export async function createTestMensagem(
   override?: Partial<Mensagem>,
 ): Promise<Mensagem> {
   const repo: Repository<Mensagem> = app.get(getRepositoryToken(Mensagem));
-  
+
   const mensagem = repo.create({
     ticketId,
     contatoId,
@@ -157,7 +157,7 @@ export async function createTestMensagem(
     status: 'enviada',
     ...override,
   });
-  
+
   mensagemSeq++;
   return await repo.save(mensagem);
 }
@@ -171,7 +171,7 @@ export async function createTestEquipe(
   override?: Partial<Equipe>,
 ): Promise<Equipe> {
   const repo: Repository<Equipe> = app.get(getRepositoryToken(Equipe));
-  
+
   const equipe = repo.create({
     nome: `Equipe Teste ${equipeSeq}`,
     descricao: `Equipe de testes ${equipeSeq}`,
@@ -179,7 +179,7 @@ export async function createTestEquipe(
     ativo: true,
     ...override,
   });
-  
+
   equipeSeq++;
   return await repo.save(equipe);
 }
@@ -194,7 +194,7 @@ export async function createTestAtendente(
   override?: Partial<Atendente>,
 ): Promise<Atendente> {
   const repo: Repository<Atendente> = app.get(getRepositoryToken(Atendente));
-  
+
   const atendente = repo.create({
     usuarioId,
     empresaId,
@@ -204,14 +204,14 @@ export async function createTestAtendente(
     atendimentosAtivos: 0,
     ...override,
   });
-  
+
   atendenteSeq++;
   return await repo.save(atendente);
 }
 
 /**
  * 🎭 Criar Cenário Completo de Atendimento
- * 
+ *
  * Cria todos os dados necessários para testes E2E:
  * - Empresa
  * - Usuário
@@ -219,7 +219,7 @@ export async function createTestAtendente(
  * - Equipe
  * - Contato
  * - Ticket
- * 
+ *
  * @returns Objeto com todas as entidades criadas
  */
 export async function createFullAtendimentoScenario(app: INestApplication) {
@@ -229,7 +229,7 @@ export async function createFullAtendimentoScenario(app: INestApplication) {
   const equipe = await createTestEquipe(app, empresa.id);
   const contato = await createTestContato(app, empresa.id);
   const ticket = await createTestTicket(app, contato.id, empresa.id);
-  
+
   return {
     empresa,
     usuario,

@@ -12,10 +12,10 @@ import {
   UseInterceptors,
   UploadedFiles,
   UseGuards,
-  Request,
-  ForbiddenException,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { EmpresaId } from '../../../common/decorators/empresa.decorator';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { TicketService } from '../services/ticket.service';
 import { MensagemService } from '../services/mensagem.service';
@@ -28,14 +28,14 @@ import { EscalarTicketDto, DesescalarTicketDto, ReatribuirTicketDto } from '../d
  * 🔐 SEGURANÇA: Todos os endpoints protegidos com JWT - empresa_id extraído do token
  */
 @Controller('api/atendimento/tickets')
-@UseGuards(AuthGuard('jwt')) // 🔐 Proteção global - requer autenticação JWT
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class TicketController {
   private readonly logger = new Logger(TicketController.name);
 
   constructor(
     private readonly ticketService: TicketService,
     private readonly mensagemService: MensagemService,
-  ) { }
+  ) {}
 
   /**
    * GET /api/atendimento/tickets
@@ -53,7 +53,7 @@ export class TicketController {
    */
   @Get()
   async listar(
-    @Request() req,
+    @EmpresaId() empresaId: string,
     @Query('status') status?: string | string[],
     @Query('canalId') canalId?: string,
     @Query('atendenteId') atendenteId?: string,
@@ -61,10 +61,9 @@ export class TicketController {
     @Query('limite') limite?: string,
     @Query('pagina') pagina?: string,
   ) {
-    // 🔐 SEGURANÇA: empresa_id vem do JWT, não pode ser manipulado
-    const empresaId = req.user.empresa_id;
-
-    this.logger.log(`📋 [GET /tickets] empresaId=${empresaId} user=${req.user.email} status=${status} tipo=${tipo || 'todos'}`);
+    this.logger.log(
+      `📋 [GET /tickets] empresaId=${empresaId} status=${status} tipo=${tipo || 'todos'}`,
+    );
 
     if (!empresaId) {
       throw new HttpException('Usuário não possui empresa associada', HttpStatus.FORBIDDEN);
@@ -122,19 +121,11 @@ export class TicketController {
    * 🔐 SEGURANÇA: Valida se ticket pertence à empresa do usuário
    */
   @Get(':id')
-  async buscar(@Request() req, @Param('id') id: string) {
-    // 🔐 SEGURANÇA: empresa_id vem do JWT
-    const empresaId = req.user.empresa_id;
-
-    this.logger.log(`🔍 [GET /tickets/${id}] empresaId=${empresaId} user=${req.user.email}`);
+  async buscar(@EmpresaId() empresaId: string, @Param('id') id: string) {
+    this.logger.log(`🔍 [GET /tickets/${id}] empresaId=${empresaId}`);
 
     try {
       const ticket = await this.ticketService.buscarPorId(id, empresaId);
-
-      // 🔐 SEGURANÇA: Verificação adicional de propriedade
-      if (ticket.empresaId !== empresaId) {
-        throw new ForbiddenException('Este ticket não pertence à sua empresa');
-      }
 
       return {
         success: true,
@@ -171,7 +162,11 @@ export class TicketController {
    * Body: { status: 'ABERTO' | 'EM_ATENDIMENTO' | 'AGUARDANDO_CLIENTE' | 'RESOLVIDO' | 'FECHADO' }
    */
   @Patch(':id/status')
-  async atualizarStatus(@Param('id') id: string, @Body('status') status: string) {
+  async atualizarStatus(
+    @EmpresaId() empresaId: string,
+    @Param('id') id: string,
+    @Body('status') status: string,
+  ) {
     this.logger.log(`🔄 [PATCH /tickets/${id}/status] status=${status}`);
 
     if (!status) {
@@ -188,6 +183,7 @@ export class TicketController {
     }
 
     try {
+      await this.ticketService.buscarPorId(id, empresaId);
       const ticket = await this.ticketService.atualizarStatus(id, status as StatusTicket);
 
       this.logger.log(`✅ Status atualizado: ${id} → ${status}`);
@@ -229,9 +225,10 @@ export class TicketController {
    */
   @Patch(':id')
   async atualizarTicket(
-    @Request() req,
+    @EmpresaId() empresaId: string,
     @Param('id') id: string,
-    @Body() dados: Partial<{
+    @Body()
+    dados: Partial<{
       atendenteId?: string;
       filaId?: string;
       cliente_id?: string;
@@ -244,8 +241,6 @@ export class TicketController {
       [key: string]: any;
     }>,
   ) {
-    const empresaId = req.user.empresa_id;
-
     this.logger.log(
       `📝 [PATCH /tickets/${id}] empresaId=${empresaId} dados=${JSON.stringify(dados)}`,
     );
@@ -280,7 +275,11 @@ export class TicketController {
    * Body: { atendenteId: string }
    */
   @Patch(':id/atribuir')
-  async atribuir(@Param('id') id: string, @Body('atendenteId') atendenteId: string) {
+  async atribuir(
+    @EmpresaId() empresaId: string,
+    @Param('id') id: string,
+    @Body('atendenteId') atendenteId: string,
+  ) {
     this.logger.log(`👤 [PATCH /tickets/${id}/atribuir] atendenteId=${atendenteId}`);
 
     if (!atendenteId) {
@@ -288,6 +287,7 @@ export class TicketController {
     }
 
     try {
+      await this.ticketService.buscarPorId(id, empresaId);
       const ticket = await this.ticketService.atribuir(id, atendenteId);
 
       this.logger.log(`✅ Ticket atribuído: ${id} → ${atendenteId}`);
@@ -317,7 +317,11 @@ export class TicketController {
    * Body: { prioridade: 'BAIXA' | 'MEDIA' | 'ALTA' | 'URGENTE' }
    */
   @Patch(':id/prioridade')
-  async atualizarPrioridade(@Param('id') id: string, @Body('prioridade') prioridade: string) {
+  async atualizarPrioridade(
+    @EmpresaId() empresaId: string,
+    @Param('id') id: string,
+    @Body('prioridade') prioridade: string,
+  ) {
     this.logger.log(`⭐ [PATCH /tickets/${id}/prioridade] prioridade=${prioridade}`);
 
     if (!prioridade) {
@@ -334,6 +338,7 @@ export class TicketController {
     }
 
     try {
+      await this.ticketService.buscarPorId(id, empresaId);
       const ticket = await this.ticketService.atualizarPrioridade(
         id,
         prioridade as PrioridadeTicket,
@@ -366,11 +371,14 @@ export class TicketController {
    * Body: CriarTicketDto
    */
   @Post()
-  async criar(@Body() dadosTicket: any) {
+  async criar(@EmpresaId() empresaId: string, @Body() dadosTicket: any) {
     this.logger.log(`📝 [POST /tickets] Criando novo ticket`);
 
     try {
-      const ticket = await this.ticketService.criar(dadosTicket);
+      const ticket = await this.ticketService.criar({
+        ...dadosTicket,
+        empresaId,
+      });
 
       this.logger.log(`✅ Ticket criado: ${ticket.id}`);
 
@@ -397,10 +405,17 @@ export class TicketController {
    * Escalona ticket para nível N1/N2/N3
    */
   @Post(':id/escalar')
-  async escalar(@Param('id') id: string, @Body() dados: EscalarTicketDto) {
-    this.logger.log(`⬆️ [POST /tickets/${id}/escalar] level=${dados?.level} reason=${dados?.reason}`);
+  async escalar(
+    @EmpresaId() empresaId: string,
+    @Param('id') id: string,
+    @Body() dados: EscalarTicketDto,
+  ) {
+    this.logger.log(
+      `⬆️ [POST /tickets/${id}/escalar] level=${dados?.level} reason=${dados?.reason}`,
+    );
 
     try {
+      await this.ticketService.buscarPorId(id, empresaId);
       const ticket = await this.ticketService.escalar(id, dados);
 
       return {
@@ -426,10 +441,15 @@ export class TicketController {
    * Remove escalonamento (retorna para N1)
    */
   @Post(':id/desescalar')
-  async desescalar(@Param('id') id: string, @Body() dados: DesescalarTicketDto) {
+  async desescalar(
+    @EmpresaId() empresaId: string,
+    @Param('id') id: string,
+    @Body() dados: DesescalarTicketDto,
+  ) {
     this.logger.log(`⬇️ [POST /tickets/${id}/desescalar]`);
 
     try {
+      await this.ticketService.buscarPorId(id, empresaId);
       const ticket = await this.ticketService.desescalar(id, dados);
 
       return {
@@ -455,12 +475,17 @@ export class TicketController {
    * Reatribui ticket para fila/atendente e/ou ajusta nível/severidade
    */
   @Patch(':id/reatribuir')
-  async reatribuir(@Param('id') id: string, @Body() dados: ReatribuirTicketDto) {
+  async reatribuir(
+    @EmpresaId() empresaId: string,
+    @Param('id') id: string,
+    @Body() dados: ReatribuirTicketDto,
+  ) {
     this.logger.log(
       `📌 [PATCH /tickets/${id}/reatribuir] fila=${dados?.filaId || '-'} atendente=${dados?.atendenteId || '-'}`,
     );
 
     try {
+      await this.ticketService.buscarPorId(id, empresaId);
       const ticket = await this.ticketService.reatribuir(id, dados);
 
       return {
@@ -488,10 +513,15 @@ export class TicketController {
    * Body: TransferirTicketDto
    */
   @Post(':id/transferir')
-  async transferir(@Param('id') id: string, @Body() dados: any) {
+  async transferir(
+    @EmpresaId() empresaId: string,
+    @Param('id') id: string,
+    @Body() dados: any,
+  ) {
     this.logger.log(`🔄 [POST /tickets/${id}/transferir] → ${dados.atendenteId}`);
 
     try {
+      await this.ticketService.buscarPorId(id, empresaId);
       const ticket = await this.ticketService.transferir(id, dados);
 
       this.logger.log(`✅ Ticket transferido com sucesso`);
@@ -522,10 +552,15 @@ export class TicketController {
    * Body: EncerrarTicketDto
    */
   @Post(':id/encerrar')
-  async encerrar(@Param('id') id: string, @Body() dados: any) {
+  async encerrar(
+    @EmpresaId() empresaId: string,
+    @Param('id') id: string,
+    @Body() dados: any,
+  ) {
     this.logger.log(`🏁 [POST /tickets/${id}/encerrar] motivo=${dados.motivo}`);
 
     try {
+      await this.ticketService.buscarPorId(id, empresaId);
       const resultado = await this.ticketService.encerrar(id, dados);
 
       this.logger.log(`✅ Ticket encerrado com sucesso`);
@@ -555,10 +590,11 @@ export class TicketController {
    * Reabre um ticket encerrado
    */
   @Post(':id/reabrir')
-  async reabrir(@Param('id') id: string) {
+  async reabrir(@EmpresaId() empresaId: string, @Param('id') id: string) {
     this.logger.log(`🔓 [POST /tickets/${id}/reabrir]`);
 
     try {
+      await this.ticketService.buscarPorId(id, empresaId);
       const ticket = await this.ticketService.reabrir(id);
 
       this.logger.log(`✅ Ticket reaberto com sucesso`);
@@ -588,6 +624,7 @@ export class TicketController {
   @Post(':id/mensagens')
   @UseInterceptors(FilesInterceptor('anexos', 5))
   async enviarMensagem(
+    @EmpresaId() empresaId: string,
     @Param('id') ticketId: string,
     @Body() dados: any,
     @UploadedFiles() arquivos?: Express.Multer.File[],
@@ -610,19 +647,19 @@ export class TicketController {
           conteudo = dados;
         }
       }
+      const ticket = await this.ticketService.buscarPorId(ticketId, empresaId);
 
-      // Adicionar ticketId do parâmetro da URL
+      // Adicionar ticketId do par�metro da URL
       const dadosCompletos = {
         ...dados,
         ticketId,
         conteudo, // Garante que conteudo está presente
       };
 
-      const mensagem = await this.mensagemService.enviar(dadosCompletos, arquivos);
+      const mensagem = await this.mensagemService.enviar(dadosCompletos, arquivos, empresaId);
       this.logger.log(`✅ Mensagem enviada para ticket ${ticketId}`);
 
       // Formatar resposta para o frontend de chat (remetente/anexos/audio normalizados)
-      const ticket = await this.ticketService.buscarPorId(ticketId).catch(() => null);
       const mensagemFormatada = this.mensagemService.formatarMensagemParaFrontend(mensagem, {
         fotoContato: ticket?.contatoFoto || null,
         status: 'enviado',
@@ -646,3 +683,4 @@ export class TicketController {
     }
   }
 }
+

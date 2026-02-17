@@ -1,6 +1,6 @@
 /**
  * 🔍 OpenTelemetry Tracing Helpers
- * 
+ *
  * Utilitários para facilitar a adição de spans customizados
  * nos services do sistema.
  */
@@ -21,7 +21,7 @@ export function getTracer() {
 
 /**
  * Decorator para adicionar tracing automático em métodos
- * 
+ *
  * @example
  * ```typescript
  * @Trace('criar-ticket')
@@ -31,36 +31,28 @@ export function getTracer() {
  * ```
  */
 export function Trace(spanName: string, attributes?: Attributes) {
-  return function (
-    target: any,
-    propertyKey: string,
-    descriptor: PropertyDescriptor,
-  ) {
+  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     const originalMethod = descriptor.value;
 
     descriptor.value = async function (...args: any[]) {
       const tracer = getTracer();
 
-      return await tracer.startActiveSpan(
-        spanName,
-        { attributes },
-        async (span: Span) => {
-          try {
-            const result = await originalMethod.apply(this, args);
-            span.setStatus({ code: SpanStatusCode.OK });
-            return result;
-          } catch (error) {
-            span.setStatus({
-              code: SpanStatusCode.ERROR,
-              message: error.message,
-            });
-            span.recordException(error);
-            throw error;
-          } finally {
-            span.end();
-          }
-        },
-      );
+      return await tracer.startActiveSpan(spanName, { attributes }, async (span: Span) => {
+        try {
+          const result = await originalMethod.apply(this, args);
+          span.setStatus({ code: SpanStatusCode.OK });
+          return result;
+        } catch (error) {
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: error.message,
+          });
+          span.recordException(error);
+          throw error;
+        } finally {
+          span.end();
+        }
+      });
     };
 
     return descriptor;
@@ -69,7 +61,7 @@ export function Trace(spanName: string, attributes?: Attributes) {
 
 /**
  * Cria um span manual
- * 
+ *
  * @example
  * ```typescript
  * const span = createSpan('buscar-contato');
@@ -94,7 +86,7 @@ export function createSpan(name: string, attributes?: Attributes): Span {
 
 /**
  * Executa função dentro de um span
- * 
+ *
  * @example
  * ```typescript
  * await withSpan('processar-webhook', async (span) => {
@@ -110,26 +102,22 @@ export async function withSpan<T>(
 ): Promise<T> {
   const tracer = getTracer();
 
-  return await tracer.startActiveSpan(
-    name,
-    { attributes },
-    async (span: Span) => {
-      try {
-        const result = await fn(span);
-        span.setStatus({ code: SpanStatusCode.OK });
-        return result;
-      } catch (error) {
-        span.setStatus({
-          code: SpanStatusCode.ERROR,
-          message: error.message,
-        });
-        span.recordException(error);
-        throw error;
-      } finally {
-        span.end();
-      }
-    },
-  );
+  return await tracer.startActiveSpan(name, { attributes }, async (span: Span) => {
+    try {
+      const result = await fn(span);
+      span.setStatus({ code: SpanStatusCode.OK });
+      return result;
+    } catch (error) {
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: error.message,
+      });
+      span.recordException(error);
+      throw error;
+    } finally {
+      span.end();
+    }
+  });
 }
 
 /**
@@ -156,7 +144,11 @@ export function addAttributes(spanOrAttributes: Span | Attributes, attributes?: 
 /**
  * Adiciona evento ao span ativo OU a um span específico
  */
-export function addEvent(nameOrSpan: string | Span, nameOrAttributes?: string | Attributes, attributes?: Attributes): void {
+export function addEvent(
+  nameOrSpan: string | Span,
+  nameOrAttributes?: string | Attributes,
+  attributes?: Attributes,
+): void {
   if (typeof nameOrSpan === 'object' && typeof (nameOrSpan as Span).addEvent === 'function') {
     // Span específico fornecido
     const span = nameOrSpan as Span;

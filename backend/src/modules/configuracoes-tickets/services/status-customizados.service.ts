@@ -14,7 +14,7 @@ export class StatusCustomizadosService {
     @InjectRepository(StatusCustomizado)
     private readonly statusRepository: Repository<StatusCustomizado>,
     @Inject(REQUEST) private readonly request: any,
-  ) { }
+  ) {}
 
   private getEmpresaId(): string {
     const empresaId = this.request.user?.empresa_id;

@@ -13,165 +13,123 @@ import { StatusTicket } from '../entities/ticket.entity';
 
 describe('StatusValidator', () => {
   describe('validarTransicaoStatus', () => {
-    it('deve permitir ABERTO → EM_ATENDIMENTO', () => {
+    it('deve permitir FILA → EM_ATENDIMENTO', () => {
+      const resultado = validarTransicaoStatus(StatusTicket.FILA, StatusTicket.EM_ATENDIMENTO);
+      expect(resultado).toBe(true);
+    });
+
+    it('deve permitir EM_ATENDIMENTO → AGUARDANDO_CLIENTE', () => {
       const resultado = validarTransicaoStatus(
-        StatusTicket.ABERTO,
+        StatusTicket.EM_ATENDIMENTO,
+        StatusTicket.AGUARDANDO_CLIENTE,
+      );
+      expect(resultado).toBe(true);
+    });
+
+    it('deve permitir EM_ATENDIMENTO → CONCLUIDO', () => {
+      const resultado = validarTransicaoStatus(StatusTicket.EM_ATENDIMENTO, StatusTicket.CONCLUIDO);
+      expect(resultado).toBe(true);
+    });
+
+    it('deve permitir AGUARDANDO_CLIENTE → EM_ATENDIMENTO', () => {
+      const resultado = validarTransicaoStatus(
+        StatusTicket.AGUARDANDO_CLIENTE,
         StatusTicket.EM_ATENDIMENTO,
       );
       expect(resultado).toBe(true);
     });
 
-    it('deve permitir EM_ATENDIMENTO → AGUARDANDO', () => {
-      const resultado = validarTransicaoStatus(
-        StatusTicket.EM_ATENDIMENTO,
-        StatusTicket.AGUARDANDO,
-      );
+    it('deve permitir CONCLUIDO → ENCERRADO', () => {
+      const resultado = validarTransicaoStatus(StatusTicket.CONCLUIDO, StatusTicket.ENCERRADO);
       expect(resultado).toBe(true);
     });
 
-    it('deve permitir EM_ATENDIMENTO → RESOLVIDO', () => {
-      const resultado = validarTransicaoStatus(
-        StatusTicket.EM_ATENDIMENTO,
-        StatusTicket.RESOLVIDO,
-      );
-      expect(resultado).toBe(true);
-    });
-
-    it('deve permitir AGUARDANDO → EM_ATENDIMENTO', () => {
-      const resultado = validarTransicaoStatus(
-        StatusTicket.AGUARDANDO,
-        StatusTicket.EM_ATENDIMENTO,
-      );
-      expect(resultado).toBe(true);
-    });
-
-    it('deve permitir RESOLVIDO → FECHADO', () => {
-      const resultado = validarTransicaoStatus(
-        StatusTicket.RESOLVIDO,
-        StatusTicket.FECHADO,
-      );
-      expect(resultado).toBe(true);
-    });
-
-    it('deve permitir FECHADO → ABERTO (reabertura)', () => {
-      const resultado = validarTransicaoStatus(
-        StatusTicket.FECHADO,
-        StatusTicket.ABERTO,
-      );
-      expect(resultado).toBe(true);
-    });
-
-    it('deve permitir RESOLVIDO → ABERTO (reabertura)', () => {
-      const resultado = validarTransicaoStatus(
-        StatusTicket.RESOLVIDO,
-        StatusTicket.ABERTO,
-      );
+    it('deve permitir ENCERRADO → FILA (reabertura)', () => {
+      const resultado = validarTransicaoStatus(StatusTicket.ENCERRADO, StatusTicket.FILA);
       expect(resultado).toBe(true);
     });
 
     it('deve permitir status igual (não mudou)', () => {
-      const resultado = validarTransicaoStatus(
-        StatusTicket.ABERTO,
-        StatusTicket.ABERTO,
-      );
+      const resultado = validarTransicaoStatus(StatusTicket.FILA, StatusTicket.FILA);
       expect(resultado).toBe(true);
     });
 
-    it('NÃO deve permitir ABERTO → AGUARDANDO (pula etapa)', () => {
-      const resultado = validarTransicaoStatus(
-        StatusTicket.ABERTO,
-        StatusTicket.AGUARDANDO,
-      );
+    it('NÃO deve permitir FILA → AGUARDANDO_CLIENTE (pula etapa)', () => {
+      const resultado = validarTransicaoStatus(StatusTicket.FILA, StatusTicket.AGUARDANDO_CLIENTE);
       expect(resultado).toBe(false);
     });
 
-    it('NÃO deve permitir ABERTO → RESOLVIDO (pula etapas)', () => {
-      const resultado = validarTransicaoStatus(
-        StatusTicket.ABERTO,
-        StatusTicket.RESOLVIDO,
-      );
+    it('NÃO deve permitir FILA → CONCLUIDO (pula etapas)', () => {
+      const resultado = validarTransicaoStatus(StatusTicket.FILA, StatusTicket.CONCLUIDO);
       expect(resultado).toBe(false);
     });
 
-    it('NÃO deve permitir FECHADO → EM_ATENDIMENTO (direto)', () => {
-      const resultado = validarTransicaoStatus(
-        StatusTicket.FECHADO,
-        StatusTicket.EM_ATENDIMENTO,
-      );
+    it('NÃO deve permitir ENCERRADO → EM_ATENDIMENTO (direto)', () => {
+      const resultado = validarTransicaoStatus(StatusTicket.ENCERRADO, StatusTicket.EM_ATENDIMENTO);
       expect(resultado).toBe(false);
     });
 
-    it('NÃO deve permitir AGUARDANDO → FECHADO sem resolver', () => {
-      const resultado = validarTransicaoStatus(
-        StatusTicket.AGUARDANDO,
-        StatusTicket.FECHADO,
-      );
-      // Na verdade, PERMITE fechar direto se cliente não responder
+    it('deve permitir AGUARDANDO_CLIENTE → ENCERRADO', () => {
+      const resultado = validarTransicaoStatus(StatusTicket.AGUARDANDO_CLIENTE, StatusTicket.ENCERRADO);
       expect(resultado).toBe(true);
     });
   });
 
   describe('obterProximosStatusValidos', () => {
-    it('deve retornar próximos status válidos para ABERTO', () => {
-      const validos = obterProximosStatusValidos(StatusTicket.ABERTO);
+    it('deve retornar próximos status válidos para FILA', () => {
+      const validos = obterProximosStatusValidos(StatusTicket.FILA);
       expect(validos).toContain(StatusTicket.EM_ATENDIMENTO);
-      expect(validos).toContain(StatusTicket.FECHADO);
-      expect(validos).toHaveLength(2);
+      expect(validos).toContain(StatusTicket.ENCERRADO);
+      expect(validos).toContain(StatusTicket.CANCELADO);
+      expect(validos).toHaveLength(3);
     });
 
     it('deve retornar próximos status válidos para EM_ATENDIMENTO', () => {
       const validos = obterProximosStatusValidos(StatusTicket.EM_ATENDIMENTO);
-      expect(validos).toContain(StatusTicket.AGUARDANDO);
-      expect(validos).toContain(StatusTicket.RESOLVIDO);
-      expect(validos).toContain(StatusTicket.ABERTO);
-      expect(validos).toHaveLength(3);
+      expect(validos).toContain(StatusTicket.AGUARDANDO_CLIENTE);
+      expect(validos).toContain(StatusTicket.AGUARDANDO_INTERNO);
+      expect(validos).toContain(StatusTicket.CONCLUIDO);
+      expect(validos).toContain(StatusTicket.ENCERRADO);
+      expect(validos).toContain(StatusTicket.FILA);
+      expect(validos).toHaveLength(5);
     });
 
-    it('deve retornar próximos status válidos para FECHADO', () => {
-      const validos = obterProximosStatusValidos(StatusTicket.FECHADO);
-      expect(validos).toContain(StatusTicket.ABERTO);
+    it('deve retornar próximos status válidos para ENCERRADO', () => {
+      const validos = obterProximosStatusValidos(StatusTicket.ENCERRADO);
+      expect(validos).toContain(StatusTicket.FILA);
       expect(validos).toHaveLength(1);
     });
   });
 
   describe('gerarMensagemErroTransicao', () => {
     it('deve gerar mensagem de erro para transição inválida', () => {
-      const mensagem = gerarMensagemErroTransicao(
-        StatusTicket.ABERTO,
-        StatusTicket.RESOLVIDO,
-      );
+      const mensagem = gerarMensagemErroTransicao(StatusTicket.FILA, StatusTicket.CONCLUIDO);
       expect(mensagem).toContain('Transição inválida');
-      expect(mensagem).toContain('ABERTO');
-      expect(mensagem).toContain('RESOLVIDO');
+      expect(mensagem).toContain('FILA');
+      expect(mensagem).toContain('CONCLUIDO');
       expect(mensagem).toContain('EM_ATENDIMENTO');
-      expect(mensagem).toContain('FECHADO');
+      expect(mensagem).toContain('ENCERRADO');
     });
   });
 
   describe('obterDescricaoTransicao', () => {
-    it('deve retornar descrição para ABERTO → EM_ATENDIMENTO', () => {
-      const descricao = obterDescricaoTransicao(
-        StatusTicket.ABERTO,
-        StatusTicket.EM_ATENDIMENTO,
-      );
+    it('deve retornar descrição para FILA → EM_ATENDIMENTO', () => {
+      const descricao = obterDescricaoTransicao(StatusTicket.FILA, StatusTicket.EM_ATENDIMENTO);
       expect(descricao).toContain('assumido');
     });
 
-    it('deve retornar descrição para EM_ATENDIMENTO → RESOLVIDO', () => {
+    it('deve retornar descrição para EM_ATENDIMENTO → CONCLUIDO', () => {
       const descricao = obterDescricaoTransicao(
         StatusTicket.EM_ATENDIMENTO,
-        StatusTicket.RESOLVIDO,
+        StatusTicket.CONCLUIDO,
       );
-      expect(descricao).toContain('resolvido');
+      expect(descricao).toContain('concluído');
     });
 
     it('deve retornar descrição genérica para transição não mapeada', () => {
-      const descricao = obterDescricaoTransicao(
-        StatusTicket.ABERTO,
-        StatusTicket.FECHADO,
-      );
-      expect(descricao).toContain('ABERTO');
-      expect(descricao).toContain('FECHADO');
+      const descricao = obterDescricaoTransicao(StatusTicket.FILA, StatusTicket.ENCERRADO);
+      expect(descricao).toContain('FILA');
+      expect(descricao).toContain('ENCERRADO');
     });
   });
 
@@ -190,19 +148,19 @@ describe('StatusValidator', () => {
         // Nota: validarTransicaoStatus() permite isso como caso especial
         proximos.forEach((proximo) => {
           if (status === proximo) {
-            fail(`Status ${status} permite transição para si mesmo`);
+            throw new Error(`Status ${status} permite transição para si mesmo`);
           }
         });
       });
     });
 
-    it('deve permitir fluxo completo: ABERTO → FECHADO', () => {
-      // Fluxo feliz: ABERTO → EM_ATENDIMENTO → RESOLVIDO → FECHADO
+    it('deve permitir fluxo completo: FILA → ENCERRADO', () => {
+      // Fluxo feliz: FILA → EM_ATENDIMENTO → CONCLUIDO → ENCERRADO
       const fluxo = [
-        StatusTicket.ABERTO,
+        StatusTicket.FILA,
         StatusTicket.EM_ATENDIMENTO,
-        StatusTicket.RESOLVIDO,
-        StatusTicket.FECHADO,
+        StatusTicket.CONCLUIDO,
+        StatusTicket.ENCERRADO,
       ];
 
       for (let i = 0; i < fluxo.length - 1; i++) {
@@ -213,13 +171,13 @@ describe('StatusValidator', () => {
       }
     });
 
-    it('deve permitir fluxo com aguardando: ABERTO → EM_ATENDIMENTO → AGUARDANDO → EM_ATENDIMENTO → RESOLVIDO', () => {
+    it('deve permitir fluxo com aguardando: FILA → EM_ATENDIMENTO → AGUARDANDO_CLIENTE → EM_ATENDIMENTO → CONCLUIDO', () => {
       const fluxo = [
-        StatusTicket.ABERTO,
+        StatusTicket.FILA,
         StatusTicket.EM_ATENDIMENTO,
-        StatusTicket.AGUARDANDO,
+        StatusTicket.AGUARDANDO_CLIENTE,
         StatusTicket.EM_ATENDIMENTO,
-        StatusTicket.RESOLVIDO,
+        StatusTicket.CONCLUIDO,
       ];
 
       for (let i = 0; i < fluxo.length - 1; i++) {
@@ -230,12 +188,8 @@ describe('StatusValidator', () => {
       }
     });
 
-    it('deve permitir reabertura completa: FECHADO → ABERTO → EM_ATENDIMENTO', () => {
-      const fluxo = [
-        StatusTicket.FECHADO,
-        StatusTicket.ABERTO,
-        StatusTicket.EM_ATENDIMENTO,
-      ];
+    it('deve permitir reabertura completa: ENCERRADO → FILA → EM_ATENDIMENTO', () => {
+      const fluxo = [StatusTicket.ENCERRADO, StatusTicket.FILA, StatusTicket.EM_ATENDIMENTO];
 
       for (let i = 0; i < fluxo.length - 1; i++) {
         const atual = fluxo[i];

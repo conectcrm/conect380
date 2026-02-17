@@ -1,18 +1,20 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Req } from '@nestjs/common';
+import { Logger, Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { EmpresaId } from '../../../common/decorators/empresa.decorator';
 import { AtendenteService } from '../services/atendente.service';
 import { CriarAtendenteDto, AtualizarAtendenteDto, AtualizarStatusAtendenteDto } from '../dto';
 
 @Controller('atendimento/atendentes')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class AtendentesController {
+  private readonly logger = new Logger(AtendentesController.name);
   constructor(private atendenteService: AtendenteService) {
-    console.log('✅ AtendentesController inicializado');
+    this.logger.log('✅ AtendentesController inicializado');
   }
 
   @Get()
-  async listar(@Req() req) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
+  async listar(@EmpresaId() empresaId: string) {
     const atendentes = await this.atendenteService.listar(empresaId);
 
     return {
@@ -23,8 +25,7 @@ export class AtendentesController {
   }
 
   @Get(':id')
-  async buscarPorId(@Req() req, @Param('id') id: string) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
+  async buscarPorId(@EmpresaId() empresaId: string, @Param('id') id: string) {
     const atendente = await this.atendenteService.buscarPorId(id, empresaId);
 
     return {
@@ -34,9 +35,7 @@ export class AtendentesController {
   }
 
   @Post()
-  async criar(@Req() req, @Body() dto: CriarAtendenteDto) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
-
+  async criar(@EmpresaId() empresaId: string, @Body() dto: CriarAtendenteDto) {
     // ⚡ Service cria User automaticamente se não existir
     const resultado = await this.atendenteService.criar(dto, empresaId);
 
@@ -51,8 +50,11 @@ export class AtendentesController {
   }
 
   @Put(':id')
-  async atualizar(@Req() req, @Param('id') id: string, @Body() dto: AtualizarAtendenteDto) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
+  async atualizar(
+    @EmpresaId() empresaId: string,
+    @Param('id') id: string,
+    @Body() dto: AtualizarAtendenteDto,
+  ) {
     const atendente = await this.atendenteService.atualizar(id, dto, empresaId);
 
     return {
@@ -63,8 +65,7 @@ export class AtendentesController {
   }
 
   @Delete(':id')
-  async deletar(@Req() req, @Param('id') id: string) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
+  async deletar(@EmpresaId() empresaId: string, @Param('id') id: string) {
     await this.atendenteService.deletar(id, empresaId);
 
     return {
@@ -75,11 +76,10 @@ export class AtendentesController {
 
   @Put(':id/status')
   async atualizarStatus(
-    @Req() req,
+    @EmpresaId() empresaId: string,
     @Param('id') id: string,
     @Body() dto: AtualizarStatusAtendenteDto,
   ) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
     const atendente = await this.atendenteService.atualizarStatus(id, dto.status, empresaId);
 
     return {

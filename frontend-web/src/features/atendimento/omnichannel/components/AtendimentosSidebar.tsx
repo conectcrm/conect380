@@ -354,7 +354,7 @@ export const AtendimentosSidebar: React.FC<AtendimentosSidebarProps> = ({
                         );
                       })()}
 
-                      {ticket.status === 'aberto' && (
+                      {ticket.status === 'fila' && (
                         <div className="flex items-center gap-0.5 text-[10px] text-gray-500">
                           <Clock className="w-3 h-3" />
                           <span className="font-mono">{formatarTempo(tempoAtendimento)}</span>

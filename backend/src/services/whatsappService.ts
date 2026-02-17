@@ -1,13 +1,12 @@
 import { Client, LocalAuth, MessageMedia } from 'whatsapp-web.js';
 import QRCode from 'qrcode';
-import fs from 'fs';
-import path from 'path';
+import { Logger } from '@nestjs/common';
 
 export interface WhatsAppStatus {
   isConnected: boolean;
   isAuthenticated: boolean;
   qrCode?: string;
-  clientInfo?: any;
+  clientInfo?: Client['info'];
   lastConnected?: Date;
 }
 
@@ -33,6 +32,7 @@ export interface WhatsAppPropostaData {
 
 class WhatsAppService {
   private client: Client | null = null;
+  private readonly logger = new Logger(WhatsAppService.name);
   private status: WhatsAppStatus = {
     isConnected: false,
     isAuthenticated: false,
@@ -73,7 +73,7 @@ class WhatsAppService {
 
     // QR Code para autenticação
     this.client.on('qr', async (qr) => {
-      console.log('📱 QR Code gerado para WhatsApp');
+      this.logger.log('📱 QR Code gerado para WhatsApp');
 
       try {
         const qrCodeData = await QRCode.toDataURL(qr);
@@ -83,13 +83,13 @@ class WhatsAppService {
         this.qrCodeCallbacks.forEach((callback) => callback(qrCodeData));
         this.notifyStatusChange();
       } catch (error) {
-        console.error('❌ Erro ao gerar QR Code:', error);
+        this.logger.error('❌ Erro ao gerar QR Code', error instanceof Error ? error.stack : null);
       }
     });
 
     // Cliente pronto
     this.client.on('ready', () => {
-      console.log('✅ WhatsApp conectado com sucesso!');
+      this.logger.log('✅ WhatsApp conectado com sucesso!');
       this.status = {
         isConnected: true,
         isAuthenticated: true,
@@ -102,14 +102,14 @@ class WhatsAppService {
 
     // Cliente autenticado
     this.client.on('authenticated', () => {
-      console.log('🔐 WhatsApp autenticado');
+      this.logger.log('🔐 WhatsApp autenticado');
       this.status.isAuthenticated = true;
       this.notifyStatusChange();
     });
 
     // Falha na autenticação
     this.client.on('auth_failure', (msg) => {
-      console.error('❌ Falha na autenticação WhatsApp:', msg);
+      this.logger.error(`❌ Falha na autenticação WhatsApp: ${msg}`);
       this.status = {
         isConnected: false,
         isAuthenticated: false,
@@ -119,7 +119,7 @@ class WhatsAppService {
 
     // Desconectado
     this.client.on('disconnected', (reason) => {
-      console.log('🔌 WhatsApp desconectado:', reason);
+      this.logger.warn(`🔌 WhatsApp desconectado: ${reason}`);
       this.status = {
         isConnected: false,
         isAuthenticated: false,
@@ -129,7 +129,7 @@ class WhatsAppService {
 
     // Mensagem recebida (para logs)
     this.client.on('message', (message) => {
-      console.log('📨 Mensagem recebida:', message.from, message.body);
+      this.logger.debug(`📨 Mensagem recebida: ${message.from} ${message.body}`);
     });
   }
 
@@ -141,9 +141,12 @@ class WhatsAppService {
 
     try {
       await this.client?.initialize();
-      console.log('🚀 Cliente WhatsApp inicializado');
+      this.logger.log('🚀 Cliente WhatsApp inicializado');
     } catch (error) {
-      console.error('❌ Erro ao inicializar WhatsApp:', error);
+      this.logger.error(
+        '❌ Erro ao inicializar WhatsApp',
+        error instanceof Error ? error.stack : null,
+      );
       throw error;
     }
   }
@@ -158,7 +161,7 @@ class WhatsAppService {
         isAuthenticated: false,
       };
       this.notifyStatusChange();
-      console.log('🛑 Cliente WhatsApp parado');
+      this.logger.log('🛑 Cliente WhatsApp parado');
     }
   }
 
@@ -193,10 +196,10 @@ class WhatsAppService {
       const formattedNumber = this.formatPhoneNumber(to);
 
       await this.client.sendMessage(formattedNumber, message);
-      console.log(`✅ Mensagem enviada para ${formattedNumber}`);
+      this.logger.log(`✅ Mensagem enviada para ${formattedNumber}`);
       return true;
     } catch (error) {
-      console.error('❌ Erro ao enviar mensagem:', error);
+      this.logger.error('❌ Erro ao enviar mensagem', error instanceof Error ? error.stack : null);
       throw error;
     }
   }
@@ -225,10 +228,13 @@ class WhatsAppService {
         await this.client.sendMessage(formattedNumber, data.message);
       }
 
-      console.log(`✅ Mensagem com mídia enviada para ${formattedNumber}`);
+      this.logger.log(`✅ Mensagem com mídia enviada para ${formattedNumber}`);
       return true;
     } catch (error) {
-      console.error('❌ Erro ao enviar mensagem com mídia:', error);
+      this.logger.error(
+        '❌ Erro ao enviar mensagem com mídia',
+        error instanceof Error ? error.stack : null,
+      );
       throw error;
     }
   }
@@ -258,14 +264,17 @@ class WhatsAppService {
       const sucesso = await this.sendMessageWithMedia(messageData);
 
       if (sucesso) {
-        console.log(
+        this.logger.log(
           `📋 Proposta ${dadosProposta.propostaNumero} enviada via WhatsApp para ${dadosProposta.clienteNome}`,
         );
       }
 
       return sucesso;
     } catch (error) {
-      console.error('❌ Erro ao enviar proposta via WhatsApp:', error);
+      this.logger.error(
+        '❌ Erro ao enviar proposta via WhatsApp',
+        error instanceof Error ? error.stack : null,
+      );
       throw error;
     }
   }
@@ -310,7 +319,7 @@ _Enviado automaticamente pelo sistema ${dados.empresaNome}_`;
       const numberId = await this.client.getNumberId(formattedNumber);
       return !!numberId;
     } catch (error) {
-      console.error('❌ Erro ao verificar número:', error);
+      this.logger.error('❌ Erro ao verificar número', error instanceof Error ? error.stack : null);
       return false;
     }
   }
@@ -330,12 +339,12 @@ _Enviado automaticamente pelo sistema ${dados.empresaNome}_`;
   }
 
   // Obter informações do cliente conectado
-  getClientInfo(): any {
+  getClientInfo(): Client['info'] | null {
     return this.client?.info || null;
   }
 
   // Obter chats
-  async getChats(): Promise<any[]> {
+  async getChats(): Promise<ReturnType<Client['getChats']>> {
     if (!this.client || !this.status.isConnected) {
       return [];
     }
@@ -344,7 +353,7 @@ _Enviado automaticamente pelo sistema ${dados.empresaNome}_`;
       const chats = await this.client.getChats();
       return chats.slice(0, 10); // Primeiros 10 chats
     } catch (error) {
-      console.error('❌ Erro ao obter chats:', error);
+      this.logger.error('❌ Erro ao obter chats', error instanceof Error ? error.stack : null);
       return [];
     }
   }

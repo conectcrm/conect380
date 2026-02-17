@@ -478,7 +478,7 @@ export default function FaturamentoPage() {
     }
   };
 
-  const handleExecutarBackup = async (config: any) => {
+  const handleExecutarBackup = async (config?: any) => {
     try {
       console.log('Iniciando backup:', config);
       // Integrar com serviço de backup
@@ -489,7 +489,7 @@ export default function FaturamentoPage() {
     }
   };
 
-  const handleRestaurarBackup = async (backupId: string, opcoes: any) => {
+  const handleRestaurarBackup = async (backupId?: string, opcoes?: any) => {
     try {
       console.log('Restaurando backup:', backupId, opcoes);
       // Integrar com serviço de restauração

@@ -1,22 +1,16 @@
 import { Injectable, Logger, HttpException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import axios, { AxiosInstance } from 'axios';
+import { runWithTenant } from '../../../common/tenant/tenant-context';
+import { Empresa } from '../../../empresas/entities/empresa.entity';
 import { RedmineConfig } from '../entities/redmine-config.entity';
-import {
-  RedmineIntegration,
-  StatusSincronizacao,
-} from '../entities/redmine-integration.entity';
-import {
-  Demanda,
-  TipoDemanda,
-  StatusDemanda,
-  PrioridadeDemanda,
-  TipoDemandaEnum,
-  StatusDemandaEnum,
-  PrioridadeDemandaEnum,
-} from '../entities/demanda.entity';
+import { RedmineIntegration, StatusSincronizacao } from '../entities/redmine-integration.entity';
+import { Demanda } from '../entities/demanda.entity';
+
+type TipoDemanda = Demanda['tipo'];
+type StatusDemanda = Demanda['status'];
+type PrioridadeDemanda = Demanda['prioridade'];
 
 interface RedmineIssue {
   id: number;
@@ -47,7 +41,9 @@ export class RedmineService {
     private readonly integrationRepository: Repository<RedmineIntegration>,
     @InjectRepository(Demanda)
     private readonly demandaRepository: Repository<Demanda>,
-  ) { }
+    @InjectRepository(Empresa)
+    private readonly empresaRepository: Repository<Empresa>,
+  ) {}
 
   /**
    * Obter configuração Redmine da empresa
@@ -68,10 +64,7 @@ export class RedmineService {
 
     const config = await this.getConfig(empresaId);
     if (!config) {
-      throw new HttpException(
-        'Redmine não configurado para esta empresa',
-        400,
-      );
+      throw new HttpException('Redmine não configurado para esta empresa', 400);
     }
 
     const client = axios.create({
@@ -97,92 +90,81 @@ export class RedmineService {
   /**
    * Mapear tipo de demanda para tracker ID
    */
-  private mapTipoToTracker(
-    tipo: TipoDemanda,
-    config: RedmineConfig,
-  ): number {
+  private mapTipoToTracker(tipo: TipoDemanda, config: RedmineConfig): number {
     const customMapping = config.mapeamentoTrackers?.[tipo];
     if (customMapping) return customMapping;
 
     // Mapeamento padrão
-    const defaultMapping = {
-      [TipoDemandaEnum.TECNICA]: 1, // Bug
-      [TipoDemandaEnum.SUPORTE]: 3, // Support
-      [TipoDemandaEnum.COMERCIAL]: 2, // Feature
-      [TipoDemandaEnum.FINANCEIRA]: 4, // Task
-      [TipoDemandaEnum.RECLAMACAO]: 3, // Support
-      [TipoDemandaEnum.SOLICITACAO]: 2, // Feature
-      [TipoDemandaEnum.OUTROS]: 4, // Task
+    const defaultMapping: Partial<Record<TipoDemanda, number>> = {
+      tecnica: 1, // Bug
+      suporte: 3, // Support
+      comercial: 2, // Feature
+      financeira: 4, // Task
+      reclamacao: 3, // Support
+      solicitacao: 2, // Feature
+      outros: 4, // Task
     };
 
-    return defaultMapping[tipo] || 4;
+    return defaultMapping[tipo] ?? 4;
   }
 
   /**
    * Mapear status de demanda para status ID Redmine
    */
-  private mapStatusToRedmine(
-    status: StatusDemanda,
-    config: RedmineConfig,
-  ): number {
+  private mapStatusToRedmine(status: StatusDemanda, config: RedmineConfig): number {
     const customMapping = config.mapeamentoStatus?.[status];
     if (customMapping) return customMapping;
 
-    const defaultMapping = {
-      [StatusDemandaEnum.ABERTA]: 1, // New
-      [StatusDemandaEnum.EM_ANDAMENTO]: 2, // In Progress
-      [StatusDemandaEnum.AGUARDANDO]: 4, // Feedback
-      [StatusDemandaEnum.CONCLUIDA]: 5, // Closed
-      [StatusDemandaEnum.CANCELADA]: 6, // Rejected
+    const defaultMapping: Partial<Record<StatusDemanda, number>> = {
+      aberta: 1, // New
+      em_andamento: 2, // In Progress
+      aguardando: 4, // Feedback
+      concluida: 5, // Closed
+      cancelada: 6, // Rejected
     };
 
-    return defaultMapping[status] || 1;
+    return defaultMapping[status] ?? 1;
   }
 
   /**
    * Mapear prioridade de demanda para priority ID Redmine
    */
-  private mapPrioridadeToRedmine(
-    prioridade: PrioridadeDemanda,
-    config: RedmineConfig,
-  ): number {
+  private mapPrioridadeToRedmine(prioridade: PrioridadeDemanda, config: RedmineConfig): number {
     const customMapping = config.mapeamentoPrioridade?.[prioridade];
     if (customMapping) return customMapping;
 
-    const defaultMapping = {
-      [PrioridadeDemandaEnum.BAIXA]: 1, // Low
-      [PrioridadeDemandaEnum.MEDIA]: 2, // Normal
-      [PrioridadeDemandaEnum.ALTA]: 3, // High
-      [PrioridadeDemandaEnum.URGENTE]: 4, // Urgent
+    const defaultMapping: Partial<Record<PrioridadeDemanda, number>> = {
+      baixa: 1, // Low
+      media: 2, // Normal
+      alta: 3, // High
+      urgente: 4, // Urgent
     };
 
-    return defaultMapping[prioridade] || 2;
+    return defaultMapping[prioridade] ?? 2;
   }
 
   /**
    * Mapear status Redmine para status demanda
    */
   private mapRedmineStatusToStatus(statusId: number): StatusDemanda {
-    const mapping = {
-      1: StatusDemandaEnum.ABERTA, // New
-      2: StatusDemandaEnum.EM_ANDAMENTO, // In Progress
-      3: StatusDemandaEnum.EM_ANDAMENTO, // Resolved (ainda não fechado)
-      4: StatusDemandaEnum.AGUARDANDO, // Feedback
-      5: StatusDemandaEnum.CONCLUIDA, // Closed
-      6: StatusDemandaEnum.CANCELADA, // Rejected
+    const mapping: Partial<Record<number, StatusDemanda>> = {
+      1: 'aberta', // New
+      2: 'em_andamento', // In Progress
+      3: 'em_andamento', // Resolved (ainda não fechado)
+      4: 'aguardando', // Feedback
+      5: 'concluida', // Closed
+      6: 'cancelada', // Rejected
     };
 
-    return mapping[statusId] || StatusDemandaEnum.ABERTA;
+    return mapping[statusId] ?? 'aberta';
   }
 
   /**
    * CRIAR issue no Redmine a partir de demanda
    */
-  async criarIssueParaDemanda(
-    demandaId: string,
-  ): Promise<RedmineIntegration> {
+  async criarIssueParaDemanda(demandaId: string, empresaId?: string): Promise<RedmineIntegration> {
     const demanda = await this.demandaRepository.findOne({
-      where: { id: demandaId },
+      where: { id: demandaId, ...(empresaId ? { empresaId } : {}) },
       relations: ['responsavel', 'autor'],
     });
 
@@ -192,7 +174,7 @@ export class RedmineService {
 
     // Verificar se já existe integração
     const existente = await this.integrationRepository.findOne({
-      where: { demandaId },
+      where: { demandaId, ...(empresaId ? { empresaId } : {}) },
     });
 
     if (existente && existente.redmineIssueId > 0) {
@@ -232,17 +214,17 @@ export class RedmineService {
       const response = await client.post('/issues.json', issuePayload);
       const createdIssue: RedmineIssue = response.data.issue;
 
-      this.logger.log(
-        `Issue ${createdIssue.id} criada no Redmine para demanda ${demanda.id}`,
-      );
+      this.logger.log(`Issue ${createdIssue.id} criada no Redmine para demanda ${demanda.id}`);
 
       // Salvar integração
-      const integration = existente || this.integrationRepository.create({
-        demandaId: demanda.id,
-        empresaId: demanda.empresaId,
-        redmineUrl: config.redmineUrl,
-        redmineProjectId: config.redmineProjectId,
-      });
+      const integration =
+        existente ||
+        this.integrationRepository.create({
+          demandaId: demanda.id,
+          empresaId: demanda.empresaId,
+          redmineUrl: config.redmineUrl,
+          redmineProjectId: config.redmineProjectId,
+        });
 
       integration.redmineIssueId = createdIssue.id;
       integration.statusSincronizacao = StatusSincronizacao.SINCRONIZADO;
@@ -258,45 +240,39 @@ export class RedmineService {
 
       return await this.integrationRepository.save(integration);
     } catch (error) {
-      this.logger.error(
-        `Erro ao criar issue no Redmine: ${error.message}`,
-        error.stack,
-      );
+      this.logger.error(`Erro ao criar issue no Redmine: ${error.message}`, error.stack);
 
       // Salvar erro na integração
-      const integration = existente || this.integrationRepository.create({
-        demandaId: demanda.id,
-        empresaId: demanda.empresaId,
-        redmineUrl: config.redmineUrl,
-        redmineIssueId: 0,
-        redmineProjectId: config.redmineProjectId,
-      });
+      const integration =
+        existente ||
+        this.integrationRepository.create({
+          demandaId: demanda.id,
+          empresaId: demanda.empresaId,
+          redmineUrl: config.redmineUrl,
+          redmineIssueId: 0,
+          redmineProjectId: config.redmineProjectId,
+        });
 
       integration.statusSincronizacao = StatusSincronizacao.ERRO;
       integration.erroSincronizacao = error.message;
 
       await this.integrationRepository.save(integration);
 
-      throw new HttpException(
-        `Erro ao criar issue no Redmine: ${error.message}`,
-        500,
-      );
+      throw new HttpException(`Erro ao criar issue no Redmine: ${error.message}`, 500);
     }
   }
 
   /**
    * ATUALIZAR issue no Redmine quando demanda mudar
    */
-  async atualizarIssueRedmine(demandaId: string): Promise<void> {
+  async atualizarIssueRedmine(demandaId: string, empresaId?: string): Promise<void> {
     const integration = await this.integrationRepository.findOne({
-      where: { demandaId },
+      where: { demandaId, ...(empresaId ? { empresaId } : {}) },
       relations: ['demanda'],
     });
 
     if (!integration || !integration.redmineIssueId) {
-      this.logger.warn(
-        `Tentativa de atualizar issue inexistente para demanda ${demandaId}`,
-      );
+      this.logger.warn(`Tentativa de atualizar issue inexistente para demanda ${demandaId}`);
       return;
     }
 
@@ -317,10 +293,7 @@ export class RedmineService {
         },
       };
 
-      await client.put(
-        `/issues/${integration.redmineIssueId}.json`,
-        issuePayload,
-      );
+      await client.put(`/issues/${integration.redmineIssueId}.json`, issuePayload);
 
       integration.statusSincronizacao = StatusSincronizacao.SINCRONIZADO;
       integration.ultimaSincronizacao = new Date();
@@ -328,45 +301,37 @@ export class RedmineService {
 
       await this.integrationRepository.save(integration);
 
-      this.logger.log(
-        `Issue ${integration.redmineIssueId} atualizada no Redmine`,
-      );
+      this.logger.log(`Issue ${integration.redmineIssueId} atualizada no Redmine`);
     } catch (error) {
-      this.logger.error(
-        `Erro ao atualizar issue Redmine: ${error.message}`,
-        error.stack,
-      );
+      this.logger.error(`Erro ao atualizar issue Redmine: ${error.message}`, error.stack);
 
       integration.statusSincronizacao = StatusSincronizacao.ERRO;
       integration.erroSincronizacao = error.message;
       await this.integrationRepository.save(integration);
 
-      throw new HttpException(
-        `Erro ao atualizar issue Redmine: ${error.message}`,
-        500,
-      );
+      throw new HttpException(`Erro ao atualizar issue Redmine: ${error.message}`, 500);
     }
   }
 
   /**
    * SINCRONIZAR status do Redmine para demanda (bidirecional)
-   * Chamado pelo cron job
+   * Obs: agendamento automático removido (build) — chamar via endpoint/job externo.
    */
-  @Cron(CronExpression.EVERY_5_MINUTES)
   async sincronizarDeRedmineCron() {
     this.logger.log('Iniciando sincronização bidirecional com Redmine');
 
-    const configs = await this.configRepository.find({
-      where: { ativo: true, sincronizacaoBidirecional: true },
+    const empresas = await this.empresaRepository.find({
+      where: { ativo: true },
+      select: { id: true } as any,
     });
 
-    for (const config of configs) {
+    for (const empresa of empresas) {
       try {
-        await this.sincronizarDeRedmine(config.empresaId);
+        await runWithTenant(empresa.id, async () => {
+          await this.sincronizarDeRedmine(empresa.id);
+        });
       } catch (error) {
-        this.logger.error(
-          `Erro ao sincronizar empresa ${config.empresaId}: ${error.message}`,
-        );
+        this.logger.error(`Erro ao sincronizar empresa ${empresa.id}: ${error.message}`);
       }
     }
   }
@@ -390,9 +355,7 @@ export class RedmineService {
     for (const integration of integrations) {
       try {
         // Buscar issue no Redmine
-        const response = await client.get(
-          `/issues/${integration.redmineIssueId}.json`,
-        );
+        const response = await client.get(`/issues/${integration.redmineIssueId}.json`);
         const issue: RedmineIssue = response.data.issue;
 
         // Verificar se mudou (comparar updated_on)
@@ -404,10 +367,8 @@ export class RedmineService {
         }
 
         // Verificar se status mudou
-        const statusMudou =
-          integration.metadados?.status_id !== issue.status_id;
-        const prioridadeMudou =
-          integration.metadados?.priority_id !== issue.priority_id;
+        const statusMudou = integration.metadados?.status_id !== issue.status_id;
+        const prioridadeMudou = integration.metadados?.priority_id !== issue.priority_id;
 
         if (!statusMudou && !prioridadeMudou) {
           // Atualizar metadados sem tocar na demanda
@@ -429,7 +390,7 @@ export class RedmineService {
           if (
             issue.closed_on &&
             !demanda.dataConclusao &&
-            novoStatus === StatusDemandaEnum.CONCLUIDA
+            novoStatus === 'concluida'
           ) {
             demanda.dataConclusao = new Date(issue.closed_on);
           }
@@ -485,9 +446,9 @@ export class RedmineService {
   /**
    * Buscar link da issue no Redmine
    */
-  async getLinkIssue(demandaId: string): Promise<string | null> {
+  async getLinkIssue(demandaId: string, empresaId?: string): Promise<string | null> {
     const integration = await this.integrationRepository.findOne({
-      where: { demandaId },
+      where: { demandaId, ...(empresaId ? { empresaId } : {}) },
     });
 
     if (!integration || !integration.redmineIssueId) {
@@ -500,9 +461,9 @@ export class RedmineService {
   /**
    * Buscar integração da demanda
    */
-  async getIntegration(demandaId: string): Promise<RedmineIntegration | null> {
+  async getIntegration(demandaId: string, empresaId?: string): Promise<RedmineIntegration | null> {
     return await this.integrationRepository.findOne({
-      where: { demandaId },
+      where: { demandaId, ...(empresaId ? { empresaId } : {}) },
     });
   }
 
@@ -515,10 +476,7 @@ export class RedmineService {
       await client.get('/projects.json?limit=1');
       return true;
     } catch (error) {
-      this.logger.error(
-        `Erro ao testar conexão Redmine: ${error.message}`,
-        error.stack,
-      );
+      this.logger.error(`Erro ao testar conexão Redmine: ${error.message}`, error.stack);
       return false;
     }
   }

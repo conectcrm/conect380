@@ -14,19 +14,18 @@ import {
   Info,
   CheckCircle,
   XCircle,
-  Filter,
-  MoreVertical,
 } from 'lucide-react';
 
 interface NotificationCenterProps {
   className?: string;
 }
 
+type NotificationFilter = 'all' | 'unread' | 'success' | 'error' | 'warning' | 'info' | 'reminder';
+
 export const NotificationCenter: React.FC<NotificationCenterProps> = ({ className = '' }) => {
   const navigate = useNavigate();
   const {
     notifications,
-    unreadCount,
     markAsRead,
     markAllAsRead,
     removeNotification,
@@ -36,9 +35,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
   } = useNotifications();
 
   const [isOpen, setIsOpen] = useState(false);
-  const [filter, setFilter] = useState<
-    'all' | 'unread' | 'success' | 'error' | 'warning' | 'info' | 'reminder'
-  >('all');
+  const [filter, setFilter] = useState<NotificationFilter>('all');
   const [realUnreadCount, setRealUnreadCount] = useState(0);
 
   // ✅ Usar useRef para persistir o Set entre re-renders (evita duplicadas)
@@ -103,7 +100,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
     const interval = setInterval(fetchNotifications, 30000);
 
     return () => clearInterval(interval);
-  }, [notifications, addNotification]);
+  }, [addNotification]);
 
   const filteredNotifications = notifications.filter((notification) => {
     switch (filter) {
@@ -129,7 +126,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
       case 'warning':
         return <AlertTriangle className="w-5 h-5 text-yellow-500" />;
       case 'info':
-        return <Info className="w-5 h-5 text-blue-500" />;
+        return <Info className="w-5 h-5 text-[#159A9C]" />;
       case 'reminder':
         return <Clock className="w-5 h-5 text-purple-500" />;
       default:
@@ -170,10 +167,14 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
       {/* Botão de Notificações */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+        className="group relative min-h-11 min-w-11 rounded-xl border border-transparent p-1.5 text-gray-600 transition-all duration-200 ease-out hover:border-[#159A9C]/25 hover:bg-[#DEEFE7]/65 hover:text-[#002333] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white active:translate-y-[1px] sm:min-h-0 sm:min-w-0 sm:p-2"
         title="Notificações"
       >
-        {settings.soundEnabled ? <Bell className="w-6 h-6" /> : <BellOff className="w-6 h-6" />}
+        {settings.soundEnabled ? (
+          <Bell className="h-5 w-5 sm:h-6 sm:w-6" />
+        ) : (
+          <BellOff className="h-5 w-5 sm:h-6 sm:w-6" />
+        )}
 
         {/* Badge de notificações não lidas */}
         {realUnreadCount > 0 && (
@@ -185,7 +186,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
 
       {/* Dropdown de Notificações */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-96 bg-white rounded-lg shadow-2xl border border-gray-200 z-50 max-h-[600px] flex flex-col">
+        <div className="absolute right-0 bottom-full z-50 mb-2 flex max-h-[600px] w-[calc(100vw-1rem)] flex-col rounded-2xl border border-[#d4e2e8] bg-white/98 shadow-[0_30px_60px_-40px_rgba(0,35,51,0.7)] backdrop-blur-sm sm:top-full sm:bottom-auto sm:mt-2 sm:mb-0 sm:w-96">
           {/* Header */}
           <div className="p-4 border-b border-gray-200">
             <div className="flex items-center justify-between mb-3">
@@ -194,7 +195,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                 {realUnreadCount > 0 && (
                   <button
                     onClick={markAllAsRead}
-                    className="text-sm text-blue-600 hover:text-blue-800"
+                    className="rounded-md p-1 text-sm text-[#159A9C] transition-colors duration-200 hover:bg-[#DEEFE7]/55 hover:text-[#0F7B7D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35"
                     title="Marcar todas como lidas"
                   >
                     <Check className="w-4 h-4" />
@@ -202,7 +203,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                 )}
                 <button
                   onClick={clearAll}
-                  className="text-sm text-red-600 hover:text-red-800"
+                  className="rounded-md p-1 text-sm text-red-600 transition-colors duration-200 hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
                   title="Limpar todas"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -226,19 +227,29 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                   label: 'Erros',
                   count: notifications.filter((n) => n.type === 'error').length,
                 },
-              ].map(({ key, label, count }) => (
-                <button
-                  key={key}
-                  onClick={() => setFilter(key as any)}
-                  className={`px-3 py-1 text-xs rounded-full transition-colors ${
-                    filter === key
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {label} {count > 0 && `(${count})`}
-                </button>
-              ))}
+              ].map(
+                ({
+                  key,
+                  label,
+                  count,
+                }: {
+                  key: NotificationFilter;
+                  label: string;
+                  count: number;
+                }) => (
+                  <button
+                    key={key}
+                    onClick={() => setFilter(key)}
+                    className={`rounded-full px-3 py-1.5 text-xs transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35 sm:py-1 ${
+                      filter === key
+                        ? 'bg-[#159A9C] text-white shadow-[0_8px_18px_-14px_rgba(0,35,51,0.6)]'
+                        : 'bg-gray-100 text-gray-600 hover:bg-[#DEEFE7]/70 hover:text-[#002333]'
+                    }`}
+                  >
+                    {label} {count > 0 && `(${count})`}
+                  </button>
+                ),
+              )}
             </div>
           </div>
 
@@ -257,7 +268,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                     setIsOpen(false);
                     navigate('/notifications');
                   }}
-                  className="text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                  className="text-sm text-[#159A9C] hover:text-[#0F7B7D] font-medium transition-colors"
                 >
                   Ver histórico completo
                 </button>
@@ -268,7 +279,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                   <div
                     key={notification.id}
                     className={`p-4 hover:bg-gray-50 transition-colors border-l-4 ${
-                      !notification.read ? 'bg-blue-50' : 'bg-white'
+                      !notification.read ? 'bg-[#159A9C]/5' : 'bg-white'
                     } ${getPriorityColor(notification.priority)}`}
                   >
                     <div className="flex items-start space-x-3">
@@ -299,7 +310,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                             {!notification.read && (
                               <button
                                 onClick={() => markAsRead(notification.id)}
-                                className="p-1 text-gray-400 hover:text-blue-600 rounded"
+                                className="rounded p-1.5 text-gray-400 transition-colors duration-200 hover:bg-[#DEEFE7]/55 hover:text-[#159A9C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35 sm:p-1"
                                 title="Marcar como lida"
                               >
                                 <Check className="w-4 h-4" />
@@ -307,7 +318,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                             )}
                             <button
                               onClick={() => removeNotification(notification.id)}
-                              className="p-1 text-gray-400 hover:text-red-600 rounded"
+                              className="rounded p-1.5 text-gray-400 transition-colors duration-200 hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 sm:p-1"
                               title="Remover"
                             >
                               <X className="w-4 h-4" />
@@ -322,7 +333,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                               notification.action!.onClick();
                               setIsOpen(false);
                             }}
-                            className="mt-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                            className="mt-2 text-sm text-[#159A9C] hover:text-[#0F7B7D] font-medium"
                           >
                             {notification.action.label}
                           </button>
@@ -343,7 +354,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                   setIsOpen(false);
                   navigate('/notifications');
                 }}
-                className="text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                className="text-sm text-[#159A9C] hover:text-[#0F7B7D] font-medium transition-colors"
               >
                 Ver todas as notificações
               </button>

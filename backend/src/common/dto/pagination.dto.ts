@@ -1,10 +1,10 @@
 /**
  * Interface padronizada para respostas paginadas
- * 
+ *
  * Uso:
  * async listar(): Promise<PaginatedResponse<Lead>> {
  *   const [data, total] = await this.repository.findAndCount(...);
- *   
+ *
  *   return {
  *     data,
  *     total,
@@ -24,7 +24,7 @@ export interface PaginatedResponse<T> {
 
 /**
  * DTO para parâmetros de paginação
- * 
+ *
  * Uso em controller:
  * @Get()
  * async listar(@Query() params: PaginationDto) {

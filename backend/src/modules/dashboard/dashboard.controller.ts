@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseInterceptors } from '@nestjs/common';
+import { Logger, Controller, Get, Query, UseGuards, UseInterceptors } from '@nestjs/common';
 import {
   DashboardService,
   DashboardKPIs,
@@ -6,11 +6,15 @@ import {
   AlertaInteligente,
 } from './dashboard.service';
 import { CacheInterceptor, CacheTTL } from '../../common/interceptors/cache.interceptor';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../common/guards/empresa.guard';
 
 @Controller('dashboard')
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 @UseInterceptors(CacheInterceptor) // 🚀 Cache ativado para dashboard
 export class DashboardController {
-  constructor(private readonly dashboardService: DashboardService) { }
+  private readonly logger = new Logger(DashboardController.name);
+  constructor(private readonly dashboardService: DashboardService) {}
 
   /**
    * GET /dashboard/kpis
@@ -61,11 +65,15 @@ export class DashboardController {
     // TEMPORÁRIO: Retornar mock data até que as migrations sejam completadas
     const agora = new Date();
     try {
-      const [kpis, vendedoresRanking, alertas] = await Promise.all([
+      const [kpis, vendedoresRanking] = await Promise.all([
         this.dashboardService.getKPIs(periodo, vendedorId, regiao),
         this.dashboardService.getVendedoresRanking(periodo),
-        this.dashboardService.getAlertasInteligentes(),
       ]);
+
+      const alertas = await this.dashboardService.getAlertasInteligentes(periodo, {
+        ranking: vendedoresRanking,
+        kpis,
+      });
 
       return {
         kpis,
@@ -86,7 +94,7 @@ export class DashboardController {
         },
       };
     } catch (error) {
-      console.log('⚠️  Erro no dashboard, retornando mock data:', error.message);
+      this.logger.log('⚠️  Erro no dashboard, retornando mock data:', error.message);
       return {
         kpis: {
           faturamentoTotal: { valor: 0, meta: 100000, variacao: 0, periodo: 'vs mês anterior' },

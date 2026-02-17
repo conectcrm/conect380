@@ -11,27 +11,38 @@ import { StatusTicket } from '../entities/ticket.entity';
  * Cada status tem uma lista de próximos status válidos
  */
 export const TRANSICOES_PERMITIDAS: Record<StatusTicket, StatusTicket[]> = {
-  [StatusTicket.ABERTO]: [
+  [StatusTicket.FILA]: [
     StatusTicket.EM_ATENDIMENTO,
-    StatusTicket.FECHADO, // Pode fechar direto se for spam/duplicado
+    StatusTicket.ENCERRADO,
+    StatusTicket.CANCELADO,
   ],
   [StatusTicket.EM_ATENDIMENTO]: [
-    StatusTicket.AGUARDANDO,
-    StatusTicket.RESOLVIDO,
-    StatusTicket.ABERTO, // Pode voltar para fila se necessário
+    StatusTicket.AGUARDANDO_CLIENTE,
+    StatusTicket.AGUARDANDO_INTERNO,
+    StatusTicket.CONCLUIDO,
+    StatusTicket.ENCERRADO,
+    StatusTicket.FILA,
   ],
-  [StatusTicket.AGUARDANDO]: [
+  [StatusTicket.AGUARDANDO_CLIENTE]: [
     StatusTicket.EM_ATENDIMENTO,
-    StatusTicket.RESOLVIDO,
-    StatusTicket.FECHADO, // Pode fechar se cliente não responder
+    StatusTicket.CONCLUIDO,
+    StatusTicket.ENCERRADO,
+    StatusTicket.CANCELADO,
   ],
-  [StatusTicket.RESOLVIDO]: [
-    StatusTicket.FECHADO,
-    StatusTicket.ABERTO, // Cliente pode reabrir
+  [StatusTicket.AGUARDANDO_INTERNO]: [
+    StatusTicket.EM_ATENDIMENTO,
+    StatusTicket.CONCLUIDO,
+    StatusTicket.ENCERRADO,
+    StatusTicket.CANCELADO,
   ],
-  [StatusTicket.FECHADO]: [
-    StatusTicket.ABERTO, // Reabertura
+  [StatusTicket.ENVIO_ATIVO]: [
+    StatusTicket.EM_ATENDIMENTO,
+    StatusTicket.AGUARDANDO_CLIENTE,
+    StatusTicket.ENCERRADO,
   ],
+  [StatusTicket.CONCLUIDO]: [StatusTicket.ENCERRADO, StatusTicket.FILA],
+  [StatusTicket.ENCERRADO]: [StatusTicket.FILA],
+  [StatusTicket.CANCELADO]: [StatusTicket.FILA],
 };
 
 /**
@@ -96,25 +107,16 @@ export function gerarMensagemErroTransicao(
  * Regras de negócio para cada transição
  */
 export const REGRAS_TRANSICAO: Record<string, string> = {
-  [`${StatusTicket.ABERTO}_${StatusTicket.EM_ATENDIMENTO}`]: 'Ticket assumido pelo atendente',
-
-  [`${StatusTicket.EM_ATENDIMENTO}_${StatusTicket.AGUARDANDO}`]:
-    'Aguardando resposta do cliente ou informações adicionais',
-
-  [`${StatusTicket.EM_ATENDIMENTO}_${StatusTicket.RESOLVIDO}`]:
-    'Problema resolvido, aguardando confirmação do cliente',
-
-  [`${StatusTicket.AGUARDANDO}_${StatusTicket.EM_ATENDIMENTO}`]:
+  [`${StatusTicket.FILA}_${StatusTicket.EM_ATENDIMENTO}`]: 'Ticket assumido pelo atendente',
+  [`${StatusTicket.EM_ATENDIMENTO}_${StatusTicket.AGUARDANDO_CLIENTE}`]:
+    'Aguardando resposta do cliente',
+  [`${StatusTicket.EM_ATENDIMENTO}_${StatusTicket.AGUARDANDO_INTERNO}`]:
+    'Aguardando resposta interna',
+  [`${StatusTicket.EM_ATENDIMENTO}_${StatusTicket.CONCLUIDO}`]: 'Atendimento concluído',
+  [`${StatusTicket.AGUARDANDO_CLIENTE}_${StatusTicket.EM_ATENDIMENTO}`]:
     'Cliente respondeu, retomando atendimento',
-
-  [`${StatusTicket.RESOLVIDO}_${StatusTicket.FECHADO}`]:
-    'Cliente confirmou resolução, arquivando ticket',
-
-  [`${StatusTicket.FECHADO}_${StatusTicket.ABERTO}`]:
-    'Ticket reaberto por nova solicitação do cliente',
-
-  [`${StatusTicket.RESOLVIDO}_${StatusTicket.ABERTO}`]:
-    'Cliente não ficou satisfeito, reabrindo ticket',
+  [`${StatusTicket.CONCLUIDO}_${StatusTicket.ENCERRADO}`]: 'Atendimento encerrado',
+  [`${StatusTicket.ENCERRADO}_${StatusTicket.FILA}`]: 'Ticket reaberto para nova solicitação',
 };
 
 /**

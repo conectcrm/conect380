@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, FindManyOptions, Between } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Oportunidade, EstagioOportunidade } from './oportunidade.entity';
 import { Atividade, TipoAtividade } from './atividade.entity';
 import {
@@ -9,30 +9,76 @@ import {
   UpdateEstagioDto,
 } from './dto/oportunidade.dto';
 import { CreateAtividadeDto } from './dto/atividade.dto';
-import { User } from '../users/user.entity';
 
 @Injectable()
 export class OportunidadesService {
+  private readonly canonicalStageOrder: EstagioOportunidade[] = [
+    EstagioOportunidade.LEADS,
+    EstagioOportunidade.QUALIFICACAO,
+    EstagioOportunidade.PROPOSTA,
+    EstagioOportunidade.NEGOCIACAO,
+    EstagioOportunidade.FECHAMENTO,
+    EstagioOportunidade.GANHO,
+    EstagioOportunidade.PERDIDO,
+  ];
+
   constructor(
     @InjectRepository(Oportunidade)
     private oportunidadeRepository: Repository<Oportunidade>,
     @InjectRepository(Atividade)
     private atividadeRepository: Repository<Atividade>,
-  ) { }
+  ) {}
 
-  async create(createOportunidadeDto: CreateOportunidadeDto, empresaId: string): Promise<Oportunidade> {
+  private toDatabaseEstagio(
+    estagio?: EstagioOportunidade | string,
+  ): EstagioOportunidade {
+    if (estagio && Object.values(EstagioOportunidade).includes(estagio as EstagioOportunidade)) {
+      return estagio as EstagioOportunidade;
+    }
+
+    return EstagioOportunidade.LEADS;
+  }
+
+  private fromDatabaseEstagio(estagio?: string | EstagioOportunidade): EstagioOportunidade {
+    if (estagio && Object.values(EstagioOportunidade).includes(estagio as EstagioOportunidade)) {
+      return estagio as EstagioOportunidade;
+    }
+
+    return EstagioOportunidade.LEADS;
+  }
+
+  private normalizeOportunidade(oportunidade: Oportunidade): Oportunidade {
+    oportunidade.estagio = this.fromDatabaseEstagio(oportunidade.estagio);
+    return oportunidade;
+  }
+
+  async create(
+    createOportunidadeDto: CreateOportunidadeDto,
+    empresaId: string,
+  ): Promise<Oportunidade> {
     const oportunidade = this.oportunidadeRepository.create({
-      ...createOportunidadeDto,
-      empresa_id: empresaId,  // ✅ ADICIONADO - Associar à empresa do token JWT
+      titulo: createOportunidadeDto.titulo,
+      descricao: createOportunidadeDto.descricao,
+      valor: createOportunidadeDto.valor,
+      probabilidade: createOportunidadeDto.probabilidade,
+      estagio: this.toDatabaseEstagio(createOportunidadeDto.estagio),
+      prioridade: createOportunidadeDto.prioridade,
+      origem: createOportunidadeDto.origem,
+      tags: createOportunidadeDto.tags?.length ? createOportunidadeDto.tags : null,
+      empresa_id: empresaId,
+      responsavel_id: createOportunidadeDto.responsavel_id,
+      cliente_id: createOportunidadeDto.cliente_id ?? null,
+      nomeContato: createOportunidadeDto.nomeContato,
+      emailContato: createOportunidadeDto.emailContato,
+      telefoneContato: createOportunidadeDto.telefoneContato,
+      empresaContato: createOportunidadeDto.empresaContato,
       dataFechamentoEsperado: createOportunidadeDto.dataFechamentoEsperado
         ? new Date(createOportunidadeDto.dataFechamentoEsperado)
         : null,
     });
 
-    const savedOportunidade =
-      await this.oportunidadeRepository.save(oportunidade);
+    const savedOportunidade = await this.oportunidadeRepository.save(oportunidade);
 
-    // Criar atividade de criação da oportunidade (não bloquear o fluxo)
     this.createAtividade(
       {
         tipo: TipoAtividade.NOTA,
@@ -43,9 +89,9 @@ export class OportunidadesService {
         userId: savedOportunidade.responsavel_id,
         empresaId,
       },
-    ).catch((err) => console.log('Erro ao criar atividade:', err));
+    ).catch(() => undefined);
 
-    return savedOportunidade;
+    return this.normalizeOportunidade(savedOportunidade);
   }
 
   async findAll(
@@ -61,15 +107,15 @@ export class OportunidadesService {
     const queryBuilder = this.oportunidadeRepository
       .createQueryBuilder('oportunidade')
       .leftJoinAndSelect('oportunidade.responsavel', 'responsavel')
-      .leftJoinAndSelect('oportunidade.cliente', 'cliente')
       .leftJoinAndSelect('oportunidade.atividades', 'atividades')
       .leftJoinAndSelect('atividades.criadoPor', 'atividadeCriadoPor')
       .where('oportunidade.empresa_id = :empresaId', { empresaId })
       .orderBy('oportunidade.updatedAt', 'DESC');
 
-    // Filtros
     if (filters?.estagio) {
-      queryBuilder.andWhere('oportunidade.estagio = :estagio', { estagio: filters.estagio });
+      queryBuilder.andWhere('oportunidade.estagio = :estagio', {
+        estagio: this.toDatabaseEstagio(filters.estagio),
+      });
     }
 
     if (filters?.responsavel_id) {
@@ -91,14 +137,14 @@ export class OportunidadesService {
       });
     }
 
-    return queryBuilder.getMany();
+    const oportunidades = await queryBuilder.getMany();
+    return oportunidades.map((item) => this.normalizeOportunidade(item));
   }
 
   async findOne(id: number, empresaId?: string): Promise<Oportunidade> {
     const queryBuilder = this.oportunidadeRepository
       .createQueryBuilder('oportunidade')
       .leftJoinAndSelect('oportunidade.responsavel', 'responsavel')
-      .leftJoinAndSelect('oportunidade.cliente', 'cliente')
       .leftJoinAndSelect('oportunidade.atividades', 'atividades')
       .leftJoinAndSelect('atividades.criadoPor', 'atividadeCriadoPor')
       .where('oportunidade.id = :id', { id });
@@ -112,10 +158,10 @@ export class OportunidadesService {
     const oportunidade = await queryBuilder.getOne();
 
     if (!oportunidade) {
-      throw new NotFoundException('Oportunidade não encontrada');
+      throw new NotFoundException('Oportunidade nao encontrada');
     }
 
-    return oportunidade;
+    return this.normalizeOportunidade(oportunidade);
   }
 
   async update(
@@ -124,22 +170,79 @@ export class OportunidadesService {
     empresaId: string,
   ): Promise<Oportunidade> {
     const oportunidade = await this.findOne(id, empresaId);
+    const estagioAnterior = oportunidade.estagio;
 
-    const estadoAnterior = { ...oportunidade };
+    const updateData: Partial<Oportunidade> = {};
 
-    await this.oportunidadeRepository.update(id, {
-      ...updateOportunidadeDto,
-      dataFechamentoEsperado: updateOportunidadeDto.dataFechamentoEsperado
+    if (updateOportunidadeDto.titulo !== undefined) {
+      updateData.titulo = updateOportunidadeDto.titulo;
+    }
+
+    if (updateOportunidadeDto.descricao !== undefined) {
+      updateData.descricao = updateOportunidadeDto.descricao;
+    }
+
+    if (updateOportunidadeDto.valor !== undefined) {
+      updateData.valor = updateOportunidadeDto.valor;
+    }
+
+    if (updateOportunidadeDto.probabilidade !== undefined) {
+      updateData.probabilidade = updateOportunidadeDto.probabilidade;
+    }
+
+    if (updateOportunidadeDto.estagio !== undefined) {
+      updateData.estagio = this.toDatabaseEstagio(updateOportunidadeDto.estagio);
+    }
+
+    if (updateOportunidadeDto.prioridade !== undefined) {
+      updateData.prioridade = updateOportunidadeDto.prioridade;
+    }
+
+    if (updateOportunidadeDto.origem !== undefined) {
+      updateData.origem = updateOportunidadeDto.origem;
+    }
+
+    if (updateOportunidadeDto.tags !== undefined) {
+      updateData.tags = updateOportunidadeDto.tags?.length ? updateOportunidadeDto.tags : null;
+    }
+
+    if (updateOportunidadeDto.responsavel_id !== undefined) {
+      updateData.responsavel_id = updateOportunidadeDto.responsavel_id;
+    }
+
+    if (updateOportunidadeDto.cliente_id !== undefined) {
+      updateData.cliente_id = updateOportunidadeDto.cliente_id ?? null;
+    }
+
+    if (updateOportunidadeDto.nomeContato !== undefined) {
+      updateData.nomeContato = updateOportunidadeDto.nomeContato;
+    }
+
+    if (updateOportunidadeDto.emailContato !== undefined) {
+      updateData.emailContato = updateOportunidadeDto.emailContato;
+    }
+
+    if (updateOportunidadeDto.telefoneContato !== undefined) {
+      updateData.telefoneContato = updateOportunidadeDto.telefoneContato;
+    }
+
+    if (updateOportunidadeDto.empresaContato !== undefined) {
+      updateData.empresaContato = updateOportunidadeDto.empresaContato;
+    }
+
+    if (updateOportunidadeDto.dataFechamentoEsperado !== undefined) {
+      updateData.dataFechamentoEsperado = updateOportunidadeDto.dataFechamentoEsperado
         ? new Date(updateOportunidadeDto.dataFechamentoEsperado)
-        : undefined,
-    });
+        : null;
+    }
 
-    // Registrar mudanças importantes
-    if (updateOportunidadeDto.estagio && updateOportunidadeDto.estagio !== estadoAnterior.estagio) {
+    await this.oportunidadeRepository.update(id, updateData);
+
+    if (updateOportunidadeDto.estagio && updateOportunidadeDto.estagio !== estagioAnterior) {
       await this.createAtividade(
         {
           tipo: TipoAtividade.NOTA,
-          descricao: `Estágio alterado de "${estadoAnterior.estagio}" para "${updateOportunidadeDto.estagio}"`,
+          descricao: `Estagio alterado de "${estagioAnterior}" para "${updateOportunidadeDto.estagio}"`,
           oportunidade_id: id,
         },
         {
@@ -149,7 +252,7 @@ export class OportunidadesService {
       );
     }
 
-    return this.findOne(id);
+    return this.findOne(id, empresaId);
   }
 
   async updateEstagio(
@@ -159,29 +262,16 @@ export class OportunidadesService {
   ): Promise<Oportunidade> {
     const oportunidade = await this.findOne(id, empresaId);
 
-    const updateData: Partial<Oportunidade> = {
-      estagio: updateEstagioDto.estagio,
-    };
+    await this.oportunidadeRepository.update(id, {
+      estagio: this.toDatabaseEstagio(updateEstagioDto.estagio),
+    });
 
-    // Se for fechamento (ganho ou perdido), registrar data
-    if (
-      updateEstagioDto.estagio === EstagioOportunidade.GANHO ||
-      updateEstagioDto.estagio === EstagioOportunidade.PERDIDO
-    ) {
-      updateData.dataFechamentoReal = updateEstagioDto.dataFechamentoReal
-        ? new Date(updateEstagioDto.dataFechamentoReal)
-        : new Date();
-    }
-
-    await this.oportunidadeRepository.update(id, updateData);
-
-    // Registrar atividade de mudança de estágio
     const descricao =
       updateEstagioDto.estagio === EstagioOportunidade.GANHO
-        ? 'Oportunidade GANHA! 🎉'
+        ? 'Oportunidade GANHA'
         : updateEstagioDto.estagio === EstagioOportunidade.PERDIDO
           ? 'Oportunidade perdida'
-          : `Movido para estágio: ${updateEstagioDto.estagio}`;
+          : `Movido para estagio: ${updateEstagioDto.estagio}`;
 
     await this.createAtividade(
       {
@@ -195,12 +285,11 @@ export class OportunidadesService {
       },
     );
 
-    return this.findOne(id);
+    return this.findOne(id, empresaId);
   }
 
   async remove(id: number, empresaId: string): Promise<void> {
     const oportunidade = await this.findOne(id, empresaId);
-
     await this.oportunidadeRepository.remove(oportunidade);
   }
 
@@ -216,11 +305,13 @@ export class OportunidadesService {
     });
 
     if (!oportunidade) {
-      throw new NotFoundException('Oportunidade não encontrada para esta empresa');
+      throw new NotFoundException('Oportunidade nao encontrada para esta empresa');
     }
 
     const atividade = this.atividadeRepository.create({
-      ...createAtividadeDto,
+      tipo: createAtividadeDto.tipo,
+      descricao: createAtividadeDto.descricao,
+      oportunidade_id: oportunidade.id,
       empresa_id: context.empresaId,
       criado_por_id: context.userId ?? oportunidade.responsavel_id,
       dataAtividade: createAtividadeDto.dataAtividade
@@ -228,11 +319,10 @@ export class OportunidadesService {
         : new Date(),
     });
 
-    return await this.atividadeRepository.save(atividade);
+    return this.atividadeRepository.save(atividade);
   }
 
   async listarAtividades(oportunidadeId: number, empresaId: string): Promise<Atividade[]> {
-    // Verificar se a oportunidade pertence à empresa
     const oportunidade = await this.oportunidadeRepository.findOne({
       where: {
         id: oportunidadeId,
@@ -241,11 +331,10 @@ export class OportunidadesService {
     });
 
     if (!oportunidade) {
-      throw new NotFoundException('Oportunidade não encontrada para esta empresa');
+      throw new NotFoundException('Oportunidade nao encontrada para esta empresa');
     }
 
-    // Buscar atividades com informações do criador
-    const atividades = await this.atividadeRepository.find({
+    return this.atividadeRepository.find({
       where: {
         oportunidade_id: oportunidadeId,
         empresa_id: empresaId,
@@ -255,8 +344,6 @@ export class OportunidadesService {
         dataAtividade: 'DESC',
       },
     });
-
-    return atividades;
   }
 
   async getMetricas(empresaId: string, filtros?: { dataInicio?: string; dataFim?: string }) {
@@ -264,18 +351,16 @@ export class OportunidadesService {
       .createQueryBuilder('oportunidade')
       .where('oportunidade.empresa_id = :empresaId', { empresaId });
 
-    // Filtros de data
     if (filtros?.dataInicio && filtros?.dataFim) {
-      queryBuilder = queryBuilder.andWhere(
-        'oportunidade.createdAt BETWEEN :dataInicio AND :dataFim',
-        {
-          dataInicio: filtros.dataInicio,
-          dataFim: filtros.dataFim,
-        },
-      );
+      queryBuilder = queryBuilder.andWhere('oportunidade.createdAt BETWEEN :dataInicio AND :dataFim', {
+        dataInicio: filtros.dataInicio,
+        dataFim: filtros.dataFim,
+      });
     }
 
-    const todasOportunidades = await queryBuilder.getMany();
+    const todasOportunidades = (await queryBuilder.getMany()).map((opp) =>
+      this.normalizeOportunidade(opp),
+    );
 
     const totalOportunidades = todasOportunidades.length;
     const valorTotalPipeline = todasOportunidades.reduce((sum, opp) => sum + Number(opp.valor), 0);
@@ -292,9 +377,8 @@ export class OportunidadesService {
 
     const valorMedio = totalOportunidades > 0 ? valorTotalPipeline / totalOportunidades : 0;
 
-    // Distribuição por estágio
     const distribuicaoPorEstagio = {};
-    Object.values(EstagioOportunidade).forEach((estagio) => {
+    this.canonicalStageOrder.forEach((estagio) => {
       const oportunidadesEstagio = todasOportunidades.filter((opp) => opp.estagio === estagio);
       distribuicaoPorEstagio[estagio] = {
         quantidade: oportunidadesEstagio.length,
@@ -316,7 +400,7 @@ export class OportunidadesService {
     const oportunidades = await this.findAll(empresaId);
 
     const pipeline = {};
-    Object.values(EstagioOportunidade).forEach((estagio) => {
+    this.canonicalStageOrder.forEach((estagio) => {
       pipeline[estagio] = {
         id: estagio,
         title: this.getEstagioLabel(estagio),
@@ -327,16 +411,16 @@ export class OportunidadesService {
 
     return {
       stages: pipeline,
-      stageOrder: Object.values(EstagioOportunidade),
+      stageOrder: this.canonicalStageOrder,
     };
   }
 
   private getEstagioLabel(estagio: EstagioOportunidade): string {
     const labels = {
       [EstagioOportunidade.LEADS]: 'Leads',
-      [EstagioOportunidade.QUALIFICACAO]: 'Qualificação',
+      [EstagioOportunidade.QUALIFICACAO]: 'Qualificacao',
       [EstagioOportunidade.PROPOSTA]: 'Proposta',
-      [EstagioOportunidade.NEGOCIACAO]: 'Negociação',
+      [EstagioOportunidade.NEGOCIACAO]: 'Negociacao',
       [EstagioOportunidade.FECHAMENTO]: 'Fechamento',
       [EstagioOportunidade.GANHO]: 'Ganho',
       [EstagioOportunidade.PERDIDO]: 'Perdido',

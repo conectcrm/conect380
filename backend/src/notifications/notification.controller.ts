@@ -13,11 +13,12 @@ import {
 import { JwtAuthGuard } from '../modules/auth/jwt-auth.guard';
 import { NotificationService } from './notification.service';
 import { NotificationResponseDto } from './dto/notification.dto';
+import { EmpresaGuard } from '../common/guards/empresa.guard';
 
 @Controller('notifications')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class NotificationController {
-  constructor(private readonly notificationService: NotificationService) { }
+  constructor(private readonly notificationService: NotificationService) {}
 
   /**
    * GET /notifications
@@ -31,10 +32,7 @@ export class NotificationController {
     const userId = req.user.id;
     const unreadOnly = onlyUnread === 'true';
 
-    const notifications = await this.notificationService.findByUser(
-      userId,
-      unreadOnly,
-    );
+    const notifications = await this.notificationService.findByUser(userId, unreadOnly);
 
     return notifications.map((n) => ({
       id: n.id,
@@ -72,10 +70,7 @@ export class NotificationController {
   ): Promise<NotificationResponseDto> {
     const userId = req.user.id; // ✅ CORRIGIDO: era req.user.userId (undefined)
 
-    const notification = await this.notificationService.markAsRead(
-      notificationId,
-      userId,
-    );
+    const notification = await this.notificationService.markAsRead(notificationId, userId);
 
     return {
       id: notification.id,
@@ -108,10 +103,7 @@ export class NotificationController {
    */
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async delete(
-    @Param('id') notificationId: string,
-    @Request() req,
-  ): Promise<void> {
+  async delete(@Param('id') notificationId: string, @Request() req): Promise<void> {
     const userId = req.user.id; // ✅ CORRIGIDO: era req.user.userId (undefined)
     await this.notificationService.delete(notificationId, userId);
   }

@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { QueryFailedError, Repository } from 'typeorm';
+import { FindOptionsWhere, QueryFailedError, Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User, UserRole } from './user.entity';
 import { Empresa } from '../../empresas/entities/empresa.entity';
@@ -12,29 +12,155 @@ export class UsersService {
     private userRepository: Repository<User>,
     @InjectRepository(Empresa)
     private empresaRepository: Repository<Empresa>,
-  ) { }
+  ) {}
+
+  private mapRawUser(raw: any): User {
+    const permissoes =
+      raw.permissoes && typeof raw.permissoes === 'string'
+        ? raw.permissoes.split(',').filter(Boolean)
+        : raw.permissoes ?? null;
+
+    const empresa =
+      raw.empresa_rel_id && raw.empresa_nome && raw.empresa_slug
+        ? ({
+            id: raw.empresa_rel_id,
+            nome: raw.empresa_nome,
+            slug: raw.empresa_slug,
+            cnpj: raw.empresa_cnpj ?? null,
+            plano: raw.empresa_plano ?? null,
+            ativo: raw.empresa_ativo ?? null,
+            subdominio: raw.empresa_subdominio ?? null,
+          } as Empresa)
+        : undefined;
+
+    return this.userRepository.create({
+      id: raw.id,
+      nome: raw.nome,
+      email: raw.email,
+      senha: raw.senha,
+      telefone: raw.telefone,
+      role: raw.role,
+      permissoes,
+      empresa_id: raw.empresa_id,
+      avatar_url: raw.avatar_url,
+      idioma_preferido: raw.idioma_preferido,
+      configuracoes: raw.configuracoes,
+      ativo: raw.ativo,
+      deve_trocar_senha: raw.deve_trocar_senha,
+      status_atendente: raw.status_atendente,
+      capacidade_maxima: raw.capacidade_maxima,
+      tickets_ativos: raw.tickets_ativos,
+      ultimo_login: raw.ultimo_login,
+      created_at: raw.created_at,
+      updated_at: raw.updated_at,
+      empresa,
+    } as Partial<User>);
+  }
 
   async findByEmail(email: string): Promise<User | undefined> {
-    return this.userRepository.findOne({
-      where: { email },
-      relations: ['empresa'],
-    });
+    const rows: any[] = await this.userRepository.query(
+      `
+        SELECT
+          u.id,
+          u.nome,
+          u.email,
+          u.senha,
+          u.telefone,
+          u.role,
+          u.permissoes,
+          u.empresa_id,
+          u.avatar_url,
+          u.idioma_preferido,
+          u.configuracoes,
+          u.ativo,
+          u.deve_trocar_senha,
+          u.status_atendente,
+          u.capacidade_maxima,
+          u.tickets_ativos,
+          u.ultimo_login,
+          u.created_at,
+          u.updated_at,
+          e.id AS empresa_rel_id,
+          e.nome AS empresa_nome,
+          e.slug AS empresa_slug,
+          e.cnpj AS empresa_cnpj,
+          e.plano AS empresa_plano,
+          e.ativo AS empresa_ativo,
+          e.subdominio AS empresa_subdominio
+        FROM users u
+        LEFT JOIN empresas e ON e.id = u.empresa_id
+        WHERE u.email = $1
+        LIMIT 1
+      `,
+      [email],
+    );
+
+    const raw = rows?.[0];
+    if (!raw) {
+      return undefined;
+    }
+
+    return this.mapRawUser(raw);
   }
 
   async findById(id: string): Promise<User | undefined> {
-    return this.userRepository.findOne({
-      where: { id },
-      relations: ['empresa'],
-    });
+    const rows: any[] = await this.userRepository.query(
+      `
+        SELECT
+          u.id,
+          u.nome,
+          u.email,
+          u.senha,
+          u.telefone,
+          u.role,
+          u.permissoes,
+          u.empresa_id,
+          u.avatar_url,
+          u.idioma_preferido,
+          u.configuracoes,
+          u.ativo,
+          u.deve_trocar_senha,
+          u.status_atendente,
+          u.capacidade_maxima,
+          u.tickets_ativos,
+          u.ultimo_login,
+          u.created_at,
+          u.updated_at,
+          e.id AS empresa_rel_id,
+          e.nome AS empresa_nome,
+          e.slug AS empresa_slug,
+          e.cnpj AS empresa_cnpj,
+          e.plano AS empresa_plano,
+          e.ativo AS empresa_ativo,
+          e.subdominio AS empresa_subdominio
+        FROM users u
+        LEFT JOIN empresas e ON e.id = u.empresa_id
+        WHERE u.id = $1
+        LIMIT 1
+      `,
+      [id],
+    );
+
+    const raw = rows?.[0];
+    if (!raw) {
+      return undefined;
+    }
+
+    return this.mapRawUser(raw);
   }
 
   /**
    * Busca usuário por ID (inclui senha - para validação de senha antiga)
    * Diferente de findById que NÃO retorna senha
    */
-  async findOne(id: string): Promise<User | undefined> {
+  async findOne(id: string, empresaId?: string): Promise<User | undefined> {
+    const where: FindOptionsWhere<User> = { id };
+    if (empresaId) {
+      where.empresa_id = empresaId;
+    }
+
     return this.userRepository.findOne({
-      where: { id },
+      where,
       select: [
         'id',
         'nome',

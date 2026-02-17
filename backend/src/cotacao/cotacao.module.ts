@@ -19,4 +19,4 @@ import { NotificationModule } from '../notifications/notification.module';
   providers: [CotacaoService, CotacaoEmailService],
   exports: [CotacaoService],
 })
-export class CotacaoModule { }
+export class CotacaoModule {}

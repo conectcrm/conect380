@@ -1,4 +1,4 @@
-import { INestApplication } from '@nestjs/common';
+﻿import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import * as request from 'supertest';
 import { AdminEmpresasController } from '../../src/modules/admin/controllers/admin-empresas.controller';
@@ -7,20 +7,19 @@ import { RolesGuard } from '../../src/common/guards/roles.guard';
 import { JwtAuthGuard } from '../../src/modules/auth/jwt-auth.guard';
 
 const mockAdminService = {
-  listarTodas: jest.fn().mockResolvedValue({ data: [], meta: { total: 0, page: 1, limit: 20, totalPages: 0 } }),
+  listarTodas: jest
+    .fn()
+    .mockResolvedValue({ data: [], meta: { total: 0, page: 1, limit: 20, totalPages: 0 } }),
   buscarPorId: jest.fn(),
 };
 
-describe('AdminEmpresasController – Guards (E2E)', () => {
+describe('AdminEmpresasController - Guards (E2E)', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [AdminEmpresasController],
-      providers: [
-        { provide: AdminEmpresasService, useValue: mockAdminService },
-        RolesGuard,
-      ],
+      providers: [{ provide: AdminEmpresasService, useValue: mockAdminService }, RolesGuard],
     })
       .overrideGuard(JwtAuthGuard)
       .useValue({
@@ -28,7 +27,7 @@ describe('AdminEmpresasController – Guards (E2E)', () => {
           const req = context.switchToHttp().getRequest();
           const role = req.headers['x-test-role'];
           if (role) {
-            req.user = { role };
+            req.user = { role, roles: [role] };
           }
           return true;
         },
@@ -43,23 +42,18 @@ describe('AdminEmpresasController – Guards (E2E)', () => {
     await app.close();
   });
 
-  it('permite acesso quando cabeçalho indica superadmin', async () => {
-    await request(app.getHttpServer())
-      .get('/admin/empresas')
-      .set('x-test-role', 'superadmin')
-      .expect(200);
+  it('permite acesso quando role e admin', async () => {
+    await request(app.getHttpServer()).get('/admin/empresas').set('x-test-role', 'admin').expect(200);
   });
 
-  it('nega acesso quando usuário não possui role', async () => {
-    await request(app.getHttpServer())
-      .get('/admin/empresas')
-      .expect(403);
+  it('nega acesso quando usuario nao possui role', async () => {
+    await request(app.getHttpServer()).get('/admin/empresas').expect(403);
   });
 
-  it('nega acesso quando role não é superadmin', async () => {
+  it('nega acesso quando role nao e admin', async () => {
     await request(app.getHttpServer())
       .get('/admin/empresas')
-      .set('x-test-role', 'admin')
+      .set('x-test-role', 'manager')
       .expect(403);
   });
 });

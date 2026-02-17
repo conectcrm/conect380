@@ -59,7 +59,7 @@ export class CreateAgendaEventoDto {
   interacao_id?: string;
 }
 
-export class UpdateAgendaEventoDto extends PartialType(CreateAgendaEventoDto) { }
+export class UpdateAgendaEventoDto extends PartialType(CreateAgendaEventoDto) {}
 
 export class AgendaEventoFiltroDto extends PaginationDto {
   @IsEnum(AgendaStatus)
@@ -86,4 +86,3 @@ export class AgendaEventoFiltroDto extends PaginationDto {
   @IsOptional()
   interacao_id?: string;
 }
-

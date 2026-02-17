@@ -47,9 +47,11 @@ export class CreateEventoDto {
   @IsUUID()
   clienteId?: string;
 
+  @IsOptional()
   @IsUUID()
   usuarioId: string;
 
+  @IsOptional()
   @IsUUID()
   empresaId: string;
 }

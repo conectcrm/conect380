@@ -3,7 +3,6 @@ import { useI18n } from '../../contexts/I18nContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { KPICard } from '../../components/common/KPICard';
 import { ResponsiveFilters } from '../../components/common/ResponsiveFilters';
-import ColorPaletteSelector from '../../components/common/ColorPaletteSelector';
 import { useDashboard } from '../../hooks/useDashboard';
 import {
   VendasChart,
@@ -45,8 +44,6 @@ const DashboardPage: React.FC = () => {
     vendedor: 'Todos',
     regiao: 'Todas',
   });
-
-  const [showPaletteSelector, setShowPaletteSelector] = useState(false);
 
   // Hook para dados reais do dashboard
   const { data, loading, error, refresh, updateFilters } = useDashboard({
@@ -102,12 +99,6 @@ const DashboardPage: React.FC = () => {
             >
               Tentar novamente
             </button>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
-            >
-              Recarregar página
-            </button>
           </div>
         </div>
       </div>
@@ -150,7 +141,14 @@ const DashboardPage: React.FC = () => {
       </div>
 
       {/* Filtros */}
-      <ResponsiveFilters filtros={filtros} setFiltros={handleFiltroChange} />
+      <ResponsiveFilters
+        filtros={filtros}
+        onChange={handleFiltroChange}
+        periodOptions={[]}
+        vendedorOptions={[]}
+        regiaoOptions={[]}
+        loading={loading}
+      />
 
       {/* Alertas Inteligentes */}
       {data.alertas && data.alertas.length > 0 && (
@@ -164,7 +162,7 @@ const DashboardPage: React.FC = () => {
                   ${alerta.severidade === 'critica' ? 'bg-red-50 border-red-500' : ''}
                   ${alerta.severidade === 'alta' ? 'bg-orange-50 border-orange-500' : ''}
                   ${alerta.severidade === 'media' ? 'bg-yellow-50 border-yellow-500' : ''}
-                  ${alerta.severidade === 'baixa' ? 'bg-blue-50 border-blue-500' : ''}
+                  ${alerta.severidade === 'baixa' ? 'bg-gray-50 border-gray-400' : ''}
                   ${alerta.tipo === 'conquista' ? 'bg-green-50 border-green-500' : ''}
                 `}
                 style={{ backgroundColor: currentPalette.colors.backgroundSecondary }}
@@ -181,7 +179,7 @@ const DashboardPage: React.FC = () => {
                   {alerta.acao && (
                     <button
                       onClick={() => (window.location.href = alerta.acao!.url)}
-                      className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition-colors"
+                      className="px-3 py-1 bg-[#159A9C] text-white rounded text-sm hover:bg-[#0F7B7D] transition-colors"
                     >
                       {alerta.acao.texto}
                     </button>
@@ -561,7 +559,7 @@ const DashboardPage: React.FC = () => {
                         {vendedor.badges.slice(0, 2).map((badge, index) => (
                           <div
                             key={index}
-                            className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
+                            className="px-2 py-1 bg-[#159A9C]/10 text-[#159A9C] text-xs rounded-full"
                           >
                             {badge === 'top_performer' && '🔥'}
                             {badge === 'goal_crusher' && '🎯'}
@@ -575,24 +573,6 @@ const DashboardPage: React.FC = () => {
                 </div>
               ))}
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Seletor de Paleta de Cores */}
-      {showPaletteSelector && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Escolher Tema</h3>
-              <button
-                onClick={() => setShowPaletteSelector(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ✕
-              </button>
-            </div>
-            <ColorPaletteSelector />
           </div>
         </div>
       )}

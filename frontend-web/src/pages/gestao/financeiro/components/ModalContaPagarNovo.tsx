@@ -1,3 +1,3 @@
-import ModalContaPagarNovo from '../../../features/financeiro/components/ModalContaPagarNovo';
+import ModalContaPagarNovo from '../../../../features/financeiro/components/ModalContaPagarNovo';
 
 export default ModalContaPagarNovo;

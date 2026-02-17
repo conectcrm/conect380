@@ -81,12 +81,15 @@ export class OrquestradorService {
   /**
    * Processa um fluxo específico manualmente
    */
-  async processarFluxo(processarDto: ProcessarFluxoDto): Promise<FluxoAutomatizado> {
+  async processarFluxo(
+    processarDto: ProcessarFluxoDto,
+    tenantId?: string,
+  ): Promise<FluxoAutomatizado> {
     const { fluxoId, forcarProcessamento, parametrosCustomizados } = processarDto;
 
     try {
       const fluxo = await this.fluxoRepository.findOne({
-        where: { id: fluxoId },
+        where: tenantId ? { id: fluxoId, tenantId } : { id: fluxoId },
       });
 
       if (!fluxo) {
@@ -111,7 +114,7 @@ export class OrquestradorService {
   /**
    * Processa fluxos pendentes manualmente (pode ser chamado por job externo)
    */
-  async processarFluxosPendentes(): Promise<void> {
+  async processarFluxosPendentes(tenantId?: string): Promise<void> {
     try {
       this.logger.log('Iniciando processamento automático de fluxos pendentes');
 
@@ -125,6 +128,7 @@ export class OrquestradorService {
             StatusFluxo.FATURA_GERADA,
           ]),
           dataProximaAcao: LessThan(new Date()),
+          ...(tenantId ? { tenantId } : {}),
         },
         take: 10, // Processar no máximo 10 por vez
       });
@@ -408,9 +412,9 @@ export class OrquestradorService {
     };
   }
 
-  async buscarPorId(id: string): Promise<FluxoAutomatizado> {
+  async buscarPorId(id: string, tenantId?: string): Promise<FluxoAutomatizado> {
     const fluxo = await this.fluxoRepository.findOne({
-      where: { id },
+      where: tenantId ? { id, tenantId } : { id },
     });
 
     if (!fluxo) {
@@ -420,30 +424,34 @@ export class OrquestradorService {
     return fluxo;
   }
 
-  async atualizar(id: string, updateDto: UpdateFluxoAutomatizadoDto): Promise<FluxoAutomatizado> {
-    const fluxo = await this.buscarPorId(id);
+  async atualizar(
+    id: string,
+    updateDto: UpdateFluxoAutomatizadoDto,
+    tenantId?: string,
+  ): Promise<FluxoAutomatizado> {
+    const fluxo = await this.buscarPorId(id, tenantId);
 
     Object.assign(fluxo, updateDto);
 
     return await this.fluxoRepository.save(fluxo);
   }
 
-  async pausarFluxo(id: string, motivo?: string): Promise<FluxoAutomatizado> {
-    const fluxo = await this.buscarPorId(id);
+  async pausarFluxo(id: string, motivo?: string, tenantId?: string): Promise<FluxoAutomatizado> {
+    const fluxo = await this.buscarPorId(id, tenantId);
     fluxo.pausar(motivo);
 
     return await this.fluxoRepository.save(fluxo);
   }
 
-  async retomarFluxo(id: string): Promise<FluxoAutomatizado> {
-    const fluxo = await this.buscarPorId(id);
+  async retomarFluxo(id: string, tenantId?: string): Promise<FluxoAutomatizado> {
+    const fluxo = await this.buscarPorId(id, tenantId);
     fluxo.retomar();
 
     return await this.fluxoRepository.save(fluxo);
   }
 
-  async cancelarFluxo(id: string, motivo?: string): Promise<FluxoAutomatizado> {
-    const fluxo = await this.buscarPorId(id);
+  async cancelarFluxo(id: string, motivo?: string, tenantId?: string): Promise<FluxoAutomatizado> {
+    const fluxo = await this.buscarPorId(id, tenantId);
     fluxo.cancelar(motivo);
 
     return await this.fluxoRepository.save(fluxo);

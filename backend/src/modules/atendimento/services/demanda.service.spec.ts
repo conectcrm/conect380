@@ -1,47 +1,34 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { DemandaService } from './demanda.service';
 import { Demanda } from '../entities/demanda.entity';
 import { Ticket } from '../entities/ticket.entity';
+import { Mensagem } from '../entities/mensagem.entity';
 import { CreateDemandaDto } from '../dto/create-demanda.dto';
 
 describe('DemandaService - Conversão de Ticket', () => {
   let service: DemandaService;
   let demandaRepository: Repository<Demanda>;
   let ticketRepository: Repository<Ticket>;
+  let mensagemRepository: Repository<Mensagem>;
 
   const mockTicket = {
     id: 'ticket-123',
-    numero: '12345',
-    status: 'aberto',
-    clienteId: 'cliente-123',
+    numero: 12345,
+    assunto: 'Preciso de ajuda',
+    status: 'FILA',
     atendenteId: 'atendente-123',
     empresaId: 'empresa-123',
-    whatsappNumero: '5511999999999',
+    contatoTelefone: '5511999999999',
+    contatoNome: 'Cliente Teste',
     createdAt: new Date('2025-12-20T10:00:00Z'),
     slaExpiresAt: new Date('2025-12-25T10:00:00Z'),
     fila: {
       id: 'fila-123',
       nome: 'Suporte Técnico',
     },
-    cliente: {
-      id: 'cliente-123',
-      nome: 'Cliente Teste',
-    },
-    mensagens: [
-      {
-        id: 'msg-1',
-        texto: 'Olá, preciso de ajuda',
-        createdAt: new Date('2025-12-20T10:00:00Z'),
-      },
-      {
-        id: 'msg-2',
-        texto: 'O sistema está com erro ao tentar fazer login',
-        createdAt: new Date('2025-12-20T10:05:00Z'),
-      },
-    ],
   };
 
   const mockDemanda = {
@@ -79,12 +66,27 @@ describe('DemandaService - Conversão de Ticket', () => {
             findOne: jest.fn(),
           },
         },
+        {
+          provide: getRepositoryToken(Mensagem),
+          useValue: {
+            findOne: jest.fn(),
+            count: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
     service = module.get<DemandaService>(DemandaService);
     demandaRepository = module.get<Repository<Demanda>>(getRepositoryToken(Demanda));
     ticketRepository = module.get<Repository<Ticket>>(getRepositoryToken(Ticket));
+    mensagemRepository = module.get<Repository<Mensagem>>(getRepositoryToken(Mensagem));
+
+    // Defaults para evitar quebra em montarDescricaoDoTicket
+    jest.spyOn(mensagemRepository, 'count').mockResolvedValue(2 as any);
+    jest.spyOn(mensagemRepository, 'findOne').mockResolvedValue({
+      conteudo: 'O sistema está com erro ao tentar fazer login',
+      createdAt: new Date('2025-12-20T10:05:00Z'),
+    } as any);
   });
 
   afterEach(() => {
@@ -106,7 +108,7 @@ describe('DemandaService - Conversão de Ticket', () => {
       // Assert
       expect(ticketRepository.findOne).toHaveBeenCalledWith({
         where: { id: 'ticket-123' },
-        relations: ['cliente', 'fila', 'mensagens'],
+        relations: ['fila'],
       });
       expect(demandaRepository.findOne).toHaveBeenCalledWith({
         where: { ticketId: 'ticket-123' },
@@ -121,10 +123,17 @@ describe('DemandaService - Conversão de Ticket', () => {
       jest.spyOn(ticketRepository, 'findOne').mockResolvedValue(mockTicket as any);
       jest.spyOn(demandaRepository, 'findOne').mockResolvedValue(null);
 
-      const createSpy = jest.spyOn(demandaRepository, 'create').mockImplementation((entity: any) => {
-        expect(entity.tipo).toBe('tecnica'); // ✅ Verifica inferência
-        return mockDemanda as any;
-      });
+      jest.spyOn(mensagemRepository, 'findOne').mockResolvedValue({
+        conteudo: 'O sistema deu erro ao processar',
+        createdAt: new Date(),
+      } as any);
+
+      const createSpy = jest
+        .spyOn(demandaRepository, 'create')
+        .mockImplementation((entity: any) => {
+          expect(entity.tipo).toBe('tecnica'); // ✅ Verifica inferência
+          return mockDemanda as any;
+        });
 
       jest.spyOn(demandaRepository, 'save').mockResolvedValue(mockDemanda as any);
       jest.spyOn(service, 'buscarPorId').mockResolvedValue(mockDemanda as any);
@@ -139,18 +148,23 @@ describe('DemandaService - Conversão de Ticket', () => {
 
     it('deve inferir prioridade "alta" se ticket está há mais de 3 dias aberto', async () => {
       // Arrange
+      const agora = new Date();
       const ticketAntigo = {
         ...mockTicket,
-        createdAt: new Date('2025-12-10T10:00:00Z'), // 13 dias atrás
+        createdAt: new Date(agora.getTime() - 4 * 24 * 60 * 60 * 1000),
+        // Garantir que SLA não esteja expirado neste cenário
+        slaExpiresAt: new Date(agora.getTime() + 24 * 60 * 60 * 1000),
       };
 
       jest.spyOn(ticketRepository, 'findOne').mockResolvedValue(ticketAntigo as any);
       jest.spyOn(demandaRepository, 'findOne').mockResolvedValue(null);
 
-      const createSpy = jest.spyOn(demandaRepository, 'create').mockImplementation((entity: any) => {
-        expect(entity.prioridade).toBe('alta'); // ✅ Verifica inferência
-        return mockDemanda as any;
-      });
+      const createSpy = jest
+        .spyOn(demandaRepository, 'create')
+        .mockImplementation((entity: any) => {
+          expect(entity.prioridade).toBe('alta'); // ✅ Verifica inferência
+          return mockDemanda as any;
+        });
 
       jest.spyOn(demandaRepository, 'save').mockResolvedValue(mockDemanda as any);
       jest.spyOn(service, 'buscarPorId').mockResolvedValue(mockDemanda as any);
@@ -164,18 +178,21 @@ describe('DemandaService - Conversão de Ticket', () => {
 
     it('deve inferir prioridade "urgente" se SLA vencido', async () => {
       // Arrange
+      const agora = new Date();
       const ticketSlaVencido = {
         ...mockTicket,
-        slaExpiresAt: new Date('2025-12-20T10:00:00Z'), // Vencido há 3 dias
+        slaExpiresAt: new Date(agora.getTime() - 24 * 60 * 60 * 1000),
       };
 
       jest.spyOn(ticketRepository, 'findOne').mockResolvedValue(ticketSlaVencido as any);
       jest.spyOn(demandaRepository, 'findOne').mockResolvedValue(null);
 
-      const createSpy = jest.spyOn(demandaRepository, 'create').mockImplementation((entity: any) => {
-        expect(entity.prioridade).toBe('urgente'); // ✅ Verifica inferência
-        return mockDemanda as any;
-      });
+      const createSpy = jest
+        .spyOn(demandaRepository, 'create')
+        .mockImplementation((entity: any) => {
+          expect(entity.prioridade).toBe('urgente'); // ✅ Verifica inferência
+          return mockDemanda as any;
+        });
 
       jest.spyOn(demandaRepository, 'save').mockResolvedValue(mockDemanda as any);
       jest.spyOn(service, 'buscarPorId').mockResolvedValue(mockDemanda as any);
@@ -192,11 +209,13 @@ describe('DemandaService - Conversão de Ticket', () => {
       jest.spyOn(ticketRepository, 'findOne').mockResolvedValue(mockTicket as any);
       jest.spyOn(demandaRepository, 'findOne').mockResolvedValue(null);
 
-      const createSpy = jest.spyOn(demandaRepository, 'create').mockImplementation((entity: any) => {
-        expect(entity.tipo).toBe('comercial'); // ✅ DTO override
-        expect(entity.prioridade).toBe('baixa'); // ✅ DTO override
-        return mockDemanda as any;
-      });
+      const createSpy = jest
+        .spyOn(demandaRepository, 'create')
+        .mockImplementation((entity: any) => {
+          expect(entity.tipo).toBe('comercial'); // ✅ DTO override
+          expect(entity.prioridade).toBe('baixa'); // ✅ DTO override
+          return mockDemanda as any;
+        });
 
       jest.spyOn(demandaRepository, 'save').mockResolvedValue(mockDemanda as any);
       jest.spyOn(service, 'buscarPorId').mockResolvedValue(mockDemanda as any);
@@ -223,22 +242,23 @@ describe('DemandaService - Conversão de Ticket', () => {
 
       expect(ticketRepository.findOne).toHaveBeenCalledWith({
         where: { id: 'ticket-invalido' },
-        relations: ['cliente', 'fila', 'mensagens'],
+        relations: ['fila'],
       });
     });
 
-    it('deve retornar demanda existente se ticket já foi convertido', async () => {
+    it('deve lançar ConflictException se ticket já foi convertido', async () => {
       // Arrange
       jest.spyOn(ticketRepository, 'findOne').mockResolvedValue(mockTicket as any);
       jest.spyOn(demandaRepository, 'findOne').mockResolvedValue(mockDemanda as any); // Já existe
 
       // Act
-      const result = await service.converterTicketEmDemanda('ticket-123', {}, 'user-123');
+      await expect(
+        service.converterTicketEmDemanda('ticket-123', {}, 'user-123'),
+      ).rejects.toThrow(ConflictException);
 
       // Assert
       expect(demandaRepository.create).not.toHaveBeenCalled(); // NÃO cria nova
       expect(demandaRepository.save).not.toHaveBeenCalled(); // NÃO salva
-      expect(result).toEqual(mockDemanda); // Retorna existente
     });
 
     it('deve incluir contexto completo do ticket na descrição', async () => {
@@ -246,16 +266,18 @@ describe('DemandaService - Conversão de Ticket', () => {
       jest.spyOn(ticketRepository, 'findOne').mockResolvedValue(mockTicket as any);
       jest.spyOn(demandaRepository, 'findOne').mockResolvedValue(null);
 
-      const createSpy = jest.spyOn(demandaRepository, 'create').mockImplementation((entity: any) => {
-        // Verifica que descrição contém elementos-chave
-        expect(entity.descricao).toContain('Última mensagem do cliente');
-        expect(entity.descricao).toContain('O sistema está com erro ao tentar fazer login');
-        expect(entity.descricao).toContain('Contexto do Ticket');
-        expect(entity.descricao).toContain('Número: #12345');
-        expect(entity.descricao).toContain('Fila: Suporte Técnico');
-        expect(entity.descricao).toContain('Cliente: Cliente Teste');
-        return mockDemanda as any;
-      });
+      const createSpy = jest
+        .spyOn(demandaRepository, 'create')
+        .mockImplementation((entity: any) => {
+          // Verifica que descrição contém elementos-chave
+          expect(entity.descricao).toContain('Última mensagem do cliente');
+          expect(entity.descricao).toContain('O sistema está com erro ao tentar fazer login');
+          expect(entity.descricao).toContain('Contexto do Ticket');
+          expect(entity.descricao).toContain('Número: #12345');
+          expect(entity.descricao).toContain('Fila: Suporte Técnico');
+          expect(entity.descricao).toContain('Contato: Cliente Teste');
+          return mockDemanda as any;
+        });
 
       jest.spyOn(demandaRepository, 'save').mockResolvedValue(mockDemanda as any);
       jest.spyOn(service, 'buscarPorId').mockResolvedValue(mockDemanda as any);
@@ -272,21 +294,23 @@ describe('DemandaService - Conversão de Ticket', () => {
       jest.spyOn(ticketRepository, 'findOne').mockResolvedValue(mockTicket as any);
       jest.spyOn(demandaRepository, 'findOne').mockResolvedValue(null);
 
-      const createSpy = jest.spyOn(demandaRepository, 'create').mockImplementation((entity: any) => {
-        expect(entity.ticketId).toBe('ticket-123');
-        expect(entity.clienteId).toBe('cliente-123');
-        expect(entity.responsavelId).toBe('atendente-123');
-        expect(entity.empresaId).toBe('empresa-123');
-        expect(entity.autorId).toBe('user-123');
-        expect(entity.contatoTelefone).toBe('5511999999999');
-        return mockDemanda as any;
-      });
+      const createSpy = jest
+        .spyOn(demandaRepository, 'create')
+        .mockImplementation((entity: any) => {
+          expect(entity.ticketId).toBe('ticket-123');
+          expect(entity.clienteId).toBe('cliente-123');
+          expect(entity.responsavelId).toBe('atendente-123');
+          expect(entity.empresaId).toBe('empresa-123');
+          expect(entity.autorId).toBe('user-123');
+          expect(entity.contatoTelefone).toBe('5511999999999');
+          return mockDemanda as any;
+        });
 
       jest.spyOn(demandaRepository, 'save').mockResolvedValue(mockDemanda as any);
       jest.spyOn(service, 'buscarPorId').mockResolvedValue(mockDemanda as any);
 
       // Act
-      await service.converterTicketEmDemanda('ticket-123', {}, 'user-123');
+      await service.converterTicketEmDemanda('ticket-123', { clienteId: 'cliente-123' }, 'user-123');
 
       // Assert
       expect(createSpy).toHaveBeenCalled();
@@ -306,18 +330,20 @@ describe('DemandaService - Conversão de Ticket', () => {
 
     casos.forEach(({ mensagem, tipoEsperado }) => {
       it(`deve inferir tipo "${tipoEsperado}" para mensagem: "${mensagem}"`, async () => {
-        const ticket = {
-          ...mockTicket,
-          mensagens: [{ id: 'msg-1', texto: mensagem, createdAt: new Date() }],
-        };
-
-        jest.spyOn(ticketRepository, 'findOne').mockResolvedValue(ticket as any);
+        jest.spyOn(ticketRepository, 'findOne').mockResolvedValue(mockTicket as any);
         jest.spyOn(demandaRepository, 'findOne').mockResolvedValue(null);
 
-        const createSpy = jest.spyOn(demandaRepository, 'create').mockImplementation((entity: any) => {
-          expect(entity.tipo).toBe(tipoEsperado);
-          return mockDemanda as any;
-        });
+        jest.spyOn(mensagemRepository, 'findOne').mockResolvedValue({
+          conteudo: mensagem,
+          createdAt: new Date(),
+        } as any);
+
+        const createSpy = jest
+          .spyOn(demandaRepository, 'create')
+          .mockImplementation((entity: any) => {
+            expect(entity.tipo).toBe(tipoEsperado);
+            return mockDemanda as any;
+          });
 
         jest.spyOn(demandaRepository, 'save').mockResolvedValue(mockDemanda as any);
         jest.spyOn(service, 'buscarPorId').mockResolvedValue(mockDemanda as any);

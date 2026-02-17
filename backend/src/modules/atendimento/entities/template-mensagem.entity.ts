@@ -8,7 +8,6 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Empresa } from '../../../empresas/entities/empresa.entity';
-import { Empresa } from '../../empresas/entities/empresa.entity';
 
 @Entity('atendimento_templates')
 export class TemplateMensagem {
@@ -32,10 +31,6 @@ export class TemplateMensagem {
 
   @Column({ name: 'empresa_id', type: 'uuid' })
   empresaId: string;
-
-  @ManyToOne(() => Empresa)
-  @JoinColumn({ name: 'empresa_id' })
-  empresa: Empresa;
 
   @ManyToOne(() => Empresa, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'empresa_id' })

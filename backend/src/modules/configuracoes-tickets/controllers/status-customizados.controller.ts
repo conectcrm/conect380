@@ -1,13 +1,26 @@
-import { Controller, Get, Post, Put, Delete, Patch, Body, Param, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Patch,
+  Body,
+  Param,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
+import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { StatusCustomizadosService } from '../services/status-customizados.service';
 import { CreateStatusCustomizadoDto } from '../dto/create-status-customizado.dto';
 import { UpdateStatusCustomizadoDto } from '../dto/update-status-customizado.dto';
 
 @Controller('configuracoes-tickets/status-customizados')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class StatusCustomizadosController {
-  constructor(private readonly statusService: StatusCustomizadosService) { }
+  constructor(private readonly statusService: StatusCustomizadosService) {}
 
   @Get()
   @HttpCode(HttpStatus.OK)

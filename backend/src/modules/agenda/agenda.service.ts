@@ -14,9 +14,11 @@ export class AgendaService {
   constructor(
     @InjectRepository(AgendaEvento)
     private readonly agendaRepository: Repository<AgendaEvento>,
-  ) { }
+  ) {}
 
-  private sanitize<T extends Partial<CreateAgendaEventoDto | UpdateAgendaEventoDto>>(payload: T): T {
+  private sanitize<T extends Partial<CreateAgendaEventoDto | UpdateAgendaEventoDto>>(
+    payload: T,
+  ): T {
     const sanitized = { ...payload } as Record<string, unknown>;
 
     const textFields = ['titulo', 'descricao', 'local', 'color'];
@@ -69,7 +71,9 @@ export class AgendaService {
       }
 
       if (filtros.interacao_id) {
-        query.andWhere('agenda.interacao_id = :interacao_id', { interacao_id: filtros.interacao_id });
+        query.andWhere('agenda.interacao_id = :interacao_id', {
+          interacao_id: filtros.interacao_id,
+        });
       }
 
       if (filtros.dataInicio && filtros.dataFim) {
@@ -138,4 +142,3 @@ export class AgendaService {
     await this.agendaRepository.remove(existing);
   }
 }
-

@@ -19,7 +19,7 @@ export class FaturamentoService {
     @InjectRepository(Contrato)
     private contratoRepository: Repository<Contrato>,
     private emailService: EmailIntegradoService,
-  ) { }
+  ) {}
 
   async criarFatura(createFaturaDto: CreateFaturaDto, empresaId: string): Promise<Fatura> {
     try {
@@ -53,7 +53,7 @@ export class FaturamentoService {
         valorPago: 0,
         dataEmissao: new Date(),
         status: StatusFatura.PENDENTE,
-        empresa_id: empresaId,
+        empresaId,
       });
 
       const faturaSalva = await this.faturaRepository.save(fatura);
@@ -81,7 +81,10 @@ export class FaturamentoService {
     }
   }
 
-  async gerarFaturaAutomatica(gerarFaturaDto: GerarFaturaAutomaticaDto, empresaId: string): Promise<Fatura> {
+  async gerarFaturaAutomatica(
+    gerarFaturaDto: GerarFaturaAutomaticaDto,
+    empresaId: string,
+  ): Promise<Fatura> {
     try {
       // 🔒 MULTI-TENANCY: Validar que contrato pertence à empresa
       const contrato = await this.contratoRepository.findOne({
@@ -138,13 +141,16 @@ export class FaturamentoService {
     }
   }
 
-  async buscarFaturas(empresaId: string, filtros?: {
-    status?: StatusFatura;
-    clienteId?: number;
-    contratoId?: number;
-    dataInicio?: Date;
-    dataFim?: Date;
-  }): Promise<Fatura[]> {
+  async buscarFaturas(
+    empresaId: string,
+    filtros?: {
+      status?: StatusFatura;
+      clienteId?: number;
+      contratoId?: number;
+      dataInicio?: Date;
+      dataFim?: Date;
+    },
+  ): Promise<Fatura[]> {
     // 🔒 MULTI-TENANCY: Filtrar por empresa_id
     const query = this.faturaRepository
       .createQueryBuilder('fatura')
@@ -204,11 +210,11 @@ export class FaturamentoService {
       .getManyAndCount();
 
     const resumo = await this.faturaRepository.query(`
-      SELECT 
+      SELECT
         COALESCE(SUM(f."valorTotal"), 0) AS "valorTotal",
         COALESCE(SUM(f."valorPago"), 0) AS "valorRecebido",
         COALESCE(SUM(f."valorTotal" - f."valorPago"), 0) AS "valorEmAberto"
-      FROM faturas f 
+      FROM faturas f
       WHERE f.ativo = true
     `);
 
@@ -222,7 +228,7 @@ export class FaturamentoService {
   async buscarFaturaPorId(id: number, empresaId: string): Promise<Fatura> {
     // 🔒 MULTI-TENANCY: Filtrar por empresa_id
     const fatura = await this.faturaRepository.findOne({
-      where: { id, empresa_id: empresaId, ativo: true },
+      where: { id, empresaId, ativo: true },
       relations: [
         'contrato',
         'contrato.proposta',
@@ -243,7 +249,7 @@ export class FaturamentoService {
   async buscarFaturaPorNumero(numero: string, empresaId: string): Promise<any> {
     // 🔒 MULTI-TENANCY: Filtrar por empresa_id
     const fatura = await this.faturaRepository.findOne({
-      where: { numero, empresa_id: empresaId, ativo: true },
+      where: { numero, empresaId, ativo: true },
       relations: [
         'contrato',
         'contrato.proposta',
@@ -261,7 +267,11 @@ export class FaturamentoService {
     return fatura;
   }
 
-  async atualizarFatura(id: number, updateFaturaDto: UpdateFaturaDto, empresaId: string): Promise<Fatura> {
+  async atualizarFatura(
+    id: number,
+    updateFaturaDto: UpdateFaturaDto,
+    empresaId: string,
+  ): Promise<Fatura> {
     // 🔒 MULTI-TENANCY: Validar empresa_id
     const fatura = await this.buscarFaturaPorId(id, empresaId);
 
@@ -507,7 +517,7 @@ export class FaturamentoService {
     return `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <h1 style="color: #2c3e50;">💰 Nova Fatura Disponível</h1>
-        
+
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <h3>Detalhes da Fatura</h3>
           <p><strong>Número:</strong> ${fatura.numero}</p>
@@ -515,14 +525,14 @@ export class FaturamentoService {
           <p><strong>Vencimento:</strong> ${fatura.dataVencimento.toLocaleDateString('pt-BR')}</p>
           <p><strong>Descrição:</strong> ${fatura.descricao}</p>
         </div>
-        
+
         <div style="text-align: center; margin: 30px 0;">
-          <a href="${process.env.FRONTEND_URL}/faturas/${fatura.id}" 
+          <a href="${process.env.FRONTEND_URL}/faturas/${fatura.id}"
              style="background-color: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
             💳 Pagar Fatura
           </a>
         </div>
-        
+
         <p style="color: #666; font-size: 14px; text-align: center;">
           Este email foi enviado automaticamente pelo sistema ConectCRM.
         </p>

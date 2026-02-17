@@ -304,7 +304,7 @@ export const ExemploProdutosResponsivo: React.FC = () => {
           setProdutoSelecionado(null);
         }}
         onSave={handleSaveProduto}
-        produto={produtoSelecionado}
+        produto={produtoSelecionado as any}
       />
     </ResponsiveLayout>
   );

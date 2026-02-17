@@ -45,12 +45,12 @@ export class Oportunidade {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'uuid', name: 'empresa_id' })
-  empresaId: string;
-
-  @ManyToOne(() => Empresa)
+  @ManyToOne(() => Empresa, { nullable: false })
   @JoinColumn({ name: 'empresa_id' })
-  empresa_rel: Empresa;
+  empresa: Empresa;
+
+  @Column('uuid')
+  empresa_id: string;
 
   @Column({ length: 255 })
   titulo: string;
@@ -85,21 +85,20 @@ export class Oportunidade {
   })
   origem: OrigemOportunidade;
 
-  @Column('simple-array', { nullable: true, comment: 'Tags separadas por vírgula' })
+  @Column({ type: 'simple-array', nullable: true, comment: 'Tags separadas por virgula' })
   tags: string[];
 
-  @Column({ type: 'date', nullable: true })
+  @Column({ type: 'date', name: 'dataFechamentoEsperado', nullable: true })
   dataFechamentoEsperado: Date;
 
-  @Column({ type: 'date', nullable: true })
+  @Column({ type: 'date', name: 'dataFechamentoReal', nullable: true })
   dataFechamentoReal: Date;
 
-  // Relacionamentos
   @ManyToOne(() => User, { nullable: false })
   @JoinColumn({ name: 'responsavel_id' })
   responsavel: User;
 
-  @Column('varchar')
+  @Column('uuid', { name: 'responsavel_id' })
   responsavel_id: string;
 
   @ManyToOne(() => Cliente, { nullable: true })
@@ -109,39 +108,26 @@ export class Oportunidade {
   @Column('uuid', { nullable: true })
   cliente_id: string;
 
-  // Informações de contato (se não houver cliente cadastrado)
-  @Column({ length: 255, nullable: true })
+  @Column({ type: 'varchar', name: 'nomeContato', length: 255, nullable: true })
   nomeContato: string;
 
-  @Column({ length: 255, nullable: true })
+  @Column({ type: 'varchar', name: 'emailContato', length: 255, nullable: true })
   emailContato: string;
 
-  @Column({ length: 20, nullable: true })
+  @Column({ type: 'varchar', name: 'telefoneContato', length: 20, nullable: true })
   telefoneContato: string;
 
-  @Column({ length: 255, nullable: true })
+  @Column({ type: 'varchar', name: 'empresaContato', length: 255, nullable: true })
   empresaContato: string;
 
-  // Multi-tenancy
-  @ManyToOne(() => Empresa, { nullable: false })
-  @JoinColumn({ name: 'empresa_id' })
-  empresa: Empresa;
-
-  @Column('uuid')
-  empresa_id: string;
-
-  // Atividades relacionadas
-  @OneToMany(() => Atividade, (atividade) => atividade.oportunidade, { cascade: true })
+  @OneToMany(() => Atividade, (atividade) => atividade.oportunidade)
   atividades: Atividade[];
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'createdAt' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updatedAt' })
   updatedAt: Date;
 
-  // Campos calculados/virtuais
   valorFormatado?: string;
-  diasNoEstagio?: number;
-  ultimaAtividade?: Date;
 }

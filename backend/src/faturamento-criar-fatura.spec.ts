@@ -5,7 +5,11 @@ import { CreateFaturaDto } from './modules/faturamento/dto/fatura.dto';
 import { EmailIntegradoService } from './modules/propostas/email-integrado.service';
 import { Contrato } from './modules/contratos/entities/contrato.entity';
 
-class EmailMock { async enviarEmailGenerico() { return true; } }
+class EmailMock {
+  async enviarEmailGenerico() {
+    return true;
+  }
+}
 
 // Repositório genérico em memória
 function createInMemoryRepository<T extends { id?: any }>() {
@@ -43,12 +47,14 @@ function createInMemoryRepository<T extends { id?: any }>() {
     },
     findOne: async (opts: any) => {
       if (opts?.where?.id != null) {
-        const found = data.find(d => (d as any).id === opts.where.id);
+        const found = data.find((d) => (d as any).id === opts.where.id);
         if (!found) return null;
         // preenchimento manual de itens quando buscando fatura
         // Como não temos instâncias reais de classe (apenas objetos), usar heurística por propriedades
         if ((found as any).numero && opts.relations?.includes('itens')) {
-          (found as any).itens = (itemRepo as any)._all().filter((i: any) => i.faturaId === (found as any).id);
+          (found as any).itens = (itemRepo as any)
+            ._all()
+            .filter((i: any) => i.faturaId === (found as any).id);
           (found as any).pagamentos = [];
         }
         return { ...found } as T;
@@ -56,7 +62,16 @@ function createInMemoryRepository<T extends { id?: any }>() {
       return null;
     },
     createQueryBuilder: () => ({
-      where: () => ({ orderBy: () => ({ getOne: () => Promise.resolve(data.slice().sort((a: any, b: any) => (a.numero || '') > (b.numero || '') ? -1 : 1)[0]) }) })
+      where: () => ({
+        orderBy: () => ({
+          getOne: () =>
+            Promise.resolve(
+              data
+                .slice()
+                .sort((a: any, b: any) => ((a.numero || '') > (b.numero || '') ? -1 : 1))[0],
+            ),
+        }),
+      }),
     }),
     _all: () => data,
   };
@@ -86,9 +101,7 @@ describe('FaturamentoService - criar fatura (unitário sem TypeORM)', () => {
       tipo: 'unica' as any,
       descricao: 'Teste Fatura',
       dataVencimento: new Date().toISOString().split('T')[0],
-      itens: [
-        { descricao: 'Item Teste', quantidade: 2, valorUnitario: 50, valorDesconto: 10 },
-      ],
+      itens: [{ descricao: 'Item Teste', quantidade: 2, valorUnitario: 50, valorDesconto: 10 }],
       valorDesconto: 0,
     };
 
@@ -124,7 +137,13 @@ describe('FaturamentoService - criar fatura (unitário sem TypeORM)', () => {
       descricao: 'Teste Combinação',
       dataVencimento: new Date().toISOString().split('T')[0],
       itens: [
-        { descricao: 'Item Combo', quantidade: 5, valorUnitario: 20, valorDesconto: 15, percentualDesconto: 10 }, // subtotal 100 - perc 10 (=10) - 15 = 75
+        {
+          descricao: 'Item Combo',
+          quantidade: 5,
+          valorUnitario: 20,
+          valorDesconto: 15,
+          percentualDesconto: 10,
+        }, // subtotal 100 - perc 10 (=10) - 15 = 75
       ],
     };
 
@@ -144,7 +163,13 @@ describe('FaturamentoService - criar fatura (unitário sem TypeORM)', () => {
         { descricao: 'Item A', quantidade: 2, valorUnitario: 50 }, // 100
         { descricao: 'Item B', quantidade: 1, valorUnitario: 80, valorDesconto: 20 }, // 60
         { descricao: 'Item C', quantidade: 3, valorUnitario: 40, percentualDesconto: 25 }, // 120 - 30 = 90
-        { descricao: 'Item D', quantidade: 4, valorUnitario: 25, valorDesconto: 10, percentualDesconto: 10 }, // subtotal 100 -10% (=10) -10 = 80
+        {
+          descricao: 'Item D',
+          quantidade: 4,
+          valorUnitario: 25,
+          valorDesconto: 10,
+          percentualDesconto: 10,
+        }, // subtotal 100 -10% (=10) -10 = 80
       ], // Total esperado = 100 + 60 + 90 + 80 = 330
     };
 

@@ -19,9 +19,12 @@ export class CobrancaService {
     private faturaRepository: Repository<Fatura>,
     private faturamentoService: FaturamentoService,
     private emailService: EmailIntegradoService,
-  ) { }
+  ) {}
 
-  async criarPlanoCobranca(createPlanoDto: CreatePlanoCobrancaDto): Promise<PlanoCobranca> {
+  async criarPlanoCobranca(
+    createPlanoDto: CreatePlanoCobrancaDto,
+    empresaId: string,
+  ): Promise<PlanoCobranca> {
     try {
       // Gerar código único
       const codigo = await this.gerarCodigoPlano();
@@ -37,6 +40,7 @@ export class CobrancaService {
 
       const plano = this.planoCobrancaRepository.create({
         ...createPlanoDto,
+        empresaId,
         codigo,
         proximaCobranca,
         status: StatusPlanoCobranca.ATIVO,
@@ -53,16 +57,20 @@ export class CobrancaService {
     }
   }
 
-  async buscarPlanosCobranca(filtros?: {
+  async buscarPlanosCobranca(
+    empresaId: string,
+    filtros?: {
     status?: StatusPlanoCobranca;
     clienteId?: number;
     contratoId?: number;
-  }): Promise<PlanoCobranca[]> {
+  },
+  ): Promise<PlanoCobranca[]> {
     const query = this.planoCobrancaRepository
       .createQueryBuilder('plano')
       .leftJoinAndSelect('plano.contrato', 'contrato')
       .leftJoinAndSelect('plano.usuarioResponsavel', 'usuario')
-      .where('plano.ativo = :ativo', { ativo: true });
+      .where('plano.ativo = :ativo', { ativo: true })
+      .andWhere('plano.empresaId = :empresaId', { empresaId });
 
     if (filtros?.status) {
       query.andWhere('plano.status = :status', { status: filtros.status });
@@ -79,9 +87,9 @@ export class CobrancaService {
     return query.orderBy('plano.createdAt', 'DESC').getMany();
   }
 
-  async buscarPlanoPorId(id: number): Promise<PlanoCobranca> {
+  async buscarPlanoPorId(id: number, empresaId: string): Promise<PlanoCobranca> {
     const plano = await this.planoCobrancaRepository.findOne({
-      where: { id, ativo: true },
+      where: { id, ativo: true, empresaId },
       relations: ['contrato', 'usuarioResponsavel', 'faturas'],
     });
 
@@ -92,9 +100,9 @@ export class CobrancaService {
     return plano;
   }
 
-  async buscarPlanoPorCodigo(codigo: string): Promise<PlanoCobranca> {
+  async buscarPlanoPorCodigo(codigo: string, empresaId: string): Promise<PlanoCobranca> {
     const plano = await this.planoCobrancaRepository.findOne({
-      where: { codigo, ativo: true },
+      where: { codigo, ativo: true, empresaId },
       relations: ['contrato', 'usuarioResponsavel', 'faturas'],
     });
 
@@ -108,8 +116,9 @@ export class CobrancaService {
   async atualizarPlanoCobranca(
     id: number,
     updatePlanoDto: UpdatePlanoCobrancaDto,
+    empresaId: string,
   ): Promise<PlanoCobranca> {
-    const plano = await this.buscarPlanoPorId(id);
+    const plano = await this.buscarPlanoPorId(id, empresaId);
 
     Object.assign(plano, updatePlanoDto);
 
@@ -124,8 +133,8 @@ export class CobrancaService {
     return planoAtualizado;
   }
 
-  async pausarPlanoCobranca(id: number): Promise<PlanoCobranca> {
-    const plano = await this.buscarPlanoPorId(id);
+  async pausarPlanoCobranca(id: number, empresaId: string): Promise<PlanoCobranca> {
+    const plano = await this.buscarPlanoPorId(id, empresaId);
 
     plano.status = StatusPlanoCobranca.PAUSADO;
 
@@ -135,8 +144,8 @@ export class CobrancaService {
     return planoAtualizado;
   }
 
-  async reativarPlanoCobranca(id: number): Promise<PlanoCobranca> {
-    const plano = await this.buscarPlanoPorId(id);
+  async reativarPlanoCobranca(id: number, empresaId: string): Promise<PlanoCobranca> {
+    const plano = await this.buscarPlanoPorId(id, empresaId);
 
     if (plano.status !== StatusPlanoCobranca.PAUSADO) {
       throw new BadRequestException('Apenas planos pausados podem ser reativados');
@@ -151,8 +160,12 @@ export class CobrancaService {
     return planoAtualizado;
   }
 
-  async cancelarPlanoCobranca(id: number, motivo?: string): Promise<PlanoCobranca> {
-    const plano = await this.buscarPlanoPorId(id);
+  async cancelarPlanoCobranca(
+    id: number,
+    empresaId: string,
+    motivo?: string,
+  ): Promise<PlanoCobranca> {
+    const plano = await this.buscarPlanoPorId(id, empresaId);
 
     plano.status = StatusPlanoCobranca.CANCELADO;
     plano.dataFim = new Date();
@@ -167,7 +180,7 @@ export class CobrancaService {
     return planoAtualizado;
   }
 
-  async processarCobrancasRecorrentes(): Promise<void> {
+  async processarCobrancasRecorrentes(empresaId: string): Promise<void> {
     this.logger.log('Iniciando processamento de cobranças recorrentes...');
 
     // Buscar planos ativos que precisam de cobrança
@@ -176,13 +189,14 @@ export class CobrancaService {
       .where('plano.status = :status', { status: StatusPlanoCobranca.ATIVO })
       .andWhere('plano.proximaCobranca <= :agora', { agora: new Date() })
       .andWhere('plano.ativo = :ativo', { ativo: true })
+      .andWhere('plano.empresaId = :empresaId', { empresaId })
       .getMany();
 
     this.logger.log(`Encontrados ${planosParaCobranca.length} planos para cobrança`);
 
     for (const plano of planosParaCobranca) {
       try {
-        await this.gerarFaturaRecorrente(plano);
+        await this.gerarFaturaRecorrente(plano, empresaId);
       } catch (error) {
         this.logger.error(`Erro ao processar cobrança do plano ${plano.codigo}: ${error.message}`);
       }
@@ -191,8 +205,12 @@ export class CobrancaService {
     this.logger.log('Processamento de cobranças recorrentes concluído');
   }
 
-  async gerarFaturaRecorrente(plano: PlanoCobranca): Promise<Fatura> {
+  async gerarFaturaRecorrente(plano: PlanoCobranca, empresaId: string): Promise<Fatura> {
     try {
+      if (plano.empresaId !== empresaId) {
+        throw new BadRequestException('Plano de cobrança não pertence à empresa autenticada');
+      }
+
       // Verificar se plano pode gerar nova fatura
       if (!plano.podeGerarNovaFatura()) {
         throw new BadRequestException('Plano não pode gerar nova fatura');
@@ -201,6 +219,7 @@ export class CobrancaService {
       // Verificar se já existe fatura para este período
       const faturaExistente = await this.faturaRepository.findOne({
         where: {
+          empresaId,
           contratoId: plano.contratoId,
           dataVencimento: plano.proximaCobranca,
           ativo: true,
@@ -240,7 +259,6 @@ export class CobrancaService {
       };
 
       // Obter empresaId do contrato relacionado
-      const empresaId = plano.contrato.empresa_id;
       const fatura = await this.faturamentoService.criarFatura(createFaturaDto, empresaId);
 
       // Adicionar juros e multa se houver
@@ -277,7 +295,7 @@ export class CobrancaService {
     }
   }
 
-  async enviarLembreteVencimento(): Promise<void> {
+  async enviarLembreteVencimento(empresaId: string): Promise<void> {
     this.logger.log('Enviando lembretes de vencimento...');
 
     // Buscar planos que precisam de lembrete
@@ -289,6 +307,7 @@ export class CobrancaService {
       .where('plano.status = :status', { status: StatusPlanoCobranca.ATIVO })
       .andWhere('plano.enviarLembrete = :enviarLembrete', { enviarLembrete: true })
       .andWhere('DATE(plano.proximaCobranca) = DATE(:dataLembrete)', { dataLembrete })
+      .andWhere('plano.empresaId = :empresaId', { empresaId })
       .getMany();
 
     for (const plano of planosLembrete) {

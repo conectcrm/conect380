@@ -52,23 +52,8 @@ describe('WhatsAppWebhookService (segurança)', () => {
     process.env.ALLOW_INSECURE_WHATSAPP_WEBHOOK = originalAllowInsecure;
   });
 
-  describe('validarPhoneNumberEmpresa', () => {
-    it('retorna true quando phone_number_id pertence à integração da empresa', async () => {
-      mockIntegracaoRepo.find.mockResolvedValue([
-        { whatsappPhoneNumberId: '123', credenciais: {} },
-      ]);
-      mockCanalRepo.find.mockResolvedValue([]);
-
-      const result = await service.validarPhoneNumberEmpresa('empresa-1', '123');
-
-      expect(result).toBe(true);
-      expect(mockIntegracaoRepo.find).toHaveBeenCalledWith({
-        where: { empresaId: 'empresa-1', tipo: 'whatsapp_business_api', ativo: true },
-      });
-    });
-
-    it('consulta canais quando não encontra phone_number_id nas integrações', async () => {
-      mockIntegracaoRepo.find.mockResolvedValue([]);
+  describe('buscarCanalPorPhoneNumberId (privado)', () => {
+    it('retorna canal quando phone_number_id existe em credenciais do canal', async () => {
       mockCanalRepo.find.mockResolvedValue([
         {
           empresaId: 'empresa-1',
@@ -78,21 +63,20 @@ describe('WhatsAppWebhookService (segurança)', () => {
         },
       ]);
 
-      const result = await service.validarPhoneNumberEmpresa('empresa-1', 'abc');
+      const canal = await (service as any).buscarCanalPorPhoneNumberId('empresa-1', 'abc');
 
-      expect(result).toBe(true);
+      expect(canal).toBeTruthy();
       expect(mockCanalRepo.find).toHaveBeenCalledWith({
-        where: { empresaId: 'empresa-1', tipo: TipoCanal.WHATSAPP, ativo: true },
+        where: { empresaId: 'empresa-1', tipo: TipoCanal.WHATSAPP },
       });
     });
 
-    it('retorna false quando ocorre erro ao consultar repositórios', async () => {
-      mockIntegracaoRepo.find.mockRejectedValue(new Error('db indisponível'));
+    it('retorna null quando ocorre erro ao consultar repositórios', async () => {
+      mockCanalRepo.find.mockRejectedValue(new Error('db indisponível'));
 
-      const result = await service.validarPhoneNumberEmpresa('empresa-1', 'xyz');
+      const canal = await (service as any).buscarCanalPorPhoneNumberId('empresa-1', 'xyz');
 
-      expect(result).toBe(false);
-      expect(mockCanalRepo.find).not.toHaveBeenCalled();
+      expect(canal).toBeNull();
     });
   });
 
@@ -123,17 +107,22 @@ describe('WhatsAppWebhookService (segurança)', () => {
       expect(result).toBe(false);
     });
 
-    it('permite callback sem secret apenas quando ALLOW_INSECURE_WHATSAPP_WEBHOOK=true', async () => {
-      mockIntegracaoRepo.findOne.mockResolvedValue({ credenciais: {} });
+    it('sem app secret, permite apenas em development (com signature presente)', async () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      try {
+        mockIntegracaoRepo.findOne.mockResolvedValue({ credenciais: {} });
 
-      process.env.ALLOW_INSECURE_WHATSAPP_WEBHOOK = 'true';
-      const permitido = await service.validarAssinatura('empresa-1', payload, '');
+        process.env.NODE_ENV = 'development';
+        const permitido = await service.validarAssinatura('empresa-1', payload, 'sha256=qualquer');
 
-      process.env.ALLOW_INSECURE_WHATSAPP_WEBHOOK = 'false';
-      const bloqueado = await service.validarAssinatura('empresa-1', payload, '');
+        process.env.NODE_ENV = 'production';
+        const bloqueado = await service.validarAssinatura('empresa-1', payload, 'sha256=qualquer');
 
-      expect(permitido).toBe(true);
-      expect(bloqueado).toBe(false);
+        expect(permitido).toBe(true);
+        expect(bloqueado).toBe(false);
+      } finally {
+        process.env.NODE_ENV = originalNodeEnv;
+      }
     });
   });
 });

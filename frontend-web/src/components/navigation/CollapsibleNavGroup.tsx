@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
+import { UI_LAYERS } from '../../config/uiLayers';
 
 interface NavigationItem {
   name: string;
@@ -80,7 +81,9 @@ const CollapsibleNavGroup: React.FC<CollapsibleNavGroupProps> = ({
               )}
 
               {/* Tooltip */}
-              <div className="absolute left-full ml-3 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[60] shadow-lg">
+              <div
+                className={`absolute left-full ml-3 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap ${UI_LAYERS.OVERLAY_DROPDOWN} shadow-lg`}
+              >
                 {item.name}
                 {item.notifications > 0 && (
                   <span className="ml-2 text-red-300">({item.notifications})</span>

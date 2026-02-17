@@ -11,6 +11,7 @@ import {
   Index,
 } from 'typeorm';
 import { Cliente } from '../../modules/clientes/cliente.entity';
+import { Empresa } from '../../empresas/entities/empresa.entity';
 import { Fornecedor } from '../../modules/financeiro/entities/fornecedor.entity';
 import { User } from '../../modules/users/user.entity';
 import { ItemCotacao } from './item-cotacao.entity';
@@ -46,6 +47,7 @@ export enum OrigemCotacao {
 
 @Entity('cotacoes')
 @Index(['numero'], { unique: true })
+@Index(['empresaId'])
 @Index(['fornecedorId'])
 @Index(['responsavelId'])
 @Index(['status'])
@@ -57,6 +59,13 @@ export class Cotacao {
 
   @Column({ unique: true, length: 20 })
   numero: string;
+
+  @Column({ type: 'uuid', name: 'empresa_id' })
+  empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   @Column({ length: 200 })
   titulo: string;

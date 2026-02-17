@@ -3,6 +3,9 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import * as path from 'path';
+import { TenantContextInterceptor } from './common/interceptors/tenant-context.interceptor';
+import { TenantQueryRunnerPatcher } from './common/tenant/tenant-query-runner.patcher';
 import { WinstonModule } from 'nest-winston';
 import { winstonConfig } from './config/logger.config';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
@@ -28,8 +31,8 @@ import { AtendimentoModule } from './modules/atendimento/atendimento.module';
 import { IAModule } from './modules/ia/ia.module';
 import { TriagemModule } from './modules/triagem/triagem.module';
 import { LeadsModule } from './modules/leads/leads.module';
+import { SearchModule } from './search/search.module';
 import { AssinaturaMiddleware } from './modules/common/assinatura.middleware';
-import { TenantContextMiddleware } from './common/middleware/tenant-context.middleware';
 import { HealthController } from './health/health.controller';
 import { RateLimitController } from './common/controllers/rate-limit.controller';
 import { DatabaseConfig } from './config/database.config';
@@ -42,7 +45,8 @@ import { MetricsModule } from './modules/metrics/metrics.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      // Usa caminho absoluto para não depender do cwd (evita cair em defaults de outro DB)
+      envFilePath: path.resolve(__dirname, '..', '.env'),
     }),
     // 📊 Winston Logger: Logs estruturados e rotação automática
     WinstonModule.forRoot(winstonConfig),
@@ -92,6 +96,7 @@ import { MetricsModule } from './modules/metrics/metrics.module';
     IAModule,
     TriagemModule,
     LeadsModule,
+    SearchModule,
     PagamentosModule,
     NotificationModule,
     MetricsModule, // 📊 Prometheus metrics endpoint
@@ -102,6 +107,11 @@ import { MetricsModule } from './modules/metrics/metrics.module';
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: TenantContextInterceptor,
+    },
+    TenantQueryRunnerPatcher,
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,
@@ -119,10 +129,6 @@ export class AppModule implements NestModule {
 
     // 🔒 HTTPS Redirect (Força HTTPS em produção)
     consumer.apply(HttpsRedirectMiddleware).forRoutes('*');
-
-    // 🔒 CRÍTICO: Middleware de Tenant Context (Multi-Tenancy)
-    // Define automaticamente o empresaId no PostgreSQL para RLS funcionar
-    consumer.apply(TenantContextMiddleware).forRoutes('*'); // Aplicar em TODAS as rotas
 
     // Middleware de verificação de assinatura
     consumer

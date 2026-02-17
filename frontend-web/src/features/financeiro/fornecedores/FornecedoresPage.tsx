@@ -781,7 +781,7 @@ export default function FornecedoresPage() {
                             <Edit3 className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => excluirFornecedor(fornecedor.id.toString())}
+                            onClick={() => excluirFornecedor(fornecedor.id)}
                             className="text-red-600 hover:text-red-800 p-1 rounded"
                             title="Excluir fornecedor"
                           >

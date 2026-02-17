@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Notification } from './entities/notification.entity';
 import { CreateNotificationDto } from './dto/notification.dto';
+import { User } from '../modules/users/user.entity';
+import { getCurrentTenantId, runWithTenant } from '../common/tenant/tenant-context';
 
 @Injectable()
 export class NotificationService {
@@ -11,7 +13,28 @@ export class NotificationService {
   constructor(
     @InjectRepository(Notification)
     private notificationRepository: Repository<Notification>,
-  ) { }
+
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
+  ) {}
+
+  private async resolveEmpresaId(data: CreateNotificationDto): Promise<string> {
+    if (data.empresaId) return data.empresaId;
+
+    const currentTenant = getCurrentTenantId();
+    if (currentTenant) return currentTenant;
+
+    const user = await this.userRepository.findOne({
+      where: { id: data.userId },
+      select: ['id', 'empresa_id'],
+    });
+
+    if (user?.empresa_id) return user.empresa_id;
+
+    throw new Error(
+      `Não foi possível determinar empresaId para criar notificação (userId=${data.userId}). Informe empresaId no payload ou garanta contexto de tenant.`,
+    );
+  }
 
   /**
    * Cria uma nova notificação
@@ -25,16 +48,21 @@ export class NotificationService {
       this.logger.log(`   Tipo: ${data.type}`);
       this.logger.log(`${'🔔'.repeat(30)}\n`);
 
-      const notification = this.notificationRepository.create({
-        userId: data.userId,
-        type: data.type,
-        title: data.title,
-        message: data.message,
-        data: data.data || {},
-        read: false,
-      });
+      const empresaId = await this.resolveEmpresaId(data);
 
-      const saved = await this.notificationRepository.save(notification);
+      const saved = await runWithTenant(empresaId, async () => {
+        const notification = this.notificationRepository.create({
+          empresaId,
+          userId: data.userId,
+          type: data.type,
+          title: data.title,
+          message: data.message,
+          data: data.data || {},
+          read: false,
+        });
+
+        return await this.notificationRepository.save(notification);
+      });
 
       this.logger.log(`✅ Notificação salva com ID: ${saved.id} para userId: ${saved.userId}`);
 

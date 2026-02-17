@@ -42,10 +42,6 @@ export class RedmineIntegration {
   @JoinColumn({ name: 'empresa_id' })
   empresa: Empresa;
 
-  @ManyToOne(() => Empresa, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'empresa_id' })
-  empresa: Empresa;
-
   // Dados Redmine
   @Column({ type: 'varchar', length: 255, name: 'redmine_url' })
   redmineUrl: string;

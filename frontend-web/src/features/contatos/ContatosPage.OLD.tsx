@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useI18n } from '../../contexts/I18nContext';
 import { BackToNucleus } from '../../components/navigation/BackToNucleus';
 import { ModalContato } from '../../components/contatos/ModalContato';
-import { ModalNovoContato } from '../../components/contatos/ModalNovoContato';
+import ModalNovoContato from '../../components/contatos/ModalNovoContato';
 import { ContatoCard } from '../../components/contatos/ContatoCard';
 import { ContatoFilters } from '../../components/contatos/ContatoFilters';
 import { ContatoMetrics } from '../../components/contatos/ContatoMetrics';

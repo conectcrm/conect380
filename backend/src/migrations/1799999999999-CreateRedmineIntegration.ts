@@ -191,15 +191,21 @@ export class CreateRedmineIntegration1735000000001 implements MigrationInterface
     );
 
     // FKs
-    await queryRunner.createForeignKey(
-      'atendimento_redmine_integrations',
-      new TableForeignKey({
-        columnNames: ['demanda_id'],
-        referencedTableName: 'atendimento_demandas',
-        referencedColumnNames: ['id'],
-        onDelete: 'CASCADE',
-      }),
-    );
+    // Nem sempre `atendimento_demandas` existe neste ponto do histórico.
+    // Se não existir, pulamos a FK e ela pode ser criada por migrations posteriores.
+    const hasAtendimentoDemandas = await queryRunner.hasTable('atendimento_demandas');
+    if (hasAtendimentoDemandas) {
+      await queryRunner.createForeignKey(
+        'atendimento_redmine_integrations',
+        new TableForeignKey({
+          columnNames: ['demanda_id'],
+          referencedTableName: 'atendimento_demandas',
+          referencedColumnNames: ['id'],
+          onDelete: 'CASCADE',
+          name: 'fk_redmine_integrations_demanda',
+        }),
+      );
+    }
 
     await queryRunner.createForeignKey(
       'atendimento_redmine_integrations',
@@ -208,6 +214,7 @@ export class CreateRedmineIntegration1735000000001 implements MigrationInterface
         referencedTableName: 'empresas',
         referencedColumnNames: ['id'],
         onDelete: 'CASCADE',
+        name: 'fk_redmine_integrations_empresa',
       }),
     );
   }

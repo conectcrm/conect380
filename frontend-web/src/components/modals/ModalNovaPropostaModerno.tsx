@@ -66,7 +66,7 @@ interface Produto {
   categoria: string;
   descricao?: string;
   unidade: string;
-  tipoItem?: string;
+  tipoItem?: 'produto' | 'servico' | 'licenca' | 'modulo' | 'aplicativo';
   unidadeMedida?: string;
   statusAtivo: boolean;
 }
@@ -449,6 +449,7 @@ export const ModalNovaPropostaModerno: React.FC<ModalNovaPropostaModernoProps> =
     try {
       const propostaData: PropostaCompleta = {
         ...data,
+        formaPagamento: data.formaPagamento as 'avista' | 'parcelado' | 'boleto' | 'cartao',
         status: 'rascunho',
         dataValidade: new Date(Date.now() + data.validadeDias * 24 * 60 * 60 * 1000),
         subtotal: totais.subtotal,

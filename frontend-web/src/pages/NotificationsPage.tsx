@@ -54,7 +54,7 @@ const NotificationsPage: React.FC = () => {
       case 'warning':
         return <AlertTriangle className="w-5 h-5 text-yellow-500" />;
       case 'info':
-        return <Info className="w-5 h-5 text-blue-500" />;
+        return <Info className="w-5 h-5 text-[#159A9C]" />;
       default:
         return <Bell className="w-5 h-5 text-gray-500" />;
     }
@@ -91,7 +91,7 @@ const NotificationsPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#DEEFE7]">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -99,7 +99,7 @@ const NotificationsPage: React.FC = () => {
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => navigate('/dashboard')}
-                className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors"
+                className="flex md:hidden items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors"
               >
                 <ArrowLeft className="w-5 h-5" />
                 <span>Voltar</span>
@@ -118,7 +118,7 @@ const NotificationsPage: React.FC = () => {
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => navigate('/dashboard')}
-                className="p-2 text-gray-400 hover:text-[#159A9C] hover:bg-[#DEEFE7] rounded-lg transition-colors"
+                className="p-2 text-gray-400 hover:text-[#159A9C] hover:bg-[#159A9C]/10 rounded-lg transition-colors"
                 title="Configurações"
               >
                 <Settings className="w-5 h-5" />
@@ -127,7 +127,7 @@ const NotificationsPage: React.FC = () => {
                 <>
                   <button
                     onClick={markAllAsRead}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                    className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors text-sm font-medium"
                   >
                     Marcar Todas como Lidas
                   </button>
@@ -195,10 +195,10 @@ const NotificationsPage: React.FC = () => {
                     <span className="text-lg font-bold text-red-600">{unreadCount}</span>
                   </div>
                 </div>
-                <div className="bg-blue-50 rounded-lg p-4">
+                <div className="bg-[#159A9C]/5 rounded-lg p-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-700">Lembretes</span>
-                    <span className="text-lg font-bold text-blue-600">{reminders.length}</span>
+                    <span className="text-lg font-bold text-[#159A9C]">{reminders.length}</span>
                   </div>
                 </div>
               </div>
@@ -231,7 +231,7 @@ const NotificationsPage: React.FC = () => {
                     <div
                       key={notification.id}
                       className={`p-6 hover:bg-gray-50 transition-colors border-l-4 ${getPriorityColor(notification.priority)} ${
-                        !notification.read ? 'bg-blue-50' : ''
+                        !notification.read ? 'bg-[#159A9C]/5' : ''
                       }`}
                     >
                       <div className="flex items-start justify-between">
@@ -248,7 +248,7 @@ const NotificationsPage: React.FC = () => {
                                 {notification.title}
                               </h3>
                               {!notification.read && (
-                                <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                                <span className="w-2 h-2 bg-[#159A9C] rounded-full"></span>
                               )}
                             </div>
                             <p
@@ -339,11 +339,11 @@ const NotificationsPage: React.FC = () => {
                               <Calendar className="w-4 h-4" />
                               <span>{new Date(reminder.scheduledFor).toLocaleString('pt-BR')}</span>
                             </span>
-                            <span className="capitalize px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
+                            <span className="capitalize px-2 py-1 bg-[#159A9C]/10 text-[#159A9C] rounded-full text-xs">
                               {reminder.entityType}
                             </span>
                             {reminder.recurring && (
-                              <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs">
+                              <span className="px-2 py-1 bg-[#159A9C]/10 text-[#159A9C] rounded-full text-xs">
                                 Recorrente
                               </span>
                             )}

@@ -79,4 +79,4 @@ import { AtendimentoModule } from '../atendimento/atendimento.module';
     TypeOrmModule, // ✅ Exportar repositories para testes
   ],
 })
-export class TriagemModule { }
+export class TriagemModule {}

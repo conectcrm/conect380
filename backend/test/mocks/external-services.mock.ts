@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 /**
  * 🎭 Mocks de Serviços Externos para Testes E2E
- * 
+ *
  * Evita chamadas reais a APIs externas durante testes:
  * - WhatsApp API
  * - OpenAI
@@ -143,7 +143,7 @@ export class MockTwilioService {
 
 /**
  * 🎯 Provider configuration para testes E2E
- * 
+ *
  * Usar nos módulos de teste:
  * ```typescript
  * providers: [

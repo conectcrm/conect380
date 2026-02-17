@@ -8,7 +8,7 @@ export class StatusCustomizadosService {
   constructor(
     @InjectRepository(StatusCustomizado)
     private readonly statusRepository: Repository<StatusCustomizado>,
-  ) { }
+  ) {}
 
   async listarPorEmpresa(empresaId: string): Promise<StatusCustomizado[]> {
     if (!empresaId) {
@@ -26,10 +26,7 @@ export class StatusCustomizadosService {
     return status;
   }
 
-  async listarPorNivel(
-    empresaId: string,
-    nivelId: string,
-  ): Promise<StatusCustomizado[]> {
+  async listarPorNivel(empresaId: string, nivelId: string): Promise<StatusCustomizado[]> {
     if (!empresaId || !nivelId) {
       console.warn('[StatusService] ⚠️ empresaId ou nivelId vazio');
       return [];
@@ -44,9 +41,9 @@ export class StatusCustomizadosService {
     return status;
   }
 
-  async buscarPorId(id: string): Promise<StatusCustomizado> {
+  async buscarPorId(id: string, empresaId: string): Promise<StatusCustomizado> {
     return this.statusRepository.findOne({
-      where: { id },
+      where: { id, empresaId },
       relations: ['nivel'],
     });
   }

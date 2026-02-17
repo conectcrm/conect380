@@ -1,6 +1,17 @@
-import { Controller, Get, Query, Res, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Query,
+  Res,
+  HttpException,
+  HttpStatus,
+  Logger,
+  UseGuards,
+} from '@nestjs/common';
 import { Response } from 'express';
 import { AnalyticsService } from './analytics.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../common/guards/empresa.guard';
 
 export interface AnalyticsQueryDto {
   periodo?: '7d' | '30d' | '90d' | '1y';
@@ -10,6 +21,7 @@ export interface AnalyticsQueryDto {
 }
 
 @Controller('analytics')
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class AnalyticsController {
   private readonly logger = new Logger(AnalyticsController.name);
 

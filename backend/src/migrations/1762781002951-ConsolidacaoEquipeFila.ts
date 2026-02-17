@@ -1,7 +1,7 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class ConsolidacaoEquipeFila1762781002951 implements MigrationInterface {
-  name = 'ConsolidacaoEquipeFila1762781002951'
+  name = 'ConsolidacaoEquipeFila1762781002951';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // ========================================
@@ -159,16 +159,36 @@ export class ConsolidacaoEquipeFila1762781002951 implements MigrationInterface {
     // ========================================
     // MIGRATIONS ADICIONAIS (schema sync)
     // ========================================
-    await queryRunner.query(`ALTER TABLE "oportunidades" DROP CONSTRAINT "FK_oportunidades_cliente"`);
-    await queryRunner.query(`ALTER TABLE "filas_atendentes" DROP CONSTRAINT "FK_filas_atendentes_user"`);
-    await queryRunner.query(`ALTER TABLE "filas_atendentes" DROP CONSTRAINT "FK_filas_atendentes_fila"`);
-    await queryRunner.query(`ALTER TABLE "atendimento_tickets" DROP CONSTRAINT "FK_ticket_departamento"`);
-    await queryRunner.query(`ALTER TABLE "empresa_modulos" DROP CONSTRAINT "fk_empresa_modulos_empresa"`);
-    await queryRunner.query(`ALTER TABLE "password_reset_tokens" DROP CONSTRAINT "FK_password_reset_tokens_user"`);
-    await queryRunner.query(`ALTER TABLE "distribuicao_log" DROP CONSTRAINT "FK_380a8c5c105b3cc1b6018baee94"`);
-    await queryRunner.query(`ALTER TABLE "distribuicao_log" DROP CONSTRAINT "FK_f9e61fcb5a74c76ddb93e2d04c5"`);
-    await queryRunner.query(`ALTER TABLE "atendimento_configuracao_inatividade" DROP CONSTRAINT "FK_configuracao_inatividade_departamento"`);
-    await queryRunner.query(`ALTER TABLE "distribuicao_config" DROP CONSTRAINT "FK_544fd99a976c9ad31371a00d1c7"`);
+    await queryRunner.query(
+      `ALTER TABLE "oportunidades" DROP CONSTRAINT "FK_oportunidades_cliente"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "filas_atendentes" DROP CONSTRAINT "FK_filas_atendentes_user"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "filas_atendentes" DROP CONSTRAINT "FK_filas_atendentes_fila"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "atendimento_tickets" DROP CONSTRAINT "FK_ticket_departamento"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "empresa_modulos" DROP CONSTRAINT "fk_empresa_modulos_empresa"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "password_reset_tokens" DROP CONSTRAINT "FK_password_reset_tokens_user"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "distribuicao_log" DROP CONSTRAINT "FK_380a8c5c105b3cc1b6018baee94"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "distribuicao_log" DROP CONSTRAINT "FK_f9e61fcb5a74c76ddb93e2d04c5"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "atendimento_configuracao_inatividade" DROP CONSTRAINT "FK_configuracao_inatividade_departamento"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "distribuicao_config" DROP CONSTRAINT "FK_544fd99a976c9ad31371a00d1c7"`,
+    );
     await queryRunner.query(`ALTER TABLE "ticket_tags" DROP CONSTRAINT "FK_TICKET_TAGS_TAG"`);
     await queryRunner.query(`ALTER TABLE "ticket_tags" DROP CONSTRAINT "FK_TICKET_TAGS_TICKET"`);
     await queryRunner.query(`DROP INDEX "public"."IDX_filas_atendentes_fila_atendente"`);
@@ -207,7 +227,9 @@ export class ConsolidacaoEquipeFila1762781002951 implements MigrationInterface {
     await queryRunner.query(`DROP INDEX "public"."IDX_SLA_CONFIG_ATIVO"`);
     await queryRunner.query(`DROP INDEX "public"."IDX_SLA_CONFIG_EMPRESA_PRIORIDADE"`);
     await queryRunner.query(`DROP INDEX "public"."IDX_configuracao_inatividade_ativo"`);
-    await queryRunner.query(`DROP INDEX "public"."IDX_configuracao_inatividade_empresa_departamento"`);
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_configuracao_inatividade_empresa_departamento"`,
+    );
     await queryRunner.query(`DROP INDEX "public"."IDX_TICKET_TAGS_TAG"`);
     await queryRunner.query(`DROP INDEX "public"."IDX_TICKET_TAGS_TICKET"`);
     await queryRunner.query(`DROP INDEX "public"."IDX_TICKET_TAGS_COMPOSITE"`);
@@ -217,18 +239,36 @@ export class ConsolidacaoEquipeFila1762781002951 implements MigrationInterface {
     await queryRunner.query(`ALTER TABLE "faturas" ADD "criadoPor" uuid`);
     await queryRunner.query(`ALTER TABLE "faturas" ADD "atualizadoPor" uuid`);
     await queryRunner.query(`COMMENT ON COLUMN "fornecedores"."cnpj_cpf" IS NULL`);
-    await queryRunner.query(`ALTER TABLE "fluxos_triagem" ALTER COLUMN "historico_versoes" SET NOT NULL`);
-    await queryRunner.query(`ALTER TABLE "fluxos_triagem" ALTER COLUMN "versao_atual" SET NOT NULL`);
+    await queryRunner.query(
+      `ALTER TABLE "fluxos_triagem" ALTER COLUMN "historico_versoes" SET NOT NULL`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "fluxos_triagem" ALTER COLUMN "versao_atual" SET NOT NULL`,
+    );
     await queryRunner.query(`COMMENT ON COLUMN "filas_atendentes"."filaId" IS NULL`);
     await queryRunner.query(`COMMENT ON COLUMN "filas_atendentes"."atendenteId" IS NULL`);
-    await queryRunner.query(`COMMENT ON COLUMN "filas_atendentes"."capacidade" IS 'Tickets simultâneos que este atendente pode ter nesta fila'`);
-    await queryRunner.query(`COMMENT ON COLUMN "filas_atendentes"."prioridade" IS '1=alta prioridade, 10=baixa prioridade'`);
+    await queryRunner.query(
+      `COMMENT ON COLUMN "filas_atendentes"."capacidade" IS 'Tickets simultâneos que este atendente pode ter nesta fila'`,
+    );
+    await queryRunner.query(
+      `COMMENT ON COLUMN "filas_atendentes"."prioridade" IS '1=alta prioridade, 10=baixa prioridade'`,
+    );
     await queryRunner.query(`COMMENT ON COLUMN "filas_atendentes"."ativo" IS NULL`);
-    await queryRunner.query(`ALTER TYPE "public"."estrategia_distribuicao_enum" RENAME TO "estrategia_distribuicao_enum_old"`);
-    await queryRunner.query(`CREATE TYPE "public"."filas_estrategia_distribuicao_enum" AS ENUM('ROUND_ROBIN', 'MENOR_CARGA', 'PRIORIDADE')`);
-    await queryRunner.query(`ALTER TABLE "filas" ALTER COLUMN "estrategia_distribuicao" DROP DEFAULT`);
-    await queryRunner.query(`ALTER TABLE "filas" ALTER COLUMN "estrategia_distribuicao" TYPE "public"."filas_estrategia_distribuicao_enum" USING "estrategia_distribuicao"::"text"::"public"."filas_estrategia_distribuicao_enum"`);
-    await queryRunner.query(`ALTER TABLE "filas" ALTER COLUMN "estrategia_distribuicao" SET DEFAULT 'ROUND_ROBIN'`);
+    await queryRunner.query(
+      `ALTER TYPE "public"."estrategia_distribuicao_enum" RENAME TO "estrategia_distribuicao_enum_old"`,
+    );
+    await queryRunner.query(
+      `CREATE TYPE "public"."filas_estrategia_distribuicao_enum" AS ENUM('ROUND_ROBIN', 'MENOR_CARGA', 'PRIORIDADE')`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "filas" ALTER COLUMN "estrategia_distribuicao" DROP DEFAULT`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "filas" ALTER COLUMN "estrategia_distribuicao" TYPE "public"."filas_estrategia_distribuicao_enum" USING "estrategia_distribuicao"::"text"::"public"."filas_estrategia_distribuicao_enum"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "filas" ALTER COLUMN "estrategia_distribuicao" SET DEFAULT 'ROUND_ROBIN'`,
+    );
     await queryRunner.query(`DROP TYPE "public"."estrategia_distribuicao_enum_old"`);
     await queryRunner.query(`COMMENT ON COLUMN "filas"."estrategia_distribuicao" IS NULL`);
     await queryRunner.query(`COMMENT ON COLUMN "filas"."capacidade_maxima" IS NULL`);
@@ -239,27 +279,51 @@ export class ConsolidacaoEquipeFila1762781002951 implements MigrationInterface {
     await queryRunner.query(`ALTER TABLE "tags" ALTER COLUMN "createdAt" SET DEFAULT now()`);
     await queryRunner.query(`ALTER TABLE "tags" ALTER COLUMN "updatedAt" SET DEFAULT now()`);
     await queryRunner.query(`COMMENT ON COLUMN "atendimento_tickets"."departamento_id" IS NULL`);
-    await queryRunner.query(`ALTER TABLE "triagem_logs" ALTER COLUMN "created_at" SET DEFAULT now()`);
+    await queryRunner.query(
+      `ALTER TABLE "triagem_logs" ALTER COLUMN "created_at" SET DEFAULT now()`,
+    );
     await queryRunner.query(`ALTER TABLE "contas_pagar" DROP COLUMN "descricao"`);
-    await queryRunner.query(`ALTER TABLE "contas_pagar" ADD "descricao" character varying NOT NULL`);
+    await queryRunner.query(
+      `ALTER TABLE "contas_pagar" ADD "descricao" character varying NOT NULL`,
+    );
     await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "valorTotal" TYPE numeric(10,2)`);
     await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "valorPago" TYPE numeric(10,2)`);
-    await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "valorDesconto" TYPE numeric(10,2)`);
+    await queryRunner.query(
+      `ALTER TABLE "faturas" ALTER COLUMN "valorDesconto" TYPE numeric(10,2)`,
+    );
     await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "valorJuros" TYPE numeric(10,2)`);
     await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "valorMulta" TYPE numeric(10,2)`);
-    await queryRunner.query(`ALTER TABLE "faturas" DROP CONSTRAINT "FK_9b8490bce74e62adb498b5ccbb6"`);
+    await queryRunner.query(
+      `ALTER TABLE "faturas" DROP CONSTRAINT "FK_9b8490bce74e62adb498b5ccbb6"`,
+    );
     await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "contratoId" DROP NOT NULL`);
-    await queryRunner.query(`ALTER TABLE "empresa_modulos" ALTER COLUMN "data_ativacao" SET DEFAULT now()`);
+    await queryRunner.query(
+      `ALTER TABLE "empresa_modulos" ALTER COLUMN "data_ativacao" SET DEFAULT now()`,
+    );
     await queryRunner.query(`COMMENT ON COLUMN "empresa_modulos"."data_expiracao" IS NULL`);
-    await queryRunner.query(`ALTER TABLE "empresa_modulos" ALTER COLUMN "created_at" SET DEFAULT now()`);
-    await queryRunner.query(`ALTER TABLE "empresa_modulos" ALTER COLUMN "updated_at" SET DEFAULT now()`);
-    await queryRunner.query(`ALTER TABLE "sla_event_logs" ALTER COLUMN "createdAt" SET DEFAULT now()`);
+    await queryRunner.query(
+      `ALTER TABLE "empresa_modulos" ALTER COLUMN "created_at" SET DEFAULT now()`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "empresa_modulos" ALTER COLUMN "updated_at" SET DEFAULT now()`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "sla_event_logs" ALTER COLUMN "createdAt" SET DEFAULT now()`,
+    );
     await queryRunner.query(`ALTER TABLE "sla_configs" ALTER COLUMN "createdAt" SET DEFAULT now()`);
     await queryRunner.query(`ALTER TABLE "sla_configs" ALTER COLUMN "updatedAt" SET DEFAULT now()`);
-    await queryRunner.query(`COMMENT ON COLUMN "atendimento_configuracao_inatividade"."departamento_id" IS NULL`);
-    await queryRunner.query(`ALTER TABLE "atendimento_configuracao_inatividade" ALTER COLUMN "created_at" SET DEFAULT now()`);
-    await queryRunner.query(`ALTER TABLE "atendimento_configuracao_inatividade" ALTER COLUMN "updated_at" SET DEFAULT now()`);
-    await queryRunner.query(`ALTER TABLE "atendimento_canais" ALTER COLUMN "provedor" DROP DEFAULT`);
+    await queryRunner.query(
+      `COMMENT ON COLUMN "atendimento_configuracao_inatividade"."departamento_id" IS NULL`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "atendimento_configuracao_inatividade" ALTER COLUMN "created_at" SET DEFAULT now()`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "atendimento_configuracao_inatividade" ALTER COLUMN "updated_at" SET DEFAULT now()`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "atendimento_canais" ALTER COLUMN "provedor" DROP DEFAULT`,
+    );
     await queryRunner.query(`ALTER TABLE "canais" DROP COLUMN "nome"`);
     await queryRunner.query(`ALTER TABLE "canais" ADD "nome" character varying NOT NULL`);
     await queryRunner.query(`ALTER TABLE "canais" DROP COLUMN "tipo"`);
@@ -272,34 +336,90 @@ export class ConsolidacaoEquipeFila1762781002951 implements MigrationInterface {
     await queryRunner.query(`ALTER TABLE "canais" ADD "webhook_url" character varying`);
     await queryRunner.query(`ALTER TABLE "canais" DROP COLUMN "webhook_secret"`);
     await queryRunner.query(`ALTER TABLE "canais" ADD "webhook_secret" character varying`);
-    await queryRunner.query(`CREATE INDEX "IDX_dced2c6050cacb6b2f6a5c2bb5" ON "filas_atendentes" ("atendenteId") `);
-    await queryRunner.query(`CREATE INDEX "IDX_4d7b70fba91aea5d9439fcee01" ON "filas_atendentes" ("filaId") `);
-    await queryRunner.query(`CREATE UNIQUE INDEX "IDX_cdcb1da9877f92375cff9b2812" ON "filas_atendentes" ("filaId", "atendenteId") `);
-    await queryRunner.query(`CREATE INDEX "IDX_67862e1af92d16dfa50f4e9d18" ON "faturas" ("clienteId") `);
-    await queryRunner.query(`CREATE INDEX "IDX_1162d4fe194d2e32a9ecf6ccb4" ON "faturas" ("status") `);
-    await queryRunner.query(`CREATE INDEX "IDX_c0d57c7b5bde732ac3d3ed3558" ON "faturas" ("dataEmissao") `);
-    await queryRunner.query(`CREATE INDEX "IDX_139d3276e0a299deacb53a557d" ON "faturas" ("dataVencimento") `);
-    await queryRunner.query(`CREATE INDEX "IDX_60cf6cd7b6a1b7298af56b056d" ON "faturas" ("ativo") `);
-    await queryRunner.query(`CREATE INDEX "IDX_c74f605d546764c24c0d9451f0" ON "faturas" ("createdAt") `);
-    await queryRunner.query(`CREATE UNIQUE INDEX "IDX_a4c04e78810691f77a6c4dd8e6" ON "faturas" ("numero") `);
-    await queryRunner.query(`CREATE INDEX "IDX_e0741e7b51d90755844ae04d67" ON "faturas" ("dataVencimento", "status") `);
-    await queryRunner.query(`CREATE INDEX "IDX_450c254ac416c5207f90573259" ON "faturas" ("clienteId", "status") `);
-    await queryRunner.query(`CREATE UNIQUE INDEX "IDX_563dad1f6cbd1478ca0ae34845" ON "atendimento_configuracao_inatividade" ("empresa_id", "departamento_id") `);
-    await queryRunner.query(`CREATE INDEX "IDX_bd3c69926bfff8721e010e77bc" ON "ticket_tags" ("ticketId") `);
-    await queryRunner.query(`CREATE INDEX "IDX_4c0c28c88a8ad89b2c1ba6c661" ON "ticket_tags" ("tagId") `);
-    await queryRunner.query(`ALTER TABLE "empresa_modulos" ADD CONSTRAINT "UQ_77259e6fdc8105e25f82ac00bb6" UNIQUE ("empresa_id", "modulo")`);
-    await queryRunner.query(`ALTER TABLE "oportunidades" ADD CONSTRAINT "FK_21bbf91bef3ac34a19858316c17" FOREIGN KEY ("cliente_id") REFERENCES "clientes"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
-    await queryRunner.query(`ALTER TABLE "filas_atendentes" ADD CONSTRAINT "FK_4d7b70fba91aea5d9439fcee014" FOREIGN KEY ("filaId") REFERENCES "filas"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-    await queryRunner.query(`ALTER TABLE "filas_atendentes" ADD CONSTRAINT "FK_dced2c6050cacb6b2f6a5c2bb5d" FOREIGN KEY ("atendenteId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-    await queryRunner.query(`ALTER TABLE "atendimento_tickets" ADD CONSTRAINT "FK_49ba5247c171bb23921c171a545" FOREIGN KEY ("fila_id") REFERENCES "filas"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
-    await queryRunner.query(`ALTER TABLE "faturas" ADD CONSTRAINT "FK_9b8490bce74e62adb498b5ccbb6" FOREIGN KEY ("contratoId") REFERENCES "contratos"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
-    await queryRunner.query(`ALTER TABLE "empresa_modulos" ADD CONSTRAINT "FK_46edc34189c9fc0365aa377b4f6" FOREIGN KEY ("empresa_id") REFERENCES "empresas"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-    await queryRunner.query(`ALTER TABLE "password_reset_tokens" ADD CONSTRAINT "FK_52ac39dd8a28730c63aeb428c9c" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-    await queryRunner.query(`ALTER TABLE "distribuicao_log" ADD CONSTRAINT "FK_f9e61fcb5a74c76ddb93e2d04c5" FOREIGN KEY ("atendenteId") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
-    await queryRunner.query(`ALTER TABLE "distribuicao_log" ADD CONSTRAINT "FK_380a8c5c105b3cc1b6018baee94" FOREIGN KEY ("filaId") REFERENCES "filas"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
-    await queryRunner.query(`ALTER TABLE "atendimento_configuracao_inatividade" ADD CONSTRAINT "FK_eb5c423596a1b4426136371d5d6" FOREIGN KEY ("departamento_id") REFERENCES "departamentos"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-    await queryRunner.query(`ALTER TABLE "ticket_tags" ADD CONSTRAINT "FK_bd3c69926bfff8721e010e77bcc" FOREIGN KEY ("ticketId") REFERENCES "atendimento_tickets"("id") ON DELETE CASCADE ON UPDATE CASCADE`);
-    await queryRunner.query(`ALTER TABLE "ticket_tags" ADD CONSTRAINT "FK_4c0c28c88a8ad89b2c1ba6c6619" FOREIGN KEY ("tagId") REFERENCES "tags"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_dced2c6050cacb6b2f6a5c2bb5" ON "filas_atendentes" ("atendenteId") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_4d7b70fba91aea5d9439fcee01" ON "filas_atendentes" ("filaId") `,
+    );
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_cdcb1da9877f92375cff9b2812" ON "filas_atendentes" ("filaId", "atendenteId") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_67862e1af92d16dfa50f4e9d18" ON "faturas" ("clienteId") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_1162d4fe194d2e32a9ecf6ccb4" ON "faturas" ("status") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_c0d57c7b5bde732ac3d3ed3558" ON "faturas" ("dataEmissao") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_139d3276e0a299deacb53a557d" ON "faturas" ("dataVencimento") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_60cf6cd7b6a1b7298af56b056d" ON "faturas" ("ativo") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_c74f605d546764c24c0d9451f0" ON "faturas" ("createdAt") `,
+    );
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_a4c04e78810691f77a6c4dd8e6" ON "faturas" ("numero") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_e0741e7b51d90755844ae04d67" ON "faturas" ("dataVencimento", "status") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_450c254ac416c5207f90573259" ON "faturas" ("clienteId", "status") `,
+    );
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX "IDX_563dad1f6cbd1478ca0ae34845" ON "atendimento_configuracao_inatividade" ("empresa_id", "departamento_id") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_bd3c69926bfff8721e010e77bc" ON "ticket_tags" ("ticketId") `,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_4c0c28c88a8ad89b2c1ba6c661" ON "ticket_tags" ("tagId") `,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "empresa_modulos" ADD CONSTRAINT "UQ_77259e6fdc8105e25f82ac00bb6" UNIQUE ("empresa_id", "modulo")`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "oportunidades" ADD CONSTRAINT "FK_21bbf91bef3ac34a19858316c17" FOREIGN KEY ("cliente_id") REFERENCES "clientes"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "filas_atendentes" ADD CONSTRAINT "FK_4d7b70fba91aea5d9439fcee014" FOREIGN KEY ("filaId") REFERENCES "filas"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "filas_atendentes" ADD CONSTRAINT "FK_dced2c6050cacb6b2f6a5c2bb5d" FOREIGN KEY ("atendenteId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "atendimento_tickets" ADD CONSTRAINT "FK_49ba5247c171bb23921c171a545" FOREIGN KEY ("fila_id") REFERENCES "filas"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "faturas" ADD CONSTRAINT "FK_9b8490bce74e62adb498b5ccbb6" FOREIGN KEY ("contratoId") REFERENCES "contratos"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "empresa_modulos" ADD CONSTRAINT "FK_46edc34189c9fc0365aa377b4f6" FOREIGN KEY ("empresa_id") REFERENCES "empresas"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "password_reset_tokens" ADD CONSTRAINT "FK_52ac39dd8a28730c63aeb428c9c" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "distribuicao_log" ADD CONSTRAINT "FK_f9e61fcb5a74c76ddb93e2d04c5" FOREIGN KEY ("atendenteId") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "distribuicao_log" ADD CONSTRAINT "FK_380a8c5c105b3cc1b6018baee94" FOREIGN KEY ("filaId") REFERENCES "filas"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "atendimento_configuracao_inatividade" ADD CONSTRAINT "FK_eb5c423596a1b4426136371d5d6" FOREIGN KEY ("departamento_id") REFERENCES "departamentos"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "ticket_tags" ADD CONSTRAINT "FK_bd3c69926bfff8721e010e77bcc" FOREIGN KEY ("ticketId") REFERENCES "atendimento_tickets"("id") ON DELETE CASCADE ON UPDATE CASCADE`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "ticket_tags" ADD CONSTRAINT "FK_4c0c28c88a8ad89b2c1ba6c6619" FOREIGN KEY ("tagId") REFERENCES "tags"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

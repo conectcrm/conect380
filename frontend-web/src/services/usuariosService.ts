@@ -5,6 +5,7 @@ import {
   AtualizarUsuario,
   FiltrosUsuarios,
   EstatisticasUsuarios,
+  UserRole,
 } from '../types/usuarios/index';
 import { User } from '../types';
 
@@ -191,18 +192,21 @@ class UsuariosService {
 
       // O backend retorna um objeto com {success: true, data: {...}}
       const backendData = response.data.data || response.data;
+      const distribuicaoPorRole = {
+        [UserRole.SUPERADMIN]: 0,
+        [UserRole.ADMIN]: 0,
+        [UserRole.MANAGER]: 0,
+        [UserRole.VENDEDOR]: 0,
+        [UserRole.USER]: 0,
+        ...(backendData.por_perfil || {}),
+      };
 
       // Mapear os dados do backend para o formato esperado pelo frontend
       return {
         totalUsuarios: backendData.total || 0,
         usuariosAtivos: backendData.ativos || 0,
         usuariosInativos: backendData.inativos || 0,
-        distribuicaoPorRole: backendData.por_perfil || {
-          admin: 0,
-          manager: 0,
-          vendedor: 0,
-          user: 0,
-        },
+        distribuicaoPorRole,
         ultimosLogins: backendData.ativos_30_dias || 0,
       };
     } catch (error) {
@@ -213,10 +217,11 @@ class UsuariosService {
         usuariosAtivos: 0,
         usuariosInativos: 0,
         distribuicaoPorRole: {
-          admin: 0,
-          manager: 0,
-          vendedor: 0,
-          user: 0,
+          [UserRole.SUPERADMIN]: 0,
+          [UserRole.ADMIN]: 0,
+          [UserRole.MANAGER]: 0,
+          [UserRole.VENDEDOR]: 0,
+          [UserRole.USER]: 0,
         },
         ultimosLogins: 0,
       };

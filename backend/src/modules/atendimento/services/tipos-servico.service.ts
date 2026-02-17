@@ -8,7 +8,7 @@ export class TiposServicoService {
   constructor(
     @InjectRepository(TipoServico)
     private readonly tipoRepository: Repository<TipoServico>,
-  ) { }
+  ) {}
 
   async listarPorEmpresa(empresaId: string): Promise<TipoServico[]> {
     if (!empresaId) {
@@ -25,7 +25,7 @@ export class TiposServicoService {
     return tipos;
   }
 
-  async buscarPorId(id: string): Promise<TipoServico> {
-    return this.tipoRepository.findOne({ where: { id } });
+  async buscarPorId(id: string, empresaId: string): Promise<TipoServico> {
+    return this.tipoRepository.findOne({ where: { id, empresaId } });
   }
 }

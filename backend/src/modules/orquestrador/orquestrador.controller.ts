@@ -8,9 +8,11 @@ import {
   ProcessarFluxoDto,
 } from './dto/fluxo-automatizado.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { EmpresaId } from '../../common/decorators/empresa.decorator';
 
 @Controller('orquestrador')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class OrquestradorController {
   constructor(private readonly orquestradorService: OrquestradorService) {}
 
@@ -18,32 +20,45 @@ export class OrquestradorController {
    * Iniciar fluxo automatizado para uma proposta aceita
    */
   @Post('fluxos')
-  async criarFluxoAutomatizado(@Body() createDto: CreateFluxoAutomatizadoDto) {
-    return await this.orquestradorService.criarFluxoAutomatizado(createDto);
+  async criarFluxoAutomatizado(
+    @EmpresaId() empresaId: string,
+    @Body() createDto: CreateFluxoAutomatizadoDto,
+  ) {
+    return await this.orquestradorService.criarFluxoAutomatizado({
+      ...createDto,
+      tenantId: empresaId,
+    });
   }
 
   /**
    * Listar fluxos automatizados com filtros
    */
   @Get('fluxos')
-  async listarFluxos(@Query() filtros: FiltroFluxosDto) {
-    return await this.orquestradorService.listarFluxos(filtros);
+  async listarFluxos(@EmpresaId() empresaId: string, @Query() filtros: FiltroFluxosDto) {
+    return await this.orquestradorService.listarFluxos({
+      ...filtros,
+      tenantId: empresaId,
+    });
   }
 
   /**
    * Buscar fluxo por ID
    */
   @Get('fluxos/:id')
-  async buscarFluxoPorId(@Param('id') id: string) {
-    return await this.orquestradorService.buscarPorId(id);
+  async buscarFluxoPorId(@EmpresaId() empresaId: string, @Param('id') id: string) {
+    return await this.orquestradorService.buscarPorId(id, empresaId);
   }
 
   /**
    * Atualizar fluxo automatizado
    */
   @Put('fluxos/:id')
-  async atualizarFluxo(@Param('id') id: string, @Body() updateDto: UpdateFluxoAutomatizadoDto) {
-    return await this.orquestradorService.atualizar(id, updateDto);
+  async atualizarFluxo(
+    @EmpresaId() empresaId: string,
+    @Param('id') id: string,
+    @Body() updateDto: UpdateFluxoAutomatizadoDto,
+  ) {
+    return await this.orquestradorService.atualizar(id, updateDto, empresaId);
   }
 
   /**
@@ -51,6 +66,7 @@ export class OrquestradorController {
    */
   @Post('fluxos/:id/processar')
   async processarFluxo(
+    @EmpresaId() empresaId: string,
     @Param('id') id: string,
     @Body() body: { forcarProcessamento?: boolean; parametrosCustomizados?: any },
   ) {
@@ -60,39 +76,47 @@ export class OrquestradorController {
       parametrosCustomizados: body.parametrosCustomizados,
     };
 
-    return await this.orquestradorService.processarFluxo(processarDto);
+    return await this.orquestradorService.processarFluxo(processarDto, empresaId);
   }
 
   /**
    * Pausar fluxo automatizado
    */
   @Post('fluxos/:id/pausar')
-  async pausarFluxo(@Param('id') id: string, @Body() body: { motivo?: string }) {
-    return await this.orquestradorService.pausarFluxo(id, body.motivo);
+  async pausarFluxo(
+    @EmpresaId() empresaId: string,
+    @Param('id') id: string,
+    @Body() body: { motivo?: string },
+  ) {
+    return await this.orquestradorService.pausarFluxo(id, body.motivo, empresaId);
   }
 
   /**
    * Retomar fluxo pausado
    */
   @Post('fluxos/:id/retomar')
-  async retomarFluxo(@Param('id') id: string) {
-    return await this.orquestradorService.retomarFluxo(id);
+  async retomarFluxo(@EmpresaId() empresaId: string, @Param('id') id: string) {
+    return await this.orquestradorService.retomarFluxo(id, empresaId);
   }
 
   /**
    * Cancelar fluxo automatizado
    */
   @Post('fluxos/:id/cancelar')
-  async cancelarFluxo(@Param('id') id: string, @Body() body: { motivo?: string }) {
-    return await this.orquestradorService.cancelarFluxo(id, body.motivo);
+  async cancelarFluxo(
+    @EmpresaId() empresaId: string,
+    @Param('id') id: string,
+    @Body() body: { motivo?: string },
+  ) {
+    return await this.orquestradorService.cancelarFluxo(id, body.motivo, empresaId);
   }
 
   /**
    * Processar todos os fluxos pendentes manualmente
    */
   @Post('processar-pendentes')
-  async processarFluxosPendentes() {
-    await this.orquestradorService.processarFluxosPendentes();
+  async processarFluxosPendentes(@EmpresaId() empresaId: string) {
+    await this.orquestradorService.processarFluxosPendentes(empresaId);
     return {
       message: 'Processamento de fluxos pendentes iniciado',
       timestamp: new Date().toISOString(),
@@ -100,19 +124,22 @@ export class OrquestradorController {
   }
 
   /**
-   * Obter estatísticas dos fluxos
+   * Obter estatisticas dos fluxos
    */
   @Get('estatisticas')
-  async obterEstatisticas(@Query() filtros: EstatisticasFluxoDto) {
-    return await this.orquestradorService.obterEstatisticas(filtros);
+  async obterEstatisticas(@EmpresaId() empresaId: string, @Query() filtros: EstatisticasFluxoDto) {
+    return await this.orquestradorService.obterEstatisticas({
+      ...filtros,
+      tenantId: empresaId,
+    });
   }
 
   /**
    * Dashboard com resumo geral
    */
   @Get('dashboard')
-  async dashboard(@Query('tenantId') tenantId?: string) {
-    const filtrosBasicos = tenantId ? { tenantId } : {};
+  async dashboard(@EmpresaId() empresaId: string) {
+    const filtrosBasicos = { tenantId: empresaId };
 
     const [estatisticas, fluxosRecentes, fluxosComErro] = await Promise.all([
       this.orquestradorService.obterEstatisticas(filtrosBasicos),
@@ -137,7 +164,7 @@ export class OrquestradorController {
           )
           .reduce((acc, r) => acc + parseInt(r.total), 0),
         taxaSucesso: this.calcularTaxaSucesso(estatisticas.resumo),
-        tempoMedioProcessamento: '2.5 horas', // Placeholder - implementar cálculo real
+        tempoMedioProcessamento: '2.5 horas', // Placeholder - implementar calculo real
       },
     };
   }

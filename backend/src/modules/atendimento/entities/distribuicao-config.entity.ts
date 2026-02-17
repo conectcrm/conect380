@@ -12,7 +12,7 @@ import { Empresa } from '../../../empresas/entities/empresa.entity';
 
 /**
  * Configuração de Distribuição Automática de Tickets
- * 
+ *
  * Define como tickets serão automaticamente atribuídos a atendentes
  * dentro de uma fila específica.
  */

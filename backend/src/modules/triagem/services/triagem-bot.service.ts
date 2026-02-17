@@ -57,7 +57,7 @@ export class TriagemBotService {
     private readonly atribuicaoService: AtribuicaoService,
     private readonly triagemLogService: TriagemLogService,
     private readonly whatsAppSenderService: WhatsAppSenderService,
-  ) { }
+  ) {}
 
   /**
    * Processa mensagem recebida pelo webhook do WhatsApp
@@ -196,8 +196,8 @@ export class TriagemBotService {
 
     const novaSessao = resposta?.sessaoId
       ? await this.sessaoRepository.findOne({
-        where: { id: resposta.sessaoId, empresaId },
-      })
+          where: { id: resposta.sessaoId, empresaId },
+        })
       : null;
 
     await this.registrarLogEntradaMensagem(empresaId, dadosMensagem, novaSessao, payload);
@@ -558,7 +558,7 @@ export class TriagemBotService {
           where: {
             codigo: 'NUC_GERAL',
             empresaId: sessao.empresaId,
-            ativo: true
+            ativo: true,
           },
         });
 
@@ -777,7 +777,7 @@ export class TriagemBotService {
         const proximaEtapaDepartamentosRaw = sessao.contexto?.__proximaEtapaDepartamento;
         const proximaEtapaDepartamentos =
           typeof proximaEtapaDepartamentosRaw === 'string' &&
-            proximaEtapaDepartamentosRaw.trim().length > 0
+          proximaEtapaDepartamentosRaw.trim().length > 0
             ? proximaEtapaDepartamentosRaw.trim()
             : 'transferir-atendimento';
 
@@ -809,7 +809,7 @@ export class TriagemBotService {
             where: {
               codigo: atalho.nucleoCodigo,
               empresaId: sessao.empresaId,
-              ativo: true
+              ativo: true,
             },
           });
 
@@ -847,7 +847,7 @@ Posso te encaminhar agora para nossa equipe?
             where: {
               codigo: 'NUC_GERAL',
               empresaId: sessao.empresaId,
-              ativo: true
+              ativo: true,
             },
           });
 
@@ -858,7 +858,8 @@ Posso te encaminhar agora para nossa equipe?
             await this.sessaoRepository.save(sessao);
 
             return await this.responderComLog(sessao, fluxo, {
-              mensagem: '👤 Vou te conectar com um atendente humano!\n\nAntes, conta rapidamente: qual o motivo do seu contato?\n\n💡 Digite SAIR para cancelar',
+              mensagem:
+                '👤 Vou te conectar com um atendente humano!\n\nAntes, conta rapidamente: qual o motivo do seu contato?\n\n💡 Digite SAIR para cancelar',
               sessaoId: sessao.id,
               etapaAtual: sessao.etapaAtual,
               aguardaResposta: true,
@@ -1063,7 +1064,8 @@ Posso te encaminhar agora para nossa equipe?
 
         sessao.contexto[chave] = valor;
         this.logger.log(
-          `💾 Contexto atualizado: ${chave} => ${Array.isArray(valor) ? `[array ${valor.length}]` : JSON.stringify(valor)
+          `💾 Contexto atualizado: ${chave} => ${
+            Array.isArray(valor) ? `[array ${valor.length}]` : JSON.stringify(valor)
           }`,
         );
       }
@@ -1682,14 +1684,14 @@ Posso te encaminhar agora para nossa equipe?
     const respostas =
       historico.length > 0
         ? historico
-          .map((item, index) => {
-            const etapa = fluxo?.estrutura?.etapas?.[item.etapa];
-            const pergunta = etapa?.mensagem
-              ? etapa.mensagem.replace(/\s+/g, ' ').trim()
-              : item.etapa;
-            return `${index + 1}. ${pergunta}: ${item.resposta}`;
-          })
-          .join('\n')
+            .map((item, index) => {
+              const etapa = fluxo?.estrutura?.etapas?.[item.etapa];
+              const pergunta = etapa?.mensagem
+                ? etapa.mensagem.replace(/\s+/g, ' ').trim()
+                : item.etapa;
+              return `${index + 1}. ${pergunta}: ${item.resposta}`;
+            })
+            .join('\n')
         : 'Nenhuma resposta registrada durante a triagem.';
 
     const contexto = sessao.contexto || {};
@@ -2071,9 +2073,9 @@ Posso te encaminhar agora para nossa equipe?
   /**
    * Cancela sessão de triagem
    */
-  async cancelarSessao(sessaoId: string): Promise<void> {
+  async cancelarSessao(empresaId: string, sessaoId: string): Promise<void> {
     const sessao = await this.sessaoRepository.findOne({
-      where: { id: sessaoId },
+      where: { id: sessaoId, empresaId },
       relations: ['fluxo'],
     });
 

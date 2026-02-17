@@ -50,7 +50,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
     try {
       const response = await fetch('/api/analytics/export?formato=completo', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         }
       });
 
@@ -83,7 +83,10 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button onClick={exportarRelatorioCompleto} className="bg-blue-600 hover:bg-blue-700">
+            <Button
+              onClick={exportarRelatorioCompleto}
+              className="bg-[#159A9C] hover:bg-[#0F7B7D]"
+            >
               <Download className="h-4 w-4 mr-2" />
               Exportar Relatório
             </Button>
@@ -158,7 +161,10 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
                                 <span className="font-bold">R$ 500.000</span>
                               </div>
                               <div className="w-full bg-gray-200 rounded-full h-3">
-                                <div className="bg-blue-500 h-3 rounded-full" style={{ width: '90%' }}></div>
+                                <div
+                                  className="bg-[#159A9C] h-3 rounded-full"
+                                  style={{ width: '90%' }}
+                                ></div>
                               </div>
                               <div className="text-center text-sm text-gray-600">
                                 90% da meta - Faltam R$ 50.000
@@ -205,7 +211,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
         </div>
 
         {/* Seção de Insights e Recomendações */}
-        <Card className="bg-gradient-to-r from-purple-50 to-blue-50">
+        <Card className="bg-[#159A9C]/5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />

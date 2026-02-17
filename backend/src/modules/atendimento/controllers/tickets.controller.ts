@@ -8,12 +8,13 @@ import {
   Param,
   Query,
   UseGuards,
-  Req,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
-import { Ticket, StatusTicket, OrigemTicket, PrioridadeTicket } from '../entities/ticket.entity';
+import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { EmpresaId } from '../../../common/decorators/empresa.decorator';
+import { Ticket, StatusTicket, PrioridadeTicket } from '../entities/ticket.entity';
 import { Mensagem } from '../entities/mensagem.entity';
 import { Tag } from '../entities/tag.entity';
 import { AtendimentoGateway } from '../gateways/atendimento.gateway';
@@ -21,7 +22,7 @@ import { OnlineStatusService } from '../services/online-status.service';
 import { CriarTicketDto, AtualizarTicketDto, AtribuirTicketDto, FiltrarTicketsDto } from '../dto';
 
 @Controller('atendimento/tickets')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class TicketsController {
   constructor(
     @InjectRepository(Ticket)
@@ -35,21 +36,19 @@ export class TicketsController {
 
     private atendimentoGateway: AtendimentoGateway,
     private onlineStatusService: OnlineStatusService,
-  ) { }
+  ) {}
 
   @Get()
-  async listar(@Req() req, @Query() filtros: FiltrarTicketsDto) {
+  async listar(@EmpresaId() empresaId: string, @Query() filtros: FiltrarTicketsDto) {
     try {
-      const empresaId = req.user.empresa_id || req.user.empresaId;
-
-      const where: any = { empresaId };
+      const where: Record<string, unknown> = { empresaId };
 
       if (filtros.status) {
         const statusFiltro = filtros.status.toString().toLowerCase();
 
         switch (statusFiltro) {
           case 'aberto':
-            where.status = In([StatusTicket.ABERTO, StatusTicket.EM_ATENDIMENTO]);
+            where.status = In([StatusTicket.FILA, StatusTicket.EM_ATENDIMENTO]);
             break;
           case 'em_atendimento':
             where.status = StatusTicket.EM_ATENDIMENTO;
@@ -60,13 +59,13 @@ export class TicketsController {
           case 'aguardando_cliente_bot':
           case 'pendente':
           case 'follow_up':
-            where.status = StatusTicket.AGUARDANDO;
+            where.status = StatusTicket.AGUARDANDO_CLIENTE;
             break;
           case 'resolvido':
-            where.status = In([StatusTicket.RESOLVIDO, StatusTicket.FECHADO]);
+            where.status = In([StatusTicket.CONCLUIDO, StatusTicket.ENCERRADO]);
             break;
           case 'fechado':
-            where.status = StatusTicket.FECHADO;
+            where.status = StatusTicket.ENCERRADO;
             break;
           default:
             where.status = statusFiltro.toUpperCase();
@@ -95,8 +94,8 @@ export class TicketsController {
             const lastActivity = await this.ticketRepo.query(
               `
               SELECT MAX(contato_last_activity) as last_activity
-              FROM atendimento_tickets 
-              WHERE contato_telefone = $1 
+              FROM atendimento_tickets
+              WHERE contato_telefone = $1
                 AND empresa_id = $2
                 AND contato_last_activity IS NOT NULL
             `,
@@ -135,9 +134,7 @@ export class TicketsController {
   }
 
   @Get(':id')
-  async buscarPorId(@Req() req, @Param('id') id: string) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
-
+  async buscarPorId(@EmpresaId() empresaId: string, @Param('id') id: string) {
     const ticket = await this.ticketRepo.findOne({
       where: { id, empresaId },
     });
@@ -151,7 +148,7 @@ export class TicketsController {
 
     // Buscar mensagens do ticket
     const mensagens = await this.mensagemRepo.find({
-      where: { ticketId: id },
+      where: { ticketId: id, empresaId },
       order: { createdAt: 'ASC' },
     });
 
@@ -165,16 +162,14 @@ export class TicketsController {
   }
 
   @Post()
-  async criar(@Req() req, @Body() dto: CriarTicketDto) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
-
+  async criar(@EmpresaId() empresaId: string, @Body() dto: CriarTicketDto) {
     // Separar tags do DTO (não pode ir direto no create)
     const { tags: tagIds, ...ticketData } = dto;
 
     const ticket = this.ticketRepo.create({
       ...ticketData,
       empresaId,
-      status: StatusTicket.ABERTO,
+      status: StatusTicket.FILA,
       prioridade: dto.prioridade || PrioridadeTicket.MEDIA,
     });
 
@@ -182,7 +177,12 @@ export class TicketsController {
 
     // Se tags foram fornecidas, carregar e associar
     if (tagIds && tagIds.length > 0) {
-      const tags = await this.tagRepo.findByIds(tagIds);
+      const tags = await this.tagRepo.find({
+        where: {
+          id: In(tagIds),
+          empresaId,
+        },
+      });
       ticket.tags = tags;
       await this.ticketRepo.save(ticket);
     }
@@ -198,9 +198,11 @@ export class TicketsController {
   }
 
   @Put(':id')
-  async atualizar(@Req() req, @Param('id') id: string, @Body() dto: AtualizarTicketDto) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
-
+  async atualizar(
+    @EmpresaId() empresaId: string,
+    @Param('id') id: string,
+    @Body() dto: AtualizarTicketDto,
+  ) {
     const ticket = await this.ticketRepo.findOne({
       where: { id, empresaId },
     });
@@ -226,9 +228,11 @@ export class TicketsController {
   }
 
   @Post(':id/atribuir')
-  async atribuir(@Req() req, @Param('id') id: string, @Body() dto: AtribuirTicketDto) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
-
+  async atribuir(
+    @EmpresaId() empresaId: string,
+    @Param('id') id: string,
+    @Body() dto: AtribuirTicketDto,
+  ) {
     const ticket = await this.ticketRepo.findOne({
       where: { id, empresaId },
     });
@@ -255,9 +259,7 @@ export class TicketsController {
   }
 
   @Delete(':id')
-  async deletar(@Req() req, @Param('id') id: string) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
-
+  async deletar(@EmpresaId() empresaId: string, @Param('id') id: string) {
     const ticket = await this.ticketRepo.findOne({
       where: { id, empresaId },
     });
@@ -278,14 +280,12 @@ export class TicketsController {
   }
 
   @Get('estatisticas/geral')
-  async estatisticas(@Req() req) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
-
+  async estatisticas(@EmpresaId() empresaId: string) {
     const [totalAbertos, totalEmAtendimento, totalResolvidos, totalFechados] = await Promise.all([
-      this.ticketRepo.count({ where: { empresaId, status: StatusTicket.ABERTO } }),
+      this.ticketRepo.count({ where: { empresaId, status: StatusTicket.FILA } }),
       this.ticketRepo.count({ where: { empresaId, status: StatusTicket.EM_ATENDIMENTO } }),
-      this.ticketRepo.count({ where: { empresaId, status: StatusTicket.RESOLVIDO } }),
-      this.ticketRepo.count({ where: { empresaId, status: StatusTicket.FECHADO } }),
+      this.ticketRepo.count({ where: { empresaId, status: StatusTicket.CONCLUIDO } }),
+      this.ticketRepo.count({ where: { empresaId, status: StatusTicket.ENCERRADO } }),
     ]);
 
     return {
@@ -301,7 +301,7 @@ export class TicketsController {
   }
 
   /* ENDPOINTS COMENTADOS - Requerem Historico e OrquestradorService
-  
+
   @Post(':id/transferir')
   async transferir(
     @Req() req,
@@ -325,7 +325,7 @@ export class TicketsController {
 
     ticket.filaId = dto.filaId;
     ticket.atendenteId = null;
-    ticket.status = StatusTicket.AGUARDANDO;
+    ticket.status = StatusTicket.AGUARDANDO_CLIENTE;
     await this.ticketRepo.save(ticket);
 
     await this.orquestradorService.distribuirTicketAutomaticamente(ticket);
@@ -356,7 +356,7 @@ export class TicketsController {
       };
     }
 
-    ticket.status = dto.status as StatusTicket || StatusTicket.RESOLVIDO;
+    ticket.status = dto.status as StatusTicket || StatusTicket.CONCLUIDO;
     ticket.closedAt = new Date();
     await this.ticketRepo.save(ticket);
 

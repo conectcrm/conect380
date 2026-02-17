@@ -82,7 +82,7 @@ export class MensagemService {
     private whatsappConfigService: WhatsAppConfigService, // 🔐 NOVO - Config centralizada
     private emailSenderService: EmailSenderService,
     private atendimentoGateway: AtendimentoGateway,
-  ) { }
+  ) {}
 
   private async ensureUploadsDirectory(): Promise<void> {
     try {
@@ -296,14 +296,14 @@ export class MensagemService {
     }
   }
 
-  async obterMidiaParaDownload(mensagemId: string): Promise<{
+  async obterMidiaParaDownload(mensagemId: string, empresaId?: string): Promise<{
     tipo: string;
     nome: string;
     remoto: boolean;
     url?: string;
     caminho?: string;
   }> {
-    const mensagem = await this.buscarPorId(mensagemId);
+    const mensagem = await this.buscarPorId(mensagemId, empresaId);
 
     if (!mensagem.midia) {
       throw new NotFoundException('Mensagem não possui mídia disponível para download');
@@ -426,9 +426,7 @@ export class MensagemService {
         if (!authToken) {
           this.logger.error(`❌ Token do WhatsApp não encontrado para baixar mídia`);
           this.logger.error(`   Empresa ID: ${ticket?.empresaId || 'não encontrado'}`);
-          throw new Error(
-            'Token do WhatsApp não configurado. Configure na tela de Integrações.'
-          );
+          throw new Error('Token do WhatsApp não configurado. Configure na tela de Integrações.');
         }
 
         let tipoMidia: 'audio' | 'image' | 'video' | 'document' = 'audio';
@@ -482,10 +480,14 @@ export class MensagemService {
    * Salva uma nova mensagem
    * 🎵 Se houver mídia do WhatsApp com URL temporária, faz download ANTES de salvar
    */
-  async salvar(dados: CriarMensagemDto): Promise<Mensagem> {
+  async salvar(dados: CriarMensagemDto, empresaId?: string): Promise<Mensagem> {
     this.logger.log(`💬 Salvando mensagem para ticket ${dados.ticketId}`);
 
-    const ticket = await this.ticketRepository.findOne({ where: { id: dados.ticketId } });
+    const where: { id: string; empresaId?: string } = { id: dados.ticketId };
+    if (empresaId) {
+      where.empresaId = empresaId;
+    }
+    const ticket = await this.ticketRepository.findOne({ where });
 
     if (!ticket) {
       throw new NotFoundException(`Ticket ${dados.ticketId} não encontrado`);
@@ -584,6 +586,7 @@ export class MensagemService {
     }
 
     const mensagem = this.mensagemRepository.create({
+      empresaId: ticket.empresaId,
       ticketId: dados.ticketId,
       tipo: dados.tipo,
       remetente: dados.remetente,
@@ -602,14 +605,27 @@ export class MensagemService {
   /**
    * Busca mensagens de um ticket
    */
-  async buscarPorTicket(ticketId: string, limite = 100): Promise<Mensagem[]> {
+  async buscarPorTicket(ticketId: string, limite = 100, empresaId?: string): Promise<Mensagem[]> {
     this.logger.log(`📨 Buscando mensagens do ticket ${ticketId}`);
 
-    const mensagens = await this.mensagemRepository.find({
-      where: { ticketId },
-      order: { createdAt: 'ASC' },
-      take: limite,
-    });
+    let mensagens: Mensagem[];
+
+    if (empresaId) {
+      mensagens = await this.mensagemRepository
+        .createQueryBuilder('mensagem')
+        .innerJoin(Ticket, 'ticket', 'ticket.id = mensagem.ticketId')
+        .where('mensagem.ticketId = :ticketId', { ticketId })
+        .andWhere('ticket.empresaId = :empresaId', { empresaId })
+        .orderBy('mensagem.createdAt', 'ASC')
+        .take(limite)
+        .getMany();
+    } else {
+      mensagens = await this.mensagemRepository.find({
+        where: { ticketId },
+        order: { createdAt: 'ASC' },
+        take: limite,
+      });
+    }
 
     this.logger.log(`📊 Encontradas ${mensagens.length} mensagens`);
 
@@ -619,10 +635,18 @@ export class MensagemService {
   /**
    * Busca mensagem por ID
    */
-  async buscarPorId(id: string): Promise<Mensagem> {
-    const mensagem = await this.mensagemRepository.findOne({
-      where: { id },
-    });
+  async buscarPorId(id: string, empresaId?: string): Promise<Mensagem> {
+    const query = this.mensagemRepository
+      .createQueryBuilder('mensagem')
+      .where('mensagem.id = :id', { id });
+
+    if (empresaId) {
+      query
+        .innerJoin(Ticket, 'ticket', 'ticket.id = mensagem.ticketId')
+        .andWhere('ticket.empresaId = :empresaId', { empresaId });
+    }
+
+    const mensagem = await query.getOne();
 
     if (!mensagem) {
       throw new NotFoundException(`Mensagem ${id} não encontrada`);
@@ -667,12 +691,12 @@ export class MensagemService {
     }> = [];
     let audio:
       | {
-        url: string;
-        downloadUrl: string;
-        duracao?: number;
-        nome: string;
-        tipo: string;
-      }
+          url: string;
+          downloadUrl: string;
+          duracao?: number;
+          nome: string;
+          tipo: string;
+        }
       | undefined;
 
     for (const midiaOriginal of midias) {
@@ -1025,7 +1049,7 @@ export class MensagemService {
   /**
    * Envia nova mensagem
    */
-  async enviar(dados: any, arquivos?: Express.Multer.File[]): Promise<Mensagem> {
+  async enviar(dados: any, arquivos?: Express.Multer.File[], empresaId?: string): Promise<Mensagem> {
     this.logger.log(`📤 Enviando mensagem para ticket ${dados.ticketId}`);
     this.logger.debug(`📋 Dados recebidos: ${JSON.stringify(dados)}`);
 
@@ -1043,6 +1067,17 @@ export class MensagemService {
     if (!conteudoNormalizado && !possuiArquivo && !possuiMidiaExistente && !possuiInformacaoAudio) {
       this.logger.error(`❌ Conteúdo da mensagem está vazio ou ausente!`);
       throw new Error('Conteúdo da mensagem é obrigatório');
+    }
+
+    const ticket = await this.ticketRepository.findOne({
+      where: {
+        id: dados.ticketId,
+        ...(empresaId ? { empresaId } : {}),
+      },
+    });
+
+    if (!ticket) {
+      throw new NotFoundException(`Ticket ${dados.ticketId} não encontrado`);
     }
 
     let conteudoMensagem = conteudoNormalizado;
@@ -1136,9 +1171,9 @@ export class MensagemService {
           const caminhoReferencia = caminhoMidiaLocal || arquivoPrincipal.path || null;
           const resultadoConversao = caminhoReferencia
             ? await this.converterAudioParaFormatoWhatsApp(
-              caminhoReferencia,
-              mensagemData.midia?.nome || arquivoPrincipal.originalname,
-            )
+                caminhoReferencia,
+                mensagemData.midia?.nome || arquivoPrincipal.originalname,
+              )
             : null;
 
           if (!resultadoConversao) {
@@ -1195,13 +1230,7 @@ export class MensagemService {
 
     // 🔥 ENVIAR VIA WHATSAPP SE FOR CANAL WHATSAPP
     try {
-      const ticket = await this.ticketRepository.findOne({
-        where: { id: dados.ticketId },
-      });
-
-      if (!ticket) {
-        this.logger.warn(`⚠️ Ticket ${dados.ticketId} não encontrado para envio via canal`);
-      } else if (ticket.canalId) {
+      if (ticket.canalId) {
         const canal = await this.canalRepository.findOne({
           where: { id: ticket.canalId },
         });
@@ -1279,7 +1308,7 @@ export class MensagemService {
               `⚠️ Ticket sem telefone de contato, mensagem não enviada via WhatsApp`,
             );
           }
-        } else if (canal.tipo === TipoCanal.EMAIL) {
+        } else if (canal && canal.tipo === TipoCanal.EMAIL) {
           // 📧 ENVIO VIA E-MAIL
           this.logger.log(`📧 Enviando mensagem via E-mail...`);
 
@@ -1289,15 +1318,18 @@ export class MensagemService {
 
             if (arquivoPrincipal) {
               // E-mail com anexo
-              const caminhoArquivo = typeof arquivoPrincipal === 'string'
-                ? arquivoPrincipal
-                : (arquivoPrincipal as any).path;
+              const caminhoArquivo =
+                typeof arquivoPrincipal === 'string'
+                  ? arquivoPrincipal
+                  : (arquivoPrincipal as any).path;
 
-              const anexos = [{
-                filename: basename(caminhoArquivo),
-                content: await fsPromises.readFile(caminhoArquivo),
-                type: mensagemData.midia?.tipo || 'application/octet-stream',
-              }];
+              const anexos = [
+                {
+                  filename: basename(caminhoArquivo),
+                  content: await fsPromises.readFile(caminhoArquivo),
+                  type: mensagemData.midia?.tipo || 'application/octet-stream',
+                },
+              ];
 
               const messageId = await this.emailSenderService.enviarComAnexos(
                 ticket.empresaId,
@@ -1340,7 +1372,10 @@ export class MensagemService {
     // 🔥 EMITIR EVENTO WEBSOCKET PARA ATUALIZAÇÃO EM TEMPO REAL
     try {
       const ticketRelacionado = await this.ticketRepository.findOne({
-        where: { id: mensagemSalva.ticketId },
+        where: {
+          id: mensagemSalva.ticketId,
+          ...(empresaId ? { empresaId } : {}),
+        },
       });
 
       const atendenteResponsavelId =
@@ -1371,8 +1406,21 @@ export class MensagemService {
   /**
    * Marca mensagens como lidas (simulação - campo não existe na entidade)
    */
-  async marcarLidas(mensagemIds: string[]): Promise<void> {
+  async marcarLidas(mensagemIds: string[], empresaId?: string): Promise<void> {
     this.logger.log(`✔️ Marcando ${mensagemIds.length} mensagens como lidas`);
+
+    if (empresaId && mensagemIds.length > 0) {
+      const totalPermitido = await this.mensagemRepository
+        .createQueryBuilder('mensagem')
+        .innerJoin(Ticket, 'ticket', 'ticket.id = mensagem.ticketId')
+        .where('mensagem.id IN (:...mensagemIds)', { mensagemIds })
+        .andWhere('ticket.empresaId = :empresaId', { empresaId })
+        .getCount();
+
+      if (totalPermitido !== mensagemIds.length) {
+        throw new NotFoundException('Uma ou mais mensagens não pertencem à empresa autenticada');
+      }
+    }
 
     // TODO: Adicionar campo 'lida' na entidade Mensagem
     // TODO: Implementar lógica de marcar como lida

@@ -14,7 +14,7 @@ export class TiposServicoService {
     @InjectRepository(TipoServico)
     private readonly tipoRepository: Repository<TipoServico>,
     @Inject(REQUEST) private readonly request: any,
-  ) { }
+  ) {}
 
   private getEmpresaId(): string {
     const empresaId = this.request.user?.empresa_id;
@@ -69,7 +69,9 @@ export class TiposServicoService {
     });
 
     if (nomeExistente) {
-      throw new BadRequestException(`Já existe um tipo de serviço com o nome ${dto.nome} nesta empresa`);
+      throw new BadRequestException(
+        `Já existe um tipo de serviço com o nome ${dto.nome} nesta empresa`,
+      );
     }
 
     const tipo = this.tipoRepository.create({
@@ -96,7 +98,9 @@ export class TiposServicoService {
       });
 
       if (nomeExistente) {
-        throw new BadRequestException(`Já existe um tipo de serviço com o nome ${dto.nome} nesta empresa`);
+        throw new BadRequestException(
+          `Já existe um tipo de serviço com o nome ${dto.nome} nesta empresa`,
+        );
       }
     }
 

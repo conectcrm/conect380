@@ -11,4 +11,4 @@ import { Oportunidade } from '../oportunidades/oportunidade.entity';
   providers: [LeadsService],
   exports: [LeadsService],
 })
-export class LeadsModule { }
+export class LeadsModule {}

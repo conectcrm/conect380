@@ -1,13 +1,26 @@
-import { Controller, Get, Post, Put, Delete, Patch, Body, Param, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Patch,
+  Body,
+  Param,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
+import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { NiveisAtendimentoService } from '../services/niveis-atendimento.service';
 import { CreateNivelAtendimentoDto } from '../dto/create-nivel-atendimento.dto';
 import { UpdateNivelAtendimentoDto } from '../dto/update-nivel-atendimento.dto';
 
 @Controller('configuracoes-tickets/niveis-atendimento')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class NiveisAtendimentoController {
-  constructor(private readonly niveisService: NiveisAtendimentoService) { }
+  constructor(private readonly niveisService: NiveisAtendimentoService) {}
 
   @Get()
   @HttpCode(HttpStatus.OK)

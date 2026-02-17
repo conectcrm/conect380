@@ -415,7 +415,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                       ))}
                     </select>
                     {errors.fornecedorId && (
-                      <p className="text-red-500 text-sm mt-1">{errors.clienteId.message}</p>
+                      <p className="text-red-500 text-sm mt-1">{errors.fornecedorId.message}</p>
                     )}
                   </div>
 

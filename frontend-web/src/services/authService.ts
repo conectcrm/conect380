@@ -41,6 +41,8 @@ export const authService = {
   logout() {
     localStorage.removeItem('authToken');
     localStorage.removeItem('user_data');
+    localStorage.removeItem('empresaAtiva');
+    localStorage.removeItem('selectedProfileId');
   },
 
   setToken(token: string) {

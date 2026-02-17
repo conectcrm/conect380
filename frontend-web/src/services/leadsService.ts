@@ -148,7 +148,7 @@ class LeadsService {
   private readonly baseUrl = '/leads';
   private readonly errorPrefix = '[LeadsService]';
 
-  private buildQueryString(params: Record<string, unknown> = {}): string {
+  private buildQueryString(params: any = {}): string {
     const searchParams = new URLSearchParams();
 
     Object.entries(params).forEach(([key, value]) => {

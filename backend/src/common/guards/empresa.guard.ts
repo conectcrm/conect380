@@ -9,10 +9,10 @@ import { Reflector } from '@nestjs/core';
 
 /**
  * Guard para validar se o usuário possui empresa_id
- * 
+ *
  * Uso:
  * @UseGuards(JwtAuthGuard, EmpresaGuard)
- * 
+ *
  * Ou para tornar opcional:
  * @UseGuards(JwtAuthGuard)
  * @SetMetadata('skipEmpresaValidation', true)
@@ -21,7 +21,7 @@ import { Reflector } from '@nestjs/core';
 export class EmpresaGuard implements CanActivate {
   private readonly logger = new Logger(EmpresaGuard.name);
 
-  constructor(private reflector: Reflector) { }
+  constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
     // Verificar se a rota tem metadata para pular validação
@@ -45,9 +45,7 @@ export class EmpresaGuard implements CanActivate {
 
     // Validar se usuário possui empresa_id
     if (!user.empresa_id) {
-      this.logger.warn(
-        `Usuário ${user.id} tentou acessar recurso sem empresa vinculada`,
-      );
+      this.logger.warn(`Usuário ${user.id} tentou acessar recurso sem empresa vinculada`);
       throw new BadRequestException(
         'Usuário não possui empresa vinculada. Entre em contato com o administrador.',
       );
@@ -55,9 +53,7 @@ export class EmpresaGuard implements CanActivate {
 
     // Log de sucesso (apenas em desenvolvimento)
     if (process.env.NODE_ENV === 'development') {
-      this.logger.debug(
-        `Usuário ${user.id} validado com empresa_id: ${user.empresa_id}`,
-      );
+      this.logger.debug(`Usuário ${user.id} validado com empresa_id: ${user.empresa_id}`);
     }
 
     return true;

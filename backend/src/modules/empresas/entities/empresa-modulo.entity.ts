@@ -26,7 +26,7 @@ export enum PlanoEnum {
 }
 
 @Entity('empresa_modulos')
-@Unique(['empresa_id', 'modulo'])
+@Unique(['empresaId', 'modulo'])
 export class EmpresaModulo {
   @PrimaryGeneratedColumn('uuid')
   id: string;

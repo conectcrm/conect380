@@ -335,7 +335,7 @@ export const ExemploModalProdutoAvancado: React.FC = () => {
             setProdutoSelecionado(null);
           }}
           onSave={handleSaveProduto}
-          produto={produtoSelecionado}
+          produto={produtoSelecionado as any}
           isLoading={isLoading}
           segmentoConfig={configuracaoAtiva}
         />

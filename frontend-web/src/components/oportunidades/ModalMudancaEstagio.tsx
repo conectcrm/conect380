@@ -31,6 +31,8 @@ const ESTAGIOS_LABELS: Record<EstagioOportunidade, string> = {
   [EstagioOportunidade.PROPOSTA]: 'Proposta',
   [EstagioOportunidade.NEGOCIACAO]: 'Negociação',
   [EstagioOportunidade.FECHAMENTO]: 'Fechamento',
+  [EstagioOportunidade.GANHO]: 'Ganho',
+  [EstagioOportunidade.PERDIDO]: 'Perdido',
 };
 
 const ModalMudancaEstagio: React.FC<ModalMudancaEstagioProps> = ({

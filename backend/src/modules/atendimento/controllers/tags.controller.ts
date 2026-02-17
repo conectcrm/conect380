@@ -9,24 +9,29 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { TagsService } from '../services/tags.service';
 import { CreateTagDto } from '../dto/create-tag.dto';
 import { UpdateTagDto } from '../dto/update-tag.dto';
 import { Tag } from '../entities/tag.entity';
+import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { EmpresaId } from '../../../common/decorators/empresa.decorator';
 
 @ApiTags('Tags')
 @Controller('tags')
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class TagsController {
-  constructor(private readonly tagsService: TagsService) { }
+  constructor(private readonly tagsService: TagsService) {}
 
   @Post()
   @ApiOperation({ summary: 'Criar nova tag' })
   @ApiResponse({ status: 201, description: 'Tag criada com sucesso', type: Tag })
   @ApiResponse({ status: 400, description: 'Dados inválidos ou tag duplicada' })
-  async criar(@Body() createTagDto: CreateTagDto) {
-    const tag = await this.tagsService.criar(createTagDto);
+  async criar(@EmpresaId() empresaId: string, @Body() createTagDto: CreateTagDto) {
+    const tag = await this.tagsService.criar(createTagDto, empresaId);
     return {
       success: true,
       message: 'Tag criada com sucesso',
@@ -50,6 +55,7 @@ export class TagsController {
   })
   @ApiResponse({ status: 200, description: 'Lista de tags', type: [Tag] })
   async listar(
+    @EmpresaId() empresaId: string,
     @Query('apenasAtivas') apenasAtivas?: string,
     @Query('comContagem') comContagem?: string,
   ) {
@@ -58,9 +64,9 @@ export class TagsController {
 
     let tags;
     if (incluirContagem) {
-      tags = await this.tagsService.listarComContagem(undefined, somenteAtivas);
+      tags = await this.tagsService.listarComContagem(empresaId, somenteAtivas);
     } else {
-      tags = await this.tagsService.listar(undefined, somenteAtivas);
+      tags = await this.tagsService.listar(empresaId, somenteAtivas);
     }
 
     return {
@@ -74,8 +80,8 @@ export class TagsController {
   @ApiOperation({ summary: 'Buscar tag por ID' })
   @ApiResponse({ status: 200, description: 'Tag encontrada', type: Tag })
   @ApiResponse({ status: 404, description: 'Tag não encontrada' })
-  async buscarPorId(@Param('id') id: string) {
-    const tag = await this.tagsService.buscarPorId(id);
+  async buscarPorId(@EmpresaId() empresaId: string, @Param('id') id: string) {
+    const tag = await this.tagsService.buscarPorId(id, empresaId);
     return {
       success: true,
       message: 'Tag encontrada',
@@ -88,8 +94,12 @@ export class TagsController {
   @ApiResponse({ status: 200, description: 'Tag atualizada com sucesso', type: Tag })
   @ApiResponse({ status: 404, description: 'Tag não encontrada' })
   @ApiResponse({ status: 400, description: 'Dados inválidos' })
-  async atualizar(@Param('id') id: string, @Body() updateTagDto: UpdateTagDto) {
-    const tag = await this.tagsService.atualizar(id, updateTagDto);
+  async atualizar(
+    @EmpresaId() empresaId: string,
+    @Param('id') id: string,
+    @Body() updateTagDto: UpdateTagDto,
+  ) {
+    const tag = await this.tagsService.atualizar(id, updateTagDto, empresaId);
     return {
       success: true,
       message: 'Tag atualizada com sucesso',
@@ -102,8 +112,8 @@ export class TagsController {
   @ApiOperation({ summary: 'Deletar tag (soft delete)' })
   @ApiResponse({ status: 200, description: 'Tag deletada com sucesso' })
   @ApiResponse({ status: 404, description: 'Tag não encontrada' })
-  async deletar(@Param('id') id: string) {
-    await this.tagsService.deletar(id);
+  async deletar(@EmpresaId() empresaId: string, @Param('id') id: string) {
+    await this.tagsService.deletar(id, empresaId);
     return {
       success: true,
       message: 'Tag deletada com sucesso',

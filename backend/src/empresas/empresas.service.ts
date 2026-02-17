@@ -21,7 +21,7 @@ export class EmpresasService {
     private userRepository: Repository<User>,
     private mailService: MailService,
     private empresaModuloService: EmpresaModuloService,
-  ) { }
+  ) {}
 
   async registrarEmpresa(createEmpresaDto: CreateEmpresaDto): Promise<Empresa> {
     console.log(`\n🚀 ===== REGISTRO DE EMPRESA INICIADO =====`);
@@ -402,15 +402,15 @@ export class EmpresasService {
 
     // Mapeamento de nomes variados para PlanoEnum
     const mapeamento: Record<string, PlanoEnum> = {
-      'STARTER': PlanoEnum.STARTER,
-      'BASIC': PlanoEnum.STARTER,
-      'BASICO': PlanoEnum.STARTER,
-      'PROFESSIONAL': PlanoEnum.BUSINESS,
-      'BUSINESS': PlanoEnum.BUSINESS,
-      'PRO': PlanoEnum.BUSINESS,
-      'ENTERPRISE': PlanoEnum.ENTERPRISE,
-      'PREMIUM': PlanoEnum.ENTERPRISE,
-      'EMPRESARIAL': PlanoEnum.ENTERPRISE,
+      STARTER: PlanoEnum.STARTER,
+      BASIC: PlanoEnum.STARTER,
+      BASICO: PlanoEnum.STARTER,
+      PROFESSIONAL: PlanoEnum.BUSINESS,
+      BUSINESS: PlanoEnum.BUSINESS,
+      PRO: PlanoEnum.BUSINESS,
+      ENTERPRISE: PlanoEnum.ENTERPRISE,
+      PREMIUM: PlanoEnum.ENTERPRISE,
+      EMPRESARIAL: PlanoEnum.ENTERPRISE,
     };
 
     return mapeamento[planoUpper] || null;

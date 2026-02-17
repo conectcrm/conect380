@@ -97,7 +97,7 @@ export const HeaderSemLogo: React.FC<HeaderSemLogoProps> = ({
                 <input
                   type="text"
                   placeholder="Buscar clientes, propostas, contratos..."
-                  className="w-full pl-8 pr-3 py-1.5 bg-gray-50/80 border border-gray-200/50 rounded-md focus:ring-1 focus:ring-blue-500/30 focus:border-blue-500/50 focus:bg-white transition-all text-xs placeholder-gray-500"
+                  className="w-full pl-8 pr-3 py-1.5 bg-gray-50/80 border border-gray-200/50 rounded-md focus:ring-1 focus:ring-[#159A9C]/30 focus:border-[#159A9C]/50 focus:bg-white transition-all text-xs placeholder-gray-500"
                 />
               </div>
             </div>
@@ -136,7 +136,7 @@ export const HeaderSemLogo: React.FC<HeaderSemLogoProps> = ({
                 className="relative p-1.5 rounded-md hover:bg-gray-100/80 transition-colors group"
                 title="Notificações"
               >
-                <Bell className="w-3.5 h-3.5 text-gray-600 group-hover:text-blue-500 transition-colors" />
+                <Bell className="w-3.5 h-3.5 text-gray-600 group-hover:text-[#159A9C] transition-colors" />
                 {unreadCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
                     {unreadCount > 9 ? '9+' : unreadCount}
@@ -162,7 +162,7 @@ export const HeaderSemLogo: React.FC<HeaderSemLogoProps> = ({
                     {notifications.map((notification) => (
                       <div
                         key={notification.id}
-                        className={`p-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${notification.unread ? 'bg-blue-50/50' : ''
+                        className={`p-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${notification.unread ? 'bg-[#159A9C]/5' : ''
                           }`}
                       >
                         <div className="flex items-start justify-between">
@@ -177,7 +177,7 @@ export const HeaderSemLogo: React.FC<HeaderSemLogoProps> = ({
                             <p className="text-xs text-gray-500 mt-1">{notification.time}</p>
                           </div>
                           {notification.unread && (
-                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-1 flex-shrink-0"></div>
+                            <div className="w-1.5 h-1.5 bg-[#159A9C] rounded-full mt-1 flex-shrink-0"></div>
                           )}
                         </div>
                       </div>
@@ -185,7 +185,7 @@ export const HeaderSemLogo: React.FC<HeaderSemLogoProps> = ({
                   </div>
 
                   <div className="p-3 border-t border-gray-100 bg-gray-50/50">
-                    <button className="w-full text-xs text-blue-600 hover:text-blue-700 font-medium">
+                    <button className="w-full text-xs text-[#159A9C] hover:text-[#0F7B7D] font-medium">
                       Ver todas as notificações
                     </button>
                   </div>
@@ -211,7 +211,7 @@ export const HeaderSemLogo: React.FC<HeaderSemLogoProps> = ({
                 className="flex items-center gap-2 p-1 rounded-md hover:bg-gray-100/80 transition-colors max-w-xs"
               >
                 {/* Avatar Pequeno */}
-                <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+                <div className="w-6 h-6 bg-[#159A9C] rounded-full flex items-center justify-center flex-shrink-0">
                   <span className="text-white font-medium text-xs">
                     {userInfo.name
                       .split(' ')
@@ -237,7 +237,7 @@ export const HeaderSemLogo: React.FC<HeaderSemLogoProps> = ({
                   {/* Cabeçalho do usuário */}
                   <div className="p-3 border-b border-gray-100">
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                      <div className="w-8 h-8 bg-[#159A9C] rounded-full flex items-center justify-center">
                         <span className="text-white font-medium text-xs">
                           {userInfo.name
                             .split(' ')

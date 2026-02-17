@@ -3,14 +3,13 @@
  * Visualização profissional em tabela com funcionalidades avançadas
  */
 
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ChevronUp,
   ChevronDown,
   Edit2,
   Trash2,
-  MoreVertical,
   UserPlus,
   Clock,
   AlertTriangle,
@@ -35,8 +34,44 @@ interface TicketsTableProps {
   sortDirection: 'asc' | 'desc';
   onSort: (field: string) => void;
   density: 'compact' | 'comfortable' | 'spacious';
-  visibleColumns?: string[]; // ← NOVA PROP
+  visibleColumns?: string[]; // NOVA PROPRIEDADE
 }
+
+interface SortableHeaderProps {
+  field: string;
+  label: React.ReactNode;
+  className?: string;
+  sortField: string;
+  sortDirection: 'asc' | 'desc';
+  onSort: (field: string) => void;
+}
+
+const SortableHeader: React.FC<SortableHeaderProps> = ({
+  field,
+  label,
+  className = '',
+  sortField,
+  sortDirection,
+  onSort,
+}) => (
+  <th
+    onClick={() => onSort(field)}
+    className={`px-4 py-3 text-left text-xs font-semibold text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-[#159A9C]/5 transition-colors select-none ${className}`}
+  >
+    <div className="flex items-center gap-2">
+      {label}
+      {sortField === field && (
+        <span className="text-[#159A9C]">
+          {sortDirection === 'asc' ? (
+            <ChevronUp className="h-4 w-4" />
+          ) : (
+            <ChevronDown className="h-4 w-4" />
+          )}
+        </span>
+      )}
+    </div>
+  </th>
+);
 
 export const TicketsTable: React.FC<TicketsTableProps> = ({
   tickets,
@@ -50,10 +85,10 @@ export const TicketsTable: React.FC<TicketsTableProps> = ({
   sortDirection,
   onSort,
   density,
-  visibleColumns = ['numero', 'prioridade', 'titulo', 'status', 'tipo', 'cliente', 'responsavel', 'sla', 'criado'], // ← PADRÃO
+  visibleColumns = ['numero', 'prioridade', 'titulo', 'status', 'tipo', 'cliente', 'responsavel', 'sla', 'criado'], // PADRÃO
 }) => {
   const navigate = useNavigate();
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const location = useLocation();
 
   // Configurações de densidade
   const densityConfig = {
@@ -64,7 +99,7 @@ export const TicketsTable: React.FC<TicketsTableProps> = ({
 
   const config = densityConfig[density];
 
-  // Helper para verificar se coluna está visível
+  // Helper para verificar se coluna esta visivel
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
 
   // Labels e cores
@@ -135,28 +170,48 @@ export const TicketsTable: React.FC<TicketsTableProps> = ({
 
   // SLA visual
   const getSLAStatus = (ticket: Ticket): { icon: React.ReactNode; text: string; color: string } => {
-    // Mock de cálculo de SLA - você deve implementar com base nos dados reais
-    const random = Math.random();
+    const referencia = ticket.slaExpiresAt || ticket.dataVencimento;
 
-    if (random < 0.3) {
+    if (!referencia) {
+      return {
+        icon: <Clock className="h-4 w-4 text-gray-400" />,
+        text: 'Sem SLA',
+        color: 'text-gray-500',
+      };
+    }
+
+    const expiresAtMs = new Date(referencia).getTime();
+    if (!Number.isFinite(expiresAtMs)) {
+      return {
+        icon: <Clock className="h-4 w-4 text-gray-400" />,
+        text: 'Sem SLA',
+        color: 'text-gray-500',
+      };
+    }
+
+    const diffMs = expiresAtMs - new Date().getTime();
+    if (diffMs <= 0) {
       return {
         icon: <XCircle className="h-4 w-4 text-red-600" />,
         text: 'Vencido',
         color: 'text-red-600',
       };
-    } else if (random < 0.6) {
+    }
+
+    if (diffMs <= 2 * 60 * 60 * 1000) {
+      const horasRestantes = Math.max(1, Math.ceil(diffMs / (60 * 60 * 1000)));
       return {
         icon: <AlertTriangle className="h-4 w-4 text-orange-600" />,
-        text: '< 2h',
+        text: `< ${horasRestantes}h`,
         color: 'text-orange-600',
       };
-    } else {
-      return {
-        icon: <CheckCircle className="h-4 w-4 text-green-600" />,
-        text: '5d',
-        color: 'text-green-600',
-      };
     }
+
+    return {
+      icon: <CheckCircle className="h-4 w-4 text-green-600" />,
+      text: formatDistanceToNow(new Date(referencia), { locale: ptBR }),
+      color: 'text-green-600',
+    };
   };
 
   // Formatar data relativa
@@ -168,33 +223,13 @@ export const TicketsTable: React.FC<TicketsTableProps> = ({
     }
   };
 
-  // Renderizar header de coluna com ordenação
-  const SortableHeader: React.FC<{ field: string; children: React.ReactNode; className?: string }> = ({
-    field,
-    children,
-    className = '',
-  }) => (
-    <th
-      onClick={() => onSort(field)}
-      className={`px-4 py-3 text-left text-xs font-semibold text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-[#159A9C]/5 transition-colors select-none ${className}`}
-    >
-      <div className="flex items-center gap-2">
-        {children}
-        {sortField === field && (
-          <span className="text-[#159A9C]">
-            {sortDirection === 'asc' ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
-          </span>
-        )}
-      </div>
-    </th>
-  );
-
   const handleRowClick = (ticket: Ticket) => {
-    navigate(`/nuclei/atendimento/tickets/${ticket.id}`);
+    const returnTo = `${location.pathname}${location.search}${location.hash}`;
+    navigate(`/atendimento/tickets/${ticket.id}`, {
+      state: {
+        returnTo,
+      },
+    });
   };
 
   const allSelected = tickets.length > 0 && selectedIds.length === tickets.length;
@@ -207,7 +242,7 @@ export const TicketsTable: React.FC<TicketsTableProps> = ({
           {/* Header */}
           <thead className="bg-gray-50">
             <tr>
-              {/* Checkbox de seleção */}
+              {/* Checkbox de selecao */}
               <th className="px-4 py-3 w-12">
                 <input
                   type="checkbox"
@@ -220,10 +255,46 @@ export const TicketsTable: React.FC<TicketsTableProps> = ({
                 />
               </th>
 
-              {isColumnVisible('numero') && <SortableHeader field="numero" className="w-24">#</SortableHeader>}
-              {isColumnVisible('prioridade') && <SortableHeader field="prioridade" className="w-32">Prioridade</SortableHeader>}
-              {isColumnVisible('titulo') && <SortableHeader field="titulo" className="min-w-[250px]">Título</SortableHeader>}
-              {isColumnVisible('status') && <SortableHeader field="status" className="w-40">Status</SortableHeader>}
+              {isColumnVisible('numero') && (
+                <SortableHeader
+                  field="numero"
+                  label="#"
+                  className="w-24"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={onSort}
+                />
+              )}
+              {isColumnVisible('prioridade') && (
+                <SortableHeader
+                  field="prioridade"
+                  label="Prioridade"
+                  className="w-32"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={onSort}
+                />
+              )}
+              {isColumnVisible('titulo') && (
+                <SortableHeader
+                  field="titulo"
+                  label="Título"
+                  className="min-w-[250px]"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={onSort}
+                />
+              )}
+              {isColumnVisible('status') && (
+                <SortableHeader
+                  field="status"
+                  label="Status"
+                  className="w-40"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={onSort}
+                />
+              )}
               {isColumnVisible('tipo') && (
                 <th className="px-4 py-3 text-left text-xs font-semibold text-[#002333] uppercase tracking-wider w-32">
                   Tipo
@@ -244,7 +315,16 @@ export const TicketsTable: React.FC<TicketsTableProps> = ({
                   SLA
                 </th>
               )}
-              {isColumnVisible('criado') && <SortableHeader field="created_at" className="w-32">Criado</SortableHeader>}
+              {isColumnVisible('criado') && (
+                <SortableHeader
+                  field="createdAt"
+                  label="Criado"
+                  className="w-32"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={onSort}
+                />
+              )}
 
               <th className="px-4 py-3 text-right text-xs font-semibold text-[#002333] uppercase tracking-wider w-24">
                 Ações
@@ -278,7 +358,7 @@ export const TicketsTable: React.FC<TicketsTableProps> = ({
                     />
                   </td>
 
-                  {/* Número */}
+                  {/* Numero */}
                   {isColumnVisible('numero') && (
                     <td
                       className={`px-4 ${config.padding} whitespace-nowrap cursor-pointer`}

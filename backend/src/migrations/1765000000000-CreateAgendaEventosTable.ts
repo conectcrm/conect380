@@ -48,12 +48,24 @@ export class CreateAgendaEventosTable1765000000000 implements MigrationInterface
     `);
 
     // Índices
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_agenda_eventos_empresa_id" ON "agenda_eventos" ("empresa_id")`);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_agenda_eventos_inicio" ON "agenda_eventos" ("inicio")`);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_agenda_eventos_status" ON "agenda_eventos" ("status")`);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_agenda_eventos_prioridade" ON "agenda_eventos" ("prioridade")`);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_agenda_eventos_interacao_id" ON "agenda_eventos" ("interacao_id")`);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_agenda_eventos_created_at" ON "agenda_eventos" ("created_at")`);
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_agenda_eventos_empresa_id" ON "agenda_eventos" ("empresa_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_agenda_eventos_inicio" ON "agenda_eventos" ("inicio")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_agenda_eventos_status" ON "agenda_eventos" ("status")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_agenda_eventos_prioridade" ON "agenda_eventos" ("prioridade")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_agenda_eventos_interacao_id" ON "agenda_eventos" ("interacao_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_agenda_eventos_created_at" ON "agenda_eventos" ("created_at")`,
+    );
 
     // FKs
     await queryRunner.query(`
@@ -100,18 +112,25 @@ export class CreateAgendaEventosTable1765000000000 implements MigrationInterface
     // ⚡ MULTI-TENANT: Criar política de isolamento
     await queryRunner.query(`
       CREATE POLICY tenant_isolation_agenda_eventos ON agenda_eventos
-        FOR ALL USING (empresa_id = get_current_tenant());
+        FOR ALL USING (empresa_id = get_current_tenant())
+        WITH CHECK (empresa_id = get_current_tenant());
     `);
 
     console.log('✅ Tabela agenda_eventos criada com RLS ativo');
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP POLICY IF EXISTS agenda_eventos_isolation_policy ON "agenda_eventos"`);
+    await queryRunner.query(
+      `DROP POLICY IF EXISTS tenant_isolation_agenda_eventos ON "agenda_eventos"`,
+    );
     await queryRunner.query(`ALTER TABLE "agenda_eventos" DISABLE ROW LEVEL SECURITY`);
 
-    await queryRunner.query(`ALTER TABLE "agenda_eventos" DROP CONSTRAINT IF EXISTS "FK_agenda_eventos_interacao"`);
-    await queryRunner.query(`ALTER TABLE "agenda_eventos" DROP CONSTRAINT IF EXISTS "FK_agenda_eventos_empresa"`);
+    await queryRunner.query(
+      `ALTER TABLE "agenda_eventos" DROP CONSTRAINT IF EXISTS "FK_agenda_eventos_interacao"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "agenda_eventos" DROP CONSTRAINT IF EXISTS "FK_agenda_eventos_empresa"`,
+    );
 
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_agenda_eventos_created_at"`);
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_agenda_eventos_interacao_id"`);

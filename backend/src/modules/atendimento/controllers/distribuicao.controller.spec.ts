@@ -6,6 +6,7 @@ import { Ticket, StatusTicket } from '../entities/ticket.entity';
 describe('DistribuicaoController', () => {
   let controller: DistribuicaoController;
   let service: DistribuicaoService;
+  const EMPRESA_ID = 'empresa-1';
 
   const mockTicket: Partial<Ticket> = {
     id: 'ticket-1',
@@ -18,7 +19,7 @@ describe('DistribuicaoController', () => {
     id: 'ticket-2',
     filaId: 'fila-1',
     atendenteId: null,
-    status: StatusTicket.ABERTO,
+    status: StatusTicket.FILA,
   };
 
   const mockDistribuicaoService = {
@@ -51,27 +52,25 @@ describe('DistribuicaoController', () => {
       mockDistribuicaoService.distribuirTicket.mockResolvedValue(mockTicket as Ticket);
 
       // Act
-      const result = await controller.distribuirTicket('ticket-1');
+      const result = await controller.distribuirTicket('ticket-1', EMPRESA_ID);
 
       // Assert
       expect(result.success).toBe(true);
-      expect(result.message).toBe('Ticket distribuído com sucesso');
+      expect(result.message).toBe('Ticket distribuido com sucesso');
       expect(result.data).toEqual(mockTicket);
-      expect(service.distribuirTicket).toHaveBeenCalledWith('ticket-1');
+      expect(service.distribuirTicket).toHaveBeenCalledWith('ticket-1', EMPRESA_ID);
     });
 
     it('deve retornar mensagem apropriada quando nenhum atendente disponível', async () => {
       // Arrange
-      mockDistribuicaoService.distribuirTicket.mockResolvedValue(
-        mockTicketSemAtendente as Ticket,
-      );
+      mockDistribuicaoService.distribuirTicket.mockResolvedValue(mockTicketSemAtendente as Ticket);
 
       // Act
-      const result = await controller.distribuirTicket('ticket-2');
+      const result = await controller.distribuirTicket('ticket-2', EMPRESA_ID);
 
       // Assert
       expect(result.success).toBe(true);
-      expect(result.message).toBe('Nenhum atendente disponível no momento');
+      expect(result.message).toBe('Nenhum atendente disponivel no momento');
       expect(result.data.atendenteId).toBeNull();
     });
 
@@ -81,7 +80,7 @@ describe('DistribuicaoController', () => {
       mockDistribuicaoService.distribuirTicket.mockRejectedValue(error);
 
       // Act & Assert
-      await expect(controller.distribuirTicket('ticket-1')).rejects.toThrow(error);
+      await expect(controller.distribuirTicket('ticket-1', EMPRESA_ID)).rejects.toThrow(error);
     });
   });
 
@@ -92,13 +91,13 @@ describe('DistribuicaoController', () => {
       mockDistribuicaoService.redistribuirFila.mockResolvedValue(mockResultado);
 
       // Act
-      const result = await controller.redistribuirFila('fila-1');
+      const result = await controller.redistribuirFila('fila-1', EMPRESA_ID);
 
       // Assert
       expect(result.success).toBe(true);
-      expect(result.message).toBe('5 ticket(s) redistribuído(s)');
+      expect(result.message).toBe('5 ticket(s) redistribuido(s)');
       expect(result.data).toEqual(mockResultado);
-      expect(service.redistribuirFila).toHaveBeenCalledWith('fila-1');
+      expect(service.redistribuirFila).toHaveBeenCalledWith('fila-1', EMPRESA_ID);
     });
 
     it('deve retornar 0 tickets quando nenhum foi distribuído', async () => {
@@ -107,11 +106,11 @@ describe('DistribuicaoController', () => {
       mockDistribuicaoService.redistribuirFila.mockResolvedValue(mockResultado);
 
       // Act
-      const result = await controller.redistribuirFila('fila-1');
+      const result = await controller.redistribuirFila('fila-1', EMPRESA_ID);
 
       // Assert
       expect(result.success).toBe(true);
-      expect(result.message).toBe('0 ticket(s) redistribuído(s)');
+      expect(result.message).toBe('0 ticket(s) redistribuido(s)');
       expect(result.data.distribuidos).toBe(0);
     });
 
@@ -121,7 +120,7 @@ describe('DistribuicaoController', () => {
       mockDistribuicaoService.redistribuirFila.mockRejectedValue(error);
 
       // Act & Assert
-      await expect(controller.redistribuirFila('fila-1')).rejects.toThrow(error);
+      await expect(controller.redistribuirFila('fila-1', EMPRESA_ID)).rejects.toThrow(error);
     });
   });
 });

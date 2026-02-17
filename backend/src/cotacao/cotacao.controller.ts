@@ -1,4 +1,4 @@
-import {
+import { Logger,
   Body,
   Controller,
   Delete,
@@ -17,6 +17,7 @@ import {
 import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../modules/auth/jwt-auth.guard';
+import { EmpresaGuard } from '../common/guards/empresa.guard';
 import { CotacaoService } from './cotacao.service';
 import {
   CriarCotacaoDto,
@@ -31,10 +32,11 @@ import { StatusCotacao } from './entities/cotacao.entity';
 
 @ApiTags('Cotações')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 @Controller('cotacao')
 export class CotacaoController {
-  constructor(private readonly cotacaoService: CotacaoService) { }
+  private readonly logger = new Logger(CotacaoController.name);
+  constructor(private readonly cotacaoService: CotacaoService) {}
 
   @Post()
   @ApiOperation({ summary: 'Criar nova cotação' })
@@ -48,7 +50,7 @@ export class CotacaoController {
     @Req() req: any,
   ): Promise<CotacaoResponseDto> {
     try {
-      const cotacao = await this.cotacaoService.criar(criarCotacaoDto, req.user.id);
+      const cotacao = await this.cotacaoService.criar(criarCotacaoDto, req.user.id, req.user.empresa_id);
       return cotacao;
     } catch (error) {
       throw new HttpException(
@@ -67,7 +69,7 @@ export class CotacaoController {
   })
   async listar(@Query() query: CotacaoQueryDto, @Req() req: any) {
     try {
-      const result = await this.cotacaoService.listar(query, req.user.id);
+      const result = await this.cotacaoService.listar(query, req.user.id, req.user.empresa_id);
       return result;
     } catch (error) {
       throw new HttpException(
@@ -86,7 +88,7 @@ export class CotacaoController {
   })
   async minhasAprovacoes(@Req() req: any): Promise<CotacaoResponseDto[]> {
     try {
-      return await this.cotacaoService.minhasAprovacoes(req.user.id);
+      return await this.cotacaoService.minhasAprovacoes(req.user.id, req.user.empresa_id);
     } catch (error) {
       throw new HttpException(
         error.message || 'Erro ao listar aprovações pendentes',
@@ -100,7 +102,7 @@ export class CotacaoController {
   @ApiResponse({ status: 200, description: 'Estatísticas das cotações' })
   async obterEstatisticas(@Req() req: any) {
     try {
-      const estatisticas = await this.cotacaoService.obterEstatisticas(req.user.id);
+      const estatisticas = await this.cotacaoService.obterEstatisticas(req.user.id, req.user.empresa_id);
       return estatisticas;
     } catch (error) {
       throw new HttpException(
@@ -115,7 +117,7 @@ export class CotacaoController {
   @ApiResponse({ status: 200, description: 'Dados do dashboard' })
   async obterDashboard(@Req() req: any) {
     try {
-      const dashboard = await this.cotacaoService.obterDashboard(req.user.id);
+      const dashboard = await this.cotacaoService.obterDashboard(req.user.id, req.user.empresa_id);
       return dashboard;
     } catch (error) {
       throw new HttpException(
@@ -138,7 +140,7 @@ export class CotacaoController {
     @Req() req: any,
   ): Promise<CotacaoResponseDto> {
     try {
-      const cotacao = await this.cotacaoService.buscarPorId(id, req.user.id);
+      const cotacao = await this.cotacaoService.buscarPorId(id, req.user.id, req.user.empresa_id);
       if (!cotacao) {
         throw new HttpException('Cotação não encontrada', HttpStatus.NOT_FOUND);
       }
@@ -165,7 +167,12 @@ export class CotacaoController {
     @Req() req: any,
   ): Promise<CotacaoResponseDto> {
     try {
-      const cotacao = await this.cotacaoService.atualizar(id, atualizarCotacaoDto, req.user.id);
+      const cotacao = await this.cotacaoService.atualizar(
+        id,
+        atualizarCotacaoDto,
+        req.user.id,
+        req.user.empresa_id,
+      );
       return cotacao;
     } catch (error) {
       throw new HttpException(
@@ -181,7 +188,7 @@ export class CotacaoController {
   @ApiResponse({ status: 404, description: 'Cotação não encontrada' })
   async deletar(@Param('id', ParseUUIDPipe) id: string, @Req() req: any) {
     try {
-      await this.cotacaoService.deletar(id, req.user.id);
+      await this.cotacaoService.deletar(id, req.user.id, req.user.empresa_id);
       return {
         success: true,
         message: 'Cotação deletada com sucesso',
@@ -198,20 +205,20 @@ export class CotacaoController {
   @ApiOperation({ summary: 'Enviar cotação em rascunho para aprovação' })
   @ApiResponse({ status: 200, description: 'Cotação enviada para aprovação com sucesso' })
   @ApiResponse({ status: 404, description: 'Cotação não encontrada' })
-  @ApiResponse({ status: 400, description: 'Cotação não está em rascunho ou faltam dados obrigatórios' })
+  @ApiResponse({
+    status: 400,
+    description: 'Cotação não está em rascunho ou faltam dados obrigatórios',
+  })
   @ApiResponse({ status: 403, description: 'Apenas o criador pode enviar para aprovação' })
-  async enviarParaAprovacao(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: any,
-  ) {
+  async enviarParaAprovacao(@Param('id', ParseUUIDPipe) id: string, @Req() req: any) {
     try {
-      console.log(`\n🎯 [CONTROLLER] Recebendo request para enviar cotação para aprovação`);
-      console.log(`   ID: ${id}`);
-      console.log(`   User: ${req.user?.id}`);
+      this.logger.log(`\n🎯 [CONTROLLER] Recebendo request para enviar cotação para aprovação`);
+      this.logger.log(`   ID: ${id}`);
+      this.logger.log(`   User: ${req.user?.id}`);
 
-      const cotacao = await this.cotacaoService.enviarParaAprovacao(id, req.user.id);
+      const cotacao = await this.cotacaoService.enviarParaAprovacao(id, req.user.id, req.user.empresa_id);
 
-      console.log(`✅ [CONTROLLER] Sucesso ao enviar para aprovação`);
+      this.logger.log(`✅ [CONTROLLER] Sucesso ao enviar para aprovação`);
 
       return {
         success: true,
@@ -219,11 +226,11 @@ export class CotacaoController {
         data: cotacao,
       };
     } catch (error) {
-      console.error(`\n❌ [CONTROLLER] Erro ao enviar cotação para aprovação:`);
-      console.error(`   Message: ${error.message}`);
-      console.error(`   Status: ${error.status}`);
-      console.error(`   Name: ${error.name}`);
-      console.error(`   Stack: ${error.stack}`);
+      this.logger.error(`\n❌ [CONTROLLER] Erro ao enviar cotação para aprovação:`);
+      this.logger.error(`   Message: ${error.message}`);
+      this.logger.error(`   Status: ${error.status}`);
+      this.logger.error(`   Name: ${error.name}`);
+      this.logger.error(`   Stack: ${error.stack}`);
 
       throw new HttpException(
         {
@@ -248,7 +255,7 @@ export class CotacaoController {
     @Req() req: any,
   ) {
     try {
-      console.log(`🔍 DEBUG Controller aprovar() - Request:`, {
+      this.logger.log(`🔍 DEBUG Controller aprovar() - Request:`, {
         cotacaoId: id,
         userId: req.user?.id,
         userNome: req.user?.nome,
@@ -258,6 +265,7 @@ export class CotacaoController {
       const cotacao = await this.cotacaoService.aprovar(
         id,
         req.user.id,
+        req.user.empresa_id,
         body.justificativa,
       );
       return {
@@ -266,7 +274,7 @@ export class CotacaoController {
         data: cotacao,
       };
     } catch (error) {
-      console.error(`❌ Erro no controller aprovar():`, {
+      this.logger.error(`❌ Erro no controller aprovar():`, {
         message: error.message,
         status: error.status,
         stack: error.stack,
@@ -300,6 +308,7 @@ export class CotacaoController {
       const cotacao = await this.cotacaoService.reprovar(
         id,
         req.user.id,
+        req.user.empresa_id,
         body.justificativa,
       );
       return {
@@ -327,9 +336,9 @@ export class CotacaoController {
         sucessos: { type: 'number' },
         falhas: { type: 'number' },
         cotacoesProcessadas: { type: 'array', items: { type: 'string' } },
-        erros: { type: 'array', items: { type: 'object' } }
-      }
-    }
+        erros: { type: 'array', items: { type: 'object' } },
+      },
+    },
   })
   async aprovarLote(
     @Body() body: { cotacaoIds: string[]; justificativa?: string },
@@ -339,6 +348,7 @@ export class CotacaoController {
       const resultado = await this.cotacaoService.aprovarLote(
         body.cotacaoIds,
         req.user.id,
+        req.user.empresa_id,
         body.justificativa,
       );
       return {
@@ -366,9 +376,9 @@ export class CotacaoController {
         sucessos: { type: 'number' },
         falhas: { type: 'number' },
         cotacoesProcessadas: { type: 'array', items: { type: 'string' } },
-        erros: { type: 'array', items: { type: 'object' } }
-      }
-    }
+        erros: { type: 'array', items: { type: 'object' } },
+      },
+    },
   })
   @ApiResponse({ status: 400, description: 'Justificativa é obrigatória para reprovação' })
   async reprovarLote(
@@ -386,6 +396,7 @@ export class CotacaoController {
       const resultado = await this.cotacaoService.reprovarLote(
         body.cotacaoIds,
         req.user.id,
+        req.user.empresa_id,
         body.justificativa,
       );
       return {
@@ -419,6 +430,7 @@ export class CotacaoController {
         alterarStatusDto.status,
         alterarStatusDto.observacao,
         req.user.id,
+        req.user.empresa_id,
       );
       return cotacao;
     } catch (error) {
@@ -440,9 +452,9 @@ export class CotacaoController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() duplicarDto: DuplicarCotacaoDto,
     @Req() req: any,
-  ): Promise<DuplicarCotacaoDto> {
+  ): Promise<CotacaoResponseDto> {
     try {
-      const cotacao = await this.cotacaoService.duplicar(id, duplicarDto, req.user.id);
+      const cotacao = await this.cotacaoService.duplicar(id, duplicarDto, req.user.id, req.user.empresa_id);
       return cotacao;
     } catch (error) {
       throw new HttpException(
@@ -461,7 +473,7 @@ export class CotacaoController {
   })
   async gerarPDF(@Param('id', ParseUUIDPipe) id: string, @Res() res: Response, @Req() req: any) {
     try {
-      const pdfBuffer = await this.cotacaoService.gerarPDF(id, req.user.id);
+      const pdfBuffer = await this.cotacaoService.gerarPDF(id, req.user.id, req.user.empresa_id);
 
       res.set({
         'Content-Type': 'application/pdf',
@@ -487,7 +499,7 @@ export class CotacaoController {
     @Req() req: any,
   ) {
     try {
-      await this.cotacaoService.enviarEmail(id, enviarEmailDto, req.user.id);
+      await this.cotacaoService.enviarEmail(id, enviarEmailDto, req.user.id, req.user.empresa_id);
       return {
         success: true,
         message: 'Email enviado com sucesso',
@@ -505,7 +517,7 @@ export class CotacaoController {
   @ApiResponse({ status: 200, description: 'Histórico da cotação' })
   async obterHistorico(@Param('id', ParseUUIDPipe) id: string, @Req() req: any) {
     try {
-      const historico = await this.cotacaoService.obterHistorico(id, req.user.id);
+      const historico = await this.cotacaoService.obterHistorico(id, req.user.id, req.user.empresa_id);
       return historico;
     } catch (error) {
       throw new HttpException(
@@ -524,7 +536,12 @@ export class CotacaoController {
     @Req() req: any,
   ) {
     try {
-      const pedido = await this.cotacaoService.converterEmPedido(id, body.observacoes, req.user.id);
+      const pedido = await this.cotacaoService.converterEmPedido(
+        id,
+        body.observacoes,
+        req.user.id,
+        req.user.empresa_id,
+      );
       return pedido;
     } catch (error) {
       throw new HttpException(
@@ -539,7 +556,7 @@ export class CotacaoController {
   @ApiResponse({ status: 200, description: 'Próximo número de cotação' })
   async buscarProximoNumero(@Req() req: any) {
     try {
-      const proximoNumero = await this.cotacaoService.buscarProximoNumero(req.user.id);
+      const proximoNumero = await this.cotacaoService.buscarProximoNumero(req.user.id, req.user.empresa_id);
       return { proximoNumero };
     } catch (error) {
       throw new HttpException(
@@ -554,7 +571,7 @@ export class CotacaoController {
   @ApiResponse({ status: 200, description: 'Lista de templates' })
   async buscarTemplates(@Req() req: any) {
     try {
-      const templates = await this.cotacaoService.buscarTemplates(req.user.id);
+      const templates = await this.cotacaoService.buscarTemplates(req.user.id, req.user.empresa_id);
       return templates;
     } catch (error) {
       throw new HttpException(
@@ -572,7 +589,7 @@ export class CotacaoController {
     @Req() req: any,
   ) {
     try {
-      const template = await this.cotacaoService.salvarTemplate(body, req.user.id);
+      const template = await this.cotacaoService.salvarTemplate(body, req.user.id, req.user.empresa_id);
       return template;
     } catch (error) {
       throw new HttpException(
@@ -592,6 +609,7 @@ export class CotacaoController {
         formato,
         query,
         req.user.id,
+        req.user.empresa_id,
       );
 
       res.set({
@@ -618,6 +636,7 @@ export class CotacaoController {
         body.dados,
         body.validarApenas || false,
         req.user.id,
+        req.user.empresa_id,
       );
       return resultado;
     } catch (error) {
@@ -633,7 +652,7 @@ export class CotacaoController {
   @ApiResponse({ status: 200, description: 'Lista de anexos' })
   async listarAnexos(@Param('id', ParseUUIDPipe) id: string, @Req() req: any) {
     try {
-      const anexos = await this.cotacaoService.listarAnexos(id, req.user.id);
+      const anexos = await this.cotacaoService.listarAnexos(id, req.user.id, req.user.empresa_id);
       return anexos;
     } catch (error) {
       throw new HttpException(
@@ -652,7 +671,7 @@ export class CotacaoController {
     @Req() req: any,
   ) {
     try {
-      const anexo = await this.cotacaoService.adicionarAnexo(id, body, req.user.id);
+      const anexo = await this.cotacaoService.adicionarAnexo(id, body, req.user.id, req.user.empresa_id);
       return anexo;
     } catch (error) {
       throw new HttpException(
@@ -671,7 +690,7 @@ export class CotacaoController {
     @Req() req: any,
   ) {
     try {
-      await this.cotacaoService.removerAnexo(id, anexoId, req.user.id);
+      await this.cotacaoService.removerAnexo(id, anexoId, req.user.id, req.user.empresa_id);
       return {
         success: true,
         message: 'Anexo removido com sucesso',
@@ -684,3 +703,4 @@ export class CotacaoController {
     }
   }
 }
+

@@ -7,6 +7,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { User } from '../../modules/users/user.entity';
+import { Empresa } from '../../empresas/entities/empresa.entity';
 
 export enum NotificationType {
   COTACAO_APROVADA = 'COTACAO_APROVADA',
@@ -19,6 +20,13 @@ export enum NotificationType {
 export class Notification {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ type: 'uuid', name: 'empresa_id' })
+  empresaId: string;
+
+  @ManyToOne(() => Empresa)
+  @JoinColumn({ name: 'empresa_id' })
+  empresa: Empresa;
 
   @Column({ name: 'user_id' })
   userId: string;

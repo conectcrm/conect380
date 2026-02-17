@@ -74,6 +74,59 @@ export class AssinaturasService {
     return this.assinaturaRepository.save(assinatura);
   }
 
+  async criarAssinaturaPendenteParaCheckout(
+    empresaId: string,
+    planoId: string,
+  ): Promise<AssinaturaEmpresa> {
+    const assinaturaAtiva = await this.assinaturaRepository.findOne({
+      where: { empresaId, status: 'ativa' },
+      relations: ['plano'],
+    });
+
+    if (assinaturaAtiva) {
+      throw new ConflictException('Empresa já possui assinatura ativa');
+    }
+
+    const plano = await this.planoRepository.findOne({ where: { id: planoId } });
+
+    if (!plano) {
+      throw new NotFoundException(`Plano com ID ${planoId} não encontrado`);
+    }
+
+    const pendenteExistente = await this.assinaturaRepository.findOne({
+      where: { empresaId, status: 'pendente' },
+      relations: ['plano'],
+      order: { criadoEm: 'DESC' },
+    });
+
+    const hoje = new Date();
+    const proximoVencimento = new Date(hoje);
+    proximoVencimento.setMonth(proximoVencimento.getMonth() + 1);
+
+    if (pendenteExistente) {
+      pendenteExistente.plano = plano;
+      pendenteExistente.valorMensal = plano.preco;
+      pendenteExistente.dataInicio = hoje;
+      pendenteExistente.proximoVencimento = proximoVencimento;
+      pendenteExistente.renovacaoAutomatica = true;
+      return this.assinaturaRepository.save(pendenteExistente);
+    }
+
+    const assinatura = this.assinaturaRepository.create({
+      empresaId,
+      plano,
+      status: 'pendente',
+      dataInicio: hoje,
+      dataFim: null,
+      proximoVencimento,
+      valorMensal: plano.preco,
+      renovacaoAutomatica: true,
+      observacoes: 'Checkout iniciado via Mercado Pago',
+    });
+
+    return this.assinaturaRepository.save(assinatura);
+  }
+
   async alterarPlano(empresaId: string, novoPlanoId: string): Promise<AssinaturaEmpresa> {
     const assinatura = await this.buscarPorEmpresa(empresaId);
 

@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { User } from '../modules/users/user.entity';
 import { Empresa } from '../empresas/entities/empresa.entity';
 import { Cliente } from '../modules/clientes/cliente.entity';
+import { ClienteAnexo } from '../modules/clientes/cliente-anexo.entity';
 import { Contato } from '../modules/clientes/contato.entity';
 import { Produto } from '../modules/produtos/produto.entity';
 import { Oportunidade } from '../modules/oportunidades/oportunidade.entity';
@@ -23,7 +24,6 @@ import { Contrato } from '../modules/contratos/entities/contrato.entity';
 import { AssinaturaContrato } from '../modules/contratos/entities/assinatura-contrato.entity';
 import { Canal } from '../modules/atendimento/entities/canal.entity';
 import { Fila } from '../modules/atendimento/entities/fila.entity';
-import { FilaAtendente } from '../modules/atendimento/entities/fila-atendente.entity'; // ✅ ETAPA 5 - Junction table
 import { Atendente } from '../modules/atendimento/entities/atendente.entity';
 import { Ticket } from '../modules/atendimento/entities/ticket.entity';
 import { Mensagem } from '../modules/atendimento/entities/mensagem.entity';
@@ -60,20 +60,23 @@ import { Notification } from '../notifications/entities/notification.entity';
 
 @Injectable()
 export class DatabaseConfig implements TypeOrmOptionsFactory {
-  constructor(private configService: ConfigService) { }
+  constructor(private configService: ConfigService) {}
 
   createTypeOrmOptions(): TypeOrmModuleOptions {
+    const { FilaAtendente } = require('../modules/atendimento/entities/fila-atendente.entity');
+
     const config = {
       type: 'postgres',
       host: this.configService.get('DATABASE_HOST', 'localhost'),
-      port: parseInt(this.configService.get('DATABASE_PORT', '5434')),
-      username: this.configService.get('DATABASE_USERNAME', 'conectcrm'),
-      password: this.configService.get('DATABASE_PASSWORD', 'conectcrm123'),
-      database: this.configService.get('DATABASE_NAME', 'conectcrm_db'),
+      port: parseInt(this.configService.get('DATABASE_PORT', '5433')),
+      username: this.configService.get('DATABASE_USERNAME', 'postgres'),
+      password: this.configService.get('DATABASE_PASSWORD', 'postgres'),
+      database: this.configService.get('DATABASE_NAME', 'conectcrm'),
       entities: [
         User,
         Empresa,
         Cliente,
+        ClienteAnexo,
         Contato, // ✅ Entity de contatos vinculados a clientes
         Produto,
         Oportunidade,
@@ -135,8 +138,8 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
       ssl:
         this.configService.get('DATABASE_SSL') === 'true'
           ? {
-            rejectUnauthorized: false,
-          }
+              rejectUnauthorized: false,
+            }
           : false,
     };
 

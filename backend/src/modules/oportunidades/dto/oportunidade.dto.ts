@@ -48,7 +48,10 @@ export class CreateOportunidadeDto {
   @MaxLength(5000, { message: 'Descrição muito longa (máximo 5000 caracteres)' })
   descricao?: string;
 
-  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Valor deve ser um número com até 2 casas decimais' })
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    { message: 'Valor deve ser um número com até 2 casas decimais' },
+  )
   @Min(0, { message: 'Valor não pode ser negativo' })
   @Max(999999999.99, { message: 'Valor muito alto (máximo 999.999.999,99)' })
   valor: number;
@@ -102,7 +105,9 @@ export class CreateOportunidadeDto {
   @IsOptional()
   @IsString({ message: 'Telefone do contato deve ser uma string' })
   @MaxLength(20, { message: 'Telefone do contato muito longo (máximo 20 caracteres)' })
-  @Matches(/^[0-9+\-() ]+$/, { message: 'Telefone do contato inválido (apenas números e símbolos)' })
+  @Matches(/^[0-9+\-() ]+$/, {
+    message: 'Telefone do contato inválido (apenas números e símbolos)',
+  })
   telefoneContato?: string;
 
   @IsOptional()

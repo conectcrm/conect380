@@ -32,7 +32,21 @@ export interface Cliente {
   updated_at?: string;
   avatar?: string;
   avatarUrl?: string;
+  avatar_url?: string;
   foto?: string;
+}
+
+export interface ClienteAttachment {
+  id: string;
+  clienteId?: string;
+  cliente_id?: string;
+  empresaId?: string;
+  empresa_id?: string;
+  nome: string;
+  tipo: string;
+  tamanho: number;
+  url: string;
+  created_at?: string;
 }
 
 export interface NotaCliente {
@@ -80,13 +94,13 @@ export interface Demanda {
   titulo: string;
   descricao?: string;
   tipo:
-  | 'tecnica'
-  | 'comercial'
-  | 'financeira'
-  | 'suporte'
-  | 'reclamacao'
-  | 'solicitacao'
-  | 'outros';
+    | 'tecnica'
+    | 'comercial'
+    | 'financeira'
+    | 'suporte'
+    | 'reclamacao'
+    | 'solicitacao'
+    | 'outros';
   prioridade: 'baixa' | 'media' | 'alta' | 'urgente';
   status: 'aberta' | 'em_andamento' | 'aguardando' | 'concluida' | 'cancelada';
   dataVencimento?: string;
@@ -116,13 +130,13 @@ export interface CreateDemandaDto {
   titulo: string;
   descricao?: string;
   tipo?:
-  | 'tecnica'
-  | 'comercial'
-  | 'financeira'
-  | 'suporte'
-  | 'reclamacao'
-  | 'solicitacao'
-  | 'outros';
+    | 'tecnica'
+    | 'comercial'
+    | 'financeira'
+    | 'suporte'
+    | 'reclamacao'
+    | 'solicitacao'
+    | 'outros';
   prioridade?: 'baixa' | 'media' | 'alta' | 'urgente';
   status?: 'aberta' | 'em_andamento' | 'aguardando' | 'concluida' | 'cancelada';
   dataVencimento?: string;
@@ -133,13 +147,13 @@ export interface UpdateDemandaDto {
   titulo?: string;
   descricao?: string;
   tipo?:
-  | 'tecnica'
-  | 'comercial'
-  | 'financeira'
-  | 'suporte'
-  | 'reclamacao'
-  | 'solicitacao'
-  | 'outros';
+    | 'tecnica'
+    | 'comercial'
+    | 'financeira'
+    | 'suporte'
+    | 'reclamacao'
+    | 'solicitacao'
+    | 'outros';
   prioridade?: 'baixa' | 'media' | 'alta' | 'urgente';
   status?: 'aberta' | 'em_andamento' | 'aguardando' | 'concluida' | 'cancelada';
   dataVencimento?: string;
@@ -154,6 +168,14 @@ export interface PaginatedClientes {
   totalPages: number;
 }
 
+export interface ClientesEstatisticas {
+  total: number;
+  ativos: number;
+  prospects: number;
+  leads: number;
+  [key: string]: unknown;
+}
+
 export interface ClienteFilters {
   search?: string;
   status?: string;
@@ -162,6 +184,7 @@ export interface ClienteFilters {
   limit?: number;
   sortBy?: string;
   sortOrder?: 'ASC' | 'DESC';
+  cacheBust?: number;
 }
 
 class ClientesService {
@@ -175,7 +198,126 @@ class ClientesService {
   private searchCooldownUntil = 0;
   private lastRateLimitAt = 0;
 
-  private buildQueryString(params: Record<string, unknown> = {}): string {
+  private isObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
+  }
+
+  private toNumber(value: unknown, fallback: number): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  private normalizeCliente(payload: unknown): Cliente {
+    const applyAvatarAliases = (cliente: Cliente): Cliente => ({
+      ...cliente,
+      avatar_url: cliente.avatar_url ?? cliente.avatarUrl ?? cliente.avatar,
+      avatarUrl: cliente.avatarUrl ?? cliente.avatar_url ?? cliente.avatar,
+      avatar: cliente.avatar ?? cliente.avatar_url ?? cliente.avatarUrl,
+    });
+
+    if (this.isObject(payload) && this.isObject(payload.data)) {
+      return applyAvatarAliases(payload.data as unknown as Cliente);
+    }
+
+    return applyAvatarAliases(((payload as Cliente) ?? {}) as Cliente);
+  }
+
+  private normalizeClientesList(payload: unknown): Cliente[] {
+    if (Array.isArray(payload)) {
+      return (payload as Cliente[]).map((cliente) => this.normalizeCliente(cliente));
+    }
+
+    if (this.isObject(payload) && Array.isArray(payload.data)) {
+      return (payload.data as Cliente[]).map((cliente) => this.normalizeCliente(cliente));
+    }
+
+    if (this.isObject(payload) && this.isObject(payload.data) && Array.isArray(payload.data.data)) {
+      return (payload.data.data as Cliente[]).map((cliente) => this.normalizeCliente(cliente));
+    }
+
+    return [];
+  }
+
+  private normalizePaginatedClientes(payload: unknown, defaultLimit: number): PaginatedClientes {
+    const empty: PaginatedClientes = {
+      data: [],
+      total: 0,
+      page: 1,
+      limit: defaultLimit,
+      totalPages: 0,
+    };
+
+    if (!this.isObject(payload)) {
+      return empty;
+    }
+
+    if (Array.isArray(payload.data)) {
+      return {
+        data: (payload.data as Cliente[]).map((cliente) => this.normalizeCliente(cliente)),
+        total: this.toNumber(payload.total, 0),
+        page: this.toNumber(payload.page, 1),
+        limit: this.toNumber(payload.limit, defaultLimit),
+        totalPages: this.toNumber(payload.totalPages, 1),
+      };
+    }
+
+    if (this.isObject(payload.data) && Array.isArray(payload.data.data)) {
+      return {
+        data: (payload.data.data as Cliente[]).map((cliente) => this.normalizeCliente(cliente)),
+        total: this.toNumber(payload.data.total, 0),
+        page: this.toNumber(payload.data.page, 1),
+        limit: this.toNumber(payload.data.limit, defaultLimit),
+        totalPages: this.toNumber(payload.data.totalPages, 1),
+      };
+    }
+
+    return empty;
+  }
+
+  private normalizeEstatisticas(payload: unknown): ClientesEstatisticas {
+    if (this.isObject(payload) && this.isObject(payload.data)) {
+      return payload.data as ClientesEstatisticas;
+    }
+
+    if (this.isObject(payload)) {
+      return payload as ClientesEstatisticas;
+    }
+
+    return {
+      total: 0,
+      ativos: 0,
+      prospects: 0,
+      leads: 0,
+    };
+  }
+
+  private normalizeAttachment(payload: unknown): ClienteAttachment {
+    const attachment = (
+      this.isObject(payload) && this.isObject(payload.data) ? payload.data : payload
+    ) as ClienteAttachment;
+
+    return {
+      ...attachment,
+      cliente_id: attachment.cliente_id ?? attachment.clienteId,
+      clienteId: attachment.clienteId ?? attachment.cliente_id,
+      empresa_id: attachment.empresa_id ?? attachment.empresaId,
+      empresaId: attachment.empresaId ?? attachment.empresa_id,
+    };
+  }
+
+  private normalizeAttachmentsList(payload: unknown): ClienteAttachment[] {
+    if (Array.isArray(payload)) {
+      return payload.map((item) => this.normalizeAttachment(item));
+    }
+
+    if (this.isObject(payload) && Array.isArray(payload.data)) {
+      return payload.data.map((item) => this.normalizeAttachment(item));
+    }
+
+    return [];
+  }
+
+  private buildQueryString(params: Partial<Record<string, unknown>> | ClienteFilters = {}): string {
     const searchParams = new URLSearchParams();
 
     Object.entries(params).forEach(([key, value]) => {
@@ -279,33 +421,45 @@ class ClientesService {
 
   async getClientes(filters: ClienteFilters = {}): Promise<PaginatedClientes> {
     const queryString = this.buildQueryString(filters);
-    return this.handleRequest(
+    const payload = await this.handleRequest(
       () => api.get<PaginatedClientes>(`${this.baseUrl}${queryString}`),
       'Erro ao listar clientes',
     );
+    return this.normalizePaginatedClientes(payload, filters.limit ?? 10);
   }
 
   async getClienteById(id: string): Promise<Cliente> {
-    return this.handleRequest(
+    const payload = await this.handleRequest(
       () => api.get<Cliente>(`${this.baseUrl}/${id}`),
       'Erro ao buscar cliente',
     );
+    return this.normalizeCliente(payload);
   }
 
   async createCliente(
     cliente: Omit<Cliente, 'id' | 'created_at' | 'updated_at'>,
   ): Promise<Cliente> {
-    return this.handleRequest(
+    const payload = await this.handleRequest(
       () => api.post<Cliente>(this.baseUrl, cliente),
       'Erro ao criar cliente',
     );
+    return this.normalizeCliente(payload);
   }
 
   async updateCliente(id: string, cliente: Partial<Cliente>): Promise<Cliente> {
-    return this.handleRequest(
+    const payload = await this.handleRequest(
       () => api.put<Cliente>(`${this.baseUrl}/${id}`, cliente),
       'Erro ao atualizar cliente',
     );
+    return this.normalizeCliente(payload);
+  }
+
+  async updateClienteStatus(id: string, status: Cliente['status']): Promise<Cliente> {
+    const payload = await this.handleRequest(
+      () => api.put<Cliente>(`${this.baseUrl}/${id}/status`, { status }),
+      'Erro ao atualizar status do cliente',
+    );
+    return this.normalizeCliente(payload);
   }
 
   async deleteCliente(id: string): Promise<void> {
@@ -316,10 +470,11 @@ class ClientesService {
   }
 
   async getClientesByStatus(status: Cliente['status']): Promise<Cliente[]> {
-    return this.handleRequest(
+    const payload = await this.handleRequest(
       () => api.get<Cliente[]>(`${this.baseUrl}/status/${status}`),
       'Erro ao listar clientes por status',
     );
+    return this.normalizeClientesList(payload);
   }
 
   async searchClientes(term: string): Promise<Cliente[]> {
@@ -369,10 +524,34 @@ class ClientesService {
     );
   }
 
-  async getEstartisticas(): Promise<Record<string, unknown>> {
-    return this.handleRequest(
-      () => api.get<Record<string, unknown>>(`${this.baseUrl}/estatisticas`),
-      'Erro ao carregar estatísticas de clientes',
+  async getEstartisticas(): Promise<ClientesEstatisticas> {
+    const payload = await this.handleRequest(
+      () => api.get<ClientesEstatisticas>(`${this.baseUrl}/estatisticas`),
+      'Erro ao carregar estatisticas de clientes',
+    );
+    return this.normalizeEstatisticas(payload);
+  }
+
+  async getEstatisticas(): Promise<ClientesEstatisticas> {
+    const payload = await this.handleRequest(
+      () => api.get<ClientesEstatisticas>(`${this.baseUrl}/estatisticas`),
+      'Erro ao carregar estatisticas de clientes',
+    );
+    return this.normalizeEstatisticas(payload);
+  }
+
+  async listarAnexosCliente(clienteId: string): Promise<ClienteAttachment[]> {
+    const payload = await this.handleRequest(
+      () => api.get<ClienteAttachment[]>(`${this.baseUrl}/${clienteId}/anexos`),
+      'Erro ao listar anexos do cliente',
+    );
+    return this.normalizeAttachmentsList(payload);
+  }
+
+  async removerAnexoCliente(clienteId: string, anexoId: string): Promise<void> {
+    await this.handleVoidRequest(
+      () => api.delete(`${this.baseUrl}/${clienteId}/anexos/${anexoId}`),
+      'Erro ao remover anexo do cliente',
     );
   }
 

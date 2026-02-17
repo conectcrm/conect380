@@ -5,14 +5,14 @@ export class MudarPlanoDto {
   @ApiProperty({
     description: 'Nome do novo plano',
     example: 'Professional',
-    enum: ['Starter', 'Professional', 'Enterprise', 'Custom']
+    enum: ['Starter', 'Professional', 'Enterprise', 'Custom'],
   })
   @IsString()
   plano: string;
 
   @ApiPropertyOptional({
     description: 'Motivo da mudança de plano',
-    example: 'Cliente solicitou upgrade para ter mais usuários'
+    example: 'Cliente solicitou upgrade para ter mais usuários',
   })
   @IsOptional()
   @IsString()
@@ -20,7 +20,7 @@ export class MudarPlanoDto {
 
   @ApiPropertyOptional({
     description: 'Valor mensal do novo plano',
-    example: 297.00
+    example: 297.0,
   })
   @IsOptional()
   @IsNumber()
@@ -28,7 +28,7 @@ export class MudarPlanoDto {
 
   @ApiPropertyOptional({
     description: 'ID do usuário que está fazendo a alteração',
-    example: 'uuid-do-admin'
+    example: 'uuid-do-admin',
   })
   @IsOptional()
   @IsString()

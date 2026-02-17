@@ -42,7 +42,6 @@ interface RespostaBuscaGlobal {
   };
 }
 
-const API_URL = API_BASE_URL;
 interface BuscaRapidaProps {
   isOpen: boolean;
   onClose: () => void;

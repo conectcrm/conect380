@@ -4,9 +4,11 @@ import { AssinaturasService } from '../planos/assinaturas.service';
 
 interface AuthenticatedRequest extends Request {
   user?: {
-    empresaId: string;
-    userId: string;
-    email: string;
+    empresaId?: string;
+    empresa_id?: string;
+    userId?: string;
+    id?: string;
+    email?: string;
   };
 }
 
@@ -25,13 +27,14 @@ export class AssinaturaMiddleware implements NestMiddleware {
     }
 
     // Verificar se usuário está autenticado
-    if (!req.user?.empresaId) {
+    const empresaId = req.user?.empresaId ?? (req.user as any)?.empresa_id;
+    if (!empresaId) {
       return next();
     }
 
     try {
       // Buscar assinatura da empresa
-      const assinatura = await this.assinaturasService.buscarPorEmpresa(req.user.empresaId);
+      const assinatura = await this.assinaturasService.buscarPorEmpresa(empresaId);
 
       if (!assinatura) {
         throw new HttpException(
@@ -80,7 +83,7 @@ export class AssinaturaMiddleware implements NestMiddleware {
 
       // Registrar chamada da API se for uma operação que consome recursos
       if (this.isResourceConsumingOperation(req)) {
-        const permitido = await this.assinaturasService.registrarChamadaApi(req.user.empresaId);
+        const permitido = await this.assinaturasService.registrarChamadaApi(empresaId);
 
         if (!permitido) {
           throw new HttpException(

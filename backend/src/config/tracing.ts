@@ -1,9 +1,9 @@
 /**
  * 🔍 OpenTelemetry Tracing Configuration
- * 
+ *
  * Configuração de tracing distribuído para observabilidade do sistema.
  * Permite rastrear requisições através de múltiplos serviços e identificar gargalos.
- * 
+ *
  * Features:
  * - Auto-instrumentação de HTTP, Express, TypeORM, Redis
  * - Export para Jaeger (visualização de traces)
@@ -38,9 +38,9 @@ class NoopSpanExporter implements SpanExporter {
 // Configurar exporter baseado no ambiente
 const traceExporter = isProduction
   ? new OTLPTraceExporter({
-    url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://jaeger:4318/v1/traces',
-    headers: {},
-  })
+      url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://jaeger:4318/v1/traces',
+      headers: {},
+    })
   : enableTracingLogs
     ? new ConsoleSpanExporter() // Dev com logs habilitados explicitamente
     : new NoopSpanExporter(); // Dev: silencioso (padrão)
@@ -92,7 +92,9 @@ export async function initializeTracing(): Promise<void> {
       }
     } else {
       console.log('📊 Modo: Jaeger (produção)');
-      console.log(`🔗 Jaeger OTLP: ${process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://jaeger:4318'}`);
+      console.log(
+        `🔗 Jaeger OTLP: ${process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://jaeger:4318'}`,
+      );
     }
   } catch (error) {
     console.error('❌ Erro ao inicializar OpenTelemetry:', error);

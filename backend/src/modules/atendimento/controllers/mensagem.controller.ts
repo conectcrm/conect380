@@ -12,6 +12,7 @@ import {
   Res,
   Req,
   HttpException,
+  UseGuards,
 } from '@nestjs/common';
 import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
@@ -21,12 +22,16 @@ import { MensagemService } from '../services/mensagem.service';
 import { TicketService } from '../services/ticket.service';
 import { OnlineStatusService } from '../services/online-status.service';
 import { AtendimentoGateway } from '../gateways/atendimento.gateway';
+import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { EmpresaId } from '../../../common/decorators/empresa.decorator';
 
 /**
  * Controller REST para gerenciamento de mensagens
  * Endpoints para listar mensagens de tickets
  */
 @Controller('api/atendimento/mensagens')
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class MensagemController {
   private readonly logger = new Logger(MensagemController.name);
 
@@ -46,7 +51,11 @@ export class MensagemController {
    * - limite: number (opcional, padrão: 100)
    */
   @Get()
-  async listar(@Query('ticketId') ticketId: string, @Query('limite') limite?: string) {
+  async listar(
+    @EmpresaId() empresaId: string,
+    @Query('ticketId') ticketId: string,
+    @Query('limite') limite?: string,
+  ) {
     this.logger.log(`💬 [GET /mensagens] ticketId=${ticketId}`);
 
     if (!ticketId) {
@@ -56,8 +65,8 @@ export class MensagemController {
     try {
       const limiteNum = limite ? parseInt(limite, 10) : 100;
       const [mensagens, ticket] = await Promise.all([
-        this.mensagemService.buscarPorTicket(ticketId, limiteNum),
-        this.ticketService.buscarPorId(ticketId).catch(() => null),
+        this.mensagemService.buscarPorTicket(ticketId, limiteNum, empresaId),
+        this.ticketService.buscarPorId(ticketId, empresaId).catch(() => null),
       ]);
 
       const fotoContato = ticket?.contatoFoto || null;
@@ -95,11 +104,11 @@ export class MensagemController {
    * Busca uma mensagem específica por ID
    */
   @Get(':id')
-  async buscar(@Param('id') id: string) {
+  async buscar(@EmpresaId() empresaId: string, @Param('id') id: string) {
     this.logger.log(`🔍 [GET /mensagens/${id}]`);
 
     try {
-      const mensagem = await this.mensagemService.buscarPorId(id);
+      const mensagem = await this.mensagemService.buscarPorId(id, empresaId);
 
       return {
         success: true,
@@ -130,11 +139,16 @@ export class MensagemController {
   }
 
   @Get(':id/anexo')
-  async baixarAnexo(@Param('id') id: string, @Req() req: Request, @Res() res: Response) {
+  async baixarAnexo(
+    @EmpresaId() empresaId: string,
+    @Param('id') id: string,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
     this.logger.log(`⬇️ [GET /mensagens/${id}/anexo] - Versão corrigida v2`);
 
     try {
-      const midia = await this.mensagemService.obterMidiaParaDownload(id);
+      const midia = await this.mensagemService.obterMidiaParaDownload(id, empresaId);
 
       this.logger.log(`📦 Mídia obtida:`, {
         remoto: midia.remoto,
@@ -250,15 +264,19 @@ export class MensagemController {
 
   @Post()
   @UseInterceptors(FilesInterceptor('anexos', 5))
-  async enviar(@Body() dados: any, @UploadedFiles() arquivos?: Express.Multer.File[]) {
+  async enviar(
+    @EmpresaId() empresaId: string,
+    @Body() dados: any,
+    @UploadedFiles() arquivos?: Express.Multer.File[],
+  ) {
     this.logger.log(`📤 [POST /mensagens] ticketId=${dados.ticketId}`);
 
     try {
-      const mensagem = await this.mensagemService.enviar(dados, arquivos);
+      const ticket = await this.ticketService.buscarPorId(dados.ticketId, empresaId);
+      const mensagem = await this.mensagemService.enviar(dados, arquivos, empresaId);
       this.logger.log(`✅ Mensagem enviada: ${mensagem.id}`);
 
       // 📱 Atualizar atividade do contato quando mensagem é enviada/recebida
-      const ticket = await this.ticketService.buscarPorId(dados.ticketId);
       if (ticket && ticket.contatoTelefone) {
         // Se mensagem é do cliente, atualizar sua atividade
         if (mensagem.remetente === 'CLIENTE') {
@@ -274,6 +292,7 @@ export class MensagemController {
           try {
             const contato = await this.onlineStatusService.findContactByPhone(
               ticket.contatoTelefone,
+              ticket.empresaId,
             );
             if (contato) {
               await this.atendimentoGateway.atualizarAtividadeContato(
@@ -310,11 +329,14 @@ export class MensagemController {
   }
 
   @Post('marcar-lidas')
-  async marcarLidas(@Body() dados: { mensagemIds: string[] }) {
+  async marcarLidas(
+    @EmpresaId() empresaId: string,
+    @Body() dados: { mensagemIds: string[] },
+  ) {
     this.logger.log(`✔️ [POST /mensagens/marcar-lidas] ${dados.mensagemIds.length} mensagens`);
 
     try {
-      await this.mensagemService.marcarLidas(dados.mensagemIds);
+      await this.mensagemService.marcarLidas(dados.mensagemIds, empresaId);
 
       return {
         success: true,

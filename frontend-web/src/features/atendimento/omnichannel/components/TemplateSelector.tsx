@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, X } from 'lucide-react';
-import { TemplateMensagem } from '../../../services/templateMensagemService';
+import { TemplateMensagem } from '../../../../services/templateMensagemService';
 
 interface TemplateSelectorProps {
   templates: TemplateMensagem[];
@@ -33,7 +33,7 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
     const searchLower = search.toLowerCase().replace('/', '');
     const filtered = templates.filter(
       (t) =>
-        t.titulo.toLowerCase().includes(searchLower) ||
+        t.nome.toLowerCase().includes(searchLower) ||
         t.conteudo.toLowerCase().includes(searchLower) ||
         t.atalho?.toLowerCase().includes(searchLower) ||
         t.categoria?.toLowerCase().includes(searchLower)
@@ -103,7 +103,7 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
               >
                 <div className="flex items-start justify-between mb-1">
                   <p className="font-medium text-sm text-[#002333] group-hover:text-[#159A9C]">
-                    {template.titulo}
+                    {template.nome}
                   </p>
                   {template.atalho && (
                     <span className="text-xs font-mono px-2 py-0.5 bg-[#DEEFE7] text-[#159A9C] rounded">

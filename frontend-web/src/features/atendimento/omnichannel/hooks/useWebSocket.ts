@@ -279,7 +279,7 @@ export const useWebSocket = (options: UseWebSocketOptions = {}): UseWebSocketRet
 
         // 🏪 Atualizar store diretamente
         if (ticket.id) {
-          atualizarTicketStore(ticket.id, { ...ticket, status: 'fechado' });
+          atualizarTicketStore(ticket.id, { ...ticket, status: 'encerrado' });
         }
 
         // 🔔 Callback opcional para notificações/UI

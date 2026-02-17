@@ -30,11 +30,14 @@ export class QueueMetricsService implements OnModuleInit {
     @InjectQueue('notifications-dlq') private readonly notificationsDlq: Queue,
     private readonly notificationsProducer: NotificationsQueueProducer,
     private readonly notificationChannels: NotificationChannelsService,
-  ) { }
+  ) {}
 
   private readonly adminNotifyUserId = process.env.NOTIFICATIONS_ADMIN_USER_ID;
+  private readonly adminNotifyEmpresaId = process.env.NOTIFICATIONS_ADMIN_EMPRESA_ID;
   private readonly adminAlertPhone = process.env.NOTIFICATIONS_ADMIN_PHONE?.trim();
-  private readonly notificationsBacklogThreshold = Number(process.env.NOTIFICATIONS_BACKLOG_THRESHOLD || 500);
+  private readonly notificationsBacklogThreshold = Number(
+    process.env.NOTIFICATIONS_BACKLOG_THRESHOLD || 500,
+  );
   private readonly backlogPolicy: ChannelPolicyKey = 'notifications-backlog';
   private readonly breakerPolicy: ChannelPolicyKey = 'notifications-breaker';
 
@@ -153,15 +156,18 @@ export class QueueMetricsService implements OnModuleInit {
         if (nomeFila === 'notifications' && this.adminNotifyUserId) {
           const msg = `Job=${jobName || 'unknown'} pausado após ${state.failCount} falhas. Retoma em ${QueueMetricsService.BREAKER_COOLDOWN_MS / 1000}s`;
 
-          void this.notificationsProducer.enqueueNotification({
-            userId: this.adminNotifyUserId,
-            type: NotificationType.SISTEMA,
-            title: 'Circuit breaker aberto em notifications',
-            message: msg,
-            data: { jobName: jobName || 'unknown', failCount: state.failCount },
-          }).catch((err) => {
-            this.logger.warn(`Falha ao enfileirar alerta de breaker: ${err?.message || err}`);
-          });
+          void this.notificationsProducer
+            .enqueueNotification({
+              empresaId: this.adminNotifyEmpresaId,
+              userId: this.adminNotifyUserId,
+              type: NotificationType.SISTEMA,
+              title: 'Circuit breaker aberto em notifications',
+              message: msg,
+              data: { jobName: jobName || 'unknown', failCount: state.failCount },
+            })
+            .catch((err) => {
+              this.logger.warn(`Falha ao enfileirar alerta de breaker: ${err?.message || err}`);
+            });
 
           const preview = msg.slice(0, 280);
           const adminPhone = this.getAdminPhone();
@@ -178,7 +184,9 @@ export class QueueMetricsService implements OnModuleInit {
 
         await sleep(QueueMetricsService.BREAKER_COOLDOWN_MS);
         await queue.resume();
-        this.logger.warn(`Circuit breaker fechado para fila ${nomeFila} (job=${jobName || 'unknown'})`);
+        this.logger.warn(
+          `Circuit breaker fechado para fila ${nomeFila} (job=${jobName || 'unknown'})`,
+        );
         this.resetBreaker(nomeFila, jobName);
       } catch (breakerError) {
         this.logger.error(`Erro ao operar breaker da fila ${nomeFila}: ${breakerError?.message}`);
@@ -209,15 +217,18 @@ export class QueueMetricsService implements OnModuleInit {
 
     const msg = `Fila ${nomeFila} com waiting=${waiting} (threshold=${this.notificationsBacklogThreshold}).`;
 
-    void this.notificationsProducer.enqueueNotification({
-      userId: this.adminNotifyUserId,
-      type: NotificationType.SISTEMA,
-      title: 'Backlog alto na fila notifications',
-      message: msg,
-      data: { queue: nomeFila, waiting, threshold: this.notificationsBacklogThreshold },
-    }).catch((err) => {
-      this.logger.warn(`Falha ao enfileirar alerta de backlog: ${err?.message || err}`);
-    });
+    void this.notificationsProducer
+      .enqueueNotification({
+        empresaId: this.adminNotifyEmpresaId,
+        userId: this.adminNotifyUserId,
+        type: NotificationType.SISTEMA,
+        title: 'Backlog alto na fila notifications',
+        message: msg,
+        data: { queue: nomeFila, waiting, threshold: this.notificationsBacklogThreshold },
+      })
+      .catch((err) => {
+        this.logger.warn(`Falha ao enfileirar alerta de backlog: ${err?.message || err}`);
+      });
 
     const preview = msg.slice(0, 280);
     const adminPhone = this.getAdminPhone();
@@ -228,7 +239,12 @@ export class QueueMetricsService implements OnModuleInit {
       logger: this.logger,
       targets: { phone: adminPhone },
       message: preview,
-      context: { source: 'notifications-backlog', queue: nomeFila, waiting, threshold: this.notificationsBacklogThreshold },
+      context: {
+        source: 'notifications-backlog',
+        queue: nomeFila,
+        waiting,
+        threshold: this.notificationsBacklogThreshold,
+      },
     });
   }
 }

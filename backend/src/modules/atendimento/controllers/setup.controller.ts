@@ -1,13 +1,10 @@
-import { Controller, Post, Get } from '@nestjs/common';
+import { Controller, Get, Post } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Canal, TipoCanal, StatusCanal } from '../entities/canal.entity';
+import { ensureDevelopmentOnly } from '../../../common/utils/dev-only.util';
 import { User } from '../../users/user.entity';
+import { Canal, StatusCanal, TipoCanal } from '../entities/canal.entity';
 
-/**
- * 🚀 Controller temporário para setup inicial do sistema
- * Endpoints públicos (sem autenticação) para configuração inicial
- */
 @Controller('api/setup')
 export class SetupController {
   constructor(
@@ -15,14 +12,12 @@ export class SetupController {
     private canalRepo: Repository<Canal>,
     @InjectRepository(User)
     private userRepo: Repository<User>,
-  ) { }
+  ) {}
 
-  /**
-   * GET /api/setup/status
-   * Verifica status do sistema
-   */
   @Get('status')
   async status() {
+    ensureDevelopmentOnly('GET /api/setup/status');
+
     try {
       const totalCanais = await this.canalRepo.count();
       const canalEmail = await this.canalRepo.findOne({
@@ -37,28 +32,23 @@ export class SetupController {
         status: 'online',
         dados: {
           totalCanais,
-          canalEmailExiste: !!canalEmail,
+          canalEmailExiste: Boolean(canalEmail),
           totalUsuarios,
         },
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
         success: false,
-        message: error.message,
+        message: error?.message ?? 'Erro ao obter status',
       };
     }
   }
 
-  /**
-   * POST /api/setup/criar-canal-email
-   * Cria canal de e-mail para TODAS as empresas no sistema
-   */
   @Post('criar-canal-email')
   async criarCanalEmailTodasEmpresas() {
-    console.log('🚀 [SetupController] Criando canais de e-mail para todas as empresas...');
+    ensureDevelopmentOnly('POST /api/setup/criar-canal-email');
 
     try {
-      // Buscar todas as empresas (via users únicos)
       const users = await this.userRepo.find({
         select: ['empresa_id'],
       });
@@ -70,29 +60,20 @@ export class SetupController {
         };
       }
 
-      // Obter empresas únicas
-      const empresasIds = [...new Set(
-        users.map(u => u.empresa_id).filter(Boolean)
-      )];
-
-      console.log(`📊 Empresas encontradas: ${empresasIds.length}`);
-
-      const canaisCriados = [];
-      const canaisJaExistentes = [];
+      const empresasIds = [...new Set(users.map((u) => u.empresa_id).filter(Boolean))];
+      const canaisCriados: Canal[] = [];
+      const canaisJaExistentes: Canal[] = [];
 
       for (const empresaId of empresasIds) {
-        // Verificar se já existe canal de e-mail para esta empresa
         const canalExistente = await this.canalRepo.findOne({
           where: { empresaId: empresaId as string, tipo: TipoCanal.EMAIL },
         });
 
         if (canalExistente) {
-          console.log(`✅ Canal de e-mail já existe para empresa: ${empresaId}`);
           canaisJaExistentes.push(canalExistente);
           continue;
         }
 
-        // Criar canal de e-mail
         const novoCanal = this.canalRepo.create({
           empresaId: empresaId as string,
           nome: 'E-mail Principal',
@@ -106,18 +87,17 @@ export class SetupController {
         });
 
         const canalSalvo = await this.canalRepo.save(novoCanal);
-        console.log(`✅ Canal criado para empresa ${empresaId}: ${canalSalvo.id}`);
         canaisCriados.push(canalSalvo);
       }
 
       return {
         success: true,
-        message: `Processo concluído! ${canaisCriados.length} canais criados, ${canaisJaExistentes.length} já existiam.`,
+        message: `Processo concluido! ${canaisCriados.length} canais criados, ${canaisJaExistentes.length} ja existiam.`,
         dados: {
           empresasTotal: empresasIds.length,
           canaisCriados: canaisCriados.length,
           canaisJaExistentes: canaisJaExistentes.length,
-          canais: [...canaisCriados, ...canaisJaExistentes].map(c => ({
+          canais: [...canaisCriados, ...canaisJaExistentes].map((c) => ({
             id: c.id,
             empresaId: c.empresaId,
             nome: c.nome,
@@ -125,22 +105,19 @@ export class SetupController {
           })),
         },
       };
-    } catch (error) {
-      console.error('❌ [SetupController] Erro:', error);
+    } catch (error: any) {
       return {
         success: false,
-        message: error.message || 'Erro ao criar canais de e-mail',
-        error: error.stack,
+        message: error?.message ?? 'Erro ao criar canais de e-mail',
+        error: error?.stack,
       };
     }
   }
 
-  /**
-   * GET /api/setup/listar-canais
-   * Lista todos os canais de todas as empresas (debug)
-   */
   @Get('listar-canais')
   async listarTodosCanais() {
+    ensureDevelopmentOnly('GET /api/setup/listar-canais');
+
     try {
       const canais = await this.canalRepo.find({
         order: { createdAt: 'DESC' },
@@ -150,7 +127,7 @@ export class SetupController {
       return {
         success: true,
         total: canais.length,
-        canais: canais.map(c => ({
+        canais: canais.map((c) => ({
           id: c.id,
           empresaId: c.empresaId,
           nome: c.nome,
@@ -159,10 +136,10 @@ export class SetupController {
           status: c.status,
         })),
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
         success: false,
-        message: error.message,
+        message: error?.message ?? 'Erro ao listar canais',
       };
     }
   }

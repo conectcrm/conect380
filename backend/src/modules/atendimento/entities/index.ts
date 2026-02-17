@@ -2,6 +2,7 @@
 
 export * from './canal.entity';
 export * from './fila.entity';
+export * from './fila-atendente.entity';
 export * from './atendente.entity';
 export * from './ticket.entity';
 export * from './mensagem.entity';

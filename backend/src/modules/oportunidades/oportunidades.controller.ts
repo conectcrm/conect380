@@ -27,7 +27,7 @@ import { EstagioOportunidade } from './oportunidade.entity';
 @Controller('oportunidades')
 @UseGuards(JwtAuthGuard, EmpresaGuard)
 export class OportunidadesController {
-  constructor(private readonly oportunidadesService: OportunidadesService) { }
+  constructor(private readonly oportunidadesService: OportunidadesService) {}
 
   @Post()
   create(@Body() createOportunidadeDto: CreateOportunidadeDto, @EmpresaId() empresaId: string) {
@@ -93,10 +93,7 @@ export class OportunidadesController {
   }
 
   @Get(':id/atividades')
-  listarAtividades(
-    @Param('id', ParseIntPipe) id: number,
-    @EmpresaId() empresaId: string,
-  ) {
+  listarAtividades(@Param('id', ParseIntPipe) id: number, @EmpresaId() empresaId: string) {
     return this.oportunidadesService.listarAtividades(id, empresaId);
   }
 

@@ -36,6 +36,16 @@ interface Empresa {
   valorMensal: number;
 }
 
+interface FilterState {
+  search: string;
+  status: string[];
+  plano: string[];
+  dataInicio: string;
+  dataFim: string;
+  valorMin: string;
+  valorMax: string;
+}
+
 export const EmpresasListPage: React.FC = () => {
   const navigate = useNavigate();
   const { addNotification } = useNotifications();
@@ -47,11 +57,14 @@ export const EmpresasListPage: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [showModalCadastro, setShowModalCadastro] = useState(false);
   const [empresaEditando, setEmpresaEditando] = useState<Empresa | null>(null);
-  const [filters, setFilters] = useState({
-    status: '',
-    plano: '',
+  const [filters, setFilters] = useState<FilterState>({
+    search: '',
+    status: [],
+    plano: [],
     dataInicio: '',
     dataFim: '',
+    valorMin: '',
+    valorMax: '',
   });
   const [pagination, setPagination] = useState({
     page: 1,
@@ -95,9 +108,11 @@ export const EmpresasListPage: React.FC = () => {
       setError(null);
 
       const params: FilterEmpresasParams = {
-        search: searchTerm || undefined,
-        status: filters.status || undefined,
-        plano: filters.plano || undefined,
+        search: searchTerm || filters.search || undefined,
+        status: filters.status[0] || undefined,
+        plano: filters.plano[0] || undefined,
+        dataInicio: filters.dataInicio || undefined,
+        dataFim: filters.dataFim || undefined,
         page: pagination.page,
         limit: pagination.limit,
         sortBy: 'created_at',
@@ -183,7 +198,7 @@ export const EmpresasListPage: React.FC = () => {
           email: dadosEmpresa.email,
           telefone: dadosEmpresa.telefone,
           plano: dadosEmpresa.plano.toUpperCase(),
-          trial_dias: 14,
+          trial_days: 14,
           admin_nome: dadosEmpresa.adminNome,
           admin_email: dadosEmpresa.adminEmail,
           admin_senha: dadosEmpresa.adminSenha,
@@ -218,10 +233,13 @@ export const EmpresasListPage: React.FC = () => {
 
   const resetFilters = () => {
     setFilters({
-      status: '',
-      plano: '',
+      search: '',
+      status: [],
+      plano: [],
       dataInicio: '',
       dataFim: '',
+      valorMin: '',
+      valorMax: '',
     });
     setPagination((prev) => ({ ...prev, page: 1 }));
   };
@@ -234,6 +252,18 @@ export const EmpresasListPage: React.FC = () => {
   const handleRefresh = () => {
     carregarEmpresas();
   };
+
+  const hasActiveFilters = () =>
+    Boolean(
+      searchTerm ||
+      filters.search ||
+      filters.status.length > 0 ||
+      filters.plano.length > 0 ||
+      filters.dataInicio ||
+      filters.dataFim ||
+      filters.valorMin ||
+      filters.valorMax,
+    );
 
   if (loading && empresas.length === 0) {
     return (
@@ -348,7 +378,12 @@ export const EmpresasListPage: React.FC = () => {
 
             {showFilters && (
               <div className="mt-4">
-                <EmpresaFilters filters={filters} onFiltersChange={setFilters} onReset={resetFilters} />
+                <EmpresaFilters
+                  filters={filters}
+                  onFiltersChange={setFilters}
+                  totalEmpresas={pagination.total || empresas.length}
+                  empresasFiltradas={filteredEmpresas.length}
+                />
               </div>
             )}
           </div>
@@ -363,11 +398,11 @@ export const EmpresasListPage: React.FC = () => {
                 <Building2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma empresa encontrada</h3>
                 <p className="text-gray-500 mb-6">
-                  {searchTerm || Object.values(filters).some((f) => f)
+                  {hasActiveFilters()
                     ? 'Tente ajustar os filtros de busca'
                     : 'Não há empresas cadastradas no sistema'}
                 </p>
-                {!searchTerm && !Object.values(filters).some((f) => f) && (
+                {!hasActiveFilters() && (
                   <button
                     onClick={handleNovaEmpresa}
                     className="bg-[#159A9C] text-white px-6 py-3 rounded-lg hover:bg-[#138A8C] transition-colors"

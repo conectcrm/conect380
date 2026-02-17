@@ -31,4 +31,4 @@ import { EmpresaConfigController } from '../modules/empresas/controllers/empresa
     TypeOrmModule, // ✅ Exportar TypeOrmModule para testes terem acesso aos repositories
   ],
 })
-export class EmpresasModule { }
+export class EmpresasModule {}

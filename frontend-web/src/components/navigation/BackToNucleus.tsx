@@ -19,7 +19,7 @@ export const BackToNucleus: React.FC<BackToNucleusProps> = ({
 
   return (
     <div className="flex flex-col space-y-2">
-      <div className="flex items-center space-x-2 text-sm text-gray-600">
+      <div className="md:hidden flex items-center space-x-2 text-sm text-gray-600">
         <Link
           to={nucleusPath}
           className="flex items-center space-x-1 hover:text-[#159A9C] transition-colors"
@@ -27,6 +27,9 @@ export const BackToNucleus: React.FC<BackToNucleusProps> = ({
           <ChevronLeft className="w-4 h-4" />
           <span>Voltar para {nucleusName}</span>
         </Link>
+      </div>
+      <div className="hidden md:flex items-center space-x-2 text-sm text-gray-600">
+        <span>{nucleusName}</span>
       </div>
       {displayTitle && <h1 className="text-2xl font-bold text-[#002333]">{displayTitle}</h1>}
     </div>

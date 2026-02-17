@@ -113,29 +113,52 @@ export class CreateTriagemLogsTable1730224800000 implements MigrationInterface {
       }),
     );
 
-    // Criar foreign keys
-    await queryRunner.createForeignKey(
-      'triagem_logs',
-      new TableForeignKey({
-        columnNames: ['sessao_id'],
-        referencedColumnNames: ['id'],
-        referencedTableName: 'sessoes_triagem',
-        onDelete: 'SET NULL',
-      }),
-    );
+    // Nem sempre as tabelas de triagem existem nesta etapa do histórico.
+    // Se ainda não existirem, pulamos as FKs aqui e elas podem ser adicionadas por migrations posteriores.
+    const hasSessoesTriagem = await queryRunner.hasTable('sessoes_triagem');
+    if (hasSessoesTriagem) {
+      await queryRunner.createForeignKey(
+        'triagem_logs',
+        new TableForeignKey({
+          columnNames: ['sessao_id'],
+          referencedColumnNames: ['id'],
+          referencedTableName: 'sessoes_triagem',
+          onDelete: 'SET NULL',
+          name: 'fk_triagem_logs_sessao',
+        }),
+      );
+    }
 
-    await queryRunner.createForeignKey(
-      'triagem_logs',
-      new TableForeignKey({
-        columnNames: ['fluxo_id'],
-        referencedColumnNames: ['id'],
-        referencedTableName: 'fluxos_triagem',
-        onDelete: 'SET NULL',
-      }),
-    );
+    const hasFluxosTriagem = await queryRunner.hasTable('fluxos_triagem');
+    if (hasFluxosTriagem) {
+      await queryRunner.createForeignKey(
+        'triagem_logs',
+        new TableForeignKey({
+          columnNames: ['fluxo_id'],
+          referencedColumnNames: ['id'],
+          referencedTableName: 'fluxos_triagem',
+          onDelete: 'SET NULL',
+          name: 'fk_triagem_logs_fluxo',
+        }),
+      );
+    }
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    // Remover FKs de forma segura (podem não existir dependendo da ordem do histórico)
+    const table = await queryRunner.getTable('triagem_logs');
+    if (table) {
+      const fkSessao = table.foreignKeys.find((fk) => fk.name === 'fk_triagem_logs_sessao');
+      if (fkSessao) {
+        await queryRunner.dropForeignKey('triagem_logs', fkSessao);
+      }
+
+      const fkFluxo = table.foreignKeys.find((fk) => fk.name === 'fk_triagem_logs_fluxo');
+      if (fkFluxo) {
+        await queryRunner.dropForeignKey('triagem_logs', fkFluxo);
+      }
+    }
+
     await queryRunner.dropTable('triagem_logs');
   }
 }

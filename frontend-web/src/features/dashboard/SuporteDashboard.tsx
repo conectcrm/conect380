@@ -40,27 +40,27 @@ const SuporteDashboard: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="p-6">
         {/* Header Suporte - Design Suave */}
-        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg shadow-sm p-6 mb-6">
+        <div className="bg-white border border-[#DEEFE7] rounded-lg shadow-sm p-6 mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-3xl font-bold flex items-center text-indigo-900">
-                <HeadphonesIcon className="h-8 w-8 mr-3 text-indigo-600" />
+              <h1 className="text-3xl font-bold flex items-center text-[#002333]">
+                <HeadphonesIcon className="h-8 w-8 mr-3 text-[#159A9C]" />
                 Dashboard de Suporte
               </h1>
-              <p className="mt-2 text-indigo-700">Atendimento ao cliente e gestão de tickets</p>
+              <p className="mt-2 text-[#002333]/70">Atendimento ao cliente e gestão de tickets</p>
             </div>
             <div className="mt-4 sm:mt-0 flex items-center space-x-4">
               <div className="text-center">
-                <div className="text-2xl font-bold text-indigo-900">
+                <div className="text-2xl font-bold text-[#002333]">
                   {suporteData.tickets.abertos}
                 </div>
-                <div className="text-sm text-indigo-600">Tickets Abertos</div>
+                <div className="text-sm text-[#002333]/70">Tickets Abertos</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-indigo-900">
+                <div className="text-2xl font-bold text-[#002333]">
                   {suporteData.tickets.satisfacao}
                 </div>
-                <div className="text-sm text-indigo-600">Satisfação</div>
+                <div className="text-sm text-[#002333]/70">Satisfação</div>
               </div>
             </div>
           </div>
@@ -115,7 +115,7 @@ const SuporteDashboard: React.FC = () => {
 
         {/* Placeholder para futuras implementações */}
         <div className="bg-white rounded-lg p-8 border border-gray-200 shadow-sm text-center">
-          <HeadphonesIcon className="w-16 h-16 text-indigo-600 mx-auto mb-4" />
+          <HeadphonesIcon className="w-16 h-16 text-[#159A9C] mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-gray-900 mb-2">
             Dashboard de Suporte em Desenvolvimento
           </h3>

@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, UserCheck, CheckCircle, Link2 } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
-import { useWhatsApp } from '../hooks/useWhatsApp';
-import { useNotifications } from '../../../hooks/useNotifications';
-import { TicketList } from '../components/chat/TicketList';
-import { MessageList } from '../components/chat/MessageList';
-import { MessageInput } from '../components/chat/MessageInput';
-import { PainelContextoCliente } from '../components/chat/PainelContextoCliente';
-import { BuscaRapida, TipoRecursoBusca } from '../components/chat/BuscaRapida';
+import { useWhatsApp } from '../../../hooks/useWhatsApp';
+import { useNotifications } from '../../../contexts/NotificationContext';
+import { TicketList } from '../../../components/chat/TicketList';
+import { MessageList } from '../../../components/chat/MessageList';
+import { MessageInput } from '../../../components/chat/MessageInput';
+import { PainelContextoCliente } from '../../../components/chat/PainelContextoCliente';
+import { BuscaRapida, TipoRecursoBusca } from '../../../components/chat/BuscaRapida';
 import { NovoAtendimentoModal } from '../components/modals/NovoAtendimentoModal';
 import { TransferirAtendimentoModal } from '../components/modals/TransferirAtendimentoModal';
 import { EncerrarAtendimentoModal } from '../components/modals/EncerrarAtendimentoModal';
@@ -42,7 +42,7 @@ export function AtendimentoPage() {
       whatsapp.carregarMensagens(activeTicketId);
       // Marcar notificações do ticket como lidas
       notifications
-        .filter((n) => n.data?.ticketId === activeTicketId && !n.read)
+        .filter((n) => ((n as any).data?.ticketId === activeTicketId || n.entityId === activeTicketId) && !n.read)
         .forEach((n) => markAsRead(n.id));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -50,7 +50,7 @@ export function AtendimentoPage() {
 
   // ✅ NOVO: Recarregar tickets quando receber notificação de novo ticket
   useEffect(() => {
-    const novoTicketNotification = notifications.find((n) => n.type === 'novo_ticket' && !n.read);
+    const novoTicketNotification = notifications.find((n) => (n as any).type === 'novo_ticket' && !n.read);
 
     if (novoTicketNotification) {
       console.log('[Atendimento] Nova notificação de ticket, recarregando lista...');

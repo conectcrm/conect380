@@ -13,10 +13,11 @@ interface ResponsiveFiltersProps {
     vendedor: string;
     regiao: string;
   };
-  onChange: (filtros: ResponsiveFiltersProps['filtros']) => void;
-  periodOptions: FilterOption[];
-  vendedorOptions: FilterOption[];
-  regiaoOptions: FilterOption[];
+  onChange?: (filtros: ResponsiveFiltersProps['filtros']) => void;
+  setFiltros?: (filtros: ResponsiveFiltersProps['filtros']) => void;
+  periodOptions?: FilterOption[];
+  vendedorOptions?: FilterOption[];
+  regiaoOptions?: FilterOption[];
   disabled?: boolean;
   loading?: boolean;
 }
@@ -24,6 +25,7 @@ interface ResponsiveFiltersProps {
 export const ResponsiveFilters: React.FC<ResponsiveFiltersProps> = ({
   filtros,
   onChange,
+  setFiltros,
   periodOptions = [],
   vendedorOptions = [],
   regiaoOptions = [],
@@ -33,6 +35,7 @@ export const ResponsiveFilters: React.FC<ResponsiveFiltersProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const { announceToScreenReader } = useAccessibility({ announceChanges: true });
   const filtersId = React.useId();
+  const handleFiltersChange = onChange ?? setFiltros ?? (() => undefined);
 
   const effectivePeriodOptions = useMemo(
     () =>
@@ -92,7 +95,7 @@ export const ResponsiveFilters: React.FC<ResponsiveFiltersProps> = ({
         ...filtros,
         [key]: event.target.value,
       };
-      onChange(updated);
+      handleFiltersChange(updated);
     };
 
   const renderOptions = (options: FilterOption[]) =>

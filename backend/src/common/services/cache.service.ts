@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 /**
  * Cache Service
- * 
+ *
  * Gerencia invalidação de cache de forma centralizada.
  * Use este service para invalidar cache após operações de escrita.
  */
@@ -20,11 +20,11 @@ export class CacheService {
 
   /**
    * Invalidar cache por rota/prefixo
-   * 
+   *
    * @example
    * // Invalida todo cache de clientes
    * cacheService.invalidate('/clientes');
-   * 
+   *
    * // Invalida cache de uma empresa específica
    * cacheService.invalidate('empresa-123:/clientes');
    */

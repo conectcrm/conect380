@@ -10,17 +10,17 @@ export class TagsService {
   constructor(
     @InjectRepository(Tag)
     private readonly tagRepository: Repository<Tag>,
-  ) { }
+  ) {}
 
   /**
    * Criar nova tag
    */
-  async criar(createTagDto: CreateTagDto, empresaId?: string): Promise<Tag> {
+  async criar(createTagDto: CreateTagDto, empresaId: string): Promise<Tag> {
     // Validar se já existe tag com o mesmo nome (case-insensitive)
     const existente = await this.tagRepository.findOne({
       where: {
         nome: createTagDto.nome,
-        empresaId: empresaId || null,
+        empresaId,
       },
     });
 
@@ -30,7 +30,7 @@ export class TagsService {
 
     const tag = this.tagRepository.create({
       ...createTagDto,
-      empresaId: empresaId || null,
+      empresaId,
       ativo: createTagDto.ativo !== undefined ? createTagDto.ativo : true,
     });
 
@@ -40,9 +40,9 @@ export class TagsService {
   /**
    * Listar todas as tags
    */
-  async listar(empresaId?: string, apenasAtivas: boolean = false): Promise<Tag[]> {
+  async listar(empresaId: string, apenasAtivas: boolean = false): Promise<Tag[]> {
     const where: any = {
-      empresaId: empresaId || null,
+      empresaId,
     };
 
     if (apenasAtivas) {
@@ -58,11 +58,11 @@ export class TagsService {
   /**
    * Buscar tag por ID
    */
-  async buscarPorId(id: string, empresaId?: string): Promise<Tag> {
+  async buscarPorId(id: string, empresaId: string): Promise<Tag> {
     const tag = await this.tagRepository.findOne({
       where: {
         id,
-        empresaId: empresaId || null,
+        empresaId,
       },
     });
 
@@ -76,7 +76,7 @@ export class TagsService {
   /**
    * Atualizar tag
    */
-  async atualizar(id: string, updateTagDto: UpdateTagDto, empresaId?: string): Promise<Tag> {
+  async atualizar(id: string, updateTagDto: UpdateTagDto, empresaId: string): Promise<Tag> {
     const tag = await this.buscarPorId(id, empresaId);
 
     // Se estiver mudando o nome, validar unicidade
@@ -84,7 +84,7 @@ export class TagsService {
       const existente = await this.tagRepository.findOne({
         where: {
           nome: updateTagDto.nome,
-          empresaId: empresaId || null,
+          empresaId,
         },
       });
 
@@ -100,7 +100,7 @@ export class TagsService {
   /**
    * Deletar tag
    */
-  async deletar(id: string, empresaId?: string): Promise<void> {
+  async deletar(id: string, empresaId: string): Promise<void> {
     const tag = await this.buscarPorId(id, empresaId);
 
     // Soft delete: apenas marcar como inativa
@@ -114,7 +114,7 @@ export class TagsService {
   /**
    * Buscar tags por IDs (útil para adicionar múltiplas tags a um ticket)
    */
-  async buscarPorIds(ids: string[], empresaId?: string): Promise<Tag[]> {
+  async buscarPorIds(ids: string[], empresaId: string): Promise<Tag[]> {
     if (!ids || ids.length === 0) {
       return [];
     }
@@ -122,9 +122,7 @@ export class TagsService {
     return await this.tagRepository
       .createQueryBuilder('tag')
       .where('tag.id IN (:...ids)', { ids })
-      .andWhere('tag.empresaId = :empresaId OR tag.empresaId IS NULL', {
-        empresaId: empresaId || null,
-      })
+      .andWhere('tag.empresaId = :empresaId', { empresaId })
       .andWhere('tag.ativo = :ativo', { ativo: true })
       .getMany();
   }
@@ -132,18 +130,18 @@ export class TagsService {
   /**
    * Contar quantos tickets usam cada tag (para exibir "usage count" no frontend)
    */
-  async contarUso(empresaId?: string): Promise<{ [tagId: string]: number }> {
+  async contarUso(empresaId: string): Promise<{ [tagId: string]: number }> {
     const query = `
       SELECT 
         t.id as "tagId",
         COUNT(tt."ticketId")::integer as count
       FROM tags t
       LEFT JOIN ticket_tags tt ON t.id = tt."tagId"
-      WHERE (t."empresaId" = $1 OR t."empresaId" IS NULL)
+      WHERE t."empresaId" = $1
       GROUP BY t.id
     `;
 
-    const results = await this.tagRepository.query(query, [empresaId || null]);
+    const results = await this.tagRepository.query(query, [empresaId]);
 
     const countMap: { [tagId: string]: number } = {};
     results.forEach((row: any) => {
@@ -156,7 +154,7 @@ export class TagsService {
   /**
    * Listar tags com contagem de uso
    */
-  async listarComContagem(empresaId?: string, apenasAtivas: boolean = false): Promise<any[]> {
+  async listarComContagem(empresaId: string, apenasAtivas: boolean = false): Promise<any[]> {
     const tags = await this.listar(empresaId, apenasAtivas);
     const countMap = await this.contarUso(empresaId);
 

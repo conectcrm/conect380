@@ -55,68 +55,6 @@ const DEFAULT_REGION_OPTIONS: FilterOption[] = [
 
 const DEFAULT_VENDOR_OPTIONS: FilterOption[] = [{ value: 'Todos', label: 'Todos os vendedores' }];
 
-// CSS personalizado para animações premium
-const animationStyles = `
-  .animate-pulse-once {
-    animation: pulse-once 2s ease-in-out;
-  }
-  
-  .kpi-card-premium {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  
-  .kpi-card-premium:hover {
-    transform: translateY(-4px) scale(1.02);
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-  }
-  
-  @keyframes pulse-once {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.8; }
-  }
-  
-  .sparkline-bar {
-    transition: all 0.3s ease;
-  }
-  
-  .sparkline-bar:hover {
-    opacity: 1 !important;
-    transform: scaleY(1.1);
-  }
-  
-  .progress-glow {
-    position: relative;
-    overflow: visible;
-  }
-  
-  .progress-glow::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    border-radius: inherit;
-    box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
-    opacity: 0;
-    transition: opacity 0.3s ease;
-  }
-  
-  .progress-glow:hover::after {
-    opacity: 1;
-  }
-`;
-
-// Injetar estilos CSS na página
-if (typeof document !== 'undefined') {
-  const styleElement = document.createElement('style');
-  styleElement.textContent = animationStyles;
-  if (!document.head.querySelector('style[data-dashboard-animations]')) {
-    styleElement.setAttribute('data-dashboard-animations', 'true');
-    document.head.appendChild(styleElement);
-  }
-}
-
 // Componente de mini gráfico sparkline para tendências
 const MiniTrendChart: React.FC<{ data: number[]; isPositive?: boolean }> = ({
   data,
@@ -135,8 +73,9 @@ const MiniTrendChart: React.FC<{ data: number[]; isPositive?: boolean }> = ({
         return (
           <div
             key={index}
-            className={`sparkline-bar rounded-t-sm flex-1 ${isPositive ? 'bg-green-400 hover:bg-green-500' : 'bg-red-400 hover:bg-red-500'
-              }`}
+            className={`rounded-t-sm flex-1 transition-all duration-300 ${
+              isPositive ? 'bg-green-400 hover:bg-green-500' : 'bg-red-400 hover:bg-red-500'
+            }`}
             style={{
               height: `${height}%`,
               minWidth: '3px',
@@ -172,9 +111,9 @@ const getPerformanceBadge = (percentage: number) => {
     return {
       icon: '💪',
       text: 'No Caminho',
-      color: 'blue',
-      bgColor: 'bg-blue-100',
-      textColor: 'text-blue-800',
+      color: 'crevasse',
+      bgColor: 'bg-[#159A9C]/10',
+      textColor: 'text-[#002333]',
     };
   return {
     icon: '⚠️',
@@ -187,10 +126,12 @@ const getPerformanceBadge = (percentage: number) => {
 
 // Função para cores inteligentes da barra de progresso
 const getProgressColor = (percentage: number) => {
-  if (percentage >= 100) return 'bg-gradient-to-r from-green-400 to-green-600';
-  if (percentage >= 90) return 'bg-gradient-to-r from-blue-400 to-blue-600';
-  if (percentage >= 70) return 'bg-gradient-to-r from-yellow-400 to-yellow-600';
-  return 'bg-gradient-to-r from-red-400 to-red-600';
+  // Sem gradientes: manter visual enterprise e alinhado ao Crevasse.
+  // Cores contextuais continuam válidas para indicar status.
+  if (percentage >= 100) return 'bg-green-600';
+  if (percentage >= 90) return 'bg-[#159A9C]';
+  if (percentage >= 70) return 'bg-yellow-500';
+  return 'bg-red-600';
 };
 
 const DashboardPage: React.FC = () => {
@@ -341,6 +282,21 @@ const DashboardPage: React.FC = () => {
     return source.slice(-limit);
   }, [data?.chartsData?.vendasMensais, filtros.periodo]);
 
+  const vendedoresChartData = useMemo(() => {
+    const source = data?.vendedoresRanking ?? [];
+
+    return source.map((vendedor: any) => {
+      const vendas = Number(vendedor?.vendas) || 0;
+      const valor = Number(vendedor?.valor);
+
+      return {
+        nome: String(vendedor?.nome ?? 'Vendedor'),
+        vendas,
+        valor: Number.isFinite(valor) ? valor : vendas,
+      };
+    });
+  }, [data?.vendedoresRanking]);
+
   // Atualizar filtros quando o usuário muda
   const handleFiltroChange = (novosFiltros: typeof filtros) => {
     setFiltros(novosFiltros);
@@ -352,7 +308,7 @@ const DashboardPage: React.FC = () => {
   };
 
   // Loading state
-  if (loading || !data?.kpis) {
+  if (loading) {
     return (
       <div className="p-6">
         <div className="animate-pulse">
@@ -398,6 +354,39 @@ const DashboardPage: React.FC = () => {
     );
   }
 
+  // Estado sem dados (ex.: token ausente, sessão expirada ou resposta vazia)
+  if (!data?.kpis) {
+    return (
+      <div className="p-6">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-6">
+          <div className="mb-4 flex items-center gap-3">
+            <AlertTriangle className="h-6 w-6 text-amber-600" />
+            <h3 className="text-lg font-semibold text-amber-800">
+              Dados do dashboard indisponiveis
+            </h3>
+          </div>
+          <p className="mb-4 text-amber-700">
+            Nao foi possivel carregar os indicadores neste momento.
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={refresh}
+              className="rounded-lg bg-amber-600 px-4 py-2 text-white transition-colors hover:bg-amber-700"
+            >
+              Tentar novamente
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="rounded-lg bg-gray-500 px-4 py-2 text-white transition-colors hover:bg-gray-600"
+            >
+              Recarregar pagina
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const totalAlertas = alertasFiltrados.length;
   const propostasAtivas = data.kpis?.emNegociacao?.quantidade ?? 0;
   const periodoAtivoLabel = PERIOD_LABELS[filtros.periodo] ?? filtros.periodo;
@@ -408,21 +397,21 @@ const DashboardPage: React.FC = () => {
     iconWrapperClass: string;
     iconClass: string;
   }> = [
-      {
-        label: 'Alertas ativos',
-        value: totalAlertas,
-        icon: Bell,
-        iconWrapperClass: 'bg-[#DEEFE7] text-[#0F7B7D]',
-        iconClass: 'h-5 w-5',
-      },
-      {
-        label: 'Propostas ativas',
-        value: propostasAtivas,
-        icon: Target,
-        iconWrapperClass: 'bg-[#DEEFE7] text-[#159A9C]',
-        iconClass: 'h-5 w-5',
-      },
-    ];
+    {
+      label: 'Alertas ativos',
+      value: totalAlertas,
+      icon: Bell,
+      iconWrapperClass: 'bg-[#DEEFE7] text-[#0F7B7D]',
+      iconClass: 'h-5 w-5',
+    },
+    {
+      label: 'Propostas ativas',
+      value: propostasAtivas,
+      icon: Target,
+      iconWrapperClass: 'bg-[#DEEFE7] text-[#159A9C]',
+      iconClass: 'h-5 w-5',
+    },
+  ];
   const faturamentoTendencia = Array.isArray((data.kpis?.faturamentoTotal as any)?.tendencia)
     ? ((data.kpis?.faturamentoTotal as any)?.tendencia as number[])
     : undefined;
@@ -452,7 +441,8 @@ const DashboardPage: React.FC = () => {
                 </div>
               </div>
               <p className="text-sm text-[#0F7B7D]">
-                Período selecionado: <span className="font-semibold text-[#002333]">{periodoAtivoLabel}</span>
+                Período selecionado:{' '}
+                <span className="font-semibold text-[#002333]">{periodoAtivoLabel}</span>
               </p>
             </div>
             <div className="flex items-center justify-end">
@@ -477,7 +467,9 @@ const DashboardPage: React.FC = () => {
                   <p className="text-xs font-semibold uppercase text-[#B4BEC9]">{label}</p>
                   <p className="text-xl font-semibold text-[#002333]">{value}</p>
                 </div>
-                <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${iconWrapperClass}`}>
+                <div
+                  className={`h-10 w-10 rounded-lg flex items-center justify-center ${iconWrapperClass}`}
+                >
                   <Icon className={iconClass} />
                 </div>
               </div>
@@ -518,11 +510,11 @@ const DashboardPage: React.FC = () => {
                   critica: 'bg-red-100 text-red-800',
                   alta: 'bg-orange-100 text-orange-800',
                   media: 'bg-yellow-100 text-yellow-800',
-                  baixa: 'bg-blue-100 text-blue-800',
+                  baixa: 'bg-gray-100 text-gray-800',
                 };
 
                 const severidadeLabel = alerta?.severidade
-                  ? severidadeClasses[alerta.severidade] ?? 'bg-gray-100 text-gray-800'
+                  ? (severidadeClasses[alerta.severidade] ?? 'bg-gray-100 text-gray-800')
                   : null;
 
                 return (
@@ -533,7 +525,7 @@ const DashboardPage: React.FC = () => {
                   ${alerta.severidade === 'critica' ? 'bg-red-50 border-red-500' : ''}
                   ${alerta.severidade === 'alta' ? 'bg-orange-50 border-orange-500' : ''}
                   ${alerta.severidade === 'media' ? 'bg-yellow-50 border-yellow-500' : ''}
-                  ${alerta.severidade === 'baixa' ? 'bg-blue-50 border-blue-500' : ''}
+                  ${alerta.severidade === 'baixa' ? 'bg-gray-50 border-gray-300' : ''}
                   ${alerta.tipo === 'conquista' ? 'bg-green-50 border-green-500' : ''}
                 `}
                   >
@@ -556,7 +548,10 @@ const DashboardPage: React.FC = () => {
                         <h4 className="font-semibold" style={{ color: currentPalette.colors.text }}>
                           {alerta.titulo}
                         </h4>
-                        <p className="text-sm" style={{ color: currentPalette.colors.textSecondary }}>
+                        <p
+                          className="text-sm"
+                          style={{ color: currentPalette.colors.textSecondary }}
+                        >
                           {alerta.descricao}
                         </p>
                       </div>
@@ -780,7 +775,7 @@ const DashboardPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
               {/* Faturamento Total */}
               <div
-                className="kpi-card-premium rounded-xl p-6 border shadow-sm hover:shadow-md transition-all relative"
+                className="rounded-xl p-6 border shadow-sm hover:shadow-md transition-all relative"
                 style={{
                   backgroundColor: currentPalette.colors.background,
                   borderColor: currentPalette.colors.border,
@@ -859,7 +854,7 @@ const DashboardPage: React.FC = () => {
                       >
                         {Math.round(
                           (data.kpis.faturamentoTotal.valor / data.kpis.faturamentoTotal.meta) *
-                          100,
+                            100,
                         )}
                         %
                       </span>
@@ -867,7 +862,7 @@ const DashboardPage: React.FC = () => {
                       {(() => {
                         const percentage = Math.round(
                           (data.kpis.faturamentoTotal.valor / data.kpis.faturamentoTotal.meta) *
-                          100,
+                            100,
                         );
                         const badge = getPerformanceBadge(percentage);
                         return (
@@ -900,7 +895,7 @@ const DashboardPage: React.FC = () => {
                           {Math.round(
                             (data.kpis.faturamentoTotal.valor / data.kpis.faturamentoTotal.meta -
                               1) *
-                            100,
+                              100,
                           )}
                           %
                         </div>
@@ -936,7 +931,7 @@ const DashboardPage: React.FC = () => {
 
               {/* Ticket Médio */}
               <div
-                className="kpi-card-premium rounded-xl p-6 border shadow-sm hover:shadow-md transition-all"
+                className="rounded-xl p-6 border shadow-sm hover:shadow-md transition-all"
                 style={{
                   backgroundColor: currentPalette.colors.background,
                   borderColor: currentPalette.colors.border,
@@ -989,7 +984,7 @@ const DashboardPage: React.FC = () => {
 
               {/* Vendas Fechadas */}
               <div
-                className="kpi-card-premium rounded-xl p-6 border shadow-sm hover:shadow-md transition-all"
+                className="rounded-xl p-6 border shadow-sm hover:shadow-md transition-all"
                 style={{
                   backgroundColor: currentPalette.colors.background,
                   borderColor: currentPalette.colors.border,
@@ -1042,7 +1037,7 @@ const DashboardPage: React.FC = () => {
 
               {/* Em Negociação */}
               <div
-                className="kpi-card-premium rounded-xl p-6 border shadow-sm hover:shadow-md transition-all"
+                className="rounded-xl p-6 border shadow-sm hover:shadow-md transition-all"
                 style={{
                   backgroundColor: currentPalette.colors.background,
                   borderColor: currentPalette.colors.border,
@@ -1143,7 +1138,7 @@ const DashboardPage: React.FC = () => {
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
           <FunnelChart data={data.chartsData?.funilVendas} />
-          <VendedoresChart data={data.vendedoresRanking} />
+          <VendedoresChart data={vendedoresChartData} />
           <AtividadesChart data={data.chartsData?.atividadesTimeline} />
         </div>
       </div>

@@ -23,7 +23,7 @@ import { ContatoMetrics } from '../../components/contatos/ContatoMetrics';
 import { ContatoFilters } from '../../components/contatos/ContatoFilters';
 import { ContatoCard } from '../../components/contatos/ContatoCard';
 import { ModalContato } from '../../components/contatos/ModalContato';
-import { ModalNovoContato } from '../../components/contatos/ModalNovoContato';
+import ModalNovoContato from '../../components/contatos/ModalNovoContato';
 import { Contato, contatosService } from './services/contatosService';
 import ErrorBoundary from '../../components/ErrorBoundary';
 import { safeRender, validateAndSanitizeContact } from '../../utils/safeRender';

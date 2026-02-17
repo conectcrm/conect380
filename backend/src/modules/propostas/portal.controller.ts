@@ -1,8 +1,9 @@
-import { Controller, Put, Param, Body, HttpStatus, HttpException, Get, Post } from '@nestjs/common';
+import { Logger, Controller, Put, Param, Body, HttpStatus, HttpException, Get, Post } from '@nestjs/common';
 import { PortalService } from './portal.service';
 
 @Controller('api/portal')
 export class PortalController {
+  private readonly logger = new Logger(PortalController.name);
   constructor(private readonly portalService: PortalService) {}
 
   /**
@@ -20,7 +21,7 @@ export class PortalController {
     },
   ) {
     try {
-      console.log(`📝 Portal: Atualizando status via token ${token} para: ${updateData.status}`);
+      this.logger.log(`📝 Portal: Atualizando status via token ${token} para: ${updateData.status}`);
 
       const resultado = await this.portalService.atualizarStatusPorToken(token, updateData.status, {
         timestamp: updateData.timestamp,
@@ -28,7 +29,7 @@ export class PortalController {
         userAgent: updateData.userAgent,
       });
 
-      console.log('✅ Portal: Status atualizado com sucesso');
+      this.logger.log('✅ Portal: Status atualizado com sucesso');
 
       return {
         success: true,
@@ -37,7 +38,7 @@ export class PortalController {
         timestamp: new Date().toISOString(),
       };
     } catch (error) {
-      console.error('❌ Portal: Erro ao atualizar status:', error);
+      this.logger.error('❌ Portal: Erro ao atualizar status:', error);
 
       throw new HttpException(
         {
@@ -109,7 +110,7 @@ export class PortalController {
         message: 'Visualização registrada',
       };
     } catch (error) {
-      console.error('❌ Portal: Erro ao registrar visualização:', error);
+      this.logger.error('❌ Portal: Erro ao registrar visualização:', error);
 
       return {
         success: false,
@@ -135,7 +136,7 @@ export class PortalController {
     },
   ) {
     try {
-      console.log(`📊 Portal: Registrando ação "${acaoData.acao}" para token ${token}`);
+      this.logger.log(`📊 Portal: Registrando ação "${acaoData.acao}" para token ${token}`);
 
       const resultado = await this.portalService.registrarAcaoCliente(token, acaoData.acao, {
         timestamp: acaoData.timestamp,
@@ -152,7 +153,7 @@ export class PortalController {
         timestamp: new Date().toISOString(),
       };
     } catch (error) {
-      console.error('❌ Portal: Erro ao registrar ação:', error);
+      this.logger.error('❌ Portal: Erro ao registrar ação:', error);
 
       throw new HttpException(
         {

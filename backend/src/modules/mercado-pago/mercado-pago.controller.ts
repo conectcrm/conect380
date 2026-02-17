@@ -8,8 +8,13 @@ import {
   HttpException,
   HttpStatus,
   Logger,
+  UseGuards,
 } from '@nestjs/common';
 import { MercadoPagoService } from './mercado-pago.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Public } from '../auth/decorators/public.decorator';
+import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { SkipEmpresaValidation } from '../../common/decorators/empresa.decorator';
 
 export interface CreateCustomerDto {
   email: string;
@@ -107,6 +112,7 @@ export interface CreateCardPaymentDto {
 }
 
 @Controller('mercadopago')
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class MercadoPagoController {
   private readonly logger = new Logger(MercadoPagoController.name);
 
@@ -203,6 +209,8 @@ export class MercadoPagoController {
   }
 
   @Post('webhooks')
+  @Public()
+  @SkipEmpresaValidation()
   async handleWebhook(
     @Body() body: any,
     @Headers('x-signature') signature: string,

@@ -62,7 +62,7 @@ const colorClasses = {
   // Tema Crevasse - Paleta oficial do sistema
   crevasse: {
     bg: 'bg-white',
-    iconBg: 'bg-gradient-to-br from-[#DEEFE7] to-[#B4BEC9]',
+    iconBg: 'bg-[#DEEFE7]',
     iconColor: 'text-[#159A9C]',
     text: 'text-[#002333]',
     border: 'border-[#DEEFE7]',
@@ -80,7 +80,7 @@ export const KPICard: React.FC<KPICardProps> = ({
   icone,
   trend,
   isLoading = false,
-  color = 'blue',
+  color = 'crevasse',
   className = '',
   'aria-label': ariaLabel,
   'aria-describedby': ariaDescribedBy,
@@ -139,9 +139,9 @@ export const KPICard: React.FC<KPICardProps> = ({
   return (
     <article
       className={`
-        bg-white rounded-xl shadow-sm border hover:shadow-md 
+        bg-white rounded-xl shadow-sm border hover:shadow-md
         transition-all duration-200 p-4 sm:p-6 ${colors.border} ${className}
-        focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2
+        focus-within:ring-2 focus-within:ring-[#159A9C]/40 focus-within:ring-offset-2
       `}
       role="region"
       aria-label={autoAriaLabel}

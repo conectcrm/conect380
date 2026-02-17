@@ -252,9 +252,9 @@ export class FornecedorService {
    * Remove contas pagas para permitir exclusão do fornecedor
    * ATENÇÃO: Esta operação remove dados históricos permanentemente
    */
-  async limparContasPagas(id: string, empresaId: number) {
+  async limparContasPagas(id: string, empresaId: string) {
     const fornecedor = await this.fornecedorRepository.findOne({
-      where: { id: id, empresaId: empresaId.toString() },
+      where: { id, empresaId },
     });
 
     if (!fornecedor) {

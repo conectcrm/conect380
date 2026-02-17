@@ -95,22 +95,31 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
       setLoading(true);
 
       const planoInfo = planos.find((p) => p.nome === formData.planoSelecionado)!;
+      const planoIdMap: Record<typeof planoInfo.nome, string> = {
+        Starter: 'starter',
+        Professional: 'professional',
+        Enterprise: 'enterprise',
+      };
 
       await addEmpresa({
         nome: formData.nome,
         cnpj: formData.cnpj,
         email: formData.email,
         telefone: formData.telefone,
-        plano: {
-          nome: planoInfo.nome,
-          preco: planoInfo.preco,
-          features: planoInfo.features,
+        endereco: {
+          rua: 'Não informado',
+          numero: 'S/N',
+          bairro: 'Não informado',
+          cidade: 'Não informado',
+          estado: 'Não informado',
+          cep: '00000-000',
         },
-        status: 'trial',
-        isActive: false,
-        dataVencimento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 dias
-        dataCriacao: new Date(),
-        ultimoAcesso: new Date(),
+        planoId: planoIdMap[planoInfo.nome],
+        usuarioAdmin: {
+          nome: formData.nome,
+          email: formData.email,
+          telefone: formData.telefone,
+        },
       });
 
       // Reset form and close modal

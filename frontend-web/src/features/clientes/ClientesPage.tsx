@@ -1,8 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import toast from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
-import { useI18n } from '../../contexts/I18nContext';
-import { useNotifications } from '../../contexts/NotificationContext';
+import { useSearchParams } from 'react-router-dom';
 import { BackToNucleus } from '../../components/navigation/BackToNucleus';
 import ModalCadastroCliente from '../../components/modals/ModalCadastroCliente';
 import { ModalDetalhesCliente } from '../../components/modals/ModalDetalhesCliente';
@@ -10,7 +8,9 @@ import { ClienteCard } from '../../components/clientes';
 import {
   clientesService,
   Cliente,
+  ClienteAttachment,
   ClienteFilters,
+  ClientesEstatisticas,
   PaginatedClientes,
 } from '../../services/clientesService';
 import { UploadResult } from '../../services/uploadService';
@@ -24,25 +24,23 @@ import {
   Eye,
   Edit,
   Trash2,
-  MoreVertical,
-  Phone,
-  Mail,
-  Building,
-  MapPin,
   Tag,
-  Calendar,
   ChevronLeft,
   ChevronRight,
   Loader2,
-  ArrowLeft,
   Grid3X3,
   List,
 } from 'lucide-react';
 
+const CLIENTE_STATUS_OPTIONS: Array<{ value: Cliente['status']; label: string }> = [
+  { value: 'lead', label: 'Lead' },
+  { value: 'prospect', label: 'Prospect' },
+  { value: 'cliente', label: 'Cliente' },
+  { value: 'inativo', label: 'Inativo' },
+];
+
 const ClientesPage: React.FC = () => {
-  const { t } = useI18n();
-  const navigate = useNavigate();
-  const { addNotification, addReminder } = useNotifications();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [clientesData, setClientesData] = useState<PaginatedClientes | null>(null);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [filters, setFilters] = useState<ClienteFilters>({
@@ -62,10 +60,13 @@ const ClientesPage: React.FC = () => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [isModalLoading, setIsModalLoading] = useState(false);
+  const [clienteAttachments, setClienteAttachments] = useState<ClienteAttachment[]>([]);
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>(() =>
     typeof window !== 'undefined' && window.innerWidth < 640 ? 'cards' : 'table',
   );
   const [selectedClientes, setSelectedClientes] = useState<string[]>([]);
+  const [statusUpdateInProgress, setStatusUpdateInProgress] = useState<Record<string, boolean>>({});
   const [estatisticas, setEstatisticas] = useState({
     total: 0,
     ativos: 0,
@@ -112,9 +113,11 @@ const ClientesPage: React.FC = () => {
 
   // Ref para rastrear se é a primeira montagem (evitar execução desnecessária)
   const isFirstMount = useRef(true);
+  const processedHighlightRef = useRef('');
+  const attachmentsRequestRef = useRef(0);
 
   // Função para calcular estatísticas baseadas nos dados carregados
-  const calcularEstatisticasLocais = (clientesData: Cliente[]) => {
+  const calcularEstatisticasLocais = useCallback((clientesData: Cliente[]) => {
     if (clientesData.length === 0) {
       setEstatisticas({ total: 0, ativos: 0, prospects: 0, leads: 0 });
       return;
@@ -126,50 +129,70 @@ const ClientesPage: React.FC = () => {
     const leads = clientesData.filter((c) => c.status === 'lead').length;
 
     setEstatisticas({ total, ativos, prospects, leads });
-  };
+  }, []);
+
+  const loadEstatisticas = useCallback(
+    async (fallbackClientes: Cliente[]) => {
+      try {
+        const stats = await clientesService.getEstatisticas();
+        const statsData = stats as ClientesEstatisticas;
+        const statsMap = statsData as Record<string, unknown>;
+
+        setEstatisticas({
+          total: Number(statsData.total ?? 0),
+          ativos: Number(statsData.ativos ?? statsMap.clientesAtivos ?? 0),
+          prospects: Number(statsData.prospects ?? 0),
+          leads: Number(statsData.leads ?? 0),
+        });
+      } catch (error) {
+        console.error('Erro ao carregar estatisticas de clientes:', error);
+        calcularEstatisticasLocais(fallbackClientes);
+      }
+    },
+    [calcularEstatisticasLocais],
+  );
 
   // Carregar clientes (memoizado para evitar loops)
-  const loadClientes = useCallback(async () => {
-    try {
-      setIsLoading(true);
+  const loadClientes = useCallback(
+    async (forceFresh = false) => {
+      try {
+        setIsLoading(true);
 
-      const data = await clientesService.getClientes(filters);
-      setClientesData(data);
-      setClientes(data.data);
+        const requestFilters: ClienteFilters = forceFresh
+          ? { ...filters, cacheBust: Date.now() }
+          : filters;
 
-      // Calcular estatísticas locais após carregar dados
-      calcularEstatisticasLocais(data.data);
-    } catch (error) {
-      console.error('❌ Erro ao carregar clientes:', error);
+        const data = await clientesService.getClientes(requestFilters);
+        setClientesData(data);
+        setClientes(data.data);
 
-      toast.error('Erro ao carregar clientes do servidor. Verifique sua conexão.', {
-        duration: 5000,
-        position: 'top-right',
-        icon: '❌',
-      });
+        // Calcular estatísticas locais após carregar dados
+        await loadEstatisticas(data.data);
+      } catch (error) {
+        console.error('❌ Erro ao carregar clientes:', error);
 
-      // Em caso de erro, manter dados vazios
-      setClientes([]);
-      setClientesData({
-        data: [],
-        total: 0,
-        page: 1,
-        limit: 10,
-        totalPages: 0,
-      });
-      calcularEstatisticasLocais([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [
-    filters.page,
-    filters.limit,
-    filters.search,
-    filters.status,
-    filters.tipo,
-    filters.sortBy,
-    filters.sortOrder,
-  ]);
+        toast.error('Erro ao carregar clientes do servidor. Verifique sua conexão.', {
+          duration: 5000,
+          position: 'top-right',
+          icon: '❌',
+        });
+
+        // Em caso de erro, manter dados vazios
+        setClientes([]);
+        setClientesData({
+          data: [],
+          total: 0,
+          page: 1,
+          limit: 10,
+          totalPages: 0,
+        });
+        calcularEstatisticasLocais([]);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [filters, loadEstatisticas, calcularEstatisticasLocais],
+  );
 
   // Aplicar filtros com debounce para busca
   useEffect(() => {
@@ -195,6 +218,97 @@ const ClientesPage: React.FC = () => {
   useEffect(() => {
     loadClientes();
   }, [loadClientes]);
+
+  useEffect(() => {
+    const highlightId = searchParams.get('highlight')?.trim() ?? '';
+
+    if (!highlightId) {
+      processedHighlightRef.current = '';
+      return;
+    }
+
+    if (isLoading || processedHighlightRef.current === highlightId) {
+      return;
+    }
+
+    processedHighlightRef.current = highlightId;
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('highlight');
+
+    const clienteDaPagina = clientes.find((cliente) => cliente.id === highlightId);
+    if (clienteDaPagina) {
+      setSelectedCliente(clienteDaPagina);
+      setShowDetailsModal(true);
+      setSearchParams(nextParams, { replace: true });
+      return;
+    }
+
+    let cancelled = false;
+
+    const carregarClientePorId = async () => {
+      try {
+        const cliente = await clientesService.getClienteById(highlightId);
+        if (!cancelled && cliente?.id) {
+          setSelectedCliente(cliente);
+          setShowDetailsModal(true);
+        }
+      } catch {
+        if (!cancelled) {
+          toast.error('Nao foi possivel abrir o cliente selecionado.');
+        }
+      } finally {
+        if (!cancelled) {
+          setSearchParams(nextParams, { replace: true });
+        }
+      }
+    };
+
+    carregarClientePorId().catch(() => {
+      // Tratado no bloco try/catch acima.
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clientes, isLoading, searchParams, setSearchParams]);
+
+  const loadClienteAttachments = useCallback(async (clienteId: string) => {
+    const requestId = ++attachmentsRequestRef.current;
+
+    try {
+      setAttachmentsLoading(true);
+      const attachments = await clientesService.listarAnexosCliente(clienteId);
+
+      if (attachmentsRequestRef.current !== requestId) {
+        return;
+      }
+
+      setClienteAttachments(attachments);
+    } catch (error) {
+      if (attachmentsRequestRef.current !== requestId) {
+        return;
+      }
+
+      console.error('Erro ao carregar anexos do cliente:', error);
+      setClienteAttachments([]);
+      toast.error('Nao foi possivel carregar os anexos do cliente.');
+    } finally {
+      if (attachmentsRequestRef.current === requestId) {
+        setAttachmentsLoading(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!showDetailsModal || !selectedCliente?.id) {
+      attachmentsRequestRef.current += 1;
+      setClienteAttachments([]);
+      setAttachmentsLoading(false);
+      return;
+    }
+
+    loadClienteAttachments(selectedCliente.id);
+  }, [loadClienteAttachments, selectedCliente?.id, showDetailsModal]);
 
   // Notificação de boas-vindas removida - usar apenas toast para feedback imediato
 
@@ -255,33 +369,59 @@ const ClientesPage: React.FC = () => {
     if (selectedClientes.length === 0) return;
 
     const confirmMessage = `Tem certeza que deseja excluir ${selectedClientes.length} cliente(s) selecionado(s)?`;
-    if (window.confirm(confirmMessage)) {
-      try {
-        const loadingToast = toast.loading(`Excluindo ${selectedClientes.length} cliente(s)...`);
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
 
-        // Excluir todos os clientes selecionados
-        await Promise.all(selectedClientes.map((id) => clientesService.deleteCliente(id)));
+    try {
+      const loadingToast = toast.loading(`Excluindo ${selectedClientes.length} cliente(s)...`);
 
-        // Recarregar lista
-        await loadClientes();
+      const deleteResults = await Promise.allSettled(
+        selectedClientes.map((id) => clientesService.deleteCliente(id)),
+      );
 
-        // Limpar seleção
-        setSelectedClientes([]);
+      const failedIds = selectedClientes.filter(
+        (_, index) => deleteResults[index]?.status === 'rejected',
+      );
+      const successCount = selectedClientes.length - failedIds.length;
 
-        toast.dismiss(loadingToast);
-        toast.success(`${selectedClientes.length} cliente(s) excluído(s) com sucesso!`, {
+      if (successCount > 0) {
+        await loadClientes(true);
+      }
+
+      setSelectedClientes(failedIds);
+      toast.dismiss(loadingToast);
+
+      if (failedIds.length === 0) {
+        toast.success(`${successCount} cliente(s) excluido(s) com sucesso!`, {
           duration: 4000,
           position: 'top-right',
-          icon: '✅',
+          icon: '!',
         });
-      } catch (error) {
-        console.error('Erro ao excluir clientes:', error);
-        toast.error('Erro ao excluir clientes. Tente novamente.', {
+        return;
+      }
+
+      if (successCount > 0) {
+        toast(`Exclusao parcial: ${successCount} excluido(s), ${failedIds.length} com falha.`, {
           duration: 5000,
           position: 'top-right',
-          icon: '❌',
+          icon: '!',
         });
+        return;
       }
+
+      toast.error('Nao foi possivel excluir os clientes selecionados.', {
+        duration: 5000,
+        position: 'top-right',
+        icon: '!',
+      });
+    } catch (error) {
+      console.error('Erro ao excluir clientes:', error);
+      toast.error('Erro ao excluir clientes. Tente novamente.', {
+        duration: 5000,
+        position: 'top-right',
+        icon: '!',
+      });
     }
   };
 
@@ -300,7 +440,7 @@ const ClientesPage: React.FC = () => {
       const a = document.createElement('a');
       a.style.display = 'none';
       a.href = url;
-      a.download = `clientes-selecionados-${selectedClientes.length}.xlsx`;
+      a.download = `clientes-selecionados-${selectedClientes.length}.csv`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -330,7 +470,7 @@ const ClientesPage: React.FC = () => {
       }
 
       // Recarregar a lista de clientes
-      await loadClientes();
+      await loadClientes(true);
 
       // Fechar modal
       setShowCreateModal(false);
@@ -351,12 +491,14 @@ const ClientesPage: React.FC = () => {
       try {
         const loadingToast = toast.loading('Excluindo cliente...');
 
-        // Buscar nome do cliente antes de excluir para notificação
-        const cliente = clientes.find((c) => c.id === id);
-        const nomeCliente = cliente?.nome || 'Cliente';
-
         await clientesService.deleteCliente(id);
-        await loadClientes();
+        await loadClientes(true);
+
+        if (selectedCliente?.id === id) {
+          setShowDetailsModal(false);
+          setSelectedCliente(null);
+          setClienteAttachments([]);
+        }
 
         toast.dismiss(loadingToast);
         toast.success('Cliente excluído com sucesso!', {
@@ -372,6 +514,44 @@ const ClientesPage: React.FC = () => {
           icon: '❌',
         });
       }
+    }
+  };
+
+  const handleStatusUpdate = async (clienteId: string, status: Cliente['status']) => {
+    const clienteAtual = clientes.find((cliente) => cliente.id === clienteId);
+
+    if (!clienteAtual || clienteAtual.status === status) {
+      return;
+    }
+
+    setStatusUpdateInProgress((prev) => ({ ...prev, [clienteId]: true }));
+
+    try {
+      await clientesService.updateClienteStatus(clienteId, status);
+      await loadClientes(true);
+
+      setSelectedCliente((current) =>
+        current?.id === clienteId ? { ...current, status } : current,
+      );
+
+      toast.success('Status do cliente atualizado com sucesso.', {
+        duration: 3500,
+        position: 'top-right',
+        icon: '!',
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar status do cliente:', error);
+      toast.error('Nao foi possivel atualizar o status do cliente.', {
+        duration: 5000,
+        position: 'top-right',
+        icon: '!',
+      });
+    } finally {
+      setStatusUpdateInProgress((prev) => {
+        const next = { ...prev };
+        delete next[clienteId];
+        return next;
+      });
     }
   };
 
@@ -404,55 +584,51 @@ const ClientesPage: React.FC = () => {
     setShowDetailsModal(true);
   };
 
-  const handleAvatarUpdate = async (clienteId: string, avatar: UploadResult) => {
-    try {
-      // TODO: Implementar API call para atualizar avatar
-      toast.success('Avatar atualizado com sucesso!');
-      // Atualizar localmente
-      setClientes((prev) =>
-        prev.map((c) => (c.id === clienteId ? { ...c, avatar: avatar.url } : c)),
-      );
-    } catch (error) {
-      toast.error('Erro ao atualizar avatar');
-    }
+  const handleAvatarUpdate = (clienteId: string, avatar: UploadResult) => {
+    setClientes((prev) =>
+      prev.map((c) =>
+        c.id === clienteId
+          ? { ...c, avatar: avatar.url, avatarUrl: avatar.url, avatar_url: avatar.url }
+          : c,
+      ),
+    );
+    setSelectedCliente((current) =>
+      current?.id === clienteId
+        ? { ...current, avatar: avatar.url, avatarUrl: avatar.url, avatar_url: avatar.url }
+        : current,
+    );
+    toast.success('Avatar do cliente atualizado com sucesso.', {
+      duration: 3000,
+      position: 'top-right',
+    });
   };
 
   const handleAttachmentAdd = async (clienteId: string, attachment: UploadResult) => {
+    if (selectedCliente?.id === clienteId && showDetailsModal) {
+      await loadClienteAttachments(clienteId);
+    }
+
+    toast.success(`Anexo ${attachment.fileName} adicionado com sucesso.`, {
+      duration: 3500,
+      position: 'top-right',
+    });
+  };
+
+  const handleAttachmentRemove = async (clienteId: string, attachmentId: string) => {
     try {
-      // TODO: Implementar API call para adicionar anexo
-      toast.success(`Anexo ${attachment.fileName} adicionado com sucesso!`);
+      await clientesService.removerAnexoCliente(clienteId, attachmentId);
+
+      setClienteAttachments((prev) => prev.filter((attachment) => attachment.id !== attachmentId));
+      toast.success('Anexo removido com sucesso.', {
+        duration: 3000,
+        position: 'top-right',
+      });
     } catch (error) {
-      toast.error('Erro ao adicionar anexo');
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'cliente':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'prospect':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'lead':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'inativo':
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'cliente':
-        return 'Cliente';
-      case 'prospect':
-        return 'Prospect';
-      case 'lead':
-        return 'Lead';
-      case 'inativo':
-        return 'Inativo';
-      default:
-        return status;
+      console.error('Erro ao remover anexo do cliente:', error);
+      toast.error('Nao foi possivel remover o anexo.', {
+        duration: 5000,
+        position: 'top-right',
+      });
     }
   };
 
@@ -490,10 +666,11 @@ const ClientesPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setViewMode('cards')}
-                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${viewMode === 'cards'
-                      ? 'bg-white text-[#159A9C] shadow-sm'
-                      : 'text-gray-600 hover:text-gray-800'
-                      }`}
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      viewMode === 'cards'
+                        ? 'bg-white text-[#159A9C] shadow-sm'
+                        : 'text-gray-600 hover:text-gray-800'
+                    }`}
                     title="Visualizar em cards"
                   >
                     <Grid3X3 className="w-4 h-4" />
@@ -501,10 +678,11 @@ const ClientesPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setViewMode('table')}
-                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${viewMode === 'table'
-                      ? 'bg-white text-[#159A9C] shadow-sm'
-                      : 'text-gray-600 hover:text-gray-800'
-                      }`}
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      viewMode === 'table'
+                        ? 'bg-white text-[#159A9C] shadow-sm'
+                        : 'text-gray-600 hover:text-gray-800'
+                    }`}
                     title="Visualizar em lista"
                   >
                     <List className="w-4 h-4" />
@@ -802,12 +980,13 @@ const ClientesPage: React.FC = () => {
                               >
                                 <span>Cliente</span>
                                 <ChevronRight
-                                  className={`w-3 h-3 transition-transform ${filters.sortBy === 'nome'
-                                    ? filters.sortOrder === 'ASC'
-                                      ? 'rotate-90'
-                                      : 'rotate-270'
-                                    : 'text-gray-400'
-                                    }`}
+                                  className={`w-3 h-3 transition-transform ${
+                                    filters.sortBy === 'nome'
+                                      ? filters.sortOrder === 'ASC'
+                                        ? 'rotate-90'
+                                        : 'rotate-270'
+                                      : 'text-gray-400'
+                                  }`}
                                 />
                               </button>
                             </th>
@@ -818,12 +997,13 @@ const ClientesPage: React.FC = () => {
                               >
                                 <span>Status</span>
                                 <ChevronRight
-                                  className={`w-3 h-3 transition-transform ${filters.sortBy === 'status'
-                                    ? filters.sortOrder === 'ASC'
-                                      ? 'rotate-90'
-                                      : 'rotate-270'
-                                    : 'text-gray-400'
-                                    }`}
+                                  className={`w-3 h-3 transition-transform ${
+                                    filters.sortBy === 'status'
+                                      ? filters.sortOrder === 'ASC'
+                                        ? 'rotate-90'
+                                        : 'rotate-270'
+                                      : 'text-gray-400'
+                                  }`}
                                 />
                               </button>
                             </th>
@@ -834,12 +1014,13 @@ const ClientesPage: React.FC = () => {
                               >
                                 <span>Criado em</span>
                                 <ChevronRight
-                                  className={`w-3 h-3 transition-transform ${filters.sortBy === 'created_at'
-                                    ? filters.sortOrder === 'ASC'
-                                      ? 'rotate-90'
-                                      : 'rotate-270'
-                                    : 'text-gray-400'
-                                    }`}
+                                  className={`w-3 h-3 transition-transform ${
+                                    filters.sortBy === 'created_at'
+                                      ? filters.sortOrder === 'ASC'
+                                        ? 'rotate-90'
+                                        : 'rotate-270'
+                                      : 'text-gray-400'
+                                  }`}
                                 />
                               </button>
                             </th>
@@ -895,20 +1076,30 @@ const ClientesPage: React.FC = () => {
 
                               {/* Status Compacto */}
                               <td className="px-4 lg:px-6 py-3">
-                                <div className="flex items-center space-x-2">
-                                  <div
-                                    className={`w-2 h-2 rounded-full ${cliente.status === 'cliente'
-                                      ? 'bg-green-500'
-                                      : cliente.status === 'prospect'
-                                        ? 'bg-[#159A9C]'
-                                        : cliente.status === 'lead'
-                                          ? 'bg-yellow-500'
-                                          : 'bg-gray-400'
-                                      }`}
-                                  ></div>
-                                  <span className="text-sm text-gray-700 capitalize">
-                                    {getStatusText(cliente.status)}
-                                  </span>
+                                <div
+                                  className="flex items-center gap-2"
+                                  onClick={(event) => event.stopPropagation()}
+                                >
+                                  <select
+                                    value={cliente.status}
+                                    onChange={(event) =>
+                                      handleStatusUpdate(
+                                        cliente.id!,
+                                        event.target.value as Cliente['status'],
+                                      )
+                                    }
+                                    disabled={Boolean(statusUpdateInProgress[cliente.id!])}
+                                    className="w-full max-w-[140px] rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-700 focus:border-[#159A9C] focus:outline-none focus:ring-1 focus:ring-[#159A9C] disabled:cursor-not-allowed disabled:bg-gray-100"
+                                  >
+                                    {CLIENTE_STATUS_OPTIONS.map((option) => (
+                                      <option key={option.value} value={option.value}>
+                                        {option.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  {statusUpdateInProgress[cliente.id!] && (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin text-[#159A9C]" />
+                                  )}
                                 </div>
                               </td>
 
@@ -917,10 +1108,10 @@ const ClientesPage: React.FC = () => {
                                 <div className="text-sm text-gray-700">
                                   {cliente.created_at
                                     ? new Date(cliente.created_at).toLocaleDateString('pt-BR', {
-                                      day: '2-digit',
-                                      month: '2-digit',
-                                      year: 'numeric',
-                                    })
+                                        day: '2-digit',
+                                        month: '2-digit',
+                                        year: 'numeric',
+                                      })
                                     : '-'}
                                 </div>
                               </td>
@@ -1021,10 +1212,11 @@ const ClientesPage: React.FC = () => {
                               <button
                                 key={page}
                                 onClick={() => handlePageChange(page)}
-                                className={`px-3 py-1 text-sm border rounded ${isCurrentPage
-                                  ? 'bg-[#159A9C] border-[#159A9C] text-white'
-                                  : 'border-gray-300 bg-white hover:bg-gray-50 text-gray-700'
-                                  }`}
+                                className={`px-3 py-1 text-sm border rounded ${
+                                  isCurrentPage
+                                    ? 'bg-[#159A9C] border-[#159A9C] text-white'
+                                    : 'border-gray-300 bg-white hover:bg-gray-50 text-gray-700'
+                                }`}
                               >
                                 {page}
                               </button>
@@ -1082,6 +1274,7 @@ const ClientesPage: React.FC = () => {
 
       {/* Modal de Detalhes */}
       <ModalDetalhesCliente
+        key={selectedCliente?.id ?? 'detalhes-cliente'}
         isOpen={showDetailsModal}
         onClose={() => {
           setShowDetailsModal(false);
@@ -1096,6 +1289,9 @@ const ClientesPage: React.FC = () => {
         onDelete={handleDeleteCliente}
         onAvatarUpdate={handleAvatarUpdate}
         onAttachmentAdd={handleAttachmentAdd}
+        attachments={clienteAttachments}
+        attachmentsLoading={attachmentsLoading}
+        onAttachmentRemove={handleAttachmentRemove}
       />
     </div>
   );

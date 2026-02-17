@@ -10,7 +10,11 @@ import { EmailIntegradoService } from '../../src/modules/propostas/email-integra
 import { User } from '../../src/modules/users/user.entity';
 import { Proposta } from '../../src/modules/propostas/proposta.entity';
 
-class EmailMock { async enviarEmailGenerico() { return true; } }
+class EmailMock {
+  async enviarEmailGenerico() {
+    return true;
+  }
+}
 
 describe('FaturamentoService - criar fatura', () => {
   let service: FaturamentoService;
@@ -30,10 +34,7 @@ describe('FaturamentoService - criar fatura', () => {
         }),
         TypeOrmModule.forFeature([Fatura, ItemFatura, Contrato]),
       ],
-      providers: [
-        FaturamentoService,
-        { provide: EmailIntegradoService, useClass: EmailMock },
-      ],
+      providers: [FaturamentoService, { provide: EmailIntegradoService, useClass: EmailMock }],
     }).compile();
 
     service = moduleRef.get(FaturamentoService);
@@ -46,9 +47,7 @@ describe('FaturamentoService - criar fatura', () => {
       tipo: 'unica' as any,
       descricao: 'Teste Fatura',
       dataVencimento: new Date().toISOString().split('T')[0],
-      itens: [
-        { descricao: 'Item Teste', quantidade: 2, valorUnitario: 50, valorDesconto: 10 },
-      ],
+      itens: [{ descricao: 'Item Teste', quantidade: 2, valorUnitario: 50, valorDesconto: 10 }],
       valorDesconto: 0,
     };
 

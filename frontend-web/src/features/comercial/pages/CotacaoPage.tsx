@@ -673,14 +673,14 @@ function CotacaoPage() {
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <button
-                    onClick={() => alterarStatusSelecionadas('aprovada')}
+                    onClick={() => alterarStatusSelecionadas(StatusCotacao.APROVADA)}
                     className="px-4 py-2 bg-[#159A9C] text-white rounded-lg text-sm font-medium hover:bg-[#0F7B7D] flex items-center gap-2 transition-colors"
                   >
                     <Check className="w-4 h-4" />
                     Aprovar
                   </button>
                   <button
-                    onClick={() => alterarStatusSelecionadas('rejeitada')}
+                    onClick={() => alterarStatusSelecionadas(StatusCotacao.REJEITADA)}
                     className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 flex items-center gap-2 transition-colors"
                   >
                     <X className="w-4 h-4" />

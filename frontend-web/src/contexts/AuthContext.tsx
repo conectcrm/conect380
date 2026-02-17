@@ -3,6 +3,43 @@ import { User } from '../types';
 import { authService } from '../services/authService';
 
 const DEBUG = process.env.NODE_ENV === 'development';
+const EMPRESA_EVENT_NAME = 'empresaAtivaChanged';
+const AUTH_TOKEN_EVENT_NAME = 'authTokenChanged';
+
+const dispatchEmpresaAtivaChanged = (empresaId?: string | null) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.dispatchEvent(
+    new CustomEvent(EMPRESA_EVENT_NAME, {
+      detail: { empresaId: empresaId || null },
+    }),
+  );
+};
+
+const dispatchAuthTokenChanged = () => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.dispatchEvent(new CustomEvent(AUTH_TOKEN_EVENT_NAME));
+};
+
+const syncEmpresaAtiva = (empresaId?: string | null) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  if (empresaId) {
+    localStorage.setItem('empresaAtiva', empresaId);
+    dispatchEmpresaAtivaChanged(empresaId);
+    return;
+  }
+
+  localStorage.removeItem('empresaAtiva');
+  dispatchEmpresaAtivaChanged(null);
+};
 
 interface AuthContextData {
   user: User | null;
@@ -30,66 +67,58 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const savedUser = authService.getUser();
 
         if (token && savedUser) {
-          // Verificar se o token ainda é válido fazendo uma requisição
           try {
             const profileResponse = await authService.getProfile();
 
             if (profileResponse.success && profileResponse.data) {
               setUser(profileResponse.data);
               authService.setUser(profileResponse.data);
-
-              // ✨ GARANTIR que empresaId está salvo ao verificar perfil
-              if (profileResponse.data.empresa?.id) {
-                localStorage.setItem('empresaAtiva', profileResponse.data.empresa.id);
-              }
+              syncEmpresaAtiva(profileResponse.data.empresa?.id);
             } else {
-              console.warn(
-                '⚠️ [AuthContext] Resposta inesperada ao verificar perfil:',
-                profileResponse,
-              );
-              // Manter o usuário salvo mesmo se a verificação falhar
+              console.warn('[AuthContext] Unexpected response when loading profile:', profileResponse);
               setUser(savedUser);
+              syncEmpresaAtiva(savedUser.empresa?.id);
             }
           } catch (profileError: any) {
-            console.warn('⚠️ [AuthContext] Erro ao verificar perfil:', profileError.message);
+            console.warn('[AuthContext] Error loading profile:', profileError.message);
 
-            // Se for erro 401, o token é inválido - fazer logout
             if (profileError.response?.status === 401) {
-              console.warn('⚠️ [AuthContext] Token inválido (401) - Fazendo logout');
+              console.warn('[AuthContext] Invalid token (401), performing logout');
               authService.logout();
+              syncEmpresaAtiva(null);
+              dispatchAuthTokenChanged();
               setUser(null);
             } else {
-              // Para outros erros (rede, servidor, etc), manter o usuário logado
-              console.warn(
-                '⚠️ [AuthContext] Erro de rede/servidor - Mantendo sessão com dados salvos',
-              );
+              console.warn('[AuthContext] Network/server error, keeping saved session data');
               setUser(savedUser);
+              syncEmpresaAtiva(savedUser.empresa?.id);
             }
           }
         } else {
-          console.log('ℹ️ [AuthContext] Nenhum token/usuário encontrado - Usuário não autenticado');
+          if (DEBUG) {
+            console.log('[AuthContext] No token/user found, user is not authenticated');
+          }
         }
       } catch (error) {
-        console.error('❌ [AuthContext] Erro ao inicializar autenticação:', error);
-        // Em caso de erro inesperado, limpar tudo
+        console.error('[AuthContext] Error initializing auth:', error);
         authService.logout();
+        syncEmpresaAtiva(null);
+        dispatchAuthTokenChanged();
         setUser(null);
       } finally {
         setIsLoading(false);
       }
     };
 
-    initializeAuth();
+    void initializeAuth();
   }, []);
 
   const login = async (email: string, password: string) => {
     try {
       const response = await authService.login({ email, senha: password });
 
-      // ✅ VERIFICAR SE PRECISA TROCAR SENHA (primeiro acesso)
       if (response.action === 'TROCAR_SENHA') {
         const trocarSenhaData = response.data as { userId: string; email: string; nome: string };
-        // Lançar erro especial com dados para redirect
         const error = new Error('TROCAR_SENHA') as any;
         error.data = {
           userId: trocarSenhaData.userId,
@@ -105,21 +134,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const { access_token, user: userData } = loginData;
 
         authService.setToken(access_token);
+        dispatchAuthTokenChanged();
+
         authService.setUser(userData);
         setUser(userData);
 
-        // ✨ SALVAR empresaId para uso em rotas de atendimento
         if (userData.empresa?.id) {
-          localStorage.setItem('empresaAtiva', userData.empresa.id);
-          console.log('✅ [AuthContext] empresaId salvo:', userData.empresa.id);
+          syncEmpresaAtiva(userData.empresa.id);
+          if (DEBUG) {
+            console.log('[AuthContext] empresaId saved:', userData.empresa.id);
+          }
         } else {
-          console.warn('⚠️ [AuthContext] userData.empresa.id não encontrado:', userData);
+          syncEmpresaAtiva(null);
+          console.warn('[AuthContext] userData.empresa.id not found:', userData);
         }
       } else {
-        throw new Error('Falha na autenticação');
+        throw new Error('Authentication failed');
       }
     } catch (error) {
-      console.error('Erro no login:', error);
+      console.error('Login error:', error);
       throw error;
     }
   };
@@ -127,9 +160,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = () => {
     authService.logout();
     setUser(null);
-    // ✨ LIMPAR empresaId no logout
-    localStorage.removeItem('empresaAtiva');
-    console.log('🔓 [AuthContext] Logout realizado - empresaId removido');
+    syncEmpresaAtiva(null);
+    localStorage.removeItem('selectedProfileId');
+    dispatchAuthTokenChanged();
+    if (DEBUG) {
+      console.log('[AuthContext] Logout done, empresaId removed');
+    }
   };
 
   const updateUser = (userData: Partial<User>) => {
@@ -137,6 +173,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const updatedUser = { ...user, ...userData };
       setUser(updatedUser);
       authService.setUser(updatedUser);
+      syncEmpresaAtiva(updatedUser.empresa?.id);
     }
   };
 
@@ -155,7 +192,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth deve ser usado dentro de um AuthProvider');
+    throw new Error('useAuth must be used within AuthProvider');
   }
   return context;
 };

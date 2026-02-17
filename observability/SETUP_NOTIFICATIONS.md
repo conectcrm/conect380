@@ -113,7 +113,7 @@ SMTP_TO=oncall@empresa.com,sre@empresa.com
 SMTP_HOST=smtp.sendgrid.net
 SMTP_PORT=587
 SMTP_USERNAME=apikey
-SMTP_PASSWORD=SG.xxxxxxxxxxxxxxxxxxxxx
+SMTP_PASSWORD=<SENDGRID_API_KEY>
 SMTP_FROM=alerts@conectcrm.com
 SMTP_TO=oncall@conectcrm.com
 ```

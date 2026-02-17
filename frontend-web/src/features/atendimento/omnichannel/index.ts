@@ -25,9 +25,6 @@ export type {
 export { useAtendimentos } from './hooks/useAtendimentos';
 export { useMensagens } from './hooks/useMensagens';
 
-// Contexts
-export { SocketProvider, useSocket } from './contexts/SocketContext';
-
 // Modals
 export { NovoAtendimentoModal } from './modals/NovoAtendimentoModal';
 export { TransferirAtendimentoModal } from './modals/TransferirAtendimentoModal';

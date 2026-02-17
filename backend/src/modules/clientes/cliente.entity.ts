@@ -5,11 +5,9 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
-  OneToMany,
   JoinColumn,
 } from 'typeorm';
 import { Empresa } from '../../empresas/entities/empresa.entity';
-// import { Contato } from './contato.entity';
 
 export enum StatusCliente {
   LEAD = 'lead',
@@ -37,16 +35,13 @@ export class Cliente {
   @Column({ length: 20, nullable: true })
   telefone: string;
 
-  @Column({ type: 'enum', enum: TipoCliente })
+  @Column({ type: 'enum', enum: TipoCliente, default: TipoCliente.PESSOA_FISICA })
   tipo: TipoCliente;
 
-  @Column({ length: 20, nullable: true })
-  documento: string; // CPF ou CNPJ
+  @Column({ name: 'documento', length: 20, nullable: true })
+  documento: string;
 
-  @Column({ type: 'enum', enum: StatusCliente, default: StatusCliente.LEAD })
-  status: StatusCliente;
-
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   endereco: string;
 
   @Column({ length: 100, nullable: true })
@@ -58,20 +53,11 @@ export class Cliente {
   @Column({ length: 10, nullable: true })
   cep: string;
 
-  @Column({ length: 100, nullable: true })
-  empresa: string;
-
-  @Column({ length: 100, nullable: true })
-  cargo: string;
-
-  @Column({ length: 100, nullable: true })
-  origem: string; // Como conheceu a empresa
-
-  @Column({ type: 'simple-array', nullable: true })
-  tags: string[];
-
   @Column({ type: 'text', nullable: true })
   observacoes: string;
+
+  @Column({ type: 'text', name: 'avatar_url', nullable: true, select: false })
+  avatar_url?: string | null;
 
   @Column({ type: 'uuid', name: 'empresa_id' })
   empresaId: string;
@@ -80,39 +66,25 @@ export class Cliente {
   @JoinColumn({ name: 'empresa_id' })
   empresa_rel: Empresa;
 
-  @Column('uuid', { nullable: true })
-  responsavel_id: string; // Vendedor responsável
-
-  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
-  valor_estimado: number;
-
-  @Column({ type: 'timestamp', nullable: true })
-  ultimo_contato: Date;
-
-  @Column({ type: 'timestamp', nullable: true })
-  proximo_contato: Date;
-
   @Column({ default: true })
   ativo: boolean;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   created_at: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updated_at: Date;
 
-  @ManyToOne(() => Empresa)
-  @JoinColumn({ name: 'empresa_id' })
-  empresaRel: Empresa;
-
-  /**
-   * Relacionamento OneToMany: Um Cliente pode ter vários Contatos
-   * Contatos são os funcionários/pessoas vinculadas à empresa (cliente)
-   *
-   * NOTA: Comentado temporariamente para resolver referência circular
-   */
-  // @OneToMany(() => Contato, (contato) => contato.cliente, {
-  //   cascade: true, // Salva contatos automaticamente ao salvar cliente
-  // })
-  // contatos: Contato[];
+  // Campos legados mantidos para compatibilidade de tipagem em serviços existentes.
+  empresa?: string;
+  cargo?: string;
+  origem?: string;
+  tags?: string[];
+  responsavel_id?: string;
+  valor_estimado?: number;
+  ultimo_contato?: Date;
+  proximo_contato?: Date;
+  status?: StatusCliente;
+  avatar?: string;
+  avatarUrl?: string;
 }

@@ -27,7 +27,7 @@ import { register } from '../../src/config/metrics';
 
 /**
  * 🧪 E2E Test: Fluxo Completo de Triagem
- * 
+ *
  * Testa o fluxo:
  * 1. Cliente envia mensagem WhatsApp
  * 2. Bot de triagem processa mensagem
@@ -105,7 +105,7 @@ describe('Triagem E2E - Fluxo Completo', () => {
       expect(ticket).toBeDefined();
       expect(ticket.id).toBeDefined();
       expect(ticket.empresaId).toBe(empresa.id);
-      expect(ticket.status).toBe('ABERTO');
+      expect(ticket.status).toBe('FILA');
     });
 
     it('deve salvar mensagem associada ao ticket', async () => {
@@ -121,7 +121,7 @@ describe('Triagem E2E - Fluxo Completo', () => {
         clienteNome: contato.nome,
       });
 
-      // Act: Salvar mensagem do cliente  
+      // Act: Salvar mensagem do cliente
       // TODO: Implementar quando MensagemService.criar() existir
       // const mensagem = await mensagemService.criar({ ... });
 
@@ -177,7 +177,7 @@ describe('Triagem E2E - Fluxo Completo', () => {
 
       // Act: Analisar intenção da mensagem
       const resultado = await openAIService.analisarIntencao(
-        'Meu pedido não chegou, preciso de ajuda urgente!'
+        'Meu pedido não chegou, preciso de ajuda urgente!',
       );
 
       // Assert: Mock retorna intenção
@@ -225,7 +225,7 @@ describe('Triagem E2E - Fluxo Completo', () => {
       });
 
       // Assert
-      expect(ticket.status).toBe('ABERTO');
+      expect(ticket.status).toBe('FILA');
     });
 
     it('deve criar registro na tabela de distribuições (se implementado)', async () => {
@@ -348,12 +348,7 @@ describe('Triagem E2E - Fluxo Completo', () => {
 
       // Assert: Novo ticket criado
       expect(ticket2.id).not.toBe(ticket1.id);
-      expect(ticket2.status).toBe('ABERTO');
+      expect(ticket2.status).toBe('FILA');
     });
   });
 });
-
-
-
-
-

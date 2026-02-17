@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Query, UseGuards, Req, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Logger,
+  Controller,
+  Get,
+  Post,
+  Body,
+  Query,
+  UseGuards,
+  UseInterceptors,
+  UploadedFile,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -6,26 +15,30 @@ import { diskStorage } from 'multer';
 import * as path from 'path';
 import * as fs from 'fs';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { EmpresaId } from '../../../common/decorators/empresa.decorator';
 import { Mensagem, TipoMensagem, StatusMensagem } from '../entities/mensagem.entity';
 import { Ticket } from '../entities/ticket.entity';
 import { AtendimentoGateway } from '../gateways/atendimento.gateway';
 import { CriarMensagemDto, BuscarMensagensDto } from '../dto';
 
 const UPLOAD_DIR = 'uploads/mensagens';
+const uploadLogger = new Logger('MensagensController');
 
 // Garantir que diretório existe
 const ensureUploadDir = () => {
   const uploadPath = path.resolve(__dirname, '../../../', UPLOAD_DIR);
   if (!fs.existsSync(uploadPath)) {
     fs.mkdirSync(uploadPath, { recursive: true });
-    console.log('[Upload] Diretório criado:', uploadPath);
+    uploadLogger.log('[Upload] Diretório criado:', uploadPath);
   }
   return uploadPath;
 };
 
 @Controller('atendimento/mensagens')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard)
 export class MensagensController {
+  private readonly logger = new Logger(MensagensController.name);
   constructor(
     @InjectRepository(Mensagem)
     private mensagemRepo: Repository<Mensagem>,
@@ -34,11 +47,10 @@ export class MensagensController {
     private ticketRepo: Repository<Ticket>,
 
     private atendimentoGateway: AtendimentoGateway,
-  ) { }
+  ) {}
 
   @Get()
-  async listar(@Req() req, @Query() query: BuscarMensagensDto) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
+  async listar(@EmpresaId() empresaId: string, @Query() query: BuscarMensagensDto) {
     const limit = parseInt(query.limit || '50');
     const offset = parseInt(query.offset || '0');
 
@@ -55,7 +67,7 @@ export class MensagensController {
     }
 
     const [mensagens, total] = await this.mensagemRepo.findAndCount({
-      where: { ticketId: query.ticketId },
+      where: { ticketId: query.ticketId, empresaId },
       order: { createdAt: 'ASC' },
       take: limit,
       skip: offset,
@@ -71,9 +83,7 @@ export class MensagensController {
   }
 
   @Post()
-  async criar(@Req() req, @Body() dto: CriarMensagemDto) {
-    const empresaId = req.user.empresa_id || req.user.empresaId;
-
+  async criar(@EmpresaId() empresaId: string, @Body() dto: CriarMensagemDto) {
     // Buscar ticket
     const ticket = await this.ticketRepo.findOne({
       where: { id: dto.ticketId, empresaId },
@@ -88,6 +98,7 @@ export class MensagensController {
 
     // Criar mensagem
     const mensagem = this.mensagemRepo.create({
+      empresaId,
       ticketId: dto.ticketId,
       tipo: dto.tipo,
       conteudo: dto.conteudo,
@@ -136,7 +147,11 @@ export class MensagensController {
       },
     }),
   )
-  async uploadArquivo(@Req() req, @UploadedFile() file: Express.Multer.File, @Body() body: any) {
+  async uploadArquivo(
+    @EmpresaId() empresaId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: any,
+  ) {
     if (!file) {
       return {
         success: false,
@@ -144,7 +159,6 @@ export class MensagensController {
       };
     }
 
-    const empresaId = req.user.empresa_id || req.user.empresaId;
     const ticketId = body.ticketId;
 
     if (!ticketId) {
@@ -185,6 +199,7 @@ export class MensagensController {
 
     // Criar mensagem com arquivo
     const mensagem = this.mensagemRepo.create({
+      empresaId,
       ticketId,
       tipo: tipoMensagem,
       conteudo: file.originalname, // Nome do arquivo como conteúdo

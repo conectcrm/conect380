@@ -124,7 +124,13 @@ const ClientesPage: React.FC = () => {
   const loadEstatisticas = async () => {
     try {
       const stats = await clientesService.getEstartisticas();
-      setEstatisticas(stats);
+      const statsData = stats as Record<string, unknown>;
+      setEstatisticas({
+        total: Number(statsData.total ?? 0),
+        ativos: Number(statsData.ativos ?? statsData.clientesAtivos ?? 0),
+        prospects: Number(statsData.prospects ?? 0),
+        leads: Number(statsData.leads ?? 0),
+      });
     } catch (error) {
       console.error('Erro ao carregar estatísticas:', error);
       // Calcular estatísticas dos dados locais como fallback

@@ -1,11 +1,11 @@
 /**
  * 🔍 Tracing Helper Utilities
- * 
+ *
  * Funções auxiliares para criar spans customizados em operações críticas.
  * Facilita o debug de lógica de negócio complexa.
  */
 
-import { trace, SpanStatusCode, Span, Tracer, context } from '@opentelemetry/api';
+import { trace, SpanStatusCode, Span, Tracer } from '@opentelemetry/api';
 
 /**
  * Obter tracer do serviço
@@ -16,7 +16,7 @@ export const getTracer = (): Tracer => {
 
 /**
  * Criar um span customizado para operação
- * 
+ *
  * @example
  * await withSpan('Processar Ticket', async () => {
  *   // sua lógica aqui
@@ -46,11 +46,12 @@ export async function withSpan<T>(
 
       return result;
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       // Registrar erro no span
-      span.recordException(error);
+      span.recordException(error instanceof Error ? error : new Error(message));
       span.setStatus({
         code: SpanStatusCode.ERROR,
-        message: error.message,
+        message,
       });
 
       throw error;
@@ -63,11 +64,14 @@ export async function withSpan<T>(
 /**
  * Adicionar evento ao span ativo
  * Útil para marcar pontos importantes na execução
- * 
+ *
  * @example
  * addEvent('Ticket criado', { ticketId: '123' });
  */
-export function addEvent(name: string, attributes?: Record<string, string | number | boolean>): void {
+export function addEvent(
+  name: string,
+  attributes?: Record<string, string | number | boolean>,
+): void {
   const span = trace.getActiveSpan();
   if (span) {
     span.addEvent(name, attributes);
@@ -76,7 +80,7 @@ export function addEvent(name: string, attributes?: Record<string, string | numb
 
 /**
  * Adicionar atributo ao span ativo
- * 
+ *
  * @example
  * addAttribute('user.id', userId);
  */
@@ -89,31 +93,24 @@ export function addAttribute(key: string, value: string | number | boolean): voi
 
 /**
  * Decorator para métodos de classe (experimental)
- * 
+ *
  * @example
  * @TraceMethod('ProcessarMensagem')
  * async processarMensagem(data: any) { ... }
  */
 export function TraceMethod(operationName?: string) {
-  return function (
-    target: any,
-    propertyKey: string,
-    descriptor: PropertyDescriptor,
-  ) {
-    const originalMethod = descriptor.value;
-    const spanName = operationName || `${target.constructor.name}.${propertyKey}`;
+  return function (target: object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+    const originalMethod = descriptor.value as (...args: unknown[]) => unknown;
+    const spanName = operationName || `${target.constructor.name}.${String(propertyKey)}`;
 
-    descriptor.value = async function (...args: any[]) {
-      return withSpan(
-        spanName,
-        async (span) => {
-          // Adicionar contexto do método
-          span.setAttribute('method', propertyKey);
-          span.setAttribute('class', target.constructor.name);
+    descriptor.value = async function (...args: unknown[]) {
+      return withSpan(spanName, async (span) => {
+        // Adicionar contexto do método
+        span.setAttribute('method', String(propertyKey));
+        span.setAttribute('class', target.constructor.name);
 
-          return originalMethod.apply(this, args);
-        },
-      );
+        return originalMethod.apply(this, args);
+      });
     };
 
     return descriptor;

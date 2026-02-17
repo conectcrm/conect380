@@ -199,13 +199,13 @@ const MetasConfiguracao: React.FC = () => {
     });
   }, [busca, metas]);
 
-  const vendedoresDisponiveis = useMemo(() => {
+  const vendedoresDisponiveis = useMemo<Array<{ id: string; nome?: string }>>(() => {
     if (vendedores.length > 0) return vendedores;
 
     const valores = metas
       .map((m) => m.vendedorId)
       .filter((v) => v !== undefined) as number[];
-    const unicos = Array.from(new Set(valores)).map((id) => ({ id: String(id) }));
+    const unicos = Array.from(new Set(valores)).map((id) => ({ id: String(id), nome: undefined }));
     return unicos;
   }, [metas, vendedores]);
 

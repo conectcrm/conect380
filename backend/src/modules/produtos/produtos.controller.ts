@@ -24,7 +24,7 @@ import { CacheInterceptor, CacheTTL } from '../../common/interceptors/cache.inte
 @UseGuards(JwtAuthGuard, EmpresaGuard)
 @UseInterceptors(CacheInterceptor) // 🚀 Cache ativado para produtos
 export class ProdutosController {
-  constructor(private readonly produtosService: ProdutosService) { }
+  constructor(private readonly produtosService: ProdutosService) {}
 
   @Get()
   @CacheTTL(60 * 1000) // 🚀 Cache: 1 minuto (listagem muda frequentemente)

@@ -1,7 +1,15 @@
-import { Controller, Post, UseGuards, Request, Body, Req } from '@nestjs/common';
+import { Logger, Controller, Post, UseGuards, Request, Body, Req } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiOperation, ApiResponse, ApiTags, ApiBody, ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsString, IsUUID, MinLength, MaxLength, Matches } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  IsUUID,
+  MinLength,
+  MaxLength,
+  Matches,
+} from 'class-validator';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { securityLogger } from '../../config/logger.config';
@@ -39,7 +47,11 @@ class RegisterDto {
   @MaxLength(100, { message: 'Senha muito longa (máximo 100 caracteres)' })
   senha: string;
 
-  @ApiProperty({ description: 'Telefone do usuário (opcional)', example: '11999999999', required: false })
+  @ApiProperty({
+    description: 'Telefone do usuário (opcional)',
+    example: '11999999999',
+    required: false,
+  })
   @IsString({ message: 'Telefone deve ser uma string' })
   @MaxLength(20, { message: 'Telefone muito longo (máximo 20 caracteres)' })
   @Matches(/^[0-9+\-() ]+$/, { message: 'Telefone inválido (apenas números e símbolos)' })
@@ -103,7 +115,8 @@ class ResetPasswordDto {
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) { }
+  private readonly logger = new Logger(AuthController.name);
+  constructor(private authService: AuthService) {}
 
   @UseGuards(AuthGuard('local'))
   @Post('login')
@@ -120,7 +133,7 @@ export class AuthController {
       // 📊 Log de login bem-sucedido
       if (result.success) {
         // Login normal (não primeiro acesso)
-        console.log(`✅ Login bem-sucedido: ${req.user.email}`);
+        this.logger.log(`✅ Login bem-sucedido: ${req.user.email}`);
       }
 
       return result;
@@ -192,12 +205,5 @@ export class AuthController {
       resetPasswordDto.token,
       resetPasswordDto.senhaNova,
     );
-  }
-
-  @Post('debug/create-test-user')
-  @ApiOperation({ summary: '[DEBUG] Criar usuário de teste - REMOVER EM PRODUÇÃO' })
-  @ApiResponse({ status: 201, description: 'Usuário criado' })
-  async createTestUser() {
-    return this.authService.createTestUser();
   }
 }

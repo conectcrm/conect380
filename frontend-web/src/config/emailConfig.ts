@@ -15,6 +15,8 @@ export interface EmailProvider {
   limits: string;
 }
 
+const awsSesEnabled = process.env.REACT_APP_ENABLE_AWS_SES === 'true';
+
 // Configurações dos provedores de e-mail
 export const EMAIL_PROVIDERS: Record<string, EmailProvider> = {
   gmail: {
@@ -29,12 +31,16 @@ export const EMAIL_PROVIDERS: Record<string, EmailProvider> = {
     setup: 'Criar conta gratuita e obter API Key',
     limits: '100 e-mails/dia (gratuito)',
   },
-  'aws-ses': {
-    name: 'Amazon SES',
-    description: 'Serviço de e-mail da Amazon Web Services',
-    setup: 'Conta AWS e configurar SES',
-    limits: '200 e-mails/dia (gratuito nos primeiros 12 meses)',
-  },
+  ...(awsSesEnabled
+    ? {
+        'aws-ses': {
+          name: 'Amazon SES',
+          description: 'Serviço de e-mail da Amazon Web Services',
+          setup: 'Conta AWS e configurar SES',
+          limits: '200 e-mails/dia (gratuito nos primeiros 12 meses)',
+        },
+      }
+    : {}),
   nodemailer: {
     name: 'Nodemailer SMTP',
     description: 'Configuração SMTP personalizada',
@@ -42,7 +48,14 @@ export const EMAIL_PROVIDERS: Record<string, EmailProvider> = {
     limits: 'Depende do provedor SMTP',
   },
 };
-
+export const DEFAULT_EMAIL_PROVIDER = 'gmail';
+export const getAllowedEmailProviders = (): string[] => Object.keys(EMAIL_PROVIDERS);
+export const resolveEmailProvider = (provider?: string): string => {
+  const normalizedProvider = (provider || '').trim();
+  return getAllowedEmailProviders().includes(normalizedProvider)
+    ? normalizedProvider
+    : DEFAULT_EMAIL_PROVIDER;
+};
 // Configurações padrão para desenvolvimento
 export const EMAIL_CONFIG: Record<string, EmailConfig> = {
   // Gmail SMTP - Mais fácil para começar
@@ -238,3 +251,4 @@ export default {
   EMAIL_CONFIG,
   TEMPLATE_PROPOSTA_EMAIL,
 };
+

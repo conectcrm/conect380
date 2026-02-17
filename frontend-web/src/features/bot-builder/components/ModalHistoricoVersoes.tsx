@@ -38,7 +38,7 @@ export const ModalHistoricoVersoes: React.FC<ModalHistoricoVersoesProps> = ({
       setLoading(true);
       setError(null);
 
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('authToken');
       const response = await fetch(`http://localhost:3001/fluxos/${fluxoId}/historico`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -74,7 +74,7 @@ export const ModalHistoricoVersoes: React.FC<ModalHistoricoVersoesProps> = ({
       setRestoring(numeroVersao);
       setError(null);
 
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('authToken');
       const response = await fetch(`http://localhost:3001/fluxos/${fluxoId}/restaurar-versao`, {
         method: 'POST',
         headers: {

@@ -1,11 +1,22 @@
-import { IsString, IsNotEmpty, IsOptional, IsInt, IsBoolean, Matches, MinLength, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsInt,
+  IsBoolean,
+  Matches,
+  MinLength,
+  MaxLength,
+} from 'class-validator';
 
 export class CreateNivelAtendimentoDto {
   @IsString({ message: 'Código deve ser uma string' })
   @IsNotEmpty({ message: 'Código é obrigatório' })
   @MinLength(2, { message: 'Código deve ter no mínimo 2 caracteres' })
   @MaxLength(10, { message: 'Código deve ter no máximo 10 caracteres' })
-  @Matches(/^[A-Z0-9]+$/, { message: 'Código deve conter apenas letras maiúsculas e números (ex: N1, N2, N3)' })
+  @Matches(/^[A-Z0-9]+$/, {
+    message: 'Código deve conter apenas letras maiúsculas e números (ex: N1, N2, N3)',
+  })
   codigo: string;
 
   @IsString({ message: 'Nome deve ser uma string' })

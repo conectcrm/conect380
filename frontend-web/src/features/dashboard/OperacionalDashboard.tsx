@@ -127,29 +127,29 @@ const OperacionalDashboard: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="p-6">
         {/* Header Operacional - Design Suave */}
-        <div className="bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200 rounded-lg shadow-sm p-6 mb-6">
+        <div className="bg-white border border-[#DEEFE7] rounded-lg shadow-sm p-6 mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-3xl font-bold flex items-center text-orange-900">
-                <Settings className="h-8 w-8 mr-3 text-orange-600" />
+              <h1 className="text-3xl font-bold flex items-center text-[#002333]">
+                <Settings className="h-8 w-8 mr-3 text-[#159A9C]" />
                 Dashboard Operacional
               </h1>
-              <p className="mt-2 text-orange-700">Gestão de processos, tickets e SLA</p>
+              <p className="mt-2 text-[#002333]/70">Gestão de processos, tickets e SLA</p>
             </div>
             <div className="mt-4 sm:mt-0 flex items-center space-x-4">
               <div className="text-center">
-                <div className="text-2xl font-bold text-orange-900">
+                <div className="text-2xl font-bold text-[#002333]">
                   {operacionalData.sla.cumprimento}%
                 </div>
-                <div className="text-sm text-orange-600">SLA</div>
+                <div className="text-sm text-[#002333]/70">SLA</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-orange-900">
+                <div className="text-2xl font-bold text-[#002333]">
                   {operacionalData.tickets.abertos}
                 </div>
-                <div className="text-sm text-orange-600">Tickets Abertos</div>
+                <div className="text-sm text-[#002333]/70">Tickets Abertos</div>
               </div>
-              <button className="px-4 py-2 bg-orange-100 hover:bg-orange-200 text-orange-800 rounded-lg transition-colors flex items-center space-x-2">
+              <button className="px-4 py-2 bg-white text-[#002333] border border-[#B4BEC9] rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm font-medium">
                 <RefreshCw className="w-4 h-4" />
                 <span>Atualizar</span>
               </button>
@@ -195,11 +195,11 @@ const OperacionalDashboard: React.FC = () => {
                 </div>
                 <div className="text-sm text-gray-500">Meta: {operacionalData.sla.meta}%</div>
               </div>
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Timer className="h-8 w-8 text-blue-600" />
+              <div className="p-3 bg-[#159A9C]/10 rounded-lg">
+                <Timer className="h-8 w-8 text-[#159A9C]" />
               </div>
             </div>
-            <div className="flex items-center text-sm text-blue-600">
+            <div className="flex items-center text-sm text-[#159A9C]">
               <Target className="w-4 h-4 mr-1" />
               <span>Resp: {operacionalData.sla.tempoMedioResposta}h</span>
             </div>
@@ -243,11 +243,11 @@ const OperacionalDashboard: React.FC = () => {
                   {operacionalData.equipe.disponiveis} disponíveis
                 </div>
               </div>
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <Users className="h-8 w-8 text-purple-600" />
+              <div className="p-3 bg-[#159A9C]/10 rounded-lg">
+                <Users className="h-8 w-8 text-[#159A9C]" />
               </div>
             </div>
-            <div className="flex items-center text-sm text-purple-600">
+            <div className="flex items-center text-sm text-[#159A9C]">
               <UserCheck className="w-4 h-4 mr-1" />
               <span>{operacionalData.equipe.ocupados} ocupados</span>
             </div>
@@ -260,7 +260,7 @@ const OperacionalDashboard: React.FC = () => {
           <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Tickets Urgentes</h3>
-              <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+              <button className="text-[#159A9C] hover:text-[#0F7B7D] text-sm font-medium transition-colors">
                 Ver todos
               </button>
             </div>
@@ -294,7 +294,7 @@ const OperacionalDashboard: React.FC = () => {
           <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Processos em Andamento</h3>
-              <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+              <button className="text-[#159A9C] hover:text-[#0F7B7D] text-sm font-medium transition-colors">
                 Ver todos
               </button>
             </div>
@@ -314,9 +314,9 @@ const OperacionalDashboard: React.FC = () => {
                       <div className="text-xs text-gray-500">Etapa {processo.etapa}</div>
                     </div>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-[#DEEFE7] rounded-full h-2">
                     <div
-                      className="bg-blue-500 h-2 rounded-full transition-all"
+                      className="bg-[#159A9C] h-2 rounded-full transition-all"
                       style={{ width: `${processo.progresso}%` }}
                     />
                   </div>
@@ -383,8 +383,8 @@ const OperacionalDashboard: React.FC = () => {
               </div>
               <div className="text-sm text-gray-600">Disponíveis</div>
             </div>
-            <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">
+            <div className="text-center p-4 bg-yellow-50 rounded-lg">
+              <div className="text-2xl font-bold text-yellow-600">
                 {operacionalData.equipe.ocupados}
               </div>
               <div className="text-sm text-gray-600">Ocupados</div>
@@ -395,8 +395,8 @@ const OperacionalDashboard: React.FC = () => {
               </div>
               <div className="text-sm text-gray-600">Ausentes</div>
             </div>
-            <div className="text-center p-4 bg-purple-50 rounded-lg">
-              <div className="text-2xl font-bold text-purple-600">
+            <div className="text-center p-4 bg-[#159A9C]/5 rounded-lg">
+              <div className="text-2xl font-bold text-[#159A9C]">
                 {operacionalData.equipe.online}
               </div>
               <div className="text-sm text-gray-600">Total Online</div>

@@ -19,7 +19,7 @@ import { TicketService } from '../../src/modules/atendimento/services/ticket.ser
 
 /**
  * 🧪 E2E Test: Distribuição de Tickets
- * 
+ *
  * Testa o fluxo:
  * 1. Ticket criado entra em fila de distribuição
  * 2. Sistema busca atendentes disponíveis
@@ -42,9 +42,7 @@ describe('Distribuição E2E - Atribuição de Tickets', () => {
         TriagemModule,
         AtendimentoModule,
       ],
-      providers: [
-        ...getMockProviders(),
-      ],
+      providers: [...getMockProviders()],
     }).compile();
 
     app = moduleFixture.createNestApplication();
@@ -68,8 +66,8 @@ describe('Distribuição E2E - Atribuição de Tickets', () => {
         await createFullAtendimentoScenario(app);
 
       // Assert: Atendente está disponível
-      expect(atendente.status).toBe('disponivel');
-      expect(atendente.online).toBe(true);
+      expect(atendente.status).toBe('DISPONIVEL');
+      expect(atendente.ativo).toBe(true);
       expect(atendente.capacidadeMaxima).toBeGreaterThan(0);
 
       // Act: Atribuir ticket manualmente (simula distribuição automática)
@@ -87,7 +85,7 @@ describe('Distribuição E2E - Atribuição de Tickets', () => {
     it.skip('deve incrementar contador de atendimentos ativos do atendente (TODO: AtendenteService)', async () => {
       // Arrange
       const { atendente, ticket } = await createFullAtendimentoScenario(app);
-      const atendimentosInicial = atendente.atendimentosAtivos;
+      const atendimentosInicial = atendente.ticketsAtivos;
 
       // Act: Atribuir ticket
       // await atribuicaoService.atribuir(ticket.id, atendente.id);
@@ -112,14 +110,14 @@ describe('Distribuição E2E - Atribuição de Tickets', () => {
         nome: 'Atendente 2',
       });
       const atendente1 = await createTestAtendente(app, usuario2.id, empresa.id, {
-        atendimentosAtivos: 2, // Atendente com carga
+        ticketsAtivos: 2, // Atendente com carga
       });
 
       const usuario3 = await createTestUsuario(app, empresa.id, {
         nome: 'Atendente 3',
       });
       const atendente2 = await createTestAtendente(app, usuario3.id, empresa.id, {
-        atendimentosAtivos: 0, // Atendente livre
+        ticketsAtivos: 0, // Atendente livre
       });
 
       // Act: Distribuir ticket
@@ -129,7 +127,7 @@ describe('Distribuição E2E - Atribuição de Tickets', () => {
       // expect(resultado.atendenteId).toBe(atendente2.id);
 
       // TODO: Implementar lógica de distribuição
-      expect(atendente2.atendimentosAtivos).toBeLessThan(atendente1.atendimentosAtivos);
+      expect(atendente2.ticketsAtivos).toBeLessThan(atendente1.ticketsAtivos);
     });
 
     it.skip('deve respeitar capacidade máxima do atendente (TODO: DistribuicaoService)', async () => {
@@ -139,7 +137,7 @@ describe('Distribuição E2E - Atribuição de Tickets', () => {
       const usuario = await createTestUsuario(app, empresa.id);
       const atendenteLoatado = await createTestAtendente(app, usuario.id, empresa.id, {
         capacidadeMaxima: 5,
-        atendimentosAtivos: 5, // Já no limite
+        ticketsAtivos: 5, // Já no limite
       });
 
       // Act: Tentar atribuir ticket
@@ -149,7 +147,7 @@ describe('Distribuição E2E - Atribuição de Tickets', () => {
       // expect(resultado).toBeNull() ou throw error
 
       // TODO: Implementar validação de capacidade
-      expect(atendenteLoatado.atendimentosAtivos).toBe(atendenteLoatado.capacidadeMaxima);
+      expect(atendenteLoatado.ticketsAtivos).toBe(atendenteLoatado.capacidadeMaxima);
     });
   });
 
@@ -164,13 +162,10 @@ describe('Distribuição E2E - Atribuição de Tickets', () => {
       const atendenteDestino = await createTestAtendente(app, usuario2.id, empresa.id);
 
       // Act: Transferir ticket
-      const ticketTransferido = await ticketService.transferir(
-        ticket.id,
-        {
-          atendenteDestinoId: atendenteDestino.id,
-          motivo: 'Cliente solicitou atendente especializado',
-        }
-      );
+      const ticketTransferido = await ticketService.transferir(ticket.id, {
+        atendenteId: atendenteDestino.id,
+        motivo: 'Cliente solicitou atendente especializado',
+      });
 
       // Assert
       expect(ticketTransferido).toBeDefined();
@@ -185,13 +180,10 @@ describe('Distribuição E2E - Atribuição de Tickets', () => {
       const atendenteDestino = await createTestAtendente(app, usuario2.id, empresa.id);
 
       // Act: Transferir
-      await ticketService.transferir(
-        ticket.id,
-        {
-          atendenteDestinoId: atendenteDestino.id,
-          motivo: 'Transferência de teste',
-        }
-      );
+      await ticketService.transferir(ticket.id, {
+        atendenteId: atendenteDestino.id,
+        motivo: 'Transferência de teste',
+      });
 
       // Assert: Métrica incrementada (verificação via Prometheus)
       const metrics = await import('../../src/config/metrics');

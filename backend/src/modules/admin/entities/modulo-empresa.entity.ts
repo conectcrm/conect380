@@ -5,7 +5,7 @@ import {
   ManyToOne,
   JoinColumn,
   CreateDateColumn,
-  UpdateDateColumn
+  UpdateDateColumn,
 } from 'typeorm';
 import { Empresa } from '../../../empresas/entities/empresa.entity';
 
@@ -24,21 +24,21 @@ export class ModuloEmpresa {
   @Column({
     type: 'varchar',
     length: 50,
-    comment: 'Nome do módulo: crm, atendimento, comercial, etc.'
+    comment: 'Nome do módulo: crm, atendimento, comercial, etc.',
   })
   modulo: string;
 
   @Column({
     type: 'boolean',
     default: true,
-    comment: 'Se o módulo está ativo para esta empresa'
+    comment: 'Se o módulo está ativo para esta empresa',
   })
   ativo: boolean;
 
   @Column({
     type: 'jsonb',
     nullable: true,
-    comment: 'Limites de uso: usuarios, leads, storage_mb, api_calls_dia, etc.'
+    comment: 'Limites de uso: usuarios, leads, storage_mb, api_calls_dia, etc.',
   })
   limites: {
     usuarios?: number;
@@ -52,7 +52,7 @@ export class ModuloEmpresa {
   @Column({
     type: 'jsonb',
     nullable: true,
-    comment: 'Uso atual dos recursos'
+    comment: 'Uso atual dos recursos',
   })
   uso_atual: {
     usuarios?: number;
@@ -66,7 +66,7 @@ export class ModuloEmpresa {
   @Column({
     type: 'jsonb',
     nullable: true,
-    comment: 'Configurações específicas do módulo'
+    comment: 'Configurações específicas do módulo',
   })
   configuracoes: Record<string, any>;
 
@@ -76,7 +76,7 @@ export class ModuloEmpresa {
   @Column({
     type: 'timestamp',
     nullable: true,
-    name: 'data_desativacao'
+    name: 'data_desativacao',
   })
   dataDesativacao: Date;
 

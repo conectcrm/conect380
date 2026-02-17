@@ -44,6 +44,7 @@ interface CreatePaymentParams {
   customerId?: string;
   description?: string;
   metadata?: Record<string, string>;
+  payment_method_types?: string[];
   automatic_payment_methods?: {
     enabled: boolean;
   };
@@ -143,6 +144,7 @@ class StripeService {
           currency: params.currency || 'brl',
           customer: params.customerId,
           description: params.description,
+          payment_method_types: params.payment_method_types,
           metadata: {
             source: 'conectcrm',
             created_at: new Date().toISOString(),
@@ -435,7 +437,7 @@ class StripeService {
 
   // Utilitários
   private getAuthToken(): string {
-    return localStorage.getItem('auth_token') || '';
+    return localStorage.getItem('authToken') || '';
   }
 
   public formatarValor(valor: number, moeda: string = 'BRL'): string {

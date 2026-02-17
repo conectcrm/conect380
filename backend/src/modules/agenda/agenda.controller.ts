@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AgendaService } from './agenda.service';
 import {
@@ -15,7 +25,7 @@ import { EmpresaId } from '../../common/decorators/empresa.decorator';
 @UseGuards(JwtAuthGuard, EmpresaGuard)
 @Controller('agenda-eventos')
 export class AgendaController {
-  constructor(private readonly agendaService: AgendaService) { }
+  constructor(private readonly agendaService: AgendaService) {}
 
   @Post()
   create(@Body() dto: CreateAgendaEventoDto, @EmpresaId() empresaId: string) {
@@ -46,4 +56,3 @@ export class AgendaController {
     return this.agendaService.remove(id, empresaId);
   }
 }
-

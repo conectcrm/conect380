@@ -48,9 +48,7 @@ export type { NotificationRetryMeta };
 export class NotificationsQueueProducer {
   private readonly logger = new Logger(NotificationsQueueProducer.name);
 
-  constructor(
-    @InjectQueue('notifications') private readonly notificationsQueue: Queue,
-  ) { }
+  constructor(@InjectQueue('notifications') private readonly notificationsQueue: Queue) {}
 
   private buildRetry(meta?: NotificationRetryMeta): RetryDecision {
     return notificationRetryStrategy(meta);
@@ -74,7 +72,11 @@ export class NotificationsQueueProducer {
     return this.enqueueNotifyUser(payload, retryMeta);
   }
 
-  async enqueue(jobName: NotificationJobName, payload: Record<string, any>, retryMeta?: NotificationRetryMeta) {
+  async enqueue(
+    jobName: NotificationJobName,
+    payload: Record<string, any>,
+    retryMeta?: NotificationRetryMeta,
+  ) {
     const retry = this.buildRetry(retryMeta);
     await this.notificationsQueue.add(jobName, payload, {
       attempts: retry.attempts,

@@ -50,7 +50,7 @@ export class Fatura {
 
   @ManyToOne(() => Empresa)
   @JoinColumn({ name: 'empresa_id' })
-  empresa_rel: Empresa;
+  empresa: Empresa;
 
   @Column({ unique: true })
   numero: string;
@@ -70,13 +70,6 @@ export class Fatura {
   @ManyToOne(() => Cliente, { eager: false })
   @JoinColumn({ name: 'clienteId' })
   cliente: Cliente;
-
-  @Column('uuid')
-  empresa_id: string;
-
-  @ManyToOne(() => Empresa)
-  @JoinColumn({ name: 'empresa_id' })
-  empresa: Empresa;
 
   @Column('uuid')
   usuarioResponsavelId: string;

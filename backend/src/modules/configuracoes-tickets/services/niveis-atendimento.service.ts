@@ -1,4 +1,11 @@
-import { Injectable, NotFoundException, BadRequestException, Logger, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { NivelAtendimento } from '../entities/nivel-atendimento.entity';
@@ -14,7 +21,7 @@ export class NiveisAtendimentoService {
     @InjectRepository(NivelAtendimento)
     private readonly nivelRepository: Repository<NivelAtendimento>,
     @Inject(REQUEST) private readonly request: any,
-  ) { }
+  ) {}
 
   private getEmpresaId(): string {
     const empresaId = this.request.user?.empresa_id;
@@ -61,7 +68,9 @@ export class NiveisAtendimentoService {
 
   async buscarPorCodigo(codigo: string): Promise<NivelAtendimento> {
     const empresaId = this.getEmpresaId();
-    this.logger.log(`🔍 Buscando nível de atendimento por código ${codigo} da empresa ${empresaId}`);
+    this.logger.log(
+      `🔍 Buscando nível de atendimento por código ${codigo} da empresa ${empresaId}`,
+    );
 
     const nivel = await this.nivelRepository.findOne({
       where: { codigo, empresaId },
@@ -76,7 +85,9 @@ export class NiveisAtendimentoService {
 
   async criar(dto: CreateNivelAtendimentoDto): Promise<NivelAtendimento> {
     const empresaId = this.getEmpresaId();
-    this.logger.log(`➕ Criando novo nível de atendimento: ${dto.nome} (${dto.codigo}) para empresa ${empresaId}`);
+    this.logger.log(
+      `➕ Criando novo nível de atendimento: ${dto.nome} (${dto.codigo}) para empresa ${empresaId}`,
+    );
 
     // Validar se código já existe para essa empresa
     const codigoExistente = await this.nivelRepository.findOne({
@@ -111,7 +122,9 @@ export class NiveisAtendimentoService {
       });
 
       if (codigoExistente) {
-        throw new BadRequestException(`Já existe um nível com o código ${dto.codigo} nesta empresa`);
+        throw new BadRequestException(
+          `Já existe um nível com o código ${dto.codigo} nesta empresa`,
+        );
       }
     }
 

@@ -2,13 +2,12 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useI18n } from '../../contexts/I18nContext';
-import { useTheme } from '../../contexts/ThemeContext';
-import { useProfile } from '../../contexts/ProfileContext';
-import { useSidebar } from '../../contexts/SidebarContext';
+import { useProfile, type PerfilUsuario } from '../../contexts/ProfileContext';
 import { useWebSocketStatus } from '../../contexts/WebSocketContext';
 import { formatCompanyName, formatUserName } from '../../utils/textUtils';
 import HierarchicalNavGroup from '../navigation/HierarchicalNavGroup';
-import { menuConfig, getMenuParaEmpresa } from '../../config/menuConfig';
+import { getMenuParaEmpresa } from '../../config/menuConfig';
+import { UI_LAYERS } from '../../config/uiLayers';
 import { useModulosAtivos } from '../../hooks/useModuloAtivo';
 import NotificationCenter from '../notifications/NotificationCenter';
 import ConectCRMLogoFinal from '../ui/ConectCRMLogoFinal';
@@ -25,7 +24,6 @@ import {
   Search,
   User,
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
   Building2,
   MessageCircle,
@@ -35,6 +33,17 @@ import {
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
+
+type UserLoginMetadata = {
+  ultimo_login?: string;
+  ultimoLogin?: string;
+  lastLoginAt?: string;
+  last_login?: string;
+};
+
+type AppWindow = Window & {
+  __APP_VERSION__?: string;
+};
 
 const formatCnpj = (cnpj?: string): string => {
   if (!cnpj) {
@@ -54,22 +63,27 @@ const ROLE_LABELS: Record<string, string> = {
   admin: 'Administrador',
   manager: 'Gestor',
   vendedor: 'Vendedor',
-  user: 'Usuário',
+  user: 'Usuario',
 };
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { sidebarCollapsed, setSidebarCollapsed } = useSidebar();
   const [showProfileSelector, setShowProfileSelector] = useState(false);
   const [showLanguageSelector, setShowLanguageSelector] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [isMainScrolled, setIsMainScrolled] = useState(false);
+  const mainContentRef = useRef<HTMLElement | null>(null);
   const { user, logout } = useAuth();
   const { t, language, availableLanguages } = useI18n();
 
   // 🔌 WebSocket Status para NotificationIndicator
-  const { connected: wsConnected, error: wsError, reconnect: wsReconnect } = useWebSocketStatus();
+  const {
+    connected: wsConnected,
+    connecting: wsConnecting,
+    error: wsError,
+    reconnect: wsReconnect,
+  } = useWebSocketStatus();
 
-  const { currentPalette } = useTheme();
   const { perfilSelecionado, setPerfilSelecionado } = useProfile();
   const location = useLocation();
   const navigate = useNavigate();
@@ -89,13 +103,16 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
   // Verificação se é admin
   const isAdmin =
-    roleKey === 'superadmin' || roleKey === 'admin' || roleKey === 'manager' || user?.email?.includes('admin');
+    roleKey === 'superadmin' ||
+    roleKey === 'admin' ||
+    roleKey === 'manager';
 
+  const userLoginMetadata = user as (typeof user & UserLoginMetadata) | undefined;
   const lastLoginRaw =
-    (user as any)?.ultimo_login ??
-    (user as any)?.ultimoLogin ??
-    (user as any)?.lastLoginAt ??
-    (user as any)?.last_login;
+    userLoginMetadata?.ultimo_login ??
+    userLoginMetadata?.ultimoLogin ??
+    userLoginMetadata?.lastLoginAt ??
+    userLoginMetadata?.last_login;
   const lastLoginDate = lastLoginRaw ? new Date(lastLoginRaw) : null;
   const lastLoginText =
     lastLoginDate && !Number.isNaN(lastLoginDate.getTime())
@@ -107,10 +124,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       ? 'Último acesso indisponível'
       : 'Nunca acessou';
 
+  const windowAppVersion =
+    typeof window !== 'undefined' ? (window as AppWindow).__APP_VERSION__ : undefined;
   const rawAppVersion =
-    (typeof window !== 'undefined' && (window as any)?.__APP_VERSION__) ??
-    process.env.REACT_APP_APP_VERSION ??
-    process.env.REACT_APP_VERSION;
+    windowAppVersion ?? process.env.REACT_APP_APP_VERSION ?? process.env.REACT_APP_VERSION;
   const appVersion = rawAppVersion
     ? rawAppVersion.toLowerCase().startsWith('v')
       ? rawAppVersion
@@ -129,34 +146,38 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   };
 
   // Perfis disponíveis para o seletor
-  const availableProfiles = [
+  const availableProfiles: Array<{
+    id: PerfilUsuario;
+    nome: string;
+    descricao: string;
+  }> = [
     {
-      id: 'administrador' as const,
+      id: 'administrador',
       nome: 'Administrador',
       descricao: 'Acesso total ao sistema',
     },
     {
-      id: 'gerente' as const,
+      id: 'gerente',
       nome: 'Gerente',
       descricao: 'Gestão de equipes e relatórios',
     },
     {
-      id: 'vendedor' as const,
+      id: 'vendedor',
       nome: 'Vendedor',
       descricao: 'Gestão de vendas e clientes',
     },
     {
-      id: 'operacional' as const,
+      id: 'operacional',
       nome: 'Operacional',
       descricao: 'Operações e processos',
     },
     {
-      id: 'financeiro' as const,
+      id: 'financeiro',
       nome: 'Financeiro',
       descricao: 'Gestão financeira',
     },
     {
-      id: 'suporte' as const,
+      id: 'suporte',
       nome: 'Suporte',
       descricao: 'Atendimento ao cliente',
     },
@@ -167,15 +188,11 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       case 'administrador':
         return 'bg-red-100 text-red-800';
       case 'gerente':
-        return 'bg-blue-100 text-blue-800';
       case 'vendedor':
-        return 'bg-green-100 text-green-800';
       case 'operacional':
-        return 'bg-purple-100 text-purple-800';
       case 'financeiro':
-        return 'bg-yellow-100 text-yellow-800';
       case 'suporte':
-        return 'bg-orange-100 text-orange-800';
+        return 'bg-[#159A9C]/10 text-[#159A9C]';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -185,8 +202,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
     return availableProfiles.find((p) => p.id === perfilSelecionado) || availableProfiles[0];
   };
 
-  const handleProfileSelect = (profileId: string) => {
-    setPerfilSelecionado(profileId as any);
+  const handleProfileSelect = (profileId: PerfilUsuario) => {
+    setPerfilSelecionado(profileId);
     setShowProfileSelector(false);
   };
 
@@ -211,7 +228,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
     if (!element) return 1;
 
     const rect = element.getBoundingClientRect();
-    const elementCenter = rect.top + rect.height / 2 - element.closest('.h-full')!.getBoundingClientRect().top;
+    const elementCenter =
+      rect.top + rect.height / 2 - element.closest('.h-full')!.getBoundingClientRect().top;
 
     const distance = Math.abs(mouseY - elementCenter);
     const maxDistance = 120; // Distância máxima de influência
@@ -244,136 +262,12 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Mapeamento de rotas para títulos dinâmicos
-  const getPageInfo = (pathname: string) => {
-    const routeMap: Record<string, { title: string; subtitle: string }> = {
-      '/dashboard': {
-        title: t('navigation.dashboard'),
-        subtitle: t('dashboard.subtitle'),
-      },
-      '/nuclei/principal': {
-        title: t('navigation.main'),
-        subtitle: t('navigation.mainModules'),
-      },
-      '/nuclei/crm': {
-        title: 'CRM',
-        subtitle: t('navigation.customerManagement'),
-      },
-      '/nuclei/vendas': {
-        title: t('navigation.sales'),
-        subtitle: t('navigation.salesProposals'),
-      },
-      '/nuclei/financeiro': {
-        title: t('navigation.financial'),
-        subtitle: t('navigation.financialControl'),
-      },
-      '/nuclei/configuracoes': {
-        title: t('navigation.settings'),
-        subtitle: t('navigation.systemSettings'),
-      },
-      '/nuclei/administracao': {
-        title: 'Administração',
-        subtitle: 'Gestão empresarial e controle administrativo',
-      },
-      '/clientes': {
-        title: 'Clientes',
-        subtitle: 'Gerencie seus clientes e contatos',
-      },
-      '/propostas': {
-        title: 'Propostas',
-        subtitle: 'Acompanhe suas propostas comerciais',
-      },
-      '/produtos': {
-        title: 'Produtos',
-        subtitle: 'Catálogo de produtos e serviços',
-      },
-      '/combos': {
-        title: 'Combos',
-        subtitle: 'Gestão de combos e pacotes de produtos',
-      },
-      '/combos/novo': {
-        title: 'Novo Combo',
-        subtitle: 'Criar um novo combo de produtos',
-      },
-      '/financeiro/contas-receber': {
-        title: 'Contas a Receber',
-        subtitle: 'Gestão de recebimentos e inadimplência',
-      },
-      '/financeiro/contas-pagar': {
-        title: 'Contas a Pagar',
-        subtitle: 'Controle de pagamentos e fornecedores',
-      },
-      '/financeiro/fluxo-caixa': {
-        title: 'Fluxo de Caixa',
-        subtitle: 'Acompanhamento de entradas e saídas',
-      },
-      '/faturamento': {
-        title: 'Faturamento',
-        subtitle: 'Gerencie faturas, cobranças e recebimentos',
-      },
-      '/financeiro/faturamento': {
-        title: 'Faturamento',
-        subtitle: 'Gerencie faturas, cobranças e recebimentos',
-      },
-      '/billing': {
-        title: 'Billing & Assinaturas',
-        subtitle: 'Gerencie sua assinatura, planos e faturamento',
-      },
-      '/atendimento': {
-        title: 'Atendimento Omnichannel',
-        subtitle: 'Chat em tempo real • WebSocket • Multi-canal',
-      },
-      '/suporte': {
-        title: 'Suporte',
-        subtitle: 'Central de ajuda e atendimento ao cliente',
-      },
-      '/configuracoes': {
-        title: 'Configurações',
-        subtitle: 'Configurações do sistema',
-      },
-      '/admin/empresas': {
-        title: 'Gestão de Empresas',
-        subtitle: 'Administração e monitoramento de empresas',
-      },
-      '/empresas/minhas': {
-        title: 'Minhas Empresas',
-        subtitle: 'Gerencie suas empresas e alterne entre elas',
-      },
-      '/configuracoes/empresa': {
-        title: 'Configurações da Empresa',
-        subtitle: 'Configurações específicas da empresa ativa',
-      },
-      '/configuracoes/departamentos': {
-        title: 'Gestão de Departamentos',
-        subtitle: 'Configure departamentos de atendimento e organize sua equipe',
-      },
-      '/configuracoes/metas': {
-        title: 'Metas Comerciais',
-        subtitle: 'Defina e gerencie metas de vendas por período, vendedor ou região',
-      },
-      '/relatorios/analytics': {
-        title: 'Relatórios e Analytics',
-        subtitle: 'Análise detalhada de performance e resultados',
-      },
-      '/gestao/usuarios': {
-        title: 'Gestão de Usuários',
-        subtitle: 'Gerencie usuários, permissões e atendentes do sistema',
-      },
-      '/sistema/backup': {
-        title: 'Backup e Sincronização',
-        subtitle: 'Gerencie backups e sincronize dados entre empresas',
-      },
-    };
+  // Em mobile, fecha o drawer lateral apos navegar para evitar overlay preso sobre a tela.
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
 
-    return (
-      routeMap[pathname] || {
-        title: 'Conect CRM',
-        subtitle: 'Sistema de gestão empresarial',
-      }
-    );
-  };
-
-  const currentPage = getPageInfo(location.pathname);
+  // Estado de conectividade de rede
 
   // Estados para funcionalidades da barra superior
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -413,6 +307,60 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const companyIdentifier = companyCnpj || user?.empresa?.slug?.toUpperCase();
   const companyPlan = user?.empresa?.plano;
 
+  const resolveSearchResultPath = (result: SearchResult): string => {
+    const normalizedPath = result.path?.trim();
+    const encodedId = encodeURIComponent(result.id);
+
+    // Compatibilidade com rotas legadas que ainda podem vir do backend.
+    if (normalizedPath) {
+      if (result.type === 'cliente' && /^\/clientes\/[0-9a-fA-F-]{36}$/.test(normalizedPath)) {
+        return `/crm/clientes?highlight=${encodedId}`;
+      }
+      if (result.type === 'produto' && /^\/produtos\/[0-9a-fA-F-]{36}$/.test(normalizedPath)) {
+        return `/vendas/produtos?highlight=${encodedId}`;
+      }
+      if (normalizedPath.startsWith('/')) {
+        return normalizedPath;
+      }
+    }
+
+    // Fallback por tipo para garantir navegação mesmo sem path válido.
+    switch (result.type) {
+      case 'cliente':
+        return `/crm/clientes?highlight=${encodedId}`;
+      case 'produto':
+        return `/vendas/produtos?highlight=${encodedId}`;
+      case 'cotacao':
+        return `/vendas/cotacoes?highlight=${encodedId}`;
+      case 'oportunidade':
+        return `/crm/pipeline?highlight=${encodedId}`;
+      case 'contato':
+        return `/crm/contatos?highlight=${encodedId}`;
+      default:
+        return '';
+    }
+  };
+
+  const handleSearchResultSelect = (result: SearchResult) => {
+    const destinationPath = resolveSearchResultPath(result);
+    if (!destinationPath) {
+      return;
+    }
+
+    setShowSearchResults(false);
+    setSearchQuery('');
+    setShowUserMenu(false);
+    navigate(destinationPath);
+  };
+
+  const handleOpenTopSearchResult = () => {
+    if (searchResults.length === 0) {
+      return;
+    }
+
+    handleSearchResultSelect(searchResults[0]);
+  };
+
   const handleLogout = () => {
     logout();
   };
@@ -436,7 +384,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
 
-      if (showUserMenu && !target.closest('[data-dropdown="user-menu"]')) {
+      if (showUserMenu && !target.closest('[data-user-menu]')) {
         setShowUserMenu(false);
       }
 
@@ -475,19 +423,93 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
     return () => document.removeEventListener('keydown', handleKeydown);
   }, []);
 
+  useEffect(() => {
+    const mainElement = mainContentRef.current;
+    if (!mainElement) {
+      return;
+    }
+
+    const handleMainScroll = () => {
+      setIsMainScrolled(mainElement.scrollTop > 6);
+    };
+
+    handleMainScroll();
+    mainElement.addEventListener('scroll', handleMainScroll, { passive: true });
+
+    return () => {
+      mainElement.removeEventListener('scroll', handleMainScroll);
+    };
+  }, [location.pathname]);
+
+  const statusPill = useMemo(() => {
+    if (!isOnline) {
+      return {
+        label: 'Sem internet',
+        title: 'Sem conexao com a internet',
+        className: 'bg-red-50 border-red-200 text-red-700',
+        dotClass: 'bg-red-500',
+        animateDot: false,
+        canReconnect: false,
+      };
+    }
+
+    if (wsConnected) {
+      return {
+        label: 'Online',
+        title: 'Sistema conectado em tempo real',
+        className: 'bg-green-50 border-green-200 text-green-700',
+        dotClass: 'bg-green-500',
+        animateDot: true,
+        canReconnect: false,
+      };
+    }
+
+    if (wsConnecting) {
+      return {
+        label: 'Conectando',
+        title: 'Conectando ao servidor',
+        className: 'bg-amber-50 border-amber-200 text-amber-700',
+        dotClass: 'bg-amber-500',
+        animateDot: true,
+        canReconnect: false,
+      };
+    }
+
+    return {
+      label: wsError ? 'Reconectar' : 'Instavel',
+      title: wsError
+        ? 'Falha na conexao em tempo real. Clique para reconectar.'
+        : 'Conexao instavel',
+      className: 'bg-orange-50 border-orange-200 text-orange-700',
+      dotClass: 'bg-orange-500',
+      animateDot: false,
+      canReconnect: Boolean(wsError),
+    };
+  }, [isOnline, wsConnected, wsConnecting, wsError]);
+
+  const topbarControlButtonClass =
+    'relative min-h-11 min-w-11 rounded-xl border border-transparent p-1.5 text-gray-600 transition-all duration-200 ease-out hover:border-[#159A9C]/25 hover:bg-[#DEEFE7]/65 hover:text-[#002333] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white active:translate-y-[1px] sm:min-h-0 sm:min-w-0 sm:p-2';
+  const userMenuItemBaseClass =
+    'group flex w-full min-h-11 items-center gap-3 px-4 py-3 text-left text-sm text-gray-700 transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35 focus-visible:ring-inset sm:min-h-0 sm:py-2.5';
+
   return (
     <div className="h-screen flex overflow-hidden bg-[#DEEFE7]">
       {/* Sidebar para mobile */}
-      <div className={`fixed inset-0 flex z-40 md:hidden ${sidebarOpen ? '' : 'hidden'}`}>
+      <div
+        className={`fixed inset-0 flex ${UI_LAYERS.MOBILE_SIDEBAR_SHELL} md:hidden ${sidebarOpen ? '' : 'hidden'}`}
+      >
         <div
           className="fixed inset-0 bg-gray-600 bg-opacity-75"
           onClick={() => setSidebarOpen(false)}
         />
 
-        <div className="relative flex-1 flex flex-col max-w-xs w-full bg-white">
+        <div
+          className="relative flex-1 flex flex-col max-w-xs w-full bg-white"
+          data-testid="mobile-sidebar-drawer"
+        >
           <div className="absolute top-0 right-0 -mr-12 pt-2">
             <button
-              className="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
+              className="ml-1 flex h-11 w-11 items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
               onClick={() => setSidebarOpen(false)}
             >
               <X className="h-6 w-6 text-white" />
@@ -501,7 +523,11 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
               </div>
             </div>
             {/* Navegação Mobile */}
-            <HierarchicalNavGroup menuItems={menuFiltrado} sidebarCollapsed={false} />
+            <HierarchicalNavGroup
+              menuItems={menuFiltrado}
+              sidebarCollapsed={false}
+              instanceId="mobile"
+            />
           </div>
         </div>
       </div>
@@ -510,7 +536,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       <div className="hidden md:flex md:flex-shrink-0 relative">
         {/* Barra de Ícones Fixa (Coluna 1) com Efeito Mac Dock */}
         <div
-          className="flex flex-col w-[75px] bg-[#002333] border-r border-[#001a26] relative z-20 shadow-lg"
+          className={`flex flex-col w-[75px] bg-[#002333] border-r border-[#001a26] relative ${UI_LAYERS.SIDEBAR_DESKTOP} shadow-lg`}
           onMouseMove={handleMouseMoveSidebar}
           onMouseLeave={handleMouseLeaveSidebar}
         >
@@ -539,6 +565,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                 <HierarchicalNavGroup
                   menuItems={menuFiltrado}
                   sidebarCollapsed={false}
+                  instanceId="desktop"
                 />
               </div>
 
@@ -573,7 +600,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                     title="Abrir chamado"
                   >
                     <Mail className="h-4 w-4 mb-1" />
-                    <span className="text-[9px] font-semibold uppercase tracking-wide">Suporte</span>
+                    <span className="text-[9px] font-semibold uppercase tracking-wide">
+                      Suporte
+                    </span>
                   </a>
                 </div>
               </div>
@@ -585,32 +614,41 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       {/* Conteúdo principal */}
       <div className="flex flex-col w-0 flex-1 overflow-hidden">
         {/* Header Refatorado e Moderno */}
-        <header className="relative z-10 flex-shrink-0 bg-white/95 backdrop-blur-sm border-b border-gray-200/80">
+        <header
+          className={`relative ${UI_LAYERS.TOPBAR_HEADER} flex-shrink-0 border-b backdrop-blur-sm transition-all duration-300 ${
+            isMainScrolled
+              ? 'bg-white/98 border-gray-200 shadow-[0_14px_26px_-24px_rgba(0,35,51,0.85)]'
+              : 'bg-white/95 border-gray-200/80'
+          }`}
+        >
           {/* Gradiente sutil no topo */}
           <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#159A9C]/20 to-transparent"></div>
 
-          <div className="w-full px-4 md:px-6">
-            <div className="h-16 flex items-center justify-between">
+          <div className="w-full px-3 sm:px-4 md:px-6">
+            <div className="flex h-[60px] items-center justify-between sm:h-16">
               {/* Lado Esquerdo: Menu Mobile + Breadcrumb + Status */}
-              <div className="flex items-center gap-4">
+              <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-4">
                 <button
-                  className="p-2 text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 rounded-lg md:hidden transition-colors"
+                  className="min-h-11 min-w-11 rounded-xl border border-transparent p-1.5 text-gray-500 transition-all duration-200 ease-out hover:border-[#159A9C]/20 hover:bg-[#DEEFE7]/70 hover:text-[#002333] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white md:hidden"
                   onClick={() => setSidebarOpen(true)}
                 >
                   <Menu className="h-5 w-5" />
                 </button>
 
-                <div className="flex items-center gap-4">
+                <div className="flex min-w-0 items-center gap-2 sm:gap-4">
                   {/* Seção da Empresa */}
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#159A9C]/10 text-[#159A9C] shadow-inner">
-                      <Building2 className="h-5 w-5" />
+                  <div
+                    className="flex min-w-0 items-center gap-2 sm:gap-3"
+                    data-testid="topbar-company-section"
+                  >
+                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#159A9C]/15 to-[#159A9C]/5 text-[#159A9C] shadow-[inset_0_1px_1px_rgba(255,255,255,0.9)] sm:h-11 sm:w-11">
+                      <Building2 className="h-4 w-4 sm:h-5 sm:w-5" />
                     </div>
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-lg font-bold text-[#159A9C] truncate">
+                    <div className="flex min-w-0 max-w-[40vw] flex-col sm:max-w-none">
+                      <span className="truncate text-sm font-bold text-[#159A9C] sm:text-base lg:text-lg">
                         {companyName}
                       </span>
-                      <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-[#4B5563]">
+                      <div className="mt-1 hidden flex-wrap items-center gap-2 text-xs text-[#4B5563] sm:flex">
                         {companyIdentifier && (
                           <span className="font-semibold tracking-wide text-[#002333]/70 uppercase">
                             {companyIdentifier}
@@ -629,7 +667,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                           </>
                         )}
                       </div>
-                      <span className="text-xs text-[#4B5563] mt-1">
+                      <span className="mt-1 hidden text-xs text-[#4B5563] lg:block">
                         Sistema de Gestão Empresarial
                       </span>
                     </div>
@@ -639,53 +677,78 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                   <div className="h-8 w-px bg-gradient-to-b from-transparent via-gray-200 to-transparent hidden md:block"></div>
 
                   {/* Status Online Melhorado */}
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-lg transition-all duration-300 hover:bg-green-100/80"
-                      title="Sistema funcionando normalmente"
+                  <div className="flex flex-shrink-0 items-center">
+                    <button
+                      type="button"
+                      data-testid="topbar-status-pill"
+                      className={`inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl border px-2.5 py-1.5 text-xs font-semibold tracking-wide transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white sm:min-h-0 sm:min-w-[108px] sm:gap-2.5 sm:px-3.5 sm:py-2 ${statusPill.className} ${statusPill.canReconnect ? 'hover:-translate-y-0.5 hover:brightness-95 hover:shadow-[0_8px_18px_-14px_rgba(0,35,51,0.6)] active:translate-y-0' : ''}`}
+                      title={statusPill.title}
+                      disabled={!statusPill.canReconnect}
+                      onClick={() => {
+                        if (statusPill.canReconnect) {
+                          wsReconnect();
+                        }
+                      }}
                     >
                       <div className="relative">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <div className="absolute inset-0 w-2 h-2 bg-green-500 rounded-full animate-ping opacity-75"></div>
+                        <div className={`w-2 h-2 rounded-full ${statusPill.dotClass}`}></div>
+                        {statusPill.animateDot && (
+                          <div
+                            className={`absolute inset-0 w-2 h-2 rounded-full animate-ping opacity-75 ${statusPill.dotClass}`}
+                          ></div>
+                        )}
                       </div>
-                      <span className="text-xs font-medium text-green-700 hidden sm:inline">
-                        Online
+                      <span className="text-xs font-medium hidden sm:inline">
+                        {statusPill.label}
                       </span>
-                    </div>
+                    </button>
                   </div>
                 </div>
               </div>
 
               {/* Lado Direito: Busca + Notificações + Avatar */}
-              <div className="flex items-center gap-3">
+              <div
+                className={`fixed bottom-3 right-3 ${UI_LAYERS.TOPBAR_FLOATING_ACTIONS} flex items-center gap-1.5 rounded-2xl border border-[#c8d8de] bg-white/96 px-1.5 py-1.5 shadow-[0_16px_34px_-24px_rgba(0,35,51,0.6)] backdrop-blur-sm sm:static sm:bottom-auto sm:right-auto sm:z-auto sm:gap-2.5 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none`}
+                data-testid="topbar-actions-tray"
+              >
                 {/* Campo de Busca Melhorado */}
                 <div className="relative hidden md:block" data-dropdown="search">
-                  <div className="relative">
+                  <div className="relative rounded-xl transition-all duration-300 focus-within:shadow-[0_0_0_4px_rgba(21,154,156,0.12)]">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <Search className="h-4 w-4 text-gray-400" />
                     </div>
                     <input
                       type="text"
+                      data-testid="topbar-search-input"
                       value={searchQuery}
                       onChange={(e) => {
                         setSearchQuery(e.target.value);
                         setShowSearchResults(e.target.value.length > 0);
                       }}
                       onFocus={() => setShowSearchResults(searchQuery.length > 0)}
-                      placeholder="Buscar clientes, propostas..."
-                      className="w-72 pl-10 pr-16 py-2.5 border border-gray-200 rounded-xl bg-gray-50/80 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#159A9C]/20 focus:border-[#159A9C]/50 focus:bg-white text-sm transition-all hover:bg-gray-50"
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault();
+                          handleOpenTopSearchResult();
+                        }
+                      }}
+                      placeholder="Buscar clientes e produtos..."
+                      className="w-72 rounded-xl border border-gray-200/90 bg-white py-2.5 pl-10 pr-16 text-sm text-gray-700 placeholder-gray-500 shadow-sm transition-all duration-200 hover:border-gray-300 hover:bg-white focus:border-[#159A9C]/50 focus:outline-none focus:ring-0"
                     />
                     <div className="absolute inset-y-0 right-0 flex items-center pr-3">
                       <div className="flex items-center gap-1">
                         <kbd className="inline-flex items-center px-2 py-1 border border-gray-300 rounded-md text-xs bg-white text-gray-600 font-medium shadow-sm">
-                          ⌘K
+                          Ctrl+K
                         </kbd>
                       </div>
                     </div>
 
                     {/* Dropdown de Resultados - Melhorado */}
                     {showSearchResults && (
-                      <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl border shadow-xl z-50 overflow-hidden">
+                      <div
+                        className={`absolute left-0 right-0 top-full ${UI_LAYERS.POPOVER_DROPDOWN} mt-2.5 overflow-hidden rounded-2xl border border-gray-200/80 bg-white/95 shadow-[0_24px_45px_-30px_rgba(0,35,51,0.55)] backdrop-blur-sm`}
+                        data-testid="topbar-search-dropdown"
+                      >
                         <div className="p-4 border-b bg-gradient-to-r from-gray-50 to-white">
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-gray-700">
@@ -706,24 +769,24 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                             </div>
                           ) : searchResults.length > 0 ? (
                             searchResults.map((result) => (
-                              <div
+                              <button
+                                type="button"
                                 key={result.id}
-                                className="p-3 hover:bg-gray-50 cursor-pointer transition-colors border-b last:border-b-0 group"
+                                data-testid="topbar-search-result"
+                                className="group w-full cursor-pointer border-b p-3.5 text-left transition-colors duration-200 last:border-b-0 hover:bg-[#DEEFE7]/40"
+                                onClick={() => handleSearchResultSelect(result)}
                               >
                                 <div className="flex items-center gap-3">
-                                  <div
-                                    className={`w-9 h-9 rounded-lg flex items-center justify-center text-white text-xs font-medium transition-transform group-hover:scale-105 ${result.type === 'cliente'
-                                      ? 'bg-blue-500'
-                                      : result.type === 'proposta'
-                                        ? 'bg-green-500'
-                                        : 'bg-purple-500'
-                                      }`}
-                                  >
+                                  <div className="w-9 h-9 rounded-lg flex items-center justify-center text-white text-xs font-medium transition-transform group-hover:scale-105 bg-[#159A9C]">
                                     {result.type === 'cliente'
                                       ? 'C'
-                                      : result.type === 'proposta'
-                                        ? 'P'
-                                        : 'CT'}
+                                      : result.type === 'cotacao'
+                                        ? 'CT'
+                                        : result.type === 'produto'
+                                          ? 'PR'
+                                          : result.type === 'oportunidade'
+                                            ? 'OP'
+                                            : 'CO'}
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium text-gray-900 truncate group-hover:text-[#159A9C] transition-colors">
@@ -737,7 +800,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                                     {result.type}
                                   </div>
                                 </div>
-                              </div>
+                              </button>
                             ))
                           ) : (
                             <div className="p-8 text-center">
@@ -753,8 +816,14 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                         </div>
 
                         <div className="p-3 border-t bg-gray-50">
-                          <button className="w-full text-sm text-[#159A9C] hover:text-[#0F7B7D] font-medium transition-colors hover:bg-white rounded-lg py-2">
-                            Ver todos os resultados
+                          <button
+                            type="button"
+                            data-testid="topbar-search-open-first"
+                            className="w-full text-sm text-[#159A9C] hover:text-[#0F7B7D] font-medium transition-colors hover:bg-white rounded-lg py-2 disabled:text-gray-400 disabled:hover:bg-transparent"
+                            onClick={handleOpenTopSearchResult}
+                            disabled={searchResults.length === 0}
+                          >
+                            Abrir primeiro resultado
                           </button>
                         </div>
                       </div>
@@ -770,7 +839,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => setShowUserMenu(!showUserMenu)}
-                      className="flex items-center gap-2 p-2 rounded-xl hover:bg-gray-100/80 transition-all duration-200 group"
+                      className={`${topbarControlButtonClass} group flex items-center gap-2 p-1.5 sm:p-2`}
                       title={`${formatUserName(user?.nome || 'Admin Sistema')}`}
                       data-user-menu
                     >
@@ -796,7 +865,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                   {/* Dropdown do Usuário - Design Premium Compacto */}
                   {showUserMenu && (
                     <div
-                      className="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl border shadow-xl z-40 overflow-visible"
+                      className={`absolute right-0 bottom-full ${UI_LAYERS.USER_MENU_DROPDOWN} mb-2 w-[calc(100vw-1rem)] max-w-[18rem] overflow-visible rounded-xl border border-[#d4e2e8] bg-white shadow-[0_30px_60px_-40px_rgba(0,35,51,0.7)] sm:top-full sm:bottom-auto sm:mt-2 sm:mb-0 sm:w-72`}
                       data-user-menu
                     >
                       {/* Header do Profile Compacto */}
@@ -847,11 +916,11 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
                         <Link
                           to="/perfil"
-                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-25 flex items-center gap-3 transition-all duration-200 group"
+                          className={`${userMenuItemBaseClass} hover:bg-[#DEEFE7]/55 hover:text-[#002333]`}
                           onClick={() => setShowUserMenu(false)}
                         >
-                          <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 group-hover:scale-105 transition-all duration-200">
-                            <User className="w-4 h-4 text-blue-600" />
+                          <div className="w-8 h-8 rounded-lg bg-[#159A9C]/10 flex items-center justify-center group-hover:bg-[#159A9C]/15 group-hover:scale-105 transition-all duration-200">
+                            <User className="w-4 h-4 text-[#159A9C]" />
                           </div>
                           <div className="flex-1">
                             <div className="font-medium text-gray-900 text-sm">Meu Perfil</div>
@@ -864,7 +933,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                           <div className="relative" data-profile-selector>
                             <button
                               onClick={() => setShowProfileSelector(!showProfileSelector)}
-                              className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gradient-to-r hover:from-teal-50 hover:to-teal-25 flex items-center gap-3 transition-all duration-200 group"
+                              className={`${userMenuItemBaseClass} hover:bg-[#DEEFE7]/65 hover:text-[#002333]`}
                             >
                               <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center group-hover:bg-teal-100 group-hover:scale-105 transition-all duration-200">
                                 <Users className="w-4 h-4 text-teal-600" />
@@ -889,7 +958,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                             {/* Dropdown de perfis - Abre ao lado */}
                             {showProfileSelector && (
                               <div
-                                className="absolute right-full top-0 mr-3 w-72 bg-white border border-gray-200 rounded-xl shadow-xl z-[60] overflow-hidden"
+                                className={`absolute right-0 top-full ${UI_LAYERS.OVERLAY_DROPDOWN} mt-2 w-[calc(100vw-2rem)] max-w-[18rem] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl sm:right-full sm:top-0 sm:mt-0 sm:mr-3 sm:w-72`}
                                 data-profile-selector
                                 style={{
                                   display: 'block',
@@ -923,18 +992,19 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                                     <button
                                       key={profile.id}
                                       onClick={() => handleProfileSelect(profile.id)}
-                                      className={`w-full p-3 text-left hover:bg-gray-50 transition-all duration-200 border-l-4 group ${perfilSelecionado === profile.id
-                                        ? 'bg-blue-50 border-blue-500 shadow-sm'
-                                        : 'border-transparent hover:border-gray-200'
-                                        }`}
+                                      className={`w-full p-3 text-left hover:bg-gray-50 transition-all duration-200 border-l-4 group ${
+                                        perfilSelecionado === profile.id
+                                          ? 'bg-[#159A9C]/5 border-[#159A9C] shadow-sm'
+                                          : 'border-transparent hover:border-gray-200'
+                                      }`}
                                     >
                                       <div className="flex items-center justify-between">
                                         <div className="flex-1 min-w-0">
                                           <div className="font-medium text-gray-900 flex items-center gap-1.5 text-sm">
                                             {profile.nome}
                                             {perfilSelecionado === profile.id && (
-                                              <span className="text-xs text-blue-600 font-medium flex items-center gap-1">
-                                                <div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>
+                                              <span className="text-xs text-[#159A9C] font-medium flex items-center gap-1">
+                                                <div className="w-1.5 h-1.5 bg-[#159A9C] rounded-full"></div>
                                                 Ativo
                                               </span>
                                             )}
@@ -972,7 +1042,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                         <button
                           type="button"
                           onClick={() => handleNavigate('/nuclei/configuracoes/empresa')}
-                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gradient-to-r hover:from-emerald-50 hover:to-emerald-25 flex items-center gap-3 transition-all duration-200 group"
+                          className={`${userMenuItemBaseClass} hover:bg-[#DEEFE7]/65 hover:text-[#002333]`}
                         >
                           <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-100 group-hover:scale-105 transition-all duration-200">
                             <Building2 className="w-4 h-4 text-emerald-600" />
@@ -1011,11 +1081,11 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
                         <button
                           type="button"
-                          onClick={() => handleNavigate('/nuclei/configuracoes/empresa')}
-                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gradient-to-r hover:from-purple-50 hover:to-purple-25 flex items-center gap-3 transition-all duration-200 group"
+                          onClick={() => handleNavigate('/configuracoes')}
+                          className={`${userMenuItemBaseClass} hover:bg-[#DEEFE7]/55 hover:text-[#002333]`}
                         >
-                          <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 group-hover:scale-105 transition-all duration-200">
-                            <Settings className="w-4 h-4 text-purple-600" />
+                          <div className="w-8 h-8 rounded-lg bg-[#159A9C]/10 flex items-center justify-center group-hover:bg-[#159A9C]/15 group-hover:scale-105 transition-all duration-200">
+                            <Settings className="w-4 h-4 text-[#159A9C]" />
                           </div>
                           <div className="flex-1">
                             <div className="font-medium text-gray-900 text-sm">
@@ -1031,7 +1101,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                         <div className="px-4 py-2">
                           <button
                             onClick={() => setShowLanguageSelector(true)}
-                            className="w-full flex items-center gap-3 p-2.5 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-all duration-200 group"
+                            className="group flex w-full min-h-11 items-center gap-3 rounded-lg border border-transparent bg-gray-50 p-2.5 text-left transition-all duration-200 ease-out hover:border-[#159A9C]/20 hover:bg-[#DEEFE7]/65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35 focus-visible:ring-inset sm:min-h-0"
                           >
                             <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center shadow-sm">
                               <span className="text-lg">
@@ -1054,11 +1124,11 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
                         <Link
                           to="/suporte"
-                          className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-25 flex items-center gap-3 transition-all duration-200 group"
+                          className={`${userMenuItemBaseClass} hover:bg-[#DEEFE7]/55 hover:text-[#002333]`}
                           onClick={() => setShowUserMenu(false)}
                         >
-                          <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 group-hover:scale-105 transition-all duration-200">
-                            <MessageCircle className="w-4 h-4 text-blue-600" />
+                          <div className="w-8 h-8 rounded-lg bg-[#159A9C]/10 flex items-center justify-center group-hover:bg-[#159A9C]/15 group-hover:scale-105 transition-all duration-200">
+                            <MessageCircle className="w-4 h-4 text-[#159A9C]" />
                           </div>
                           <div className="flex-1">
                             <div className="font-medium text-gray-900 text-sm">
@@ -1076,7 +1146,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                       <div className="py-1">
                         <button
                           onClick={handleLogout}
-                          className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-gradient-to-r hover:from-red-50 hover:to-red-25 flex items-center gap-3 transition-all duration-200 rounded-b-xl group"
+                          className={`${userMenuItemBaseClass} rounded-b-xl text-red-600 hover:bg-red-50 hover:text-red-700 focus-visible:ring-red-300`}
                         >
                           <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center group-hover:bg-red-100 group-hover:scale-105 transition-all duration-200">
                             <LogOut className="w-4 h-4 text-red-600" />
@@ -1099,6 +1169,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
         {/* Conteúdo da página */}
         <main
+          ref={mainContentRef}
           className={`flex-1 relative focus:outline-none ${location.pathname === '/atendimento' || location.pathname === '/atendimento/chat' ? 'overflow-hidden' : 'overflow-y-auto'}`}
         >
           {location.pathname === '/atendimento' || location.pathname === '/atendimento/chat' ? (
@@ -1106,8 +1177,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
             <div className="h-full w-full">{children}</div>
           ) : (
             // Para outras rotas, usar toda a largura disponível
-            <div className="py-6">
-              <div className="w-full px-4 sm:px-6">{children}</div>
+            <div className="py-4 sm:py-5">
+              <div className="mx-auto w-full px-3 sm:px-5">{children}</div>
             </div>
           )}
         </main>

@@ -1,6 +1,41 @@
 import { useState, useEffect } from 'react';
 import { modulosService, ModuloEnum } from '../services/modulosService';
 
+const EMPRESA_EVENT_NAME = 'empresaAtivaChanged';
+
+const getEmpresaAtivaKey = (): string =>
+  typeof window === 'undefined' ? '' : localStorage.getItem('empresaAtiva') || '';
+
+const useEmpresaAtivaDependency = (): string => {
+  const [empresaAtivaKey, setEmpresaAtivaKey] = useState<string>(getEmpresaAtivaKey);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const syncEmpresaAtiva = () => {
+      setEmpresaAtivaKey(getEmpresaAtivaKey());
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === 'empresaAtiva') {
+        syncEmpresaAtiva();
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener(EMPRESA_EVENT_NAME, syncEmpresaAtiva);
+
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener(EMPRESA_EVENT_NAME, syncEmpresaAtiva);
+    };
+  }, []);
+
+  return empresaAtivaKey;
+};
+
 /**
  * Hook para verificar se empresa tem módulo ativo
  * @param modulo Módulo a verificar
@@ -9,6 +44,7 @@ import { modulosService, ModuloEnum } from '../services/modulosService';
 export const useModuloAtivo = (modulo: ModuloEnum): [boolean, boolean] => {
   const [isAtivo, setIsAtivo] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const empresaAtivaKey = useEmpresaAtivaDependency();
 
   useEffect(() => {
     const verificar = async () => {
@@ -25,7 +61,7 @@ export const useModuloAtivo = (modulo: ModuloEnum): [boolean, boolean] => {
     };
 
     verificar();
-  }, [modulo]);
+  }, [modulo, empresaAtivaKey]);
 
   return [isAtivo, isLoading];
 };
@@ -37,6 +73,7 @@ export const useModuloAtivo = (modulo: ModuloEnum): [boolean, boolean] => {
 export const useModulosAtivos = (): [ModuloEnum[], boolean] => {
   const [modulosAtivos, setModulosAtivos] = useState<ModuloEnum[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const empresaAtivaKey = useEmpresaAtivaDependency();
 
   useEffect(() => {
     const carregar = async () => {
@@ -53,7 +90,7 @@ export const useModulosAtivos = (): [ModuloEnum[], boolean] => {
     };
 
     carregar();
-  }, []);
+  }, [empresaAtivaKey]);
 
   return [modulosAtivos, isLoading];
 };

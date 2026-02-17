@@ -1,7 +1,6 @@
 import { MigrationInterface, QueryRunner, Table } from 'typeorm';
 
-export class CreateDistribuicaoAutomaticaTables1762531500000
-  implements MigrationInterface {
+export class CreateDistribuicaoAutomaticaTables1762531500000 implements MigrationInterface {
   name = 'CreateDistribuicaoAutomaticaTables1762531500000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

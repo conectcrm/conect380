@@ -162,7 +162,7 @@ export const ResponsiveDashboardLayout: React.FC<ResponsiveDashboardLayoutProps>
                     </div>
 
                     <div className="p-3 border-t">
-                      <button className="text-sm text-blue-600 hover:underline">Ver todas</button>
+                      <button className="text-sm text-[#159A9C] hover:underline">Ver todas</button>
                     </div>
                   </div>
                 )}

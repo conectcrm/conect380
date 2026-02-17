@@ -1,6 +1,6 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder, In, Between } from 'typeorm';
+import { Repository, SelectQueryBuilder, In, Between, IsNull } from 'typeorm';
 import { Cotacao, StatusCotacao } from './entities/cotacao.entity';
 import { ItemCotacao } from './entities/item-cotacao.entity';
 import { AnexoCotacao } from './entities/anexo-cotacao.entity';
@@ -41,12 +41,16 @@ export class CotacaoService {
 
     private cotacaoEmailService: CotacaoEmailService,
     private notificationService: NotificationService,
-  ) { }
+  ) {}
 
-  async criar(criarCotacaoDto: CriarCotacaoDto, userId: string): Promise<CotacaoResponseDto> {
+  async criar(
+    criarCotacaoDto: CriarCotacaoDto,
+    userId: string,
+    empresaId: string,
+  ): Promise<CotacaoResponseDto> {
     // Validar fornecedor
     const fornecedor = await this.fornecedorRepository.findOne({
-      where: { id: criarCotacaoDto.fornecedorId },
+      where: { id: criarCotacaoDto.fornecedorId, empresaId },
     });
 
     if (!fornecedor) {
@@ -55,7 +59,7 @@ export class CotacaoService {
 
     // Validar usuário responsável
     const responsavel = await this.userRepository.findOne({
-      where: { id: userId },
+      where: { id: userId, empresa_id: empresaId },
     });
 
     if (!responsavel) {
@@ -65,7 +69,7 @@ export class CotacaoService {
     // Validar aprovador (se fornecido)
     if (criarCotacaoDto.aprovadorId) {
       const aprovador = await this.userRepository.findOne({
-        where: { id: criarCotacaoDto.aprovadorId },
+        where: { id: criarCotacaoDto.aprovadorId, empresa_id: empresaId },
       });
 
       if (!aprovador) {
@@ -74,13 +78,14 @@ export class CotacaoService {
     }
 
     // Gerar número da cotação
-    const numero = await this.gerarNumeroCotacao();
+    const numero = await this.gerarNumeroCotacao(empresaId);
 
     // Criar cotação (SEM itens - serão criados separadamente)
     const { itens, ...cotacaoData } = criarCotacaoDto;
     const cotacao = this.cotacaoRepository.create({
       ...cotacaoData,
       numero,
+      empresaId,
       status: StatusCotacao.RASCUNHO,
       responsavelId: userId,
       prazoResposta: criarCotacaoDto.prazoResposta ? new Date(criarCotacaoDto.prazoResposta) : null,
@@ -96,6 +101,7 @@ export class CotacaoService {
         this.buildItemCotacaoEntity(item, {
           cotacaoId: cotacaoSalva.id,
           userId,
+          empresaId,
           ordem: index + 1,
         }),
       );
@@ -127,7 +133,7 @@ export class CotacaoService {
 
     // Recarregar cotação com valor total atualizado
     const cotacaoAtualizada = await this.cotacaoRepository.findOne({
-      where: { id: cotacaoSalva.id },
+      where: { id: cotacaoSalva.id, empresaId },
     });
 
     // Log simples de auditoria
@@ -140,7 +146,7 @@ export class CotacaoService {
     // PENDENTE = foi enviada para aprovação, aprovador deve ser notificado
     if (criarCotacaoDto.aprovadorId && cotacaoSalva.status === StatusCotacao.PENDENTE) {
       const aprovador = await this.userRepository.findOne({
-        where: { id: criarCotacaoDto.aprovadorId }
+        where: { id: criarCotacaoDto.aprovadorId, empresa_id: empresaId },
       });
 
       if (aprovador) {
@@ -166,11 +172,11 @@ export class CotacaoService {
       }
     }
 
-    return this.buscarPorId(cotacaoSalva.id, userId);
+    return this.buscarPorId(cotacaoSalva.id, userId, empresaId);
   }
 
-  async listar(query: CotacaoQueryDto, userId: string) {
-    const queryBuilder = this.createQueryBuilder();
+  async listar(query: CotacaoQueryDto, userId: string, empresaId: string) {
+    const queryBuilder = this.createQueryBuilder(empresaId);
 
     // Aplicar filtros básicos
     this.applyFilters(queryBuilder, query, userId);
@@ -204,46 +210,43 @@ export class CotacaoService {
       statistics: {
         total,
         totalValue,
-        byStatus: await this.getStatusStatistics(userId),
-        byPriority: await this.getPriorityStatistics(userId),
+        byStatus: await this.getStatusStatistics(empresaId),
+        byPriority: await this.getPriorityStatistics(empresaId),
       },
     };
   }
 
-  async minhasAprovacoes(userId: string): Promise<CotacaoResponseDto[]> {
+  async minhasAprovacoes(userId: string, empresaId: string): Promise<CotacaoResponseDto[]> {
     const cotacoes = await this.cotacaoRepository.find({
       where: [
         {
+          empresaId,
           aprovadorId: userId,
-          status: StatusCotacao.RASCUNHO
+          status: StatusCotacao.RASCUNHO,
         },
         {
+          empresaId,
           aprovadorId: userId,
-          status: StatusCotacao.ENVIADA
+          status: StatusCotacao.ENVIADA,
         },
         {
+          empresaId,
           aprovadorId: userId,
-          status: StatusCotacao.EM_ANALISE
-        }
+          status: StatusCotacao.EM_ANALISE,
+        },
       ],
-      relations: [
-        'fornecedor',
-        'responsavel',
-        'aprovador',
-        'itens',
-        'criadoPorUser'
-      ],
+      relations: ['fornecedor', 'responsavel', 'aprovador', 'itens', 'criadoPorUser'],
       order: {
-        dataCriacao: 'DESC'
-      }
+        dataCriacao: 'DESC',
+      },
     });
 
-    return cotacoes.map(cotacao => this.formatarCotacaoResponse(cotacao));
+    return cotacoes.map((cotacao) => this.formatarCotacaoResponse(cotacao));
   }
 
-  async buscarPorId(id: string, userId: string): Promise<CotacaoResponseDto> {
+  async buscarPorId(id: string, userId: string, empresaId: string): Promise<CotacaoResponseDto> {
     const cotacao = await this.cotacaoRepository.findOne({
-      where: { id },
+      where: { id, empresaId },
       relations: [
         'fornecedor',
         'responsavel',
@@ -266,9 +269,10 @@ export class CotacaoService {
     id: string,
     atualizarCotacaoDto: AtualizarCotacaoDto,
     userId: string,
+    empresaId: string,
   ): Promise<CotacaoResponseDto> {
     const cotacao = await this.cotacaoRepository.findOne({
-      where: { id },
+      where: { id, empresaId },
       relations: ['itens'],
     });
 
@@ -290,7 +294,7 @@ export class CotacaoService {
       atualizarCotacaoDto.fornecedorId !== cotacao.fornecedorId
     ) {
       const fornecedor = await this.fornecedorRepository.findOne({
-        where: { id: atualizarCotacaoDto.fornecedorId },
+        where: { id: atualizarCotacaoDto.fornecedorId, empresaId },
       });
 
       if (!fornecedor) {
@@ -301,7 +305,7 @@ export class CotacaoService {
     // Validar aprovador se foi alterado
     if (atualizarCotacaoDto.aprovadorId) {
       const aprovador = await this.userRepository.findOne({
-        where: { id: atualizarCotacaoDto.aprovadorId },
+        where: { id: atualizarCotacaoDto.aprovadorId, empresa_id: empresaId },
       });
 
       if (!aprovador) {
@@ -327,7 +331,7 @@ export class CotacaoService {
     // Atualizar itens se fornecidos
     if (itens) {
       // Remover itens existentes
-      await this.itemCotacaoRepository.delete({ cotacaoId: id });
+      await this.itemCotacaoRepository.delete({ cotacaoId: id, empresaId });
 
       // Criar novos itens
       if (atualizarCotacaoDto.itens.length > 0) {
@@ -335,9 +339,12 @@ export class CotacaoService {
           this.buildItemCotacaoEntity(item, {
             cotacaoId: id,
             userId,
+            empresaId,
             ordem: index + 1,
           }),
         );
+
+        novosItens.forEach((item) => item.atualizarValores());
 
         await this.itemCotacaoRepository.save(novosItens);
       }
@@ -349,12 +356,12 @@ export class CotacaoService {
     // Log simples de auditoria
     console.log(`[AUDIT] COTACAO UPDATE - ID: ${id}, User: ${userId}`);
 
-    return this.buscarPorId(id, userId);
+    return this.buscarPorId(id, userId, empresaId);
   }
 
-  async deletar(id: string, userId: string): Promise<void> {
+  async deletar(id: string, userId: string, empresaId: string): Promise<void> {
     const cotacao = await this.cotacaoRepository.findOne({
-      where: { id },
+      where: { id, empresaId },
     });
 
     if (!cotacao) {
@@ -382,11 +389,11 @@ export class CotacaoService {
    * Envia cotação em RASCUNHO para aprovação
    * Muda status para PENDENTE e notifica o aprovador
    */
-  async enviarParaAprovacao(id: string, userId: string): Promise<CotacaoResponseDto> {
+  async enviarParaAprovacao(id: string, userId: string, empresaId: string): Promise<CotacaoResponseDto> {
     try {
       // Buscar cotação com relações
       const cotacao = await this.cotacaoRepository.findOne({
-        where: { id },
+        where: { id, empresaId },
         relations: ['aprovador', 'criadoPorUser', 'fornecedor', 'itens'],
       });
 
@@ -455,9 +462,11 @@ export class CotacaoService {
       }
 
       // Log de auditoria
-      console.log(`[AUDIT] COTACAO SEND_TO_APPROVAL - ID: ${id}, User: ${userId}, Numero: ${cotacao.numero}`);
+      console.log(
+        `[AUDIT] COTACAO SEND_TO_APPROVAL - ID: ${id}, User: ${userId}, Numero: ${cotacao.numero}`,
+      );
 
-      return this.buscarPorId(id, userId);
+      return this.buscarPorId(id, userId, empresaId);
     } catch (error) {
       console.error('Erro ao enviar cotação para aprovação:', error.message);
       throw error;
@@ -467,10 +476,11 @@ export class CotacaoService {
   async aprovar(
     id: string,
     userId: string,
+    empresaId: string,
     justificativa?: string,
   ): Promise<Cotacao> {
     const cotacao = await this.cotacaoRepository.findOne({
-      where: { id },
+      where: { id, empresaId },
       relations: ['aprovador', 'fornecedor', 'itens', 'criadoPorUser'],
     });
 
@@ -488,18 +498,12 @@ export class CotacaoService {
 
     // Verificar se o usuário é o aprovador
     if (cotacao.aprovadorId !== userId) {
-      throw new HttpException(
-        'Apenas o aprovador pode aprovar esta cotação',
-        HttpStatus.FORBIDDEN,
-      );
+      throw new HttpException('Apenas o aprovador pode aprovar esta cotação', HttpStatus.FORBIDDEN);
     }
 
     // Verificar se já foi aprovada/reprovada
     if (cotacao.statusAprovacao) {
-      throw new HttpException(
-        `Cotação já foi ${cotacao.statusAprovacao}`,
-        HttpStatus.BAD_REQUEST,
-      );
+      throw new HttpException(`Cotação já foi ${cotacao.statusAprovacao}`, HttpStatus.BAD_REQUEST);
     }
 
     // Atualizar campos de aprovação
@@ -515,7 +519,7 @@ export class CotacaoService {
     );
 
     // Enviar email de notificação (async, não bloqueia resposta)
-    const aprovador = await this.userRepository.findOne({ where: { id: userId } });
+    const aprovador = await this.userRepository.findOne({ where: { id: userId, empresa_id: empresaId } });
     if (aprovador) {
       // Enviar email
       this.cotacaoEmailService
@@ -546,13 +550,9 @@ export class CotacaoService {
     return cotacao;
   }
 
-  async reprovar(
-    id: string,
-    userId: string,
-    justificativa: string,
-  ): Promise<Cotacao> {
+  async reprovar(id: string, userId: string, empresaId: string, justificativa: string): Promise<Cotacao> {
     const cotacao = await this.cotacaoRepository.findOne({
-      where: { id },
+      where: { id, empresaId },
       relations: ['aprovador', 'fornecedor', 'itens', 'criadoPorUser'],
     });
 
@@ -570,10 +570,7 @@ export class CotacaoService {
 
     // Verificar se já foi aprovada/reprovada
     if (cotacao.statusAprovacao) {
-      throw new HttpException(
-        `Cotação já foi ${cotacao.statusAprovacao}`,
-        HttpStatus.BAD_REQUEST,
-      );
+      throw new HttpException(`Cotação já foi ${cotacao.statusAprovacao}`, HttpStatus.BAD_REQUEST);
     }
 
     // Justificativa é obrigatória para reprovação
@@ -597,7 +594,7 @@ export class CotacaoService {
     );
 
     // Enviar email de notificação (async, não bloqueia resposta)
-    const aprovador = await this.userRepository.findOne({ where: { id: userId } });
+    const aprovador = await this.userRepository.findOne({ where: { id: userId, empresa_id: empresaId } });
     if (aprovador) {
       // Enviar email
       this.cotacaoEmailService
@@ -633,6 +630,7 @@ export class CotacaoService {
   async aprovarLote(
     cotacaoIds: string[],
     userId: string,
+    empresaId: string,
     justificativa?: string,
   ): Promise<{
     total: number;
@@ -651,7 +649,7 @@ export class CotacaoService {
 
     for (const cotacaoId of cotacaoIds) {
       try {
-        await this.aprovar(cotacaoId, userId, justificativa);
+        await this.aprovar(cotacaoId, userId, empresaId, justificativa);
         resultado.sucessos++;
         resultado.cotacoesProcessadas.push(cotacaoId);
       } catch (error) {
@@ -673,6 +671,7 @@ export class CotacaoService {
   async reprovarLote(
     cotacaoIds: string[],
     userId: string,
+    empresaId: string,
     justificativa: string,
   ): Promise<{
     total: number;
@@ -699,7 +698,7 @@ export class CotacaoService {
 
     for (const cotacaoId of cotacaoIds) {
       try {
-        await this.reprovar(cotacaoId, userId, justificativa);
+        await this.reprovar(cotacaoId, userId, empresaId, justificativa);
         resultado.sucessos++;
         resultado.cotacoesProcessadas.push(cotacaoId);
       } catch (error) {
@@ -721,11 +720,13 @@ export class CotacaoService {
   async alterarStatus(
     id: string,
     novoStatus: StatusCotacao,
-    observacao?: string,
-    userId?: string,
+    observacao: string | undefined,
+    userId: string,
+    empresaId: string,
   ): Promise<CotacaoResponseDto> {
+    
     const cotacao = await this.cotacaoRepository.findOne({
-      where: { id },
+      where: { id, empresaId },
     });
 
     if (!cotacao) {
@@ -773,11 +774,11 @@ export class CotacaoService {
       `[AUDIT] COTACAO UPDATE_STATUS - ID: ${id}, User: ${userId}, ${statusAnterior} → ${novoStatus}`,
     );
 
-    return this.buscarPorId(id, userId);
+    return this.buscarPorId(id, userId, empresaId);
   }
 
-  async gerarPDF(id: string, userId: string): Promise<Buffer> {
-    const cotacao = await this.buscarPorId(id, userId);
+  async gerarPDF(id: string, userId: string, empresaId: string): Promise<Buffer> {
+    const cotacao = await this.buscarPorId(id, userId, empresaId);
 
     // Log simples de auditoria
     console.log(
@@ -799,8 +800,13 @@ export class CotacaoService {
     return Buffer.from(dados, 'utf-8');
   }
 
-  async enviarEmail(id: string, enviarEmailDto: EnviarEmailDto, userId: string): Promise<void> {
-    const cotacao = await this.buscarPorId(id, userId);
+  async enviarEmail(
+    id: string,
+    enviarEmailDto: EnviarEmailDto,
+    userId: string,
+    empresaId: string,
+  ): Promise<void> {
+    const cotacao = await this.buscarPorId(id, userId, empresaId);
 
     // Log simples em vez de envio real
     console.log(
@@ -809,7 +815,7 @@ export class CotacaoService {
 
     // Atualizar status se ainda for rascunho
     if (cotacao.status === StatusCotacao.RASCUNHO) {
-      await this.alterarStatus(id, StatusCotacao.ENVIADA, 'Enviada por email', userId);
+      await this.alterarStatus(id, StatusCotacao.ENVIADA, 'Enviada por email', userId, empresaId);
     }
 
     // Log simples de auditoria
@@ -818,8 +824,12 @@ export class CotacaoService {
     );
   }
 
-  async obterHistorico(id: string, userId: string) {
-    // Implementação básica sem módulo de auditoria
+  async obterHistorico(id: string, userId: string, empresaId: string) {
+    const cotacao = await this.cotacaoRepository.findOne({ where: { id, empresaId } });
+    if (!cotacao) {
+      throw new HttpException('Cotação não encontrada', HttpStatus.NOT_FOUND);
+    }
+
     return {
       message: 'Histórico não disponível - módulo de auditoria não configurado',
       cotacaoId: id,
@@ -829,14 +839,15 @@ export class CotacaoService {
   }
 
   // Métodos auxiliares privados
-  private createQueryBuilder(): SelectQueryBuilder<Cotacao> {
+  private createQueryBuilder(empresaId: string): SelectQueryBuilder<Cotacao> {
     return this.cotacaoRepository
       .createQueryBuilder('cotacao')
       .leftJoinAndSelect('cotacao.fornecedor', 'fornecedor')
       .leftJoinAndSelect('cotacao.responsavel', 'responsavel')
       .leftJoinAndSelect('cotacao.aprovador', 'aprovador')
       .leftJoinAndSelect('cotacao.itens', 'itens')
-      .where('cotacao.deletadoEm IS NULL');
+      .where('cotacao.deletadoEm IS NULL')
+      .andWhere('cotacao.empresaId = :empresaId', { empresaId });
   }
 
   private applyFilters(
@@ -884,13 +895,13 @@ export class CotacaoService {
     // Busca global
     if (query.busca) {
       queryBuilder.andWhere(
-        '(cotacao.numero ILIKE :busca OR cotacao.titulo ILIKE :busca OR cliente.nome ILIKE :busca)',
+        '(cotacao.numero ILIKE :busca OR cotacao.titulo ILIKE :busca OR fornecedor.nome ILIKE :busca)',
         { busca: `%${query.busca}%` },
       );
     }
   }
 
-  private async gerarNumeroCotacao(): Promise<string> {
+  private async gerarNumeroCotacao(empresaId: string): Promise<string> {
     const ano = new Date().getFullYear();
     const prefixo = `COT${ano}`;
 
@@ -929,7 +940,7 @@ export class CotacaoService {
 
   private buildItemCotacaoEntity(
     item: CriarItemCotacaoDto,
-    context: { cotacaoId: string; userId: string; ordem: number },
+    context: { cotacaoId: string; userId: string; empresaId: string; ordem: number },
   ): ItemCotacao {
     const quantidade = Number(item.quantidade) || 0;
     const valorUnitario = Number(item.valorUnitario) || 0;
@@ -973,6 +984,7 @@ export class CotacaoService {
     entity.desconto = descontoPercentual;
     entity.aliquotaImposto = aliquotaImposto;
     entity.cotacaoId = context.cotacaoId;
+    entity.empresaId = context.empresaId;
     entity.ordem = context.ordem;
     entity.valorDesconto = valorDesconto;
     entity.valorImposto = valorImposto;
@@ -1026,12 +1038,13 @@ export class CotacaoService {
     return transicoes[statusAtual]?.includes(novoStatus) || false;
   }
 
-  private async getStatusStatistics(userId: string) {
+  private async getStatusStatistics(empresaId: string) {
     const result = await this.cotacaoRepository
       .createQueryBuilder('cotacao')
       .select('cotacao.status', 'status')
       .addSelect('COUNT(*)', 'quantidade')
       .where('cotacao.deletadoEm IS NULL')
+      .andWhere('cotacao.empresaId = :empresaId', { empresaId })
       .groupBy('cotacao.status')
       .getRawMany();
 
@@ -1041,12 +1054,13 @@ export class CotacaoService {
     }));
   }
 
-  private async getPriorityStatistics(userId: string) {
+  private async getPriorityStatistics(empresaId: string) {
     const result = await this.cotacaoRepository
       .createQueryBuilder('cotacao')
       .select('cotacao.prioridade', 'prioridade')
       .addSelect('COUNT(*)', 'quantidade')
       .where('cotacao.deletadoEm IS NULL')
+      .andWhere('cotacao.empresaId = :empresaId', { empresaId })
       .groupBy('cotacao.prioridade')
       .getRawMany();
 
@@ -1075,27 +1089,27 @@ export class CotacaoService {
       fornecedorId: cotacao.fornecedorId,
       fornecedor: cotacao.fornecedor
         ? {
-          id: cotacao.fornecedor.id,
-          nome: cotacao.fornecedor.nome,
-          email: cotacao.fornecedor.email,
-          telefone: cotacao.fornecedor.telefone,
-        }
+            id: cotacao.fornecedor.id,
+            nome: cotacao.fornecedor.nome,
+            email: cotacao.fornecedor.email,
+            telefone: cotacao.fornecedor.telefone,
+          }
         : null,
       responsavelId: cotacao.responsavelId,
       responsavel: cotacao.responsavel
         ? {
-          id: cotacao.responsavel.id,
-          nome: cotacao.responsavel.nome,
-          email: cotacao.responsavel.email,
-        }
+            id: cotacao.responsavel.id,
+            nome: cotacao.responsavel.nome,
+            email: cotacao.responsavel.email,
+          }
         : null,
       aprovadorId: cotacao.aprovadorId,
       aprovador: cotacao.aprovador
         ? {
-          id: cotacao.aprovador.id,
-          nome: cotacao.aprovador.nome,
-          email: cotacao.aprovador.email,
-        }
+            id: cotacao.aprovador.id,
+            nome: cotacao.aprovador.nome,
+            email: cotacao.aprovador.email,
+          }
         : null,
       itens:
         cotacao.itens?.map((item) => ({
@@ -1131,16 +1145,16 @@ export class CotacaoService {
     };
   }
 
-  async obterEstatisticas(userId: string): Promise<any> {
-    const total = await this.cotacaoRepository.count();
+  async obterEstatisticas(userId: string, empresaId: string): Promise<any> {
+    const total = await this.cotacaoRepository.count({ where: { empresaId, deletadoEm: IsNull() } });
     const pendentes = await this.cotacaoRepository.count({
-      where: { status: StatusCotacao.RASCUNHO },
+      where: { empresaId, deletadoEm: IsNull(), status: StatusCotacao.RASCUNHO },
     });
     const aprovadas = await this.cotacaoRepository.count({
-      where: { status: StatusCotacao.APROVADA },
+      where: { empresaId, deletadoEm: IsNull(), status: StatusCotacao.APROVADA },
     });
     const rejeitadas = await this.cotacaoRepository.count({
-      where: { status: StatusCotacao.REJEITADA },
+      where: { empresaId, deletadoEm: IsNull(), status: StatusCotacao.REJEITADA },
     });
 
     return {
@@ -1151,11 +1165,11 @@ export class CotacaoService {
     };
   }
 
-  async obterDashboard(userId: string): Promise<any> {
-    const estatisticas = await this.obterEstatisticas(userId);
+  async obterDashboard(userId: string, empresaId: string): Promise<any> {
+    const estatisticas = await this.obterEstatisticas(userId, empresaId);
     return {
       ...estatisticas,
-      recentes: await this.listar({ page: 1, limit: 5 }, userId),
+      recentes: await this.listar({ page: 1, limit: 5 } as any, userId, empresaId),
     };
   }
 
@@ -1163,25 +1177,78 @@ export class CotacaoService {
     id: string,
     duplicarDto: DuplicarCotacaoDto,
     userId: string,
+    empresaId: string,
   ): Promise<CotacaoResponseDto> {
-    const cotacaoOriginal = await this.buscarPorId(id, userId);
+    const cotacaoOriginal = await this.cotacaoRepository.findOne({
+      where: { id, empresaId },
+      relations: ['itens'],
+    });
 
-    const novaCotacao = {
-      ...cotacaoOriginal,
-      numero: undefined, // Será gerado automaticamente
+    if (!cotacaoOriginal) {
+      throw new HttpException('Cotação não encontrada', HttpStatus.NOT_FOUND);
+    }
+
+    const numero = await this.gerarNumeroCotacao(empresaId);
+
+    const novaCotacao = this.cotacaoRepository.create({
+      numero,
+      empresaId,
+      titulo: cotacaoOriginal.titulo,
+      descricao: cotacaoOriginal.descricao,
       status: StatusCotacao.RASCUNHO,
-      dataEnvio: null,
-      dataAprovacao: null,
-      dataRejeicao: null,
-      dataConversao: null,
+      prioridade: cotacaoOriginal.prioridade,
+      fornecedorId: cotacaoOriginal.fornecedorId,
+      responsavelId: userId,
+      aprovadorId: cotacaoOriginal.aprovadorId,
+      prazoResposta: cotacaoOriginal.prazoResposta,
       observacoes: duplicarDto.observacoes || cotacaoOriginal.observacoes,
-    };
+      condicoesPagamento: cotacaoOriginal.condicoesPagamento,
+      prazoEntrega: cotacaoOriginal.prazoEntrega,
+      validadeOrcamento: cotacaoOriginal.validadeOrcamento,
+      origem: cotacaoOriginal.origem,
+      criadoPor: userId,
+      atualizadoPor: userId,
+    });
 
-    return this.criar(novaCotacao as any, userId);
+    const cotacaoSalva = await this.cotacaoRepository.save(novaCotacao);
+
+    if (cotacaoOriginal.itens?.length) {
+      const itensDuplicados = cotacaoOriginal.itens.map((item, index) => {
+        const novoItem = new ItemCotacao();
+        novoItem.empresaId = empresaId;
+        novoItem.cotacaoId = cotacaoSalva.id;
+        novoItem.ordem = index + 1;
+        novoItem.descricao = item.descricao;
+        novoItem.unidade = item.unidade;
+        novoItem.observacoes = item.observacoes;
+        novoItem.codigo = item.codigo;
+        novoItem.categoria = item.categoria;
+        novoItem.prazoEntregaDias = item.prazoEntregaDias;
+        novoItem.especificacoes = item.especificacoes;
+        novoItem.quantidade = item.quantidade;
+        novoItem.valorUnitario = item.valorUnitario;
+        novoItem.desconto = item.desconto;
+        novoItem.aliquotaImposto = item.aliquotaImposto;
+        novoItem.criadoPor = userId;
+        novoItem.atualizadoPor = userId;
+        novoItem.atualizarValores();
+        return novoItem;
+      });
+
+      await this.itemCotacaoRepository.save(itensDuplicados);
+      await this.calcularValorTotal(cotacaoSalva.id);
+    }
+
+    return this.buscarPorId(cotacaoSalva.id, userId, empresaId);
   }
 
-  async converterEmPedido(id: string, observacoes: string, userId: string): Promise<any> {
-    const cotacao = await this.cotacaoRepository.findOne({ where: { id } });
+  async converterEmPedido(
+    id: string,
+    observacoes: string,
+    userId: string,
+    empresaId: string,
+  ): Promise<any> {
+    const cotacao = await this.cotacaoRepository.findOne({ where: { id, empresaId } });
     if (!cotacao) {
       throw new HttpException('Cotação não encontrada', HttpStatus.NOT_FOUND);
     }
@@ -1211,20 +1278,28 @@ export class CotacaoService {
   async exportar(
     formato: string,
     filtros: any,
-    userId?: string,
+    userId: string,
+    empresaId: string,
   ): Promise<{ buffer: Buffer; filename: string; mimeType: string }> {
-    const cotacoes = await this.cotacaoRepository.find();
 
-    if (formato === 'PDF') {
-      // Implementar exportação PDF
+    const cotacoes = await this.cotacaoRepository.find({
+      where: { empresaId, deletadoEm: IsNull() },
+      order: { dataCriacao: 'DESC' },
+      take: 5000,
+    });
+
+    const normalized = (formato || '').toString().toUpperCase();
+
+    if (normalized === 'PDF') {
       const pdfContent = JSON.stringify(cotacoes);
       return {
         buffer: Buffer.from(pdfContent),
         filename: `cotacoes_${Date.now()}.pdf`,
         mimeType: 'application/pdf',
       };
-    } else if (formato === 'EXCEL') {
-      // Implementar exportação Excel
+    }
+
+    if (normalized === 'EXCEL' || normalized === 'XLSX') {
       const excelContent = JSON.stringify(cotacoes);
       return {
         buffer: Buffer.from(excelContent),
@@ -1233,10 +1308,25 @@ export class CotacaoService {
       };
     }
 
+    if (normalized === 'CSV' || normalized === '') {
+      const header = 'id,numero,titulo,status,valorTotal\n';
+      const rows = cotacoes
+        .map((c) =>
+          [c.id, c.numero, (c.titulo || '').replace(/\"/g, '""'), c.status, c.valorTotal ?? '']
+            .map((v) => `"${String(v ?? '')}"`)
+            .join(','),
+        )
+        .join('\n');
+      return {
+        buffer: Buffer.from(header + rows, 'utf-8'),
+        filename: `cotacoes_${Date.now()}.csv`,
+        mimeType: 'text/csv; charset=utf-8',
+      };
+    }
     throw new HttpException('Formato não suportado', HttpStatus.BAD_REQUEST);
   }
 
-  async importar(dados: any, validarApenas: boolean, userId: string): Promise<any> {
+  async importar(dados: any, validarApenas: boolean, userId: string, empresaId: string): Promise<any> {
     // Implementar lógica de importação
     return {
       sucesso: 0,
@@ -1245,17 +1335,26 @@ export class CotacaoService {
     };
   }
 
-  async listarAnexos(id: string, userId: string): Promise<any[]> {
+  async listarAnexos(id: string, userId: string, empresaId: string): Promise<any[]> {
+    const cotacao = await this.cotacaoRepository.findOne({ where: { id, empresaId } });
+    if (!cotacao) {
+      throw new HttpException('Cotação não encontrada', HttpStatus.NOT_FOUND);
+    }
     const anexos = await this.anexoCotacaoRepository.find({
-      where: { cotacaoId: id },
+      where: { cotacaoId: id, empresaId },
     });
 
     return anexos;
   }
 
-  async adicionarAnexo(id: string, body: any, userId: string): Promise<any> {
+  async adicionarAnexo(id: string, body: any, userId: string, empresaId: string): Promise<any> {
+    const cotacao = await this.cotacaoRepository.findOne({ where: { id, empresaId } });
+    if (!cotacao) {
+      throw new HttpException('Cotação não encontrada', HttpStatus.NOT_FOUND);
+    }
     const anexo = this.anexoCotacaoRepository.create({
       cotacaoId: id,
+      empresaId,
       nome: body.nome,
       tipo: body.tipo,
       url: body.url,
@@ -1266,32 +1365,23 @@ export class CotacaoService {
     return this.anexoCotacaoRepository.save(anexo);
   }
 
-  async removerAnexo(id: string, anexoId: string, userId: string): Promise<void> {
+  async removerAnexo(id: string, anexoId: string, userId: string, empresaId: string): Promise<void> {
+    const cotacao = await this.cotacaoRepository.findOne({ where: { id, empresaId } });
+    if (!cotacao) {
+      throw new HttpException('Cotação não encontrada', HttpStatus.NOT_FOUND);
+    }
     await this.anexoCotacaoRepository.delete({
       id: anexoId,
       cotacaoId: id,
+      empresaId,
     });
   }
 
-  async buscarProximoNumero(userId: string): Promise<string> {
-    const ultimaCotacao = await this.cotacaoRepository
-      .createQueryBuilder('cotacao')
-      .where('cotacao.criadoPor = :userId', { userId })
-      .orderBy('cotacao.numero', 'DESC')
-      .getOne();
-
-    if (!ultimaCotacao || !ultimaCotacao.numero) {
-      return '001';
-    }
-
-    // Extrair número e incrementar
-    const ultimoNumero = parseInt(ultimaCotacao.numero) || 0;
-    const proximoNumero = ultimoNumero + 1;
-
-    return proximoNumero.toString().padStart(3, '0');
+  async buscarProximoNumero(userId: string, empresaId: string): Promise<string> {
+    return this.gerarNumeroCotacao(empresaId);
   }
 
-  async buscarTemplates(userId: string): Promise<any[]> {
+  async buscarTemplates(userId: string, empresaId: string): Promise<any[]> {
     // Por enquanto retorna templates padrão
     // Futuramente pode ser uma tabela separada
     return [
@@ -1321,6 +1411,7 @@ export class CotacaoService {
   async salvarTemplate(
     dados: { nome: string; descricao?: string; dados: any },
     userId: string,
+    empresaId: string,
   ): Promise<any> {
     // Por enquanto retorna sucesso
     // Futuramente implementar tabela de templates
@@ -1334,3 +1425,5 @@ export class CotacaoService {
     };
   }
 }
+
+

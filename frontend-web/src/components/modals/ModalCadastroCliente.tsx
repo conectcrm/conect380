@@ -161,6 +161,25 @@ interface ModalCadastroClienteProps {
   isLoading?: boolean;
 }
 
+interface ClienteFormData {
+  nome: string;
+  email: string;
+  telefone: string;
+  tipo: 'pessoa_fisica' | 'pessoa_juridica';
+  cpf?: string;
+  cnpj?: string;
+  status: 'cliente' | 'lead' | 'prospect' | 'inativo';
+  cep: string;
+  logradouro: string;
+  numero: string;
+  complemento?: string;
+  bairro: string;
+  cidade: string;
+  estado: string;
+  tags: string[];
+  observacoes?: string;
+}
+
 const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
   isOpen,
   onClose,

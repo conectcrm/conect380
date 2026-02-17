@@ -33,10 +33,6 @@ export class BuscaGlobalRequestDto {
   @IsEnum(TipoRecursoBusca, { each: true })
   tipos?: TipoRecursoBusca[];
 
-  @IsString()
-  @IsNotEmpty()
-  empresaId: string;
-
   @IsOptional()
   @IsNumber()
   @Min(1)

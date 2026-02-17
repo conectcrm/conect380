@@ -1,17 +1,7 @@
-/**
- * 📁 Upload Service - Sistema de Upload de Arquivos
- *
- * Funcionalidades:
- * - Upload de avatar de usuários
- * - Upload de anexos de clientes
- * - Upload de documentos do sistema
- * - Validação de tipos e tamanhos
- * - Preview de imagens
- * - Progress tracking
- */
+﻿import { api } from './api';
 
 export interface UploadOptions {
-  maxSize?: number; // em MB
+  maxSize?: number;
   allowedTypes?: string[];
   category: 'avatar' | 'client-attachment' | 'document' | 'system';
 }
@@ -21,6 +11,10 @@ export interface UploadProgress {
   progress: number;
   status: 'uploading' | 'success' | 'error';
   error?: string;
+}
+
+export interface UploadContext {
+  clienteId?: string;
 }
 
 export interface UploadResult {
@@ -35,11 +29,9 @@ export interface UploadResult {
 }
 
 class UploadService {
-  private readonly BASE_URL = '/api/upload';
-  private readonly MAX_FILE_SIZE = 10; // MB padrão
+  private readonly MAX_FILE_SIZE = 10;
 
-  // Configurações por categoria
-  private getConfig(category: string): UploadOptions {
+  getConfig(category: string): UploadOptions {
     const configs: Record<string, UploadOptions> = {
       avatar: {
         maxSize: 2,
@@ -84,23 +76,20 @@ class UploadService {
     return configs[category] || configs.system;
   }
 
-  // Validar arquivo antes do upload
   validateFile(file: File, options: UploadOptions): { valid: boolean; error?: string } {
-    // Validar tamanho
     const maxSizeBytes = (options.maxSize || this.MAX_FILE_SIZE) * 1024 * 1024;
     if (file.size > maxSizeBytes) {
       return {
         valid: false,
-        error: `Arquivo muito grande. Máximo permitido: ${options.maxSize || this.MAX_FILE_SIZE}MB`,
+        error: `Arquivo muito grande. Maximo permitido: ${options.maxSize || this.MAX_FILE_SIZE}MB`,
       };
     }
 
-    // Validar tipo
     if (options.allowedTypes && !options.allowedTypes.includes('*')) {
       if (!options.allowedTypes.includes(file.type)) {
         return {
           valid: false,
-          error: 'Tipo de arquivo não permitido',
+          error: 'Tipo de arquivo nao permitido',
         };
       }
     }
@@ -108,26 +97,164 @@ class UploadService {
     return { valid: true };
   }
 
-  // Upload único com progress
   async uploadFile(
     file: File,
     category: string,
     onProgress?: (progress: UploadProgress) => void,
+    context?: UploadContext,
   ): Promise<UploadResult> {
     const config = this.getConfig(category);
-
-    // Validar arquivo
     const validation = this.validateFile(file, config);
+
     if (!validation.valid) {
       throw new Error(validation.error);
     }
 
-    // Preparar FormData
+    if (category === 'avatar') {
+      return this.uploadClienteAvatar(file, onProgress, context);
+    }
+
+    if (category === 'client-attachment') {
+      return this.uploadClienteAnexo(file, onProgress, context);
+    }
+
+    return this.simularUpload(file, category, onProgress);
+  }
+
+  async uploadMultiple(
+    files: File[],
+    category: string,
+    onProgress?: (fileName: string, progress: UploadProgress) => void,
+    context?: UploadContext,
+  ): Promise<UploadResult[]> {
+    const promises = files.map((file) =>
+      this.uploadFile(
+        file,
+        category,
+        (progressData) => onProgress?.(file.name, progressData),
+        context,
+      ),
+    );
+
+    return Promise.all(promises);
+  }
+
+  private async uploadClienteAvatar(
+    file: File,
+    onProgress?: (progress: UploadProgress) => void,
+    context?: UploadContext,
+  ): Promise<UploadResult> {
+    if (!context?.clienteId) {
+      throw new Error('Cliente nao informado para upload de avatar.');
+    }
+
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    const response = await api.post(`/clientes/${context.clienteId}/avatar`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: (event) => {
+        const total = event.total || file.size;
+        const progress = Math.min(100, Math.round((event.loaded / total) * 100));
+
+        onProgress?.({
+          fileName: file.name,
+          progress,
+          status: 'uploading',
+        });
+      },
+    });
+
+    const payload = response.data?.data || response.data || {};
+    const avatarUrl = payload.avatar_url || payload.avatarUrl || payload.avatar;
+
+    if (!avatarUrl) {
+      throw new Error('Resposta invalida ao atualizar avatar do cliente.');
+    }
+
+    const result: UploadResult = {
+      id: payload.id || context.clienteId,
+      fileName: file.name,
+      originalName: file.name,
+      size: file.size,
+      type: file.type,
+      url: this.resolveUploadUrl(avatarUrl),
+      category: 'avatar',
+      uploadedAt: new Date(),
+    };
+
+    this.saveUploadResult(result);
+    onProgress?.({
+      fileName: file.name,
+      progress: 100,
+      status: 'success',
+    });
+
+    return result;
+  }
+
+  private async uploadClienteAnexo(
+    file: File,
+    onProgress?: (progress: UploadProgress) => void,
+    context?: UploadContext,
+  ): Promise<UploadResult> {
+    if (!context?.clienteId) {
+      throw new Error('Cliente nao informado para upload de anexo.');
+    }
+
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('category', category);
 
-    // Simular upload para desenvolvimento (pode ser substituído por API real)
+    const response = await api.post(`/clientes/${context.clienteId}/anexos`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: (event) => {
+        const total = event.total || file.size;
+        const progress = Math.min(100, Math.round((event.loaded / total) * 100));
+
+        onProgress?.({
+          fileName: file.name,
+          progress,
+          status: 'uploading',
+        });
+      },
+    });
+
+    const payload = response.data?.data || response.data || {};
+
+    if (!payload.url) {
+      throw new Error('Resposta invalida ao adicionar anexo do cliente.');
+    }
+
+    const result: UploadResult = {
+      id: payload.id || `anexo_${Date.now()}`,
+      fileName: payload.nome || file.name,
+      originalName: payload.nome || file.name,
+      size: Number(payload.tamanho || file.size),
+      type: payload.tipo || file.type,
+      url: this.resolveUploadUrl(payload.url),
+      category: 'client-attachment',
+      uploadedAt: payload.created_at ? new Date(payload.created_at) : new Date(),
+    };
+
+    this.saveUploadResult(result);
+    onProgress?.({
+      fileName: file.name,
+      progress: 100,
+      status: 'success',
+    });
+
+    return result;
+  }
+
+  private simularUpload(
+    file: File,
+    category: string,
+    onProgress?: (progress: UploadProgress) => void,
+  ): Promise<UploadResult> {
     return new Promise((resolve, reject) => {
       let progress = 0;
       const fileName = file.name;
@@ -145,19 +272,17 @@ class UploadService {
         if (progress >= 100) {
           clearInterval(interval);
 
-          // Simular resultado do upload
           const result: UploadResult = {
             id: `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             fileName: `${category}_${Date.now()}_${file.name}`,
             originalName: file.name,
             size: file.size,
             type: file.type,
-            url: URL.createObjectURL(file), // Em produção seria a URL do servidor
+            url: URL.createObjectURL(file),
             category,
             uploadedAt: new Date(),
           };
 
-          // Salvar no localStorage para persistência
           this.saveUploadResult(result);
 
           onProgress?.({
@@ -166,11 +291,10 @@ class UploadService {
             status: 'success',
           });
 
-          setTimeout(() => resolve(result), 500);
+          setTimeout(() => resolve(result), 300);
         }
       }, 200);
 
-      // Simular possível erro (5% de chance)
       if (Math.random() < 0.05) {
         setTimeout(() => {
           clearInterval(interval);
@@ -186,22 +310,20 @@ class UploadService {
     });
   }
 
-  // Upload múltiplo
-  async uploadMultiple(
-    files: File[],
-    category: string,
-    onProgress?: (fileName: string, progress: UploadProgress) => void,
-  ): Promise<UploadResult[]> {
-    const promises = files.map((file) =>
-      this.uploadFile(file, category, (progress) => onProgress?.(file.name, progress)),
-    );
+  private resolveUploadUrl(url: string): string {
+    if (!url) {
+      return '';
+    }
 
-    return Promise.all(promises);
+    if (/^https?:\/\//i.test(url)) {
+      return url;
+    }
+
+    return url.startsWith('/') ? url : `/${url}`;
   }
 
-  // Salvar resultado no localStorage
   private saveUploadResult(result: UploadResult): void {
-    const key = `conectcrm_uploads`;
+    const key = 'conectcrm_uploads';
     const stored = localStorage.getItem(key);
     const uploads: UploadResult[] = stored ? JSON.parse(stored) : [];
 
@@ -209,9 +331,8 @@ class UploadService {
     localStorage.setItem(key, JSON.stringify(uploads));
   }
 
-  // Listar arquivos por categoria
   getUploads(category?: string): UploadResult[] {
-    const key = `conectcrm_uploads`;
+    const key = 'conectcrm_uploads';
     const stored = localStorage.getItem(key);
     const uploads: UploadResult[] = stored ? JSON.parse(stored) : [];
 
@@ -222,9 +343,8 @@ class UploadService {
     return uploads;
   }
 
-  // Deletar arquivo
   async deleteFile(uploadId: string): Promise<boolean> {
-    const key = `conectcrm_uploads`;
+    const key = 'conectcrm_uploads';
     const stored = localStorage.getItem(key);
     const uploads: UploadResult[] = stored ? JSON.parse(stored) : [];
 
@@ -234,15 +354,14 @@ class UploadService {
     return true;
   }
 
-  // Gerar URL de preview para imagens
   generatePreviewUrl(file: File): string {
     if (file.type.startsWith('image/')) {
       return URL.createObjectURL(file);
     }
+
     return '';
   }
 
-  // Obter ícone por tipo de arquivo
   getFileIcon(type: string): string {
     const iconMap: Record<string, string> = {
       'image/': '🖼️',
@@ -265,7 +384,6 @@ class UploadService {
     return '📎';
   }
 
-  // Formatar tamanho do arquivo
   formatFileSize(bytes: number): string {
     if (bytes === 0) return '0 Bytes';
 

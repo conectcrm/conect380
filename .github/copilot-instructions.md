@@ -2406,7 +2406,7 @@ REACT_APP_WS_URL=ws://localhost:3001
 ### ❌ NUNCA Faça Isso:
 ```typescript
 // 🚫 ERRADO - credenciais hardcoded
-const apiKey = 'sk-1234567890abcdef';
+const apiKey = '<OPENAI_API_KEY>';
 const password = 'minhasenha123';
 const jwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
 ```
