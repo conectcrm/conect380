@@ -238,6 +238,7 @@ switch ($decision) {
 $decisionReasonLines = @($decisionReasons | ForEach-Object { "- Motivo: $_" }) -join "`n"
 $nextActionLines = @($nextActions | ForEach-Object { "- $_" }) -join "`n"
 $followupCommand = ".\scripts\prepare-mvp-pilot-outreach-followup.ps1 -RunDir `"$resolvedRunDir`""
+$importCommand = ".\scripts\import-mvp-pilot-outreach-updates.ps1 -RunDir `"$resolvedRunDir`" -UpdatesCsvPath `"<arquivo-atualizacoes.csv>`" -DryRun"
 $closureCommand = ".\scripts\close-mvp-pilot-wave.ps1 -RunDir `"$resolvedRunDir`" -MinAcceptedClients $MinAcceptedClients"
 
 $report = @"
@@ -273,6 +274,7 @@ $nextActionLines
 
 ## Comandos de apoio
 - Follow-up comercial: $followupCommand
+- Importar atualizacoes em lote: $importCommand
 - Recalcular fechamento: $closureCommand
 "@
 

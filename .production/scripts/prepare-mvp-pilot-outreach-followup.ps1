@@ -271,7 +271,7 @@ $($statusLines -join "`n")
 ## Ordem de execucao sugerida
 1. Tratar itens CRITICA primeiro (prazo vencido, sem resposta ou bloqueio).
 2. Tratar itens ALTA no mesmo turno comercial.
-3. Atualizar status apos cada retorno com `update-mvp-pilot-outreach-status.ps1`.
+3. Atualizar status em lote via `import-mvp-pilot-outreach-updates.ps1` (ou usar update unitario).
 4. Reexecutar fechamento com `close-mvp-pilot-wave.ps1` ao fim da rodada.
 "@
 
