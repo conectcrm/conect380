@@ -1,4 +1,4 @@
-name: CI - Testes e Build
+﻿name: CI - Testes e Build
 
 on:
   push:
@@ -40,37 +40,37 @@ jobs:
           - 6379:6379
     
     steps:
-      - name: 📥 Checkout código
+      - name: ðŸ“¥ Checkout cÃ³digo
         uses: actions/checkout@v4
       
-      - name: 🔧 Setup Node.js
+      - name: ðŸ”§ Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
       
-      - name: 📦 Instalar dependências
+      - name: ðŸ“¦ Instalar dependÃªncias
         working-directory: backend
         run: npm ci
       
-      - name: 🔍 Verificar vulnerabilidades
+      - name: ðŸ” Verificar vulnerabilidades
         working-directory: backend
         run: npm audit --audit-level=high
         continue-on-error: true
       
-      - name: 🎨 Linting (ESLint)
+      - name: ðŸŽ¨ Linting (ESLint)
         working-directory: backend
         run: npm run lint
         continue-on-error: true
       
-      - name: 🏗️ Build TypeScript
+      - name: ðŸ—ï¸ Build TypeScript
         working-directory: backend
         run: npm run build
         env:
           NODE_ENV: test
       
-      - name: 🧪 Rodar testes unitários
+      - name: ðŸ§ª Rodar testes unitÃ¡rios
         working-directory: backend
         run: npm test -- --coverage
         env:
@@ -84,7 +84,7 @@ jobs:
           REDIS_PORT: 6379
           JWT_SECRET: test-secret-key-for-ci
       
-      - name: 📊 Upload coverage para Codecov
+      - name: ðŸ“Š Upload coverage para Codecov
         uses: codecov/codecov-action@v3
         with:
           files: backend/coverage/lcov.info
@@ -100,50 +100,50 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: 📥 Checkout código
+      - name: ðŸ“¥ Checkout cÃ³digo
         uses: actions/checkout@v4
       
-      - name: 🔧 Setup Node.js
+      - name: ðŸ”§ Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: frontend-web/package-lock.json
       
-      - name: 📦 Instalar dependências
+      - name: ðŸ“¦ Instalar dependÃªncias
         working-directory: frontend-web
         run: npm ci
       
-      - name: 🔍 Verificar vulnerabilidades
+      - name: ðŸ” Verificar vulnerabilidades
         working-directory: frontend-web
         run: npm audit --audit-level=high
         continue-on-error: true
       
-      - name: 🎨 Linting (ESLint)
+      - name: ðŸŽ¨ Linting (ESLint)
         working-directory: frontend-web
         run: npm run lint
         continue-on-error: true
       
-      - name: 🏗️ Build React
+      - name: ðŸ—ï¸ Build React
         working-directory: frontend-web
         run: npm run build
         env:
           CI: true
           REACT_APP_API_URL: http://localhost:3001
       
-      - name: 🧪 Rodar testes
+      - name: ðŸ§ª Rodar testes
         working-directory: frontend-web
         run: npm test -- --coverage --watchAll=false
         env:
           CI: true
       
-      - name: 🎨 Validar tema Crevasse
+      - name: ðŸŽ¨ Validar tema Crevasse
         working-directory: frontend-web
         run: npm test -- theme-validation.test.ts --watchAll=false
         env:
           CI: true
       
-      - name: 📊 Upload coverage para Codecov
+      - name: ðŸ“Š Upload coverage para Codecov
         uses: codecov/codecov-action@v3
         with:
           files: frontend-web/coverage/lcov.info
@@ -151,8 +151,8 @@ jobs:
           name: frontend-coverage
         continue-on-error: true
       
-      - name: 📦 Upload build artifact
-        uses: actions/upload-artifact@v3
+      - name: ðŸ“¦ Upload build artifact
+        uses: actions/upload-artifact@v4
         with:
           name: frontend-build
           path: frontend-web/build
@@ -162,7 +162,7 @@ jobs:
   # Job 3: Security Scan (CodeQL)
   # ==============================================================================
   security:
-    name: Análise de Segurança
+    name: AnÃ¡lise de SeguranÃ§a
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -170,47 +170,48 @@ jobs:
       security-events: write
     
     steps:
-      - name: 📥 Checkout código
+      - name: ðŸ“¥ Checkout cÃ³digo
         uses: actions/checkout@v4
       
-      - name: 🔒 Inicializar CodeQL
+      - name: ðŸ”’ Inicializar CodeQL
         uses: github/codeql-action/init@v2
         with:
           languages: javascript, typescript
       
-      - name: 🔍 Executar análise CodeQL
+      - name: ðŸ” Executar anÃ¡lise CodeQL
         uses: github/codeql-action/analyze@v2
 
   # ==============================================================================
-  # Job 4: Verificação de Arquivos Temporários
+  # Job 4: VerificaÃ§Ã£o de Arquivos TemporÃ¡rios
   # ==============================================================================
   check-temp-files:
-    name: Verificar Arquivos Temporários
+    name: Verificar Arquivos Temporarios
     runs-on: ubuntu-latest
-    
+
     steps:
-      - name: 📥 Checkout código
+      - name: Checkout codigo
         uses: actions/checkout@v4
-      
-      - name: 🔍 Verificar arquivos temporários
+        with:
+          fetch-depth: 2
+
+      - name: Verificar arquivos temporarios
         run: |
-          echo "🔍 Verificando arquivos temporários..."
-          TEMP_FILES=$(find . -type f \
-            -name "test-*" -o \
-            -name "debug-*" -o \
-            -name "temp-*" -o \
-            -name "exemplo-*" -o \
-            -name "CORRECAO_*" -o \
-            -name "DEBUG_*" | \
-            grep -v node_modules | \
-            grep -v .git || true)
-          
+          echo "Verificando arquivos temporarios alterados no commit..."
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR HEAD^ HEAD || true)
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "Nenhum arquivo alterado detectado no commit atual."
+            exit 0
+          fi
+
+          TEMP_FILES=$(echo "$CHANGED_FILES" | grep -E '(^|/)(test-|debug-|temp-|exemplo-|CORRECAO_|DEBUG_)' || true)
+
           if [ -n "$TEMP_FILES" ]; then
-            echo "❌ Arquivos temporários encontrados:"
+            echo "Arquivos temporarios encontrados:"
             echo "$TEMP_FILES"
             exit 1
           else
-            echo "✅ Nenhum arquivo temporário encontrado!"
+            echo "Nenhum arquivo temporario encontrado."
           fi
 
   # ==============================================================================
@@ -223,7 +224,7 @@ jobs:
     if: always()
     
     steps:
-      - name: 📊 Verificar status dos jobs
+      - name: ðŸ“Š Verificar status dos jobs
         run: |
           echo "Backend: ${{ needs.backend.result }}"
           echo "Frontend: ${{ needs.frontend.result }}"
@@ -234,8 +235,10 @@ jobs:
              [ "${{ needs.frontend.result }}" != "success" ] || \
              [ "${{ needs.security.result }}" != "success" ] || \
              [ "${{ needs.check-temp-files.result }}" != "success" ]; then
-            echo "❌ CI falhou em um ou mais jobs"
+            echo "âŒ CI falhou em um ou mais jobs"
             exit 1
           else
-            echo "✅ Todos os jobs passaram com sucesso!"
+            echo "âœ… Todos os jobs passaram com sucesso!"
           fi
+
+
