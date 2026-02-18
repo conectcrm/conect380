@@ -199,6 +199,14 @@ Atualizar status de convite no outreach (por `empresa_id` ou `cliente`):
   -Observacao "convite confirmado pelo comercial"
 ```
 
+Importar atualizacoes de convite em lote (CSV com `empresa_id` ou `cliente` + `status_convite`):
+```powershell
+.\scripts\import-mvp-pilot-outreach-updates.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -UpdatesCsvPath ".production\pilot-runs\<sessao>\outreach-followup-<timestamp>.csv" `
+  -DryRun
+```
+
 Fechamento da wave (consolidacao comercial + tecnica e decisao final):
 ```powershell
 .\scripts\close-mvp-pilot-wave.ps1 `
