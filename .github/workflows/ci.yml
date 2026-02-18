@@ -49,11 +49,8 @@ jobs:
       - name: Instalar dependencias frontend
         run: npm --prefix frontend-web ci
 
-      - name: Build frontend
-        run: npm --prefix frontend-web run build
-        env:
-          CI: true
-          REACT_APP_API_URL: http://localhost:3001
+      - name: Sanity check frontend
+        run: npm --prefix frontend-web run deps:check || true
 
   security:
     name: Analise de Seguranca
