@@ -237,6 +237,8 @@ switch ($decision) {
 
 $decisionReasonLines = @($decisionReasons | ForEach-Object { "- Motivo: $_" }) -join "`n"
 $nextActionLines = @($nextActions | ForEach-Object { "- $_" }) -join "`n"
+$followupCommand = ".\scripts\prepare-mvp-pilot-outreach-followup.ps1 -RunDir `"$resolvedRunDir`""
+$closureCommand = ".\scripts\close-mvp-pilot-wave.ps1 -RunDir `"$resolvedRunDir`" -MinAcceptedClients $MinAcceptedClients"
 
 $report = @"
 # MVP Wave Closure
@@ -268,6 +270,10 @@ $decisionReasonLines
 
 ## Proximas acoes recomendadas
 $nextActionLines
+
+## Comandos de apoio
+- Follow-up comercial: $followupCommand
+- Recalcular fechamento: $closureCommand
 "@
 
 Set-Content -Path $OutputPath -Value $report -Encoding UTF8
