@@ -22,6 +22,6 @@ jobs:
       - name: Guardrails (docs scope)
         shell: pwsh
         run: |
-          ./scripts/ci/docs-scope-guardrails.ps1 \
-            -BaseSha '${{ github.event.pull_request.base.sha }}' \
-            -HeadSha '${{ github.sha }}'
+          ./scripts/ci/docs-scope-guardrails.ps1 `
+            -BaseSha '${{ github.event.pull_request.base.sha }}' `
+            -HeadSha '${{ github.event.pull_request.head.sha }}'

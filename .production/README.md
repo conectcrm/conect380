@@ -123,14 +123,76 @@ Registro rapido de evidencias do piloto:
   -Responsavel "time-oncall"
 ```
 
+Registro padronizado de cenarios funcionais (recomendado para cobertura):
+```powershell
+.\scripts\record-mvp-pilot-functional-result.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -Cliente "Codexa LTDA" `
+  -Cenario CriacaoLead `
+  -Resultado PASS `
+  -Evidencia "screenshot://piloto/codexa-lead.png" `
+  -Responsavel "time-oncall"
+```
+
+Gerar planilha funcional da janela (5 cenarios x cliente):
+```powershell
+.\scripts\prepare-mvp-pilot-functional-sheet.ps1 -RunDir ".production\pilot-runs\<sessao>" -Force
+```
+
+Importar resultados preenchidos da planilha:
+```powershell
+.\scripts\import-mvp-pilot-functional-sheet.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -SheetPath ".production\pilot-runs\<sessao>\functional-sheet.csv" `
+  -SkipIfAlreadyRecorded
+
+# Validacao final (falha se ainda existir linha pendente)
+.\scripts\import-mvp-pilot-functional-sheet.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -SheetPath ".production\pilot-runs\<sessao>\functional-sheet.csv" `
+  -SkipIfAlreadyRecorded `
+  -Strict
+```
+
 Ciclo tecnico automatizado do piloto (health + logs + smoke + evidencias):
 ```powershell
 .\scripts\run-mvp-pilot-cycle.ps1 -RunDir ".production\pilot-runs\<sessao>"
+```
+Se executar com `-SkipCoreSmoke` ou `-SkipUiSmoke`, rode um ciclo completo depois antes do readiness final.
+
+Execucao automatizada dos 5 cenarios funcionais por cliente (gera evidencias e coverage):
+```powershell
+.\scripts\run-mvp-pilot-functional-scenarios.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -ProvisionMissingUsers
+```
+Quando backend/API estiver ligado a outro Postgres local, alinhe os parametros do DB da API:
+```powershell
+.\scripts\run-mvp-pilot-functional-scenarios.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -DbContainerName conectsuite-postgres `
+  -DbUser postgres `
+  -DbName conectcrm `
+  -ProvisionMissingUsers
+```
+
+Cobertura funcional por cliente (cenarios core do piloto):
+```powershell
+.\scripts\check-mvp-pilot-functional-coverage.ps1 -RunDir ".production\pilot-runs\<sessao>"
 ```
 
 Relatorio de prontidao do piloto (blockers + decisao automatizada):
 ```powershell
 .\scripts\assess-mvp-pilot-readiness.ps1 -RunDir ".production\pilot-runs\<sessao>" -BranchProtectionStatus Unknown
+```
+Por padrao, o readiness usa o ultimo `functional-coverage-*.md` para decidir cobertura funcional (`Auto`).
+
+Exemplo de fechamento final (branch aplicada + cobertura concluida):
+```powershell
+.\scripts\assess-mvp-pilot-readiness.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -BranchProtectionStatus Applied `
+  -FunctionalCoverageStatus COVERAGE_OK
 ```
 
 Opcoes uteis:
@@ -162,10 +224,12 @@ AWS foi retirado do fluxo atual por decisao de escopo. Quando for retomado, a es
 ## Proximo passo sugerido
 Rodar o checklist de `DEPLOY.md` e registrar o resultado final de prontidao (backend, frontend e multi-tenant) antes do go-live.
 Para proteger merge em producao, aplicar tambem o guia `.production/BRANCH_PROTECTION.md`.
+Se o token atual nao tiver admin, usar o handoff `.production/BRANCH_PROTECTION_HANDOFF_2026-02-17.md`.
 Para rollout comercial por escopo reduzido, usar `.production/MVP_GO_LIVE_PLAN_2026-02-17.md`.
 Registrar decisao operacional em `.production/MVP_GO_NO_GO_2026-02-17.md`.
 Para piloto controlado com clientes, usar `.production/MVP_PILOT_CHECKLIST_2026-02-17.md`.
 Ver execucao de kickoff em `.production/MVP_PILOT_KICKOFF_2026-02-17.md`.
+Para fechamento rapido da sessao atual, seguir `.production/pilot-runs/20260217-174413-piloto-comercial-lote-1-full/next-actions-20260218-0809.md`.
 
 ## Branch protection (automatizado)
 ```powershell
@@ -175,5 +239,8 @@ Ver execucao de kickoff em `.production/MVP_PILOT_KICKOFF_2026-02-17.md`.
 # Aplicar no repo novo (token necessario)
 $env:GITHUB_TOKEN = "ghp_xxx"
 .\scripts\configure-branch-protection.ps1 -Owner conectcrm -Repo conect380
+
+# Aplicar apenas em main (quando develop ainda nao existe)
+.\scripts\configure-branch-protection.ps1 -Owner conectcrm -Repo conect380 -Branches main
 ```
 

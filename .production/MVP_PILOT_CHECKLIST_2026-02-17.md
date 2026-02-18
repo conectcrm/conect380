@@ -37,6 +37,16 @@ Data: 2026-02-17
   - [ ] Abrir ticket, responder, alterar status
 - [ ] Registrar evidencias (timestamp, cliente, resultado, erro)
   - [ ] Usar `.\.production\scripts\record-mvp-pilot-evidence.ps1`
+  - [ ] Preferir `.\.production\scripts\record-mvp-pilot-functional-result.ps1` para os 5 cenarios padrao
+- [ ] Gerar planilha funcional para execucao em lote:
+  - [ ] `.\.production\scripts\prepare-mvp-pilot-functional-sheet.ps1 -RunDir "<pasta-da-sessao>" -Force`
+- [ ] Importar resultados da planilha para `evidence.csv`:
+  - [ ] `.\.production\scripts\import-mvp-pilot-functional-sheet.ps1 -RunDir "<pasta-da-sessao>" -SheetPath "<pasta-da-sessao>\functional-sheet.csv" -SkipIfAlreadyRecorded`
+  - [ ] `.\.production\scripts\import-mvp-pilot-functional-sheet.ps1 -RunDir "<pasta-da-sessao>" -SheetPath "<pasta-da-sessao>\functional-sheet.csv" -SkipIfAlreadyRecorded -Strict`
+- [ ] Opcional (preferencial): executar cenarios funcionais automaticamente e registrar evidencias:
+  - [ ] `.\.production\scripts\run-mvp-pilot-functional-scenarios.ps1 -RunDir "<pasta-da-sessao>" -ProvisionMissingUsers`
+- [ ] Consolidar cobertura funcional por cliente:
+  - [ ] `.\.production\scripts\check-mvp-pilot-functional-coverage.ps1 -RunDir "<pasta-da-sessao>"`
 
 ## 4) Monitoramento intensivo
 - [ ] Monitorar logs backend (`docker compose logs -f backend`)
@@ -51,6 +61,7 @@ Data: 2026-02-17
 - [ ] 0 bloqueio em fluxo core (leads/pipeline/propostas/atendimento)
 - [ ] Taxa de sucesso operacional >= 95% nos cenarios do piloto
 - [ ] Sem regressao critica em autenticacao/contexto de empresa
+- [ ] Cobertura funcional sem gaps (`MISSING=0`, `FAIL=0`, `BLOCKED=0`)
 - [ ] Rodar readiness automatizado sem blockers:
   - [ ] `.\.production\scripts\assess-mvp-pilot-readiness.ps1 -RunDir "<pasta-da-sessao>" -BranchProtectionStatus Applied`
 
