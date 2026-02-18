@@ -220,6 +220,19 @@ Rodada comercial completa da wave (follow-up + import + fechamento + snapshot):
   -UpdatesCsvPath ".production\pilot-runs\<sessao>\outreach-updates-<timestamp>.csv"
 ```
 
+Preparacao da proxima wave (gate + kickoff da nova sessao + clientes + outreach):
+```powershell
+# DryRun (nao cria nova sessao)
+.\scripts\prepare-mvp-next-wave.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -DryRun
+
+# Aplicar quando o fechamento atual estiver GO_NEXT_WAVE
+.\scripts\prepare-mvp-next-wave.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -NextPilotName "piloto-comercial-lote-3"
+```
+
 Fechamento da wave (consolidacao comercial + tecnica e decisao final):
 ```powershell
 .\scripts\close-mvp-pilot-wave.ps1 `
