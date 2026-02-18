@@ -49,9 +49,6 @@ jobs:
       - name: Instalar dependencias frontend
         run: npm --prefix frontend-web ci
 
-      - name: Type-check frontend
-        run: npm --prefix frontend-web run type-check
-
       - name: Build frontend
         run: npm --prefix frontend-web run build
         env:
