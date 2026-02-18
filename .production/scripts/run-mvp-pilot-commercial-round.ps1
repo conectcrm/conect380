@@ -5,6 +5,7 @@ param(
   [string]$UpdatesCsvPath = "",
   [switch]$SkipImport,
   [switch]$ImportDryRun,
+  [switch]$AllowImportFromFollowup,
   [switch]$SkipIfAlreadyFinal,
   [int]$MinAcceptedClients = 1
 )
@@ -14,6 +15,7 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $pilotRoot = Join-Path $repoRoot ".production\pilot-runs"
 
 $followupScript = Join-Path $PSScriptRoot "prepare-mvp-pilot-outreach-followup.ps1"
+$templateScript = Join-Path $PSScriptRoot "prepare-mvp-pilot-outreach-updates-template.ps1"
 $importScript = Join-Path $PSScriptRoot "import-mvp-pilot-outreach-updates.ps1"
 $closeScript = Join-Path $PSScriptRoot "close-mvp-pilot-wave.ps1"
 $snapshotScript = Join-Path $PSScriptRoot "snapshot-mvp-wave-status.ps1"
@@ -126,6 +128,7 @@ New-Item -ItemType Directory -Path $runLogsDir -Force | Out-Null
 
 $followupCsvPath = Join-Path $resolvedRunDir "outreach-followup-$roundId.csv"
 $followupMdPath = Join-Path $resolvedRunDir "outreach-followup-$roundId.md"
+$updatesTemplatePath = Join-Path $resolvedRunDir "outreach-updates-template-$roundId.csv"
 $closurePath = Join-Path $resolvedRunDir "wave-closure-$roundId.md"
 $snapshotPath = Join-Path $resolvedRunDir "wave-status-$roundId.md"
 $roundSummaryPath = Join-Path $runLogsDir "summary.md"
@@ -152,32 +155,65 @@ else {
   Add-Step -Step "Preparar follow-up" -Status "FAIL" -Details "Falha ao gerar fila de follow-up." -Artifact $followupExec.LogPath
 }
 
-if (-not $SkipImport -and $followupExec.ExitCode -eq 0) {
-  $importSource = $UpdatesCsvPath
-  if ([string]::IsNullOrWhiteSpace($importSource)) {
-    $importSource = $followupCsvPath
-  }
-
+$templateReady = $false
+if ($followupExec.ExitCode -eq 0) {
   Write-Host ""
-  Write-Host ">> Importando atualizacoes de convite"
-  $importArgs = @(
+  Write-Host ">> Gerando template de atualizacoes"
+  $templateArgs = @(
     "-RunDir", $resolvedRunDir,
-    "-UpdatesCsvPath", $importSource
+    "-SourceCsvPath", $followupCsvPath,
+    "-OutputCsvPath", $updatesTemplatePath,
+    "-Owner", $Owner
   )
-  if ($ImportDryRun) {
-    $importArgs += "-DryRun"
-  }
-  if ($SkipIfAlreadyFinal) {
-    $importArgs += "-SkipIfAlreadyFinal"
-  }
-
-  $importExec = Invoke-PowerShellFile -ScriptPath $importScript -ScriptArguments $importArgs -LogPath (Join-Path $runLogsDir "02-import.log")
-  if ($importExec.ExitCode -eq 0) {
-    $importMode = if ($ImportDryRun) { "DRYRUN" } else { "APPLY" }
-    Add-Step -Step "Importar atualizacoes" -Status "PASS" -Details "Modo: $importMode" -Artifact $importExec.LogPath
+  $templateExec = Invoke-PowerShellFile -ScriptPath $templateScript -ScriptArguments $templateArgs -LogPath (Join-Path $runLogsDir "02-template.log")
+  if ($templateExec.ExitCode -eq 0) {
+    $templateReady = $true
+    Add-Step -Step "Gerar template de updates" -Status "PASS" -Artifact $updatesTemplatePath
   }
   else {
-    Add-Step -Step "Importar atualizacoes" -Status "FAIL" -Details "Falha na importacao de atualizacoes." -Artifact $importExec.LogPath
+    Add-Step -Step "Gerar template de updates" -Status "FAIL" -Details "Falha ao gerar template de updates." -Artifact $templateExec.LogPath
+  }
+}
+else {
+  Add-Step -Step "Gerar template de updates" -Status "SKIP" -Details "Etapa anterior falhou."
+}
+
+if (-not $SkipImport -and $templateReady) {
+  $importSource = $UpdatesCsvPath
+  $importMode = if ($ImportDryRun) { "DRYRUN" } else { "APPLY" }
+  $importBlocked = $false
+
+  if ([string]::IsNullOrWhiteSpace($importSource)) {
+    if ($ImportDryRun -or $AllowImportFromFollowup) {
+      $importSource = $updatesTemplatePath
+    }
+    else {
+      $importBlocked = $true
+      Add-Step -Step "Importar atualizacoes" -Status "FAIL" -Details "Modo APPLY requer -UpdatesCsvPath explicito (arquivo preenchido pelo comercial)." -Artifact $updatesTemplatePath
+    }
+  }
+
+  if (-not $importBlocked) {
+    Write-Host ""
+    Write-Host ">> Importando atualizacoes de convite"
+    $importArgs = @(
+      "-RunDir", $resolvedRunDir,
+      "-UpdatesCsvPath", $importSource
+    )
+    if ($ImportDryRun) {
+      $importArgs += "-DryRun"
+    }
+    if ($SkipIfAlreadyFinal) {
+      $importArgs += "-SkipIfAlreadyFinal"
+    }
+
+    $importExec = Invoke-PowerShellFile -ScriptPath $importScript -ScriptArguments $importArgs -LogPath (Join-Path $runLogsDir "03-import.log")
+    if ($importExec.ExitCode -eq 0) {
+      Add-Step -Step "Importar atualizacoes" -Status "PASS" -Details "Modo: $importMode | Origem: $importSource" -Artifact $importExec.LogPath
+    }
+    else {
+      Add-Step -Step "Importar atualizacoes" -Status "FAIL" -Details "Falha na importacao de atualizacoes." -Artifact $importExec.LogPath
+    }
   }
 }
 else {
@@ -185,7 +221,7 @@ else {
     Add-Step -Step "Importar atualizacoes" -Status "SKIP" -Details "SkipImport habilitado."
   }
   else {
-    Add-Step -Step "Importar atualizacoes" -Status "SKIP" -Details "Etapa anterior falhou."
+    Add-Step -Step "Importar atualizacoes" -Status "SKIP" -Details "Template de updates nao disponivel."
   }
 }
 
@@ -199,7 +235,7 @@ if (-not $hasFailure) {
     "-MinAcceptedClients", "$MinAcceptedClients",
     "-OutputPath", $closurePath
   )
-  $closeExec = Invoke-PowerShellFile -ScriptPath $closeScript -ScriptArguments $closeArgs -LogPath (Join-Path $runLogsDir "03-close.log")
+  $closeExec = Invoke-PowerShellFile -ScriptPath $closeScript -ScriptArguments $closeArgs -LogPath (Join-Path $runLogsDir "04-close.log")
   if ($closeExec.ExitCode -eq 0) {
     Add-Step -Step "Fechar wave" -Status "PASS" -Artifact $closurePath
   }
@@ -219,7 +255,7 @@ if (-not $hasFailure) {
     "-RunDir", $resolvedRunDir,
     "-OutputPath", $snapshotPath
   )
-  $snapshotExec = Invoke-PowerShellFile -ScriptPath $snapshotScript -ScriptArguments $snapshotArgs -LogPath (Join-Path $runLogsDir "04-snapshot.log")
+  $snapshotExec = Invoke-PowerShellFile -ScriptPath $snapshotScript -ScriptArguments $snapshotArgs -LogPath (Join-Path $runLogsDir "05-snapshot.log")
   if ($snapshotExec.ExitCode -eq 0) {
     Add-Step -Step "Gerar snapshot" -Status "PASS" -Artifact $snapshotPath
   }
@@ -249,6 +285,7 @@ Round ID: $roundId
 - Decisao de fechamento: $closureDecision
 - Follow-up CSV: $followupCsvPath
 - Follow-up MD: $followupMdPath
+- Updates template: $updatesTemplatePath
 - Fechamento: $closurePath
 - Snapshot: $snapshotPath
 
@@ -266,6 +303,7 @@ if (Test-Path $statusPath) {
 - Relatorio: $roundSummaryPath
 - Decisao: $closureDecision
 - Follow-up CSV: $followupCsvPath
+- Updates template: $updatesTemplatePath
 - Fechamento: $closurePath
 - Snapshot: $snapshotPath
 "@

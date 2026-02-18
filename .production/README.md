@@ -207,14 +207,21 @@ Importar atualizacoes de convite em lote (CSV com `empresa_id` ou `cliente` + `s
   -DryRun
 ```
 
+Gerar template de atualizacoes (arquivo enxuto para o comercial preencher):
+```powershell
+.\scripts\prepare-mvp-pilot-outreach-updates-template.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -OutputCsvPath ".production\pilot-runs\<sessao>\outreach-updates-template-<timestamp>.csv"
+```
+
 Rodada comercial completa da wave (follow-up + import + fechamento + snapshot):
 ```powershell
-# DryRun de importacao (seguro)
+# DryRun de importacao (gera follow-up + template e valida sem gravar)
 .\scripts\run-mvp-pilot-commercial-round.ps1 `
   -RunDir ".production\pilot-runs\<sessao>" `
   -ImportDryRun
 
-# Aplicacao real das respostas em lote
+# Aplicacao real das respostas em lote (arquivo obrigatorio)
 .\scripts\run-mvp-pilot-commercial-round.ps1 `
   -RunDir ".production\pilot-runs\<sessao>" `
   -UpdatesCsvPath ".production\pilot-runs\<sessao>\outreach-updates-<timestamp>.csv"
