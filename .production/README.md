@@ -240,6 +240,20 @@ Preparacao da proxima wave (gate + kickoff da nova sessao + clientes + outreach)
   -NextPilotName "piloto-comercial-lote-3"
 ```
 
+Avancar wave em um comando (rodada comercial + transicao automatica se `GO_NEXT_WAVE`):
+```powershell
+# Round seguro (dryrun)
+.\scripts\advance-mvp-wave.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -ImportDryRun
+
+# Round real com updates preenchidos
+.\scripts\advance-mvp-wave.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -UpdatesCsvPath ".production\pilot-runs\<sessao>\outreach-updates-template-<timestamp>.csv" `
+  -NextPilotName "piloto-comercial-lote-3"
+```
+
 Fechamento da wave (consolidacao comercial + tecnica e decisao final):
 ```powershell
 .\scripts\close-mvp-pilot-wave.ps1 `
