@@ -183,6 +183,22 @@ Snapshot operacional da wave (status de outreach + monitor + ciclo + readiness +
 .\scripts\snapshot-mvp-wave-status.ps1 -RunDir ".production\pilot-runs\<sessao>"
 ```
 
+Atualizar status de convite no outreach (por `empresa_id` ou `cliente`):
+```powershell
+.\scripts\update-mvp-pilot-outreach-status.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -EmpresaId "<empresa_id>" `
+  -StatusConvite ACEITO `
+  -Observacao "convite confirmado pelo comercial"
+```
+
+Fechamento da wave (consolidacao comercial + tecnica e decisao final):
+```powershell
+.\scripts\close-mvp-pilot-wave.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -MinAcceptedClients 1
+```
+
 Execucao automatizada dos 5 cenarios funcionais por cliente (gera evidencias e coverage):
 ```powershell
 .\scripts\run-mvp-pilot-functional-scenarios.ps1 `
