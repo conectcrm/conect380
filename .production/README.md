@@ -226,6 +226,7 @@ Status atual: GO liberado para comercializacao controlada.
 Para rollout comercial por escopo reduzido, usar `.production/MVP_GO_LIVE_PLAN_2026-02-17.md`.
 Para execucao da primeira onda comercial, usar `.production/MVP_ROLLOUT_WAVE1_2026-02-18.md`.
 Registrar decisao operacional em `.production/MVP_GO_NO_GO_2026-02-17.md`.
+Resumo executivo para comercial/diretoria em `.production/MVP_EXEC_SUMMARY_2026-02-18.md`.
 Para piloto controlado com clientes, usar `.production/MVP_PILOT_CHECKLIST_2026-02-17.md`.
 Ver execucao de kickoff em `.production/MVP_PILOT_KICKOFF_2026-02-17.md`.
 Para fechamento rapido da sessao atual, seguir `.production/pilot-runs/20260217-174413-piloto-comercial-lote-1-full/next-actions-20260218-1054.md`.
@@ -242,4 +243,3 @@ $env:GITHUB_TOKEN = "ghp_xxx"
 # Aplicar apenas em main (quando develop ainda nao existe)
 .\scripts\configure-branch-protection.ps1 -Owner conectcrm -Repo conect380 -Branches main
 ```
-
