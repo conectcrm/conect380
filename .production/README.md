@@ -222,14 +222,13 @@ docker compose down
 AWS foi retirado do fluxo atual por decisao de escopo. Quando for retomado, a estrategia de deploy remoto pode ser adicionada novamente em um guia separado.
 
 ## Proximo passo sugerido
-Rodar o checklist de `DEPLOY.md` e registrar o resultado final de prontidao (backend, frontend e multi-tenant) antes do go-live.
-Para proteger merge em producao, aplicar tambem o guia `.production/BRANCH_PROTECTION.md`.
-Se o token atual nao tiver admin, usar o handoff `.production/BRANCH_PROTECTION_HANDOFF_2026-02-17.md`.
+Status atual: GO liberado para comercializacao controlada.
 Para rollout comercial por escopo reduzido, usar `.production/MVP_GO_LIVE_PLAN_2026-02-17.md`.
+Para execucao da primeira onda comercial, usar `.production/MVP_ROLLOUT_WAVE1_2026-02-18.md`.
 Registrar decisao operacional em `.production/MVP_GO_NO_GO_2026-02-17.md`.
 Para piloto controlado com clientes, usar `.production/MVP_PILOT_CHECKLIST_2026-02-17.md`.
 Ver execucao de kickoff em `.production/MVP_PILOT_KICKOFF_2026-02-17.md`.
-Para fechamento rapido da sessao atual, seguir `.production/pilot-runs/20260217-174413-piloto-comercial-lote-1-full/next-actions-20260218-0809.md`.
+Para fechamento rapido da sessao atual, seguir `.production/pilot-runs/20260217-174413-piloto-comercial-lote-1-full/next-actions-20260218-1054.md`.
 
 ## Branch protection (automatizado)
 ```powershell
