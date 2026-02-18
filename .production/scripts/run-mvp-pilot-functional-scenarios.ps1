@@ -305,8 +305,7 @@ set
   senha = crypt('$passwordSafe', gen_salt('bf')),
   role = 'admin',
   ativo = true,
-  updated_at = now(),
-  atualizado_em = now()
+  updated_at = now()
 where lower(email) = lower('$emailSafe');
 
 insert into users (id, nome, email, senha, empresa_id, role, ativo)
@@ -325,6 +324,43 @@ where not exists (
     password = $ProvisionUserPassword
     source = "provisioned"
   }
+}
+
+function Resolve-TokenCompanyContext {
+  param(
+    [string]$Token,
+    [string]$EmpresaId
+  )
+
+  if (-not (Is-NotBlank $Token)) {
+    return $null
+  }
+
+  $payload = Get-JwtPayload -Token $Token
+  $tokenEmpresaId = Get-ObjectValue -Object $payload -Name "empresa_id"
+  $userId = Get-ObjectValue -Object $payload -Name "sub"
+
+  if ($tokenEmpresaId -eq $EmpresaId) {
+    return [pscustomobject]@{
+      empresa_id = $tokenEmpresaId
+      user_id = $userId
+    }
+  }
+
+  $switchResp = Invoke-JsonRequest -Method "POST" -Path "/minhas-empresas/switch" -Token $Token -Body @{
+    empresaId = $EmpresaId
+  }
+  $switchEmpresaId = Get-ObjectValue -Object $switchResp.Data -Name "empresaId"
+  $switchSuccess = $switchResp.StatusCode -ge 200 -and $switchResp.StatusCode -lt 300
+
+  if ($switchSuccess -and $switchEmpresaId -eq $EmpresaId) {
+    return [pscustomobject]@{
+      empresa_id = $EmpresaId
+      user_id = $userId
+    }
+  }
+
+  return $null
 }
 
 function Resolve-ClientCredential {
@@ -357,17 +393,45 @@ function Resolve-ClientCredential {
   }
 
   $orderedCredentials = @()
-  foreach ($email in $candidates) {
-    $matched = $credentialRows | Where-Object { $_.email -eq $email } | Select-Object -First 1
-    if ($null -ne $matched) {
-      $orderedCredentials += $matched
+  $seenCredentialKeys = @{}
+
+  function Add-OrderedCredential {
+    param(
+      [pscustomobject]$Credential
+    )
+
+    if ($null -eq $Credential) {
+      return
+    }
+
+    $emailValue = "$($Credential.email)".Trim().ToLowerInvariant()
+    $passwordValue = "$($Credential.password)".Trim()
+
+    if (-not (Is-NotBlank $emailValue) -or -not (Is-NotBlank $passwordValue)) {
+      return
+    }
+
+    $credentialKey = "$emailValue|$passwordValue"
+    if ($seenCredentialKeys.ContainsKey($credentialKey)) {
+      return
+    }
+
+    $seenCredentialKeys[$credentialKey] = $true
+    $orderedCredentials += [pscustomobject]@{
+      email = $emailValue
+      password = $passwordValue
+      source = $Credential.source
     }
   }
 
+  foreach ($email in $candidates) {
+    $emailLookup = "$email".Trim().ToLowerInvariant()
+    $matched = $credentialRows | Where-Object { "$($_.email)".Trim().ToLowerInvariant() -eq $emailLookup } | Select-Object -First 1
+    Add-OrderedCredential -Credential $matched
+  }
+
   foreach ($row in $credentialRows) {
-    if ($orderedCredentials -notcontains $row) {
-      $orderedCredentials += $row
-    }
+    Add-OrderedCredential -Credential $row
   }
 
   foreach ($credential in $orderedCredentials) {
@@ -388,11 +452,8 @@ function Resolve-ClientCredential {
       continue
     }
 
-    $payload = Get-JwtPayload -Token $token
-    $tokenEmpresaId = Get-ObjectValue -Object $payload -Name "empresa_id"
-    $userId = Get-ObjectValue -Object $payload -Name "sub"
-
-    if ($tokenEmpresaId -ne $empresaId) {
+    $tokenContext = Resolve-TokenCompanyContext -Token $token -EmpresaId $empresaId
+    if ($null -eq $tokenContext) {
       continue
     }
 
@@ -400,8 +461,8 @@ function Resolve-ClientCredential {
       email = $credential.email
       password = $credential.password
       token = $token
-      empresa_id = $tokenEmpresaId
-      user_id = $userId
+      empresa_id = $tokenContext.empresa_id
+      user_id = $tokenContext.user_id
       source = $credential.source
     }
   }
@@ -420,16 +481,14 @@ function Resolve-ClientCredential {
         $token = Get-ObjectValue -Object $loginProvisioned.Data -Name "access_token"
       }
       if (Is-NotBlank $token) {
-        $payload = Get-JwtPayload -Token $token
-        $tokenEmpresaId = Get-ObjectValue -Object $payload -Name "empresa_id"
-        $userId = Get-ObjectValue -Object $payload -Name "sub"
-        if ($tokenEmpresaId -eq $empresaId) {
+        $tokenContext = Resolve-TokenCompanyContext -Token $token -EmpresaId $empresaId
+        if ($null -ne $tokenContext) {
           return [pscustomobject]@{
             email = $provisioned.email
             password = $provisioned.password
             token = $token
-            empresa_id = $tokenEmpresaId
-            user_id = $userId
+            empresa_id = $tokenContext.empresa_id
+            user_id = $tokenContext.user_id
             source = "provisioned"
           }
         }
