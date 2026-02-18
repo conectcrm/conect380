@@ -178,6 +178,11 @@ Monitoramento continuo da janela (rodando ciclos em intervalo fixo e consolidand
   -BranchProtectionStatus Applied
 ```
 
+Snapshot operacional da wave (status de outreach + monitor + ciclo + readiness + cobertura):
+```powershell
+.\scripts\snapshot-mvp-wave-status.ps1 -RunDir ".production\pilot-runs\<sessao>"
+```
+
 Execucao automatizada dos 5 cenarios funcionais por cliente (gera evidencias e coverage):
 ```powershell
 .\scripts\run-mvp-pilot-functional-scenarios.ps1 `
