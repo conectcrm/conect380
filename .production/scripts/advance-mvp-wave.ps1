@@ -2,6 +2,7 @@ param(
   [string]$RunDir = "",
   [string]$UpdatesCsvPath = "",
   [switch]$ImportDryRun,
+  [switch]$AllowNoChanges,
   [string]$Owner = "time-comercial",
   [int]$DefaultFollowupHours = 4,
   [int]$MinAcceptedClients = 1,
@@ -158,6 +159,9 @@ $commercialArgs = @(
 )
 if ($ImportDryRun) {
   $commercialArgs += "-ImportDryRun"
+}
+if ($AllowNoChanges) {
+  $commercialArgs += "-AllowNoChanges"
 }
 if (-not [string]::IsNullOrWhiteSpace($UpdatesCsvPath)) {
   $commercialArgs += "-UpdatesCsvPath"
