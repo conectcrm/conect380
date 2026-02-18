@@ -160,6 +160,24 @@ Ciclo tecnico automatizado do piloto (health + logs + smoke + evidencias):
 ```
 Se executar com `-SkipCoreSmoke` ou `-SkipUiSmoke`, rode um ciclo completo depois antes do readiness final.
 
+Monitoramento continuo da janela (rodando ciclos em intervalo fixo e consolidando resumo):
+```powershell
+# Exemplo completo de 48h com ciclo a cada 2h
+.\scripts\run-mvp-pilot-window-monitor.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -WindowHours 48 `
+  -IntervalMinutes 120 `
+  -BranchProtectionStatus Applied
+
+# Execucao curta de baseline (1 ciclo)
+.\scripts\run-mvp-pilot-window-monitor.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -WindowHours 48 `
+  -IntervalMinutes 120 `
+  -MaxCycles 1 `
+  -BranchProtectionStatus Applied
+```
+
 Execucao automatizada dos 5 cenarios funcionais por cliente (gera evidencias e coverage):
 ```powershell
 .\scripts\run-mvp-pilot-functional-scenarios.ps1 `
