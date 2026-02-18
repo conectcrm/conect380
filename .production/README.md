@@ -207,6 +207,19 @@ Importar atualizacoes de convite em lote (CSV com `empresa_id` ou `cliente` + `s
   -DryRun
 ```
 
+Rodada comercial completa da wave (follow-up + import + fechamento + snapshot):
+```powershell
+# DryRun de importacao (seguro)
+.\scripts\run-mvp-pilot-commercial-round.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -ImportDryRun
+
+# Aplicacao real das respostas em lote
+.\scripts\run-mvp-pilot-commercial-round.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -UpdatesCsvPath ".production\pilot-runs\<sessao>\outreach-updates-<timestamp>.csv"
+```
+
 Fechamento da wave (consolidacao comercial + tecnica e decisao final):
 ```powershell
 .\scripts\close-mvp-pilot-wave.ps1 `
