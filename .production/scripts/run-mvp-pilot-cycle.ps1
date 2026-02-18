@@ -15,6 +15,48 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $pilotRoot = Join-Path $repoRoot ".production\pilot-runs"
 $recordEvidenceScript = Join-Path $PSScriptRoot "record-mvp-pilot-evidence.ps1"
 
+function Invoke-DockerComposeWithFallbackEnv {
+  param(
+    [string]$ComposeFile,
+    [string[]]$ComposeArguments,
+    [string]$OutputPath
+  )
+
+  $fallbackEnv = @{
+    "DATABASE_PASSWORD" = "placeholder"
+    "JWT_SECRET" = "placeholder"
+    "WHATSAPP_API_KEY" = "placeholder"
+    "OPENAI_API_KEY" = "placeholder"
+    "ANTHROPIC_API_KEY" = "placeholder"
+  }
+
+  $managedKeys = @()
+  $previousValues = @{}
+
+  foreach ($key in $fallbackEnv.Keys) {
+    $previousValues[$key] = [System.Environment]::GetEnvironmentVariable($key, "Process")
+    if ([string]::IsNullOrWhiteSpace($previousValues[$key])) {
+      $managedKeys += $key
+      Set-Item "Env:$key" $fallbackEnv[$key]
+    }
+  }
+
+  try {
+    docker compose -f $ComposeFile @ComposeArguments | Set-Content -Path $OutputPath -Encoding UTF8
+    return $LASTEXITCODE
+  }
+  finally {
+    foreach ($key in $managedKeys) {
+      if ($null -eq $previousValues[$key]) {
+        Remove-Item "Env:$key" -ErrorAction SilentlyContinue
+      }
+      else {
+        Set-Item "Env:$key" $previousValues[$key]
+      }
+    }
+  }
+}
+
 function Resolve-RunDirectory {
   param(
     [string]$ProvidedRunDir,
@@ -67,6 +109,10 @@ function Get-EvidenceResult {
 
   if ($StepStatus -eq "FAIL") {
     return "FAIL"
+  }
+
+  if ($StepStatus -eq "SKIP") {
+    return ""
   }
 
   return "BLOCKED"
@@ -188,13 +234,13 @@ if (-not $SkipDockerLogs) {
     $backendDockerLog = Join-Path $cycleDir "docker-backend.log"
     $frontendDockerLog = Join-Path $cycleDir "docker-frontend.log"
 
-    docker compose -f $composeFile logs --tail 400 backend | Set-Content -Path $backendDockerLog -Encoding UTF8
-    if ($LASTEXITCODE -ne 0) {
+    $backendExitCode = Invoke-DockerComposeWithFallbackEnv -ComposeFile $composeFile -ComposeArguments @("logs", "--tail", "400", "backend") -OutputPath $backendDockerLog
+    if ($backendExitCode -ne 0) {
       throw "falha ao coletar logs do backend"
     }
 
-    docker compose -f $composeFile logs --tail 400 frontend | Set-Content -Path $frontendDockerLog -Encoding UTF8
-    if ($LASTEXITCODE -ne 0) {
+    $frontendExitCode = Invoke-DockerComposeWithFallbackEnv -ComposeFile $composeFile -ComposeArguments @("logs", "--tail", "400", "frontend") -OutputPath $frontendDockerLog
+    if ($frontendExitCode -ne 0) {
       throw "falha ao coletar logs do frontend"
     }
 
@@ -300,6 +346,10 @@ Write-Host ""
 Write-Host ">> Registro de evidencias (automatico)"
 foreach ($item in $results) {
   $evidenceResult = Get-EvidenceResult -StepStatus $item.Status
+  if ([string]::IsNullOrWhiteSpace($evidenceResult)) {
+    continue
+  }
+
   $details = $item.Details
   if ([string]::IsNullOrWhiteSpace($details) -and $item.Status -eq "SKIP") {
     $details = "Etapa marcada como skip"
