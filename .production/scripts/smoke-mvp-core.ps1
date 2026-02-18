@@ -116,7 +116,7 @@ Write-Host ""
 Write-Host "MVP smoke summary:"
 $results | Format-Table -AutoSize
 
-$failed = $results | Where-Object { $_.Status -eq "FAIL" }
+$failed = @($results | Where-Object { $_.Status -eq "FAIL" })
 if ($failed.Count -gt 0) {
   Write-Host ""
   Write-Host "MVP smoke result: FAIL"
