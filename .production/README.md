@@ -206,6 +206,7 @@ Importar atualizacoes de convite em lote (CSV com `empresa_id` ou `cliente` + `s
   -UpdatesCsvPath ".production\pilot-runs\<sessao>\outreach-followup-<timestamp>.csv" `
   -DryRun
 ```
+Em `APPLY`, o import falha se `applied=0` (sem mudanca efetiva). Use `-AllowNoChanges` apenas em excecao operacional.
 
 Gerar template de atualizacoes (arquivo enxuto para o comercial preencher):
 ```powershell
@@ -226,6 +227,7 @@ Rodada comercial completa da wave (follow-up + import + fechamento + snapshot):
   -RunDir ".production\pilot-runs\<sessao>" `
   -UpdatesCsvPath ".production\pilot-runs\<sessao>\outreach-updates-<timestamp>.csv"
 ```
+Em `APPLY`, se o CSV nao tiver mudanca efetiva, a rodada falha por seguranca.
 
 Preparacao da proxima wave (gate + kickoff da nova sessao + clientes + outreach):
 ```powershell

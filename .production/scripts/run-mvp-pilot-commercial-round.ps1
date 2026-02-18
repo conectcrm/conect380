@@ -6,6 +6,7 @@ param(
   [switch]$SkipImport,
   [switch]$ImportDryRun,
   [switch]$AllowImportFromFollowup,
+  [switch]$AllowNoChanges,
   [switch]$SkipIfAlreadyFinal,
   [int]$MinAcceptedClients = 1
 )
@@ -205,6 +206,9 @@ if (-not $SkipImport -and $templateReady) {
     }
     if ($SkipIfAlreadyFinal) {
       $importArgs += "-SkipIfAlreadyFinal"
+    }
+    if ($AllowNoChanges) {
+      $importArgs += "-AllowNoChanges"
     }
 
     $importExec = Invoke-PowerShellFile -ScriptPath $importScript -ScriptArguments $importArgs -LogPath (Join-Path $runLogsDir "03-import.log")

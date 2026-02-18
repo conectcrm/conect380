@@ -2,6 +2,7 @@ param(
   [string]$RunDir = "",
   [string]$UpdatesCsvPath = "",
   [switch]$SkipIfAlreadyFinal,
+  [switch]$AllowNoChanges,
   [switch]$DryRun
 )
 
@@ -204,7 +205,14 @@ if ($DryRun) {
   Write-Host "Sem mudanca: $unchanged"
   Write-Host "Ignorados (status final): $skippedFinal"
   Write-Host "Nao encontrados: $notFound"
+  if ($applied -eq 0) {
+    Write-Host "Aviso: nenhuma alteracao efetiva detectada no arquivo de updates."
+  }
   exit 0
+}
+
+if ($applied -eq 0 -and -not $AllowNoChanges) {
+  throw "Nenhuma alteracao efetiva encontrada em APPLY (applied=0). Revise o CSV ou use -AllowNoChanges."
 }
 
 $outreachRows | Export-Csv -Path $outreachPath -NoTypeInformation -Encoding UTF8
