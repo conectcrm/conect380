@@ -115,3 +115,4 @@ Fechamentos executados:
 
 Status final para comercializacao:
 - **GO** para rollout controlado do MVP comercial.
+- Execucao operacional da primeira onda em `.production/MVP_ROLLOUT_WAVE1_2026-02-18.md`.
