@@ -112,6 +112,13 @@ Plano de outreach comercial para os clientes do piloto:
 .\scripts\prepare-mvp-pilot-outreach.ps1 -RunDir ".production\pilot-runs\<sessao>" -Owner "time-comercial"
 ```
 
+Fila automatizada de follow-up comercial (prioriza convites em aberto):
+```powershell
+.\scripts\prepare-mvp-pilot-outreach-followup.ps1 `
+  -RunDir ".production\pilot-runs\<sessao>" `
+  -Owner "time-comercial"
+```
+
 Registro rapido de evidencias do piloto:
 ```powershell
 .\scripts\record-mvp-pilot-evidence.ps1 `
