@@ -1,18 +1,84 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, QueryFailedError, Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User, UserRole } from './user.entity';
 import { Empresa } from '../../empresas/entities/empresa.entity';
 
 @Injectable()
 export class UsersService {
+  private userColumnsCache: Set<string> | null = null;
+
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
     @InjectRepository(Empresa)
     private empresaRepository: Repository<Empresa>,
   ) {}
+
+  private async getUsersTableColumns(): Promise<Set<string>> {
+    if (this.userColumnsCache) {
+      return this.userColumnsCache;
+    }
+
+    const rows: Array<{ column_name: string }> = await this.userRepository.query(
+      `
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'users'
+      `,
+    );
+
+    this.userColumnsCache = new Set(rows.map((row) => row.column_name));
+    return this.userColumnsCache;
+  }
+
+  private resolveUsersColumnExpression(
+    columns: Set<string>,
+    alias: string,
+    candidates: string[],
+    fallbackExpression: string = 'NULL',
+  ): string {
+    for (const candidate of candidates) {
+      if (columns.has(candidate)) {
+        return `u.${candidate} AS ${alias}`;
+      }
+    }
+
+    return `${fallbackExpression} AS ${alias}`;
+  }
+
+  private buildUserSelect(columns: Set<string>): string {
+    return [
+      'u.id',
+      'u.nome',
+      'u.email',
+      'u.senha',
+      this.resolveUsersColumnExpression(columns, 'telefone', ['telefone']),
+      'u.role',
+      this.resolveUsersColumnExpression(columns, 'permissoes', ['permissoes']),
+      'u.empresa_id',
+      this.resolveUsersColumnExpression(columns, 'avatar_url', ['avatar_url']),
+      this.resolveUsersColumnExpression(columns, 'idioma_preferido', ['idioma_preferido'], "'pt-BR'"),
+      this.resolveUsersColumnExpression(columns, 'configuracoes', ['configuracoes']),
+      'u.ativo',
+      this.resolveUsersColumnExpression(columns, 'deve_trocar_senha', ['deve_trocar_senha'], 'false'),
+      this.resolveUsersColumnExpression(columns, 'status_atendente', ['status_atendente']),
+      this.resolveUsersColumnExpression(columns, 'capacidade_maxima', ['capacidade_maxima'], 'NULL'),
+      this.resolveUsersColumnExpression(columns, 'tickets_ativos', ['tickets_ativos'], 'NULL'),
+      this.resolveUsersColumnExpression(columns, 'ultimo_login', ['ultimo_login']),
+      this.resolveUsersColumnExpression(columns, 'created_at', ['created_at', 'criado_em']),
+      this.resolveUsersColumnExpression(columns, 'updated_at', ['updated_at', 'atualizado_em']),
+      'e.id AS empresa_rel_id',
+      'e.nome AS empresa_nome',
+      'e.slug AS empresa_slug',
+      'e.cnpj AS empresa_cnpj',
+      'e.plano AS empresa_plano',
+      'e.ativo AS empresa_ativo',
+      'e.subdominio AS empresa_subdominio',
+    ].join(',\n          ');
+  }
 
   private mapRawUser(raw: any): User {
     const permissoes =
@@ -57,36 +123,74 @@ export class UsersService {
     } as Partial<User>);
   }
 
+  private normalizeRoleInput(role: unknown): UserRole | null {
+    if (typeof role !== 'string') {
+      return null;
+    }
+
+    const normalized = role.trim().toLowerCase();
+    if (!normalized) {
+      return null;
+    }
+
+    switch (normalized) {
+      case 'superadmin':
+        return UserRole.SUPERADMIN;
+      case 'admin':
+      case 'administrador':
+        return UserRole.ADMIN;
+      case 'gerente':
+      case 'manager':
+      case 'gestor':
+        return UserRole.GERENTE;
+      case 'vendedor':
+        return UserRole.VENDEDOR;
+      case 'suporte':
+      case 'support':
+      case 'user':
+      case 'usuario':
+      case 'operacional':
+        return UserRole.SUPORTE;
+      case 'financeiro':
+        return UserRole.FINANCEIRO;
+      default:
+        return null;
+    }
+  }
+
+  private normalizeRoleForCreate(userData: Partial<User>): Partial<User> {
+    const roleNormalizado = this.normalizeRoleInput(userData.role);
+    return {
+      ...userData,
+      role: roleNormalizado ?? UserRole.VENDEDOR,
+    };
+  }
+
+  private normalizeRoleForUpdate(userData: Partial<User>): Partial<User> {
+    if (userData.role === undefined) {
+      return userData;
+    }
+
+    const roleNormalizado = this.normalizeRoleInput(userData.role);
+    if (!roleNormalizado) {
+      const { role, ...rest } = userData;
+      return rest;
+    }
+
+    return {
+      ...userData,
+      role: roleNormalizado,
+    };
+  }
+
   async findByEmail(email: string): Promise<User | undefined> {
+    const columns = await this.getUsersTableColumns();
+    const select = this.buildUserSelect(columns);
+
     const rows: any[] = await this.userRepository.query(
       `
         SELECT
-          u.id,
-          u.nome,
-          u.email,
-          u.senha,
-          u.telefone,
-          u.role,
-          u.permissoes,
-          u.empresa_id,
-          u.avatar_url,
-          u.idioma_preferido,
-          u.configuracoes,
-          u.ativo,
-          u.deve_trocar_senha,
-          u.status_atendente,
-          u.capacidade_maxima,
-          u.tickets_ativos,
-          u.ultimo_login,
-          u.created_at,
-          u.updated_at,
-          e.id AS empresa_rel_id,
-          e.nome AS empresa_nome,
-          e.slug AS empresa_slug,
-          e.cnpj AS empresa_cnpj,
-          e.plano AS empresa_plano,
-          e.ativo AS empresa_ativo,
-          e.subdominio AS empresa_subdominio
+          ${select}
         FROM users u
         LEFT JOIN empresas e ON e.id = u.empresa_id
         WHERE u.email = $1
@@ -104,35 +208,13 @@ export class UsersService {
   }
 
   async findById(id: string): Promise<User | undefined> {
+    const columns = await this.getUsersTableColumns();
+    const select = this.buildUserSelect(columns);
+
     const rows: any[] = await this.userRepository.query(
       `
         SELECT
-          u.id,
-          u.nome,
-          u.email,
-          u.senha,
-          u.telefone,
-          u.role,
-          u.permissoes,
-          u.empresa_id,
-          u.avatar_url,
-          u.idioma_preferido,
-          u.configuracoes,
-          u.ativo,
-          u.deve_trocar_senha,
-          u.status_atendente,
-          u.capacidade_maxima,
-          u.tickets_ativos,
-          u.ultimo_login,
-          u.created_at,
-          u.updated_at,
-          e.id AS empresa_rel_id,
-          e.nome AS empresa_nome,
-          e.slug AS empresa_slug,
-          e.cnpj AS empresa_cnpj,
-          e.plano AS empresa_plano,
-          e.ativo AS empresa_ativo,
-          e.subdominio AS empresa_subdominio
+          ${select}
         FROM users u
         LEFT JOIN empresas e ON e.id = u.empresa_id
         WHERE u.id = $1
@@ -154,31 +236,21 @@ export class UsersService {
    * Diferente de findById que NÃO retorna senha
    */
   async findOne(id: string, empresaId?: string): Promise<User | undefined> {
-    const where: FindOptionsWhere<User> = { id };
-    if (empresaId) {
-      where.empresa_id = empresaId;
+    const user = await this.findById(id);
+    if (!user) {
+      return undefined;
     }
 
-    return this.userRepository.findOne({
-      where,
-      select: [
-        'id',
-        'nome',
-        'email',
-        'senha',
-        'role',
-        'empresa_id',
-        'ativo',
-        'deve_trocar_senha',
-        'ultimo_login',
-        'created_at',
-        'updated_at',
-      ],
-    });
+    if (empresaId && user.empresa_id !== empresaId) {
+      return undefined;
+    }
+
+    return user;
   }
 
   async create(userData: Partial<User>): Promise<User> {
-    const user = this.userRepository.create(userData);
+    const normalizedData = this.normalizeRoleForCreate(userData);
+    const user = this.userRepository.create(normalizedData);
     return this.userRepository.save(user);
   }
 
@@ -196,12 +268,14 @@ export class UsersService {
       userData.empresa_id = empresa.id;
     }
 
-    const user = this.userRepository.create(userData);
+    const normalizedData = this.normalizeRoleForCreate(userData);
+    const user = this.userRepository.create(normalizedData);
     return this.userRepository.save(user);
   }
 
   async update(id: string, userData: Partial<User>): Promise<User> {
-    await this.userRepository.update(id, userData);
+    const normalizedData = this.normalizeRoleForUpdate(userData);
+    await this.userRepository.update(id, normalizedData);
     return this.findById(id);
   }
 
@@ -213,7 +287,19 @@ export class UsersService {
   }
 
   async updateLastLogin(id: string): Promise<void> {
-    await this.userRepository.update(id, { ultimo_login: new Date() });
+    const columns = await this.getUsersTableColumns();
+    if (!columns.has('ultimo_login')) {
+      return;
+    }
+
+    await this.userRepository.query(
+      `
+        UPDATE users
+        SET ultimo_login = $1
+        WHERE id = $2
+      `,
+      [new Date(), id],
+    );
   }
 
   /**
@@ -240,8 +326,9 @@ export class UsersService {
           busca: `%${filtros.busca}%`,
         });
       }
-      if (filtros.role) {
-        query.andWhere('user.role = :role', { role: filtros.role });
+      const roleFilter = this.normalizeRoleInput(filtros.role);
+      if (roleFilter) {
+        query.andWhere('user.role = :role', { role: roleFilter });
       }
       if (typeof filtros.ativo === 'boolean') {
         query.andWhere('user.ativo = :ativo', { ativo: filtros.ativo });
@@ -269,14 +356,17 @@ export class UsersService {
     const adminCount = await this.userRepository.count({
       where: { empresa_id, role: UserRole.ADMIN },
     });
-    const managerCount = await this.userRepository.count({
-      where: { empresa_id, role: UserRole.MANAGER },
+    const gerenteCount = await this.userRepository.count({
+      where: { empresa_id, role: UserRole.GERENTE },
     });
     const vendedorCount = await this.userRepository.count({
       where: { empresa_id, role: UserRole.VENDEDOR },
     });
-    const userCount = await this.userRepository.count({
-      where: { empresa_id, role: UserRole.USER },
+    const suporteCount = await this.userRepository.count({
+      where: { empresa_id, role: UserRole.SUPORTE },
+    });
+    const financeiroCount = await this.userRepository.count({
+      where: { empresa_id, role: UserRole.FINANCEIRO },
     });
 
     return {
@@ -285,9 +375,12 @@ export class UsersService {
       inativos,
       por_perfil: {
         admin: adminCount,
-        manager: managerCount,
+        gerente: gerenteCount,
+        manager: gerenteCount, // alias legado
         vendedor: vendedorCount,
-        user: userCount,
+        suporte: suporteCount,
+        financeiro: financeiroCount,
+        user: suporteCount, // alias legado
       },
     };
   }
@@ -319,10 +412,10 @@ export class UsersService {
 
     // Hash da senha antes de salvar
     const hashedPassword = await bcrypt.hash(userData.senha, 10);
-    const userDataWithHashedPassword = {
+    const userDataWithHashedPassword = this.normalizeRoleForCreate({
       ...userData,
       senha: hashedPassword,
-    };
+    });
 
     const user = this.userRepository.create(userDataWithHashedPassword);
 
@@ -339,7 +432,8 @@ export class UsersService {
   }
 
   async atualizar(id: string, userData: Partial<User>, empresa_id: string): Promise<User> {
-    await this.userRepository.update({ id, empresa_id }, userData);
+    const normalizedData = this.normalizeRoleForUpdate(userData);
+    await this.userRepository.update({ id, empresa_id }, normalizedData);
     return this.userRepository.findOne({ where: { id, empresa_id } });
   }
 

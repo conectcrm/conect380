@@ -341,9 +341,13 @@ export class OportunidadesService {
     },
   ): Promise<Oportunidade[]> {
     const schema = await this.resolveOportunidadesSchema();
+    const usersColumns = await this.getTableColumns('users');
     const responsavelRef = `oportunidade.${this.quoteIdentifier(schema.responsavelColumn)}`;
     const createdAtRef = `oportunidade.${this.quoteIdentifier(schema.createdAtColumn)}`;
     const updatedAtRef = `oportunidade.${this.quoteIdentifier(schema.updatedAtColumn)}`;
+    const responsavelAvatarExpr = usersColumns.has('avatar_url')
+      ? 'responsavel.avatar_url'
+      : 'NULL';
     const dataFechamentoEsperadoExpr = schema.dataFechamentoEsperadoColumn
       ? `oportunidade.${this.quoteIdentifier(schema.dataFechamentoEsperadoColumn)}`
       : 'NULL';
@@ -399,7 +403,7 @@ export class OportunidadesService {
       .addSelect('responsavel.id', 'responsavel__id')
       .addSelect('responsavel.nome', 'responsavel__nome')
       .addSelect('responsavel.email', 'responsavel__email')
-      .addSelect('responsavel.avatar_url', 'responsavel__avatar_url')
+      .addSelect(responsavelAvatarExpr, 'responsavel__avatar_url')
       .addSelect('cliente.id', 'cliente__id')
       .addSelect('cliente.nome', 'cliente__nome')
       .addSelect('cliente.email', 'cliente__email')
@@ -730,6 +734,7 @@ export class OportunidadesService {
 
   async listarAtividades(oportunidadeId: string, empresaId: string): Promise<Atividade[]> {
     const atividadeSchema = await this.resolveAtividadesSchema();
+    const usersColumns = await this.getTableColumns('users');
     const oportunidade = await this.findOne(oportunidadeId, empresaId);
 
     if (!oportunidade) {
@@ -739,6 +744,7 @@ export class OportunidadesService {
     const userRef = `atividade.${this.quoteIdentifier(atividadeSchema.userColumn)}`;
     const dateRef = `atividade.${this.quoteIdentifier(atividadeSchema.dateColumn)}`;
     const createdRef = `atividade.${this.quoteIdentifier(atividadeSchema.createdAtColumn)}`;
+    const usuarioAvatarExpr = usersColumns.has('avatar_url') ? 'usuario.avatar_url' : 'NULL';
 
     const rows = await this.atividadeRepository
       .createQueryBuilder('atividade')
@@ -753,7 +759,7 @@ export class OportunidadesService {
       .addSelect(createdRef, 'createdAt')
       .addSelect('usuario.id', 'usuario__id')
       .addSelect('usuario.nome', 'usuario__nome')
-      .addSelect('usuario.avatar_url', 'usuario__avatar_url')
+      .addSelect(usuarioAvatarExpr, 'usuario__avatar_url')
       .where('atividade.oportunidade_id::text = :oportunidadeId', { oportunidadeId })
       .andWhere('atividade.empresa_id = :empresaId', { empresaId })
       .orderBy(dateRef, 'DESC')
