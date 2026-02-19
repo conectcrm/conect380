@@ -13,14 +13,17 @@ import {
 import { AssinaturasService } from './assinaturas.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { CriarAssinaturaDto } from './dto/criar-assinatura.dto';
 import { CriarCheckoutDto } from './dto/criar-checkout.dto';
 import { MercadoPagoService } from '../mercado-pago/mercado-pago.service';
 import { EmpresaId } from '../../common/decorators/empresa.decorator';
+import { UserRole } from '../users/user.entity';
 import type { Request } from 'express';
 
 @Controller('assinaturas')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, RolesGuard)
 export class AssinaturasController {
   constructor(
     private readonly assinaturasService: AssinaturasService,
@@ -59,6 +62,7 @@ export class AssinaturasController {
   }
 
   @Post()
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async criar(@EmpresaId() empresaId: string, @Body() dados: CriarAssinaturaDto) {
     return this.assinaturasService.criar({
       ...dados,
@@ -67,6 +71,7 @@ export class AssinaturasController {
   }
 
   @Post('checkout')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async criarCheckout(
     @EmpresaId() empresaId: string,
     @Body() dados: CriarCheckoutDto,
@@ -126,6 +131,7 @@ export class AssinaturasController {
   }
 
   @Patch('empresa/:empresaId/plano')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async alterarPlano(
     @EmpresaId() empresaId: string,
     @Param('empresaId') _empresaIdIgnorado: string,
@@ -135,6 +141,7 @@ export class AssinaturasController {
   }
 
   @Patch('empresa/:empresaId/cancelar')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async cancelar(
     @EmpresaId() empresaId: string,
     @Param('empresaId') _empresaIdIgnorado: string,
@@ -145,16 +152,19 @@ export class AssinaturasController {
   }
 
   @Patch('empresa/:empresaId/suspender')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async suspender(@EmpresaId() empresaId: string, @Param('empresaId') _empresaIdIgnorado: string) {
     return this.assinaturasService.suspender(empresaId);
   }
 
   @Patch('empresa/:empresaId/reativar')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async reativar(@EmpresaId() empresaId: string, @Param('empresaId') _empresaIdIgnorado: string) {
     return this.assinaturasService.reativar(empresaId);
   }
 
   @Patch('empresa/:empresaId/contadores')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async atualizarContadores(
     @EmpresaId() empresaId: string,
     @Param('empresaId') _empresaIdIgnorado: string,
@@ -169,6 +179,7 @@ export class AssinaturasController {
   }
 
   @Post('empresa/:empresaId/api-call')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async registrarChamadaApi(
     @EmpresaId() empresaId: string,
     @Param('empresaId') _empresaIdIgnorado: string,
