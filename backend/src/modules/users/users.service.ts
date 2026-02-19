@@ -49,12 +49,11 @@ export class UsersService {
     return `${fallbackExpression} AS ${alias}`;
   }
 
-  private buildUserSelect(columns: Set<string>): string {
-    return [
+  private buildUserSelect(columns: Set<string>, includePassword: boolean = false): string {
+    const baseSelect = [
       'u.id',
       'u.nome',
       'u.email',
-      'u.senha',
       this.resolveUsersColumnExpression(columns, 'telefone', ['telefone']),
       'u.role',
       this.resolveUsersColumnExpression(columns, 'permissoes', ['permissoes']),
@@ -77,7 +76,15 @@ export class UsersService {
       'e.plano AS empresa_plano',
       'e.ativo AS empresa_ativo',
       'e.subdominio AS empresa_subdominio',
-    ].join(',\n          ');
+    ];
+
+    if (includePassword) {
+      baseSelect.splice(3, 0, 'u.senha');
+    } else {
+      baseSelect.splice(3, 0, 'NULL::text AS senha');
+    }
+
+    return baseSelect.join(',\n          ');
   }
 
   private mapRawUser(raw: any): User {
@@ -185,7 +192,7 @@ export class UsersService {
 
   async findByEmail(email: string): Promise<User | undefined> {
     const columns = await this.getUsersTableColumns();
-    const select = this.buildUserSelect(columns);
+    const select = this.buildUserSelect(columns, true);
 
     const rows: any[] = await this.userRepository.query(
       `
@@ -209,7 +216,31 @@ export class UsersService {
 
   async findById(id: string): Promise<User | undefined> {
     const columns = await this.getUsersTableColumns();
-    const select = this.buildUserSelect(columns);
+    const select = this.buildUserSelect(columns, false);
+
+    const rows: any[] = await this.userRepository.query(
+      `
+        SELECT
+          ${select}
+        FROM users u
+        LEFT JOIN empresas e ON e.id = u.empresa_id
+        WHERE u.id = $1
+        LIMIT 1
+      `,
+      [id],
+    );
+
+    const raw = rows?.[0];
+    if (!raw) {
+      return undefined;
+    }
+
+    return this.mapRawUser(raw);
+  }
+
+  private async findByIdWithPassword(id: string): Promise<User | undefined> {
+    const columns = await this.getUsersTableColumns();
+    const select = this.buildUserSelect(columns, true);
 
     const rows: any[] = await this.userRepository.query(
       `
@@ -236,7 +267,7 @@ export class UsersService {
    * Diferente de findById que NÃO retorna senha
    */
   async findOne(id: string, empresaId?: string): Promise<User | undefined> {
-    const user = await this.findById(id);
+    const user = await this.findByIdWithPassword(id);
     if (!user) {
       return undefined;
     }

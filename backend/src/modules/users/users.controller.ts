@@ -12,7 +12,9 @@ import { Logger,
   UploadedFile,
   UseInterceptors,
   BadRequestException,
+  ForbiddenException,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -24,8 +26,10 @@ import * as path from 'path';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/user.decorator';
-import { User } from './user.entity';
+import { User, UserRole } from './user.entity';
 
 const AVATAR_UPLOAD_SUBDIR = 'avatars';
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -43,7 +47,7 @@ const ensureAvatarDirectory = (): string => {
 
 @ApiTags('users')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, RolesGuard)
 @Controller('users')
 export class UsersController {
   private readonly logger = new Logger(UsersController.name);
@@ -69,6 +73,193 @@ export class UsersController {
     }
 
     return path.join(this.getAvatarUploadDir(), filePart);
+  }
+
+  private normalizeRoleInput(role: unknown): UserRole | null {
+    if (typeof role !== 'string') {
+      return null;
+    }
+
+    const normalized = role.trim().toLowerCase();
+    if (!normalized) {
+      return null;
+    }
+
+    switch (normalized) {
+      case 'superadmin':
+        return UserRole.SUPERADMIN;
+      case 'admin':
+      case 'administrador':
+        return UserRole.ADMIN;
+      case 'gerente':
+      case 'manager':
+      case 'gestor':
+        return UserRole.GERENTE;
+      case 'vendedor':
+        return UserRole.VENDEDOR;
+      case 'suporte':
+      case 'support':
+      case 'user':
+      case 'usuario':
+      case 'operacional':
+        return UserRole.SUPORTE;
+      case 'financeiro':
+        return UserRole.FINANCEIRO;
+      default:
+        return null;
+    }
+  }
+
+  private getManageableRoles(actorRole: UserRole): Set<UserRole> {
+    if (actorRole === UserRole.SUPERADMIN) {
+      return new Set([
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+        UserRole.GERENTE,
+        UserRole.VENDEDOR,
+        UserRole.SUPORTE,
+        UserRole.FINANCEIRO,
+      ]);
+    }
+
+    if (actorRole === UserRole.ADMIN) {
+      return new Set([UserRole.GERENTE, UserRole.VENDEDOR, UserRole.SUPORTE, UserRole.FINANCEIRO]);
+    }
+
+    if (actorRole === UserRole.GERENTE) {
+      return new Set([UserRole.VENDEDOR, UserRole.SUPORTE]);
+    }
+
+    return new Set();
+  }
+
+  private ensureCanAssignRole(actor: User, requestedRole: unknown): void {
+    const actorRole = this.normalizeRoleInput(actor.role) ?? UserRole.VENDEDOR;
+    const normalizedRequestedRole =
+      requestedRole === undefined
+        ? UserRole.VENDEDOR
+        : this.normalizeRoleInput(requestedRole);
+
+    if (requestedRole !== undefined && !normalizedRequestedRole) {
+      throw new BadRequestException('Perfil de usuario invalido');
+    }
+
+    if (!normalizedRequestedRole || !this.getManageableRoles(actorRole).has(normalizedRequestedRole)) {
+      throw new ForbiddenException('Sem permissao para atribuir este perfil');
+    }
+  }
+
+  private async ensureCanManageUser(actor: User, userId: string, action: string): Promise<User> {
+    const target = await this.usersService.findOne(userId, actor.empresa_id);
+    if (!target) {
+      throw new NotFoundException('Usuario nao encontrado');
+    }
+
+    const actorRole = this.normalizeRoleInput(actor.role) ?? UserRole.VENDEDOR;
+    const targetRole = this.normalizeRoleInput(target.role);
+
+    if (target.id === actor.id && actorRole !== UserRole.SUPERADMIN) {
+      throw new ForbiddenException(
+        `Nao e permitido ${action} o proprio usuario por este endpoint`,
+      );
+    }
+
+    if (!targetRole || !this.getManageableRoles(actorRole).has(targetRole)) {
+      throw new ForbiddenException(`Sem permissao para ${action} este usuario`);
+    }
+
+    return target;
+  }
+
+  private sanitizeUser(user?: User | null): any {
+    if (!user) {
+      return user;
+    }
+
+    const { senha, ...safeUser } = user as User & { senha?: string };
+    return safeUser;
+  }
+
+  private sanitizeProfileUpdatePayload(updateData: Partial<User>): Partial<User> {
+    const allowedKeys = new Set(['nome', 'telefone', 'avatar_url', 'idioma_preferido', 'configuracoes']);
+    const forbiddenKeys = ['role', 'empresa_id', 'ativo', 'senha', 'permissoes', 'deve_trocar_senha'];
+    const payload = updateData ?? {};
+
+    const forbiddenProvided = forbiddenKeys.filter((key) => key in payload);
+    if (forbiddenProvided.length > 0) {
+      throw new ForbiddenException(
+        `Nao e permitido alterar os campos: ${forbiddenProvided.join(', ')}`,
+      );
+    }
+
+    const unknownKeys = Object.keys(payload).filter((key) => !allowedKeys.has(key));
+    if (unknownKeys.length > 0) {
+      throw new BadRequestException(`Campos nao permitidos: ${unknownKeys.join(', ')}`);
+    }
+
+    const sanitized = Object.fromEntries(
+      Object.entries(payload).filter(([key, value]) => allowedKeys.has(key) && value !== undefined),
+    ) as Partial<User>;
+
+    if (Object.keys(sanitized).length === 0) {
+      throw new BadRequestException('Nenhum campo valido para atualizacao de perfil');
+    }
+
+    return sanitized;
+  }
+
+  private sanitizeUserCreatePayload(dadosUsuario: any): Partial<User> {
+    const allowedKeys = new Set([
+      'nome',
+      'email',
+      'senha',
+      'telefone',
+      'role',
+      'permissoes',
+      'avatar_url',
+      'idioma_preferido',
+      'configuracoes',
+      'status_atendente',
+      'capacidade_maxima',
+    ]);
+    const payload = dadosUsuario ?? {};
+    const unknownKeys = Object.keys(payload).filter((key) => !allowedKeys.has(key));
+    if (unknownKeys.length > 0) {
+      throw new BadRequestException(`Campos nao permitidos: ${unknownKeys.join(', ')}`);
+    }
+
+    return payload;
+  }
+
+  private sanitizeUserAdminUpdatePayload(dadosAtualizacao: any): Partial<User> {
+    const allowedKeys = new Set([
+      'nome',
+      'email',
+      'telefone',
+      'role',
+      'permissoes',
+      'avatar_url',
+      'idioma_preferido',
+      'configuracoes',
+      'status_atendente',
+      'capacidade_maxima',
+    ]);
+    const payload = dadosAtualizacao ?? {};
+    const unknownKeys = Object.keys(payload).filter((key) => !allowedKeys.has(key));
+
+    if (unknownKeys.length > 0) {
+      throw new BadRequestException(`Campos nao permitidos: ${unknownKeys.join(', ')}`);
+    }
+
+    const sanitized = Object.fromEntries(
+      Object.entries(payload).filter(([_, value]) => value !== undefined),
+    ) as Partial<User>;
+
+    if (Object.keys(sanitized).length === 0) {
+      throw new BadRequestException('Nenhum campo valido para atualizacao');
+    }
+
+    return sanitized;
   }
 
   @Get('profile')
@@ -106,10 +297,11 @@ export class UsersController {
   @ApiOperation({ summary: 'Atualizar perfil do usuário logado' })
   @ApiResponse({ status: 200, description: 'Perfil atualizado com sucesso' })
   async updateProfile(@CurrentUser() user: User, @Body() updateData: Partial<User>) {
-    const updatedUser = await this.usersService.update(user.id, updateData);
+    const safeUpdateData = this.sanitizeProfileUpdatePayload(updateData);
+    const updatedUser = await this.usersService.update(user.id, safeUpdateData);
     return {
       success: true,
-      data: updatedUser,
+      data: this.sanitizeUser(updatedUser),
       message: 'Perfil atualizado com sucesso',
     };
   }
@@ -232,6 +424,7 @@ export class UsersController {
   }
 
   @Get(['', '/'])
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
   @ApiOperation({ summary: 'Listar usuários com filtros' })
   @ApiResponse({ status: 200, description: 'Lista de usuários com filtros retornada com sucesso' })
   async listarUsuarios(
@@ -260,7 +453,7 @@ export class UsersController {
     return {
       success: true,
       data: {
-        items: result.usuarios,
+        items: result.usuarios.map((usuario) => this.sanitizeUser(usuario)),
         total: result.total,
         pagina: filtros.pagina,
         limite: filtros.limite,
@@ -269,6 +462,7 @@ export class UsersController {
   }
 
   @Get('estatisticas')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
   @ApiOperation({ summary: 'Obter estatísticas dos usuários' })
   @ApiResponse({ status: 200, description: 'Estatísticas retornadas com sucesso' })
   async obterEstatisticas(@CurrentUser() user: User) {
@@ -280,33 +474,39 @@ export class UsersController {
   }
 
   @Get('atendentes')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
   @ApiOperation({ summary: 'Listar usuários com permissão de atendimento' })
   @ApiResponse({ status: 200, description: 'Atendentes retornados com sucesso' })
   async listarAtendentes(@CurrentUser() user: User) {
     const atendentes = await this.usersService.listarAtendentes(user.empresa_id);
     return {
       success: true,
-      data: atendentes,
+      data: atendentes.map((atendente) => this.sanitizeUser(atendente)),
     };
   }
 
   @Post()
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
   @ApiOperation({ summary: 'Criar novo usuário' })
   @ApiResponse({ status: 201, description: 'Usuário criado com sucesso' })
   async criarUsuario(@CurrentUser() user: User, @Body() dadosUsuario: any) {
+    const payload = this.sanitizeUserCreatePayload(dadosUsuario);
+    this.ensureCanAssignRole(user, payload.role);
+
     const novoUsuario = await this.usersService.criar({
-      ...dadosUsuario,
+      ...payload,
       empresa_id: user.empresa_id,
     });
 
     return {
       success: true,
-      data: novoUsuario,
+      data: this.sanitizeUser(novoUsuario),
       message: 'Usuário criado com sucesso',
     };
   }
 
   @Put(':id')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
   @ApiOperation({ summary: 'Atualizar usuário' })
   @ApiResponse({ status: 200, description: 'Usuário atualizado com sucesso' })
   async atualizarUsuario(
@@ -314,22 +514,31 @@ export class UsersController {
     @Param('id') id: string,
     @Body() dadosAtualizacao: any,
   ) {
+    await this.ensureCanManageUser(user, id, 'atualizar');
+    const payload = this.sanitizeUserAdminUpdatePayload(dadosAtualizacao);
+    if (payload.role !== undefined) {
+      this.ensureCanAssignRole(user, payload.role);
+    }
+
     const usuarioAtualizado = await this.usersService.atualizar(
       id,
-      dadosAtualizacao,
+      payload,
       user.empresa_id,
     );
     return {
       success: true,
-      data: usuarioAtualizado,
+      data: this.sanitizeUser(usuarioAtualizado),
       message: 'Usuário atualizado com sucesso',
     };
   }
 
   @Put(':id/reset-senha')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
   @ApiOperation({ summary: 'Resetar senha do usuário' })
   @ApiResponse({ status: 200, description: 'Senha resetada com sucesso' })
   async resetarSenha(@CurrentUser() user: User, @Param('id') id: string) {
+    await this.ensureCanManageUser(user, id, 'resetar senha de');
+
     const novaSenha = await this.usersService.resetarSenha(id, user.empresa_id);
     return {
       success: true,
@@ -339,6 +548,7 @@ export class UsersController {
   }
 
   @Patch(':id/status')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
   @ApiOperation({ summary: 'Alterar status do usuário (ativar/desativar)' })
   @ApiResponse({ status: 200, description: 'Status do usuário alterado com sucesso' })
   async alterarStatusUsuario(
@@ -346,18 +556,28 @@ export class UsersController {
     @Param('id') id: string,
     @Body('ativo') ativo: boolean,
   ) {
+    await this.ensureCanManageUser(user, id, 'alterar status de');
     const usuarioAtualizado = await this.usersService.alterarStatus(id, ativo, user.empresa_id);
     return {
       success: true,
-      data: usuarioAtualizado,
+      data: this.sanitizeUser(usuarioAtualizado),
       message: `Usuário ${ativo ? 'ativado' : 'desativado'} com sucesso`,
     };
   }
 
   @Put('bulk/ativar')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
   @ApiOperation({ summary: 'Ativar usuários em massa' })
   @ApiResponse({ status: 200, description: 'Usuários ativados com sucesso' })
   async ativarUsuarios(@CurrentUser() user: User, @Body('ids') ids: string[]) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new BadRequestException('Informe ao menos um ID para ativar');
+    }
+
+    for (const id of ids) {
+      await this.ensureCanManageUser(user, id, 'ativar');
+    }
+
     await this.usersService.ativarEmMassa(ids, user.empresa_id);
     return {
       success: true,
@@ -366,9 +586,18 @@ export class UsersController {
   }
 
   @Put('bulk/desativar')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
   @ApiOperation({ summary: 'Desativar usuários em massa' })
   @ApiResponse({ status: 200, description: 'Usuários desativados com sucesso' })
   async desativarUsuarios(@CurrentUser() user: User, @Body('ids') ids: string[]) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new BadRequestException('Informe ao menos um ID para desativar');
+    }
+
+    for (const id of ids) {
+      await this.ensureCanManageUser(user, id, 'desativar');
+    }
+
     await this.usersService.desativarEmMassa(ids, user.empresa_id);
     return {
       success: true,
