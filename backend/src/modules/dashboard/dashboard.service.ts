@@ -110,6 +110,9 @@ export interface DashboardChartsData {
 
 @Injectable()
 export class DashboardService {
+  private readonly statusAprovadaAliases = ['aprovada', 'aceita'];
+  private readonly statusEmNegociacaoAliases = ['enviada', 'visualizada'];
+
   constructor(
     @InjectRepository(PropostaEntity)
     private propostaRepository: Repository<PropostaEntity>,
@@ -120,6 +123,10 @@ export class DashboardService {
     private metasService: MetasService,
     private eventosService: EventosService,
   ) {}
+
+  private isStatusAprovada(status?: string): boolean {
+    return !!status && this.statusAprovadaAliases.includes(status);
+  }
 
   /**
    * Obter KPIs principais do dashboard
@@ -669,7 +676,9 @@ export class DashboardService {
     const query = this.propostaRepository
       .createQueryBuilder('proposta')
       .select('SUM(proposta.total)', 'total')
-      .where('proposta.status = :status', { status: 'aprovada' })
+      .where('proposta.status::text IN (:...statusAprovada)', {
+        statusAprovada: this.statusAprovadaAliases,
+      })
       .andWhere('proposta.criadaEm BETWEEN :dataInicio AND :dataFim', { dataInicio, dataFim });
 
     if (empresaId) {
@@ -695,7 +704,9 @@ export class DashboardService {
     const query = this.propostaRepository
       .createQueryBuilder('proposta')
       .select('AVG(proposta.total)', 'media')
-      .where('proposta.status = :status', { status: 'aprovada' })
+      .where('proposta.status::text IN (:...statusAprovada)', {
+        statusAprovada: this.statusAprovadaAliases,
+      })
       .andWhere('proposta.criadaEm BETWEEN :dataInicio AND :dataFim', { dataInicio, dataFim });
 
     if (empresaId) {
@@ -718,17 +729,22 @@ export class DashboardService {
     regiao?: string,
     empresaId?: string,
   ): Promise<number> {
-    const whereConditions: any = {
-      status: 'aprovada',
-      criadaEm: Between(dataInicio, dataFim),
-      ...(empresaId ? { empresaId } : {}),
-    };
+    const query = this.propostaRepository
+      .createQueryBuilder('proposta')
+      .where('proposta.criadaEm BETWEEN :dataInicio AND :dataFim', { dataInicio, dataFim })
+      .andWhere('proposta.status::text IN (:...statusAprovada)', {
+        statusAprovada: this.statusAprovadaAliases,
+      });
 
-    if (vendedorId) {
-      whereConditions.vendedor_id = vendedorId;
+    if (empresaId) {
+      query.andWhere('proposta.empresaId = :empresaId', { empresaId });
     }
 
-    return await this.propostaRepository.count({ where: whereConditions });
+    if (vendedorId) {
+      query.andWhere('proposta.vendedor_id = :vendedorId', { vendedorId });
+    }
+
+    return await query.getCount();
   }
 
   private async calculateEmNegociacao(
@@ -826,24 +842,25 @@ export class DashboardService {
     regiao?: string,
     empresaId?: string,
   ): Promise<number> {
-    const whereConditionsTotal: any = {
-      criadaEm: Between(dataInicio, dataFim),
-      ...(empresaId ? { empresaId } : {}),
-    };
+    const totalQuery = this.propostaRepository
+      .createQueryBuilder('proposta')
+      .where('proposta.criadaEm BETWEEN :dataInicio AND :dataFim', { dataInicio, dataFim });
 
-    const whereConditionsAprovadas: any = {
-      status: 'aprovada',
-      criadaEm: Between(dataInicio, dataFim),
-      ...(empresaId ? { empresaId } : {}),
-    };
-
-    if (vendedorId) {
-      whereConditionsTotal.vendedor_id = vendedorId;
-      whereConditionsAprovadas.vendedor_id = vendedorId;
+    if (empresaId) {
+      totalQuery.andWhere('proposta.empresaId = :empresaId', { empresaId });
     }
 
-    const total = await this.propostaRepository.count({ where: whereConditionsTotal });
-    const aprovadas = await this.propostaRepository.count({ where: whereConditionsAprovadas });
+    if (vendedorId) {
+      totalQuery.andWhere('proposta.vendedor_id = :vendedorId', { vendedorId });
+    }
+
+    const total = await totalQuery.getCount();
+    const aprovadas = await totalQuery
+      .clone()
+      .andWhere('proposta.status::text IN (:...statusAprovada)', {
+        statusAprovada: this.statusAprovadaAliases,
+      })
+      .getCount();
 
     return total > 0 ? (aprovadas / total) * 100 : 0;
   }
@@ -855,6 +872,7 @@ export class DashboardService {
     regiao?: string,
     empresaId?: string,
   ): Promise<number> {
+    const statusFinalizadas = [...this.statusAprovadaAliases, 'rejeitada', 'expirada'];
     const query = this.propostaRepository
       .createQueryBuilder('proposta')
       .select(
@@ -862,8 +880,8 @@ export class DashboardService {
         'dias',
       )
       .where('proposta.criadaEm BETWEEN :dataInicio AND :dataFim', { dataInicio, dataFim })
-      .andWhere('proposta.status IN (:...status)', {
-        status: ['aprovada', 'rejeitada', 'expirada'],
+      .andWhere('proposta.status::text IN (:...statusFinalizadas)', {
+        statusFinalizadas,
       });
 
     if (empresaId) {
@@ -889,7 +907,9 @@ export class DashboardService {
       .createQueryBuilder('proposta')
       .select('AVG(EXTRACT(EPOCH FROM (:dataFim - proposta.criadaEm)) / 86400)', 'dias')
       .where('proposta.criadaEm BETWEEN :dataInicio AND :dataFim', { dataInicio, dataFim })
-      .andWhere('proposta.status IN (:...status)', { status: ['enviada', 'visualizada'] });
+      .andWhere('proposta.status::text IN (:...statusEmNegociacao)', {
+        statusEmNegociacao: this.statusEmNegociacaoAliases,
+      });
 
     if (empresaId) {
       query.andWhere('proposta.empresaId = :empresaId', { empresaId });
@@ -1001,7 +1021,7 @@ export class DashboardService {
     const totals = new Map<string, number>(monthKeys.map((key) => [key, 0]));
 
     propostas.forEach((proposta) => {
-      if (proposta.status !== 'aprovada') return;
+      if (!this.isStatusAprovada(proposta.status)) return;
       const key = this.toMonthKey(proposta.criadaEm);
       const total = Number(proposta.total || 0);
       totals.set(key, (totals.get(key) || 0) + total);
@@ -1017,13 +1037,13 @@ export class DashboardService {
   private buildPropostasPorStatus(
     propostas: Pick<PropostaEntity, 'status'>[],
   ): DashboardChartsData['propostasPorStatus'] {
-    const statusConfig: Array<{ status: string; label: string; color: string }> = [
-      { status: 'rascunho', label: 'Rascunho', color: '#6B7280' },
-      { status: 'enviada', label: 'Enviada', color: '#3B82F6' },
-      { status: 'visualizada', label: 'Visualizada', color: '#06B6D4' },
-      { status: 'aprovada', label: 'Aprovada', color: '#10B981' },
-      { status: 'rejeitada', label: 'Rejeitada', color: '#F59E0B' },
-      { status: 'expirada', label: 'Expirada', color: '#EF4444' },
+    const statusConfig: Array<{ statuses: string[]; label: string; color: string }> = [
+      { statuses: ['rascunho'], label: 'Rascunho', color: '#6B7280' },
+      { statuses: ['enviada'], label: 'Enviada', color: '#3B82F6' },
+      { statuses: ['visualizada'], label: 'Visualizada', color: '#06B6D4' },
+      { statuses: this.statusAprovadaAliases, label: 'Aprovada', color: '#10B981' },
+      { statuses: ['rejeitada'], label: 'Rejeitada', color: '#F59E0B' },
+      { statuses: ['expirada'], label: 'Expirada', color: '#EF4444' },
     ];
 
     if (propostas.length === 0) {
@@ -1038,7 +1058,7 @@ export class DashboardService {
     const total = propostas.length;
     return statusConfig
       .map((config) => {
-        const quantidade = counts.get(config.status) || 0;
+        const quantidade = config.statuses.reduce((acc, status) => acc + (counts.get(status) || 0), 0);
         const percentual = total > 0 ? (quantidade / total) * 100 : 0;
         return {
           status: config.label,
@@ -1054,8 +1074,8 @@ export class DashboardService {
   ): DashboardChartsData['funilVendas'] {
     const etapas: Array<{ etapa: string; statuses: string[] }> = [
       { etapa: 'Rascunho', statuses: ['rascunho'] },
-      { etapa: 'Enviadas', statuses: ['enviada', 'visualizada'] },
-      { etapa: 'Aprovadas', statuses: ['aprovada'] },
+      { etapa: 'Enviadas', statuses: this.statusEmNegociacaoAliases },
+      { etapa: 'Aprovadas', statuses: this.statusAprovadaAliases },
       { etapa: 'Perdidas', statuses: ['rejeitada', 'expirada'] },
     ];
 

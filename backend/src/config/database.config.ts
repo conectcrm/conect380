@@ -51,6 +51,7 @@ import { EmpresaModulo } from '../modules/empresas/entities/empresa-modulo.entit
 import { EmpresaConfig } from '../modules/empresas/entities/empresa-config.entity'; // ✅ Configurações de empresa
 import { PasswordResetToken } from '../modules/auth/entities/password-reset-token.entity'; // ✅ Tokens de recuperação de senha
 import { Lead } from '../modules/leads/lead.entity'; // ✅ Módulo de Leads CRM
+import { Meta } from '../modules/metas/entities/meta.entity';
 import { ConfiguracaoGateway } from '../modules/pagamentos/entities/configuracao-gateway.entity';
 import { TransacaoGateway } from '../modules/pagamentos/entities/transacao-gateway.entity';
 import { Cotacao } from '../cotacao/entities/cotacao.entity';
@@ -130,6 +131,7 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         EmpresaConfig, // ✅ Configurações de empresa
         PasswordResetToken, // ✅ Tokens de recuperação de senha
         Lead, // ✅ Módulo de Leads CRM
+        Meta, // ✅ Metas comerciais
       ],
       synchronize: false, // ✅ DESABILITADO - usar migrations para segurança
       logging: this.configService.get('APP_ENV') === 'development',
