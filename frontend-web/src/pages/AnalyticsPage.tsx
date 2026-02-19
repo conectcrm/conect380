@@ -1,19 +1,18 @@
-import React, { useState } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Button } from '../ui/button';
+import React from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/Tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
 import {
   BarChart3,
   TrendingUp,
   Target,
-  AlertTriangle,
   FileText,
   Download,
   RefreshCw
 } from 'lucide-react';
-import AnalyticsDashboard from './AnalyticsDashboard';
-import KpisTempoReal from './KpisTempoReal';
-import AlertasGestao from './AlertasGestao';
+import AnalyticsDashboard from '../components/analytics/AnalyticsDashboard';
+import KpisTempoReal from '../components/analytics/KpisTempoReal';
+import AlertasGestao from '../components/analytics/AlertasGestao';
 
 interface AnalyticsPageProps {
   defaultTab?: string;
@@ -22,8 +21,6 @@ interface AnalyticsPageProps {
 const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
   defaultTab = 'dashboard'
 }) => {
-  const [activeTab, setActiveTab] = useState(defaultTab);
-
   const handleAlertaClick = (alerta: any) => {
     console.log('Alerta clicado:', alerta);
 
@@ -105,7 +102,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-3">
             {/* Tabs principais */}
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <Tabs defaultValue={defaultTab}>
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="dashboard" className="flex items-center gap-2">
                   <BarChart3 className="h-4 w-4" />
@@ -225,7 +222,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
                 <ul className="text-sm text-gray-700 space-y-1">
                   <li>• Taxa de conversão acima da média do setor</li>
                   <li>• Ticket médio crescendo consistentemente</li>
-                  <li>• Tempo de resposta excelente (< 2h)</li>
+                  <li>• Tempo de resposta excelente (&lt; 2h)</li>
                 </ul>
               </div>
 
@@ -264,5 +261,3 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
 };
 
 export default AnalyticsPage;
-
-

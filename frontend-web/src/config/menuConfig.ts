@@ -238,6 +238,15 @@ export const menuConfig: MenuConfig[] = [
         group: 'Vendas',
       },
       {
+        id: 'comercial-analytics',
+        title: 'Analytics Comercial',
+        icon: BarChart3,
+        href: '/relatorios/analytics',
+        color: 'blue',
+        requiredModule: 'CRM',
+        group: 'Vendas',
+      },
+      {
         id: 'comercial-cotacoes',
         title: 'Cota\u00e7\u00f5es',
         icon: Calculator,

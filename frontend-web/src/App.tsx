@@ -84,6 +84,7 @@ const DashboardDistribuicaoPage = React.lazy(() => import('./pages/DashboardDist
 const GestaoSkillsPage = React.lazy(() => import('./pages/GestaoSkillsPage'));
 const ConfiguracaoSLAPage = React.lazy(() => import('./pages/ConfiguracaoSLAPage'));
 const DashboardAnalyticsPage = React.lazy(() => import('./pages/DashboardAnalyticsPage'));
+const AnalyticsPage = React.lazy(() => import('./pages/AnalyticsPage'));
 const FechamentoAutomaticoPage = React.lazy(() => import('./pages/FechamentoAutomaticoPage'));
 const GestaoTicketsPage = React.lazy(() => import('./pages/GestaoTicketsPage'));
 const TicketCreatePage = React.lazy(() => import('./pages/TicketCreatePage'));
@@ -599,7 +600,7 @@ const AppRoutes: React.FC = () => {
                     path="/nuclei/configuracoes/tickets/tipos"
                     element={<Navigate to="/configuracoes/tickets/tipos" replace />}
                   />
-                  <Route path="/relatorios/analytics" element={<RelatoriosAnalyticsPage />} />
+                  <Route path="/relatorios/analytics" element={<AnalyticsPage />} />
                   <Route path="/gestao/permissoes" element={<SistemaPermissoesPage />} />
                   <Route path="/sistema/backup" element={<BackupSincronizacaoPage />} />
                   {/* Atendimento Omnichannel - Protegido */}

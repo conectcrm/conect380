@@ -6,10 +6,8 @@ import {
   AlertTriangle,
   Clock,
   TrendingUp,
-  Target,
   CheckCircle,
   Bell,
-  X,
   ArrowRight,
 } from 'lucide-react';
 
@@ -29,6 +27,39 @@ interface AlertasGestaoProps {
   onAlertaClick?: (alerta: Alerta) => void;
   maxAlertas?: number;
 }
+
+const formatarTipo = (tipo: string) =>
+  tipo
+    .split('_')
+    .filter(Boolean)
+    .map((parte) => parte.charAt(0).toUpperCase() + parte.slice(1))
+    .join(' ');
+
+const getTituloAlerta = (tipo: string) => {
+  switch (tipo) {
+    case 'prazo_vencido':
+      return 'Propostas sem avanço';
+    case 'baixa_conversao':
+      return 'Baixa conversão';
+    case 'tempo_resposta':
+      return 'Tempo de resposta alto';
+    default:
+      return `Alerta: ${formatarTipo(tipo)}`;
+  }
+};
+
+const getTituloOportunidade = (tipo: string) => {
+  switch (tipo) {
+    case 'conversao_leads':
+      return 'Leads qualificados para conversão';
+    case 'upsell':
+      return 'Oportunidades de upsell';
+    case 'reengajamento':
+      return 'Clientes para reengajar';
+    default:
+      return `Oportunidade: ${formatarTipo(tipo)}`;
+  }
+};
 
 const AlertasGestao: React.FC<AlertasGestaoProps> = ({ onAlertaClick, maxAlertas = 5 }) => {
   const [alertas, setAlertas] = useState<Alerta[]>([]);
@@ -52,9 +83,12 @@ const AlertasGestao: React.FC<AlertasGestaoProps> = ({ onAlertaClick, maxAlertas
 
       if (response.ok) {
         const data = await response.json();
+        const alertasCriticos = Array.isArray(data.alertas_criticos) ? data.alertas_criticos : [];
+        const alertasAtencao = Array.isArray(data.alertas_atencao) ? data.alertas_atencao : [];
+        const oportunidades = Array.isArray(data.oportunidades) ? data.oportunidades : [];
 
         const todosAlertas: Alerta[] = [
-          ...data.alertas_criticos.map((alerta: any) => ({
+          ...alertasCriticos.map((alerta: any) => ({
             id: `critico-${alerta.tipo}`,
             tipo: 'critico' as const,
             titulo: getTituloAlerta(alerta.tipo),
@@ -64,7 +98,7 @@ const AlertasGestao: React.FC<AlertasGestaoProps> = ({ onAlertaClick, maxAlertas
             timestamp: new Date().toISOString(),
             lido: false,
           })),
-          ...data.alertas_atencao.map((alerta: any) => ({
+          ...alertasAtencao.map((alerta: any) => ({
             id: `atencao-${alerta.tipo}`,
             tipo: 'atencao' as const,
             titulo: getTituloAlerta(alerta.tipo),
@@ -74,13 +108,15 @@ const AlertasGestao: React.FC<AlertasGestaoProps> = ({ onAlertaClick, maxAlertas
             timestamp: new Date().toISOString(),
             lido: false,
           })),
-          ...data.oportunidades.map((oportunidade: any) => ({
+          ...oportunidades.map((oportunidade: any) => ({
             id: `oportunidade-${oportunidade.tipo}`,
             tipo: 'oportunidade' as const,
             titulo: getTituloOportunidade(oportunidade.tipo),
             descricao: oportunidade.descricao,
             quantidade: oportunidade.quantidade,
-            acao_sugerida: `Potencial: ${formatarMoeda(oportunidade.potencial_receita)}`,
+            acao_sugerida:
+              oportunidade.acao_sugerida ||
+              `Potencial estimado: ${formatarMoeda(oportunidade.potencial_receita || 0)}`,
             timestamp: new Date().toISOString(),
             lido: false,
           })),
@@ -92,30 +128,6 @@ const AlertasGestao: React.FC<AlertasGestaoProps> = ({ onAlertaClick, maxAlertas
       console.error('Erro ao carregar alertas:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const getTituloAlerta = (tipo: string) => {
-    switch (tipo) {
-      case 'prazo_vencido':
-        return 'Propostas Vencidas';
-      case 'baixa_conversao':
-        return 'Baixa Conversão';
-      case 'tempo_resposta':
-        return 'Tempo de Resposta Alto';
-      default:
-        return 'Alerta';
-    }
-  };
-
-  const getTituloOportunidade = (tipo: string) => {
-    switch (tipo) {
-      case 'upsell':
-        return 'Oportunidades de Upsell';
-      case 'reengajamento':
-        return 'Clientes para Reengajar';
-      default:
-        return 'Oportunidade';
     }
   };
 
@@ -171,11 +183,11 @@ const AlertasGestao: React.FC<AlertasGestaoProps> = ({ onAlertaClick, maxAlertas
 
     if (diffMins < 60) {
       return `${diffMins}m`;
-    } else if (diffMins < 1440) {
-      return `${Math.floor(diffMins / 60)}h`;
-    } else {
-      return `${Math.floor(diffMins / 1440)}d`;
     }
+    if (diffMins < 1440) {
+      return `${Math.floor(diffMins / 60)}h`;
+    }
+    return `${Math.floor(diffMins / 1440)}d`;
   };
 
   if (loading) {
@@ -218,15 +230,15 @@ const AlertasGestao: React.FC<AlertasGestaoProps> = ({ onAlertaClick, maxAlertas
           <div className="text-center py-8">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-2" />
             <p className="text-gray-600">Nenhum alerta no momento</p>
-            <p className="text-sm text-gray-500">Tudo funcionando perfeitamente!</p>
+            <p className="text-sm text-gray-500">Tudo funcionando normalmente.</p>
           </div>
         ) : (
           alertas.map((alerta) => (
             <div
               key={alerta.id}
-              className={`border-l-4 p-4 rounded-lg cursor-pointer transition-all duration-200 hover:shadow-md ${getCorAlerta(alerta.tipo)} ${
-                !alerta.lido ? 'opacity-100' : 'opacity-60'
-              }`}
+              className={`border-l-4 p-4 rounded-lg cursor-pointer transition-all duration-200 hover:shadow-md ${getCorAlerta(
+                alerta.tipo,
+              )} ${!alerta.lido ? 'opacity-100' : 'opacity-60'}`}
               onClick={() => handleAlertaClick(alerta)}
             >
               <div className="flex items-start justify-between">
@@ -247,10 +259,8 @@ const AlertasGestao: React.FC<AlertasGestaoProps> = ({ onAlertaClick, maxAlertas
                     <p className="text-sm text-gray-700 mb-2">{alerta.descricao}</p>
 
                     <div className="flex items-center justify-between">
-                      <p className="text-xs text-gray-600 italic">💡 {alerta.acao_sugerida}</p>
-                      <span className="text-xs text-gray-500">
-                        {formatarTempo(alerta.timestamp)}
-                      </span>
+                      <p className="text-xs text-gray-600 italic">Dica: {alerta.acao_sugerida}</p>
+                      <span className="text-xs text-gray-500">{formatarTempo(alerta.timestamp)}</span>
                     </div>
                   </div>
                 </div>
@@ -271,7 +281,7 @@ const AlertasGestao: React.FC<AlertasGestaoProps> = ({ onAlertaClick, maxAlertas
               className="w-full"
               onClick={() => window.open('/alertas-completos', '_blank')}
             >
-              Ver Todos os Alertas
+              Ver todos os alertas
             </Button>
           </div>
         )}
