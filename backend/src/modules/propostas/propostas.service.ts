@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
+import { randomUUID } from 'crypto';
 import { Proposta as PropostaEntity } from './proposta.entity';
 import { User } from '../users/user.entity';
 import { Cliente } from '../clientes/cliente.entity';
@@ -65,6 +66,7 @@ export interface Proposta {
 @Injectable()
 export class PropostasService {
   private contadorId = 1;
+  private tableColumnsCache = new Map<string, Set<string>>();
 
   constructor(
     @InjectRepository(PropostaEntity)
@@ -101,6 +103,205 @@ export class PropostasService {
     }
   }
 
+  private async getTableColumns(tableName: string): Promise<Set<string>> {
+    if (this.tableColumnsCache.has(tableName)) {
+      return this.tableColumnsCache.get(tableName)!;
+    }
+
+    const rows: Array<{ column_name?: string }> = await this.propostaRepository.query(
+      `
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = $1
+      `,
+      [tableName],
+    );
+
+    const columns = new Set(
+      rows
+        .map((row) => row.column_name)
+        .filter((columnName): columnName is string => Boolean(columnName)),
+    );
+
+    this.tableColumnsCache.set(tableName, columns);
+    return columns;
+  }
+
+  private isLegacyPropostasSchema(columns: Set<string>): boolean {
+    return !columns.has('cliente');
+  }
+
+  private toIsoString(value: unknown): string {
+    if (!value) {
+      return new Date().toISOString();
+    }
+
+    const parsed = value instanceof Date ? value : new Date(value as string);
+    if (Number.isNaN(parsed.getTime())) {
+      return new Date().toISOString();
+    }
+
+    return parsed.toISOString();
+  }
+
+  private normalizeStatusToDatabase(status: string | undefined, legacySchema: boolean): string {
+    const normalized = (status || '').toString().toLowerCase().trim();
+
+    if (!legacySchema) {
+      return normalized || 'rascunho';
+    }
+
+    switch (normalized) {
+      case 'aprovada':
+      case 'aceita':
+        return 'aceita';
+      case 'visualizada':
+      case 'enviada':
+        return 'enviada';
+      case 'rejeitada':
+      case 'expirada':
+      case 'rascunho':
+        return normalized;
+      default:
+        return 'rascunho';
+    }
+  }
+
+  private normalizeStatusFromDatabase(status: string | undefined): Proposta['status'] {
+    const normalized = (status || '').toString().toLowerCase().trim();
+    if (normalized === 'aceita') {
+      return 'aprovada';
+    }
+    if (
+      normalized === 'rascunho' ||
+      normalized === 'enviada' ||
+      normalized === 'visualizada' ||
+      normalized === 'aprovada' ||
+      normalized === 'rejeitada' ||
+      normalized === 'expirada'
+    ) {
+      return normalized;
+    }
+    return 'rascunho';
+  }
+
+  private async resolveFallbackUserId(empresaId: string): Promise<string> {
+    const usersRows: Array<{ id?: string }> = await this.propostaRepository.query(
+      `
+        SELECT id
+        FROM users
+        WHERE empresa_id = $1
+        ORDER BY COALESCE(criado_em, NOW()) DESC
+        LIMIT 1
+      `,
+      [empresaId],
+    );
+
+    return usersRows?.[0]?.id || randomUUID();
+  }
+
+  private async ensureLegacyOportunidadeId(
+    empresaId: string,
+    titulo: string,
+    valor: number,
+    vendedorId: string | null,
+  ): Promise<string> {
+    const oportunidadeColumns = await this.getTableColumns('oportunidades');
+    const userColumn = oportunidadeColumns.has('usuario_id')
+      ? 'usuario_id'
+      : oportunidadeColumns.has('responsavel_id')
+        ? 'responsavel_id'
+        : null;
+
+    const insertColumns: string[] = ['empresa_id', 'titulo', 'valor'];
+    const insertValues: unknown[] = [empresaId, titulo, valor];
+
+    if (userColumn) {
+      insertColumns.push(userColumn);
+      insertValues.push(vendedorId || (await this.resolveFallbackUserId(empresaId)));
+    }
+
+    if (oportunidadeColumns.has('estagio')) {
+      insertColumns.push('estagio');
+      insertValues.push('lead');
+    }
+
+    if (oportunidadeColumns.has('probabilidade')) {
+      insertColumns.push('probabilidade');
+      insertValues.push(0);
+    }
+
+    const placeholders = insertValues.map((_, index) => `$${index + 1}`).join(', ');
+    const result: Array<{ id: string }> = await this.propostaRepository.query(
+      `
+        INSERT INTO oportunidades (${insertColumns.map((column) => `"${column}"`).join(', ')})
+        VALUES (${placeholders})
+        RETURNING id
+      `,
+      insertValues,
+    );
+
+    return result?.[0]?.id || randomUUID();
+  }
+
+  private buildLegacyInterface(
+    row: any,
+    overrides: Partial<Proposta> = {},
+    defaultClienteNome = 'Cliente nao informado',
+  ): Proposta {
+    const valor = Number(row?.valor ?? overrides.valor ?? 0);
+    const total = Number(overrides.total ?? overrides.valor ?? row?.total ?? valor);
+    const subtotal = Number(overrides.subtotal ?? total);
+    const descontoGlobal = Number(overrides.descontoGlobal ?? row?.descontoGlobal ?? 0);
+    const impostos = Number(overrides.impostos ?? row?.impostos ?? 0);
+    const criadaEmIso = this.toIsoString(
+      row?.criado_em ?? row?.criadaEm ?? overrides.criadaEm ?? overrides.createdAt,
+    );
+    const atualizadaEmIso = this.toIsoString(
+      row?.atualizado_em ?? row?.atualizadaEm ?? overrides.atualizadaEm ?? overrides.updatedAt,
+    );
+    const dataVencimentoIso = row?.validade
+      ? this.toIsoString(row.validade)
+      : overrides.dataVencimento;
+
+    const clienteFallback: Proposta['cliente'] = {
+      id: 'cliente-legacy',
+      nome: defaultClienteNome,
+      email: '',
+    };
+
+    const cliente =
+      overrides.cliente && typeof overrides.cliente === 'object' ? overrides.cliente : clienteFallback;
+
+    return {
+      id: row?.id ?? overrides.id ?? randomUUID(),
+      numero: row?.numero ?? overrides.numero ?? this.gerarNumero(),
+      titulo: row?.titulo ?? overrides.titulo,
+      cliente,
+      produtos: overrides.produtos ?? [],
+      subtotal,
+      descontoGlobal,
+      impostos,
+      total,
+      valor,
+      formaPagamento: overrides.formaPagamento ?? 'avista',
+      validadeDias: overrides.validadeDias ?? 30,
+      observacoes: overrides.observacoes ?? row?.descricao ?? undefined,
+      incluirImpostosPDF: overrides.incluirImpostosPDF ?? false,
+      status: this.normalizeStatusFromDatabase(row?.status ?? (overrides.status as string)),
+      dataVencimento: dataVencimentoIso,
+      criadaEm: criadaEmIso,
+      atualizadaEm: atualizadaEmIso,
+      createdAt: criadaEmIso,
+      updatedAt: atualizadaEmIso,
+      source: overrides.source ?? row?.source ?? 'api',
+      vendedor: overrides.vendedor,
+      portalAccess: overrides.portalAccess,
+      emailDetails: overrides.emailDetails,
+    };
+  }
+
   /**
    * Converter entidade para interface de retorno
    */
@@ -132,12 +333,12 @@ export class PropostasService {
             id: entity.vendedor.id,
             nome: entity.vendedor.nome,
             email: entity.vendedor.email,
-            tipo:
-              entity.vendedor.role === 'admin'
-                ? 'admin'
-                : entity.vendedor.role === 'manager'
-                  ? 'gerente'
-                  : 'vendedor',
+            tipo: (() => {
+              const vendedorRole = (entity.vendedor.role || '').toString().toLowerCase();
+              if (vendedorRole === 'admin' || vendedorRole === 'superadmin') return 'admin';
+              if (vendedorRole === 'gerente' || vendedorRole === 'manager') return 'gerente';
+              return 'vendedor';
+            })(),
             ativo: entity.vendedor.ativo,
           }
         : entity.vendedor_id,
@@ -161,10 +362,51 @@ export class PropostasService {
    */
   async listarPropostas(empresaId?: string): Promise<Proposta[]> {
     try {
+      const columns = await this.getTableColumns('propostas');
+      const legacySchema = this.isLegacyPropostasSchema(columns);
+
+      if (legacySchema) {
+        const createdColumn = columns.has('criado_em') ? 'criado_em' : 'criadaEm';
+        const updatedColumn = columns.has('atualizado_em') ? 'atualizado_em' : 'atualizadaEm';
+        const whereClause = empresaId ? 'WHERE p.empresa_id = $1' : '';
+        const params = empresaId ? [empresaId] : [];
+        const descricaoExpr = columns.has('descricao')
+          ? 'p.descricao'
+          : columns.has('observacoes')
+            ? 'p.observacoes'
+            : 'NULL';
+        const validadeExpr = columns.has('validade')
+          ? 'p.validade'
+          : columns.has('dataVencimento')
+            ? 'p."dataVencimento"'
+            : 'NULL';
+
+        const rows: any[] = await this.propostaRepository.query(
+          `
+            SELECT
+              p.id,
+              p.numero,
+              p.titulo,
+              p.valor,
+              p.status,
+              ${descricaoExpr} AS descricao,
+              ${validadeExpr} AS validade,
+              p.${createdColumn} AS criado_em,
+              p.${updatedColumn} AS atualizado_em
+            FROM propostas p
+            ${whereClause}
+            ORDER BY p.${createdColumn} DESC
+          `,
+          params,
+        );
+
+        return rows.map((row) => this.buildLegacyInterface(row));
+      }
+
       const entities = await this.propostaRepository.find({
         where: empresaId ? { empresaId } : undefined,
         order: { criadaEm: 'DESC' },
-        relations: ['vendedor'],
+        relations: columns.has('vendedor_id') ? ['vendedor'] : [],
       });
 
       console.log(`📊 ${entities.length} propostas encontradas no banco`);
@@ -180,9 +422,56 @@ export class PropostasService {
    */
   async obterProposta(id: string, empresaId?: string): Promise<Proposta | null> {
     try {
+      const columns = await this.getTableColumns('propostas');
+      const legacySchema = this.isLegacyPropostasSchema(columns);
+
+      if (legacySchema) {
+        const createdColumn = columns.has('criado_em') ? 'criado_em' : 'criadaEm';
+        const updatedColumn = columns.has('atualizado_em') ? 'atualizado_em' : 'atualizadaEm';
+        const whereClause = empresaId
+          ? 'WHERE p.id = $1 AND p.empresa_id = $2'
+          : 'WHERE p.id = $1';
+        const params = empresaId ? [id, empresaId] : [id];
+        const descricaoExpr = columns.has('descricao')
+          ? 'p.descricao'
+          : columns.has('observacoes')
+            ? 'p.observacoes'
+            : 'NULL';
+        const validadeExpr = columns.has('validade')
+          ? 'p.validade'
+          : columns.has('dataVencimento')
+            ? 'p."dataVencimento"'
+            : 'NULL';
+
+        const rows: any[] = await this.propostaRepository.query(
+          `
+            SELECT
+              p.id,
+              p.numero,
+              p.titulo,
+              p.valor,
+              p.status,
+              ${descricaoExpr} AS descricao,
+              ${validadeExpr} AS validade,
+              p.${createdColumn} AS criado_em,
+              p.${updatedColumn} AS atualizado_em
+            FROM propostas p
+            ${whereClause}
+            LIMIT 1
+          `,
+          params,
+        );
+
+        if (!rows?.[0]) {
+          return null;
+        }
+
+        return this.buildLegacyInterface(rows[0]);
+      }
+
       const entity = await this.propostaRepository.findOne({
         where: empresaId ? { id, empresaId } : { id },
-        relations: ['vendedor'],
+        relations: columns.has('vendedor_id') ? ['vendedor'] : [],
       });
 
       return entity ? this.entityToInterface(entity) : null;
@@ -298,6 +587,97 @@ export class PropostasService {
           documento: '',
           status: 'lead',
         };
+      }
+
+      const propostaColumns = await this.getTableColumns('propostas');
+      const legacySchema = this.isLegacyPropostasSchema(propostaColumns);
+
+      if (legacySchema) {
+        const titulo = dadosProposta.titulo || `Proposta ${numero}`;
+        const valor = Number(dadosProposta.valor || dadosProposta.total || 0);
+        const validadeDias = dadosProposta.validadeDias || 30;
+        const dataVencimento =
+          dadosProposta.dataVencimento ||
+          new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000).toISOString();
+        const insertColumns: string[] = ['empresa_id', 'numero', 'titulo', 'valor', 'status'];
+        const insertValues: unknown[] = [
+          empresaIdProposta,
+          numero,
+          titulo,
+          valor,
+          this.normalizeStatusToDatabase(dadosProposta.status, true),
+        ];
+
+        if (propostaColumns.has('oportunidade_id')) {
+          insertColumns.push('oportunidade_id');
+          insertValues.push(
+            await this.ensureLegacyOportunidadeId(empresaIdProposta, titulo, valor, vendedorId),
+          );
+        }
+
+        if (propostaColumns.has('descricao')) {
+          insertColumns.push('descricao');
+          insertValues.push(dadosProposta.observacoes ?? null);
+        }
+
+        if (propostaColumns.has('validade')) {
+          insertColumns.push('validade');
+          insertValues.push(new Date(dataVencimento));
+        }
+
+        const placeholders = insertValues.map((_, index) => `$${index + 1}`).join(', ');
+        const createdColumn = propostaColumns.has('criado_em') ? 'criado_em' : 'criadaEm';
+        const updatedColumn = propostaColumns.has('atualizado_em') ? 'atualizado_em' : 'atualizadaEm';
+
+        const rows: any[] = await this.propostaRepository.query(
+          `
+            INSERT INTO propostas (${insertColumns.map((column) => `"${column}"`).join(', ')})
+            VALUES (${placeholders})
+            RETURNING
+              id,
+              numero,
+              titulo,
+              valor,
+              status,
+              ${
+                propostaColumns.has('descricao')
+                  ? 'descricao'
+                  : propostaColumns.has('observacoes')
+                    ? 'observacoes'
+                    : 'NULL'
+              } AS descricao,
+              ${
+                propostaColumns.has('validade')
+                  ? 'validade'
+                  : propostaColumns.has('dataVencimento')
+                    ? '"dataVencimento"'
+                    : 'NULL'
+              } AS validade,
+              ${createdColumn} AS criado_em,
+              ${updatedColumn} AS atualizado_em
+          `,
+          insertValues,
+        );
+
+        return this.buildLegacyInterface(
+          rows?.[0],
+          {
+            cliente: clienteProcessado,
+            produtos: dadosProposta.produtos || [],
+            subtotal: dadosProposta.subtotal || 0,
+            descontoGlobal: dadosProposta.descontoGlobal || 0,
+            impostos: dadosProposta.impostos || 0,
+            total: dadosProposta.total || valor,
+            valor,
+            formaPagamento: dadosProposta.formaPagamento || 'avista',
+            validadeDias,
+            observacoes: dadosProposta.observacoes,
+            incluirImpostosPDF: dadosProposta.incluirImpostosPDF || false,
+            source: dadosProposta.source || 'api',
+            vendedor: dadosProposta.vendedor,
+          },
+          typeof dadosProposta.cliente === 'string' ? dadosProposta.cliente : clienteProcessado?.nome,
+        );
       }
 
       const novaProposta = this.propostaRepository.create({
@@ -550,3 +930,4 @@ export class PropostasService {
     }
   }
 }
+
