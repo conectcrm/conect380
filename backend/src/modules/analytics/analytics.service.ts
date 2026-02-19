@@ -10,7 +10,13 @@ import { EstagioOportunidade, Oportunidade } from '../oportunidades/oportunidade
 import { Lead, StatusLead } from '../leads/lead.entity';
 
 type Periodo = '7d' | '30d' | '90d' | '1y';
-type StatusProposta = 'rascunho' | 'enviada' | 'visualizada' | 'aprovada' | 'rejeitada' | 'expirada';
+type StatusProposta =
+  | 'rascunho'
+  | 'enviada'
+  | 'visualizada'
+  | 'aprovada'
+  | 'rejeitada'
+  | 'expirada';
 
 export interface AnalyticsQueryParams {
   empresaId: string;
@@ -110,14 +116,15 @@ export class AnalyticsService {
       const { startDate, endDate } = this.getDateRange(periodo);
       const { startDate: prevStart, endDate: prevEnd } = this.getPreviousRange(startDate, endDate);
 
-      const [propostas, propostasPrev, faturas, faturasPrev, contratos, vendedoresAtivos] = await Promise.all([
-        this.queryPropostas(params.empresaId, startDate, endDate, vendedorId, params.status),
-        this.queryPropostas(params.empresaId, prevStart, prevEnd, vendedorId, params.status),
-        this.queryFaturasPagas(params.empresaId, startDate, endDate, vendedorId),
-        this.queryFaturasPagas(params.empresaId, prevStart, prevEnd, vendedorId),
-        this.queryContratosAssinados(params.empresaId, startDate, endDate, vendedorId),
-        this.queryVendedoresAtivos(params.empresaId),
-      ]);
+      const [propostas, propostasPrev, faturas, faturasPrev, contratos, vendedoresAtivos] =
+        await Promise.all([
+          this.queryPropostas(params.empresaId, startDate, endDate, vendedorId, params.status),
+          this.queryPropostas(params.empresaId, prevStart, prevEnd, vendedorId, params.status),
+          this.queryFaturasPagas(params.empresaId, startDate, endDate, vendedorId),
+          this.queryFaturasPagas(params.empresaId, prevStart, prevEnd, vendedorId),
+          this.queryContratosAssinados(params.empresaId, startDate, endDate, vendedorId),
+          this.queryVendedoresAtivos(params.empresaId),
+        ]);
 
       const propostasCriadas = propostas.length;
       const propostasEnviadas = propostas.filter((p) => p.status !== 'rascunho').length;
@@ -168,10 +175,18 @@ export class AnalyticsService {
           contratos_assinados: contratosAssinados,
           faturas_pagas: faturasPagas,
           conversao_por_etapa: {
-            criada_para_enviada: Number((this.ratio(propostasEnviadas, propostasCriadas) * 100).toFixed(1)),
-            enviada_para_aprovada: Number((this.ratio(propostasAprovadas, propostasEnviadas) * 100).toFixed(1)),
-            aprovada_para_assinada: Number((this.ratio(contratosAssinados, propostasAprovadas) * 100).toFixed(1)),
-            assinada_para_paga: Number((this.ratio(faturasPagas, contratosAssinados) * 100).toFixed(1)),
+            criada_para_enviada: Number(
+              (this.ratio(propostasEnviadas, propostasCriadas) * 100).toFixed(1),
+            ),
+            enviada_para_aprovada: Number(
+              (this.ratio(propostasAprovadas, propostasEnviadas) * 100).toFixed(1),
+            ),
+            aprovada_para_assinada: Number(
+              (this.ratio(contratosAssinados, propostasAprovadas) * 100).toFixed(1),
+            ),
+            assinada_para_paga: Number(
+              (this.ratio(faturasPagas, contratosAssinados) * 100).toFixed(1),
+            ),
           },
         },
         tempo_medio: {
@@ -179,7 +194,9 @@ export class AnalyticsService {
           envio_para_aprovacao: envioAprovacao,
           aprovacao_para_assinatura: aprovacaoAssinatura,
           assinatura_para_pagamento: assinaturaPagamento,
-          ciclo_completo: Number((propostaEnvio + envioAprovacao + aprovacaoAssinatura + assinaturaPagamento).toFixed(1)),
+          ciclo_completo: Number(
+            (propostaEnvio + envioAprovacao + aprovacaoAssinatura + assinaturaPagamento).toFixed(1),
+          ),
         },
         vendedores: this.buildVendedores(propostas, vendedoresAtivos, vendedorId),
         evolucao_temporal: this.buildEvolucao(propostas, periodo, startDate, endDate),
@@ -302,10 +319,26 @@ export class AnalyticsService {
   async getTempoMedioEtapas(params: AnalyticsQueryParams) {
     const data = await this.getDashboardData(params);
     const etapas = [
-      { nome: 'Proposta -> Envio', tempo_medio: data.tempo_medio.proposta_para_envio, benchmark: 0.5 },
-      { nome: 'Envio -> Aprovacao', tempo_medio: data.tempo_medio.envio_para_aprovacao, benchmark: 2.5 },
-      { nome: 'Aprovacao -> Assinatura', tempo_medio: data.tempo_medio.aprovacao_para_assinatura, benchmark: 1.5 },
-      { nome: 'Assinatura -> Pagamento', tempo_medio: data.tempo_medio.assinatura_para_pagamento, benchmark: 2.0 },
+      {
+        nome: 'Proposta -> Envio',
+        tempo_medio: data.tempo_medio.proposta_para_envio,
+        benchmark: 0.5,
+      },
+      {
+        nome: 'Envio -> Aprovacao',
+        tempo_medio: data.tempo_medio.envio_para_aprovacao,
+        benchmark: 2.5,
+      },
+      {
+        nome: 'Aprovacao -> Assinatura',
+        tempo_medio: data.tempo_medio.aprovacao_para_assinatura,
+        benchmark: 1.5,
+      },
+      {
+        nome: 'Assinatura -> Pagamento',
+        tempo_medio: data.tempo_medio.assinatura_para_pagamento,
+        benchmark: 2.0,
+      },
     ].map((item) => ({ ...item, status: this.benchmarkStatus(item.tempo_medio, item.benchmark) }));
 
     return {
@@ -318,8 +351,12 @@ export class AnalyticsService {
 
   async getDistribuicaoValores(params: AnalyticsQueryParams) {
     const data = await this.getDashboardData(params);
-    const topQuantidade = [...data.distribuicao_valores].sort((a, b) => b.quantidade - a.quantidade)[0];
-    const topValor = [...data.distribuicao_valores].sort((a, b) => b.valor_total - a.valor_total)[0];
+    const topQuantidade = [...data.distribuicao_valores].sort(
+      (a, b) => b.quantidade - a.quantidade,
+    )[0];
+    const topValor = [...data.distribuicao_valores].sort(
+      (a, b) => b.valor_total - a.valor_total,
+    )[0];
 
     return {
       faixas: data.distribuicao_valores,
@@ -379,7 +416,10 @@ export class AnalyticsService {
       propostas_quentes: propostasQuentes,
       alertas: propostasQuentes
         .filter((p) => p.dias_para_fechar > 0 && p.dias_para_fechar <= 5)
-        .map((p) => `Oportunidade "${p.cliente}" prevista para fechar em ${p.dias_para_fechar} dia(s).`),
+        .map(
+          (p) =>
+            `Oportunidade "${p.cliente}" prevista para fechar em ${p.dias_para_fechar} dia(s).`,
+        ),
     };
   }
 
@@ -480,25 +520,26 @@ export class AnalyticsService {
     inicioHoje.setHours(0, 0, 0, 0);
     const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1);
 
-    const [propostasHoje, propostas24h, faturasHoje, faturasMes, vendedoresAtivos, pipeline] = await Promise.all([
-      this.queryPropostas(empresaId, inicioHoje, agora),
-      this.queryPropostas(empresaId, new Date(agora.getTime() - 24 * 60 * 60 * 1000), agora),
-      this.queryFaturasPagas(empresaId, inicioHoje, agora),
-      this.queryFaturasPagas(empresaId, inicioMes, agora),
-      this.queryVendedoresAtivos(empresaId),
-      this.oportunidadeRepo.find({
-        where: {
-          empresa_id: empresaId,
-          estagio: In([
-            EstagioOportunidade.LEADS,
-            EstagioOportunidade.QUALIFICACAO,
-            EstagioOportunidade.PROPOSTA,
-            EstagioOportunidade.NEGOCIACAO,
-            EstagioOportunidade.FECHAMENTO,
-          ]),
-        },
-      }),
-    ]);
+    const [propostasHoje, propostas24h, faturasHoje, faturasMes, vendedoresAtivos, pipeline] =
+      await Promise.all([
+        this.queryPropostas(empresaId, inicioHoje, agora),
+        this.queryPropostas(empresaId, new Date(agora.getTime() - 24 * 60 * 60 * 1000), agora),
+        this.queryFaturasPagas(empresaId, inicioHoje, agora),
+        this.queryFaturasPagas(empresaId, inicioMes, agora),
+        this.queryVendedoresAtivos(empresaId),
+        this.oportunidadeRepo.find({
+          where: {
+            empresa_id: empresaId,
+            estagio: In([
+              EstagioOportunidade.LEADS,
+              EstagioOportunidade.QUALIFICACAO,
+              EstagioOportunidade.PROPOSTA,
+              EstagioOportunidade.NEGOCIACAO,
+              EstagioOportunidade.FECHAMENTO,
+            ]),
+          },
+        }),
+      ]);
 
     const propostasRespondidas24h = propostas24h.filter((p) =>
       ['visualizada', 'aprovada', 'rejeitada'].includes(p.status),
@@ -507,10 +548,15 @@ export class AnalyticsService {
     return {
       vendas_hoje: Number(this.sum(faturasHoje.map((f) => this.num(f.valorTotal))).toFixed(2)),
       propostas_enviadas_hoje: propostasHoje.filter((p) => p.status !== 'rascunho').length,
-      taxa_resposta_24h: Number((this.ratio(propostasRespondidas24h, propostas24h.length) * 100).toFixed(1)),
+      taxa_resposta_24h: Number(
+        (this.ratio(propostasRespondidas24h, propostas24h.length) * 100).toFixed(1),
+      ),
       pipeline_valor: Number(this.sum(pipeline.map((p) => this.num(p.valor))).toFixed(2)),
       meta_mensal_progresso: Number(
-        ((this.sum(faturasMes.map((f) => this.num(f.valorTotal))) / this.getMetaFaturamento()) * 100).toFixed(1),
+        (
+          (this.sum(faturasMes.map((f) => this.num(f.valorTotal))) / this.getMetaFaturamento()) *
+          100
+        ).toFixed(1),
       ),
       vendedores_ativos: vendedoresAtivos.length,
       ultima_atualizacao: agora.toISOString(),
@@ -706,12 +752,17 @@ export class AnalyticsService {
     const totalMs = Math.max(1, endMs - startMs + 1);
     const buckets = Array.from({ length: bucketsCount }, (_, i) => {
       const bStart = startMs + Math.floor((totalMs * i) / bucketsCount);
-      const bEnd = i === bucketsCount - 1 ? endMs : startMs + Math.floor((totalMs * (i + 1)) / bucketsCount) - 1;
+      const bEnd =
+        i === bucketsCount - 1
+          ? endMs
+          : startMs + Math.floor((totalMs * (i + 1)) / bucketsCount) - 1;
       const label =
         periodo === '7d'
           ? new Date(bStart).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
           : periodo === '1y'
-            ? new Date(bStart).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', '')
+            ? new Date(bStart)
+                .toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
+                .replace('.', '')
             : periodo === '90d'
               ? `Mes ${i + 1}`
               : `Sem ${i + 1}`;
@@ -744,7 +795,13 @@ export class AnalyticsService {
       { faixa: 'Ate R$ 10k', min: 0, max: 10000, quantidade: 0, valor_total: 0 },
       { faixa: 'R$ 10k - 25k', min: 10000, max: 25000, quantidade: 0, valor_total: 0 },
       { faixa: 'R$ 25k - 50k', min: 25000, max: 50000, quantidade: 0, valor_total: 0 },
-      { faixa: 'Acima R$ 50k', min: 50000, max: Number.POSITIVE_INFINITY, quantidade: 0, valor_total: 0 },
+      {
+        faixa: 'Acima R$ 50k',
+        min: 50000,
+        max: Number.POSITIVE_INFINITY,
+        quantidade: 0,
+        valor_total: 0,
+      },
     ];
 
     propostas.forEach((p) => {
@@ -779,7 +836,9 @@ export class AnalyticsService {
         status: item.label,
         quantidade: arr.length,
         valor_total: Number(this.sum(arr.map((p) => this.num(p.total ?? p.valor ?? 0))).toFixed(2)),
-        tempo_medio_status: Number(this.avg(arr.map((p) => this.days(p.criadaEm, agora))).toFixed(1)),
+        tempo_medio_status: Number(
+          this.avg(arr.map((p) => this.days(p.criadaEm, agora))).toFixed(1),
+        ),
       };
     });
   }

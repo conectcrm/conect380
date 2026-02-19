@@ -281,7 +281,9 @@ export class OportunidadesService {
 
     if (schema.columns.has('tags') && createOportunidadeDto.tags !== undefined) {
       columns.push('tags');
-      values.push(createOportunidadeDto.tags.length > 0 ? createOportunidadeDto.tags.join(',') : null);
+      values.push(
+        createOportunidadeDto.tags.length > 0 ? createOportunidadeDto.tags.join(',') : null,
+      );
     }
 
     if (schema.columns.has('nomeContato')) {
@@ -354,7 +356,9 @@ export class OportunidadesService {
     const origemExpr = schema.columns.has('origem')
       ? `oportunidade.${this.quoteIdentifier('origem')}`
       : `'website'`;
-    const tagsExpr = schema.columns.has('tags') ? `oportunidade.${this.quoteIdentifier('tags')}` : 'NULL';
+    const tagsExpr = schema.columns.has('tags')
+      ? `oportunidade.${this.quoteIdentifier('tags')}`
+      : 'NULL';
     const nomeContatoExpr = schema.columns.has('nomeContato')
       ? `oportunidade.${this.quoteIdentifier('nomeContato')}`
       : 'NULL';
@@ -517,7 +521,10 @@ export class OportunidadesService {
     }
 
     if (updateOportunidadeDto.estagio !== undefined) {
-      updateData.estagio = this.toDatabaseEstagio(updateOportunidadeDto.estagio, schema.estagioMode);
+      updateData.estagio = this.toDatabaseEstagio(
+        updateOportunidadeDto.estagio,
+        schema.estagioMode,
+      );
     }
 
     if (updateOportunidadeDto.responsavel_id !== undefined) {
@@ -528,7 +535,10 @@ export class OportunidadesService {
       updateData.cliente_id = updateOportunidadeDto.cliente_id ?? null;
     }
 
-    if (schema.dataFechamentoEsperadoColumn && updateOportunidadeDto.dataFechamentoEsperado !== undefined) {
+    if (
+      schema.dataFechamentoEsperadoColumn &&
+      updateOportunidadeDto.dataFechamentoEsperado !== undefined
+    ) {
       updateData[schema.dataFechamentoEsperadoColumn] = updateOportunidadeDto.dataFechamentoEsperado
         ? new Date(updateOportunidadeDto.dataFechamentoEsperado)
         : null;
@@ -550,10 +560,16 @@ export class OportunidadesService {
     if (schema.columns.has('emailContato') && updateOportunidadeDto.emailContato !== undefined) {
       updateData.emailContato = updateOportunidadeDto.emailContato;
     }
-    if (schema.columns.has('telefoneContato') && updateOportunidadeDto.telefoneContato !== undefined) {
+    if (
+      schema.columns.has('telefoneContato') &&
+      updateOportunidadeDto.telefoneContato !== undefined
+    ) {
       updateData.telefoneContato = updateOportunidadeDto.telefoneContato;
     }
-    if (schema.columns.has('empresaContato') && updateOportunidadeDto.empresaContato !== undefined) {
+    if (
+      schema.columns.has('empresaContato') &&
+      updateOportunidadeDto.empresaContato !== undefined
+    ) {
       updateData.empresaContato = updateOportunidadeDto.empresaContato;
     }
 
@@ -770,10 +786,13 @@ export class OportunidadesService {
       .where('oportunidade.empresa_id = :empresaId', { empresaId });
 
     if (filtros?.dataInicio && filtros?.dataFim) {
-      queryBuilder = queryBuilder.andWhere('oportunidade.createdAt BETWEEN :dataInicio AND :dataFim', {
-        dataInicio: filtros.dataInicio,
-        dataFim: filtros.dataFim,
-      });
+      queryBuilder = queryBuilder.andWhere(
+        'oportunidade.createdAt BETWEEN :dataInicio AND :dataFim',
+        {
+          dataInicio: filtros.dataInicio,
+          dataFim: filtros.dataFim,
+        },
+      );
     }
 
     const todasOportunidades = (await queryBuilder.getRawMany()).map((opp) => ({

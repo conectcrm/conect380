@@ -35,7 +35,9 @@ export class AnalyticsController {
   @Get('dashboard')
   async getDashboardData(@EmpresaId() empresaId: string, @Query() query: AnalyticsQueryDto) {
     try {
-      this.logger.log(`Buscando dashboard analytics (periodo=${query.periodo}, vendedor=${query.vendedor})`);
+      this.logger.log(
+        `Buscando dashboard analytics (periodo=${query.periodo}, vendedor=${query.vendedor})`,
+      );
       return await this.analyticsService.getDashboardData(this.withEmpresa(empresaId, query));
     } catch (error) {
       this.logger.error('Erro ao buscar dados do dashboard:', error);
@@ -60,9 +62,14 @@ export class AnalyticsController {
   }
 
   @Get('performance-vendedores')
-  async getPerformanceVendedores(@EmpresaId() empresaId: string, @Query() query: AnalyticsQueryDto) {
+  async getPerformanceVendedores(
+    @EmpresaId() empresaId: string,
+    @Query() query: AnalyticsQueryDto,
+  ) {
     try {
-      return await this.analyticsService.getPerformanceVendedores(this.withEmpresa(empresaId, query));
+      return await this.analyticsService.getPerformanceVendedores(
+        this.withEmpresa(empresaId, query),
+      );
     } catch (error) {
       this.logger.error('Erro ao buscar performance de vendedores:', error);
       throw new HttpException(
@@ -144,7 +151,9 @@ export class AnalyticsController {
     @Res() res: Response,
   ) {
     try {
-      const buffer = await this.analyticsService.exportarRelatorio(this.withEmpresa(empresaId, query));
+      const buffer = await this.analyticsService.exportarRelatorio(
+        this.withEmpresa(empresaId, query),
+      );
       const filename = `relatorio-vendas-${query.periodo || '30d'}-${new Date().toISOString().split('T')[0]}.xlsx`;
 
       res.set({

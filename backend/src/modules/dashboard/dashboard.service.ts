@@ -1058,7 +1058,10 @@ export class DashboardService {
     const total = propostas.length;
     return statusConfig
       .map((config) => {
-        const quantidade = config.statuses.reduce((acc, status) => acc + (counts.get(status) || 0), 0);
+        const quantidade = config.statuses.reduce(
+          (acc, status) => acc + (counts.get(status) || 0),
+          0,
+        );
         const percentual = total > 0 ? (quantidade / total) * 100 : 0;
         return {
           status: config.label,
