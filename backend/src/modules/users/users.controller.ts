@@ -27,7 +27,10 @@ import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { Permission } from '../../common/permissions/permissions.constants';
 import { CurrentUser } from '../../common/decorators/user.decorator';
 import { User, UserRole } from './user.entity';
 
@@ -47,7 +50,7 @@ const ensureAvatarDirectory = (): string => {
 
 @ApiTags('users')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, EmpresaGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, RolesGuard, PermissionsGuard)
 @Controller('users')
 export class UsersController {
   private readonly logger = new Logger(UsersController.name);
@@ -294,6 +297,7 @@ export class UsersController {
   }
 
   @Put('profile')
+  @Permissions(Permission.USERS_PROFILE_UPDATE)
   @ApiOperation({ summary: 'Atualizar perfil do usuário logado' })
   @ApiResponse({ status: 200, description: 'Perfil atualizado com sucesso' })
   async updateProfile(@CurrentUser() user: User, @Body() updateData: Partial<User>) {
@@ -307,6 +311,7 @@ export class UsersController {
   }
 
   @Post('profile/avatar')
+  @Permissions(Permission.USERS_PROFILE_UPDATE)
   @UseInterceptors(
     FileInterceptor('avatar', {
       storage: diskStorage({
@@ -425,6 +430,7 @@ export class UsersController {
 
   @Get(['', '/'])
   @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
+  @Permissions(Permission.USERS_READ)
   @ApiOperation({ summary: 'Listar usuários com filtros' })
   @ApiResponse({ status: 200, description: 'Lista de usuários com filtros retornada com sucesso' })
   async listarUsuarios(
@@ -463,6 +469,7 @@ export class UsersController {
 
   @Get('estatisticas')
   @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
+  @Permissions(Permission.USERS_READ)
   @ApiOperation({ summary: 'Obter estatísticas dos usuários' })
   @ApiResponse({ status: 200, description: 'Estatísticas retornadas com sucesso' })
   async obterEstatisticas(@CurrentUser() user: User) {
@@ -475,6 +482,7 @@ export class UsersController {
 
   @Get('atendentes')
   @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
+  @Permissions(Permission.USERS_READ)
   @ApiOperation({ summary: 'Listar usuários com permissão de atendimento' })
   @ApiResponse({ status: 200, description: 'Atendentes retornados com sucesso' })
   async listarAtendentes(@CurrentUser() user: User) {
@@ -487,6 +495,7 @@ export class UsersController {
 
   @Post()
   @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
+  @Permissions(Permission.USERS_CREATE)
   @ApiOperation({ summary: 'Criar novo usuário' })
   @ApiResponse({ status: 201, description: 'Usuário criado com sucesso' })
   async criarUsuario(@CurrentUser() user: User, @Body() dadosUsuario: any) {
@@ -507,6 +516,7 @@ export class UsersController {
 
   @Put(':id')
   @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
+  @Permissions(Permission.USERS_UPDATE)
   @ApiOperation({ summary: 'Atualizar usuário' })
   @ApiResponse({ status: 200, description: 'Usuário atualizado com sucesso' })
   async atualizarUsuario(
@@ -534,6 +544,7 @@ export class UsersController {
 
   @Put(':id/reset-senha')
   @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
+  @Permissions(Permission.USERS_RESET_PASSWORD)
   @ApiOperation({ summary: 'Resetar senha do usuário' })
   @ApiResponse({ status: 200, description: 'Senha resetada com sucesso' })
   async resetarSenha(@CurrentUser() user: User, @Param('id') id: string) {
@@ -549,6 +560,7 @@ export class UsersController {
 
   @Patch(':id/status')
   @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
+  @Permissions(Permission.USERS_STATUS_UPDATE)
   @ApiOperation({ summary: 'Alterar status do usuário (ativar/desativar)' })
   @ApiResponse({ status: 200, description: 'Status do usuário alterado com sucesso' })
   async alterarStatusUsuario(
@@ -567,6 +579,7 @@ export class UsersController {
 
   @Put('bulk/ativar')
   @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
+  @Permissions(Permission.USERS_BULK_UPDATE)
   @ApiOperation({ summary: 'Ativar usuários em massa' })
   @ApiResponse({ status: 200, description: 'Usuários ativados com sucesso' })
   async ativarUsuarios(@CurrentUser() user: User, @Body('ids') ids: string[]) {
@@ -587,6 +600,7 @@ export class UsersController {
 
   @Put('bulk/desativar')
   @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
+  @Permissions(Permission.USERS_BULK_UPDATE)
   @ApiOperation({ summary: 'Desativar usuários em massa' })
   @ApiResponse({ status: 200, description: 'Usuários desativados com sucesso' })
   async desativarUsuarios(@CurrentUser() user: User, @Body('ids') ids: string[]) {

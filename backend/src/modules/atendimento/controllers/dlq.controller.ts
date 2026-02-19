@@ -12,12 +12,16 @@ import { randomUUID } from 'crypto';
 import { DlqReprocessService, FilaReprocessavel } from '../services/dlq-reprocess.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { Permission } from '../../../common/permissions/permissions.constants';
 import { UserRole } from '../../users/user.entity';
 
 @Controller('api/atendimento/filas/dlq')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
+@Permissions(Permission.ATENDIMENTO_DLQ_MANAGE)
 export class DlqController {
   private readonly logger = new Logger(DlqController.name);
 

@@ -17,7 +17,10 @@ import { securityLogger } from '../../config/logger.config';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { Permission } from '../../common/permissions/permissions.constants';
 import { UserRole } from '../users/user.entity';
 
 class LoginDto {
@@ -157,8 +160,9 @@ export class AuthController {
   }
 
   @Post('register')
-  @UseGuards(JwtAuthGuard, EmpresaGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, EmpresaGuard, RolesGuard, PermissionsGuard)
   @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
+  @Permissions(Permission.USERS_CREATE)
   @Throttle({ default: { limit: 3, ttl: 3600000 } }) // 🛡️ 3 cadastros/hora (previne spam)
   @ApiOperation({ summary: 'Registrar novo usuário' })
   @ApiBody({ type: RegisterDto })
