@@ -22,6 +22,7 @@ import { FinanceiroModule } from './modules/financeiro/financeiro.module';
 import { FaturamentoModule } from './modules/faturamento/faturamento.module';
 import { CotacaoModule } from './cotacao/cotacao.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { OportunidadesModule } from './modules/oportunidades/oportunidades.module';
 import { EmpresasModule } from './empresas/empresas.module';
 import { MetasModule } from './modules/metas/metas.module';
@@ -87,6 +88,7 @@ import { MetricsModule } from './modules/metrics/metrics.module';
     FaturamentoModule,
     CotacaoModule,
     DashboardModule,
+    AnalyticsModule,
     OportunidadesModule,
     EmpresasModule,
     MetasModule,
