@@ -4,7 +4,6 @@ import { Repository, Between } from 'typeorm';
 import { Proposta as PropostaEntity } from '../propostas/proposta.entity';
 import { User, UserRole } from '../users/user.entity';
 import { Cliente } from '../clientes/cliente.entity';
-import { Evento } from '../eventos/evento.entity';
 import { MetasService } from '../metas/metas.service';
 import { EventosService } from '../eventos/eventos.service';
 
@@ -40,6 +39,18 @@ export interface DashboardKPIs {
   };
   propostasEnviadas: {
     valor: number;
+    variacao: number;
+  };
+  cicloMedio: {
+    dias: number;
+    variacao: number;
+  };
+  tempoEtapa: {
+    dias: number;
+    variacao: number;
+  };
+  followUpsPendentes: {
+    quantidade: number;
     variacao: number;
   };
   taxaSucessoGeral: {
@@ -90,6 +101,13 @@ export interface AlertaInteligente {
   lido: boolean;
 }
 
+export interface DashboardChartsData {
+  vendasMensais: Array<{ mes: string; valor: number; meta: number }>;
+  propostasPorStatus: Array<{ status: string; valor: number; color: string }>;
+  atividadesTimeline: Array<{ mes: string; reunioes: number; ligacoes: number; emails: number }>;
+  funilVendas: Array<{ etapa: string; quantidade: number; valor: number }>;
+}
+
 @Injectable()
 export class DashboardService {
   constructor(
@@ -110,16 +128,13 @@ export class DashboardService {
     periodo: string = 'mensal',
     vendedorId?: string,
     regiao?: string,
-    empresaId?: number,
+    empresaId?: string,
   ): Promise<DashboardKPIs> {
     const { dataInicio, dataFim } = this.getDateRange(periodo);
-    const periodoAnterior = this.getDateRange(this.getPeriodoAnterior(periodo));
+    const periodoAnterior = this.getPreviousDateRange(periodo, { dataInicio, dataFim });
 
     // Buscar meta atual para o vendedor/região específica
-    const metaAtual = await this.metasService.getMetaAtual(
-      vendedorId ? parseInt(vendedorId) : undefined,
-      regiao,
-    );
+    const metaAtual = await this.metasService.getMetaAtual(vendedorId, regiao, empresaId);
     const valorMeta = metaAtual?.valor || 450000; // Meta padrão se não encontrar
 
     // Faturamento Total
@@ -128,12 +143,14 @@ export class DashboardService {
       dataFim,
       vendedorId,
       regiao,
+      empresaId,
     );
     const faturamentoAnterior = await this.calculateFaturamento(
       periodoAnterior.dataInicio,
       periodoAnterior.dataFim,
       vendedorId,
       regiao,
+      empresaId,
     );
     const variacaoFaturamento =
       faturamentoAnterior > 0
@@ -146,12 +163,14 @@ export class DashboardService {
       dataFim,
       vendedorId,
       regiao,
+      empresaId,
     );
     const ticketMedioAnterior = await this.calculateTicketMedio(
       periodoAnterior.dataInicio,
       periodoAnterior.dataFim,
       vendedorId,
       regiao,
+      empresaId,
     );
     const variacaoTicketMedio =
       ticketMedioAnterior > 0
@@ -164,12 +183,14 @@ export class DashboardService {
       dataFim,
       vendedorId,
       regiao,
+      empresaId,
     );
     const vendasFechadasAnterior = await this.calculateVendasFechadas(
       periodoAnterior.dataInicio,
       periodoAnterior.dataFim,
       vendedorId,
       regiao,
+      empresaId,
     );
     const variacaoVendasFechadas =
       vendasFechadasAnterior > 0
@@ -177,14 +198,20 @@ export class DashboardService {
         : 0;
 
     // Em Negociação
-    const emNegociacao = await this.calculateEmNegociacao(vendedorId, regiao);
+    const emNegociacao = await this.calculateEmNegociacao(vendedorId, regiao, empresaId);
 
     // Novos Clientes
-    const novosClientesAtual = await this.calculateNovosClientes(dataInicio, dataFim, regiao);
+    const novosClientesAtual = await this.calculateNovosClientes(
+      dataInicio,
+      dataFim,
+      regiao,
+      empresaId,
+    );
     const novosClientesAnterior = await this.calculateNovosClientes(
       periodoAnterior.dataInicio,
       periodoAnterior.dataFim,
       regiao,
+      empresaId,
     );
     const variacaoNovosClientes =
       novosClientesAnterior > 0
@@ -197,12 +224,14 @@ export class DashboardService {
       dataFim,
       vendedorId,
       regiao,
+      empresaId,
     );
     const leadsAnterior = await this.calculateLeadsQualificados(
       periodoAnterior.dataInicio,
       periodoAnterior.dataFim,
       vendedorId,
       regiao,
+      empresaId,
     );
     const variacaoLeads =
       leadsAnterior > 0 ? ((leadsAtual - leadsAnterior) / leadsAnterior) * 100 : 0;
@@ -213,16 +242,73 @@ export class DashboardService {
       dataFim,
       vendedorId,
       regiao,
+      empresaId,
     );
     const propostasEnviadasAnterior = await this.calculatePropostasEnviadas(
       periodoAnterior.dataInicio,
       periodoAnterior.dataFim,
       vendedorId,
       regiao,
+      empresaId,
     );
     const variacaoPropostasEnviadas =
       propostasEnviadasAnterior > 0
         ? ((propostasEnviadasAtual - propostasEnviadasAnterior) / propostasEnviadasAnterior) * 100
+        : 0;
+
+    // Ciclo Médio de venda (dias)
+    const cicloMedioAtual = await this.calculateCicloMedio(
+      dataInicio,
+      dataFim,
+      vendedorId,
+      regiao,
+      empresaId,
+    );
+    const cicloMedioAnterior = await this.calculateCicloMedio(
+      periodoAnterior.dataInicio,
+      periodoAnterior.dataFim,
+      vendedorId,
+      regiao,
+      empresaId,
+    );
+    const variacaoCicloMedio = cicloMedioAnterior > 0 ? cicloMedioAtual - cicloMedioAnterior : 0;
+
+    // Tempo médio por etapa ativa (dias)
+    const tempoEtapaAtual = await this.calculateTempoEtapa(
+      dataInicio,
+      dataFim,
+      vendedorId,
+      regiao,
+      empresaId,
+    );
+    const tempoEtapaAnterior = await this.calculateTempoEtapa(
+      periodoAnterior.dataInicio,
+      periodoAnterior.dataFim,
+      vendedorId,
+      regiao,
+      empresaId,
+    );
+    const variacaoTempoEtapa = tempoEtapaAnterior > 0 ? tempoEtapaAtual - tempoEtapaAnterior : 0;
+
+    // Follow-ups pendentes
+    const followUpsPendentesAtual = await this.calculateFollowUpsPendentes(
+      dataInicio,
+      dataFim,
+      vendedorId,
+      regiao,
+      empresaId,
+    );
+    const followUpsPendentesAnterior = await this.calculateFollowUpsPendentes(
+      periodoAnterior.dataInicio,
+      periodoAnterior.dataFim,
+      vendedorId,
+      regiao,
+      empresaId,
+    );
+    const variacaoFollowUpsPendentes =
+      followUpsPendentesAnterior > 0
+        ? ((followUpsPendentesAtual - followUpsPendentesAnterior) / followUpsPendentesAnterior) *
+          100
         : 0;
 
     // Taxa de Sucesso
@@ -231,24 +317,24 @@ export class DashboardService {
       dataFim,
       vendedorId,
       regiao,
+      empresaId,
     );
     const taxaSucessoAnterior = await this.calculateTaxaSucesso(
       periodoAnterior.dataInicio,
       periodoAnterior.dataFim,
       vendedorId,
       regiao,
+      empresaId,
     );
     const variacaoTaxaSucesso =
       taxaSucessoAnterior > 0 ? taxaSucessoAtual - taxaSucessoAnterior : 0;
 
     // Estatísticas da Agenda - filtrar por empresa do usuário logado
-    // empresaId deve ser string UUID, não number
-    const empresaIdString = empresaId ? empresaId.toString() : undefined;
     const eventStats = await this.eventosService.getEventStatsByPeriod(
       dataInicio.toISOString().split('T')[0],
       dataFim.toISOString().split('T')[0],
       vendedorId,
-      empresaIdString,
+      empresaId,
     );
 
     return {
@@ -285,6 +371,18 @@ export class DashboardService {
         valor: propostasEnviadasAtual,
         variacao: Number(variacaoPropostasEnviadas.toFixed(1)),
       },
+      cicloMedio: {
+        dias: Number(cicloMedioAtual.toFixed(1)),
+        variacao: Number(variacaoCicloMedio.toFixed(1)),
+      },
+      tempoEtapa: {
+        dias: Number(tempoEtapaAtual.toFixed(1)),
+        variacao: Number(variacaoTempoEtapa.toFixed(1)),
+      },
+      followUpsPendentes: {
+        quantidade: followUpsPendentesAtual,
+        variacao: Number(variacaoFollowUpsPendentes.toFixed(1)),
+      },
       taxaSucessoGeral: {
         percentual: Number(taxaSucessoAtual.toFixed(1)),
         variacao: Number(variacaoTaxaSucesso.toFixed(1)),
@@ -303,26 +401,39 @@ export class DashboardService {
   /**
    * Obter ranking de vendedores
    */
-  async getVendedoresRanking(periodo: string = 'mensal'): Promise<VendedorRanking[]> {
+  async getVendedoresRanking(
+    periodo: string = 'mensal',
+    empresaId?: string,
+  ): Promise<VendedorRanking[]> {
     const { dataInicio, dataFim } = this.getDateRange(periodo);
-    const periodoAnterior = this.getDateRange(this.getPeriodoAnterior(periodo));
+    const periodoAnterior = this.getPreviousDateRange(periodo, { dataInicio, dataFim });
     const dataInicioAnterior = periodoAnterior.dataInicio;
     const dataFimAnterior = periodoAnterior.dataFim;
 
     // Buscar todos os vendedores
     const vendedores = await this.userRepository.find({
-      where: { role: UserRole.VENDEDOR, ativo: true },
+      where: empresaId
+        ? { role: UserRole.VENDEDOR, ativo: true, empresa_id: empresaId }
+        : { role: UserRole.VENDEDOR, ativo: true },
     });
 
     const ranking: VendedorRanking[] = [];
 
     for (const vendedor of vendedores) {
       // Vendas do período
-      const vendasAtual = await this.calculateFaturamento(dataInicio, dataFim, vendedor.id);
+      const vendasAtual = await this.calculateFaturamento(
+        dataInicio,
+        dataFim,
+        vendedor.id,
+        undefined,
+        empresaId,
+      );
       const vendasAnterior = await this.calculateFaturamento(
         dataInicioAnterior,
         dataFimAnterior,
         vendedor.id,
+        undefined,
+        empresaId,
       );
       const variacao =
         vendasAnterior > 0 ? ((vendasAtual - vendasAnterior) / vendasAnterior) * 100 : 0;
@@ -363,6 +474,7 @@ export class DashboardService {
    */
   async getAlertasInteligentes(
     periodo: string = 'mensal',
+    empresaId?: string,
     precomputed?: {
       ranking?: VendedorRanking[];
       kpis?: DashboardKPIs;
@@ -372,7 +484,7 @@ export class DashboardService {
     const agora = new Date();
 
     // Verificar metas em risco
-    const ranking = precomputed?.ranking ?? (await this.getVendedoresRanking(periodo));
+    const ranking = precomputed?.ranking ?? (await this.getVendedoresRanking(periodo, empresaId));
     const vendedoresEmRisco = ranking.filter((v) => v.vendas / v.meta < 0.7);
 
     for (const vendedor of vendedoresEmRisco) {
@@ -395,6 +507,7 @@ export class DashboardService {
     // Verificar propostas próximas do vencimento
     const propostas = await this.propostaRepository.find({
       where: {
+        ...(empresaId ? { empresaId } : {}),
         status: 'enviada',
         dataVencimento: Between(agora, new Date(agora.getTime() + 3 * 24 * 60 * 60 * 1000)),
       },
@@ -420,7 +533,8 @@ export class DashboardService {
     }
 
     // Verificar conquistas
-    const kpis = precomputed?.kpis ?? (await this.getKPIs(periodo));
+    const kpis =
+      precomputed?.kpis ?? (await this.getKPIs(periodo, undefined, undefined, empresaId));
     if (kpis.faturamentoTotal.valor >= kpis.faturamentoTotal.meta) {
       alertas.push({
         id: 'meta-superada',
@@ -442,49 +556,78 @@ export class DashboardService {
 
   // Métodos auxiliares privados
   private getDateRange(periodo: string): { dataInicio: Date; dataFim: Date } {
-    const agora = new Date();
-    let dataInicio: Date;
-    const dataFim: Date = new Date(agora);
-
-    switch (periodo) {
-      case 'mensal':
-        dataInicio = new Date(agora.getFullYear(), agora.getMonth(), 1);
-        break;
-      case 'trimestral':
-        const trimestre = Math.floor(agora.getMonth() / 3);
-        dataInicio = new Date(agora.getFullYear(), trimestre * 3, 1);
-        break;
-      case 'semestral':
-        const semestre = Math.floor(agora.getMonth() / 6);
-        dataInicio = new Date(agora.getFullYear(), semestre * 6, 1);
-        break;
-      case 'anual':
-        dataInicio = new Date(agora.getFullYear(), 0, 1);
-        break;
-      default:
-        dataInicio = new Date(agora.getFullYear(), agora.getMonth(), 1);
-    }
-
+    const dataFim = new Date();
+    const dataInicio = this.getRangeStart(periodo, dataFim);
     return { dataInicio, dataFim };
   }
 
-  private getPeriodoAnterior(periodo: string): string {
+  private getPreviousDateRange(
+    periodo: string,
+    currentRange: { dataInicio: Date; dataFim: Date },
+  ): { dataInicio: Date; dataFim: Date } {
+    const currentStart = currentRange.dataInicio;
+    const previousEnd = new Date(currentStart.getTime() - 1);
+    let previousStart: Date;
+
     switch (periodo) {
+      case 'semanal':
+        previousStart = new Date(previousEnd);
+        previousStart.setDate(previousStart.getDate() - 6);
+        previousStart.setHours(0, 0, 0, 0);
+        break;
       case 'mensal':
-        return 'mensal_anterior';
+        previousStart = new Date(currentStart);
+        previousStart.setMonth(previousStart.getMonth() - 1);
+        break;
       case 'trimestral':
-        return 'trimestral_anterior';
+        previousStart = new Date(currentStart);
+        previousStart.setMonth(previousStart.getMonth() - 3);
+        break;
       case 'semestral':
-        return 'semestral_anterior';
+        previousStart = new Date(currentStart);
+        previousStart.setMonth(previousStart.getMonth() - 6);
+        break;
       case 'anual':
-        return 'anual_anterior';
+        previousStart = new Date(currentStart);
+        previousStart.setFullYear(previousStart.getFullYear() - 1);
+        break;
       default:
-        return 'mensal_anterior';
+        previousStart = new Date(currentStart);
+        previousStart.setMonth(previousStart.getMonth() - 1);
+    }
+
+    return { dataInicio: previousStart, dataFim: previousEnd };
+  }
+
+  private getRangeStart(periodo: string, referenceDate: Date): Date {
+    switch (periodo) {
+      case 'semanal': {
+        const start = new Date(referenceDate);
+        start.setDate(start.getDate() - 6);
+        start.setHours(0, 0, 0, 0);
+        return start;
+      }
+      case 'mensal':
+        return new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
+      case 'trimestral': {
+        const trimestre = Math.floor(referenceDate.getMonth() / 3);
+        return new Date(referenceDate.getFullYear(), trimestre * 3, 1);
+      }
+      case 'semestral': {
+        const semestre = Math.floor(referenceDate.getMonth() / 6);
+        return new Date(referenceDate.getFullYear(), semestre * 6, 1);
+      }
+      case 'anual':
+        return new Date(referenceDate.getFullYear(), 0, 1);
+      default:
+        return new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
     }
   }
 
   private getPeriodoLabel(periodo: string): string {
     switch (periodo) {
+      case 'semanal':
+        return 'vs semana anterior';
       case 'mensal':
         return 'vs mês anterior';
       case 'trimestral':
@@ -501,6 +644,8 @@ export class DashboardService {
   private getMeta(periodo: string): number {
     // Metas exemplo - em produção, viriam do banco
     switch (periodo) {
+      case 'semanal':
+        return 112500;
       case 'mensal':
         return 450000;
       case 'trimestral':
@@ -519,21 +664,23 @@ export class DashboardService {
     dataFim: Date,
     vendedorId?: string,
     regiao?: string,
+    empresaId?: string,
   ): Promise<number> {
-    const whereConditions: any = {
-      status: 'aprovada',
-      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString()),
-    };
-
-    if (vendedorId) {
-      whereConditions.vendedor_id = vendedorId;
-    }
-
-    const result = await this.propostaRepository
+    const query = this.propostaRepository
       .createQueryBuilder('proposta')
       .select('SUM(proposta.total)', 'total')
-      .where(whereConditions)
-      .getRawOne();
+      .where('proposta.status = :status', { status: 'aprovada' })
+      .andWhere('proposta.criadaEm BETWEEN :dataInicio AND :dataFim', { dataInicio, dataFim });
+
+    if (empresaId) {
+      query.andWhere('proposta.empresaId = :empresaId', { empresaId });
+    }
+
+    if (vendedorId) {
+      query.andWhere('proposta.vendedor_id = :vendedorId', { vendedorId });
+    }
+
+    const result = await query.getRawOne();
 
     return Number(result?.total || 0);
   }
@@ -543,21 +690,23 @@ export class DashboardService {
     dataFim: Date,
     vendedorId?: string,
     regiao?: string,
+    empresaId?: string,
   ): Promise<number> {
-    const whereConditions: any = {
-      status: 'aprovada',
-      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString()),
-    };
-
-    if (vendedorId) {
-      whereConditions.vendedor_id = vendedorId;
-    }
-
-    const result = await this.propostaRepository
+    const query = this.propostaRepository
       .createQueryBuilder('proposta')
       .select('AVG(proposta.total)', 'media')
-      .where(whereConditions)
-      .getRawOne();
+      .where('proposta.status = :status', { status: 'aprovada' })
+      .andWhere('proposta.criadaEm BETWEEN :dataInicio AND :dataFim', { dataInicio, dataFim });
+
+    if (empresaId) {
+      query.andWhere('proposta.empresaId = :empresaId', { empresaId });
+    }
+
+    if (vendedorId) {
+      query.andWhere('proposta.vendedor_id = :vendedorId', { vendedorId });
+    }
+
+    const result = await query.getRawOne();
 
     return Number(result?.media || 0);
   }
@@ -567,10 +716,12 @@ export class DashboardService {
     dataFim: Date,
     vendedorId?: string,
     regiao?: string,
+    empresaId?: string,
   ): Promise<number> {
     const whereConditions: any = {
       status: 'aprovada',
-      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString()),
+      criadaEm: Between(dataInicio, dataFim),
+      ...(empresaId ? { empresaId } : {}),
     };
 
     if (vendedorId) {
@@ -583,9 +734,11 @@ export class DashboardService {
   private async calculateEmNegociacao(
     vendedorId?: string,
     regiao?: string,
+    empresaId?: string,
   ): Promise<{ valor: number; quantidade: number; propostas: string[] }> {
     const whereConditions: any = {
       status: 'enviada',
+      ...(empresaId ? { empresaId } : {}),
     };
 
     if (vendedorId) {
@@ -610,9 +763,11 @@ export class DashboardService {
     dataInicio: Date,
     dataFim: Date,
     regiao?: string,
+    empresaId?: string,
   ): Promise<number> {
     const whereConditions: any = {
-      created_at: Between(dataInicio.toISOString(), dataFim.toISOString()),
+      created_at: Between(dataInicio, dataFim),
+      ...(empresaId ? { empresaId } : {}),
     };
 
     return await this.clienteRepository.count({ where: whereConditions });
@@ -623,10 +778,12 @@ export class DashboardService {
     dataFim: Date,
     vendedorId?: string,
     regiao?: string,
+    empresaId?: string,
   ): Promise<number> {
     const whereConditions: any = {
       status: 'enviada',
-      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString()),
+      criadaEm: Between(dataInicio, dataFim),
+      ...(empresaId ? { empresaId } : {}),
     };
 
     if (vendedorId) {
@@ -641,21 +798,23 @@ export class DashboardService {
     dataFim: Date,
     vendedorId?: string,
     regiao?: string,
+    empresaId?: string,
   ): Promise<number> {
-    const whereConditions: any = {
-      status: 'enviada',
-      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString()),
-    };
-
-    if (vendedorId) {
-      whereConditions.vendedor_id = vendedorId;
-    }
-
-    const result = await this.propostaRepository
+    const query = this.propostaRepository
       .createQueryBuilder('proposta')
       .select('SUM(proposta.total)', 'total')
-      .where(whereConditions)
-      .getRawOne();
+      .where('proposta.status = :status', { status: 'enviada' })
+      .andWhere('proposta.criadaEm BETWEEN :dataInicio AND :dataFim', { dataInicio, dataFim });
+
+    if (empresaId) {
+      query.andWhere('proposta.empresaId = :empresaId', { empresaId });
+    }
+
+    if (vendedorId) {
+      query.andWhere('proposta.vendedor_id = :vendedorId', { vendedorId });
+    }
+
+    const result = await query.getRawOne();
 
     return Number(result?.total || 0);
   }
@@ -665,25 +824,103 @@ export class DashboardService {
     dataFim: Date,
     vendedorId?: string,
     regiao?: string,
+    empresaId?: string,
   ): Promise<number> {
     const whereConditionsTotal: any = {
-      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString()),
+      criadaEm: Between(dataInicio, dataFim),
+      ...(empresaId ? { empresaId } : {}),
     };
 
     const whereConditionsAprovadas: any = {
       status: 'aprovada',
-      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString()),
+      criadaEm: Between(dataInicio, dataFim),
+      ...(empresaId ? { empresaId } : {}),
     };
 
     if (vendedorId) {
-      whereConditionsTotal.vendedorId = vendedorId;
-      whereConditionsAprovadas.vendedorId = vendedorId;
+      whereConditionsTotal.vendedor_id = vendedorId;
+      whereConditionsAprovadas.vendedor_id = vendedorId;
     }
 
     const total = await this.propostaRepository.count({ where: whereConditionsTotal });
     const aprovadas = await this.propostaRepository.count({ where: whereConditionsAprovadas });
 
     return total > 0 ? (aprovadas / total) * 100 : 0;
+  }
+
+  private async calculateCicloMedio(
+    dataInicio: Date,
+    dataFim: Date,
+    vendedorId?: string,
+    regiao?: string,
+    empresaId?: string,
+  ): Promise<number> {
+    const query = this.propostaRepository
+      .createQueryBuilder('proposta')
+      .select(
+        'AVG(EXTRACT(EPOCH FROM (COALESCE(proposta.atualizadaEm, proposta.criadaEm) - proposta.criadaEm)) / 86400)',
+        'dias',
+      )
+      .where('proposta.criadaEm BETWEEN :dataInicio AND :dataFim', { dataInicio, dataFim })
+      .andWhere('proposta.status IN (:...status)', {
+        status: ['aprovada', 'rejeitada', 'expirada'],
+      });
+
+    if (empresaId) {
+      query.andWhere('proposta.empresaId = :empresaId', { empresaId });
+    }
+
+    if (vendedorId) {
+      query.andWhere('proposta.vendedor_id = :vendedorId', { vendedorId });
+    }
+
+    const result = await query.getRawOne();
+    return Number(result?.dias || 0);
+  }
+
+  private async calculateTempoEtapa(
+    dataInicio: Date,
+    dataFim: Date,
+    vendedorId?: string,
+    regiao?: string,
+    empresaId?: string,
+  ): Promise<number> {
+    const query = this.propostaRepository
+      .createQueryBuilder('proposta')
+      .select('AVG(EXTRACT(EPOCH FROM (:dataFim - proposta.criadaEm)) / 86400)', 'dias')
+      .where('proposta.criadaEm BETWEEN :dataInicio AND :dataFim', { dataInicio, dataFim })
+      .andWhere('proposta.status IN (:...status)', { status: ['enviada', 'visualizada'] });
+
+    if (empresaId) {
+      query.andWhere('proposta.empresaId = :empresaId', { empresaId });
+    }
+
+    if (vendedorId) {
+      query.andWhere('proposta.vendedor_id = :vendedorId', { vendedorId });
+    }
+
+    const result = await query.getRawOne();
+    return Number(result?.dias || 0);
+  }
+
+  private async calculateFollowUpsPendentes(
+    dataInicio: Date,
+    dataFim: Date,
+    vendedorId?: string,
+    regiao?: string,
+    empresaId?: string,
+  ): Promise<number> {
+    const whereConditions: any = {
+      criadaEm: Between(dataInicio, dataFim),
+      status: 'enviada',
+      ...(empresaId ? { empresaId } : {}),
+    };
+
+    if (vendedorId) {
+      whereConditions.vendedor_id = vendedorId;
+    }
+
+    return await this.propostaRepository.count({ where: whereConditions });
   }
 
   private calculateBadges(vendas: number, meta: number, variacao: number): string[] {
@@ -703,6 +940,215 @@ export class DashboardService {
     if (progressoMeta >= 90) return '#3B82F6'; // Azul
     if (progressoMeta >= 70) return '#F59E0B'; // Amarelo
     return '#EF4444'; // Vermelho
+  }
+
+  async getChartsData(
+    periodo: string = 'mensal',
+    vendedorId?: string,
+    regiao?: string,
+    empresaId?: string,
+  ): Promise<DashboardChartsData> {
+    const { dataInicio, dataFim } = this.getDateRange(periodo);
+
+    const whereConditions: any = {
+      criadaEm: Between(dataInicio, dataFim),
+      ...(empresaId ? { empresaId } : {}),
+    };
+
+    if (vendedorId) {
+      whereConditions.vendedor_id = vendedorId;
+    }
+
+    const propostas = await this.propostaRepository.find({
+      where: whereConditions,
+      select: ['status', 'total', 'criadaEm'],
+    });
+
+    const metaAtual = await this.metasService.getMetaAtual(vendedorId, regiao, empresaId);
+    const metaMensal = Number(metaAtual?.valor || this.getMeta('mensal'));
+
+    const vendasMensais = this.buildVendasMensais(propostas, dataInicio, dataFim, metaMensal);
+    const propostasPorStatus = this.buildPropostasPorStatus(propostas);
+    const funilVendas = this.buildFunilVendas(propostas);
+
+    let atividadesTimeline: DashboardChartsData['atividadesTimeline'] = [];
+    try {
+      atividadesTimeline = await this.buildAtividadesTimeline(
+        dataInicio,
+        dataFim,
+        vendedorId,
+        empresaId,
+      );
+    } catch {
+      atividadesTimeline = [];
+    }
+
+    return {
+      vendasMensais,
+      propostasPorStatus,
+      atividadesTimeline,
+      funilVendas,
+    };
+  }
+
+  private buildVendasMensais(
+    propostas: Pick<PropostaEntity, 'status' | 'total' | 'criadaEm'>[],
+    dataInicio: Date,
+    dataFim: Date,
+    metaMensal: number,
+  ): DashboardChartsData['vendasMensais'] {
+    const monthKeys = this.getMonthKeys(dataInicio, dataFim);
+    const totals = new Map<string, number>(monthKeys.map((key) => [key, 0]));
+
+    propostas.forEach((proposta) => {
+      if (proposta.status !== 'aprovada') return;
+      const key = this.toMonthKey(proposta.criadaEm);
+      const total = Number(proposta.total || 0);
+      totals.set(key, (totals.get(key) || 0) + total);
+    });
+
+    return monthKeys.map((key) => ({
+      mes: this.getMonthLabel(key),
+      valor: Number((totals.get(key) || 0).toFixed(2)),
+      meta: Number(metaMensal.toFixed(2)),
+    }));
+  }
+
+  private buildPropostasPorStatus(
+    propostas: Pick<PropostaEntity, 'status'>[],
+  ): DashboardChartsData['propostasPorStatus'] {
+    const statusConfig: Array<{ status: string; label: string; color: string }> = [
+      { status: 'rascunho', label: 'Rascunho', color: '#6B7280' },
+      { status: 'enviada', label: 'Enviada', color: '#3B82F6' },
+      { status: 'visualizada', label: 'Visualizada', color: '#06B6D4' },
+      { status: 'aprovada', label: 'Aprovada', color: '#10B981' },
+      { status: 'rejeitada', label: 'Rejeitada', color: '#F59E0B' },
+      { status: 'expirada', label: 'Expirada', color: '#EF4444' },
+    ];
+
+    if (propostas.length === 0) {
+      return [];
+    }
+
+    const counts = new Map<string, number>();
+    propostas.forEach((proposta) => {
+      counts.set(proposta.status, (counts.get(proposta.status) || 0) + 1);
+    });
+
+    const total = propostas.length;
+    return statusConfig
+      .map((config) => {
+        const quantidade = counts.get(config.status) || 0;
+        const percentual = total > 0 ? (quantidade / total) * 100 : 0;
+        return {
+          status: config.label,
+          valor: Number(percentual.toFixed(1)),
+          color: config.color,
+        };
+      })
+      .filter((item) => item.valor > 0);
+  }
+
+  private buildFunilVendas(
+    propostas: Pick<PropostaEntity, 'status' | 'total'>[],
+  ): DashboardChartsData['funilVendas'] {
+    const etapas: Array<{ etapa: string; statuses: string[] }> = [
+      { etapa: 'Rascunho', statuses: ['rascunho'] },
+      { etapa: 'Enviadas', statuses: ['enviada', 'visualizada'] },
+      { etapa: 'Aprovadas', statuses: ['aprovada'] },
+      { etapa: 'Perdidas', statuses: ['rejeitada', 'expirada'] },
+    ];
+
+    return etapas
+      .map(({ etapa, statuses }) => {
+        const propostasEtapa = propostas.filter((proposta) => statuses.includes(proposta.status));
+        const valor = propostasEtapa.reduce(
+          (acc, proposta) => acc + Number(proposta.total || 0),
+          0,
+        );
+
+        return {
+          etapa,
+          quantidade: propostasEtapa.length,
+          valor: Number(valor.toFixed(2)),
+        };
+      })
+      .filter((item) => item.quantidade > 0);
+  }
+
+  private async buildAtividadesTimeline(
+    dataInicio: Date,
+    dataFim: Date,
+    vendedorId?: string,
+    empresaId?: string,
+  ): Promise<DashboardChartsData['atividadesTimeline']> {
+    const monthKeys = this.getMonthKeys(dataInicio, dataFim);
+
+    const timeline = await Promise.all(
+      monthKeys.map(async (monthKey) => {
+        const [year, month] = monthKey.split('-').map(Number);
+        const startDate = new Date(year, month - 1, 1);
+        const endDate = new Date(year, month, 0);
+
+        const stats = await this.eventosService.getEventStatsByPeriod(
+          startDate.toISOString().split('T')[0],
+          endDate.toISOString().split('T')[0],
+          vendedorId,
+          empresaId,
+        );
+
+        const reunioes = Number(stats?.estatisticasPorTipo?.reuniao || 0);
+        const ligacoes = Number(stats?.estatisticasPorTipo?.ligacao || 0);
+        const followUps = Number(stats?.estatisticasPorTipo?.['follow-up'] || 0);
+        const outros = Number(stats?.estatisticasPorTipo?.outro || 0);
+
+        return {
+          mes: this.getMonthLabel(monthKey),
+          reunioes,
+          ligacoes,
+          emails: followUps + outros,
+        };
+      }),
+    );
+
+    return timeline;
+  }
+
+  private getMonthKeys(dataInicio: Date, dataFim: Date): string[] {
+    const keys: string[] = [];
+    const cursor = new Date(dataInicio.getFullYear(), dataInicio.getMonth(), 1);
+    const end = new Date(dataFim.getFullYear(), dataFim.getMonth(), 1);
+
+    while (cursor <= end) {
+      keys.push(this.toMonthKey(cursor));
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    return keys;
+  }
+
+  private toMonthKey(date: Date): string {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  private getMonthLabel(monthKey: string): string {
+    const monthNames = [
+      'Jan',
+      'Fev',
+      'Mar',
+      'Abr',
+      'Mai',
+      'Jun',
+      'Jul',
+      'Ago',
+      'Set',
+      'Out',
+      'Nov',
+      'Dez',
+    ];
+    const [year, month] = monthKey.split('-').map(Number);
+    const monthName = monthNames[Math.max(0, Math.min(11, month - 1))];
+    return `${monthName}/${String(year).slice(-2)}`;
   }
 
   getPeriodosDisponiveis(): string[] {

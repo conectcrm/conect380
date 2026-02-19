@@ -574,14 +574,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                 <div className="flex flex-col items-center gap-2">
                   <Link
                     to="/suporte"
-                    ref={(el) => {
-                      if (el) sidebarItemsRef.current[1] = el;
-                    }}
-                    className="flex flex-col items-center justify-center w-full py-2 rounded-lg text-white/70 hover:text-white hover:bg-white/5 group"
-                    style={{
-                      transform: `scale(${getDockScale(1)})`,
-                      transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                    }}
+                    className="flex flex-col items-center justify-center w-full py-2 rounded-lg text-white/70"
                     title="Central de ajuda"
                   >
                     <MessageCircle className="h-5 w-5 mb-1" />
@@ -589,14 +582,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                   </Link>
                   <a
                     href="mailto:suporte@conectcrm.com"
-                    ref={(el) => {
-                      if (el) sidebarItemsRef.current[2] = el;
-                    }}
-                    className="flex flex-col items-center justify-center w-full py-2 rounded-lg bg-[#159A9C]/20 text-[#159A9C] hover:bg-[#159A9C]/30 group"
-                    style={{
-                      transform: `scale(${getDockScale(2)})`,
-                      transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                    }}
+                    className="flex flex-col items-center justify-center w-full py-2 rounded-lg bg-[#159A9C]/20 text-[#159A9C]"
                     title="Abrir chamado"
                   >
                     <Mail className="h-4 w-4 mb-1" />

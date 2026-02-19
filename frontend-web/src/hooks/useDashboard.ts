@@ -174,7 +174,7 @@ export const useDashboard = (options: UseDashboardOptions = {}): UseDashboardRet
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState({ periodo, vendedorId, regiao });
 
-  // Função para buscar dados do dashboard
+  // Funcao para buscar dados do dashboard
   const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
@@ -207,10 +207,12 @@ export const useDashboard = (options: UseDashboardOptions = {}): UseDashboardRet
       );
 
       // Converter timestamps dos alertas
-      const alertasComData = result.alertas.map((alerta: any) => ({
-        ...alerta,
-        timestamp: new Date(alerta.timestamp),
-      }));
+      const alertasComData = Array.isArray(result.alertas)
+        ? result.alertas.map((alerta: any) => ({
+            ...alerta,
+            timestamp: new Date(alerta.timestamp),
+          }))
+        : [];
 
       const metadataDefaults = {
         periodo: filters.periodo,
@@ -247,28 +249,23 @@ export const useDashboard = (options: UseDashboardOptions = {}): UseDashboardRet
         metadata,
       });
     } catch (err) {
-      console.error('❌ Erro ao buscar dados do dashboard:', err);
+      console.error('Erro ao buscar dados do dashboard:', err);
       const isAbortError =
         err instanceof DOMException ? err.name === 'AbortError' : (err as any)?.name === 'AbortError';
       const errorMessage = isAbortError
-        ? 'Tempo limite ao carregar o dashboard. Verifique se o backend está rodando.'
+        ? 'Tempo limite ao carregar o dashboard. Verifique se o backend esta rodando.'
         : err instanceof Error
           ? err.message
           : 'Erro desconhecido';
 
       setError(errorMessage);
-
-      if (errorMessage.includes('401')) {
-        setData(createEmptyDashboardData());
-      } else {
-        setData(getMockData());
-      }
+      setData(createEmptyDashboardData());
     } finally {
       setLoading(false);
     }
   }, [filters, refreshInterval]);
 
-  // Função para atualizar filtros
+  // Funcao para atualizar filtros
   const updateFilters = useCallback((newFilters: Partial<UseDashboardOptions>) => {
     setFilters((prev) => ({
       ...prev,
@@ -276,7 +273,7 @@ export const useDashboard = (options: UseDashboardOptions = {}): UseDashboardRet
     }));
   }, []);
 
-  // Função para refresh manual
+  // Funcao para refresh manual
   const refresh = useCallback(async () => {
     await fetchDashboardData();
   }, [fetchDashboardData]);
@@ -307,7 +304,7 @@ export const useDashboard = (options: UseDashboardOptions = {}): UseDashboardRet
 };
 
 /**
- * Hook específico para KPIs
+ * Hook especifico para KPIs
  */
 export const useDashboardKPIs = (
   periodo: string = 'mensal',
@@ -348,7 +345,7 @@ export const useDashboardKPIs = (
       const result = await response.json();
       setKpis(result);
     } catch (err) {
-      console.error('❌ Erro ao buscar KPIs:', err);
+      console.error('Erro ao buscar KPIs:', err);
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
       setLoading(false);
@@ -363,7 +360,7 @@ export const useDashboardKPIs = (
 };
 
 /**
- * Hook específico para alertas
+ * Hook especifico para alertas
  */
 export const useDashboardAlertas = () => {
   const [alertas, setAlertas] = useState<AlertaInteligente[]>([]);
@@ -400,7 +397,7 @@ export const useDashboardAlertas = () => {
 
       setAlertas(alertasComData);
     } catch (err) {
-      console.error('❌ Erro ao buscar alertas:', err);
+      console.error('Erro ao buscar alertas:', err);
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
       setLoading(false);
@@ -430,60 +427,5 @@ export const useDashboardAlertas = () => {
     fecharAlerta,
   };
 };
-
-// Dados mock como fallback
-const getMockData = (): DashboardData => ({
-  kpis: {
-    faturamentoTotal: { valor: 487650, meta: 450000, variacao: 24, periodo: 'vs mês anterior' },
-    ticketMedio: { valor: 23420, variacao: 8.7, periodo: 'vs mês anterior' },
-    vendasFechadas: { quantidade: 34, variacao: 18, periodo: 'vs mês anterior' },
-    emNegociacao: {
-      valor: 285400,
-      quantidade: 22,
-      propostas: ['PROP-001', 'PROP-002', 'PROP-003'],
-    },
-    novosClientesMes: { quantidade: 248, variacao: 12.5 },
-    leadsQualificados: { quantidade: 32, variacao: 8.3 },
-    propostasEnviadas: { valor: 125000, variacao: 15.2 },
-    cicloMedio: { dias: 18, variacao: -3.4 },
-    tempoEtapa: { dias: 7, variacao: -1.2 },
-    followUpsPendentes: { quantidade: 14, variacao: -9.5 },
-    taxaSucessoGeral: { percentual: 68, variacao: -2.1 },
-  },
-  vendedoresRanking: [
-    {
-      id: '1',
-      nome: 'João Silva',
-      vendas: 150000,
-      meta: 90000,
-      variacao: 25,
-      posicao: 1,
-      badges: ['top_performer', 'goal_crusher'],
-      cor: '#10B981',
-    },
-  ],
-  alertas: [
-    {
-      id: 'mock-1',
-      tipo: 'conquista',
-      severidade: 'baixa',
-      titulo: 'Meta Superada! 🎉',
-      descricao: 'Parabéns! A meta mensal foi superada em 8%!',
-      timestamp: new Date(),
-      lido: false,
-    },
-  ],
-  chartsData: undefined,
-  metadata: {
-    periodo: 'mensal',
-    vendedorId: undefined,
-    regiao: undefined,
-    atualizadoEm: new Date().toISOString(),
-    proximaAtualizacao: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-    periodosDisponiveis: ['semanal', 'mensal', 'trimestral', 'semestral', 'anual'],
-    vendedoresDisponiveis: [{ id: '1', nome: 'João Silva' }],
-    regioesDisponiveis: ['Todas', 'Norte', 'Nordeste', 'Centro-Oeste', 'Sudeste', 'Sul'],
-  },
-});
 
 export default useDashboard;

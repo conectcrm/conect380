@@ -1,14 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { FindOptionsWhere, Repository } from 'typeorm';
+import { Meta as MetaEntity, MetaTipo } from './entities/meta.entity';
 
 export interface Meta {
   id?: string;
   tipo: 'mensal' | 'trimestral' | 'anual';
   periodo: string;
-  vendedorId?: number;
+  vendedorId?: string | null;
   regiao?: string;
   valor: number;
   descricao?: string;
   ativa: boolean;
+  empresaId?: string;
   criadaEm: Date;
   atualizadaEm: Date;
 }
@@ -16,10 +20,11 @@ export interface Meta {
 export interface CreateMetaDto {
   tipo: 'mensal' | 'trimestral' | 'anual';
   periodo: string;
-  vendedorId?: number;
+  vendedorId?: string;
   regiao?: string;
   valor: number;
   descricao?: string;
+  empresaId?: string;
 }
 
 export interface UpdateMetaDto extends Partial<CreateMetaDto> {
@@ -28,180 +33,286 @@ export interface UpdateMetaDto extends Partial<CreateMetaDto> {
 
 @Injectable()
 export class MetasService {
-  // Por enquanto, sem injeção de repositório até criarmos a entidade Meta
+  constructor(
+    @InjectRepository(MetaEntity)
+    private readonly metasRepository: Repository<MetaEntity>,
+  ) {}
 
-  async findAll(): Promise<Meta[]> {
-    try {
-      // Por enquanto, retorna dados mockados
-      return [
-        {
-          id: '1',
-          tipo: 'mensal',
-          periodo: '2025-01',
-          vendedorId: null,
-          regiao: null,
-          valor: 450000,
-          descricao: 'Meta geral mensal para toda equipe',
-          ativa: true,
-          criadaEm: new Date('2025-01-01'),
-          atualizadaEm: new Date('2025-01-01'),
-        },
-        {
-          id: '2',
-          tipo: 'trimestral',
-          periodo: '2025-Q1',
-          vendedorId: 1,
-          regiao: 'São Paulo',
-          valor: 300000,
-          descricao: 'Meta específica para região SP',
-          ativa: true,
-          criadaEm: new Date('2025-01-01'),
-          atualizadaEm: new Date('2025-01-01'),
-        },
-      ];
-    } catch (error) {
-      console.error('Erro ao buscar metas:', error);
-      throw new Error('Erro interno do servidor');
+  async findAll(empresaId?: string): Promise<Meta[]> {
+    const where: FindOptionsWhere<MetaEntity> = {};
+    if (empresaId) {
+      where.empresaId = empresaId;
     }
+
+    const metas = await this.metasRepository.find({
+      where,
+      order: {
+        periodo: 'DESC',
+        criadaEm: 'DESC',
+      },
+    });
+
+    return metas.map((meta) => this.toMetaDto(meta));
   }
 
-  async findOne(id: string): Promise<Meta> {
-    try {
-      const metas = await this.findAll();
-      const meta = metas.find((m) => m.id === id);
-
-      if (!meta) {
-        throw new Error('Meta não encontrada');
-      }
-
-      return meta;
-    } catch (error) {
-      console.error('Erro ao buscar meta:', error);
-      throw new Error('Meta não encontrada');
+  async findOne(id: string, empresaId?: string): Promise<Meta> {
+    const where: FindOptionsWhere<MetaEntity> = { id };
+    if (empresaId) {
+      where.empresaId = empresaId;
     }
+
+    const meta = await this.metasRepository.findOne({ where });
+    if (!meta) {
+      throw new NotFoundException('Meta nao encontrada');
+    }
+
+    return this.toMetaDto(meta);
   }
 
-  async create(createMetaDto: CreateMetaDto): Promise<Meta> {
-    try {
-      const agora = new Date();
-      const novaMeta: Meta = {
-        id: Date.now().toString(), // Temporário, será substituído pela DB
-        ...createMetaDto,
-        ativa: true,
-        criadaEm: agora,
-        atualizadaEm: agora,
+  async create(createMetaDto: CreateMetaDto, empresaId?: string): Promise<Meta> {
+    const meta = this.metasRepository.create({
+      tipo: this.normalizeTipo(createMetaDto.tipo),
+      periodo: createMetaDto.periodo,
+      valor: Number(createMetaDto.valor) || 0,
+      vendedorId: this.parseVendedorId(createMetaDto.vendedorId),
+      regiao: this.normalizeOptionalText(createMetaDto.regiao),
+      descricao: this.normalizeOptionalText(createMetaDto.descricao),
+      ativa: true,
+      empresaId: empresaId || createMetaDto.empresaId || null,
+    });
+
+    const savedMeta = await this.metasRepository.save(meta);
+    return this.toMetaDto(savedMeta);
+  }
+
+  async update(id: string, updateMetaDto: UpdateMetaDto, empresaId?: string): Promise<Meta> {
+    const metaAtual = await this.findOneEntity(id, empresaId);
+
+    if (updateMetaDto.tipo !== undefined) {
+      metaAtual.tipo = this.normalizeTipo(updateMetaDto.tipo);
+    }
+    if (updateMetaDto.periodo !== undefined) {
+      metaAtual.periodo = updateMetaDto.periodo;
+    }
+    if (updateMetaDto.valor !== undefined) {
+      metaAtual.valor = Number(updateMetaDto.valor) || 0;
+    }
+    if (updateMetaDto.vendedorId !== undefined) {
+      metaAtual.vendedorId = this.parseVendedorId(updateMetaDto.vendedorId);
+    }
+    if (updateMetaDto.regiao !== undefined) {
+      metaAtual.regiao = this.normalizeOptionalText(updateMetaDto.regiao);
+    }
+    if (updateMetaDto.descricao !== undefined) {
+      metaAtual.descricao = this.normalizeOptionalText(updateMetaDto.descricao);
+    }
+    if (updateMetaDto.ativa !== undefined) {
+      metaAtual.ativa = Boolean(updateMetaDto.ativa);
+    }
+
+    const savedMeta = await this.metasRepository.save(metaAtual);
+    return this.toMetaDto(savedMeta);
+  }
+
+  async remove(id: string, empresaId?: string): Promise<void> {
+    const meta = await this.findOneEntity(id, empresaId);
+    await this.metasRepository.remove(meta);
+  }
+
+  async findByPeriodo(tipo: string, periodo: string, empresaId?: string): Promise<Meta[]> {
+    const where: FindOptionsWhere<MetaEntity> = {
+      tipo: this.normalizeTipo(tipo),
+      periodo,
+      ativa: true,
+    };
+    if (empresaId) {
+      where.empresaId = empresaId;
+    }
+
+    const metas = await this.metasRepository.find({
+      where,
+      order: { atualizadaEm: 'DESC' },
+    });
+
+    return metas.map((meta) => this.toMetaDto(meta));
+  }
+
+  async findByVendedor(vendedorId: string, empresaId?: string): Promise<Meta[]> {
+    const vendedor = this.parseVendedorId(vendedorId);
+    if (vendedor === undefined) {
+      return [];
+    }
+
+    const where: FindOptionsWhere<MetaEntity> = {
+      vendedorId: vendedor,
+      ativa: true,
+    };
+    if (empresaId) {
+      where.empresaId = empresaId;
+    }
+
+    const metas = await this.metasRepository.find({
+      where,
+      order: { atualizadaEm: 'DESC' },
+    });
+
+    return metas.map((meta) => this.toMetaDto(meta));
+  }
+
+  async getMetaAtual(
+    vendedorId?: string,
+    regiao?: string,
+    empresaId?: string,
+  ): Promise<Meta | null> {
+    const periodoMensal = this.getPeriodoAtual(MetaTipo.MENSAL);
+    const vendedor = this.parseVendedorId(vendedorId);
+    const regiaoNormalizada = this.normalizeOptionalText(regiao);
+
+    const baseWhere: FindOptionsWhere<MetaEntity> = {
+      tipo: MetaTipo.MENSAL,
+      periodo: periodoMensal,
+      ativa: true,
+    };
+
+    if (empresaId) {
+      baseWhere.empresaId = empresaId;
+    }
+
+    const buscarMeta = async (
+      extra: Partial<FindOptionsWhere<MetaEntity>>,
+    ): Promise<MetaEntity | null> => {
+      const where: FindOptionsWhere<MetaEntity> = {
+        ...baseWhere,
+        ...extra,
       };
 
-      // Aqui seria a lógica para salvar no banco
-      // return this.metasRepository.save(novaMeta);
+      return await this.metasRepository.findOne({
+        where,
+        order: { atualizadaEm: 'DESC' },
+      });
+    };
 
-      return novaMeta;
-    } catch (error) {
-      console.error('Erro ao criar meta:', error);
-      throw new Error('Erro ao criar meta');
+    if (vendedor !== undefined && regiaoNormalizada) {
+      const especifica = await buscarMeta({
+        vendedorId: vendedor,
+        regiao: regiaoNormalizada,
+      });
+      if (especifica) return this.toMetaDto(especifica);
     }
+
+    if (vendedor !== undefined) {
+      const porVendedor = await buscarMeta({
+        vendedorId: vendedor,
+        regiao: null,
+      });
+      if (porVendedor) return this.toMetaDto(porVendedor);
+    }
+
+    if (regiaoNormalizada) {
+      const porRegiao = await buscarMeta({
+        vendedorId: null,
+        regiao: regiaoNormalizada,
+      });
+      if (porRegiao) return this.toMetaDto(porRegiao);
+    }
+
+    const geral = await buscarMeta({
+      vendedorId: null,
+      regiao: null,
+    });
+    if (geral) return this.toMetaDto(geral);
+
+    const fallbackWhere: FindOptionsWhere<MetaEntity> = {
+      ativa: true,
+    };
+    if (empresaId) {
+      fallbackWhere.empresaId = empresaId;
+    }
+
+    const fallback = await this.metasRepository.findOne({
+      where: fallbackWhere,
+      order: {
+        tipo: 'ASC',
+        periodo: 'DESC',
+        atualizadaEm: 'DESC',
+      },
+    });
+
+    return fallback ? this.toMetaDto(fallback) : null;
   }
 
-  async update(id: string, updateMetaDto: UpdateMetaDto): Promise<Meta> {
-    try {
-      const meta = await this.findOne(id);
-
-      const metaAtualizada: Meta = {
-        ...meta,
-        ...updateMetaDto,
-        atualizadaEm: new Date(),
-      };
-
-      // Aqui seria a lógica para atualizar no banco
-      // return this.metasRepository.save(metaAtualizada);
-
-      return metaAtualizada;
-    } catch (error) {
-      console.error('Erro ao atualizar meta:', error);
-      throw new Error('Erro ao atualizar meta');
+  private async findOneEntity(id: string, empresaId?: string): Promise<MetaEntity> {
+    const where: FindOptionsWhere<MetaEntity> = { id };
+    if (empresaId) {
+      where.empresaId = empresaId;
     }
+
+    const meta = await this.metasRepository.findOne({ where });
+    if (!meta) {
+      throw new NotFoundException('Meta nao encontrada');
+    }
+
+    return meta;
   }
 
-  async remove(id: string): Promise<void> {
-    try {
-      const meta = await this.findOne(id);
-
-      // Aqui seria a lógica para remover do banco
-      // await this.metasRepository.remove(meta);
-
-      console.log(`Meta ${id} removida com sucesso`);
-    } catch (error) {
-      console.error('Erro ao remover meta:', error);
-      throw new Error('Erro ao remover meta');
-    }
+  private toMetaDto(meta: MetaEntity): Meta {
+    return {
+      id: meta.id,
+      tipo: meta.tipo,
+      periodo: meta.periodo,
+      vendedorId: meta.vendedorId ?? undefined,
+      regiao: meta.regiao ?? undefined,
+      valor: Number(meta.valor) || 0,
+      descricao: meta.descricao ?? undefined,
+      ativa: meta.ativa,
+      empresaId: meta.empresaId ?? undefined,
+      criadaEm: meta.criadaEm,
+      atualizadaEm: meta.atualizadaEm,
+    };
   }
 
-  async findByPeriodo(tipo: string, periodo: string): Promise<Meta[]> {
-    try {
-      const metas = await this.findAll();
-      return metas.filter((meta) => meta.tipo === tipo && meta.periodo === periodo && meta.ativa);
-    } catch (error) {
-      console.error('Erro ao buscar metas por período:', error);
-      throw new Error('Erro ao buscar metas');
-    }
+  private normalizeTipo(tipo: string): MetaTipo {
+    if (tipo === MetaTipo.TRIMESTRAL) return MetaTipo.TRIMESTRAL;
+    if (tipo === MetaTipo.ANUAL) return MetaTipo.ANUAL;
+    return MetaTipo.MENSAL;
   }
 
-  async findByVendedor(vendedorId: number): Promise<Meta[]> {
-    try {
-      const metas = await this.findAll();
-      return metas.filter((meta) => meta.vendedorId === vendedorId && meta.ativa);
-    } catch (error) {
-      console.error('Erro ao buscar metas por vendedor:', error);
-      throw new Error('Erro ao buscar metas');
+  private getPeriodoAtual(tipo: MetaTipo): string {
+    const now = new Date();
+    const year = now.getFullYear();
+
+    if (tipo === MetaTipo.ANUAL) {
+      return `${year}`;
     }
+
+    if (tipo === MetaTipo.TRIMESTRAL) {
+      const quarter = Math.floor(now.getMonth() / 3) + 1;
+      return `${year}-Q${quarter}`;
+    }
+
+    return `${year}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   }
 
-  async getMetaAtual(vendedorId?: number, regiao?: string): Promise<Meta | null> {
-    try {
-      const agora = new Date();
-      const anoAtual = agora.getFullYear();
-      const mesAtual = agora.getMonth() + 1;
-      const periodoMensal = `${anoAtual}-${mesAtual.toString().padStart(2, '0')}`;
+  private parseVendedorId(vendedorId?: string | null): string | undefined {
+    if (vendedorId === null || vendedorId === undefined) {
+      return undefined;
+    }
+    const trimmed = vendedorId.trim();
 
-      const metas = await this.findAll();
+    // Aceita apenas UUID v4/v5 para manter consistencia com users.id.
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed)
+    ) {
+      return undefined;
+    }
+    return trimmed;
+  }
 
-      // Busca por meta específica (vendedor + região)
-      if (vendedorId && regiao) {
-        const meta = metas.find(
-          (m) =>
-            m.vendedorId === vendedorId &&
-            m.regiao === regiao &&
-            m.periodo === periodoMensal &&
-            m.ativa,
-        );
-        if (meta) return meta;
-      }
-
-      // Busca por meta específica do vendedor
-      if (vendedorId) {
-        const meta = metas.find(
-          (m) => m.vendedorId === vendedorId && !m.regiao && m.periodo === periodoMensal && m.ativa,
-        );
-        if (meta) return meta;
-      }
-
-      // Busca por meta específica da região
-      if (regiao) {
-        const meta = metas.find(
-          (m) => !m.vendedorId && m.regiao === regiao && m.periodo === periodoMensal && m.ativa,
-        );
-        if (meta) return meta;
-      }
-
-      // Busca por meta geral
-      const metaGeral = metas.find(
-        (m) => !m.vendedorId && !m.regiao && m.periodo === periodoMensal && m.ativa,
-      );
-
-      return metaGeral || null;
-    } catch (error) {
-      console.error('Erro ao buscar meta atual:', error);
+  private normalizeOptionalText(value?: string | null): string | null {
+    if (value === null || value === undefined) {
       return null;
     }
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
   }
 }

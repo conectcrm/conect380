@@ -26,6 +26,23 @@ interface FormularioMeta {
   descricao: string;
 }
 
+interface ErrorResponseShape {
+  response?: {
+    data?: {
+      message?: string | string[];
+    };
+  };
+}
+
+const getApiErrorMessage = (err: unknown): string | undefined => {
+  if (typeof err !== 'object' || err === null) {
+    return undefined;
+  }
+
+  const message = (err as ErrorResponseShape).response?.data?.message;
+  return Array.isArray(message) ? message.join('. ') : message;
+};
+
 const DEFAULT_PERIOD = () => {
   const agora = new Date();
   const ano = agora.getFullYear();
@@ -71,10 +88,7 @@ const MetasConfiguracao: React.FC = () => {
       setMetas(normalizados);
     } catch (err: unknown) {
       console.error('Erro ao carregar metas:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
+      const normalizedMessage = getApiErrorMessage(err);
       const fallbackMessage = err instanceof Error ? err.message : undefined;
       setError(normalizedMessage || fallbackMessage || 'Erro ao carregar metas');
       setMetas([]);
@@ -115,10 +129,7 @@ const MetasConfiguracao: React.FC = () => {
       setVendedores(normalizados);
     } catch (err: unknown) {
       console.error('Erro ao carregar vendedores:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
+      const normalizedMessage = getApiErrorMessage(err);
       const fallbackMessage = err instanceof Error ? err.message : undefined;
       setError(normalizedMessage || fallbackMessage || 'Erro ao carregar vendedores');
     } finally {
@@ -151,10 +162,7 @@ const MetasConfiguracao: React.FC = () => {
       setRegioes(normalizadas);
     } catch (err: unknown) {
       console.error('Erro ao carregar regiões:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
+      const normalizedMessage = getApiErrorMessage(err);
       const fallbackMessage = err instanceof Error ? err.message : undefined;
       setError(normalizedMessage || fallbackMessage || 'Erro ao carregar regiões');
     } finally {
@@ -181,7 +189,20 @@ const MetasConfiguracao: React.FC = () => {
   const formatarPeriodo = (tipo: MetaTipo, periodo: string) => {
     if (tipo === 'mensal') {
       const [ano, mes] = periodo.split('-');
-      const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+      const meses = [
+        'Jan',
+        'Fev',
+        'Mar',
+        'Abr',
+        'Mai',
+        'Jun',
+        'Jul',
+        'Ago',
+        'Set',
+        'Out',
+        'Nov',
+        'Dez',
+      ];
       return `${meses[Number(mes) - 1]} ${ano}`;
     }
     if (tipo === 'trimestral') return periodo.replace('Q', 'T');
@@ -202,9 +223,7 @@ const MetasConfiguracao: React.FC = () => {
   const vendedoresDisponiveis = useMemo<Array<{ id: string; nome?: string }>>(() => {
     if (vendedores.length > 0) return vendedores;
 
-    const valores = metas
-      .map((m) => m.vendedorId)
-      .filter((v) => v !== undefined) as number[];
+    const valores = metas.map((m) => m.vendedorId).filter((v) => v !== undefined) as string[];
     const unicos = Array.from(new Set(valores)).map((id) => ({ id: String(id), nome: undefined }));
     return unicos;
   }, [metas, vendedores]);
@@ -234,7 +253,7 @@ const MetasConfiguracao: React.FC = () => {
         valor: parseValorParaNumero(formulario.valor),
         vendedorId:
           formulario.vendedorId && formulario.vendedorId !== 'todos'
-            ? Number(formulario.vendedorId)
+            ? formulario.vendedorId
             : undefined,
         regiao: formulario.regiao && formulario.regiao !== 'todas' ? formulario.regiao : undefined,
         descricao: formulario.descricao || undefined,
@@ -255,10 +274,7 @@ const MetasConfiguracao: React.FC = () => {
       resetForm();
     } catch (err: unknown) {
       console.error('Erro ao salvar meta:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
+      const normalizedMessage = getApiErrorMessage(err);
       const fallbackMessage = err instanceof Error ? err.message : undefined;
       setError(normalizedMessage || fallbackMessage || 'Erro ao salvar meta');
     } finally {
@@ -288,10 +304,7 @@ const MetasConfiguracao: React.FC = () => {
       setMetas((prev) => prev.filter((meta) => meta.id !== id));
     } catch (err: unknown) {
       console.error('Erro ao excluir meta:', err);
-      const responseMessage = (err as any)?.response?.data?.message;
-      const normalizedMessage = Array.isArray(responseMessage)
-        ? responseMessage.join('. ')
-        : responseMessage;
+      const normalizedMessage = getApiErrorMessage(err);
       const fallbackMessage = err instanceof Error ? err.message : undefined;
       setError(normalizedMessage || fallbackMessage || 'Erro ao excluir meta');
     } finally {
@@ -301,11 +314,7 @@ const MetasConfiguracao: React.FC = () => {
 
   const renderBadgetTipo = (tipo: MetaTipo) => {
     const base = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium';
-    return (
-      <span className={`${base} bg-[#159A9C]/10 text-[#159A9C] capitalize`}>
-        {tipo}
-      </span>
-    );
+    return <span className={`${base} bg-[#159A9C]/10 text-[#159A9C] capitalize`}>{tipo}</span>;
   };
 
   const valorTotal = metas.reduce((acc, meta) => acc + (Number(meta.valor) || 0), 0);
@@ -392,7 +401,9 @@ const MetasConfiguracao: React.FC = () => {
                   <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
                     Metas Ativas
                   </p>
-                  <p className="mt-2 text-3xl font-bold text-[#002333]">{metas.filter((m) => m.ativa).length}</p>
+                  <p className="mt-2 text-3xl font-bold text-[#002333]">
+                    {metas.filter((m) => m.ativa).length}
+                  </p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
                   <User className="h-6 w-6 text-[#159A9C]" />
@@ -406,7 +417,9 @@ const MetasConfiguracao: React.FC = () => {
                   <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
                     Valor Total
                   </p>
-                  <p className="mt-2 text-3xl font-bold text-[#002333]">{formatarValor(valorTotal)}</p>
+                  <p className="mt-2 text-3xl font-bold text-[#002333]">
+                    {formatarValor(valorTotal)}
+                  </p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
                   <DollarSign className="h-6 w-6 text-[#159A9C]" />
@@ -562,8 +575,16 @@ const MetasConfiguracao: React.FC = () => {
                   <input
                     type={formulario.tipo === 'mensal' ? 'month' : 'text'}
                     value={formulario.periodo}
-                    onChange={(e) => setFormulario((prev) => ({ ...prev, periodo: e.target.value }))}
-                    placeholder={formulario.tipo === 'trimestral' ? 'Ex: 2025-Q1' : formulario.tipo === 'anual' ? 'Ex: 2025' : ''}
+                    onChange={(e) =>
+                      setFormulario((prev) => ({ ...prev, periodo: e.target.value }))
+                    }
+                    placeholder={
+                      formulario.tipo === 'trimestral'
+                        ? 'Ex: 2025-Q1'
+                        : formulario.tipo === 'anual'
+                          ? 'Ex: 2025'
+                          : ''
+                    }
                     className="w-full border border-[#B4BEC9] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#159A9C] text-sm"
                     required
                   />
@@ -575,11 +596,15 @@ const MetasConfiguracao: React.FC = () => {
                   <label className="block text-sm font-medium text-[#002333] mb-2">Vendedor</label>
                   <select
                     value={formulario.vendedorId}
-                    onChange={(e) => setFormulario((prev) => ({ ...prev, vendedorId: e.target.value }))}
+                    onChange={(e) =>
+                      setFormulario((prev) => ({ ...prev, vendedorId: e.target.value }))
+                    }
                     className="w-full border border-[#B4BEC9] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#159A9C] text-sm"
                     disabled={loadingVendedores}
                   >
-                    <option value="todos">{loadingVendedores ? 'Carregando vendedores...' : 'Todos os vendedores'}</option>
+                    <option value="todos">
+                      {loadingVendedores ? 'Carregando vendedores...' : 'Todos os vendedores'}
+                    </option>
                     {vendedoresDisponiveis.map((vendedor) => (
                       <option key={vendedor.id} value={vendedor.id}>
                         {vendedor.nome || `Vendedor #${vendedor.id}`}
@@ -596,7 +621,9 @@ const MetasConfiguracao: React.FC = () => {
                     className="w-full border border-[#B4BEC9] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#159A9C] text-sm"
                     disabled={loadingRegioes}
                   >
-                    <option value="todas">{loadingRegioes ? 'Carregando regiões...' : 'Todas as regiões'}</option>
+                    <option value="todas">
+                      {loadingRegioes ? 'Carregando regiões...' : 'Todas as regiões'}
+                    </option>
                     {regioesDisponiveis.map((regiao) => {
                       const value = regiao;
                       return (
@@ -610,7 +637,9 @@ const MetasConfiguracao: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[#002333] mb-2">Valor da Meta</label>
+                <label className="block text-sm font-medium text-[#002333] mb-2">
+                  Valor da Meta
+                </label>
                 <div className="relative">
                   <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-[#B4BEC9] h-4 w-4" />
                   <input
@@ -629,10 +658,14 @@ const MetasConfiguracao: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[#002333] mb-2">Descrição (opcional)</label>
+                <label className="block text-sm font-medium text-[#002333] mb-2">
+                  Descrição (opcional)
+                </label>
                 <textarea
                   value={formulario.descricao}
-                  onChange={(e) => setFormulario((prev) => ({ ...prev, descricao: e.target.value }))}
+                  onChange={(e) =>
+                    setFormulario((prev) => ({ ...prev, descricao: e.target.value }))
+                  }
                   placeholder="Contextualize o objetivo desta meta"
                   rows={3}
                   className="w-full border border-[#B4BEC9] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#159A9C] text-sm"

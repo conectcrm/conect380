@@ -146,24 +146,10 @@ class PropostasService {
       this.isLoadingProdutos = false;
     }
 
-    // Fallback com produtos básicos se não conseguir carregar do backend
-    const fallbackProdutos = [
-      {
-        id: 'prod1',
-        nome: 'Produto Básico',
-        preco: 100.0,
-        categoria: 'Geral',
-        descricao: 'Produto de exemplo',
-        unidade: 'unidade',
-        tipo: 'produto' as const,
-      },
-    ];
-
-    // Cache o fallback também
-    this.produtosCache = fallbackProdutos;
+    // Sem fallback mock: manter somente dados reais
+    this.produtosCache = [];
     this.produtosCacheTimestamp = Date.now();
-
-    return fallbackProdutos;
+    return [];
   }
 
   private mapCliente(proposta: PropostaBasica): Cliente {
@@ -364,8 +350,6 @@ class PropostasService {
         this.vendedoresCacheTimestamp = Date.now();
 
         return vendedoresFormatados;
-      } else {
-        // Nenhum usuário ativo encontrado, utilizar fallback padrão
       }
     } catch (error) {
       console.error('❌ Erro ao carregar vendedores do backend:', error);
@@ -373,23 +357,10 @@ class PropostasService {
       this.isLoadingVendedores = false;
     }
 
-    // Fallback: retornar pelo menos um vendedor padrão
-    const fallbackVendedores = [
-      {
-        id: 'vend_default',
-        nome: 'Vendedor Padrão',
-        email: 'vendedor@empresa.com',
-        telefone: '',
-        tipo: 'vendedor' as const,
-        ativo: true,
-      },
-    ];
-
-    // Cache o fallback também
-    this.vendedoresCache = fallbackVendedores;
+    // Sem fallback mock: manter somente dados reais
+    this.vendedoresCache = [];
     this.vendedoresCacheTimestamp = Date.now();
-
-    return fallbackVendedores;
+    return [];
   }
 
   // Gerar título automático para proposta
@@ -597,7 +568,7 @@ class PropostasService {
     }
   }
 
-  // Obter vendedor atual (mock para compatibilidade)
+  // Obter vendedor atual
   async obterVendedorAtual(): Promise<Vendedor | null> {
     try {
       // Verificar se temos cache válido para vendedor atual
@@ -625,22 +596,7 @@ class PropostasService {
       return vendedorAtual;
     } catch (error) {
       console.error('❌ Erro ao obter vendedor atual:', error);
-
-      // Fallback: retornar vendedor padrão
-      const fallbackVendedor = {
-        id: 'vend_atual_default',
-        nome: 'Vendedor Atual',
-        email: 'atual@empresa.com',
-        telefone: '',
-        tipo: 'vendedor' as const,
-        ativo: true,
-      };
-
-      // Cache o fallback também
-      this.vendedorAtualCache = fallbackVendedor;
-      this.vendedorAtualCacheTimestamp = Date.now();
-
-      return fallbackVendedor;
+      return null;
     }
   }
 
