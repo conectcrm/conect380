@@ -4,6 +4,7 @@
 - Ambiente com backend e frontend atualizados na branch `chore/mvp-effective-change-gate-20260218`.
 - Usuarios de teste ativos para perfis: `superadmin`, `admin`, `gerente`, `vendedor`, `suporte`, `financeiro`.
 - Empresa de teste com assinatura ativa e modulos `usuarios` e `dashboard` habilitados.
+- Referencia de permissoes canonicas: `.production/CATALOGO_PERMISSOES_2026-02-19.md`.
 
 ## Criterio de aprovacao
 - Cada item marcado como `PASS` quando comportamento observado bater com resultado esperado.
@@ -75,6 +76,10 @@
 - [ ] `npm --prefix backend run test:e2e -- test/admin/admin-empresas-guard.e2e-spec.ts`
 - [ ] `npm --prefix backend run test -- src/modules/users/users.controller.spec.ts`
 - [ ] `.production/scripts/smoke-dashboard-role-scope.ps1 -BaseUrl http://127.0.0.1:3001`
+
+## 9) Compatibilidade de permissoes legadas
+- [ ] Usuario com permissao explicita legada (ex.: `USERS_CREATE`) consegue acessar rota equivalente (`users.create`).
+- [ ] Usuario sem role suficiente e sem permissao explicita nao acessa rota protegida por `@Permissions` (esperado: 403).
 
 ## Evidencias
 - Anexar no PR:

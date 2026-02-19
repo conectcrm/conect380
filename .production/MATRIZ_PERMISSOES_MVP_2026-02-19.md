@@ -4,6 +4,7 @@
 - Fonte: codigo atual da branch `chore/mvp-effective-change-gate-20260218`.
 - Foco: autenticacao, usuarios, dashboard, assinaturas, configuracao de empresa, planos, admin empresas e DLQ.
 - Perfis considerados: `superadmin`, `admin`, `gerente`, `vendedor`, `suporte`, `financeiro`.
+- Catalogo granular: `.production/CATALOGO_PERMISSOES_2026-02-19.md`.
 
 ## Legenda
 - `OK`: permitido no endpoint.
@@ -17,6 +18,7 @@
 | `JwtAuthGuard` | Exige JWT valido nos controllers protegidos. |
 | `EmpresaGuard` | Exige `user.empresa_id` para rotas multi-tenant. Sem isso, retorna 400. |
 | `RolesGuard` | Aplica `@Roles(...)` com match exato de role (sem hierarquia implicita). |
+| `PermissionsGuard` | Aplica `@Permissions(...)` com permissoes canonicas e aliases legados. |
 | `AssinaturaMiddleware` | Exige assinatura ativa e modulo incluido no plano para rotas monitoradas. |
 | `AssinaturaMiddleware` rota `/users` | Mapeada para modulo `usuarios` (hardening aplicado). |
 
