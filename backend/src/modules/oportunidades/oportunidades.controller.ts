@@ -8,7 +8,6 @@ import {
   Delete,
   Query,
   UseGuards,
-  ParseIntPipe,
   Request,
 } from '@nestjs/common';
 import { OportunidadesService } from './oportunidades.service';
@@ -65,13 +64,13 @@ export class OportunidadesController {
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number, @EmpresaId() empresaId: string) {
+  findOne(@Param('id') id: string, @EmpresaId() empresaId: string) {
     return this.oportunidadesService.findOne(id, empresaId);
   }
 
   @Patch(':id')
   update(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @Body() updateOportunidadeDto: UpdateOportunidadeDto,
     @EmpresaId() empresaId: string,
   ) {
@@ -80,7 +79,7 @@ export class OportunidadesController {
 
   @Patch(':id/estagio')
   updateEstagio(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @Body() updateEstagioDto: UpdateEstagioDto,
     @EmpresaId() empresaId: string,
   ) {
@@ -88,18 +87,18 @@ export class OportunidadesController {
   }
 
   @Delete(':id')
-  remove(@Param('id', ParseIntPipe) id: number, @EmpresaId() empresaId: string) {
+  remove(@Param('id') id: string, @EmpresaId() empresaId: string) {
     return this.oportunidadesService.remove(id, empresaId);
   }
 
   @Get(':id/atividades')
-  listarAtividades(@Param('id', ParseIntPipe) id: number, @EmpresaId() empresaId: string) {
+  listarAtividades(@Param('id') id: string, @EmpresaId() empresaId: string) {
     return this.oportunidadesService.listarAtividades(id, empresaId);
   }
 
   @Post(':id/atividades')
   createAtividade(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @Body() createAtividadeDto: CreateAtividadeDto,
     @EmpresaId() empresaId: string,
     @Request() req,
