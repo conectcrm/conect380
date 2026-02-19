@@ -17,7 +17,7 @@ import { UserRole } from '../../users/user.entity';
 
 @Controller('api/atendimento/filas/dlq')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.ADMIN)
+@Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
 export class DlqController {
   private readonly logger = new Logger(DlqController.name);
 

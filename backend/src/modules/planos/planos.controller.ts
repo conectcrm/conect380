@@ -37,7 +37,7 @@ export class PlanosController {
   }
 
   @Post()
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async criar(@Body() dados: CriarPlanoDto): Promise<Plano> {
     this.logger.log('🔍 Dados recebidos no controller:', dados);
     this.logger.log('🔍 Tipos dos campos:', {
@@ -57,7 +57,7 @@ export class PlanosController {
   }
 
   @Put(':id')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async atualizar(@Param('id') id: string, @Body() dados: AtualizarPlanoDto): Promise<Plano> {
     this.logger.log('📊 [PLANOS UPDATE] Dados recebidos para atualização:', {
       id,
@@ -78,7 +78,7 @@ export class PlanosController {
   }
 
   @Delete(':id')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async remover(@Param('id') id: string): Promise<{ message: string }> {
     await this.planosService.remover(id);
     this.logger.log(`🗑️ [PLANOS SUCCESS] Plano com ID "${id}" removido com sucesso!`);
@@ -86,7 +86,7 @@ export class PlanosController {
   }
 
   @Put(':id/desativar')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async desativar(@Param('id') id: string): Promise<Plano> {
     const plano = await this.planosService.desativar(id);
     this.logger.log(`⏸️ [PLANOS SUCCESS] Plano "${plano.nome}" desativado com sucesso!`);
@@ -94,7 +94,7 @@ export class PlanosController {
   }
 
   @Put(':id/ativar')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async ativar(@Param('id') id: string): Promise<Plano> {
     const plano = await this.planosService.ativar(id);
     this.logger.log(`✅ [PLANOS SUCCESS] Plano "${plano.nome}" ativado com sucesso!`);
@@ -102,7 +102,7 @@ export class PlanosController {
   }
 
   @Put(':id/toggle-status')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
   async toggleStatus(@Param('id') id: string): Promise<Plano> {
     const planoAtual = await this.planosService.buscarPorId(id);
     if (!planoAtual) {
