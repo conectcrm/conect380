@@ -16,10 +16,15 @@ export class ProdutosService {
       return produto;
     }
 
+    const ativoResolved =
+      produto.status !== undefined && produto.status !== null
+        ? produto.status === 'ativo'
+        : (produto as any).ativo ?? true;
+
     (produto as any).empresa_id = produto.empresaId;
     (produto as any).tipoItem = produto.tipoItem ?? tipoItemFallback;
-    (produto as any).status = produto.status ?? 'ativo';
-    (produto as any).ativo = (produto.status ?? 'ativo') === 'ativo';
+    (produto as any).status = produto.status ?? (ativoResolved ? 'ativo' : 'inativo');
+    (produto as any).ativo = ativoResolved;
     return produto;
   }
 
@@ -81,6 +86,7 @@ export class ProdutosService {
         vendasTotal: payload.vendasTotal ?? 0,
         tags: payload.tags ?? null,
         variacoes: payload.variacoes ?? null,
+        ativo: payload.status ? payload.status !== 'inativo' : true,
         empresaId,
       });
 
@@ -143,6 +149,7 @@ export class ProdutosService {
     }
     if (payload.status !== undefined) {
       produto.status = payload.status;
+      produto.ativo = payload.status !== 'inativo';
     }
     if (payload.estoqueAtual !== undefined) {
       produto.estoqueAtual = payload.estoqueAtual;
@@ -178,8 +185,9 @@ export class ProdutosService {
   }
 
   async findByStatus(status: string, empresaId: string): Promise<Produto[]> {
+    const ativo = status !== 'inativo';
     const produtos = await this.produtoRepository.find({
-      where: { status, empresaId },
+      where: { ativo, empresaId },
       order: { nome: 'ASC' },
     });
     return produtos.map((produto) => this.normalizeProduto(produto));
@@ -191,7 +199,7 @@ export class ProdutosService {
     });
 
     const produtosAtivos = await this.produtoRepository.count({
-      where: { status: 'ativo', empresaId },
+      where: { ativo: true, empresaId },
     });
 
     const valorTotal = await this.produtoRepository

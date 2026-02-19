@@ -30,19 +30,44 @@ export class Produto {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   preco: number;
 
-  @Column({ type: 'decimal', name: 'custoUnitario', precision: 10, scale: 2, default: 0 })
+  @Column({
+    type: 'decimal',
+    name: 'custoUnitario',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    select: false,
+    insert: false,
+    update: false,
+  })
   custoUnitario: number;
 
-  @Column({ type: 'varchar', name: 'tipoItem', length: 100 })
+  @Column({
+    type: 'varchar',
+    name: 'tipoItem',
+    length: 100,
+    nullable: true,
+    select: false,
+    insert: false,
+    update: false,
+  })
   tipoItem: string;
 
-  @Column({ type: 'varchar', length: 100 })
+  @Column({ type: 'varchar', length: 100, nullable: true, select: false, insert: false, update: false })
   frequencia: string;
 
-  @Column({ type: 'varchar', name: 'unidadeMedida', length: 100 })
+  @Column({
+    type: 'varchar',
+    name: 'unidadeMedida',
+    length: 100,
+    nullable: true,
+    select: false,
+    insert: false,
+    update: false,
+  })
   unidadeMedida: string;
 
-  @Column({ type: 'varchar', length: 100 })
+  @Column({ type: 'varchar', length: 100, nullable: true, select: false, insert: false, update: false })
   status: string;
 
   @Column({ type: 'text', nullable: true })
@@ -51,37 +76,60 @@ export class Produto {
   @Column({ type: 'varchar', length: 100 })
   sku: string;
 
-  @Column({ type: 'varchar', length: 255 })
+  @Column({ type: 'varchar', length: 255, nullable: true, select: false, insert: false, update: false })
   fornecedor: string;
 
-  @Column({ type: 'int', name: 'estoqueAtual', default: 0 })
+  @Column({ type: 'int', name: 'estoque', default: 0, nullable: true })
   estoqueAtual: number;
 
-  @Column({ type: 'int', name: 'estoqueMinimo', default: 0 })
+  @Column({
+    type: 'int',
+    name: 'estoqueMinimo',
+    nullable: true,
+    select: false,
+    insert: false,
+    update: false,
+  })
   estoqueMinimo: number;
 
-  @Column({ type: 'int', name: 'estoqueMaximo', default: 0 })
+  @Column({
+    type: 'int',
+    name: 'estoqueMaximo',
+    nullable: true,
+    select: false,
+    insert: false,
+    update: false,
+  })
   estoqueMaximo: number;
 
-  @Column({ type: 'int', name: 'vendasMes', default: 0 })
+  @Column({ type: 'int', name: 'vendasMes', nullable: true, select: false, insert: false, update: false })
   vendasMes: number;
 
-  @Column({ type: 'int', name: 'vendasTotal', default: 0 })
+  @Column({
+    type: 'int',
+    name: 'vendasTotal',
+    nullable: true,
+    select: false,
+    insert: false,
+    update: false,
+  })
   vendasTotal: number;
 
-  @Column({ type: 'json', nullable: true })
+  @Column({ type: 'json', nullable: true, select: false, insert: false, update: false })
   tags?: string[];
 
-  @Column({ type: 'json', nullable: true })
+  @Column({ type: 'json', nullable: true, select: false, insert: false, update: false })
   variacoes?: string[];
 
-  @CreateDateColumn({ name: 'criadoEm' })
+  @Column({ type: 'boolean', name: 'ativo', default: true })
+  ativo: boolean;
+
+  @CreateDateColumn({ name: 'criado_em' })
   criadoEm: Date;
 
-  @UpdateDateColumn({ name: 'atualizadoEm' })
+  @UpdateDateColumn({ name: 'atualizado_em' })
   atualizadoEm: Date;
 
   // Compatibilidade de resposta com clientes legados/testes.
   empresa_id?: string;
-  ativo?: boolean;
 }
