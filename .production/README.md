@@ -1,13 +1,14 @@
 # ConectCRM Production Workspace
 
 ## Objetivo
-Este diretorio concentra o fluxo de build e execucao para ambiente de producao local (Docker), sem dependencia de AWS neste momento.
+Este diretorio concentra o fluxo de build, validacao e operacao para release MVP em ambiente local Docker.
 
 ## Escopo atual
 - Build backend + frontend + imagens Docker
 - Subida local com Docker Compose
-- Validacao basica de saude
-- Validacoes de isolamento multi-tenant
+- Validacao de saude e isolamento multi-tenant
+- Preflight e smoke do MVP
+- Suporte ao ciclo de piloto comercial
 
 ## Requisitos
 - Node.js 20+
@@ -16,39 +17,36 @@ Este diretorio concentra o fluxo de build e execucao para ambiente de producao l
 - Docker Compose 2+
 - PowerShell 7+
 
-## Estrutura
+## Estrutura principal
 ```text
 .production/
   README.md
   DEPLOY.md
   docker-compose.yml
-  docker/
-    Dockerfile.backend
-    Dockerfile.frontend
   configs/
-    nginx.conf
+  docker/
   scripts/
-    build-all.ps1
-    test-rls.ps1
-    test-full-isolation.ps1
+  pilot-runs/
 ```
 
-## Quick start (local)
+## Quick start local
 ```powershell
 cd c:\Projetos\conectcrm\.production
 
-# 1) Build completo
-.\scripts\build-all.ps1
-
-# 2) Preparar variaveis locais
+# 1) Preparar variaveis locais
 cp .env.production .env.production.local
 # editar .env.production.local
+
+# 2) Build
+.\scripts\build-all.ps1
 
 # 3) Subir stack
 docker compose up -d
 
-# 4) Verificar status
+# 4) Verificar
 docker compose ps
+curl http://localhost:3500/health
+curl http://localhost:3000
 ```
 
 ## Endpoints esperados
@@ -57,123 +55,96 @@ docker compose ps
 - Health: `http://localhost:3500/health`
 - API Docs: `http://localhost:3500/api-docs`
 
-## Validacoes recomendadas antes de producao
+## Validacao antes de go-live
+No diretorio raiz do repositorio:
 ```powershell
-# Executa checklist completo em um comando
-.\scripts\preflight-go-live.ps1
+# preflight completo
+.\.production\scripts\preflight-go-live.ps1
 
-# Opcional: sem E2E (mais rapido)
-.\scripts\preflight-go-live.ps1 -SkipE2E
+# opcional: mais rapido, sem E2E
+.\.production\scripts\preflight-go-live.ps1 -SkipE2E
 ```
 
-## Modo MVP (go-live comercial)
-Para release do MVP comercial, habilitar escopo reduzido no frontend:
+## Fluxo MVP (escopo comercial)
 ```powershell
 $env:REACT_APP_MVP_MODE = "true"
+
+# checklist tecnico MVP
+.\.production\scripts\preflight-mvp-go-live.ps1
+
+# smoke core e UI
+.\.production\scripts\smoke-mvp-core.ps1
+.\.production\scripts\smoke-mvp-ui.ps1
+
+# smoke de dashboard por perfil
+.\.production\scripts\smoke-dashboard-role-scope.ps1 -BaseUrl http://127.0.0.1:3001
 ```
 
-Checklist tecnico do MVP:
+## Fluxo de piloto comercial (resumo)
 ```powershell
-.\scripts\preflight-mvp-go-live.ps1
+# 1) abrir sessao de piloto
+.\.production\scripts\start-mvp-pilot.ps1 -PilotName "piloto-comercial-lote-1" -SkipPreflight
+
+# 2) recomendar e ajustar clientes
+.\.production\scripts\recommend-mvp-pilot-clients.ps1 -RunDir ".production\pilot-runs\<sessao>"
+.\.production\scripts\finalize-mvp-pilot-clients.ps1 -RunDir ".production\pilot-runs\<sessao>" -WindowStart "2026-02-18 09:00" -WindowHours 48
+.\.production\scripts\review-mvp-pilot-profiles.ps1 -RunDir ".production\pilot-runs\<sessao>" -Reviewer "time-comercial" -MinScore 1
+
+# 3) preparar outreach
+.\.production\scripts\prepare-mvp-pilot-outreach.ps1 -RunDir ".production\pilot-runs\<sessao>" -Owner "time-comercial"
+.\.production\scripts\prepare-mvp-pilot-outreach-followup.ps1 -RunDir ".production\pilot-runs\<sessao>" -Owner "time-comercial"
+
+# 4) registrar execucao funcional
+.\.production\scripts\record-mvp-pilot-functional-result.ps1 -RunDir ".production\pilot-runs\<sessao>" -Cliente "Cliente X" -Cenario CriacaoLead -Resultado PASS
+.\.production\scripts\prepare-mvp-pilot-functional-sheet.ps1 -RunDir ".production\pilot-runs\<sessao>" -Force
+.\.production\scripts\import-mvp-pilot-functional-sheet.ps1 -RunDir ".production\pilot-runs\<sessao>" -SheetPath ".production\pilot-runs\<sessao>\functional-sheet.csv" -SkipIfAlreadyRecorded
+
+# 5) cobertura e readiness
+.\.production\scripts\run-mvp-pilot-functional-scenarios.ps1 -RunDir ".production\pilot-runs\<sessao>" -ProvisionMissingUsers
+.\.production\scripts\check-mvp-pilot-functional-coverage.ps1 -RunDir ".production\pilot-runs\<sessao>"
+.\.production\scripts\assess-mvp-pilot-readiness.ps1 -RunDir ".production\pilot-runs\<sessao>" -BranchProtectionStatus Unknown
 ```
 
-Smoke automatizado do MVP (fluxos core):
-```powershell
-.\scripts\smoke-mvp-core.ps1
-```
+## Scripts mais usados
+- Build/deploy local:
+  - `scripts/build-all.ps1`
+  - `scripts/preflight-go-live.ps1`
+  - `scripts/preflight-mvp-go-live.ps1`
+- Smoke:
+  - `scripts/smoke-mvp-core.ps1`
+  - `scripts/smoke-mvp-ui.ps1`
+  - `scripts/smoke-dashboard-role-scope.ps1`
+- Isolamento:
+  - `scripts/test-full-isolation.ps1`
+  - `scripts/test-rls.ps1`
+- Piloto:
+  - `scripts/start-mvp-pilot.ps1`
+  - `scripts/run-mvp-pilot-cycle.ps1`
+  - `scripts/run-mvp-pilot-window-monitor.ps1`
 
-Smoke UI do MVP (login + rotas core):
-```powershell
-.\scripts\smoke-mvp-ui.ps1
-```
-
-Kickoff de sessao piloto (gera pasta com checklist/evidencias/status):
-```powershell
-.\scripts\start-mvp-pilot.ps1 -PilotName "piloto-comercial-lote-1" -SkipPreflight
-```
-
-Sugestao automatica de clientes para a sessao (classifica `SUGERIDO`, `REVISAR_CONTATO` e `REVISAR_PERFIL`):
-```powershell
-.\scripts\recommend-mvp-pilot-clients.ps1 -RunDir ".production\pilot-runs\<sessao>"
-```
-
-Finalizacao de contatos e janela do piloto (ajusta contato suspeito + agenda 48h):
-```powershell
-.\scripts\finalize-mvp-pilot-clients.ps1 -RunDir ".production\pilot-runs\<sessao>" -WindowStart "2026-02-18 09:00" -WindowHours 48
-```
-
-Revisao final de clientes em `REVISAR_PERFIL`:
-```powershell
-.\scripts\review-mvp-pilot-profiles.ps1 -RunDir ".production\pilot-runs\<sessao>" -Reviewer "time-comercial" -MinScore 1
-```
-
-Plano de outreach comercial para os clientes do piloto:
-```powershell
-.\scripts\prepare-mvp-pilot-outreach.ps1 -RunDir ".production\pilot-runs\<sessao>" -Owner "time-comercial"
-```
-
-Registro rapido de evidencias do piloto:
-```powershell
-.\scripts\record-mvp-pilot-evidence.ps1 `
-  -RunDir ".production\pilot-runs\<sessao>" `
-  -Cliente "Codexa LTDA" `
-  -Cenario "Criacao de lead" `
-  -Resultado PASS `
-  -Evidencia "screenshot://piloto/codexa-lead.png" `
-  -Responsavel "time-oncall"
-```
-
-Ciclo tecnico automatizado do piloto (health + logs + smoke + evidencias):
-```powershell
-.\scripts\run-mvp-pilot-cycle.ps1 -RunDir ".production\pilot-runs\<sessao>"
-```
-
-Relatorio de prontidao do piloto (blockers + decisao automatizada):
-```powershell
-.\scripts\assess-mvp-pilot-readiness.ps1 -RunDir ".production\pilot-runs\<sessao>" -BranchProtectionStatus Unknown
-```
-
-Opcoes uteis:
-```powershell
-# Sem isolamento E2E (diagnostico rapido)
-.\scripts\preflight-mvp-go-live.ps1 -SkipIsolationE2E
-
-# Sem lint budget (somente troubleshooting)
-.\scripts\preflight-mvp-go-live.ps1 -SkipLintBudget
-```
-
-## Operacao diaria
+## Operacao rapida
 ```powershell
 # logs
 docker compose logs -f backend
 docker compose logs -f frontend
 
-# restart pontual
+# restart seletivo
 docker compose restart backend
 docker compose restart frontend
 
-# parar stack
+# stop
 docker compose down
 ```
 
-## Observacao sobre AWS
-AWS foi retirado do fluxo atual por decisao de escopo. Quando for retomado, a estrategia de deploy remoto pode ser adicionada novamente em um guia separado.
+## Seguranca
+- Nunca commitar segredos reais em `.env.production` ou `.env.production.local`.
+- Usar `.env.production` apenas como template.
+- Revisar permissao de acesso aos artefatos em `pilot-runs/` antes de compartilhar.
 
-## Proximo passo sugerido
-Rodar o checklist de `DEPLOY.md` e registrar o resultado final de prontidao (backend, frontend e multi-tenant) antes do go-live.
-Para proteger merge em producao, aplicar tambem o guia `.production/BRANCH_PROTECTION.md`.
-Para rollout comercial por escopo reduzido, usar `.production/MVP_GO_LIVE_PLAN_2026-02-17.md`.
-Registrar decisao operacional em `.production/MVP_GO_NO_GO_2026-02-17.md`.
-Para piloto controlado com clientes, usar `.production/MVP_PILOT_CHECKLIST_2026-02-17.md`.
-Ver execucao de kickoff em `.production/MVP_PILOT_KICKOFF_2026-02-17.md`.
-
-## Branch protection (automatizado)
-```powershell
-# DryRun
-.\scripts\configure-branch-protection.ps1 -DryRun
-
-# Aplicar no repo novo (token necessario)
-$env:GITHUB_TOKEN = "ghp_xxx"
-.\scripts\configure-branch-protection.ps1 -Owner conectcrm -Repo conect380
-```
-
+## Documentos de referencia
+- `./DEPLOY.md`
+- `./CATALOGO_PERMISSOES_2026-02-19.md`
+- `./MATRIZ_PERMISSOES_MVP_2026-02-19.md`
+- `./MVP_PERMISSOES_QA_CHECKLIST_2026-02-19.md`
+- `./MVP_DASHBOARD_ROLE_CHECKLIST_2026-02-19.md`
+- `./PERMISSION_MATRIX_2026-02-19.md`
