@@ -43,8 +43,7 @@ export class EmpresaModuloController {
   }
 
   @Get('ativos')
-  @UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
-  @Permissions(Permission.CONFIG_EMPRESA_READ)
+  @UseGuards(JwtAuthGuard, EmpresaGuard)
   async listarModulosAtivos(@EmpresaId() empresaId: string) {
     const modulos = await this.empresaModuloService.listarModulosAtivos(empresaId);
 
@@ -67,8 +66,7 @@ export class EmpresaModuloController {
   }
 
   @Get('verificar/:modulo')
-  @UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
-  @Permissions(Permission.CONFIG_EMPRESA_READ)
+  @UseGuards(JwtAuthGuard, EmpresaGuard)
   async verificarModulo(@EmpresaId() empresaId: string, @Param('modulo') modulo: ModuloEnum) {
     const ativo = await this.empresaModuloService.isModuloAtivo(empresaId, modulo);
 

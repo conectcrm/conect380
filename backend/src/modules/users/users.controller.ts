@@ -442,6 +442,7 @@ export class UsersController {
   @ApiOperation({ summary: 'Obter perfil do usuário logado' })
   @ApiResponse({ status: 200, description: 'Perfil retornado com sucesso' })
   async getProfile(@CurrentUser() user: User) {
+    const normalizedPermissions = Array.isArray(user.permissoes) ? user.permissoes : [];
     const empresa = user.empresa
       ? {
           id: user.empresa.id,
@@ -462,6 +463,8 @@ export class UsersController {
         email: user.email,
         telefone: user.telefone,
         role: user.role,
+        permissoes: normalizedPermissions,
+        permissions: normalizedPermissions,
         avatar_url: user.avatar_url,
         idioma_preferido: user.idioma_preferido,
         empresa,

@@ -32,7 +32,7 @@ describe('permissions.utils', () => {
   });
 
   describe('resolveUserPermissions', () => {
-    it('deve normalizar aliases legados de role e permissao', () => {
+    it('deve normalizar aliases legados e priorizar permissoes explicitas', () => {
       const resolved = resolveUserPermissions({
         role: 'manager',
         permissions: [
@@ -45,7 +45,7 @@ describe('permissions.utils', () => {
       expect(resolved.has(Permission.CRM_CLIENTES_READ)).toBe(true);
       expect(resolved.has(Permission.ATENDIMENTO_TICKETS_CREATE)).toBe(true);
       expect(resolved.has(Permission.ATENDIMENTO_TICKETS_UPDATE)).toBe(true);
-      expect(resolved.has(Permission.USERS_CREATE)).toBe(true);
+      expect(resolved.has(Permission.USERS_CREATE)).toBe(false);
     });
 
     it('deve considerar permissoes de multiplos roles quando informado em user.roles', () => {
@@ -57,6 +57,15 @@ describe('permissions.utils', () => {
       expect(resolved.has(Permission.FINANCEIRO_FATURAMENTO_READ)).toBe(true);
       expect(resolved.has(Permission.USERS_CREATE)).toBe(false);
     });
+
+    it('deve usar permissoes padrao do role quando nao houver permissoes explicitas', () => {
+      const resolved = resolveUserPermissions({
+        role: 'manager',
+      });
+
+      expect(resolved.has(Permission.USERS_CREATE)).toBe(true);
+      expect(resolved.has(Permission.CRM_CLIENTES_READ)).toBe(true);
+    });
   });
 
   describe('hasRequiredPermissions', () => {
@@ -64,7 +73,6 @@ describe('permissions.utils', () => {
       const allowed = hasRequiredPermissions(
         {
           role: UserRole.ADMIN,
-          permissions: ['ATENDIMENTO_TICKETS_ASSIGN'],
         },
         [Permission.ATENDIMENTO_TICKETS_ASSIGN, Permission.CRM_CLIENTES_READ],
       );

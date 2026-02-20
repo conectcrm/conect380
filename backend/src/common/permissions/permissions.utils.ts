@@ -94,6 +94,28 @@ export function resolveUserPermissions(user?: PermissionUserContext): Set<Permis
     return resolved;
   }
 
+  const explicitPermissions = new Set<Permission>();
+  for (const permissionInput of iteratePermissionInputs(user.permissoes)) {
+    const normalized = normalizePermissionToken(permissionInput);
+    if (normalized) {
+      explicitPermissions.add(normalized);
+    }
+  }
+
+  for (const permissionInput of iteratePermissionInputs(user.permissions)) {
+    const normalized = normalizePermissionToken(permissionInput);
+    if (normalized) {
+      explicitPermissions.add(normalized);
+    }
+  }
+
+  // When explicit permissions are present, treat them as the final source of truth.
+  // Role defaults are fallback-only for legacy users without explicit grants.
+  if (explicitPermissions.size > 0) {
+    explicitPermissions.forEach((permission) => resolved.add(permission));
+    return resolved;
+  }
+
   const roles = Array.isArray(user.roles)
     ? user.roles
     : user.role !== undefined
@@ -104,20 +126,6 @@ export function resolveUserPermissions(user?: PermissionUserContext): Set<Permis
     addRolePermissions(resolved, user.role);
   } else {
     roles.forEach((role) => addRolePermissions(resolved, role));
-  }
-
-  for (const permissionInput of iteratePermissionInputs(user.permissoes)) {
-    const normalized = normalizePermissionToken(permissionInput);
-    if (normalized) {
-      resolved.add(normalized);
-    }
-  }
-
-  for (const permissionInput of iteratePermissionInputs(user.permissions)) {
-    const normalized = normalizePermissionToken(permissionInput);
-    if (normalized) {
-      resolved.add(normalized);
-    }
   }
 
   return resolved;
