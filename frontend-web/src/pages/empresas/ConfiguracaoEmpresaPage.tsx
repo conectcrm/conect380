@@ -453,7 +453,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                         />
                         <p className="text-xs text-gray-500 mt-1">Formato: (00) 00000-0000</p>
                       </div>
-                      <div className="col-span-2">
+                      <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Endereço Completo
                         </label>
@@ -538,7 +538,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                       <h3 className="text-lg font-semibold text-[#002333]">Identidade Visual</h3>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="col-span-2">
+                      <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Descrição
                         </label>
@@ -562,7 +562,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                       </div>
 
                       {/* Upload de Logo */}
-                      <div className="col-span-2">
+                      <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-gray-700 mb-3">
                           Logo da Empresa
                         </label>
@@ -693,7 +693,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                       </div>
 
                       {/* Preview de Branding */}
-                      <div className="col-span-2">
+                      <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-gray-700 mb-3">
                           Preview do Branding
                         </label>
@@ -837,7 +837,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                     </div>
 
                     {/* IP Whitelist */}
-                    <div className="col-span-2">
+                    <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         IPs Permitidos (Whitelist)
                       </label>

@@ -1130,11 +1130,11 @@ const GestaoUsuariosPage: React.FC = () => {
           {/* Ações em massa */}
           {usuariosSelecionados.length > 0 && (
             <div className="bg-white rounded-lg shadow-sm border p-4 mb-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm text-gray-600">
                   {usuariosSelecionados.length} usuário(s) selecionado(s)
                 </p>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => handleBulkAction('ativar')}
                     className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
