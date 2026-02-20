@@ -28,6 +28,7 @@ import { EmpresasModule } from './empresas/empresas.module';
 import { MetasModule } from './modules/metas/metas.module';
 import { PlanosModule } from './modules/planos/planos.module';
 import { EventosModule } from './modules/eventos/eventos.module';
+import { AgendaModule } from './modules/agenda/agenda.module';
 import { AtendimentoModule } from './modules/atendimento/atendimento.module';
 import { IAModule } from './modules/ia/ia.module';
 import { TriagemModule } from './modules/triagem/triagem.module';
@@ -94,6 +95,7 @@ import { MetricsModule } from './modules/metrics/metrics.module';
     MetasModule,
     PlanosModule,
     EventosModule,
+    AgendaModule,
     AtendimentoModule,
     IAModule,
     TriagemModule,

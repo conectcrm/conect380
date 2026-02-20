@@ -23,11 +23,16 @@ export const useCalendarEvents = () => {
       try {
         setLoading(true);
         setError(null);
-        const eventos = await agendaEventosService.listarEventos({
+        let eventos = await agendaEventosService.listarEventos({
           startDate: filtros?.startDate,
           endDate: filtros?.endDate,
           status: filtros?.status,
         });
+
+        if (filtros?.type) {
+          eventos = eventos.filter((event) => event.type === filtros.type);
+        }
+
         setEvents(eventos);
       } catch (error) {
         console.error('Erro ao carregar eventos:', error);
@@ -60,8 +65,17 @@ export const useCalendarEvents = () => {
         setError(null);
 
         const newEvent = await agendaEventosService.criarEvento(event);
-        setEvents((prev) => [...prev, newEvent]);
-        return newEvent;
+        const mergedEvent: CalendarEvent = {
+          ...newEvent,
+          type: event.type || newEvent.type,
+          collaborator: event.collaborator ?? newEvent.collaborator,
+          responsavel: event.responsavel ?? newEvent.responsavel,
+          responsavelId: event.responsavelId ?? newEvent.responsavelId,
+          category: event.category ?? newEvent.category,
+        };
+
+        setEvents((prev) => [...prev, mergedEvent]);
+        return mergedEvent;
       } catch (error) {
         console.error('Erro ao criar evento:', error);
         setError('Não foi possível criar o evento');
@@ -81,11 +95,22 @@ export const useCalendarEvents = () => {
         setError(null);
 
         const updatedEvent = await agendaEventosService.atualizarEvento(eventId, updates);
-        setEvents((prev) => prev.map((event) => (event.id === eventId ? updatedEvent : event)));
+        const mergedUpdatedEvent: CalendarEvent = {
+          ...updatedEvent,
+          type: updates.type ?? updatedEvent.type,
+          collaborator: updates.collaborator ?? updatedEvent.collaborator,
+          responsavel: updates.responsavel ?? updatedEvent.responsavel,
+          responsavelId: updates.responsavelId ?? updatedEvent.responsavelId,
+          category: updates.category ?? updatedEvent.category,
+        };
+
+        setEvents((prev) =>
+          prev.map((event) => (event.id === eventId ? mergedUpdatedEvent : event)),
+        );
 
         // Atualizar selectedEvent se for o mesmo
         if (selectedEvent?.id === eventId) {
-          setSelectedEvent(updatedEvent);
+          setSelectedEvent(mergedUpdatedEvent);
         }
       } catch (error) {
         console.error('Erro ao atualizar evento:', error);
@@ -182,10 +207,18 @@ export const useCalendarEvents = () => {
   // Função para obter lista única de colaboradores
   const getCollaborators = useCallback(() => {
     const collaborators = events
-      .map((event) => event.collaborator)
-      .filter((collaborator): collaborator is string => !!collaborator)
-      .filter((collaborator, index, array) => array.indexOf(collaborator) === index)
-      .sort();
+      .flatMap((event) => {
+        const values: string[] = [];
+
+        if (event.collaborator) values.push(event.collaborator);
+        if (event.responsavel) values.push(event.responsavel);
+        if (event.attendees?.length) values.push(...event.attendees);
+
+        return values;
+      })
+      .filter((value): value is string => !!value)
+      .filter((value, index, array) => array.indexOf(value) === index)
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
     return collaborators.map((name) => ({
       value: name,

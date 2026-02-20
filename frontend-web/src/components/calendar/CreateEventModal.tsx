@@ -30,7 +30,7 @@ const eventSchema = yup.object({
   title: yup.string().required('Título é obrigatório'),
   eventType: yup
     .string()
-    .oneOf(['reuniao', 'tarefa', 'evento', 'follow-up'])
+    .oneOf(['reuniao', 'ligacao', 'tarefa', 'evento', 'follow-up'])
     .required('Tipo de evento é obrigatório'),
   responsavel: yup.string().required('Responsável é obrigatório'),
   isAllDay: yup.boolean(),
@@ -82,6 +82,22 @@ interface CreateEventModalProps {
   event?: CalendarEvent | null;
   selectedDate?: Date | null;
 }
+
+const mapCalendarTypeToModalType = (type?: CalendarEvent['type']) => {
+  switch (type) {
+    case 'meeting':
+      return 'reuniao';
+    case 'call':
+      return 'ligacao';
+    case 'task':
+      return 'tarefa';
+    case 'follow-up':
+      return 'follow-up';
+    case 'event':
+    default:
+      return 'evento';
+  }
+};
 
 export const CreateEventModal: React.FC<CreateEventModalProps> = ({
   isOpen,
@@ -218,7 +234,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
 
         reset({
           title: event.title,
-          eventType: 'reuniao',
+          eventType: mapCalendarTypeToModalType(event.type),
           responsavel: (event as any).responsavelId || usuarioAtual?.id || '',
           isAllDay: event.allDay || false,
           startDate: startDate.toISOString().split('T')[0],
@@ -490,21 +506,35 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                       <button
                         type="button"
                         onClick={() => field.onChange('reuniao')}
-                        className={`flex items-center gap-1 p-2 border rounded-md transition-colors ${field.value === 'reuniao'
+                        className={`flex items-center gap-1 p-2 border rounded-md transition-colors ${
+                          field.value === 'reuniao'
                             ? 'border-[#159A9C] bg-[#159A9C]/10 text-[#159A9C]'
                             : 'border-[#B4BEC9] bg-white text-[#002333] hover:bg-gray-50'
-                          }`}
+                        }`}
                       >
                         <Users className="w-3 h-3" />
                         <span className="text-xs font-medium">Reunião</span>
                       </button>
                       <button
                         type="button"
-                        onClick={() => field.onChange('tarefa')}
-                        className={`flex items-center gap-1 p-2 border rounded-md transition-colors ${field.value === 'tarefa'
+                        onClick={() => field.onChange('ligacao')}
+                        className={`flex items-center gap-1 p-2 border rounded-md transition-colors ${
+                          field.value === 'ligacao'
                             ? 'border-[#159A9C] bg-[#159A9C]/10 text-[#159A9C]'
                             : 'border-[#B4BEC9] bg-white text-[#002333] hover:bg-gray-50'
-                          }`}
+                        }`}
+                      >
+                        <Phone className="w-3 h-3" />
+                        <span className="text-xs font-medium">Ligacao</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => field.onChange('tarefa')}
+                        className={`flex items-center gap-1 p-2 border rounded-md transition-colors ${
+                          field.value === 'tarefa'
+                            ? 'border-[#159A9C] bg-[#159A9C]/10 text-[#159A9C]'
+                            : 'border-[#B4BEC9] bg-white text-[#002333] hover:bg-gray-50'
+                        }`}
                       >
                         <CheckSquare className="w-3 h-3" />
                         <span className="text-xs font-medium">Tarefa</span>
@@ -512,10 +542,11 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                       <button
                         type="button"
                         onClick={() => field.onChange('evento')}
-                        className={`flex items-center gap-1 p-2 border rounded-md transition-colors ${field.value === 'evento'
+                        className={`flex items-center gap-1 p-2 border rounded-md transition-colors ${
+                          field.value === 'evento'
                             ? 'border-[#159A9C] bg-[#159A9C]/10 text-[#159A9C]'
                             : 'border-[#B4BEC9] bg-white text-[#002333] hover:bg-gray-50'
-                          }`}
+                        }`}
                       >
                         <Calendar className="w-3 h-3" />
                         <span className="text-xs font-medium">Evento</span>
@@ -523,12 +554,13 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                       <button
                         type="button"
                         onClick={() => field.onChange('follow-up')}
-                        className={`flex items-center gap-1 p-2 border rounded-md transition-colors ${field.value === 'follow-up'
+                        className={`flex items-center gap-1 p-2 border rounded-md transition-colors ${
+                          field.value === 'follow-up'
                             ? 'border-[#159A9C] bg-[#159A9C]/10 text-[#159A9C]'
                             : 'border-[#B4BEC9] bg-white text-[#002333] hover:bg-gray-50'
-                          }`}
+                        }`}
                       >
-                        <Phone className="w-3 h-3" />
+                        <FileText className="w-3 h-3" />
                         <span className="text-xs font-medium">Follow-up</span>
                       </button>
                     </div>
@@ -586,10 +618,11 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                       <button
                         type="button"
                         onClick={() => field.onChange('pending')}
-                        className={`flex items-center justify-center gap-1 p-2 border rounded-md transition-colors ${field.value === 'pending'
+                        className={`flex items-center justify-center gap-1 p-2 border rounded-md transition-colors ${
+                          field.value === 'pending'
                             ? 'border-yellow-500 bg-yellow-50 text-yellow-700'
                             : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                          }`}
+                        }`}
                       >
                         <Clock className="w-3 h-3" />
                         <span className="text-xs font-medium">Pendente</span>
@@ -597,10 +630,11 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                       <button
                         type="button"
                         onClick={() => field.onChange('confirmed')}
-                        className={`flex items-center justify-center gap-1 p-2 border rounded-md transition-colors ${field.value === 'confirmed'
+                        className={`flex items-center justify-center gap-1 p-2 border rounded-md transition-colors ${
+                          field.value === 'confirmed'
                             ? 'border-green-500 bg-green-50 text-green-700'
                             : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                          }`}
+                        }`}
                       >
                         <CheckSquare className="w-3 h-3" />
                         <span className="text-xs font-medium">Confirmado</span>
@@ -608,10 +642,11 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                       <button
                         type="button"
                         onClick={() => field.onChange('cancelled')}
-                        className={`flex items-center justify-center gap-1 p-2 border rounded-md transition-colors ${field.value === 'cancelled'
+                        className={`flex items-center justify-center gap-1 p-2 border rounded-md transition-colors ${
+                          field.value === 'cancelled'
                             ? 'border-red-500 bg-red-50 text-red-700'
                             : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                          }`}
+                        }`}
                       >
                         <X className="w-3 h-3" />
                         <span className="text-xs font-medium">Cancelado</span>
@@ -638,10 +673,11 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                         <button
                           type="button"
                           onClick={() => field.onChange('presencial')}
-                          className={`flex items-center justify-center gap-1 p-2 border rounded-md transition-colors ${field.value === 'presencial'
+                          className={`flex items-center justify-center gap-1 p-2 border rounded-md transition-colors ${
+                            field.value === 'presencial'
                               ? 'border-[#159A9C] bg-[#159A9C]/10 text-[#159A9C]'
                               : 'border-[#B4BEC9] bg-white text-[#002333] hover:bg-gray-50'
-                            }`}
+                          }`}
                         >
                           <MapPinIcon className="w-3 h-3" />
                           <span className="text-xs font-medium">Presencial</span>
@@ -649,10 +685,11 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                         <button
                           type="button"
                           onClick={() => field.onChange('virtual')}
-                          className={`flex items-center justify-center gap-1 p-2 border rounded-md transition-colors ${field.value === 'virtual'
+                          className={`flex items-center justify-center gap-1 p-2 border rounded-md transition-colors ${
+                            field.value === 'virtual'
                               ? 'border-[#159A9C] bg-[#159A9C]/10 text-[#159A9C]'
                               : 'border-[#B4BEC9] bg-white text-[#002333] hover:bg-gray-50'
-                            }`}
+                          }`}
                         >
                           <Monitor className="w-3 h-3" />
                           <span className="text-xs font-medium">Virtual</span>

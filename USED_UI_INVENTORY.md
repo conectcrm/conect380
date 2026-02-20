@@ -2,7 +2,7 @@
 
 ## Fase A - grafo em uso (somente runtime ativo)
 - Fonte principal: configuracao real de rotas + traversal de imports a partir das paginas roteadas (com exclusao de redirects e ModuleUnderConstruction).
-- Rotas ativas auditaveis: 47.
+- Rotas ativas auditaveis: 49.
 - Arquivos raiz de rota: 45.
 - Arquivos TSX alcancaveis por import traversal: 150.
 - Fora de escopo (nao auditado): 500 orfaos suspeitos.
@@ -35,7 +35,9 @@
 | /configuracoes/tickets/status | GestaoStatusCustomizadosPage | frontend-web/src/pages/GestaoStatusCustomizadosPage.tsx | GestaoStatusCustomizadosPage |
 | /configuracoes/tickets/tipos | GestaoTiposServicoPage | frontend-web/src/pages/GestaoTiposServicoPage.tsx | GestaoTiposServicoPage |
 | /configuracoes/usuarios | GestaoUsuariosPage | frontend-web/src/features/gestao/pages/GestaoUsuariosPage.tsx | GestaoUsuariosPage, BackToNucleus, user CRUD dialogs, permission groups |
+| /agenda | AgendaPage | frontend-web/src/features/agenda/AgendaPage.tsx | AgendaPage, MonthView, WeekView, CreateEventModal, CalendarEventComponent |
 | /crm/leads | LeadsPage | frontend-web/src/pages/LeadsPage.tsx | LeadsPage, lead forms/import flows |
+| /crm/agenda | AgendaPage | frontend-web/src/features/agenda/AgendaPage.tsx | AgendaPage, MonthView, WeekView, CreateEventModal, CalendarEventComponent |
 | /crm/pipeline | PipelinePage | frontend-web/src/pages/PipelinePage.tsx | PipelinePage, kanban/table pipeline views, oportunidade modals |
 | /dashboard | DashboardRouter | frontend-web/src/features/dashboard/DashboardRouter.tsx | DashboardRouter, DashboardPage, AtendimentoRoleDashboard, OperacionalDashboard, SuporteDashboard, VendedorDashboard, FinanceiroDashboard |
 | /empresas/:empresaId/backup | BackupSincronizacaoPage | frontend-web/src/pages/empresas/BackupSincronizacaoPage.tsx | BackupSincronizacaoPage |

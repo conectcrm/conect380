@@ -20,7 +20,54 @@ import {
   Rows,
   Square,
   Users,
+  X,
 } from 'lucide-react';
+
+const mapModalEventTypeToCalendarType = (
+  modalEventType: string | undefined,
+): CalendarEvent['type'] => {
+  switch (modalEventType) {
+    case 'reuniao':
+      return 'meeting';
+    case 'ligacao':
+      return 'call';
+    case 'tarefa':
+      return 'task';
+    case 'follow-up':
+      return 'follow-up';
+    case 'evento':
+    default:
+      return 'event';
+  }
+};
+
+const AGENDA_PREFERENCES_KEYS = {
+  showStatsPanel: 'agenda:show-stats-panel',
+  openFiltersByDefault: 'agenda:open-filters-default',
+} as const;
+
+const readBooleanPreference = (key: string, defaultValue: boolean): boolean => {
+  if (typeof window === 'undefined') return defaultValue;
+  const value = window.localStorage.getItem(key);
+  if (value === null) return defaultValue;
+  return value === 'true';
+};
+
+const writeBooleanPreference = (key: string, value: boolean): void => {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(key, String(value));
+};
+
+const matchesCollaboratorFilter = (event: CalendarEvent, filterValue: string): boolean => {
+  if (!filterValue) return true;
+  if (event.collaborator === filterValue) return true;
+  if (event.responsavel === filterValue) return true;
+  return !!event.attendees?.includes(filterValue);
+};
+
+const toCsvCell = (value: unknown): string => {
+  return `"${String(value ?? '').replace(/"/g, '""')}"`;
+};
 
 export const AgendaPage: React.FC = () => {
   // Hook de notificações
@@ -38,14 +85,26 @@ export const AgendaPage: React.FC = () => {
     getCollaborators,
   } = useCalendarEvents();
 
-  const { view, navigateDate, setViewType, goToToday, goToDate } = useCalendarView();
+  const { view, navigateDate, setViewType, goToToday } = useCalendarView();
 
-  const { draggedEvent, dropTarget, startDrag, endDrag, cancelDrag, setDrop, isDragging } =
-    useCalendarDragDrop(events, moveEvent);
+  const { draggedEvent, dropTarget, startDrag, endDrag, setDrop } = useCalendarDragDrop(
+    events,
+    moveEvent,
+  );
 
   const [showEventModal, setShowEventModal] = useState(false);
   const [eventModalDate, setEventModalDate] = useState<Date | null>(null);
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState<boolean>(() =>
+    readBooleanPreference(AGENDA_PREFERENCES_KEYS.openFiltersByDefault, false),
+  );
+  const [showStatsPanel, setShowStatsPanel] = useState<boolean>(() =>
+    readBooleanPreference(AGENDA_PREFERENCES_KEYS.showStatsPanel, true),
+  );
+  const [showAgendaSettings, setShowAgendaSettings] = useState(false);
+  const [settingsShowStatsPanel, setSettingsShowStatsPanel] = useState<boolean>(showStatsPanel);
+  const [settingsOpenFiltersByDefault, setSettingsOpenFiltersByDefault] = useState<boolean>(() =>
+    readBooleanPreference(AGENDA_PREFERENCES_KEYS.openFiltersByDefault, false),
+  );
   const [filterType, setFilterType] = useState<string>('');
   const [filterPriority, setFilterPriority] = useState<string>('');
   const [filterStatus, setFilterStatus] = useState<string>('');
@@ -88,6 +147,10 @@ export const AgendaPage: React.FC = () => {
   };
 
   const handleSaveEvent = async (eventData: any) => {
+    const mappedEventType = mapModalEventTypeToCalendarType(eventData.eventType);
+    const collaboratorName = eventData.responsavel || '';
+    const responsavelId = eventData.responsavelId || '';
+
     // Converter dados do CreateEventModal para o formato CalendarEvent
     const calendarEventData: Omit<CalendarEvent, 'id'> = {
       title: eventData.title,
@@ -96,15 +159,16 @@ export const AgendaPage: React.FC = () => {
       end: eventData.end,
       location: eventData.location || '',
       allDay: eventData.allDay || false,
-      type: 'event',
+      type: mappedEventType,
       priority: eventData.priority || 'medium',
       status: eventData.status || 'pending',
-      collaborator: '',
-      category: eventData.category || 'meeting',
+      collaborator: collaboratorName,
+      responsavel: collaboratorName || responsavelId,
+      responsavelId,
+      category: eventData.category || mappedEventType,
       color: eventData.color || '#159A9C',
       attendees: eventData.attendees || [],
       recurring: eventData.isRecurring || false,
-      responsavel: eventData.responsavel || '',
     };
 
     try {
@@ -329,7 +393,7 @@ export const AgendaPage: React.FC = () => {
       if (filterType && event.type !== filterType) return false;
       if (filterPriority && event.priority !== filterPriority) return false;
       if (filterStatus && event.status !== filterStatus) return false;
-      if (filterCollaborator && event.collaborator !== filterCollaborator) return false;
+      if (filterCollaborator && !matchesCollaboratorFilter(event, filterCollaborator)) return false;
       return true;
     });
   };
@@ -343,20 +407,92 @@ export const AgendaPage: React.FC = () => {
     setFilterCollaborator('');
   };
 
+  const handleDownloadAgenda = () => {
+    if (filteredEvents.length === 0) {
+      showWarning(
+        'Sem dados para exportar',
+        'Ajuste os filtros ou crie um evento antes de exportar.',
+      );
+      return;
+    }
+
+    const header = [
+      'Titulo',
+      'Inicio',
+      'Fim',
+      'Tipo',
+      'Status',
+      'Prioridade',
+      'Local',
+      'Responsavel',
+      'Participantes',
+    ];
+
+    const rows = filteredEvents.map((event) => [
+      event.title,
+      event.start.toISOString(),
+      event.end.toISOString(),
+      event.type,
+      event.status,
+      event.priority,
+      event.location || '',
+      event.collaborator || event.responsavel || '',
+      event.attendees?.join(' | ') || '',
+    ]);
+
+    const csvContent = [header, ...rows].map((row) => row.map(toCsvCell).join(';')).join('\n');
+    const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `agenda-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+
+    showSuccess(
+      'Exportacao concluida',
+      `${filteredEvents.length} evento(s) exportado(s) com sucesso.`,
+    );
+  };
+
+  const handleOpenAgendaSettings = () => {
+    setSettingsShowStatsPanel(showStatsPanel);
+    setSettingsOpenFiltersByDefault(
+      readBooleanPreference(AGENDA_PREFERENCES_KEYS.openFiltersByDefault, false),
+    );
+    setShowAgendaSettings(true);
+  };
+
+  const handleSaveAgendaSettings = () => {
+    setShowStatsPanel(settingsShowStatsPanel);
+    setShowFilters(settingsOpenFiltersByDefault);
+
+    writeBooleanPreference(AGENDA_PREFERENCES_KEYS.showStatsPanel, settingsShowStatsPanel);
+    writeBooleanPreference(
+      AGENDA_PREFERENCES_KEYS.openFiltersByDefault,
+      settingsOpenFiltersByDefault,
+    );
+
+    setShowAgendaSettings(false);
+    showSuccess('Configuracoes salvas', 'Preferencias da agenda atualizadas com sucesso.');
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header Padronizado */}
-      <div className="bg-white border-b px-6 py-4">
+      <div className="bg-white border-b px-4 py-4 sm:px-6">
         <BackToNucleus nucleusName="CRM" nucleusPath="/nuclei/crm" />
       </div>
 
-      <div className="p-6">
+      <div className="p-3 sm:p-6">
         <div className="max-w-7xl mx-auto">
           {/* Header da Página */}
-          <div className="bg-white rounded-lg shadow-sm border border-[#DEEFE7] p-6 mb-6">
+          <div className="bg-white rounded-lg shadow-sm border border-[#DEEFE7] p-4 sm:p-6 mb-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h1 className="text-3xl font-bold text-[#002333] flex items-center">
+                <h1 className="text-2xl sm:text-3xl font-bold text-[#002333] flex items-center">
                   <Calendar className="h-8 w-8 mr-3 text-[#159A9C]" />
                   Agenda
                 </h1>
@@ -367,10 +503,11 @@ export const AgendaPage: React.FC = () => {
                   onClick={() => setShowFilters(!showFilters)}
                   className={`
                   px-4 py-2 rounded-lg border transition-colors flex items-center space-x-2 text-sm font-medium
-                  ${showFilters
+                  ${
+                    showFilters
                       ? 'bg-[#159A9C] text-white border-[#159A9C]'
                       : 'bg-white text-[#002333] border-[#B4BEC9] hover:bg-gray-50'
-                    }
+                  }
                 `}
                 >
                   <Filter className="w-4 h-4" />
@@ -420,7 +557,9 @@ export const AgendaPage: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Prioridade</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Prioridade
+                    </label>
                     <select
                       value={filterPriority}
                       onChange={(e) => setFilterPriority(e.target.value)}
@@ -466,7 +605,7 @@ export const AgendaPage: React.FC = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       <Users className="w-4 h-4 inline mr-1" />
-                      Colaborador
+                      Responsavel/Participante
                     </label>
                     <select
                       value={filterCollaborator}
@@ -503,10 +642,10 @@ export const AgendaPage: React.FC = () => {
           </div>
 
           {/* Navegação e Controles */}
-          <div className="bg-white rounded-lg shadow-sm border border-[#DEEFE7] p-6 mb-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
+          <div className="bg-white rounded-lg shadow-sm border border-[#DEEFE7] p-4 sm:p-6 mb-6">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+                <div className="flex items-center space-x-1 sm:space-x-2">
                   <button
                     onClick={() => navigateDate('prev')}
                     className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-[#002333]"
@@ -523,23 +662,26 @@ export const AgendaPage: React.FC = () => {
 
                   <button
                     onClick={goToToday}
-                    className="px-3 py-2 text-sm font-medium text-[#002333] hover:bg-gray-100 rounded-lg transition-colors"
+                    className="px-3 py-2 text-xs sm:text-sm font-medium text-[#002333] hover:bg-gray-100 rounded-lg transition-colors"
                   >
                     Hoje
                   </button>
                 </div>
 
-                <h2 className="text-xl font-semibold text-[#002333]">{getViewTitle()}</h2>
+                <h2 className="text-sm sm:text-xl font-semibold text-[#002333] break-words">
+                  {getViewTitle()}
+                </h2>
               </div>
 
-              <div className="flex items-center space-x-3">
-                <div className="flex items-center border border-[#B4BEC9] rounded-lg">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <div className="flex items-center border border-[#B4BEC9] rounded-lg overflow-hidden">
                   <button
                     onClick={() => setViewType('month')}
-                    className={`px-3 py-2 text-sm font-medium rounded-l-lg transition-colors flex items-center space-x-2 ${view.type === 'month'
-                      ? 'bg-[#159A9C] text-white'
-                      : 'text-[#002333] hover:bg-gray-50'
-                      }`}
+                    className={`px-2.5 py-2 sm:px-3 text-xs sm:text-sm font-medium transition-colors flex items-center space-x-1 sm:space-x-2 ${
+                      view.type === 'month'
+                        ? 'bg-[#159A9C] text-white'
+                        : 'text-[#002333] hover:bg-gray-50'
+                    }`}
                   >
                     <Grid3X3 className="w-4 h-4" />
                     <span>Mês</span>
@@ -547,10 +689,11 @@ export const AgendaPage: React.FC = () => {
 
                   <button
                     onClick={() => setViewType('week')}
-                    className={`px-3 py-2 text-sm font-medium border-l border-[#B4BEC9] transition-colors flex items-center space-x-2 ${view.type === 'week'
-                      ? 'bg-[#159A9C] text-white'
-                      : 'text-[#002333] hover:bg-gray-50'
-                      }`}
+                    className={`px-2.5 py-2 sm:px-3 text-xs sm:text-sm font-medium border-l border-[#B4BEC9] transition-colors flex items-center space-x-1 sm:space-x-2 ${
+                      view.type === 'week'
+                        ? 'bg-[#159A9C] text-white'
+                        : 'text-[#002333] hover:bg-gray-50'
+                    }`}
                   >
                     <Rows className="w-4 h-4" />
                     <span>Semana</span>
@@ -558,22 +701,31 @@ export const AgendaPage: React.FC = () => {
 
                   <button
                     onClick={() => setViewType('day')}
-                    className={`px-3 py-2 text-sm font-medium rounded-r-lg border-l border-[#B4BEC9] transition-colors flex items-center space-x-2 ${view.type === 'day'
-                      ? 'bg-[#159A9C] text-white'
-                      : 'text-[#002333] hover:bg-gray-50'
-                      }`}
+                    className={`px-2.5 py-2 sm:px-3 text-xs sm:text-sm font-medium border-l border-[#B4BEC9] transition-colors flex items-center space-x-1 sm:space-x-2 ${
+                      view.type === 'day'
+                        ? 'bg-[#159A9C] text-white'
+                        : 'text-[#002333] hover:bg-gray-50'
+                    }`}
                   >
                     <Square className="w-4 h-4" />
                     <span>Dia</span>
                   </button>
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <button className="p-2 text-[#002333] hover:text-[#002333] hover:bg-gray-100 rounded-lg transition-colors">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleDownloadAgenda}
+                    aria-label="Exportar agenda"
+                    className="p-2 text-[#002333] hover:text-[#002333] hover:bg-gray-100 rounded-lg transition-colors"
+                  >
                     <Download className="w-4 h-4" />
                   </button>
 
-                  <button className="p-2 text-[#002333] hover:text-[#002333] hover:bg-gray-100 rounded-lg transition-colors">
+                  <button
+                    onClick={handleOpenAgendaSettings}
+                    aria-label="Abrir configuracoes da agenda"
+                    className="p-2 text-[#002333] hover:text-[#002333] hover:bg-gray-100 rounded-lg transition-colors"
+                  >
                     <Settings className="w-4 h-4" />
                   </button>
                 </div>
@@ -582,9 +734,9 @@ export const AgendaPage: React.FC = () => {
           </div>
 
           {/* Conteúdo Principal */}
-          <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 flex flex-col xl:flex-row gap-4">
             {/* Calendário */}
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1 min-w-0 overflow-auto">
               <div className="bg-white rounded-lg shadow-sm min-h-full">
                 {view.type === 'month' && (
                   <MonthView
@@ -611,6 +763,7 @@ export const AgendaPage: React.FC = () => {
                     onDrop={handleDrop}
                     draggedEvent={draggedEvent?.eventId || null}
                     dropTarget={dropTarget}
+                    daysToShow={7}
                   />
                 )}
 
@@ -625,103 +778,167 @@ export const AgendaPage: React.FC = () => {
                     onDrop={handleDrop}
                     draggedEvent={draggedEvent?.eventId || null}
                     dropTarget={dropTarget}
+                    daysToShow={1}
                   />
                 )}
               </div>
             </div>
 
             {/* Sidebar de Estatísticas */}
-            <div className="w-80 border-l bg-white p-6">
-              <h3 className="text-lg font-semibold text-[#002333] mb-4">📊 Estatísticas</h3>
+            {showStatsPanel && (
+              <div className="w-full xl:w-80 rounded-lg border border-[#DEEFE7] bg-white p-4 sm:p-6">
+                <h3 className="text-lg font-semibold text-[#002333] mb-4">📊 Estatísticas</h3>
 
-              <div className="space-y-4">
-                <div className="p-4 bg-white rounded-lg border border-[#DEEFE7]">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-[#002333]">Eventos Hoje</span>
-                    <span className="text-2xl font-bold text-[#159A9C]">
-                      {
-                        filteredEvents.filter((e) => {
-                          const today = new Date();
-                          const eventDate = new Date(e.start);
-                          return eventDate.toDateString() === today.toDateString();
-                        }).length
-                      }
-                    </span>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-white rounded-lg border border-[#DEEFE7]">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-[#002333]">Confirmados</span>
-                    <span className="text-2xl font-bold text-[#159A9C]">
-                      {filteredEvents.filter((e) => e.status === 'confirmed').length}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-white rounded-lg border border-[#DEEFE7]">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-[#002333]">Pendentes</span>
-                    <span className="text-2xl font-bold text-[#159A9C]">
-                      {filteredEvents.filter((e) => e.status === 'pending').length}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-white rounded-lg border border-[#DEEFE7]">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-[#002333]">Alta Prioridade</span>
-                    <span className="text-2xl font-bold text-[#159A9C]">
-                      {filteredEvents.filter((e) => e.priority === 'high').length}
-                    </span>
-                  </div>
-                </div>
-
-                {filterCollaborator && (
+                <div className="space-y-4">
                   <div className="p-4 bg-white rounded-lg border border-[#DEEFE7]">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-[#002333]">
-                        {getCollaborators().find((c) => c.value === filterCollaborator)?.label ||
-                          filterCollaborator}
-                      </span>
+                      <span className="text-sm font-medium text-[#002333]">Eventos Hoje</span>
                       <span className="text-2xl font-bold text-[#159A9C]">
-                        {filteredEvents.filter((e) => e.collaborator === filterCollaborator).length}
+                        {
+                          filteredEvents.filter((e) => {
+                            const today = new Date();
+                            const eventDate = new Date(e.start);
+                            return eventDate.toDateString() === today.toDateString();
+                          }).length
+                        }
                       </span>
                     </div>
-                    <div className="text-xs text-[#002333] mt-1">eventos atribuídos</div>
                   </div>
-                )}
-              </div>
 
-              <div className="mt-6 pt-6 border-t">
-                <h4 className="text-md font-semibold text-[#002333] mb-3">🎯 Ações Rápidas</h4>
-
-                <div className="space-y-2">
-                  <button
-                    onClick={() => setShowEventModal(true)}
-                    className="w-full p-3 text-left bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors text-sm font-medium"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <Plus className="w-4 h-4" />
-                      <span>Novo Evento</span>
+                  <div className="p-4 bg-white rounded-lg border border-[#DEEFE7]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-[#002333]">Confirmados</span>
+                      <span className="text-2xl font-bold text-[#159A9C]">
+                        {filteredEvents.filter((e) => e.status === 'confirmed').length}
+                      </span>
                     </div>
-                  </button>
+                  </div>
 
-                  <button
-                    onClick={goToToday}
-                    className="w-full p-3 text-left bg-white text-[#002333] border border-[#DEEFE7] rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <Calendar className="w-4 h-4" />
-                      <span>Ir para Hoje</span>
+                  <div className="p-4 bg-white rounded-lg border border-[#DEEFE7]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-[#002333]">Pendentes</span>
+                      <span className="text-2xl font-bold text-[#159A9C]">
+                        {filteredEvents.filter((e) => e.status === 'pending').length}
+                      </span>
                     </div>
-                  </button>
+                  </div>
+
+                  <div className="p-4 bg-white rounded-lg border border-[#DEEFE7]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-[#002333]">Alta Prioridade</span>
+                      <span className="text-2xl font-bold text-[#159A9C]">
+                        {filteredEvents.filter((e) => e.priority === 'high').length}
+                      </span>
+                    </div>
+                  </div>
+
+                  {filterCollaborator && (
+                    <div className="p-4 bg-white rounded-lg border border-[#DEEFE7]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-[#002333]">
+                          {getCollaborators().find((c) => c.value === filterCollaborator)?.label ||
+                            filterCollaborator}
+                        </span>
+                        <span className="text-2xl font-bold text-[#159A9C]">
+                          {
+                            filteredEvents.filter((e) =>
+                              matchesCollaboratorFilter(e, filterCollaborator),
+                            ).length
+                          }
+                        </span>
+                      </div>
+                      <div className="text-xs text-[#002333] mt-1">eventos atribuídos</div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-6 pt-6 border-t">
+                  <h4 className="text-md font-semibold text-[#002333] mb-3">🎯 Ações Rápidas</h4>
+
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => setShowEventModal(true)}
+                      className="w-full p-3 text-left bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors text-sm font-medium"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <Plus className="w-4 h-4" />
+                        <span>Novo Evento</span>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={goToToday}
+                      className="w-full p-3 text-left bg-white text-[#002333] border border-[#DEEFE7] rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <Calendar className="w-4 h-4" />
+                        <span>Ir para Hoje</span>
+                      </div>
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Modal de Configuracoes */}
+      {showAgendaSettings && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white rounded-lg border border-[#DEEFE7] shadow-xl">
+            <div className="flex items-center justify-between p-4 border-b border-[#DEEFE7]">
+              <h3 className="text-lg font-semibold text-[#002333]">Configuracoes da agenda</h3>
+              <button
+                onClick={() => setShowAgendaSettings(false)}
+                className="p-1 text-[#002333] hover:bg-gray-100 rounded"
+                aria-label="Fechar configuracoes da agenda"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              <label className="flex items-center justify-between gap-3">
+                <span className="text-sm font-medium text-[#002333]">
+                  Exibir painel de estatisticas
+                </span>
+                <input
+                  type="checkbox"
+                  checked={settingsShowStatsPanel}
+                  onChange={(e) => setSettingsShowStatsPanel(e.target.checked)}
+                  className="h-4 w-4 rounded border-[#B4BEC9] text-[#159A9C] focus:ring-[#159A9C]"
+                />
+              </label>
+
+              <label className="flex items-center justify-between gap-3">
+                <span className="text-sm font-medium text-[#002333]">Abrir filtros por padrao</span>
+                <input
+                  type="checkbox"
+                  checked={settingsOpenFiltersByDefault}
+                  onChange={(e) => setSettingsOpenFiltersByDefault(e.target.checked)}
+                  className="h-4 w-4 rounded border-[#B4BEC9] text-[#159A9C] focus:ring-[#159A9C]"
+                />
+              </label>
+            </div>
+
+            <div className="p-4 border-t border-[#DEEFE7] flex justify-end gap-2">
+              <button
+                onClick={() => setShowAgendaSettings(false)}
+                className="px-4 py-2 text-sm border border-[#B4BEC9] rounded-lg text-[#002333] hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveAgendaSettings}
+                className="px-4 py-2 text-sm bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D]"
+              >
+                Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Evento */}
       <CreateEventModal

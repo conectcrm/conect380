@@ -38,10 +38,16 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
   const [filter, setFilter] = useState<NotificationFilter>('all');
   const [realUnreadCount, setRealUnreadCount] = useState(0);
 
-  // ✅ Usar useRef para persistir o Set entre re-renders (evita duplicadas)
-  const processedApiNotificationsRef = useRef<Set<string>>(new Set());
+  // IDs já vistos da API (usado para controlar toasts, não para deduplicar lista)
+  const seenApiNotificationsRef = useRef<Set<string>>(new Set());
+  const isInitialSyncRef = useRef(true);
+  const addNotificationRef = useRef(addNotification);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    addNotificationRef.current = addNotification;
+  }, [addNotification]);
 
   // Fechar dropdown ao clicar fora
   useEffect(() => {
@@ -63,31 +69,37 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
         const count = await notificationService.contarNaoLidas();
         setRealUnreadCount(count);
 
-        // Adicionar apenas notificações novas (não processadas antes)
+        // Sincronizar notificações da API no contexto local sem criar duplicadas por ID
         apiNotifications.forEach((apiNotif) => {
-          // Se já processamos esta notificação da API, pular
-          if (processedApiNotificationsRef.current.has(apiNotif.id)) {
-            return;
-          }
-
-          // Marcar como processada
-          processedApiNotificationsRef.current.add(apiNotif.id);
-
           // Mapear tipo da API para tipo do contexto
           let type: 'success' | 'error' | 'warning' | 'info' | 'reminder' = 'info';
           if (apiNotif.type === 'COTACAO_APROVADA') type = 'success';
           else if (apiNotif.type === 'COTACAO_REPROVADA') type = 'error';
           else if (apiNotif.type === 'COTACAO_PENDENTE') type = 'warning';
 
-          addNotification({
+          const parsedTimestamp = new Date(apiNotif.createdAt);
+          const timestamp = Number.isNaN(parsedTimestamp.getTime()) ? new Date() : parsedTimestamp;
+          const alreadySeen = seenApiNotificationsRef.current.has(apiNotif.id);
+
+          addNotificationRef.current({
             id: apiNotif.id, // ✅ Preservar ID do banco de dados
             type,
             title: apiNotif.title,
             message: apiNotif.message,
+            read: apiNotif.read,
+            timestamp,
             autoClose: true, // Fechar automaticamente após 5 segundos
             duration: 5000,
+            // Evita toasts duplicados em hidratação inicial e atualizações já conhecidas
+            silent: isInitialSyncRef.current || alreadySeen || apiNotif.read,
           });
+
+          seenApiNotificationsRef.current.add(apiNotif.id);
         });
+
+        if (isInitialSyncRef.current) {
+          isInitialSyncRef.current = false;
+        }
       } catch (error) {
         console.error('Erro ao buscar notificações:', error);
       }
@@ -100,7 +112,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
     const interval = setInterval(fetchNotifications, 30000);
 
     return () => clearInterval(interval);
-  }, [addNotification]);
+  }, []);
 
   const filteredNotifications = notifications.filter((notification) => {
     switch (filter) {

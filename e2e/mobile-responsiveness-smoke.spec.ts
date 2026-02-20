@@ -1,41 +1,42 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from "@playwright/test";
 
-const BASE_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
-const ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL || 'admin@conectsuite.com.br';
-const ADMIN_PASSWORD = process.env.TEST_ADMIN_PASSWORD || 'admin123';
-const PROFILE_STORAGE_KEY = 'selectedProfileId';
-const ADMIN_PROFILE_ID = 'administrador';
+const BASE_URL = process.env.FRONTEND_URL || "http://localhost:3000";
+const ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL || "admin@conectsuite.com.br";
+const ADMIN_PASSWORD = process.env.TEST_ADMIN_PASSWORD || "admin123";
+const PROFILE_STORAGE_KEY = "selectedProfileId";
+const ADMIN_PROFILE_ID = "administrador";
 
 const FULL_BREAKPOINTS = [320, 360, 375, 390, 414, 430];
 const SAMPLE_BREAKPOINTS = [360, 430];
 
 const CRITICAL_ROUTES = [
-  '/atendimento/inbox',
-  '/vendas/propostas',
-  '/configuracoes/empresa',
-  '/configuracoes/usuarios',
+  "/atendimento/inbox",
+  "/vendas/propostas",
+  "/configuracoes/empresa",
+  "/configuracoes/usuarios",
+  "/agenda",
 ];
 
 const EXPANDED_ROUTES = [
-  '/dashboard',
-  '/atendimento/tickets',
-  '/atendimento/automacoes',
-  '/atendimento/equipe',
-  '/atendimento/configuracoes',
-  '/crm/leads',
-  '/crm/pipeline',
-  '/vendas/produtos',
-  '/relatorios/analytics',
-  '/configuracoes',
-  '/admin/console',
-  '/admin/empresas',
+  "/dashboard",
+  "/atendimento/tickets",
+  "/atendimento/automacoes",
+  "/atendimento/equipe",
+  "/atendimento/configuracoes",
+  "/crm/leads",
+  "/crm/pipeline",
+  "/vendas/produtos",
+  "/relatorios/analytics",
+  "/configuracoes",
+  "/admin/console",
+  "/admin/empresas",
 ];
 
 async function installRateLimitBypass(page: Page): Promise<void> {
-  await page.context().route('**/*', async (route) => {
+  await page.context().route("**/*", async (route) => {
     const headers = {
       ...route.request().headers(),
-      'x-real-ip': `127.0.0.${Math.floor(Math.random() * 200) + 20}`,
+      "x-real-ip": `127.0.0.${Math.floor(Math.random() * 200) + 20}`,
     };
 
     await route.continue({ headers });
@@ -44,12 +45,12 @@ async function installRateLimitBypass(page: Page): Promise<void> {
 
 async function dismissDevOverlay(page: Page): Promise<void> {
   await page.evaluate(() => {
-    const styleId = 'pw-hide-wds-overlay-mobile-smoke';
+    const styleId = "pw-hide-wds-overlay-mobile-smoke";
     if (document.getElementById(styleId)) {
       return;
     }
 
-    const style = document.createElement('style');
+    const style = document.createElement("style");
     style.id = styleId;
     style.textContent = `
       #webpack-dev-server-client-overlay {
@@ -61,8 +62,8 @@ async function dismissDevOverlay(page: Page): Promise<void> {
   });
 
   const dismissButton = page
-    .frameLocator('iframe#webpack-dev-server-client-overlay')
-    .getByRole('button', { name: /dismiss/i });
+    .frameLocator("iframe#webpack-dev-server-client-overlay")
+    .getByRole("button", { name: /dismiss/i });
 
   const isVisible = await dismissButton.isVisible().catch(() => false);
   if (isVisible) {
@@ -80,11 +81,11 @@ async function forceAdminProfile(page: Page): Promise<void> {
 }
 
 async function login(page: Page): Promise<void> {
-  let lastUrl = '';
-  let lastError = '';
+  let lastUrl = "";
+  let lastError = "";
 
   for (let attempt = 1; attempt <= 4; attempt += 1) {
-    await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`${BASE_URL}/login`, { waitUntil: "domcontentloaded" });
     await dismissDevOverlay(page);
 
     if (/\/dashboard/.test(page.url())) {
@@ -109,7 +110,7 @@ async function login(page: Page): Promise<void> {
       page
         .getByText(/email ou senha incorretos/i)
         .first()
-        .waitFor({ state: 'visible', timeout: 15000 })
+        .waitFor({ state: "visible", timeout: 15000 })
         .catch(() => undefined),
     ]);
 
@@ -128,7 +129,7 @@ async function login(page: Page): Promise<void> {
       .catch(() => false);
 
     if (rateLimited) {
-      lastError = 'rate limited';
+      lastError = "rate limited";
       await page.waitForTimeout(4000 * attempt);
       continue;
     }
@@ -140,28 +141,28 @@ async function login(page: Page): Promise<void> {
       .catch(() => false);
 
     if (hasInvalidCredentials) {
-      lastError = 'email ou senha incorretos';
+      lastError = "email ou senha incorretos";
     }
 
     await page.waitForTimeout(2000);
   }
 
   throw new Error(
-    `Login failed after 4 attempts. Last URL: ${lastUrl}. Last error: ${lastError || 'unknown'}`,
+    `Login failed after 4 attempts. Last URL: ${lastUrl}. Last error: ${lastError || "unknown"}`,
   );
 }
 
 async function gotoRouteWithAuthRecovery(page: Page, route: string): Promise<void> {
   await page.goto(`${BASE_URL}${route}`, {
-    waitUntil: 'domcontentloaded',
+    waitUntil: "domcontentloaded",
     timeout: 30000,
   });
   await dismissDevOverlay(page);
 
-  if (page.url().includes('/login')) {
+  if (page.url().includes("/login")) {
     await login(page);
     await page.goto(`${BASE_URL}${route}`, {
-      waitUntil: 'domcontentloaded',
+      waitUntil: "domcontentloaded",
       timeout: 30000,
     });
     await dismissDevOverlay(page);
@@ -181,7 +182,7 @@ async function hasHorizontalOverflow(page: Page): Promise<boolean> {
 
 async function isPermissionDeniedPage(page: Page): Promise<boolean> {
   const deniedHeadingVisible = await page
-    .getByRole('heading', { name: /acesso negado/i })
+    .getByRole("heading", { name: /acesso negado/i })
     .first()
     .isVisible()
     .catch(() => false);
@@ -198,11 +199,11 @@ async function isPermissionDeniedPage(page: Page): Promise<boolean> {
 }
 
 async function assertMobileDrawerAndProfileInteraction(page: Page): Promise<void> {
-  const menuButton = page.getByTestId('mobile-menu-open');
+  const menuButton = page.getByTestId("mobile-menu-open");
   await expect(menuButton).toBeVisible({ timeout: 10000 });
   await menuButton.click({ force: true });
 
-  const drawer = page.getByTestId('mobile-sidebar-drawer');
+  const drawer = page.getByTestId("mobile-sidebar-drawer");
   await expect(drawer).toBeVisible({ timeout: 10000 });
 
   const dashboardLabel = drawer.getByText(/dashboard/i).first();
@@ -215,26 +216,76 @@ async function assertMobileDrawerAndProfileInteraction(page: Page): Promise<void
 
   expect
     .soft(
-      computedTextColor === 'rgb(255, 255, 255)' || computedTextColor === 'rgba(0, 0, 0, 0)',
+      computedTextColor === "rgb(255, 255, 255)" || computedTextColor === "rgba(0, 0, 0, 0)",
       `mobile drawer label color unexpected: ${computedTextColor}`,
     )
     .toBeFalsy();
 
-  const closeDrawerButton = page.getByTestId('mobile-menu-close');
+  const closeDrawerButton = page.getByTestId("mobile-menu-close");
   await closeDrawerButton.click({ force: true });
   await expect(drawer).toBeHidden({ timeout: 10000 });
 
-  const profileButton = page.locator('button[data-user-menu]').first();
+  const profileButton = page.locator("button[data-user-menu]").first();
   await expect(profileButton).toBeVisible({ timeout: 10000 });
   await profileButton.click({ force: true });
 
-  await expect(page.getByText('Meu Perfil')).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText("Meu Perfil")).toBeVisible({ timeout: 10000 });
 }
 
-test.describe('Mobile Responsiveness Smoke', () => {
+async function assertAgendaCoreActions(page: Page): Promise<void> {
+  const weekButton = page.getByRole("button", { name: /^semana$/i }).first();
+  const dayButton = page.getByRole("button", { name: /^dia$/i }).first();
+  const newEventButton = page.getByRole("button", { name: /novo evento/i }).first();
+  const exportButton = page.getByRole("button", { name: /exportar agenda/i }).first();
+  const settingsButton = page
+    .getByRole("button", { name: /abrir configuracoes da agenda/i })
+    .first();
+
+  await expect(weekButton).toBeVisible({ timeout: 10000 });
+  await expect(dayButton).toBeVisible({ timeout: 10000 });
+  await expect(newEventButton).toBeVisible({ timeout: 10000 });
+  await expect(exportButton).toBeVisible({ timeout: 10000 });
+  await expect(settingsButton).toBeVisible({ timeout: 10000 });
+
+  await dayButton.click({ force: true });
+  await weekButton.click({ force: true });
+  await exportButton.click({ force: true });
+
+  await settingsButton.click({ force: true });
+  const settingsTitle = page.getByText(/configuracoes da agenda/i).first();
+  await expect(settingsTitle).toBeVisible({ timeout: 10000 });
+  await page
+    .getByRole("button", { name: /^salvar$/i })
+    .first()
+    .click({ force: true });
+  await expect(settingsTitle).toBeHidden({ timeout: 10000 });
+
+  await newEventButton.click({ force: true });
+  const modalTitle = page.getByText(/criar evento|editar evento/i).first();
+  await expect(modalTitle).toBeVisible({ timeout: 10000 });
+
+  const modalFitsViewport = await page.evaluate(() => {
+    const overlay = document.querySelector(".fixed.inset-0");
+    const modal = overlay?.firstElementChild as HTMLElement | null;
+    if (!modal) {
+      return false;
+    }
+
+    const rect = modal.getBoundingClientRect();
+    return rect.left >= 0 && rect.right <= window.innerWidth + 1;
+  });
+
+  expect.soft(modalFitsViewport, "agenda modal exceeds viewport width").toBeTruthy();
+
+  const cancelButton = page.getByRole("button", { name: /^cancelar$/i }).first();
+  await cancelButton.click({ force: true });
+  await expect(modalTitle).toBeHidden({ timeout: 10000 });
+}
+
+test.describe("Mobile Responsiveness Smoke", () => {
   test.setTimeout(20 * 60 * 1000);
 
-  test('critical + expanded mobile routes should keep usable layout and no overflow', async ({
+  test("critical + expanded mobile routes should keep usable layout and no overflow", async ({
     page,
   }) => {
     const permissionBlockedRoutes = new Set<string>();
@@ -249,16 +300,18 @@ test.describe('Mobile Responsiveness Smoke', () => {
           await gotoRouteWithAuthRecovery(page, route);
 
           const currentUrl = page.url();
-          expect.soft(
-            currentUrl.includes('/login'),
-            `${width}px ${route}: redirected to login unexpectedly`,
-          ).toBeFalsy();
+          expect
+            .soft(
+              currentUrl.includes("/login"),
+              `${width}px ${route}: redirected to login unexpectedly`,
+            )
+            .toBeFalsy();
 
           const permissionDenied = await isPermissionDeniedPage(page);
           if (permissionDenied) {
             permissionBlockedRoutes.add(route);
             test.info().annotations.push({
-              type: 'warning',
+              type: "warning",
               description: `${width}px ${route}: blocked by permission guard; responsive checks skipped`,
             });
             return;
@@ -267,30 +320,32 @@ test.describe('Mobile Responsiveness Smoke', () => {
           const overflow = await hasHorizontalOverflow(page);
           expect.soft(overflow, `${width}px ${route}: horizontal overflow detected`).toBeFalsy();
 
-          if (route === '/atendimento/inbox') {
+          if (route === "/atendimento/inbox") {
             const listCtaVisible = await page
-              .getByRole('button', { name: /Novo Atendimento/i })
+              .getByRole("button", { name: /Novo Atendimento/i })
               .isVisible()
               .catch(() => false);
             const backToListVisible = await page
-              .getByRole('button', { name: /Voltar para lista/i })
+              .getByRole("button", { name: /Voltar para lista/i })
               .isVisible()
               .catch(() => false);
             const blockingEmptyStateVisible = await page
-              .getByText('Nenhum atendimento selecionado', { exact: false })
+              .getByText("Nenhum atendimento selecionado", { exact: false })
               .isVisible()
               .catch(() => false);
 
             const hasMobileNavigationPath =
               listCtaVisible || backToListVisible || !blockingEmptyStateVisible;
 
-            expect.soft(
-              hasMobileNavigationPath,
-              `${width}px /atendimento/inbox: no clear list/chat navigation path`,
-            ).toBeTruthy();
+            expect
+              .soft(
+                hasMobileNavigationPath,
+                `${width}px /atendimento/inbox: no clear list/chat navigation path`,
+              )
+              .toBeTruthy();
           }
 
-          if (route === '/vendas/propostas') {
+          if (route === "/vendas/propostas") {
             const rowCheckbox = page.locator('tbody input[type="checkbox"]').first();
             const canSelect = await rowCheckbox.isVisible().catch(() => false);
 
@@ -299,11 +354,17 @@ test.describe('Mobile Responsiveness Smoke', () => {
               await page.waitForTimeout(300);
 
               const overflowAfterSelection = await hasHorizontalOverflow(page);
-              expect.soft(
-                overflowAfterSelection,
-                `${width}px /vendas/propostas: overflow after showing bulk selection bar`,
-              ).toBeFalsy();
+              expect
+                .soft(
+                  overflowAfterSelection,
+                  `${width}px /vendas/propostas: overflow after showing bulk selection bar`,
+                )
+                .toBeFalsy();
             }
+          }
+
+          if (route === "/agenda") {
+            await assertAgendaCoreActions(page);
           }
         });
       }
@@ -317,16 +378,18 @@ test.describe('Mobile Responsiveness Smoke', () => {
           await gotoRouteWithAuthRecovery(page, route);
 
           const currentUrl = page.url();
-          expect.soft(
-            currentUrl.includes('/login'),
-            `${width}px ${route}: redirected to login unexpectedly`,
-          ).toBeFalsy();
+          expect
+            .soft(
+              currentUrl.includes("/login"),
+              `${width}px ${route}: redirected to login unexpectedly`,
+            )
+            .toBeFalsy();
 
           const permissionDenied = await isPermissionDeniedPage(page);
           if (permissionDenied) {
             permissionBlockedRoutes.add(route);
             test.info().annotations.push({
-              type: 'warning',
+              type: "warning",
               description: `${width}px ${route}: blocked by permission guard; responsive checks skipped`,
             });
             return;
@@ -335,7 +398,7 @@ test.describe('Mobile Responsiveness Smoke', () => {
           const overflow = await hasHorizontalOverflow(page);
           expect.soft(overflow, `${width}px ${route}: horizontal overflow detected`).toBeFalsy();
 
-          if (route === '/dashboard' && width === 360) {
+          if (route === "/dashboard" && width === 360) {
             await assertMobileDrawerAndProfileInteraction(page);
           }
         });
@@ -344,7 +407,7 @@ test.describe('Mobile Responsiveness Smoke', () => {
 
     if (permissionBlockedRoutes.size > 0) {
       console.warn(
-        `[mobile-smoke] skipped responsive checks on permission-blocked routes: ${Array.from(permissionBlockedRoutes).join(', ')}`,
+        `[mobile-smoke] skipped responsive checks on permission-blocked routes: ${Array.from(permissionBlockedRoutes).join(", ")}`,
       );
     }
   });

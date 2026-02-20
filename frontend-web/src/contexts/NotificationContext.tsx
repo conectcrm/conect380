@@ -1,4 +1,12 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+  useRef,
+  useCallback,
+} from 'react';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
 
@@ -90,7 +98,9 @@ interface NotificationContextData {
 const NotificationContext = createContext<NotificationContextData | undefined>(undefined);
 
 type AddNotificationInput = Omit<Notification, 'id' | 'timestamp' | 'read' | 'priority'> &
-  Partial<Pick<Notification, 'id' | 'priority'>>;
+  Partial<Pick<Notification, 'id' | 'timestamp' | 'read' | 'priority'>> & {
+    silent?: boolean;
+  };
 
 export const useNotifications = () => {
   const context = useContext(NotificationContext);
@@ -107,6 +117,7 @@ interface NotificationProviderProps {
 export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children }) => {
   // ✅ Garantir que estados iniciais sejam arrays válidos
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const notificationsRef = useRef<Notification[]>([]);
   const [reminders, setReminders] = useState<NotificationReminder[]>([]);
   const [settings, setSettings] = useState({
     soundEnabled: true,
@@ -230,6 +241,10 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   // Motivo: Causava vazamento de notificações entre usuários
   // As notificações vêm da API com polling e são filtradas por userId no backend
 
+  useEffect(() => {
+    notificationsRef.current = notifications;
+  }, [notifications]);
+
   // Salvar lembretes no localStorage
   useEffect(() => {
     localStorage.setItem('conect-reminders', JSON.stringify(reminders));
@@ -278,67 +293,121 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     return () => clearInterval(interval);
   }, [reminders, settings.reminderInterval]);
 
-  const addNotification = (notification: AddNotificationInput) => {
+  const addNotification = useCallback((notification: AddNotificationInput) => {
+    const { silent = false, ...notificationData } = notification;
+    const currentNotifications = Array.isArray(notificationsRef.current)
+      ? notificationsRef.current
+      : [];
+    const resolvedId = notificationData.id || generateId();
+
+    const parsedTimestamp =
+      notificationData.timestamp instanceof Date
+        ? notificationData.timestamp
+        : notificationData.timestamp
+          ? new Date(notificationData.timestamp)
+          : new Date();
+    const normalizedTimestamp = Number.isNaN(parsedTimestamp.getTime()) ? new Date() : parsedTimestamp;
+
+    const existingIndex = currentNotifications.findIndex((item) => item.id === resolvedId);
+    if (existingIndex >= 0) {
+      const existingNotification = currentNotifications[existingIndex];
+      const updatedNotification: Notification = {
+        ...existingNotification,
+        ...notificationData,
+        id: resolvedId,
+        timestamp: normalizedTimestamp,
+        read: notificationData.read ?? existingNotification.read,
+        priority: notificationData.priority ?? existingNotification.priority ?? 'medium',
+      };
+
+      const hasChanged =
+        existingNotification.type !== updatedNotification.type ||
+        existingNotification.title !== updatedNotification.title ||
+        existingNotification.message !== updatedNotification.message ||
+        existingNotification.read !== updatedNotification.read ||
+        existingNotification.priority !== updatedNotification.priority ||
+        existingNotification.autoClose !== updatedNotification.autoClose ||
+        existingNotification.duration !== updatedNotification.duration ||
+        existingNotification.entityType !== updatedNotification.entityType ||
+        existingNotification.entityId !== updatedNotification.entityId ||
+        existingNotification.timestamp.getTime() !== updatedNotification.timestamp.getTime();
+
+      if (!hasChanged) {
+        return resolvedId;
+      }
+
+      const nextNotifications = [...currentNotifications];
+      nextNotifications[existingIndex] = updatedNotification;
+      notificationsRef.current = nextNotifications;
+      setNotifications(nextNotifications);
+      return resolvedId;
+    }
+
     // Verificar se já existe uma notificação similar muito recente (últimos 2 minutos para erros)
-    const timeWindow = notification.type === 'error' ? 2 * 60 * 1000 : 5 * 60 * 1000;
+    const timeWindow = notificationData.type === 'error' ? 2 * 60 * 1000 : 5 * 60 * 1000;
     const recentTimeAgo = new Date(Date.now() - timeWindow);
-    const recentSimilar = notifications.find(
+    const recentSimilar = currentNotifications.find(
       (existing) =>
-        existing.title === notification.title &&
-        existing.type === notification.type &&
-        existing.message === notification.message &&
-        existing.entityType === notification.entityType &&
+        existing.title === notificationData.title &&
+        existing.type === notificationData.type &&
+        existing.message === notificationData.message &&
+        existing.entityType === notificationData.entityType &&
         existing.timestamp > recentTimeAgo,
     );
 
-    // Se encontrou notificação similar recente, não criar nova
     if (recentSimilar) {
-      // Log silencioso - apenas em debug mode
       if (process.env.NODE_ENV === 'development') {
-        console.debug('Notificação duplicada evitada:', notification.title);
+        console.debug('Notificação duplicada evitada:', notificationData.title);
       }
       return;
     }
 
     const newNotification: Notification = {
-      ...notification,
-      id: notification.id || generateId(), // Usar ID fornecido ou gerar novo
-      timestamp: new Date(),
-      read: false,
-      priority: notification.priority ?? 'medium',
+      ...notificationData,
+      id: resolvedId,
+      timestamp: normalizedTimestamp,
+      read: notificationData.read ?? false,
+      priority: notificationData.priority ?? 'medium',
     };
 
-    setNotifications((prev) => [newNotification, ...prev]);
+    const nextNotifications = [newNotification, ...currentNotifications];
+    notificationsRef.current = nextNotifications;
+    setNotifications(nextNotifications);
+
+    if (silent) {
+      return newNotification.id;
+    }
 
     // Mostrar toast
     const toastOptions = {
-      duration: notification.autoClose !== false ? notification.duration || 4000 : Infinity,
+      id: newNotification.id,
+      duration: notificationData.autoClose !== false ? notificationData.duration || 4000 : Infinity,
       position: 'top-right' as const,
     };
 
-    switch (notification.type) {
+    switch (notificationData.type) {
       case 'success':
-        toast.success(notification.message, toastOptions);
+        toast.success(notificationData.message, toastOptions);
         break;
       case 'error':
-        toast.error(notification.message, toastOptions);
+        toast.error(notificationData.message, toastOptions);
         break;
       case 'warning':
-        toast(notification.message, {
+        toast(notificationData.message, {
           ...toastOptions,
           icon: '⚠️',
           style: { borderLeft: '4px solid #f59e0b' },
         });
         break;
       case 'info':
-        toast(notification.message, {
+        toast(notificationData.message, {
           ...toastOptions,
           icon: 'ℹ️',
           style: { borderLeft: '4px solid #3b82f6' },
         });
         break;
       case 'reminder':
-        toast(notification.message, {
+        toast(notificationData.message, {
           ...toastOptions,
           icon: '🔔',
           style: { borderLeft: '4px solid #8b5cf6' },
@@ -352,8 +421,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       'Notification' in window &&
       Notification.permission === 'granted'
     ) {
-      new Notification(notification.title, {
-        body: notification.message,
+      new Notification(notificationData.title, {
+        body: notificationData.message,
         icon: '/favicon.ico',
         tag: newNotification.id,
       });
@@ -361,11 +430,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
     // Som (se habilitado)
     if (settings.soundEnabled) {
-      playNotificationSound(notification.type);
+      playNotificationSound(notificationData.type);
     }
 
     return newNotification.id;
-  };
+  }, [settings.browserNotifications, settings.soundEnabled]);
 
   const playNotificationSound = (type: Notification['type']) => {
     // Som desabilitado por padrão devido à política de autoplay dos navegadores
@@ -428,11 +497,14 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         // ✅ Garantir que prev é um array válido
         if (!Array.isArray(prev)) {
           console.warn('⚠️ notifications não é um array em markAsRead, resetando');
+          notificationsRef.current = [];
           return [];
         }
-        return prev.map((notification) =>
+        const next = prev.map((notification) =>
           notification.id === id ? { ...notification, read: true } : notification,
         );
+        notificationsRef.current = next;
+        return next;
       });
 
       // Persistir no backend
@@ -451,9 +523,12 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         // ✅ Garantir que prev é um array válido
         if (!Array.isArray(prev)) {
           console.warn('⚠️ notifications não é um array em markAllAsRead, resetando');
+          notificationsRef.current = [];
           return [];
         }
-        return prev.map((notification) => ({ ...notification, read: true }));
+        const next = prev.map((notification) => ({ ...notification, read: true }));
+        notificationsRef.current = next;
+        return next;
       });
 
       // Persistir no backend
@@ -468,7 +543,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   const removeNotification = async (id: string) => {
     try {
       // Remover do estado local imediatamente (UX responsivo)
-      setNotifications((prev) => prev.filter((notification) => notification.id !== id));
+      setNotifications((prev) => {
+        const next = prev.filter((notification) => notification.id !== id);
+        notificationsRef.current = next;
+        return next;
+      });
 
       // Remover do backend
       await api.delete(`/notifications/${id}`);
@@ -481,6 +560,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   const clearAll = async () => {
     try {
       // Limpar estado local imediatamente
+      notificationsRef.current = [];
       setNotifications([]);
 
       // Limpar no backend

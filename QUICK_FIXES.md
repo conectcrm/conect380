@@ -3,6 +3,7 @@
 ## Status de aplicacao
 - 2026-02-20: itens abaixo aplicados no codigo.
 - 2026-02-20: validacao automatizada mobile executada com sucesso em `e2e/mobile-responsiveness-smoke.spec.ts`.
+- 2026-02-20: reteste completo concluido (frontend unit tests, backend tests e smoke mobile e2e).
 
 1. Inbox mobile navigation unblock (P0) - APLICADO
 - Arquivo: frontend-web/src/features/atendimento/omnichannel/ChatOmnichannel.tsx
@@ -46,3 +47,52 @@
   - Paleta especifica para `instanceId=\"mobile\"` no menu (texto/icone escuros em fundo branco).
   - Fechamento do drawer limpa submenu ativo (`setActiveSubmenuPanel(null)`), evitando camada residual.
   - Test IDs adicionados para abrir/fechar menu mobile e validacao E2E de perfil pos-fechamento.
+
+7. Agenda mobile: remover compressao por sidebar fixa (P1) - APLICADO
+- Arquivo: frontend-web/src/features/agenda/AgendaPage.tsx
+- Troca rapida:
+  - De: `flex overflow-hidden` + `w-80 border-l`
+  - Para: `flex-col xl:flex-row` + sidebar `w-full xl:w-80` com card responsivo
+  - Ajuste adicional: paddings mobile (`px-4`, `p-3`) e toolbar com `flex-wrap`.
+
+8. Agenda: modo Dia real e modo Semana com largura controlada (P1) - APLICADO
+- Arquivos:
+  - frontend-web/src/features/agenda/AgendaPage.tsx
+  - frontend-web/src/components/calendar/WeekView.tsx
+- Troca rapida:
+  - Novo prop `daysToShow` no `WeekView` (`7` para semana e `1` para dia).
+  - Wrapper com `overflow-x-auto` + `min-w` para evitar esmagamento em 320-430px.
+  - Correção da linha de hora atual com zero-padding (`09:00` em vez de `9:00`).
+
+9. Agenda: tipo/responsavel persistidos no estado local (P2) - APLICADO
+- Arquivos:
+  - frontend-web/src/features/agenda/AgendaPage.tsx
+  - frontend-web/src/components/calendar/CreateEventModal.tsx
+  - frontend-web/src/hooks/useCalendar.ts
+- Troca rapida:
+  - Mapear `eventType` do modal para `CalendarEvent.type`.
+  - Alinhar opcoes de tipo (incluindo `Ligacao`) entre criacao e filtro da agenda.
+  - Preencher colaborador/responsavel ao salvar.
+  - Filtro de colaborador expandido para considerar tambem `responsavel` e `attendees`.
+  - Merge no hook apos create/update para manter filtros funcionais durante a sessao.
+
+10. Agenda: toolbar funcional (P2) - APLICADO
+- Arquivos:
+  - frontend-web/src/features/agenda/AgendaPage.tsx
+  - e2e/mobile-responsiveness-smoke.spec.ts
+- Troca rapida:
+  - `Download` passou a exportar CSV da agenda filtrada.
+  - `Settings` passou a abrir modal real de preferencias da agenda.
+  - Preferencias salvas em localStorage (`agenda:show-stats-panel` e `agenda:open-filters-default`).
+
+11. Smoke E2E agenda em mobile (P1) - APLICADO
+- Arquivo: e2e/mobile-responsiveness-smoke.spec.ts
+- Troca rapida:
+  - Adicao de `/agenda` na lista critica.
+  - Validacao de botoes de visao (Semana/Dia), exportacao, configuracoes e ajuste do modal ao viewport.
+
+12. Notificacoes: nao duplicar no polling/read sync (P1) - APLICADO
+- Arquivo: frontend-web/src/components/notifications/__tests__/NotificationCenter.polling.test.tsx
+- Troca rapida:
+  - Teste cobrindo mesmo `id` em polls consecutivos sem duplicar item.
+  - Teste cobrindo `markAsRead` seguido de novo polling mantendo estado sincronizado.

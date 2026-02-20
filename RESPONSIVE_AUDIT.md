@@ -13,6 +13,10 @@
   - `1 passed`
 - Arquivo de validacao automatizada:
   - `e2e/mobile-responsiveness-smoke.spec.ts`
+- Reteste de estabilidade (2026-02-20):
+  - `frontend-web`: `CI=true npm test -- --watch=false --runInBand` -> `13 passed`
+  - `backend`: `npm test -- --runInBand` -> `16 passed`
+  - `e2e`: `npx playwright test e2e/mobile-responsiveness-smoke.spec.ts --project=chromium --reporter=list` -> `1 passed`
 
 ---
 
@@ -146,6 +150,67 @@ Correcao sugerida:
   - Classes: `flex flex-col ... sm:flex-row ...` e `flex flex-wrap gap-2`
 
 Prioridade: P2 (Resolvido)
+
+---
+
+Rota: /agenda e /crm/agenda
+
+Status: ✅ OK
+
+Problema:
+- Antes do ajuste, o layout principal da agenda mantinha sidebar fixa (`w-80`) ao lado do calendario e a visao semanal usava grade rigida de 8 colunas, comprimindo o conteudo no mobile.
+- Breakpoints testados: 320, 360, 375, 390, 414, 430.
+
+Impacto:
+- P1 potencial (uso principal da agenda em mobile comprometido).
+
+Causa provavel:
+- Container principal sem adaptacao mobile-first e grade semanal sem estrategia para largura reduzida.
+
+Correcao sugerida:
+- Aplicada.
+- Arquivos:
+  - `frontend-web/src/features/agenda/AgendaPage.tsx`
+  - `frontend-web/src/components/calendar/WeekView.tsx`
+  - `frontend-web/src/components/calendar/CreateEventModal.tsx`
+  - `frontend-web/src/hooks/useCalendar.ts`
+  - `e2e/mobile-responsiveness-smoke.spec.ts`
+- Trechos relevantes:
+  - `frontend-web/src/features/agenda/AgendaPage.tsx:717` (acoes da toolbar com exportacao e configuracoes)
+  - `frontend-web/src/features/agenda/AgendaPage.tsx:737` (layout `flex-col xl:flex-row` + sidebar responsiva)
+  - `frontend-web/src/features/agenda/AgendaPage.tsx:766` (`daysToShow={7}`)
+  - `frontend-web/src/features/agenda/AgendaPage.tsx:781` (`daysToShow={1}`)
+  - `frontend-web/src/features/agenda/AgendaPage.tsx:887` (modal real de configuracoes da agenda)
+  - `frontend-web/src/components/calendar/WeekView.tsx:121` (`overflow-x-auto` + `min-w` controlado)
+  - `frontend-web/src/components/calendar/WeekView.tsx:45` (`currentTimeSlot` com zero-padding)
+  - `frontend-web/src/components/calendar/CreateEventModal.tsx:86` (`mapCalendarTypeToModalType`)
+  - `frontend-web/src/hooks/useCalendar.ts:208` (`getCollaborators` com `collaborator + responsavel + attendees`)
+  - `frontend-web/src/hooks/useCalendar.ts:35`, `frontend-web/src/hooks/useCalendar.ts:68`, `frontend-web/src/hooks/useCalendar.ts:98` (filtro por tipo e merge do estado local apos create/update)
+  - `e2e/mobile-responsiveness-smoke.spec.ts:17` (rota adicionada no smoke)
+
+Prioridade: P1 (Resolvido)
+
+---
+
+Rota: /agenda e /crm/agenda
+
+Status: ⚠️ Atenção
+
+Problema:
+- A API de agenda ainda nao possui campos dedicados para persistir `tipo` detalhado e `responsavel` no banco.
+- Em recarregamento completo da pagina, alguns eventos podem voltar sem metadados avancados de filtro.
+
+Impacto:
+- P2 (filtros avancados podem perder granularidade entre sessoes).
+
+Causa provavel:
+- Contrato atual de `agenda_eventos` no backend persiste apenas campos base (titulo, datas, status, prioridade, local, attendees), sem colunas proprias para tipo/responsavel.
+
+Correcao sugerida:
+- Curto prazo: manter fallback local (ja aplicado), considerando `attendees` no filtro de responsavel/participante.
+- Proximo passo: evoluir contrato backend para incluir `tipo` e `responsavel_id`/`responsavel_nome` em `agenda_eventos`.
+
+Prioridade: P2
 
 ---
 

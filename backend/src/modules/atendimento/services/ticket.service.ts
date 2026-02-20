@@ -203,7 +203,7 @@ export class TicketService {
         policyKey: this.escalationPolicy,
         channels: this.notificationChannels,
         logger: this.logger,
-        targets: { phone },
+        targets: { phone, empresaId: ticket.empresaId },
         message,
         context: {
           source: 'ticket-priority-high',
@@ -242,7 +242,7 @@ export class TicketService {
         policyKey: this.highPriorityPolicy,
         channels: this.notificationChannels,
         logger: this.logger,
-        targets: { phone },
+        targets: { phone, empresaId: ticket.empresaId },
         message,
         context: {
           source: 'ticket-escalation',
