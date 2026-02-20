@@ -10,11 +10,24 @@ import {
 import { Empresa } from '../../empresas/entities/empresa.entity';
 
 export enum UserRole {
+  SUPERADMIN = 'superadmin',
   ADMIN = 'admin',
-  MANAGER = 'manager',
+  GERENTE = 'gerente',
+  MANAGER = 'gerente', // alias legado
   VENDEDOR = 'vendedor',
-  USER = 'user',
+  SUPORTE = 'suporte',
+  USER = 'suporte', // alias legado
+  FINANCEIRO = 'financeiro',
 }
+
+const USER_ROLE_DB_VALUES: string[] = [
+  UserRole.SUPERADMIN,
+  UserRole.ADMIN,
+  UserRole.GERENTE,
+  UserRole.VENDEDOR,
+  UserRole.SUPORTE,
+  UserRole.FINANCEIRO,
+];
 
 export enum StatusAtendente {
   DISPONIVEL = 'DISPONIVEL',
@@ -37,25 +50,32 @@ export class User {
   @Column()
   senha: string;
 
-  @Column({ length: 20, nullable: true })
+  @Column({ length: 20, nullable: true, select: false, insert: false, update: false })
   telefone: string;
 
-  @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
+  // Keep alias keys in UserRole for legacy code paths, but only persist unique enum labels in DB.
+  @Column({ type: 'enum', enum: USER_ROLE_DB_VALUES, default: UserRole.VENDEDOR })
   role: UserRole;
 
-  @Column({ type: 'simple-array', nullable: true })
+  @Column({ type: 'simple-array', nullable: true, select: false, insert: false, update: false })
   permissoes: string[];
 
   @Column('uuid')
   empresa_id: string;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: 'text', nullable: true, select: false, insert: false, update: false })
   avatar_url: string;
 
-  @Column({ length: 10, default: 'pt-BR' })
+  @Column({
+    length: 10,
+    default: 'pt-BR',
+    select: false,
+    insert: false,
+    update: false,
+  })
   idioma_preferido: string;
 
-  @Column({ type: 'json', nullable: true })
+  @Column({ type: 'json', nullable: true, select: false, insert: false, update: false })
   configuracoes: {
     tema?: string;
     notificacoes?: {
@@ -79,13 +99,13 @@ export class User {
   @Column({ type: 'integer', default: 0, nullable: true })
   tickets_ativos: number;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamp', nullable: true, select: false, insert: false, update: false })
   ultimo_login: Date;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'criado_em' })
   created_at: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'atualizado_em' })
   updated_at: Date;
 
   @ManyToOne(() => Empresa, (empresa) => empresa.usuarios)

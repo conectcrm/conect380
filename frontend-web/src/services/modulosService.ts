@@ -34,22 +34,87 @@ export interface CreateEmpresaModuloDto {
   plano?: PlanoEnum;
 }
 
+const MODULOS_ATIVOS_CACHE_TTL_MS = 60_000;
+const RATE_LIMIT_BACKOFF_MS = 60_000;
+
+let modulosAtivosCache: ModuloEnum[] | null = null;
+let modulosAtivosCacheAt = 0;
+let modulosAtivosRequest: Promise<ModuloEnum[]> | null = null;
+let modulosAtivosRateLimitedUntil = 0;
+
+const isRateLimitError = (error: unknown): boolean => {
+  return Boolean((error as any)?.response?.status === 429);
+};
+
+const getCachedModulosAtivos = (): ModuloEnum[] | null => {
+  if (!modulosAtivosCache) {
+    return null;
+  }
+
+  if (Date.now() - modulosAtivosCacheAt > MODULOS_ATIVOS_CACHE_TTL_MS) {
+    modulosAtivosCache = null;
+    return null;
+  }
+
+  return [...modulosAtivosCache];
+};
+
+const setCachedModulosAtivos = (modulos: ModuloEnum[]): void => {
+  modulosAtivosCache = [...modulos];
+  modulosAtivosCacheAt = Date.now();
+};
+
 /**
- * Service para gerenciar licenciamento de módulos da empresa
+ * Service para gerenciar licenciamento de modulos da empresa.
  */
 export const modulosService = {
   /**
-   * Lista módulos ativos da empresa logada
-   * @returns Array de módulos ativos (string[])
+   * Lista modulos ativos da empresa logada.
+   * Possui cache de curta duracao + dedupe de request em voo.
    */
   async listarModulosAtivos(): Promise<ModuloEnum[]> {
-    const response = await api.get('/empresas/modulos/ativos');
-    return response.data.data;
+    const cached = getCachedModulosAtivos();
+    if (cached) {
+      return cached;
+    }
+
+    if (Date.now() < modulosAtivosRateLimitedUntil && modulosAtivosCache) {
+      return [...modulosAtivosCache];
+    }
+
+    if (modulosAtivosRequest) {
+      return modulosAtivosRequest;
+    }
+
+    modulosAtivosRequest = api
+      .get('/empresas/modulos/ativos')
+      .then((response) => {
+        const modulos = Array.isArray(response.data?.data) ? response.data.data : [];
+        setCachedModulosAtivos(modulos);
+        modulosAtivosRateLimitedUntil = 0;
+        return [...modulos];
+      })
+      .catch((error) => {
+        if (isRateLimitError(error)) {
+          modulosAtivosRateLimitedUntil = Date.now() + RATE_LIMIT_BACKOFF_MS;
+
+          // Se houver cache, usa o ultimo snapshot para nao quebrar a UX.
+          if (modulosAtivosCache) {
+            return [...modulosAtivosCache];
+          }
+        }
+
+        throw error;
+      })
+      .finally(() => {
+        modulosAtivosRequest = null;
+      });
+
+    return modulosAtivosRequest;
   },
 
   /**
-   * Lista todos os módulos (ativos e inativos)
-   * @returns Array de EmpresaModulo
+   * Lista todos os modulos (ativos e inativos).
    */
   async listar(): Promise<EmpresaModulo[]> {
     const response = await api.get('/empresas/modulos');
@@ -57,9 +122,7 @@ export const modulosService = {
   },
 
   /**
-   * Verifica se módulo está ativo
-   * @param modulo Módulo a verificar
-   * @returns true se ativo
+   * Verifica se modulo esta ativo.
    */
   async isModuloAtivo(modulo: ModuloEnum): Promise<boolean> {
     const response = await api.get(`/empresas/modulos/verificar/${modulo}`);
@@ -67,8 +130,7 @@ export const modulosService = {
   },
 
   /**
-   * Retorna plano atual da empresa
-   * @returns Plano atual ou null
+   * Retorna plano atual da empresa.
    */
   async getPlanoAtual(): Promise<PlanoEnum | null> {
     const response = await api.get('/empresas/modulos/plano');
@@ -76,9 +138,7 @@ export const modulosService = {
   },
 
   /**
-   * Ativa módulo
-   * @param dto Dados do módulo
-   * @returns Módulo criado
+   * Ativa modulo.
    */
   async ativar(dto: CreateEmpresaModuloDto): Promise<EmpresaModulo> {
     const response = await api.post('/empresas/modulos/ativar', dto);
@@ -86,16 +146,14 @@ export const modulosService = {
   },
 
   /**
-   * Desativa módulo
-   * @param modulo Módulo a desativar
+   * Desativa modulo.
    */
   async desativar(modulo: ModuloEnum): Promise<void> {
     await api.delete(`/empresas/modulos/${modulo}`);
   },
 
   /**
-   * Ativa plano completo (Starter, Business, Enterprise)
-   * @param plano Plano a ativar
+   * Ativa plano completo (Starter, Business, Enterprise).
    */
   async ativarPlano(plano: PlanoEnum): Promise<void> {
     await api.post(`/empresas/modulos/plano/${plano}`);

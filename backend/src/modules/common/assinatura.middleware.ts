@@ -131,6 +131,7 @@ export class AssinaturaMiddleware implements NestMiddleware {
       '/propostas': 'propostas',
       '/clientes': 'clientes',
       '/usuarios': 'usuarios',
+      '/users': 'usuarios',
       '/dashboard': 'dashboard',
       '/relatorios': 'relatorios',
       '/financeiro': 'financeiro',

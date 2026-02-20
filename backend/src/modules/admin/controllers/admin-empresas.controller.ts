@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { AdminEmpresasService } from '../services/admin-empresas.service';
 import { CreateEmpresaAdminDto } from '../dto/create-empresa-admin.dto';
 import { UpdateEmpresaAdminDto } from '../dto/update-empresa-admin.dto';
@@ -22,11 +23,14 @@ import { CreateModuloEmpresaDto } from '../dto/create-modulo-empresa.dto';
 import { UpdateModuloEmpresaDto } from '../dto/update-modulo-empresa.dto';
 import { MudarPlanoDto } from '../dto/mudar-plano.dto';
 import { Roles } from '../../../common/decorators/roles.decorator';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { Permission } from '../../../common/permissions/permissions.constants';
 import { UserRole } from '../../users/user.entity';
 
 @Controller('admin/empresas')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.ADMIN)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
+@Permissions(Permission.ADMIN_EMPRESAS_MANAGE)
 export class AdminEmpresasController {
   constructor(private readonly adminEmpresasService: AdminEmpresasService) {}
 

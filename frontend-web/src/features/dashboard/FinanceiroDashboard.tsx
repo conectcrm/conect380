@@ -1,423 +1,387 @@
-import React, { useState } from 'react';
-import { useI18n } from '../../contexts/I18nContext';
-import { useTheme } from '../../contexts/ThemeContext';
-import { KPICard } from '../../components/common/KPICard';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  DollarSign,
-  TrendingUp,
-  TrendingDown,
+  AlertCircle,
+  CalendarClock,
+  CheckCircle2,
   CreditCard,
-  Calendar,
-  AlertTriangle,
-  CheckSquare,
-  Clock,
-  FileText,
-  PiggyBank,
-  ArrowUp,
-  ArrowDown,
+  DollarSign,
   RefreshCw,
-  BarChart3,
-  Target,
+  TrendingUp,
 } from 'lucide-react';
+import faturamentoService, {
+  EstatisticasPagamentos,
+  Fatura,
+  FaturasPaginadasResponse,
+  StatusFatura,
+} from '../../services/faturamentoService';
+
+type PeriodoFiltro = '7d' | '30d' | '90d';
+
+const formatCurrency = (value: number): string =>
+  value.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    maximumFractionDigits: 0,
+  });
+
+const formatDate = (value: string): string => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString('pt-BR');
+};
+
+const getPeriodoDates = (periodo: PeriodoFiltro): { dataInicio: string; dataFim: string } => {
+  const fim = new Date();
+  const inicio = new Date(fim);
+
+  if (periodo === '7d') {
+    inicio.setDate(inicio.getDate() - 7);
+  } else if (periodo === '30d') {
+    inicio.setDate(inicio.getDate() - 30);
+  } else {
+    inicio.setDate(inicio.getDate() - 90);
+  }
+
+  return {
+    dataInicio: inicio.toISOString(),
+    dataFim: fim.toISOString(),
+  };
+};
+
+const statusLabelMap: Record<string, string> = {
+  [StatusFatura.PENDENTE]: 'Pendente',
+  [StatusFatura.ENVIADA]: 'Enviada',
+  [StatusFatura.PAGA]: 'Paga',
+  [StatusFatura.VENCIDA]: 'Vencida',
+  [StatusFatura.CANCELADA]: 'Cancelada',
+  [StatusFatura.PARCIALMENTE_PAGA]: 'Parcial',
+};
+
+const statusColorMap: Record<string, string> = {
+  [StatusFatura.PAGA]: 'bg-green-100 text-green-700',
+  [StatusFatura.PENDENTE]: 'bg-yellow-100 text-yellow-700',
+  [StatusFatura.VENCIDA]: 'bg-red-100 text-red-700',
+  [StatusFatura.ENVIADA]: 'bg-blue-100 text-blue-700',
+  [StatusFatura.PARCIALMENTE_PAGA]: 'bg-orange-100 text-orange-700',
+  [StatusFatura.CANCELADA]: 'bg-gray-100 text-gray-700',
+};
 
 const FinanceiroDashboard: React.FC = () => {
-  const { t } = useI18n();
-  const { currentPalette } = useTheme();
+  const [periodo, setPeriodo] = useState<PeriodoFiltro>('30d');
+  const [faturasData, setFaturasData] = useState<FaturasPaginadasResponse | null>(null);
+  const [pagamentosStats, setPagamentosStats] = useState<EstatisticasPagamentos | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Dados simulados financeiros
-  const financeiroData = {
-    fluxoCaixa: {
-      saldoAtual: 485000,
-      entradas: 125000,
-      saidas: 89000,
-      projecao30dias: 521000,
-    },
-    contasReceber: {
-      total: 245000,
-      vencidas: 12000,
-      vencem30dias: 87000,
-      inadimplencia: 2.3,
-    },
-    contasPagar: {
-      total: 156000,
-      vencidas: 5000,
-      vencem30dias: 45000,
-      desconto: 1200,
-    },
-    metas: {
-      receitaMensal: 800000,
-      receitaAtual: 625000,
-      percentual: 78.1,
-    },
-  };
+  const carregarDados = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  const contasVencidas = [
-    {
-      id: 'CR001',
-      tipo: 'receber',
-      cliente: 'Tech Solutions Ltda',
-      valor: 15000,
-      vencimento: '2025-07-28',
-      dias: 7,
-      status: 'vencida',
-    },
-    {
-      id: 'CP001',
-      tipo: 'pagar',
-      fornecedor: 'Software Licensing Inc',
-      valor: 3500,
-      vencimento: '2025-08-01',
-      dias: 3,
-      status: 'vencida',
-    },
-    {
-      id: 'CR002',
-      tipo: 'receber',
-      cliente: 'StartUp Growth Co',
-      valor: 22000,
-      vencimento: '2025-08-05',
-      dias: 1,
-      status: 'vence_hoje',
-    },
-  ];
+      const range = getPeriodoDates(periodo);
 
-  const indicadoresFinanceiros = [
-    {
-      titulo: 'Liquidez Corrente',
-      valor: 2.45,
-      sufixo: 'x',
-      tendencia: 'positiva',
-      descricao: 'Capacidade de pagamento',
-    },
-    {
-      titulo: 'Margem Bruta',
-      valor: 67.8,
-      sufixo: '%',
-      tendencia: 'positiva',
-      descricao: 'Rentabilidade das vendas',
-    },
-    {
-      titulo: 'ROI Mensal',
-      valor: 18.5,
-      sufixo: '%',
-      tendencia: 'positiva',
-      descricao: 'Retorno sobre investimento',
-    },
-    {
-      titulo: 'Break-even',
-      valor: 15,
-      sufixo: ' dias',
-      tendencia: 'negativa',
-      descricao: 'Ponto de equilíbrio',
-    },
-  ];
+      const [faturasResponse, pagamentosResponse] = await Promise.all([
+        faturamentoService.listarFaturasPaginadas({
+          page: 1,
+          pageSize: 200,
+          dataInicial: range.dataInicio,
+          dataFinal: range.dataFim,
+          sortBy: 'dataVencimento',
+          sortOrder: 'ASC',
+        }),
+        faturamentoService.obterEstatisticasPagamentos({
+          dataInicio: range.dataInicio,
+          dataFim: range.dataFim,
+        }),
+      ]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'vencida':
-        return 'bg-red-100 text-red-800 border-red-200';
-      case 'vence_hoje':
-        return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'a_vencer':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+      setFaturasData(faturasResponse);
+      setPagamentosStats(pagamentosResponse);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro ao carregar dashboard financeiro';
+      setError(message);
+    } finally {
+      setLoading(false);
     }
+  }, [periodo]);
+
+  useEffect(() => {
+    void carregarDados();
+  }, [carregarDados]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await carregarDados();
+    setRefreshing(false);
   };
 
-  const formatCurrency = (value: number) => {
-    return value.toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      minimumFractionDigits: 0,
-    });
-  };
+  const faturas = faturasData?.data || [];
+  const aggregates = faturasData?.aggregates || {};
+
+  const {
+    totalFaturas,
+    faturasPagas,
+    faturasVencidas,
+    taxaRecebimento,
+    proximosVencimentos,
+    distribuicaoStatus,
+  } = useMemo(() => {
+    const pagas = faturas.filter((fatura) => fatura.status === StatusFatura.PAGA).length;
+    const vencidas = faturas.filter((fatura) => fatura.status === StatusFatura.VENCIDA).length;
+    const taxa = faturas.length > 0 ? (pagas / faturas.length) * 100 : 0;
+
+    const hoje = new Date();
+    const limite = new Date(hoje);
+    limite.setDate(limite.getDate() + 14);
+
+    const vencimentos = faturas
+      .filter((fatura) => {
+        const vencimento = new Date(fatura.dataVencimento);
+        return vencimento >= hoje && vencimento <= limite && fatura.status !== StatusFatura.PAGA;
+      })
+      .sort(
+        (a, b) =>
+          new Date(a.dataVencimento).getTime() - new Date(b.dataVencimento).getTime(),
+      )
+      .slice(0, 6);
+
+    const statusCount = faturas.reduce<Record<string, number>>((acc, fatura) => {
+      const key = String(fatura.status);
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+
+    const distribuicao = Object.entries(statusCount)
+      .map(([status, quantidade]) => ({
+        status,
+        quantidade,
+        percentual: faturas.length > 0 ? (quantidade / faturas.length) * 100 : 0,
+      }))
+      .sort((a, b) => b.quantidade - a.quantidade);
+
+    return {
+      totalFaturas: faturas.length,
+      faturasPagas: pagas,
+      faturasVencidas: vencidas,
+      taxaRecebimento: taxa,
+      proximosVencimentos: vencimentos,
+      distribuicaoStatus: distribuicao,
+    };
+  }, [faturas]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="p-6">
-        {/* Header Financeiro - Design Suave */}
-        <div className="bg-white border border-[#DEEFE7] rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="bg-white rounded-lg border border-[#DEEFE7] shadow-sm p-6 mb-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-3xl font-bold flex items-center text-[#002333]">
-                <DollarSign className="h-8 w-8 mr-3 text-[#159A9C]" />
-                Dashboard Financeiro
-              </h1>
-              <p className="mt-2 text-[#002333]/70">
-                Controle de fluxo de caixa e gestão financeira
+              <h1 className="text-2xl font-bold text-[#002333]">Dashboard Financeiro</h1>
+              <p className="text-[#002333]/70 mt-1">
+                Visao de faturamento, recebimento e exposicao de inadimplencia.
               </p>
             </div>
-            <div className="mt-4 sm:mt-0 flex items-center space-x-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-[#002333]">
-                  {formatCurrency(financeiroData.fluxoCaixa.saldoAtual)}
-                </div>
-                <div className="text-sm text-[#002333]/70">Saldo Atual</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-[#002333]">
-                  {financeiroData.metas.percentual}%
-                </div>
-                <div className="text-sm text-[#002333]/70">Meta Mensal</div>
-              </div>
-              <button className="px-4 py-2 bg-white text-[#002333] border border-[#B4BEC9] rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm font-medium">
-                <RefreshCw className="w-4 h-4" />
-                <span>Atualizar</span>
+
+            <div className="flex items-center gap-3">
+              <select
+                value={periodo}
+                onChange={(event) => setPeriodo(event.target.value as PeriodoFiltro)}
+                className="px-3 py-2 border border-[#B4BEC9] rounded-lg text-sm focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+              >
+                <option value="7d">Ultimos 7 dias</option>
+                <option value="30d">Ultimos 30 dias</option>
+                <option value="90d">Ultimos 90 dias</option>
+              </select>
+
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center gap-2"
+              >
+                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                Atualizar
               </button>
             </div>
           </div>
         </div>
 
-        {/* KPIs Financeiros Principais */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
-          {/* Fluxo de Caixa */}
-          <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-sm font-bold uppercase tracking-wide text-gray-600">
-                  Fluxo de Caixa
-                </h3>
-                <div className="text-2xl font-bold text-gray-900 mt-1">
-                  {formatCurrency(financeiroData.fluxoCaixa.saldoAtual)}
-                </div>
-                <div className="text-sm text-gray-500">Saldo atual em caixa</div>
-              </div>
-              <div className="p-3 bg-[#159A9C]/10 rounded-lg">
-                <PiggyBank className="h-8 w-8 text-[#159A9C]" />
-              </div>
-            </div>
-            <div className="flex items-center text-sm text-green-600">
-              <TrendingUp className="w-4 h-4 mr-1" />
-              <span>Projeção 30d: {formatCurrency(financeiroData.fluxoCaixa.projecao30dias)}</span>
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-red-800 font-medium">Falha ao carregar dados financeiros</p>
+              <p className="text-red-700 text-sm">{error}</p>
             </div>
           </div>
+        )}
 
-          {/* Contas a Receber */}
-          <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-sm font-bold uppercase tracking-wide text-gray-600">
-                  Contas a Receber
-                </h3>
-                <div className="text-2xl font-bold text-gray-900 mt-1">
-                  {formatCurrency(financeiroData.contasReceber.total)}
-                </div>
-                <div className="text-sm text-gray-500">Total em aberto</div>
-              </div>
-              <div className="p-3 bg-[#159A9C]/10 rounded-lg">
-                <CreditCard className="h-8 w-8 text-[#159A9C]" />
-              </div>
-            </div>
-            <div className="flex items-center text-sm text-red-600">
-              <AlertTriangle className="w-4 h-4 mr-1" />
-              <span>Vencidas: {formatCurrency(financeiroData.contasReceber.vencidas)}</span>
-            </div>
+        {loading && (
+          <div className="bg-white rounded-lg border border-[#DEEFE7] p-8 text-center mb-6">
+            <RefreshCw className="h-8 w-8 text-[#159A9C] animate-spin mx-auto mb-3" />
+            <p className="text-[#002333]/70">Carregando indicadores financeiros...</p>
           </div>
+        )}
 
-          {/* Contas a Pagar */}
-          <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-sm font-bold uppercase tracking-wide text-gray-600">
-                  Contas a Pagar
-                </h3>
-                <div className="text-2xl font-bold text-gray-900 mt-1">
-                  {formatCurrency(financeiroData.contasPagar.total)}
-                </div>
-                <div className="text-sm text-gray-500">Total em aberto</div>
-              </div>
-              <div className="p-3 bg-[#159A9C]/10 rounded-lg">
-                <FileText className="h-8 w-8 text-[#159A9C]" />
-              </div>
-            </div>
-            <div className="flex items-center text-sm text-orange-600">
-              <Clock className="w-4 h-4 mr-1" />
-              <span>Vencem 30d: {formatCurrency(financeiroData.contasPagar.vencem30dias)}</span>
-            </div>
-          </div>
-
-          {/* Meta de Receita */}
-          <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-sm font-bold uppercase tracking-wide text-gray-600">
-                  Meta Mensal
-                </h3>
-                <div className="text-2xl font-bold text-gray-900 mt-1">
-                  {financeiroData.metas.percentual}%
-                </div>
-                <div className="text-sm text-gray-500">
-                  {formatCurrency(financeiroData.metas.receitaAtual)} de{' '}
-                  {formatCurrency(financeiroData.metas.receitaMensal)}
-                </div>
-              </div>
-              <div className="p-3 bg-[#159A9C]/10 rounded-lg">
-                <Target className="h-8 w-8 text-[#159A9C]" />
-              </div>
-            </div>
-            <div className="w-full bg-[#DEEFE7] rounded-full h-2 mt-2">
-              <div
-                className="bg-[#159A9C] h-2 rounded-full transition-all"
-                style={{ width: `${financeiroData.metas.percentual}%` }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Contas Vencidas e Indicadores */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Contas Críticas */}
-          <div className="lg:col-span-2 bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Contas Críticas</h3>
-              <button className="text-[#159A9C] hover:text-[#0F7B7D] text-sm font-medium transition-colors">
-                Ver todas
-              </button>
-            </div>
-            <div className="space-y-4">
-              {contasVencidas.map((conta) => (
-                <div key={conta.id} className="p-4 border border-gray-200 rounded-lg">
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium text-gray-900">
-                          {conta.tipo === 'receber' ? conta.cliente : conta.fornecedor}
-                        </span>
-                        <span
-                          className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(conta.status)}`}
-                        >
-                          {conta.status === 'vencida' ? 'VENCIDA' : 'VENCE HOJE'}
-                        </span>
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        Vencimento: {new Date(conta.vencimento).toLocaleDateString('pt-BR')}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        {conta.dias > 0 ? `${conta.dias} dias em atraso` : 'Vence hoje'}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-lg font-bold text-gray-900">
-                        {formatCurrency(conta.valor)}
-                      </div>
-                      <div className="text-xs text-gray-500">#{conta.id}</div>
-                    </div>
+        {!loading && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-6">
+              <div className="bg-white rounded-lg border border-[#DEEFE7] p-5 shadow-sm">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide font-semibold text-[#002333]/60">
+                      Valor faturado
+                    </p>
+                    <p className="text-2xl font-bold text-[#002333] mt-2">
+                      {formatCurrency(Number(aggregates.valorTotal || 0))}
+                    </p>
+                    <p className="text-sm text-[#002333]/70 mt-2">{totalFaturas} faturas no periodo</p>
+                  </div>
+                  <div className="h-11 w-11 rounded-xl bg-[#159A9C]/10 flex items-center justify-center">
+                    <DollarSign className="h-5 w-5 text-[#159A9C]" />
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
+              </div>
 
-          {/* Indicadores Financeiros */}
-          <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Indicadores</h3>
-            <div className="space-y-4">
-              {indicadoresFinanceiros.map((indicador, index) => (
-                <div key={index} className="p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium text-gray-900">{indicador.titulo}</span>
-                    {indicador.tendencia === 'positiva' ? (
-                      <ArrowUp className="w-4 h-4 text-green-600" />
-                    ) : (
-                      <ArrowDown className="w-4 h-4 text-red-600" />
-                    )}
+              <div className="bg-white rounded-lg border border-[#DEEFE7] p-5 shadow-sm">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide font-semibold text-[#002333]/60">
+                      Valor recebido
+                    </p>
+                    <p className="text-2xl font-bold text-[#002333] mt-2">
+                      {formatCurrency(Number(aggregates.valorRecebido || pagamentosStats?.valorTotal || 0))}
+                    </p>
+                    <p className="text-sm text-[#002333]/70 mt-2">
+                      {faturasPagas} faturas liquidadas
+                    </p>
                   </div>
-                  <div className="text-xl font-bold text-gray-900">
-                    {indicador.valor}
-                    {indicador.sufixo}
+                  <div className="h-11 w-11 rounded-xl bg-green-100 flex items-center justify-center">
+                    <CheckCircle2 className="h-5 w-5 text-green-700" />
                   </div>
-                  <div className="text-xs text-gray-500">{indicador.descricao}</div>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* KPIs Secundários */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
-          <KPICard
-            title="Entradas do Mês"
-            value={formatCurrency(financeiroData.fluxoCaixa.entradas)}
-            icon={<TrendingUp size={24} />}
-            trend={{
-              value: 8,
-              isPositive: true,
-              label: 'vs mês anterior',
-            }}
-          />
-
-          <KPICard
-            title="Saídas do Mês"
-            value={formatCurrency(financeiroData.fluxoCaixa.saidas)}
-            icon={<TrendingDown size={24} />}
-            trend={{
-              value: 3,
-              isPositive: false,
-              label: 'vs mês anterior',
-            }}
-          />
-
-          <KPICard
-            title="Taxa Inadimplência"
-            value={`${financeiroData.contasReceber.inadimplencia}%`}
-            icon={<AlertTriangle size={24} />}
-            trend={{
-              value: 0.5,
-              isPositive: false,
-              label: 'vs mês anterior',
-            }}
-          />
-
-          <KPICard
-            title="Descontos Obtidos"
-            value={formatCurrency(financeiroData.contasPagar.desconto)}
-            icon={<CheckSquare size={24} />}
-            trend={{
-              value: 15,
-              isPositive: true,
-              label: 'vs mês anterior',
-            }}
-          />
-        </div>
-
-        {/* Resumo do Fluxo de Caixa */}
-        <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Resumo do Fluxo de Caixa</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            <div className="text-center p-4 bg-green-50 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">
-                {formatCurrency(financeiroData.fluxoCaixa.entradas)}
               </div>
-              <div className="text-sm text-gray-600">Entradas do Mês</div>
-              <div className="text-xs text-green-600 mt-1">+8% vs anterior</div>
-            </div>
-            <div className="text-center p-4 bg-red-50 rounded-lg">
-              <div className="text-2xl font-bold text-red-600">
-                {formatCurrency(financeiroData.fluxoCaixa.saidas)}
+
+              <div className="bg-white rounded-lg border border-[#DEEFE7] p-5 shadow-sm">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide font-semibold text-[#002333]/60">
+                      Em aberto
+                    </p>
+                    <p className="text-2xl font-bold text-[#002333] mt-2">
+                      {formatCurrency(Number(aggregates.valorEmAberto || 0))}
+                    </p>
+                    <p className="text-sm text-[#002333]/70 mt-2">{faturasVencidas} faturas vencidas</p>
+                  </div>
+                  <div className="h-11 w-11 rounded-xl bg-orange-100 flex items-center justify-center">
+                    <CalendarClock className="h-5 w-5 text-orange-700" />
+                  </div>
+                </div>
               </div>
-              <div className="text-sm text-gray-600">Saídas do Mês</div>
-              <div className="text-xs text-red-600 mt-1">+3% vs anterior</div>
+
+              <div className="bg-white rounded-lg border border-[#DEEFE7] p-5 shadow-sm">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide font-semibold text-[#002333]/60">
+                      Taxa de recebimento
+                    </p>
+                    <p className="text-2xl font-bold text-[#002333] mt-2">
+                      {taxaRecebimento.toFixed(1)}%
+                    </p>
+                    <p className="text-sm text-[#002333]/70 mt-2">
+                      {pagamentosStats?.totalPagamentos || 0} pagamentos processados
+                    </p>
+                  </div>
+                  <div className="h-11 w-11 rounded-xl bg-blue-100 flex items-center justify-center">
+                    <TrendingUp className="h-5 w-5 text-blue-700" />
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="text-center p-4 bg-[#159A9C]/5 rounded-lg">
-              <div className="text-2xl font-bold text-[#159A9C]">
-                {formatCurrency(
-                  financeiroData.fluxoCaixa.entradas - financeiroData.fluxoCaixa.saidas,
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-white rounded-lg border border-[#DEEFE7] p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-[#002333] mb-4">Distribuicao por status</h2>
+                {distribuicaoStatus.length === 0 ? (
+                  <p className="text-sm text-[#002333]/70">Sem faturas no periodo selecionado.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {distribuicaoStatus.map((item) => (
+                      <div key={item.status}>
+                        <div className="flex items-center justify-between text-sm mb-1">
+                          <span className="text-[#002333] font-medium">
+                            {statusLabelMap[item.status] || item.status}
+                          </span>
+                          <span className="text-[#002333]/70">
+                            {item.quantidade} ({item.percentual.toFixed(1)}%)
+                          </span>
+                        </div>
+                        <div className="w-full h-2 bg-[#DEEFE7] rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-[#159A9C]"
+                            style={{ width: `${Math.max(4, item.percentual)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
-              <div className="text-sm text-gray-600">Resultado Líquido</div>
-              <div className="text-xs text-[#159A9C] mt-1">
-                +
-                {(
-                  ((financeiroData.fluxoCaixa.entradas - financeiroData.fluxoCaixa.saidas) /
-                    financeiroData.fluxoCaixa.saidas) *
-                  100
-                ).toFixed(1)}
-                %
+
+              <div className="bg-white rounded-lg border border-[#DEEFE7] p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-[#002333] mb-4">Proximos vencimentos (14 dias)</h2>
+                {proximosVencimentos.length === 0 ? (
+                  <p className="text-sm text-[#002333]/70">Nenhum vencimento no horizonte imediato.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {proximosVencimentos.map((fatura: Fatura) => (
+                      <div key={fatura.id} className="p-3 rounded-lg border border-[#DEEFE7] bg-white">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium text-[#002333]">#{fatura.numero}</p>
+                            <p className="text-sm text-[#002333]/70">
+                              Vencimento {formatDate(fatura.dataVencimento)}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold text-[#002333]">{formatCurrency(fatura.valorTotal)}</p>
+                            <span
+                              className={`inline-flex px-2 py-0.5 rounded text-xs ${
+                                statusColorMap[fatura.status] || 'bg-gray-100 text-gray-700'
+                              }`}
+                            >
+                              {statusLabelMap[fatura.status] || fatura.status}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
-          </div>
-        </div>
+
+            <div className="bg-white rounded-lg border border-[#DEEFE7] p-6 shadow-sm mt-6">
+              <div className="flex items-center gap-2 mb-4">
+                <CreditCard className="h-5 w-5 text-[#159A9C]" />
+                <h2 className="text-lg font-semibold text-[#002333]">Pagamentos por metodo</h2>
+              </div>
+
+              {!pagamentosStats || Object.keys(pagamentosStats.porMetodo || {}).length === 0 ? (
+                <p className="text-sm text-[#002333]/70">Sem dados de pagamentos para o periodo.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                  {Object.entries(pagamentosStats.porMetodo).map(([metodo, dados]) => (
+                    <div key={metodo} className="p-4 border border-[#DEEFE7] rounded-lg bg-gray-50">
+                      <p className="text-xs uppercase tracking-wide text-[#002333]/60">{metodo}</p>
+                      <p className="text-xl font-bold text-[#002333] mt-1">{formatCurrency(dados.valor)}</p>
+                      <p className="text-sm text-[#002333]/70">{dados.quantidade} pagamentos</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

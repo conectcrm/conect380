@@ -8,7 +8,6 @@ import {
   Delete,
   Query,
   UseGuards,
-  ParseIntPipe,
   Request,
 } from '@nestjs/common';
 import { OportunidadesService } from './oportunidades.service';
@@ -21,15 +20,20 @@ import {
 import { CreateAtividadeDto } from './dto/atividade.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { Permission } from '../../common/permissions/permissions.constants';
 import { EmpresaId } from '../../common/decorators/empresa.decorator';
 import { EstagioOportunidade } from './oportunidade.entity';
 
 @Controller('oportunidades')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.CRM_OPORTUNIDADES_READ)
 export class OportunidadesController {
   constructor(private readonly oportunidadesService: OportunidadesService) {}
 
   @Post()
+  @Permissions(Permission.CRM_OPORTUNIDADES_CREATE)
   create(@Body() createOportunidadeDto: CreateOportunidadeDto, @EmpresaId() empresaId: string) {
     return this.oportunidadesService.create(createOportunidadeDto, empresaId);
   }
@@ -65,13 +69,14 @@ export class OportunidadesController {
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number, @EmpresaId() empresaId: string) {
+  findOne(@Param('id') id: string, @EmpresaId() empresaId: string) {
     return this.oportunidadesService.findOne(id, empresaId);
   }
 
   @Patch(':id')
+  @Permissions(Permission.CRM_OPORTUNIDADES_UPDATE)
   update(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @Body() updateOportunidadeDto: UpdateOportunidadeDto,
     @EmpresaId() empresaId: string,
   ) {
@@ -79,8 +84,9 @@ export class OportunidadesController {
   }
 
   @Patch(':id/estagio')
+  @Permissions(Permission.CRM_OPORTUNIDADES_UPDATE)
   updateEstagio(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @Body() updateEstagioDto: UpdateEstagioDto,
     @EmpresaId() empresaId: string,
   ) {
@@ -88,18 +94,20 @@ export class OportunidadesController {
   }
 
   @Delete(':id')
-  remove(@Param('id', ParseIntPipe) id: number, @EmpresaId() empresaId: string) {
+  @Permissions(Permission.CRM_OPORTUNIDADES_DELETE)
+  remove(@Param('id') id: string, @EmpresaId() empresaId: string) {
     return this.oportunidadesService.remove(id, empresaId);
   }
 
   @Get(':id/atividades')
-  listarAtividades(@Param('id', ParseIntPipe) id: number, @EmpresaId() empresaId: string) {
+  listarAtividades(@Param('id') id: string, @EmpresaId() empresaId: string) {
     return this.oportunidadesService.listarAtividades(id, empresaId);
   }
 
   @Post(':id/atividades')
+  @Permissions(Permission.CRM_OPORTUNIDADES_UPDATE)
   createAtividade(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @Body() createAtividadeDto: CreateAtividadeDto,
     @EmpresaId() empresaId: string,
     @Request() req,

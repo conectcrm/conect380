@@ -16,6 +16,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permission } from '../../../common/permissions/permissions.constants';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { Departamento } from '../../triagem/entities/departamento.entity';
 import { ConfiguracaoInactivityDto } from '../dto/configuracao-inatividade.dto';
@@ -23,7 +26,8 @@ import { ConfiguracaoInatividade } from '../entities/configuracao-inatividade.en
 import { InactivityMonitorService } from '../services/inactivity-monitor.service';
 
 @Controller('atendimento/configuracao-inatividade')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.ATENDIMENTO_SLA_MANAGE)
 export class ConfiguracaoInactividadeController {
   private readonly logger = new Logger(ConfiguracaoInactividadeController.name);
 

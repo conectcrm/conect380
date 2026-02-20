@@ -67,6 +67,7 @@ export class AuthService {
 
     // Atualizar último login
     await this.usersService.updateLastLogin(user.id);
+    const normalizedPermissions = Array.isArray(user.permissoes) ? user.permissoes : [];
 
     return {
       success: true,
@@ -77,6 +78,8 @@ export class AuthService {
           nome: user.nome,
           email: user.email,
           role: user.role,
+          permissoes: normalizedPermissions,
+          permissions: normalizedPermissions,
           empresa: user.empresa,
         },
       },

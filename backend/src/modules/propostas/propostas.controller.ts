@@ -19,10 +19,14 @@ import {
 } from './dto/proposta.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { Permission } from '../../common/permissions/permissions.constants';
 import { EmpresaId } from '../../common/decorators/empresa.decorator';
 
 @Controller('propostas')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.COMERCIAL_PROPOSTAS_READ)
 export class PropostasController {
   private readonly logger = new Logger(PropostasController.name);
   constructor(private readonly propostasService: PropostasService) {}
@@ -80,6 +84,7 @@ export class PropostasController {
    * Atualiza o status de uma proposta
    */
   @Put(':id/status')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_UPDATE)
   async atualizarStatus(
     @EmpresaId() empresaId: string,
     @Param('id') propostaId: string,
@@ -163,6 +168,7 @@ export class PropostasController {
    * Cria uma nova proposta
    */
   @Post()
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_CREATE)
   async criarProposta(
     @EmpresaId() empresaId: string,
     @Body() dadosProposta: any,
@@ -213,6 +219,7 @@ export class PropostasController {
    * Remove uma proposta
    */
   @Delete(':id')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_DELETE)
   async removerProposta(
     @EmpresaId() empresaId: string,
     @Param('id') propostaId: string,

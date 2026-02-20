@@ -46,6 +46,13 @@ describe('AdminEmpresasController - Guards (E2E)', () => {
     await request(app.getHttpServer()).get('/admin/empresas').set('x-test-role', 'admin').expect(200);
   });
 
+  it('permite acesso quando role e superadmin', async () => {
+    await request(app.getHttpServer())
+      .get('/admin/empresas')
+      .set('x-test-role', 'superadmin')
+      .expect(200);
+  });
+
   it('nega acesso quando usuario nao possui role', async () => {
     await request(app.getHttpServer()).get('/admin/empresas').expect(403);
   });

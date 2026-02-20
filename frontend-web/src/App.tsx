@@ -3,6 +3,7 @@ import React, { Suspense } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { Navigate, Route, BrowserRouter as Router, Routes, useLocation } from 'react-router-dom';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+import PermissionPathGuard from './components/licensing/PermissionPathGuard';
 import { AuthProvider } from './contexts/AuthContext';
 import { EmpresaProvider } from './contexts/EmpresaContextAPIReal';
 import { I18nProvider } from './contexts/I18nContext';
@@ -84,6 +85,7 @@ const DashboardDistribuicaoPage = React.lazy(() => import('./pages/DashboardDist
 const GestaoSkillsPage = React.lazy(() => import('./pages/GestaoSkillsPage'));
 const ConfiguracaoSLAPage = React.lazy(() => import('./pages/ConfiguracaoSLAPage'));
 const DashboardAnalyticsPage = React.lazy(() => import('./pages/DashboardAnalyticsPage'));
+const AnalyticsPage = React.lazy(() => import('./pages/AnalyticsPage'));
 const FechamentoAutomaticoPage = React.lazy(() => import('./pages/FechamentoAutomaticoPage'));
 const GestaoTicketsPage = React.lazy(() => import('./pages/GestaoTicketsPage'));
 const TicketCreatePage = React.lazy(() => import('./pages/TicketCreatePage'));
@@ -226,7 +228,11 @@ const AppRoutes: React.FC = () => {
           {/* Nova Inbox - Tela cheia estilo Zendesk/Intercom */}
           <Route
             path="/atendimento/inbox"
-            element={protegerRota(ModuloEnum.ATENDIMENTO, <InboxAtendimentoPage />)}
+            element={
+              <PermissionPathGuard>
+                {protegerRota(ModuloEnum.ATENDIMENTO, <InboxAtendimentoPage />)}
+              </PermissionPathGuard>
+            }
           />
 
           {/* Redirect: Chat antigo → Nova Inbox */}
@@ -236,8 +242,9 @@ const AppRoutes: React.FC = () => {
           <Route
             path="*"
             element={
-              <DashboardLayout>
-                <Routes>
+              <PermissionPathGuard>
+                <DashboardLayout>
+                  <Routes>
                   <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard" element={<DashboardRouter />} />
                   {/* Página de Notificações */}
@@ -599,7 +606,7 @@ const AppRoutes: React.FC = () => {
                     path="/nuclei/configuracoes/tickets/tipos"
                     element={<Navigate to="/configuracoes/tickets/tipos" replace />}
                   />
-                  <Route path="/relatorios/analytics" element={<RelatoriosAnalyticsPage />} />
+                  <Route path="/relatorios/analytics" element={<AnalyticsPage />} />
                   <Route path="/gestao/permissoes" element={<SistemaPermissoesPage />} />
                   <Route path="/sistema/backup" element={<BackupSincronizacaoPage />} />
                   {/* Atendimento Omnichannel - Protegido */}
@@ -908,8 +915,9 @@ const AppRoutes: React.FC = () => {
                   />
                   <Route path="/configuracoes" element={<ConfiguracoesPage />} />
                   <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                </Routes>
-              </DashboardLayout>
+                  </Routes>
+                </DashboardLayout>
+              </PermissionPathGuard>
             }
           />
         </Routes>

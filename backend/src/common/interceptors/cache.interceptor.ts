@@ -55,7 +55,8 @@ export class CacheInterceptor implements NestInterceptor {
 
     const empresaId = this.resolveEmpresaId(request);
     const normalizedUrl = request.originalUrl || url;
-    const cacheKey = `${empresaId}:${normalizedUrl}`;
+    const cacheScope = this.resolveCacheScope(normalizedUrl, request);
+    const cacheKey = `${empresaId}:${cacheScope}:${normalizedUrl}`;
 
     const cached = CacheInterceptor.cache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < cached.ttlMs) {
@@ -98,6 +99,19 @@ export class CacheInterceptor implements NestInterceptor {
     }
 
     return String(headerEmpresaId || 'default');
+  }
+
+  private resolveCacheScope(normalizedUrl: string, request: any): string {
+    if (this.isDashboardUrl(normalizedUrl)) {
+      const userId = request?.user?.id;
+      return userId ? `user:${String(userId)}` : 'user:anonymous';
+    }
+
+    return 'shared';
+  }
+
+  private isDashboardUrl(url: string): boolean {
+    return /\/dashboard(?:\/|\?|$)/.test(url);
   }
 
   private cleanExpiredCache() {

@@ -39,6 +39,7 @@ import {
   NovoUsuario,
   AtualizarUsuario,
   UserRole,
+  PermissionCatalogResponse,
   ROLE_LABELS,
   ROLE_COLORS,
   STATUS_ATENDENTE_LABELS,
@@ -98,6 +99,281 @@ const getErrorMessage = (error: unknown, fallback?: string): string => {
   return fallback ?? 'Erro inesperado';
 };
 
+const PERMISSAO_ATENDIMENTO_TOKENS = new Set([
+  'ATENDIMENTO',
+  'ATENDIMENTO_DLQ_MANAGE',
+  'ATENDIMENTO_CHATS_READ',
+  'ATENDIMENTO_CHATS_REPLY',
+  'ATENDIMENTO_TICKETS_READ',
+  'ATENDIMENTO_TICKETS_CREATE',
+  'ATENDIMENTO_TICKETS_UPDATE',
+  'ATENDIMENTO_TICKETS_ASSIGN',
+  'ATENDIMENTO_TICKETS_CLOSE',
+  'ATENDIMENTO_FILAS_MANAGE',
+  'ATENDIMENTO_SLA_MANAGE',
+  'atendimento.dlq.manage',
+  'atendimento.chats.read',
+  'atendimento.chats.reply',
+  'atendimento.tickets.read',
+  'atendimento.tickets.create',
+  'atendimento.tickets.update',
+  'atendimento.tickets.assign',
+  'atendimento.tickets.close',
+  'atendimento.filas.manage',
+  'atendimento.sla.manage',
+]);
+
+type PermissaoModalOption = { value: string; label: string; legacy?: boolean };
+type PermissaoModalGroup = {
+  id: string;
+  label: string;
+  description?: string;
+  roles: string[];
+  options: PermissaoModalOption[];
+};
+
+type PermissionCatalogState = {
+  groups: PermissaoModalGroup[];
+  defaultsByRole: Record<string, string[]>;
+};
+
+const PERMISSOES_MODAL_GROUPS_FALLBACK: PermissaoModalGroup[] = [
+  {
+    id: 'insights',
+    label: 'Dashboards e Relatorios',
+    description: 'Visualizacao de indicadores e analises',
+    roles: [
+      UserRole.USER,
+      UserRole.VENDEDOR,
+      UserRole.FINANCEIRO,
+      UserRole.MANAGER,
+      UserRole.ADMIN,
+      UserRole.SUPERADMIN,
+    ],
+    options: [
+      { value: 'dashboard.read', label: 'Dashboard: visualizar' },
+      { value: 'relatorios.read', label: 'Relatorios: visualizar' },
+    ],
+  },
+  {
+    id: 'crm',
+    label: 'CRM',
+    description: 'Clientes, leads, oportunidades, produtos e agenda',
+    roles: [
+      UserRole.USER,
+      UserRole.VENDEDOR,
+      UserRole.FINANCEIRO,
+      UserRole.MANAGER,
+      UserRole.ADMIN,
+      UserRole.SUPERADMIN,
+    ],
+    options: [
+      { value: 'crm.clientes.read', label: 'Clientes: visualizar' },
+      { value: 'crm.clientes.create', label: 'Clientes: criar' },
+      { value: 'crm.clientes.update', label: 'Clientes: editar' },
+      { value: 'crm.clientes.delete', label: 'Clientes: excluir' },
+      { value: 'crm.leads.read', label: 'Leads: visualizar' },
+      { value: 'crm.leads.create', label: 'Leads: criar' },
+      { value: 'crm.leads.update', label: 'Leads: editar' },
+      { value: 'crm.leads.delete', label: 'Leads: excluir' },
+      { value: 'crm.oportunidades.read', label: 'Oportunidades: visualizar' },
+      { value: 'crm.oportunidades.create', label: 'Oportunidades: criar' },
+      { value: 'crm.oportunidades.update', label: 'Oportunidades: editar' },
+      { value: 'crm.oportunidades.delete', label: 'Oportunidades: excluir' },
+      { value: 'crm.produtos.read', label: 'Produtos: visualizar' },
+      { value: 'crm.produtos.create', label: 'Produtos: criar' },
+      { value: 'crm.produtos.update', label: 'Produtos: editar' },
+      { value: 'crm.produtos.delete', label: 'Produtos: excluir' },
+      { value: 'crm.agenda.read', label: 'Agenda: visualizar' },
+      { value: 'crm.agenda.create', label: 'Agenda: criar' },
+      { value: 'crm.agenda.update', label: 'Agenda: editar' },
+      { value: 'crm.agenda.delete', label: 'Agenda: excluir' },
+    ],
+  },
+  {
+    id: 'atendimento',
+    label: 'Atendimento',
+    description: 'Controle de acesso para chats e tickets',
+    roles: [
+      UserRole.USER,
+      UserRole.VENDEDOR,
+      UserRole.MANAGER,
+      UserRole.ADMIN,
+      UserRole.SUPERADMIN,
+    ],
+    options: [
+      { value: 'atendimento.chats.read', label: 'Chats: visualizar' },
+      { value: 'atendimento.chats.reply', label: 'Chats: responder' },
+      { value: 'atendimento.tickets.read', label: 'Tickets: visualizar' },
+      { value: 'atendimento.tickets.create', label: 'Tickets: criar ticket' },
+      { value: 'atendimento.tickets.update', label: 'Tickets: editar ticket' },
+      { value: 'atendimento.tickets.assign', label: 'Tickets: atribuir' },
+      { value: 'atendimento.tickets.close', label: 'Tickets: encerrar/reabrir' },
+      { value: 'atendimento.filas.manage', label: 'Filas: gerenciar' },
+      { value: 'atendimento.sla.manage', label: 'SLA: gerenciar' },
+      { value: 'atendimento.dlq.manage', label: 'Atendimento: DLQ' },
+      { value: 'ATENDIMENTO', label: 'Atendimento (legado)' },
+    ],
+  },
+  {
+    id: 'comercial',
+    label: 'Comercial',
+    description: 'Acesso aos recursos comerciais',
+    roles: [
+      UserRole.USER,
+      UserRole.VENDEDOR,
+      UserRole.FINANCEIRO,
+      UserRole.MANAGER,
+      UserRole.ADMIN,
+      UserRole.SUPERADMIN,
+    ],
+    options: [
+      { value: 'comercial.propostas.read', label: 'Propostas: visualizar' },
+      { value: 'comercial.propostas.create', label: 'Propostas: criar' },
+      { value: 'comercial.propostas.update', label: 'Propostas: editar' },
+      { value: 'comercial.propostas.delete', label: 'Propostas: excluir' },
+      { value: 'comercial.propostas.send', label: 'Propostas: enviar' },
+    ],
+  },
+  {
+    id: 'financeiro',
+    label: 'Financeiro',
+    description: 'Faturamento e pagamentos',
+    roles: [UserRole.FINANCEIRO, UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPERADMIN],
+    options: [
+      { value: 'financeiro.faturamento.read', label: 'Faturamento: visualizar' },
+      { value: 'financeiro.faturamento.manage', label: 'Faturamento: gerenciar' },
+      { value: 'financeiro.pagamentos.read', label: 'Pagamentos: visualizar' },
+      { value: 'financeiro.pagamentos.manage', label: 'Pagamentos: gerenciar' },
+    ],
+  },
+  {
+    id: 'configuracoes',
+    label: 'Configuracoes',
+    description: 'Empresa, integracoes e automacoes',
+    roles: [UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPERADMIN],
+    options: [
+      { value: 'config.empresa.read', label: 'Empresa: visualizar configuracoes' },
+      { value: 'config.empresa.update', label: 'Empresa: atualizar configuracoes' },
+      { value: 'config.integracoes.manage', label: 'Integracoes: gerenciar' },
+      { value: 'config.automacoes.manage', label: 'Automacoes: gerenciar' },
+    ],
+  },
+  {
+    id: 'administracao',
+    label: 'Administracao',
+    description: 'Permissoes de gestao de usuarios e governanca',
+    roles: [UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPERADMIN],
+    options: [
+      { value: 'users.read', label: 'Usuarios: visualizar' },
+      { value: 'users.create', label: 'Usuarios: criar' },
+      { value: 'users.update', label: 'Usuarios: editar' },
+      { value: 'users.reset-password', label: 'Usuarios: resetar senha' },
+      { value: 'users.status.update', label: 'Usuarios: alterar status' },
+      { value: 'users.bulk.update', label: 'Usuarios: acao em massa' },
+      { value: 'planos.manage', label: 'Planos: gerenciar' },
+      { value: 'admin.empresas.manage', label: 'Empresas: administracao' },
+    ],
+  },
+];
+
+const DEFAULT_PERMISSION_CATALOG: PermissionCatalogState = {
+  groups: PERMISSOES_MODAL_GROUPS_FALLBACK,
+  defaultsByRole: {},
+};
+
+const getRoleCandidates = (role?: UserRole): string[] => {
+  const selectedRole = role ?? UserRole.USER;
+
+  if (selectedRole === UserRole.MANAGER) {
+    return [UserRole.MANAGER, 'gerente'];
+  }
+
+  if (selectedRole === UserRole.USER) {
+    return [UserRole.USER, 'suporte'];
+  }
+
+  return [selectedRole];
+};
+
+const getPermissionGroupsByRole = (
+  catalog: PermissionCatalogState,
+  role?: UserRole,
+): PermissaoModalGroup[] => {
+  const roleCandidates = new Set(getRoleCandidates(role));
+  return catalog.groups.filter((group) => group.roles.some((groupRole) => roleCandidates.has(groupRole)));
+};
+
+const getVisiblePermissionValuesByRole = (
+  catalog: PermissionCatalogState,
+  role?: UserRole,
+): Set<string> => {
+  const groups = getPermissionGroupsByRole(catalog, role);
+  return new Set(groups.flatMap((group) => group.options.map((option) => option.value)));
+};
+
+const getRecommendedPermissionsByRole = (
+  catalog: PermissionCatalogState,
+  role?: UserRole,
+): string[] => {
+  const roleCandidates = getRoleCandidates(role);
+
+  for (const candidate of roleCandidates) {
+    const defaults = catalog.defaultsByRole[candidate];
+    if (Array.isArray(defaults) && defaults.length > 0) {
+      return defaults;
+    }
+  }
+
+  return [];
+};
+
+const getGroupPermissionValues = (group: PermissaoModalGroup): string[] =>
+  Array.from(new Set(group.options.map((option) => option.value)));
+
+const mapPermissionCatalogPayload = (payload: PermissionCatalogResponse): PermissionCatalogState => {
+  const groups = Array.isArray(payload.groups)
+    ? payload.groups
+        .filter(
+          (group) =>
+            group &&
+            typeof group.id === 'string' &&
+            typeof group.label === 'string' &&
+            Array.isArray(group.roles) &&
+            Array.isArray(group.options),
+        )
+        .map((group) => ({
+          id: group.id,
+          label: group.label,
+          description: group.description,
+          roles: group.roles.filter((role) => typeof role === 'string'),
+          options: group.options
+            .filter(
+              (option) =>
+                option &&
+                typeof option.value === 'string' &&
+                option.value.trim().length > 0 &&
+                typeof option.label === 'string' &&
+                option.label.trim().length > 0,
+            )
+            .map((option) => ({
+              value: option.value,
+              label: option.label,
+              legacy: Boolean(option.legacy),
+            })),
+        }))
+        .filter((group) => group.options.length > 0 && group.roles.length > 0)
+    : [];
+
+  return {
+    groups: groups.length > 0 ? groups : DEFAULT_PERMISSION_CATALOG.groups,
+    defaultsByRole:
+      payload.defaultsByRole && typeof payload.defaultsByRole === 'object'
+        ? payload.defaultsByRole
+        : DEFAULT_PERMISSION_CATALOG.defaultsByRole,
+  };
+};
+
 const GestaoUsuariosPage: React.FC = () => {
   // Estados principais
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -106,6 +382,7 @@ const GestaoUsuariosPage: React.FC = () => {
   const [totalUsuariosSistema, setTotalUsuariosSistema] = useState(0);
   const [busca, setBusca] = useState('');
   const [abaAtiva, setAbaAtiva] = useState<AbaAtiva>('todos');
+  const [permissionCatalog, setPermissionCatalog] = useState<PermissionCatalogState | null>(null);
 
   // Filtros
   const [filtroRole, setFiltroRole] = useState<UserRole | ''>('');
@@ -230,6 +507,7 @@ const GestaoUsuariosPage: React.FC = () => {
   // Carregar dados ao montar componente
   useEffect(() => {
     carregarDados();
+    carregarCatalogoPermissoes();
   }, []);
 
   // Atualizar lista quando aba muda
@@ -261,6 +539,16 @@ const GestaoUsuariosPage: React.FC = () => {
     }
   };
 
+  const carregarCatalogoPermissoes = async (): Promise<void> => {
+    try {
+      const catalogo = await usuariosService.obterCatalogoPermissoes();
+      setPermissionCatalog(mapPermissionCatalogPayload(catalogo));
+    } catch (err: unknown) {
+      console.warn('Nao foi possivel carregar catalogo de permissoes, fallback local sera usado.', err);
+      setPermissionCatalog(null);
+    }
+  };
+
   // Filtrar usuários
   const usuariosFiltrados = usuarios.filter((usuario) => {
     // Filtro de busca (nome ou email)
@@ -280,7 +568,8 @@ const GestaoUsuariosPage: React.FC = () => {
 
     // Filtro de atendentes
     if (apenasAtendentes) {
-      const temPermissaoAtendimento = usuario.permissoes?.includes('ATENDIMENTO');
+      const temPermissaoAtendimento =
+        usuario.permissoes?.some((perm) => PERMISSAO_ATENDIMENTO_TOKENS.has(perm)) ?? false;
       if (!temPermissaoAtendimento) return false;
     }
 
@@ -543,6 +832,28 @@ const GestaoUsuariosPage: React.FC = () => {
     });
   };
 
+  const catalogoPermissoes = permissionCatalog ?? DEFAULT_PERMISSION_CATALOG;
+
+  const normalizePermissionsForRole = (role: UserRole, currentPermissions: string[] = []): string[] => {
+    const visibleValues = getVisiblePermissionValuesByRole(catalogoPermissoes, role);
+    const retainedPermissions = currentPermissions.filter(
+      (permission) => visibleValues.has(permission) || permission === 'ATENDIMENTO',
+    );
+    const recommendedPermissions = getRecommendedPermissionsByRole(catalogoPermissoes, role);
+    const nextPermissions =
+      retainedPermissions.length > 0 ? retainedPermissions : [...recommendedPermissions];
+
+    return Array.from(new Set(nextPermissions));
+  };
+
+  const handleRoleChange = (role: UserRole): void => {
+    setFormData((prev) => ({
+      ...prev,
+      role,
+      permissoes: normalizePermissionsForRole(role, prev.permissoes || []),
+    }));
+  };
+
   const handleTogglePermissao = (permissao: string): void => {
     setFormData((prev) => ({
       ...prev,
@@ -550,6 +861,28 @@ const GestaoUsuariosPage: React.FC = () => {
         ? prev.permissoes.filter((p) => p !== permissao)
         : [...(prev.permissoes || []), permissao],
     }));
+  };
+
+  const handleTogglePermissoesDoGrupo = (grupo: PermissaoModalGroup, selecionado: boolean): void => {
+    const groupValues = getGroupPermissionValues(grupo);
+    if (groupValues.length === 0) {
+      return;
+    }
+
+    setFormData((prev) => {
+      const nextPermissions = new Set(prev.permissoes || []);
+
+      if (selecionado) {
+        groupValues.forEach((value) => nextPermissions.add(value));
+      } else {
+        groupValues.forEach((value) => nextPermissions.delete(value));
+      }
+
+      return {
+        ...prev,
+        permissoes: Array.from(nextPermissions),
+      };
+    });
   };
 
   const formatarDataHora = (data?: Date | string): string => {
@@ -564,6 +897,12 @@ const GestaoUsuariosPage: React.FC = () => {
       })
     );
   };
+
+  const roleSelecionadoFormulario = (formData.role as UserRole) || UserRole.USER;
+  const gruposPermissaoDoFormulario = getPermissionGroupsByRole(
+    catalogoPermissoes,
+    roleSelecionadoFormulario,
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -745,6 +1084,7 @@ const GestaoUsuariosPage: React.FC = () => {
                     <option value={UserRole.SUPERADMIN}>Super Admin</option>
                     <option value={UserRole.ADMIN}>Administrador</option>
                     <option value={UserRole.MANAGER}>Gerente</option>
+                    <option value={UserRole.FINANCEIRO}>Financeiro</option>
                     <option value={UserRole.VENDEDOR}>Vendedor</option>
                     <option value={UserRole.USER}>Usuário</option>
                   </select>
@@ -790,11 +1130,11 @@ const GestaoUsuariosPage: React.FC = () => {
           {/* Ações em massa */}
           {usuariosSelecionados.length > 0 && (
             <div className="bg-white rounded-lg shadow-sm border p-4 mb-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm text-gray-600">
                   {usuariosSelecionados.length} usuário(s) selecionado(s)
                 </p>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => handleBulkAction('ativar')}
                     className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
@@ -1116,9 +1456,7 @@ const GestaoUsuariosPage: React.FC = () => {
                 </label>
                 <select
                   value={formData.role || UserRole.USER}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, role: e.target.value as UserRole }))
-                  }
+                  onChange={(e) => handleRoleChange(e.target.value as UserRole)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                   required
                 >
@@ -1127,29 +1465,74 @@ const GestaoUsuariosPage: React.FC = () => {
                   )}
                   <option value={UserRole.USER}>Usuário</option>
                   <option value={UserRole.VENDEDOR}>Vendedor</option>
+                  <option value={UserRole.FINANCEIRO}>Financeiro</option>
                   <option value={UserRole.MANAGER}>Gerente</option>
                   <option value={UserRole.ADMIN}>Administrador</option>
                 </select>
               </div>
-
               {/* Permissões */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Permissões</label>
-                <div className="space-y-2 border border-gray-300 rounded-lg p-4">
-                  {['COMERCIAL', 'ATENDIMENTO', 'FINANCEIRO', 'GESTAO'].map((perm) => (
-                    <label key={perm} className="flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.permissoes?.includes(perm) || false}
-                        onChange={() => handleTogglePermissao(perm)}
-                        className="h-4 w-4 text-[#159A9C] focus:ring-[#159A9C] border-gray-300 rounded"
-                      />
-                      <span className="ml-2 text-sm text-gray-700">{perm}</span>
-                    </label>
-                  ))}
+                <div className="space-y-4 border border-gray-300 rounded-lg p-4 bg-gray-50/50">
+                  {gruposPermissaoDoFormulario.map((grupo) => {
+                    const groupValues = getGroupPermissionValues(grupo);
+                    const selectedCount = groupValues.filter((value) =>
+                      formData.permissoes?.includes(value),
+                    ).length;
+                    const allSelected = groupValues.length > 0 && selectedCount === groupValues.length;
+                    const partiallySelected = selectedCount > 0 && !allSelected;
+
+                    return (
+                      <div key={grupo.id} className="bg-white border border-gray-200 rounded-lg p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-[#002333]">{grupo.label}</p>
+                            {grupo.description && (
+                              <p className="text-xs text-gray-500 mt-0.5">{grupo.description}</p>
+                            )}
+                          </div>
+                          <label className="flex items-center cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={allSelected}
+                              ref={(element) => {
+                                if (element) {
+                                  element.indeterminate = partiallySelected;
+                                }
+                              }}
+                              onChange={(event) =>
+                                handleTogglePermissoesDoGrupo(grupo, event.target.checked)
+                              }
+                              className="h-4 w-4 text-[#159A9C] focus:ring-[#159A9C] border-gray-300 rounded"
+                            />
+                            <span className="ml-2 text-xs font-medium text-gray-600 whitespace-nowrap">
+                              Selecionar todos ({selectedCount}/{groupValues.length})
+                            </span>
+                          </label>
+                        </div>
+                        <div className="space-y-2 mt-3">
+                          {grupo.options.map((permOption) => (
+                            <label key={permOption.value} className="flex items-center cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={formData.permissoes?.includes(permOption.value) || false}
+                                onChange={() => handleTogglePermissao(permOption.value)}
+                                className="h-4 w-4 text-[#159A9C] focus:ring-[#159A9C] border-gray-300 rounded"
+                              />
+                              <span className="ml-2 text-sm text-gray-700">{permOption.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {gruposPermissaoDoFormulario.length === 0 && (
+                    <p className="text-sm text-gray-500">
+                      Nenhuma permissão disponível para o papel selecionado.
+                    </p>
+                  )}
                 </div>
               </div>
-
               {/* Avatar URL */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Avatar (URL)</label>

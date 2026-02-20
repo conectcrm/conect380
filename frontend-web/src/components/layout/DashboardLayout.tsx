@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useI18n } from '../../contexts/I18nContext';
 import { useProfile, type PerfilUsuario } from '../../contexts/ProfileContext';
 import { useWebSocketStatus } from '../../contexts/WebSocketContext';
+import { useSidebar } from '../../contexts/SidebarContext';
 import { formatCompanyName, formatUserName } from '../../utils/textUtils';
 import HierarchicalNavGroup from '../navigation/HierarchicalNavGroup';
 import { getMenuParaEmpresa } from '../../config/menuConfig';
@@ -74,6 +75,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const [isMainScrolled, setIsMainScrolled] = useState(false);
   const mainContentRef = useRef<HTMLElement | null>(null);
   const { user, logout } = useAuth();
+  const { setActiveSubmenuPanel } = useSidebar();
   const { t, language, availableLanguages } = useI18n();
 
   // 🔌 WebSocket Status para NotificationIndicator
@@ -94,8 +96,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   // ⚡ LICENCIAMENTO: Filtrar menu baseado nos módulos ativos
   const menuFiltrado = useMemo(() => {
     if (loadingModulos) return []; // Não mostrar menu enquanto carrega
-    return getMenuParaEmpresa(modulosAtivos);
-  }, [modulosAtivos, loadingModulos]);
+    return getMenuParaEmpresa(modulosAtivos, user);
+  }, [modulosAtivos, loadingModulos, user]);
 
   const roleKey = (user?.role || '').toLowerCase();
   const displayRole =
@@ -105,7 +107,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const isAdmin =
     roleKey === 'superadmin' ||
     roleKey === 'admin' ||
-    roleKey === 'manager';
+    roleKey === 'manager' ||
+    roleKey === 'gerente';
 
   const userLoginMetadata = user as (typeof user & UserLoginMetadata) | undefined;
   const lastLoginRaw =
@@ -143,6 +146,11 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
     setShowProfileSelector(false);
     setShowLanguageSelector(false);
     navigate(path);
+  };
+
+  const closeMobileSidebar = () => {
+    setSidebarOpen(false);
+    setActiveSubmenuPanel(null);
   };
 
   // Perfis disponíveis para o seletor
@@ -265,7 +273,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   // Em mobile, fecha o drawer lateral apos navegar para evitar overlay preso sobre a tela.
   useEffect(() => {
     setSidebarOpen(false);
-  }, [location.pathname]);
+    setActiveSubmenuPanel(null);
+  }, [location.pathname, setActiveSubmenuPanel]);
 
   // Estado de conectividade de rede
 
@@ -500,7 +509,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       >
         <div
           className="fixed inset-0 bg-gray-600 bg-opacity-75"
-          onClick={() => setSidebarOpen(false)}
+          onClick={closeMobileSidebar}
         />
 
         <div
@@ -509,8 +518,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         >
           <div className="absolute top-0 right-0 -mr-12 pt-2">
             <button
+              data-testid="mobile-menu-close"
               className="ml-1 flex h-11 w-11 items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
-              onClick={() => setSidebarOpen(false)}
+              onClick={closeMobileSidebar}
             >
               <X className="h-6 w-6 text-white" />
             </button>
@@ -574,14 +584,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                 <div className="flex flex-col items-center gap-2">
                   <Link
                     to="/suporte"
-                    ref={(el) => {
-                      if (el) sidebarItemsRef.current[1] = el;
-                    }}
-                    className="flex flex-col items-center justify-center w-full py-2 rounded-lg text-white/70 hover:text-white hover:bg-white/5 group"
-                    style={{
-                      transform: `scale(${getDockScale(1)})`,
-                      transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                    }}
+                    className="flex flex-col items-center justify-center w-full py-2 rounded-lg text-white/70"
                     title="Central de ajuda"
                   >
                     <MessageCircle className="h-5 w-5 mb-1" />
@@ -589,14 +592,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                   </Link>
                   <a
                     href="mailto:suporte@conectcrm.com"
-                    ref={(el) => {
-                      if (el) sidebarItemsRef.current[2] = el;
-                    }}
-                    className="flex flex-col items-center justify-center w-full py-2 rounded-lg bg-[#159A9C]/20 text-[#159A9C] hover:bg-[#159A9C]/30 group"
-                    style={{
-                      transform: `scale(${getDockScale(2)})`,
-                      transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                    }}
+                    className="flex flex-col items-center justify-center w-full py-2 rounded-lg bg-[#159A9C]/20 text-[#159A9C]"
                     title="Abrir chamado"
                   >
                     <Mail className="h-4 w-4 mb-1" />
@@ -629,6 +625,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
               {/* Lado Esquerdo: Menu Mobile + Breadcrumb + Status */}
               <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-4">
                 <button
+                  data-testid="mobile-menu-open"
                   className="min-h-11 min-w-11 rounded-xl border border-transparent p-1.5 text-gray-500 transition-all duration-200 ease-out hover:border-[#159A9C]/20 hover:bg-[#DEEFE7]/70 hover:text-[#002333] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white md:hidden"
                   onClick={() => setSidebarOpen(true)}
                 >

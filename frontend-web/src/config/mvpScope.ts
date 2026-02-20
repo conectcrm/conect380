@@ -29,6 +29,7 @@ const MVP_ALLOWED_CHILD_MENU_IDS = new Set<string>([
   'comercial-leads',
   'comercial-pipeline',
   'comercial-propostas',
+  'comercial-analytics',
   'comercial-produtos',
   'configuracoes-sistema',
   'configuracoes-empresa',

@@ -1,18 +1,125 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, QueryFailedError, Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User, UserRole } from './user.entity';
 import { Empresa } from '../../empresas/entities/empresa.entity';
 
+type UsersReadScopeInput = {
+  user_ids?: unknown;
+  allowed_roles?: unknown;
+};
+
+type UsersReadScopeFilters = {
+  userIds: string[];
+  allowedRoles: UserRole[];
+};
+
+const ATENDIMENTO_PERMISSION_TOKENS = [
+  'ATENDIMENTO',
+  'ATENDIMENTO_DLQ_MANAGE',
+  'ATENDIMENTO_CHATS_REPLY',
+  'ATENDIMENTO_TICKETS_READ',
+  'ATENDIMENTO_CHATS_READ',
+  'ATENDIMENTO_TICKETS_CREATE',
+  'ATENDIMENTO_TICKETS_UPDATE',
+  'ATENDIMENTO_TICKETS_ASSIGN',
+  'ATENDIMENTO_TICKETS_CLOSE',
+  'ATENDIMENTO_FILAS_MANAGE',
+  'ATENDIMENTO_SLA_MANAGE',
+  'atendimento.dlq.manage',
+  'atendimento.chats.reply',
+  'atendimento.tickets.read',
+  'atendimento.chats.read',
+  'atendimento.tickets.create',
+  'atendimento.tickets.update',
+  'atendimento.tickets.assign',
+  'atendimento.tickets.close',
+  'atendimento.filas.manage',
+  'atendimento.sla.manage',
+];
+
 @Injectable()
 export class UsersService {
+  private userColumnsCache: Set<string> | null = null;
+
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
     @InjectRepository(Empresa)
     private empresaRepository: Repository<Empresa>,
   ) {}
+
+  private async getUsersTableColumns(): Promise<Set<string>> {
+    if (this.userColumnsCache) {
+      return this.userColumnsCache;
+    }
+
+    const rows: Array<{ column_name: string }> = await this.userRepository.query(
+      `
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'users'
+      `,
+    );
+
+    this.userColumnsCache = new Set(rows.map((row) => row.column_name));
+    return this.userColumnsCache;
+  }
+
+  private resolveUsersColumnExpression(
+    columns: Set<string>,
+    alias: string,
+    candidates: string[],
+    fallbackExpression: string = 'NULL',
+  ): string {
+    for (const candidate of candidates) {
+      if (columns.has(candidate)) {
+        return `u.${candidate} AS ${alias}`;
+      }
+    }
+
+    return `${fallbackExpression} AS ${alias}`;
+  }
+
+  private buildUserSelect(columns: Set<string>, includePassword: boolean = false): string {
+    const baseSelect = [
+      'u.id',
+      'u.nome',
+      'u.email',
+      this.resolveUsersColumnExpression(columns, 'telefone', ['telefone']),
+      'u.role',
+      this.resolveUsersColumnExpression(columns, 'permissoes', ['permissoes']),
+      'u.empresa_id',
+      this.resolveUsersColumnExpression(columns, 'avatar_url', ['avatar_url']),
+      this.resolveUsersColumnExpression(columns, 'idioma_preferido', ['idioma_preferido'], "'pt-BR'"),
+      this.resolveUsersColumnExpression(columns, 'configuracoes', ['configuracoes']),
+      'u.ativo',
+      this.resolveUsersColumnExpression(columns, 'deve_trocar_senha', ['deve_trocar_senha'], 'false'),
+      this.resolveUsersColumnExpression(columns, 'status_atendente', ['status_atendente']),
+      this.resolveUsersColumnExpression(columns, 'capacidade_maxima', ['capacidade_maxima'], 'NULL'),
+      this.resolveUsersColumnExpression(columns, 'tickets_ativos', ['tickets_ativos'], 'NULL'),
+      this.resolveUsersColumnExpression(columns, 'ultimo_login', ['ultimo_login']),
+      this.resolveUsersColumnExpression(columns, 'created_at', ['created_at', 'criado_em']),
+      this.resolveUsersColumnExpression(columns, 'updated_at', ['updated_at', 'atualizado_em']),
+      'e.id AS empresa_rel_id',
+      'e.nome AS empresa_nome',
+      'e.slug AS empresa_slug',
+      'e.cnpj AS empresa_cnpj',
+      'e.plano AS empresa_plano',
+      'e.ativo AS empresa_ativo',
+      'e.subdominio AS empresa_subdominio',
+    ];
+
+    if (includePassword) {
+      baseSelect.splice(3, 0, 'u.senha');
+    } else {
+      baseSelect.splice(3, 0, 'NULL::text AS senha');
+    }
+
+    return baseSelect.join(',\n          ');
+  }
 
   private mapRawUser(raw: any): User {
     const permissoes =
@@ -57,36 +164,287 @@ export class UsersService {
     } as Partial<User>);
   }
 
+  private normalizeRoleInput(role: unknown): UserRole | null {
+    if (typeof role !== 'string') {
+      return null;
+    }
+
+    const normalized = role.trim().toLowerCase();
+    if (!normalized) {
+      return null;
+    }
+
+    switch (normalized) {
+      case 'superadmin':
+        return UserRole.SUPERADMIN;
+      case 'admin':
+      case 'administrador':
+        return UserRole.ADMIN;
+      case 'gerente':
+      case 'manager':
+      case 'gestor':
+        return UserRole.GERENTE;
+      case 'vendedor':
+        return UserRole.VENDEDOR;
+      case 'suporte':
+      case 'support':
+      case 'user':
+      case 'usuario':
+      case 'operacional':
+        return UserRole.SUPORTE;
+      case 'financeiro':
+        return UserRole.FINANCEIRO;
+      default:
+        return null;
+    }
+  }
+
+  private normalizeRoleForCreate(userData: Partial<User>): Partial<User> {
+    const roleNormalizado = this.normalizeRoleInput(userData.role);
+    return {
+      ...userData,
+      role: roleNormalizado ?? UserRole.VENDEDOR,
+    };
+  }
+
+  private normalizeRoleForUpdate(userData: Partial<User>): Partial<User> {
+    if (userData.role === undefined) {
+      return userData;
+    }
+
+    const roleNormalizado = this.normalizeRoleInput(userData.role);
+    if (!roleNormalizado) {
+      const { role, ...rest } = userData;
+      return rest;
+    }
+
+    return {
+      ...userData,
+      role: roleNormalizado,
+    };
+  }
+
+  private normalizeReadScopeUserIds(userIds: unknown): string[] {
+    if (!Array.isArray(userIds)) {
+      return [];
+    }
+
+    const normalized = userIds
+      .filter((id): id is string => typeof id === 'string')
+      .map((id) => id.trim())
+      .filter(Boolean);
+
+    return Array.from(new Set(normalized));
+  }
+
+  private normalizeReadScopeRoles(roles: unknown): UserRole[] {
+    if (!Array.isArray(roles)) {
+      return [];
+    }
+
+    const normalized = roles
+      .map((role) => this.normalizeRoleInput(role))
+      .filter((role): role is UserRole => !!role);
+
+    return Array.from(new Set(normalized));
+  }
+
+  private resolveReadScopeFilters(input?: UsersReadScopeInput): UsersReadScopeFilters {
+    return {
+      userIds: this.normalizeReadScopeUserIds(input?.user_ids),
+      allowedRoles: this.normalizeReadScopeRoles(input?.allowed_roles),
+    };
+  }
+
+  private appendReadScopeClause(
+    whereClauses: string[],
+    whereValues: unknown[],
+    scopeFilters: UsersReadScopeFilters,
+  ): void {
+    if (scopeFilters.userIds.length === 0 && scopeFilters.allowedRoles.length === 0) {
+      return;
+    }
+
+    const scopeClauses: string[] = [];
+
+    if (scopeFilters.userIds.length > 0) {
+      const userPlaceholders = scopeFilters.userIds.map((id) => {
+        whereValues.push(id);
+        return `$${whereValues.length}`;
+      });
+      scopeClauses.push(`u.id IN (${userPlaceholders.join(', ')})`);
+    }
+
+    if (scopeFilters.allowedRoles.length > 0) {
+      const rolePlaceholders = scopeFilters.allowedRoles.map((role) => {
+        whereValues.push(role);
+        return `$${whereValues.length}`;
+      });
+      scopeClauses.push(`u.role IN (${rolePlaceholders.join(', ')})`);
+    }
+
+    if (scopeClauses.length === 1) {
+      whereClauses.push(scopeClauses[0]);
+      return;
+    }
+
+    whereClauses.push(`(${scopeClauses.join(' OR ')})`);
+  }
+
+  private filterUsersByReadScope(users: User[], scopeFilters: UsersReadScopeFilters): User[] {
+    if (scopeFilters.userIds.length === 0 && scopeFilters.allowedRoles.length === 0) {
+      return users;
+    }
+
+    const userIdSet = new Set(scopeFilters.userIds);
+    const roleSet = new Set(scopeFilters.allowedRoles);
+
+    return users.filter((user) => {
+      if (user.id && userIdSet.has(user.id)) {
+        return true;
+      }
+
+      if (roleSet.size === 0) {
+        return false;
+      }
+
+      const normalizedRole = this.normalizeRoleInput(user.role);
+      return !!normalizedRole && roleSet.has(normalizedRole);
+    });
+  }
+
+  private isActiveFlag(value: unknown): boolean {
+    return value === true || value === 'true' || value === 't' || value === 1 || value === '1';
+  }
+
+  private normalizePermissionsInput(permissoes: unknown): string | null {
+    if (Array.isArray(permissoes)) {
+      const values = permissoes
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      return values.length > 0 ? values.join(',') : null;
+    }
+
+    if (typeof permissoes === 'string') {
+      const values = permissoes
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      return values.length > 0 ? values.join(',') : null;
+    }
+
+    return null;
+  }
+
+  private normalizeSortDirection(direction: unknown): 'ASC' | 'DESC' {
+    const normalized = typeof direction === 'string' ? direction.trim().toUpperCase() : 'ASC';
+    return normalized === 'DESC' ? 'DESC' : 'ASC';
+  }
+
+  private resolveUsersSortColumn(orderBy: unknown, columns: Set<string>): string {
+    const normalized = typeof orderBy === 'string' ? orderBy.trim().toLowerCase() : 'nome';
+
+    switch (normalized) {
+      case 'email':
+        return 'u.email';
+      case 'role':
+        return 'u.role';
+      case 'created_at':
+        if (columns.has('created_at')) {
+          return 'u.created_at';
+        }
+        if (columns.has('criado_em')) {
+          return 'u.criado_em';
+        }
+        return 'u.nome';
+      case 'ultimo_login':
+        if (columns.has('ultimo_login')) {
+          return 'u.ultimo_login';
+        }
+        if (columns.has('updated_at')) {
+          return 'u.updated_at';
+        }
+        if (columns.has('atualizado_em')) {
+          return 'u.atualizado_em';
+        }
+        return 'u.nome';
+      case 'nome':
+      default:
+        return 'u.nome';
+    }
+  }
+
+  private async persistOptionalUsersColumns(
+    id: string,
+    userData: Partial<User>,
+    empresaId?: string,
+  ): Promise<void> {
+    const columns = await this.getUsersTableColumns();
+    const setClauses: string[] = [];
+    const values: unknown[] = [];
+
+    const pushAssignment = (column: string, value: unknown, cast?: 'json'): void => {
+      if (!columns.has(column) || value === undefined) {
+        return;
+      }
+
+      values.push(value);
+      const valueExpression = cast ? `$${values.length}::${cast}` : `$${values.length}`;
+      setClauses.push(`${column} = ${valueExpression}`);
+    };
+
+    const normalizedPermissions =
+      userData.permissoes === undefined
+        ? undefined
+        : this.normalizePermissionsInput(userData.permissoes);
+
+    pushAssignment('telefone', userData.telefone);
+    pushAssignment('permissoes', normalizedPermissions);
+    pushAssignment('avatar_url', userData.avatar_url);
+    pushAssignment('idioma_preferido', userData.idioma_preferido);
+    pushAssignment(
+      'configuracoes',
+      userData.configuracoes === undefined ? undefined : JSON.stringify(userData.configuracoes ?? null),
+      'json',
+    );
+    pushAssignment('status_atendente', userData.status_atendente);
+    pushAssignment('capacidade_maxima', userData.capacidade_maxima);
+    pushAssignment('tickets_ativos', userData.tickets_ativos);
+    pushAssignment('ativo', userData.ativo);
+
+    if (setClauses.length === 0) {
+      return;
+    }
+
+    const whereClauses = [`id = $${values.length + 1}`];
+    values.push(id);
+
+    if (empresaId) {
+      whereClauses.push(`empresa_id = $${values.length + 1}`);
+      values.push(empresaId);
+    }
+
+    await this.userRepository.query(
+      `
+        UPDATE users
+        SET ${setClauses.join(',\n            ')}
+        WHERE ${whereClauses.join(' AND ')}
+      `,
+      values,
+    );
+  }
+
   async findByEmail(email: string): Promise<User | undefined> {
+    const columns = await this.getUsersTableColumns();
+    const select = this.buildUserSelect(columns, true);
+
     const rows: any[] = await this.userRepository.query(
       `
         SELECT
-          u.id,
-          u.nome,
-          u.email,
-          u.senha,
-          u.telefone,
-          u.role,
-          u.permissoes,
-          u.empresa_id,
-          u.avatar_url,
-          u.idioma_preferido,
-          u.configuracoes,
-          u.ativo,
-          u.deve_trocar_senha,
-          u.status_atendente,
-          u.capacidade_maxima,
-          u.tickets_ativos,
-          u.ultimo_login,
-          u.created_at,
-          u.updated_at,
-          e.id AS empresa_rel_id,
-          e.nome AS empresa_nome,
-          e.slug AS empresa_slug,
-          e.cnpj AS empresa_cnpj,
-          e.plano AS empresa_plano,
-          e.ativo AS empresa_ativo,
-          e.subdominio AS empresa_subdominio
+          ${select}
         FROM users u
         LEFT JOIN empresas e ON e.id = u.empresa_id
         WHERE u.email = $1
@@ -104,35 +462,37 @@ export class UsersService {
   }
 
   async findById(id: string): Promise<User | undefined> {
+    const columns = await this.getUsersTableColumns();
+    const select = this.buildUserSelect(columns, false);
+
     const rows: any[] = await this.userRepository.query(
       `
         SELECT
-          u.id,
-          u.nome,
-          u.email,
-          u.senha,
-          u.telefone,
-          u.role,
-          u.permissoes,
-          u.empresa_id,
-          u.avatar_url,
-          u.idioma_preferido,
-          u.configuracoes,
-          u.ativo,
-          u.deve_trocar_senha,
-          u.status_atendente,
-          u.capacidade_maxima,
-          u.tickets_ativos,
-          u.ultimo_login,
-          u.created_at,
-          u.updated_at,
-          e.id AS empresa_rel_id,
-          e.nome AS empresa_nome,
-          e.slug AS empresa_slug,
-          e.cnpj AS empresa_cnpj,
-          e.plano AS empresa_plano,
-          e.ativo AS empresa_ativo,
-          e.subdominio AS empresa_subdominio
+          ${select}
+        FROM users u
+        LEFT JOIN empresas e ON e.id = u.empresa_id
+        WHERE u.id = $1
+        LIMIT 1
+      `,
+      [id],
+    );
+
+    const raw = rows?.[0];
+    if (!raw) {
+      return undefined;
+    }
+
+    return this.mapRawUser(raw);
+  }
+
+  private async findByIdWithPassword(id: string): Promise<User | undefined> {
+    const columns = await this.getUsersTableColumns();
+    const select = this.buildUserSelect(columns, true);
+
+    const rows: any[] = await this.userRepository.query(
+      `
+        SELECT
+          ${select}
         FROM users u
         LEFT JOIN empresas e ON e.id = u.empresa_id
         WHERE u.id = $1
@@ -154,32 +514,24 @@ export class UsersService {
    * Diferente de findById que NÃO retorna senha
    */
   async findOne(id: string, empresaId?: string): Promise<User | undefined> {
-    const where: FindOptionsWhere<User> = { id };
-    if (empresaId) {
-      where.empresa_id = empresaId;
+    const user = await this.findByIdWithPassword(id);
+    if (!user) {
+      return undefined;
     }
 
-    return this.userRepository.findOne({
-      where,
-      select: [
-        'id',
-        'nome',
-        'email',
-        'senha',
-        'role',
-        'empresa_id',
-        'ativo',
-        'deve_trocar_senha',
-        'ultimo_login',
-        'created_at',
-        'updated_at',
-      ],
-    });
+    if (empresaId && user.empresa_id !== empresaId) {
+      return undefined;
+    }
+
+    return user;
   }
 
   async create(userData: Partial<User>): Promise<User> {
-    const user = this.userRepository.create(userData);
-    return this.userRepository.save(user);
+    const normalizedData = this.normalizeRoleForCreate(userData);
+    const user = this.userRepository.create(normalizedData);
+    const savedUser = await this.userRepository.save(user);
+    await this.persistOptionalUsersColumns(savedUser.id, normalizedData, savedUser.empresa_id);
+    return this.findById(savedUser.id);
   }
 
   async createWithHash(userData: Partial<User>): Promise<User> {
@@ -196,12 +548,17 @@ export class UsersService {
       userData.empresa_id = empresa.id;
     }
 
-    const user = this.userRepository.create(userData);
-    return this.userRepository.save(user);
+    const normalizedData = this.normalizeRoleForCreate(userData);
+    const user = this.userRepository.create(normalizedData);
+    const savedUser = await this.userRepository.save(user);
+    await this.persistOptionalUsersColumns(savedUser.id, normalizedData, savedUser.empresa_id);
+    return this.findById(savedUser.id);
   }
 
   async update(id: string, userData: Partial<User>): Promise<User> {
-    await this.userRepository.update(id, userData);
+    const normalizedData = this.normalizeRoleForUpdate(userData);
+    await this.userRepository.update(id, normalizedData);
+    await this.persistOptionalUsersColumns(id, normalizedData);
     return this.findById(id);
   }
 
@@ -213,7 +570,19 @@ export class UsersService {
   }
 
   async updateLastLogin(id: string): Promise<void> {
-    await this.userRepository.update(id, { ultimo_login: new Date() });
+    const columns = await this.getUsersTableColumns();
+    if (!columns.has('ultimo_login')) {
+      return;
+    }
+
+    await this.userRepository.query(
+      `
+        UPDATE users
+        SET ultimo_login = $1
+        WHERE id = $2
+      `,
+      [new Date(), id],
+    );
   }
 
   /**
@@ -232,52 +601,136 @@ export class UsersService {
 
   async listarComFiltros(filtros: any): Promise<{ usuarios: User[]; total: number }> {
     try {
-      const query = this.userRepository
-        .createQueryBuilder('user')
-        .where('user.empresa_id = :empresa_id', { empresa_id: filtros.empresa_id });
-      if (filtros.busca) {
-        query.andWhere('(user.nome LIKE :busca OR user.email LIKE :busca)', {
-          busca: `%${filtros.busca}%`,
-        });
+      const columns = await this.getUsersTableColumns();
+      const select = this.buildUserSelect(columns, false);
+      const scopeFilters = this.resolveReadScopeFilters(filtros);
+      const whereClauses: string[] = ['u.empresa_id = $1'];
+      const whereValues: unknown[] = [filtros.empresa_id];
+
+      const busca = typeof filtros.busca === 'string' ? filtros.busca.trim() : '';
+      if (busca) {
+        whereValues.push(`%${busca}%`);
+        const placeholder = `$${whereValues.length}`;
+        whereClauses.push(`(u.nome ILIKE ${placeholder} OR u.email ILIKE ${placeholder})`);
       }
-      if (filtros.role) {
-        query.andWhere('user.role = :role', { role: filtros.role });
+
+      const roleFilter = this.normalizeRoleInput(filtros.role);
+      if (roleFilter) {
+        whereValues.push(roleFilter);
+        whereClauses.push(`u.role = $${whereValues.length}`);
       }
+
       if (typeof filtros.ativo === 'boolean') {
-        query.andWhere('user.ativo = :ativo', { ativo: filtros.ativo });
+        whereValues.push(filtros.ativo);
+        whereClauses.push(`u.ativo = $${whereValues.length}`);
       }
-      const total = await query.getCount();
+
+      this.appendReadScopeClause(whereClauses, whereValues, scopeFilters);
+
+      const whereSql = whereClauses.join('\n          AND ');
+      const countRows: Array<{ total: string | number }> = await this.userRepository.query(
+        `
+          SELECT COUNT(*)::int AS total
+          FROM users u
+          WHERE ${whereSql}
+        `,
+        whereValues,
+      );
+
+      const totalRaw = countRows?.[0]?.total ?? 0;
+      const total = typeof totalRaw === 'number' ? totalRaw : Number(totalRaw) || 0;
 
       // Garantir que a direção seja em maiúsculas para o TypeORM
-      const direcaoUpper = (filtros.direcao || 'ASC').toUpperCase() as 'ASC' | 'DESC';
-      query.orderBy(`user.${filtros.ordenacao || 'nome'}`, direcaoUpper);
-      query.skip((filtros.pagina - 1) * filtros.limite).take(filtros.limite);
-      const usuarios = await query.getMany();
-      return { usuarios: usuarios || [], total: total || 0 };
+      const limiteRaw = Number(filtros.limite ?? 10);
+      const paginaRaw = Number(filtros.pagina ?? 1);
+      const limite = Number.isFinite(limiteRaw) ? Math.max(1, Math.floor(limiteRaw)) : 10;
+      const pagina = Number.isFinite(paginaRaw) ? Math.max(1, Math.floor(paginaRaw)) : 1;
+      const offset = (pagina - 1) * limite;
+
+      const direcao = this.normalizeSortDirection(filtros.direcao);
+      const orderBy = this.resolveUsersSortColumn(filtros.ordenacao, columns);
+      const dataValues = [...whereValues, limite, offset];
+      const limitPlaceholder = `$${whereValues.length + 1}`;
+      const offsetPlaceholder = `$${whereValues.length + 2}`;
+
+      const rows: any[] = await this.userRepository.query(
+        `
+          SELECT
+            ${select}
+          FROM users u
+          LEFT JOIN empresas e ON e.id = u.empresa_id
+          WHERE ${whereSql}
+          ORDER BY ${orderBy} ${direcao}
+          LIMIT ${limitPlaceholder}
+          OFFSET ${offsetPlaceholder}
+        `,
+        dataValues,
+      );
+
+      const usuarios = rows.map((row) => this.mapRawUser(row));
+      return { usuarios, total };
     } catch (err) {
       console.error('Erro ao listar usuários:', err);
       return { usuarios: [], total: 0 };
     }
   }
 
-  async obterEstatisticas(empresa_id: string): Promise<any> {
-    const total = await this.userRepository.count({ where: { empresa_id } });
-    const ativos = await this.userRepository.count({ where: { empresa_id, ativo: true } });
-    const inativos = await this.userRepository.count({ where: { empresa_id, ativo: false } });
+  async obterEstatisticas(empresa_id: string, scopeInput: UsersReadScopeInput = {}): Promise<any> {
+    const scopeFilters = this.resolveReadScopeFilters(scopeInput);
+    const whereClauses: string[] = ['u.empresa_id = $1'];
+    const whereValues: unknown[] = [empresa_id];
+    this.appendReadScopeClause(whereClauses, whereValues, scopeFilters);
 
-    // Calcular distribuição por perfil
-    const adminCount = await this.userRepository.count({
-      where: { empresa_id, role: UserRole.ADMIN },
-    });
-    const managerCount = await this.userRepository.count({
-      where: { empresa_id, role: UserRole.MANAGER },
-    });
-    const vendedorCount = await this.userRepository.count({
-      where: { empresa_id, role: UserRole.VENDEDOR },
-    });
-    const userCount = await this.userRepository.count({
-      where: { empresa_id, role: UserRole.USER },
-    });
+    const whereSql = whereClauses.join('\n          AND ');
+    const rows: Array<{ role: string; ativo: boolean | string | number; total: string | number }> =
+      await this.userRepository.query(
+        `
+          SELECT
+            u.role AS role,
+            u.ativo AS ativo,
+            COUNT(*)::int AS total
+          FROM users u
+          WHERE ${whereSql}
+          GROUP BY u.role, u.ativo
+        `,
+        whereValues,
+      );
+
+    let total = 0;
+    let ativos = 0;
+    let inativos = 0;
+    let adminCount = 0;
+    let gerenteCount = 0;
+    let vendedorCount = 0;
+    let suporteCount = 0;
+    let financeiroCount = 0;
+
+    for (const row of rows) {
+      const count = typeof row.total === 'number' ? row.total : Number(row.total) || 0;
+      if (count <= 0) {
+        continue;
+      }
+
+      total += count;
+      if (this.isActiveFlag(row.ativo)) {
+        ativos += count;
+      } else {
+        inativos += count;
+      }
+
+      const role = this.normalizeRoleInput(row.role);
+      if (role === UserRole.ADMIN) {
+        adminCount += count;
+      } else if (role === UserRole.GERENTE) {
+        gerenteCount += count;
+      } else if (role === UserRole.VENDEDOR) {
+        vendedorCount += count;
+      } else if (role === UserRole.SUPORTE) {
+        suporteCount += count;
+      } else if (role === UserRole.FINANCEIRO) {
+        financeiroCount += count;
+      }
+    }
 
     return {
       total,
@@ -285,30 +738,66 @@ export class UsersService {
       inativos,
       por_perfil: {
         admin: adminCount,
-        manager: managerCount,
+        gerente: gerenteCount,
+        manager: gerenteCount, // alias legado
         vendedor: vendedorCount,
-        user: userCount,
+        suporte: suporteCount,
+        financeiro: financeiroCount,
+        user: suporteCount, // alias legado
       },
     };
   }
+  async listarAtendentes(empresa_id: string, scopeInput: UsersReadScopeInput = {}): Promise<User[]> {
+    const columns = await this.getUsersTableColumns();
+    const select = this.buildUserSelect(columns, false);
+    const scopeFilters = this.resolveReadScopeFilters(scopeInput);
+    const atendimentoPermissionWhere = ATENDIMENTO_PERMISSION_TOKENS.map(
+      (token) =>
+        `
+            u.permissoes = '${token}'
+            OR u.permissoes LIKE '${token},%'
+            OR u.permissoes LIKE '%,${token}'
+            OR u.permissoes LIKE '%,${token},%'
+        `.trim(),
+    ).join('\n            OR ');
 
-  async listarAtendentes(empresa_id: string): Promise<User[]> {
-    return await this.userRepository
-      .find({
-        where: {
-          empresa_id,
-          ativo: true,
-        },
-        order: { nome: 'ASC' },
-      })
-      .then((users) =>
-        users.filter(
-          (user) =>
-            user.permissoes &&
-            (user.permissoes.includes('ATENDIMENTO') ||
-              user.permissoes.some((p) => p === 'ATENDIMENTO')),
-        ),
+    if (!columns.has('permissoes')) {
+      const fallbackRows: any[] = await this.userRepository.query(
+        `
+          SELECT
+            ${select}
+          FROM users u
+          LEFT JOIN empresas e ON e.id = u.empresa_id
+          WHERE u.empresa_id = $1
+            AND u.ativo = true
+            AND u.role = $2
+          ORDER BY u.nome ASC
+        `,
+        [empresa_id, UserRole.SUPORTE],
       );
+
+      const fallbackUsers = fallbackRows.map((row) => this.mapRawUser(row));
+      return this.filterUsersByReadScope(fallbackUsers, scopeFilters);
+    }
+
+    const rows: any[] = await this.userRepository.query(
+      `
+        SELECT
+          ${select}
+        FROM users u
+        LEFT JOIN empresas e ON e.id = u.empresa_id
+        WHERE u.empresa_id = $1
+          AND u.ativo = true
+          AND (
+            ${atendimentoPermissionWhere}
+          )
+        ORDER BY u.nome ASC
+      `,
+      [empresa_id],
+    );
+
+    const atendentes = rows.map((row) => this.mapRawUser(row));
+    return this.filterUsersByReadScope(atendentes, scopeFilters);
   }
 
   async criar(userData: Partial<User>): Promise<User> {
@@ -319,16 +808,17 @@ export class UsersService {
 
     // Hash da senha antes de salvar
     const hashedPassword = await bcrypt.hash(userData.senha, 10);
-    const userDataWithHashedPassword = {
+    const userDataWithHashedPassword = this.normalizeRoleForCreate({
       ...userData,
       senha: hashedPassword,
-    };
+    });
 
     const user = this.userRepository.create(userDataWithHashedPassword);
 
     try {
       const savedUser = await this.userRepository.save(user);
-      return savedUser;
+      await this.persistOptionalUsersColumns(savedUser.id, userDataWithHashedPassword, savedUser.empresa_id);
+      return this.findById(savedUser.id);
     } catch (err: any) {
       console.error('Erro ao salvar usuário:', err);
       if (err.code === '23505' && String(err.detail).includes('email')) {
@@ -339,8 +829,15 @@ export class UsersService {
   }
 
   async atualizar(id: string, userData: Partial<User>, empresa_id: string): Promise<User> {
-    await this.userRepository.update({ id, empresa_id }, userData);
-    return this.userRepository.findOne({ where: { id, empresa_id } });
+    const normalizedData = this.normalizeRoleForUpdate(userData);
+    await this.userRepository.update({ id, empresa_id }, normalizedData);
+    await this.persistOptionalUsersColumns(id, normalizedData, empresa_id);
+    const user = await this.findById(id);
+    if (!user || user.empresa_id !== empresa_id) {
+      throw new NotFoundException('Usuario nao encontrado');
+    }
+
+    return user;
   }
 
   async excluir(id: string, empresa_id: string): Promise<void> {

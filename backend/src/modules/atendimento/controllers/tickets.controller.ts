@@ -14,6 +14,9 @@ import { Repository, In } from 'typeorm';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { Permission } from '../../../common/permissions/permissions.constants';
 import { Ticket, StatusTicket, PrioridadeTicket } from '../entities/ticket.entity';
 import { Mensagem } from '../entities/mensagem.entity';
 import { Tag } from '../entities/tag.entity';
@@ -22,7 +25,8 @@ import { OnlineStatusService } from '../services/online-status.service';
 import { CriarTicketDto, AtualizarTicketDto, AtribuirTicketDto, FiltrarTicketsDto } from '../dto';
 
 @Controller('atendimento/tickets')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.ATENDIMENTO_TICKETS_READ)
 export class TicketsController {
   constructor(
     @InjectRepository(Ticket)
@@ -162,6 +166,7 @@ export class TicketsController {
   }
 
   @Post()
+  @Permissions(Permission.ATENDIMENTO_TICKETS_CREATE)
   async criar(@EmpresaId() empresaId: string, @Body() dto: CriarTicketDto) {
     // Separar tags do DTO (não pode ir direto no create)
     const { tags: tagIds, ...ticketData } = dto;
@@ -198,6 +203,7 @@ export class TicketsController {
   }
 
   @Put(':id')
+  @Permissions(Permission.ATENDIMENTO_TICKETS_UPDATE)
   async atualizar(
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
@@ -228,6 +234,7 @@ export class TicketsController {
   }
 
   @Post(':id/atribuir')
+  @Permissions(Permission.ATENDIMENTO_TICKETS_ASSIGN)
   async atribuir(
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
@@ -259,6 +266,7 @@ export class TicketsController {
   }
 
   @Delete(':id')
+  @Permissions(Permission.ATENDIMENTO_TICKETS_CLOSE)
   async deletar(@EmpresaId() empresaId: string, @Param('id') id: string) {
     const ticket = await this.ticketRepo.findOne({
       where: { id, empresaId },

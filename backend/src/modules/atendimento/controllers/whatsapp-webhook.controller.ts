@@ -16,6 +16,9 @@ import { Public } from '../../auth/decorators/public.decorator';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permission } from '../../../common/permissions/permissions.constants';
 import { RemetenteMensagem } from '../entities/mensagem.entity'; // ✨ NOVO: Import do enum
 import { StatusTicket } from '../entities/ticket.entity';
 import { MensagemService } from '../services/mensagem.service';
@@ -272,7 +275,8 @@ export class WhatsAppWebhookController {
    *   "mensagemId": "uuid-da-mensagem-no-banco"
    * }
    */
-  @UseGuards(JwtAuthGuard, EmpresaGuard)
+  @UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+  @Permissions(Permission.ATENDIMENTO_CHATS_REPLY)
   @Post(':empresaId/enviar')
   async enviarMensagem(
     @EmpresaId() empresaId: string,

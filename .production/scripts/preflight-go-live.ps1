@@ -115,6 +115,11 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "validate:multi-tenant failed" }
   }
 
+  Run-Step -Name "Permissions governance" -Action {
+    npm --prefix backend run validate:permissions-governance
+    if ($LASTEXITCODE -ne 0) { throw "validate:permissions-governance failed" }
+  }
+
   if (-not $SkipApplyRls) {
     Run-Step -Name "Apply RLS baseline" -Action {
       Invoke-WithDbEnv -DbHost $RlsHost -Port $RlsPort -Database $RlsDatabase -Username $RlsUser -Password $RlsPassword -Action {

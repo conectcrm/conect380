@@ -12,13 +12,18 @@ import { Response } from 'express';
 import { PdfService } from './pdf.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { Permission } from '../../common/permissions/permissions.constants';
 
 @Controller('propostas/pdf')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.COMERCIAL_PROPOSTAS_READ)
 export class PdfController {
   constructor(private readonly pdfService: PdfService) {}
 
   @Post('gerar/:tipo')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_SEND)
   async gerarPdf(@Param('tipo') tipo: string, @Body() dadosProposta: any, @Res() res: Response) {
     try {
       const tiposPermitidos = ['comercial', 'simples'];
@@ -42,6 +47,7 @@ export class PdfController {
   }
 
   @Post('preview/:tipo')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_SEND)
   async previewHtml(@Param('tipo') tipo: string, @Body() dadosProposta: any, @Res() res: Response) {
     try {
       const tiposPermitidos = ['comercial', 'simples'];

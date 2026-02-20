@@ -27,9 +27,12 @@ import { StatusContrato } from './entities/contrato.entity';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
 import { EmpresaId, SkipEmpresaValidation } from '../../common/decorators/empresa.decorator';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permission } from '../../common/permissions/permissions.constants';
 
 @Controller('contratos')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
 export class ContratosController {
   private readonly logger = new Logger(ContratosController.name);
 
@@ -43,6 +46,7 @@ export class ContratosController {
    * Criar novo contrato
    */
   @Post()
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_CREATE)
   async criarContrato(
     @Body() createContratoDto: CreateContratoDto,
     @EmpresaId() empresaId: string,
@@ -71,6 +75,7 @@ export class ContratosController {
    * Listar contratos
    */
   @Get()
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_READ)
   async listarContratos(
     @EmpresaId() empresaId: string,
     @Query('status') status?: StatusContrato,
@@ -107,6 +112,7 @@ export class ContratosController {
    * Buscar contrato por ID
    */
   @Get(':id')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_READ)
   async buscarContrato(@Param('id', ParseIntPipe) id: number, @EmpresaId() empresaId: string) {
     // 🔒 MULTI-TENANCY: Passar empresa_id para validar isolamento
     const contrato = await this.contratosService.buscarContratoPorId(id, empresaId);
@@ -123,6 +129,7 @@ export class ContratosController {
    * Buscar contrato por número
    */
   @Get('numero/:numero')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_READ)
   async buscarContratoPorNumero(@Param('numero') numero: string, @EmpresaId() empresaId: string) {
     // 🔒 MULTI-TENANCY: Passar empresa_id para validar isolamento
     const contrato = await this.contratosService.buscarContratoPorNumero(numero, empresaId);
@@ -138,6 +145,7 @@ export class ContratosController {
    * Atualizar contrato
    */
   @Put(':id')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_UPDATE)
   async atualizarContrato(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateContratoDto: UpdateContratoDto,
@@ -172,6 +180,7 @@ export class ContratosController {
    * Cancelar contrato
    */
   @Delete(':id')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_DELETE)
   async cancelarContrato(
     @Param('id', ParseIntPipe) id: number,
     @Body('motivo') motivo: string | undefined,
@@ -202,6 +211,7 @@ export class ContratosController {
    * Download do PDF do contrato
    */
   @Get(':id/pdf')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_SEND)
   async downloadPDF(
     @Param('id', ParseIntPipe) id: number,
     @EmpresaId() empresaId: string,
@@ -242,6 +252,7 @@ export class ContratosController {
    * Criar solicitação de assinatura
    */
   @Post(':id/assinaturas')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_SEND)
   async criarAssinatura(
     @Param('id', ParseIntPipe) contratoId: number,
     @Body() createAssinaturaDto: CreateAssinaturaDto,
@@ -272,6 +283,7 @@ export class ContratosController {
    * Listar assinaturas do contrato
    */
   @Get(':id/assinaturas')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_READ)
   async listarAssinaturas(@Param('id', ParseIntPipe) contratoId: number) {
     try {
       const assinaturas = await this.assinaturaService.buscarAssinaturasPorContrato(contratoId);
