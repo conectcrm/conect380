@@ -16,62 +16,118 @@ import {
 import { CacheInterceptor, CacheTTL } from '../../common/interceptors/cache.interceptor';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { Permission } from '../../common/permissions/permissions.constants';
 import { EmpresaId } from '../../common/decorators/empresa.decorator';
+import { CurrentUser } from '../../common/decorators/user.decorator';
+import { User, UserRole } from '../users/user.entity';
 
 @Controller('dashboard')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.DASHBOARD_READ)
 @UseInterceptors(CacheInterceptor)
 export class DashboardController {
   private readonly logger = new Logger(DashboardController.name);
 
   constructor(private readonly dashboardService: DashboardService) {}
 
+  private normalizeRole(user?: User): string {
+    return user?.role?.toString().toLowerCase().trim() ?? '';
+  }
+
+  private isPrivilegedRole(role: string): boolean {
+    return (
+      role === UserRole.SUPERADMIN ||
+      role === UserRole.ADMIN ||
+      role === UserRole.GERENTE ||
+      role === UserRole.MANAGER ||
+      role === 'gestor' ||
+      role === 'superadmin'
+    );
+  }
+
+  private resolveVendedorScope(user: User | undefined, requestedVendedorId?: string): string | undefined {
+    if (!user?.id) {
+      return undefined;
+    }
+
+    const role = this.normalizeRole(user);
+
+    // Menor privilégio: perfis operacionais/usuário enxergam apenas seus próprios dados.
+    if (role === UserRole.VENDEDOR) {
+      return user.id;
+    }
+
+    if (this.isPrivilegedRole(role)) {
+      return requestedVendedorId;
+    }
+
+    // Fallback seguro para roles desconhecidas.
+    return user.id;
+  }
+
   @Get('kpis')
   @CacheTTL(30 * 1000)
   async getKPIs(
+    @CurrentUser() user: User,
     @EmpresaId() empresaId: string,
     @Query('periodo') periodo: string = 'mensal',
     @Query('vendedor') vendedorId?: string,
     @Query('regiao') regiao?: string,
   ): Promise<DashboardKPIs> {
-    return await this.dashboardService.getKPIs(periodo, vendedorId, regiao, empresaId);
+    const vendedorScope = this.resolveVendedorScope(user, vendedorId);
+    return await this.dashboardService.getKPIs(periodo, vendedorScope, regiao, empresaId);
   }
 
   @Get('vendedores-ranking')
   @CacheTTL(60 * 1000)
   async getVendedoresRanking(
+    @CurrentUser() user: User,
     @EmpresaId() empresaId: string,
     @Query('periodo') periodo: string = 'mensal',
   ): Promise<VendedorRanking[]> {
-    return await this.dashboardService.getVendedoresRanking(periodo, empresaId);
+    const vendedorScope = this.resolveVendedorScope(user);
+    return await this.dashboardService.getVendedoresRanking(periodo, empresaId, vendedorScope);
   }
 
   @Get('alertas')
   @CacheTTL(45 * 1000)
-  async getAlertasInteligentes(@EmpresaId() empresaId: string): Promise<AlertaInteligente[]> {
-    return await this.dashboardService.getAlertasInteligentes('mensal', empresaId);
+  async getAlertasInteligentes(
+    @CurrentUser() user: User,
+    @EmpresaId() empresaId: string,
+  ): Promise<AlertaInteligente[]> {
+    const vendedorScope = this.resolveVendedorScope(user);
+    return await this.dashboardService.getAlertasInteligentes(
+      'mensal',
+      empresaId,
+      undefined,
+      vendedorScope,
+    );
   }
 
   @Get('resumo')
   async getResumoCompleto(
+    @CurrentUser() user: User,
     @EmpresaId() empresaId: string,
     @Query('periodo') periodo: string = 'mensal',
     @Query('vendedor') vendedorId?: string,
     @Query('regiao') regiao?: string,
   ) {
     const agora = new Date();
+    const vendedorScope = this.resolveVendedorScope(user, vendedorId);
 
     try {
       const [kpis, vendedoresRanking, chartsData] = await Promise.all([
-        this.dashboardService.getKPIs(periodo, vendedorId, regiao, empresaId),
-        this.dashboardService.getVendedoresRanking(periodo, empresaId),
-        this.dashboardService.getChartsData(periodo, vendedorId, regiao, empresaId),
+        this.dashboardService.getKPIs(periodo, vendedorScope, regiao, empresaId),
+        this.dashboardService.getVendedoresRanking(periodo, empresaId, vendedorScope),
+        this.dashboardService.getChartsData(periodo, vendedorScope, regiao, empresaId),
       ]);
 
       const alertas = await this.dashboardService.getAlertasInteligentes(periodo, empresaId, {
         ranking: vendedoresRanking,
         kpis,
-      });
+      }, vendedorScope);
 
       return {
         kpis,
@@ -80,7 +136,7 @@ export class DashboardController {
         chartsData,
         metadata: {
           periodo,
-          vendedorId,
+          vendedorId: vendedorScope,
           regiao,
           atualizadoEm: agora.toISOString(),
           proximaAtualizacao: new Date(agora.getTime() + 15 * 60 * 1000).toISOString(),

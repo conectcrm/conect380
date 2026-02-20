@@ -411,6 +411,7 @@ export class DashboardService {
   async getVendedoresRanking(
     periodo: string = 'mensal',
     empresaId?: string,
+    vendedorIdFiltro?: string,
   ): Promise<VendedorRanking[]> {
     const { dataInicio, dataFim } = this.getDateRange(periodo);
     const periodoAnterior = this.getPreviousDateRange(periodo, { dataInicio, dataFim });
@@ -473,6 +474,10 @@ export class DashboardService {
       vendedor.posicao = index + 1;
     });
 
+    if (vendedorIdFiltro) {
+      return ranking.filter((vendedor) => vendedor.id === vendedorIdFiltro);
+    }
+
     return ranking;
   }
 
@@ -486,12 +491,15 @@ export class DashboardService {
       ranking?: VendedorRanking[];
       kpis?: DashboardKPIs;
     },
+    vendedorId?: string,
   ): Promise<AlertaInteligente[]> {
     const alertas: AlertaInteligente[] = [];
     const agora = new Date();
 
     // Verificar metas em risco
-    const ranking = precomputed?.ranking ?? (await this.getVendedoresRanking(periodo, empresaId));
+    const ranking =
+      precomputed?.ranking ??
+      (await this.getVendedoresRanking(periodo, empresaId, vendedorId));
     const vendedoresEmRisco = ranking.filter((v) => v.vendas / v.meta < 0.7);
 
     for (const vendedor of vendedoresEmRisco) {
@@ -515,6 +523,7 @@ export class DashboardService {
     const propostas = await this.propostaRepository.find({
       where: {
         ...(empresaId ? { empresaId } : {}),
+        ...(vendedorId ? { vendedor_id: vendedorId } : {}),
         status: 'enviada',
         dataVencimento: Between(agora, new Date(agora.getTime() + 3 * 24 * 60 * 60 * 1000)),
       },
@@ -541,7 +550,7 @@ export class DashboardService {
 
     // Verificar conquistas
     const kpis =
-      precomputed?.kpis ?? (await this.getKPIs(periodo, undefined, undefined, empresaId));
+      precomputed?.kpis ?? (await this.getKPIs(periodo, vendedorId, undefined, empresaId));
     if (kpis.faturamentoTotal.valor >= kpis.faturamentoTotal.meta) {
       alertas.push({
         id: 'meta-superada',
