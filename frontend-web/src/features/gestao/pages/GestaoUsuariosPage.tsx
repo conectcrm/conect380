@@ -328,6 +328,9 @@ const getRecommendedPermissionsByRole = (
   return [];
 };
 
+const getGroupPermissionValues = (group: PermissaoModalGroup): string[] =>
+  Array.from(new Set(group.options.map((option) => option.value)));
+
 const mapPermissionCatalogPayload = (payload: PermissionCatalogResponse): PermissionCatalogState => {
   const groups = Array.isArray(payload.groups)
     ? payload.groups
@@ -858,6 +861,28 @@ const GestaoUsuariosPage: React.FC = () => {
         ? prev.permissoes.filter((p) => p !== permissao)
         : [...(prev.permissoes || []), permissao],
     }));
+  };
+
+  const handleTogglePermissoesDoGrupo = (grupo: PermissaoModalGroup, selecionado: boolean): void => {
+    const groupValues = getGroupPermissionValues(grupo);
+    if (groupValues.length === 0) {
+      return;
+    }
+
+    setFormData((prev) => {
+      const nextPermissions = new Set(prev.permissoes || []);
+
+      if (selecionado) {
+        groupValues.forEach((value) => nextPermissions.add(value));
+      } else {
+        groupValues.forEach((value) => nextPermissions.delete(value));
+      }
+
+      return {
+        ...prev,
+        permissoes: Array.from(nextPermissions),
+      };
+    });
   };
 
   const formatarDataHora = (data?: Date | string): string => {
@@ -1449,27 +1474,58 @@ const GestaoUsuariosPage: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Permissões</label>
                 <div className="space-y-4 border border-gray-300 rounded-lg p-4 bg-gray-50/50">
-                  {gruposPermissaoDoFormulario.map((grupo) => (
-                    <div key={grupo.id} className="bg-white border border-gray-200 rounded-lg p-3">
-                      <p className="text-sm font-semibold text-[#002333]">{grupo.label}</p>
-                      {grupo.description && (
-                        <p className="text-xs text-gray-500 mt-0.5">{grupo.description}</p>
-                      )}
-                      <div className="space-y-2 mt-3">
-                        {grupo.options.map((permOption) => (
-                          <label key={permOption.value} className="flex items-center cursor-pointer">
+                  {gruposPermissaoDoFormulario.map((grupo) => {
+                    const groupValues = getGroupPermissionValues(grupo);
+                    const selectedCount = groupValues.filter((value) =>
+                      formData.permissoes?.includes(value),
+                    ).length;
+                    const allSelected = groupValues.length > 0 && selectedCount === groupValues.length;
+                    const partiallySelected = selectedCount > 0 && !allSelected;
+
+                    return (
+                      <div key={grupo.id} className="bg-white border border-gray-200 rounded-lg p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-[#002333]">{grupo.label}</p>
+                            {grupo.description && (
+                              <p className="text-xs text-gray-500 mt-0.5">{grupo.description}</p>
+                            )}
+                          </div>
+                          <label className="flex items-center cursor-pointer select-none">
                             <input
                               type="checkbox"
-                              checked={formData.permissoes?.includes(permOption.value) || false}
-                              onChange={() => handleTogglePermissao(permOption.value)}
+                              checked={allSelected}
+                              ref={(element) => {
+                                if (element) {
+                                  element.indeterminate = partiallySelected;
+                                }
+                              }}
+                              onChange={(event) =>
+                                handleTogglePermissoesDoGrupo(grupo, event.target.checked)
+                              }
                               className="h-4 w-4 text-[#159A9C] focus:ring-[#159A9C] border-gray-300 rounded"
                             />
-                            <span className="ml-2 text-sm text-gray-700">{permOption.label}</span>
+                            <span className="ml-2 text-xs font-medium text-gray-600 whitespace-nowrap">
+                              Selecionar todos ({selectedCount}/{groupValues.length})
+                            </span>
                           </label>
-                        ))}
+                        </div>
+                        <div className="space-y-2 mt-3">
+                          {grupo.options.map((permOption) => (
+                            <label key={permOption.value} className="flex items-center cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={formData.permissoes?.includes(permOption.value) || false}
+                                onChange={() => handleTogglePermissao(permOption.value)}
+                                className="h-4 w-4 text-[#159A9C] focus:ring-[#159A9C] border-gray-300 rounded"
+                              />
+                              <span className="ml-2 text-sm text-gray-700">{permOption.label}</span>
+                            </label>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {gruposPermissaoDoFormulario.length === 0 && (
                     <p className="text-sm text-gray-500">
                       Nenhuma permissão disponível para o papel selecionado.
