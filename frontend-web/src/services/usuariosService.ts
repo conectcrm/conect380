@@ -5,6 +5,7 @@ import {
   AtualizarUsuario,
   FiltrosUsuarios,
   EstatisticasUsuarios,
+  PermissionCatalogResponse,
   UserRole,
 } from '../types/usuarios/index';
 import { User } from '../types';
@@ -67,6 +68,24 @@ class UsuariosService {
   async obterUsuario(id: string): Promise<Usuario> {
     const response = await api.get(this.getUrl(`/${id}`));
     return this.formatarUsuario(response.data);
+  }
+
+  async obterCatalogoPermissoes(): Promise<PermissionCatalogResponse> {
+    const response = await api.get(this.getUrl('/permissoes/catalogo'));
+    const payload = response.data?.data ?? response.data ?? {};
+
+    return {
+      version: typeof payload.version === 'string' ? payload.version : 'unknown',
+      groups: Array.isArray(payload.groups) ? payload.groups : [],
+      defaultsByRole:
+        payload.defaultsByRole && typeof payload.defaultsByRole === 'object'
+          ? payload.defaultsByRole
+          : {},
+      allPermissions: Array.isArray(payload.allPermissions) ? payload.allPermissions : [],
+      legacyAssignablePermissions: Array.isArray(payload.legacyAssignablePermissions)
+        ? payload.legacyAssignablePermissions
+        : [],
+    };
   }
 
   async criarUsuario(usuario: NovoUsuario): Promise<Usuario> {
@@ -198,6 +217,10 @@ class UsuariosService {
         [UserRole.MANAGER]: 0,
         [UserRole.VENDEDOR]: 0,
         [UserRole.USER]: 0,
+        [UserRole.FINANCEIRO]: 0,
+        ...(backendData.por_perfil?.financeiro !== undefined
+          ? { [UserRole.FINANCEIRO]: Number(backendData.por_perfil.financeiro) || 0 }
+          : {}),
         ...(backendData.por_perfil || {}),
       };
 
@@ -222,6 +245,7 @@ class UsuariosService {
           [UserRole.MANAGER]: 0,
           [UserRole.VENDEDOR]: 0,
           [UserRole.USER]: 0,
+          [UserRole.FINANCEIRO]: 0,
         },
         ultimosLogins: 0,
       };
