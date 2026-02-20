@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, Repository } from 'typeorm';
 import { Meta as MetaEntity, MetaTipo } from './entities/meta.entity';
@@ -33,6 +33,10 @@ export interface UpdateMetaDto extends Partial<CreateMetaDto> {
 
 @Injectable()
 export class MetasService {
+  private readonly logger = new Logger(MetasService.name);
+  private vendedorIdSchemaMode: 'uuid' | 'integer' | null = null;
+  private vendedorIdSchemaModePromise: Promise<'uuid' | 'integer'> | null = null;
+
   constructor(
     @InjectRepository(MetaEntity)
     private readonly metasRepository: Repository<MetaEntity>,
@@ -70,11 +74,12 @@ export class MetasService {
   }
 
   async create(createMetaDto: CreateMetaDto, empresaId?: string): Promise<Meta> {
+    const vendedorNormalizado = await this.parseVendedorId(createMetaDto.vendedorId);
     const meta = this.metasRepository.create({
       tipo: this.normalizeTipo(createMetaDto.tipo),
       periodo: createMetaDto.periodo,
       valor: Number(createMetaDto.valor) || 0,
-      vendedorId: this.parseVendedorId(createMetaDto.vendedorId),
+      vendedorId: vendedorNormalizado,
       regiao: this.normalizeOptionalText(createMetaDto.regiao),
       descricao: this.normalizeOptionalText(createMetaDto.descricao),
       ativa: true,
@@ -98,7 +103,7 @@ export class MetasService {
       metaAtual.valor = Number(updateMetaDto.valor) || 0;
     }
     if (updateMetaDto.vendedorId !== undefined) {
-      metaAtual.vendedorId = this.parseVendedorId(updateMetaDto.vendedorId);
+      metaAtual.vendedorId = await this.parseVendedorId(updateMetaDto.vendedorId);
     }
     if (updateMetaDto.regiao !== undefined) {
       metaAtual.regiao = this.normalizeOptionalText(updateMetaDto.regiao);
@@ -138,7 +143,7 @@ export class MetasService {
   }
 
   async findByVendedor(vendedorId: string, empresaId?: string): Promise<Meta[]> {
-    const vendedor = this.parseVendedorId(vendedorId);
+    const vendedor = await this.parseVendedorId(vendedorId);
     if (vendedor === undefined) {
       return [];
     }
@@ -165,7 +170,7 @@ export class MetasService {
     empresaId?: string,
   ): Promise<Meta | null> {
     const periodoMensal = this.getPeriodoAtual(MetaTipo.MENSAL);
-    const vendedor = this.parseVendedorId(vendedorId);
+    const vendedor = await this.parseVendedorId(vendedorId);
     const regiaoNormalizada = this.normalizeOptionalText(regiao);
 
     const baseWhere: FindOptionsWhere<MetaEntity> = {
@@ -293,19 +298,85 @@ export class MetasService {
     return `${year}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   }
 
-  private parseVendedorId(vendedorId?: string | null): string | undefined {
+  private async getVendedorIdSchemaMode(): Promise<'uuid' | 'integer'> {
+    if (this.vendedorIdSchemaMode) {
+      return this.vendedorIdSchemaMode;
+    }
+
+    if (this.vendedorIdSchemaModePromise) {
+      return this.vendedorIdSchemaModePromise;
+    }
+
+    this.vendedorIdSchemaModePromise = (async () => {
+      try {
+        const rows: Array<{ data_type?: string; udt_name?: string }> = await this.metasRepository.query(
+          `
+            SELECT data_type, udt_name
+            FROM information_schema.columns
+            WHERE table_schema = current_schema()
+              AND table_name = 'metas'
+              AND column_name = 'vendedor_id'
+            LIMIT 1
+          `,
+        );
+
+        const raw = rows?.[0];
+        const dataType = (raw?.data_type || '').toLowerCase();
+        const udtName = (raw?.udt_name || '').toLowerCase();
+
+        if (udtName === 'uuid') {
+          return 'uuid';
+        }
+
+        if (dataType.includes('integer') || udtName.includes('int')) {
+          return 'integer';
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Falha ao detectar schema de metas.vendedor_id; fallback para UUID. Motivo: ${
+            (error as Error)?.message || 'desconhecido'
+          }`,
+        );
+      }
+
+      return 'uuid';
+    })();
+
+    const mode = await this.vendedorIdSchemaModePromise;
+    this.vendedorIdSchemaMode = mode;
+    this.vendedorIdSchemaModePromise = null;
+
+    return mode;
+  }
+
+  private isUuid(value: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value,
+    );
+  }
+
+  private async parseVendedorId(vendedorId?: string | null): Promise<string | undefined> {
     if (vendedorId === null || vendedorId === undefined) {
       return undefined;
     }
-    const trimmed = vendedorId.trim();
 
-    // Aceita apenas UUID v4/v5 para manter consistencia com users.id.
-    if (
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed)
-    ) {
+    const trimmed = vendedorId.trim();
+    if (!trimmed) {
       return undefined;
     }
-    return trimmed;
+
+    const schemaMode = await this.getVendedorIdSchemaMode();
+
+    if (schemaMode === 'integer') {
+      if (/^\d+$/.test(trimmed)) {
+        return trimmed;
+      }
+
+      // Schema legado integer: UUID deve ser ignorado para evitar erro de cast.
+      return undefined;
+    }
+
+    return this.isUuid(trimmed) ? trimmed : undefined;
   }
 
   private normalizeOptionalText(value?: string | null): string | null {
