@@ -119,6 +119,20 @@
   - `legacyAssignablePermissions`
 - Consumidor atual: modal de cadastro/edicao em `frontend-web/src/features/gestao/pages/GestaoUsuariosPage.tsx` com fallback local.
 
+## Gate de governanca automatica
+- Teste de governanca: `backend/src/common/permissions/permissions.governance.spec.ts`
+- Comando dedicado: `npm --prefix backend run validate:permissions-governance`
+- O gate valida, no minimo:
+  - toda permissao canonica deve estar no catalogo exibido para selecao de usuario;
+  - `defaultsByRole` so pode conter permissoes canonicas;
+  - tokens legados atribuiveis devem estar consistentes no catalogo;
+  - controllers que usam `PermissionsGuard` devem declarar `@Permissions(...)` com `Permission.*`;
+  - toda permissao usada em `@Permissions` deve existir no catalogo.
+- O comando foi integrado nos preflights:
+  - `.production/scripts/preflight-go-live.ps1`
+  - `.production/scripts/preflight-mvp-go-live.ps1`
+- Resultado esperado: ao criar modulo/tela/endpoint com nova permissao, o build falha ate o catalogo e regras de role serem atualizados.
+
 ## Recomendacao de rollout
 1. Manter `@Roles` + `@Permissions` nos endpoints sensiveis (modelo atual).
 2. Adicionar permissoes gradualmente modulo a modulo.

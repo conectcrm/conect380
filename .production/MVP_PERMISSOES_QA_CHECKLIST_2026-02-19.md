@@ -73,6 +73,7 @@
 
 ## 8) Regressao automatizada minima
 - [ ] `npm --prefix backend run build`
+- [ ] `npm --prefix backend run validate:permissions-governance`
 - [ ] `npm --prefix backend run test:e2e -- test/admin/admin-empresas-guard.e2e-spec.ts`
 - [ ] `npm --prefix backend run test -- src/modules/users/users.controller.spec.ts`
 - [ ] `.production/scripts/smoke-dashboard-role-scope.ps1 -BaseUrl http://127.0.0.1:3001`
