@@ -30,7 +30,13 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
-import { Permission } from '../../common/permissions/permissions.constants';
+import {
+  ALL_PERMISSIONS,
+  LEGACY_PERMISSION_ALIASES,
+  getPermissionCatalog,
+  Permission,
+} from '../../common/permissions/permissions.constants';
+import { resolveUserPermissions } from '../../common/permissions/permissions.utils';
 import { CurrentUser } from '../../common/decorators/user.decorator';
 import { User, UserRole } from './user.entity';
 
@@ -38,6 +44,13 @@ const AVATAR_UPLOAD_SUBDIR = 'avatars';
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const AVATAR_SEGMENT = `/uploads/${AVATAR_UPLOAD_SUBDIR}/`;
 const avatarLogger = new Logger('UsersController');
+const ALL_PERMISSION_VALUES = new Set<string>(ALL_PERMISSIONS);
+const LEGACY_ASSIGNABLE_PERMISSIONS = new Set<string>(['ATENDIMENTO']);
+type UsersReadScope = 'company' | 'team' | 'own';
+type UsersReadScopeFilters = {
+  user_ids?: string[];
+  allowed_roles?: UserRole[];
+};
 
 const ensureAvatarDirectory = (): string => {
   const uploadDir = path.resolve(__dirname, '../../../uploads', AVATAR_UPLOAD_SUBDIR);
@@ -136,6 +149,68 @@ export class UsersController {
     return new Set();
   }
 
+  private resolveUsersReadScope(actor: User): UsersReadScope {
+    const actorRole = this.normalizeRoleInput(actor.role);
+    if (actorRole === UserRole.SUPERADMIN || actorRole === UserRole.ADMIN) {
+      return 'company';
+    }
+
+    if (actorRole === UserRole.GERENTE) {
+      return 'team';
+    }
+
+    return 'own';
+  }
+
+  private resolveUsersReadScopeFilters(actor: User): UsersReadScopeFilters {
+    const scope = this.resolveUsersReadScope(actor);
+
+    if (scope === 'company') {
+      return {};
+    }
+
+    if (scope === 'team') {
+      const actorRole = this.normalizeRoleInput(actor.role) ?? UserRole.VENDEDOR;
+      const manageableRoles = Array.from(this.getManageableRoles(actorRole));
+      if (manageableRoles.length === 0) {
+        return actor.id ? { user_ids: [actor.id] } : {};
+      }
+
+      if (!actor.id) {
+        return { allowed_roles: manageableRoles };
+      }
+
+      return {
+        user_ids: [actor.id],
+        allowed_roles: manageableRoles,
+      };
+    }
+
+    return actor.id ? { user_ids: [actor.id] } : {};
+  }
+
+  private filterUsersByReadScope(users: User[], scopeFilters: UsersReadScopeFilters): User[] {
+    const userIdSet = new Set((scopeFilters.user_ids ?? []).filter((id) => typeof id === 'string' && id));
+    const roleSet = new Set(scopeFilters.allowed_roles ?? []);
+
+    if (userIdSet.size === 0 && roleSet.size === 0) {
+      return users;
+    }
+
+    return users.filter((member) => {
+      if (member.id && userIdSet.has(member.id)) {
+        return true;
+      }
+
+      if (roleSet.size === 0) {
+        return false;
+      }
+
+      const memberRole = this.normalizeRoleInput(member.role);
+      return !!memberRole && roleSet.has(memberRole);
+    });
+  }
+
   private ensureCanAssignRole(actor: User, requestedRole: unknown): void {
     const actorRole = this.normalizeRoleInput(actor.role) ?? UserRole.VENDEDOR;
     const normalizedRequestedRole =
@@ -150,6 +225,102 @@ export class UsersController {
     if (!normalizedRequestedRole || !this.getManageableRoles(actorRole).has(normalizedRequestedRole)) {
       throw new ForbiddenException('Sem permissao para atribuir este perfil');
     }
+  }
+
+  private normalizePermissionToken(token: unknown): string | null {
+    if (typeof token !== 'string') {
+      return null;
+    }
+
+    const trimmed = token.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    const canonicalCandidate = trimmed.toLowerCase();
+    if (ALL_PERMISSION_VALUES.has(canonicalCandidate)) {
+      return canonicalCandidate;
+    }
+
+    const legacyCandidate = trimmed.toUpperCase();
+    const mappedLegacy = LEGACY_PERMISSION_ALIASES[legacyCandidate];
+    if (mappedLegacy) {
+      return mappedLegacy;
+    }
+
+    if (LEGACY_ASSIGNABLE_PERMISSIONS.has(legacyCandidate)) {
+      return legacyCandidate;
+    }
+
+    return null;
+  }
+
+  private normalizePermissionInputList(rawPermissions: unknown): string[] {
+    if (rawPermissions === undefined) {
+      return [];
+    }
+
+    if (rawPermissions === null) {
+      return [];
+    }
+
+    if (Array.isArray(rawPermissions)) {
+      return rawPermissions.map((item) => (typeof item === 'string' ? item : String(item)));
+    }
+
+    if (typeof rawPermissions === 'string') {
+      return rawPermissions.includes(',') ? rawPermissions.split(',') : [rawPermissions];
+    }
+
+    throw new BadRequestException('Formato de permissoes invalido');
+  }
+
+  private normalizeAndValidateAssignablePermissions(
+    actor: User,
+    requestedPermissions: unknown,
+  ): string[] | undefined {
+    if (requestedPermissions === undefined) {
+      return undefined;
+    }
+
+    const rawPermissions = this.normalizePermissionInputList(requestedPermissions);
+    const normalizedPermissions: string[] = [];
+    const invalidPermissions: string[] = [];
+
+    for (const rawPermission of rawPermissions) {
+      const normalized = this.normalizePermissionToken(rawPermission);
+      if (!normalized) {
+        const displayValue = typeof rawPermission === 'string' ? rawPermission : String(rawPermission);
+        invalidPermissions.push(displayValue);
+        continue;
+      }
+
+      normalizedPermissions.push(normalized);
+    }
+
+    if (invalidPermissions.length > 0) {
+      const invalidList = invalidPermissions.map((permission) => `"${permission}"`).join(', ');
+      throw new BadRequestException(`Permissoes invalidas: ${invalidList}`);
+    }
+
+    const uniquePermissions = Array.from(new Set(normalizedPermissions));
+    const actorRole = this.normalizeRoleInput(actor.role);
+
+    if (actorRole !== UserRole.SUPERADMIN) {
+      const actorPermissionSet = resolveUserPermissions(actor);
+      const notAssignable = uniquePermissions.filter(
+        (permission) =>
+          !LEGACY_ASSIGNABLE_PERMISSIONS.has(permission) &&
+          !actorPermissionSet.has(permission as Permission),
+      );
+
+      if (notAssignable.length > 0) {
+        const forbiddenList = notAssignable.map((permission) => `"${permission}"`).join(', ');
+        throw new ForbiddenException(`Sem permissao para conceder: ${forbiddenList}`);
+      }
+    }
+
+    return uniquePermissions;
   }
 
   private async ensureCanManageUser(actor: User, userId: string, action: string): Promise<User> {
@@ -224,6 +395,7 @@ export class UsersController {
       'configuracoes',
       'status_atendente',
       'capacidade_maxima',
+      'ativo',
     ]);
     const payload = dadosUsuario ?? {};
     const unknownKeys = Object.keys(payload).filter((key) => !allowedKeys.has(key));
@@ -246,6 +418,7 @@ export class UsersController {
       'configuracoes',
       'status_atendente',
       'capacidade_maxima',
+      'ativo',
     ]);
     const payload = dadosAtualizacao ?? {};
     const unknownKeys = Object.keys(payload).filter((key) => !allowedKeys.has(key));
@@ -410,13 +583,16 @@ export class UsersController {
   }
 
   @Get('team')
+  @Permissions(Permission.USERS_READ)
   @ApiOperation({ summary: 'Listar usuários da empresa' })
   @ApiResponse({ status: 200, description: 'Lista de usuários retornada com sucesso' })
   async getTeam(@CurrentUser() user: User) {
+    const scopeFilters = this.resolveUsersReadScopeFilters(user);
     const team = await this.usersService.findByEmpresa(user.empresa_id);
+    const scopedTeam = this.filterUsersByReadScope(team, scopeFilters);
     return {
       success: true,
-      data: team.map((member) => ({
+      data: scopedTeam.map((member) => ({
         id: member.id,
         nome: member.nome,
         email: member.email,
@@ -428,8 +604,18 @@ export class UsersController {
     };
   }
 
+  @Get('permissoes/catalogo')
+  @Permissions(Permission.USERS_READ)
+  @ApiOperation({ summary: 'Obter catalogo canonico de permissoes para gestao de usuarios' })
+  @ApiResponse({ status: 200, description: 'Catalogo de permissoes retornado com sucesso' })
+  async obterCatalogoPermissoes() {
+    return {
+      success: true,
+      data: getPermissionCatalog(),
+    };
+  }
+
   @Get(['', '/'])
-  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
   @Permissions(Permission.USERS_READ)
   @ApiOperation({ summary: 'Listar usuários com filtros' })
   @ApiResponse({ status: 200, description: 'Lista de usuários com filtros retornada com sucesso' })
@@ -443,6 +629,7 @@ export class UsersController {
     @Query('limite') limite?: string,
     @Query('pagina') pagina?: string,
   ) {
+    const scopeFilters = this.resolveUsersReadScopeFilters(user);
     const filtros = {
       busca: busca || '',
       role: role || '',
@@ -452,6 +639,7 @@ export class UsersController {
       limite: limite ? parseInt(limite, 10) : 10,
       pagina: pagina ? parseInt(pagina, 10) : 1,
       empresa_id: user.empresa_id,
+      ...scopeFilters,
     };
 
     const result = await this.usersService.listarComFiltros(filtros);
@@ -468,12 +656,12 @@ export class UsersController {
   }
 
   @Get('estatisticas')
-  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
   @Permissions(Permission.USERS_READ)
   @ApiOperation({ summary: 'Obter estatísticas dos usuários' })
   @ApiResponse({ status: 200, description: 'Estatísticas retornadas com sucesso' })
   async obterEstatisticas(@CurrentUser() user: User) {
-    const stats = await this.usersService.obterEstatisticas(user.empresa_id);
+    const scopeFilters = this.resolveUsersReadScopeFilters(user);
+    const stats = await this.usersService.obterEstatisticas(user.empresa_id, scopeFilters);
     return {
       success: true,
       data: stats,
@@ -481,12 +669,12 @@ export class UsersController {
   }
 
   @Get('atendentes')
-  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
   @Permissions(Permission.USERS_READ)
   @ApiOperation({ summary: 'Listar usuários com permissão de atendimento' })
   @ApiResponse({ status: 200, description: 'Atendentes retornados com sucesso' })
   async listarAtendentes(@CurrentUser() user: User) {
-    const atendentes = await this.usersService.listarAtendentes(user.empresa_id);
+    const scopeFilters = this.resolveUsersReadScopeFilters(user);
+    const atendentes = await this.usersService.listarAtendentes(user.empresa_id, scopeFilters);
     return {
       success: true,
       data: atendentes.map((atendente) => this.sanitizeUser(atendente)),
@@ -501,6 +689,13 @@ export class UsersController {
   async criarUsuario(@CurrentUser() user: User, @Body() dadosUsuario: any) {
     const payload = this.sanitizeUserCreatePayload(dadosUsuario);
     this.ensureCanAssignRole(user, payload.role);
+    const normalizedPermissions = this.normalizeAndValidateAssignablePermissions(
+      user,
+      payload.permissoes,
+    );
+    if (normalizedPermissions !== undefined) {
+      payload.permissoes = normalizedPermissions;
+    }
 
     const novoUsuario = await this.usersService.criar({
       ...payload,
@@ -528,6 +723,13 @@ export class UsersController {
     const payload = this.sanitizeUserAdminUpdatePayload(dadosAtualizacao);
     if (payload.role !== undefined) {
       this.ensureCanAssignRole(user, payload.role);
+    }
+    const normalizedPermissions = this.normalizeAndValidateAssignablePermissions(
+      user,
+      payload.permissoes,
+    );
+    if (normalizedPermissions !== undefined) {
+      payload.permissoes = normalizedPermissions;
     }
 
     const usuarioAtualizado = await this.usersService.atualizar(
