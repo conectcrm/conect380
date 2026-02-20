@@ -1,8 +1,8 @@
 import React from 'react';
-import DashboardPage from './DashboardPage';
+import AtendimentoRoleDashboard from './AtendimentoRoleDashboard';
 
 const SuporteDashboard: React.FC = () => {
-  return <DashboardPage />;
+  return <AtendimentoRoleDashboard mode="suporte" />;
 };
 
 export default SuporteDashboard;

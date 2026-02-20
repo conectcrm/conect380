@@ -21,6 +21,7 @@ export const EstatisticasCards: React.FC<EstatisticasCardsProps> = ({
       [UserRole.MANAGER]: 0,
       [UserRole.VENDEDOR]: 0,
       [UserRole.USER]: 0,
+      [UserRole.FINANCEIRO]: 0,
     },
     ultimosLogins: 0,
   };
