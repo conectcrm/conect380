@@ -105,7 +105,7 @@ describe('UsersController Security', () => {
         email: 'teste@empresa.com',
         senha: '123456',
         role: UserRole.VENDEDOR,
-        permissoes: ['COMERCIAL'],
+        permissoes: ['PERMISSAO_FANTASMA'],
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
@@ -141,7 +141,7 @@ describe('UsersController Security', () => {
       email: 'novo2@empresa.com',
       role: UserRole.VENDEDOR,
       empresa_id: 'empresa-1',
-      permissoes: ['users.create', 'ATENDIMENTO'],
+      permissoes: ['users.create', 'ATENDIMENTO', 'comercial.propostas.read'],
     });
 
     await controller.criarUsuario(admin, {
@@ -149,12 +149,16 @@ describe('UsersController Security', () => {
       email: 'novo2@empresa.com',
       senha: '123456',
       role: UserRole.VENDEDOR,
-      permissoes: ['USERS_CREATE', 'ATENDIMENTO'],
+      permissoes: ['USERS_CREATE', 'ATENDIMENTO', 'COMERCIAL'],
     });
 
     expect(usersServiceMock.criar).toHaveBeenCalledWith(
       expect.objectContaining({
-        permissoes: ['users.create', 'ATENDIMENTO'],
+        permissoes: expect.arrayContaining([
+          'users.create',
+          'ATENDIMENTO',
+          'comercial.propostas.read',
+        ]),
       }),
     );
   });
