@@ -12,14 +12,19 @@ import {
 import { MetasService, CreateMetaDto, UpdateMetaDto } from './metas.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { Permission } from '../../common/permissions/permissions.constants';
 import { EmpresaId } from '../../common/decorators/empresa.decorator';
 
 @Controller('metas')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.RELATORIOS_READ)
 export class MetasController {
   constructor(private readonly metasService: MetasService) {}
 
   @Post()
+  @Permissions(Permission.CONFIG_AUTOMACOES_MANAGE)
   create(@EmpresaId() empresaId: string, @Body() createMetaDto: CreateMetaDto) {
     return this.metasService.create(createMetaDto, empresaId);
   }
@@ -64,6 +69,7 @@ export class MetasController {
   }
 
   @Patch(':id')
+  @Permissions(Permission.CONFIG_AUTOMACOES_MANAGE)
   update(
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
@@ -73,6 +79,7 @@ export class MetasController {
   }
 
   @Delete(':id')
+  @Permissions(Permission.CONFIG_AUTOMACOES_MANAGE)
   remove(@EmpresaId() empresaId: string, @Param('id') id: string) {
     return this.metasService.remove(id, empresaId);
   }

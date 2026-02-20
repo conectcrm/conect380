@@ -12,6 +12,9 @@ import { Response } from 'express';
 import { AnalyticsService } from './analytics.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { Permission } from '../../common/permissions/permissions.constants';
 import { EmpresaId } from '../../common/decorators/empresa.decorator';
 
 export interface AnalyticsQueryDto {
@@ -22,7 +25,8 @@ export interface AnalyticsQueryDto {
 }
 
 @Controller('analytics')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.RELATORIOS_READ)
 export class AnalyticsController {
   private readonly logger = new Logger(AnalyticsController.name);
 

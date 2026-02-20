@@ -15,6 +15,9 @@ import {
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { Permission } from '../../../common/permissions/permissions.constants';
 import { FilaService, MetricasFila } from '../services/fila.service';
 import { CreateFilaDto, UpdateFilaDto, AddAtendenteFilaDto, AtribuirTicketDto } from '../dto/fila';
 import {
@@ -37,7 +40,8 @@ import {
 @ApiTags('Filas')
 @ApiBearerAuth()
 @Controller('api/filas')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.ATENDIMENTO_FILAS_MANAGE)
 export class FilaController {
   constructor(private readonly filaService: FilaService) {}
 

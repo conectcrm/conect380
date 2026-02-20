@@ -12,9 +12,13 @@ import { EmailIntegradoService } from './email-integrado.service';
 import { PortalService } from './portal.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { Permission } from '../../common/permissions/permissions.constants';
 
 @Controller('email')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.COMERCIAL_PROPOSTAS_SEND)
 export class EmailController {
   private readonly logger = new Logger(EmailController.name);
 

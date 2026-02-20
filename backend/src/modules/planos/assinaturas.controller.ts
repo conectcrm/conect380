@@ -15,6 +15,9 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permission } from '../../common/permissions/permissions.constants';
 import { CriarAssinaturaDto } from './dto/criar-assinatura.dto';
 import { CriarCheckoutDto } from './dto/criar-checkout.dto';
 import { MercadoPagoService } from '../mercado-pago/mercado-pago.service';
@@ -23,7 +26,8 @@ import { UserRole } from '../users/user.entity';
 import type { Request } from 'express';
 
 @Controller('assinaturas')
-@UseGuards(JwtAuthGuard, EmpresaGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, RolesGuard, PermissionsGuard)
+@Permissions(Permission.PLANOS_MANAGE)
 export class AssinaturasController {
   constructor(
     private readonly assinaturasService: AssinaturasService,

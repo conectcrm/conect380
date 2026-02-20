@@ -4,11 +4,15 @@ import { Repository } from 'typeorm';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { Permission } from '../../../common/permissions/permissions.constants';
 import { Fila } from '../entities/fila.entity';
 import { CriarFilaDto, AtualizarFilaDto, AtribuirAtendenteFilaDto } from '../dto';
 
 @Controller('atendimento/filas')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.ATENDIMENTO_FILAS_MANAGE)
 export class FilasController {
   private readonly logger = new Logger(FilasController.name);
   constructor(

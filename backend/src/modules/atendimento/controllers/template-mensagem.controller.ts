@@ -2,16 +2,21 @@ import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } fro
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permission } from '../../../common/permissions/permissions.constants';
 import { TemplateMensagemService } from '../services/template-mensagem.service';
 import { CreateTemplateMensagemDto } from '../dto/create-template-mensagem.dto';
 import { UpdateTemplateMensagemDto } from '../dto/update-template-mensagem.dto';
 
 @Controller('atendimento/templates-mensagens')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.ATENDIMENTO_CHATS_READ)
 export class TemplateMensagemController {
   constructor(private readonly templateService: TemplateMensagemService) {}
 
   @Post()
+  @Permissions(Permission.ATENDIMENTO_CHATS_REPLY)
   async criar(@Body() dto: CreateTemplateMensagemDto, @EmpresaId() empresaId: string) {
     return await this.templateService.criar(dto, empresaId);
   }
@@ -42,6 +47,7 @@ export class TemplateMensagemController {
   }
 
   @Put(':id')
+  @Permissions(Permission.ATENDIMENTO_CHATS_REPLY)
   async atualizar(
     @Param('id') id: string,
     @EmpresaId() empresaId: string,
@@ -51,6 +57,7 @@ export class TemplateMensagemController {
   }
 
   @Delete(':id')
+  @Permissions(Permission.ATENDIMENTO_CHATS_REPLY)
   async deletar(@Param('id') id: string, @EmpresaId() empresaId: string) {
     await this.templateService.deletar(id, empresaId);
     return { message: 'Template deletado com sucesso' };

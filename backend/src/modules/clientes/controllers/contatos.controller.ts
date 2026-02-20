@@ -13,6 +13,9 @@ import {
 import { JwtAuthGuard } from '../../../modules/auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { Permission } from '../../../common/permissions/permissions.constants';
 import { ContatosService } from '../services/contatos.service';
 import { CreateContatoDto, UpdateContatoDto, ResponseContatoDto } from '../dto/contato.dto';
 
@@ -28,7 +31,8 @@ import { CreateContatoDto, UpdateContatoDto, ResponseContatoDto } from '../dto/c
  * DELETE /api/crm/contatos/:id                     - Remove contato (soft delete)
  */
 @Controller('api/crm')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.CRM_CLIENTES_READ)
 export class ContatosController {
   constructor(private readonly contatosService: ContatosService) {}
 
@@ -77,6 +81,7 @@ export class ContatosController {
    * }
    */
   @Post('clientes/:clienteId/contatos')
+  @Permissions(Permission.CRM_CLIENTES_CREATE)
   @HttpCode(HttpStatus.CREATED)
   async criar(
     @Param('clienteId') clienteId: string,
@@ -98,6 +103,7 @@ export class ContatosController {
    * }
    */
   @Patch('contatos/:id')
+  @Permissions(Permission.CRM_CLIENTES_UPDATE)
   async atualizar(
     @Param('id') id: string,
     @Body() updateContatoDto: UpdateContatoDto,
@@ -111,6 +117,7 @@ export class ContatosController {
    * PATCH /api/crm/contatos/:id/principal
    */
   @Patch('contatos/:id/principal')
+  @Permissions(Permission.CRM_CLIENTES_UPDATE)
   async definirComoPrincipal(
     @Param('id') id: string,
     @EmpresaId() empresaId: string,
@@ -123,6 +130,7 @@ export class ContatosController {
    * DELETE /api/crm/contatos/:id
    */
   @Delete('contatos/:id')
+  @Permissions(Permission.CRM_CLIENTES_DELETE)
   @HttpCode(HttpStatus.NO_CONTENT)
   async remover(@Param('id') id: string, @EmpresaId() empresaId: string): Promise<void> {
     return this.contatosService.remover(id, empresaId);
