@@ -94,8 +94,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   // ⚡ LICENCIAMENTO: Filtrar menu baseado nos módulos ativos
   const menuFiltrado = useMemo(() => {
     if (loadingModulos) return []; // Não mostrar menu enquanto carrega
-    return getMenuParaEmpresa(modulosAtivos);
-  }, [modulosAtivos, loadingModulos]);
+    return getMenuParaEmpresa(modulosAtivos, user);
+  }, [modulosAtivos, loadingModulos, user]);
 
   const roleKey = (user?.role || '').toLowerCase();
   const displayRole =
@@ -105,7 +105,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const isAdmin =
     roleKey === 'superadmin' ||
     roleKey === 'admin' ||
-    roleKey === 'manager';
+    roleKey === 'manager' ||
+    roleKey === 'gerente';
 
   const userLoginMetadata = user as (typeof user & UserLoginMetadata) | undefined;
   const lastLoginRaw =

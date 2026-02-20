@@ -4,7 +4,19 @@ export interface User {
   nome: string;
   email: string;
   telefone?: string;
-  role: 'superadmin' | 'admin' | 'manager' | 'vendedor' | 'user';
+  role:
+  | 'superadmin'
+  | 'admin'
+  | 'manager'
+  | 'gerente'
+  | 'vendedor'
+  | 'user'
+  | 'suporte'
+  | 'financeiro'
+  | string;
+  permissoes?: string[];
+  permissions?: string[];
+  roles?: string[];
   avatar_url?: string;
   idioma_preferido: string;
   empresa: {

@@ -15,6 +15,8 @@ import {
   DesempenhoAtendente,
   EstatisticasCanal,
 } from '../../services/analyticsService';
+import { userHasPermission } from '../../config/menuConfig';
+import { useAuth } from '../../hooks/useAuth';
 
 type AtendimentoRoleMode = 'suporte' | 'operacional';
 
@@ -61,6 +63,7 @@ const formatHours = (value: number) => {
 };
 
 const AtendimentoRoleDashboard: React.FC<AtendimentoRoleDashboardProps> = ({ mode }) => {
+  const { user } = useAuth();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [atendentes, setAtendentes] = useState<DesempenhoAtendente[]>([]);
   const [canais, setCanais] = useState<EstatisticasCanal[]>([]);
@@ -68,8 +71,18 @@ const AtendimentoRoleDashboard: React.FC<AtendimentoRoleDashboardProps> = ({ mod
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const canViewAnalytics = useMemo(() => userHasPermission(user, 'relatorios.read'), [user]);
 
   const loadData = useCallback(async () => {
+    if (!canViewAnalytics) {
+      setError(null);
+      setMetrics(null);
+      setAtendentes([]);
+      setCanais([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -89,7 +102,7 @@ const AtendimentoRoleDashboard: React.FC<AtendimentoRoleDashboardProps> = ({ mod
     } finally {
       setLoading(false);
     }
-  }, [periodo]);
+  }, [canViewAnalytics, periodo]);
 
   useEffect(() => {
     loadData();
@@ -228,6 +241,19 @@ const AtendimentoRoleDashboard: React.FC<AtendimentoRoleDashboardProps> = ({ mod
             <div>
               <p className="text-red-800 font-medium">Falha ao carregar dados</p>
               <p className="text-red-700 text-sm">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {!loading && !error && !canViewAnalytics && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-amber-700 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-amber-900 font-medium">Visao analitica restrita</p>
+              <p className="text-amber-800 text-sm">
+                Este perfil possui acesso ao dashboard, mas nao tem permissao de relatorios para
+                carregar os indicadores avancados.
+              </p>
             </div>
           </div>
         )}

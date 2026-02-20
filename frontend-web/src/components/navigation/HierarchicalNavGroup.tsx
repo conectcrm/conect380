@@ -87,6 +87,7 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
     user?.role === 'superadmin' ||
     user?.role === 'admin' ||
     user?.role === 'manager' ||
+    user?.role === 'gerente' ||
     user?.email?.includes('admin');
 
   // Fechar painel ao clicar fora
