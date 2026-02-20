@@ -2,6 +2,7 @@
 
 ## Status de aplicacao
 - 2026-02-20: itens abaixo aplicados no codigo.
+- 2026-02-20: validacao automatizada mobile executada com sucesso em `e2e/mobile-responsiveness-smoke.spec.ts`.
 
 1. Inbox mobile navigation unblock (P0) - APLICADO
 - Arquivo: frontend-web/src/features/atendimento/omnichannel/ChatOmnichannel.tsx
@@ -27,3 +28,21 @@
 - Troca rapida:
   - Container: flex-col sm:flex-row gap-3
   - Grupo de botoes: flex flex-wrap gap-2
+
+5. Smoke E2E mobile versionado (validacao recorrente) - APLICADO
+- Arquivo: e2e/mobile-responsiveness-smoke.spec.ts
+- Escopo rapido:
+  - Breakpoints: 320, 360, 375, 390, 414, 430
+  - Rotas criticas: inbox, propostas, configuracao empresa, configuracao usuarios
+  - Amostra expandida: dashboard + modulos MVP
+  - Checagem de overflow horizontal e fluxo minimo de navegacao mobile
+
+6. Menu mobile com itens invisiveis + perfil sem interacao (drawer) - APLICADO
+- Arquivos:
+  - frontend-web/src/components/navigation/HierarchicalNavGroup.tsx
+  - frontend-web/src/components/layout/DashboardLayout.tsx
+  - e2e/mobile-responsiveness-smoke.spec.ts
+- Troca rapida:
+  - Paleta especifica para `instanceId=\"mobile\"` no menu (texto/icone escuros em fundo branco).
+  - Fechamento do drawer limpa submenu ativo (`setActiveSubmenuPanel(null)`), evitando camada residual.
+  - Test IDs adicionados para abrir/fechar menu mobile e validacao E2E de perfil pos-fechamento.

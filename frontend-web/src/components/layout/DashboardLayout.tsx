@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useI18n } from '../../contexts/I18nContext';
 import { useProfile, type PerfilUsuario } from '../../contexts/ProfileContext';
 import { useWebSocketStatus } from '../../contexts/WebSocketContext';
+import { useSidebar } from '../../contexts/SidebarContext';
 import { formatCompanyName, formatUserName } from '../../utils/textUtils';
 import HierarchicalNavGroup from '../navigation/HierarchicalNavGroup';
 import { getMenuParaEmpresa } from '../../config/menuConfig';
@@ -74,6 +75,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const [isMainScrolled, setIsMainScrolled] = useState(false);
   const mainContentRef = useRef<HTMLElement | null>(null);
   const { user, logout } = useAuth();
+  const { setActiveSubmenuPanel } = useSidebar();
   const { t, language, availableLanguages } = useI18n();
 
   // 🔌 WebSocket Status para NotificationIndicator
@@ -144,6 +146,11 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
     setShowProfileSelector(false);
     setShowLanguageSelector(false);
     navigate(path);
+  };
+
+  const closeMobileSidebar = () => {
+    setSidebarOpen(false);
+    setActiveSubmenuPanel(null);
   };
 
   // Perfis disponíveis para o seletor
@@ -266,7 +273,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   // Em mobile, fecha o drawer lateral apos navegar para evitar overlay preso sobre a tela.
   useEffect(() => {
     setSidebarOpen(false);
-  }, [location.pathname]);
+    setActiveSubmenuPanel(null);
+  }, [location.pathname, setActiveSubmenuPanel]);
 
   // Estado de conectividade de rede
 
@@ -501,7 +509,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       >
         <div
           className="fixed inset-0 bg-gray-600 bg-opacity-75"
-          onClick={() => setSidebarOpen(false)}
+          onClick={closeMobileSidebar}
         />
 
         <div
@@ -510,8 +518,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         >
           <div className="absolute top-0 right-0 -mr-12 pt-2">
             <button
+              data-testid="mobile-menu-close"
               className="ml-1 flex h-11 w-11 items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
-              onClick={() => setSidebarOpen(false)}
+              onClick={closeMobileSidebar}
             >
               <X className="h-6 w-6 text-white" />
             </button>
@@ -616,6 +625,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
               {/* Lado Esquerdo: Menu Mobile + Breadcrumb + Status */}
               <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-4">
                 <button
+                  data-testid="mobile-menu-open"
                   className="min-h-11 min-w-11 rounded-xl border border-transparent p-1.5 text-gray-500 transition-all duration-200 ease-out hover:border-[#159A9C]/20 hover:bg-[#DEEFE7]/70 hover:text-[#002333] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white md:hidden"
                   onClick={() => setSidebarOpen(true)}
                 >

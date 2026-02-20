@@ -1,7 +1,7 @@
 ﻿# USED_UI_INVENTORY
 
 ## Fase A - grafo em uso (somente runtime ativo)
-- Fonte principal: .tmp/ui-active-graph.json (rotas filtradas por MVP menu + rotas publicas/portal + exclusao de redirects e ModuleUnderConstruction).
+- Fonte principal: configuracao real de rotas + traversal de imports a partir das paginas roteadas (com exclusao de redirects e ModuleUnderConstruction).
 - Rotas ativas auditaveis: 47.
 - Arquivos raiz de rota: 45.
 - Arquivos TSX alcancaveis por import traversal: 150.

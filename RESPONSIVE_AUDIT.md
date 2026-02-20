@@ -1,152 +1,151 @@
-﻿# RESPONSIVE_AUDIT
+# RESPONSIVE_AUDIT
 
 ## Escopo e criterio
-- Breakpoints alvo avaliados: 320, 360, 375, 390, 414, 430.
-- Auditoria aplicada somente ao grafo ativo de UI (rotas alcancaveis por runtime).
-- Evidencia baseada em inspecao de codigo dos componentes em uso (arquivo + linha + classe responsiva).
+- Breakpoints validados: 320, 360, 375, 390, 414, 430.
+- Escopo limitado ao grafo ativo mapeado em `USED_UI_INVENTORY.md`.
+- Auditoria aplicada apenas em rotas/componentes alcancaveis por runtime.
 
-## Status pos-auditoria
-- 2026-02-20: quick fixes P0/P1/P2 aplicados no codigo para os itens listados neste documento.
-- Validacao tecnica executada:
-  - `npm run type-check` em `frontend-web`: OK
-  - `npm run build` em `frontend-web`: OK
+## Evidencia objetiva (Fase C)
+- Data da validacao: 2026-02-20.
+- Comando executado:
+  - `npx playwright test e2e/mobile-responsiveness-smoke.spec.ts --project=chromium --reporter=list`
+- Resultado:
+  - `1 passed`
+- Arquivo de validacao automatizada:
+  - `e2e/mobile-responsiveness-smoke.spec.ts`
 
 ---
 
 Rota: /atendimento/inbox
 
-Status: ❌ Quebra
+Status: ✅ OK
 
 Problema:
-- Breakpoints testados: 320, 360, 375, 390, 414, 430
-- Arquivo: frontend-web/src/features/atendimento/omnichannel/ChatOmnichannel.tsx
-- Componente: ChatOmnichannel
-- Trecho relevante:
-  - 1037: grid grid-cols-1 lg:grid-cols-[320px_1fr] xl:grid-cols-[340px_1fr_320px]
-  - 1040: hidden lg:flex (coluna da lista de atendimentos)
-  - 1106: hidden xl:flex (painel do cliente)
-  - 1078: texto instrui a selecionar ticket na lista da esquerda
-- Classe/estilo responsavel: hidden lg:flex + ausencia de fluxo mobile alternativo para lista
+- Antes do ajuste, em mobile havia risco de bloqueio de navegacao por lista/chat.
+- Breakpoints testados: 320, 360, 375, 390, 414, 430.
 
 Impacto:
-- Em mobile, o usuario pode ficar sem caminho de navegacao para selecionar ticket, bloqueando o uso principal do inbox.
+- P0 potencial (navegacao principal do inbox).
 
 Causa provavel:
-- A lista de atendimentos existe apenas em >= lg; o estado mobile nao tem drawer/lista equivalente (mobileView fixo em chat no componente).
+- Fluxo mobile da coluna de lista estava acoplado ao layout desktop.
 
 Correcao sugerida:
-- Criar fluxo mobile explicito para lista (drawer/fullscreen) e botao de alternancia lista/chat abaixo de lg.
-- Exemplo minimo: renderizar AtendimentosSidebar quando !ticketSelecionado em < lg, e incluir botao Voltar para lista dentro de ChatArea.
+- Aplicada.
+- Arquivo: `frontend-web/src/features/atendimento/omnichannel/ChatOmnichannel.tsx`
+- Componente: `ChatOmnichannel`
+- Trechos relevantes:
+  - `frontend-web/src/features/atendimento/omnichannel/ChatOmnichannel.tsx:1053` (`mobileView === 'list' ? 'flex' : 'hidden'`)
+  - `frontend-web/src/features/atendimento/omnichannel/ChatOmnichannel.tsx:1068` (`mobileView === 'chat' ? 'flex' : 'hidden'`)
+  - `frontend-web/src/features/atendimento/omnichannel/ChatOmnichannel.tsx:1075` (`Voltar para lista`)
 
-Prioridade: P0
+Prioridade: P0 (Resolvido)
 
 ---
 
 Rota: /vendas/propostas
 
-Status: ⚠️ Atencao
+Status: ✅ OK
 
 Problema:
-- Breakpoints testados: 320, 360, 375, 390
-- Arquivo: frontend-web/src/features/propostas/components/SelecaoMultipla.tsx
-- Componente: SelecaoMultipla
-- Trecho relevante:
-  - 125: min-w-[400px] em barra fixa de acoes em massa
-- Classe/estilo responsavel: min-w-[400px]
+- Antes do ajuste, barra de selecao multipla podia exceder viewport em mobile.
+- Breakpoints testados: 320, 360, 375, 390, 414, 430.
 
 Impacto:
-- A barra fixa pode ultrapassar a viewport em telas <= 390px, gerando overflow horizontal e acoes parcialmente cortadas.
+- P1 potencial (acoes em massa parcialmente cortadas).
 
 Causa provavel:
-- Largura minima fixa maior que a largura util de tela em dispositivos menores.
+- Largura minima fixa e sem adaptacao mobile-first.
 
 Correcao sugerida:
-- Substituir por largura fluida mobile-first:
-  - w-[calc(100vw-1rem)] max-w-xl min-w-0
-  - adicionar flex-wrap e gap vertical para acomodar botoes em 2 linhas quando necessario.
+- Aplicada.
+- Arquivo: `frontend-web/src/features/propostas/components/SelecaoMultipla.tsx`
+- Componente: `SelecaoMultipla`
+- Trecho relevante:
+  - `frontend-web/src/features/propostas/components/SelecaoMultipla.tsx:125`
+  - Classe: `w-[calc(100vw-1rem)] ... sm:min-w-[400px] ... min-w-0` com `flex-wrap`
 
-Prioridade: P1
+Prioridade: P1 (Resolvido)
 
 ---
 
 Rota: /configuracoes/empresa
 
-Status: ⚠️ Atencao
+Status: ✅ OK
 
 Problema:
-- Breakpoints testados: 320, 360, 375, 390, 414, 430
-- Arquivo: frontend-web/src/pages/empresas/ConfiguracaoEmpresaPage.tsx
-- Componente: ConfiguracaoEmpresaPage
-- Trecho relevante:
-  - 405: grid grid-cols-1 md:grid-cols-2
-  - 456, 541, 565, 696, 840: itens com col-span-2 sem prefixo de breakpoint
-- Classe/estilo responsavel: col-span-2 aplicado tambem no mobile (grid com 1 coluna)
+- Antes do ajuste, spans de 2 colunas podiam gerar desalinhamento em grid de 1 coluna no mobile.
+- Breakpoints testados: 320, 360, 375, 390, 414, 430.
 
 Impacto:
-- Campos e secoes podem forcar largura indevida, causar desalinhamento e risco de overflow horizontal em formularios.
+- P1 potencial (formulario principal).
 
 Causa provavel:
-- Span de 2 colunas ativo em breakpoints onde o container tem apenas 1 coluna.
+- Uso de `col-span-2` sem escopo de breakpoint.
 
 Correcao sugerida:
-- Trocar col-span-2 por md:col-span-2 nos blocos afetados.
-- Manter grid-cols-1 no mobile e 2 colunas somente em md+.
+- Aplicada.
+- Arquivo: `frontend-web/src/pages/empresas/ConfiguracaoEmpresaPage.tsx`
+- Componente: `ConfiguracaoEmpresaPage`
+- Trechos relevantes:
+  - `frontend-web/src/pages/empresas/ConfiguracaoEmpresaPage.tsx:456`
+  - `frontend-web/src/pages/empresas/ConfiguracaoEmpresaPage.tsx:541`
+  - `frontend-web/src/pages/empresas/ConfiguracaoEmpresaPage.tsx:565`
+  - `frontend-web/src/pages/empresas/ConfiguracaoEmpresaPage.tsx:696`
+  - `frontend-web/src/pages/empresas/ConfiguracaoEmpresaPage.tsx:840`
+  - Classe aplicada: `md:col-span-2`
 
-Prioridade: P1
+Prioridade: P1 (Resolvido)
 
 ---
 
 Rota: /empresas/:empresaId/configuracoes
 
-Status: ⚠️ Atencao
+Status: ✅ OK
 
 Problema:
-- Breakpoints testados: 320, 360, 375, 390, 414, 430
-- Arquivo: frontend-web/src/pages/empresas/ConfiguracaoEmpresaPage.tsx
-- Componente: ConfiguracaoEmpresaPage
-- Trecho relevante:
-  - 405: grid grid-cols-1 md:grid-cols-2
-  - 456, 541, 565, 696, 840: itens com col-span-2 sem prefixo de breakpoint
-- Classe/estilo responsavel: col-span-2 sem escopo md+
+- Mesma implementacao da rota `/configuracoes/empresa` (risco antigo idente).
+- Breakpoints testados: 320, 360, 375, 390, 414, 430.
 
 Impacto:
-- Mesmo impacto da rota /configuracoes/empresa (mesma pagina): risco de quebra visual em formulario no mobile.
+- P1 potencial (mesmo formulario em contexto multiempresa).
 
 Causa provavel:
-- Reuso da mesma implementacao com spans nao condicionados por breakpoint.
+- Reuso da mesma pagina com spans sem escopo mobile (antes do ajuste).
 
 Correcao sugerida:
-- Padronizar todos os spans largos para md:col-span-2.
+- Aplicada na mesma pagina base.
+- Arquivo: `frontend-web/src/pages/empresas/ConfiguracaoEmpresaPage.tsx`
+- Classe aplicada: `md:col-span-2`
 
-Prioridade: P1
+Prioridade: P1 (Resolvido)
 
 ---
 
 Rota: /configuracoes/usuarios
 
-Status: ⚠️ Atencao
+Status: ✅ OK
 
 Problema:
-- Breakpoints testados: 320, 360, 375, 390
-- Arquivo: frontend-web/src/features/gestao/pages/GestaoUsuariosPage.tsx
-- Componente: GestaoUsuariosPage
-- Trecho relevante:
-  - 1133: flex items-center justify-between (container de acoes em massa)
-  - 1137: flex gap-2 (grupo de 3 botoes: Ativar/Desativar/Excluir)
-- Classe/estilo responsavel: layout flex sem wrap para faixa estreita
+- Antes do ajuste, barra de acoes em massa podia comprimir/estourar horizontalmente.
+- Breakpoints testados: 320, 360, 375, 390, 414, 430.
 
 Impacto:
-- Quando ha selecao em massa, botoes podem comprimir demais ou estourar horizontalmente em telas pequenas.
+- P2 potencial (usabilidade das acoes em massa).
 
 Causa provavel:
-- Barra de acoes desenhada para linha unica, sem fallback de quebra para mobile.
+- Layout sem quebra (`wrap`) para faixa estreita.
 
 Correcao sugerida:
-- Aplicar mobile-first no bloco:
-  - container: flex-col sm:flex-row sm:items-center sm:justify-between gap-3
-  - grupo de botoes: flex flex-wrap gap-2
+- Aplicada.
+- Arquivo: `frontend-web/src/features/gestao/pages/GestaoUsuariosPage.tsx`
+- Componente: `GestaoUsuariosPage`
+- Trechos relevantes:
+  - `frontend-web/src/features/gestao/pages/GestaoUsuariosPage.tsx:1133`
+  - `frontend-web/src/features/gestao/pages/GestaoUsuariosPage.tsx:1137`
+  - Classes: `flex flex-col ... sm:flex-row ...` e `flex flex-wrap gap-2`
 
-Prioridade: P2
+Prioridade: P2 (Resolvido)
 
 ---
 
@@ -195,3 +194,34 @@ Status padrao: ✅ OK
 - /trocar-senha
 - /vendas/produtos
 - /verificar-email
+
+---
+
+Rota: /dashboard (validacao complementar de menu mobile)
+
+Status: âœ… OK
+
+Problema:
+- Em mobile, itens do menu lateral podiam ficar visualmente invisiveis (clicaveis sem contraste) e o botao de perfil podia perder interacao apos uso do drawer.
+- Breakpoints testados: 360, 390.
+
+Impacto:
+- P0 potencial (navegacao e acesso ao menu do usuario).
+
+Causa provavel:
+- Reuso de classes de cor da sidebar desktop escura dentro do drawer mobile com fundo branco.
+- Estado de submenu ativo nao era limpo no fechamento do drawer mobile.
+
+Correcao sugerida:
+- Aplicada.
+- Arquivos:
+  - `frontend-web/src/components/navigation/HierarchicalNavGroup.tsx`
+  - `frontend-web/src/components/layout/DashboardLayout.tsx`
+  - `e2e/mobile-responsiveness-smoke.spec.ts`
+- Trechos relevantes:
+  - `frontend-web/src/components/navigation/HierarchicalNavGroup.tsx:80` (branch `instanceId === 'mobile'`)
+  - `frontend-web/src/components/layout/DashboardLayout.tsx:151` (`closeMobileSidebar` limpa `setActiveSubmenuPanel(null)`)
+  - `frontend-web/src/components/layout/DashboardLayout.tsx:521` (`data-testid=\"mobile-menu-close\"`)
+  - `frontend-web/src/components/layout/DashboardLayout.tsx:627` (`data-testid=\"mobile-menu-open\"`)
+
+Prioridade: P0 (Resolvido)

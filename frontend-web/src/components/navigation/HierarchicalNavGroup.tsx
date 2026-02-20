@@ -77,6 +77,7 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
   sidebarCollapsed: _sidebarCollapsed,
   instanceId,
 }) => {
+  const isMobileInstance = instanceId === 'mobile';
   const location = useLocation();
   const { user } = useAuth();
   const { activeSubmenuPanel, toggleSubmenuPanel, setActiveSubmenuPanel } = useSidebar();
@@ -173,6 +174,21 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
     // 2. OU tem um filho ativo (navegou para uma página filho)
     // Mas não os dois ao mesmo tempo para evitar duplicação visual
     const shouldHighlight = isPanelOpen || hasActiveChild;
+    const itemBaseStateClass = shouldHighlight
+      ? 'bg-[#159A9C]/20 border-[#159A9C]/35 shadow-[inset_0_0_0_1px_rgba(21,154,156,0.15)]'
+      : isMobileInstance
+        ? 'hover:bg-[#DEEFE7]/75 hover:border-[#159A9C]/20'
+        : 'hover:bg-white/8 hover:border-white/10';
+    const iconColorClass = shouldHighlight
+      ? 'text-[#159A9C]'
+      : isMobileInstance
+        ? 'text-[#4B5563] group-hover:text-[#0F7B7D]'
+        : 'text-white/80 group-hover:text-white';
+    const titleColorClass = shouldHighlight
+      ? 'text-[#159A9C]'
+      : isMobileInstance
+        ? 'text-[#334155] group-hover:text-[#0F7B7D]'
+        : 'text-white/90 group-hover:text-white';
 
     // Layout vertical: Ícone em cima, texto embaixo
     if (hasChildren) {
@@ -187,7 +203,7 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
             transition-all duration-200 ease-out
             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white md:focus-visible:ring-offset-[#002333]
             md:min-h-0 md:flex-col md:items-center md:justify-center md:gap-0 md:px-1 md:py-2.5
-            ${shouldHighlight ? 'bg-[#159A9C]/20 border-[#159A9C]/35 shadow-[inset_0_0_0_1px_rgba(21,154,156,0.15)]' : 'hover:bg-white/8 hover:border-white/10'}
+            ${itemBaseStateClass}
           `}
           title={item.title}
           aria-expanded={isPanelOpen}
@@ -196,13 +212,13 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
           <Icon
             className={`
             h-5 w-5 transition-colors duration-200 mb-0 md:mb-1.5
-            ${shouldHighlight ? 'text-[#159A9C]' : 'text-white/80 group-hover:text-white'}
+            ${iconColorClass}
           `}
           />
           <span
             className={`
             text-xs md:text-[9px] font-semibold text-left md:text-center leading-tight max-w-full px-0 md:px-1 truncate uppercase tracking-wide
-            ${shouldHighlight ? 'text-[#159A9C]' : 'text-white/90 group-hover:text-white'}
+            ${titleColorClass}
           `}
           >
             {item.title}
@@ -218,6 +234,21 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
     // Item sem submenu - link direto
     // ✅ Não destacar se houver um painel aberto (prioridade visual para o painel)
     const shouldBeActive = isActive && !activeSubmenuPanel;
+    const linkBaseStateClass = shouldBeActive
+      ? 'bg-[#159A9C]/20 border-[#159A9C]/35 shadow-[inset_0_0_0_1px_rgba(21,154,156,0.15)]'
+      : isMobileInstance
+        ? 'hover:bg-[#DEEFE7]/75 hover:border-[#159A9C]/20'
+        : 'hover:bg-white/8 hover:border-white/10';
+    const linkIconColorClass = shouldBeActive
+      ? 'text-[#159A9C]'
+      : isMobileInstance
+        ? 'text-[#4B5563] group-hover:text-[#0F7B7D]'
+        : 'text-white/80 group-hover:text-white';
+    const linkTitleColorClass = shouldBeActive
+      ? 'text-[#159A9C]'
+      : isMobileInstance
+        ? 'text-[#334155] group-hover:text-[#0F7B7D]'
+        : 'text-white/90 group-hover:text-white';
 
     return (
       <Link
@@ -228,7 +259,7 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
           transition-all duration-200 ease-out
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white md:focus-visible:ring-offset-[#002333]
           md:min-h-0 md:flex-col md:items-center md:justify-center md:gap-0 md:px-1 md:py-2.5
-          ${shouldBeActive ? 'bg-[#159A9C]/20 border-[#159A9C]/35 shadow-[inset_0_0_0_1px_rgba(21,154,156,0.15)]' : 'hover:bg-white/8 hover:border-white/10'}
+          ${linkBaseStateClass}
         `}
         title={item.title}
         aria-current={shouldBeActive ? 'page' : undefined}
@@ -236,13 +267,13 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
         <Icon
           className={`
           h-5 w-5 transition-colors duration-200 mb-0 md:mb-1.5
-          ${shouldBeActive ? 'text-[#159A9C]' : 'text-white/80 group-hover:text-white'}
+          ${linkIconColorClass}
         `}
         />
         <span
           className={`
           text-xs md:text-[9px] font-semibold text-left md:text-center leading-tight max-w-full px-0 md:px-1 truncate uppercase tracking-wide
-          ${shouldBeActive ? 'text-[#159A9C]' : 'text-white/90 group-hover:text-white'}
+          ${linkTitleColorClass}
         `}
         >
           {item.title}
