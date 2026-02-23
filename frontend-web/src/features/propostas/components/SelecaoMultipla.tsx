@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   X,
 } from 'lucide-react';
+import { useGlobalConfirmation } from '../../../contexts/GlobalConfirmationContext';
 
 interface SelecaoMultiplaProps {
   propostasSelecionadas: string[];
@@ -31,6 +32,7 @@ export const SelecaoMultipla: React.FC<SelecaoMultiplaProps> = ({
   onAcoesMassa,
   visible,
 }) => {
+  const { confirm } = useGlobalConfirmation();
   const [showAcoes, setShowAcoes] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -92,13 +94,13 @@ export const SelecaoMultipla: React.FC<SelecaoMultiplaProps> = ({
 
     if (acaoId === 'excluir') {
       if (
-        !window.confirm(`Tem certeza que deseja excluir ${quantidade} proposta(s) selecionada(s)?`)
+        !(await confirm(`Tem certeza que deseja excluir ${quantidade} proposta(s) selecionada(s)?`))
       ) {
         return;
       }
     } else if (acao) {
       if (
-        !window.confirm(`Executar "${acao.label}" em ${quantidade} proposta(s) selecionada(s)?`)
+        !(await confirm(`Executar "${acao.label}" em ${quantidade} proposta(s) selecionada(s)?`))
       ) {
         return;
       }

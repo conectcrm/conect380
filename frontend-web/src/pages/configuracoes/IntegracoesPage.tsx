@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { toast } from 'react-hot-toast';
+import { toastService } from '../../services/toastService';
 import {
   Settings,
   Save,
@@ -172,7 +172,7 @@ const IntegracoesPage: React.FC = () => {
       }
     } catch (error) {
       console.error('Erro ao carregar configurações:', error);
-      toast.error('Erro ao carregar configurações de integrações');
+      toastService.error('Erro ao carregar configurações de integrações');
     } finally {
       setLoading(false);
     }
@@ -285,16 +285,16 @@ const IntegracoesPage: React.FC = () => {
         const result = await response.json();
         console.log('✅ [Frontend] Resposta de sucesso:', result);
         const acao = canalExistente ? 'atualizada' : 'criada';
-        toast.success(`Integração ${tipo} ${acao} com sucesso!`);
+        toastService.success(`Integração ${tipo} ${acao} com sucesso!`);
         await carregarConfiguracoes();
       } else {
         const error = await response.json();
         console.error('❌ [Frontend] Erro ao salvar:', error);
-        toast.error(`Erro ao salvar: ${error.message || 'Erro desconhecido'}`);
+        toastService.error(`Erro ao salvar: ${error.message || 'Erro desconhecido'}`);
       }
     } catch (error) {
       console.error('Erro ao salvar integração:', error);
-      toast.error('Erro ao salvar integração');
+      toastService.error('Erro ao salvar integração');
     } finally {
       setLoading(false);
     }
@@ -305,7 +305,7 @@ const IntegracoesPage: React.FC = () => {
   // ============================================
   const validarTokenWhatsApp = async () => {
     if (!whatsappConfig.api_token || !whatsappConfig.phone_number_id) {
-      toast.error('Preencha o API Token e Phone Number ID primeiro!');
+      toastService.error('Preencha o API Token e Phone Number ID primeiro!');
       return;
     }
 
@@ -333,15 +333,15 @@ const IntegracoesPage: React.FC = () => {
 
       if (response.ok && result.success) {
         setTokenValido(true);
-        toast.success('✅ Token válido! Conexão com WhatsApp estabelecida.');
+        toastService.success('Token válido! Conexão com WhatsApp estabelecida.');
       } else {
         setTokenValido(false);
-        toast.error(`❌ Token inválido: ${result.message || 'Verifique suas credenciais'}`);
+        toastService.error(`Token inválido: ${result.message || 'Verifique suas credenciais'}`);
       }
     } catch (error) {
       console.error('Erro ao validar token:', error);
       setTokenValido(false);
-      toast.error('Erro ao validar token WhatsApp');
+      toastService.error('Erro ao validar token WhatsApp');
     } finally {
       setValidandoToken(false);
     }
@@ -352,19 +352,19 @@ const IntegracoesPage: React.FC = () => {
   // ============================================
   const enviarMensagemTeste = async () => {
     if (!testeNumero) {
-      toast.error('Digite um número de telefone para teste!');
+      toastService.error('Digite um número de telefone para teste!');
       return;
     }
 
     if (!whatsappConfig.api_token || !whatsappConfig.phone_number_id) {
-      toast.error('Configure as credenciais do WhatsApp primeiro!');
+      toastService.error('Configure as credenciais do WhatsApp primeiro!');
       return;
     }
 
     // Validar formato do número
     const numeroLimpo = testeNumero.replace(/\D/g, '');
     if (numeroLimpo.length < 10) {
-      toast.error('Número inválido! Use o formato: 5511999999999');
+      toastService.error('Número inválido! Use o formato: 5511999999999');
       return;
     }
 
@@ -392,13 +392,13 @@ const IntegracoesPage: React.FC = () => {
       const result = await response.json();
 
       if (response.ok && result.success) {
-        toast.success('✅ Mensagem enviada com sucesso!');
+        toastService.success('Mensagem enviada com sucesso!');
       } else {
-        toast.error(`❌ Erro ao enviar: ${result.message || 'Erro desconhecido'}`);
+        toastService.error(`Erro ao enviar: ${result.message || 'Erro desconhecido'}`);
       }
     } catch (error) {
       console.error('Erro ao enviar mensagem de teste:', error);
-      toast.error('Erro ao enviar mensagem de teste');
+      toastService.error('Erro ao enviar mensagem de teste');
     } finally {
       setTestando(null);
     }
@@ -457,14 +457,14 @@ const IntegracoesPage: React.FC = () => {
       const result = await response.json();
 
       if (response.ok && result.success && result.data?.valido) {
-        toast.success(result.data.mensagem || `Conexão com ${tipo} testada com sucesso!`);
+        toastService.success(result.data.mensagem || `Conexão com ${tipo} testada com sucesso!`);
       } else {
         const mensagemErro = result.data?.mensagem || result.message || 'Erro ao testar conexão';
-        toast.error(`${tipo}: ${mensagemErro}`);
+        toastService.error(`${tipo}: ${mensagemErro}`);
       }
     } catch (error: any) {
       console.error('Erro ao testar conexão:', error);
-      toast.error(`Erro ao testar conexão com ${tipo}: ${error.message || 'Erro desconhecido'}`);
+      toastService.error(`Erro ao testar conexão com ${tipo}: ${error.message || 'Erro desconhecido'}`);
     } finally {
       setTestando(null);
     }
@@ -591,7 +591,7 @@ const IntegracoesPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                     Access Token
                     <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full font-medium">
                       Permanente

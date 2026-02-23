@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PropostasService } from './propostas.service';
 import { EmailIntegradoService } from './email-integrado.service';
 
@@ -18,6 +18,7 @@ interface ViewData {
 
 @Injectable()
 export class PortalService {
+  private readonly logger = new Logger(PortalService.name);
   private tokenMappings: Record<string, string> = {
     // Tokens pré-definidos para desenvolvimento
     'test-token-123': '1',
@@ -38,6 +39,30 @@ export class PortalService {
     private readonly emailService: EmailIntegradoService,
   ) {}
 
+
+  private maskToken(token?: string): string {
+    if (!token) return '[token]';
+    if (token.length <= 8) return `${token.slice(0, 2)}***`;
+    return `${token.slice(0, 4)}...${token.slice(-4)}`;
+  }
+
+  private sanitizePortalMetadata(metadata?: any): any {
+    if (!metadata || typeof metadata !== 'object') return metadata ?? null;
+
+    const clone: Record<string, unknown> = { ...metadata };
+    if (typeof clone.ip === 'string') {
+      const ip = clone.ip as string;
+      const parts = ip.split('.');
+      clone.ip = parts.length === 4 ? `${parts[0]}.${parts[1]}.*.*` : '[ip-redacted]';
+    }
+    if (typeof clone.userAgent === 'string') {
+      const ua = clone.userAgent as string;
+      clone.userAgent = `${ua.slice(0, 60)}${ua.length > 60 ? '...' : ''}`;
+    }
+
+    return clone;
+  }
+
   /**
    * Atualiza status de proposta usando token do portal
    */
@@ -46,7 +71,7 @@ export class PortalService {
     novoStatus: string,
     metadata?: ViewData,
   ): Promise<any> {
-    console.log(`🔐 Portal: Processando token ${token}`);
+    this.logger.log(`🔐 Portal: Processando token ${this.maskToken(token)}`);
 
     // 1. Validar token e obter proposta ID
     const tokenData = await this.validarToken(token);
@@ -55,8 +80,8 @@ export class PortalService {
       throw new Error('Token inválido ou expirado');
     }
 
-    console.log(`✅ Token válido para proposta: ${tokenData.propostaId}`);
-    console.log(
+    this.logger.log(`✅ Token válido para proposta: ${tokenData.propostaId}`);
+    this.logger.log(
       `🔧 DEBUG: tokenData.propostaId = "${tokenData.propostaId}" (tipo: ${typeof tokenData.propostaId})`,
     );
 
@@ -70,8 +95,8 @@ export class PortalService {
     let resultado;
 
     if (novoStatus === 'aprovada' || novoStatus === 'rejeitada') {
-      console.log(`🔄 Portal: Aplicando transição automática para ${novoStatus}`);
-      console.log(
+      this.logger.log(`🔄 Portal: Aplicando transição automática para ${novoStatus}`);
+      this.logger.log(
         `🔧 DEBUG: Chamando atualizarStatusComValidacao com ID: "${tokenData.propostaId}"`,
       );
       resultado = await this.propostasService.atualizarStatusComValidacao(
@@ -81,7 +106,7 @@ export class PortalService {
         `Cliente ${novoStatus} a proposta via portal (token: ${token.substring(0, 8)}...)`,
       );
     } else {
-      console.log(`🔧 DEBUG: Chamando atualizarStatus com ID: "${tokenData.propostaId}"`);
+      this.logger.log(`🔧 DEBUG: Chamando atualizarStatus com ID: "${tokenData.propostaId}"`);
       resultado = await this.propostasService.atualizarStatus(
         tokenData.propostaId,
         novoStatus,
@@ -101,9 +126,8 @@ export class PortalService {
           status: 'aprovada',
           dataAceite: new Date().toISOString(),
         });
-        console.log('📧 Email de notificação de aceitação enviado com sucesso');
-      } catch (emailError) {
-        console.warn('⚠️ Erro ao enviar email, mas proposta foi aceita:', emailError);
+        this.logger.log('📧 Email de notificação de aceitação enviado com sucesso');
+      } catch (emailError) {        this.logger.warn('Portal: erro ao enviar email de aceita??o (proposta j? atualizada)');
       }
     } else if (novoStatus === 'rejeitada') {
       try {
@@ -115,13 +139,12 @@ export class PortalService {
           status: 'rejeitada',
           dataRejeicao: new Date().toISOString(),
         });
-        console.log('📧 Email de notificação de rejeição enviado com sucesso');
-      } catch (emailError) {
-        console.warn('⚠️ Erro ao enviar email, mas proposta foi rejeitada:', emailError);
+        this.logger.log('📧 Email de notificação de rejeição enviado com sucesso');
+      } catch (emailError) {        this.logger.warn('Portal: erro ao enviar email de rejei??o (proposta j? atualizada)');
       }
     }
 
-    console.log(`✅ Portal: Status atualizado com sucesso`);
+    this.logger.log(`✅ Portal: Status atualizado com sucesso`);
 
     return {
       ...resultado,
@@ -136,7 +159,7 @@ export class PortalService {
    * Obtém proposta por token do portal
    */
   async obterPropostaPorToken(token: string): Promise<any> {
-    console.log(`🔍 Portal: Buscando proposta por token ${token}`);
+    this.logger.log(`🔍 Portal: Buscando proposta por token ${this.maskToken(token)}`);
 
     // 1. Validar token
     const tokenData = await this.validarToken(token);
@@ -154,7 +177,7 @@ export class PortalService {
 
     // 3. 🔄 SINCRONIZAÇÃO AUTOMÁTICA: Atualizar status para "visualizada" se ainda estiver "enviada"
     if (proposta.status === 'enviada') {
-      console.log(`🔄 Portal: Auto-atualizando status ${proposta.status} → visualizada`);
+      this.logger.log(`🔄 Portal: Auto-atualizando status ${proposta.status} → visualizada`);
 
       try {
         await this.propostasService.marcarComoVisualizada(
@@ -167,9 +190,8 @@ export class PortalService {
         proposta.status = 'visualizada';
         proposta.updatedAt = new Date().toISOString();
 
-        console.log(`✅ Portal: Status atualizado automaticamente para "visualizada"`);
-      } catch (error) {
-        console.warn(`⚠️ Portal: Erro ao atualizar status automaticamente:`, error);
+        this.logger.log(`✅ Portal: Status atualizado automaticamente para "visualizada"`);
+      } catch (error) {        this.logger.warn('Portal: erro ao atualizar status automaticamente para visualizada');
       }
     }
 
@@ -180,7 +202,7 @@ export class PortalService {
       statusAtual: proposta.status,
     });
 
-    console.log(`✅ Portal: Proposta encontrada para token`);
+    this.logger.log(`✅ Portal: Proposta encontrada para token`);
 
     return {
       ...proposta,
@@ -194,8 +216,7 @@ export class PortalService {
   /**
    * Valida token do portal
    */
-  private async validarToken(token: string): Promise<TokenData | null> {
-    console.log(`🔐 Validando token: ${token}`);
+  private async validarToken(token: string): Promise<TokenData | null> {    this.logger.debug(`Portal: Validando token ${this.maskToken(token)}`);
 
     // ✅ CORREÇÃO: Usar método centralizado para obter mapeamentos
     const tokenMappings = this.getTokenMappings();
@@ -209,39 +230,28 @@ export class PortalService {
     if (!propostaId) {
       // 🔧 CORREÇÃO: Buscar proposta pelo NÚMERO (token)
       try {
-        const propostas = await this.propostasService.listarPropostas();
-        console.log(`📊 ${propostas.length} propostas encontradas no banco`);
-        console.log(`🔍 Procurando proposta com número: "${token}"`);
-
-        // Log das primeiras propostas para debug
-        if (propostas.length > 0) {
-          console.log(`📋 Primeiras propostas no banco:`);
-          propostas.slice(0, 3).forEach((p) => {
-            console.log(`   - ${p.numero} (ID: ${p.id})`);
-          });
-        }
+        const propostas = await this.propostasService.listarPropostas();        this.logger.debug(`Portal: ${propostas.length} propostas encontradas no banco`);        this.logger.debug(`Portal: procurando proposta por n?mero/token ${this.maskToken(token)}`);
 
         // Tentar encontrar proposta pelo número (token)
         const propostaEncontrada = propostas.find((p) => p.numero === token);
 
         if (propostaEncontrada) {
           propostaId = propostaEncontrada.id;
-          console.log(`✅ Token ${token} mapeado para proposta existente ID: ${propostaId}`);
-          console.log(
+          this.logger.log(`✅ Token ${this.maskToken(token)} mapeado para proposta existente ID: ${propostaId}`);
+          this.logger.log(
             `🔧 DEBUG: propostaEncontrada.id = "${propostaEncontrada.id}" (tipo: ${typeof propostaEncontrada.id})`,
           );
-          console.log(`🔧 DEBUG: propostaEncontrada.numero = "${propostaEncontrada.numero}"`);
+          this.logger.log(`🔧 DEBUG: propostaEncontrada.numero = "${propostaEncontrada.numero}"`);
         } else {
-          console.log(`❌ Proposta com número ${token} não encontrada no banco`);
-          console.log(`🔍 Buscou entre ${propostas.length} propostas. Token rejeitado.`);
+          this.logger.log(`❌ Proposta com número ${this.maskToken(token)} não encontrada no banco`);
+          this.logger.log(`🔍 Buscou entre ${propostas.length} propostas. Token rejeitado.`);
           return null; // Token inválido se proposta não existe
         }
-      } catch (error) {
-        console.warn(`⚠️ Erro ao buscar propostas:`, error);
+      } catch (error) {        this.logger.warn('Portal: erro ao buscar propostas para validar token');
         return null; // Falhar se não conseguir buscar
       }
     } else {
-      console.log(`✅ Token ${token} encontrado no mapeamento: ${propostaId}`);
+      this.logger.log(`✅ Token ${this.maskToken(token)} encontrado no mapeamento: ${propostaId}`);
     }
 
     // Simular dados do token para desenvolvimento
@@ -253,7 +263,7 @@ export class PortalService {
       isActive: true,
     };
 
-    console.log(`✅ Token ${token} validado → Proposta ID real: ${propostaId}`);
+    this.logger.log(`✅ Token ${this.maskToken(token)} validado → Proposta ID real: ${propostaId}`);
     return tokenMock;
   }
 
@@ -261,7 +271,7 @@ export class PortalService {
    * Registra ação no portal
    */
   async registrarAcaoPortal(token: string, acao: string, metadata?: any): Promise<void> {
-    console.log(`📝 Portal: Registrando ação "${acao}" para token ${token}`);
+    this.logger.log(`📝 Portal: Registrando ação "${acao}" para token ${this.maskToken(token)}`);
 
     const logEntry = {
       token: token.substring(0, 8) + '...',
@@ -271,7 +281,7 @@ export class PortalService {
     };
 
     // Em um ambiente real, isso seria salvo no banco de dados
-    console.log(`📋 Log Portal:`, logEntry);
+    this.logger.debug(`Portal log entry: ${JSON.stringify({ ...logEntry, metadata: this.sanitizePortalMetadata(logEntry.metadata) })}`);
   }
 
   /**
@@ -293,7 +303,7 @@ export class PortalService {
     acao: string,
     metadata?: any,
   ): Promise<{ sucesso: boolean; mensagem: string; status?: string }> {
-    console.log(`🎯 Portal: Registrando ação "${acao}" do cliente`);
+    this.logger.log(`🎯 Portal: Registrando ação "${acao}" do cliente`);
 
     try {
       // 1. Validar token
@@ -329,14 +339,14 @@ export class PortalService {
           break;
         default:
           // Para outras ações, apenas registrar sem alterar status
-          console.log(`📝 Ação "${acao}" registrada sem alteração de status`);
+          this.logger.log(`📝 Ação "${acao}" registrada sem alteração de status`);
           break;
       }
 
       // 4. Se há mudança de status, aplicar via método centralizado
       if (novoStatus) {
         await this.atualizarStatusPorToken(token, novoStatus, metadata);
-        console.log(`✅ Status atualizado para: ${novoStatus}`);
+        this.logger.log(`✅ Status atualizado para: ${novoStatus}`);
 
         return {
           sucesso: true,
@@ -350,7 +360,7 @@ export class PortalService {
         mensagem: `Ação "${acao}" registrada com sucesso`,
       };
     } catch (error) {
-      console.error(`❌ Erro ao registrar ação do cliente:`, error);
+      this.logger.error(`❌ Erro ao registrar ação do cliente:`, error);
       return {
         sucesso: false,
         mensagem: `Erro ao registrar ação: ${error.message}`,
@@ -362,12 +372,12 @@ export class PortalService {
    * Registra um token para uma proposta específica
    */
   async registrarTokenProposta(token: string, propostaId: string): Promise<void> {
-    console.log(`🎫 Portal: Registrando token ${token} para proposta ${propostaId}`);
+    this.logger.log(`🎫 Portal: Registrando token ${this.maskToken(token)} para proposta ${propostaId}`);
 
     // Adicionar ao mapeamento em memória
     this.tokenMappings[token] = propostaId;
 
-    console.log(`✅ Token ${token} registrado com sucesso para proposta ${propostaId}`);
+    this.logger.log(`✅ Token ${this.maskToken(token)} registrado com sucesso para proposta ${propostaId}`);
   }
 
   /**
@@ -392,7 +402,7 @@ export class PortalService {
     };
 
     // Em um ambiente real, salvar no banco de dados
-    console.log(`🎫 Token gerado para proposta ${propostaId}:`, token);
+    this.logger.log(`🎫 Token gerado para proposta ${propostaId}:`, token);
 
     return token;
   }

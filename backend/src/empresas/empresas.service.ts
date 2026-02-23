@@ -10,9 +10,62 @@ import { MailService } from '../mail/mail.service';
 import { EmpresaModuloService } from '../modules/empresas/services/empresa-modulo.service';
 import { PlanoEnum } from '../modules/empresas/entities/empresa-modulo.entity';
 
+type RegistroEmpresaConsentAuditMeta = {
+  ip?: string | null;
+  userAgent?: string | null;
+  termosVersao?: string;
+  privacidadeVersao?: string;
+};
+
 @Injectable()
 export class EmpresasService {
   private readonly logger = new Logger(EmpresasService.name);
+  private static readonly TERMOS_VERSAO_ATUAL = process.env.LGPD_TERMOS_VERSAO || '2026-02-23';
+  private static readonly PRIVACIDADE_VERSAO_ATUAL =
+    process.env.LGPD_PRIVACIDADE_VERSAO || '2026-02-23';
+
+  private maskEmail(email?: string): string {
+    if (!email || !email.includes('@')) return '[redacted]';
+
+    const [localPart, domain] = email.split('@');
+    if (!localPart || !domain) return '[redacted]';
+
+    const visiblePrefix = localPart.slice(0, 2);
+    return `${visiblePrefix}${'*'.repeat(Math.max(localPart.length - 2, 2))}@${domain}`;
+  }
+
+  private maskDigits(value?: string): string {
+    if (!value) return '[redacted]';
+
+    const digits = value.replace(/\D/g, '');
+    if (!digits) return '[redacted]';
+
+    const visibleSuffix = digits.slice(-4);
+    return `${'*'.repeat(Math.max(digits.length - 4, 4))}${visibleSuffix}`;
+  }
+
+  private buildRegistroEmpresaLogMeta(createEmpresaDto: CreateEmpresaDto): Record<string, unknown> {
+    const { empresa, usuario, plano, aceitarTermos } = createEmpresaDto;
+
+    return {
+      plano,
+      aceitarTermos: Boolean(aceitarTermos),
+      empresa: {
+        nome: empresa?.nome || '[vazio]',
+        cnpj: this.maskDigits(empresa?.cnpj),
+        email: this.maskEmail(empresa?.email),
+        telefone: this.maskDigits(empresa?.telefone),
+        cidade: empresa?.cidade || null,
+        estado: empresa?.estado || null,
+      },
+      usuarioAdmin: {
+        nome: usuario?.nome || '[vazio]',
+        email: this.maskEmail(usuario?.email),
+        telefone: this.maskDigits(usuario?.telefone),
+        senha: '[redacted]',
+      },
+    };
+  }
 
   constructor(
     @InjectRepository(Empresa)
@@ -23,13 +76,17 @@ export class EmpresasService {
     private empresaModuloService: EmpresaModuloService,
   ) {}
 
-  async registrarEmpresa(createEmpresaDto: CreateEmpresaDto): Promise<Empresa> {
-    console.log(`\n🚀 ===== REGISTRO DE EMPRESA INICIADO =====`);
-    console.log(`📋 DTO recebido:`, JSON.stringify(createEmpresaDto, null, 2));
-
+  async registrarEmpresa(
+    createEmpresaDto: CreateEmpresaDto,
+    consentAuditMeta?: RegistroEmpresaConsentAuditMeta,
+  ): Promise<Empresa> {
+    this.logger.log(
+      `[REGISTRO_EMPRESA] Iniciado ${JSON.stringify(
+        this.buildRegistroEmpresaLogMeta(createEmpresaDto),
+      )}`,
+    );
     const { empresa, usuario, plano, aceitarTermos } = createEmpresaDto;
-    console.log(`📋 Plano extraído: "${plano}"`);
-
+    this.logger.debug(`[REGISTRO_EMPRESA] Plano extraido: "${plano}"`);
     if (!aceitarTermos) {
       throw new HttpException('É necessário aceitar os termos de uso', HttpStatus.BAD_REQUEST);
     }
@@ -82,6 +139,13 @@ export class EmpresasService {
         data_expiracao: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 dias de trial
         email_verificado: true, // ✅ TEMPORÁRIO: Desabilitado para testes multi-tenant
         token_verificacao: null, // ✅ TEMPORÁRIO: Sem token para testes
+        termosAceitosEm: new Date(),
+        termosAceitosIp: consentAuditMeta?.ip?.slice(0, 64) || null,
+        termosAceitosUserAgent: consentAuditMeta?.userAgent?.slice(0, 1000) || null,
+        termosAceitosVersao:
+          consentAuditMeta?.termosVersao || EmpresasService.TERMOS_VERSAO_ATUAL,
+        privacidadeAceitaVersao:
+          consentAuditMeta?.privacidadeVersao || EmpresasService.PRIVACIDADE_VERSAO_ATUAL,
       });
 
       const empresaSalva = await this.empresaRepository.save(novaEmpresa);
@@ -102,7 +166,7 @@ export class EmpresasService {
       });
 
       await this.userRepository.save(novoUsuario);
-      console.log(`✅ [DEBUG] Usuário salvo: ${novoUsuario.id}`);
+      this.logger.debug(`[REGISTRO_EMPRESA] Usuario admin salvo: ${novoUsuario.id}`);
 
       // ⚠️ TEMPORÁRIO: Email de verificação desabilitado para testes multi-tenant
       // TODO: Reabilitar quando configurar SMTP para produção
@@ -115,12 +179,14 @@ export class EmpresasService {
         await this.empresaModuloService.ativarPlano(empresaSalva.id, planoEnum);
         this.logger.log(`Módulos do plano ${planoEnum} ativados para empresa ${empresaSalva.id}`);
       }
-      console.log(`✅ [DEBUG] ATIVAÇÃO CONCLUÍDA`);
-      console.log(`═══════════════════════════════════════\n`);
 
+      this.logger.log(
+        `[REGISTRO_EMPRESA] Concluido empresaId=${empresaSalva.id} adminUserId=${novoUsuario.id}`,
+      );
       return empresaSalva;
     } catch (error) {
-      console.error('Erro ao registrar empresa:', error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      this.logger.error('[REGISTRO_EMPRESA] Erro ao registrar empresa', stack);
       throw new HttpException('Erro interno do servidor', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }

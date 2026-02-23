@@ -3040,11 +3040,11 @@ export class AddHistoricoVersoes1761582305362 implements MigrationInterface {
     await queryRunner.query(`DROP INDEX "public"."IDX_4abce30d9cb740a703be515d80"`);
     await queryRunner.query(`DROP TABLE "itens_cotacao"`);
     await queryRunner.query(
-      `COMMENT ON TABLE "canais" IS 'Canais de comunicaÃ§Ã£o (WhatsApp, Telegram, Email, etc)'`,
+      `COMMENT ON TABLE "canais" IS 'Canais de comunicação (WhatsApp, Telegram, Email, etc)'`,
     );
     await queryRunner.query(`COMMENT ON TABLE "atendentes" IS 'Atendentes/Agentes do sistema'`);
     await queryRunner.query(
-      `COMMENT ON TABLE "filas" IS 'Filas de atendimento para distribuiÃ§Ã£o de tickets'`,
+      `COMMENT ON TABLE "filas" IS 'Filas de atendimento para distribuição de tickets'`,
     );
     await queryRunner.query(
       `COMMENT ON TABLE "contas_pagar" IS 'Contas a pagar com controle de status e pagamentos'`,

@@ -248,7 +248,15 @@ export class TicketController {
     }>,
   ) {
     this.logger.log(
-      `📝 [PATCH /tickets/${id}] empresaId=${empresaId} dados=${JSON.stringify(dados)}`,
+      `[PATCH /tickets/${id}] empresaId=${empresaId} dados(resumo)=${JSON.stringify({
+        keys: dados ? Object.keys(dados) : [],
+        status: dados?.status ?? null,
+        prioridade: dados?.prioridade ?? null,
+        tipo: dados?.tipo ?? null,
+        responsavelId: dados?.responsavel_id ?? dados?.responsavelId ?? null,
+        hasTitulo: Boolean(dados?.titulo),
+        hasDescricao: Boolean(dados?.descricao),
+      })}`,
     );
 
     try {
@@ -646,7 +654,15 @@ export class TicketController {
     @UploadedFiles() arquivos?: Express.Multer.File[],
   ) {
     this.logger.log(`📤 [POST /tickets/${ticketId}/mensagens]`);
-    this.logger.debug(`📋 Body recebido: ${JSON.stringify(dados)}`);
+    this.logger.debug(
+      `Body recebido (resumo): ${JSON.stringify({
+        keys: dados ? Object.keys(dados) : [],
+        tipo: dados?.tipo ?? null,
+        remetente: dados?.remetente ?? null,
+        conteudoLength: typeof dados?.conteudo === 'string' ? dados.conteudo.length : 0,
+        hasMidia: Boolean(dados?.midia),
+      })}`,
+    );
     this.logger.debug(`📎 Arquivos: ${arquivos?.length || 0}`);
 
     try {
@@ -665,7 +681,7 @@ export class TicketController {
       }
       const ticket = await this.ticketService.buscarPorId(ticketId, empresaId);
 
-      // Adicionar ticketId do par�metro da URL
+      // Adicionar ticketId do parâmetro da URL
       const dadosCompletos = {
         ...dados,
         ticketId,
@@ -699,4 +715,3 @@ export class TicketController {
     }
   }
 }
-

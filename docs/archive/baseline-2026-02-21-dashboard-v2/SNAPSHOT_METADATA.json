@@ -1,0 +1,13 @@
+{
+  "capturedAt": "2026-02-21T17:13:35.452Z",
+  "baseUrl": "http://localhost:3000",
+  "viewport": {
+    "width": 1920,
+    "height": 1080
+  },
+  "route": "/dashboard",
+  "files": [
+    "docs\\archive\\baseline-2026-02-21-dashboard-v2\\dashboard-v2-viewport-1920x1080-2026-02-21.png",
+    "docs\\archive\\baseline-2026-02-21-dashboard-v2\\dashboard-v2-fullpage-2026-02-21.png"
+  ]
+}

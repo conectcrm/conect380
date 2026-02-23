@@ -6,6 +6,7 @@ import { ModalProposta } from '../../components/modals/ModalProposta';
 import { ModalNovaProposta } from '../../components/modals/ModalNovaProposta';
 import { propostasService, Proposta as PropostaCompleta } from '../../services/propostasService';
 import { pdfPropostasService, DadosProposta } from '../../services/pdfPropostasService';
+import { useGlobalConfirmation } from '../../contexts/GlobalConfirmationContext';
 import DashboardPropostas from './components/DashboardPropostas';
 import BulkActions from './components/BulkActions';
 import FiltrosAvancados from './components/FiltrosAvancados';
@@ -246,6 +247,7 @@ const converterPropostaParaUI = async (proposta: any) => {
 // Dados removidos - sistema agora trabalha apenas com dados reais do banco
 
 const PropostasPage: React.FC = () => {
+  const { confirm } = useGlobalConfirmation();
   const { t } = useI18n();
   const navigate = useNavigate();
   const location = useLocation();
@@ -261,7 +263,7 @@ const PropostasPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showWizardModal, setShowWizardModal] = useState(false);
 
-  // � Sistema de Controle de Atualizações v2
+  // Sistema de Controle de Atualizações v2
   const [isLoadingPropostas, setIsLoadingPropostas] = useState(false);
   const updateControl = React.useRef({
     lastUpdate: 0,
@@ -312,7 +314,7 @@ const PropostasPage: React.FC = () => {
     setTimeout(() => setNotification(null), 5000);
   }, []);
 
-  // � Sistema Inteligente de Atualizações v2
+  // Sistema Inteligente de Atualizações v2
   const carregarPropostas = useCallback(
     async (
       options: {
@@ -860,7 +862,7 @@ const PropostasPage: React.FC = () => {
 
         case 'excluir':
           if (
-            window.confirm(
+            await confirm(
               `Tem certeza que deseja excluir ${propostasSelecionadas.length} proposta(s)?`,
             )
           ) {
@@ -907,7 +909,7 @@ const PropostasPage: React.FC = () => {
 
   // Ações em massa usando serviços reais
   const handleBulkDelete = async () => {
-    if (window.confirm(`Deseja excluir ${selectedPropostas.length} proposta(s) selecionada(s)?`)) {
+    if (await confirm(`Deseja excluir ${selectedPropostas.length} proposta(s) selecionada(s)?`)) {
       try {
         setIsLoading(true);
 
@@ -1549,7 +1551,7 @@ const PropostasPage: React.FC = () => {
   };
 
   const handleDeleteProposta = async (proposta: any) => {
-    if (window.confirm(`Tem certeza que deseja excluir a proposta ${proposta.numero}?`)) {
+    if (await confirm(`Tem certeza que deseja excluir a proposta ${proposta.numero}?`)) {
       try {
         setIsLoading(true);
 
@@ -2354,6 +2356,5 @@ const PropostasPage: React.FC = () => {
 };
 
 export default PropostasPage;
-
 
 

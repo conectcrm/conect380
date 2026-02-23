@@ -6,6 +6,8 @@ import FinanceiroDashboard from './FinanceiroDashboard';
 import OperacionalDashboard from './OperacionalDashboard';
 import SuporteDashboard from './SuporteDashboard';
 import VendedorDashboard from './VendedorDashboard';
+import DashboardV2Page from '../dashboard-v2/DashboardV2Page';
+import { useDashboardV2Flag } from '../dashboard-v2/useDashboardV2';
 
 type UserRecord =
   | {
@@ -79,15 +81,21 @@ const resolveBaseProfile = (user: UserRecord): PerfilUsuario => {
   );
 };
 
-const DashboardRouter: React.FC = () => {
+type DashboardRouterProps = {
+  forceLegacy?: boolean;
+};
+
+const DashboardRouter: React.FC<DashboardRouterProps> = ({ forceLegacy = false }) => {
   const { user } = useAuth();
   const { perfilSelecionado } = useProfile();
+  const { flag, loading: dashboardV2FlagLoading } = useDashboardV2Flag(!forceLegacy);
 
   const userRecord: UserRecord = user;
   const perfilBase = resolveBaseProfile(userRecord);
   const perfilAtivo = canSwitchProfile(userRecord) ? perfilSelecionado : perfilBase;
+  const shouldUseDashboardV2 = !forceLegacy && !dashboardV2FlagLoading && flag.enabled;
 
-  const renderDashboard = () => {
+  const renderDashboard = (): React.ReactNode => {
     switch (perfilAtivo) {
       case 'vendedor':
         return <VendedorDashboard />;
@@ -99,9 +107,9 @@ const DashboardRouter: React.FC = () => {
         return <FinanceiroDashboard />;
       case 'gerente':
       case 'administrador':
-        return <DashboardPage />;
+        return shouldUseDashboardV2 ? <DashboardV2Page /> : <DashboardPage />;
       default:
-        return <DashboardPage />;
+        return shouldUseDashboardV2 ? <DashboardV2Page /> : <DashboardPage />;
     }
   };
 

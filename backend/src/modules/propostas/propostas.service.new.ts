@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Proposta as PropostaEntity } from './proposta.entity';
@@ -55,6 +55,7 @@ export interface Proposta {
 
 @Injectable()
 export class PropostasService {
+  private readonly logger = new Logger(PropostasService.name);
   private contadorId = 1;
 
   constructor(
@@ -80,7 +81,7 @@ export class PropostasService {
         }
       }
     } catch (error) {
-      console.warn('⚠️ Erro ao inicializar contador de propostas:', error.message);
+      this.logger.warn('⚠️ Erro ao inicializar contador de propostas:', error.message);
     }
   }
 
@@ -148,10 +149,10 @@ export class PropostasService {
         relations: ['vendedor'],
       });
 
-      console.log(`📊 ${entities.length} propostas encontradas no banco`);
+      this.logger.log(`📊 ${entities.length} propostas encontradas no banco`);
       return entities.map((entity) => this.entityToInterface(entity));
     } catch (error) {
-      console.error('❌ Erro ao listar propostas:', error);
+      this.logger.error('❌ Erro ao listar propostas:', error);
       return [];
     }
   }
@@ -168,7 +169,7 @@ export class PropostasService {
 
       return entity ? this.entityToInterface(entity) : null;
     } catch (error) {
-      console.error('❌ Erro ao obter proposta:', error);
+      this.logger.error('❌ Erro ao obter proposta:', error);
       return null;
     }
   }
@@ -208,11 +209,11 @@ export class PropostasService {
       });
 
       const propostaSalva = await this.propostaRepository.save(novaProposta);
-      console.log(`✅ Proposta criada no banco: ${propostaSalva.id} - ${propostaSalva.numero}`);
+      this.logger.log(`✅ Proposta criada no banco: ${propostaSalva.id} - ${propostaSalva.numero}`);
 
       return this.entityToInterface(propostaSalva);
     } catch (error) {
-      console.error('❌ Erro ao criar proposta:', error);
+      this.logger.error('❌ Erro ao criar proposta:', error);
       throw error;
     }
   }
@@ -225,7 +226,7 @@ export class PropostasService {
       const resultado = await this.propostaRepository.delete(id);
       return resultado.affected > 0;
     } catch (error) {
-      console.error('❌ Erro ao remover proposta:', error);
+      this.logger.error('❌ Erro ao remover proposta:', error);
       return false;
     }
   }
@@ -253,11 +254,11 @@ export class PropostasService {
       if (observacoes) proposta.observacoes = observacoes;
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);
-      console.log(`✅ Status da proposta ${propostaId} atualizado para: ${status}`);
+      this.logger.log(`✅ Status da proposta ${propostaId} atualizado para: ${status}`);
 
       return this.entityToInterface(propostaAtualizada);
     } catch (error) {
-      console.error('❌ Erro ao atualizar status:', error);
+      this.logger.error('❌ Erro ao atualizar status:', error);
       throw error;
     }
   }
@@ -287,11 +288,11 @@ export class PropostasService {
       };
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);
-      console.log(`👁️ Proposta ${propostaId} marcada como visualizada`);
+      this.logger.log(`👁️ Proposta ${propostaId} marcada como visualizada`);
 
       return this.entityToInterface(propostaAtualizada);
     } catch (error) {
-      console.error('❌ Erro ao marcar como visualizada:', error);
+      this.logger.error('❌ Erro ao marcar como visualizada:', error);
       throw error;
     }
   }
@@ -321,11 +322,11 @@ export class PropostasService {
       };
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);
-      console.log(`📧 Email registrado para proposta ${propostaId}`);
+      this.logger.log(`📧 Email registrado para proposta ${propostaId}`);
 
       return this.entityToInterface(propostaAtualizada);
     } catch (error) {
-      console.error('❌ Erro ao registrar envio de email:', error);
+      this.logger.error('❌ Erro ao registrar envio de email:', error);
       throw error;
     }
   }

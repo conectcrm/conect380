@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { BackToNucleus } from '../components/navigation/BackToNucleus';
 import { tiposService, type TipoServico } from '../services/tiposService';
+import { useGlobalConfirmation } from '../contexts/GlobalConfirmationContext';
 
 interface CreateTipoDto {
   nome: string;
@@ -46,6 +47,7 @@ const iconesDisponiveis = [
 ];
 
 const GestaoTiposServicoPage: React.FC = () => {
+  const { confirm } = useGlobalConfirmation();
   // Estados principais
   const [tipos, setTipos] = useState<TipoServico[]>([]);
   const [loading, setLoading] = useState(true);
@@ -153,7 +155,11 @@ const GestaoTiposServicoPage: React.FC = () => {
   };
 
   const handleDelete = async (id: string, nome: string) => {
-    if (!window.confirm(`Tem certeza que deseja excluir o tipo "${nome}"? Esta ação não pode ser desfeita.`)) {
+    if (
+      !(await confirm(
+        `Tem certeza que deseja excluir o tipo "${nome}"? Esta ação não pode ser desfeita.`,
+      ))
+    ) {
       return;
     }
 

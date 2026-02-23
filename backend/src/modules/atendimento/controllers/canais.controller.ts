@@ -32,6 +32,46 @@ export class CanaisController {
     this.logger.log('✅ CanaisController criado!');
   }
 
+
+  private maskSecretValue(value: unknown): string {
+    if (value === null || value === undefined) return '[masked]';
+    const str = String(value);
+    if (!str) return '[masked]';
+    const suffix = str.slice(-4);
+    return `${'*'.repeat(Math.max(str.length - 4, 4))}${suffix}`;
+  }
+
+  private sanitizeForLog(value: any, depth = 0): any {
+    if (depth > 5) return '[max-depth]';
+    if (value === null || value === undefined) return value;
+    if (Array.isArray(value)) {
+      return value.slice(0, 20).map((item) => this.sanitizeForLog(item, depth + 1));
+    }
+    if (typeof value === 'object') {
+      const out: Record<string, unknown> = {};
+      for (const [key, val] of Object.entries(value)) {
+        if (/(token|secret|senha|password|api[_-]?key|webhook_verify_token)/i.test(key)) {
+          out[key] = this.maskSecretValue(val);
+          continue;
+        }
+        if (typeof val === 'string' && /(html|body|mensagem|conteudo|text)/i.test(key)) {
+          out[key] = val.length > 120 ? `${val.slice(0, 120)}...` : val;
+          continue;
+        }
+        out[key] = this.sanitizeForLog(val, depth + 1);
+      }
+      return out;
+    }
+    return value;
+  }
+
+  private safeStringifyForLog(value: any): string {
+    try {
+      return JSON.stringify(this.sanitizeForLog(value));
+    } catch {
+      return '[unserializable]';
+    }
+  }
   @Get()
   async listar(@EmpresaId() empresaId: string) {
     this.logger.log('🔍 [CanaisController] GET /atendimento/canais chamado');
@@ -270,7 +310,7 @@ export class CanaisController {
 
     this.logger.log('🔍 [CanaisController] POST /atendimento/canais chamado');
     this.logger.log('🔍 [CanaisController] Tipo:', tipo);
-    this.logger.log('🔍 [CanaisController] DTO:', JSON.stringify(dto, null, 2));
+    this.logger.log('🔍 [CanaisController] DTO:', this.safeStringifyForLog(dto));
 
     // Se for openai ou anthropic, salvar em integracoes_config
     if (tipo === 'openai' || tipo === 'anthropic') {
@@ -288,7 +328,7 @@ export class CanaisController {
         const credenciais = dto.configuracao?.credenciais || dto.credenciais || {};
         this.logger.log(
           '📝 [CanaisController] Credenciais recebidas:',
-          JSON.stringify(credenciais, null, 2),
+          this.safeStringifyForLog(credenciais),
         );
 
         // Mapear campos do frontend para backend
@@ -314,7 +354,7 @@ export class CanaisController {
 
         this.logger.log(
           '📝 [CanaisController] Credenciais formatadas:',
-          JSON.stringify(credenciaisFormatadas, null, 2),
+          this.safeStringifyForLog(credenciaisFormatadas),
         );
 
         if (config) {
@@ -337,7 +377,7 @@ export class CanaisController {
           this.logger.log('✅ [CanaisController] Nova configuração IA criada:', config.id);
         }
 
-        this.logger.log('✅ [CanaisController] Config final salva:', JSON.stringify(config, null, 2));
+        this.logger.log('✅ [CanaisController] Config final salva:', this.safeStringifyForLog(config));
 
         return {
           success: true,
@@ -358,7 +398,7 @@ export class CanaisController {
     this.logger.log('📝 [CanaisController] Criando canal normal:', tipo);
     this.logger.log(
       '📝 [CanaisController] Configuracao recebida:',
-      JSON.stringify(dto.configuracao, null, 2),
+      this.safeStringifyForLog(dto.configuracao),
     );
 
     // 🔧 Normalizar estrutura de configuração para WhatsApp
@@ -393,7 +433,7 @@ export class CanaisController {
 
       this.logger.log(
         '✅ [CanaisController] WhatsApp - Configuração normalizada:',
-        JSON.stringify(configuracaoFinal, null, 2),
+        this.safeStringifyForLog(configuracaoFinal),
       );
     }
 
@@ -410,7 +450,7 @@ export class CanaisController {
     this.logger.log('✅ [CanaisController] Canal salvo com ID:', canal.id);
     this.logger.log(
       '✅ [CanaisController] Configuracao salva:',
-      JSON.stringify(canal.configuracao, null, 2),
+      this.safeStringifyForLog(canal.configuracao),
     );
 
     return {
@@ -429,7 +469,7 @@ export class CanaisController {
 
     this.logger.log('🔍 [CanaisController] PUT /atendimento/canais/:id chamado');
     this.logger.log('🔍 [CanaisController] ID:', id);
-    this.logger.log('🔍 [CanaisController] DTO:', JSON.stringify(dto, null, 2));
+    this.logger.log('🔍 [CanaisController] DTO:', this.safeStringifyForLog(dto));
 
     const canal = await this.canalRepo.findOne({
       where: { id, empresaId },
@@ -448,7 +488,7 @@ export class CanaisController {
     if (dto.configuracao !== undefined) {
       this.logger.log(
         '📝 [CanaisController] Atualizando configuracao:',
-        JSON.stringify(dto.configuracao, null, 2),
+        this.safeStringifyForLog(dto.configuracao),
       );
 
       // 🔧 MERGE inteligente para WhatsApp - preserva campos existentes e adiciona/atualiza novos
@@ -482,15 +522,15 @@ export class CanaisController {
 
         this.logger.log(
           '🔄 [CanaisController] Merge WhatsApp - Credenciais antes:',
-          JSON.stringify(credenciaisExistentes, null, 2),
+          this.safeStringifyForLog(credenciaisExistentes),
         );
         this.logger.log(
           '🔄 [CanaisController] Merge WhatsApp - Credenciais novas:',
-          JSON.stringify(novasCredenciais, null, 2),
+          this.safeStringifyForLog(novasCredenciais),
         );
         this.logger.log(
           '✅ [CanaisController] Merge WhatsApp - Credenciais mescladas:',
-          JSON.stringify(credenciaisMerged, null, 2),
+          this.safeStringifyForLog(credenciaisMerged),
         );
 
         canal.configuracao = {
@@ -509,7 +549,7 @@ export class CanaisController {
     this.logger.log('✅ [CanaisController] Canal atualizado');
     this.logger.log(
       '✅ [CanaisController] Configuracao atualizada:',
-      JSON.stringify(canal.configuracao, null, 2),
+      this.safeStringifyForLog(canal.configuracao),
     );
 
     // 🔧 CRÍTICO: Se for WhatsApp, atualizar TAMBÉM atendimento_integracoes_config
@@ -532,7 +572,7 @@ export class CanaisController {
 
         this.logger.log(
           '📝 [CanaisController] Credenciais a salvar:',
-          JSON.stringify(credenciais, null, 2),
+          this.safeStringifyForLog(credenciais),
         );
 
         if (integracao) {
@@ -568,7 +608,7 @@ export class CanaisController {
           this.logger.log('✅ [CanaisController] Integração atualizada com sucesso!');
           this.logger.log(
             '✅ [CanaisController] Credenciais JSONB:',
-            JSON.stringify(integracao.credenciais, null, 2),
+            this.safeStringifyForLog(integracao.credenciais),
           );
           this.logger.log(
             '✅ [CanaisController] Token coluna:',

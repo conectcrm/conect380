@@ -120,7 +120,24 @@ Se não aparecer nada:
 
 ---
 
-## ✅ 10. Se Tudo Funcionar
+## 🔤 10. Verificar Encoding (UTF-8)
+
+Útil quando aparecerem textos “quebrados” (ex.: `Informa��es`, `InformaÃ§Ãµes`) por arquivo salvo com encoding errado.
+
+```powershell
+cd C:\Projetos\conectcrm
+
+# Verificar tudo (frontend-web/src e backend/src)
+npm run check:encoding -- --all
+
+# Verificar apenas arquivos específicos (exemplos)
+node scripts\checkEncoding.js frontend-web\src\pages\LeadsPage.tsx
+node scripts\checkEncoding.js backend\src\main.ts
+```
+
+---
+
+## ✅ 11. Se Tudo Funcionar
 
 ```powershell
 Write-Host "

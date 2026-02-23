@@ -29,6 +29,7 @@ import {
 } from '../../types/oportunidades/enums';
 import { Usuario } from '../../types/usuarios';
 import { useAuth } from '../../contexts/AuthContext';
+import { useGlobalConfirmation } from '../../contexts/GlobalConfirmationContext';
 import InputMoeda from '../common/InputMoeda';
 import { Cliente, clientesService } from '../../services/clientesService';
 
@@ -104,6 +105,7 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
   loadingUsuarios = false,
 }) => {
   const { user } = useAuth();
+  const { confirm } = useGlobalConfirmation();
   const [activeTab, setActiveTab] = useState<TabType>('detalhes');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<ValidationError[]>([]);
@@ -434,7 +436,7 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
     }
   };
 
-  const handleClose = () => {
+  const handleClose = async () => {
     if (loading) return; // Não permitir fechar enquanto está salvando
 
     // Verificar se há mudanças não salvas
@@ -445,9 +447,7 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
       : formData.titulo.trim() !== '' || formData.descricao.trim() !== '';
 
     if (hasChanges) {
-      const confirmClose = window.confirm(
-        'Você tem alterações não salvas. Deseja realmente fechar?',
-      );
+      const confirmClose = await confirm('Você tem alterações não salvas. Deseja realmente fechar?');
       if (!confirmClose) return;
     }
 

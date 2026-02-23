@@ -1,8 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Oportunidade, EstagioOportunidade } from './oportunidade.entity';
 import { Atividade, TipoAtividade } from './atividade.entity';
+import { OportunidadeStageEvent } from './oportunidade-stage-event.entity';
+import { DashboardV2JobsService } from '../dashboard-v2/dashboard-v2.jobs.service';
 import {
   CreateOportunidadeDto,
   UpdateOportunidadeDto,
@@ -12,7 +14,9 @@ import { CreateAtividadeDto } from './dto/atividade.dto';
 
 @Injectable()
 export class OportunidadesService {
+  private readonly logger = new Logger(OportunidadesService.name);
   private tableColumnsCache = new Map<string, Set<string>>();
+  private stageEventsTableAvailable?: boolean;
 
   private readonly canonicalStageOrder: EstagioOportunidade[] = [
     EstagioOportunidade.LEADS,
@@ -29,6 +33,10 @@ export class OportunidadesService {
     private oportunidadeRepository: Repository<Oportunidade>,
     @InjectRepository(Atividade)
     private atividadeRepository: Repository<Atividade>,
+    @InjectRepository(OportunidadeStageEvent)
+    private stageEventRepository: Repository<OportunidadeStageEvent>,
+    @Optional()
+    private readonly dashboardV2JobsService?: DashboardV2JobsService,
   ) {}
 
   private quoteIdentifier(identifier: string): string {
@@ -234,6 +242,130 @@ export class OportunidadesService {
     }
   }
 
+  private normalizeStageForEvent(stage?: EstagioOportunidade | string | null): string | null {
+    const normalized = (stage || '').toString().trim().toLowerCase();
+
+    if (!normalized) {
+      return null;
+    }
+
+    switch (normalized) {
+      case 'lead':
+      case 'leads':
+        return EstagioOportunidade.LEADS;
+      case 'qualificado':
+      case 'qualificacao':
+      case 'qualification':
+        return EstagioOportunidade.QUALIFICACAO;
+      case 'proposta':
+      case 'proposal':
+        return EstagioOportunidade.PROPOSTA;
+      case 'negociacao':
+      case 'negotiation':
+        return EstagioOportunidade.NEGOCIACAO;
+      case 'fechamento':
+      case 'closing':
+        return EstagioOportunidade.FECHAMENTO;
+      case 'ganho':
+      case 'won':
+        return EstagioOportunidade.GANHO;
+      case 'perdido':
+      case 'lost':
+        return EstagioOportunidade.PERDIDO;
+      default:
+        return normalized;
+    }
+  }
+
+  private async isStageEventsTableAvailable(): Promise<boolean> {
+    if (this.stageEventsTableAvailable !== undefined) {
+      return this.stageEventsTableAvailable;
+    }
+
+    const columns = await this.getTableColumns('oportunidade_stage_events');
+    this.stageEventsTableAvailable =
+      columns.has('empresa_id') &&
+      columns.has('oportunidade_id') &&
+      columns.has('to_stage') &&
+      columns.has('changed_at') &&
+      columns.has('source');
+
+    if (!this.stageEventsTableAvailable) {
+      this.logger.warn(
+        'Tabela "oportunidade_stage_events" indisponivel. Dual-write de estagio permanece em modo degradado.',
+      );
+    }
+
+    return this.stageEventsTableAvailable;
+  }
+
+  private async createStageEvent(params: {
+    empresaId: string;
+    oportunidadeId: string | number;
+    fromStage?: EstagioOportunidade | string | null;
+    toStage?: EstagioOportunidade | string | null;
+    changedBy?: string | null;
+    changedAt?: Date;
+    source: string;
+  }): Promise<void> {
+    if (!(await this.isStageEventsTableAvailable())) {
+      return;
+    }
+
+    const oportunidadeId = params.oportunidadeId?.toString().trim();
+    if (!oportunidadeId) {
+      this.logger.warn(
+        `Nao foi possivel registrar stage event: oportunidade_id invalido (${params.oportunidadeId}).`,
+      );
+      return;
+    }
+
+    const toStage = this.normalizeStageForEvent(params.toStage);
+    if (!toStage) {
+      return;
+    }
+
+    const fromStage = this.normalizeStageForEvent(params.fromStage);
+    const changedBy =
+      params.changedBy && /^[0-9a-fA-F-]{36}$/.test(params.changedBy) ? params.changedBy : null;
+
+    try {
+      await this.stageEventRepository.query(
+        `
+          INSERT INTO "oportunidade_stage_events" (
+            "empresa_id",
+            "oportunidade_id",
+            "from_stage",
+            "to_stage",
+            "changed_at",
+            "changed_by",
+            "source"
+          ) VALUES ($1, $2, $3, $4, COALESCE($5::timestamptz, now()), $6, $7)
+        `,
+        [
+          params.empresaId,
+          oportunidadeId,
+          fromStage,
+          toStage,
+          params.changedAt ? params.changedAt.toISOString() : null,
+          changedBy,
+          params.source,
+        ],
+      );
+
+      await this.dashboardV2JobsService?.enqueueStageEventRecompute({
+        empresaId: params.empresaId,
+        oportunidadeId,
+        changedAt: (params.changedAt || new Date()).toISOString(),
+        trigger: params.source,
+      });
+    } catch (error: any) {
+      this.logger.error(
+        `Falha ao registrar stage event da oportunidade ${oportunidadeId}: ${error?.message || error}`,
+      );
+    }
+  }
+
   async create(
     createOportunidadeDto: CreateOportunidadeDto,
     empresaId: string,
@@ -325,6 +457,15 @@ export class OportunidadesService {
         empresaId,
       },
     ).catch(() => undefined);
+
+    this.createStageEvent({
+      empresaId,
+      oportunidadeId: savedOportunidadeId,
+      fromStage: null,
+      toStage: createOportunidadeDto.estagio,
+      changedBy: createOportunidadeDto.responsavel_id,
+      source: 'create',
+    }).catch(() => undefined);
 
     return this.findOne(savedOportunidadeId, empresaId);
   }
@@ -501,6 +642,7 @@ export class OportunidadesService {
     id: string,
     updateOportunidadeDto: UpdateOportunidadeDto,
     empresaId: string,
+    actorUserId?: string,
   ): Promise<Oportunidade> {
     const schema = await this.resolveOportunidadesSchema();
     const oportunidade = await this.findOne(id, empresaId);
@@ -596,6 +738,15 @@ export class OportunidadesService {
     }
 
     if (updateOportunidadeDto.estagio && updateOportunidadeDto.estagio !== estagioAnterior) {
+      await this.createStageEvent({
+        empresaId,
+        oportunidadeId: oportunidade.id,
+        fromStage: estagioAnterior,
+        toStage: updateOportunidadeDto.estagio,
+        changedBy: actorUserId ?? oportunidade.responsavel_id,
+        source: 'update',
+      });
+
       await this.createAtividade(
         {
           tipo: TipoAtividade.NOTA,
@@ -603,7 +754,7 @@ export class OportunidadesService {
           oportunidade_id: id,
         },
         {
-          userId: oportunidade.responsavel_id,
+          userId: actorUserId ?? oportunidade.responsavel_id,
           empresaId,
         },
       );
@@ -616,6 +767,7 @@ export class OportunidadesService {
     id: string,
     updateEstagioDto: UpdateEstagioDto,
     empresaId: string,
+    actorUserId?: string,
   ): Promise<Oportunidade> {
     const schema = await this.resolveOportunidadesSchema();
     const oportunidade = await this.findOne(id, empresaId);
@@ -629,6 +781,15 @@ export class OportunidadesService {
       .where('id::text = :id', { id })
       .andWhere('empresa_id = :empresaId', { empresaId })
       .execute();
+
+    await this.createStageEvent({
+      empresaId,
+      oportunidadeId: oportunidade.id,
+      fromStage: oportunidade.estagio,
+      toStage: updateEstagioDto.estagio,
+      changedBy: actorUserId ?? oportunidade.responsavel_id,
+      source: 'update_estagio',
+    });
 
     const descricao =
       updateEstagioDto.estagio === EstagioOportunidade.GANHO
@@ -644,7 +805,7 @@ export class OportunidadesService {
         oportunidade_id: id,
       },
       {
-        userId: oportunidade.responsavel_id,
+        userId: actorUserId ?? oportunidade.responsavel_id,
         empresaId,
       },
     );

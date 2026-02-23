@@ -16,7 +16,7 @@ import {
   User,
   X,
 } from 'lucide-react';
-import { BackToNucleus } from '../components/navigation/BackToNucleus';
+import { EmptyState, FiltersBar, PageHeader, SectionCard } from '../components/layout-v2';
 import {
   CreateInteracaoDto,
   interacoesService,
@@ -27,6 +27,7 @@ import {
   AgendaEventoPayload,
 } from '../services/interacoesService';
 import { getErrorMessage } from '../utils/errorHandling';
+import { useGlobalConfirmation } from '../contexts/GlobalConfirmationContext';
 
 const tipoLabels: Record<string, { label: string; icon: JSX.Element }> = {
   [TipoInteracao.CHAMADA]: {
@@ -56,6 +57,7 @@ const tipoOptions = Object.keys(tipoLabels) as Array<TipoInteracao>;
 const badgeClass = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium';
 
 const InteracoesPage: React.FC = () => {
+  const { confirm } = useGlobalConfirmation();
   const [filtros, setFiltros] = useState<InteracaoFiltro>({ page: 1, limit: 10 });
   const [lista, setLista] = useState<Interacao[]>([]);
   const [estatisticas, setEstatisticas] = useState<InteracoesEstatisticas | null>(null);
@@ -211,7 +213,7 @@ const InteracoesPage: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Deseja realmente excluir esta interação?')) return;
+    if (!(await confirm('Deseja realmente excluir esta interação?'))) return;
     try {
       setSaving(true);
       setError(null);
@@ -366,162 +368,183 @@ const InteracoesPage: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus nucleusName="CRM" nucleusPath="/nuclei/crm" />
-      </div>
+    <div className="space-y-4 pt-1 sm:pt-2">
+      <SectionCard className="space-y-4 p-4 sm:p-5">
+        <PageHeader
+          title={
+            <span className="inline-flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-[#159A9C]" />
+              <span>Interações</span>
+            </span>
+          }
+          description="Registro unificado de chamadas, e-mails, reuniões e notas de CRM"
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={carregarTudo}
+                disabled={loading}
+                className="inline-flex items-center justify-center rounded-lg border border-[#D4E2E7] bg-white p-2 text-[#607B89] transition-colors hover:bg-[#F6FAF9] hover:text-[#19384C] disabled:opacity-50"
+                title="Atualizar"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleOpen()}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#0F7B7D]"
+              >
+                <Plus className="h-4 w-4" />
+                Nova interação
+              </button>
+            </div>
+          }
+        />
 
-      <div className="p-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="bg-white rounded-lg shadow-sm border mb-6">
-            <div className="px-6 py-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start">
-                <div>
-                  <h1 className="text-3xl font-bold text-[#002333] flex items-center">
-                    <MessageSquare className="h-8 w-8 mr-3 text-[#159A9C]" />
-                    Interações
-                    {loading && (
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#159A9C] ml-3"></div>
-                    )}
-                  </h1>
-                  <p className="mt-2 text-[#B4BEC9]">
-                    Registro unificado de chamadas, e-mails, reuniões e notas de CRM
-                  </p>
-                </div>
-                <div className="mt-4 sm:mt-0 flex items-center gap-3">
-                  <button
-                    onClick={carregarTudo}
-                    disabled={loading}
-                    className="px-4 py-2 border border-[#B4BEC9] rounded-lg hover:bg-[#DEEFE7] transition-colors disabled:opacity-50"
-                    title="Atualizar"
-                  >
-                    <RefreshCw className={`w-5 h-5 text-[#002333] ${loading ? 'animate-spin' : ''}`} />
-                  </button>
-                  <button
-                    onClick={() => handleOpen()}
-                    className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors flex items-center gap-2 text-sm font-medium"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Nova interação
-                  </button>
-                </div>
-              </div>
+        {!loading ? (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">{statsCards}</div>
+        ) : null}
+      </SectionCard>
+
+      <FiltersBar className="p-4">
+        <div className="flex w-full flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
+          <div className="w-full sm:min-w-[260px] sm:flex-1">
+            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Buscar</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
+              <input
+                value={filtros.busca || ''}
+                onChange={(e) =>
+                  setFiltros((prev) => ({ ...prev, busca: e.target.value, page: 1 }))
+                }
+                placeholder="Título ou descrição"
+                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+              />
             </div>
           </div>
 
-          {/* KPI Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {statsCards}
+          <div className="w-full sm:w-auto">
+            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Tipo</label>
+            <select
+              value={filtros.tipo || ''}
+              onChange={(e) =>
+                setFiltros((prev) => ({
+                  ...prev,
+                  tipo: e.target.value || undefined,
+                  page: 1,
+                }))
+              }
+              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[170px]"
+            >
+              <option value="">Todos</option>
+              {tipoOptions.map((tipo) => (
+                <option key={tipo} value={tipo}>
+                  {tipoLabels[tipo]?.label || tipo}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* Filtros */}
-          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-            <div className="flex flex-col lg:flex-row gap-4">
-              <div className="flex-1">
-                <label className="text-sm text-[#002333] font-medium">Buscar</label>
-                <div className="mt-1 relative">
-                  <Search className="h-5 w-5 text-[#B4BEC9] absolute left-3 top-2.5" />
-                  <input
-                    value={filtros.busca || ''}
-                    onChange={(e) => setFiltros((prev) => ({ ...prev, busca: e.target.value, page: 1 }))}
-                    placeholder="Título ou descrição"
-                    className="w-full pl-10 pr-3 py-2 border border-[#DEEFE7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
-                  />
-                </div>
-              </div>
-
-              <div className="w-full lg:w-52">
-                <label className="text-sm text-[#002333] font-medium">Tipo</label>
-                <select
-                  value={filtros.tipo || ''}
-                  onChange={(e) => setFiltros((prev) => ({ ...prev, tipo: e.target.value || undefined, page: 1 }))}
-                  className="mt-1 w-full border border-[#DEEFE7] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
-                >
-                  <option value="">Todos</option>
-                  {tipoOptions.map((tipo) => (
-                    <option key={tipo} value={tipo}>
-                      {tipoLabels[tipo]?.label || tipo}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="w-full lg:w-52">
-                <label className="text-sm text-[#002333] font-medium">Data ref. (início)</label>
-                <input
-                  type="date"
-                  value={filtros.dataInicio || ''}
-                  onChange={(e) => setFiltros((prev) => ({ ...prev, dataInicio: e.target.value || undefined, page: 1 }))}
-                  className="mt-1 w-full border border-[#DEEFE7] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
-                />
-              </div>
-
-              <div className="w-full lg:w-52">
-                <label className="text-sm text-[#002333] font-medium">Data ref. (fim)</label>
-                <input
-                  type="date"
-                  value={filtros.dataFim || ''}
-                  onChange={(e) => setFiltros((prev) => ({ ...prev, dataFim: e.target.value || undefined, page: 1 }))}
-                  className="mt-1 w-full border border-[#DEEFE7] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
-                />
-              </div>
-            </div>
+          <div className="w-full sm:w-auto">
+            <label className="mb-2 block text-sm font-medium text-[#385A6A]">
+              Data ref. (início)
+            </label>
+            <input
+              type="date"
+              value={filtros.dataInicio || ''}
+              onChange={(e) =>
+                setFiltros((prev) => ({
+                  ...prev,
+                  dataInicio: e.target.value || undefined,
+                  page: 1,
+                }))
+              }
+              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[170px]"
+            />
           </div>
 
-          {/* Lista */}
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            {error && (
-              <div className="mb-4 p-4 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm">
-                {error}
-              </div>
-            )}
-
-            {loading ? (
-              <div className="text-center text-[#002333]/60 py-10">Carregando interações...</div>
-            ) : lista.length === 0 ? (
-              <div className="text-center py-10 text-[#002333]/70">
-                <p className="text-lg font-medium">Nenhuma interação encontrada</p>
-                <p className="mt-2 text-sm">Cadastre a primeira interação para iniciar o histórico.</p>
-                <button
-                  onClick={() => handleOpen()}
-                  className="mt-4 px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors text-sm font-medium"
-                >
-                  <Plus className="h-4 w-4 inline mr-2" /> Nova interação
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
-                {lista.map(renderCard)}
-              </div>
-            )}
-
-            {/* Paginação simples */}
-            {totalPages > 1 && (
-              <div className="mt-6 flex items-center justify-between text-sm text-[#002333]/70">
-                <span>
-                  Página {filtros.page} de {totalPages} — {total} registros
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    disabled={(filtros.page || 1) <= 1}
-                    onClick={() => setFiltros((prev) => ({ ...prev, page: Math.max((prev.page || 1) - 1, 1) }))}
-                    className="px-3 py-1 border border-[#DEEFE7] rounded-lg hover:bg-[#DEEFE7] disabled:opacity-50"
-                  >
-                    Anterior
-                  </button>
-                  <button
-                    disabled={(filtros.page || 1) >= totalPages}
-                    onClick={() => setFiltros((prev) => ({ ...prev, page: (prev.page || 1) + 1 }))}
-                    className="px-3 py-1 border border-[#DEEFE7] rounded-lg hover:bg-[#DEEFE7] disabled:opacity-50"
-                  >
-                    Próxima
-                  </button>
-                </div>
-              </div>
-            )}
+          <div className="w-full sm:w-auto">
+            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Data ref. (fim)</label>
+            <input
+              type="date"
+              value={filtros.dataFim || ''}
+              onChange={(e) =>
+                setFiltros((prev) => ({
+                  ...prev,
+                  dataFim: e.target.value || undefined,
+                  page: 1,
+                }))
+              }
+              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[170px]"
+            />
           </div>
         </div>
-      </div>
+      </FiltersBar>
+
+      <SectionCard className="p-4 sm:p-5">
+        {error ? (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        ) : null}
+
+        {loading ? (
+          <div className="py-14 text-center text-sm text-[#607B89]">Carregando interações...</div>
+        ) : lista.length === 0 ? (
+          <EmptyState
+            title="Nenhuma interação encontrada"
+            description="Cadastre a primeira interação para iniciar o histórico."
+            action={
+              <button
+                type="button"
+                onClick={() => handleOpen()}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#0F7B7D]"
+              >
+                <Plus className="h-4 w-4" />
+                Nova interação
+              </button>
+            }
+          />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">{lista.map(renderCard)}</div>
+        )}
+
+        {totalPages > 1 ? (
+          <div className="mt-6 flex flex-col gap-3 text-sm text-[#607B89] sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              Página {filtros.page} de {totalPages} — {total} registros
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={(filtros.page || 1) <= 1}
+                onClick={() =>
+                  setFiltros((prev) => ({
+                    ...prev,
+                    page: Math.max((prev.page || 1) - 1, 1),
+                  }))
+                }
+                className="inline-flex items-center justify-center rounded-lg border border-[#D4E2E7] bg-white px-3 py-1.5 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9] disabled:opacity-50"
+              >
+                Anterior
+              </button>
+              <button
+                type="button"
+                disabled={(filtros.page || 1) >= totalPages}
+                onClick={() =>
+                  setFiltros((prev) => ({
+                    ...prev,
+                    page: (prev.page || 1) + 1,
+                  }))
+                }
+                className="inline-flex items-center justify-center rounded-lg border border-[#D4E2E7] bg-white px-3 py-1.5 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9] disabled:opacity-50"
+              >
+                Próxima
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </SectionCard>
 
       {/* Dialog */}
       {showDialog && (

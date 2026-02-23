@@ -1,7 +1,3 @@
-﻿/**
- * ðŸ‘¤ Cliente Card - Componente de card de cliente com upload de avatar
- */
-
 import React, { useState } from 'react';
 import { Phone, Mail, Edit, Eye, Paperclip } from 'lucide-react';
 import { AvatarUpload } from '../upload/AvatarUpload';
@@ -27,215 +23,183 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({
 }) => {
   const [showAttachments, setShowAttachments] = useState(false);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'cliente':
-        return 'bg-green-100 text-green-800';
-      case 'prospect':
-        return 'bg-blue-100 text-blue-800';
-      case 'lead':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'inativo':
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+  const statusLabelMap: Record<string, string> = {
+    cliente: 'Cliente',
+    prospect: 'Prospect',
+    lead: 'Lead',
+    inativo: 'Inativo',
   };
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'cliente':
-        return 'Cliente';
-      case 'prospect':
-        return 'Prospect';
-      case 'lead':
-        return 'Lead';
-      case 'inativo':
-        return 'Inativo';
-      default:
-        return status;
-    }
+  const statusBadgeMap: Record<string, string> = {
+    cliente: 'border border-[#BEE4D8] bg-[#ECF7F3] text-[#0F7B7D]',
+    prospect: 'border border-[#CFE3EA] bg-[#F1F7FA] text-[#2F7086]',
+    lead: 'border border-[#E9DEBF] bg-[#FCF8EB] text-[#9A6B17]',
+    inativo: 'border border-[#DCE3E8] bg-[#F5F8FA] text-[#617785]',
   };
 
-  const handleAvatarChange = (avatar: UploadResult) => {
+  const statusDotMap: Record<string, string> = {
+    cliente: 'bg-[#159A9C]',
+    prospect: 'bg-[#3B82F6]',
+    lead: 'bg-[#D29B2D]',
+    inativo: 'bg-[#9AAEB8]',
+  };
+
+  const handleAvatarChange = (avatar: UploadResult): void => {
+    if (!cliente.id) {
+      return;
+    }
+
     onAvatarUpdate?.(cliente.id, avatar);
   };
 
-  const handleAttachmentAdd = (attachments: UploadResult[]) => {
-    if (attachments.length > 0) {
+  const handleAttachmentAdd = (attachments: UploadResult[]): void => {
+    if (attachments.length > 0 && cliente.id) {
       onAttachmentAdd?.(cliente.id, attachments[0]);
     }
   };
 
+  const createdAtLabel = cliente.created_at
+    ? new Date(cliente.created_at).toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+      })
+    : '--';
+
   return (
     <div
-      className="bg-white rounded-lg border border-gray-200 hover:border-[#159A9C] hover:shadow-lg transition-all duration-200 overflow-hidden group cursor-pointer"
+      className="group cursor-pointer rounded-2xl border border-[#DCE7EB] bg-white p-4 transition-[border-color,box-shadow] hover:border-[#BFD7DD] hover:shadow-[0_14px_28px_-20px_rgba(16,57,74,0.38)]"
       onClick={() => onView?.(cliente)}
     >
-      {/* Status Bar */}
-      <div
-        className={`h-1 ${
-          cliente.status === 'cliente'
-            ? 'bg-green-500'
-            : cliente.status === 'prospect'
-              ? 'bg-blue-500'
-              : cliente.status === 'lead'
-                ? 'bg-yellow-500'
-                : 'bg-gray-400'
-        }`}
-      ></div>
-
-      <div className="p-4">
-        {/* Header: Avatar e Nome */}
-        <div className="flex items-start space-x-3 mb-3">
-          <div className="relative flex-shrink-0">
-            <AvatarUpload
-              currentAvatar={cliente.avatar ?? cliente.avatarUrl}
-              onAvatarChange={handleAvatarChange}
-              size="sm"
-              context={{ clienteId: cliente.id }}
-              className="border-2 border-gray-100 group-hover:border-[#159A9C] transition-colors"
-            />
-            {/* Status Indicator */}
-            <div
-              className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${
-                cliente.status === 'cliente'
-                  ? 'bg-green-500'
-                  : cliente.status === 'prospect'
-                    ? 'bg-blue-500'
-                    : cliente.status === 'lead'
-                      ? 'bg-yellow-500'
-                      : 'bg-gray-400'
-              }`}
-            ></div>
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-semibold text-gray-900 truncate group-hover:text-[#159A9C] transition-colors">
-              {cliente.nome}
-            </h3>
-            {cliente.empresa && (
-              <p className="text-xs text-gray-600 truncate mt-0.5">{cliente.empresa}</p>
-            )}
-          </div>
-
-          {/* Menu de aÃ§Ãµes - sempre visÃ­vel em hover */}
-          <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onView?.(cliente);
-              }}
-              className="p-1 text-gray-400 hover:text-[#159A9C] hover:bg-[#DEEFE7] rounded transition-colors"
-              title="Ver detalhes"
-            >
-              <Eye className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit?.(cliente);
-              }}
-              className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-              title="Editar"
-            >
-              <Edit className="w-3.5 h-3.5" />
-            </button>
-          </div>
+      <div className="mb-3 flex items-start gap-3">
+        <div className="relative flex-shrink-0">
+          <AvatarUpload
+            currentAvatar={cliente.avatar ?? cliente.avatarUrl}
+            onAvatarChange={handleAvatarChange}
+            size="sm"
+            context={{ clienteId: cliente.id }}
+            className="border border-[#D5E2E7] transition-colors group-hover:border-[#AFC9D1]"
+          />
+          <div
+            className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-white ${
+              statusDotMap[cliente.status] ?? statusDotMap.inativo
+            }`}
+          />
         </div>
 
-        {/* InformaÃ§Ãµes de Contato Essenciais */}
-        <div className="space-y-1 mb-3">
-          {cliente.email && (
-            <div className="flex items-center text-xs text-gray-600">
-              <Mail className="w-3 h-3 mr-1.5 text-gray-400 flex-shrink-0" />
-              <span className="truncate">{cliente.email}</span>
-            </div>
-          )}
-          {cliente.telefone && (
-            <div className="flex items-center text-xs text-gray-600">
-              <Phone className="w-3 h-3 mr-1.5 text-gray-400 flex-shrink-0" />
-              <span className="truncate">{cliente.telefone}</span>
-            </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-sm font-semibold text-[#1B3B4E]">{cliente.nome}</h3>
+          {cliente.empresa && (
+            <p className="mt-0.5 truncate text-xs text-[#688391]">{cliente.empresa}</p>
           )}
         </div>
 
-        {/* Tags principais (mÃ¡ximo 2) */}
-        {cliente.tags && cliente.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-3">
-            {cliente.tags.slice(0, 2).map((tag, index) => (
-              <span
-                key={index}
-                className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700"
-              >
-                {tag}
-              </span>
-            ))}
-            {cliente.tags.length > 2 && (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-500 border border-dashed border-gray-300">
-                +{cliente.tags.length - 2}
-              </span>
-            )}
+        <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onView?.(cliente);
+            }}
+            className="rounded-lg p-1 text-[#7A95A2] transition-colors hover:bg-[#EAF3F6] hover:text-[#159A9C]"
+            title="Ver detalhes"
+          >
+            <Eye className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit?.(cliente);
+            }}
+            className="rounded-lg p-1 text-[#7A95A2] transition-colors hover:bg-[#EAF3F6] hover:text-[#159A9C]"
+            title="Editar"
+          >
+            <Edit className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+
+      <div className="mb-3 space-y-1.5">
+        {cliente.email && (
+          <div className="flex items-center text-xs text-[#587481]">
+            <Mail className="mr-1.5 h-3 w-3 flex-shrink-0 text-[#8BA1AC]" />
+            <span className="truncate">{cliente.email}</span>
           </div>
         )}
-
-        {/* Footer: Status e Data */}
-        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-          <span
-            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(cliente.status)}`}
-          >
-            {getStatusLabel(cliente.status)}
-          </span>
-
-          <div className="flex items-center space-x-2 text-xs text-gray-500">
-            {/* Indicador de anexos se existirem */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowAttachments(!showAttachments);
-              }}
-              className="p-0.5 hover:text-gray-700 transition-colors"
-              title="Anexos"
-            >
-              <Paperclip className="w-3 h-3" />
-            </button>
-
-            <span>
-              {new Date(cliente.created_at).toLocaleDateString('pt-BR', {
-                day: '2-digit',
-                month: '2-digit',
-              })}
-            </span>
-          </div>
-        </div>
-
-        {/* SeÃ§Ã£o de Anexos (ExpansÃ­vel) - Simplificada */}
-        {showAttachments && (
-          <div className="mt-3 pt-3 border-t border-gray-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-gray-700">Anexos</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowAttachments(false);
-                }}
-                className="text-xs text-gray-500 hover:text-gray-700"
-              >
-                x
-              </button>
-            </div>
-
-            <FileUpload
-              category="client-attachment"
-              onUploadSuccess={handleAttachmentAdd}
-              multiple={true}
-              compact={true}
-              context={{ clienteId: cliente.id }}
-              className="mb-2"
-            />
+        {cliente.telefone && (
+          <div className="flex items-center text-xs text-[#587481]">
+            <Phone className="mr-1.5 h-3 w-3 flex-shrink-0 text-[#8BA1AC]" />
+            <span className="truncate">{cliente.telefone}</span>
           </div>
         )}
       </div>
+
+      {cliente.tags && cliente.tags.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {cliente.tags.slice(0, 2).map((tag, index) => (
+            <span
+              key={index}
+              className="inline-flex items-center rounded-md border border-[#DCE5EA] bg-[#F7FAFB] px-2 py-0.5 text-[11px] font-medium text-[#607987]"
+            >
+              {tag}
+            </span>
+          ))}
+          {cliente.tags.length > 2 && (
+            <span className="inline-flex items-center rounded-md border border-dashed border-[#CCDCE3] bg-[#FBFDFE] px-2 py-0.5 text-[11px] font-medium text-[#7D93A0]">
+              +{cliente.tags.length - 2}
+            </span>
+          )}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between border-t border-[#E6EEF2] pt-2.5">
+        <span
+          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+            statusBadgeMap[cliente.status] ?? statusBadgeMap.inativo
+          }`}
+        >
+          {statusLabelMap[cliente.status] ?? cliente.status}
+        </span>
+
+        <div className="flex items-center gap-2 text-[11px] text-[#728B97]">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowAttachments(!showAttachments);
+            }}
+            className="rounded-md p-1 transition-colors hover:bg-[#EAF3F6] hover:text-[#446776]"
+            title="Anexos"
+          >
+            <Paperclip className="h-3 w-3" />
+          </button>
+
+          <span>{createdAtLabel}</span>
+        </div>
+      </div>
+
+      {showAttachments && (
+        <div className="mt-3 border-t border-[#E6EEF2] pt-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-medium text-[#4C6977]">Anexos</span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowAttachments(false);
+              }}
+              className="rounded-md px-1.5 py-0.5 text-xs text-[#728B97] transition-colors hover:bg-[#EFF5F7] hover:text-[#4C6977]"
+            >
+              x
+            </button>
+          </div>
+
+          <FileUpload
+            category="client-attachment"
+            onUploadSuccess={handleAttachmentAdd}
+            multiple={true}
+            compact={true}
+            context={{ clienteId: cliente.id }}
+            className="mb-1"
+          />
+        </div>
+      )}
     </div>
   );
 };

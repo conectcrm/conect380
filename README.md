@@ -487,7 +487,7 @@ npm run cypress:open
 ### 📖 Documentação de Features
 
 - **[SISTEMA_WHATSAPP_CONCLUIDO.md](docs/archive/2025/SISTEMA_WHATSAPP_CONCLUIDO.md)** - Integração WhatsApp
-- **[CHAT_REALTIME_README.md](CHAT_REALTIME_README.md)** - WebSocket e tempo real
+- **[FRONTEND_CHAT_REALTIME.md](frontend-web/docs/FRONTEND_CHAT_REALTIME.md)** - WebSocket e tempo real
 - **[CONSOLIDACAO_CONSTRUTOR_VISUAL.md](docs/archive/2025/CONSOLIDACAO_CONSTRUTOR_VISUAL.md)** - Editor de fluxos
 - **[MISSAO_CUMPRIDA_ATENDIMENTO.md](docs/archive/2025/MISSAO_CUMPRIDA_ATENDIMENTO.md)** - Sistema de atendimento completo
 

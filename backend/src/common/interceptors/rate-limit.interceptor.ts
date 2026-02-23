@@ -19,8 +19,14 @@ interface RateLimitEntry {
 export class RateLimitInterceptor implements NestInterceptor {
   private readonly limitsByIP = new Map<string, RateLimitEntry>();
   private readonly limitsByEmpresa = new Map<string, RateLimitEntry>();
-  private readonly isDevelopment = process.env.NODE_ENV === 'development';
-  private readonly DEV_BYPASS_GET_PATHS = ['/empresas/modulos/ativos'];
+  private readonly nodeEnv = String(process.env.NODE_ENV || 'development').toLowerCase();
+  private readonly isDevelopment = this.nodeEnv === 'development';
+  private readonly DEV_BYPASS_GET_PATHS = [
+    '/empresas/modulos/ativos',
+    '/dashboard/v2/feature-flag',
+    '/dashboard/resumo',
+    '/notifications',
+  ];
 
   // Base limits (production): 100 req/min per IP and 1000 req/min per empresa.
   // Development gets wider limits and shorter temporary block duration.
@@ -40,6 +46,12 @@ export class RateLimitInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest();
 
     if (this.shouldBypassInDevelopment(request)) {
+      const response = context.switchToHttp().getResponse();
+      try {
+        response?.setHeader?.('x-rate-limit-bypass', 'development');
+      } catch {
+        // noop
+      }
       return next.handle();
     }
 
@@ -104,9 +116,17 @@ export class RateLimitInterceptor implements NestInterceptor {
       return false;
     }
 
-    const path = String(request?.originalUrl || request?.url || '').split('?')[0];
+    const rawPath = String(request?.path || request?.originalUrl || request?.url || '');
+    const path = rawPath.split('?')[0].replace(/\/+$/, '');
+
+    // Em desenvolvimento, o dashboard e notificações podem disparar várias requisições em sequência
+    // durante reloads/reativações de sessão. Bypass aqui evita 429 local e ruído nos logs.
+    if (path.startsWith('/dashboard/') || path.startsWith('/notifications')) {
+      return true;
+    }
+
     return this.DEV_BYPASS_GET_PATHS.some(
-      (allowedPath) => path === allowedPath || path.endsWith(allowedPath),
+      (allowedPath) => path === allowedPath || path.endsWith(allowedPath.replace(/\/+$/, '')),
     );
   }
 

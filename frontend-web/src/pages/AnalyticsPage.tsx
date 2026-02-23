@@ -2,6 +2,7 @@ import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/Tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
+import { PageHeader, SectionCard } from '../components/layout-v2';
 import {
   BarChart3,
   TrendingUp,
@@ -68,36 +69,32 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Analytics & Relatórios</h1>
-            <p className="text-gray-600 mt-1">
-              Dashboard completo de performance, métricas e alertas do sistema
-            </p>
-          </div>
+    <div className="space-y-4 pt-1 sm:pt-2">
+      <SectionCard className="p-5">
+        <PageHeader
+          title="Analytics & Relatórios"
+          description="Dashboard completo de performance, métricas e alertas do sistema"
+          actions={
+            <>
+              <Button onClick={exportarRelatorioCompleto} className="bg-[#159A9C] hover:bg-[#0F7B7D]">
+                <Download className="h-4 w-4 mr-2" />
+                Exportar Relatório
+              </Button>
 
-          <div className="flex flex-wrap gap-2">
-            <Button
-              onClick={exportarRelatorioCompleto}
-              className="bg-[#159A9C] hover:bg-[#0F7B7D]"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Exportar Relatório
-            </Button>
+              <Button variant="outline" onClick={() => window.location.reload()}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Atualizar
+              </Button>
+            </>
+          }
+        />
+      </SectionCard>
 
-            <Button variant="outline" onClick={() => window.location.reload()}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Atualizar
-            </Button>
-          </div>
-        </div>
-
-        {/* KPIs em Tempo Real - Sempre visível */}
+      <SectionCard className="p-5">
         <KpisTempoReal autoRefresh={true} refreshInterval={60000} />
+      </SectionCard>
 
+      <SectionCard className="p-5">
         {/* Alertas de Gestão - Sidebar ou seção destacada */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-3">
@@ -158,10 +155,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
                                 <span className="font-bold">R$ 500.000</span>
                               </div>
                               <div className="w-full bg-gray-200 rounded-full h-3">
-                                <div
-                                  className="bg-[#159A9C] h-3 rounded-full"
-                                  style={{ width: '90%' }}
-                                ></div>
+                                <div className="bg-[#159A9C] h-3 rounded-full" style={{ width: '90%' }}></div>
                               </div>
                               <div className="text-center text-sm text-gray-600">
                                 90% da meta - Faltam R$ 50.000
@@ -200,61 +194,52 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
 
           {/* Sidebar com Alertas */}
           <div className="lg:col-span-1">
-            <AlertasGestao
-              onAlertaClick={handleAlertaClick}
-              maxAlertas={10}
-            />
+            <AlertasGestao onAlertaClick={handleAlertaClick} maxAlertas={10} />
           </div>
         </div>
+      </SectionCard>
 
-        {/* Seção de Insights e Recomendações */}
-        <Card className="bg-[#159A9C]/5">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Insights e Recomendações Automáticas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <h4 className="font-semibold text-green-700">✅ Pontos Fortes</h4>
-                <ul className="text-sm text-gray-700 space-y-1">
-                  <li>• Taxa de conversão acima da média do setor</li>
-                  <li>• Ticket médio crescendo consistentemente</li>
-                  <li>• Tempo de resposta excelente (&lt; 2h)</li>
-                </ul>
-              </div>
-
-              <div className="space-y-2">
-                <h4 className="font-semibold text-yellow-700">⚠️ Oportunidades</h4>
-                <ul className="text-sm text-gray-700 space-y-1">
-                  <li>• 12 clientes elegíveis para upsell</li>
-                  <li>• Melhorar follow-up em propostas pendentes</li>
-                  <li>• Automatizar mais etapas do processo</li>
-                </ul>
-              </div>
-
-              <div className="space-y-2">
-                <h4 className="font-semibold text-red-700">🎯 Ações Prioritárias</h4>
-                <ul className="text-sm text-gray-700 space-y-1">
-                  <li>• Revisar 5 propostas com prazo vencido</li>
-                  <li>• Treinar vendedores com baixa conversão</li>
-                  <li>• Otimizar processo de aprovação</li>
-                </ul>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Footer com estatísticas gerais */}
-        <div className="text-center py-6 border-t">
-          <p className="text-gray-600 text-sm">
-            Sistema ConectCRM - 100% Automatizado |
-            Última atualização: {new Date().toLocaleString('pt-BR')} |
-            <span className="text-green-600 font-medium">🟢 Todos os sistemas operacionais</span>
-          </p>
+      <SectionCard className="p-5">
+        <div className="flex items-center gap-2">
+          <FileText className="h-5 w-5" />
+          <h2 className="text-lg font-semibold text-gray-900">Insights e Recomendações Automáticas</h2>
         </div>
+
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <h4 className="font-semibold text-green-700">✅ Pontos Fortes</h4>
+            <ul className="text-sm text-gray-700 space-y-1">
+              <li>• Taxa de conversão acima da média do setor</li>
+              <li>• Ticket médio crescendo consistentemente</li>
+              <li>• Tempo de resposta excelente (&lt; 2h)</li>
+            </ul>
+          </div>
+
+          <div className="space-y-2">
+            <h4 className="font-semibold text-yellow-700">⚠️ Oportunidades</h4>
+            <ul className="text-sm text-gray-700 space-y-1">
+              <li>• 12 clientes elegíveis para upsell</li>
+              <li>• Melhorar follow-up em propostas pendentes</li>
+              <li>• Automatizar mais etapas do processo</li>
+            </ul>
+          </div>
+
+          <div className="space-y-2">
+            <h4 className="font-semibold text-red-700">🎯 Ações Prioritárias</h4>
+            <ul className="text-sm text-gray-700 space-y-1">
+              <li>• Revisar 5 propostas com prazo vencido</li>
+              <li>• Treinar vendedores com baixa conversão</li>
+              <li>• Otimizar processo de aprovação</li>
+            </ul>
+          </div>
+        </div>
+      </SectionCard>
+
+      <div className="text-center py-6 border-t">
+        <p className="text-gray-600 text-sm">
+          Sistema ConectCRM - 100% Automatizado | Última atualização: {new Date().toLocaleString('pt-BR')} |
+          <span className="text-green-600 font-medium">🟢 Todos os sistemas operacionais</span>
+        </p>
       </div>
     </div>
   );

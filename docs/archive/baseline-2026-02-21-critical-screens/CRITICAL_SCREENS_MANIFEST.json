@@ -1,0 +1,159 @@
+{
+  "snapshotDate": "2026-02-21",
+  "capturedAt": "2026-02-21T02:03:03.007Z",
+  "baseUrl": "http://localhost:3000",
+  "viewport": {
+    "width": 1920,
+    "height": 1080
+  },
+  "totalRoutes": 16,
+  "successCount": 16,
+  "errorCount": 0,
+  "captures": [
+    {
+      "routeRequested": "/dashboard",
+      "routeFinal": "/dashboard",
+      "title": "Conect CRM",
+      "status": "ok",
+      "viewportFile": "01-dashboard-viewport-1920x1080.png",
+      "fullPageFile": "01-dashboard-fullpage.png",
+      "error": null
+    },
+    {
+      "routeRequested": "/pipeline",
+      "routeFinal": "/pipeline",
+      "title": "Conect CRM",
+      "status": "ok",
+      "viewportFile": "02-pipeline-viewport-1920x1080.png",
+      "fullPageFile": "02-pipeline-fullpage.png",
+      "error": null
+    },
+    {
+      "routeRequested": "/propostas",
+      "routeFinal": "/propostas",
+      "title": "Conect CRM",
+      "status": "ok",
+      "viewportFile": "03-propostas-viewport-1920x1080.png",
+      "fullPageFile": "03-propostas-fullpage.png",
+      "error": null
+    },
+    {
+      "routeRequested": "/clientes",
+      "routeFinal": "/clientes",
+      "title": "Conect CRM",
+      "status": "ok",
+      "viewportFile": "04-clientes-viewport-1920x1080.png",
+      "fullPageFile": "04-clientes-fullpage.png",
+      "error": null
+    },
+    {
+      "routeRequested": "/leads",
+      "routeFinal": "/leads",
+      "title": "Conect CRM",
+      "status": "ok",
+      "viewportFile": "05-leads-viewport-1920x1080.png",
+      "fullPageFile": "05-leads-fullpage.png",
+      "error": null
+    },
+    {
+      "routeRequested": "/atendimento",
+      "routeFinal": "/atendimento",
+      "title": "Conect CRM",
+      "status": "ok",
+      "viewportFile": "06-atendimento-viewport-1920x1080.png",
+      "fullPageFile": "06-atendimento-fullpage.png",
+      "error": null
+    },
+    {
+      "routeRequested": "/atendimento/inbox",
+      "routeFinal": "/atendimento/inbox",
+      "title": "Conect CRM",
+      "status": "ok",
+      "viewportFile": "07-atendimento-inbox-viewport-1920x1080.png",
+      "fullPageFile": "07-atendimento-inbox-fullpage.png",
+      "error": null
+    },
+    {
+      "routeRequested": "/atendimento/automacoes",
+      "routeFinal": "/atendimento/automacoes",
+      "title": "Conect CRM",
+      "status": "ok",
+      "viewportFile": "08-atendimento-automacoes-viewport-1920x1080.png",
+      "fullPageFile": "08-atendimento-automacoes-fullpage.png",
+      "error": null
+    },
+    {
+      "routeRequested": "/atendimento/equipe",
+      "routeFinal": "/atendimento/equipe",
+      "title": "Conect CRM",
+      "status": "ok",
+      "viewportFile": "09-atendimento-equipe-viewport-1920x1080.png",
+      "fullPageFile": "09-atendimento-equipe-fullpage.png",
+      "error": null
+    },
+    {
+      "routeRequested": "/atendimento/distribuicao",
+      "routeFinal": "/atendimento/distribuicao",
+      "title": "Conect CRM",
+      "status": "ok",
+      "viewportFile": "10-atendimento-distribuicao-viewport-1920x1080.png",
+      "fullPageFile": "10-atendimento-distribuicao-fullpage.png",
+      "error": null
+    },
+    {
+      "routeRequested": "/atendimento/distribuicao/dashboard",
+      "routeFinal": "/atendimento/distribuicao/dashboard",
+      "title": "Conect CRM",
+      "status": "ok",
+      "viewportFile": "11-atendimento-distribuicao-dashboard-viewport-1920x1080.png",
+      "fullPageFile": "11-atendimento-distribuicao-dashboard-fullpage.png",
+      "error": null
+    },
+    {
+      "routeRequested": "/atendimento/analytics",
+      "routeFinal": "/atendimento/analytics",
+      "title": "Conect CRM",
+      "status": "ok",
+      "viewportFile": "12-atendimento-analytics-viewport-1920x1080.png",
+      "fullPageFile": "12-atendimento-analytics-fullpage.png",
+      "error": null
+    },
+    {
+      "routeRequested": "/financeiro",
+      "routeFinal": "/financeiro",
+      "title": "Conect CRM",
+      "status": "ok",
+      "viewportFile": "13-financeiro-viewport-1920x1080.png",
+      "fullPageFile": "13-financeiro-fullpage.png",
+      "error": null
+    },
+    {
+      "routeRequested": "/financeiro/contas-receber",
+      "routeFinal": "/financeiro/contas-receber",
+      "title": "Conect CRM",
+      "status": "ok",
+      "viewportFile": "14-financeiro-contas-receber-viewport-1920x1080.png",
+      "fullPageFile": "14-financeiro-contas-receber-fullpage.png",
+      "error": null
+    },
+    {
+      "routeRequested": "/configuracoes",
+      "routeFinal": "/configuracoes",
+      "title": "Conect CRM",
+      "status": "ok",
+      "viewportFile": "15-configuracoes-viewport-1920x1080.png",
+      "fullPageFile": "15-configuracoes-fullpage.png",
+      "error": null
+    },
+    {
+      "routeRequested": "/perfil",
+      "routeFinal": "/perfil",
+      "title": "Conect CRM",
+      "status": "ok",
+      "viewportFile": "16-perfil-viewport-1920x1080.png",
+      "fullPageFile": "16-perfil-fullpage.png",
+      "error": null
+    }
+  ],
+  "notes": "Baseline visual de telas criticas antes da nova refatoracao de design."
+}

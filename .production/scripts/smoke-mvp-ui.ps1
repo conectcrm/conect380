@@ -2,7 +2,8 @@ param(
   [string]$FrontendUrl = "http://localhost:3000",
   [string]$BackendHealthUrl = "http://localhost:3001/health",
   [string]$AdminEmail = "admin@conectsuite.com.br",
-  [string]$AdminPassword = "admin123"
+  [string]$AdminPassword = "admin123",
+  [switch]$SkipMobileGuard
 )
 
 $ErrorActionPreference = "Stop"
@@ -63,6 +64,16 @@ try {
   npx playwright test e2e/mvp-smoke-ui.spec.ts --project=chromium --reporter=list
   if ($LASTEXITCODE -ne 0) {
     throw "Playwright MVP UI smoke falhou"
+  }
+
+  if (-not $SkipMobileGuard) {
+    npx playwright test e2e/mobile-responsiveness-smoke.spec.ts e2e/mobile-drawer-profile.spec.ts --project=chromium --reporter=list
+    if ($LASTEXITCODE -ne 0) {
+      throw "Playwright mobile guard smoke falhou"
+    }
+  }
+  else {
+    Write-Host "Mobile guard skipped (SkipMobileGuard enabled)."
   }
 }
 finally {

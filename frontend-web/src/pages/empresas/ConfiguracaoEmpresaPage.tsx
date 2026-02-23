@@ -17,12 +17,14 @@ import {
   X,
   ImageIcon,
 } from 'lucide-react';
-import { BackToNucleus } from '../../components/navigation/BackToNucleus';
+import { LoadingSkeleton, PageHeader, SectionCard } from '../../components/layout-v2';
 import { empresaConfigService, ConfiguracoesEmpresa } from '../../services/empresaConfigService';
 import { empresaService, EmpresaResponse } from '../../services/empresaService';
 import { useAuth } from '../../hooks/useAuth';
+import { useGlobalConfirmation } from '../../contexts/GlobalConfirmationContext';
 
 const ConfiguracaoEmpresaPage: React.FC = () => {
+  const { confirm } = useGlobalConfirmation();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('geral');
   const [config, setConfig] = useState<ConfiguracoesEmpresa | null>(null);
@@ -110,11 +112,17 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
         throw new Error('Usuário não possui empresa associada');
       }
 
-      console.log('📤 Enviando configurações:', {
-        ...formData,
-        logoUrl: formData.logoUrl
-          ? `${formData.logoUrl.substring(0, 50)}... (${Math.round((formData.logoUrl.length * 3) / 4 / 1024)}KB)`
-          : null,
+      console.log('Enviando configura??es da empresa (resumo):', {
+        activeTab,
+        hasLogo: Boolean(formData.logoUrl),
+        emailsHabilitados: Boolean(formData.emailsHabilitados),
+        smtpConfigurado: Boolean(formData.smtpUsuario && formData.smtpSenha),
+        whatsappHabilitado: Boolean(formData.whatsappHabilitado),
+        whatsappTokenConfigurado: Boolean(formData.whatsappApiToken),
+        smsHabilitado: Boolean(formData.smsHabilitado),
+        smsApiKeyConfigurada: Boolean(formData.smsApiKey),
+        pushHabilitado: Boolean(formData.pushHabilitado),
+        pushApiKeyConfigurada: Boolean(formData.pushApiKey),
       });
 
       // Salvar configurações avançadas (JWT automático)
@@ -147,9 +155,9 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
 
   const handleReset = async () => {
     if (
-      !window.confirm(
+      !(await confirm(
         'Tem certeza que deseja restaurar todas as configurações para os valores padrão?',
-      )
+      ))
     )
       return;
     try {
@@ -331,67 +339,60 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#159A9C] mx-auto"></div>
-          <p className="mt-4 text-gray-600">Carregando...</p>
-        </div>
+      <div className="space-y-4 pt-1 sm:pt-2">
+        <LoadingSkeleton lines={8} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus nucleusName="Configurações" nucleusPath="/nuclei/configuracoes/empresas" />
-      </div>
+    <div className="space-y-4 pb-24 pt-1 sm:pt-2">
+      <SectionCard className="p-5">
+        <PageHeader
+          title={
+            <span className="inline-flex items-center gap-3">
+              <Settings className="h-7 w-7 text-[#159A9C]" />
+              <span>Configurações da Empresa</span>
+            </span>
+          }
+          description="Gerencie todas as configurações do sistema"
+          actions={
+            hasChanges ? (
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
+                <Info className="h-4 w-4 mr-1" />
+                Alterações pendentes
+              </span>
+            ) : null
+          }
+        />
+      </SectionCard>
 
-      <div className="p-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <Settings className="h-8 w-8 mr-3 text-[#159A9C]" />
-                <div>
-                  <h1 className="text-3xl font-bold text-[#002333]">Configurações da Empresa</h1>
-                  <p className="text-gray-500 mt-1">Gerencie todas as configurações do sistema</p>
-                </div>
-              </div>
-              {hasChanges && (
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
-                  <Info className="h-4 w-4 mr-1" />
-                  Alterações pendentes
-                </span>
-              )}
-            </div>
+      {error && (
+        <div className="rounded-[18px] border border-red-200 bg-red-50 px-4 py-3 text-red-800">
+          {error}
+        </div>
+      )}
+
+      <SectionCard className="overflow-hidden">
+        <div className="border-b px-6 py-3">
+          <div className="flex gap-4 overflow-x-auto">
+            {tabs.map((tab) => {
+              const IconComponent = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2 px-4 py-2 font-medium text-sm whitespace-nowrap transition-colors ${activeTab === tab.id ? 'text-[#159A9C] border-b-2 border-[#159A9C]' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  <IconComponent className="h-4 w-4" />
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
+        </div>
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-6">
-              {error}
-            </div>
-          )}
-
-          <div className="bg-white rounded-lg shadow-sm border mb-6">
-            <div className="border-b px-6 py-3">
-              <div className="flex gap-4 overflow-x-auto">
-                {tabs.map((tab) => {
-                  const IconComponent = tab.icon;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`flex items-center gap-2 px-4 py-2 font-medium text-sm whitespace-nowrap transition-colors ${activeTab === tab.id ? 'text-[#159A9C] border-b-2 border-[#159A9C]' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
-                      <IconComponent className="h-4 w-4" />
-                      {tab.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="p-6">
+        <div className="p-6">
               {activeTab === 'geral' && (
                 <div className="space-y-8">
                   {/* Seção 1: Informações da Empresa */}
@@ -1510,29 +1511,29 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                   </div>
                 )}
             </div>
-          </div>
+      </SectionCard>
 
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <div className="flex justify-between">
-              <button
-                onClick={handleReset}
-                disabled={saving}
-                className="flex items-center gap-2 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-              >
-                <RotateCcw className="h-4 w-4" />
-                Restaurar Padrões
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={!hasChanges || saving}
-                className="flex items-center gap-2 px-6 py-3 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50"
-              >
-                <Save className="h-4 w-4" />
-                {saving ? 'Salvando...' : 'Salvar Alterações'}
-              </button>
-            </div>
+      <div className="sticky bottom-4 z-10">
+        <SectionCard className="p-5">
+          <div className="flex flex-col sm:flex-row gap-3 sm:justify-between">
+            <button
+              onClick={handleReset}
+              disabled={saving}
+              className="flex items-center justify-center gap-2 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Restaurar Padrões
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={!hasChanges || saving}
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50"
+            >
+              <Save className="h-4 w-4" />
+              {saving ? 'Salvando...' : 'Salvar Alterações'}
+            </button>
           </div>
-        </div>
+        </SectionCard>
       </div>
     </div>
   );

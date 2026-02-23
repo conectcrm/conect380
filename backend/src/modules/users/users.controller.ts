@@ -22,6 +22,7 @@ import { diskStorage } from 'multer';
 import { Express, Request } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as bcrypt from 'bcryptjs';
 
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -53,7 +54,7 @@ type UsersReadScopeFilters = {
 };
 
 const ensureAvatarDirectory = (): string => {
-  const uploadDir = path.resolve(__dirname, '../../../uploads', AVATAR_UPLOAD_SUBDIR);
+  const uploadDir = path.resolve(process.cwd(), 'uploads', AVATAR_UPLOAD_SUBDIR);
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
     avatarLogger.log('[Uploads] Diretório de avatares criado:', uploadDir);
@@ -467,8 +468,62 @@ export class UsersController {
         permissions: normalizedPermissions,
         avatar_url: user.avatar_url,
         idioma_preferido: user.idioma_preferido,
+        configuracoes: user.configuracoes ?? null,
+        empresa_id: user.empresa_id,
+        ativo: user.ativo,
+        ultimo_login: user.ultimo_login ?? null,
+        created_at: user.created_at ?? null,
+        updated_at: user.updated_at ?? null,
         empresa,
       },
+    };
+  }
+
+  @Get('profile/export')
+  @ApiOperation({ summary: 'Exportar dados do usuario logado (LGPD)' })
+  @ApiResponse({ status: 200, description: 'Dados exportados com sucesso' })
+  async exportOwnProfileData(@CurrentUser() user: User) {
+    const data = await this.usersService.exportOwnData(user.id, user.empresa_id);
+    return {
+      success: true,
+      data,
+      message: 'Exportacao de dados gerada com sucesso',
+    };
+  }
+
+  @Post('profile/privacy-request')
+  @ApiOperation({ summary: 'Registrar solicitacao LGPD do usuario logado' })
+  @ApiResponse({ status: 201, description: 'Solicitacao registrada com sucesso' })
+  async createOwnPrivacyRequest(
+    @CurrentUser() user: User,
+    @Body()
+    body: {
+      type?: 'data_export' | 'account_anonymization' | 'account_deletion';
+      reason?: string;
+    },
+  ) {
+    const allowedTypes = new Set(['data_export', 'account_anonymization', 'account_deletion']);
+    const requestType = typeof body?.type === 'string' ? body.type : '';
+
+    if (!allowedTypes.has(requestType)) {
+      throw new BadRequestException(
+        'Tipo de solicitacao invalido. Use data_export, account_anonymization ou account_deletion.',
+      );
+    }
+
+    if (body?.reason !== undefined && typeof body.reason !== 'string') {
+      throw new BadRequestException('Campo reason invalido.');
+    }
+
+    const data = await this.usersService.createPrivacyRequest(user.id, user.empresa_id, {
+      type: requestType as 'data_export' | 'account_anonymization' | 'account_deletion',
+      reason: body?.reason,
+    });
+
+    return {
+      success: true,
+      data,
+      message: 'Solicitacao LGPD registrada com sucesso',
     };
   }
 
@@ -486,12 +541,69 @@ export class UsersController {
     };
   }
 
+  @Put('profile/password')
+  @Permissions(Permission.USERS_PROFILE_UPDATE)
+  @ApiOperation({ summary: 'Atualizar senha do usuário logado' })
+  @ApiResponse({ status: 200, description: 'Senha atualizada com sucesso' })
+  async updateOwnPassword(
+    @CurrentUser() user: User,
+    @Body()
+    body: {
+      senha_atual?: string;
+      senha_nova?: string;
+      confirmar_senha?: string;
+    },
+  ) {
+    const senhaAtual = typeof body?.senha_atual === 'string' ? body.senha_atual.trim() : '';
+    const senhaNova = typeof body?.senha_nova === 'string' ? body.senha_nova.trim() : '';
+    const confirmarSenha =
+      typeof body?.confirmar_senha === 'string' ? body.confirmar_senha.trim() : '';
+
+    if (!senhaAtual) {
+      throw new BadRequestException('Informe sua senha atual.');
+    }
+
+    if (!senhaNova) {
+      throw new BadRequestException('Informe a nova senha.');
+    }
+
+    if (senhaNova.length < 6) {
+      throw new BadRequestException('A nova senha deve ter pelo menos 6 caracteres.');
+    }
+
+    if (confirmarSenha && confirmarSenha !== senhaNova) {
+      throw new BadRequestException('A confirmacao da nova senha nao confere.');
+    }
+
+    if (senhaAtual === senhaNova) {
+      throw new BadRequestException('A nova senha deve ser diferente da senha atual.');
+    }
+
+    const userWithPassword = await this.usersService.findOne(user.id, user.empresa_id);
+    if (!userWithPassword || !userWithPassword.senha) {
+      throw new NotFoundException('Usuario nao encontrado.');
+    }
+
+    const senhaAtualValida = await bcrypt.compare(senhaAtual, userWithPassword.senha);
+    if (!senhaAtualValida) {
+      throw new ForbiddenException('Senha atual incorreta.');
+    }
+
+    const hashedPassword = await bcrypt.hash(senhaNova, 10);
+    await this.usersService.updatePassword(user.id, hashedPassword, true);
+
+    return {
+      success: true,
+      message: 'Senha atualizada com sucesso',
+    };
+  }
+
   @Post('profile/avatar')
   @Permissions(Permission.USERS_PROFILE_UPDATE)
   @UseInterceptors(
     FileInterceptor('avatar', {
       storage: diskStorage({
-        destination: () => ensureAvatarDirectory(),
+        destination: (_req, _file, cb) => cb(null, ensureAvatarDirectory()),
         filename: (req, file, cb) => {
           const request = req as Request & { user?: User };
           const userId = request?.user?.id || 'user';
@@ -581,6 +693,117 @@ export class UsersController {
       this.logger.error('[Uploads] Erro ao atualizar avatar do usuário:', error);
       throw new InternalServerErrorException(
         'Não foi possível atualizar seu avatar. Tente novamente em instantes.',
+      );
+    }
+  }
+
+  @Post(':id/avatar')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
+  @Permissions(Permission.USERS_UPDATE)
+  @UseInterceptors(
+    FileInterceptor('avatar', {
+      storage: diskStorage({
+        destination: (_req, _file, cb) => cb(null, ensureAvatarDirectory()),
+        filename: (req, file, cb) => {
+          const request = req as Request & {
+            params?: Record<string, string>;
+            user?: User;
+          };
+          const targetUserId = request?.params?.id || request?.user?.id || 'user';
+          const ext = path.extname(file.originalname)?.toLowerCase() || '.png';
+          const safeExt = ['.jpg', '.jpeg', '.png', '.webp'].includes(ext) ? ext : '.png';
+          const fileName = `${targetUserId}-${Date.now()}${safeExt}`;
+          cb(null, fileName);
+        },
+      }),
+      limits: {
+        fileSize: parseInt(process.env.AVATAR_MAX_SIZE || '', 10) || 2 * 1024 * 1024,
+      },
+      fileFilter: (req, file, cb) => {
+        if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+          return cb(
+            new BadRequestException(
+              'Formato de imagem não suportado. Use JPG, PNG ou WEBP.',
+            ) as any,
+            false,
+          );
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  @ApiOperation({ summary: 'Atualizar avatar de um usuário da empresa' })
+  @ApiResponse({ status: 200, description: 'Avatar atualizado com sucesso' })
+  async uploadAvatarByAdmin(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException(
+        'Nenhuma imagem foi enviada. Selecione uma foto em JPG, PNG ou WEBP.',
+      );
+    }
+
+    const targetUser = await this.ensureCanManageUser(user, id, 'atualizar avatar de');
+
+    const newAvatarRelativePath = `${AVATAR_SEGMENT}${file.filename}`;
+    const newAvatarFullPath = path.join(this.getAvatarUploadDir(), file.filename);
+    const previousAvatarPath = this.getLocalAvatarPath(targetUser.avatar_url);
+
+    try {
+      const updatedUser = await this.usersService.atualizar(
+        id,
+        { avatar_url: newAvatarRelativePath },
+        user.empresa_id,
+      );
+
+      if (!updatedUser) {
+        throw new InternalServerErrorException('Usuário não encontrado ao atualizar avatar.');
+      }
+
+      if (previousAvatarPath && previousAvatarPath !== newAvatarFullPath) {
+        try {
+          await fs.promises.unlink(previousAvatarPath);
+        } catch (unlinkError) {
+          const errorCode = (unlinkError as NodeJS.ErrnoException)?.code;
+          if (errorCode !== 'ENOENT') {
+            this.logger.warn(
+              '[Uploads] Falha ao remover avatar antigo:',
+              previousAvatarPath,
+              unlinkError,
+            );
+          }
+        }
+      }
+
+      return {
+        success: true,
+        data: {
+          id: updatedUser.id,
+          nome: updatedUser.nome,
+          email: updatedUser.email,
+          avatar_url: updatedUser.avatar_url ?? newAvatarRelativePath,
+        },
+        message: 'Avatar do usuário atualizado com sucesso',
+      };
+    } catch (error) {
+      try {
+        await fs.promises.unlink(newAvatarFullPath);
+      } catch (cleanupError) {
+        const errorCode = (cleanupError as NodeJS.ErrnoException)?.code;
+        if (errorCode !== 'ENOENT') {
+          this.logger.error(
+            '[Uploads] Falha ao remover avatar após erro:',
+            newAvatarFullPath,
+            cleanupError,
+          );
+        }
+      }
+
+      this.logger.error('[Uploads] Erro ao atualizar avatar do usuário por admin:', error);
+      throw new InternalServerErrorException(
+        'Não foi possível atualizar o avatar do usuário. Tente novamente em instantes.',
       );
     }
   }
@@ -681,6 +904,82 @@ export class UsersController {
     return {
       success: true,
       data: atendentes.map((atendente) => this.sanitizeUser(atendente)),
+    };
+  }
+
+  @Get('privacy-requests')
+  @Permissions(Permission.USERS_READ)
+  @ApiOperation({ summary: 'Listar solicitacoes LGPD da empresa' })
+  @ApiResponse({ status: 200, description: 'Solicitacoes LGPD retornadas com sucesso' })
+  async listarSolicitacoesPrivacidade(
+    @CurrentUser() user: User,
+    @Query('status') status?: string,
+    @Query('type') type?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const allowedStatus = new Set(['open', 'in_review', 'completed', 'rejected']);
+    const allowedType = new Set(['data_export', 'account_anonymization', 'account_deletion']);
+
+    if (status && !allowedStatus.has(status)) {
+      throw new BadRequestException(
+        'Status invalido. Use open, in_review, completed ou rejected.',
+      );
+    }
+
+    if (type && !allowedType.has(type)) {
+      throw new BadRequestException(
+        'Tipo invalido. Use data_export, account_anonymization ou account_deletion.',
+      );
+    }
+
+    const data = await this.usersService.listPrivacyRequests(user.empresa_id, {
+      status: status as any,
+      type: type as any,
+      limit: limit ? parseInt(limit, 10) : 50,
+    });
+
+    return {
+      success: true,
+      data,
+    };
+  }
+
+  @Patch('privacy-requests/:id')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
+  @Permissions(Permission.USERS_UPDATE)
+  @ApiOperation({ summary: 'Atualizar status de solicitacao LGPD' })
+  @ApiResponse({ status: 200, description: 'Solicitacao LGPD atualizada com sucesso' })
+  async atualizarSolicitacaoPrivacidade(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body()
+    body: {
+      status?: 'open' | 'in_review' | 'completed' | 'rejected';
+      resolution_note?: string;
+    },
+  ) {
+    const allowedStatus = new Set(['open', 'in_review', 'completed', 'rejected']);
+    const status = typeof body?.status === 'string' ? body.status : '';
+
+    if (!allowedStatus.has(status)) {
+      throw new BadRequestException(
+        'Status invalido. Use open, in_review, completed ou rejected.',
+      );
+    }
+
+    if (body?.resolution_note !== undefined && typeof body.resolution_note !== 'string') {
+      throw new BadRequestException('resolution_note invalido.');
+    }
+
+    const data = await this.usersService.updatePrivacyRequestStatus(id, user.empresa_id, user, {
+      status: status as 'open' | 'in_review' | 'completed' | 'rejected',
+      resolution_note: body?.resolution_note,
+    });
+
+    return {
+      success: true,
+      data,
+      message: 'Solicitacao LGPD atualizada com sucesso',
     };
   }
 

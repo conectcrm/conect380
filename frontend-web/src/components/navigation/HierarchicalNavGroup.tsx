@@ -77,7 +77,6 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
   sidebarCollapsed: _sidebarCollapsed,
   instanceId,
 }) => {
-  const isMobileInstance = instanceId === 'mobile';
   const location = useLocation();
   const { user } = useAuth();
   const { activeSubmenuPanel, toggleSubmenuPanel, setActiveSubmenuPanel } = useSidebar();
@@ -175,20 +174,14 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
     // Mas não os dois ao mesmo tempo para evitar duplicação visual
     const shouldHighlight = isPanelOpen || hasActiveChild;
     const itemBaseStateClass = shouldHighlight
-      ? 'bg-[#159A9C]/20 border-[#159A9C]/35 shadow-[inset_0_0_0_1px_rgba(21,154,156,0.15)]'
-      : isMobileInstance
-        ? 'hover:bg-[#DEEFE7]/75 hover:border-[#159A9C]/20'
-        : 'hover:bg-white/8 hover:border-white/10';
+      ? 'bg-white border-[#8FCFC4]/80 shadow-[0_10px_18px_-15px_rgba(15,123,125,0.65)]'
+      : 'hover:bg-[#F4FBF8] hover:border-[#CFE2E5]';
     const iconColorClass = shouldHighlight
       ? 'text-[#159A9C]'
-      : isMobileInstance
-        ? 'text-[#4B5563] group-hover:text-[#0F7B7D]'
-        : 'text-white/80 group-hover:text-white';
+      : 'text-[#5B7382] group-hover:text-[#0F7B7D]';
     const titleColorClass = shouldHighlight
       ? 'text-[#159A9C]'
-      : isMobileInstance
-        ? 'text-[#334155] group-hover:text-[#0F7B7D]'
-        : 'text-white/90 group-hover:text-white';
+      : 'text-[#3D5867] group-hover:text-[#0F7B7D]';
 
     // Layout vertical: Ícone em cima, texto embaixo
     if (hasChildren) {
@@ -235,20 +228,14 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
     // ✅ Não destacar se houver um painel aberto (prioridade visual para o painel)
     const shouldBeActive = isActive && !activeSubmenuPanel;
     const linkBaseStateClass = shouldBeActive
-      ? 'bg-[#159A9C]/20 border-[#159A9C]/35 shadow-[inset_0_0_0_1px_rgba(21,154,156,0.15)]'
-      : isMobileInstance
-        ? 'hover:bg-[#DEEFE7]/75 hover:border-[#159A9C]/20'
-        : 'hover:bg-white/8 hover:border-white/10';
+      ? 'bg-white border-[#8FCFC4]/80 shadow-[0_10px_18px_-15px_rgba(15,123,125,0.65)]'
+      : 'hover:bg-[#F4FBF8] hover:border-[#CFE2E5]';
     const linkIconColorClass = shouldBeActive
       ? 'text-[#159A9C]'
-      : isMobileInstance
-        ? 'text-[#4B5563] group-hover:text-[#0F7B7D]'
-        : 'text-white/80 group-hover:text-white';
+      : 'text-[#5B7382] group-hover:text-[#0F7B7D]';
     const linkTitleColorClass = shouldBeActive
       ? 'text-[#159A9C]'
-      : isMobileInstance
-        ? 'text-[#334155] group-hover:text-[#0F7B7D]'
-        : 'text-white/90 group-hover:text-white';
+      : 'text-[#3D5867] group-hover:text-[#0F7B7D]';
 
     return (
       <Link

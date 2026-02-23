@@ -7,6 +7,46 @@ on:
     branches: [main, develop]
 
 jobs:
+  encoding-guardrails:
+    name: Guardrails - Encoding
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+
+      - name: Detectar arquivos alterados
+        run: |
+          set -e
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "PR: verificando diff contra base branch (${{ github.base_ref }})"
+            git fetch --no-tags --prune --depth=1 origin "${{ github.base_ref }}"
+            git diff --name-only --diff-filter=ACMR "origin/${{ github.base_ref }}...HEAD" > changed_files.txt || true
+          else
+            echo "Push: verificando diff do último commit"
+            git diff --name-only --diff-filter=ACMR HEAD^ HEAD > changed_files.txt || true
+          fi
+
+          echo "Arquivos alterados (primeiros 50):"
+          head -n 50 changed_files.txt || true
+
+      - name: Rodar check de encoding (arquivos alterados)
+        run: |
+          if [ ! -s changed_files.txt ]; then
+            echo "Nenhum arquivo alterado para verificar."
+            exit 0
+          fi
+
+          cat changed_files.txt | node scripts/checkEncoding.js --stdin
+
   backend:
     name: Backend - Testes e Build
     runs-on: ubuntu-latest
@@ -101,18 +141,20 @@ jobs:
   final-status:
     name: Status Final do CI
     runs-on: ubuntu-latest
-    needs: [backend, frontend, security, check-temp-files]
+    needs: [encoding-guardrails, backend, frontend, security, check-temp-files]
     if: always()
 
     steps:
       - name: Verificar status dos jobs
         run: |
+          echo "Encoding Guardrails: ${{ needs.encoding-guardrails.result }}"
           echo "Backend: ${{ needs.backend.result }}"
           echo "Frontend: ${{ needs.frontend.result }}"
           echo "Security: ${{ needs.security.result }}"
           echo "Temp Files Check: ${{ needs.check-temp-files.result }}"
 
-          if [ "${{ needs.backend.result }}" != "success" ] || \
+          if [ "${{ needs.encoding-guardrails.result }}" != "success" ] || \
+             [ "${{ needs.backend.result }}" != "success" ] || \
              [ "${{ needs.frontend.result }}" != "success" ] || \
              [ "${{ needs.security.result }}" != "success" ] || \
              [ "${{ needs.check-temp-files.result }}" != "success" ]; then

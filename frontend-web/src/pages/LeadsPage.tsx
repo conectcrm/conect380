@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import toast from 'react-hot-toast';
+import { toastService } from '../services/toastService';
 import {
   RefreshCw,
   Plus,
@@ -12,9 +12,7 @@ import {
   CheckCircle,
   X,
   UserPlus,
-  TrendingUp,
   Target,
-  Award,
   Mail,
   Phone,
   Briefcase,
@@ -29,7 +27,9 @@ import {
   DollarSign,
   Calendar,
 } from 'lucide-react';
-import { BackToNucleus } from '../components/navigation/BackToNucleus';
+import { useGlobalConfirmation } from '../contexts/GlobalConfirmationContext';
+import { FiltersBar, InlineStats, PageHeader, SectionCard } from '../components/layout-v2';
+import ActiveEmpresaBadge from '../components/tenant/ActiveEmpresaBadge';
 import leadsService, {
   Lead,
   StatusLead,
@@ -101,6 +101,7 @@ const convertSchema = yup.object().shape({
 });
 
 const LeadsPage: React.FC = () => {
+  const { confirm } = useGlobalConfirmation();
   // Estados principais
   const [leads, setLeads] = useState<Lead[]>([]);
   const [estatisticas, setEstatisticas] = useState<LeadEstatisticas | null>(null);
@@ -226,10 +227,10 @@ const LeadsPage: React.FC = () => {
 
       if (editingLead) {
         await leadsService.atualizar(editingLead.id, data);
-        toast.success('Lead atualizado com sucesso!');
+        toastService.success('Lead atualizado com sucesso!');
       } else {
         await leadsService.criar(data);
-        toast.success('Lead criado com sucesso!');
+        toastService.success('Lead criado com sucesso!');
       }
 
       setShowDialog(false);
@@ -245,7 +246,7 @@ const LeadsPage: React.FC = () => {
       const fallbackMessage = err instanceof Error ? err.message : undefined;
       const errorMsg = normalizedMessage || fallbackMessage || 'Erro ao salvar lead';
       setError(errorMsg);
-      toast.error(errorMsg);
+      toastService.error(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -258,7 +259,7 @@ const LeadsPage: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Tem certeza que deseja excluir este lead?')) {
+    if (!(await confirm('Tem certeza que deseja excluir este lead?'))) {
       return;
     }
 
@@ -329,7 +330,7 @@ const LeadsPage: React.FC = () => {
 
       await leadsService.converter(leadToConvert.id, convertData);
 
-      toast.success('Lead convertido em oportunidade com sucesso!');
+      toastService.success('Lead convertido em oportunidade com sucesso!');
       setShowConvertDialog(false);
       setLeadToConvert(null);
       resetConvertForm();
@@ -343,7 +344,7 @@ const LeadsPage: React.FC = () => {
       const fallbackMessage = err instanceof Error ? err.message : undefined;
       const errorMsg = normalizedMessage || fallbackMessage || 'Erro ao converter lead';
       setError(errorMsg);
-      toast.error(errorMsg);
+      toastService.error(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -465,313 +466,269 @@ const LeadsPage: React.FC = () => {
     return colors[status] || 'bg-gray-100 text-gray-800';
   };
 
+  const pageDescription = loading
+    ? 'Carregando...'
+    : `Gerencie seus ${leads.length} leads e converta em oportunidades`;
+  const hasFilters = Boolean(busca.trim()) || filtroStatus !== 'todos';
+
+  const handleClearFilters = () => {
+    setBusca('');
+    setFiltroStatus('todos');
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header com Breadcrumb */}
-      <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus nucleusName="CRM" nucleusPath="/nuclei/crm" />
-      </div>
+    <div className="space-y-4 pt-1 sm:pt-2">
+      <SectionCard className="space-y-4 p-4 sm:p-5">
+        <PageHeader
+          title={
+            <span className="inline-flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-[#159A9C]" />
+              <span>Leads</span>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin text-[#159A9C]" /> : null}
+            </span>
+          }
+          description={pageDescription}
+          filters={<ActiveEmpresaBadge variant="page" />}
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={carregarDados}
+                disabled={loading}
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-[#B4BEC9] bg-white px-3 text-[#19384C] transition-colors hover:bg-[#F6FAF9] disabled:opacity-50"
+                title="Atualizar leads"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+              <button
+                onClick={handleOpenImportDialog}
+                className="inline-flex items-center gap-2 rounded-lg border border-[#159A9C] bg-white px-4 py-2 text-sm font-medium text-[#159A9C] transition-colors hover:bg-[#F4FBF9]"
+              >
+                <Upload className="h-4 w-4" />
+                Importar CSV
+              </button>
+              <button
+                onClick={() => handleOpenDialog()}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#0F7B7D]"
+              >
+                <Plus className="h-4 w-4" />
+                Novo Lead
+              </button>
+            </div>
+          }
+        />
 
-      <div className="p-6">
-        <div className="max-w-7xl mx-auto">
-          {/* Header da Página */}
-          <div className="bg-white rounded-lg shadow-sm border mb-6">
-            <div className="px-6 py-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start">
-                <div>
-                  <h1 className="text-3xl font-bold text-[#002333] flex items-center">
-                    <UserPlus className="h-8 w-8 mr-3 text-[#159A9C]" />
-                    Gestão de Leads
-                    {loading && (
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#159A9C] ml-3"></div>
-                    )}
-                  </h1>
-                  <p className="mt-2 text-[#B4BEC9]">
-                    {loading
-                      ? 'Carregando...'
-                      : `Gerencie seus ${leads.length} leads e converta em oportunidades`}
-                  </p>
-                </div>
-                <div className="mt-4 sm:mt-0 flex items-center gap-3">
-                  <button
-                    onClick={carregarDados}
-                    disabled={loading}
-                    className="px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-                  >
-                    <RefreshCw
-                      className={`w-5 h-5 text-gray-600 ${loading ? 'animate-spin' : ''}`}
-                    />
-                  </button>
-                  <button
-                    onClick={handleOpenImportDialog}
-                    className="bg-white hover:bg-gray-50 text-[#159A9C] border border-[#159A9C] px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm text-sm font-medium"
-                  >
-                    <Upload className="w-4 h-4" />
-                    Importar CSV
-                  </button>
-                  <button
-                    onClick={() => handleOpenDialog()}
-                    className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm text-sm font-medium"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Novo Lead
-                  </button>
-                </div>
+        {!loading && (
+          <InlineStats
+            stats={[
+              { label: 'Total', value: String(estatisticas?.total || 0), tone: 'neutral' },
+              {
+                label: 'Qualificados',
+                value: String(estatisticas?.qualificados || 0),
+                tone: 'accent',
+              },
+              {
+                label: 'Taxa de conversão',
+                value: `${(estatisticas?.taxaConversao || 0).toFixed(1)}%`,
+                tone: 'accent',
+              },
+              {
+                label: 'Score médio',
+                value: String((estatisticas?.scoreMedio || 0).toFixed(0)),
+                tone: 'neutral',
+              },
+            ]}
+          />
+        )}
+      </SectionCard>
+
+      <div className="max-w-7xl mx-auto space-y-6">
+        <FiltersBar className="p-4">
+          <div className="flex w-full flex-col gap-4 sm:flex-row sm:items-end">
+            <div className="flex-1">
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                Buscar leads
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
+                <input
+                  type="text"
+                  placeholder="Buscar por nome, email ou empresa..."
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                />
               </div>
+            </div>
+
+            <div className="w-full sm:w-64">
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                Status
+              </label>
+              <select
+                value={filtroStatus}
+                onChange={(e) => setFiltroStatus(e.target.value)}
+                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+              >
+                <option value="todos">Todos os status</option>
+                <option value={StatusLead.NOVO}>Novos</option>
+                <option value={StatusLead.CONTATADO}>Contatados</option>
+                <option value={StatusLead.QUALIFICADO}>Qualificados</option>
+                <option value={StatusLead.DESQUALIFICADO}>Desqualificados</option>
+                <option value={StatusLead.CONVERTIDO}>Convertidos</option>
+              </select>
+            </div>
+
+            <div className="w-full sm:w-auto">
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                Ações
+              </label>
+              <button
+                type="button"
+                onClick={handleClearFilters}
+                disabled={!hasFilters}
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <X className="h-4 w-4" />
+                Limpar
+              </button>
             </div>
           </div>
+        </FiltersBar>
 
-          {/* Dashboard Cards (KPI Cards) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {/* Card 1 - Total */}
-            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                    Total de Leads
-                  </p>
-                  <p className="mt-2 text-3xl font-bold text-[#002333]">
-                    {estatisticas?.total || 0}
-                  </p>
-                  <p className="mt-3 text-sm text-[#002333]/70">Leads cadastrados no sistema</p>
-                </div>
-                <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
-                  <UserPlus className="h-6 w-6 text-[#159A9C]" />
-                </div>
-              </div>
-            </div>
-
-            {/* Card 2 - Qualificados */}
-            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                    Qualificados
-                  </p>
-                  <p className="mt-2 text-3xl font-bold text-[#002333]">
-                    {estatisticas?.qualificados || 0}
-                  </p>
-                  <p className="mt-3 text-sm text-[#002333]/70">Prontos para conversão</p>
-                </div>
-                <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center shadow-sm">
-                  <CheckCircle className="h-6 w-6 text-green-600" />
-                </div>
-              </div>
-            </div>
-
-            {/* Card 3 - Taxa de Conversão */}
-            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                    Taxa de Conversão
-                  </p>
-                  <p className="mt-2 text-3xl font-bold text-[#002333]">
-                    {estatisticas?.taxaConversao?.toFixed(1) || 0}%
-                  </p>
-                  <p className="mt-3 text-sm text-[#002333]/70">
-                    Leads convertidos em oportunidades
-                  </p>
-                </div>
-                <div className="h-12 w-12 rounded-2xl bg-blue-500/10 flex items-center justify-center shadow-sm">
-                  <TrendingUp className="h-6 w-6 text-blue-600" />
-                </div>
-              </div>
-            </div>
-
-            {/* Card 4 - Score Médio */}
-            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                    Score Médio
-                  </p>
-                  <p className="mt-2 text-3xl font-bold text-[#002333]">
-                    {estatisticas?.scoreMedio?.toFixed(0) || 0}
-                  </p>
-                  <p className="mt-3 text-sm text-[#002333]/70">Qualidade média dos leads</p>
-                </div>
-                <div className="h-12 w-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center shadow-sm">
-                  <Award className="h-6 w-6 text-yellow-600" />
-                </div>
-              </div>
-            </div>
+        {/* Error Alert */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <p className="text-red-800">{error}</p>
           </div>
+        )}
 
-          {/* Barra de Busca/Filtros */}
-          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-            <div className="flex flex-col sm:flex-row gap-4 items-end">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Buscar Leads</label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input
-                    type="text"
-                    placeholder="Buscar por nome, email ou empresa..."
-                    value={busca}
-                    onChange={(e) => setBusca(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors"
-                  />
-                </div>
-              </div>
-
-              <div className="w-full sm:w-64">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                <select
-                  value={filtroStatus}
-                  onChange={(e) => setFiltroStatus(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors"
+        {/* Estado Vazio */}
+        {!loading && leadsFiltrados.length === 0 && (
+          <div className="bg-white rounded-lg shadow-sm border">
+            <div className="text-center py-12 px-6">
+              <UserPlus className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                {hasFilters ? 'Nenhum lead encontrado' : 'Nenhum lead cadastrado'}
+              </h3>
+              <p className="text-gray-600 mb-4">
+                {hasFilters
+                  ? 'Tente ajustar os filtros de busca'
+                  : 'Crie seu primeiro lead para começar'}
+              </p>
+              {!hasFilters && (
+                <button
+                  onClick={() => handleOpenDialog()}
+                  className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm mx-auto text-sm font-medium"
                 >
-                  <option value="todos">Todos os Status</option>
-                  <option value={StatusLead.NOVO}>Novos</option>
-                  <option value={StatusLead.CONTATADO}>Contatados</option>
-                  <option value={StatusLead.QUALIFICADO}>Qualificados</option>
-                  <option value={StatusLead.DESQUALIFICADO}>Desqualificados</option>
-                  <option value={StatusLead.CONVERTIDO}>Convertidos</option>
-                </select>
-              </div>
+                  <Plus className="w-4 h-4" />
+                  Criar Primeiro Lead
+                </button>
+              )}
             </div>
           </div>
+        )}
 
-          {/* Error Alert */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-              <p className="text-red-800">{error}</p>
-            </div>
-          )}
+        {/* Grid de Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {leadsFiltrados.map((lead) => (
+            <div
+              key={lead.id}
+              className="bg-white rounded-lg shadow-sm border hover:shadow-lg transition-shadow duration-300"
+            >
+              <div className="p-6">
+                {/* Header do Card */}
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="w-12 h-12 rounded-xl bg-[#159A9C] flex items-center justify-center text-white shadow-md flex-shrink-0">
+                      <UserPlus className="h-6 w-6" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg font-semibold text-gray-900 truncate">{lead.nome}</h3>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
+                          lead.status,
+                        )}`}
+                      >
+                        {getStatusLabel(lead.status)}
+                      </span>
+                    </div>
+                  </div>
 
-          {/* Estado Vazio */}
-          {!loading && leadsFiltrados.length === 0 && (
-            <div className="bg-white rounded-lg shadow-sm border">
-              <div className="text-center py-12 px-6">
-                <UserPlus className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  {busca || filtroStatus !== 'todos'
-                    ? 'Nenhum lead encontrado'
-                    : 'Nenhum lead cadastrado'}
-                </h3>
-                <p className="text-gray-600 mb-4">
-                  {busca || filtroStatus !== 'todos'
-                    ? 'Tente ajustar os filtros de busca'
-                    : 'Crie seu primeiro lead para começar'}
-                </p>
-                {!busca && filtroStatus === 'todos' && (
+                  {/* Ações */}
+                  <div className="flex gap-1 flex-shrink-0 ml-2">
+                    <button
+                      onClick={() => handleOpenDialog(lead)}
+                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                      title="Editar"
+                    >
+                      <Edit2 className="h-4 w-4 text-gray-600" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(lead.id)}
+                      className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Excluir"
+                    >
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Conteúdo */}
+                <div className="space-y-2 mb-4">
+                  {lead.email && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Mail className="h-4 w-4 text-gray-400" />
+                      <span className="truncate">{lead.email}</span>
+                    </div>
+                  )}
+                  {lead.telefone && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Phone className="h-4 w-4 text-gray-400" />
+                      <span>{lead.telefone}</span>
+                    </div>
+                  )}
+                  {lead.empresa_nome && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Briefcase className="h-4 w-4 text-gray-400" />
+                      <span className="truncate">{lead.empresa_nome}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer do Card */}
+                <div className="flex items-center justify-between pt-4 border-t">
+                  <div className="flex items-center gap-2">
+                    <Target className="h-4 w-4 text-yellow-500" />
+                    <span className="text-sm font-medium text-gray-700">Score: {lead.score}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    {getOrigemLabel(lead.origem)}
+                  </div>
+                </div>
+
+                {/* Botão de Qualificação */}
+                {lead.status === StatusLead.NOVO && (
                   <button
-                    onClick={() => handleOpenDialog()}
-                    className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm mx-auto text-sm font-medium"
+                    onClick={() => handleQualificar(lead.id)}
+                    className="mt-4 w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center justify-center gap-2 transition-colors text-sm font-medium"
                   >
-                    <Plus className="w-4 h-4" />
-                    Criar Primeiro Lead
+                    <CheckCircle className="h-4 w-4" />
+                    Qualificar Lead
+                  </button>
+                )}
+
+                {lead.status === StatusLead.QUALIFICADO && (
+                  <button
+                    onClick={() => handleOpenConvertDialog(lead)}
+                    className="mt-4 w-full px-4 py-2 bg-[#159A9C] hover:bg-[#0F7B7D] text-white rounded-lg flex items-center justify-center gap-2 transition-colors text-sm font-medium"
+                  >
+                    <ArrowRight className="h-4 w-4" />
+                    Converter em Oportunidade
                   </button>
                 )}
               </div>
             </div>
-          )}
-
-          {/* Grid de Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {leadsFiltrados.map((lead) => (
-              <div
-                key={lead.id}
-                className="bg-white rounded-lg shadow-sm border hover:shadow-lg transition-shadow duration-300"
-              >
-                <div className="p-6">
-                  {/* Header do Card */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className="w-12 h-12 rounded-xl bg-[#159A9C] flex items-center justify-center text-white shadow-md flex-shrink-0">
-                        <UserPlus className="h-6 w-6" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-lg font-semibold text-gray-900 truncate">
-                          {lead.nome}
-                        </h3>
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                            lead.status,
-                          )}`}
-                        >
-                          {getStatusLabel(lead.status)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Ações */}
-                    <div className="flex gap-1 flex-shrink-0 ml-2">
-                      <button
-                        onClick={() => handleOpenDialog(lead)}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                        title="Editar"
-                      >
-                        <Edit2 className="h-4 w-4 text-gray-600" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(lead.id)}
-                        className="p-2 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Excluir"
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Conteúdo */}
-                  <div className="space-y-2 mb-4">
-                    {lead.email && (
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Mail className="h-4 w-4 text-gray-400" />
-                        <span className="truncate">{lead.email}</span>
-                      </div>
-                    )}
-                    {lead.telefone && (
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Phone className="h-4 w-4 text-gray-400" />
-                        <span>{lead.telefone}</span>
-                      </div>
-                    )}
-                    {lead.empresa_nome && (
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Briefcase className="h-4 w-4 text-gray-400" />
-                        <span className="truncate">{lead.empresa_nome}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Footer do Card */}
-                  <div className="flex items-center justify-between pt-4 border-t">
-                    <div className="flex items-center gap-2">
-                      <Target className="h-4 w-4 text-yellow-500" />
-                      <span className="text-sm font-medium text-gray-700">Score: {lead.score}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      {getOrigemLabel(lead.origem)}
-                    </div>
-                  </div>
-
-                  {/* Botão de Qualificação */}
-                  {lead.status === StatusLead.NOVO && (
-                    <button
-                      onClick={() => handleQualificar(lead.id)}
-                      className="mt-4 w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center justify-center gap-2 transition-colors text-sm font-medium"
-                    >
-                      <CheckCircle className="h-4 w-4" />
-                      Qualificar Lead
-                    </button>
-                  )}
-
-                  {lead.status === StatusLead.QUALIFICADO && (
-                    <button
-                      onClick={() => handleOpenConvertDialog(lead)}
-                      className="mt-4 w-full px-4 py-2 bg-[#159A9C] hover:bg-[#0F7B7D] text-white rounded-lg flex items-center justify-center gap-2 transition-colors text-sm font-medium"
-                    >
-                      <ArrowRight className="h-4 w-4" />
-                      Converter em Oportunidade
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+          ))}
         </div>
       </div>
 
@@ -935,7 +892,9 @@ const LeadsPage: React.FC = () => {
 
               {/* Observações (Full Width) */}
               <div className="mt-6">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Observações
+                </label>
                 <textarea
                   {...register('observacoes')}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors resize-none"

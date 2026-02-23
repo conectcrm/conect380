@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { X, RotateCcw, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useGlobalConfirmation } from '../../../contexts/GlobalConfirmationContext';
 
 interface VersaoFluxo {
   numero: number;
@@ -22,6 +23,7 @@ export const ModalHistoricoVersoes: React.FC<ModalHistoricoVersoesProps> = ({
   onClose,
   onRestore,
 }) => {
+  const { confirm } = useGlobalConfirmation();
   const [versoes, setVersoes] = useState<VersaoFluxo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +68,7 @@ export const ModalHistoricoVersoes: React.FC<ModalHistoricoVersoesProps> = ({
       ? `⚠️ Esta versão está publicada. Tem certeza que deseja restaurar para a versão ${numeroVersao}?\n\nIsso criará um novo snapshot da versão atual antes de restaurar.`
       : `Tem certeza que deseja restaurar para a versão ${numeroVersao}?\n\nA versão atual será salva antes de restaurar.`;
 
-    if (!window.confirm(confirmMessage)) {
+    if (!(await confirm(confirmMessage))) {
       return;
     }
 

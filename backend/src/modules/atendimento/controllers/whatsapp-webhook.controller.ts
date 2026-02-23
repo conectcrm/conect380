@@ -167,7 +167,19 @@ export class WhatsAppWebhookController {
       }
 
       this.logger.log(`📩 Webhook recebido - Empresa: ${empresaId}`);
-      this.logger.debug(`Payload: ${JSON.stringify(body).substring(0, 200)}...`);
+      this.logger.debug(
+        `Payload resumo: ${JSON.stringify({
+          object: body?.object || null,
+          entryCount: Array.isArray(body?.entry) ? body.entry.length : 0,
+          firstChangeField: body?.entry?.[0]?.changes?.[0]?.field || null,
+          messages: Array.isArray(body?.entry?.[0]?.changes?.[0]?.value?.messages)
+            ? body.entry[0].changes[0].value.messages.length
+            : 0,
+          statuses: Array.isArray(body?.entry?.[0]?.changes?.[0]?.value?.statuses)
+            ? body.entry[0].changes[0].value.statuses.length
+            : 0,
+        })}`,
+      );
 
       // Processar webhook de forma assíncrona
       setImmediate(async () => {
@@ -209,7 +221,19 @@ export class WhatsAppWebhookController {
     try {
       // 1. Log do webhook recebido (sem dados sensíveis)
       this.logger.log(`📩 Webhook recebido - Empresa: ${empresaId}`);
-      this.logger.debug(`Payload: ${JSON.stringify(body).substring(0, 200)}...`);
+      this.logger.debug(
+        `Payload resumo: ${JSON.stringify({
+          object: body?.object || null,
+          entryCount: Array.isArray(body?.entry) ? body.entry.length : 0,
+          firstChangeField: body?.entry?.[0]?.changes?.[0]?.field || null,
+          messages: Array.isArray(body?.entry?.[0]?.changes?.[0]?.value?.messages)
+            ? body.entry[0].changes[0].value.messages.length
+            : 0,
+          statuses: Array.isArray(body?.entry?.[0]?.changes?.[0]?.value?.statuses)
+            ? body.entry[0].changes[0].value.statuses.length
+            : 0,
+        })}`,
+      );
 
       // 2. Validar assinatura (X-Hub-Signature-256)
       const signature = req.headers['x-hub-signature-256'] as string;

@@ -9,7 +9,9 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { MetasService, CreateMetaDto, UpdateMetaDto } from './metas.service';
+import { MetasService } from './metas.service';
+import { CreateMetaDto } from './dto/create-meta.dto';
+import { UpdateMetaDto } from './dto/update-meta.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';

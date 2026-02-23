@@ -79,8 +79,9 @@ export class OportunidadesController {
     @Param('id') id: string,
     @Body() updateOportunidadeDto: UpdateOportunidadeDto,
     @EmpresaId() empresaId: string,
+    @Request() req,
   ) {
-    return this.oportunidadesService.update(id, updateOportunidadeDto, empresaId);
+    return this.oportunidadesService.update(id, updateOportunidadeDto, empresaId, req.user?.id);
   }
 
   @Patch(':id/estagio')
@@ -89,8 +90,9 @@ export class OportunidadesController {
     @Param('id') id: string,
     @Body() updateEstagioDto: UpdateEstagioDto,
     @EmpresaId() empresaId: string,
+    @Request() req,
   ) {
-    return this.oportunidadesService.updateEstagio(id, updateEstagioDto, empresaId);
+    return this.oportunidadesService.updateEstagio(id, updateEstagioDto, empresaId, req.user?.id);
   }
 
   @Delete(':id')

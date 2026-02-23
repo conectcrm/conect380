@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -28,12 +29,90 @@ import * as Papa from 'papaparse';
 
 @Injectable()
 export class LeadsService {
+  private readonly logger = new Logger(LeadsService.name);
+
   constructor(
     @InjectRepository(Lead)
     private readonly leadsRepository: Repository<Lead>,
     @InjectRepository(Oportunidade)
     private readonly oportunidadesRepository: Repository<Oportunidade>,
   ) {}
+
+
+  private maskEmail(email?: string | null): string | null {
+    if (!email || typeof email !== 'string') return null;
+    const [localPart, domain] = email.split('@');
+    if (!localPart || !domain) return '[email]';
+    const prefix = localPart.slice(0, 2);
+    return `${prefix}${'*'.repeat(Math.max(localPart.length - 2, 2))}@${domain}`;
+  }
+
+  private maskPhone(phone?: string | null): string | null {
+    if (!phone || typeof phone !== 'string') return null;
+    const digits = phone.replace(/\D/g, '');
+    if (!digits) return '[telefone]';
+    const suffix = digits.slice(-4);
+    return `${'*'.repeat(Math.max(digits.length - 4, 4))}${suffix}`;
+  }
+
+  private summarizeText(value?: string | null, max: number = 60): string | null {
+    if (!value || typeof value !== 'string') return null;
+    const normalized = value.replace(/\s+/g, ' ').trim();
+    if (!normalized) return null;
+    return normalized.length > max ? `${normalized.slice(0, max)}...` : normalized;
+  }
+
+  private buildLeadPayloadLogMeta(payload: Partial<CreateLeadDto> | Partial<UpdateLeadDto>) {
+    const p = payload as any;
+
+    return {
+      nome: this.summarizeText(payload.nome, 40),
+      email: this.maskEmail(payload.email),
+      telefone: this.maskPhone(payload.telefone),
+      empresaNome: this.summarizeText(payload.empresa_nome, 40),
+      origem: p.origem || null,
+      status: p.status || null,
+      responsavelId: payload.responsavel_id || null,
+      observacoesResumo: this.summarizeText(payload.observacoes, 80),
+    };
+  }
+
+  private buildLeadEntityLogMeta(lead: Lead) {
+    return {
+      id: lead.id || null,
+      nome: this.summarizeText(lead.nome, 40),
+      email: this.maskEmail(lead.email),
+      telefone: this.maskPhone(lead.telefone),
+      empresaId: lead.empresaId,
+      status: lead.status,
+      origem: lead.origem,
+      score: lead.score,
+    };
+  }
+
+  private buildFiltrosLogMeta(empresaId: string, filtros?: LeadFiltros) {
+    return {
+      empresaId,
+      page: filtros?.page || 1,
+      limit: filtros?.limit || 50,
+      status: filtros?.status || null,
+      origem: filtros?.origem || null,
+      responsavelId: filtros?.responsavel_id || null,
+      busca: this.summarizeText(filtros?.busca, 40),
+      dataInicio: filtros?.dataInicio || null,
+      dataFim: filtros?.dataFim || null,
+    };
+  }
+
+  private logError(context: string, error: unknown): void {
+    const err = error as any;
+    const message = err?.message || 'Erro desconhecido';
+    const detail = err?.detail || null;
+    const code = err?.code || null;
+    const stack = err instanceof Error ? err.stack : undefined;
+
+    this.logger.error(`${context} message=${message} code=${code} detail=${detail}`, stack);
+  }
 
   private sanitizeLeadInput<T extends Partial<CreateLeadDto> | Partial<UpdateLeadDto>>(
     payload: T,
@@ -126,12 +205,10 @@ export class LeadsService {
    */
   async create(dto: CreateLeadDto, empresaId: string): Promise<Lead> {
     try {
-      // Debug: verificar empresa_id
-      console.log('🔍 [LeadsService.create] Empresa ID:', empresaId);
+      this.logger.debug(`[LeadsService.create] empresaId=${empresaId}`);
 
       const sanitizedDto = this.sanitizeLeadInput(dto);
-
-      console.log('🔍 [LeadsService.create] DTO sanitizado:', sanitizedDto);
+      this.logger.debug(`[LeadsService.create] payload=${JSON.stringify(this.buildLeadPayloadLogMeta(sanitizedDto))}`);
 
       const lead = this.leadsRepository.create({
         ...sanitizedDto,
@@ -139,34 +216,19 @@ export class LeadsService {
         status: sanitizedDto.status || StatusLead.NOVO,
         origem: (this.mapearOrigemParaBanco(sanitizedDto.origem as string) || 'website') as OrigemLead,
       });
-
-      console.log('🔍 [LeadsService.create] Lead criado (antes do save):', {
-        nome: lead.nome,
-        email: lead.email,
-        empresa_id: lead.empresaId,
-        status: lead.status,
-        origem: lead.origem,
-        score: lead.score,
-      });
+      this.logger.debug(`[LeadsService.create] lead-before-save=${JSON.stringify(this.buildLeadEntityLogMeta(lead))}`);
 
       // Calcular score inicial
       lead.score = this.calcularScore(lead);
 
       const savedLead = await this.leadsRepository.save(lead);
-
-      console.log('✅ [LeadsService.create] Lead salvo com sucesso:', savedLead.id);
+      this.logger.log(`[LeadsService.create] lead salvo id=${savedLead.id}`);
 
       // Buscar com relacionamentos
       return await this.findOne(savedLead.id, empresaId);
     } catch (error) {
       const detail = (error as any)?.detail || (error as Error).message;
-      console.error('❌ [LeadsService.create] Erro ao criar lead:', {
-        message: (error as any)?.message,
-        code: (error as any)?.code,
-        detail: (error as any)?.detail,
-        stack: (error as any)?.stack,
-        name: (error as any)?.name,
-      });
+      this.logError('[LeadsService.create] erro ao criar lead', error);
 
       // Se for erro de validação do BadRequestException, propagar
       if (error instanceof BadRequestException) {
@@ -190,8 +252,7 @@ export class LeadsService {
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
-      }
-      console.error('Erro ao capturar lead público:', error);
+      }      this.logError('[LeadsService.captureFromPublic] erro ao capturar lead p?blico', error);
       throw new InternalServerErrorException('Erro ao capturar lead', error.message);
     }
   }
@@ -201,10 +262,7 @@ export class LeadsService {
    */
   async findAll(empresaId: string, filtros?: LeadFiltros): Promise<any> {
     try {
-      console.log('🔍 [LeadsService.findAll] Buscando leads:', {
-        empresa_id: empresaId,
-        filtros,
-      });
+      this.logger.debug(`[LeadsService.findAll] filtros=${JSON.stringify(this.buildFiltrosLogMeta(empresaId, filtros))}`);
 
       const page = filtros?.page || 1;
       const limit = filtros?.limit || 50;
@@ -252,15 +310,7 @@ export class LeadsService {
       query.orderBy('lead.created_at', 'DESC');
 
       const [leads, total] = await query.getManyAndCount();
-
-      console.log('✅ [LeadsService.findAll] Leads encontrados:', {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-        retornados: leads.length,
-        ids: leads.map((l) => l.id),
-      });
+      this.logger.debug(`[LeadsService.findAll] resultado=${JSON.stringify({ total, page, limit, totalPages: Math.ceil(total / limit), retornados: leads.length, ids: leads.map((l) => l.id) })}`);
 
       return {
         data: leads,
@@ -269,8 +319,7 @@ export class LeadsService {
         limit,
         totalPages: Math.ceil(total / limit),
       };
-    } catch (error) {
-      console.error('❌ [LeadsService.findAll] Erro ao listar leads:', error);
+    } catch (error) {      this.logError('[LeadsService.findAll] erro ao listar leads', error);
       throw new InternalServerErrorException('Erro ao listar leads', error.message);
     }
   }
@@ -297,7 +346,7 @@ export class LeadsService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      console.error('Erro ao buscar lead:', error);
+      this.logError('[LeadsService.findOne] erro ao buscar lead', error);
       throw new InternalServerErrorException('Erro ao buscar lead', error.message);
     }
   }
@@ -328,7 +377,7 @@ export class LeadsService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      console.error('Erro ao atualizar lead:', error);
+      this.logError('[LeadsService.update] erro ao atualizar lead', error);
       throw new InternalServerErrorException('Erro ao atualizar lead', error.message);
     }
   }
@@ -349,7 +398,7 @@ export class LeadsService {
       if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
       }
-      console.error('Erro ao remover lead:', error);
+      this.logError('[LeadsService.remove] erro ao remover lead', error);
       throw new InternalServerErrorException('Erro ao remover lead', error.message);
     }
   }
@@ -399,7 +448,7 @@ export class LeadsService {
       if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
       }
-      console.error('Erro ao converter lead:', error);
+      this.logError('[LeadsService.converterParaOportunidade] erro ao converter lead', error);
       throw new InternalServerErrorException('Erro ao converter lead', error.message);
     }
   }
@@ -409,16 +458,12 @@ export class LeadsService {
    */
   async getEstatisticas(empresaId: string): Promise<LeadEstatisticas> {
     try {
-      console.log(
-        '🔍 [LeadsService.getEstatisticas] Calculando estatísticas para empresa:',
-        empresaId,
-      );
+      this.logger.debug(`[LeadsService.getEstatisticas] empresaId=${empresaId}`);
 
       // Buscar todos os leads (sem paginação para estatísticas)
       const result = await this.findAll(empresaId, { limit: 10000 }); // Limite alto para pegar todos
       const leads = result.data;
-
-      console.log('🔍 [LeadsService.getEstatisticas] Leads encontrados:', leads.length);
+      this.logger.debug(`[LeadsService.getEstatisticas] leads encontrados=${leads.length}`);
 
       const total = leads.length;
       const novos = leads.filter((l) => l.status === StatusLead.NOVO).length;
@@ -476,13 +521,10 @@ export class LeadsService {
         scoreMedio,
         porOrigem,
         porResponsavel,
-      };
-
-      console.log('✅ [LeadsService.getEstatisticas] Estatísticas calculadas:', estatisticas);
+      };      this.logger.debug(`[LeadsService.getEstatisticas] estatisticas=${JSON.stringify(estatisticas)}`);
 
       return estatisticas;
-    } catch (error) {
-      console.error('❌ [LeadsService.getEstatisticas] Erro ao obter estatísticas:', error);
+    } catch (error) {      this.logError('[LeadsService.getEstatisticas] erro ao obter estat?sticas', error);
       throw new InternalServerErrorException('Erro ao obter estatísticas', error.message);
     }
   }
@@ -597,7 +639,7 @@ export class LeadsService {
 
       return result;
     } catch (error) {
-      console.error('Erro geral no import CSV:', error);
+      this.logError('[LeadsService.importFromCsv] erro geral no import CSV', error);
       throw new InternalServerErrorException(
         'Erro ao importar leads',
         error instanceof Error ? error.message : 'Erro desconhecido',

@@ -45,6 +45,7 @@ export interface NotificationReminder {
 }
 
 export interface NotificationReminderInput {
+  id?: string;
   title: string;
   message?: string;
   scheduledFor: Date | string | number;
@@ -160,7 +161,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     const scheduledFor = Number.isNaN(scheduledForValue.getTime()) ? new Date() : scheduledForValue;
 
     return {
-      id: existingId ?? generateId(),
+      id: reminder.id ?? existingId ?? generateId(),
       title: reminder.title,
       message: reminder.message ?? '',
       scheduledFor,
@@ -396,21 +397,18 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         toast(notificationData.message, {
           ...toastOptions,
           icon: '⚠️',
-          style: { borderLeft: '4px solid #f59e0b' },
         });
         break;
       case 'info':
         toast(notificationData.message, {
           ...toastOptions,
           icon: 'ℹ️',
-          style: { borderLeft: '4px solid #3b82f6' },
         });
         break;
       case 'reminder':
         toast(notificationData.message, {
           ...toastOptions,
           icon: '🔔',
-          style: { borderLeft: '4px solid #8b5cf6' },
         });
         break;
     }
@@ -451,7 +449,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
       // Criar contexto de áudio
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      
+
       // Verificar se AudioContext foi suspenso pela política do navegador
       if (audioContext.state === 'suspended') {
         // Tentar resumir (só funciona após interação do usuário)
@@ -572,7 +570,16 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
   const addReminder = (reminder: NotificationReminderInput) => {
     const newReminder = normalizeReminder(reminder);
-    setReminders((prev) => [...prev, newReminder]);
+    setReminders((prev) => {
+      const existingIndex = prev.findIndex((item) => item.id === newReminder.id);
+      if (existingIndex === -1) {
+        return [...prev, newReminder];
+      }
+
+      const next = [...prev];
+      next[existingIndex] = newReminder;
+      return next;
+    });
     return newReminder.id;
   };
 

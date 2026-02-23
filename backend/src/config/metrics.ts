@@ -397,6 +397,17 @@ export const filaWaitingGauge = new promClient.Gauge({
 });
 
 /**
+ * Counter: Cache do Dashboard V2 (hit/miss/error)
+ * Labels: empresaId, status
+ */
+export const dashboardV2CacheHitsTotal = new promClient.Counter({
+  name: 'conectcrm_dashboard_v2_cache_total',
+  help: 'Total de operacoes de cache do Dashboard V2 por status',
+  labelNames: ['empresaId', 'status'],
+  registers: [register],
+});
+
+/**
  * ═══════════════════════════════════════════════════════════════
  * 🛠️ HELPER FUNCTIONS
  * ═══════════════════════════════════════════════════════════════

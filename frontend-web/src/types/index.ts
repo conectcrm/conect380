@@ -18,7 +18,17 @@ export interface User {
   permissions?: string[];
   roles?: string[];
   avatar_url?: string;
+  configuracoes?: {
+    tema?: string;
+    notificacoes?: {
+      email?: boolean;
+      push?: boolean;
+    };
+  };
   idioma_preferido: string;
+  ultimo_login?: string | Date | null;
+  created_at?: string | Date | null;
+  updated_at?: string | Date | null;
   empresa: {
     id: string;
     nome: string;

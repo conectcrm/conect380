@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+﻿import { Injectable } from '@nestjs/common';
 import { TypeOrmOptionsFactory, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { User } from '../modules/users/user.entity';
@@ -9,12 +9,21 @@ import { Contato } from '../modules/clientes/contato.entity';
 import { Produto } from '../modules/produtos/produto.entity';
 import { Oportunidade } from '../modules/oportunidades/oportunidade.entity';
 import { Atividade } from '../modules/oportunidades/atividade.entity';
+import { OportunidadeStageEvent } from '../modules/oportunidades/oportunidade-stage-event.entity';
 import { Proposta } from '../modules/propostas/proposta.entity';
+import { DashboardPipelineSnapshotDaily } from '../modules/dashboard-v2/entities/dashboard-pipeline-snapshot-daily.entity';
+import { DashboardFunnelMetricsDaily } from '../modules/dashboard-v2/entities/dashboard-funnel-metrics-daily.entity';
+import { DashboardAgingStageDaily } from '../modules/dashboard-v2/entities/dashboard-aging-stage-daily.entity';
+import { DashboardRevenueMetricsDaily } from '../modules/dashboard-v2/entities/dashboard-revenue-metrics-daily.entity';
+import { FeatureFlagTenant } from '../modules/dashboard-v2/entities/feature-flag-tenant.entity';
+import { DashboardV2MetricDivergence } from '../modules/dashboard-v2/entities/dashboard-v2-metric-divergence.entity';
 import { Plano } from '../modules/planos/entities/plano.entity';
 import { ModuloSistema } from '../modules/planos/entities/modulo-sistema.entity';
 import { PlanoModulo } from '../modules/planos/entities/plano-modulo.entity';
 import { AssinaturaEmpresa } from '../modules/planos/entities/assinatura-empresa.entity';
 import { Evento } from '../modules/eventos/evento.entity';
+import { AgendaEvento } from '../modules/agenda/agenda-evento.entity';
+import { Interacao } from '../modules/interacoes/interacao.entity';
 import { Fornecedor } from '../modules/financeiro/entities/fornecedor.entity';
 import { Fatura } from '../modules/faturamento/entities/fatura.entity';
 import { ItemFatura } from '../modules/faturamento/entities/item-fatura.entity';
@@ -58,6 +67,7 @@ import { Cotacao } from '../cotacao/entities/cotacao.entity';
 import { ItemCotacao } from '../cotacao/entities/item-cotacao.entity';
 import { AnexoCotacao } from '../cotacao/entities/anexo-cotacao.entity';
 import { Notification } from '../notifications/entities/notification.entity';
+import { SystemBranding } from '../modules/system-branding/entities/system-branding.entity';
 
 @Injectable()
 export class DatabaseConfig implements TypeOrmOptionsFactory {
@@ -82,12 +92,21 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         Produto,
         Oportunidade,
         Atividade,
+        OportunidadeStageEvent,
         Proposta,
+        DashboardPipelineSnapshotDaily,
+        DashboardFunnelMetricsDaily,
+        DashboardAgingStageDaily,
+        DashboardRevenueMetricsDaily,
+        FeatureFlagTenant,
+        DashboardV2MetricDivergence,
         Plano,
         ModuloSistema,
         PlanoModulo,
         AssinaturaEmpresa,
         Evento,
+        AgendaEvento,
+        Interacao,
         Fornecedor,
         Fatura,
         ItemFatura,
@@ -132,6 +151,7 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         PasswordResetToken, // ✅ Tokens de recuperação de senha
         Lead, // ✅ Módulo de Leads CRM
         Meta, // ✅ Metas comerciais
+        SystemBranding, // ✅ Branding global do sistema
       ],
       synchronize: false, // ✅ DESABILITADO - usar migrations para segurança
       logging: this.configService.get('APP_ENV') === 'development',
@@ -159,3 +179,4 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
     return config as TypeOrmModuleOptions;
   }
 }
+

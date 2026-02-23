@@ -28,9 +28,9 @@ export const UsageMeter: React.FC<UsageMeterProps> = ({ onUpgrade, showDetails =
       <Card>
         <CardContent className="p-6">
           <div className="animate-pulse space-y-4">
-            <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-            <div className="h-2 bg-gray-200 rounded"></div>
-            <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+            <div className="h-4 w-1/3 rounded bg-[#DEEFE7]"></div>
+            <div className="h-2 rounded bg-[#DEEFE7]"></div>
+            <div className="h-4 w-1/4 rounded bg-[#DEEFE7]"></div>
           </div>
         </CardContent>
       </Card>
@@ -50,13 +50,13 @@ export const UsageMeter: React.FC<UsageMeterProps> = ({ onUpgrade, showDetails =
   const getStatusColor = (percentual: number) => {
     if (percentual >= 95) return 'text-red-600';
     if (percentual >= 80) return 'text-yellow-600';
-    return 'text-green-600';
+    return 'text-[#159A9C]';
   };
 
   const getProgressColor = (percentual: number) => {
     if (percentual >= 95) return 'bg-red-600';
     if (percentual >= 80) return 'bg-yellow-500';
-    return 'bg-green-500';
+    return 'bg-[#159A9C]';
   };
 
   const metrics = [
@@ -105,7 +105,7 @@ export const UsageMeter: React.FC<UsageMeterProps> = ({ onUpgrade, showDetails =
     // Versão compacta
     return (
       <Card
-        className={`${hasCritical ? 'border-red-200' : hasWarnings ? 'border-yellow-200' : 'border-green-200'}`}
+        className={`${hasCritical ? 'border-red-200' : hasWarnings ? 'border-yellow-200' : 'border-[#DEEFE7]'}`}
       >
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-3">
@@ -125,10 +125,10 @@ export const UsageMeter: React.FC<UsageMeterProps> = ({ onUpgrade, showDetails =
           <div className="space-y-3">
             {metrics.map((metric) => (
               <div key={metric.id} className="flex items-center gap-3">
-                <div className="text-gray-500">{metric.icon}</div>
+                <div className="text-[#6E8997]">{metric.icon}</div>
                 <div className="flex-1">
                   <div className="flex justify-between text-sm mb-1">
-                    <span>{metric.label}</span>
+                    <span className="text-[#244455]">{metric.label}</span>
                     <span className={getStatusColor(metric.percentage)}>
                       {metric.current}/{metric.limit} {metric.unit}
                     </span>
@@ -167,7 +167,7 @@ export const UsageMeter: React.FC<UsageMeterProps> = ({ onUpgrade, showDetails =
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
+            <TrendingUp className="h-5 w-5 text-[#159A9C]" />
             Uso dos Recursos - {assinatura.plano.nome}
           </CardTitle>
         </CardHeader>
@@ -177,8 +177,8 @@ export const UsageMeter: React.FC<UsageMeterProps> = ({ onUpgrade, showDetails =
               <div key={metric.id} className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="text-gray-500">{metric.icon}</div>
-                    <span className="font-medium">{metric.label}</span>
+                    <div className="text-[#6E8997]">{metric.icon}</div>
+                    <span className="font-medium text-[#244455]">{metric.label}</span>
                   </div>
                   {getStatusIcon(metric.percentage)}
                 </div>
@@ -188,7 +188,7 @@ export const UsageMeter: React.FC<UsageMeterProps> = ({ onUpgrade, showDetails =
                     <span>
                       {metric.current} {metric.unit}
                     </span>
-                    <span className="text-gray-500">
+                    <span className="text-[#6E8997]">
                       de {metric.limit} {metric.unit}
                     </span>
                   </div>
@@ -224,7 +224,7 @@ export const UsageMeter: React.FC<UsageMeterProps> = ({ onUpgrade, showDetails =
 
                 {/* Estimativa baseada no uso */}
                 {metric.id === 'api' && (
-                  <div className="text-xs text-gray-500 border-t pt-2">Reset diário às 00:00</div>
+                  <div className="border-t border-[#DEEFE7] pt-2 text-xs text-[#6E8997]">Reset diário às 00:00</div>
                 )}
               </div>
             ))}
@@ -260,7 +260,7 @@ export const UsageMeter: React.FC<UsageMeterProps> = ({ onUpgrade, showDetails =
                   <Button
                     onClick={onUpgrade}
                     size="sm"
-                    className={`mt-3 ${hasCritical ? 'bg-red-600 hover:bg-red-700' : 'bg-yellow-600 hover:bg-yellow-700'}`}
+                    className={`mt-3 ${hasCritical ? 'bg-red-600 hover:bg-red-700' : 'bg-[#159A9C] hover:bg-[#0F7B7D]'}`}
                   >
                     Ver Planos Superiores
                   </Button>

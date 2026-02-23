@@ -11,6 +11,7 @@ import {
 import { User } from '../users/user.entity';
 import { Cliente } from '../clientes/cliente.entity';
 import { Atividade } from './atividade.entity';
+import { OportunidadeStageEvent } from './oportunidade-stage-event.entity';
 import { Empresa } from '../../empresas/entities/empresa.entity';
 
 export enum EstagioOportunidade {
@@ -122,6 +123,9 @@ export class Oportunidade {
 
   @OneToMany(() => Atividade, (atividade) => atividade.oportunidade)
   atividades: Atividade[];
+
+  @OneToMany(() => OportunidadeStageEvent, (event) => event.oportunidade)
+  stageEvents: OportunidadeStageEvent[];
 
   @CreateDateColumn({ name: 'createdAt' })
   createdAt: Date;

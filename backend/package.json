@@ -23,6 +23,7 @@
     "validate:rls": "powershell -File ../scripts/ci/rls-coverage-check.ps1",
     "validate:lint-budget": "powershell -File ../scripts/ci/lint-budget-check.ps1",
     "update:lint-budget": "powershell -File ../scripts/ci/update-lint-budget.ps1",
+    "benchmark:dashboard-v2": "node scripts/benchmark-dashboard-v2.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
@@ -124,6 +125,7 @@
     "winston-daily-rotate-file": "^5.0.0"
   },
   "devDependencies": {
+    "autocannon": "^7.15.0",
     "@nestjs/cli": "^11.0.13",
     "@nestjs/schematics": "^10.0.0",
     "@nestjs/testing": "^10.0.0",

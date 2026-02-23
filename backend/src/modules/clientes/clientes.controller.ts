@@ -56,7 +56,7 @@ const ALLOWED_ATTACHMENT_MIME_TYPES = [
 ];
 
 const ensureClientesUploadDirectory = (subdir: string): string => {
-  const uploadDir = path.resolve(__dirname, '../../../uploads', CLIENTES_UPLOADS_SUBDIR, subdir);
+  const uploadDir = path.resolve(process.cwd(), 'uploads', CLIENTES_UPLOADS_SUBDIR, subdir);
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
   }
@@ -325,7 +325,8 @@ export class ClientesController {
   @UseInterceptors(
     FileInterceptor('avatar', {
       storage: diskStorage({
-        destination: () => ensureClientesUploadDirectory(CLIENTES_AVATAR_SUBDIR),
+        destination: (_req, _file, cb) =>
+          cb(null, ensureClientesUploadDirectory(CLIENTES_AVATAR_SUBDIR)),
         filename: (req: any, file, cb) => {
           const clienteId = req?.params?.id || 'cliente';
           const ext = path.extname(file.originalname)?.toLowerCase() || '.png';
@@ -422,7 +423,8 @@ export class ClientesController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: () => ensureClientesUploadDirectory(CLIENTES_ANEXOS_SUBDIR),
+        destination: (_req, _file, cb) =>
+          cb(null, ensureClientesUploadDirectory(CLIENTES_ANEXOS_SUBDIR)),
         filename: (req: any, file, cb) => {
           const clienteId = req?.params?.id || 'cliente';
           const originalExt = path.extname(file.originalname)?.toLowerCase() || '';

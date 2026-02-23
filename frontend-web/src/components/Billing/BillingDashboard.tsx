@@ -44,10 +44,10 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
     return (
       <div className="space-y-6">
         <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+          <div className="mb-4 h-8 w-1/4 rounded bg-[#DEEFE7]"></div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-32 bg-gray-200 rounded"></div>
+              <div key={i} className="h-32 rounded bg-[#DEEFE7]"></div>
             ))}
           </div>
         </div>
@@ -74,12 +74,12 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
         <CardContent className="pt-6">
           <div className="text-center">
             <Crown className="h-16 w-16 text-yellow-500 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold mb-2">Bem-vindo ao ConectCRM!</h3>
-            <p className="text-gray-600 mb-6">
+            <h3 className="mb-2 text-xl font-semibold text-[#002333]">Bem-vindo ao ConectCRM!</h3>
+            <p className="mb-6 text-[#385A6A]">
               Para começar a usar todas as funcionalidades, escolha um plano que se adeque às suas
               necessidades.
             </p>
-            <Button onClick={onUpgrade} size="lg" className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={onUpgrade} size="lg" className="bg-[#159A9C] hover:bg-[#0F7B7D]">
               <Crown className="h-4 w-4 mr-2" />
               Escolher Plano
             </Button>
@@ -99,13 +99,13 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
   return (
     <div className="space-y-6">
       {/* Header com Status da Assinatura */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Billing & Assinatura</h1>
-          <p className="text-gray-600">Gerencie sua assinatura e monitore o uso dos recursos</p>
+          <h2 className="text-xl font-bold text-[#002333]">Billing & Assinatura</h2>
+          <p className="text-[#385A6A]">Gerencie sua assinatura e monitore o uso dos recursos</p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:gap-3">
           <Badge
             variant={statusInfo.status === 'ativa' ? 'default' : 'destructive'}
             className="text-sm"
@@ -118,14 +118,19 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
               onClick={() => setShowAdmin(true)}
               variant="outline"
               size="sm"
-              className="border-blue-200 text-blue-600 hover:bg-blue-50"
+              className="border-[#B4BEC9] text-[#159A9C] hover:bg-[#159A9C]/10"
             >
               <Settings className="h-4 w-4 mr-2" />
               Administração
             </Button>
           )}
 
-          <Button onClick={onManageBilling} variant="outline" size="sm">
+          <Button
+            onClick={onManageBilling}
+            variant="outline"
+            size="sm"
+            className="border-[#B4BEC9] text-[#19384C] hover:bg-[#F6FAF9]"
+          >
             <CreditCard className="h-4 w-4 mr-2" />
             Gerenciar
           </Button>
@@ -143,14 +148,14 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-              <p className="text-sm text-gray-600">Valor Mensal</p>
+              <p className="text-sm text-[#385A6A]">Valor Mensal</p>
               <p className="text-2xl font-bold text-green-600">
                 {formatCurrency(assinatura.valorMensal)}
               </p>
             </div>
 
             <div>
-              <p className="text-sm text-gray-600">Próximo Vencimento</p>
+              <p className="text-sm text-[#385A6A]">Próximo Vencimento</p>
               <p className="text-lg font-semibold">
                 {proximoVencimento.toLocaleDateString('pt-BR')}
               </p>
@@ -162,7 +167,7 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
             </div>
 
             <div>
-              <p className="text-sm text-gray-600">Renovação</p>
+              <p className="text-sm text-[#385A6A]">Renovação</p>
               <div className="flex items-center gap-2">
                 {assinatura.renovacaoAutomatica ? (
                   <>
@@ -180,8 +185,8 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
           </div>
 
           {assinatura.plano.descricao && (
-            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-800">{assinatura.plano.descricao}</p>
+              <div className="mt-4 rounded-lg bg-[#DEEFE7] p-3">
+                <p className="text-sm text-[#244455]">{assinatura.plano.descricao}</p>
             </div>
           )}
         </CardContent>
@@ -313,7 +318,7 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
                     <Button
                       onClick={onUpgrade}
                       size="sm"
-                      className="mt-3 bg-yellow-600 hover:bg-yellow-700"
+                      className="mt-3 bg-[#159A9C] hover:bg-[#0F7B7D]"
                     >
                       Ver Planos Superiores
                     </Button>
@@ -339,7 +344,7 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
                     <Button
                       onClick={onManageBilling}
                       size="sm"
-                      className="mt-3 bg-red-600 hover:bg-red-700"
+                      className="mt-3 bg-[#159A9C] hover:bg-[#0F7B7D]"
                     >
                       Gerenciar Billing
                     </Button>

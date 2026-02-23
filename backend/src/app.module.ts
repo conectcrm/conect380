@@ -22,6 +22,7 @@ import { FinanceiroModule } from './modules/financeiro/financeiro.module';
 import { FaturamentoModule } from './modules/faturamento/faturamento.module';
 import { CotacaoModule } from './cotacao/cotacao.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { DashboardV2Module } from './modules/dashboard-v2/dashboard-v2.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { OportunidadesModule } from './modules/oportunidades/oportunidades.module';
 import { EmpresasModule } from './empresas/empresas.module';
@@ -42,6 +43,11 @@ import { BullModule } from '@nestjs/bull';
 import { PagamentosModule } from './modules/pagamentos/pagamentos.module';
 import { NotificationModule } from './notifications/notification.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
+import { SystemBrandingModule } from './modules/system-branding/system-branding.module';
+
+const nodeEnv = (process.env.NODE_ENV || '').toLowerCase();
+const isProduction = nodeEnv === 'production';
+const throttlerShortLimit = isProduction ? 10 : 200;
 
 @Module({
   imports: [
@@ -66,7 +72,7 @@ import { MetricsModule } from './modules/metrics/metrics.module';
       {
         name: 'short',
         ttl: 1000, // 1 segundo
-        limit: 10, // 10 requisições por segundo
+        limit: throttlerShortLimit, // 10 req/s em produção | 200 req/s em desenvolvimento
       },
       {
         name: 'medium',
@@ -89,6 +95,7 @@ import { MetricsModule } from './modules/metrics/metrics.module';
     FaturamentoModule,
     CotacaoModule,
     DashboardModule,
+    DashboardV2Module,
     AnalyticsModule,
     OportunidadesModule,
     EmpresasModule,
@@ -104,6 +111,7 @@ import { MetricsModule } from './modules/metrics/metrics.module';
     PagamentosModule,
     NotificationModule,
     MetricsModule, // 📊 Prometheus metrics endpoint
+    SystemBrandingModule,
   ],
   controllers: [HealthController, RateLimitController], // 📊 Health + Rate Limit monitoring
   providers: [

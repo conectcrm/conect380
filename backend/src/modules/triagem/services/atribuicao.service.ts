@@ -37,7 +37,7 @@ export interface AtribuirEquipeDto {
 }
 
 /**
- * Service para gerenciar equipes e atribuiÃ§Ãµes de atendentes
+ * Service para gerenciar equipes e atribuições de atendentes
  */
 @Injectable()
 export class AtribuicaoService {
@@ -113,7 +113,7 @@ export class AtribuicaoService {
   }
 
   // ========================================================================
-  // GESTÃƒO DE EQUIPES
+  // GESTÃO DE EQUIPES
   // ========================================================================
 
   /**
@@ -138,7 +138,9 @@ export class AtribuicaoService {
         `${timestamp} - Tentativa de criar equipe "${dto.nome}" para empresa ${empresaId}\n`,
       );
     } catch (traceError) {
-      this.logger.warn(`NÃ£o foi possÃ­vel gravar trace de criaÃ§Ã£o de equipe: ${traceError.message}`);
+      this.logger.warn(
+        `Não foi possível gravar trace de criação de equipe: ${traceError.message}`,
+      );
     }
     try {
       return await this.equipeRepository.save(equipe);
@@ -204,7 +206,7 @@ export class AtribuicaoService {
   }
 
   // ========================================================================
-  // GESTÃƒO DE MEMBROS DA EQUIPE
+  // GESTÃO DE MEMBROS DA EQUIPE
   // ========================================================================
 
   /**
@@ -273,11 +275,11 @@ export class AtribuicaoService {
   }
 
   // ========================================================================
-  // ATRIBUIÃ‡Ã•ES DIRETAS (Atendente â†’ NÃºcleo/Departamento)
+  // ATRIBUIÇÕES DIRETAS (Atendente → Núcleo/Departamento)
   // ========================================================================
 
   /**
-   * Atribui um atendente diretamente a um nÃºcleo ou departamento
+    * Atribui um atendente diretamente a um núcleo ou departamento
    */
   async atribuirAtendenteANucleoDepartamento(
     empresaId: string,
@@ -323,7 +325,7 @@ export class AtribuicaoService {
   }
 
   /**
-   * Remove uma atribuiÃ§Ã£o direta de atendente
+    * Remove uma atribuição direta de atendente
    */
   async removerAtribuicaoAtendente(empresaId: string, atribuicaoId: string): Promise<void> {
     const atribuicao = await this.atendenteAtribuicaoRepository.findOne({
@@ -338,7 +340,7 @@ export class AtribuicaoService {
   }
 
   /**
-   * Lista atribuiÃ§Ãµes de um atendente
+    * Lista atribuições de um atendente
    */
   async listarAtribuicoesAtendente(
     empresaId: string,
@@ -354,11 +356,11 @@ export class AtribuicaoService {
   }
 
   // ========================================================================
-  // ATRIBUIÃ‡Ã•ES DE EQUIPE (Equipe â†’ NÃºcleo/Departamento)
+  // ATRIBUIÇÕES DE EQUIPE (Equipe → Núcleo/Departamento)
   // ========================================================================
 
   /**
-   * Atribui uma equipe a um nÃºcleo ou departamento
+    * Atribui uma equipe a um núcleo ou departamento
    */
   async atribuirEquipeANucleoDepartamento(
     empresaId: string,
@@ -404,7 +406,7 @@ export class AtribuicaoService {
   }
 
   /**
-   * Remove uma atribuiÃ§Ã£o de equipe
+    * Remove uma atribuição de equipe
    */
   async removerAtribuicaoEquipe(empresaId: string, atribuicaoId: string): Promise<void> {
     const atribuicao = await this.equipeAtribuicaoRepository.findOne({
@@ -419,7 +421,7 @@ export class AtribuicaoService {
   }
 
   /**
-   * Lista atribuiÃ§Ãµes de uma equipe
+    * Lista atribuições de uma equipe
    */
   async listarAtribuicoesEquipe(empresaId: string, equipeId: string): Promise<EquipeAtribuicao[]> {
     await this.buscarEquipeDaEmpresa(empresaId, equipeId);
@@ -610,7 +612,7 @@ export class AtribuicaoService {
 
   /**
    * Seleciona o atendente com menor carga de trabalho
-   * TODO: Implementar lÃ³gica de contagem de tickets ativos por atendente
+    * TODO: Implementar lógica de contagem de tickets ativos por atendente
    */
   async selecionarAtendentePorCarga(
     atendentes: User[],
@@ -708,7 +710,7 @@ export class AtribuicaoService {
 
     if (candidatos.length === 0) {
       this.logger.warn(
-        `âš ï¸ Nenhum atendente disponÃ­vel para roteamento automÃ¡tico (empresa ${empresaId}, nÃºcleo ${nucleoId}, departamento ${departamentoId || 'N/A'})`,
+        `⚠️ Nenhum atendente disponível para roteamento automático (empresa ${empresaId}, núcleo ${nucleoId}, departamento ${departamentoId || 'N/A'})`,
       );
       return null;
     }

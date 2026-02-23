@@ -1,4 +1,4 @@
-import { test as base, expect } from '@playwright/test';
+import { test as base, expect } from "@playwright/test";
 
 /**
  * Fixtures customizadas para testes E2E do ConectCRM
@@ -12,16 +12,33 @@ export interface CustomFixtures {
 
 // Dados de usuários de teste
 const ADMIN_USER = {
-  email: process.env.TEST_ADMIN_EMAIL || 'admin@conectsuite.com.br',
-  senha: process.env.TEST_ADMIN_PASSWORD || 'admin123',
+  email: process.env.TEST_ADMIN_EMAIL || "admin@conectsuite.com.br",
+  senha: process.env.TEST_ADMIN_PASSWORD || "admin123",
 };
 
 const ATENDENTE_USER = {
-  email: process.env.TEST_ATENDENTE_EMAIL || 'atendente@conectcrm.com',
-  senha: process.env.TEST_ATENDENTE_PASSWORD || 'atendente123',
+  email: process.env.TEST_ATENDENTE_EMAIL || "atendente@conectcrm.com",
+  senha: process.env.TEST_ATENDENTE_PASSWORD || "atendente123",
 };
 
 async function performLogin(page: any, email: string, senha: string) {
+  await page.evaluate(() => {
+    const styleId = "pw-hide-wds-overlay";
+    if (document.getElementById(styleId)) {
+      return;
+    }
+
+    const style = document.createElement("style");
+    style.id = styleId;
+    style.textContent = `
+      #webpack-dev-server-client-overlay {
+        display: none !important;
+        pointer-events: none !important;
+      }
+    `;
+    document.head.appendChild(style);
+  });
+
   const emailInput = page
     .locator('input[name="email"], input[type="email"], input[placeholder*="empresa" i]')
     .first();
@@ -36,31 +53,31 @@ async function performLogin(page: any, email: string, senha: string) {
 
   await emailInput.fill(email);
   await passwordInput.fill(senha);
-  await submitButton.click();
+  await submitButton.click({ force: true });
 }
 
 // Estender test com fixtures
 export const test = base.extend<CustomFixtures>({
   // Fixture: usuário admin
-  adminUser: async ({ }, use) => {
+  adminUser: async ({}, use) => {
     await use(ADMIN_USER);
   },
 
   // Fixture: usuário atendente
-  atendenteUser: async ({ }, use) => {
+  atendenteUser: async ({}, use) => {
     await use(ATENDENTE_USER);
   },
 
   // Fixture: página autenticada
   authenticatedPage: async ({ page }, use) => {
     // Navegar para login
-    await page.goto('/login');
+    await page.goto("/login");
 
     // Fazer login
     await performLogin(page, ADMIN_USER.email, ADMIN_USER.senha);
 
     // Aguardar redirecionamento
-    await page.waitForURL('**/dashboard', { timeout: 10000 });
+    await page.waitForURL("**/dashboard", { timeout: 10000 });
 
     // Verificar se está autenticado
     await expect(page).toHaveURL(/.*dashboard/);
@@ -79,9 +96,9 @@ export { expect };
  * Helper: Fazer login manual
  */
 export async function login(page: any, email: string, senha: string) {
-  await page.goto('/login');
+  await page.goto("/login");
   await performLogin(page, email, senha);
-  await page.waitForURL('**/dashboard', { timeout: 10000 });
+  await page.waitForURL("**/dashboard", { timeout: 10000 });
 }
 
 /**
@@ -91,11 +108,11 @@ export async function waitForElementWithRetry(
   page: any,
   selector: string,
   maxRetries = 3,
-  timeout = 5000
+  timeout = 5000,
 ) {
   for (let i = 0; i < maxRetries; i++) {
     try {
-      await page.waitForSelector(selector, { timeout, state: 'visible' });
+      await page.waitForSelector(selector, { timeout, state: "visible" });
       return true;
     } catch (error) {
       if (i === maxRetries - 1) throw error;
@@ -114,7 +131,7 @@ export async function waitForWebSocketConnection(page: any, timeout = 10000) {
       // Verificar se existe alguma conexão WebSocket ativa
       return (window as any).wsConnected === true;
     },
-    { timeout }
+    { timeout },
   );
 }
 
@@ -122,7 +139,7 @@ export async function waitForWebSocketConnection(page: any, timeout = 10000) {
  * Helper: Criar ticket de teste
  */
 export async function createTestTicket(page: any, ticketData: any) {
-  await page.goto('/atendimento');
+  await page.goto("/atendimento");
   await page.click('[data-testid="new-ticket-button"]');
 
   await page.fill('[name="assunto"]', ticketData.assunto);
@@ -151,18 +168,13 @@ export async function clearBrowserData(page: any) {
  * Helper: Obter token JWT do localStorage
  */
 export async function getAuthToken(page: any): Promise<string | null> {
-  return page.evaluate(() => localStorage.getItem('authToken'));
+  return page.evaluate(() => localStorage.getItem("authToken"));
 }
 
 /**
  * Helper: Fazer requisição HTTP autenticada
  */
-export async function makeAuthenticatedRequest(
-  page: any,
-  url: string,
-  method = 'GET',
-  body?: any
-) {
+export async function makeAuthenticatedRequest(page: any, url: string, method = "GET", body?: any) {
   const token = await getAuthToken(page);
 
   return page.evaluate(
@@ -170,7 +182,7 @@ export async function makeAuthenticatedRequest(
       const response = await fetch(url, {
         method,
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: body ? JSON.stringify(body) : undefined,
@@ -181,6 +193,6 @@ export async function makeAuthenticatedRequest(
         data: await response.json().catch(() => null),
       };
     },
-    { url, method, body, token }
+    { url, method, body, token },
   );
 }

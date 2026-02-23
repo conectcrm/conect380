@@ -58,6 +58,10 @@ export class UpdateLeadDto {
   @IsOptional()
   status?: StatusLead;
 
+  @IsEnum(OrigemLead)
+  @IsOptional()
+  origem?: OrigemLead;
+
   @IsInt()
   @Min(0)
   @Max(100)

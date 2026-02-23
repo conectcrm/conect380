@@ -25,9 +25,19 @@ interface AgendaEventoResponse {
   local?: string | null;
   color?: string | null;
   attendees?: string[] | null;
+  attendee_responses?: Record<string, 'pending' | 'confirmed' | 'declined'> | null;
+  my_rsvp?: 'pending' | 'confirmed' | 'declined' | null;
+  criado_por_id?: string | null;
+  criado_por_nome?: string | null;
   interacao_id?: string | null;
   created_at?: string;
   updated_at?: string;
+}
+
+interface AgendaParticipantResponse {
+  id: string;
+  nome: string;
+  email: string;
 }
 
 interface PaginatedAgendaResponse {
@@ -55,6 +65,129 @@ interface EventoResponse {
 }
 
 const CREVASSE_PRIMARY = '#159A9C';
+const LOCAL_AGENDA_EVENT_META_STORAGE_KEY = 'conectcrm:agenda:event-meta:v1';
+
+type AgendaEventLocalMeta = Pick<
+  Partial<CalendarEvent>,
+  | 'type'
+  | 'category'
+  | 'status'
+  | 'priority'
+  | 'attendees'
+  | 'attendeeResponses'
+  | 'collaborator'
+  | 'responsavel'
+  | 'responsavelId'
+  | 'cliente'
+  | 'allDay'
+  | 'location'
+  | 'locationType'
+  | 'color'
+  | 'notes'
+  | 'reminderTime'
+  | 'reminderType'
+  | 'emailOffline'
+  | 'attachments'
+  | 'recurring'
+  | 'isRecurring'
+  | 'recurringPattern'
+  | 'myRsvp'
+>;
+
+const AGENDA_EVENT_LOCAL_META_KEYS: Array<keyof AgendaEventLocalMeta> = [
+  'type',
+  'category',
+  'status',
+  'priority',
+  'attendees',
+  'attendeeResponses',
+  'collaborator',
+  'responsavel',
+  'responsavelId',
+  'cliente',
+  'allDay',
+  'location',
+  'locationType',
+  'color',
+  'notes',
+  'reminderTime',
+  'reminderType',
+  'emailOffline',
+  'attachments',
+  'recurring',
+  'isRecurring',
+  'recurringPattern',
+  'myRsvp',
+];
+
+const canUseLocalStorage = () => typeof window !== 'undefined' && !!window.localStorage;
+
+const readAgendaEventLocalMetaMap = (): Record<string, AgendaEventLocalMeta> => {
+  if (!canUseLocalStorage()) return {};
+
+  try {
+    const raw = window.localStorage.getItem(LOCAL_AGENDA_EVENT_META_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (error) {
+    console.warn('Falha ao ler metadados locais da agenda:', error);
+    return {};
+  }
+};
+
+const writeAgendaEventLocalMetaMap = (map: Record<string, AgendaEventLocalMeta>) => {
+  if (!canUseLocalStorage()) return;
+
+  try {
+    window.localStorage.setItem(LOCAL_AGENDA_EVENT_META_STORAGE_KEY, JSON.stringify(map));
+  } catch (error) {
+    console.warn('Falha ao salvar metadados locais da agenda:', error);
+  }
+};
+
+const mergeAgendaEventLocalMeta = (event: CalendarEvent): CalendarEvent => {
+  const localMeta = readAgendaEventLocalMetaMap()[event.id];
+  if (!localMeta) return event;
+  return { ...event, ...localMeta };
+};
+
+const upsertAgendaEventLocalMeta = (eventId: string, source: Partial<CalendarEvent>) => {
+  if (!eventId || !canUseLocalStorage()) return;
+
+  const map = readAgendaEventLocalMetaMap();
+  const currentMeta = { ...(map[eventId] || {}) };
+
+  AGENDA_EVENT_LOCAL_META_KEYS.forEach((key) => {
+    if (!Object.prototype.hasOwnProperty.call(source, key)) return;
+    const value = source[key];
+
+    if (value === undefined) {
+      delete currentMeta[key];
+      return;
+    }
+
+    currentMeta[key] = value as never;
+  });
+
+  if (Object.keys(currentMeta).length === 0) {
+    delete map[eventId];
+  } else {
+    map[eventId] = currentMeta;
+  }
+
+  writeAgendaEventLocalMetaMap(map);
+};
+
+const removeAgendaEventLocalMeta = (eventId: string) => {
+  if (!eventId || !canUseLocalStorage()) return;
+
+  const map = readAgendaEventLocalMetaMap();
+  if (!map[eventId]) return;
+
+  delete map[eventId];
+  writeAgendaEventLocalMetaMap(map);
+};
 
 const mapStatusToFrontend = (status: AgendaStatusBackend): CalendarEvent['status'] => {
   switch (status) {
@@ -137,6 +270,10 @@ const toCalendarEventFromAgenda = (evento: AgendaEventoResponse): CalendarEvent 
     location: evento.local ?? '',
     color: evento.color ?? CREVASSE_PRIMARY,
     attendees: evento.attendees ?? undefined,
+    attendeeResponses: evento.attendee_responses ?? undefined,
+    myRsvp: evento.my_rsvp ?? undefined,
+    criadoPorId: evento.criado_por_id ?? undefined,
+    criadoPorNome: evento.criado_por_nome ?? undefined,
     type: 'event',
     category: 'meeting',
   };
@@ -197,6 +334,7 @@ const fromCalendarEventToEventos = (event: Omit<CalendarEvent, 'id'>) => {
     tipo: mapCalendarTypeToEventosType(event.type),
     cor: event.color ?? CREVASSE_PRIMARY,
     clienteId: event.cliente?.id,
+    usuarioId: event.responsavelId || undefined,
   };
 };
 
@@ -229,6 +367,7 @@ const fromCalendarUpdatesToEventos = (updates: Partial<CalendarEvent>) => {
   if (updates.type !== undefined) payload.tipo = mapCalendarTypeToEventosType(updates.type);
   if (updates.color !== undefined) payload.cor = updates.color;
   if (updates.cliente?.id) payload.clienteId = updates.cliente.id;
+  if (updates.responsavelId !== undefined) payload.usuarioId = updates.responsavelId || undefined;
 
   return payload;
 };
@@ -236,7 +375,7 @@ const fromCalendarUpdatesToEventos = (updates: Partial<CalendarEvent>) => {
 class AgendaEventosService {
   private readonly agendaBaseUrl = '/agenda-eventos';
   private readonly eventosBaseUrl = '/eventos';
-  private endpointVariant: EndpointVariant = 'eventos';
+  private endpointVariant: EndpointVariant = 'agenda';
 
   private extractAgendaData(responseData: AgendaEventoResponse[] | PaginatedAgendaResponse) {
     if (Array.isArray(responseData)) return responseData;
@@ -250,6 +389,12 @@ class AgendaEventosService {
     if (!axios.isAxiosError(error)) return false;
     const status = error.response?.status;
     return status === 404 || status === 500;
+  }
+
+  private isSharedAgendaEvent(
+    payload: Pick<Partial<CalendarEvent>, 'attendees'> | Omit<CalendarEvent, 'id'>,
+  ): boolean {
+    return Array.isArray(payload.attendees) && payload.attendees.length > 1;
   }
 
   private async withEndpointFallback<T>(handlers: {
@@ -290,79 +435,168 @@ class AgendaEventosService {
     interacaoId?: string;
     type?: CalendarEvent['type'] | string;
   }): Promise<CalendarEvent[]> {
-    return this.withEndpointFallback({
-      agenda: async () => {
-        const params = new URLSearchParams();
+    const agendaParams = new URLSearchParams();
+    if (filtros?.startDate) agendaParams.append('dataInicio', filtros.startDate.toISOString());
+    if (filtros?.endDate) agendaParams.append('dataFim', filtros.endDate.toISOString());
+    if (filtros?.status) agendaParams.append('status', mapStatusToBackend(filtros.status));
+    if (filtros?.priority) agendaParams.append('prioridade', mapPriorityToBackend(filtros.priority));
+    if (filtros?.search) agendaParams.append('busca', filtros.search);
+    if (filtros?.interacaoId) agendaParams.append('interacao_id', filtros.interacaoId);
+    agendaParams.append('page', '1');
+    agendaParams.append('limit', '100');
 
-        if (filtros?.startDate) params.append('dataInicio', filtros.startDate.toISOString());
-        if (filtros?.endDate) params.append('dataFim', filtros.endDate.toISOString());
-        if (filtros?.status) params.append('status', mapStatusToBackend(filtros.status));
-        if (filtros?.priority) params.append('prioridade', mapPriorityToBackend(filtros.priority));
-        if (filtros?.search) params.append('busca', filtros.search);
-        if (filtros?.interacaoId) params.append('interacao_id', filtros.interacaoId);
+    const eventosParams: Record<string, string> = {};
+    if (filtros?.startDate) eventosParams.startDate = filtros.startDate.toISOString();
+    if (filtros?.endDate) eventosParams.endDate = filtros.endDate.toISOString();
+    if (filtros?.type) {
+      eventosParams.tipo = mapCalendarTypeToEventosType(filtros.type);
+    }
 
-        const url = params.toString()
-          ? `${this.agendaBaseUrl}?${params.toString()}`
-          : this.agendaBaseUrl;
-        const response = await api.get<AgendaEventoResponse[] | PaginatedAgendaResponse>(url);
-        const raw = this.extractAgendaData(response.data);
-        return raw.map(toCalendarEventFromAgenda);
-      },
-      eventos: async () => {
-        const params: Record<string, string> = {};
+    let agendaEvents: CalendarEvent[] = [];
+    let eventosEvents: CalendarEvent[] = [];
+    let agendaError: unknown;
+    let eventosError: unknown;
 
-        if (filtros?.startDate) params.startDate = filtros.startDate.toISOString();
-        if (filtros?.endDate) params.endDate = filtros.endDate.toISOString();
-        if (filtros?.type) {
-          params.tipo = mapCalendarTypeToEventosType(filtros.type);
+    try {
+      const buildAgendaUrl = (page: number) => {
+        const params = new URLSearchParams(agendaParams);
+        params.set('page', String(page));
+        return params.toString() ? `${this.agendaBaseUrl}?${params.toString()}` : this.agendaBaseUrl;
+      };
+
+      const firstResponse = await api.get<AgendaEventoResponse[] | PaginatedAgendaResponse>(
+        buildAgendaUrl(1),
+      );
+      let rawAgenda = this.extractAgendaData(firstResponse.data);
+
+      if (!Array.isArray(firstResponse.data)) {
+        const totalPages = Math.max(1, Number(firstResponse.data.totalPages || 1));
+
+        if (totalPages > 1) {
+          const remainingResponses = await Promise.all(
+            Array.from({ length: totalPages - 1 }, (_, index) =>
+              api.get<AgendaEventoResponse[] | PaginatedAgendaResponse>(buildAgendaUrl(index + 2)),
+            ),
+          );
+
+          remainingResponses.forEach((response) => {
+            rawAgenda = [...rawAgenda, ...this.extractAgendaData(response.data)];
+          });
         }
+      }
 
-        const response = await api.get<EventoResponse[]>(this.eventosBaseUrl, { params });
-        const raw = Array.isArray(response.data) ? response.data : [];
-        return raw.map(toCalendarEventFromEventos);
-      },
+      agendaEvents = rawAgenda.map(toCalendarEventFromAgenda).map(mergeAgendaEventLocalMeta);
+      this.endpointVariant = 'agenda';
+    } catch (error) {
+      agendaError = error;
+    }
+
+    try {
+      const response = await api.get<EventoResponse[]>(this.eventosBaseUrl, { params: eventosParams });
+      const raw = Array.isArray(response.data) ? response.data : [];
+      eventosEvents = raw.map(toCalendarEventFromEventos).map(mergeAgendaEventLocalMeta);
+      if (agendaEvents.length === 0) {
+        this.endpointVariant = 'eventos';
+      }
+    } catch (error) {
+      eventosError = error;
+    }
+
+    if (agendaEvents.length === 0 && eventosEvents.length === 0) {
+      throw (this.endpointVariant === 'agenda' ? agendaError : eventosError) || agendaError || eventosError;
+    }
+
+    const mergedById = new Map<string, CalendarEvent>();
+    [...eventosEvents, ...agendaEvents].forEach((event) => {
+      mergedById.set(event.id, event);
     });
+
+    return Array.from(mergedById.values()).sort((a, b) => a.start.getTime() - b.start.getTime());
   }
 
   async obterEvento(id: string): Promise<CalendarEvent> {
     return this.withEndpointFallback({
       agenda: async () => {
         const response = await api.get<AgendaEventoResponse>(`${this.agendaBaseUrl}/${id}`);
-        return toCalendarEventFromAgenda(response.data);
+        return mergeAgendaEventLocalMeta(toCalendarEventFromAgenda(response.data));
       },
       eventos: async () => {
         const response = await api.get<EventoResponse>(`${this.eventosBaseUrl}/${id}`);
-        return toCalendarEventFromEventos(response.data);
+        return mergeAgendaEventLocalMeta(toCalendarEventFromEventos(response.data));
       },
     });
   }
 
+  async listarParticipantesInternos(): Promise<Array<{ id: string; nome: string; email: string }>> {
+    const response = await api.get<{ success?: boolean; data?: AgendaParticipantResponse[] }>(
+      `${this.agendaBaseUrl}/participants`,
+    );
+
+    const payload = response.data;
+    const items = Array.isArray(payload?.data)
+      ? payload.data
+      : Array.isArray(response.data)
+        ? (response.data as unknown as AgendaParticipantResponse[])
+        : [];
+
+    return items
+      .filter((item) => item && item.id && item.nome && item.email)
+      .map((item) => ({
+        id: item.id,
+        nome: item.nome,
+        email: item.email,
+      }));
+  }
+
   async criarEvento(event: Omit<CalendarEvent, 'id'>): Promise<CalendarEvent> {
+    if (this.isSharedAgendaEvent(event)) {
+      const payload = fromCalendarEventToAgenda(event);
+      const response = await api.post<AgendaEventoResponse>(this.agendaBaseUrl, payload);
+      this.endpointVariant = 'agenda';
+      const mappedEvent = toCalendarEventFromAgenda(response.data);
+      upsertAgendaEventLocalMeta(mappedEvent.id, event);
+      return mergeAgendaEventLocalMeta(mappedEvent);
+    }
+
     return this.withEndpointFallback({
       agenda: async () => {
         const payload = fromCalendarEventToAgenda(event);
         const response = await api.post<AgendaEventoResponse>(this.agendaBaseUrl, payload);
-        return toCalendarEventFromAgenda(response.data);
+        const mappedEvent = toCalendarEventFromAgenda(response.data);
+        upsertAgendaEventLocalMeta(mappedEvent.id, event);
+        return mergeAgendaEventLocalMeta(mappedEvent);
       },
       eventos: async () => {
         const payload = fromCalendarEventToEventos(event);
         const response = await api.post<EventoResponse>(this.eventosBaseUrl, payload);
-        return toCalendarEventFromEventos(response.data);
+        const mappedEvent = toCalendarEventFromEventos(response.data);
+        upsertAgendaEventLocalMeta(mappedEvent.id, event);
+        return mergeAgendaEventLocalMeta(mappedEvent);
       },
     });
   }
 
   async atualizarEvento(id: string, updates: Partial<CalendarEvent>): Promise<CalendarEvent> {
+    if (this.isSharedAgendaEvent(updates)) {
+      const payload = fromCalendarUpdatesToAgenda(updates);
+      const response = await api.patch<AgendaEventoResponse>(`${this.agendaBaseUrl}/${id}`, payload);
+      this.endpointVariant = 'agenda';
+      upsertAgendaEventLocalMeta(id, updates);
+      return mergeAgendaEventLocalMeta(toCalendarEventFromAgenda(response.data));
+    }
+
     return this.withEndpointFallback({
       agenda: async () => {
         const payload = fromCalendarUpdatesToAgenda(updates);
         const response = await api.patch<AgendaEventoResponse>(`${this.agendaBaseUrl}/${id}`, payload);
-        return toCalendarEventFromAgenda(response.data);
+        upsertAgendaEventLocalMeta(id, updates);
+        return mergeAgendaEventLocalMeta(toCalendarEventFromAgenda(response.data));
       },
       eventos: async () => {
         const payload = fromCalendarUpdatesToEventos(updates);
         const response = await api.patch<EventoResponse>(`${this.eventosBaseUrl}/${id}`, payload);
-        return toCalendarEventFromEventos(response.data);
+        upsertAgendaEventLocalMeta(id, updates);
+        return mergeAgendaEventLocalMeta(toCalendarEventFromEventos(response.data));
       },
     });
   }
@@ -371,11 +605,31 @@ class AgendaEventosService {
     await this.withEndpointFallback({
       agenda: async () => {
         await api.delete(`${this.agendaBaseUrl}/${id}`);
+        removeAgendaEventLocalMeta(id);
       },
       eventos: async () => {
         await api.delete(`${this.eventosBaseUrl}/${id}`);
+        removeAgendaEventLocalMeta(id);
       },
     });
+  }
+
+  async responderConviteEvento(
+    id: string,
+    resposta: Extract<NonNullable<CalendarEvent['myRsvp']>, 'confirmed' | 'declined'>,
+  ): Promise<CalendarEvent> {
+    const response = await api.patch<AgendaEventoResponse>(`${this.agendaBaseUrl}/${id}/rsvp`, {
+      resposta,
+    });
+
+    this.endpointVariant = 'agenda';
+    upsertAgendaEventLocalMeta(id, { myRsvp: resposta });
+    return mergeAgendaEventLocalMeta(toCalendarEventFromAgenda(response.data));
+  }
+
+  atualizarMetadadosLocaisEvento(id: string, updates: Partial<CalendarEvent>): void {
+    if (!id) return;
+    upsertAgendaEventLocalMeta(id, updates);
   }
 }
 

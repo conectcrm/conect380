@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Plus, Edit2, Trash2, X, Save, Zap, CheckCircle, AlertCircle } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../../hooks/useAuth';
+import { useGlobalConfirmation } from '../../contexts/GlobalConfirmationContext';
 
 import { API_BASE_URL } from '../../services/api';
 
@@ -44,6 +45,7 @@ export function RespostasRapidas({
   ticketAtual,
   clienteAtual,
 }: RespostasRapidasProps) {
+  const { confirm } = useGlobalConfirmation();
   const { user } = useAuth();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [busca, setBusca] = useState('');
@@ -208,7 +210,7 @@ export function RespostasRapidas({
   };
 
   const deletarTemplate = async (id: string) => {
-    if (!confirm('Tem certeza que deseja deletar este template?')) return;
+    if (!(await confirm('Tem certeza que deseja deletar este template?'))) return;
 
     try {
       setLoading(true);

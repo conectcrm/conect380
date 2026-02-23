@@ -22,7 +22,7 @@ export interface Usuario {
   role: UserRole;
   permissoes?: string[];
   empresa_id: string;
-  avatar_url?: string;
+  avatar_url?: string | null;
   idioma_preferido: string;
   configuracoes?: {
     tema?: string;
@@ -55,7 +55,7 @@ export interface NovoUsuario {
   role: UserRole;
   permissoes?: string[];
   empresa_id: string;
-  avatar_url?: string;
+  avatar_url?: string | null;
   idioma_preferido?: string;
   configuracoes?: {
     tema?: string;
@@ -74,7 +74,7 @@ export interface AtualizarUsuario {
   telefone?: string;
   role?: UserRole;
   permissoes?: string[];
-  avatar_url?: string;
+  avatar_url?: string | null;
   idioma_preferido?: string;
   configuracoes?: {
     tema?: string;

@@ -177,8 +177,8 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
   const renderMethodSelection = () => (
     <div className="space-y-4">
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">Escolha a forma de pagamento</h3>
-        <p className="text-sm text-gray-600">Selecione como deseja pagar pela assinatura</p>
+        <h3 className="mb-2 text-lg font-semibold text-[#002333]">Escolha a forma de pagamento</h3>
+        <p className="text-sm text-[#385A6A]">Selecione como deseja pagar pela assinatura</p>
       </div>
 
       <div className="grid gap-3">
@@ -189,10 +189,10 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
               key={method.id}
               onClick={() => setSelectedMethod(method.id)}
               disabled={!method.available}
-              className={`w-full p-4 border-2 rounded-xl text-left transition-all duration-200 hover:border-blue-300 hover:bg-blue-50 ${
+              className={`w-full p-4 border-2 rounded-xl text-left transition-all duration-200 hover:border-[#159A9C]/40 hover:bg-[#159A9C]/5 ${
                 selectedMethod === method.id
-                  ? 'border-blue-500 bg-blue-50 shadow-md'
-                  : 'border-gray-200 bg-white'
+                  ? 'border-[#159A9C] bg-[#159A9C]/5 shadow-md'
+                  : 'border-[#D4E2E7] bg-white'
               } ${!method.available && 'opacity-50 cursor-not-allowed'}`}
             >
               <div className="flex items-center justify-between">
@@ -201,14 +201,14 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
                     <Icon className="w-5 h-5 text-gray-700" />
                   </div>
                   <div>
-                    <div className="font-medium text-gray-900">{method.name}</div>
-                    <div className="text-sm text-gray-600">{method.processingTime}</div>
+                    <div className="font-medium text-[#002333]">{method.name}</div>
+                    <div className="text-sm text-[#385A6A]">{method.processingTime}</div>
                     {method.fees && (
-                      <div className="text-xs text-orange-600 font-medium">{method.fees}</div>
+                      <div className="text-xs font-medium text-yellow-700">{method.fees}</div>
                     )}
                   </div>
                 </div>
-                {selectedMethod === method.id && <CheckCircle className="w-5 h-5 text-blue-500" />}
+                {selectedMethod === method.id && <CheckCircle className="w-5 h-5 text-[#159A9C]" />}
               </div>
             </button>
           );
@@ -220,8 +220,8 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
   const renderCardForm = () => (
     <div className="space-y-4">
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">Dados do cartão de crédito</h3>
-        <p className="text-sm text-gray-600">Seus dados estão protegidos com criptografia SSL</p>
+        <h3 className="mb-2 text-lg font-semibold text-[#002333]">Dados do cartão de crédito</h3>
+        <p className="text-sm text-[#385A6A]">Seus dados estão protegidos com criptografia SSL</p>
       </div>
 
       <div className="grid gap-4">
@@ -286,8 +286,8 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
   const renderPixForm = () => (
     <div className="space-y-4">
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">Pagamento via PIX</h3>
-        <p className="text-sm text-gray-600">
+        <h3 className="mb-2 text-lg font-semibold text-[#002333]">Pagamento via PIX</h3>
+        <p className="text-sm text-[#385A6A]">
           Após confirmar, você receberá o QR Code para pagamento
         </p>
       </div>
@@ -307,17 +307,17 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
 
   const renderProcessing = () => (
     <div className="text-center py-8">
-      <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto mb-4" />
-      <h3 className="text-lg font-semibold text-gray-900 mb-2">Processando pagamento...</h3>
-      <p className="text-sm text-gray-600">Por favor, aguarde enquanto processamos seu pagamento</p>
+      <Loader2 className="w-12 h-12 text-[#159A9C] animate-spin mx-auto mb-4" />
+      <h3 className="mb-2 text-lg font-semibold text-[#002333]">Processando pagamento...</h3>
+      <p className="text-sm text-[#385A6A]">Por favor, aguarde enquanto processamos seu pagamento</p>
     </div>
   );
 
   const renderSuccess = () => (
     <div className="text-center py-8">
       <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-      <h3 className="text-xl font-bold text-gray-900 mb-2">Pagamento realizado com sucesso!</h3>
-      <p className="text-sm text-gray-600 mb-4">
+      <h3 className="mb-2 text-xl font-bold text-[#002333]">Pagamento realizado com sucesso!</h3>
+      <p className="mb-4 text-sm text-[#385A6A]">
         Sua assinatura foi ativada e você já pode usar todos os recursos
       </p>
       <Badge variant="secondary" className="text-sm bg-green-100 text-green-800">
@@ -353,17 +353,17 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
         </div>
 
         {planoSelecionado && (
-          <div className="bg-gray-50 rounded-lg p-4 mt-4">
-            <div className="flex justify-between items-center">
+            <div className="mt-4 rounded-lg bg-[#DEEFE7] p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <div className="font-semibold text-gray-900">{planoSelecionado.nome}</div>
-                <div className="text-sm text-gray-600">{planoSelecionado.periodo}</div>
+                <div className="font-semibold text-[#002333]">{planoSelecionado.nome}</div>
+                <div className="text-sm text-[#385A6A]">{planoSelecionado.periodo}</div>
               </div>
-              <div className="text-right">
-                <div className="text-2xl font-bold text-gray-900">
+              <div className="text-left sm:text-right">
+                <div className="text-2xl font-bold text-[#002333]">
                   R$ {formatPrice(planoSelecionado.preco)}
                 </div>
-                <div className="text-sm text-gray-600">por mês</div>
+                <div className="text-sm text-[#385A6A]">por mês</div>
               </div>
             </div>
           </div>
@@ -375,10 +375,10 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
           <div className="space-y-6">
             {renderMethodSelection()}
 
-            <div className="flex gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <Button
                 onClick={() => setPaymentStep('details')}
-                className="flex-1"
+                className="flex-1 bg-[#159A9C] hover:bg-[#0F7B7D]"
                 disabled={!selectedMethod}
               >
                 Continuar
@@ -395,22 +395,22 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
             {selectedMethod === 'card' && renderCardForm()}
             {selectedMethod === 'pix' && renderPixForm()}
 
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="rounded-lg border border-[#DEEFE7] bg-[#DEEFE7]/55 p-4">
               <div className="flex items-start gap-3">
-                <Lock className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <Lock className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#159A9C]" />
                 <div className="text-sm">
-                  <div className="font-medium text-yellow-800">Pagamento Seguro</div>
-                  <div className="text-yellow-700">
+                  <div className="font-medium text-[#244455]">Pagamento Seguro</div>
+                  <div className="text-[#385A6A]">
                     Seus dados são protegidos com criptografia SSL de 256 bits
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <Button
                 onClick={handlePayment}
-                className="flex-1"
+                className="flex-1 bg-[#159A9C] hover:bg-[#0F7B7D]"
                 disabled={!validateForm() || isProcessing}
               >
                 {isProcessing ? (

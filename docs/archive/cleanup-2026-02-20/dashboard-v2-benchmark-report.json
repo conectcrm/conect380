@@ -1,0 +1,98 @@
+{
+  "tenantId": "250cc3ac-617b-4d8b-be6e-b14901e4edde",
+  "periodStart": "2026-01-22",
+  "periodEnd": "2026-02-21",
+  "sampleSize": 15,
+  "generatedAt": "2026-02-21T03:05:23.586Z",
+  "coldCacheOnly": {
+    "/dashboard/v2/overview": {
+      "ms": 80.49,
+      "cacheHit": false
+    },
+    "/dashboard/v2/trends": {
+      "ms": 19.65,
+      "cacheHit": false
+    },
+    "/dashboard/v2/funnel": {
+      "ms": 22.32,
+      "cacheHit": false
+    },
+    "/dashboard/v2/pipeline-summary": {
+      "ms": 20.03,
+      "cacheHit": false
+    },
+    "/dashboard/v2/insights": {
+      "ms": 35.13,
+      "cacheHit": false
+    }
+  },
+  "coldCompute": {
+    "/dashboard/v2/overview": {
+      "ms": 380.55,
+      "cacheHit": false
+    },
+    "/dashboard/v2/trends": {
+      "ms": 296.31,
+      "cacheHit": false
+    },
+    "/dashboard/v2/funnel": {
+      "ms": 286.1,
+      "cacheHit": false
+    },
+    "/dashboard/v2/pipeline-summary": {
+      "ms": 282.07,
+      "cacheHit": false
+    },
+    "/dashboard/v2/insights": {
+      "ms": 261.46,
+      "cacheHit": false
+    }
+  },
+  "cacheHitPerf": {
+    "/dashboard/v2/overview": {
+      "count": 15,
+      "minMs": 8.61,
+      "p50Ms": 8.86,
+      "p95Ms": 9.97,
+      "maxMs": 9.97,
+      "meanMs": 9.01,
+      "cacheHitRate": 100
+    },
+    "/dashboard/v2/trends": {
+      "count": 15,
+      "minMs": 8.66,
+      "p50Ms": 9.78,
+      "p95Ms": 11.29,
+      "maxMs": 11.29,
+      "meanMs": 9.68,
+      "cacheHitRate": 100
+    },
+    "/dashboard/v2/funnel": {
+      "count": 15,
+      "minMs": 8.53,
+      "p50Ms": 9.03,
+      "p95Ms": 10.7,
+      "maxMs": 10.7,
+      "meanMs": 9.31,
+      "cacheHitRate": 100
+    },
+    "/dashboard/v2/pipeline-summary": {
+      "count": 15,
+      "minMs": 8.48,
+      "p50Ms": 8.91,
+      "p95Ms": 10.83,
+      "maxMs": 10.83,
+      "meanMs": 9.11,
+      "cacheHitRate": 100
+    },
+    "/dashboard/v2/insights": {
+      "count": 15,
+      "minMs": 8.55,
+      "p50Ms": 9.55,
+      "p95Ms": 20.73,
+      "maxMs": 20.73,
+      "meanMs": 10.9,
+      "cacheHitRate": 100
+    }
+  }
+}

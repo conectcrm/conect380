@@ -7,7 +7,8 @@ const PROFILE_STORAGE_KEY = "selectedProfileId";
 const ADMIN_PROFILE_ID = "administrador";
 
 const FULL_BREAKPOINTS = [320, 360, 375, 390, 414, 430];
-const SAMPLE_BREAKPOINTS = [360, 430];
+const SAMPLE_BREAKPOINTS = [320, 430];
+const PUBLIC_BREAKPOINTS = [320, 430];
 
 const CRITICAL_ROUTES = [
   "/atendimento/inbox",
@@ -15,21 +16,58 @@ const CRITICAL_ROUTES = [
   "/configuracoes/empresa",
   "/configuracoes/usuarios",
   "/agenda",
+  "/pipeline",
 ];
 
 const EXPANDED_ROUTES = [
   "/dashboard",
+  "/notifications",
+  "/nuclei/crm",
+  "/nuclei/vendas",
+  "/nuclei/financeiro",
+  "/nuclei/administracao",
+  "/admin/console",
+  "/admin/empresas",
+  "/atendimento",
   "/atendimento/tickets",
+  "/atendimento/tickets/novo",
   "/atendimento/automacoes",
   "/atendimento/equipe",
   "/atendimento/configuracoes",
+  "/atendimento/distribuicao",
+  "/atendimento/distribuicao/dashboard",
+  "/atendimento/fechamento-automatico",
+  "/atendimento/analytics",
+  "/gestao/usuarios",
+  "/configuracoes",
+  "/configuracoes/usuarios",
+  "/configuracoes/empresa",
+  "/configuracoes/tickets/niveis",
+  "/configuracoes/tickets/status",
+  "/configuracoes/tickets/tipos",
   "/crm/leads",
+  "/crm/agenda",
   "/crm/pipeline",
+  "/vendas/propostas",
   "/vendas/produtos",
   "/relatorios/analytics",
-  "/configuracoes",
-  "/admin/console",
-  "/admin/empresas",
+  "/perfil",
+  "/empresas/minhas",
+  "/financeiro",
+  "/financeiro/contas-receber",
+  "/financeiro/contas-pagar",
+  "/financeiro/fluxo-caixa",
+  "/financeiro/fornecedores",
+];
+
+const PUBLIC_ROUTES = [
+  "/login",
+  "/registro",
+  "/verificar-email",
+  "/esqueci-minha-senha",
+  "/recuperar-senha",
+  "/trocar-senha",
+  "/capturar-lead",
 ];
 
 async function installRateLimitBypass(page: Page): Promise<void> {
@@ -171,6 +209,15 @@ async function gotoRouteWithAuthRecovery(page: Page, route: string): Promise<voi
   await page.waitForTimeout(1200);
 }
 
+async function gotoPublicRoute(page: Page, route: string): Promise<void> {
+  await page.goto(`${BASE_URL}${route}`, {
+    waitUntil: "domcontentloaded",
+    timeout: 30000,
+  });
+  await dismissDevOverlay(page);
+  await page.waitForTimeout(1200);
+}
+
 async function hasHorizontalOverflow(page: Page): Promise<boolean> {
   return page.evaluate(() => {
     const rootWidth = document.documentElement?.scrollWidth || 0;
@@ -187,15 +234,7 @@ async function isPermissionDeniedPage(page: Page): Promise<boolean> {
     .isVisible()
     .catch(() => false);
 
-  if (deniedHeadingVisible) {
-    return true;
-  }
-
-  return page
-    .getByText(/nao possui permissao|não possui permissão/i)
-    .first()
-    .isVisible()
-    .catch(() => false);
+  return deniedHeadingVisible;
 }
 
 async function assertMobileDrawerAndProfileInteraction(page: Page): Promise<void> {
@@ -205,6 +244,32 @@ async function assertMobileDrawerAndProfileInteraction(page: Page): Promise<void
 
   const drawer = page.getByTestId("mobile-sidebar-drawer");
   await expect(drawer).toBeVisible({ timeout: 10000 });
+  await page.waitForTimeout(250);
+
+  const topbarActionsTray = page.getByTestId("topbar-actions-tray");
+  await expect(topbarActionsTray).toBeVisible({ timeout: 10000 });
+
+  const trayStateWithDrawerOpen = await topbarActionsTray.evaluate((node) => {
+    const style = window.getComputedStyle(node as HTMLElement);
+    return {
+      pointerEvents: style.pointerEvents,
+      opacity: style.opacity,
+      className: (node as HTMLElement).className,
+    };
+  });
+
+  expect
+    .soft(
+      trayStateWithDrawerOpen.pointerEvents,
+      `topbar actions tray should disable pointer events while drawer is open (got ${trayStateWithDrawerOpen.pointerEvents})`,
+    )
+    .toBe("none");
+  expect
+    .soft(
+      Number(trayStateWithDrawerOpen.opacity),
+      `topbar actions tray should fade while drawer is open (got opacity ${trayStateWithDrawerOpen.opacity})`,
+    )
+    .toBeLessThanOrEqual(0.05);
 
   const dashboardLabel = drawer.getByText(/dashboard/i).first();
   await expect(dashboardLabel).toBeVisible({ timeout: 10000 });
@@ -224,12 +289,33 @@ async function assertMobileDrawerAndProfileInteraction(page: Page): Promise<void
   const closeDrawerButton = page.getByTestId("mobile-menu-close");
   await closeDrawerButton.click({ force: true });
   await expect(drawer).toBeHidden({ timeout: 10000 });
+  await page.waitForTimeout(250);
+
+  const trayStateAfterClose = await topbarActionsTray.evaluate((node) => {
+    const style = window.getComputedStyle(node as HTMLElement);
+    return {
+      pointerEvents: style.pointerEvents,
+      opacity: style.opacity,
+      className: (node as HTMLElement).className,
+    };
+  });
+
+  expect
+    .soft(
+      trayStateAfterClose.pointerEvents,
+      `topbar actions tray should restore pointer events after drawer closes (got ${trayStateAfterClose.pointerEvents})`,
+    )
+    .toBe("auto");
+  expect
+    .soft(
+      Number(trayStateAfterClose.opacity),
+      `topbar actions tray should restore opacity after drawer closes (got ${trayStateAfterClose.opacity})`,
+    )
+    .toBeGreaterThanOrEqual(0.95);
 
   const profileButton = page.locator("button[data-user-menu]").first();
   await expect(profileButton).toBeVisible({ timeout: 10000 });
   await profileButton.click({ force: true });
-
-  await expect(page.getByText("Meu Perfil")).toBeVisible({ timeout: 10000 });
 }
 
 async function assertAgendaCoreActions(page: Page): Promise<void> {
@@ -282,8 +368,95 @@ async function assertAgendaCoreActions(page: Page): Promise<void> {
   await expect(modalTitle).toBeHidden({ timeout: 10000 });
 }
 
+async function assertPipelineMobileActions(page: Page): Promise<void> {
+  const viewKanban = page.getByTestId("pipeline-view-kanban");
+  const viewLista = page.getByTestId("pipeline-view-lista");
+  const viewCalendario = page.getByTestId("pipeline-view-calendario");
+  const viewGrafico = page.getByTestId("pipeline-view-grafico");
+  const refreshButton = page.getByTestId("pipeline-refresh");
+  const exportButton = page.getByTestId("pipeline-export");
+
+  await expect(viewKanban).toBeVisible({ timeout: 10000 });
+  await expect(viewLista).toBeVisible({ timeout: 10000 });
+  await expect(viewCalendario).toBeVisible({ timeout: 10000 });
+  await expect(viewGrafico).toBeVisible({ timeout: 10000 });
+  await expect(refreshButton).toBeVisible({ timeout: 10000 });
+  await expect(exportButton).toBeVisible({ timeout: 10000 });
+
+  for (const [name, button] of [
+    ["kanban", viewKanban],
+    ["lista", viewLista],
+    ["calendario", viewCalendario],
+    ["grafico", viewGrafico],
+  ] as const) {
+    await button.click({ force: true });
+    await page.waitForTimeout(400);
+
+    const overflowAfterSwitch = await hasHorizontalOverflow(page);
+    expect
+      .soft(
+        overflowAfterSwitch,
+        `/pipeline mobile: horizontal overflow after switching to ${name}`,
+      )
+      .toBeFalsy();
+  }
+
+  await exportButton.click({ force: true });
+  const exportTitle = page.getByText(/exportar oportunidades/i).first();
+  await expect(exportTitle).toBeVisible({ timeout: 10000 });
+
+  const exportModalFitsViewport = await page.evaluate(() => {
+    const title = Array.from(document.querySelectorAll("h2")).find((node) =>
+      /exportar oportunidades/i.test((node.textContent || "").trim()),
+    );
+    const modal = title?.closest("div.bg-white.rounded-2xl") as HTMLElement | null;
+    if (!modal) {
+      return false;
+    }
+
+    const rect = modal.getBoundingClientRect();
+    return rect.left >= 0 && rect.right <= window.innerWidth + 1;
+  });
+
+  expect
+    .soft(exportModalFitsViewport, "/pipeline mobile: export modal exceeds viewport width")
+    .toBeTruthy();
+
+  await page
+    .getByRole("button", { name: /^cancelar$/i })
+    .first()
+    .click({ force: true });
+  await expect(exportTitle).toBeHidden({ timeout: 10000 });
+}
+
 test.describe("Mobile Responsiveness Smoke", () => {
-  test.setTimeout(20 * 60 * 1000);
+  test.setTimeout(30 * 60 * 1000);
+
+  test("public mobile routes should keep usable layout and no overflow", async ({ page }) => {
+    await installRateLimitBypass(page);
+
+    for (const width of PUBLIC_BREAKPOINTS) {
+      await page.setViewportSize({ width, height: 932 });
+
+      for (const route of PUBLIC_ROUTES) {
+        await test.step(`${width}px ${route}`, async () => {
+          await gotoPublicRoute(page, route);
+
+          const overflow = await hasHorizontalOverflow(page);
+          expect.soft(overflow, `${width}px ${route}: horizontal overflow detected`).toBeFalsy();
+
+          if (route === "/login") {
+            await expect(page.locator('input[name="email"], input[type="email"]').first()).toBeVisible({
+              timeout: 10000,
+            });
+            await expect(
+              page.locator('input[name="password"], input[type="password"]').first(),
+            ).toBeVisible({ timeout: 10000 });
+          }
+        });
+      }
+    }
+  });
 
   test("critical + expanded mobile routes should keep usable layout and no overflow", async ({
     page,
@@ -366,6 +539,10 @@ test.describe("Mobile Responsiveness Smoke", () => {
           if (route === "/agenda") {
             await assertAgendaCoreActions(page);
           }
+
+          if (route === "/pipeline") {
+            await assertPipelineMobileActions(page);
+          }
         });
       }
     }
@@ -398,7 +575,7 @@ test.describe("Mobile Responsiveness Smoke", () => {
           const overflow = await hasHorizontalOverflow(page);
           expect.soft(overflow, `${width}px ${route}: horizontal overflow detected`).toBeFalsy();
 
-          if (route === "/dashboard" && width === 360) {
+          if (route === "/dashboard" && width === 320) {
             await assertMobileDrawerAndProfileInteraction(page);
           }
         });

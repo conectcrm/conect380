@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { useI18n } from '../../contexts/I18nContext';
 import { useLocation, useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
-import { Eye, EyeOff, Loader2, Mail, Lock, ArrowRight, Check } from 'lucide-react';
-import ConectCRMLogoFinal from '../../components/ui/ConectCRMLogoFinal';
+import { Eye, EyeOff, Loader2, Mail, Lock, ArrowRight, Check, CheckCircle2 } from 'lucide-react';
+import Conect360Logo from '../../components/ui/Conect360Logo';
+import { toastService } from '../../services/toastService';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -12,25 +11,29 @@ const LoginPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [redirectMessage, setRedirectMessage] = useState<string | null>(null);
   const { login } = useAuth();
-  const { t } = useI18n();
   const location = useLocation();
   const navigate = useNavigate();
 
   // Mostrar mensagem de sucesso se vier do registro
   useEffect(() => {
-    const state = location.state as any;
+    const state = location.state as { message?: string; email?: string } | null;
     if (state?.message) {
-      toast.success(state.message);
+      setRedirectMessage(state.message);
+      toastService.success(state.message);
+
       if (state.email) {
         setEmail(state.email);
       }
+
+      navigate(location.pathname, { replace: true, state: null });
     }
 
     // Verificar se a sessão expirou
     const sessionExpired = localStorage.getItem('sessionExpired');
     if (sessionExpired === 'true') {
-      toast.error('Sua sessão expirou. Por favor, faça login novamente.');
+      toastService.error('Sua sessão expirou. Por favor, faça login novamente.');
       localStorage.removeItem('sessionExpired');
     }
   }, [location]);
@@ -39,9 +42,9 @@ const LoginPage: React.FC = () => {
     const newErrors: { email?: string; password?: string } = {};
 
     if (!email) {
-      newErrors.email = 'Email é obrigatório';
+      newErrors.email = 'E-mail é obrigatório';
     } else if (!/\S+@\S+\.\S+/.test(email)) {
-      newErrors.email = 'Email inválido';
+      newErrors.email = 'E-mail inválido';
     }
 
     if (!password) {
@@ -65,90 +68,115 @@ const LoginPage: React.FC = () => {
 
     try {
       await login(email, password);
-      toast.success('Login realizado com sucesso!');
-    } catch (error: any) {
+      toastService.success('Login realizado com sucesso!');
+    } catch (error: unknown) {
       console.error('Erro no login:', error);
 
+      const isObject = (value: unknown): value is Record<string, unknown> =>
+        typeof value === 'object' && value !== null;
+
+      const errorMessage =
+        isObject(error) && typeof error.message === 'string'
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : undefined;
+
+      const errorData = isObject(error) ? error.data : undefined;
+
       // ✅ VERIFICAR SE PRECISA TROCAR SENHA (primeiro acesso)
-      if (error.message === 'TROCAR_SENHA' && error.data) {
-        toast('🔑 Primeiro acesso detectado. Redirecionando...', { icon: '🔑' });
+      if (errorMessage === 'TROCAR_SENHA' && isObject(errorData)) {
+        const userId = typeof errorData.userId === 'string' ? errorData.userId : undefined;
+        const emailFromData = typeof errorData.email === 'string' ? errorData.email : undefined;
+        const nome = typeof errorData.nome === 'string' ? errorData.nome : undefined;
+        const senhaTemporaria =
+          typeof errorData.senhaTemporaria === 'string' ? errorData.senhaTemporaria : undefined;
+
+        if (!userId || !emailFromData || !nome) {
+          toastService.error('Não foi possível iniciar a troca de senha. Tente novamente.');
+          return;
+        }
+
+        toastService.info('Primeiro acesso detectado. Redirecionando...');
         navigate('/trocar-senha', {
           state: {
-            userId: error.data.userId,
-            email: error.data.email,
-            nome: error.data.nome,
-            senhaTemporaria: error.data.senhaTemporaria || password,
+            userId,
+            email: emailFromData,
+            nome,
+            senhaTemporaria: senhaTemporaria || password,
           },
         });
         return;
       }
 
-      toast.error('Credenciais inválidas. Tente novamente.');
-      setErrors({ email: 'Email ou senha incorretos' });
+      toastService.error('Credenciais inválidas. Tente novamente.');
+      setErrors({ email: 'E-mail ou senha incorretos' });
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#DEEFE7] via-white to-[#F0F9FA] flex">
+    <div className="min-h-screen bg-gray-50 flex">
       {/* Left Side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 bg-[#159A9C] relative overflow-hidden">
         {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-20 w-64 h-64 rounded-full bg-white"></div>
-          <div className="absolute bottom-20 right-20 w-96 h-96 rounded-full bg-white"></div>
-          <div className="absolute top-1/2 left-1/3 w-32 h-32 rounded-full bg-white"></div>
+        <div className="absolute inset-0">
+          <div className="absolute top-16 left-16 w-64 h-64 rounded-full bg-white/10"></div>
+          <div className="absolute bottom-16 right-16 w-96 h-96 rounded-full bg-white/10"></div>
+          <div className="absolute top-1/2 left-1/3 w-32 h-32 rounded-full bg-white/10"></div>
         </div>
 
-        <div className="relative z-10 flex flex-col justify-center p-12 text-white">
-          {/* Logo */}
-          <div className="mb-8">
-            <div className="flex items-center justify-center mb-6">
-              <ConectCRMLogoFinal size="2xl" variant="full" />
+        <div className="relative z-10 flex flex-col h-full p-12 text-white">
+          {/* Logo + Headline (top) */}
+          <div>
+            <div className="mb-8 flex items-center">
+              <Conect360Logo size="2xl" variant="full-light" className="w-auto" />
             </div>
+
             <h2 className="text-fluid-3xl font-bold mb-4">
-              Transforme seus
+              Unifique atendimento,
               <br />
-              <span className="text-[#DEEFE7]">negócios digitais</span>
+              <span className="text-[#DEEFE7]">vendas e financeiro</span>
             </h2>
-            <p className="text-fluid-lg text-[#DEEFE7] mb-8">
-              O CRM mais completo e intuitivo do mercado brasileiro
+            <p className="text-fluid-lg text-[#DEEFE7] mb-10">
+              Omnichannel, CRM, Financeiro e Automação com IA no mesmo sistema.
             </p>
           </div>
 
-          {/* Features */}
+          {/* Features (middle) */}
           <div className="space-y-4">
             {[
-              'Gestão completa de clientes e vendas',
-              'Dashboard com métricas em tempo real',
-              'Sistema de notificações inteligente',
-              'Integração com principais ferramentas',
-              'Suporte técnico especializado',
+              'Atendimento omnichannel (WhatsApp, e-mail, chat e telefone)',
+              'CRM e Vendas (leads, oportunidades, propostas e contratos)',
+              'Financeiro integrado (faturas, pagamentos e recorrência)',
+              'Automação com IA (triagem, bot e insights)',
+              'Analytics e dashboards com métricas em tempo real',
             ].map((feature, index) => (
-              <div key={index} className="flex items-center space-x-3">
-                <div className="w-5 h-5 bg-[#DEEFE7] rounded-full flex items-center justify-center">
-                  <Check className="w-3 h-3 text-[#159A9C]" />
+              <div key={index} className="flex items-start gap-3">
+                <div className="mt-0.5 w-5 h-5 bg-white/15 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Check className="w-3 h-3 text-white" />
                 </div>
-                <span className="text-[#DEEFE7]">{feature}</span>
+                <span className="text-[#DEEFE7] leading-relaxed">{feature}</span>
               </div>
             ))}
           </div>
 
-          {/* Stats */}
-          <div className="mt-12 grid grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="text-fluid-2xl font-bold text-white">5000+</div>
-              <div className="text-sm text-[#DEEFE7]">Empresas</div>
-            </div>
-            <div className="text-center">
-              <div className="text-fluid-2xl font-bold text-white">99.9%</div>
-              <div className="text-sm text-[#DEEFE7]">Uptime</div>
-            </div>
-            <div className="text-center">
-              <div className="text-fluid-2xl font-bold text-white">24/7</div>
-              <div className="text-sm text-[#DEEFE7]">Suporte</div>
-            </div>
+          {/* Pillars (bottom) */}
+          <div className="mt-12 grid grid-cols-3 gap-3">
+            {[
+              { title: 'Omnichannel', subtitle: 'Inbox unificada' },
+              { title: 'IA', subtitle: 'Triagem e automações' },
+              { title: 'Multi-tenant', subtitle: 'Dados isolados' },
+            ].map((item) => (
+              <div
+                key={item.title}
+                className="rounded-xl border border-white/15 bg-white/10 px-4 py-3"
+              >
+                <div className="text-sm font-semibold text-white">{item.title}</div>
+                <div className="text-xs text-[#DEEFE7] mt-0.5">{item.subtitle}</div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -159,7 +187,7 @@ const LoginPage: React.FC = () => {
           {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-8">
             <div className="inline-flex items-center justify-center mb-4">
-              <ConectCRMLogoFinal size="lg" variant="full" />
+              <Conect360Logo size="xl" variant="full" className="w-auto" />
             </div>
           </div>
 
@@ -167,15 +195,24 @@ const LoginPage: React.FC = () => {
           <div className="text-center mb-8">
             <h1 className="text-fluid-2xl font-bold text-[#002333] mb-2">Bem-vindo de volta!</h1>
             <p className="text-[#B4BEC9]">Faça login para acessar sua conta</p>
+
+            {redirectMessage && (
+              <div className="mt-5 rounded-lg border border-[#DEEFE7] bg-[#DEEFE7] px-4 py-3 text-left">
+                <div className="flex items-start gap-2 text-sm text-[#002333]">
+                  <CheckCircle2 className="h-5 w-5 text-[#159A9C] mt-0.5 flex-shrink-0" />
+                  <span className="leading-relaxed">{redirectMessage}</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Login Form */}
-          <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+          <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Email Field */}
               <div>
                 <label className="block text-sm font-semibold text-[#002333] mb-2">
-                  Email corporativo
+                  E-mail corporativo
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#B4BEC9] w-5 h-5" />
@@ -186,7 +223,7 @@ const LoginPage: React.FC = () => {
                       setEmail(e.target.value);
                       if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
                     }}
-                    className={`w-full pl-11 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
+                    className={`w-full pl-11 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
                       errors.email ? 'border-red-300 bg-red-50' : 'border-gray-300'
                     }`}
                     placeholder="seu@empresa.com"
@@ -207,7 +244,7 @@ const LoginPage: React.FC = () => {
                       setPassword(e.target.value);
                       if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
                     }}
-                    className={`w-full pl-11 pr-12 py-3 border rounded-xl focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
+                    className={`w-full pl-11 pr-12 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
                       errors.password ? 'border-red-300 bg-red-50' : 'border-gray-300'
                     }`}
                     placeholder="Digite sua senha"
@@ -245,17 +282,17 @@ const LoginPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white py-3 px-4 rounded-xl font-semibold hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center space-x-2"
+                className="w-full bg-[#159A9C] text-white px-4 py-2 rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2 text-sm font-medium"
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                     <span>Entrando...</span>
                   </>
                 ) : (
                   <>
                     <span>Entrar</span>
-                    <ArrowRight className="w-5 h-5" />
+                    <ArrowRight className="w-4 h-4" />
                   </>
                 )}
               </button>
@@ -269,7 +306,7 @@ const LoginPage: React.FC = () => {
                 </div>
                 <div className="relative flex justify-center text-sm">
                   <span className="px-4 bg-white text-[#B4BEC9] font-medium">
-                    Novo no Conect CRM?
+                    Novo no Conect360?
                   </span>
                 </div>
               </div>
@@ -280,13 +317,13 @@ const LoginPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => navigate('/registro')}
-                className="w-full bg-white border-2 border-[#159A9C] text-[#159A9C] py-3 px-4 rounded-xl font-semibold hover:bg-[#DEEFE7] transition-all flex items-center justify-center space-x-2"
+                className="w-full bg-white border border-[#159A9C] text-[#159A9C] px-4 py-2 rounded-lg hover:bg-[#159A9C]/10 transition-colors flex items-center justify-center space-x-2 text-sm font-medium"
               >
-                <span>🚀 Criar Conta Empresarial</span>
+                <span>Criar Conta Empresarial</span>
               </button>
 
               {/* Benefits */}
-              <div className="flex items-center justify-center space-x-6 text-xs text-[#B4BEC9]">
+              <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-[#B4BEC9]">
                 <div className="flex items-center space-x-1">
                   <Check className="w-3 h-3 text-green-500" />
                   <span>30 dias grátis</span>

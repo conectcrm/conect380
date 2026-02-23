@@ -57,18 +57,22 @@ export class LoggingInterceptor implements NestInterceptor {
           const endTime = Date.now();
           const duration = endTime - startTime;
 
+          const statusCode = error?.status || 500;
+          const shouldSuppressStack = statusCode === 429;
+          const logLevel: 'warn' | 'error' = statusCode === 429 ? 'warn' : 'error';
+
           // Log de erro estruturado com Winston
-          this.logger.error('HTTP Error', {
+          this.logger[logLevel]('HTTP Error', {
             context: 'HTTP',
             method,
             url,
-            statusCode: error.status || 500,
+            statusCode,
             duration: `${duration}ms`,
             userId,
             ip,
             userAgent,
             error: error.message,
-            stack: error.stack,
+            stack: shouldSuppressStack ? undefined : error.stack,
             timestamp: new Date().toISOString(),
           });
         },

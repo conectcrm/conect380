@@ -21,7 +21,6 @@ import {
   Home,
   AlertTriangle,
   ClipboardList,
-  Mail,
 } from 'lucide-react';
 import menuConfig, { MenuConfig } from './menuConfig';
 import { ModuleItem, NucleusModulesData } from '../components/navigation/ModulesScreen';
@@ -300,10 +299,6 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
     color: 'purple',
     modules: [
       {
-        menuId: 'configuracoes-sistema',
-        description: 'Configurações gerais do sistema, tema, idioma e preferências pessoais.',
-      },
-      {
         menuId: 'configuracoes-empresa',
         description: 'Dados cadastrais, CNPJ, endereço e informações fiscais.',
       },
@@ -318,11 +313,6 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
         badgeColor: 'green',
       },
       {
-        menuId: 'configuracoes-email',
-        description: 'Configuração de SMTP, templates de e-mail e notificações.',
-        icon: Mail,
-      },
-      {
         menuId: 'configuracoes-integracoes',
         description: 'APIs externas, webhooks e conectores com outros sistemas.',
         badge: 'Novo',
@@ -331,12 +321,6 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
       {
         menuId: 'configuracoes-backup',
         description: 'Gestão de backups automáticos e sincronização entre empresas.',
-      },
-      {
-        menuId: 'configuracoes-seguranca',
-        description: 'Configurações de segurança, 2FA e políticas de acesso.',
-        badge: 'Crítico',
-        badgeColor: 'red',
       },
     ],
   },
@@ -522,7 +506,7 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
         id: 'configuracoes',
         name: 'Configurações',
         description: 'Configurações gerais do sistema, permissões e preferências.',
-        href: '/configuracoes',
+        href: '/configuracoes/empresa',
         icon: Settings,
         notifications: 1,
       },

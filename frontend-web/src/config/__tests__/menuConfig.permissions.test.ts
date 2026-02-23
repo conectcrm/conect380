@@ -213,6 +213,22 @@ describe('menuConfig permission filtering', () => {
     expect(adminManager).toBe(true);
   });
 
+  it('allows empresas minhas route only for admin.empresas.manage', () => {
+    const withoutManage = canUserAccessPath('/empresas/minhas', ALL_MODULES, {
+      email: 'viewer@empresa.com',
+      role: 'custom',
+      permissions: ['crm.clientes.read'],
+    } as any);
+    const withManage = canUserAccessPath('/empresas/minhas', ALL_MODULES, {
+      email: 'superadmin@empresa.com',
+      role: 'super_admin',
+      permissions: ['admin.empresas.manage'],
+    } as any);
+
+    expect(withoutManage).toBe(false);
+    expect(withManage).toBe(true);
+  });
+
   it('keeps nested access for leaf routes when permission is present', () => {
     const withRead = canUserAccessPath('/crm/clientes/123', ALL_MODULES, {
       email: 'sales@empresa.com',

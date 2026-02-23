@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
 import { randomUUID } from 'crypto';
@@ -65,6 +65,7 @@ export interface Proposta {
 
 @Injectable()
 export class PropostasService {
+  private readonly logger = new Logger(PropostasService.name);
   private contadorId = 1;
   private tableColumnsCache = new Map<string, Set<string>>();
 
@@ -78,6 +79,22 @@ export class PropostasService {
   ) {
     // Inicializar contador baseado nas propostas existentes
     this.inicializarContador();
+  }
+
+  private maskEmail(email?: string | null): string {
+    if (!email) return '[email]';
+    const [local, domain] = String(email).split('@');
+    if (!domain) return '[email]';
+    const localMasked =
+      local.length <= 2 ? `${local[0] || '*'}*` : `${local.slice(0, 2)}***${local.slice(-1)}`;
+    return `${localMasked}@${domain}`;
+  }
+
+  private summarizeText(text?: string | null, max = 60): string {
+    if (!text) return '[vazio]';
+    const normalized = String(text).replace(/\s+/g, ' ').trim();
+    if (!normalized) return '[vazio]';
+    return normalized.length > max ? `${normalized.slice(0, max)}...` : normalized;
   }
 
   private async inicializarContador() {
@@ -99,7 +116,7 @@ export class PropostasService {
         }
       }
     } catch (error) {
-      console.warn('⚠️ Erro ao inicializar contador de propostas:', error.message);
+      this.logger.warn(`Erro ao inicializar contador de propostas: ${error.message}`);
     }
   }
 
@@ -409,10 +426,10 @@ export class PropostasService {
         relations: columns.has('vendedor_id') ? ['vendedor'] : [],
       });
 
-      console.log(`📊 ${entities.length} propostas encontradas no banco`);
+      this.logger.debug(`${entities.length} propostas encontradas no banco`);
       return entities.map((entity) => this.entityToInterface(entity));
     } catch (error) {
-      console.error('❌ Erro ao listar propostas:', error);
+      this.logger.error('Erro ao listar propostas', error?.stack || String(error));
       return [];
     }
   }
@@ -476,7 +493,7 @@ export class PropostasService {
 
       return entity ? this.entityToInterface(entity) : null;
     } catch (error) {
-      console.error('❌ Erro ao obter proposta:', error);
+      this.logger.error('Erro ao obter proposta', error?.stack || String(error));
       return null;
     }
   }
@@ -497,9 +514,7 @@ export class PropostasService {
         // Se vendedor for um objeto, usar o ID direto
         if (typeof dadosProposta.vendedor === 'object' && dadosProposta.vendedor.id) {
           vendedorId = dadosProposta.vendedor.id;
-          console.log(
-            `👤 Vendedor recebido como objeto: ${dadosProposta.vendedor.nome} -> ${vendedorId}`,
-          );
+          this.logger.debug(`Vendedor recebido (objeto): ${JSON.stringify({ nome: this.summarizeText((dadosProposta.vendedor as any).nome, 40), vendedorId })}`);
         } else {
           // Se vendedor for uma string, buscar pelo nome
           const nomeVendedor =
@@ -515,9 +530,9 @@ export class PropostasService {
 
           if (vendedor) {
             vendedorId = vendedor.id;
-            console.log(`👤 Vendedor encontrado por nome: ${nomeVendedor} -> ${vendedorId}`);
+            this.logger.debug(`Vendedor encontrado por nome: ${JSON.stringify({ nome: this.summarizeText(nomeVendedor, 40), vendedorId })}`);
           } else {
-            console.warn(`⚠️ Vendedor não encontrado: ${nomeVendedor}`);
+            this.logger.warn(`Vendedor nao encontrado: ${this.summarizeText(nomeVendedor, 40)}`);
           }
         }
       }
@@ -527,7 +542,7 @@ export class PropostasService {
       if (typeof dadosProposta.cliente === 'string') {
         // 🔍 BUSCAR CLIENTE REAL NO BANCO ao invés de gerar email fictício
         const nomeCliente = dadosProposta.cliente as string;
-        console.log(`🔍 Buscando cliente real: "${nomeCliente}"`);
+        this.logger.debug(`Buscando cliente real por nome: ${this.summarizeText(nomeCliente, 50)}`);
 
         try {
           // Buscar cliente real pelo nome (busca flexível)
@@ -541,7 +556,7 @@ export class PropostasService {
           });
 
           if (clienteReal) {
-            console.log(`✅ Cliente real encontrado: ${clienteReal.nome} - ${clienteReal.email}`);
+            this.logger.debug(`Cliente real encontrado: ${JSON.stringify({ clienteId: clienteReal.id, nome: this.summarizeText(clienteReal.nome, 50), email: this.maskEmail(clienteReal.email) })}`);
             clienteProcessado = {
               id: clienteReal.id,
               nome: clienteReal.nome,
@@ -551,7 +566,7 @@ export class PropostasService {
               status: clienteReal.status || 'lead',
             };
           } else {
-            console.warn(`⚠️ Cliente "${nomeCliente}" não encontrado no cadastro`);
+            this.logger.warn(`Cliente nao encontrado no cadastro: ${this.summarizeText(nomeCliente, 50)}`);
             // ✅ NÃO gerar email fictício - deixar vazio para busca posterior
             clienteProcessado = {
               id: 'cliente-temp',
@@ -563,7 +578,7 @@ export class PropostasService {
             };
           }
         } catch (error) {
-          console.error('❌ Erro ao buscar cliente no banco:', error);
+          this.logger.error('Erro ao buscar cliente no banco', error?.stack || String(error));
           // Fallback sem email fictício
           clienteProcessado = {
             id: 'cliente-temp',
@@ -704,11 +719,11 @@ export class PropostasService {
       });
 
       const propostaSalva = await this.propostaRepository.save(novaProposta);
-      console.log(`✅ Proposta criada no banco: ${propostaSalva.id} - ${propostaSalva.numero}`);
+      this.logger.log(`✅ Proposta criada no banco: ${propostaSalva.id} - ${propostaSalva.numero}`);
 
       return this.entityToInterface(propostaSalva);
     } catch (error) {
-      console.error('❌ Erro ao criar proposta:', error);
+      this.logger.error('Erro ao criar proposta', error?.stack || String(error));
       throw error;
     }
   }
@@ -723,7 +738,7 @@ export class PropostasService {
       );
       return resultado.affected > 0;
     } catch (error) {
-      console.error('❌ Erro ao remover proposta:', error);
+      this.logger.error('Erro ao remover proposta', error?.stack || String(error));
       return false;
     }
   }
@@ -739,10 +754,7 @@ export class PropostasService {
     empresaId?: string,
   ): Promise<Proposta> {
     try {
-      console.log(
-        `🔧 DEBUG: atualizarStatus chamado com propostaId: "${propostaId}" (tipo: ${typeof propostaId})`,
-      );
-      console.log(`🔧 DEBUG: Tentando buscar proposta por ID: ${propostaId}`);
+      this.logger.debug(`atualizarStatus chamado: ${JSON.stringify({ propostaId, tipoPropostaId: typeof propostaId, status, source: source || null, hasObservacoes: Boolean(observacoes) })}`);
 
       const proposta = await this.propostaRepository.findOne({
         where: empresaId ? { id: propostaId, empresaId } : { id: propostaId },
@@ -757,11 +769,11 @@ export class PropostasService {
       if (observacoes) proposta.observacoes = observacoes;
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);
-      console.log(`✅ Status da proposta ${propostaId} atualizado para: ${status}`);
+      this.logger.log(`✅ Status da proposta ${propostaId} atualizado para: ${status}`);
 
       return this.entityToInterface(propostaAtualizada);
     } catch (error) {
-      console.error('❌ Erro ao atualizar status:', error);
+      this.logger.error('Erro ao atualizar status', error?.stack || String(error));
       throw error;
     }
   }
@@ -788,7 +800,7 @@ export class PropostasService {
       // Validações específicas para transições automáticas
       if (status === 'aprovada' || status === 'rejeitada') {
         if (proposta.status !== 'visualizada' && proposta.status !== 'enviada') {
-          console.warn(
+          this.logger.warn(
             `⚠️ Transição automática de '${proposta.status}' para '${status}' pode não ser válida`,
           );
         }
@@ -799,11 +811,11 @@ export class PropostasService {
       if (observacoes) proposta.observacoes = observacoes;
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);
-      console.log(`✅ Status da proposta ${propostaId} atualizado com validação para: ${status}`);
+      this.logger.log(`✅ Status da proposta ${propostaId} atualizado com validação para: ${status}`);
 
       return this.entityToInterface(propostaAtualizada);
     } catch (error) {
-      console.error('❌ Erro ao atualizar status com validação:', error);
+      this.logger.error('Erro ao atualizar status com validacao', error?.stack || String(error));
       throw error;
     }
   }
@@ -834,11 +846,11 @@ export class PropostasService {
       };
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);
-      console.log(`👁️ Proposta ${propostaId} marcada como visualizada`);
+      this.logger.log(`👁️ Proposta ${propostaId} marcada como visualizada`);
 
       return this.entityToInterface(propostaAtualizada);
     } catch (error) {
-      console.error('❌ Erro ao marcar como visualizada:', error);
+      this.logger.error('Erro ao marcar como visualizada', error?.stack || String(error));
       throw error;
     }
   }
@@ -869,11 +881,11 @@ export class PropostasService {
       };
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);
-      console.log(`📧 Email registrado para proposta ${propostaId}`);
+      this.logger.log(`Email registrado para proposta ${propostaId} (${this.maskEmail(emailCliente)})`);
 
       return this.entityToInterface(propostaAtualizada);
     } catch (error) {
-      console.error('❌ Erro ao registrar envio de email:', error);
+      this.logger.error('Erro ao registrar envio de email', error?.stack || String(error));
       throw error;
     }
   }
@@ -888,7 +900,7 @@ export class PropostasService {
     empresaId?: string,
   ): Promise<Proposta> {
     try {
-      console.log(`🔄 Marcando proposta ${propostaIdOuNumero} como enviada automaticamente`);
+      this.logger.debug(`Marcando proposta ${propostaIdOuNumero} como enviada automaticamente`);
 
       // Tentar encontrar por ID (UUID) primeiro, depois por número
       let proposta = await this.propostaRepository
@@ -921,13 +933,12 @@ export class PropostasService {
       };
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);
-      console.log(`✅ Proposta ${proposta.numero} marcada como enviada automaticamente`);
+      this.logger.log(`✅ Proposta ${proposta.numero} marcada como enviada automaticamente`);
 
       return this.entityToInterface(propostaAtualizada);
     } catch (error) {
-      console.error('❌ Erro ao marcar proposta como enviada:', error);
+      this.logger.error('Erro ao marcar proposta como enviada', error?.stack || String(error));
       throw error;
     }
   }
 }
-

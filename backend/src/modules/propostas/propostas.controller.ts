@@ -174,7 +174,18 @@ export class PropostasController {
     @Body() dadosProposta: any,
   ): Promise<PropostaResponseDto> {
     try {
-      this.logger.log('[PROPOSTAS] Criando nova proposta:', JSON.stringify(dadosProposta, null, 2));
+      this.logger.log(
+        `[PROPOSTAS] Criando nova proposta (resumo): ${JSON.stringify({
+          titulo: dadosProposta?.titulo ? String(dadosProposta.titulo).slice(0, 80) : null,
+          clienteId: dadosProposta?.clienteId || dadosProposta?.cliente?.id || null,
+          clienteNome: dadosProposta?.cliente?.nome
+            ? String(dadosProposta.cliente.nome).slice(0, 60)
+            : null,
+          itens: Array.isArray(dadosProposta?.produtos) ? dadosProposta.produtos.length : 0,
+          total: dadosProposta?.total ?? dadosProposta?.valor ?? null,
+          status: dadosProposta?.status || null,
+        })}`,
+      );
 
       // Converter dados do frontend para formato interno
       const propostaParaCriar: Partial<Proposta> = {

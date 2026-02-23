@@ -1,4 +1,4 @@
-import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
+﻿import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder, In, Between, IsNull } from 'typeorm';
 import { Cotacao, StatusCotacao } from './entities/cotacao.entity';
@@ -22,6 +22,15 @@ import {
 @Injectable()
 export class CotacaoService {
   private readonly logger = new Logger(CotacaoService.name);
+
+  private maskEmail(email?: string | null): string {
+    if (!email) return '[email]';
+    const [local, domain] = String(email).split('@');
+    if (!domain) return '[email]';
+    const localMasked =
+      local.length <= 2 ? `${local[0] || '*'}*` : `${local.slice(0, 2)}***${local.slice(-1)}`;
+    return `${localMasked}@${domain}`;
+  }
 
   constructor(
     @InjectRepository(Cotacao)
@@ -137,7 +146,7 @@ export class CotacaoService {
     });
 
     // Log simples de auditoria
-    console.log(
+    this.logger.log(
       `[AUDIT] COTACAO CREATE - ID: ${cotacaoSalva.id}, User: ${userId}, Numero: ${cotacaoSalva.numero}, Status: ${cotacaoSalva.status}`,
     );
 
@@ -168,7 +177,7 @@ export class CotacaoService {
               valorTotal: cotacaoAtualizada.valorTotal,
             },
           })
-          .catch((err) => console.error('Erro ao criar notificação:', err));
+          .catch((err) => this.logger.error('Erro ao criar notificacao', err?.stack || String(err)));
       }
     }
 
@@ -354,7 +363,7 @@ export class CotacaoService {
     }
 
     // Log simples de auditoria
-    console.log(`[AUDIT] COTACAO UPDATE - ID: ${id}, User: ${userId}`);
+    this.logger.log(`[AUDIT] COTACAO UPDATE - ID: ${id}, User: ${userId}`);
 
     return this.buscarPorId(id, userId, empresaId);
   }
@@ -382,7 +391,7 @@ export class CotacaoService {
     await this.cotacaoRepository.save(cotacao);
 
     // Log simples de auditoria
-    console.log(`[AUDIT] COTACAO DELETE - ID: ${id}, User: ${userId}, Numero: ${cotacao.numero}`);
+    this.logger.log(`[AUDIT] COTACAO DELETE - ID: ${id}, User: ${userId}, Numero: ${cotacao.numero}`);
   }
 
   /**
@@ -462,13 +471,16 @@ export class CotacaoService {
       }
 
       // Log de auditoria
-      console.log(
+      this.logger.log(
         `[AUDIT] COTACAO SEND_TO_APPROVAL - ID: ${id}, User: ${userId}, Numero: ${cotacao.numero}`,
       );
 
       return this.buscarPorId(id, userId, empresaId);
     } catch (error) {
-      console.error('Erro ao enviar cotação para aprovação:', error.message);
+      this.logger.error(
+        'Erro ao enviar cotacao para aprovacao',
+        error?.stack || error?.message || String(error),
+      );
       throw error;
     }
   }
@@ -514,7 +526,7 @@ export class CotacaoService {
 
     await this.cotacaoRepository.save(cotacao);
 
-    console.log(
+    this.logger.log(
       `[AUDIT] COTACAO APROVADA - ID: ${id}, Aprovador: ${userId}, Numero: ${cotacao.numero}`,
     );
 
@@ -524,7 +536,7 @@ export class CotacaoService {
       // Enviar email
       this.cotacaoEmailService
         .notificarCotacaoAprovada(cotacao, aprovador, justificativa)
-        .catch((err) => console.error('Erro ao enviar email de aprovação:', err));
+        .catch((err) => this.logger.error('Erro ao enviar email de aprovacao', err?.stack || String(err)));
 
       // Criar notificação no sistema
       if (cotacao.criadoPor) {
@@ -542,8 +554,8 @@ export class CotacaoService {
               dataAprovacao: cotacao.dataAprovacao,
             },
           })
-          .then(() => console.log(`✅ Notificação criada para cotação #${cotacao.numero}`))
-          .catch((err) => console.error(`❌ Erro ao criar notificação:`, err));
+          .then(() => this.logger.debug(`Notificacao criada para cotacao #${cotacao.numero}`))
+          .catch((err) => this.logger.error('Erro ao criar notificacao', err?.stack || String(err)));
       }
     }
 
@@ -589,7 +601,7 @@ export class CotacaoService {
 
     await this.cotacaoRepository.save(cotacao);
 
-    console.log(
+    this.logger.log(
       `[AUDIT] COTACAO REPROVADA - ID: ${id}, Aprovador: ${userId}, Numero: ${cotacao.numero}`,
     );
 
@@ -599,8 +611,8 @@ export class CotacaoService {
       // Enviar email
       this.cotacaoEmailService
         .notificarCotacaoReprovada(cotacao, aprovador, justificativa)
-        .then(() => console.log(`✅ Email de reprovação enviado para cotação #${cotacao.numero}`))
-        .catch((err) => console.error(`❌ Erro ao enviar email de reprovação:`, err));
+        .then(() => this.logger.debug(`Email de reprovacao enviado para cotacao #${cotacao.numero}`))
+        .catch((err) => this.logger.error('Erro ao enviar email de reprovacao', err?.stack || String(err)));
 
       // Criar notificação no sistema
       if (cotacao.criadoPor) {
@@ -619,8 +631,8 @@ export class CotacaoService {
               justificativa,
             },
           })
-          .then(() => console.log(`✅ Notificação criada para cotação #${cotacao.numero}`))
-          .catch((err) => console.error(`❌ Erro ao criar notificação:`, err));
+          .then(() => this.logger.debug(`Notificacao criada para cotacao #${cotacao.numero}`))
+          .catch((err) => this.logger.error('Erro ao criar notificacao', err?.stack || String(err)));
       }
     }
 
@@ -661,7 +673,7 @@ export class CotacaoService {
       }
     }
 
-    console.log(
+    this.logger.log(
       `[AUDIT] APROVACAO LOTE - Total: ${resultado.total}, Sucessos: ${resultado.sucessos}, Falhas: ${resultado.falhas}, Aprovador: ${userId}`,
     );
 
@@ -710,7 +722,7 @@ export class CotacaoService {
       }
     }
 
-    console.log(
+    this.logger.log(
       `[AUDIT] REPROVACAO LOTE - Total: ${resultado.total}, Sucessos: ${resultado.sucessos}, Falhas: ${resultado.falhas}, Aprovador: ${userId}`,
     );
 
@@ -770,7 +782,7 @@ export class CotacaoService {
     await this.cotacaoRepository.save(cotacao);
 
     // Log simples de auditoria
-    console.log(
+    this.logger.log(
       `[AUDIT] COTACAO UPDATE_STATUS - ID: ${id}, User: ${userId}, ${statusAnterior} → ${novoStatus}`,
     );
 
@@ -781,7 +793,7 @@ export class CotacaoService {
     const cotacao = await this.buscarPorId(id, userId, empresaId);
 
     // Log simples de auditoria
-    console.log(
+    this.logger.log(
       `[AUDIT] COTACAO GENERATE_PDF - ID: ${id}, User: ${userId}, Numero: ${cotacao.numero}`,
     );
 
@@ -809,8 +821,18 @@ export class CotacaoService {
     const cotacao = await this.buscarPorId(id, userId, empresaId);
 
     // Log simples em vez de envio real
-    console.log(
-      `[EMAIL] COTACAO SEND - ID: ${id}, Destinatarios: ${enviarEmailDto.destinatarios.join(', ')}, Assunto: ${enviarEmailDto.assunto}`,
+    this.logger.log(
+      `[EMAIL] COTACAO SEND - resumo: ${JSON.stringify({
+        id,
+        destinatarios: Array.isArray(enviarEmailDto.destinatarios)
+          ? enviarEmailDto.destinatarios.length
+          : 0,
+        dominios: (enviarEmailDto.destinatarios || [])
+          .filter((d) => typeof d === 'string' && d.includes('@'))
+          .slice(0, 5)
+          .map((d) => d.split('@')[1]),
+        assunto: (enviarEmailDto.assunto || '').slice(0, 120),
+      })}`,
     );
 
     // Atualizar status se ainda for rascunho
@@ -819,7 +841,7 @@ export class CotacaoService {
     }
 
     // Log simples de auditoria
-    console.log(
+    this.logger.log(
       `[AUDIT] COTACAO SEND_EMAIL - ID: ${id}, User: ${userId}, Destinatarios: ${enviarEmailDto.destinatarios.length}`,
     );
   }
@@ -929,13 +951,17 @@ export class CotacaoService {
 
     const valorTotal = parseFloat(resultado?.total || '0');
 
-    console.log(`🧮 calcularValorTotal - Cotacao ID: ${cotacaoId}`);
-    console.log(`🧮 Soma dos itens: ${resultado?.total}`);
-    console.log(`🧮 Valor total calculado: ${valorTotal}`);
+    this.logger.debug(
+      `calcularValorTotal resumo: ${JSON.stringify({
+        cotacaoId,
+        somaItens: resultado?.total ?? null,
+        valorTotal,
+      })}`,
+    );
 
     await this.cotacaoRepository.update(cotacaoId, { valorTotal });
 
-    console.log(`✅ Valor total atualizado no banco: ${valorTotal}`);
+    this.logger.debug(`Valor total atualizado no banco: ${valorTotal}`);
   }
 
   private buildItemCotacaoEntity(

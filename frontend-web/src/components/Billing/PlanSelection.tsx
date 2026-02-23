@@ -18,7 +18,6 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
   showCurrentPlan = true,
 }) => {
   const { planos, assinatura, loading, alterarPlano } = useSubscription();
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [isChangingPlan, setIsChangingPlan] = useState(false);
 
   const handlePlanSelect = async (plano: Plano) => {
@@ -53,26 +52,26 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
   const getPlanColor = (codigo: string) => {
     switch (codigo) {
       case 'starter':
-        return 'text-green-600';
+        return 'text-[#159A9C]';
       case 'professional':
-        return 'text-blue-600';
+        return 'text-[#159A9C]';
       case 'enterprise':
-        return 'text-purple-600';
+        return 'text-[#159A9C]';
       default:
-        return 'text-gray-600';
+        return 'text-[#385A6A]';
     }
   };
 
   const getPlanBorderColor = (codigo: string) => {
     switch (codigo) {
       case 'starter':
-        return 'border-green-200';
+        return 'border-[#DEEFE7]';
       case 'professional':
-        return 'border-blue-200';
+        return 'border-[#DEEFE7]';
       case 'enterprise':
-        return 'border-purple-200';
+        return 'border-[#DEEFE7]';
       default:
-        return 'border-gray-200';
+        return 'border-[#DEEFE7]';
     }
   };
 
@@ -89,8 +88,8 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
     return (
       <div className="space-y-6">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Carregando planos...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#159A9C] mx-auto"></div>
+          <p className="mt-2 text-[#385A6A]">Carregando planos...</p>
         </div>
       </div>
     );
@@ -100,8 +99,8 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
     <div className="space-y-6">
       {/* Header */}
       <div className="text-center">
-        <h2 className="text-3xl font-bold text-gray-900">Escolha o Plano Ideal</h2>
-        <p className="mt-4 text-lg text-gray-600">Planos flexíveis que crescem com sua empresa</p>
+        <h2 className="text-3xl font-bold text-[#002333]">Escolha o Plano Ideal</h2>
+        <p className="mt-4 text-lg text-[#385A6A]">Planos flexíveis que crescem com sua empresa</p>
       </div>
 
       {/* Planos */}
@@ -114,15 +113,15 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
             <Card
               key={plano.id}
               className={`
-                relative overflow-hidden transition-all duration-200 hover:shadow-lg
+                relative overflow-hidden transition-all duration-200 hover:shadow-md
                 ${getPlanBorderColor(plano.codigo)}
-                ${isRecommended ? 'ring-2 ring-blue-500 ring-opacity-50' : ''}
+                ${isRecommended ? 'ring-2 ring-[#159A9C] ring-opacity-40' : ''}
                 ${isCurrent ? 'ring-2 ring-green-500' : ''}
               `}
             >
               {/* Badge de Recomendado */}
               {isRecommended && (
-                <div className="absolute top-0 right-0 bg-blue-500 text-white px-3 py-1 text-xs font-medium rounded-bl-lg">
+                <div className="absolute top-0 right-0 bg-[#159A9C] text-white px-3 py-1 text-xs font-medium rounded-bl-lg">
                   Recomendado
                 </div>
               )}
@@ -139,16 +138,16 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
                   {getPlanIcon(plano.codigo)}
                 </div>
 
-                <CardTitle className="text-xl">{plano.nome}</CardTitle>
+                <CardTitle className="text-xl text-[#002333]">{plano.nome}</CardTitle>
 
                 <div className="mt-4">
-                  <span className="text-4xl font-bold text-gray-900">
+                  <span className="text-4xl font-bold text-[#002333]">
                     {formatCurrency(plano.preco)}
                   </span>
-                  <span className="text-gray-600">/mês</span>
+                  <span className="text-[#385A6A]">/mês</span>
                 </div>
 
-                {plano.descricao && <p className="mt-2 text-sm text-gray-600">{plano.descricao}</p>}
+                {plano.descricao && <p className="mt-2 text-sm text-[#385A6A]">{plano.descricao}</p>}
               </CardHeader>
 
               <CardContent className="space-y-4">
@@ -156,26 +155,26 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
                     <Users className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm">{plano.limiteUsuarios} usuários</span>
+                        <span className="text-sm text-[#244455]">{plano.limiteUsuarios} usuários</span>
                   </div>
 
                   <div className="flex items-center gap-3">
                     <UserCheck className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm">
+                        <span className="text-sm text-[#244455]">
                       {plano.limiteClientes.toLocaleString()} clientes
                     </span>
                   </div>
 
                   <div className="flex items-center gap-3">
                     <Database className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm">
+                        <span className="text-sm text-[#244455]">
                       {Math.round(plano.limiteStorage / (1024 * 1024 * 1024))} GB de armazenamento
                     </span>
                   </div>
 
                   <div className="flex items-center gap-3">
                     <Zap className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm">
+                        <span className="text-sm text-[#244455]">
                       {plano.limiteApiCalls.toLocaleString()} API calls/dia
                     </span>
                   </div>
@@ -186,27 +185,27 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
                   {plano.permiteApi && (
                     <div className="flex items-center gap-2">
                       <Check className="h-4 w-4 text-green-500" />
-                      <span className="text-sm">API completa</span>
+                      <span className="text-sm text-[#244455]">API completa</span>
                     </div>
                   )}
 
                   {plano.permiteIntegracao && (
                     <div className="flex items-center gap-2">
                       <Check className="h-4 w-4 text-green-500" />
-                      <span className="text-sm">Integrações</span>
+                      <span className="text-sm text-[#244455]">Integrações</span>
                     </div>
                   )}
 
                   {plano.permiteWhitelabel && (
                     <div className="flex items-center gap-2">
                       <Check className="h-4 w-4 text-green-500" />
-                      <span className="text-sm">White-label</span>
+                      <span className="text-sm text-[#244455]">White-label</span>
                     </div>
                   )}
 
                   <div className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">Suporte {plano.suportePrioridade}</span>
+                    <span className="text-sm text-[#244455]">Suporte {plano.suportePrioridade}</span>
                   </div>
                 </div>
 
@@ -233,11 +232,10 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
                 <Button
                   onClick={() => handlePlanSelect(plano)}
                   disabled={isCurrent || isChangingPlan}
-                  className={`
-                    w-full mt-6 
+                    className={`
+                    w-full mt-6
                     ${isCurrent ? 'bg-green-600 hover:bg-green-700' : ''}
-                    ${plano.codigo === 'professional' ? 'bg-blue-600 hover:bg-blue-700' : ''}
-                    ${plano.codigo === 'enterprise' ? 'bg-purple-600 hover:bg-purple-700' : ''}
+                    ${!isCurrent ? 'bg-[#159A9C] hover:bg-[#0F7B7D]' : ''}
                   `}
                   size="lg"
                 >
@@ -261,46 +259,46 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="min-w-[640px] w-full text-sm">
                 <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2">Recurso</th>
+                  <tr className="border-b border-[#DEEFE7]">
+                    <th className="py-2 text-left text-[#385A6A] whitespace-nowrap">Recurso</th>
                     {planos.map((plano) => (
-                      <th key={plano.id} className="text-center py-2">
+                      <th key={plano.id} className="py-2 text-center text-[#385A6A] whitespace-nowrap">
                         {plano.nome}
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="space-y-2">
-                  <tr className="border-b">
-                    <td className="py-2">Usuários</td>
+                  <tr className="border-b border-[#DEEFE7]">
+                    <td className="py-2 text-[#244455] whitespace-nowrap">Usuários</td>
                     {planos.map((plano) => (
-                      <td key={plano.id} className="text-center py-2">
+                      <td key={plano.id} className="py-2 text-center text-[#244455] whitespace-nowrap">
                         {plano.limiteUsuarios}
                       </td>
                     ))}
                   </tr>
-                  <tr className="border-b">
-                    <td className="py-2">Clientes</td>
+                  <tr className="border-b border-[#DEEFE7]">
+                    <td className="py-2 text-[#244455] whitespace-nowrap">Clientes</td>
                     {planos.map((plano) => (
-                      <td key={plano.id} className="text-center py-2">
+                      <td key={plano.id} className="py-2 text-center text-[#244455] whitespace-nowrap">
                         {plano.limiteClientes.toLocaleString()}
                       </td>
                     ))}
                   </tr>
-                  <tr className="border-b">
-                    <td className="py-2">Storage</td>
+                  <tr className="border-b border-[#DEEFE7]">
+                    <td className="py-2 text-[#244455] whitespace-nowrap">Storage</td>
                     {planos.map((plano) => (
-                      <td key={plano.id} className="text-center py-2">
+                      <td key={plano.id} className="py-2 text-center text-[#244455] whitespace-nowrap">
                         {Math.round(plano.limiteStorage / (1024 * 1024 * 1024))} GB
                       </td>
                     ))}
                   </tr>
                   <tr>
-                    <td className="py-2">White-label</td>
+                    <td className="py-2 text-[#244455] whitespace-nowrap">White-label</td>
                     {planos.map((plano) => (
-                      <td key={plano.id} className="text-center py-2">
+                      <td key={plano.id} className="py-2 text-center text-[#244455] whitespace-nowrap">
                         {plano.permiteWhitelabel ? '✓' : '—'}
                       </td>
                     ))}

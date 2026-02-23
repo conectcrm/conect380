@@ -1,9 +1,12 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User, UserRole } from './user.entity';
 import { Empresa } from '../../empresas/entities/empresa.entity';
+import { AtividadeTipo, UserActivity } from './entities/user-activity.entity';
+import { Notification, NotificationType } from '../../notifications/entities/notification.entity';
+import { NotificationService } from '../../notifications/notification.service';
 
 type UsersReadScopeInput = {
   user_ids?: unknown;
@@ -14,6 +17,9 @@ type UsersReadScopeFilters = {
   userIds: string[];
   allowedRoles: UserRole[];
 };
+
+type LgpdPrivacyRequestType = 'data_export' | 'account_anonymization' | 'account_deletion';
+type LgpdPrivacyRequestStatus = 'open' | 'in_review' | 'completed' | 'rejected';
 
 const ATENDIMENTO_PERMISSION_TOKENS = [
   'ATENDIMENTO',
@@ -41,6 +47,7 @@ const ATENDIMENTO_PERMISSION_TOKENS = [
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
   private userColumnsCache: Set<string> | null = null;
 
   constructor(
@@ -48,6 +55,11 @@ export class UsersService {
     private userRepository: Repository<User>,
     @InjectRepository(Empresa)
     private empresaRepository: Repository<Empresa>,
+    @InjectRepository(UserActivity)
+    private userActivityRepository: Repository<UserActivity>,
+    @InjectRepository(Notification)
+    private notificationRepository: Repository<Notification>,
+    private notificationService: NotificationService,
   ) {}
 
   private async getUsersTableColumns(): Promise<Set<string>> {
@@ -256,6 +268,178 @@ export class UsersService {
     };
   }
 
+  private parseActivityDetailsJson(value?: string | null): Record<string, unknown> | null {
+    if (!value || typeof value !== 'string') {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(value);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return null;
+      }
+      return parsed as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+
+  private isLgpdPrivacyRequestDetails(details: Record<string, unknown> | null): boolean {
+    return details?.categoria === 'lgpd_privacy_request';
+  }
+
+  private serializeLgpdRequestActivity(activity: UserActivity & { usuario?: User }): Record<string, unknown> {
+    const details = this.parseActivityDetailsJson(activity.detalhes);
+    const requestedBy =
+      details && typeof details.requested_by === 'object' && details.requested_by
+        ? (details.requested_by as Record<string, unknown>)
+        : null;
+    const handledBy =
+      details && typeof details.handled_by === 'object' && details.handled_by
+        ? (details.handled_by as Record<string, unknown>)
+        : null;
+
+    return {
+      id: activity.id,
+      protocolo: activity.id,
+      created_at: activity.createdAt,
+      updated_at:
+        typeof details?.updated_at === 'string'
+          ? details.updated_at
+          : typeof details?.requested_at === 'string'
+            ? details.requested_at
+            : activity.createdAt,
+      status: (details?.status as string) || 'open',
+      type: (details?.request_type as string) || 'data_export',
+      reason: typeof details?.reason === 'string' ? details.reason : null,
+      resolution_note:
+        typeof details?.resolution_note === 'string' ? details.resolution_note : null,
+      requested_at:
+        typeof details?.requested_at === 'string' ? details.requested_at : activity.createdAt,
+      handled_at: typeof details?.handled_at === 'string' ? details.handled_at : null,
+      handled_by: handledBy,
+      requester: {
+        id: activity.usuarioId,
+        nome:
+          activity.usuario?.nome ||
+          (requestedBy && typeof requestedBy.nome === 'string' ? requestedBy.nome : null),
+        email:
+          activity.usuario?.email ||
+          (requestedBy && typeof requestedBy.email === 'string' ? requestedBy.email : null),
+      },
+      raw_details: details,
+    };
+  }
+
+  private async notifyAdminsAboutPrivacyRequest(params: {
+    empresaId: string;
+    requester: Pick<User, 'id' | 'nome' | 'email'>;
+    requestId: string;
+    requestType: LgpdPrivacyRequestType;
+  }): Promise<void> {
+    const adminRoles = new Set<UserRole>([UserRole.SUPERADMIN, UserRole.ADMIN]);
+    const companyUsers = await this.userRepository.find({
+      where: { empresa_id: params.empresaId, ativo: true },
+      select: ['id', 'nome', 'email', 'role', 'empresa_id'],
+    });
+
+    const recipients = companyUsers.filter((candidate) => {
+      if (!candidate?.id || candidate.id === params.requester.id) {
+        return false;
+      }
+      const normalizedRole = this.normalizeRoleInput(candidate.role);
+      return !!normalizedRole && adminRoles.has(normalizedRole);
+    });
+
+    if (recipients.length === 0) {
+      return;
+    }
+
+    const requestTypeLabelMap: Record<LgpdPrivacyRequestType, string> = {
+      data_export: 'Exportacao de dados',
+      account_anonymization: 'Anonimizacao de conta',
+      account_deletion: 'Exclusao de conta',
+    };
+
+    const title = 'Nova solicitacao LGPD registrada';
+    const message = `${params.requester.nome || 'Usuario'} registrou uma solicitacao de ${
+      requestTypeLabelMap[params.requestType]
+    }. Protocolo: ${params.requestId}.`;
+
+    const results = await Promise.allSettled(
+      recipients.map((recipient) =>
+        this.notificationService.create({
+          empresaId: params.empresaId,
+          userId: recipient.id,
+          type: NotificationType.SISTEMA,
+          title,
+          message,
+          data: {
+            category: 'lgpd_privacy_request',
+            requestId: params.requestId,
+            requestType: params.requestType,
+            requesterUserId: params.requester.id,
+            source: 'users.profile.privacy-request',
+          },
+        }),
+      ),
+    );
+
+    const failed = results.filter((result) => result.status === 'rejected').length;
+    if (failed > 0) {
+      this.logger.warn(
+        `Falha parcial ao notificar admins sobre solicitacao LGPD ${params.requestId}: ${failed}/${results.length}`,
+      );
+    }
+  }
+
+  private async notifyRequesterAboutPrivacyRequestStatus(params: {
+    empresaId: string;
+    requesterUserId: string;
+    requestId: string;
+    requestType: LgpdPrivacyRequestType;
+    status: Extract<LgpdPrivacyRequestStatus, 'completed' | 'rejected'>;
+    handledBy?: { id?: string | null; nome?: string | null; email?: string | null } | null;
+    resolutionNote?: string | null;
+  }): Promise<void> {
+    const requestTypeLabelMap: Record<LgpdPrivacyRequestType, string> = {
+      data_export: 'exportacao de dados',
+      account_anonymization: 'anonimizacao de conta',
+      account_deletion: 'exclusao de conta',
+    };
+
+    const statusLabelMap: Record<Extract<LgpdPrivacyRequestStatus, 'completed' | 'rejected'>, string> = {
+      completed: 'concluida',
+      rejected: 'negada',
+    };
+
+    const handledByLabel = params.handledBy?.nome || 'equipe administrativa';
+    const title =
+      params.status === 'completed'
+        ? 'Sua solicitacao LGPD foi concluida'
+        : 'Sua solicitacao LGPD foi atualizada';
+    const message = `Sua solicitacao de ${
+      requestTypeLabelMap[params.requestType]
+    } (protocolo ${params.requestId}) foi ${statusLabelMap[params.status]} por ${handledByLabel}.`;
+
+    await this.notificationService.create({
+      empresaId: params.empresaId,
+      userId: params.requesterUserId,
+      type: NotificationType.SISTEMA,
+      title,
+      message,
+      data: {
+        category: 'lgpd_privacy_request',
+        requestId: params.requestId,
+        requestType: params.requestType,
+        requestStatus: params.status,
+        handledBy: params.handledBy || null,
+        resolutionNote: params.resolutionNote || null,
+        source: 'users.privacy-requests.update-status',
+      },
+    });
+  }
+
   private appendReadScopeClause(
     whereClauses: string[],
     whereValues: unknown[],
@@ -437,6 +621,28 @@ export class UsersService {
     );
   }
 
+  private extractRepositoryUpdatableFields(userData: Partial<User>): Partial<User> {
+    const updatable: Partial<User> = {};
+    const assign = <K extends keyof User>(key: K): void => {
+      if (userData[key] !== undefined) {
+        updatable[key] = userData[key] as User[K];
+      }
+    };
+
+    assign('nome');
+    assign('email');
+    assign('senha');
+    assign('role');
+    assign('empresa_id');
+    assign('ativo');
+    assign('deve_trocar_senha');
+    assign('status_atendente');
+    assign('capacidade_maxima');
+    assign('tickets_ativos');
+
+    return updatable;
+  }
+
   async findByEmail(email: string): Promise<User | undefined> {
     const columns = await this.getUsersTableColumns();
     const select = this.buildUserSelect(columns, true);
@@ -557,9 +763,303 @@ export class UsersService {
 
   async update(id: string, userData: Partial<User>): Promise<User> {
     const normalizedData = this.normalizeRoleForUpdate(userData);
-    await this.userRepository.update(id, normalizedData);
+    const repositoryUpdatableData = this.extractRepositoryUpdatableFields(normalizedData);
+
+    if (Object.keys(repositoryUpdatableData).length > 0) {
+      await this.userRepository.update(id, repositoryUpdatableData);
+    }
+
     await this.persistOptionalUsersColumns(id, normalizedData);
-    return this.findById(id);
+    const user = await this.findById(id);
+    if (!user) {
+      throw new NotFoundException('Usuario nao encontrado');
+    }
+
+    return user;
+  }
+
+  async exportOwnData(userId: string, empresaId?: string): Promise<Record<string, unknown>> {
+    const user = await this.findOne(userId, empresaId);
+    if (!user) {
+      throw new NotFoundException('Usuario nao encontrado');
+    }
+
+    const [activities, notifications] = await Promise.all([
+      this.userActivityRepository.find({
+        where: {
+          usuarioId: userId,
+          ...(empresaId ? { empresaId } : {}),
+        },
+        order: { createdAt: 'DESC' },
+        take: 200,
+      }),
+      this.notificationRepository.find({
+        where: {
+          userId,
+          ...(empresaId ? { empresaId } : {}),
+        },
+        order: { createdAt: 'DESC' },
+        take: 200,
+      }),
+    ]);
+
+    return {
+      exported_at: new Date().toISOString(),
+      format_version: '1.0',
+      titular: {
+        id: user.id,
+        nome: user.nome,
+        email: user.email,
+        telefone: user.telefone ?? null,
+        role: user.role,
+        permissoes: Array.isArray(user.permissoes) ? user.permissoes : [],
+        avatar_url: user.avatar_url ?? null,
+        idioma_preferido: user.idioma_preferido ?? null,
+        configuracoes: user.configuracoes ?? null,
+        empresa_id: user.empresa_id,
+        ativo: user.ativo,
+        ultimo_login: user.ultimo_login ?? null,
+        created_at: user.created_at ?? null,
+        updated_at: user.updated_at ?? null,
+      },
+      empresa: user.empresa
+        ? {
+            id: user.empresa.id,
+            nome: user.empresa.nome,
+            slug: user.empresa.slug,
+            cnpj: user.empresa.cnpj ?? null,
+            plano: user.empresa.plano ?? null,
+            ativo: user.empresa.ativo ?? null,
+            subdominio: user.empresa.subdominio ?? null,
+          }
+        : null,
+      atividades_recentes: activities.map((activity) => ({
+        id: activity.id,
+        tipo: activity.tipo,
+        descricao: activity.descricao,
+        detalhes: activity.detalhes ?? null,
+        created_at: activity.createdAt,
+      })),
+      notificacoes_recentes: notifications.map((notification) => ({
+        id: notification.id,
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        read: notification.read,
+        data: notification.data ?? null,
+        created_at: notification.createdAt,
+        read_at: notification.readAt ?? null,
+      })),
+      limits: {
+        atividades_recentes: 200,
+        notificacoes_recentes: 200,
+      },
+    };
+  }
+
+  async createPrivacyRequest(
+    userId: string,
+    empresaId: string,
+    input: {
+      type: 'data_export' | 'account_anonymization' | 'account_deletion';
+      reason?: string;
+    },
+  ): Promise<Record<string, unknown>> {
+    const user = await this.findOne(userId, empresaId);
+    if (!user) {
+      throw new NotFoundException('Usuario nao encontrado');
+    }
+
+    const reason =
+      typeof input.reason === 'string' && input.reason.trim().length > 0
+        ? input.reason.trim().slice(0, 1000)
+        : null;
+
+    const saved = await this.userActivityRepository.save(
+      this.userActivityRepository.create({
+        usuarioId: userId,
+        empresaId,
+        tipo: AtividadeTipo.EDICAO,
+        descricao: `Solicitacao LGPD registrada (${input.type})`,
+        detalhes: JSON.stringify({
+          categoria: 'lgpd_privacy_request',
+          request_type: input.type,
+          reason,
+          status: 'open',
+          requested_by: {
+            id: user.id,
+            email: user.email,
+            nome: user.nome,
+          },
+          requested_at: new Date().toISOString(),
+        }),
+      }),
+    );
+
+    try {
+      await this.notifyAdminsAboutPrivacyRequest({
+        empresaId,
+        requester: {
+          id: user.id,
+          nome: user.nome,
+          email: user.email,
+        },
+        requestId: saved.id,
+        requestType: input.type,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Nao foi possivel notificar admins sobre solicitacao LGPD ${saved.id}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+
+    return {
+      protocolo: saved.id,
+      status: 'recebido',
+      tipo: input.type,
+      criado_em: saved.createdAt,
+      observacao:
+        'Solicitacao registrada para avaliacao administrativa. Nenhuma exclusao/anonimizacao e executada automaticamente.',
+    };
+  }
+
+  async listPrivacyRequests(
+    empresaId: string,
+    filters: {
+      status?: LgpdPrivacyRequestStatus;
+      type?: LgpdPrivacyRequestType;
+      limit?: number;
+    } = {},
+  ): Promise<Record<string, unknown>[]> {
+    const requestedLimit =
+      typeof filters.limit === 'number' && Number.isFinite(filters.limit) ? filters.limit : 50;
+    const limit = Math.max(1, Math.min(200, Math.trunc(requestedLimit)));
+
+    const activities = await this.userActivityRepository
+      .createQueryBuilder('activity')
+      .leftJoinAndSelect('activity.usuario', 'usuario')
+      .where('activity.empresa_id = :empresaId', { empresaId })
+      .andWhere('activity.detalhes IS NOT NULL')
+      .andWhere('activity.detalhes LIKE :marker', {
+        marker: '%"categoria":"lgpd_privacy_request"%',
+      })
+      .orderBy('activity.created_at', 'DESC')
+      .take(limit * 3)
+      .getMany();
+
+    return activities
+      .map((activity) => this.serializeLgpdRequestActivity(activity))
+      .filter((item) => {
+        const details = item.raw_details as Record<string, unknown> | undefined;
+        if (!this.isLgpdPrivacyRequestDetails(details ?? null)) {
+          return false;
+        }
+
+        if (filters.status && item.status !== filters.status) {
+          return false;
+        }
+
+        if (filters.type && item.type !== filters.type) {
+          return false;
+        }
+
+        return true;
+      })
+      .slice(0, limit)
+      .map(({ raw_details, ...rest }) => rest);
+  }
+
+  async updatePrivacyRequestStatus(
+    activityId: string,
+    empresaId: string,
+    actor: Pick<User, 'id' | 'nome' | 'email'>,
+    payload: {
+      status: LgpdPrivacyRequestStatus;
+      resolution_note?: string;
+    },
+  ): Promise<Record<string, unknown>> {
+    const activity = await this.userActivityRepository.findOne({
+      where: { id: activityId, empresaId },
+      relations: ['usuario'],
+    });
+
+    if (!activity) {
+      throw new NotFoundException('Solicitacao LGPD nao encontrada');
+    }
+
+    const details = this.parseActivityDetailsJson(activity.detalhes);
+    if (!this.isLgpdPrivacyRequestDetails(details)) {
+      throw new NotFoundException('Registro informado nao e uma solicitacao LGPD');
+    }
+
+    const previousStatus =
+      typeof details?.status === 'string' ? (details.status as LgpdPrivacyRequestStatus) : 'open';
+
+    const resolutionNote =
+      typeof payload.resolution_note === 'string' && payload.resolution_note.trim().length > 0
+        ? payload.resolution_note.trim().slice(0, 1500)
+        : null;
+
+    const nextDetails: Record<string, unknown> = {
+      ...(details || {}),
+      status: payload.status,
+      updated_at: new Date().toISOString(),
+      handled_at: new Date().toISOString(),
+      handled_by: {
+        id: actor.id,
+        nome: actor.nome ?? null,
+        email: actor.email ?? null,
+      },
+    };
+
+    if (resolutionNote) {
+      nextDetails.resolution_note = resolutionNote;
+    } else if (payload.status === 'completed' || payload.status === 'rejected') {
+      nextDetails.resolution_note = null;
+    }
+
+    if (payload.status === 'completed' || payload.status === 'rejected') {
+      nextDetails.closed_at = new Date().toISOString();
+    }
+
+    activity.detalhes = JSON.stringify(nextDetails);
+    activity.descricao = `Solicitacao LGPD ${payload.status}`;
+
+    const saved = await this.userActivityRepository.save(activity);
+
+    const shouldNotifyRequester =
+      payload.status !== previousStatus &&
+      (payload.status === 'completed' || payload.status === 'rejected') &&
+      activity.usuarioId &&
+      activity.usuarioId !== actor.id;
+
+    if (shouldNotifyRequester) {
+      try {
+        await this.notifyRequesterAboutPrivacyRequestStatus({
+          empresaId,
+          requesterUserId: activity.usuarioId,
+          requestId: saved.id,
+          requestType: ((details?.request_type as LgpdPrivacyRequestType) || 'data_export') as LgpdPrivacyRequestType,
+          status: payload.status as 'completed' | 'rejected',
+          handledBy: {
+            id: actor.id,
+            nome: actor.nome ?? null,
+            email: actor.email ?? null,
+          },
+          resolutionNote,
+        });
+      } catch (error) {
+        this.logger.warn(
+          `Nao foi possivel notificar solicitante sobre tratamento LGPD ${saved.id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+
+    return this.serializeLgpdRequestActivity(saved as UserActivity & { usuario?: User });
   }
 
   async findByEmpresa(empresaId: string): Promise<User[]> {
@@ -830,7 +1330,12 @@ export class UsersService {
 
   async atualizar(id: string, userData: Partial<User>, empresa_id: string): Promise<User> {
     const normalizedData = this.normalizeRoleForUpdate(userData);
-    await this.userRepository.update({ id, empresa_id }, normalizedData);
+    const repositoryUpdatableData = this.extractRepositoryUpdatableFields(normalizedData);
+
+    if (Object.keys(repositoryUpdatableData).length > 0) {
+      await this.userRepository.update({ id, empresa_id }, repositoryUpdatableData);
+    }
+
     await this.persistOptionalUsersColumns(id, normalizedData, empresa_id);
     const user = await this.findById(id);
     if (!user || user.empresa_id !== empresa_id) {

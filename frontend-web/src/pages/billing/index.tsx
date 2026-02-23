@@ -3,15 +3,16 @@ import { BillingDashboard } from '../../components/Billing/BillingDashboard';
 import { PlanSelection } from '../../components/Billing/PlanSelection';
 import { UsageMeter } from '../../components/Billing/UsageMeter';
 import { PaymentForm } from '../../components/Billing/PaymentForm';
-import { Button } from '../../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { ArrowLeft, Settings, CreditCard, FileText, HelpCircle } from 'lucide-react';
+import { ArrowLeft, CreditCard, FileText, HelpCircle, LayoutDashboard, Settings } from 'lucide-react';
+import { FiltersBar, PageHeader, SectionCard } from '../../components/layout-v2';
 
 type BillingView = 'dashboard' | 'plans' | 'usage' | 'settings' | 'payment';
 
 export const BillingPage: React.FC = () => {
   const [currentView, setCurrentView] = useState<BillingView>('dashboard');
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
+
+  const abaAtiva = currentView === 'payment' ? 'plans' : currentView;
 
   const handlePlanSelect = (plano: any) => {
     setSelectedPlan(plano);
@@ -20,8 +21,6 @@ export const BillingPage: React.FC = () => {
 
   const handlePaymentSuccess = (paymentData: any) => {
     console.log('Pagamento realizado com sucesso:', paymentData);
-    // Aqui você pode fazer a integração com o backend
-    // Resetar estado e voltar para dashboard
     setSelectedPlan(null);
     setCurrentView('dashboard');
   };
@@ -50,45 +49,42 @@ export const BillingPage: React.FC = () => {
 
       case 'settings':
         return (
-          <Card>
-            <CardHeader>
-              <CardTitle>Configurações de Billing</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                <div className="text-center py-12">
-                  <Settings className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    Configurações de Billing
-                  </h3>
-                  <p className="text-gray-600 mb-6">
-                    Esta seção permitirá gerenciar métodos de pagamento, histórico de faturas e
-                    configurações de cobrança.
-                  </p>
-                  <div className="space-y-4 max-w-md mx-auto">
-                    <div className="p-4 border border-gray-200 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <CreditCard className="h-5 w-5 text-gray-400" />
-                        <span className="text-sm text-gray-600">Métodos de Pagamento</span>
-                      </div>
+          <SectionCard className="p-4 sm:p-5">
+            <div className="space-y-6">
+              <div className="py-6 text-center sm:py-10">
+                <Settings className="mx-auto mb-4 h-14 w-14 text-[#B4BEC9]" />
+                <h3 className="mb-2 text-lg font-semibold text-[#002333]">
+                  Configurações de Billing
+                </h3>
+                <p className="mx-auto mb-6 max-w-2xl text-sm text-[#385A6A]">
+                  Esta seção permitirá gerenciar métodos de pagamento, histórico de faturas e
+                  configurações de cobrança.
+                </p>
+                <div className="mx-auto grid max-w-3xl grid-cols-1 gap-3 md:grid-cols-3">
+                  <div className="rounded-xl border border-[#DEEFE7] bg-white p-4 text-left">
+                    <div className="flex items-center gap-3">
+                      <CreditCard className="h-5 w-5 text-[#159A9C]" />
+                      <span className="text-sm font-medium text-[#244455]">Métodos de Pagamento</span>
                     </div>
-                    <div className="p-4 border border-gray-200 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-5 w-5 text-gray-400" />
-                        <span className="text-sm text-gray-600">Histórico de Faturas</span>
-                      </div>
+                  </div>
+                  <div className="rounded-xl border border-[#DEEFE7] bg-white p-4 text-left">
+                    <div className="flex items-center gap-3">
+                      <FileText className="h-5 w-5 text-[#159A9C]" />
+                      <span className="text-sm font-medium text-[#244455]">Histórico de Faturas</span>
                     </div>
-                    <div className="p-4 border border-gray-200 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Settings className="h-5 w-5 text-gray-400" />
-                        <span className="text-sm text-gray-600">Configurações de Cobrança</span>
-                      </div>
+                  </div>
+                  <div className="rounded-xl border border-[#DEEFE7] bg-white p-4 text-left">
+                    <div className="flex items-center gap-3">
+                      <Settings className="h-5 w-5 text-[#159A9C]" />
+                      <span className="text-sm font-medium text-[#244455]">
+                        Configurações de Cobrança
+                      </span>
                     </div>
                   </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </SectionCard>
         );
 
       default:
@@ -102,95 +98,110 @@ export const BillingPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Navigation */}
-        {currentView !== 'dashboard' && (
-          <div className="mb-6">
-            <Button variant="ghost" onClick={() => setCurrentView('dashboard')} className="mb-4">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Voltar ao Dashboard
-            </Button>
-          </div>
-        )}
-
-        {/* Header Navigation */}
-        <div className="mb-8">
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
+    <div className="space-y-4 pt-1 sm:pt-2">
+      <SectionCard className="p-4 sm:p-5">
+        <PageHeader
+          title={
+            <span className="inline-flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-[#159A9C]" />
+              <span>Billing</span>
+            </span>
+          }
+          description="Gerencie assinatura, uso, planos e configurações de cobrança em um fluxo único."
+          actions={
+            currentView !== 'dashboard' ? (
               <button
+                type="button"
                 onClick={() => setCurrentView('dashboard')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  currentView === 'dashboard'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                className="inline-flex items-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
               >
-                Dashboard
+                <ArrowLeft className="h-4 w-4" />
+                Voltar ao Dashboard
               </button>
-              <button
-                onClick={() => setCurrentView('usage')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  currentView === 'usage'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Uso Detalhado
-              </button>
-              <button
-                onClick={() => setCurrentView('plans')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  currentView === 'plans'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Planos
-              </button>
-              <button
-                onClick={() => setCurrentView('settings')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  currentView === 'settings'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Configurações
-              </button>
-            </nav>
+            ) : undefined
+          }
+        />
+      </SectionCard>
+
+      <FiltersBar className="p-4">
+        <div className="flex w-full flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setCurrentView('dashboard')}
+            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              abaAtiva === 'dashboard'
+                ? 'bg-[#159A9C] text-white'
+                : 'border border-[#D4E2E7] bg-white text-[#244455] hover:bg-[#F6FAF9]'
+            }`}
+          >
+            <LayoutDashboard className="h-4 w-4" />
+            Dashboard
+          </button>
+          <button
+            type="button"
+            onClick={() => setCurrentView('usage')}
+            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              abaAtiva === 'usage'
+                ? 'bg-[#159A9C] text-white'
+                : 'border border-[#D4E2E7] bg-white text-[#244455] hover:bg-[#F6FAF9]'
+            }`}
+          >
+            Uso Detalhado
+          </button>
+          <button
+            type="button"
+            onClick={() => setCurrentView('plans')}
+            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              abaAtiva === 'plans'
+                ? 'bg-[#159A9C] text-white'
+                : 'border border-[#D4E2E7] bg-white text-[#244455] hover:bg-[#F6FAF9]'
+            }`}
+          >
+            Planos
+          </button>
+          <button
+            type="button"
+            onClick={() => setCurrentView('settings')}
+            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              abaAtiva === 'settings'
+                ? 'bg-[#159A9C] text-white'
+                : 'border border-[#D4E2E7] bg-white text-[#244455] hover:bg-[#F6FAF9]'
+            }`}
+          >
+            <Settings className="h-4 w-4" />
+            Configurações
+          </button>
+        </div>
+      </FiltersBar>
+
+      <div className="space-y-4">{renderContent()}</div>
+
+      <SectionCard className="p-4 sm:p-6">
+        <div className="text-center">
+          <HelpCircle className="mx-auto mb-3 h-8 w-8 text-[#159A9C]" />
+          <h3 className="mb-2 text-lg font-semibold text-[#002333]">Precisa de Ajuda?</h3>
+          <p className="mx-auto mb-4 max-w-2xl text-sm text-[#385A6A]">
+            Nossa equipe está pronta para ajudar você a escolher o melhor plano e configurar sua
+            assinatura.
+          </p>
+          <div className="flex flex-col justify-center gap-3 sm:flex-row">
+            <button
+              type="button"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
+            >
+              <FileText className="h-4 w-4" />
+              Documentação
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
+            >
+              <HelpCircle className="h-4 w-4" />
+              Falar com Suporte
+            </button>
           </div>
         </div>
-
-        {/* Content */}
-        <div className="space-y-6">{renderContent()}</div>
-
-        {/* Help Section */}
-        <div className="mt-12 pt-8 border-t border-gray-200">
-          <Card>
-            <CardContent className="p-6">
-              <div className="text-center">
-                <HelpCircle className="h-8 w-8 text-blue-500 mx-auto mb-3" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Precisa de Ajuda?</h3>
-                <p className="text-gray-600 mb-4">
-                  Nossa equipe está pronta para ajudar você a escolher o melhor plano e configurar
-                  sua assinatura.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <Button variant="outline" size="sm">
-                    <FileText className="h-4 w-4 mr-2" />
-                    Documentação
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    <HelpCircle className="h-4 w-4 mr-2" />
-                    Falar com Suporte
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      </SectionCard>
     </div>
   );
 };

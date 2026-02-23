@@ -9,6 +9,7 @@ export interface CalendarEvent {
   status: 'confirmed' | 'pending' | 'cancelled';
   attendees?: string[];
   location?: string;
+  locationType?: 'presencial' | 'virtual';
   color?: string;
   collaborator?: string; // Colaborador responsável pelo evento
   responsavel?: string; // ID do usuário responsável pelo evento
@@ -19,6 +20,10 @@ export interface CalendarEvent {
   };
   allDay?: boolean;
   notes?: string;
+  reminderTime?: number;
+  reminderType?: 'notification' | 'email' | 'both';
+  emailOffline?: boolean;
+  attachments?: string[];
   recurring?: {
     type: 'daily' | 'weekly' | 'monthly';
     interval: number;
@@ -28,6 +33,9 @@ export interface CalendarEvent {
   recurringPattern?: unknown;
   responsavelId?: string;
   criadoPorId?: string;
+  criadoPorNome?: string;
+  attendeeResponses?: Record<string, 'pending' | 'confirmed' | 'declined'>;
+  myRsvp?: 'pending' | 'confirmed' | 'declined';
 }
 
 export interface CalendarView {

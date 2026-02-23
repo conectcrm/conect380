@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import toast from 'react-hot-toast';
 import {
   X,
   FileText,
@@ -19,6 +18,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { cotacaoService } from '../../services/cotacaoService';
+import { toastService } from '../../services/toastService';
 import { fornecedorService } from '../../services/fornecedorService';
 import { usuariosService } from '../../services/usuariosService';
 import { useAuth } from '../../hooks/useAuth';
@@ -215,7 +215,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
       setFornecedores(fornecedoresData);
     } catch (error) {
       console.error('Erro ao carregar fornecedores:', error);
-      toast.error('Erro ao carregar fornecedores');
+      toastService.error('Erro ao carregar fornecedores');
     } finally {
       setLoadingFornecedores(false);
     }
@@ -228,7 +228,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
       setUsuarios(response.usuarios || []);
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
-      toast.error('Erro ao carregar usuários');
+      toastService.error('Erro ao carregar usuários');
     } finally {
       setLoadingUsuarios(false);
     }
@@ -301,7 +301,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
         };
 
         novaCotacao = await cotacaoService.atualizar(cotacao.id, dadosAtualizacao);
-        toast.success('Cotação atualizada com sucesso!');
+        toastService.success('Cotação atualizada com sucesso!');
       } else {
         const dadosCriacao: CriarCotacaoRequest = {
           fornecedorId: data.fornecedorId,
@@ -321,14 +321,14 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
         };
 
         novaCotacao = await cotacaoService.criar(dadosCriacao);
-        toast.success('Cotação criada com sucesso!');
+        toastService.success('Cotação criada com sucesso!');
       }
 
       onSave(novaCotacao);
       onClose();
     } catch (error: any) {
       console.error('Erro ao salvar cotação:', error);
-      toast.error(error.message || 'Erro ao salvar cotação');
+      toastService.apiError(error, 'Erro ao salvar cotação');
     } finally {
       setIsSubmitting(false);
     }

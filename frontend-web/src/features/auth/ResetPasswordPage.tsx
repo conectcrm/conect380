@@ -1,8 +1,34 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { KeyRound, Eye, EyeOff, ArrowLeft, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
-import toast from 'react-hot-toast';
 import { authService } from '../../services/authService';
+import { toastService } from '../../services/toastService';
+import Conect360Logo from '../../components/ui/Conect360Logo';
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null;
+};
+
+const normalizeApiErrorMessage = (err: unknown): string | undefined => {
+  const errRecord = isRecord(err) ? err : undefined;
+  const response = errRecord && isRecord(errRecord['response']) ? errRecord['response'] : undefined;
+  const data = response && isRecord(response['data']) ? response['data'] : undefined;
+  const responseMessage = data ? data['message'] : undefined;
+
+  if (Array.isArray(responseMessage)) {
+    const joined = responseMessage
+      .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+      .join('. ');
+    return joined || undefined;
+  }
+
+  if (typeof responseMessage === 'string' && responseMessage.trim()) {
+    return responseMessage;
+  }
+
+  const message = err instanceof Error ? err.message : undefined;
+  return message?.trim() ? message : undefined;
+};
 
 const ResetPasswordPage: React.FC = () => {
   const navigate = useNavigate();
@@ -26,17 +52,17 @@ const ResetPasswordPage: React.FC = () => {
     if (!token) {
       setFeedback('error');
       setMessage('Token inválido ou expirado. Solicite uma nova recuperação.');
-      toast.error('Token inválido ou expirado.');
+      toastService.error('Token inválido ou expirado.');
       return;
     }
 
     if (!senhaValida) {
-      toast.error('A nova senha deve ter pelo menos 6 caracteres.');
+      toastService.error('A nova senha deve ter pelo menos 6 caracteres.');
       return;
     }
 
     if (!senhasConferem) {
-      toast.error('As senhas informadas não conferem.');
+      toastService.error('As senhas informadas não conferem.');
       return;
     }
 
@@ -52,17 +78,17 @@ const ResetPasswordPage: React.FC = () => {
 
       setFeedback('success');
       setMessage(response.message || 'Senha alterada com sucesso! Você já pode fazer login.');
-      toast.success('Senha redefinida com sucesso!');
+      toastService.success('Senha redefinida com sucesso!');
       setNovaSenha('');
       setConfirmacaoSenha('');
     } catch (error: unknown) {
       console.error('Erro ao redefinir senha:', error);
       const fallbackMessage =
-        (error as any)?.response?.data?.message ||
+        normalizeApiErrorMessage(error) ||
         'Token inválido ou expirado. Solicite uma nova recuperação de senha.';
       setFeedback('error');
       setMessage(fallbackMessage);
-      toast.error(fallbackMessage);
+      toastService.error(fallbackMessage);
     } finally {
       setLoading(false);
     }
@@ -70,19 +96,22 @@ const ResetPasswordPage: React.FC = () => {
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#DEEFE7] via-white to-[#DEEFE7] flex items-center justify-center px-4 py-10">
-        <div className="max-w-lg w-full bg-white rounded-2xl shadow-xl border border-[#DEEFE7] p-8 text-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-10">
+        <div className="max-w-lg w-full bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center">
+          <div className="flex items-center justify-center mb-6">
+            <Conect360Logo size="lg" variant="full" className="w-auto" />
+          </div>
           <div className="h-16 w-16 mx-auto rounded-full bg-red-50 flex items-center justify-center text-red-500 mb-4">
             <AlertCircle className="h-8 w-8" />
           </div>
           <h1 className="text-2xl font-bold text-[#002333] mb-2">Link inválido</h1>
-          <p className="text-[#4B5563] mb-6">
+          <p className="text-[#002333]/70 mb-6">
             Não encontramos um token válido de recuperação. Solicite um novo link e tente novamente.
           </p>
           <button
             type="button"
             onClick={() => navigate('/esqueci-minha-senha')}
-            className="inline-flex items-center gap-2 bg-[#159A9C] text-white font-semibold px-5 py-3 rounded-xl hover:bg-[#0F7B7D] transition-colors"
+            className="inline-flex items-center gap-2 bg-[#159A9C] text-white px-4 py-2 rounded-lg hover:bg-[#0F7B7D] transition-colors text-sm font-medium"
           >
             <ArrowLeft className="h-4 w-4" />
             Voltar para recuperar acesso
@@ -93,7 +122,7 @@ const ResetPasswordPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#DEEFE7] via-white to-[#DEEFE7] flex items-center justify-center px-4 py-10">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-10">
       <div className="max-w-lg w-full">
         <div className="mb-6">
           <button
@@ -106,15 +135,16 @@ const ResetPasswordPage: React.FC = () => {
           </button>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl border border-[#DEEFE7] p-8">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="text-center mb-8">
+            <div className="flex items-center justify-center mb-6">
+              <Conect360Logo size="lg" variant="full" className="w-auto" />
+            </div>
             <div className="h-16 w-16 mx-auto rounded-full bg-[#DEEFE7] flex items-center justify-center text-[#159A9C] mb-4">
               <KeyRound className="h-8 w-8" />
             </div>
             <h1 className="text-3xl font-bold text-[#002333] mb-2">Defina uma nova senha</h1>
-            <p className="text-[#4B5563]">
-              Crie uma senha segura para continuar acessando o Conect CRM.
-            </p>
+            <p className="text-[#002333]/70">Crie uma senha segura para continuar acessando o Conect360.</p>
           </div>
 
           {feedback && (
@@ -148,7 +178,7 @@ const ResetPasswordPage: React.FC = () => {
                   type={mostrarNovaSenha ? 'text' : 'password'}
                   value={novaSenha}
                   onChange={(event) => setNovaSenha(event.target.value)}
-                  className="w-full pr-12 pl-4 py-3 border border-[#B4BEC9] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors"
+                  className="w-full pr-12 pl-4 py-2.5 border border-[#B4BEC9] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors"
                   placeholder="Digite a nova senha"
                   autoComplete="new-password"
                   disabled={loading}
@@ -179,7 +209,7 @@ const ResetPasswordPage: React.FC = () => {
                   type={mostrarConfirmacao ? 'text' : 'password'}
                   value={confirmacaoSenha}
                   onChange={(event) => setConfirmacaoSenha(event.target.value)}
-                  className="w-full pr-12 pl-4 py-3 border border-[#B4BEC9] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors"
+                  className="w-full pr-12 pl-4 py-2.5 border border-[#B4BEC9] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors"
                   placeholder="Repita a nova senha"
                   autoComplete="new-password"
                   disabled={loading}
@@ -204,17 +234,17 @@ const ResetPasswordPage: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white font-semibold py-3 rounded-xl shadow-md hover:shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center gap-2 bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed text-sm font-medium"
             >
               {loading ? (
                 <>
-                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   <span>Salvando nova senha...</span>
                 </>
               ) : (
                 <>
                   <span>Atualizar senha</span>
-                  <KeyRound className="h-5 w-5" />
+                  <KeyRound className="h-4 w-4" />
                 </>
               )}
             </button>
