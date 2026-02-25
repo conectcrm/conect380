@@ -170,6 +170,12 @@ Preflight completo GO Full (guardrail + build + E2E criticos + permissoes):
 npm run preflight:go-live:vendas:full
 ```
 
+Workflow manual no GitHub Actions (com Postgres/Redis + Playwright):
+
+- Arquivo: `.github/workflows/vendas-go-live-preflight.yml`
+- Trigger: `workflow_dispatch`
+- Input: `mode` (`core` ou `full`)
+
 Comando para validar GO Full com arquivos reais de deploy:
 
 ```bash
