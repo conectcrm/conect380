@@ -212,6 +212,38 @@ npm run migration:run
 npm run start:dev
 ```
 
+#### Gateways de pagamento (feature gate por ambiente)
+
+Os endpoints de gateway (`/pagamentos/gateways/*`) ficam em **modo default deny em producao**.
+
+Matriz de rollout do Fluxo de Vendas (GO Core / GO Full):
+
+- `docs/features/FLUXO_VENDAS_RELEASE_FLAGS.md`
+- Guardrail automatico (baseline GO Core): `npm run validate:release:vendas:core`
+- Preflight completo GO Core: `npm run preflight:go-live:vendas:core`
+- Validacao GO Full (arquivo real de deploy):
+  `node scripts/ci/validate-sales-release-mode.mjs --mode full --frontend-env frontend-web/.env --backend-env backend/.env.production`
+
+- Sem configuracao explicita, o backend retorna `501 Not Implemented` para providers nao habilitados
+- Isso evita expor integracoes "fantasma" (ex.: service vazio) em ambiente produtivo
+
+Variaveis de ambiente (backend):
+
+```bash
+# Lista permitida de providers (separados por virgula)
+# Valores aceitos: stripe, mercado_pago, pagseguro
+PAGAMENTOS_GATEWAY_ENABLED_PROVIDERS=stripe,mercado_pago
+
+# Bypass global (usar apenas em dev/homologacao)
+PAGAMENTOS_GATEWAY_ALLOW_UNIMPLEMENTED=false
+```
+
+Comportamento:
+
+- `NODE_ENV=production` + lista vazia: bloqueia providers (501)
+- `NODE_ENV=test` + lista vazia: liberado para compatibilidade da suite automatizada
+- `PAGAMENTOS_GATEWAY_ALLOW_UNIMPLEMENTED=true`: libera todos os providers (nao usar em producao)
+
 **Portas**:
 
 - Backend: `http://localhost:3001`
@@ -363,6 +395,18 @@ npm run test:e2e
 # Coverage
 npm run test:cov
 ```
+
+#### Padrão E2E (Backend)
+
+- Use `createE2EApp(...)` de `backend/test/_support/e2e-app.helper.ts` para bootstrap de app de teste.
+- O helper centraliza:
+  - logger silencioso em teste (`NEST_LOGS_IN_TEST=false` por padrão)
+  - `ValidationPipe` padrão (`whitelist + transform`)
+  - lock de bootstrap E2E para reduzir flake por corrida de schema (`E2E_BOOTSTRAP_LOCK_IN_TEST=true`)
+- Para suites que **não** precisam de pipes globais, use:
+  - `createE2EApp(moduleFixture, { validationPipe: false })`
+- Para bootstrap manual com `Test.createTestingModule(...).compile()`, envolva com:
+  - `withE2EBootstrapLock(() => Test.createTestingModule(...).compile())`
 
 ### Frontend
 
