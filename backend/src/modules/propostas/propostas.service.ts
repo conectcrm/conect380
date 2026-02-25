@@ -968,6 +968,22 @@ export class PropostasService {
     try {
       this.logger.debug(`atualizarStatus chamado: ${JSON.stringify({ propostaId, tipoPropostaId: typeof propostaId, status, source: source || null, hasObservacoes: Boolean(observacoes) })}`);
 
+      const propostaColumns = await this.getTableColumns('propostas');
+      const legacySchema = this.isLegacyPropostasSchema(propostaColumns);
+      if (legacySchema) {
+        const propostaAtualizada = await this.atualizarProposta(
+          propostaId,
+          {
+            status: status as Proposta['status'],
+            source,
+            observacoes,
+          },
+          empresaId,
+        );
+        this.logger.log(`Status da proposta ${propostaId} atualizado para: ${status} (legacy mode)`);
+        return propostaAtualizada;
+      }
+
       const proposta = await this.propostaRepository.findOne({
         where: empresaId ? { id: propostaId, empresaId } : { id: propostaId },
       });
@@ -1001,6 +1017,39 @@ export class PropostasService {
     empresaId?: string,
   ): Promise<Proposta> {
     try {
+      const propostaColumns = await this.getTableColumns('propostas');
+      const legacySchema = this.isLegacyPropostasSchema(propostaColumns);
+
+      if (legacySchema) {
+        const propostaAtual = await this.obterProposta(propostaId, empresaId);
+        if (!propostaAtual) {
+          throw new Error(`Proposta com ID ${propostaId} nao encontrada`);
+        }
+
+        if (status === 'aprovada' || status === 'rejeitada') {
+          if (propostaAtual.status !== 'visualizada' && propostaAtual.status !== 'enviada') {
+            this.logger.warn(
+              `Transicao automatica de '${propostaAtual.status}' para '${status}' pode nao ser valida`,
+            );
+          }
+        }
+
+        const propostaAtualizada = await this.atualizarProposta(
+          propostaId,
+          {
+            status: status as Proposta['status'],
+            source,
+            observacoes,
+          },
+          empresaId,
+        );
+
+        this.logger.log(
+          `Status da proposta ${propostaId} atualizado com validacao para: ${status} (legacy mode)`,
+        );
+        return propostaAtualizada;
+      }
+
       const proposta = await this.propostaRepository.findOne({
         where: empresaId ? { id: propostaId, empresaId } : { id: propostaId },
       });
@@ -1042,6 +1091,24 @@ export class PropostasService {
     empresaId?: string,
   ): Promise<Proposta> {
     try {
+      const propostaColumns = await this.getTableColumns('propostas');
+      const legacySchema = this.isLegacyPropostasSchema(propostaColumns);
+
+      if (legacySchema) {
+        const proposta = await this.obterProposta(propostaId, empresaId);
+        if (!proposta) {
+          throw new Error(`Proposta com ID ${propostaId} nao encontrada`);
+        }
+
+        const propostaAtualizada = await this.atualizarProposta(
+          propostaId,
+          { status: 'visualizada' },
+          empresaId,
+        );
+        this.logger.log(`Proposta ${propostaId} marcada como visualizada (legacy mode)`);
+        return propostaAtualizada;
+      }
+
       const proposta = await this.propostaRepository.findOne({
         where: empresaId ? { id: propostaId, empresaId } : { id: propostaId },
       });

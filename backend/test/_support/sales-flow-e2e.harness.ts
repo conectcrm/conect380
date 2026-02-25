@@ -373,10 +373,16 @@ export class SalesFlowE2EHarness {
       });
 
     expect([200, 201]).toContain(response.status);
-    expect(response.body?.success).toBe(true);
-    expect(response.body?.data?.id).toBeTruthy();
+    if (response.body?.success === false) {
+      throw new Error(
+        `Falha ao criar contrato via API: ${String(response.body?.message || response.body?.error || 'resposta invalida')}`,
+      );
+    }
 
-    return response.body.data;
+    const contrato = response.body?.data ?? response.body;
+    expect(contrato?.id).toBeTruthy();
+
+    return contrato;
   }
 }
 

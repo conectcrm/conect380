@@ -394,21 +394,45 @@ describe('Cotacao gerar-conta-pagar (E2E)', () => {
     senhaHash: string;
     permissoes?: string;
   }) {
+    const permissaoColumnRows = await dataSource.query(
+      `
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'users'
+          AND column_name = 'permissoes'
+        LIMIT 1
+      `,
+    );
+
+    const hasPermissoesColumn = Array.isArray(permissaoColumnRows) && permissaoColumnRows.length > 0;
+
+    if (hasPermissoesColumn) {
+      await dataSource.query(
+        `
+          INSERT INTO users (id, nome, email, senha, empresa_id, role, ativo, permissoes)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `,
+        [
+          params.id,
+          params.nome,
+          params.email,
+          params.senhaHash,
+          empresaId,
+          params.role,
+          true,
+          params.permissoes || null,
+        ],
+      );
+      return;
+    }
+
     await dataSource.query(
       `
-        INSERT INTO users (id, nome, email, senha, empresa_id, role, ativo, permissoes)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        INSERT INTO users (id, nome, email, senha, empresa_id, role, ativo)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
       `,
-      [
-        params.id,
-        params.nome,
-        params.email,
-        params.senhaHash,
-        empresaId,
-        params.role,
-        true,
-        params.permissoes || null,
-      ],
+      [params.id, params.nome, params.email, params.senhaHash, empresaId, params.role, true],
     );
   }
 

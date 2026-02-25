@@ -31,30 +31,61 @@ export class ContratosService {
 
   async criarContrato(createContratoDto: CreateContratoDto, empresaId: string): Promise<Contrato> {
     try {
-      let proposta: Proposta | null = null;
+      let propostaIdVinculada: string | null = null;
 
       if (createContratoDto.propostaId) {
-        // 🔒 VALIDAÇÃO MULTI-TENANCY: Verificar se a proposta pertence à empresa
-        proposta = await this.propostaRepository.findOne({
-          where: { id: createContratoDto.propostaId },
-        });
+        // Validacao multi-tenant com lookup SQL enxuto para suportar schema legado de propostas.
+        const propostaColumnsRows: Array<{ column_name?: string }> = await this.propostaRepository.query(
+          `
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'propostas'
+          `,
+        );
+        const propostaColumns = new Set(
+          propostaColumnsRows
+            .map((row) => row.column_name)
+            .filter((columnName): columnName is string => Boolean(columnName)),
+        );
+        const empresaColumn = propostaColumns.has('empresa_id')
+          ? 'empresa_id'
+          : propostaColumns.has('empresaId')
+            ? 'empresaId'
+            : null;
 
-        if (!proposta) {
-          throw new NotFoundException('Proposta não encontrada');
+        if (!empresaColumn) {
+          throw new NotFoundException('Proposta nao encontrada');
         }
 
-        if (proposta.empresa_id !== empresaId) {
+        const propostaRows: Array<{ id?: string; empresa_id?: string }> =
+          await this.propostaRepository.query(
+            `
+              SELECT id::text AS id, "${empresaColumn}"::text AS empresa_id
+              FROM propostas
+              WHERE id::text = $1
+              LIMIT 1
+            `,
+            [createContratoDto.propostaId],
+          );
+        const proposta = propostaRows?.[0];
+
+        if (!proposta?.id) {
+          throw new NotFoundException('Proposta nao encontrada');
+        }
+
+        if (!proposta.empresa_id || proposta.empresa_id !== empresaId) {
           this.logger.warn(
             `Tentativa de criar contrato com proposta de outra empresa. ` +
-              `Empresa do token: ${empresaId}, Empresa da proposta: ${proposta.empresa_id}`,
+              `Empresa do token: ${empresaId}, Empresa da proposta: ${proposta.empresa_id || 'indefinida'}`,
           );
-          throw new ForbiddenException(
-            'Você não tem permissão para criar contrato com esta proposta',
-          );
+          throw new ForbiddenException('Voce nao tem permissao para criar contrato com esta proposta');
         }
+
+        propostaIdVinculada = proposta.id;
       }
 
-      // Gerar número único do contrato
+      // Gerar numero unico do contrato
       const numero = await this.gerarNumeroContrato();
 
       const contrato = this.contratoRepository.create({
@@ -79,7 +110,9 @@ export class ContratosService {
 
       this.logger.log(
         `Contrato criado: ${contratoAtualizado.numero}` +
-          (proposta ? ` (vinculado à proposta ${proposta.id})` : ' (sem proposta vinculada)'),
+          (propostaIdVinculada
+            ? ` (vinculado a proposta ${propostaIdVinculada})`
+            : ' (sem proposta vinculada)'),
       );
 
       return contratoAtualizado;

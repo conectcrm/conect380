@@ -22,9 +22,16 @@ interface ViewData {
   timestamp?: string;
 }
 
+interface PropostaLookup {
+  id: string;
+  numero?: string | null;
+  empresaId: string;
+}
+
 @Injectable()
 export class PortalService {
   private readonly logger = new Logger(PortalService.name);
+  private propostasColumnsCache?: Set<string>;
 
   constructor(
     private readonly propostasService: PropostasService,
@@ -108,27 +115,109 @@ export class PortalService {
   private async resolvePropostaEntity(
     propostaIdOuNumero: string,
     empresaId?: string,
-  ): Promise<PropostaEntity | null> {
+  ): Promise<PropostaLookup | null> {
     if (!propostaIdOuNumero) return null;
 
+    if (!this.propostasColumnsCache) {
+      const rows: Array<{ column_name?: string }> = await this.propostaRepository.query(
+        `
+          SELECT column_name
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'propostas'
+        `,
+      );
+      this.propostasColumnsCache = new Set(
+        rows
+          .map((row) => row.column_name)
+          .filter((columnName): columnName is string => Boolean(columnName)),
+      );
+    }
+
+    const columns = this.propostasColumnsCache;
+    const numeroColumn = columns.has('numero');
+    const empresaColumn = columns.has('empresa_id')
+      ? 'empresa_id'
+      : columns.has('empresaId')
+        ? 'empresaId'
+        : null;
+
+    const selectNumero = numeroColumn ? `"numero"` : 'NULL';
+    const selectEmpresa = empresaColumn ? `"${empresaColumn}"` : 'NULL';
+
+    const buscarPorId = async (): Promise<PropostaLookup | null> => {
+      const params: unknown[] = [propostaIdOuNumero];
+      let whereClause = 'id::text = $1';
+
+      if (empresaId) {
+        if (!empresaColumn) return null;
+        params.push(empresaId);
+        whereClause += ` AND "${empresaColumn}" = $2`;
+      }
+
+      const rows: Array<{ id?: string; numero?: string | null; empresa_id?: string }> =
+        await this.propostaRepository.query(
+          `
+            SELECT id::text AS id, ${selectNumero} AS numero, ${selectEmpresa}::text AS empresa_id
+            FROM propostas
+            WHERE ${whereClause}
+            LIMIT 1
+          `,
+          params,
+        );
+
+      if (!rows?.[0]?.id || !rows?.[0]?.empresa_id) return null;
+      return {
+        id: rows[0].id,
+        numero: rows[0].numero ?? null,
+        empresaId: rows[0].empresa_id,
+      };
+    };
+
+    const buscarPorNumero = async (): Promise<PropostaLookup | null> => {
+      if (!numeroColumn) return null;
+      const params: unknown[] = [propostaIdOuNumero];
+      let whereClause = 'numero = $1';
+
+      if (empresaId) {
+        if (!empresaColumn) return null;
+        params.push(empresaId);
+        whereClause += ` AND "${empresaColumn}" = $2`;
+      }
+
+      const rows: Array<{ id?: string; numero?: string | null; empresa_id?: string }> =
+        await this.propostaRepository.query(
+          `
+            SELECT id::text AS id, ${selectNumero} AS numero, ${selectEmpresa}::text AS empresa_id
+            FROM propostas
+            WHERE ${whereClause}
+            LIMIT 1
+          `,
+          params,
+        );
+
+      if (!rows?.[0]?.id || !rows?.[0]?.empresa_id) return null;
+      return {
+        id: rows[0].id,
+        numero: rows[0].numero ?? null,
+        empresaId: rows[0].empresa_id,
+      };
+    };
+
     if (this.isUuid(propostaIdOuNumero)) {
-      const byId = await this.propostaRepository.findOne({
-        where: empresaId ? { id: propostaIdOuNumero, empresaId } : { id: propostaIdOuNumero },
-      });
+      const byId = await buscarPorId();
       if (byId) return byId;
     }
 
-    return this.propostaRepository.findOne({
-      where: empresaId ? { numero: propostaIdOuNumero, empresaId } : { numero: propostaIdOuNumero },
-    });
+    return buscarPorNumero();
   }
 
   private async persistTokenForProposta(
     rawToken: string,
-    proposta: PropostaEntity,
+    proposta: PropostaLookup,
     expiresInDays = 30,
   ): Promise<{ token: string; expiresAt: string }> {
-    const empresaId = proposta.empresaId || (proposta as any).empresa_id;
+    const empresaId = proposta.empresaId;
     if (!empresaId) {
       throw new Error('Proposta sem empresa_id. Nao e possivel gerar token de portal com seguranca.');
     }
