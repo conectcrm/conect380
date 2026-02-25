@@ -67,14 +67,54 @@ jobs:
             backend/package-lock.json
             frontend-web/package-lock.json
 
+      - name: Endurecer rede do npm
+        run: |
+          npm config set fetch-retries 5
+          npm config set fetch-retry-factor 2
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+
       - name: Instalar dependencias root
-        run: npm ci
+        run: |
+          for tentativa in 1 2 3; do
+            if npm ci; then
+              exit 0
+            fi
+            if [ "$tentativa" -eq 3 ]; then
+              echo "Falha ao instalar dependencias root apos 3 tentativas."
+              exit 1
+            fi
+            echo "Tentativa ${tentativa}/3 falhou para dependencias root. Repetindo em 15s..."
+            sleep 15
+          done
 
       - name: Instalar dependencias backend
-        run: npm --prefix backend ci
+        run: |
+          for tentativa in 1 2 3; do
+            if npm --prefix backend ci; then
+              exit 0
+            fi
+            if [ "$tentativa" -eq 3 ]; then
+              echo "Falha ao instalar dependencias backend apos 3 tentativas."
+              exit 1
+            fi
+            echo "Tentativa ${tentativa}/3 falhou para dependencias backend. Repetindo em 15s..."
+            sleep 15
+          done
 
       - name: Instalar dependencias frontend
-        run: npm --prefix frontend-web ci
+        run: |
+          for tentativa in 1 2 3; do
+            if npm --prefix frontend-web ci; then
+              exit 0
+            fi
+            if [ "$tentativa" -eq 3 ]; then
+              echo "Falha ao instalar dependencias frontend apos 3 tentativas."
+              exit 1
+            fi
+            echo "Tentativa ${tentativa}/3 falhou para dependencias frontend. Repetindo em 15s..."
+            sleep 15
+          done
 
       - name: Aplicar migrations na base de teste
         run: npm --prefix backend run migration:run
