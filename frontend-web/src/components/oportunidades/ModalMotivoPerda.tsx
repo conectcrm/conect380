@@ -14,6 +14,7 @@ interface ModalMotivoPerdaProps {
   tituloOportunidade: string;
   valorOportunidade?: number;
   loading?: boolean;
+  errorMessage?: string | null;
 }
 
 // Configuração dos motivos de perda com ícones e descrições
@@ -75,6 +76,7 @@ const ModalMotivoPerda: React.FC<ModalMotivoPerdaProps> = ({
   tituloOportunidade,
   valorOportunidade,
   loading = false,
+  errorMessage = null,
 }) => {
   const [motivoPerda, setMotivoPerda] = useState<MotivoPerda | ''>('');
   const [motivoPerdaDetalhes, setMotivoPerdaDetalhes] = useState('');
@@ -107,7 +109,10 @@ const ModalMotivoPerda: React.FC<ModalMotivoPerdaProps> = ({
   const motivoSelecionado = MOTIVOS_PERDA_CONFIG.find((m) => m.value === motivoPerda);
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div
+      data-testid="modal-motivo-perda"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+    >
       <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header - Vermelho para indicar perda */}
         <div className="bg-gradient-to-br from-red-600 to-red-700 text-white p-6 rounded-t-2xl">
@@ -160,6 +165,7 @@ const ModalMotivoPerda: React.FC<ModalMotivoPerdaProps> = ({
               {MOTIVOS_PERDA_CONFIG.map((motivo) => (
                 <button
                   key={motivo.value}
+                  data-testid={`modal-motivo-perda-option-${motivo.value}`}
                   type="button"
                   onClick={() => setMotivoPerda(motivo.value)}
                   disabled={loading}
@@ -274,6 +280,17 @@ const ModalMotivoPerda: React.FC<ModalMotivoPerdaProps> = ({
               de análise de perdas, identificar padrões e melhorar nossa taxa de conversão.
             </p>
           </div>
+
+          {errorMessage && (
+            <div
+              data-testid="modal-motivo-perda-error"
+              className="bg-red-50 rounded-lg p-3 border border-red-200"
+            >
+              <p className="text-sm text-red-800">
+                <strong>Nao foi possivel registrar a perda:</strong> {errorMessage}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -286,6 +303,7 @@ const ModalMotivoPerda: React.FC<ModalMotivoPerdaProps> = ({
             Cancelar
           </button>
           <button
+            data-testid="modal-motivo-perda-confirmar"
             onClick={handleConfirmar}
             disabled={!isFormValid || loading}
             className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"

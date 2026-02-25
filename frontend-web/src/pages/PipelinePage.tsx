@@ -210,10 +210,12 @@ const PipelinePage: React.FC = () => {
     novoEstagio: EstagioOportunidade;
   } | null>(null);
   const [loadingMudancaEstagio, setLoadingMudancaEstagio] = useState(false);
+  const [erroMudancaEstagio, setErroMudancaEstagio] = useState<string | null>(null);
 
   // ✅ Estados para Modal de Motivo de Perda
   const [showModalMotivoPerda, setShowModalMotivoPerda] = useState(false);
   const [oportunidadeParaPerder, setOportunidadeParaPerder] = useState<Oportunidade | null>(null);
+  const [erroMotivoPerda, setErroMotivoPerda] = useState<string | null>(null);
   const [showModalDeletar, setShowModalDeletar] = useState(false);
   const [oportunidadeDeletar, setOportunidadeDeletar] = useState<Oportunidade | null>(null);
   const [loadingDeletar, setLoadingDeletar] = useState(false);
@@ -403,7 +405,7 @@ const PipelinePage: React.FC = () => {
       toastService.success('Proposta gerada com sucesso!');
 
       // Redirecionar para a página de propostas com a proposta recém-criada
-      navigate(`/comercial/propostas?proposta=${response.proposta.id}`);
+      navigate(`/vendas/propostas?proposta=${response.proposta.id}`);
     } catch (err: unknown) {
       console.error('Erro ao gerar proposta:', err);
       const errorMessage = err instanceof Error ? err.message : 'Erro ao gerar proposta';
@@ -732,6 +734,7 @@ const PipelinePage: React.FC = () => {
     // ✅ Se for movido para PERDIDO, abrir modal de motivo de perda
     if (novoEstagio === EstagioOportunidade.PERDIDO) {
       setOportunidadeParaPerder(draggedItem);
+      setErroMotivoPerda(null);
       setShowModalMotivoPerda(true);
       return;
     }
@@ -741,7 +744,16 @@ const PipelinePage: React.FC = () => {
       oportunidade: draggedItem,
       novoEstagio: novoEstagio,
     });
+    setErroMudancaEstagio(null);
     setShowModalMudancaEstagio(true);
+  };
+
+  const extrairMensagemErroApi = (err: any, fallback: string) => {
+    const message = err?.response?.data?.message;
+    if (Array.isArray(message)) return message.join(', ');
+    if (typeof message === 'string' && message.trim()) return message;
+    if (err instanceof Error && err.message) return err.message;
+    return fallback;
   };
 
   // Confirmar mudança de estágio com motivo registrado
@@ -754,6 +766,8 @@ const PipelinePage: React.FC = () => {
 
     try {
       setLoadingMudancaEstagio(true);
+      setErroMotivoPerda(null);
+      setErroMudancaEstagio(null);
 
       const { oportunidade, novoEstagio } = mudancaEstagioData;
 
@@ -801,13 +815,16 @@ const PipelinePage: React.FC = () => {
       setShowModalMudancaEstagio(false);
       setMudancaEstagioData(null);
       setDraggedItem(null);
+      setErroMudancaEstagio(null);
 
       // Toast de sucesso (você pode usar uma lib de toast aqui)
       toastService.success('Oportunidade movida com sucesso!');
     } catch (err) {
       console.error('Erro ao mover oportunidade:', err);
-      toastService.error('Erro ao mover oportunidade');
-      setError('Erro ao mover oportunidade');
+      const errorMessage = extrairMensagemErroApi(err, 'Erro ao mover oportunidade');
+      toastService.error(errorMessage);
+      setErroMudancaEstagio(errorMessage);
+      setError(errorMessage);
     } finally {
       setLoadingMudancaEstagio(false);
     }
@@ -851,20 +868,18 @@ const PipelinePage: React.FC = () => {
       setShowModalMotivoPerda(false);
       setOportunidadeParaPerder(null);
       setDraggedItem(null);
+      setErroMotivoPerda(null);
 
       toastService.success('Oportunidade marcada como perdida com sucesso!');
     } catch (err: any) {
       console.error('Erro ao marcar oportunidade como perdida:', err);
-
-      // Verificar se é erro de validação (motivo obrigatório)
-      const errorMessage = err?.response?.data?.message;
-      if (Array.isArray(errorMessage)) {
-        toastService.error(errorMessage.join(', '));
-      } else {
-        toastService.error(errorMessage || 'Erro ao marcar oportunidade como perdida');
-      }
-
-      setError('Erro ao marcar oportunidade como perdida');
+      const errorMessage = extrairMensagemErroApi(
+        err,
+        'Erro ao marcar oportunidade como perdida',
+      );
+      toastService.error(errorMessage);
+      setErroMotivoPerda(errorMessage);
+      setError(errorMessage);
     } finally {
       setLoadingMudancaEstagio(false);
     }
@@ -1525,6 +1540,7 @@ const PipelinePage: React.FC = () => {
           {agrupadoPorEstagio.map((estagio) => (
             <div
               key={estagio.id}
+              data-testid={`pipeline-column-${estagio.id}`}
               className="flex-shrink-0 w-[min(20rem,calc(100vw-6rem))] sm:w-80"
               onDragOver={handleDragOver}
               onDrop={() => handleDrop(estagio.id)}
@@ -1615,6 +1631,7 @@ const PipelinePage: React.FC = () => {
                     return (
                       <div
                         key={oportunidade.id}
+                        data-testid={`pipeline-card-${oportunidade.id}`}
                         draggable
                         onDragStart={() => handleDragStart(oportunidade)}
                         onClick={() => handleVerDetalhes(oportunidade)}
@@ -2505,12 +2522,14 @@ const PipelinePage: React.FC = () => {
             setShowModalMudancaEstagio(false);
             setMudancaEstagioData(null);
             setDraggedItem(null);
+            setErroMudancaEstagio(null);
           }}
           onConfirm={handleConfirmarMudancaEstagio}
           estagioOrigem={mudancaEstagioData.oportunidade.estagio}
           estagioDestino={mudancaEstagioData.novoEstagio}
           tituloOportunidade={mudancaEstagioData.oportunidade.titulo}
           loading={loadingMudancaEstagio}
+          errorMessage={erroMudancaEstagio}
         />
       )}
 
@@ -2522,11 +2541,13 @@ const PipelinePage: React.FC = () => {
             setShowModalMotivoPerda(false);
             setOportunidadeParaPerder(null);
             setDraggedItem(null);
+            setErroMotivoPerda(null);
           }}
           onConfirm={handleConfirmarPerda}
           tituloOportunidade={oportunidadeParaPerder.titulo}
           valorOportunidade={oportunidadeParaPerder.valor}
           loading={loadingMudancaEstagio}
+          errorMessage={erroMotivoPerda}
         />
       )}
 
