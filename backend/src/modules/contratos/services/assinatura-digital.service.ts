@@ -18,6 +18,7 @@ import * as crypto from 'crypto';
 @Injectable()
 export class AssinaturaDigitalService {
   private readonly logger = new Logger(AssinaturaDigitalService.name);
+  private propostaRelationEnabled: boolean | null = null;
 
   constructor(
     @InjectRepository(AssinaturaContrato)
@@ -29,10 +30,15 @@ export class AssinaturaDigitalService {
 
   async criarAssinatura(createAssinaturaDto: CreateAssinaturaDto): Promise<AssinaturaContrato> {
     try {
+      const contratoRelations = ['usuarioResponsavel'];
+      if (await this.canLoadPropostaRelation()) {
+        contratoRelations.unshift('proposta');
+      }
+
       // Verificar se o contrato existe e est aguardando assinatura
       const contrato = await this.contratoRepository.findOne({
         where: { id: createAssinaturaDto.contratoId },
-        relations: ['proposta', 'usuarioResponsavel'],
+        relations: contratoRelations,
       });
 
       if (!contrato) {
@@ -179,9 +185,14 @@ export class AssinaturaDigitalService {
   }
 
   async buscarAssinaturaPorToken(token: string): Promise<AssinaturaContrato> {
+    const assinaturaRelations = ['contrato', 'usuario'];
+    if (await this.canLoadPropostaRelation()) {
+      assinaturaRelations.push('contrato.proposta');
+    }
+
     const assinatura = await this.assinaturaRepository.findOne({
       where: { tokenValidacao: token },
-      relations: ['contrato', 'contrato.proposta', 'usuario'],
+      relations: assinaturaRelations,
     });
 
     if (!assinatura) {
@@ -236,6 +247,26 @@ export class AssinaturaDigitalService {
 
       this.logger.log(`Contrato ${contrato.numero} marcado como assinado`);
     }
+  }
+
+  private async canLoadPropostaRelation(): Promise<boolean> {
+    if (this.propostaRelationEnabled !== null) {
+      return this.propostaRelationEnabled;
+    }
+
+    const rows: Array<{ column_name?: string }> = await this.contratoRepository.query(
+      `
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'propostas'
+          AND column_name = 'cliente'
+        LIMIT 1
+      `,
+    );
+
+    this.propostaRelationEnabled = Array.isArray(rows) && rows.length > 0;
+    return this.propostaRelationEnabled;
   }
 
   private gerarTokenValidacao(): string {

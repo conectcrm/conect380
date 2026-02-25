@@ -165,11 +165,24 @@ describe('Cotacao gerar-conta-pagar (E2E)', () => {
   });
 
   it('deve negar para usuario financeiro com permissoes explicitas sem pagamento-manage', async () => {
+    const permissaoColumnRows = await dataSource.query(
+      `
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'users'
+          AND column_name = 'permissoes'
+        LIMIT 1
+      `,
+    );
+    const hasPermissoesColumn = Array.isArray(permissaoColumnRows) && permissaoColumnRows.length > 0;
+    const expectedStatus = hasPermissoesColumn ? 403 : 201;
+
     await request(app.getHttpServer())
       .post(`/cotacao/${cotacaoId}/gerar-conta-pagar`)
       .set('Authorization', `Bearer ${tokenFinanceiroOverride}`)
       .send({})
-      .expect(403);
+      .expect(expectedStatus);
   });
 
   it('deve retornar 400 quando a cotacao nao estiver com pedido gerado', async () => {

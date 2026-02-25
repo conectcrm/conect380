@@ -761,25 +761,42 @@ export class DashboardService {
     regiao?: string,
     empresaId?: string,
   ): Promise<{ valor: number; quantidade: number; propostas: string[] }> {
-    const whereConditions: any = {
-      status: 'enviada',
-      ...(empresaId ? { empresaId } : {}),
-    };
+    const aggregateQuery = this.propostaRepository
+      .createQueryBuilder('proposta')
+      .select('COUNT(proposta.id)', 'quantidade')
+      // Usa "valor" para compatibilidade com schema legado (sem depender de colunas JSON).
+      .addSelect('COALESCE(SUM(proposta.valor), 0)', 'valor')
+      .where('proposta.status = :status', { status: 'enviada' });
 
-    if (vendedorId) {
-      whereConditions.vendedor_id = vendedorId;
+    if (empresaId) {
+      aggregateQuery.andWhere('proposta.empresaId = :empresaId', { empresaId });
     }
 
-    const propostas = await this.propostaRepository.find({ where: whereConditions });
+    if (vendedorId) {
+      aggregateQuery.andWhere('proposta.vendedor_id = :vendedorId', { vendedorId });
+    }
 
-    // Correção: validar e converter total para number, evitando valores quebrados
-    const valor = propostas.reduce((acc, p) => {
-      const total = parseFloat(p.total?.toString() || '0') || 0;
-      return acc + total;
-    }, 0);
+    const aggregate = await aggregateQuery.getRawOne<{ quantidade?: string; valor?: string }>();
+    const quantidade = Number(aggregate?.quantidade || 0);
+    const valor = Number(aggregate?.valor || 0);
 
-    const quantidade = propostas.length;
-    const propostasIds = propostas.slice(0, 5).map((p) => p.numero);
+    const rowsQuery = this.propostaRepository
+      .createQueryBuilder('proposta')
+      .select('proposta.numero', 'numero')
+      .where('proposta.status = :status', { status: 'enviada' })
+      .orderBy('proposta.criadaEm', 'DESC')
+      .limit(5);
+
+    if (empresaId) {
+      rowsQuery.andWhere('proposta.empresaId = :empresaId', { empresaId });
+    }
+
+    if (vendedorId) {
+      rowsQuery.andWhere('proposta.vendedor_id = :vendedorId', { vendedorId });
+    }
+
+    const propostasRows = await rowsQuery.getRawMany<{ numero?: string }>();
+    const propostasIds = propostasRows.map((row) => row?.numero).filter(Boolean) as string[];
 
     return { valor, quantidade, propostas: propostasIds };
   }
@@ -1191,3 +1208,4 @@ export class DashboardService {
     return ['Todas', 'Norte', 'Nordeste', 'Centro-Oeste', 'Sudeste', 'Sul'];
   }
 }
+

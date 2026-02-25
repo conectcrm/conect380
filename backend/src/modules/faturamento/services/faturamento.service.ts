@@ -11,6 +11,7 @@ import { EmailIntegradoService } from '../../propostas/email-integrado.service';
 @Injectable()
 export class FaturamentoService {
   private readonly logger = new Logger(FaturamentoService.name);
+  private propostaRelationEnabled: boolean | null = null;
 
   constructor(
     @InjectRepository(Fatura)
@@ -32,7 +33,6 @@ export class FaturamentoService {
         // x" MULTI-TENANCY: Validar que contrato pertence  empresa
         contrato = await this.contratoRepository.findOne({
           where: { id: createFaturaDto.contratoId, empresa_id: empresaId },
-          relations: ['proposta'],
         });
 
         if (!contrato) {
@@ -92,7 +92,6 @@ export class FaturamentoService {
       // x" MULTI-TENANCY: Validar que contrato pertence  empresa
       const contrato = await this.contratoRepository.findOne({
         where: { id: gerarFaturaDto.contratoId, empresa_id: empresaId },
-        relations: ['proposta'],
       });
 
       if (!contrato) {
@@ -240,16 +239,21 @@ export class FaturamentoService {
     };
 
     // x MULTI-TENANCY: Filtrar por empresa_id
+    const includePropostaRelation = await this.canLoadPropostaRelation();
+
     const queryBuilder = this.faturaRepository
       .createQueryBuilder('fatura')
       .leftJoinAndSelect('fatura.contrato', 'contrato')
-      .leftJoinAndSelect('contrato.proposta', 'proposta')
       .leftJoinAndSelect('fatura.cliente', 'cliente')
       .leftJoinAndSelect('fatura.usuarioResponsavel', 'usuario')
       .leftJoinAndSelect('fatura.itens', 'itens')
       .leftJoinAndSelect('fatura.pagamentos', 'pagamentos')
       .where('fatura.ativo = :ativo', { ativo: true })
       .andWhere('fatura.empresa_id = :empresaId', { empresaId });
+
+    if (includePropostaRelation) {
+      queryBuilder.leftJoinAndSelect('contrato.proposta', 'proposta');
+    }
 
     aplicarFiltros(queryBuilder);
 
@@ -288,17 +292,15 @@ export class FaturamentoService {
   }
 
   async buscarFaturaPorId(id: number, empresaId: string): Promise<Fatura> {
+    const relations = ['contrato', 'usuarioResponsavel', 'itens', 'pagamentos', 'cliente'];
+    if (await this.canLoadPropostaRelation()) {
+      relations.splice(1, 0, 'contrato.proposta');
+    }
+
     // x" MULTI-TENANCY: Filtrar por empresa_id
     const fatura = await this.faturaRepository.findOne({
       where: { id, empresaId, ativo: true },
-      relations: [
-        'contrato',
-        'contrato.proposta',
-        'usuarioResponsavel',
-        'itens',
-        'pagamentos',
-        'cliente',
-      ],
+      relations,
     });
 
     if (!fatura) {
@@ -309,17 +311,15 @@ export class FaturamentoService {
   }
 
   async buscarFaturaPorNumero(numero: string, empresaId: string): Promise<any> {
+    const relations = ['contrato', 'usuarioResponsavel', 'itens', 'pagamentos', 'cliente'];
+    if (await this.canLoadPropostaRelation()) {
+      relations.splice(1, 0, 'contrato.proposta');
+    }
+
     // x" MULTI-TENANCY: Filtrar por empresa_id
     const fatura = await this.faturaRepository.findOne({
       where: { numero, empresaId, ativo: true },
-      relations: [
-        'contrato',
-        'contrato.proposta',
-        'usuarioResponsavel',
-        'itens',
-        'pagamentos',
-        'cliente',
-      ],
+      relations,
     });
 
     if (!fatura) {
@@ -529,6 +529,26 @@ export class FaturamentoService {
 
       return false;
     }
+  }
+
+  private async canLoadPropostaRelation(): Promise<boolean> {
+    if (this.propostaRelationEnabled !== null) {
+      return this.propostaRelationEnabled;
+    }
+
+    const rows: Array<{ column_name?: string }> = await this.faturaRepository.query(
+      `
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'propostas'
+          AND column_name = 'cliente'
+        LIMIT 1
+      `,
+    );
+
+    this.propostaRelationEnabled = Array.isArray(rows) && rows.length > 0;
+    return this.propostaRelationEnabled;
   }
 
   private calcularValorTotalItens(itens: any[]): number {

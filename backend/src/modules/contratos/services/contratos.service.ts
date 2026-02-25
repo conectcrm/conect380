@@ -17,6 +17,7 @@ import { AssinaturaDigitalService } from './assinatura-digital.service';
 @Injectable()
 export class ContratosService {
   private readonly logger = new Logger(ContratosService.name);
+  private propostaRelationEnabled: boolean | null = null;
 
   constructor(
     @InjectRepository(Contrato)
@@ -162,28 +163,38 @@ export class ContratosService {
   }
 
   async buscarContratoPorId(id: number, empresaId: string): Promise<Contrato> {
-    // 🔒 MULTI-TENANCY: Filtrar por empresa_id
+    const relations = ['usuarioResponsavel', 'assinaturas', 'assinaturas.usuario'];
+    if (await this.canLoadPropostaRelation()) {
+      relations.unshift('proposta');
+    }
+
+    // MULTI-TENANCY: Filtrar por empresa_id
     const contrato = await this.contratoRepository.findOne({
       where: { id, empresa_id: empresaId, ativo: true },
-      relations: ['proposta', 'usuarioResponsavel', 'assinaturas', 'assinaturas.usuario'],
+      relations,
     });
 
     if (!contrato) {
-      throw new NotFoundException('Contrato não encontrado');
+      throw new NotFoundException('Contrato nao encontrado');
     }
 
     return contrato;
   }
 
   async buscarContratoPorNumero(numero: string, empresaId: string): Promise<Contrato> {
-    // 🔒 MULTI-TENANCY: Filtrar por empresa_id
+    const relations = ['usuarioResponsavel', 'assinaturas', 'assinaturas.usuario'];
+    if (await this.canLoadPropostaRelation()) {
+      relations.unshift('proposta');
+    }
+
+    // MULTI-TENANCY: Filtrar por empresa_id
     const contrato = await this.contratoRepository.findOne({
       where: { numero, empresa_id: empresaId, ativo: true },
-      relations: ['proposta', 'usuarioResponsavel', 'assinaturas', 'assinaturas.usuario'],
+      relations,
     });
 
     if (!contrato) {
-      throw new NotFoundException('Contrato não encontrado');
+      throw new NotFoundException('Contrato nao encontrado');
     }
 
     return contrato;
@@ -319,4 +330,25 @@ export class ContratosService {
       .andWhere('status = :status', { status: StatusAssinatura.PENDENTE })
       .execute();
   }
+
+  private async canLoadPropostaRelation(): Promise<boolean> {
+    if (this.propostaRelationEnabled !== null) {
+      return this.propostaRelationEnabled;
+    }
+
+    const rows: Array<{ column_name?: string }> = await this.propostaRepository.query(
+      `
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'propostas'
+          AND column_name = 'cliente'
+        LIMIT 1
+      `,
+    );
+
+    this.propostaRelationEnabled = Array.isArray(rows) && rows.length > 0;
+    return this.propostaRelationEnabled;
+  }
 }
+

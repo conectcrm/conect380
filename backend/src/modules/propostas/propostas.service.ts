@@ -145,6 +145,27 @@ export class PropostasService {
     return columns;
   }
 
+  private extractQueryRows<T = any>(result: unknown): T[] {
+    if (!result) {
+      return [];
+    }
+
+    if (Array.isArray(result)) {
+      // Some pg/typeorm paths return [rows, rowCount] for write queries.
+      if (result.length === 2 && Array.isArray(result[0]) && typeof result[1] === 'number') {
+        return result[0] as T[];
+      }
+      return result as T[];
+    }
+
+    const maybeObject = result as { rows?: unknown };
+    if (Array.isArray(maybeObject?.rows)) {
+      return maybeObject.rows as T[];
+    }
+
+    return [];
+  }
+
   private isLegacyPropostasSchema(columns: Set<string>): boolean {
     return !columns.has('cliente');
   }
@@ -250,7 +271,7 @@ export class PropostasService {
     }
 
     const placeholders = insertValues.map((_, index) => `$${index + 1}`).join(', ');
-    const result: Array<{ id: string }> = await this.propostaRepository.query(
+    const resultRaw = await this.propostaRepository.query(
       `
         INSERT INTO oportunidades (${insertColumns.map((column) => `"${column}"`).join(', ')})
         VALUES (${placeholders})
@@ -258,7 +279,7 @@ export class PropostasService {
       `,
       insertValues,
     );
-
+    const result = this.extractQueryRows<{ id: string }>(resultRaw);
     return result?.[0]?.id || randomUUID();
   }
 
@@ -644,7 +665,7 @@ export class PropostasService {
         const createdColumn = propostaColumns.has('criado_em') ? 'criado_em' : 'criadaEm';
         const updatedColumn = propostaColumns.has('atualizado_em') ? 'atualizado_em' : 'atualizadaEm';
 
-        const rows: any[] = await this.propostaRepository.query(
+        const rowsRaw = await this.propostaRepository.query(
           `
             INSERT INTO propostas (${insertColumns.map((column) => `"${column}"`).join(', ')})
             VALUES (${placeholders})
@@ -673,6 +694,7 @@ export class PropostasService {
           `,
           insertValues,
         );
+        const rows = this.extractQueryRows<any>(rowsRaw);
 
         return this.buildLegacyInterface(
           rows?.[0],
@@ -813,7 +835,7 @@ export class PropostasService {
           whereClause += ` AND empresa_id = $${idx++}`;
         }
 
-        const updateResult: Array<{ id: string }> = await this.propostaRepository.query(
+        const updateResultRaw = await this.propostaRepository.query(
           `
             UPDATE propostas
             SET ${setClauses.join(', ')}
@@ -822,6 +844,7 @@ export class PropostasService {
           `,
           params,
         );
+        const updateResult = this.extractQueryRows<{ id: string }>(updateResultRaw);
 
         if (!updateResult?.[0]?.id) {
           throw new Error(`Proposta com ID ${id} nao encontrada`);

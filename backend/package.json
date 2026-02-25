@@ -35,6 +35,7 @@
     "test:e2e:contas-pagar": "jest --config ./test/jest-e2e.json --runInBand ./financeiro/contas-pagar.e2e-spec.ts",
     "test:e2e:contas-pagar:local": "powershell -Command \"$env:DATABASE_HOST='localhost'; $env:DATABASE_PORT='5433'; $env:DATABASE_USERNAME='postgres'; $env:DATABASE_PASSWORD='postgres'; $env:DATABASE_NAME='conectcrm'; npm run test:e2e:contas-pagar\"",
     "test:e2e:vendas": "jest --config ./test/jest-e2e.json --runInBand --forceExit ./propostas/portal-token-core.e2e-spec.ts ./propostas/contratos-fluxo.e2e-spec.ts ./propostas/faturamento-pagamentos-gateway.e2e-spec.ts",
+    "test:e2e:vendas:permissoes": "jest --config ./test/jest-e2e.json --runInBand --forceExit ./permissoes/perfis-acesso-vendas.e2e-spec.ts",
     "migration:generate": "typeorm migration:generate -d ormconfig.js",
     "migration:create": "typeorm migration:create",
     "migration:run": "typeorm migration:run -d ormconfig.js -t each",
