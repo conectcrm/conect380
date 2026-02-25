@@ -268,7 +268,7 @@ Verify Token:          ✅ DEFINIDO
 
 ---
 
-## � **PROBLEMAS COMUNS**
+## **PROBLEMAS COMUNS**
 
 ### **Erro: "Invalid OAuth access token"**
 - ❌ Token expirado (use permanente, não temporário)

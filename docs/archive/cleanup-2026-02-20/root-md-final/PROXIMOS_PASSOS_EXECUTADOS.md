@@ -297,7 +297,7 @@ Executamos com sucesso a **Fase 1: Prioridade Alta** da correção de posicionam
 4. COMUNICADO_ATUALIZACAO_POSICIONAMENTO.md ⭐⭐
    └─ Para todo o time (contexto)
 
-5. CORRECAO_DOCUMENTACAO_CONCLUIDA.md ⭐⭐
+5. RELATORIO_DOCUMENTACAO_CONCLUIDA.md ⭐⭐
    └─ O que mudou e por quê
 
 6. docs/INDICE_DOCUMENTACAO.md ⭐

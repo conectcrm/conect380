@@ -19,8 +19,6 @@ import {
 } from 'lucide-react';
 import { cotacaoService } from '../../services/cotacaoService';
 import { toastService } from '../../services/toastService';
-import { fornecedorService } from '../../services/fornecedorService';
-import { usuariosService } from '../../services/usuariosService';
 import { useAuth } from '../../hooks/useAuth';
 import MoneyInput from '../common/MoneyInput';
 import {
@@ -150,14 +148,9 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
   const watchedItens = watch('itens');
   const watchedTags = watch('tags');
 
-  // Carregar fornecedores
+  // Carregar metadata de criacao/edicao (fornecedores + aprovadores)
   useEffect(() => {
-    carregarFornecedores();
-  }, []);
-
-  // Carregar usuários (potenciais aprovadores)
-  useEffect(() => {
-    carregarUsuarios();
+    carregarMetadataCriacao();
   }, []);
 
   // Preencher dados para edição
@@ -208,28 +201,18 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
     }
   }, [cotacao, isEditing, reset]);
 
-  const carregarFornecedores = async () => {
+  const carregarMetadataCriacao = async () => {
     setLoadingFornecedores(true);
+    setLoadingUsuarios(true);
     try {
-      const fornecedoresData = await fornecedorService.buscarFornecedores({ ativo: true });
-      setFornecedores(fornecedoresData);
+      const metadata = await cotacaoService.buscarMetadataCriacao();
+      setFornecedores(metadata.fornecedores || []);
+      setUsuarios(metadata.aprovadores || []);
     } catch (error) {
-      console.error('Erro ao carregar fornecedores:', error);
-      toastService.error('Erro ao carregar fornecedores');
+      console.error('Erro ao carregar metadata da cotação:', error);
+      toastService.error('Erro ao carregar fornecedores e aprovadores');
     } finally {
       setLoadingFornecedores(false);
-    }
-  };
-
-  const carregarUsuarios = async () => {
-    try {
-      setLoadingUsuarios(true);
-      const response = await usuariosService.listarUsuarios({ ativo: true });
-      setUsuarios(response.usuarios || []);
-    } catch (error) {
-      console.error('Erro ao carregar usuários:', error);
-      toastService.error('Erro ao carregar usuários');
-    } finally {
       setLoadingUsuarios(false);
     }
   };
@@ -338,33 +321,49 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
 
   const getPrioridadeColor = (prioridade: PrioridadeCotacao) => {
     const colors = {
-      baixa: 'bg-green-100 text-green-800',
-      media: 'bg-yellow-100 text-yellow-800',
-      alta: 'bg-orange-100 text-orange-800',
+      baixa: 'bg-gray-100 text-gray-800',
+      media: 'bg-blue-100 text-blue-800',
+      alta: 'bg-yellow-100 text-yellow-800',
       urgente: 'bg-red-100 text-red-800',
     };
     return colors[prioridade] || colors.media;
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg sm:rounded-xl shadow-2xl w-[calc(100%-2rem)] sm:w-[600px] md:w-[700px] lg:w-[900px] xl:w-[1000px] max-w-[1100px] max-h-[90vh] overflow-hidden flex flex-col">
+    <div
+      className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-[#0F172A]/35 p-4 backdrop-blur-sm sm:items-center"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-cadastro-cotacao-title"
+    >
+      <div
+        className="flex max-h-[92vh] w-[calc(100%-2rem)] max-w-[1100px] flex-col overflow-hidden rounded-2xl border border-[#DCE8EC] bg-white shadow-[0_24px_70px_-28px_rgba(15,57,74,0.45)] sm:w-[600px] md:w-[700px] lg:w-[900px] xl:w-[1000px]"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-[#159A9C]">
+        <div className="flex items-center justify-between border-b border-[#E1EAEE] bg-white px-5 py-4 sm:px-6">
           <div className="flex items-center space-x-3">
-            <FileText className="w-6 h-6 text-white" />
-            <h2 className="text-xl font-semibold text-white">
+            <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[#ECF7F3] text-[#159A9C]">
+              <FileText className="w-5 h-5" />
+            </div>
+            <h2 id="modal-cadastro-cotacao-title" className="text-lg font-semibold text-[#173A4D] sm:text-xl">
               {isEditing ? 'Editar Cotação' : 'Nova Cotação'}
             </h2>
           </div>
-          <button onClick={onClose} className="text-white hover:text-gray-200 transition-colors">
-            <X className="w-6 h-6" />
+          <button
+            onClick={onClose}
+            type="button"
+            aria-label="Fechar modal"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[#5E7A88] transition-colors hover:bg-[#F2F7F8] hover:text-[#173A4D]"
+          >
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-gray-200">
-          <nav className="flex space-x-8 px-6">
+        <div className="shrink-0 border-b border-[#E1EAEE]">
+          <nav className="flex overflow-x-auto px-4 sm:px-6">
             {[
               { id: 'dados', label: 'Dados Básicos', icon: FileText },
               { id: 'itens', label: 'Itens', icon: Calculator },
@@ -373,7 +372,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
               <button
                 key={id}
                 onClick={() => setActiveTab(id as any)}
-                className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
+                className={`shrink-0 whitespace-nowrap py-4 px-3 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === id
                     ? 'border-[#159A9C] text-[#159A9C]'
                     : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -389,8 +388,8 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
         </div>
 
         {/* Content */}
-        <form onSubmit={handleSubmit(onSubmit)} className="flex-1 overflow-hidden">
-          <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6 sm:py-6">
             {/* Tab: Dados Básicos */}
             {activeTab === 'dados' && (
               <div className="space-y-6">
@@ -542,7 +541,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                   <button
                     type="button"
                     onClick={adicionarItem}
-                    className="flex items-center space-x-2 px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0d7a7c] transition-colors"
+                    className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#0F7B7D]"
                   >
                     <Plus className="w-4 h-4" />
                     <span>Adicionar Item</span>
@@ -551,7 +550,10 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
 
                 <div className="space-y-4">
                   {watchedItens.map((item, index) => (
-                    <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    <div
+                      key={index}
+                      className="rounded-xl border border-[#DCE8EC] bg-[#F8FBFC] p-4 shadow-[0_8px_20px_-22px_rgba(15,57,74,0.45)]"
+                    >
                       <div className="flex items-center justify-between mb-4">
                         <h4 className="font-medium text-gray-700">Item {index + 1}</h4>
                         {watchedItens.length > 1 && (
@@ -574,7 +576,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                           <input
                             type="text"
                             {...register(`itens.${index}.descricao`)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
+                            className="w-full rounded-xl border border-[#D4E2E7] bg-white px-3 py-2 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
                             placeholder="Descrição do item"
                           />
                         </div>
@@ -588,7 +590,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                             type="number"
                             step="0.01"
                             {...register(`itens.${index}.quantidade`)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
+                            className="w-full rounded-xl border border-[#D4E2E7] bg-white px-3 py-2 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
                             min="0"
                           />
                         </div>
@@ -600,7 +602,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                           </label>
                           <select
                             {...register(`itens.${index}.unidade`)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
+                            className="w-full rounded-xl border border-[#D4E2E7] bg-white px-3 py-2 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
                           >
                             <option value="un">Unidade</option>
                             <option value="kg">Quilograma</option>
@@ -625,7 +627,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                                 value={field.value || 0}
                                 onChange={(value) => field.onChange(value)}
                                 placeholder="R$ 0,00"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
+                                className="w-full rounded-xl border border-[#D4E2E7] bg-white px-3 py-2 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
                               />
                             )}
                           />
@@ -639,16 +641,16 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                           <input
                             type="text"
                             {...register(`itens.${index}.observacoes`)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
+                            className="w-full rounded-xl border border-[#D4E2E7] bg-white px-3 py-2 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
                             placeholder="Observações sobre o item"
                           />
                         </div>
 
                         {/* Valor Total do Item */}
                         <div className="lg:col-span-4 flex justify-end">
-                          <div className="text-right">
-                            <span className="text-sm text-gray-500">Valor Total: </span>
-                            <span className="font-medium text-lg text-[#159A9C]">
+                          <div className="rounded-xl border border-[#DCE8EC] bg-white px-4 py-2 text-right">
+                            <span className="text-sm text-[#6E8997]">Valor Total: </span>
+                            <span className="font-semibold text-lg text-[#159A9C]">
                               R${' '}
                               {(item.quantidade * item.valorUnitario).toLocaleString('pt-BR', {
                                 minimumFractionDigits: 2,
@@ -662,10 +664,10 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                 </div>
 
                 {/* Valor Total Geral */}
-                <div className="border-t border-gray-200 pt-4">
+                <div className="border-t border-[#E1EAEE] pt-4">
                   <div className="flex justify-end">
-                    <div className="text-right">
-                      <span className="text-lg text-gray-700">Valor Total da Cotação: </span>
+                    <div className="rounded-2xl border border-[#CFE0E6] bg-[#F7FBFC] px-5 py-4 text-right shadow-[0_8px_20px_-22px_rgba(15,57,74,0.35)]">
+                      <span className="text-lg text-[#4C6A78]">Valor Total da Cotação: </span>
                       <span className="font-bold text-2xl text-[#159A9C]">
                         R${' '}
                         {calcularValorTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -689,7 +691,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                       {...register('condicoesPagamento')}
                       rows={3}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                      placeholder="Ex: À vista com 5% de desconto, ou 3x sem juros"
+                      placeholder="Ex: 15 dias uteis apos confirmacao"
                     />
                   </div>
 
@@ -702,7 +704,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                       type="text"
                       {...register('prazoEntrega')}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                      placeholder="Ex: 15 dias úteis após confirmação"
+                      placeholder="Ex: a vista com 5% de desconto, ou 3x sem juros"
                     />
                   </div>
 
@@ -746,14 +748,14 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                       type="text"
                       value={novaTag}
                       onChange={(e) => setNovaTag(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), adicionarTag())}
+                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), adicionarTag())}
                       className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
                       placeholder="Digite uma tag e pressione Enter"
                     />
                     <button
                       type="button"
                       onClick={adicionarTag}
-                      className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0d7a7c] transition-colors"
+                      className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors text-sm font-medium"
                     >
                       <Plus className="w-4 h-4" />
                     </button>
@@ -777,7 +779,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
+          <div className="sticky bottom-0 z-10 flex shrink-0 items-center justify-between border-t border-[#E1EAEE] bg-white/95 px-5 py-4 backdrop-blur sm:px-6">
             <div className="text-sm text-gray-500">
               {activeTab === 'itens' && (
                 <span>
@@ -786,11 +788,11 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
                 </span>
               )}
             </div>
-            <div className="flex space-x-3">
+            <div className="flex flex-wrap justify-end gap-3">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="inline-flex items-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
                 disabled={isSubmitting}
               >
                 Cancelar
@@ -798,7 +800,7 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-6 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0d7a7c] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
                 <span>{isEditing ? 'Atualizar' : 'Criar'} Cotação</span>
@@ -812,3 +814,5 @@ export const ModalCadastroCotacao: React.FC<ModalCadastroCotacaoProps> = ({
 };
 
 export default ModalCadastroCotacao;
+
+

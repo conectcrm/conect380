@@ -13,6 +13,7 @@ import { Logger,
 import { PropostasService, Proposta } from './propostas.service';
 import {
   AtualizarStatusDto,
+  AtualizarPropostaDto,
   PropostaResponseDto,
   CriarPropostaDto,
   PropostaDto,
@@ -23,13 +24,17 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { Permission } from '../../common/permissions/permissions.constants';
 import { EmpresaId } from '../../common/decorators/empresa.decorator';
+import { PortalService } from './portal.service';
 
 @Controller('propostas')
 @UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
 @Permissions(Permission.COMERCIAL_PROPOSTAS_READ)
 export class PropostasController {
   private readonly logger = new Logger(PropostasController.name);
-  constructor(private readonly propostasService: PropostasService) {}
+  constructor(
+    private readonly propostasService: PropostasService,
+    private readonly portalService: PortalService,
+  ) {}
 
   // Helper para converter Proposta para PropostaDto
   private toPropostaDto(proposta: Proposta): PropostaDto {
@@ -76,6 +81,49 @@ export class PropostasController {
           error: error.message,
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Atualiza dados de uma proposta
+   */
+  @Put(':id')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_UPDATE)
+  async atualizarProposta(
+    @EmpresaId() empresaId: string,
+    @Param('id') propostaId: string,
+    @Body() dadosProposta: AtualizarPropostaDto,
+  ): Promise<PropostaResponseDto> {
+    try {
+      this.logger.log(`[PROPOSTAS] Atualizando proposta: ${propostaId}`);
+
+      const proposta = await this.propostasService.atualizarProposta(
+        propostaId,
+        dadosProposta as Partial<Proposta>,
+        empresaId,
+      );
+
+      return {
+        success: true,
+        message: 'Proposta atualizada com sucesso',
+        proposta: this.toPropostaDto(proposta),
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      this.logger.error('[PROPOSTAS] Erro ao atualizar proposta:', error);
+      const message = String(error?.message || '');
+      const statusCode = message.includes('nao encontrada')
+        ? HttpStatus.NOT_FOUND
+        : HttpStatus.INTERNAL_SERVER_ERROR;
+
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Erro ao atualizar proposta',
+          error: message,
+        },
+        statusCode,
       );
     }
   }
@@ -171,37 +219,38 @@ export class PropostasController {
   @Permissions(Permission.COMERCIAL_PROPOSTAS_CREATE)
   async criarProposta(
     @EmpresaId() empresaId: string,
-    @Body() dadosProposta: any,
+    @Body() dadosProposta: CriarPropostaDto,
   ): Promise<PropostaResponseDto> {
     try {
+      const payload = dadosProposta as any;
       this.logger.log(
         `[PROPOSTAS] Criando nova proposta (resumo): ${JSON.stringify({
-          titulo: dadosProposta?.titulo ? String(dadosProposta.titulo).slice(0, 80) : null,
-          clienteId: dadosProposta?.clienteId || dadosProposta?.cliente?.id || null,
-          clienteNome: dadosProposta?.cliente?.nome
-            ? String(dadosProposta.cliente.nome).slice(0, 60)
+          titulo: payload?.titulo ? String(payload.titulo).slice(0, 80) : null,
+          clienteId: payload?.clienteId || payload?.cliente?.id || null,
+          clienteNome: payload?.cliente?.nome
+            ? String(payload.cliente.nome).slice(0, 60)
             : null,
-          itens: Array.isArray(dadosProposta?.produtos) ? dadosProposta.produtos.length : 0,
-          total: dadosProposta?.total ?? dadosProposta?.valor ?? null,
-          status: dadosProposta?.status || null,
+          itens: Array.isArray(payload?.produtos) ? payload.produtos.length : 0,
+          total: payload?.total ?? payload?.valor ?? null,
+          status: payload?.status || null,
         })}`,
       );
 
       // Converter dados do frontend para formato interno
       const propostaParaCriar: Partial<Proposta> = {
-        titulo: dadosProposta.titulo || `Proposta ${Date.now()}`,
-        cliente: dadosProposta.cliente,
-        produtos: dadosProposta.produtos || [],
-        subtotal: dadosProposta.subtotal || 0,
-        descontoGlobal: dadosProposta.descontoGlobal || 0,
-        impostos: dadosProposta.impostos || 0,
-        total: dadosProposta.total || dadosProposta.valor || 0,
-        valor: dadosProposta.valor || dadosProposta.total || 0,
-        formaPagamento: dadosProposta.formaPagamento || 'avista',
-        validadeDias: dadosProposta.validadeDias || 30,
-        observacoes: dadosProposta.observacoes,
-        incluirImpostosPDF: dadosProposta.incluirImpostosPDF || false,
-        vendedor: dadosProposta.vendedor,
+        titulo: payload.titulo || `Proposta ${Date.now()}`,
+        cliente: payload.cliente,
+        produtos: payload.produtos || [],
+        subtotal: payload.subtotal || 0,
+        descontoGlobal: payload.descontoGlobal || 0,
+        impostos: payload.impostos || 0,
+        total: payload.total || payload.valor || 0,
+        valor: payload.valor || payload.total || 0,
+        formaPagamento: payload.formaPagamento || 'avista',
+        validadeDias: payload.validadeDias || 30,
+        observacoes: payload.observacoes,
+        incluirImpostosPDF: payload.incluirImpostosPDF || false,
+        vendedor: payload.vendedor,
       };
 
       const proposta = await this.propostasService.criarProposta(propostaParaCriar, empresaId);
@@ -222,6 +271,55 @@ export class PropostasController {
           error: error.message,
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Gera token publico do portal para compartilhamento/envio de proposta
+   */
+  @Post(':id/gerar-token')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_UPDATE)
+  async gerarTokenPortal(
+    @EmpresaId() empresaId: string,
+    @Param('id') propostaId: string,
+    @Body() body?: { expiresInDays?: number },
+  ) {
+    try {
+      const expiresInDays =
+        typeof body?.expiresInDays === 'number' && Number.isFinite(body.expiresInDays)
+          ? body.expiresInDays
+          : 30;
+
+      const tokenData = await this.portalService.gerarTokenParaProposta(
+        propostaId,
+        empresaId,
+        expiresInDays,
+      );
+
+      const proposta = await this.propostasService.obterProposta(tokenData.propostaId, empresaId);
+
+      return {
+        success: true,
+        token: tokenData.token,
+        expiresAt: tokenData.expiresAt,
+        linkPortal: proposta?.numero
+          ? `/portal/${proposta.numero}/${tokenData.token}`
+          : `/portal/proposta/${tokenData.token}`,
+      };
+    } catch (error) {
+      this.logger.error('[PROPOSTAS] Erro ao gerar token de portal:', error);
+      const message = String(error?.message || '');
+      const statusCode = message.includes('nao encontrada')
+        ? HttpStatus.NOT_FOUND
+        : HttpStatus.INTERNAL_SERVER_ERROR;
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Erro ao gerar token de portal',
+          error: message,
+        },
+        statusCode,
       );
     }
   }

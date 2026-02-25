@@ -55,17 +55,25 @@ function shouldIgnore(filePath) {
 }
 
 const PROBLEM_PATTERNS = [
-  { name: 'U+FFFD (caractere de substituição \uFFFD)', regex: /\uFFFD/g },
+  { name: 'U+FFFD replacement character', regex: /\uFFFD/g },
   {
-    name: 'Mojibake UTF-8→Latin-1 (Ã§/Ã£/Ãµ/...)',
-    regex: /Ã§|Ã£|Ãµ|Ã¡|Ã©|Ã­|Ã³|Ãº|Ãª|Ã€|Ã‰|Ã“|Ãš|Ã”/g,
+    name: 'UTF-8 mojibake (C3xx sequences)',
+    regex:
+      /\u00C3\u00A7|\u00C3\u00A3|\u00C3\u00B5|\u00C3\u00A1|\u00C3\u00A9|\u00C3\u00AD|\u00C3\u00B3|\u00C3\u00BA|\u00C3\u00AA|\u00C3\u0080|\u00C3\u0089|\u00C3\u0093|\u00C3\u009A|\u00C3\u0094/g,
   },
-  { name: 'Mojibake comum (Â...)', regex: /Â©|Â®|Â°|Âº|Âª|Â·/g },
   {
-    name: 'Mojibake comum (â€™/â€œ/â€�/â€“/â€”/â€¦)',
-    regex: /â€™|â€œ|â€�|â€˜|â€“|â€”|â€¦|â€¢|â„¢/g,
+    name: 'UTF-8 mojibake (C2xx sequences)',
+    regex: /\u00C2\u00A9|\u00C2\u00AE|\u00C2\u00B0|\u00C2\u00BA|\u00C2\u00AA|\u00C2\u00B7/g,
   },
-  { name: 'Mojibake comum (â†/âœ/â/ðŸ)', regex: /â†|âœ|â|ðŸ/g },
+  {
+    name: 'UTF-8 mojibake (punctuation sequences)',
+    regex:
+      /\u00E2\u20AC\u2122|\u00E2\u20AC\u0153|\u00E2\u20AC\u02DC|\u00E2\u20AC\u201C|\u00E2\u20AC\u201D|\u00E2\u20AC\u00A6|\u00E2\u20AC\u00A2|\u00E2\u201E\u00A2/g,
+  },
+  {
+    name: 'UTF-8 mojibake (symbol/emoji fragments)',
+    regex: /\u00E2\u2020|\u00E2\u0153|\u00E2\u009D|\u00F0\u0178/g,
+  },
 ];
 
 function indexToLineCol(content, index) {
@@ -134,9 +142,9 @@ async function readStdinLines() {
 }
 
 function printUsage() {
-  console.log('Uso: node scripts/checkEncoding.js [--stdin] [--all] [arquivos...]');
-  console.log('  --stdin  Lê lista de arquivos via stdin (um por linha)');
-  console.log('  --all    Varre diretórios padrão (frontend-web/src e backend/src)');
+  console.log('Usage: node scripts/checkEncoding.js [--stdin] [--all] [files...]');
+  console.log('  --stdin  Read file list from stdin (one per line)');
+  console.log('  --all    Scan default dirs (frontend-web/src and backend/src)');
 }
 
 async function main() {
@@ -159,7 +167,7 @@ async function main() {
   } else if (scanAll) {
     targets = ['frontend-web/src', 'backend/src'];
   } else {
-    console.log(colorize('Nenhum arquivo informado. Use --stdin, --all, ou passe caminhos.', 'yellow'));
+    console.log(colorize('No files informed. Use --stdin, --all, or explicit paths.', 'yellow'));
     printUsage();
     process.exit(0);
   }
@@ -208,10 +216,9 @@ async function main() {
         allFindings.push({ file: file.rel, ...finding });
       }
     } catch (err) {
-      // Se não conseguir ler como texto (ex.: arquivo muito grande ou encoding estranho), reporta e falha.
       allFindings.push({
         file: file.rel,
-        pattern: 'Erro ao ler arquivo como UTF-8',
+        pattern: 'Read error as UTF-8',
         index: 0,
         sample: '',
         line: 0,
@@ -222,29 +229,29 @@ async function main() {
   }
 
   if (allFindings.length === 0) {
-    console.log(colorize(`✅ Encoding OK (${filesToScan.length} arquivo(s) verificado(s))`, 'green'));
+    console.log(colorize(`[OK] Encoding OK (${filesToScan.length} file(s) scanned)`, 'green'));
     process.exit(0);
   }
 
-  console.log(colorize('❌ Problemas de encoding encontrados:', 'red'));
+  console.log(colorize('[FAIL] Encoding issues found:', 'red'));
   for (const f of allFindings) {
     const location = f.line ? `:${f.line}:${f.col}` : '';
     console.log(colorize(`- ${f.file}${location}`, 'bright'));
-    console.log(`  Padrão: ${f.pattern}`);
+    console.log(`  Pattern: ${f.pattern}`);
     if (f.sample) {
-      console.log(`  Amostra: ${JSON.stringify(f.sample)}`);
+      console.log(`  Sample: ${JSON.stringify(f.sample)}`);
     }
     if (f.lineText) {
-      console.log(`  Linha: ${f.lineText.trim()}`);
+      console.log(`  Line: ${f.lineText.trim()}`);
     }
   }
 
   console.log('');
-  console.log('Dica: geralmente isso indica arquivo salvo fora de UTF-8 ou texto copiado com encoding errado.');
+  console.log('Tip: file was likely saved in the wrong encoding or copied with mojibake.');
   process.exit(1);
 }
 
 main().catch((err) => {
-  console.error(colorize(`Erro inesperado: ${err && err.stack ? err.stack : err}`, 'red'));
+  console.error(colorize(`Unexpected error: ${err && err.stack ? err.stack : err}`, 'red'));
   process.exit(1);
 });

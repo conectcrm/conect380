@@ -122,7 +122,7 @@ Se não aparecer nada:
 
 ## 🔤 10. Verificar Encoding (UTF-8)
 
-Útil quando aparecerem textos “quebrados” (ex.: `Informa��es`, `InformaÃ§Ãµes`) por arquivo salvo com encoding errado.
+Use este passo quando aparecerem textos quebrados por encoding incorreto.
 
 ```powershell
 cd C:\Projetos\conectcrm

@@ -1,4 +1,4 @@
-﻿import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { createHmac } from 'crypto';
@@ -62,7 +62,7 @@ export class WhatsAppWebhookService {
       // 1. Tentar validar com token do .env (fallback)
       const tokenEnv = process.env.WHATSAPP_VERIFY_TOKEN?.trim();
       if (verifyToken === tokenEnv) {
-        this.logger.log(`âœ… Token validado via .env`);
+        this.logger.log(` Token validado via .env`);
         return true;
       }
 
@@ -73,7 +73,7 @@ export class WhatsAppWebhookService {
 
       if (!integracao) {
         this.logger.warn(
-          `âš ï¸  IntegraÃ§Ã£o nÃ£o encontrada para empresa ${empresaId}, usando token padrÃ£o`,
+          `  Integrao no encontrada para empresa ${empresaId}, usando token padro`,
         );
         return verifyToken === tokenEnv;
       }
@@ -81,12 +81,12 @@ export class WhatsAppWebhookService {
       const tokenEsperado = integracao.credenciais?.whatsapp_webhook_verify_token;
 
       if (!tokenEsperado) {
-        this.logger.warn(`âš ï¸  Token nÃ£o configurado no banco, usando token padrÃ£o`);
+        this.logger.warn(`  Token no configurado no banco, usando token padro`);
         return verifyToken === tokenEnv;
       }
 
       const valido = verifyToken === tokenEsperado;
-      this.logger.log(`${valido ? 'âœ…' : 'âŒ'} Token validado via banco de dados`);
+      this.logger.log(`${valido ? '' : ''} Token validado via banco de dados`);
       return valido;
     } catch (error) {
       this.logger.error('Erro ao validar token:', error.message);
@@ -129,17 +129,17 @@ export class WhatsAppWebhookService {
 
   async processar(empresaId: string, payload: any): Promise<any> {
     try {
-      this.logger.log(`ðŸ“¨ Processando webhook - Empresa: ${empresaId}`);
+      this.logger.log(` Processando webhook - Empresa: ${empresaId}`);
       this.logger.debug(`Payload resumo: ${JSON.stringify(this.summarizeWebhookPayload(payload))}`);
 
       // Validar estrutura do payload
       if (!payload.object || payload.object !== 'whatsapp_business_account') {
-        this.logger.warn('âš ï¸  Payload nÃ£o Ã© do WhatsApp Business');
-        return { success: false, message: 'Payload invÃ¡lido' };
+        this.logger.warn('  Payload no  do WhatsApp Business');
+        return { success: false, message: 'Payload invlido' };
       }
 
       if (!payload.entry || payload.entry.length === 0) {
-        this.logger.warn('âš ï¸  Nenhuma entrada no payload');
+        this.logger.warn('  Nenhuma entrada no payload');
         return { success: false, message: 'Sem entradas' };
       }
 
@@ -170,7 +170,7 @@ export class WhatsAppWebhookService {
 
       return { success: true, message: 'Webhook processado com sucesso' };
     } catch (error) {
-      this.logger.error(`âŒ Erro ao processar webhook: ${error.message}`, error.stack);
+      this.logger.error(` Erro ao processar webhook: ${error.message}`, error.stack);
       throw error;
     }
   }
@@ -213,25 +213,25 @@ export class WhatsAppWebhookService {
     this.logger.debug(`Webhook mensagem recebida empresa=${empresaId} resumo=${JSON.stringify({ tipo: message?.type || null, messageId: message?.id || null, hasText: Boolean(message?.text?.body), phoneNumberId: value?.metadata?.phone_number_id || null })}`);
     try {
       const {
-        from, // NÃºmero do remetente
+        from, // Nmero do remetente
         id: messageId, // ID da mensagem
         timestamp, // Timestamp da mensagem
         type, // Tipo: text, image, video, audio, document, etc.
       } = message;
 
 
-      this.logger.log(`ðŸ“© Nova mensagem recebida`);
+      this.logger.log(` Nova mensagem recebida`);
       this.logger.log(`   De: ${this.maskPhone(from)}`);
       this.logger.log(`   ID: ${messageId}`);
       this.logger.log(`   Tipo: ${type}`);
 
-      // Extrair conteÃºdo baseado no tipo
+      // Extrair contedo baseado no tipo
       let conteudo = '';
 
       if (type === 'text') {
         conteudo = message.text?.body || '';
       } else if (type === 'interactive') {
-        // âœ¨ Processar resposta de botÃ£o interativo
+        //  Processar resposta de boto interativo
         const interactive = message.interactive;
         if (interactive?.type === 'button_reply') {
           // Resposta de Reply Button
@@ -245,14 +245,14 @@ export class WhatsAppWebhookService {
       } else if (type === 'image') {
         conteudo = `[Imagem] ${message.image?.caption || ''}`;
       } else if (type === 'video') {
-        conteudo = `[VÃ­deo] ${message.video?.caption || ''}`;
+        conteudo = `[Vdeo] ${message.video?.caption || ''}`;
       } else if (type === 'audio') {
-        // âœ¨ Ãudio: sem texto, apenas player visual
+        //  udio: sem texto, apenas player visual
         conteudo = '';
       } else if (type === 'document') {
         conteudo = `[Documento] ${message.document?.filename || ''}`;
       } else if (type === 'location') {
-        conteudo = `[LocalizaÃ§Ã£o] ${message.location?.latitude}, ${message.location?.longitude}`;
+        conteudo = `[Localizao] ${message.location?.latitude}, ${message.location?.longitude}`;
       } else if (type === 'contacts') {
         conteudo = '[Contato]';
       } else {
@@ -267,33 +267,33 @@ export class WhatsAppWebhookService {
 
 
       if (!phoneNumberId) {
-        this.logger.debug(`âŒ [WEBHOOK DEBUG] Phone Number ID nÃ£o encontrado - ABORTANDO`);
-        this.logger.debug('â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•');
-        this.logger.warn(`âš ï¸  Phone Number ID nÃ£o encontrado no payload`);
+        this.logger.debug(` [WEBHOOK DEBUG] Phone Number ID no encontrado - ABORTANDO`);
+        this.logger.debug('');
+        this.logger.warn(`  Phone Number ID no encontrado no payload`);
         await this.senderService.marcarComoLida(empresaId, messageId);
         return;
       }
 
       // 2. Buscar canal pelo phone_number_id
-      this.logger.debug(`ðŸ” [WEBHOOK DEBUG] Buscando canal...`);
+      this.logger.debug(` [WEBHOOK DEBUG] Buscando canal...`);
       const canal = await this.buscarCanalPorPhoneNumberId(empresaId, phoneNumberId);
 
       this.logger.debug(
-        `ðŸ“‹ [WEBHOOK DEBUG] Canal encontrado: ${canal ? JSON.stringify({ id: canal.id, nome: canal.nome, tipo: canal.tipo }) : 'NULL'}`,
+        ` [WEBHOOK DEBUG] Canal encontrado: ${canal ? JSON.stringify({ id: canal.id, nome: canal.nome, tipo: canal.tipo }) : 'NULL'}`,
       );
 
       if (!canal) {
-        this.logger.debug(`âŒ [WEBHOOK DEBUG] Canal nÃ£o encontrado - ABORTANDO`);
-        this.logger.debug('â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•');
-        this.logger.warn(`âš ï¸  Canal nÃ£o encontrado para phone_number_id: ${phoneNumberId}`);
+        this.logger.debug(` [WEBHOOK DEBUG] Canal no encontrado - ABORTANDO`);
+        this.logger.debug('');
+        this.logger.warn(`  Canal no encontrado para phone_number_id: ${phoneNumberId}`);
         await this.senderService.marcarComoLida(empresaId, messageId);
         return;
       }
 
-      this.logger.debug(`âœ… [WEBHOOK DEBUG] Canal OK - prosseguindo...`);
-      this.logger.log(`ðŸ“± Canal encontrado: ${canal.nome} (${canal.id})`);
+      this.logger.debug(` [WEBHOOK DEBUG] Canal OK - prosseguindo...`);
+      this.logger.log(` Canal encontrado: ${canal.nome} (${canal.id})`);
 
-      // 3. Antes de qualquer aÃ§Ã£o, verificar se Ã© resposta de CSAT
+      // 3. Antes de qualquer ao, verificar se  resposta de CSAT
       const resultadoCsat = await this.ticketService.registrarRespostaCsat({
         empresaId,
         telefone: from,
@@ -302,7 +302,7 @@ export class WhatsAppWebhookService {
 
       if (resultadoCsat.registrado) {
         this.logger.log(
-          `â­ Resposta CSAT registrada (nota ${resultadoCsat.nota}) para contato ${from}`,
+          ` Resposta CSAT registrada (nota ${resultadoCsat.nota}) para contato ${from}`,
         );
 
         await this.senderService.marcarComoLida(empresaId, messageId);
@@ -311,15 +311,15 @@ export class WhatsAppWebhookService {
           await this.senderService.enviarMensagem(
             empresaId,
             from,
-            'Muito obrigado pela sua avaliaÃ§Ã£o! Sua opiniÃ£o Ã© essencial para continuarmos melhorando. ðŸ˜Š',
+            'Muito obrigado pela sua avaliao! Sua opinio  essencial para continuarmos melhorando. ',
           );
         } catch (erroAgradecimento) {
           this.logger.warn(
-            `âš ï¸ Falha ao enviar agradecimento do CSAT: ${erroAgradecimento.message}`,
+            ` Falha ao enviar agradecimento do CSAT: ${erroAgradecimento.message}`,
           );
         }
 
-        this.logger.debug('â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•');
+        this.logger.debug('');
         return;
       }
 
@@ -357,15 +357,15 @@ export class WhatsAppWebhookService {
         })}`,
       );
 
-      // ðŸ†• Se nÃ£o houver foto no payload, tentar buscar na API do WhatsApp
+      //  Se no houver foto no payload, tentar buscar na API do WhatsApp
       let fotoFinal = fotoCliente;
       if (!fotoCliente) {
-        this.logger.debug(`ðŸ” [WEBHOOK DEBUG] Foto nÃ£o veio no payload - buscando na API...`);
+        this.logger.debug(` [WEBHOOK DEBUG] Foto no veio no payload - buscando na API...`);
         try {
           fotoFinal = await this.senderService.buscarFotoPerfilContato(empresaId, from);
           this.logger.debug(`Foto obtida da API: ${fotoFinal ? '[disponivel]' : '[nao encontrada]'}`);
         } catch (error) {
-          this.logger.debug(`âš ï¸ [WEBHOOK DEBUG] Erro ao buscar foto: ${error.message}`);
+          this.logger.debug(` [WEBHOOK DEBUG] Erro ao buscar foto: ${error.message}`);
         }
       }
 
@@ -378,7 +378,7 @@ export class WhatsAppWebhookService {
           body: conteudo,
           name: nomeCliente,
           messageId,
-          canalId: canal.id, // UUID do canal, nÃ£o phone_number_id
+          canalId: canal.id, // UUID do canal, no phone_number_id
         };
 
         const resultadoTriagem = await this.triagemBotService.processarMensagemWhatsApp(
@@ -399,7 +399,7 @@ export class WhatsAppWebhookService {
         );
 
         if (resultadoTriagem?.ignorado) {
-          this.logger.debug('ðŸ¤– TriagemBot ignorou mensagem, seguindo com atendimento padrÃ£o.');
+          this.logger.debug(' TriagemBot ignorou mensagem, seguindo com atendimento padro.');
         }
 
         if (resultadoTriagem?.resposta) {
@@ -418,17 +418,17 @@ export class WhatsAppWebhookService {
             })}`,
           );
           this.logger.debug(
-            `ðŸ” [DEBUG] usarBotoes: ${resposta.usarBotoes}, tipoBotao: ${resposta.tipoBotao}, opcoes: ${resposta.opcoes?.length || 0}`,
+            ` [DEBUG] usarBotoes: ${resposta.usarBotoes}, tipoBotao: ${resposta.tipoBotao}, opcoes: ${resposta.opcoes?.length || 0}`,
           );
 
           if (resposta.mensagem && resposta.mensagem.trim().length > 0) {
             try {
-              // âœ¨ Enviar com botÃµes interativos se disponÃ­vel
+              //  Enviar com botes interativos se disponvel
               if (resposta.usarBotoes && resposta.opcoes && resposta.opcoes.length > 0) {
-                this.logger.debug(`âœ… [DEBUG] CondiÃ§Ã£o de botÃµes ATIVADA! Tipo: ${resposta.tipoBotao}`);
+                this.logger.debug(` [DEBUG] Condio de botes ATIVADA! Tipo: ${resposta.tipoBotao}`);
 
                 if (resposta.tipoBotao === 'reply' && resposta.opcoes.length <= 3) {
-                  // Reply Buttons (atÃ© 3)
+                  // Reply Buttons (at 3)
                   const botoes = resposta.opcoes.map((op) => ({
                     id: op.valor,
                     titulo: op.texto,
@@ -449,17 +449,17 @@ export class WhatsAppWebhookService {
                   );
 
                   if (resultadoEnvio?.sucesso) {
-                    this.logger.log('ðŸ”˜ Resposta com botÃµes interativos enviada.');
+                    this.logger.log(' Resposta com botes interativos enviada.');
                   } else {
                     this.logger.warn(
-                      'âš ï¸ Falha ao enviar botÃµes interativos. Utilizando fallback em texto.',
+                      ' Falha ao enviar botes interativos. Utilizando fallback em texto.',
                     );
                     const mensagemFallback = this.montarMensagemFallbackTriagem(resposta);
                     await this.senderService.enviarMensagem(empresaId, from, mensagemFallback);
-                    this.logger.log('ðŸ’¬ Resposta de texto enviada apÃ³s fallback.');
+                    this.logger.log(' Resposta de texto enviada aps fallback.');
                   }
                 } else if (resposta.tipoBotao === 'list' && resposta.opcoes.length <= 10) {
-                  // List Message (atÃ© 10)
+                  // List Message (at 10)
                   const opcoes = resposta.opcoes.map((op) => ({
                     id: op.valor,
                     titulo: op.texto,
@@ -477,83 +477,83 @@ export class WhatsAppWebhookService {
                     empresaId,
                     from,
                     resposta.mensagem,
-                    'Escolha uma opÃ§Ã£o',
+                    'Escolha uma opo',
                     opcoes,
                   );
 
                   if (resultadoEnvio?.sucesso) {
-                    this.logger.log('ðŸ“‹ Resposta com lista interativa enviada.');
+                    this.logger.log(' Resposta com lista interativa enviada.');
                   } else {
                     this.logger.warn(
-                      'âš ï¸ Falha ao enviar lista interativa. Utilizando fallback em texto.',
+                      ' Falha ao enviar lista interativa. Utilizando fallback em texto.',
                     );
                     const mensagemFallback = this.montarMensagemFallbackTriagem(resposta);
                     await this.senderService.enviarMensagem(empresaId, from, mensagemFallback);
-                    this.logger.log('ðŸ’¬ Resposta de texto enviada apÃ³s fallback.');
+                    this.logger.log(' Resposta de texto enviada aps fallback.');
                   }
                 } else {
                   // Fallback para mensagem de texto
                   this.logger.debug(
-                    `âš ï¸ [DEBUG] Fallback para texto (tipoBotao: ${resposta.tipoBotao}, opcoes: ${resposta.opcoes.length})`,
+                    ` [DEBUG] Fallback para texto (tipoBotao: ${resposta.tipoBotao}, opcoes: ${resposta.opcoes.length})`,
                   );
                   await this.senderService.enviarMensagem(empresaId, from, resposta.mensagem);
-                  this.logger.log('ðŸ’¬ Resposta de texto enviada (fallback).');
+                  this.logger.log(' Resposta de texto enviada (fallback).');
                 }
               } else {
                 // Mensagem de texto simples
                 this.logger.debug(
-                  `â„¹ï¸ [DEBUG] Enviando texto simples (usarBotoes: ${resposta.usarBotoes}, opcoes: ${resposta.opcoes?.length || 0})`,
+                  ` [DEBUG] Enviando texto simples (usarBotoes: ${resposta.usarBotoes}, opcoes: ${resposta.opcoes?.length || 0})`,
                 );
                 await this.senderService.enviarMensagem(empresaId, from, resposta.mensagem);
-                this.logger.log('ðŸ¤– Resposta automÃ¡tica da triagem enviada.');
+                this.logger.log(' Resposta automtica da triagem enviada.');
               }
             } catch (erroEnvio) {
-              this.logger.error(`âŒ Falha ao enviar resposta da triagem: ${erroEnvio.message}`);
-              this.logger.error(`âŒ [DEBUG] Stack:`, erroEnvio.stack);
+              this.logger.error(` Falha ao enviar resposta da triagem: ${erroEnvio.message}`);
+              this.logger.error(` [DEBUG] Stack:`, erroEnvio.stack);
             }
           }
 
           if (!resposta.finalizado) {
             this.logger.log(
-              'ðŸ•‘ Triagem em andamento - atendimento humano aguardarÃ¡ nova interaÃ§Ã£o.',
+              ' Triagem em andamento - atendimento humano aguardar nova interao.',
             );
             await this.senderService.marcarComoLida(empresaId, messageId);
-            this.logger.debug('â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•');
+            this.logger.debug('');
             return;
           }
 
           if (resposta.finalizado && !triagemTicketId) {
             this.logger.log(
-              'âœ… Triagem finalizada sem ticket - nenhuma aÃ§Ã£o adicional necessÃ¡ria.',
+              ' Triagem finalizada sem ticket - nenhuma ao adicional necessria.',
             );
             await this.senderService.marcarComoLida(empresaId, messageId);
-            this.logger.debug('â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•');
+            this.logger.debug('');
             return;
           }
         }
       } catch (erroTriagem) {
-        this.logger.warn(`âš ï¸ Falha ao processar triagem: ${erroTriagem.message}`);
+        this.logger.warn(` Falha ao processar triagem: ${erroTriagem.message}`);
       }
 
       if (triagemProcessada && !triagemTicketId) {
-        this.logger.log('ðŸ¤– Triagem tratou a interaÃ§Ã£o sem gerar ticket.');
+        this.logger.log(' Triagem tratou a interao sem gerar ticket.');
         await this.senderService.marcarComoLida(empresaId, messageId);
-        this.logger.debug('â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•');
+        this.logger.debug('');
         return;
       }
 
-      this.logger.debug(`ðŸŽ« [WEBHOOK DEBUG] Chamando ticketService.buscarOuCriarTicket...`);
+      this.logger.debug(` [WEBHOOK DEBUG] Chamando ticketService.buscarOuCriarTicket...`);
 
       let ticket;
       if (triagemTicketId) {
         try {
           ticket = await this.ticketService.buscarPorId(triagemTicketId, empresaId);
           this.logger.debug(
-            `âœ… [WEBHOOK DEBUG] Ticket recuperado da triagem: ${JSON.stringify({ id: ticket.id, numero: ticket.numero })}`,
+            ` [WEBHOOK DEBUG] Ticket recuperado da triagem: ${JSON.stringify({ id: ticket.id, numero: ticket.numero })}`,
           );
         } catch (erroBusca) {
           this.logger.error(
-            `âŒ Falha ao recuperar ticket da triagem (${triagemTicketId}): ${erroBusca.message}`,
+            ` Falha ao recuperar ticket da triagem (${triagemTicketId}): ${erroBusca.message}`,
           );
         }
       }
@@ -569,12 +569,12 @@ export class WhatsAppWebhookService {
           origem: 'WHATSAPP',
         });
 
-        // âœ… CORREÃ‡ÃƒO: Verificar se Ã© um ticket realmente NOVO (recÃ©m-criado)
+        //  CORREO: Verificar se  um ticket realmente NOVO (recm-criado)
         const ehTicketNovo =
           ticketCriado && new Date().getTime() - new Date(ticketCriado.createdAt).getTime() < 5000;
 
         if (ehTicketNovo) {
-          this.logger.log(`ðŸ†• Ticket NOVO criado! Notificando via WebSocket...`);
+          this.logger.log(` Ticket NOVO criado! Notificando via WebSocket...`);
           // Notificar atendentes sobre novo ticket
           this.atendimentoGateway.notificarNovoTicket(ticketCriado);
         }
@@ -583,12 +583,12 @@ export class WhatsAppWebhookService {
       }
 
       this.logger.debug(
-        `âœ… [WEBHOOK DEBUG] Ticket retornado: ${ticket ? JSON.stringify({ id: ticket.id, numero: ticket.numero }) : 'NULL'}`,
+        ` [WEBHOOK DEBUG] Ticket retornado: ${ticket ? JSON.stringify({ id: ticket.id, numero: ticket.numero }) : 'NULL'}`,
       );
-      this.logger.log(`ðŸŽ« Ticket: ${ticket.id} (NÃºmero: ${ticket.numero})`);
+      this.logger.log(` Ticket: ${ticket.id} (Nmero: ${ticket.numero})`);
 
       // 5. Salvar mensagem
-      this.logger.debug(`ðŸ’¾ [WEBHOOK DEBUG] Salvando mensagem no banco...`);
+      this.logger.debug(` [WEBHOOK DEBUG] Salvando mensagem no banco...`);
       this.logger.debug(`   ticketId: ${ticket.id}`);
       this.logger.debug(`   tipo original: ${type}`);
 
@@ -609,21 +609,21 @@ export class WhatsAppWebhookService {
         remetente: RemetenteMensagem.CLIENTE,
         conteudo,
         idExterno: messageId,
-        midia: message[type], // Dados originais da mÃ­dia (se houver)
+        midia: message[type], // Dados originais da mdia (se houver)
       }, empresaId);
 
-      this.logger.debug(`âœ… [WEBHOOK DEBUG] Mensagem salva: ${mensagem ? mensagem.id : 'NULL'}`);
-      this.logger.log(`ðŸ’¾ Mensagem salva: ${mensagem.id}`);
+      this.logger.debug(` [WEBHOOK DEBUG] Mensagem salva: ${mensagem ? mensagem.id : 'NULL'}`);
+      this.logger.log(` Mensagem salva: ${mensagem.id}`);
 
-      // 6. Atualizar Ãºltima mensagem do ticket
-      this.logger.debug(`ðŸ”„ [WEBHOOK DEBUG] Atualizando Ãºltima mensagem do ticket...`);
+      // 6. Atualizar ltima mensagem do ticket
+      this.logger.debug(` [WEBHOOK DEBUG] Atualizando ltima mensagem do ticket...`);
       await this.ticketService.atualizarUltimaMensagem(ticket.id);
 
       // 7. Notificar atendentes via WebSocket
-      this.logger.debug(`ðŸ“¢ [WEBHOOK DEBUG] Notificando via WebSocket...`);
+      this.logger.debug(` [WEBHOOK DEBUG] Notificando via WebSocket...`);
       this.logger.debug(`   mensagem.id: ${mensagem.id}`);
 
-      // ðŸ”§ Transformar mensagem para formato esperado pelo frontend
+      //  Transformar mensagem para formato esperado pelo frontend
       const mensagemFormatada: any = this.mensagemService.formatarMensagemParaFrontend(mensagem, {
         fotoContato: ticket.contatoFoto || fotoFinal || null,
         atendenteId: ticket.atendenteId || null,
@@ -656,19 +656,19 @@ export class WhatsAppWebhookService {
 
       this.atendimentoGateway.notificarNovaMensagem(mensagemFormatada);
 
-      this.logger.debug(`âœ… [WEBHOOK DEBUG] WebSocket notificado com sucesso`);
-      this.logger.debug('â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•');
+      this.logger.debug(` [WEBHOOK DEBUG] WebSocket notificado com sucesso`);
+      this.logger.debug('');
 
-      this.logger.log(`ðŸ”” NotificaÃ§Ã£o enviada via WebSocket`);
+      this.logger.log(` Notificao enviada via WebSocket`);
 
       // 8. Marcar mensagem como lida
       await this.senderService.marcarComoLida(empresaId, messageId);
 
-      // 9. Verificar se deve acionar IA para resposta automÃ¡tica
+      // 9. Verificar se deve acionar IA para resposta automtica
       const deveUsarIA = await this.aiService.deveAcionarIA(empresaId);
 
       if (deveUsarIA && type === 'text' && conteudo) {
-        this.logger.log(`ðŸ¤– Acionando IA para resposta automÃ¡tica`);
+        this.logger.log(` Acionando IA para resposta automtica`);
 
         try {
           // Gerar resposta com IA
@@ -677,14 +677,14 @@ export class WhatsAppWebhookService {
             empresaNome: 'ConectCRM',
           });
 
-          this.logger.log(`âœ… Resposta gerada pela IA (${provedor})`);
+          this.logger.log(` Resposta gerada pela IA (${provedor})`);
           this.logger.log(`   Resposta: ${this.summarizeText(resposta, 100)}`);
 
-          // Enviar resposta automÃ¡tica
+          // Enviar resposta automtica
           const resultadoEnvio = await this.senderService.enviarMensagem(empresaId, from, resposta);
 
           if (resultadoEnvio.sucesso) {
-            this.logger.log(`âœ… Resposta automÃ¡tica enviada!`);
+            this.logger.log(` Resposta automtica enviada!`);
 
             // Salvar resposta da IA no banco
             await this.mensagemService.salvar({
@@ -695,27 +695,27 @@ export class WhatsAppWebhookService {
               idExterno: resultadoEnvio.messageId,
             }, empresaId);
 
-            this.logger.log(`ðŸ’¾ Resposta IA salva no banco`);
+            this.logger.log(` Resposta IA salva no banco`);
           } else {
-            this.logger.error(`âŒ Falha ao enviar resposta: ${resultadoEnvio.erro}`);
+            this.logger.error(` Falha ao enviar resposta: ${resultadoEnvio.erro}`);
           }
         } catch (errorIA) {
-          this.logger.error(`âŒ Erro ao processar IA: ${errorIA.message}`);
-          // Enviar mensagem padrÃ£o em caso de erro
+          this.logger.error(` Erro ao processar IA: ${errorIA.message}`);
+          // Enviar mensagem padro em caso de erro
           await this.senderService.enviarMensagem(
             empresaId,
             from,
-            'OlÃ¡! Recebemos sua mensagem e responderemos em breve. Obrigado!',
+            'Ol! Recebemos sua mensagem e responderemos em breve. Obrigado!',
           );
         }
       } else {
-        this.logger.log(`â„¹ï¸  IA nÃ£o configurada ou desabilitada, mensagem apenas registrada`);
+        this.logger.log(`  IA no configurada ou desabilitada, mensagem apenas registrada`);
       }
 
       // Log de sucesso
-      this.logger.log(`âœ… Mensagem processada: ${messageId}`);
+      this.logger.log(` Mensagem processada: ${messageId}`);
     } catch (error) {
-      this.logger.error(`âŒ Erro ao processar mensagem: ${error.message}`, error.stack);
+      this.logger.error(` Erro ao processar mensagem: ${error.message}`, error.stack);
     }
   }
 
@@ -729,17 +729,17 @@ export class WhatsAppWebhookService {
     if (opcoes.length === 0) {
       return mensagemBase.length > 0
         ? mensagemBase
-        : 'Por favor, escolha uma das opÃ§Ãµes disponÃ­veis.';
+        : 'Por favor, escolha uma das opes disponveis.';
     }
 
     const linhasOpcoes = opcoes.map((opcao, index) => {
-      const titulo = opcao?.texto ? String(opcao.texto).trim() : `OpÃ§Ã£o ${index + 1}`;
+      const titulo = opcao?.texto ? String(opcao.texto).trim() : `Opo ${index + 1}`;
       const descricao = opcao?.descricao ? ` - ${String(opcao.descricao).trim()}` : '';
       return `${index + 1}. ${titulo}${descricao}`;
     });
 
     const corpoOpcoes = linhasOpcoes.join('\n');
-    const mensagemOrientacao = '\n\nEnvie o nÃºmero da opÃ§Ã£o desejada ou digite SAIR para cancelar.';
+    const mensagemOrientacao = '\n\nEnvie o nmero da opo desejada ou digite SAIR para cancelar.';
 
     if (mensagemBase.length === 0) {
       return `${corpoOpcoes}${mensagemOrientacao}`;
@@ -760,17 +760,17 @@ export class WhatsAppWebhookService {
         recipient_id,
       } = status;
 
-      this.logger.log(`ðŸ“¬ Status de mensagem atualizado`);
+      this.logger.log(` Status de mensagem atualizado`);
       this.logger.log(`   ID: ${messageId}`);
       this.logger.log(`   Status: ${statusType}`);
       this.logger.log(`   Para: ${this.maskPhone(recipient_id)}`);
 
       // TODO: Atualizar status da mensagem no banco de dados
-      // TODO: Notificar via WebSocket sobre atualizaÃ§Ã£o de status
+      // TODO: Notificar via WebSocket sobre atualizao de status
 
-      this.logger.log(`âœ… Status processado: ${messageId} -> ${statusType}`);
+      this.logger.log(` Status processado: ${messageId} -> ${statusType}`);
     } catch (error) {
-      this.logger.error(`âŒ Erro ao processar status: ${error.message}`, error.stack);
+      this.logger.error(` Erro ao processar status: ${error.message}`, error.stack);
     }
   }
 
@@ -787,7 +787,7 @@ export class WhatsAppWebhookService {
         return null;
       }
 
-      // Buscar canal onde a configuraÃ§Ã£o contenha o phone_number_id
+      // Buscar canal onde a configurao contenha o phone_number_id
       const canais = await this.canalRepo.find({
         where: { empresaId, tipo: TipoCanal.WHATSAPP },
       });
@@ -814,7 +814,7 @@ export class WhatsAppWebhookService {
 
       return null;
     } catch (error) {
-      this.logger.error(`âŒ Erro ao buscar canal: ${error.message}`);
+      this.logger.error(` Erro ao buscar canal: ${error.message}`);
       return null;
     }
   }
@@ -836,7 +836,7 @@ export class WhatsAppWebhookService {
   }
 
   /**
-   * Extrai informaÃ§Ãµes de mÃ­dia da mensagem
+   * Extrai informaes de mdia da mensagem
    */
   private extrairMidia(message: any, tipo: string): any {
     if (tipo === 'text') return null;

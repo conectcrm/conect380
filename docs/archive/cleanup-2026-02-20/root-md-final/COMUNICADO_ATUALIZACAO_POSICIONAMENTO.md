@@ -183,7 +183,7 @@ não Zendesk (apenas atendimento)."
 
 1. 📖 **VISAO_SISTEMA_2025.md** - Posicionamento oficial
 2. 📖 **PITCH_DECK_INVESTIDORES.md** - Argumentos de vendas atualizados
-3. 📖 **CORRECAO_DOCUMENTACAO_CONCLUIDA.md** - O que mudou e por quê
+3. 📖 **RELATORIO_DOCUMENTACAO_CONCLUIDA.md** - O que mudou e por quê
 4. 📖 **docs/INDICE_DOCUMENTACAO.md** - Navegação completa
 
 ⚠️ **NÃO LEIA**: Arquivos em `docs/archive/2025/deprecated-omnichannel/`
