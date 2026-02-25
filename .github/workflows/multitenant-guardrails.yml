@@ -2,10 +2,6 @@ name: Multi-tenant Guardrails
 
 on:
   pull_request:
-    paths:
-      - 'backend/**'
-      - 'scripts/**'
-      - '.github/**'
   push:
     branches:
       - main
