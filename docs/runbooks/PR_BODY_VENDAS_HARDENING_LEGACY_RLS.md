@@ -20,7 +20,7 @@ Mudancas principais:
 - [ ] Nova feature
 - [ ] Breaking change
 - [x] Refatoracao
-- [ ] Documentacao
+- [x] Documentacao
 - [x] Performance
 - [x] Testes
 
@@ -31,7 +31,7 @@ Mudancas principais:
 - [x] Banco de Dados
 - [ ] Integracoes
 - [ ] Infra/DevOps
-- [ ] Documentacao
+- [x] Documentacao
 
 ## Issue Relacionada
 
@@ -71,7 +71,7 @@ N/A
 ## Checklist Tecnico (Obrigatorio)
 
 - [x] Fiz self-review do codigo
-- [ ] Atualizei documentacao relevante
+- [x] Atualizei documentacao relevante
 - [x] Nao deixei TODO/HACK sem justificativa
 - [x] Nao inclui dados sensiveis
 - [x] Nao introduzi warnings novos relevantes
@@ -125,7 +125,7 @@ npm --prefix backend run build
 - [x] Pode fazer deploy imediato
 - [ ] Requer configuracao adicional
 - [ ] Requer variaveis de ambiente novas
-- [ ] Requer migration manual
+- [x] Requer migration manual
 - [ ] Requer restart de servicos
 
 ## Evidencias Visuais (se frontend)
