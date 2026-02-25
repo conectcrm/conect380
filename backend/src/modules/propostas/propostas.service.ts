@@ -729,6 +729,218 @@ export class PropostasService {
   }
 
   /**
+   * Atualiza dados de uma proposta (além de status)
+   */
+  async atualizarProposta(
+    id: string,
+    dadosProposta: Partial<Proposta>,
+    empresaId?: string,
+  ): Promise<Proposta> {
+    try {
+      const propostaColumns = await this.getTableColumns('propostas');
+      const legacySchema = this.isLegacyPropostasSchema(propostaColumns);
+
+      if (legacySchema) {
+        const setClauses: string[] = [];
+        const params: unknown[] = [];
+        let idx = 1;
+
+        if (dadosProposta.titulo !== undefined) {
+          setClauses.push(`"titulo" = $${idx++}`);
+          params.push(dadosProposta.titulo || null);
+        }
+
+        const valorAtualizado =
+          dadosProposta.valor !== undefined
+            ? Number(dadosProposta.valor)
+            : dadosProposta.total !== undefined
+              ? Number(dadosProposta.total)
+              : undefined;
+        if (valorAtualizado !== undefined && Number.isFinite(valorAtualizado)) {
+          setClauses.push(`"valor" = $${idx++}`);
+          params.push(valorAtualizado);
+        }
+
+        if (dadosProposta.status !== undefined) {
+          setClauses.push(`"status" = $${idx++}`);
+          params.push(this.normalizeStatusToDatabase(dadosProposta.status, true));
+        }
+
+        if (dadosProposta.source !== undefined && propostaColumns.has('source')) {
+          setClauses.push(`"source" = $${idx++}`);
+          params.push(dadosProposta.source || null);
+        }
+
+        const observacoesColumn = propostaColumns.has('observacoes')
+          ? 'observacoes'
+          : propostaColumns.has('descricao')
+            ? 'descricao'
+            : null;
+        if (observacoesColumn && dadosProposta.observacoes !== undefined) {
+          setClauses.push(`"${observacoesColumn}" = $${idx++}`);
+          params.push(dadosProposta.observacoes || null);
+        }
+
+        const validadeColumn = propostaColumns.has('validade')
+          ? 'validade'
+          : propostaColumns.has('dataVencimento')
+            ? 'dataVencimento'
+            : null;
+        const validadeDias =
+          dadosProposta.validadeDias !== undefined ? Number(dadosProposta.validadeDias) : undefined;
+        const dataVencimentoValue =
+          dadosProposta.dataVencimento ??
+          (validadeDias && Number.isFinite(validadeDias)
+            ? new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000).toISOString()
+            : undefined);
+        if (validadeColumn && dataVencimentoValue) {
+          setClauses.push(`"${validadeColumn}" = $${idx++}`);
+          params.push(new Date(dataVencimentoValue));
+        }
+
+        if (setClauses.length === 0) {
+          const existente = await this.obterProposta(id, empresaId);
+          if (!existente) throw new Error(`Proposta com ID ${id} nao encontrada`);
+          return existente;
+        }
+
+        params.push(id);
+        const idParam = `$${idx++}`;
+        let whereClause = `id = ${idParam}`;
+
+        if (empresaId) {
+          params.push(empresaId);
+          whereClause += ` AND empresa_id = $${idx++}`;
+        }
+
+        const updateResult: Array<{ id: string }> = await this.propostaRepository.query(
+          `
+            UPDATE propostas
+            SET ${setClauses.join(', ')}
+            WHERE ${whereClause}
+            RETURNING id
+          `,
+          params,
+        );
+
+        if (!updateResult?.[0]?.id) {
+          throw new Error(`Proposta com ID ${id} nao encontrada`);
+        }
+
+        const propostaAtualizada = await this.obterProposta(id, empresaId);
+        if (!propostaAtualizada) {
+          throw new Error(`Proposta com ID ${id} nao encontrada`);
+        }
+        return propostaAtualizada;
+      }
+
+      const proposta = await this.propostaRepository.findOne({
+        where: empresaId ? { id, empresaId } : { id },
+      });
+
+      if (!proposta) {
+        throw new Error(`Proposta com ID ${id} nao encontrada`);
+      }
+
+      if (dadosProposta.titulo !== undefined) {
+        proposta.titulo = dadosProposta.titulo || null;
+      }
+
+      if (dadosProposta.cliente !== undefined) {
+        if (typeof dadosProposta.cliente === 'string') {
+          const clienteAtual = proposta.cliente || { id: 'cliente-temp', nome: '', email: '' };
+          proposta.cliente = {
+            ...clienteAtual,
+            nome: dadosProposta.cliente,
+            email: clienteAtual.email || '',
+          } as any;
+        } else if (dadosProposta.cliente && typeof dadosProposta.cliente === 'object') {
+          proposta.cliente = dadosProposta.cliente as any;
+        }
+      }
+
+      if (dadosProposta.produtos !== undefined) {
+        proposta.produtos = (dadosProposta.produtos || []) as any;
+      }
+
+      if (dadosProposta.subtotal !== undefined) {
+        proposta.subtotal = Number(dadosProposta.subtotal);
+      }
+      if (dadosProposta.descontoGlobal !== undefined) {
+        proposta.descontoGlobal = Number(dadosProposta.descontoGlobal);
+      }
+      if (dadosProposta.impostos !== undefined) {
+        proposta.impostos = Number(dadosProposta.impostos);
+      }
+
+      const totalFoiEnviado = dadosProposta.total !== undefined;
+      const valorFoiEnviado = dadosProposta.valor !== undefined;
+      if (totalFoiEnviado) {
+        proposta.total = Number(dadosProposta.total);
+        if (!valorFoiEnviado) proposta.valor = Number(dadosProposta.total);
+      }
+      if (valorFoiEnviado) {
+        proposta.valor = Number(dadosProposta.valor);
+        if (!totalFoiEnviado) proposta.total = Number(dadosProposta.valor);
+      }
+
+      if (dadosProposta.formaPagamento !== undefined) {
+        proposta.formaPagamento = dadosProposta.formaPagamento as any;
+      }
+
+      if (dadosProposta.validadeDias !== undefined) {
+        proposta.validadeDias = Number(dadosProposta.validadeDias);
+      }
+
+      if (dadosProposta.observacoes !== undefined) {
+        proposta.observacoes = dadosProposta.observacoes || null;
+      }
+
+      if (dadosProposta.incluirImpostosPDF !== undefined) {
+        proposta.incluirImpostosPDF = Boolean(dadosProposta.incluirImpostosPDF);
+      }
+
+      if (dadosProposta.status !== undefined) {
+        proposta.status = dadosProposta.status;
+      }
+
+      if (dadosProposta.dataVencimento !== undefined) {
+        proposta.dataVencimento = dadosProposta.dataVencimento
+          ? new Date(dadosProposta.dataVencimento)
+          : null;
+      } else if (dadosProposta.validadeDias !== undefined && Number.isFinite(proposta.validadeDias)) {
+        proposta.dataVencimento = new Date(Date.now() + proposta.validadeDias * 24 * 60 * 60 * 1000);
+      }
+
+      if (dadosProposta.source !== undefined) {
+        proposta.source = dadosProposta.source || null;
+      }
+
+      if (dadosProposta.vendedor !== undefined) {
+        let vendedorId: string | null = null;
+
+        if (dadosProposta.vendedor && typeof dadosProposta.vendedor === 'object') {
+          vendedorId = (dadosProposta.vendedor as any).id || null;
+        } else if (typeof dadosProposta.vendedor === 'string') {
+          const vendedor = await this.userRepository.findOne({
+            where: empresaId ? { nome: dadosProposta.vendedor, empresa_id: empresaId } : { nome: dadosProposta.vendedor },
+          });
+          vendedorId = vendedor?.id || null;
+        }
+
+        proposta.vendedor_id = vendedorId;
+      }
+
+      const propostaAtualizada = await this.propostaRepository.save(proposta);
+      this.logger.log(`✅ Proposta atualizada: ${propostaAtualizada.id}`);
+      return this.entityToInterface(propostaAtualizada);
+    } catch (error) {
+      this.logger.error('Erro ao atualizar proposta', error?.stack || String(error));
+      throw error;
+    }
+  }
+
+  /**
    * Remove uma proposta
    */
   async removerProposta(id: string, empresaId?: string): Promise<boolean> {
