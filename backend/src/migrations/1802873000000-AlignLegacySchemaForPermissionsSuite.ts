@@ -136,51 +136,62 @@ export class AlignLegacySchemaForPermissionsSuite1802873000000 implements Migrat
         ADD COLUMN IF NOT EXISTS "empresa_id" uuid
       `);
 
-      await queryRunner.query(`
-        DO $$
-        BEGIN
-          IF EXISTS (
-            SELECT 1
-            FROM information_schema.columns
-            WHERE table_schema = 'public'
-              AND table_name = 'evento'
-              AND column_name = 'empresaId'
-          ) THEN
-            UPDATE "evento"
-            SET "empresa_id" = COALESCE("empresa_id", "empresaId")
-            WHERE "empresa_id" IS NULL;
-          END IF;
-        END
-        $$;
-      `);
+      const eventoEmpresaIdLegacyColumnRows: Array<{ column_name?: string }> = await queryRunner.query(
+        `
+          SELECT column_name
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'evento'
+            AND column_name = 'empresaId'
+          LIMIT 1
+        `,
+      );
 
-      await queryRunner.query(`
-        CREATE OR REPLACE FUNCTION sync_evento_empresa_columns()
-        RETURNS trigger AS $$
-        BEGIN
-          NEW."empresa_id" := COALESCE(NEW."empresa_id", NEW."empresaId");
-          NEW."empresaId" := COALESCE(NEW."empresaId", NEW."empresa_id");
-          RETURN NEW;
-        END;
-        $$ LANGUAGE plpgsql;
-      `);
+      const hasEventoEmpresaIdLegacyColumn =
+        Array.isArray(eventoEmpresaIdLegacyColumnRows) && eventoEmpresaIdLegacyColumnRows.length > 0;
 
-      await queryRunner.query(`
-        DROP TRIGGER IF EXISTS trg_sync_evento_empresa_columns ON "evento"
-      `);
+      if (hasEventoEmpresaIdLegacyColumn) {
+        await queryRunner.query(`
+          UPDATE "evento"
+          SET "empresa_id" = COALESCE("empresa_id", "empresaId")
+          WHERE "empresa_id" IS NULL
+        `);
 
-      await queryRunner.query(`
-        CREATE TRIGGER trg_sync_evento_empresa_columns
-        BEFORE INSERT OR UPDATE ON "evento"
-        FOR EACH ROW
-        EXECUTE FUNCTION sync_evento_empresa_columns()
-      `);
+        await queryRunner.query(`
+          CREATE OR REPLACE FUNCTION sync_evento_empresa_columns()
+          RETURNS trigger AS $$
+          BEGIN
+            NEW."empresa_id" := COALESCE(NEW."empresa_id", NEW."empresaId");
+            NEW."empresaId" := COALESCE(NEW."empresaId", NEW."empresa_id");
+            RETURN NEW;
+          END;
+          $$ LANGUAGE plpgsql;
+        `);
 
-      await queryRunner.query(`
-        UPDATE "evento"
-        SET "empresaId" = COALESCE("empresaId", "empresa_id")
-        WHERE "empresaId" IS NULL
-      `);
+        await queryRunner.query(`
+          DROP TRIGGER IF EXISTS trg_sync_evento_empresa_columns ON "evento"
+        `);
+
+        await queryRunner.query(`
+          CREATE TRIGGER trg_sync_evento_empresa_columns
+          BEFORE INSERT OR UPDATE ON "evento"
+          FOR EACH ROW
+          EXECUTE FUNCTION sync_evento_empresa_columns()
+        `);
+
+        await queryRunner.query(`
+          UPDATE "evento"
+          SET "empresaId" = COALESCE("empresaId", "empresa_id")
+          WHERE "empresaId" IS NULL
+        `);
+      } else {
+        await queryRunner.query(`
+          DROP TRIGGER IF EXISTS trg_sync_evento_empresa_columns ON "evento"
+        `);
+        await queryRunner.query(`
+          DROP FUNCTION IF EXISTS sync_evento_empresa_columns()
+        `);
+      }
 
       await queryRunner.query(`
         CREATE INDEX IF NOT EXISTS "IDX_evento_empresa_id"

@@ -89,7 +89,7 @@ N/A
 - [ ] Sem mudanca de banco
 - [x] Migration criada
 - [x] Migration testada localmente
-- [ ] Rollback validado
+- [x] Rollback validado
 - [x] Indices relevantes revisados
 - [x] RLS/policy `tenant_isolation_*` revisada (se tabela multi-tenant)
 
@@ -98,8 +98,9 @@ N/A
 Descreva como validar:
 
 1. Aplicar migrations (`npm --prefix backend run migration:run`).
-2. Executar suites E2E de isolamento e vendas.
-3. Executar build/type-check para garantir regressao zero no backend.
+2. Validar rollback/reapply (`migration:revert` em cadeia e novo `migration:run`).
+3. Executar suites E2E de isolamento e vendas.
+4. Executar build/type-check para garantir regressao zero no backend.
 
 ### Evidencias de teste
 
@@ -111,6 +112,10 @@ Descreva como validar:
 Comandos executados:
 
 ```bash
+npm --prefix backend run migration:show
+npm --prefix backend run migration:run
+# rollback validado em cadeia (8 reversoes)
+npm --prefix backend run migration:revert
 npm --prefix backend run validate:rls
 npm --prefix backend run test:e2e -- test/permissoes/perfis-acesso.e2e-spec.ts
 npm --prefix backend run test:e2e:vendas
@@ -152,6 +157,7 @@ Arquivos-chave alterados:
 
 Pontos de atencao:
 
-- Migrations corretivas sao baseline-safe e usam `down` como no-op; rollback formal nao foi executado.
+- Correcao aplicada na migration `1802873000000-AlignLegacySchemaForPermissionsSuite.ts` para tratar schema de `evento` sem coluna legada `empresaId`.
+- Rollback validado localmente com ciclo completo `migration:run -> migration:revert (x8) -> migration:run`.
 - A validacao de relacoes com `proposta` em contratos/faturamento/assinatura foi tornada adaptativa para ambientes legados.
 - RLS foi expandido para tabelas que historicamente podiam escapar do isolamento em ambientes antigos.
