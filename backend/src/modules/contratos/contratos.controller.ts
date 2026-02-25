@@ -10,10 +10,13 @@ import {
   UseGuards,
   Res,
   HttpStatus,
+  HttpException,
+  InternalServerErrorException,
   ParseIntPipe,
   Logger,
 } from '@nestjs/common';
 import { Response } from 'express';
+import * as path from 'path';
 import { ContratosService } from './services/contratos.service';
 import { AssinaturaDigitalService } from './services/assinatura-digital.service';
 import { PdfContratoService } from './services/pdf-contrato.service';
@@ -25,6 +28,7 @@ import {
 } from './dto/assinatura.dto';
 import { StatusContrato } from './entities/contrato.entity';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Public } from '../auth/decorators/public.decorator';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
 import { EmpresaId, SkipEmpresaValidation } from '../../common/decorators/empresa.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
@@ -41,6 +45,16 @@ export class ContratosController {
     private readonly assinaturaService: AssinaturaDigitalService,
     private readonly pdfService: PdfContratoService,
   ) {}
+
+  private rethrowPublicSignatureError(error: any, contexto: string): never {
+    this.logger.error(`Erro em ${contexto}: ${error?.message || error}`);
+
+    if (error instanceof HttpException) {
+      throw error;
+    }
+
+    throw new InternalServerErrorException('Erro interno ao processar assinatura');
+  }
 
   /**
    * Criar novo contrato
@@ -230,11 +244,12 @@ export class ContratosController {
 
       const arquivo = await this.pdfService.obterArquivoPDF(contrato.caminhoArquivoPDF);
 
-      res.setHeader('Content-Type', 'text/html');
-      res.setHeader(
-        'Content-Disposition',
-        `attachment; filename="contrato-${contrato.numero}.html"`,
-      );
+      const ext = path.extname(contrato.caminhoArquivoPDF || '').toLowerCase();
+      const isPdf = ext === '.pdf';
+      const nomeArquivo = `contrato-${contrato.numero}.${isPdf ? 'pdf' : 'html'}`;
+
+      res.setHeader('Content-Type', isPdf ? 'application/pdf' : 'text/html; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename=\"${nomeArquivo}\"`);
 
       return res.send(arquivo);
     } catch (error) {
@@ -307,23 +322,18 @@ export class ContratosController {
    * Página de assinatura (sem autenticação JWT)
    */
   @Get('assinar/:token')
+  @Public()
   @SkipEmpresaValidation()
   async paginaAssinatura(@Param('token') token: string) {
     try {
       const assinatura = await this.assinaturaService.buscarAssinaturaPorToken(token);
-
       return {
         success: true,
         message: 'Dados da assinatura carregados',
         data: assinatura,
       };
     } catch (error) {
-      this.logger.error(`Erro ao carregar página de assinatura: ${error.message}`);
-      return {
-        success: false,
-        message: error.message,
-        data: null,
-      };
+      this.rethrowPublicSignatureError(error, 'carregar pagina de assinatura');
     }
   }
 
@@ -331,6 +341,7 @@ export class ContratosController {
    * Processar assinatura digital (sem autenticação JWT)
    */
   @Post('assinar/processar')
+  @Public()
   @SkipEmpresaValidation()
   async processarAssinatura(@Body() processarAssinaturaDto: ProcessarAssinaturaDto) {
     try {
@@ -344,12 +355,7 @@ export class ContratosController {
         data: assinatura,
       };
     } catch (error) {
-      this.logger.error(`Erro ao processar assinatura: ${error.message}`);
-      return {
-        success: false,
-        message: error.message,
-        data: null,
-      };
+      this.rethrowPublicSignatureError(error, 'processar assinatura');
     }
   }
 
@@ -357,6 +363,7 @@ export class ContratosController {
    * Rejeitar assinatura (sem autenticação JWT)
    */
   @Post('assinar/rejeitar')
+  @Public()
   @SkipEmpresaValidation()
   async rejeitarAssinatura(@Body() rejeitarAssinaturaDto: RejeitarAssinaturaDto) {
     try {
@@ -370,12 +377,7 @@ export class ContratosController {
         data: assinatura,
       };
     } catch (error) {
-      this.logger.error(`Erro ao rejeitar assinatura: ${error.message}`);
-      return {
-        success: false,
-        message: error.message,
-        data: null,
-      };
+      this.rethrowPublicSignatureError(error, 'rejeitar assinatura');
     }
   }
 }

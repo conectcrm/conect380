@@ -390,6 +390,68 @@ export class EnviarEmailDto {
   copiaParaRemetente?: boolean;
 }
 
+// DTO para converter cotação em pedido
+export class ConverterPedidoDto {
+  @ApiPropertyOptional({ description: 'Observações da conversão em pedido' })
+  @IsOptional()
+  @IsString()
+  @Length(0, 2000)
+  observacoes?: string;
+}
+
+// DTO para registrar compra concluída (pagamento externo)
+export class GerarContaPagarDto {
+  @ApiPropertyOptional({ description: 'Data de vencimento da conta a pagar (YYYY-MM-DD)' })
+  @IsOptional()
+  @IsString()
+  @Length(4, 20)
+  dataVencimento?: string;
+
+  @ApiPropertyOptional({ description: 'Categoria financeira (default: fornecedores)' })
+  @IsOptional()
+  @IsString()
+  @Length(1, 50)
+  categoria?: string;
+
+  @ApiPropertyOptional({ description: 'Prioridade financeira (baixa/media/alta/urgente)' })
+  @IsOptional()
+  @IsString()
+  @Length(1, 20)
+  prioridade?: string;
+
+  @ApiPropertyOptional({ description: 'Observacoes adicionais da conta a pagar' })
+  @IsOptional()
+  @IsString()
+  @Length(0, 2000)
+  observacoes?: string;
+}
+
+export class MarcarAdquiridoDto {
+  @ApiPropertyOptional({ description: 'Número do pedido/compra externa' })
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  numeroPedido?: string;
+
+  @ApiPropertyOptional({ description: 'Referência do pagamento externo' })
+  @IsOptional()
+  @IsString()
+  @Length(1, 150)
+  referenciaPagamento?: string;
+
+  @ApiPropertyOptional({ description: 'Data da aquisição (ISO string)' })
+  @IsOptional()
+  @IsString()
+  @Length(4, 40)
+  dataAquisicao?: string;
+
+  @ApiPropertyOptional({ description: 'Observações da compra/pagamento externo' })
+  @IsOptional()
+  @IsString()
+  @Length(0, 2000)
+  observacoes?: string;
+}
+
 // DTO de resposta da cotação de aquisição
 export class CotacaoResponseDto {
   @ApiProperty({ description: 'ID da cotação' })
@@ -496,6 +558,9 @@ export class CotacaoResponseDto {
 
   @ApiPropertyOptional({ description: 'Data de conversão' })
   dataConversao?: Date;
+
+  @ApiPropertyOptional({ description: 'Metadados adicionais do fluxo (ex.: compra interna)' })
+  metadados?: Record<string, any>;
 
   @ApiProperty({ description: 'Criado por' })
   criadoPor: string;

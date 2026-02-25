@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Oportunidade, EstagioOportunidade } from './oportunidade.entity';
@@ -11,6 +11,107 @@ import {
   UpdateEstagioDto,
 } from './dto/oportunidade.dto';
 import { CreateAtividadeDto } from './dto/atividade.dto';
+
+const ALL_OPORTUNIDADE_STAGES = new Set<string>([
+  EstagioOportunidade.LEADS,
+  EstagioOportunidade.QUALIFICACAO,
+  EstagioOportunidade.PROPOSTA,
+  EstagioOportunidade.NEGOCIACAO,
+  EstagioOportunidade.FECHAMENTO,
+  EstagioOportunidade.GANHO,
+  EstagioOportunidade.PERDIDO,
+]);
+
+function normalizeStageRuleInput(
+  stage?: EstagioOportunidade | string | null,
+): EstagioOportunidade | null {
+  const normalized = (stage || '').toString().trim().toLowerCase();
+  if (!normalized) return null;
+
+  switch (normalized) {
+    case 'lead':
+    case 'leads':
+      return EstagioOportunidade.LEADS;
+    case 'qualificado':
+    case 'qualificacao':
+    case 'qualification':
+      return EstagioOportunidade.QUALIFICACAO;
+    case 'proposta':
+    case 'proposal':
+      return EstagioOportunidade.PROPOSTA;
+    case 'negociacao':
+    case 'negotiation':
+      return EstagioOportunidade.NEGOCIACAO;
+    case 'fechamento':
+    case 'closing':
+      return EstagioOportunidade.FECHAMENTO;
+    case 'ganho':
+    case 'won':
+      return EstagioOportunidade.GANHO;
+    case 'perdido':
+    case 'lost':
+      return EstagioOportunidade.PERDIDO;
+    default:
+      return ALL_OPORTUNIDADE_STAGES.has(normalized)
+        ? (normalized as EstagioOportunidade)
+        : null;
+  }
+}
+
+export const OPORTUNIDADE_STAGE_TRANSITIONS: Record<
+  EstagioOportunidade,
+  readonly EstagioOportunidade[]
+> = {
+  // Fluxo "forward" sequencial com rollback de 1 etapa entre estágios comerciais.
+  // Estágios terminais (won/lost) não podem ser reabertos via updateEstagio.
+  [EstagioOportunidade.LEADS]: [EstagioOportunidade.QUALIFICACAO, EstagioOportunidade.PERDIDO],
+  [EstagioOportunidade.QUALIFICACAO]: [
+    EstagioOportunidade.LEADS,
+    EstagioOportunidade.PROPOSTA,
+    EstagioOportunidade.PERDIDO,
+  ],
+  [EstagioOportunidade.PROPOSTA]: [
+    EstagioOportunidade.QUALIFICACAO,
+    EstagioOportunidade.NEGOCIACAO,
+    EstagioOportunidade.PERDIDO,
+  ],
+  [EstagioOportunidade.NEGOCIACAO]: [
+    EstagioOportunidade.PROPOSTA,
+    EstagioOportunidade.FECHAMENTO,
+    EstagioOportunidade.PERDIDO,
+  ],
+  [EstagioOportunidade.FECHAMENTO]: [
+    EstagioOportunidade.NEGOCIACAO,
+    EstagioOportunidade.GANHO,
+    EstagioOportunidade.PERDIDO,
+  ],
+  [EstagioOportunidade.GANHO]: [],
+  [EstagioOportunidade.PERDIDO]: [],
+};
+
+export function isOportunidadeTerminalStage(stage?: EstagioOportunidade | string | null): boolean {
+  const normalized = normalizeStageRuleInput(stage);
+  return normalized === EstagioOportunidade.GANHO || normalized === EstagioOportunidade.PERDIDO;
+}
+
+export function getAllowedNextOportunidadeStages(
+  currentStage?: EstagioOportunidade | string | null,
+): readonly EstagioOportunidade[] {
+  const normalized = normalizeStageRuleInput(currentStage);
+  if (!normalized) return [];
+  return OPORTUNIDADE_STAGE_TRANSITIONS[normalized] || [];
+}
+
+export function isOportunidadeStageTransitionAllowed(
+  currentStage?: EstagioOportunidade | string | null,
+  nextStage?: EstagioOportunidade | string | null,
+): boolean {
+  const current = normalizeStageRuleInput(currentStage);
+  const next = normalizeStageRuleInput(nextStage);
+  if (!current || !next) return false;
+  if (current === next) return true;
+  return getAllowedNextOportunidadeStages(current).includes(next);
+}
 
 @Injectable()
 export class OportunidadesService {
@@ -27,6 +128,10 @@ export class OportunidadesService {
     EstagioOportunidade.GANHO,
     EstagioOportunidade.PERDIDO,
   ];
+
+  private isTerminalStage(stage?: EstagioOportunidade | string): boolean {
+    return isOportunidadeTerminalStage(stage);
+  }
 
   constructor(
     @InjectRepository(Oportunidade)
@@ -771,13 +876,67 @@ export class OportunidadesService {
   ): Promise<Oportunidade> {
     const schema = await this.resolveOportunidadesSchema();
     const oportunidade = await this.findOne(id, empresaId);
+    const currentStage = oportunidade.estagio;
+    const nextStage = updateEstagioDto.estagio;
+
+    if (currentStage === nextStage) {
+      return oportunidade;
+    }
+
+    if (!isOportunidadeStageTransitionAllowed(currentStage, nextStage)) {
+      const allowed = getAllowedNextOportunidadeStages(currentStage);
+      throw new BadRequestException(
+        `Transicao de estagio invalida: ${currentStage} -> ${nextStage}. Permitidos: ${allowed.join(', ') || 'nenhum'}`,
+      );
+    }
+
+    if (nextStage === EstagioOportunidade.PERDIDO && !updateEstagioDto.motivoPerda) {
+      throw new BadRequestException(
+        'motivoPerda e obrigatorio para marcar oportunidade como perdida',
+      );
+    }
+
+    const updatePayload: Record<string, unknown> = {
+      estagio: this.toDatabaseEstagio(nextStage, schema.estagioMode),
+    };
+
+    if (schema.dataFechamentoRealColumn) {
+      if (updateEstagioDto.dataFechamentoReal) {
+        updatePayload[schema.dataFechamentoRealColumn] = new Date(updateEstagioDto.dataFechamentoReal);
+      } else if (this.isTerminalStage(nextStage)) {
+        updatePayload[schema.dataFechamentoRealColumn] = new Date();
+      }
+    }
+
+    // Campos de perda (presentes em schemas mais novos)
+    if (schema.columns.has('motivo_perda')) {
+      updatePayload.motivoPerda =
+        nextStage === EstagioOportunidade.PERDIDO ? updateEstagioDto.motivoPerda ?? null : null;
+    }
+
+    if (schema.columns.has('motivo_perda_detalhes')) {
+      updatePayload.motivoPerdaDetalhes =
+        nextStage === EstagioOportunidade.PERDIDO
+          ? (updateEstagioDto.motivoPerdaDetalhes ?? null)
+          : null;
+    }
+
+    if (schema.columns.has('concorrente_nome')) {
+      updatePayload.concorrenteNome =
+        nextStage === EstagioOportunidade.PERDIDO ? updateEstagioDto.concorrenteNome ?? null : null;
+    }
+
+    if (schema.columns.has('data_revisao')) {
+      updatePayload.dataRevisao =
+        nextStage === EstagioOportunidade.PERDIDO && updateEstagioDto.dataRevisao
+          ? new Date(updateEstagioDto.dataRevisao)
+          : null;
+    }
 
     await this.oportunidadeRepository
       .createQueryBuilder()
       .update('oportunidades')
-      .set({
-        estagio: this.toDatabaseEstagio(updateEstagioDto.estagio, schema.estagioMode),
-      })
+      .set(updatePayload as any)
       .where('id::text = :id', { id })
       .andWhere('empresa_id = :empresaId', { empresaId })
       .execute();
@@ -792,11 +951,11 @@ export class OportunidadesService {
     });
 
     const descricao =
-      updateEstagioDto.estagio === EstagioOportunidade.GANHO
+      nextStage === EstagioOportunidade.GANHO
         ? 'Oportunidade GANHA'
-        : updateEstagioDto.estagio === EstagioOportunidade.PERDIDO
-          ? 'Oportunidade perdida'
-          : `Movido para estagio: ${updateEstagioDto.estagio}`;
+        : nextStage === EstagioOportunidade.PERDIDO
+          ? `Oportunidade perdida${updateEstagioDto.motivoPerda ? ` (motivo: ${updateEstagioDto.motivoPerda})` : ''}`
+          : `Movido para estagio: ${nextStage}`;
 
     await this.createAtividade(
       {

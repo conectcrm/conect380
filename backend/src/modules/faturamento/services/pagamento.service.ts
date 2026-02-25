@@ -22,6 +22,15 @@ export class PagamentoService {
     private faturamentoService: FaturamentoService,
   ) {}
 
+  private logEvento(evento: string, payload: Record<string, unknown>): void {
+    this.logger.log(
+      `[${evento}] ${JSON.stringify({
+        service: PagamentoService.name,
+        ...payload,
+      })}`,
+    );
+  }
+
   async criarPagamento(
     createPagamentoDto: CreatePagamentoDto,
     empresaId: string,
@@ -33,15 +42,15 @@ export class PagamentoService {
       });
 
       if (!fatura) {
-        throw new NotFoundException('Fatura não encontrada');
+        throw new NotFoundException('Fatura no encontrada');
       }
 
-      // Verificação direta do status em vez de usar o método isPaga()
+      // Verificao direta do status em vez de usar o mtodo isPaga()
       if (fatura.status === StatusFatura.PAGA) {
-        throw new BadRequestException('Fatura já está paga');
+        throw new BadRequestException('Fatura j est paga');
       }
 
-      // Verificar se já existe pagamento com o mesmo transacaoId
+      // Verificar se j existe pagamento com o mesmo transacaoId
       const pagamentoExistente = await this.pagamentoRepository.findOne({
         where: {
           transacaoId: createPagamentoDto.transacaoId,
@@ -50,10 +59,10 @@ export class PagamentoService {
       });
 
       if (pagamentoExistente) {
-        throw new BadRequestException('Já existe um pagamento com este ID de transação');
+        throw new BadRequestException('J existe um pagamento com este ID de transao');
       }
 
-      // Calcular valor líquido
+      // Calcular valor lquido
       const taxa = createPagamentoDto.taxa || 0;
       const valorLiquido = createPagamentoDto.valor - taxa;
 
@@ -82,7 +91,7 @@ export class PagamentoService {
     empresaId: string,
   ): Promise<Pagamento> {
     try {
-      // Buscar pagamento pelo ID da transação do gateway
+      // Buscar pagamento pelo ID da transao do gateway
       const pagamento = await this.pagamentoRepository.findOne({
         where: {
           gatewayTransacaoId: processarPagamentoDto.gatewayTransacaoId,
@@ -92,10 +101,11 @@ export class PagamentoService {
       });
 
       if (!pagamento) {
-        throw new NotFoundException('Pagamento não encontrado');
+        throw new NotFoundException('Pagamento no encontrado');
       }
 
       // Atualizar status do pagamento
+      const statusAnteriorPagamento = pagamento.status;
       pagamento.status = processarPagamentoDto.novoStatus;
       pagamento.dataProcessamento = new Date();
 
@@ -110,15 +120,26 @@ export class PagamentoService {
         };
       }
 
-      // Se aprovado, marcar data de aprovação
+      // Se aprovado, marcar data de aprovao
       if (processarPagamentoDto.novoStatus === StatusPagamento.APROVADO) {
         pagamento.dataAprovacao = new Date();
-
-        // Atualizar status da fatura
-        await this.atualizarStatusFatura(pagamento.faturaId, pagamento.valor, empresaId);
       }
 
       const pagamentoAtualizado = await this.pagamentoRepository.save(pagamento);
+
+      if (processarPagamentoDto.novoStatus === StatusPagamento.APROVADO) {
+        // Persistir primeiro para que o recalculo da fatura enxergue este pagamento como aprovado.
+        await this.atualizarStatusFatura(pagamento.faturaId, pagamento.valor, empresaId);
+      }
+
+      this.logEvento('PAGAMENTO_STATUS_CHANGE', {
+        empresaId,
+        pagamentoId: pagamentoAtualizado.id,
+        faturaId: pagamentoAtualizado.faturaId,
+        gatewayTransacaoId: pagamentoAtualizado.gatewayTransacaoId,
+        statusAnterior: statusAnteriorPagamento,
+        statusNovo: processarPagamentoDto.novoStatus,
+      });
 
       this.logger.log(
         `Pagamento processado: ${pagamentoAtualizado.transacaoId} - Status: ${processarPagamentoDto.novoStatus}`,
@@ -184,7 +205,7 @@ export class PagamentoService {
     });
 
     if (!pagamento) {
-      throw new NotFoundException('Pagamento não encontrado');
+      throw new NotFoundException('Pagamento no encontrado');
     }
 
     return pagamento;
@@ -197,7 +218,7 @@ export class PagamentoService {
     });
 
     if (!pagamento) {
-      throw new NotFoundException('Pagamento não encontrado');
+      throw new NotFoundException('Pagamento no encontrado');
     }
 
     return pagamento;
@@ -213,7 +234,7 @@ export class PagamentoService {
     });
 
     if (!pagamento) {
-      throw new NotFoundException('Pagamento não encontrado para esta transação do gateway');
+      throw new NotFoundException('Pagamento no encontrado para esta transao do gateway');
     }
 
     return pagamento;
@@ -227,7 +248,7 @@ export class PagamentoService {
     const pagamento = await this.buscarPagamentoPorId(id, empresaId);
 
     if (pagamento.isAprovado()) {
-      throw new BadRequestException('Não é possível alterar pagamento já aprovado');
+      throw new BadRequestException('No  possvel alterar pagamento j aprovado');
     }
 
     Object.assign(pagamento, updatePagamentoDto);
@@ -242,7 +263,7 @@ export class PagamentoService {
     const pagamento = await this.buscarPagamentoPorId(id, empresaId);
 
     if (!pagamento.isAprovado()) {
-      throw new BadRequestException('Só é possível estornar pagamentos aprovados');
+      throw new BadRequestException('S  possvel estornar pagamentos aprovados');
     }
 
     // Criar registro de estorno
@@ -322,7 +343,7 @@ export class PagamentoService {
       estatisticas.valorLiquido += pagamento.valorLiquido;
       estatisticas.taxasTotal += pagamento.taxa;
 
-      // Por método
+      // Por mtodo
       if (!estatisticas.porMetodo[pagamento.metodoPagamento]) {
         estatisticas.porMetodo[pagamento.metodoPagamento] = { quantidade: 0, valor: 0 };
       }
@@ -351,15 +372,21 @@ export class PagamentoService {
     });
 
     if (!fatura) return;
+    const statusAnterior = fatura.status;
 
     // Calcular total pago (somando apenas pagamentos aprovados)
     const pagamentosAprovados = fatura.pagamentos.filter((p) => p.isAprovado());
-    const totalPago = pagamentosAprovados.reduce((total, p) => total + p.valor, 0);
+    const totalPago = Number(
+      pagamentosAprovados
+        .reduce((total, p) => total + Number(p.valor || 0), 0)
+        .toFixed(2),
+    );
+    const valorTotalFatura = Number(fatura.valorTotal || 0);
 
     fatura.valorPago = totalPago;
 
     // Determinar status baseado no valor pago
-    if (totalPago >= fatura.valorTotal) {
+    if (totalPago >= valorTotalFatura) {
       fatura.status = StatusFatura.PAGA;
       fatura.dataPagamento = new Date();
     } else if (totalPago > 0) {
@@ -371,6 +398,18 @@ export class PagamentoService {
 
     await this.faturaRepository.save(fatura);
 
+    this.logEvento('FATURA_STATUS_RECALCULADO', {
+      empresaId,
+      faturaId: fatura.id,
+      numero: fatura.numero,
+      statusAnterior,
+      statusNovo: fatura.status,
+      valorTotal: valorTotalFatura,
+      valorPago: totalPago,
+      qtdPagamentosAprovados: pagamentosAprovados.length,
+    });
+
     this.logger.log(`Status da fatura ${fatura.numero} atualizado para: ${fatura.status}`);
   }
 }
+

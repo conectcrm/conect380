@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { testDatabaseConfig } from './test.database.config';
@@ -22,6 +22,7 @@ import { Ticket } from '../src/modules/atendimento/entities/ticket.entity';
 import { Mensagem } from '../src/modules/atendimento/entities/mensagem.entity';
 import { Equipe } from '../src/modules/triagem/entities/equipe.entity';
 import { Atendente } from '../src/modules/atendimento/entities/atendente.entity';
+import { createE2EApp, withE2EBootstrapLock } from './_support/e2e-app.helper';
 
 /**
  * 🧪 Helper para criar aplicação de teste E2E
@@ -48,7 +49,7 @@ import { Atendente } from '../src/modules/atendimento/entities/atendente.entity'
  * ```
  */
 export async function createTestApp(): Promise<INestApplication> {
-  const moduleFixture: TestingModule = await Test.createTestingModule({
+  const moduleFixture: TestingModule = await withE2EBootstrapLock(() => Test.createTestingModule({
     imports: [
       // Database de teste
       TypeOrmModule.forRoot(testDatabaseConfig),
@@ -83,20 +84,15 @@ export async function createTestApp(): Promise<INestApplication> {
       // Mocks de serviços externos
       ...getMockProviders(),
     ],
-  }).compile();
+  }).compile());
 
-  const app = moduleFixture.createNestApplication();
-
-  // Habilitar validation pipes (como em produção)
-  app.useGlobalPipes(
-    new ValidationPipe({
+  const app = await createE2EApp(moduleFixture, {
+    validationPipeOptions: {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
-    }),
-  );
-
-  await app.init();
+    },
+  });
 
   return app;
 }
@@ -141,3 +137,6 @@ export async function cleanDatabase(app: INestApplication): Promise<void> {
     await queryRunner.release();
   }
 }
+
+
+

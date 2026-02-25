@@ -21,6 +21,7 @@ import {
   EstagioOportunidade,
   PrioridadeOportunidade,
   OrigemOportunidade,
+  MotivoPerdaOportunidade,
 } from '../oportunidade.entity';
 
 // ✅ Validação customizada: Exige cliente_id OU nomeContato
@@ -189,6 +190,22 @@ export class UpdateEstagioDto {
   @IsOptional()
   @IsDateString()
   dataFechamentoReal?: string;
+
+  @IsOptional()
+  @IsEnum(MotivoPerdaOportunidade)
+  motivoPerda?: MotivoPerdaOportunidade;
+
+  @IsOptional()
+  @IsString()
+  motivoPerdaDetalhes?: string;
+
+  @IsOptional()
+  @IsString()
+  concorrenteNome?: string;
+
+  @IsOptional()
+  @IsDateString()
+  dataRevisao?: string;
 }
 
 export class MetricasQueryDto {

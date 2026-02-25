@@ -11,6 +11,7 @@ import { Oportunidade } from '../modules/oportunidades/oportunidade.entity';
 import { Atividade } from '../modules/oportunidades/atividade.entity';
 import { OportunidadeStageEvent } from '../modules/oportunidades/oportunidade-stage-event.entity';
 import { Proposta } from '../modules/propostas/proposta.entity';
+import { PropostaPortalToken } from '../modules/propostas/proposta-portal-token.entity';
 import { DashboardPipelineSnapshotDaily } from '../modules/dashboard-v2/entities/dashboard-pipeline-snapshot-daily.entity';
 import { DashboardFunnelMetricsDaily } from '../modules/dashboard-v2/entities/dashboard-funnel-metrics-daily.entity';
 import { DashboardAgingStageDaily } from '../modules/dashboard-v2/entities/dashboard-aging-stage-daily.entity';
@@ -25,6 +26,7 @@ import { Evento } from '../modules/eventos/evento.entity';
 import { AgendaEvento } from '../modules/agenda/agenda-evento.entity';
 import { Interacao } from '../modules/interacoes/interacao.entity';
 import { Fornecedor } from '../modules/financeiro/entities/fornecedor.entity';
+import { ContaPagar } from '../modules/financeiro/entities/conta-pagar.entity';
 import { Fatura } from '../modules/faturamento/entities/fatura.entity';
 import { ItemFatura } from '../modules/faturamento/entities/item-fatura.entity';
 import { Pagamento } from '../modules/faturamento/entities/pagamento.entity';
@@ -94,6 +96,7 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         Atividade,
         OportunidadeStageEvent,
         Proposta,
+        PropostaPortalToken,
         DashboardPipelineSnapshotDaily,
         DashboardFunnelMetricsDaily,
         DashboardAgingStageDaily,
@@ -108,6 +111,7 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         AgendaEvento,
         Interacao,
         Fornecedor,
+        ContaPagar,
         Fatura,
         ItemFatura,
         Pagamento,
@@ -165,18 +169,24 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
           : false,
     };
 
-    // Debug log
-    console.log('📊 Database Config:', {
-      host: config.host,
-      port: config.port,
-      username: config.username,
-      password: config.password?.substr(0, 3) + '***',
-      database: config.database,
-      entitiesCount: config.entities.length, // ✅ Quantas entities carregadas
-      synchronize: config.synchronize, // ✅ Confirmar se está true
-    });
+    const shouldLogDbConfig =
+      this.configService.get('DATABASE_CONFIG_DEBUG') === 'true' ||
+      (this.configService.get('APP_ENV') === 'development' &&
+        this.configService.get('NODE_ENV') !== 'test');
+
+    if (shouldLogDbConfig) {
+      // Debug log
+      console.log('📊 Database Config:', {
+        host: config.host,
+        port: config.port,
+        username: config.username,
+        password: config.password?.substr(0, 3) + '***',
+        database: config.database,
+        entitiesCount: config.entities.length, // ✅ Quantas entities carregadas
+        synchronize: config.synchronize, // ✅ Confirmar se está true
+      });
+    }
 
     return config as TypeOrmModuleOptions;
   }
 }
-

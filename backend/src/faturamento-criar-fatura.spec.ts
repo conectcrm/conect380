@@ -81,6 +81,7 @@ function createInMemoryRepository<T extends { id?: any }>() {
 const faturaRepo = createInMemoryRepository<Fatura>();
 const itemRepo = createInMemoryRepository<ItemFatura>();
 const contratoRepo = createInMemoryRepository<Contrato>();
+const clienteRepo = createInMemoryRepository<any>();
 
 describe('FaturamentoService - criar fatura (unitário sem TypeORM)', () => {
   let service: FaturamentoService;
@@ -90,6 +91,7 @@ describe('FaturamentoService - criar fatura (unitário sem TypeORM)', () => {
       faturaRepo as any,
       itemRepo as any,
       contratoRepo as any,
+      clienteRepo as any,
       new EmailMock() as any,
     );
   });

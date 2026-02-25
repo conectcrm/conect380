@@ -41,6 +41,20 @@ export class CacheInterceptor implements NestInterceptor {
     cleanupInterval.unref?.();
   }
 
+  private isTestEnv(): boolean {
+    return process.env.NODE_ENV === 'test' || process.env.APP_ENV === 'test';
+  }
+
+  private shouldLogCacheInTest(): boolean {
+    if (!this.isTestEnv()) return true;
+    return process.env.CACHE_LOGS_IN_TEST === 'true';
+  }
+
+  private logCache(message: string): void {
+    if (!this.shouldLogCacheInTest()) return;
+    console.log(message);
+  }
+
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
     const { method, url } = request;
@@ -60,11 +74,11 @@ export class CacheInterceptor implements NestInterceptor {
 
     const cached = CacheInterceptor.cache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < cached.ttlMs) {
-      console.log(`🟢 [Cache] HIT: ${cacheKey} (${ttlMs}ms)`);
+      this.logCache(`🟢 [Cache] HIT: ${cacheKey} (${ttlMs}ms)`);
       return of(cached.data);
     }
 
-    console.log(`🔴 [Cache] MISS: ${cacheKey}`);
+    this.logCache(`🔴 [Cache] MISS: ${cacheKey}`);
 
     return next.handle().pipe(
       tap((data) => {
@@ -73,7 +87,7 @@ export class CacheInterceptor implements NestInterceptor {
           timestamp: Date.now(),
           ttlMs,
         });
-        console.log(`💾 [Cache] SAVED: ${cacheKey} (TTL: ${ttlMs}ms)`);
+        this.logCache(`💾 [Cache] SAVED: ${cacheKey} (TTL: ${ttlMs}ms)`);
       }),
     );
   }
@@ -126,7 +140,7 @@ export class CacheInterceptor implements NestInterceptor {
     }
 
     if (cleaned > 0) {
-      console.log(`🧹 [Cache] Removed ${cleaned} expired entries`);
+      this.logCache(`🧹 [Cache] Removed ${cleaned} expired entries`);
     }
   }
 
@@ -141,14 +155,14 @@ export class CacheInterceptor implements NestInterceptor {
     }
 
     if (invalidated > 0) {
-      console.log(`🗑️ [Cache] Invalidated ${invalidated} entries (${prefix})`);
+      this.logCache(`🗑️ [Cache] Invalidated ${invalidated} entries (${prefix})`);
     }
   }
 
   clearAll() {
     const size = CacheInterceptor.cache.size;
     CacheInterceptor.cache.clear();
-    console.log(`🗑️ [Cache] Cleared all cache entries (${size})`);
+    this.logCache(`🗑️ [Cache] Cleared all cache entries (${size})`);
   }
 
   getStats() {
@@ -162,3 +176,4 @@ export class CacheInterceptor implements NestInterceptor {
     };
   }
 }
+

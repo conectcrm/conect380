@@ -10,10 +10,11 @@ import { Pagamento } from './entities/pagamento.entity';
 import { PlanoCobranca } from './entities/plano-cobranca.entity';
 import { ContratosModule } from '../contratos/contratos.module';
 import { PropostasModule } from '../propostas/propostas.module';
+import { Cliente } from '../clientes/cliente.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Fatura, ItemFatura, Pagamento, PlanoCobranca]),
+    TypeOrmModule.forFeature([Fatura, ItemFatura, Pagamento, PlanoCobranca, Cliente]),
     forwardRef(() => ContratosModule), // Para evitar dependência circular
     PropostasModule, // Para acessar o EmailIntegradoService
   ],

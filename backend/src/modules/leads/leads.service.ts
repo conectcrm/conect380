@@ -25,6 +25,7 @@ import {
   OrigemOportunidade,
   PrioridadeOportunidade,
 } from '../oportunidades/oportunidade.entity';
+import { OportunidadesService } from '../oportunidades/oportunidades.service';
 import * as Papa from 'papaparse';
 
 @Injectable()
@@ -34,8 +35,7 @@ export class LeadsService {
   constructor(
     @InjectRepository(Lead)
     private readonly leadsRepository: Repository<Lead>,
-    @InjectRepository(Oportunidade)
-    private readonly oportunidadesRepository: Repository<Oportunidade>,
+    private readonly oportunidadesService: OportunidadesService,
   ) {}
 
 
@@ -418,24 +418,26 @@ export class LeadsService {
         throw new BadRequestException('Lead já foi convertido anteriormente');
       }
 
-      // Criar oportunidade
-      const oportunidade = this.oportunidadesRepository.create({
-        titulo: `${lead.nome}${lead.empresa_nome ? ` - ${lead.empresa_nome}` : ''}`,
-        descricao: dto.descricao || lead.observacoes || `Lead convertido: ${lead.nome}`,
-        valor: dto.valor || 0,
-        estagio: this.mapearEstagioParaBanco((dto.estagio as EstagioOportunidade) || EstagioOportunidade.LEADS),
-        prioridade: PrioridadeOportunidade.MEDIA,
-        origem: this.mapearOrigemParaBanco(lead.origem),
-        empresa_id: empresaId,
-        responsavel_id: lead.responsavel_id,
-        probabilidade: 20, // Probabilidade inicial baixa
-        nomeContato: lead.nome,
-        emailContato: lead.email,
-        telefoneContato: lead.telefone,
-        empresaContato: lead.empresa_nome,
-      });
-
-      const savedOportunidade = await this.oportunidadesRepository.save(oportunidade);
+      // Criar oportunidade usando OportunidadesService (schema-aware e compatível com bancos legados)
+      const savedOportunidade = await this.oportunidadesService.create(
+        {
+          titulo: `${lead.nome}${lead.empresa_nome ? ` - ${lead.empresa_nome}` : ''}`,
+          descricao: dto.descricao || lead.observacoes || `Lead convertido: ${lead.nome}`,
+          valor: dto.valor || 0,
+          probabilidade: 20,
+          estagio: this.mapearEstagioParaBanco(
+            (dto.estagio as EstagioOportunidade) || EstagioOportunidade.LEADS,
+          ),
+          prioridade: PrioridadeOportunidade.MEDIA,
+          origem: this.mapearOrigemParaBanco(lead.origem),
+          responsavel_id: lead.responsavel_id as any,
+          nomeContato: lead.nome,
+          emailContato: lead.email,
+          telefoneContato: lead.telefone,
+          empresaContato: lead.empresa_nome,
+        } as any,
+        empresaId,
+      );
 
       // Atualizar lead
       lead.status = StatusLead.CONVERTIDO;

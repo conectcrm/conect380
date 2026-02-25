@@ -3,6 +3,7 @@ import { Contrato } from '../entities/contrato.entity';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import * as puppeteer from 'puppeteer';
 
 @Injectable()
 export class PdfContratoService {
@@ -15,23 +16,16 @@ export class PdfContratoService {
 
   async gerarPDFContrato(contrato: Contrato): Promise<string> {
     try {
-      // Garantir que o diretório existe
       this.ensureUploadsDirectory();
 
-      // Por enquanto, gerar um arquivo HTML que pode ser convertido para PDF
-      const nomeArquivo = `contrato-${contrato.numero || contrato.id}-${Date.now()}.html`;
+      const nomeArquivo = `contrato-${contrato.numero || contrato.id}-${Date.now()}.pdf`;
       const caminhoCompleto = path.join(this.uploadsDir, nomeArquivo);
-
-      // Gerar conteúdo HTML do contrato
       const htmlContent = this.gerarHTMLContrato(contrato);
+      const pdfBuffer = await this.htmlParaPdf(htmlContent);
 
-      // Escrever arquivo
-      fs.writeFileSync(caminhoCompleto, htmlContent, 'utf8');
+      fs.writeFileSync(caminhoCompleto, pdfBuffer);
 
-      this.logger.log(
-        `Contrato HTML gerado para ${contrato.numero || contrato.id}: ${caminhoCompleto}`,
-      );
-
+      this.logger.log(`Contrato PDF gerado para ${contrato.numero || contrato.id}: ${caminhoCompleto}`);
       return caminhoCompleto;
     } catch (error) {
       this.logger.error(`Erro ao gerar documento do contrato: ${error.message}`);
@@ -45,7 +39,6 @@ export class PdfContratoService {
       const hash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
 
       this.logger.log(`Hash calculado para ${caminhoArquivo}: ${hash}`);
-
       return hash;
     } catch (error) {
       this.logger.error(`Erro ao calcular hash do documento: ${error.message}`);
@@ -56,7 +49,7 @@ export class PdfContratoService {
   async obterArquivoPDF(caminhoArquivo: string): Promise<Buffer> {
     try {
       if (!fs.existsSync(caminhoArquivo)) {
-        throw new Error('Arquivo não encontrado');
+        throw new Error('Arquivo nao encontrado');
       }
 
       return fs.readFileSync(caminhoArquivo);
@@ -66,165 +59,238 @@ export class PdfContratoService {
     }
   }
 
+  private async htmlParaPdf(html: string): Promise<Buffer> {
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+
+    try {
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'networkidle0' });
+
+      const pdf = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: {
+          top: '20px',
+          right: '20px',
+          bottom: '20px',
+          left: '20px',
+        },
+      });
+
+      return Buffer.from(pdf);
+    } finally {
+      await browser.close();
+    }
+  }
+
   private gerarHTMLContrato(contrato: Contrato): string {
     const empresaNome = process.env.EMPRESA_NOME || 'ConectCRM';
     const empresaCNPJ = process.env.EMPRESA_CNPJ || '00.000.000/0001-00';
-    const empresaEndereco = process.env.EMPRESA_ENDERECO || 'Endereço da Empresa';
+    const empresaEndereco = process.env.EMPRESA_ENDERECO || 'Endereco da Empresa';
     const dataAtual = new Date().toLocaleDateString('pt-BR');
+    const valorTotal = Number(contrato.valorTotal || 0);
+    const valorTotalFormatado = new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(Number.isFinite(valorTotal) ? valorTotal : 0);
+
+    const dataInicio = contrato.dataInicio
+      ? new Date(contrato.dataInicio).toLocaleDateString('pt-BR')
+      : 'N/A';
+    const dataFim = contrato.dataFim ? new Date(contrato.dataFim).toLocaleDateString('pt-BR') : 'N/A';
+
+    const condicoesPagamento = contrato.condicoesPagamento
+      ? `
+        <p>Forma de Pagamento: ${contrato.condicoesPagamento.formaPagamento}<br>
+        Numero de Parcelas: ${contrato.condicoesPagamento.parcelas}<br>
+        Valor da Parcela: ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(contrato.condicoesPagamento.valorParcela || 0))}<br>
+        Dia de Vencimento: ${contrato.condicoesPagamento.diaVencimento}</p>
+      `
+      : '';
+
+    const clausulasEspeciais = contrato.clausulasEspeciais
+      ? `
+      <div class="section">
+        <div class="section-title">4. CLAUSULAS ESPECIAIS</div>
+        <p>${this.escapeHtml(contrato.clausulasEspeciais)}</p>
+      </div>
+    `
+      : '';
+
+    const observacoes = contrato.observacoes
+      ? `
+      <div class="section">
+        <div class="section-title">5. OBSERVACOES</div>
+        <p>${this.escapeHtml(contrato.observacoes)}</p>
+      </div>
+    `
+      : '';
 
     return `
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Contrato ${contrato.numero || contrato.id}</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            margin: 40px;
-            color: #333;
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .contract-number {
-            text-align: right;
-            margin-bottom: 20px;
-        }
-        .section {
-            margin-bottom: 25px;
-        }
-        .section-title {
-            font-weight: bold;
-            text-decoration: underline;
-            margin-bottom: 10px;
-        }
-        .signatures {
-            margin-top: 50px;
-        }
-        .signature-line {
-            border-bottom: 1px solid #000;
-            width: 300px;
-            margin: 30px 0 5px 0;
-        }
-        .footer {
-            margin-top: 50px;
-            font-size: 12px;
-            text-align: center;
-            color: #666;
-        }
-        .value {
-            font-weight: bold;
-            color: #2c3e50;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contrato ${this.escapeHtml(contrato.numero || String(contrato.id || 'N/A'))}</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.5;
+      margin: 24px;
+      color: #202124;
+      font-size: 12px;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #111827;
+      padding-bottom: 12px;
+    }
+    .contract-number {
+      text-align: right;
+      margin-bottom: 16px;
+      font-weight: bold;
+    }
+    .section {
+      margin-bottom: 16px;
+      page-break-inside: avoid;
+    }
+    .section-title {
+      font-weight: 700;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+    p {
+      margin: 4px 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .value {
+      font-weight: bold;
+      color: #111827;
+    }
+    .signatures {
+      margin-top: 48px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+    }
+    .signature-box {
+      padding-top: 24px;
+    }
+    .signature-line {
+      border-top: 1px solid #000;
+      margin-top: 36px;
+      padding-top: 6px;
+    }
+    .footer {
+      margin-top: 36px;
+      border-top: 1px solid #d1d5db;
+      padding-top: 10px;
+      font-size: 10px;
+      color: #4b5563;
+      text-align: center;
+    }
+  </style>
 </head>
 <body>
-    <div class="header">
-        <h1>CONTRATO DE PRESTAÇÃO DE SERVIÇOS</h1>
-    </div>
+  <div class="header">
+    <h1>CONTRATO DE PRESTACAO DE SERVICOS</h1>
+  </div>
 
-    <div class="contract-number">
-        <strong>Contrato Nº: ${contrato.numero || 'N/A'}</strong>
-    </div>
+  <div class="contract-number">
+    Contrato No: ${this.escapeHtml(contrato.numero || 'N/A')}
+  </div>
 
-    <div class="section">
-        <div class="section-title">CONTRATANTE:</div>
-        <p>Empresa: ${empresaNome}<br>
-        CNPJ: ${empresaCNPJ}<br>
-        Endereço: ${empresaEndereco}</p>
-    </div>
+  <div class="section">
+    <div class="section-title">Contratante</div>
+    <p>Empresa: ${this.escapeHtml(empresaNome)}</p>
+    <p>CNPJ: ${this.escapeHtml(empresaCNPJ)}</p>
+    <p>Endereco: ${this.escapeHtml(empresaEndereco)}</p>
+  </div>
 
-    <div class="section">
-        <div class="section-title">CONTRATADO:</div>
-        <p>Cliente ID: ${contrato.clienteId}<br>
-        (Dados do cliente serão preenchidos automaticamente)</p>
-    </div>
+  <div class="section">
+    <div class="section-title">Contratado</div>
+    <p>Cliente ID: ${this.escapeHtml(String(contrato.clienteId || 'N/A'))}</p>
+    <p>(Dados completos do cliente devem ser conferidos no cadastro do CRM)</p>
+  </div>
 
-    <div class="section">
-        <div class="section-title">1. OBJETO DO CONTRATO</div>
-        <p>${contrato.objeto || 'Objeto não especificado'}</p>
-    </div>
+  <div class="section">
+    <div class="section-title">1. Objeto do Contrato</div>
+    <p>${this.escapeHtml(contrato.objeto || 'Objeto nao especificado')}</p>
+  </div>
 
-    <div class="section">
-        <div class="section-title">2. VALOR E CONDIÇÕES DE PAGAMENTO</div>
-        <p><span class="value">Valor Total: R$ ${contrato.valorTotal?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}</span></p>
-        ${
-          contrato.condicoesPagamento
-            ? `
-        <p>Forma de Pagamento: ${contrato.condicoesPagamento.formaPagamento}<br>
-        Número de Parcelas: ${contrato.condicoesPagamento.parcelas}<br>
-        Valor da Parcela: R$ ${contrato.condicoesPagamento.valorParcela?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}<br>
-        Dia de Vencimento: ${contrato.condicoesPagamento.diaVencimento}</p>
-        `
-            : ''
-        }
-    </div>
+  <div class="section">
+    <div class="section-title">2. Valor e Condicoes de Pagamento</div>
+    <p><span class="value">Valor Total: ${valorTotalFormatado}</span></p>
+    ${condicoesPagamento}
+  </div>
 
-    <div class="section">
-        <div class="section-title">3. PRAZO DE VIGÊNCIA</div>
-        <p>Data de Início: ${contrato.dataInicio ? new Date(contrato.dataInicio).toLocaleDateString('pt-BR') : 'N/A'}<br>
-        Data de Término: ${contrato.dataFim ? new Date(contrato.dataFim).toLocaleDateString('pt-BR') : 'N/A'}</p>
-    </div>
+  <div class="section">
+    <div class="section-title">3. Prazo de Vigencia</div>
+    <p>Data de Inicio: ${this.escapeHtml(dataInicio)}</p>
+    <p>Data de Termino: ${this.escapeHtml(dataFim)}</p>
+    <p>Data de Vencimento para Assinatura: ${this.escapeHtml(
+      contrato.dataVencimento ? new Date(contrato.dataVencimento).toLocaleDateString('pt-BR') : 'N/A',
+    )}</p>
+  </div>
 
-    ${
-      contrato.clausulasEspeciais
-        ? `
-    <div class="section">
-        <div class="section-title">4. CLÁUSULAS ESPECIAIS</div>
-        <p>${contrato.clausulasEspeciais}</p>
-    </div>
-    `
-        : ''
-    }
+  ${clausulasEspeciais}
+  ${observacoes}
 
-    ${
-      contrato.observacoes
-        ? `
-    <div class="section">
-        <div class="section-title">5. OBSERVAÇÕES</div>
-        <p>${contrato.observacoes}</p>
-    </div>
-    `
-        : ''
-    }
+  <div class="section">
+    <div class="section-title">6. Clausulas Gerais</div>
+    <p>6.1. Este contrato sera regido pelas leis brasileiras.</p>
+    <p>6.2. Qualquer alteracao devera ser formalizada por escrito e assinada pelas partes.</p>
+    <p>6.3. Em caso de descumprimento, a parte lesada podera rescindir o contrato conforme legislacao aplicavel.</p>
+    <p>6.4. O foro competente e o da comarca da sede da contratante, salvo disposicao legal diversa.</p>
+  </div>
 
-    <div class="section">
-        <div class="section-title">6. CLÁUSULAS GERAIS</div>
-        <p>6.1. Este contrato será regido pelas leis brasileiras.</p>
-        <p>6.2. Qualquer alteração deste contrato deverá ser feita por escrito e assinada por ambas as partes.</p>
-        <p>6.3. Em caso de descumprimento de qualquer cláusula, a parte lesada poderá rescindir o contrato.</p>
-        <p>6.4. O foro competente para dirimir questões relativas a este contrato é o da comarca da sede da CONTRATANTE.</p>
-    </div>
+  <div class="section">
+    <p><strong>Local e Data:</strong> ________________, ${this.escapeHtml(dataAtual)}</p>
+  </div>
 
-    <div class="section">
-        <p><strong>Local e Data:</strong> ________________, ${dataAtual}</p>
+  <div class="signatures">
+    <div class="signature-box">
+      <div class="signature-line"></div>
+      <p><strong>CONTRATANTE</strong></p>
+      <p>${this.escapeHtml(empresaNome)}</p>
     </div>
+    <div class="signature-box">
+      <div class="signature-line"></div>
+      <p><strong>CONTRATADO</strong></p>
+      <p>Cliente</p>
+    </div>
+  </div>
 
-    <div class="signatures">
-        <div class="signature-line"></div>
-        <p><strong>CONTRATANTE</strong><br>${empresaNome}</p>
-        
-        <div class="signature-line"></div>
-        <p><strong>CONTRATADO</strong><br>Cliente</p>
-    </div>
-
-    <div class="footer">
-        <p>Documento gerado automaticamente em ${new Date().toLocaleString('pt-BR')}<br>
-        ID do Contrato: ${contrato.id || 'N/A'}</p>
-    </div>
+  <div class="footer">
+    <p>Documento gerado automaticamente em ${this.escapeHtml(
+      new Date().toLocaleString('pt-BR'),
+    )}</p>
+    <p>ID do Contrato: ${this.escapeHtml(String(contrato.id || 'N/A'))}</p>
+  </div>
 </body>
 </html>
     `;
   }
 
+  private escapeHtml(value: string): string {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   private ensureUploadsDirectory(): void {
     if (!fs.existsSync(this.uploadsDir)) {
       fs.mkdirSync(this.uploadsDir, { recursive: true });
-      this.logger.log(`Diretório de uploads criado: ${this.uploadsDir}`);
+      this.logger.log(`Diretorio de uploads criado: ${this.uploadsDir}`);
     }
   }
 }

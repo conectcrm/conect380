@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
+import { createE2EApp, withE2EBootstrapLock } from '../_support/e2e-app.helper';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcryptjs';
 import * as request from 'supertest';
@@ -36,13 +37,11 @@ describe('Analytics Real Data (E2E)', () => {
   jest.setTimeout(120000);
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
+    const moduleFixture: TestingModule = await withE2EBootstrapLock(() => Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    }).compile());
 
-    app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-    await app.init();
+    app = await createE2EApp(moduleFixture);
 
     dataSource = app.get(DataSource);
 
@@ -354,3 +353,6 @@ describe('Analytics Real Data (E2E)', () => {
     expect(response.body).toBeDefined();
   });
 });
+
+
+

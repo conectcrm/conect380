@@ -1417,14 +1417,10 @@ export class UsersService {
   }
 
   async alterarStatus(id: string, ativo: boolean, empresa_id: string): Promise<User> {
-    console.log(
-      `🔧 UsersService.alterarStatus - ID: ${id}, Ativo: ${ativo}, Empresa: ${empresa_id}`,
-    );
 
     // Verificar se o usuário existe e pertence à empresa
     const usuario = await this.userRepository.findOne({
       where: { id, empresa_id },
-      relations: ['empresa'],
     });
 
     if (!usuario) {
@@ -1437,10 +1433,7 @@ export class UsersService {
     // Buscar o usuário atualizado
     const usuarioAtualizado = await this.userRepository.findOne({
       where: { id, empresa_id },
-      relations: ['empresa'],
     });
-
-    console.log(`✅ Status do usuário ${id} alterado para: ${ativo ? 'ATIVO' : 'INATIVO'}`);
 
     return usuarioAtualizado;
   }

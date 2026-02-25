@@ -200,12 +200,21 @@ export class PdfService {
   }
 
   private getStatusText(status: string): string {
-    const statusMap = {
+    const normalized = String(status || '').trim().toLowerCase();
+    const statusMap: Record<string, string> = {
       draft: 'Rascunho',
+      rascunho: 'Rascunho',
       sent: 'Enviada',
+      enviada: 'Enviada',
+      viewed: 'Visualizada',
+      visualizada: 'Visualizada',
       approved: 'Aprovada',
+      aprovada: 'Aprovada',
       rejected: 'Rejeitada',
+      rejeitada: 'Rejeitada',
+      expired: 'Expirada',
+      expirada: 'Expirada',
     };
-    return statusMap[status] || 'Desconhecido';
+    return statusMap[normalized] || 'Desconhecido';
   }
 }

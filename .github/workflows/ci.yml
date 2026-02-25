@@ -267,7 +267,7 @@ jobs:
         run: npm --prefix backend run migration:run
 
       - name: Rodar E2E de multi-tenancy
-        run: npm --prefix backend run test:e2e -- test/multi-tenancy.e2e-spec.ts
+        run: npm --prefix backend run test:e2e -- multi-tenancy.e2e-spec.ts
 
   backend-e2e-vendas:
     name: Backend - E2E Vendas

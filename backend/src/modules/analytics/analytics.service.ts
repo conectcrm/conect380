@@ -375,7 +375,17 @@ export class AnalyticsService {
     const vendedorId = this.normalizeVendedor(params.vendedor);
     const oportunidadesQuery = this.oportunidadeRepo
       .createQueryBuilder('o')
-      .leftJoinAndSelect('o.responsavel', 'responsavel')
+      .leftJoin('o.responsavel', 'responsavel')
+      .select([
+        'o.id AS id',
+        'o.valor AS valor',
+        'o.probabilidade AS probabilidade',
+        'o."empresaContato" AS "empresaContato"',
+        'o."nomeContato" AS "nomeContato"',
+        'o.titulo AS titulo',
+        'o."dataFechamentoEsperado" AS "dataFechamentoEsperado"',
+        'responsavel.nome AS "responsavelNome"',
+      ])
       .where('o.empresa_id = :empresaId', { empresaId: params.empresaId })
       .andWhere('o.estagio IN (:...estagios)', {
         estagios: [
@@ -387,7 +397,16 @@ export class AnalyticsService {
       });
 
     if (vendedorId) oportunidadesQuery.andWhere('o.responsavel_id = :vendedorId', { vendedorId });
-    const oportunidades = await oportunidadesQuery.getMany();
+    const oportunidades = await oportunidadesQuery.getRawMany<{
+      id: number;
+      valor: number | string;
+      probabilidade: number | string;
+      empresaContato?: string | null;
+      nomeContato?: string | null;
+      titulo?: string | null;
+      dataFechamentoEsperado?: Date | string | null;
+      responsavelNome?: string | null;
+    }>();
 
     const agora = new Date();
     const previsao = this.sum(
@@ -396,7 +415,11 @@ export class AnalyticsService {
     const confianca = this.avg(oportunidades.map((o) => this.num(o.probabilidade)));
 
     const propostasQuentes = [...oportunidades]
-      .sort((a, b) => b.probabilidade - a.probabilidade || this.num(b.valor) - this.num(a.valor))
+      .sort(
+        (a, b) =>
+          this.num(b.probabilidade) - this.num(a.probabilidade) ||
+          this.num(b.valor) - this.num(a.valor),
+      )
       .slice(0, 5)
       .map((o) => ({
         id: String(o.id),
@@ -404,7 +427,7 @@ export class AnalyticsService {
         valor: Number(this.num(o.valor).toFixed(2)),
         probabilidade: Number(this.num(o.probabilidade).toFixed(1)),
         dias_para_fechar: o.dataFechamentoEsperado ? this.days(agora, o.dataFechamentoEsperado) : 0,
-        vendedor: o.responsavel?.nome || 'Sem responsavel',
+        vendedor: o.responsavelNome || 'Sem responsavel',
       }));
 
     return {
@@ -527,18 +550,20 @@ export class AnalyticsService {
         this.queryFaturasPagas(empresaId, inicioHoje, agora),
         this.queryFaturasPagas(empresaId, inicioMes, agora),
         this.queryVendedoresAtivos(empresaId),
-        this.oportunidadeRepo.find({
-          where: {
-            empresa_id: empresaId,
-            estagio: In([
+        this.oportunidadeRepo
+          .createQueryBuilder('o')
+          .select(['o.id AS id', 'o.valor AS valor'])
+          .where('o.empresa_id = :empresaId', { empresaId })
+          .andWhere('o.estagio IN (:...estagios)', {
+            estagios: [
               EstagioOportunidade.LEADS,
               EstagioOportunidade.QUALIFICACAO,
               EstagioOportunidade.PROPOSTA,
               EstagioOportunidade.NEGOCIACAO,
               EstagioOportunidade.FECHAMENTO,
-            ]),
-          },
-        }),
+            ],
+          })
+          .getRawMany<{ id: number; valor: number | string }>(),
       ]);
 
     const propostasRespondidas24h = propostas24h.filter((p) =>

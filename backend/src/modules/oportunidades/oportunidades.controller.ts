@@ -18,6 +18,7 @@ import {
   MetricasQueryDto,
 } from './dto/oportunidade.dto';
 import { CreateAtividadeDto } from './dto/atividade.dto';
+import { TipoAtividade } from './atividade.entity';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
@@ -25,12 +26,16 @@ import { Permissions } from '../../common/decorators/permissions.decorator';
 import { Permission } from '../../common/permissions/permissions.constants';
 import { EmpresaId } from '../../common/decorators/empresa.decorator';
 import { EstagioOportunidade } from './oportunidade.entity';
+import { PropostasService } from '../propostas/propostas.service';
 
 @Controller('oportunidades')
 @UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
 @Permissions(Permission.CRM_OPORTUNIDADES_READ)
 export class OportunidadesController {
-  constructor(private readonly oportunidadesService: OportunidadesService) {}
+  constructor(
+    private readonly oportunidadesService: OportunidadesService,
+    private readonly propostasService: PropostasService,
+  ) {}
 
   @Post()
   @Permissions(Permission.CRM_OPORTUNIDADES_CREATE)
@@ -119,5 +124,61 @@ export class OportunidadesController {
       userId: req.user?.id,
       empresaId,
     });
+  }
+
+  @Post(':id/gerar-proposta')
+  @Permissions(Permission.CRM_OPORTUNIDADES_UPDATE, Permission.COMERCIAL_PROPOSTAS_CREATE)
+  async gerarProposta(
+    @Param('id') id: string,
+    @EmpresaId() empresaId: string,
+    @Request() req,
+  ) {
+    const oportunidade = await this.oportunidadesService.findOne(id, empresaId);
+
+    const clientePayload = {
+      id: oportunidade.cliente_id || null,
+      nome:
+        oportunidade.empresaContato ||
+        oportunidade.nomeContato ||
+        oportunidade.titulo ||
+        'Cliente não informado',
+      email: oportunidade.emailContato || '',
+      telefone: oportunidade.telefoneContato || '',
+      documento: '',
+      status: 'lead',
+    };
+
+    const proposta = await this.propostasService.criarProposta(
+      {
+        titulo: oportunidade.titulo || `Proposta da oportunidade ${oportunidade.id}`,
+        cliente: clientePayload,
+        valor: Number(oportunidade.valor || 0),
+        total: Number(oportunidade.valor || 0),
+        status: 'rascunho',
+        source: 'oportunidade',
+        observacoes: `Gerada automaticamente a partir da oportunidade ${oportunidade.id}`,
+      } as any,
+      empresaId,
+    );
+
+    // Registrar atividade de histórico sem bloquear a criação da proposta
+    try {
+      await this.oportunidadesService.createAtividade(
+        {
+          tipo: TipoAtividade.NOTA,
+          descricao: `Proposta ${proposta.numero || proposta.id} gerada a partir da oportunidade`,
+          oportunidade_id: id,
+        },
+        { userId: req.user?.id, empresaId },
+      );
+    } catch {
+      // no-op: histórico não deve quebrar a ação principal
+    }
+
+    return {
+      success: true,
+      message: 'Proposta gerada com sucesso',
+      proposta,
+    };
   }
 }

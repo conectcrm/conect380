@@ -66,6 +66,18 @@ describe('permissions.utils', () => {
       expect(resolved.has(Permission.USERS_CREATE)).toBe(true);
       expect(resolved.has(Permission.CRM_CLIENTES_READ)).toBe(true);
     });
+
+    it('deve tratar permissoes explicitas como override mesmo para role financeiro', () => {
+      const resolved = resolveUserPermissions({
+        role: UserRole.FINANCEIRO,
+        permissoes: 'dashboard.read,comercial.propostas.read',
+      });
+
+      expect(resolved.has(Permission.DASHBOARD_READ)).toBe(true);
+      expect(resolved.has(Permission.COMERCIAL_PROPOSTAS_READ)).toBe(true);
+      expect(resolved.has(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)).toBe(false);
+      expect(resolved.has(Permission.FINANCEIRO_FATURAMENTO_MANAGE)).toBe(false);
+    });
   });
 
   describe('hasRequiredPermissions', () => {

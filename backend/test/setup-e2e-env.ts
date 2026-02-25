@@ -1,4 +1,14 @@
 process.env.NODE_ENV ??= 'test';
+process.env.APP_ENV ??= 'test';
+process.env.HTTP_LOG_REQUESTS_IN_TEST ??= 'false';
+process.env.HTTP_LOG_EXPECTED_ERRORS_IN_TEST ??= 'false';
+process.env.HTTP_LOG_UNIMPLEMENTED_IN_TEST ??= 'false';
+process.env.CACHE_LOGS_IN_TEST ??= 'false';
+process.env.GATEWAY_FEATURE_GATE_LOGS_IN_TEST ??= 'false';
+process.env.EMAIL_INTEGRADO_LOGS_IN_TEST ??= 'false';
+process.env.EMAIL_INTEGRADO_ERRORS_IN_TEST ??= 'false';
+process.env.NEST_LOGS_IN_TEST ??= 'false';
+process.env.E2E_BOOTSTRAP_LOCK_IN_TEST ??= 'true';
 process.env.JWT_SECRET ??= 'test-jwt-secret';
 process.env.DATABASE_HOST ??= 'localhost';
 process.env.DATABASE_PORT ??= '5434';

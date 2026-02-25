@@ -15,6 +15,7 @@ import { EmpresaGuard } from '../../common/guards/empresa.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { Permission } from '../../common/permissions/permissions.constants';
+import { EmpresaId } from '../../common/decorators/empresa.decorator';
 
 @Controller('email')
 @UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
@@ -70,6 +71,7 @@ export class EmailController {
    */
   @Post('enviar-proposta')
   async enviarProposta(
+    @EmpresaId() empresaId: string,
     @Body()
     dados: {
       proposta: any;
@@ -83,10 +85,15 @@ export class EmailController {
 
       // Se solicitado, registrar o token no portal service
       if (dados.registrarToken && dados.proposta.token) {
-        this.logger.log('[EMAIL] Registrando token no sistema de portal:', dados.proposta.token);
+        const tokenMask =
+          typeof dados.proposta.token === 'string'
+            ? `${dados.proposta.token.slice(0, 4)}...${dados.proposta.token.slice(-4)}`
+            : '[token]';
+        this.logger.log(`[EMAIL] Registrando token no portal: ${tokenMask}`);
         await this.portalService.registrarTokenProposta(
           dados.proposta.token,
-          dados.proposta.numero || dados.proposta.id,
+          dados.proposta.id || dados.proposta.numero,
+          empresaId,
         );
       }
 

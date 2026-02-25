@@ -80,7 +80,7 @@ export class FaturamentoController {
   async buscarFaturas(
     @EmpresaId() empresaId: string,
     @Query('status') status?: StatusFatura,
-    @Query('clienteId') clienteId?: number,
+    @Query('clienteId') clienteId?: string,
     @Query('contratoId') contratoId?: number,
     @Query('dataInicio') dataInicio?: string,
     @Query('dataFim') dataFim?: string,
@@ -92,7 +92,7 @@ export class FaturamentoController {
   ) {
     const filtros = {
       status,
-      clienteId: clienteId ? Number(clienteId) : undefined,
+      clienteId: clienteId?.trim() || undefined,
       contratoId: contratoId ? Number(contratoId) : undefined,
       dataInicio: dataInicio ? new Date(dataInicio) : undefined,
       dataFim: dataFim ? new Date(dataFim) : undefined,
@@ -106,6 +106,7 @@ export class FaturamentoController {
       Number(pageSize) || 10,
       sortBy,
       sortOrder,
+      filtros,
     );
 
     return {
@@ -125,7 +126,7 @@ export class FaturamentoController {
   async buscarFaturasPaginadas(
     @EmpresaId() empresaId: string,
     @Query('status') status?: StatusFatura,
-    @Query('clienteId') clienteId?: number,
+    @Query('clienteId') clienteId?: string,
     @Query('contratoId') contratoId?: number,
     @Query('dataInicio') dataInicio?: string,
     @Query('dataFim') dataFim?: string,
@@ -137,7 +138,7 @@ export class FaturamentoController {
   ) {
     const filtros = {
       status,
-      clienteId: clienteId ? Number(clienteId) : undefined,
+      clienteId: clienteId?.trim() || undefined,
       contratoId: contratoId ? Number(contratoId) : undefined,
       dataInicio: dataInicio ? new Date(dataInicio) : undefined,
       dataFim: dataFim ? new Date(dataFim) : undefined,
@@ -150,6 +151,7 @@ export class FaturamentoController {
       Number(pageSize) || 10,
       sortBy,
       sortOrder,
+      filtros,
     );
 
     return {
@@ -243,8 +245,9 @@ export class FaturamentoController {
   async enviarFaturaPorEmail(
     @Param('id', ParseIntPipe) id: number,
     @EmpresaId() empresaId: string,
+    @Body('email') email?: string,
   ) {
-    const sucesso = await this.faturamentoService.enviarFaturaPorEmail(id, empresaId);
+    const sucesso = await this.faturamentoService.enviarFaturaPorEmail(id, empresaId, email);
 
     return {
       status: HttpStatus.OK,
