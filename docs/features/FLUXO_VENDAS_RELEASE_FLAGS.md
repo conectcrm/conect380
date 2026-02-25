@@ -152,10 +152,22 @@ Comando baseline (GO Core seguro por padrao dos exemplos):
 npm run validate:release:vendas:core
 ```
 
+Comando baseline (GO Full seguro por padrao dos exemplos de full):
+
+```bash
+npm run validate:release:vendas:full
+```
+
 Preflight completo GO Core (guardrail + build + E2E criticos):
 
 ```bash
 npm run preflight:go-live:vendas:core
+```
+
+Preflight completo GO Full (guardrail + build + E2E criticos + permissoes):
+
+```bash
+npm run preflight:go-live:vendas:full
 ```
 
 Comando para validar GO Full com arquivos reais de deploy:
@@ -173,3 +185,8 @@ Regras verificadas automaticamente:
 2. Full: `REACT_APP_MVP_MODE=false`, bypass `ALLOW_UNIMPLEMENTED=false`, listas de providers preenchidas.
 3. Full: listas de providers frontend e backend alinhadas.
 4. Providers aceitos apenas: `stripe`, `mercado_pago`, `pagseguro`.
+
+Arquivos baseline GO Full usados pelos comandos npm:
+
+- `frontend-web/.env.full.example`
+- `backend/.env.production.full.example`
