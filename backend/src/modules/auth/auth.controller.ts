@@ -4,6 +4,7 @@ import { ApiOperation, ApiResponse, ApiTags, ApiBody, ApiProperty } from '@nestj
 import {
   IsEmail,
   IsNotEmpty,
+  IsOptional,
   IsString,
   IsUUID,
   MinLength,
@@ -13,6 +14,14 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { securityLogger } from '../../config/logger.config';
+import { JwtAuthGuard } from './jwt-auth.guard';
+import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { Permission } from '../../common/permissions/permissions.constants';
+import { UserRole } from '../users/user.entity';
 
 class LoginDto {
   @ApiProperty({ description: 'E-mail do usuário', example: 'usuario@empresa.com' })
@@ -57,9 +66,14 @@ class RegisterDto {
   @Matches(/^[0-9+\-() ]+$/, { message: 'Telefone inválido (apenas números e símbolos)' })
   telefone?: string;
 
-  @ApiProperty({ description: 'ID da empresa', example: 'f9e51bf4-930c-4964-bba7-6f538ea10bc5' })
+  @ApiProperty({
+    description: 'ID da empresa (ignorado; o contexto vem do usuário autenticado)',
+    example: 'f9e51bf4-930c-4964-bba7-6f538ea10bc5',
+    required: false,
+  })
+  @IsOptional()
   @IsUUID('4', { message: 'ID da empresa inválido' })
-  empresa_id: string;
+  empresa_id?: string;
 }
 
 class TrocarSenhaDto {
@@ -146,14 +160,21 @@ export class AuthController {
   }
 
   @Post('register')
+  @UseGuards(JwtAuthGuard, EmpresaGuard, RolesGuard, PermissionsGuard)
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
+  @Permissions(Permission.USERS_CREATE)
   @Throttle({ default: { limit: 3, ttl: 3600000 } }) // 🛡️ 3 cadastros/hora (previne spam)
   @ApiOperation({ summary: 'Registrar novo usuário' })
   @ApiBody({ type: RegisterDto })
   @ApiResponse({ status: 201, description: 'Usuário criado com sucesso' })
   @ApiResponse({ status: 400, description: 'Dados inválidos' })
+  @ApiResponse({ status: 403, description: 'Sem permissão para criar usuários' })
   @ApiResponse({ status: 429, description: 'Limite de cadastros atingido - aguarde 1 hora' })
-  async register(@Body() registerDto: RegisterDto) {
-    return this.authService.register(registerDto);
+  async register(@Request() req, @Body() registerDto: RegisterDto) {
+    return this.authService.register({
+      ...registerDto,
+      empresa_id: req.user?.empresa_id,
+    });
   }
 
   @UseGuards(AuthGuard('jwt'))

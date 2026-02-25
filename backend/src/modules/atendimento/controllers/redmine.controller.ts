@@ -12,6 +12,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permission } from '../../../common/permissions/permissions.constants';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { CreateRedmineConfigDto } from '../dto/create-redmine-config.dto';
 import { UpdateRedmineConfigDto } from '../dto/update-redmine-config.dto';
@@ -19,7 +22,8 @@ import { RedmineConfig } from '../entities/redmine-config.entity';
 import { RedmineService } from '../services/redmine.service';
 
 @Controller('redmine')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.CONFIG_INTEGRACOES_MANAGE)
 export class RedmineController {
   constructor(
     private readonly redmineService: RedmineService,

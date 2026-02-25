@@ -37,6 +37,7 @@ import {
   useConfirmacaoInteligente,
   useValidacaoFinanceira,
 } from '../../../hooks/useConfirmacaoInteligente';
+import { useGlobalConfirmation } from '../../../contexts/GlobalConfirmationContext';
 
 export {}; // Para resolver o erro isolatedModules
 
@@ -49,6 +50,7 @@ interface DashboardCards {
 
 export default function FornecedoresPage() {
   const navigate = useNavigate();
+  const { confirm } = useGlobalConfirmation();
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [modalAberto, setModalAberto] = useState(false);
@@ -293,9 +295,9 @@ export default function FornecedoresPage() {
 
   const ativarSelecionados = async () => {
     if (
-      !window.confirm(
+      !(await confirm(
         `Tem certeza que deseja ativar ${fornecedoresSelecionados.length} fornecedor(es)?`,
-      )
+      ))
     ) {
       return;
     }
@@ -314,9 +316,9 @@ export default function FornecedoresPage() {
 
   const desativarSelecionados = async () => {
     if (
-      !window.confirm(
+      !(await confirm(
         `Tem certeza que deseja desativar ${fornecedoresSelecionados.length} fornecedor(es)?`,
-      )
+      ))
     ) {
       return;
     }

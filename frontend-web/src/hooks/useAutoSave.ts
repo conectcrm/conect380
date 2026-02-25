@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useRef, useCallback } from 'react';
-import { toast } from 'react-hot-toast';
+import { toastService } from '../services/toastService';
 
 interface UseAutoSaveOptions {
   delay?: number; // Delay em ms antes de salvar (padrão: 30000ms = 30s)
@@ -32,22 +32,10 @@ export const useAutoSave = ({
     try {
       await onSave();
       lastSaveAttempt.current = Date.now();
-      toast.success('💾 Auto-save realizado', {
-        duration: 2000,
-        style: {
-          fontSize: '14px',
-          padding: '8px 12px',
-        },
-      });
+      toastService.success('Auto-save realizado.', { duration: 2000 });
     } catch (error) {
       console.error('Erro no auto-save:', error);
-      toast.error('❌ Erro no auto-save', {
-        duration: 3000,
-        style: {
-          fontSize: '14px',
-          padding: '8px 12px',
-        },
-      });
+      toastService.error('Erro no auto-save.', { duration: 3000 });
     }
   }, [enabled, hasUnsavedChanges, isFormValid, onSave]);
 

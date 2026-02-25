@@ -25,6 +25,8 @@ export enum StatusCotacao {
   APROVADA = 'aprovada',
   REJEITADA = 'rejeitada',
   VENCIDA = 'vencida',
+  PEDIDO_GERADO = 'pedido_gerado',
+  ADQUIRIDO = 'adquirido',
   CONVERTIDA = 'convertida',
   CANCELADA = 'cancelada',
 }

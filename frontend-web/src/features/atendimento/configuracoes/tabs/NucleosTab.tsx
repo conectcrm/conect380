@@ -23,6 +23,7 @@ import { departamentoService } from '../../../../services/departamentoService';
 import ModalGerenciarAgentesNucleo from '../../../../components/atendimento/ModalGerenciarAgentesNucleo';
 import { ModalGerenciarDepartamentos } from '../../../../components/atendimento/ModalGerenciarDepartamentos';
 import { ModalDepartamento } from '../../../../components/atendimento/ModalDepartamento';
+import { useGlobalConfirmation } from '../../../../contexts/GlobalConfirmationContext';
 
 interface NucleoExpanded extends Nucleo {
   departamentos?: any[];
@@ -30,6 +31,7 @@ interface NucleoExpanded extends Nucleo {
 }
 
 export const NucleosTab: React.FC = () => {
+  const { confirm } = useGlobalConfirmation();
   const [nucleos, setNucleos] = useState<NucleoExpanded[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -127,7 +129,7 @@ export const NucleosTab: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Tem certeza que deseja excluir este núcleo?')) return;
+    if (!(await confirm('Tem certeza que deseja excluir este núcleo?'))) return;
     try {
       await nucleoService.deletar(id);
       carregarNucleos();

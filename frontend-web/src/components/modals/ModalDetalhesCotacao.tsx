@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { Cotacao, StatusCotacao } from '../../types/cotacaoTypes';
 import { cotacaoService } from '../../services/cotacaoService';
-import toast from 'react-hot-toast';
+import { toastService } from '../../services/toastService';
 
 interface ModalDetalhesCotacaoProps {
   isOpen: boolean;
@@ -107,11 +107,11 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
     setIsChangingStatus(true);
     try {
       await cotacaoService.alterarStatus(cotacao.id, novoStatus);
-      toast.success('Status alterado com sucesso!');
+      toastService.success('Status alterado com sucesso!');
       onStatusChange?.(cotacao.id, novoStatus);
     } catch (error) {
       console.error('Erro ao alterar status:', error);
-      toast.error('Erro ao alterar status');
+      toastService.apiError(error, 'Erro ao alterar status');
     } finally {
       setIsChangingStatus(false);
     }
@@ -122,11 +122,11 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
 
     try {
       await cotacaoService.duplicar(cotacao.id);
-      toast.success('Cotação duplicada com sucesso!');
+      toastService.success('Cotação duplicada com sucesso!');
       onClose();
     } catch (error) {
       console.error('Erro ao duplicar cotação:', error);
-      toast.error('Erro ao duplicar cotação');
+      toastService.apiError(error, 'Erro ao duplicar cotação');
     }
   };
 
@@ -134,17 +134,30 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
     if (!cotacao) return;
 
     try {
-      await cotacaoService.gerarPDF(cotacao.id);
-      toast.success('PDF gerado com sucesso!');
+      const pdfBlob = await cotacaoService.gerarPDF(cotacao.id);
+
+      const safeNumero = String(cotacao.numero || cotacao.id).replace(/[^a-zA-Z0-9-_]+/g, '-');
+      const filename = `cotacao-${safeNumero}.pdf`;
+
+      const url = window.URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      toastService.success('PDF gerado com sucesso!');
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
-      toast.error('Erro ao gerar PDF');
+      toastService.apiError(error, 'Erro ao gerar PDF');
     }
   };
 
   const handleSendEmail = async () => {
     if (!cotacao || !cotacao.fornecedor?.email) {
-      toast.error('Fornecedor não possui email cadastrado');
+      toastService.error('Fornecedor não possui email cadastrado');
       return;
     }
 
@@ -154,10 +167,10 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
         [cotacao.fornecedor.email],
         'Segue em anexo a cotação solicitada.',
       );
-      toast.success('Email enviado com sucesso!');
+      toastService.success('Email enviado com sucesso!');
     } catch (error) {
       console.error('Erro ao enviar email:', error);
-      toast.error('Erro ao enviar email');
+      toastService.apiError(error, 'Erro ao enviar email');
     }
   };
 

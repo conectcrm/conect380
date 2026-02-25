@@ -122,6 +122,15 @@ export interface NovoPagamento {
   observacoes?: string;
 }
 
+export interface EstatisticasPagamentos {
+  totalPagamentos: number;
+  valorTotal: number;
+  valorLiquido: number;
+  taxasTotal: number;
+  porMetodo: Record<string, { quantidade: number; valor: number }>;
+  porStatus: Record<string, { quantidade: number; valor: number }>;
+}
+
 export interface FiltrosFatura {
   busca?: string;
   status?: StatusFatura;
@@ -468,6 +477,25 @@ export const faturamentoService = {
       return response.data.data || response.data;
     } catch (error) {
       console.error('Erro ao obter faturas vencidas:', error);
+      throw error;
+    }
+  },
+
+  async obterEstatisticasPagamentos(periodo?: {
+    dataInicio?: string;
+    dataFim?: string;
+    gateway?: string;
+  }): Promise<EstatisticasPagamentos> {
+    try {
+      const params = new URLSearchParams();
+      if (periodo?.dataInicio) params.append('dataInicio', periodo.dataInicio);
+      if (periodo?.dataFim) params.append('dataFim', periodo.dataFim);
+      if (periodo?.gateway) params.append('gateway', periodo.gateway);
+
+      const response = await api.get(`/faturamento/pagamentos/estatisticas?${params.toString()}`);
+      return response.data?.data || response.data;
+    } catch (error) {
+      console.error('Erro ao obter estatísticas de pagamentos:', error);
       throw error;
     }
   },

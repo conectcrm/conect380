@@ -1,16 +1,19 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Logger } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PlanosService } from './planos.service';
 import { CriarPlanoDto } from './dto/criar-plano.dto';
 import { AtualizarPlanoDto } from './dto/atualizar-plano.dto';
 import { Plano } from './entities/plano.entity';
 import { ModuloSistema } from './entities/modulo-sistema.entity';
 import { UserRole } from '../users/user.entity';
+import { Permission } from '../../common/permissions/permissions.constants';
 
 @Controller('planos')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 export class PlanosController {
   private readonly logger = new Logger(PlanosController.name);
 
@@ -37,7 +40,8 @@ export class PlanosController {
   }
 
   @Post()
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
+  @Permissions(Permission.PLANOS_MANAGE)
   async criar(@Body() dados: CriarPlanoDto): Promise<Plano> {
     this.logger.log('🔍 Dados recebidos no controller:', dados);
     this.logger.log('🔍 Tipos dos campos:', {
@@ -57,7 +61,8 @@ export class PlanosController {
   }
 
   @Put(':id')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
+  @Permissions(Permission.PLANOS_MANAGE)
   async atualizar(@Param('id') id: string, @Body() dados: AtualizarPlanoDto): Promise<Plano> {
     this.logger.log('📊 [PLANOS UPDATE] Dados recebidos para atualização:', {
       id,
@@ -78,7 +83,8 @@ export class PlanosController {
   }
 
   @Delete(':id')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
+  @Permissions(Permission.PLANOS_MANAGE)
   async remover(@Param('id') id: string): Promise<{ message: string }> {
     await this.planosService.remover(id);
     this.logger.log(`🗑️ [PLANOS SUCCESS] Plano com ID "${id}" removido com sucesso!`);
@@ -86,7 +92,8 @@ export class PlanosController {
   }
 
   @Put(':id/desativar')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
+  @Permissions(Permission.PLANOS_MANAGE)
   async desativar(@Param('id') id: string): Promise<Plano> {
     const plano = await this.planosService.desativar(id);
     this.logger.log(`⏸️ [PLANOS SUCCESS] Plano "${plano.nome}" desativado com sucesso!`);
@@ -94,7 +101,8 @@ export class PlanosController {
   }
 
   @Put(':id/ativar')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
+  @Permissions(Permission.PLANOS_MANAGE)
   async ativar(@Param('id') id: string): Promise<Plano> {
     const plano = await this.planosService.ativar(id);
     this.logger.log(`✅ [PLANOS SUCCESS] Plano "${plano.nome}" ativado com sucesso!`);
@@ -102,7 +110,8 @@ export class PlanosController {
   }
 
   @Put(':id/toggle-status')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
+  @Permissions(Permission.PLANOS_MANAGE)
   async toggleStatus(@Param('id') id: string): Promise<Plano> {
     const planoAtual = await this.planosService.buscarPorId(id);
     if (!planoAtual) {

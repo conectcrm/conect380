@@ -1,9 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class MailService {
+  private readonly logger = new Logger(MailService.name);
   private transporter: nodemailer.Transporter;
+
+  private maskEmail(email?: string | null): string {
+    if (!email) return '[email-vazio]';
+    const [local, domain] = email.split('@');
+    if (!domain) return '[email-invalido]';
+    if (local.length <= 2) return `${local[0] ?? '*'}*@${domain}`;
+    return `${local.slice(0, 2)}***@${domain}`;
+  }
 
   constructor() {
     this.transporter = nodemailer.createTransport({
@@ -102,9 +111,12 @@ export class MailService {
 
     try {
       await this.transporter.sendMail(mailOptions);
-      console.log(`✅ Email de verificação enviado para: ${to}`);
+      this.logger.log(`Email de verificacao enviado para ${this.maskEmail(to)}`);
     } catch (error) {
-      console.error('❌ Erro ao enviar email:', error);
+      this.logger.error(
+        `Erro ao enviar email de verificacao para ${this.maskEmail(to)}`,
+        error instanceof Error ? error.stack : String(error),
+      );
       throw error;
     }
   }
@@ -196,9 +208,12 @@ export class MailService {
 
     try {
       await this.transporter.sendMail(mailOptions);
-      console.log(`✅ Email de boas-vindas enviado para: ${to}`);
+      this.logger.log(`Email de boas-vindas enviado para ${this.maskEmail(to)}`);
     } catch (error) {
-      console.error('❌ Erro ao enviar email de boas-vindas:', error);
+      this.logger.error(
+        `Erro ao enviar email de boas-vindas para ${this.maskEmail(to)}`,
+        error instanceof Error ? error.stack : String(error),
+      );
       throw error;
     }
   }
@@ -277,9 +292,12 @@ export class MailService {
 
     try {
       await this.transporter.sendMail(mailOptions);
-      console.log(`✅ Email de recuperação de senha enviado para: ${to}`);
+      this.logger.log(`Email de recuperacao de senha enviado para ${this.maskEmail(to)}`);
     } catch (error) {
-      console.error('❌ Erro ao enviar email de recuperação de senha:', error);
+      this.logger.error(
+        `Erro ao enviar email de recuperacao de senha para ${this.maskEmail(to)}`,
+        error instanceof Error ? error.stack : String(error),
+      );
       throw error;
     }
   }

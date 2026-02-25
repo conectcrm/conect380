@@ -2,12 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cotacaoService } from '../../../services/cotacaoService';
 import { fornecedorService } from '../../../services/fornecedorService';
+import { toastService } from '../../../services/toastService';
+import { exportToCSV, exportToExcel } from '../../../utils/exportUtils';
 import {
   Cotacao,
   FiltroCotacao,
   StatusCotacao,
   PrioridadeCotacao,
 } from '../../../types/cotacaoTypes';
+import { useGlobalConfirmation } from '../../../contexts/GlobalConfirmationContext';
 import ModalCadastroCotacao from '../../../components/modals/ModalCadastroCotacao';
 import ModalDetalhesCotacao from '../../../components/modals/ModalDetalhesCotacao';
 import {
@@ -47,21 +50,13 @@ interface DashboardCards {
   cotacoesVencidas: number;
 }
 
-const useConfirmacaoInteligente = () => ({
-  confirmar: (tipo: string, callback: () => void, options?: any) => {
-    const confirmed = window.confirm(`Tem certeza que deseja realizar esta ação?`);
-    if (confirmed) {
-      callback();
-    }
-  },
-});
-
 const useValidacaoFinanceira = () => ({
   validar: () => true,
 });
 
 function CotacaoPage() {
   const navigate = useNavigate();
+  const { confirm } = useGlobalConfirmation();
   const [cotacoes, setCotacoes] = useState<Cotacao[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [modalCadastroAberto, setModalCadastroAberto] = useState(false);
@@ -79,7 +74,6 @@ function CotacaoPage() {
     cotacoesVencidas: 0,
   });
 
-  const confirmacao = useConfirmacaoInteligente();
   const validacao = useValidacaoFinanceira();
 
   useEffect(() => {
@@ -119,6 +113,7 @@ function CotacaoPage() {
       calcularDashboard(listaNormalizada);
     } catch (error) {
       console.error('Erro ao carregar cotações:', error);
+      toastService.apiError(error, 'Erro ao carregar cotações');
     } finally {
       setCarregando(false);
     }
@@ -190,35 +185,37 @@ function CotacaoPage() {
   };
 
   const excluirCotacao = async (id: string) => {
-    if (window.confirm('Tem certeza que deseja excluir esta cotação?')) {
-      try {
-        await cotacaoService.deletar(id);
-        carregarCotacoes();
-        fecharModalDetalhes();
-      } catch (error) {
-        console.error('Erro ao excluir cotação:', error);
-      }
+    if (!(await confirm('Tem certeza que deseja excluir esta cotação?'))) {
+      return;
+    }
+
+    try {
+      await cotacaoService.deletar(id);
+      carregarCotacoes();
+      fecharModalDetalhes();
+      toastService.success('Cotação excluída com sucesso!');
+    } catch (error) {
+      console.error('Erro ao excluir cotação:', error);
+      toastService.apiError(error, 'Erro ao excluir cotação');
     }
   };
 
   const enviarParaAprovacao = async (cotacao: Cotacao) => {
     if (
-      window.confirm(
+      !(await confirm(
         `Deseja enviar a cotação #${cotacao.numero} para aprovação?\n\nApós enviar, o aprovador será notificado.`,
-      )
+      ))
     ) {
-      try {
-        await cotacaoService.enviarParaAprovacao(cotacao.id);
-        alert(
-          `✅ Cotação #${cotacao.numero} enviada para aprovação com sucesso!\n\nO aprovador foi notificado.`,
-        );
-        carregarCotacoes(); // Recarregar lista
-      } catch (error: any) {
-        console.error('Erro ao enviar cotação para aprovação:', error);
-        const errorMessage =
-          error.response?.data?.message || error.message || 'Erro ao enviar cotação para aprovação';
-        alert(`Erro ao enviar para aprovação:\n\n${errorMessage}`);
-      }
+      return;
+    }
+
+    try {
+      await cotacaoService.enviarParaAprovacao(cotacao.id);
+      toastService.success(`Cotação #${cotacao.numero} enviada para aprovação com sucesso!`);
+      carregarCotacoes(); // Recarregar lista
+    } catch (error: any) {
+      console.error('Erro ao enviar cotação para aprovação:', error);
+      toastService.apiError(error, 'Erro ao enviar cotação para aprovação');
     }
   };
 
@@ -253,9 +250,9 @@ function CotacaoPage() {
 
   const alterarStatusSelecionadas = async (novoStatus: StatusCotacao) => {
     if (
-      !window.confirm(
+      !(await confirm(
         `Tem certeza que deseja alterar o status de ${cotacoesSelecionadas.length} cotação(ões)?`,
-      )
+      ))
     ) {
       return;
     }
@@ -266,76 +263,101 @@ function CotacaoPage() {
       }
       deselecionarTodos();
       carregarCotacoes();
+      toastService.success('Status das cotações atualizado com sucesso!');
     } catch (error) {
       console.error('Erro ao alterar status das cotações:', error);
+      toastService.apiError(error, 'Erro ao alterar status das cotações');
     }
   };
 
   const excluirSelecionadas = async () => {
-    confirmacao.confirmar(
-      'excluir-categoria-financeira',
-      async () => {
-        for (const id of cotacoesSelecionadas) {
-          await cotacaoService.deletar(id);
-        }
-        deselecionarTodos();
-        carregarCotacoes();
-      },
-      { quantidadeItens: cotacoesSelecionadas.length },
-    );
+    if (
+      !(await confirm(
+        `Tem certeza que deseja excluir ${cotacoesSelecionadas.length} cotação(ões)?`,
+      ))
+    ) {
+      return;
+    }
+
+    try {
+      for (const id of cotacoesSelecionadas) {
+        await cotacaoService.deletar(id);
+      }
+      deselecionarTodos();
+      carregarCotacoes();
+      toastService.success('Cotações excluídas com sucesso!');
+    } catch (error) {
+      console.error('Erro ao excluir cotações em massa:', error);
+      toastService.apiError(error, 'Erro ao excluir cotações em massa');
+    }
   };
 
   // Funções de exportação
   const exportarParaCSV = () => {
+    if (cotacoes.length === 0) {
+      toastService.warning('Não há dados para exportar');
+      return;
+    }
     const colunas = [
-      { key: 'numero', title: 'Número' },
-      { key: 'titulo', title: 'Título' },
-      { key: 'fornecedor.nome', title: 'Fornecedor' },
-      { key: 'status', title: 'Status', formatter: formatStatusForExport },
-      { key: 'prioridade', title: 'Prioridade' },
+      { key: 'numero', label: 'Número' },
+      { key: 'titulo', label: 'Título' },
+      { key: 'fornecedor.nome', label: 'Fornecedor' },
+      { key: 'status', label: 'Status', transform: formatStatusForExport },
+      { key: 'prioridade', label: 'Prioridade' },
       {
         key: 'valorTotal',
-        title: 'Valor Total',
-        formatter: (valor: number) =>
+        label: 'Valor Total',
+        transform: (valor: number) =>
           `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
       },
-      { key: 'prazoResposta', title: 'Prazo Resposta', formatter: formatDateForExport },
-      { key: 'dataCriacao', title: 'Data Criação', formatter: formatDateForExport },
+      { key: 'prazoResposta', label: 'Prazo Resposta', transform: formatDateForExport },
+      { key: 'dataCriacao', label: 'Data Criação', transform: formatDateForExport },
     ];
     exportToCSV(cotacoes, colunas, 'cotacoes');
+    toastService.success('Exportação CSV iniciada');
   };
 
   const exportarParaExcel = () => {
+    if (cotacoes.length === 0) {
+      toastService.warning('Não há dados para exportar');
+      return;
+    }
     const colunas = [
-      { key: 'numero', title: 'Número' },
-      { key: 'titulo', title: 'Título' },
-      { key: 'fornecedor.nome', title: 'Fornecedor' },
-      { key: 'status', title: 'Status', formatter: formatStatusForExport },
-      { key: 'prioridade', title: 'Prioridade' },
-      { key: 'valorTotal', title: 'Valor Total', formatter: (valor: number) => valor },
-      { key: 'prazoResposta', title: 'Prazo Resposta', formatter: formatDateForExport },
-      { key: 'dataCriacao', title: 'Data Criação', formatter: formatDateForExport },
+      { key: 'numero', label: 'Número' },
+      { key: 'titulo', label: 'Título' },
+      { key: 'fornecedor.nome', label: 'Fornecedor' },
+      { key: 'status', label: 'Status', transform: formatStatusForExport },
+      { key: 'prioridade', label: 'Prioridade' },
+      { key: 'valorTotal', label: 'Valor Total', transform: (valor: number) => valor },
+      { key: 'prazoResposta', label: 'Prazo Resposta', transform: formatDateForExport },
+      { key: 'dataCriacao', label: 'Data Criação', transform: formatDateForExport },
     ];
     exportToExcel(cotacoes, colunas, 'cotacoes');
+    toastService.success('Exportação Excel iniciada');
   };
 
   const exportarSelecionadas = () => {
     const cotacoesSelecionadasData = cotacoes.filter((cotacao) =>
       cotacoesSelecionadas.includes(cotacao.id),
     );
+    if (cotacoesSelecionadasData.length === 0) {
+      toastService.warning('Nenhuma cotação selecionada para exportar');
+      return;
+    }
     const colunas = [
-      { key: 'numero', title: 'Número' },
-      { key: 'titulo', title: 'Título' },
-      { key: 'fornecedor.nome', title: 'Fornecedor' },
-      { key: 'status', title: 'Status', formatter: formatStatusForExport },
+      { key: 'numero', label: 'Número' },
+      { key: 'titulo', label: 'Título' },
+      { key: 'fornecedor.nome', label: 'Fornecedor' },
+      { key: 'status', label: 'Status', transform: formatStatusForExport },
       {
         key: 'valorTotal',
-        title: 'Valor Total',
-        formatter: (valor: number) =>
+        label: 'Valor Total',
+        transform: (valor: number) =>
           `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
       },
     ];
     exportToCSV(cotacoesSelecionadasData, colunas, 'cotacoes-selecionadas');
+    toastService.success('Exportação iniciada');
   };
 
   // Funções auxiliares
@@ -355,15 +377,6 @@ function CotacaoPage() {
 
   const formatDateForExport = (date: string) => {
     return new Date(date).toLocaleDateString('pt-BR');
-  };
-
-  // Mocks para funções de exportação
-  const exportToCSV = (data: any[], columns: any[], filename: string) => {
-    console.log('Exportando para CSV:', filename, data.length, 'registros');
-  };
-
-  const exportToExcel = (data: any[], columns: any[], filename: string) => {
-    console.log('Exportando para Excel:', filename, data.length, 'registros');
   };
 
   const getStatusBadge = (status: StatusCotacao) => {

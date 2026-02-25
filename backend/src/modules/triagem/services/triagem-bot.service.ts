@@ -59,6 +59,30 @@ export class TriagemBotService {
     private readonly whatsAppSenderService: WhatsAppSenderService,
   ) {}
 
+  private maskPhone(phone?: string): string {
+    if (!phone) return '[telefone]';
+    const digits = phone.replace(/\D/g, '');
+    if (!digits) return '[telefone]';
+    const suffix = digits.slice(-4);
+    return `${'*'.repeat(Math.max(digits.length - 4, 4))}${suffix}`;
+  }
+
+  private summarizeText(text?: string): string {
+    if (!text) return '[vazio]';
+    const normalized = text.replace(/\s+/g, ' ').trim();
+    if (!normalized) return '[vazio]';
+    return normalized.length > 40 ? `${normalized.slice(0, 40)}...` : normalized;
+  }
+
+  private summarizeWebhookPayload(payload: any): Record<string, unknown> {
+    return {
+      object: payload?.object || null,
+      entryCount: Array.isArray(payload?.entry) ? payload.entry.length : 0,
+      hasMessages: Boolean(payload?.entry?.[0]?.changes?.[0]?.value?.messages?.length),
+      hasStatuses: Boolean(payload?.entry?.[0]?.changes?.[0]?.value?.statuses?.length),
+    };
+  }
+
   /**
    * Processa mensagem recebida pelo webhook do WhatsApp
    */
@@ -66,20 +90,16 @@ export class TriagemBotService {
     empresaId: string,
     payload: any,
   ): Promise<ResultadoProcessamentoWebhook> {
-    // 🔍 DEBUG: Log inicial do webhook
-    console.log('═══════════════════════════════════════════════════════════');
-    console.log('🤖 [BOT DEBUG] processarMensagemWhatsApp CHAMADO!');
-    console.log(`   empresaId: ${empresaId}`);
-    console.log(`   payload:`, JSON.stringify(payload, null, 2));
-    console.log('═══════════════════════════════════════════════════════════');
-
-    this.logger.debug('🌐 WEBHOOK RECEBIDO:');
-    this.logger.debug(`   - empresaId: ${empresaId}`);
-    this.logger.debug(`   - payload type: ${payload?.object || 'unknown'}`);
+    this.logger.debug(
+      `Triagem webhook recebido empresa=${empresaId} ${JSON.stringify(
+        this.summarizeWebhookPayload(payload),
+      )}`,
+    );
 
     const dadosMensagem = this.extrairDadosWebhook(payload);
-
-    console.log('🔍 [BOT DEBUG] Dados extraídos:', JSON.stringify(dadosMensagem, null, 2));
+    this.logger.debug(
+      `Triagem dados extraidos telefone=${this.maskPhone(dadosMensagem?.telefone)} texto=${this.summarizeText(dadosMensagem?.texto)} canal=${dadosMensagem?.canalId || 'N/A'}`,
+    );
 
     if (!dadosMensagem?.telefone || !dadosMensagem?.texto) {
       this.logger.warn('Webhook WhatsApp ignorado: sem telefone ou texto processável');
@@ -94,15 +114,15 @@ export class TriagemBotService {
 
     // 🔍 DEBUG: Dados extraídos
     this.logger.debug(`📱 DADOS EXTRAÍDOS:`);
-    this.logger.debug(`   - Telefone: ${dadosMensagem.telefone} → ${telefoneNormalizado}`);
-    this.logger.debug(`   - Texto: "${dadosMensagem.texto}"`);
+    this.logger.debug(`   - Telefone: ${this.maskPhone(dadosMensagem.telefone)} -> ${this.maskPhone(telefoneNormalizado)}`);
+    this.logger.debug(`   - Texto: "${this.summarizeText(dadosMensagem.texto)}"`);
     this.logger.debug(`   - Nome: ${dadosMensagem.nome || 'N/A'}`);
     this.logger.debug(`   - Canal ID: ${dadosMensagem.canalId || 'N/A'}`);
 
     // Atualizar telefone normalizado para retorno
     dadosMensagem.telefone = telefoneNormalizado;
 
-    this.logger.log(`Mensagem recebida de ${telefoneNormalizado}: "${dadosMensagem.texto}"`);
+    this.logger.log(`Mensagem recebida de ${this.maskPhone(telefoneNormalizado)}: "${this.summarizeText(dadosMensagem.texto)}"`);
 
     // Verificar se existe sessão ativa
     const sessaoAtiva = await this.buscarSessaoAtiva(empresaId, telefoneNormalizado);
@@ -265,9 +285,9 @@ export class TriagemBotService {
         .getOne();
 
       if (contato) {
-        this.logger.log(`✅ Contato encontrado: ${contato.nome} (${contato.telefone})`);
+        this.logger.log(`Contato encontrado: ${contato.nome} (${this.maskPhone(contato.telefone)})`);
       } else {
-        this.logger.log(`❌ Nenhum contato encontrado para: ${telefoneNormalizado}`);
+        this.logger.log(`Nenhum contato encontrado para: ${this.maskPhone(telefoneNormalizado)}`);
       }
 
       return contato;
@@ -690,7 +710,7 @@ export class TriagemBotService {
     // Processar resposta baseado no tipo de etapa
     let proximaEtapa: string | null = null;
 
-    // � PROCESSAR KEYWORDS (metadata.keywords) - Suporte para Web fallback
+    // 🔍 PROCESSAR KEYWORDS (metadata.keywords) - Suporte para Web fallback
     const keywords = (etapaAtual as any)?.metadata?.keywords;
     if (keywords && typeof keywords === 'object') {
       const respostaNormalizada = dto.resposta?.toLowerCase().trim();
@@ -707,7 +727,7 @@ export class TriagemBotService {
       }
     }
 
-    // �📋 Processamento especial para confirmação de dados
+    // 📋 Processamento especial para confirmação de dados
     if (
       sessao.etapaAtual === 'confirmar-dados-cliente' ||
       sessao.etapaAtual === 'confirmacao-dados' ||

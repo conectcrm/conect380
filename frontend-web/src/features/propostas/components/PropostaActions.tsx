@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { toast } from 'react-hot-toast';
+import { toastService } from '../../../services/toastService';
 import {
   Eye,
   Mail,
@@ -24,6 +24,7 @@ import { faturamentoService } from '../../../services/faturamentoService';
 import { contratoService } from '../../../services/contratoService';
 import { faturamentoAPI } from '../../../services/faturamentoAPI';
 import { api } from '../../../services/api';
+import { useGlobalConfirmation } from '../../../contexts/GlobalConfirmationContext';
 
 type ClienteContatoData = {
   nome: string;
@@ -193,6 +194,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   className = '',
   showLabels = false,
 }) => {
+  const { confirm } = useGlobalConfirmation();
   const [sendingEmail, setSendingEmail] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [clienteData, setClienteData] = useState<{
@@ -357,7 +359,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   // Gerar contrato a partir da proposta
   const handleGerarContrato = async () => {
     if (!podeGerarContrato()) {
-      toast.error('Apenas propostas aprovadas podem gerar contratos');
+      toastService.error('Apenas propostas aprovadas podem gerar contratos');
       return;
     }
 
@@ -392,7 +394,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       const contrato = await contratoService.criarContrato(contratoData);
 
       if (contrato) {
-        toast.success(`✅ Contrato ${contrato.numero} gerado com sucesso!`);
+        toastService.success(`Contrato ${contrato.numero} gerado com sucesso!`);
 
         // Disparar evento para atualizar a interface
         const eventoAtualizacao = new CustomEvent('propostaAtualizada', {
@@ -407,13 +409,13 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         window.dispatchEvent(eventoAtualizacao);
 
         // Abrir página do contrato gerado
-        if (window.confirm('Deseja visualizar o contrato gerado?')) {
+        if (await confirm('Deseja visualizar o contrato gerado?')) {
           window.open(`/contratos/${contrato.id}`, '_blank');
         }
       }
     } catch (error) {
       console.error('❌ Erro ao gerar contrato:', error);
-      toast.error('Erro ao gerar contrato. Tente novamente.');
+      toastService.error('Erro ao gerar contrato. Tente novamente.');
     } finally {
       setGerandoContrato(false);
     }
@@ -422,7 +424,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   // Criar fatura automática
   const handleCriarFatura = async () => {
     if (!podeCriarFatura()) {
-      toast.error('Apenas propostas aprovadas podem gerar faturas');
+      toastService.error('Apenas propostas aprovadas podem gerar faturas');
       return;
     }
 
@@ -452,7 +454,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       const fatura = await faturamentoAPI.criarFatura(faturaData);
 
       if (fatura) {
-        toast.success(`✅ Fatura ${fatura.numero} criada com sucesso!`);
+        toastService.success(`Fatura ${fatura.numero} criada com sucesso!`);
 
         // Disparar evento para atualizar a interface
         const eventoAtualizacao = new CustomEvent('propostaAtualizada', {
@@ -467,13 +469,13 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         window.dispatchEvent(eventoAtualizacao);
 
         // Navegar para página de faturamento (opcional)
-        if (window.confirm('Deseja visualizar a fatura criada?')) {
+        if (await confirm('Deseja visualizar a fatura criada?')) {
           window.open(`/faturamento#fatura-${fatura.id}`, '_blank');
         }
       }
     } catch (error) {
       console.error('❌ Erro ao criar fatura:', error);
-      toast.error('Erro ao criar fatura. Tente novamente.');
+      toastService.error('Erro ao criar fatura. Tente novamente.');
     } finally {
       setCriandoFatura(false);
     }
@@ -502,7 +504,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           proximaAcao = 'aprovar_proposta';
           novoStatus = 'aprovada';
           // Marcar como aprovada no sistema
-          toast.success('✅ Proposta marcada como aprovada');
+          toastService.success('Proposta marcada como aprovada');
           break;
 
         case 'aprovada':
@@ -520,11 +522,11 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         case 'fatura_criada':
           proximaAcao = 'aguardar_pagamento';
           novoStatus = 'aguardando_pagamento';
-          toast('📧 Fatura enviada para cobrança automática', { icon: 'ℹ️' });
+          toastService.info('Fatura enviada para cobrança automática');
           break;
 
         default:
-          toast('Esta proposta já está na última etapa do fluxo', { icon: 'ℹ️' });
+          toastService.info('Esta proposta já está na última etapa do fluxo');
           return;
       }
 
@@ -540,7 +542,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       window.dispatchEvent(eventoAtualizacao);
     } catch (error) {
       console.error('❌ Erro ao avançar fluxo:', error);
-      toast.error('Erro ao avançar fluxo. Tente novamente.');
+      toastService.error('Erro ao avançar fluxo. Tente novamente.');
     } finally {
       setAvancandoFluxo(false);
     }
@@ -551,14 +553,14 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     const clienteData = await getClienteData();
 
     if (!clienteData.email) {
-      toast.error('Cliente não possui email cadastrado');
+      toastService.error('Cliente não possui email cadastrado');
       return;
     }
 
     // Validar se o email é válido
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(clienteData.email)) {
-      toast.error('Email do cliente é inválido: ' + clienteData.email);
+      toastService.error('Email do cliente é inválido: ' + clienteData.email);
       return;
     }
 
@@ -581,17 +583,17 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       );
 
       if (!emailReal) {
-        toast.error('Envio cancelado - Email real é obrigatório');
+        toastService.error('Envio cancelado - Email real é obrigatório');
         return;
       }
 
       if (!emailRegex.test(emailReal)) {
-        toast.error('Email informado é inválido: ' + emailReal);
+        toastService.error('Email informado é inválido: ' + emailReal);
         return;
       }
 
       emailFinal = emailReal; // Usar o email real
-      toast.success(`Email corrigido de "${clienteData.email}" para "${emailReal}"`);
+      toastService.success(`Email corrigido de "${clienteData.email}" para "${emailReal}"`);
     }
 
     setSendingEmail(true);
@@ -627,7 +629,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       const resultado = await emailServiceReal.enviarPropostaParaCliente(emailData);
 
       if (resultado.success) {
-        toast.success(`✅ Proposta enviada por email para ${clienteData.nome}`);
+        toastService.success(`Proposta enviada por email para ${clienteData.nome}`);
         // Criar evento personalizado para notificar a PropostasPage
         const eventoAtualizacao = new CustomEvent('propostaAtualizada', {
           detail: {
@@ -644,11 +646,11 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         // ⚡ OTIMIZADO: Remover segundo evento desnecessário para evitar auto-refresh
         // O evento único acima já é suficiente para atualizar a interface
       } else {
-        toast.error(`❌ Erro ao enviar email: ${resultado.error}`);
+        toastService.error(`Erro ao enviar email: ${resultado.error}`);
       }
     } catch (error) {
       console.error('Erro ao enviar email:', error);
-      toast.error('Erro ao enviar email da proposta');
+      toastService.error('Erro ao enviar email da proposta');
     } finally {
       setSendingEmail(false);
     }
@@ -659,7 +661,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     const clienteData = await getClienteData();
 
     if (!clienteData?.telefone) {
-      toast.error('Cliente não possui telefone cadastrado');
+      toastService.error('Cliente não possui telefone cadastrado');
       return;
     }
 
@@ -734,10 +736,10 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
       await pdfPropostasService.downloadPdf('comercial', dadosPDF);
 
-      toast.success(`📄 PDF da proposta ${propostaData.numero} baixado`);
+      toastService.success(`PDF da proposta ${propostaData.numero} baixado`);
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
-      toast.error('Erro ao gerar PDF da proposta');
+      toastService.error('Erro ao gerar PDF da proposta');
     } finally {
       setDownloadingPdf(false);
     }
@@ -757,16 +759,16 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           text: `Proposta comercial para ${clienteData.nome}`,
           url: shareUrl,
         });
-        toast.success('🔗 Proposta compartilhada');
+        toastService.success('Proposta compartilhada');
       } catch (error) {
         // Fallback para cópia do link
         navigator.clipboard.writeText(shareUrl);
-        toast.success('🔗 Link da proposta copiado');
+        toastService.success('Link da proposta copiado');
       }
     } else {
       // Fallback para navegadores sem suporte ao Web Share API
       navigator.clipboard.writeText(shareUrl);
-      toast.success('🔗 Link da proposta copiado');
+      toastService.success('Link da proposta copiado');
     }
   };
 
@@ -907,7 +909,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           }}
           pdfBuffer={propostaPdfBuffer}
           onSuccess={() => {
-            toast.success('Proposta enviada via WhatsApp!');
+            toastService.success('Proposta enviada via WhatsApp!');
             setShowWhatsAppModal(false);
           }}
         />
@@ -917,5 +919,4 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 };
 
 export default PropostaActions;
-
 

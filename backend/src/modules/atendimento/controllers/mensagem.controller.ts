@@ -25,13 +25,17 @@ import { AtendimentoGateway } from '../gateways/atendimento.gateway';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { Permission } from '../../../common/permissions/permissions.constants';
 
 /**
  * Controller REST para gerenciamento de mensagens
  * Endpoints para listar mensagens de tickets
  */
 @Controller('api/atendimento/mensagens')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.ATENDIMENTO_CHATS_READ)
 export class MensagemController {
   private readonly logger = new Logger(MensagemController.name);
 
@@ -263,6 +267,7 @@ export class MensagemController {
   }
 
   @Post()
+  @Permissions(Permission.ATENDIMENTO_CHATS_REPLY)
   @UseInterceptors(FilesInterceptor('anexos', 5))
   async enviar(
     @EmpresaId() empresaId: string,
@@ -329,6 +334,7 @@ export class MensagemController {
   }
 
   @Post('marcar-lidas')
+  @Permissions(Permission.ATENDIMENTO_CHATS_REPLY)
   async marcarLidas(
     @EmpresaId() empresaId: string,
     @Body() dados: { mensagemIds: string[] },

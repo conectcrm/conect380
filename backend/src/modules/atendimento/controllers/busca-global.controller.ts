@@ -2,11 +2,15 @@ import { Controller, Post, Body, UseGuards, Logger } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { Permission } from '../../../common/permissions/permissions.constants';
 import { BuscaGlobalService } from '../services/busca-global.service';
 import { BuscaGlobalRequestDto, BuscaGlobalResponseDto } from '../dto/busca-global.dto';
 
 @Controller('api/atendimento/busca-global')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.ATENDIMENTO_CHATS_READ)
 export class BuscaGlobalController {
   private readonly logger = new Logger(BuscaGlobalController.name);
 

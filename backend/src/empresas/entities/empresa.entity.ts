@@ -67,6 +67,21 @@ export class Empresa {
   @Column({ nullable: true })
   token_verificacao: string;
 
+  @Column({ type: 'timestamp', nullable: true, name: 'termos_aceitos_em' })
+  termosAceitosEm: Date | null;
+
+  @Column({ type: 'varchar', length: 64, nullable: true, name: 'termos_aceitos_ip' })
+  termosAceitosIp: string | null;
+
+  @Column({ type: 'text', nullable: true, name: 'termos_aceitos_user_agent' })
+  termosAceitosUserAgent: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true, name: 'termos_aceitos_versao' })
+  termosAceitosVersao: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true, name: 'privacidade_aceita_versao' })
+  privacidadeAceitaVersao: string | null;
+
   @Column({ type: 'json', nullable: true })
   configuracoes: Record<string, unknown>;
 

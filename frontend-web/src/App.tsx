@@ -3,6 +3,7 @@ import React, { Suspense } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { Navigate, Route, BrowserRouter as Router, Routes, useLocation } from 'react-router-dom';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+import PermissionPathGuard from './components/licensing/PermissionPathGuard';
 import { AuthProvider } from './contexts/AuthContext';
 import { EmpresaProvider } from './contexts/EmpresaContextAPIReal';
 import { I18nProvider } from './contexts/I18nContext';
@@ -10,12 +11,15 @@ import { MenuProvider } from './contexts/MenuContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { ProfileProvider } from './contexts/ProfileContext';
 import { SidebarProvider } from './contexts/SidebarContext';
+import { SystemBrandingProvider } from './contexts/SystemBrandingContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { GlobalConfirmationProvider } from './contexts/GlobalConfirmationContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';
 import { ModuloEnum } from './services/modulosService';
 import { protegerRota, protegerRotaSuperadmin } from './utils/routeGuardHelper';
 // Importar páginas de núcleos
 import ModuleUnderConstruction from './components/common/ModuleUnderConstruction';
+import Conect360Logo from './components/ui/Conect360Logo';
 // Sistema de Filas - ETAPA 5 (Núcleo Atendimento)
 // Sistema de Distribuição Automática - Núcleo Atendimento
 // Sistema de Templates de Mensagens - Núcleo Atendimento
@@ -47,6 +51,8 @@ const LoginPage = React.lazy(() => import('./features/auth/LoginPage'));
 const RegistroEmpresaPage = React.lazy(() => import('./features/auth/RegistroEmpresaPage'));
 const ResetPasswordPage = React.lazy(() => import('./features/auth/ResetPasswordPage'));
 const VerificacaoEmailPage = React.lazy(() => import('./features/auth/VerificacaoEmailPage'));
+const TermosUsoPage = React.lazy(() => import('./pages/public/TermosUsoPage'));
+const PoliticaPrivacidadePage = React.lazy(() => import('./pages/public/PoliticaPrivacidadePage'));
 
 const ClientesPage = React.lazy(() => import('./features/clientes/ClientesPage'));
 const ContatosPage = React.lazy(() => import('./features/contatos/ContatosPage'));
@@ -54,6 +60,7 @@ const LeadsPage = React.lazy(() => import('./pages/LeadsPage'));
 const InteracoesPage = React.lazy(() => import('./pages/InteracoesPage'));
 
 const DashboardRouter = React.lazy(() => import('./features/dashboard/DashboardRouter'));
+const DashboardHomeRoute = React.lazy(() => import('./features/dashboard/DashboardHomeRoute'));
 const NotificationsPage = React.lazy(() => import('./pages/NotificationsPage'));
 const ContratosPage = React.lazy(() => import('./features/contratos/ContratosPage'));
 
@@ -64,11 +71,14 @@ const CrmNucleusPage = React.lazy(() => import('./pages/nuclei/CrmNucleusPage'))
 const VendasNucleusPage = React.lazy(() => import('./pages/nuclei/VendasNucleusPage'));
 const FinanceiroNucleusPage = React.lazy(() => import('./pages/nuclei/FinanceiroNucleusPage'));
 
-const ConfiguracoesPage = React.lazy(() => import('./features/configuracoes/ConfiguracoesPage'));
 const ConfiguracoesWrapper = React.lazy(() => import('./pages/ConfiguracoesWrapper'));
 const GestaoModulosPage = React.lazy(() => import('./pages/GestaoModulosPage'));
 const AdminConsolePage = React.lazy(() => import('./pages/AdminConsolePage'));
+const AdminConformidadePage = React.lazy(() => import('./pages/admin/AdminConformidadePage'));
 const GestaoUsuariosPage = React.lazy(() => import('./features/gestao/pages/GestaoUsuariosPage'));
+const SystemBrandingPage = React.lazy(
+  () => import('./features/admin/system-branding/SystemBrandingPage'),
+);
 
 const AtendimentoDashboard = React.lazy(
   () => import('./features/atendimento/pages/AtendimentoDashboard'),
@@ -84,6 +94,7 @@ const DashboardDistribuicaoPage = React.lazy(() => import('./pages/DashboardDist
 const GestaoSkillsPage = React.lazy(() => import('./pages/GestaoSkillsPage'));
 const ConfiguracaoSLAPage = React.lazy(() => import('./pages/ConfiguracaoSLAPage'));
 const DashboardAnalyticsPage = React.lazy(() => import('./pages/DashboardAnalyticsPage'));
+const AnalyticsPage = React.lazy(() => import('./pages/AnalyticsPage'));
 const FechamentoAutomaticoPage = React.lazy(() => import('./pages/FechamentoAutomaticoPage'));
 const GestaoTicketsPage = React.lazy(() => import('./pages/GestaoTicketsPage'));
 const TicketCreatePage = React.lazy(() => import('./pages/TicketCreatePage'));
@@ -112,7 +123,7 @@ const FornecedoresPage = React.lazy(
   () => import('./features/financeiro/fornecedores/FornecedoresPage'),
 );
 
-const PerfilPage = React.lazy(() => import('./features/perfil/PerfilPage'));
+const PerfilPage = React.lazy(() => import('./features/perfil'));
 const PortalClientePage = React.lazy(() => import('./pages/PortalClientePage'));
 const FaturamentoPage = React.lazy(() => import('./pages/faturamento/FaturamentoPage'));
 const TrocarSenhaPage = React.lazy(() => import('./pages/TrocarSenhaPage'));
@@ -137,6 +148,11 @@ const GestaoStatusCustomizadosPage = React.lazy(
 
 const AgendaPage = React.lazy(() =>
   import('./features/agenda/AgendaPage').then((m) => ({ default: m.AgendaPage })),
+);
+const AgendaEventDetailsPage = React.lazy(() =>
+  import('./features/agenda/AgendaEventDetailsPage').then((m) => ({
+    default: m.AgendaEventDetailsPage,
+  })),
 );
 
 const EmpresasListPage = React.lazy(() =>
@@ -189,10 +205,10 @@ const AppRoutes: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="bg-white p-8 rounded-xl shadow-lg text-center max-w-md w-full mx-4">
-          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-2xl shadow-lg mx-auto mb-4">
-            C
+          <div className="mx-auto mb-4 inline-flex h-16 w-16 items-center justify-center rounded-xl border border-[#D8E4E8] bg-[#F8FCFD]">
+            <Conect360Logo variant="loading" size="lg" className="h-10 w-10" />
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Conect CRM</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Conect360</h2>
           <p className="text-gray-600 mb-6">Carregando aplicação...</p>
 
           {/* Loading spinner */}
@@ -221,12 +237,28 @@ const AppRoutes: React.FC = () => {
 
     return (
       <>
-        {/* Rotas Fullscreen (sem DashboardLayout) */}
+        {/* Todas as rotas autenticadas usam App Shell canônico */}
         <Routes>
-          {/* Nova Inbox - Tela cheia estilo Zendesk/Intercom */}
+          <Route
+            path="/dashboard"
+            element={
+              <PermissionPathGuard>
+                <DashboardLayout>
+                  <DashboardHomeRoute />
+                </DashboardLayout>
+              </PermissionPathGuard>
+            }
+          />
+
           <Route
             path="/atendimento/inbox"
-            element={protegerRota(ModuloEnum.ATENDIMENTO, <InboxAtendimentoPage />)}
+            element={
+              <PermissionPathGuard>
+                <DashboardLayout>
+                  {protegerRota(ModuloEnum.ATENDIMENTO, <InboxAtendimentoPage />)}
+                </DashboardLayout>
+              </PermissionPathGuard>
+            }
           />
 
           {/* Redirect: Chat antigo → Nova Inbox */}
@@ -236,8 +268,9 @@ const AppRoutes: React.FC = () => {
           <Route
             path="*"
             element={
-              <DashboardLayout>
-                <Routes>
+              <PermissionPathGuard>
+                <DashboardLayout>
+                  <Routes>
                   <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard" element={<DashboardRouter />} />
                   {/* Página de Notificações */}
@@ -260,7 +293,7 @@ const AppRoutes: React.FC = () => {
                   <Route path="/nuclei/comercial" element={<Navigate to="/nuclei/crm" replace />} />
                   <Route
                     path="/nuclei/configuracoes"
-                    element={<Navigate to="/configuracoes" replace />}
+                    element={<Navigate to="/configuracoes/empresa" replace />}
                   />{' '}
                   {/* Configurações: base platform */}
                   <Route
@@ -288,7 +321,14 @@ const AppRoutes: React.FC = () => {
                     path="/admin/usuarios"
                     element={<Navigate to="/configuracoes/usuarios" replace />}
                   />
-                  <Route path="/admin/sistema" element={<Navigate to="/configuracoes" replace />} />
+                  <Route
+                    path="/admin/sistema"
+                    element={protegerRotaSuperadmin(<SystemBrandingPage />)}
+                  />
+                  <Route
+                    path="/admin/branding"
+                    element={<Navigate to="/admin/sistema" replace />}
+                  />
                   {/* ⭐ NOVA ROTA: Configurações de Atendimento com Abas (com redirects automáticos) */}
                   <Route
                     path="/atendimento/configuracoes"
@@ -405,20 +445,7 @@ const AppRoutes: React.FC = () => {
                   />
                   <Route
                     path="/admin/conformidade"
-                    element={protegerRotaSuperadmin(
-                      <ModuleUnderConstruction
-                        moduleName="Políticas & Conformidade"
-                        description="Gestão de políticas internas, LGPD e compliance regulatório"
-                        estimatedCompletion="Q4 2025"
-                        features={[
-                          'Gestão de políticas',
-                          'Compliance LGPD',
-                          'Controle de consentimento',
-                          'Auditoria de conformidade',
-                          'Relatórios regulatórios',
-                        ]}
-                      />,
-                    )}
+                    element={protegerRotaSuperadmin(<AdminConformidadePage />)}
                   />
                   <Route
                     path="/admin/acesso"
@@ -464,11 +491,11 @@ const AppRoutes: React.FC = () => {
                   <Route path="/configuracoes/departamentos" element={<DepartamentosPage />} />
                   <Route
                     path="/configuracoes/sistema"
-                    element={<Navigate to="/configuracoes" replace />}
+                    element={<Navigate to="/configuracoes/empresa" replace />}
                   />
                   <Route
                     path="/configuracoes/seguranca"
-                    element={<Navigate to="/configuracoes" replace />}
+                    element={<Navigate to="/configuracoes/empresa" replace />}
                   />
                   {/* ROTAS DO NÚCLEO ATENDIMENTO */}
                   <Route
@@ -599,7 +626,7 @@ const AppRoutes: React.FC = () => {
                     path="/nuclei/configuracoes/tickets/tipos"
                     element={<Navigate to="/configuracoes/tickets/tipos" replace />}
                   />
-                  <Route path="/relatorios/analytics" element={<RelatoriosAnalyticsPage />} />
+                  <Route path="/relatorios/analytics" element={<AnalyticsPage />} />
                   <Route path="/gestao/permissoes" element={<SistemaPermissoesPage />} />
                   <Route path="/sistema/backup" element={<BackupSincronizacaoPage />} />
                   {/* Atendimento Omnichannel - Protegido */}
@@ -790,8 +817,16 @@ const AppRoutes: React.FC = () => {
                   />
                   <Route path="/agenda" element={protegerRota(ModuloEnum.CRM, <AgendaPage />)} />
                   <Route
+                    path="/agenda/eventos/:id"
+                    element={protegerRota(ModuloEnum.CRM, <AgendaEventDetailsPage />)}
+                  />
+                  <Route
                     path="/crm/agenda"
                     element={protegerRota(ModuloEnum.CRM, <AgendaPage />)}
+                  />
+                  <Route
+                    path="/crm/agenda/eventos/:id"
+                    element={protegerRota(ModuloEnum.CRM, <AgendaEventDetailsPage />)}
                   />
                   <Route
                     path="/crm/clientes"
@@ -906,10 +941,11 @@ const AppRoutes: React.FC = () => {
                       />
                     }
                   />
-                  <Route path="/configuracoes" element={<ConfiguracoesPage />} />
+                  <Route path="/configuracoes" element={<Navigate to="/configuracoes/empresa" replace />} />
                   <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                </Routes>
-              </DashboardLayout>
+                  </Routes>
+                </DashboardLayout>
+              </PermissionPathGuard>
             }
           />
         </Routes>
@@ -931,6 +967,8 @@ const AppRoutes: React.FC = () => {
       {/* Rotas de autenticação */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/registro" element={<RegistroEmpresaPage />} />
+      <Route path="/termos" element={<TermosUsoPage />} />
+      <Route path="/privacidade" element={<PoliticaPrivacidadePage />} />
       <Route path="/verificar-email" element={<VerificacaoEmailPage />} />
       <Route path="/esqueci-minha-senha" element={<ForgotPasswordPage />} />
       <Route path="/recuperar-senha" element={<ResetPasswordPage />} />
@@ -946,49 +984,81 @@ const App: React.FC = () => {
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
         <ThemeProvider>
-          <AuthProvider>
-            <ProfileProvider>
-              <NotificationProvider>
-                <EmpresaProvider>
-                  <WebSocketProvider>
-                    <ErrorBoundary>
-                      <SidebarProvider>
-                        <MenuProvider>
-                          {/* SocketProvider temporariamente desabilitado - usando useWebSocket do chat */}
-                          {/* <SocketProvider> */}
-                          <Router
-                            future={{
-                              v7_startTransition: true,
-                              v7_relativeSplatPath: true,
-                            }}
-                          >
-                            <ScrollToTop />
-                            <div className="App">
-                              <Suspense
-                                fallback={
-                                  <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-                                    <div className="bg-white p-6 rounded-xl shadow-lg text-center max-w-md w-full mx-4">
-                                      <p className="text-gray-600">Carregando...</p>
+          <SystemBrandingProvider>
+            <AuthProvider>
+              <ProfileProvider>
+                <NotificationProvider>
+                  <EmpresaProvider>
+                    <WebSocketProvider>
+                      <ErrorBoundary>
+                        <SidebarProvider>
+                          <MenuProvider>
+                            <GlobalConfirmationProvider>
+                            {/* SocketProvider temporariamente desabilitado - usando useWebSocket do chat */}
+                            {/* <SocketProvider> */}
+                            <Router
+                              future={{
+                                v7_startTransition: true,
+                                v7_relativeSplatPath: true,
+                              }}
+                            >
+                              <ScrollToTop />
+                              <div className="App">
+                                <Suspense
+                                  fallback={
+                                    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+                                      <div className="bg-white p-6 rounded-xl shadow-lg text-center max-w-md w-full mx-4">
+                                        <p className="text-gray-600">Carregando...</p>
+                                      </div>
                                     </div>
-                                  </div>
-                                }
-                              >
-                                <AppRoutes />
-                              </Suspense>
+                                  }
+                                >
+                                  <AppRoutes />
+                                </Suspense>
 
-                              {/* Toast Notifications */}
-                              <Toaster position="top-right" />
-                            </div>
-                          </Router>
-                          {/* </SocketProvider> */}
-                        </MenuProvider>
-                      </SidebarProvider>
-                    </ErrorBoundary>
-                  </WebSocketProvider>
-                </EmpresaProvider>
-              </NotificationProvider>
-            </ProfileProvider>
-          </AuthProvider>
+                                {/* Toast Notifications */}
+                                <Toaster
+                                  position="top-right"
+                                  toastOptions={{
+                                    duration: 3000,
+                                    className:
+                                      'rounded-xl border border-[#D7E4E8] bg-white px-4 py-3 text-sm text-[#002333] shadow-lg',
+                                    success: {
+                                      duration: 3000,
+                                      iconTheme: {
+                                        primary: '#159A9C',
+                                        secondary: '#FFFFFF',
+                                      },
+                                    },
+                                    error: {
+                                      duration: 5000,
+                                      iconTheme: {
+                                        primary: '#DC2626',
+                                        secondary: '#FFFFFF',
+                                      },
+                                    },
+                                    loading: {
+                                      duration: Infinity,
+                                      iconTheme: {
+                                        primary: '#159A9C',
+                                        secondary: '#FFFFFF',
+                                      },
+                                    },
+                                  }}
+                                />
+                              </div>
+                            </Router>
+                            {/* </SocketProvider> */}
+                            </GlobalConfirmationProvider>
+                          </MenuProvider>
+                        </SidebarProvider>
+                      </ErrorBoundary>
+                    </WebSocketProvider>
+                  </EmpresaProvider>
+                </NotificationProvider>
+              </ProfileProvider>
+            </AuthProvider>
+          </SystemBrandingProvider>
         </ThemeProvider>
       </I18nProvider>
     </QueryClientProvider>

@@ -1,4 +1,12 @@
-import { Logger, Controller, Get, Query, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  Logger,
+  Controller,
+  Get,
+  Query,
+  UseGuards,
+  UseInterceptors,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import {
   DashboardService,
   DashboardKPIs,
@@ -8,80 +16,127 @@ import {
 import { CacheInterceptor, CacheTTL } from '../../common/interceptors/cache.interceptor';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { Permission } from '../../common/permissions/permissions.constants';
+import { EmpresaId } from '../../common/decorators/empresa.decorator';
+import { CurrentUser } from '../../common/decorators/user.decorator';
+import { User, UserRole } from '../users/user.entity';
 
 @Controller('dashboard')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
-@UseInterceptors(CacheInterceptor) // 🚀 Cache ativado para dashboard
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.DASHBOARD_READ)
+@UseInterceptors(CacheInterceptor)
 export class DashboardController {
   private readonly logger = new Logger(DashboardController.name);
+
   constructor(private readonly dashboardService: DashboardService) {}
 
-  /**
-   * GET /dashboard/kpis
-   * Obter KPIs principais do dashboard
-   */
+  private normalizeRole(user?: User): string {
+    return user?.role?.toString().toLowerCase().trim() ?? '';
+  }
+
+  private isPrivilegedRole(role: string): boolean {
+    return (
+      role === UserRole.SUPERADMIN ||
+      role === UserRole.ADMIN ||
+      role === UserRole.GERENTE ||
+      role === UserRole.MANAGER ||
+      role === 'gestor' ||
+      role === 'superadmin'
+    );
+  }
+
+  private resolveVendedorScope(user: User | undefined, requestedVendedorId?: string): string | undefined {
+    if (!user?.id) {
+      return undefined;
+    }
+
+    const role = this.normalizeRole(user);
+
+    // Menor privilégio: perfis operacionais/usuário enxergam apenas seus próprios dados.
+    if (role === UserRole.VENDEDOR) {
+      return user.id;
+    }
+
+    if (this.isPrivilegedRole(role)) {
+      return requestedVendedorId;
+    }
+
+    // Fallback seguro para roles desconhecidas.
+    return user.id;
+  }
+
   @Get('kpis')
-  @CacheTTL(30 * 1000) // 🚀 Cache: 30 segundos (KPIs precisam ser atualizados frequentemente)
+  @CacheTTL(30 * 1000)
   async getKPIs(
+    @CurrentUser() user: User,
+    @EmpresaId() empresaId: string,
     @Query('periodo') periodo: string = 'mensal',
     @Query('vendedor') vendedorId?: string,
     @Query('regiao') regiao?: string,
   ): Promise<DashboardKPIs> {
-    return await this.dashboardService.getKPIs(periodo, vendedorId, regiao);
+    const vendedorScope = this.resolveVendedorScope(user, vendedorId);
+    return await this.dashboardService.getKPIs(periodo, vendedorScope, regiao, empresaId);
   }
 
-  /**
-   * GET /dashboard/vendedores-ranking
-   * Obter ranking de vendedores
-   */
   @Get('vendedores-ranking')
-  @CacheTTL(60 * 1000) // 🚀 Cache: 1 minuto (ranking muda menos frequentemente)
+  @CacheTTL(60 * 1000)
   async getVendedoresRanking(
+    @CurrentUser() user: User,
+    @EmpresaId() empresaId: string,
     @Query('periodo') periodo: string = 'mensal',
   ): Promise<VendedorRanking[]> {
-    return await this.dashboardService.getVendedoresRanking(periodo);
+    const vendedorScope = this.resolveVendedorScope(user);
+    return await this.dashboardService.getVendedoresRanking(periodo, empresaId, vendedorScope);
   }
 
-  /**
-   * GET /dashboard/alertas
-   * Obter alertas inteligentes
-   */
   @Get('alertas')
-  @CacheTTL(45 * 1000) // 🚀 Cache: 45 segundos (alertas devem ser relativamente frescos)
-  async getAlertasInteligentes(): Promise<AlertaInteligente[]> {
-    return await this.dashboardService.getAlertasInteligentes();
+  @CacheTTL(45 * 1000)
+  async getAlertasInteligentes(
+    @CurrentUser() user: User,
+    @EmpresaId() empresaId: string,
+  ): Promise<AlertaInteligente[]> {
+    const vendedorScope = this.resolveVendedorScope(user);
+    return await this.dashboardService.getAlertasInteligentes(
+      'mensal',
+      empresaId,
+      undefined,
+      vendedorScope,
+    );
   }
 
-  /**
-   * GET /dashboard/resumo
-   * Obter dados completos do dashboard
-   */
   @Get('resumo')
   async getResumoCompleto(
+    @CurrentUser() user: User,
+    @EmpresaId() empresaId: string,
     @Query('periodo') periodo: string = 'mensal',
     @Query('vendedor') vendedorId?: string,
     @Query('regiao') regiao?: string,
   ) {
-    // TEMPORÁRIO: Retornar mock data até que as migrations sejam completadas
     const agora = new Date();
+    const vendedorScope = this.resolveVendedorScope(user, vendedorId);
+
     try {
-      const [kpis, vendedoresRanking] = await Promise.all([
-        this.dashboardService.getKPIs(periodo, vendedorId, regiao),
-        this.dashboardService.getVendedoresRanking(periodo),
+      const [kpis, vendedoresRanking, chartsData] = await Promise.all([
+        this.dashboardService.getKPIs(periodo, vendedorScope, regiao, empresaId),
+        this.dashboardService.getVendedoresRanking(periodo, empresaId, vendedorScope),
+        this.dashboardService.getChartsData(periodo, vendedorScope, regiao, empresaId),
       ]);
 
-      const alertas = await this.dashboardService.getAlertasInteligentes(periodo, {
+      const alertas = await this.dashboardService.getAlertasInteligentes(periodo, empresaId, {
         ranking: vendedoresRanking,
         kpis,
-      });
+      }, vendedorScope);
 
       return {
         kpis,
         vendedoresRanking,
         alertas,
+        chartsData,
         metadata: {
           periodo,
-          vendedorId,
+          vendedorId: vendedorScope,
           regiao,
           atualizadoEm: agora.toISOString(),
           proximaAtualizacao: new Date(agora.getTime() + 15 * 60 * 1000).toISOString(),
@@ -94,46 +149,11 @@ export class DashboardController {
         },
       };
     } catch (error) {
-      this.logger.log('⚠️  Erro no dashboard, retornando mock data:', error.message);
-      return {
-        kpis: {
-          faturamentoTotal: { valor: 0, meta: 100000, variacao: 0, periodo: 'vs mês anterior' },
-          ticketMedio: { valor: 0, variacao: 0, periodo: 'vs mês anterior' },
-          vendasFechadas: { quantidade: 0, variacao: 0, periodo: 'vs mês anterior' },
-          emNegociacao: { valor: 0, quantidade: 0, propostas: [] },
-          novosClientesMes: { quantidade: 0, variacao: 0 },
-          leadsQualificados: { quantidade: 0, variacao: 0 },
-          propostasEnviadas: { valor: 0, variacao: 0 },
-          taxaSucessoGeral: { percentual: 0, variacao: 0 },
-          agenda: {
-            totalEventos: 0,
-            eventosConcluidos: 0,
-            proximosEventos: 0,
-            eventosHoje: 0,
-            estatisticasPorTipo: {
-              reuniao: 0,
-              ligacao: 0,
-              apresentacao: 0,
-              visita: 0,
-              'follow-up': 0,
-              outro: 0,
-            },
-            produtividade: 0,
-          },
-        },
-        vendedoresRanking: [],
-        alertas: [],
-        metadata: {
-          periodo,
-          vendedorId,
-          regiao,
-          atualizadoEm: agora.toISOString(),
-          proximaAtualizacao: new Date(agora.getTime() + 15 * 60 * 1000).toISOString(),
-          periodosDisponiveis: this.dashboardService.getPeriodosDisponiveis(),
-          vendedoresDisponiveis: [],
-          regioesDisponiveis: this.dashboardService.getRegioesDisponiveis(),
-        },
-      };
+      this.logger.error(
+        `Erro ao carregar resumo do dashboard (empresa=${empresaId}, periodo=${periodo}): ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException('Erro ao carregar dados do dashboard.');
     }
   }
 }

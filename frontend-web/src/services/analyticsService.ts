@@ -1,5 +1,4 @@
-import axios from 'axios';
-import { API_BASE_URL } from './api';
+import api from './api';
 
 // Base URL da API (ajustar conforme ambiente)
 
@@ -72,9 +71,7 @@ export const analyticsService = {
         queryParams.append('dataFim', params.dataFim);
       }
 
-      const response = await axios.get(
-        `${API_BASE_URL}/api/atendimento/analytics/dashboard?${queryParams.toString()}`,
-      );
+      const response = await api.get(`/api/atendimento/analytics/dashboard?${queryParams.toString()}`);
 
       return response.data;
     } catch (error) {
@@ -100,8 +97,8 @@ export const analyticsService = {
         queryParams.append('limite', params.limite.toString());
       }
 
-      const response = await axios.get(
-        `${API_BASE_URL}/api/atendimento/analytics/desempenho-atendentes?${queryParams.toString()}`,
+      const response = await api.get(
+        `/api/atendimento/analytics/desempenho-atendentes?${queryParams.toString()}`,
       );
 
       return response.data;
@@ -123,9 +120,7 @@ export const analyticsService = {
         periodo: params.periodo || '30d',
       });
 
-      const response = await axios.get(
-        `${API_BASE_URL}/api/atendimento/analytics/canais?${queryParams.toString()}`,
-      );
+      const response = await api.get(`/api/atendimento/analytics/canais?${queryParams.toString()}`);
 
       return response.data;
     } catch (error) {
@@ -150,9 +145,7 @@ export const analyticsService = {
         granularidade: params.granularidade || 'dia',
       });
 
-      const response = await axios.get(
-        `${API_BASE_URL}/api/atendimento/analytics/tendencias?${queryParams.toString()}`,
-      );
+      const response = await api.get(`/api/atendimento/analytics/tendencias?${queryParams.toString()}`);
 
       return response.data;
     } catch (error) {

@@ -15,6 +15,9 @@ import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permission } from '../../../common/permissions/permissions.constants';
 import { MessageTemplateService } from '../services/message-template.service';
 import { CriarTemplateDto, AtualizarTemplateDto } from '../dto/template-tag.dto';
 import { MessageTemplate } from '../entities/message-template.entity';
@@ -25,11 +28,13 @@ import { MessageTemplate } from '../entities/message-template.entity';
  */
 @ApiTags('Message Templates')
 @Controller('atendimento/templates')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.ATENDIMENTO_CHATS_READ)
 export class MessageTemplateController {
   constructor(private readonly templateService: MessageTemplateService) {}
 
   @Post()
+  @Permissions(Permission.ATENDIMENTO_CHATS_REPLY)
   @ApiOperation({ summary: 'Criar novo template de mensagem' })
   @ApiResponse({ status: 201, description: 'Template criado com sucesso', type: MessageTemplate })
   @ApiResponse({ status: 400, description: 'Dados inválidos ou template duplicado' })
@@ -105,6 +110,7 @@ export class MessageTemplateController {
   }
 
   @Put(':id')
+  @Permissions(Permission.ATENDIMENTO_CHATS_REPLY)
   @ApiOperation({ summary: 'Atualizar template' })
   @ApiResponse({
     status: 200,
@@ -127,6 +133,7 @@ export class MessageTemplateController {
   }
 
   @Delete(':id')
+  @Permissions(Permission.ATENDIMENTO_CHATS_REPLY)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Deletar template' })
   @ApiResponse({ status: 204, description: 'Template deletado com sucesso' })

@@ -5,6 +5,7 @@ import {
   AtualizarUsuario,
   FiltrosUsuarios,
   EstatisticasUsuarios,
+  PermissionCatalogResponse,
   UserRole,
 } from '../types/usuarios/index';
 import { User } from '../types';
@@ -16,8 +17,49 @@ export interface ListarUsuariosResponse {
   limite: number;
 }
 
+export interface UploadAvatarResponse {
+  id: string;
+  nome?: string;
+  email?: string;
+  avatar_url?: string | null;
+}
+
+export type PrivacyRequestType = 'data_export' | 'account_anonymization' | 'account_deletion';
+
+export interface PrivacyRequestResponse {
+  protocolo: string;
+  status: string;
+  tipo: PrivacyRequestType;
+  criado_em: string;
+  observacao?: string;
+}
+
+export interface AdminPrivacyRequestItem {
+  id: string;
+  protocolo: string;
+  created_at: string;
+  updated_at?: string | null;
+  status: 'open' | 'in_review' | 'completed' | 'rejected';
+  type: PrivacyRequestType;
+  reason?: string | null;
+  resolution_note?: string | null;
+  requested_at?: string | null;
+  handled_at?: string | null;
+  handled_by?: {
+    id?: string | null;
+    nome?: string | null;
+    email?: string | null;
+  } | null;
+  requester?: {
+    id?: string | null;
+    nome?: string | null;
+    email?: string | null;
+  } | null;
+}
+
 class UsuariosService {
   private readonly basePath = '/users';
+  private readonly requestTimeoutMs = 30000;
 
   private getUrl(path: string = ''): string {
     return `${this.basePath}${path}`;
@@ -67,6 +109,24 @@ class UsuariosService {
   async obterUsuario(id: string): Promise<Usuario> {
     const response = await api.get(this.getUrl(`/${id}`));
     return this.formatarUsuario(response.data);
+  }
+
+  async obterCatalogoPermissoes(): Promise<PermissionCatalogResponse> {
+    const response = await api.get(this.getUrl('/permissoes/catalogo'));
+    const payload = response.data?.data ?? response.data ?? {};
+
+    return {
+      version: typeof payload.version === 'string' ? payload.version : 'unknown',
+      groups: Array.isArray(payload.groups) ? payload.groups : [],
+      defaultsByRole:
+        payload.defaultsByRole && typeof payload.defaultsByRole === 'object'
+          ? payload.defaultsByRole
+          : {},
+      allPermissions: Array.isArray(payload.allPermissions) ? payload.allPermissions : [],
+      legacyAssignablePermissions: Array.isArray(payload.legacyAssignablePermissions)
+        ? payload.legacyAssignablePermissions
+        : [],
+    };
   }
 
   async criarUsuario(usuario: NovoUsuario): Promise<Usuario> {
@@ -152,16 +212,36 @@ class UsuariosService {
 
   // Formatador específico para o tipo User (usado no contexto de autenticação)
   private formatarUsuarioParaUser(usuario: any): User {
+    const notificacoes = usuario.configuracoes?.notificacoes;
+
     return {
       id: usuario.id,
       nome: usuario.nome,
       email: usuario.email,
       telefone: usuario.telefone,
       role: usuario.role,
+      permissoes: usuario.permissoes || usuario.permissions || [],
+      permissions: usuario.permissions || usuario.permissoes || [],
       avatar_url: usuario.avatar_url,
+      configuracoes: {
+        tema: usuario.configuracoes?.tema || 'light',
+        notificacoes: {
+          email:
+            typeof notificacoes?.email === 'boolean'
+              ? notificacoes.email
+              : true,
+          push:
+            typeof notificacoes?.push === 'boolean'
+              ? notificacoes.push
+              : true,
+        },
+      },
       idioma_preferido: usuario.idioma_preferido || 'pt-BR',
+      ultimo_login: usuario.ultimo_login || null,
+      created_at: usuario.created_at || null,
+      updated_at: usuario.updated_at || null,
       empresa: {
-        id: usuario.empresa_id || '1',
+        id: usuario.empresa_id || usuario.empresa?.id || '1',
         nome: usuario.empresa?.nome || 'Empresa',
         slug: usuario.empresa?.slug || 'empresa',
       },
@@ -198,6 +278,10 @@ class UsuariosService {
         [UserRole.MANAGER]: 0,
         [UserRole.VENDEDOR]: 0,
         [UserRole.USER]: 0,
+        [UserRole.FINANCEIRO]: 0,
+        ...(backendData.por_perfil?.financeiro !== undefined
+          ? { [UserRole.FINANCEIRO]: Number(backendData.por_perfil.financeiro) || 0 }
+          : {}),
         ...(backendData.por_perfil || {}),
       };
 
@@ -222,6 +306,7 @@ class UsuariosService {
           [UserRole.MANAGER]: 0,
           [UserRole.VENDEDOR]: 0,
           [UserRole.USER]: 0,
+          [UserRole.FINANCEIRO]: 0,
         },
         ultimosLogins: 0,
       };
@@ -236,8 +321,93 @@ class UsuariosService {
 
   // Método para atualizar perfil do usuário logado
   async atualizarPerfil(dados: Partial<NovoUsuario>): Promise<Usuario> {
-    const response = await api.put(this.getUrl('/profile'), dados);
+    const response = await api.put(this.getUrl('/profile'), dados, {
+      timeout: this.requestTimeoutMs,
+    });
     return this.formatarUsuario(response.data.data);
+  }
+
+  async atualizarSenhaPerfil(dados: {
+    senha_atual: string;
+    senha_nova: string;
+    confirmar_senha?: string;
+  }): Promise<void> {
+    await api.put(this.getUrl('/profile/password'), dados, {
+      timeout: this.requestTimeoutMs,
+    });
+  }
+
+  async exportarDadosPerfil(): Promise<Record<string, unknown>> {
+    const response = await api.get(this.getUrl('/profile/export'), {
+      timeout: this.requestTimeoutMs,
+    });
+    return response.data?.data ?? response.data ?? {};
+  }
+
+  async solicitarPrivacidadePerfil(payload: {
+    type: PrivacyRequestType;
+    reason?: string;
+  }): Promise<PrivacyRequestResponse> {
+    const response = await api.post(this.getUrl('/profile/privacy-request'), payload, {
+      timeout: this.requestTimeoutMs,
+    });
+    return response.data?.data ?? response.data ?? {};
+  }
+
+  async listarSolicitacoesPrivacidade(params?: {
+    status?: 'open' | 'in_review' | 'completed' | 'rejected';
+    type?: PrivacyRequestType;
+    limit?: number;
+  }): Promise<AdminPrivacyRequestItem[]> {
+    const response = await api.get(this.getUrl('/privacy-requests'), { params });
+    return Array.isArray(response.data?.data) ? response.data.data : [];
+  }
+
+  async atualizarSolicitacaoPrivacidade(
+    id: string,
+    payload: {
+      status: 'open' | 'in_review' | 'completed' | 'rejected';
+      resolution_note?: string;
+    },
+  ): Promise<AdminPrivacyRequestItem> {
+    const response = await api.patch(this.getUrl(`/privacy-requests/${id}`), payload, {
+      timeout: this.requestTimeoutMs,
+    });
+    return response.data?.data ?? response.data ?? {};
+  }
+
+  async uploadAvatarUsuario(id: string, file: File): Promise<UploadAvatarResponse> {
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    const response = await api.post(this.getUrl(`/${id}/avatar`), formData, {
+      timeout: this.requestTimeoutMs,
+    });
+    const payload = response.data?.data ?? response.data ?? {};
+
+    return {
+      id: payload.id || id,
+      nome: payload.nome,
+      email: payload.email,
+      avatar_url: payload.avatar_url ?? null,
+    };
+  }
+
+  async uploadAvatarPerfil(file: File): Promise<UploadAvatarResponse> {
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    const response = await api.post(this.getUrl('/profile/avatar'), formData, {
+      timeout: this.requestTimeoutMs,
+    });
+    const payload = response.data?.data ?? response.data ?? {};
+
+    return {
+      id: payload.id || '',
+      nome: payload.nome,
+      email: payload.email,
+      avatar_url: payload.avatar_url ?? null,
+    };
   }
 
   // Formatação de dados
@@ -262,8 +432,8 @@ class UsuariosService {
       ativo: usuario.ativo,
       deve_trocar_senha: Boolean(usuario.deve_trocar_senha),
       ultimo_login: usuario.ultimo_login ? new Date(usuario.ultimo_login) : undefined,
-      created_at: new Date(usuario.created_at),
-      updated_at: new Date(usuario.updated_at),
+      created_at: usuario.created_at ? new Date(usuario.created_at) : new Date(),
+      updated_at: usuario.updated_at ? new Date(usuario.updated_at) : new Date(),
       empresa: usuario.empresa,
     };
   }

@@ -288,3 +288,65 @@ groups:
         annotations:
           summary: "Taxa de conversão abaixo do esperado"
           description: "Apenas {{ $value | humanizePercentage }} dos tickets resolvidos"
+
+  # ========================================
+  # GRUPO 7: Dashboard V2 Benchmark Gates
+  # ========================================
+  - name: dashboard_v2_benchmark
+    interval: 1m
+    rules:
+      # Alerta 15: Benchmark sem execucao recente (>36h)
+      - alert: DashboardV2BenchmarkStale
+        expr: |
+          time() - max(push_time_seconds{job="dashboard_v2_benchmark"}) > 129600
+        for: 10m
+        labels:
+          severity: warning
+          component: dashboard_v2
+          type: performance_gate
+        annotations:
+          summary: "Benchmark Dashboard V2 sem atualizacao recente"
+          description: "Sem push no job dashboard_v2_benchmark ha mais de 36h"
+          action: "Verificar workflow dashboard-v2-benchmark no GitHub Actions"
+
+      # Alerta 16: Gate de p95 falhou
+      - alert: DashboardV2BenchmarkP95GateFailed
+        expr: |
+          max(conectcrm_dashboard_v2_benchmark_gate_pass{gate="cache_hit_p95"}) < 1
+        for: 5m
+        labels:
+          severity: critical
+          component: dashboard_v2
+          type: performance_gate
+        annotations:
+          summary: "Gate P95 do Dashboard V2 falhou"
+          description: "Benchmark reportou cache-hit p95 acima do limite de 400ms"
+          action: "Investigar regressao de consulta/caching em /dashboard/v2/*"
+
+      # Alerta 17: Gate cold-start falhou
+      - alert: DashboardV2BenchmarkColdGateFailed
+        expr: |
+          max(conectcrm_dashboard_v2_benchmark_gate_pass{gate="cold"}) < 1
+        for: 5m
+        labels:
+          severity: critical
+          component: dashboard_v2
+          type: performance_gate
+        annotations:
+          summary: "Gate cold-start do Dashboard V2 falhou"
+          description: "Benchmark reportou cold-start acima do limite de 1200ms"
+          action: "Verificar agregacoes, queries e processamento de warmup"
+
+      # Alerta 18: Benchmark retornou erros HTTP
+      - alert: DashboardV2BenchmarkHttpErrors
+        expr: |
+          max(conectcrm_dashboard_v2_benchmark_non2xx_total) > 0
+        for: 5m
+        labels:
+          severity: warning
+          component: dashboard_v2
+          type: performance_gate
+        annotations:
+          summary: "Benchmark Dashboard V2 encontrou respostas nao-2xx"
+          description: "Foram detectadas respostas HTTP nao-2xx no ultimo benchmark"
+          action: "Revisar rate-limit, auth e disponibilidade das rotas /dashboard/v2/*"

@@ -24,6 +24,7 @@ import { getMockProviders } from '../mocks/external-services.mock';
 import { TicketService } from '../../src/modules/atendimento/services/ticket.service';
 import { MensagemService } from '../../src/modules/atendimento/services/mensagem.service';
 import { register } from '../../src/config/metrics';
+import { createE2EApp, withE2EBootstrapLock } from '../_support/e2e-app.helper';
 
 /**
  * 🧪 E2E Test: Fluxo Completo de Triagem
@@ -43,7 +44,7 @@ describe('Triagem E2E - Fluxo Completo', () => {
   let mensagemService: MensagemService;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
+    const moduleFixture: TestingModule = await withE2EBootstrapLock(() => Test.createTestingModule({
       imports: [
         TypeOrmModule.forRoot(testDatabaseConfig),
         WinstonModule.forRoot({
@@ -57,10 +58,9 @@ describe('Triagem E2E - Fluxo Completo', () => {
       providers: [
         ...getMockProviders(), // Mocks de serviços externos
       ],
-    }).compile();
+    }).compile());
 
-    app = moduleFixture.createNestApplication();
-    await app.init();
+    app = await createE2EApp(moduleFixture, { validationPipe: false });
 
     ticketService = app.get(TicketService);
     mensagemService = app.get(MensagemService);
@@ -352,3 +352,5 @@ describe('Triagem E2E - Fluxo Completo', () => {
     });
   });
 });
+
+

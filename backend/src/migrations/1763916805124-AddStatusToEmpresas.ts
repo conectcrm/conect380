@@ -410,19 +410,19 @@ export class AddStatusToEmpresas1763916805124 implements MigrationInterface {
     await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_1162d4fe194d2e32a9ecf6ccb4"`);
     await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_67862e1af92d16dfa50f4e9d18"`);
     await queryRunner.query(
-      `COMMENT ON COLUMN "modulos_empresas"."configuracoes" IS 'ConfiguraÃ§Ãµes especÃ­ficas do mÃ³dulo'`,
+      `COMMENT ON COLUMN "modulos_empresas"."configuracoes" IS 'Configurações específicas do módulo'`,
     );
     await queryRunner.query(
-      `COMMENT ON COLUMN "modulos_empresas"."ativo" IS 'Se o mÃ³dulo estÃ¡ ativo para esta empresa'`,
+      `COMMENT ON COLUMN "modulos_empresas"."ativo" IS 'Se o módulo está ativo para esta empresa'`,
     );
     await queryRunner.query(
-      `COMMENT ON COLUMN "modulos_empresas"."modulo" IS 'Nome do mÃ³dulo: crm, atendimento, comercial, etc.'`,
+      `COMMENT ON COLUMN "modulos_empresas"."modulo" IS 'Nome do módulo: crm, atendimento, comercial, etc.'`,
     );
     await queryRunner.query(
-      `COMMENT ON COLUMN "historico_planos"."alterado_por" IS 'ID do admin que fez a alteraÃ§Ã£o'`,
+      `COMMENT ON COLUMN "historico_planos"."alterado_por" IS 'ID do admin que fez a alteração'`,
     );
     await queryRunner.query(
-      `COMMENT ON COLUMN "historico_planos"."motivo" IS 'Motivo da mudanÃ§a de plano'`,
+      `COMMENT ON COLUMN "historico_planos"."motivo" IS 'Motivo da mudança de plano'`,
     );
     await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "valorMulta" TYPE numeric(10,2)`);
     await queryRunner.query(`ALTER TABLE "faturas" ALTER COLUMN "valorJuros" TYPE numeric(10,2)`);

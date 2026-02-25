@@ -11,6 +11,7 @@ import {
 import { User } from '../users/user.entity';
 import { Cliente } from '../clientes/cliente.entity';
 import { Atividade } from './atividade.entity';
+import { OportunidadeStageEvent } from './oportunidade-stage-event.entity';
 import { Empresa } from '../../empresas/entities/empresa.entity';
 
 export enum EstagioOportunidade {
@@ -38,6 +39,17 @@ export enum OrigemOportunidade {
   EVENTO = 'evento',
   PARCEIRO = 'parceiro',
   CAMPANHA = 'campanha',
+}
+
+export enum MotivoPerdaOportunidade {
+  PRECO = 'preco',
+  CONCORRENTE = 'concorrente',
+  TIMING = 'timing',
+  ORCAMENTO = 'orcamento',
+  PRODUTO = 'produto',
+  PROJETO_CANCELADO = 'projeto_cancelado',
+  SEM_RESPOSTA = 'sem_resposta',
+  OUTRO = 'outro',
 }
 
 @Entity('oportunidades')
@@ -120,8 +132,28 @@ export class Oportunidade {
   @Column({ type: 'varchar', name: 'empresaContato', length: 255, nullable: true })
   empresaContato: string;
 
+  @Column({
+    type: 'enum',
+    enum: MotivoPerdaOportunidade,
+    name: 'motivo_perda',
+    nullable: true,
+  })
+  motivoPerda?: MotivoPerdaOportunidade;
+
+  @Column({ type: 'text', name: 'motivo_perda_detalhes', nullable: true })
+  motivoPerdaDetalhes?: string;
+
+  @Column({ type: 'varchar', name: 'concorrente_nome', length: 100, nullable: true })
+  concorrenteNome?: string;
+
+  @Column({ type: 'timestamp', name: 'data_revisao', nullable: true })
+  dataRevisao?: Date;
+
   @OneToMany(() => Atividade, (atividade) => atividade.oportunidade)
   atividades: Atividade[];
+
+  @OneToMany(() => OportunidadeStageEvent, (event) => event.oportunidade)
+  stageEvents: OportunidadeStageEvent[];
 
   @CreateDateColumn({ name: 'createdAt' })
   createdAt: Date;

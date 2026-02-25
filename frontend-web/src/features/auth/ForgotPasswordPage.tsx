@@ -1,8 +1,34 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, ArrowLeft, ArrowRight, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
-import toast from 'react-hot-toast';
 import { authService } from '../../services/authService';
+import { toastService } from '../../services/toastService';
+import Conect360Logo from '../../components/ui/Conect360Logo';
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null;
+};
+
+const normalizeApiErrorMessage = (err: unknown): string | undefined => {
+  const errRecord = isRecord(err) ? err : undefined;
+  const response = errRecord && isRecord(errRecord['response']) ? errRecord['response'] : undefined;
+  const data = response && isRecord(response['data']) ? response['data'] : undefined;
+  const responseMessage = data ? data['message'] : undefined;
+
+  if (Array.isArray(responseMessage)) {
+    const joined = responseMessage
+      .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+      .join('. ');
+    return joined || undefined;
+  }
+
+  if (typeof responseMessage === 'string' && responseMessage.trim()) {
+    return responseMessage;
+  }
+
+  const message = err instanceof Error ? err.message : undefined;
+  return message?.trim() ? message : undefined;
+};
 
 const ForgotPasswordPage: React.FC = () => {
   const navigate = useNavigate();
@@ -15,7 +41,7 @@ const ForgotPasswordPage: React.FC = () => {
     event.preventDefault();
 
     if (!email.trim()) {
-      toast.error('Informe um e-mail válido para continuar');
+      toastService.error('Informe um e-mail válido para continuar');
       setFeedback('error');
       setMessage('Informe um e-mail válido para continuar');
       return;
@@ -33,22 +59,22 @@ const ForgotPasswordPage: React.FC = () => {
         response.message ||
           'Se o e-mail estiver cadastrado, enviaremos as instruções em instantes.',
       );
-      toast.success('Verifique sua caixa de entrada ou a pasta de spam.');
+      toastService.success('Verifique sua caixa de entrada ou a pasta de spam.');
     } catch (error: unknown) {
       console.error('Erro ao solicitar recuperação de senha:', error);
       const fallbackMessage =
-        (error as any)?.response?.data?.message ||
+        normalizeApiErrorMessage(error) ||
         'Não foi possível processar sua solicitação. Tente novamente em instantes.';
       setFeedback('error');
       setMessage(fallbackMessage);
-      toast.error(fallbackMessage);
+      toastService.error(fallbackMessage);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#DEEFE7] via-white to-[#DEEFE7] flex items-center justify-center px-4 py-10">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-10">
       <div className="max-w-lg w-full">
         <div className="mb-6">
           <button
@@ -61,13 +87,16 @@ const ForgotPasswordPage: React.FC = () => {
           </button>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl border border-[#DEEFE7] p-8">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="text-center mb-8">
+            <div className="flex items-center justify-center mb-6">
+              <Conect360Logo size="lg" variant="full" className="w-auto" />
+            </div>
             <div className="h-16 w-16 mx-auto rounded-full bg-[#DEEFE7] flex items-center justify-center text-[#159A9C] mb-4">
               <Mail className="h-8 w-8" />
             </div>
             <h1 className="text-3xl font-bold text-[#002333] mb-2">Recuperar acesso</h1>
-            <p className="text-[#4B5563]">
+            <p className="text-[#002333]/70">
               Informe o e-mail cadastrado para receber um link seguro e criar uma nova senha.
             </p>
           </div>
@@ -101,7 +130,7 @@ const ForgotPasswordPage: React.FC = () => {
                   type="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  className="w-full pl-11 pr-4 py-3 border border-[#B4BEC9] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors"
+                  className="w-full pl-11 pr-4 py-2.5 border border-[#B4BEC9] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors"
                   placeholder="nome@empresa.com"
                   autoComplete="email"
                   disabled={loading}
@@ -115,17 +144,17 @@ const ForgotPasswordPage: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] text-white font-semibold py-3 rounded-xl shadow-md hover:shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center gap-2 bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed text-sm font-medium"
             >
               {loading ? (
                 <>
-                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   <span>Enviando instruções...</span>
                 </>
               ) : (
                 <>
                   <span>Enviar link de recuperação</span>
-                  <ArrowRight className="h-5 w-5" />
+                  <ArrowRight className="h-4 w-4" />
                 </>
               )}
             </button>

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../../contexts/NotificationContext';
 import notificationService from '../../services/notificationService';
@@ -37,17 +37,52 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
   const [isOpen, setIsOpen] = useState(false);
   const [filter, setFilter] = useState<NotificationFilter>('all');
   const [realUnreadCount, setRealUnreadCount] = useState(0);
+  const [isConfirmingClearAll, setIsConfirmingClearAll] = useState(false);
 
-  // ✅ Usar useRef para persistir o Set entre re-renders (evita duplicadas)
-  const processedApiNotificationsRef = useRef<Set<string>>(new Set());
-
+  // IDs já vistos da API (usado para controlar toasts, não para deduplicar lista)
+  const seenApiNotificationsRef = useRef<Set<string>>(new Set());
+  const isInitialSyncRef = useRef(true);
+  const addNotificationRef = useRef(addNotification);
+  const triggerButtonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const wasOpenRef = useRef(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const panelId = useId();
+  const panelTitleId = `${panelId}-title`;
+
+  useEffect(() => {
+    addNotificationRef.current = addNotification;
+  }, [addNotification]);
+
+  useEffect(() => {
+    if (!isConfirmingClearAll) return;
+
+    const timeout = window.setTimeout(() => {
+      setIsConfirmingClearAll(false);
+    }, 5000);
+
+    return () => window.clearTimeout(timeout);
+  }, [isConfirmingClearAll]);
+
+  useEffect(() => {
+    if (isOpen) {
+      window.requestAnimationFrame(() => {
+        panelRef.current?.focus();
+      });
+    } else if (wasOpenRef.current) {
+      triggerButtonRef.current?.focus();
+      setIsConfirmingClearAll(false);
+    }
+
+    wasOpenRef.current = isOpen;
+  }, [isOpen]);
 
   // Fechar dropdown ao clicar fora
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
+        setIsConfirmingClearAll(false);
       }
     };
 
@@ -63,74 +98,93 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
         const count = await notificationService.contarNaoLidas();
         setRealUnreadCount(count);
 
-        // Adicionar apenas notificações novas (não processadas antes)
+        // Sincronizar notificações da API no contexto local sem criar duplicadas por ID
         apiNotifications.forEach((apiNotif) => {
-          // Se já processamos esta notificação da API, pular
-          if (processedApiNotificationsRef.current.has(apiNotif.id)) {
-            return;
-          }
-
-          // Marcar como processada
-          processedApiNotificationsRef.current.add(apiNotif.id);
-
           // Mapear tipo da API para tipo do contexto
           let type: 'success' | 'error' | 'warning' | 'info' | 'reminder' = 'info';
           if (apiNotif.type === 'COTACAO_APROVADA') type = 'success';
           else if (apiNotif.type === 'COTACAO_REPROVADA') type = 'error';
           else if (apiNotif.type === 'COTACAO_PENDENTE') type = 'warning';
 
-          addNotification({
-            id: apiNotif.id, // ✅ Preservar ID do banco de dados
+          const parsedTimestamp = new Date(apiNotif.createdAt);
+          const timestamp = Number.isNaN(parsedTimestamp.getTime()) ? new Date() : parsedTimestamp;
+          const alreadySeen = seenApiNotificationsRef.current.has(apiNotif.id);
+
+          addNotificationRef.current({
+            id: apiNotif.id, // Preservar ID do banco de dados
             type,
             title: apiNotif.title,
             message: apiNotif.message,
-            autoClose: true, // Fechar automaticamente após 5 segundos
+            read: apiNotif.read,
+            timestamp,
+            autoClose: true,
             duration: 5000,
+            // Evita toasts duplicados em hidratação inicial e atualizações já conhecidas
+            silent: isInitialSyncRef.current || alreadySeen || apiNotif.read,
           });
+
+          seenApiNotificationsRef.current.add(apiNotif.id);
         });
+
+        if (isInitialSyncRef.current) {
+          isInitialSyncRef.current = false;
+        }
       } catch (error) {
         console.error('Erro ao buscar notificações:', error);
       }
     };
 
-    // Buscar imediatamente
-    fetchNotifications();
-
-    // Polling a cada 30 segundos
-    const interval = setInterval(fetchNotifications, 30000);
+    void fetchNotifications();
+    const interval = setInterval(() => {
+      void fetchNotifications();
+    }, 30000);
 
     return () => clearInterval(interval);
-  }, [addNotification]);
+  }, []);
 
-  const filteredNotifications = notifications.filter((notification) => {
-    switch (filter) {
-      case 'unread':
-        return !notification.read;
-      case 'success':
-      case 'error':
-      case 'warning':
-      case 'info':
-      case 'reminder':
-        return notification.type === filter;
-      default:
-        return true;
-    }
-  });
+  const notificationCounts = useMemo(
+    () => ({
+      all: notifications.length,
+      unreadLocal: notifications.filter((n) => !n.read).length,
+      reminder: notifications.filter((n) => n.type === 'reminder').length,
+      error: notifications.filter((n) => n.type === 'error').length,
+    }),
+    [notifications],
+  );
+
+  const filteredNotifications = useMemo(
+    () =>
+      notifications.filter((notification) => {
+        switch (filter) {
+          case 'unread':
+            return !notification.read;
+          case 'success':
+          case 'error':
+          case 'warning':
+          case 'info':
+          case 'reminder':
+            return notification.type === filter;
+          default:
+            return true;
+        }
+      }),
+    [filter, notifications],
+  );
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'success':
-        return <CheckCircle className="w-5 h-5 text-green-500" />;
+        return <CheckCircle className="h-5 w-5 text-green-500" />;
       case 'error':
-        return <XCircle className="w-5 h-5 text-red-500" />;
+        return <XCircle className="h-5 w-5 text-red-500" />;
       case 'warning':
-        return <AlertTriangle className="w-5 h-5 text-yellow-500" />;
+        return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
       case 'info':
-        return <Info className="w-5 h-5 text-[#159A9C]" />;
+        return <Info className="h-5 w-5 text-[#159A9C]" />;
       case 'reminder':
-        return <Clock className="w-5 h-5 text-purple-500" />;
+        return <Clock className="h-5 w-5 text-[#7C5CFF]" />;
       default:
-        return <Bell className="w-5 h-5 text-gray-500" />;
+        return <Bell className="h-5 w-5 text-[#607B89]" />;
     }
   };
 
@@ -162,13 +216,53 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
     return 'Agora';
   };
 
+  const closePopover = () => {
+    setIsOpen(false);
+    setIsConfirmingClearAll(false);
+  };
+
+  const handleTogglePopover = () => {
+    setIsOpen((prev) => {
+      const next = !prev;
+      if (!next) setIsConfirmingClearAll(false);
+      return next;
+    });
+  };
+
+  const handlePanelKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      closePopover();
+    }
+  };
+
+  const handleSettingsClick = () => {
+    closePopover();
+    navigate('/perfil?section=notifications');
+  };
+
+  const handleClearAllRequest = () => {
+    setIsConfirmingClearAll(true);
+  };
+
+  const handleClearAllConfirm = () => {
+    void clearAll();
+    setIsConfirmingClearAll(false);
+  };
+
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
-      {/* Botão de Notificações */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        ref={triggerButtonRef}
+        type="button"
+        onClick={handleTogglePopover}
         className="group relative min-h-11 min-w-11 rounded-xl border border-transparent p-1.5 text-gray-600 transition-all duration-200 ease-out hover:border-[#159A9C]/25 hover:bg-[#DEEFE7]/65 hover:text-[#002333] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white active:translate-y-[1px] sm:min-h-0 sm:min-w-0 sm:p-2"
         title="Notificações"
+        aria-label={`Notificações${realUnreadCount > 0 ? `, ${realUnreadCount} não lidas` : ''}`}
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+        aria-controls={isOpen ? panelId : undefined}
       >
         {settings.soundEnabled ? (
           <Bell className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -176,56 +270,112 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
           <BellOff className="h-5 w-5 sm:h-6 sm:w-6" />
         )}
 
-        {/* Badge de notificações não lidas */}
         {realUnreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium">
+          <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-medium text-white">
             {realUnreadCount > 99 ? '99+' : realUnreadCount}
           </span>
         )}
       </button>
 
-      {/* Dropdown de Notificações */}
       {isOpen && (
-        <div className="absolute right-0 bottom-full z-50 mb-2 flex max-h-[600px] w-[calc(100vw-1rem)] flex-col rounded-2xl border border-[#d4e2e8] bg-white/98 shadow-[0_30px_60px_-40px_rgba(0,35,51,0.7)] backdrop-blur-sm sm:top-full sm:bottom-auto sm:mt-2 sm:mb-0 sm:w-96">
-          {/* Header */}
-          <div className="p-4 border-b border-gray-200">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold text-gray-900">Notificações</h3>
+        <div
+          id={panelId}
+          ref={panelRef}
+          role="dialog"
+          aria-modal="false"
+          aria-labelledby={panelTitleId}
+          tabIndex={-1}
+          onKeyDown={handlePanelKeyDown}
+          className="absolute right-0 bottom-full z-50 mb-2 flex max-h-[600px] w-[calc(100vw-1rem)] flex-col rounded-2xl border border-[#D7E4E8] bg-white shadow-lg sm:bottom-auto sm:top-full sm:mb-0 sm:mt-2 sm:w-96"
+        >
+          <div className="border-b border-[#E5EEF2] p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 id={panelTitleId} className="text-lg font-semibold text-[#19384C]">
+                Notificações
+              </h3>
               <div className="flex items-center space-x-2">
                 {realUnreadCount > 0 && (
                   <button
-                    onClick={markAllAsRead}
+                    type="button"
+                    onClick={() => void markAllAsRead()}
                     className="rounded-md p-1 text-sm text-[#159A9C] transition-colors duration-200 hover:bg-[#DEEFE7]/55 hover:text-[#0F7B7D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35"
                     title="Marcar todas como lidas"
+                    aria-label="Marcar todas as notificações como lidas"
                   >
-                    <Check className="w-4 h-4" />
+                    <Check className="h-4 w-4" />
                   </button>
                 )}
+
+                {notifications.length > 0 ? (
+                  isConfirmingClearAll ? (
+                    <div className="inline-flex items-center gap-1 rounded-lg border border-[#F5D0D5] bg-[#FFF5F6] p-1">
+                      <button
+                        type="button"
+                        onClick={() => setIsConfirmingClearAll(false)}
+                        className="rounded-md p-1 text-[#607B89] transition-colors hover:bg-white hover:text-[#19384C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B4BEC9]/40"
+                        title="Cancelar limpeza"
+                        aria-label="Cancelar limpeza de notificações"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleClearAllConfirm}
+                        className="rounded-md p-1 text-red-600 transition-colors hover:bg-white hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
+                        title="Confirmar limpar todas"
+                        aria-label="Confirmar limpeza de todas as notificações"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleClearAllRequest}
+                      className="rounded-md p-1 text-sm text-red-600 transition-colors duration-200 hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
+                      title="Limpar todas"
+                      aria-label="Limpar todas as notificações"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )
+                ) : null}
+
                 <button
-                  onClick={clearAll}
-                  className="rounded-md p-1 text-sm text-red-600 transition-colors duration-200 hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
-                  title="Limpar todas"
+                  type="button"
+                  onClick={handleSettingsClick}
+                  className="rounded-md p-1 text-sm text-[#607B89] transition-colors duration-200 hover:bg-[#EEF6F8] hover:text-[#19384C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35"
+                  title="Preferências de notificações"
+                  aria-label="Abrir preferências de notificações"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Settings className="h-4 w-4" />
                 </button>
-                <Settings className="w-4 h-4 text-gray-500 cursor-pointer hover:text-gray-700" />
               </div>
             </div>
 
-            {/* Filtros */}
+            {isConfirmingClearAll ? (
+              <div className="mb-3 rounded-lg border border-[#FBE4E8] bg-[#FFF8F9] px-3 py-2 text-xs text-[#9B1C1C]">
+                Confirme a limpeza para remover todas as notificações visíveis desta sessão.
+              </div>
+            ) : null}
+
             <div className="flex flex-wrap gap-2">
               {[
-                { key: 'all', label: 'Todas', count: notifications.length },
-                { key: 'unread', label: 'Não Lidas', count: realUnreadCount },
+                { key: 'all', label: 'Todas', count: notificationCounts.all },
+                {
+                  key: 'unread',
+                  label: 'Não Lidas',
+                  count: realUnreadCount || notificationCounts.unreadLocal,
+                },
                 {
                   key: 'reminder',
                   label: 'Lembretes',
-                  count: notifications.filter((n) => n.type === 'reminder').length,
+                  count: notificationCounts.reminder,
                 },
                 {
                   key: 'error',
                   label: 'Erros',
-                  count: notifications.filter((n) => n.type === 'error').length,
+                  count: notificationCounts.error,
                 },
               ].map(
                 ({
@@ -239,11 +389,13 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                 }) => (
                   <button
                     key={key}
+                    type="button"
                     onClick={() => setFilter(key)}
+                    aria-pressed={filter === key}
                     className={`rounded-full px-3 py-1.5 text-xs transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35 sm:py-1 ${
                       filter === key
                         ? 'bg-[#159A9C] text-white shadow-[0_8px_18px_-14px_rgba(0,35,51,0.6)]'
-                        : 'bg-gray-100 text-gray-600 hover:bg-[#DEEFE7]/70 hover:text-[#002333]'
+                        : 'bg-[#F3F7F9] text-[#607B89] hover:bg-[#DEEFE7]/70 hover:text-[#002333]'
                     }`}
                   >
                     {label} {count > 0 && `(${count})`}
@@ -253,87 +405,84 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
             </div>
           </div>
 
-          {/* Lista de Notificações */}
           <div className="flex-1 overflow-y-auto">
             {filteredNotifications.length === 0 ? (
               <div className="p-8 text-center">
-                <Bell className="w-12 h-12 mx-auto text-gray-300 mb-4" />
-                <p className="text-gray-500 mb-4">
+                <Bell className="mx-auto mb-4 h-12 w-12 text-[#B4BEC9]" />
+                <p className="mb-4 text-[#607B89]">
                   {filter === 'all'
                     ? 'Nenhuma notificação'
                     : `Nenhuma notificação ${filter === 'unread' ? 'não lida' : `do tipo ${filter}`}`}
                 </p>
                 <button
+                  type="button"
                   onClick={() => {
-                    setIsOpen(false);
+                    closePopover();
                     navigate('/notifications');
                   }}
-                  className="text-sm text-[#159A9C] hover:text-[#0F7B7D] font-medium transition-colors"
+                  className="text-sm font-medium text-[#159A9C] transition-colors hover:text-[#0F7B7D]"
                 >
                   Ver histórico completo
                 </button>
               </div>
             ) : (
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-[#EEF3F5]">
                 {filteredNotifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`p-4 hover:bg-gray-50 transition-colors border-l-4 ${
-                      !notification.read ? 'bg-[#159A9C]/5' : 'bg-white'
+                    className={`border-l-4 p-4 transition-colors hover:bg-[#F7FBFC] ${
+                      !notification.read ? 'bg-[#159A9C]/4' : 'bg-white'
                     } ${getPriorityColor(notification.priority)}`}
                   >
                     <div className="flex items-start space-x-3">
-                      {/* Ícone */}
-                      <div className="flex-shrink-0 mt-0.5">
-                        {getNotificationIcon(notification.type)}
-                      </div>
+                      <div className="mt-0.5 flex-shrink-0">{getNotificationIcon(notification.type)}</div>
 
-                      {/* Conteúdo */}
-                      <div className="flex-1 min-w-0">
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <p
                               className={`text-sm font-medium ${
-                                !notification.read ? 'text-gray-900' : 'text-gray-700'
+                                !notification.read ? 'text-[#19384C]' : 'text-[#355061]'
                               }`}
                             >
                               {notification.title}
                             </p>
-                            <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
-                            <p className="text-xs text-gray-500 mt-2">
-                              {formatTime(notification.timestamp)}
-                            </p>
+                            <p className="mt-1 text-sm text-[#607B89]">{notification.message}</p>
+                            <p className="mt-2 text-xs text-[#7A8F9B]">{formatTime(notification.timestamp)}</p>
                           </div>
 
-                          {/* Ações */}
-                          <div className="flex items-center space-x-1 ml-2">
+                          <div className="ml-2 flex items-center space-x-1">
                             {!notification.read && (
                               <button
-                                onClick={() => markAsRead(notification.id)}
+                                type="button"
+                                onClick={() => void markAsRead(notification.id)}
                                 className="rounded p-1.5 text-gray-400 transition-colors duration-200 hover:bg-[#DEEFE7]/55 hover:text-[#159A9C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35 sm:p-1"
                                 title="Marcar como lida"
+                                aria-label={`Marcar notificação ${notification.title} como lida`}
                               >
-                                <Check className="w-4 h-4" />
+                                <Check className="h-4 w-4" />
                               </button>
                             )}
                             <button
-                              onClick={() => removeNotification(notification.id)}
+                              type="button"
+                              onClick={() => void removeNotification(notification.id)}
                               className="rounded p-1.5 text-gray-400 transition-colors duration-200 hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 sm:p-1"
                               title="Remover"
+                              aria-label={`Remover notificação ${notification.title}`}
                             >
-                              <X className="w-4 h-4" />
+                              <X className="h-4 w-4" />
                             </button>
                           </div>
                         </div>
 
-                        {/* Ação personalizada */}
                         {notification.action && (
                           <button
+                            type="button"
                             onClick={() => {
-                              notification.action!.onClick();
-                              setIsOpen(false);
+                              notification.action.onClick();
+                              closePopover();
                             }}
-                            className="mt-2 text-sm text-[#159A9C] hover:text-[#0F7B7D] font-medium"
+                            className="mt-2 text-sm font-medium text-[#159A9C] hover:text-[#0F7B7D]"
                           >
                             {notification.action.label}
                           </button>
@@ -346,15 +495,15 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
             )}
           </div>
 
-          {/* Footer */}
           {filteredNotifications.length > 0 && (
-            <div className="p-3 border-t border-gray-200 text-center">
+            <div className="border-t border-[#E5EEF2] p-3 text-center">
               <button
+                type="button"
                 onClick={() => {
-                  setIsOpen(false);
+                  closePopover();
                   navigate('/notifications');
                 }}
-                className="text-sm text-[#159A9C] hover:text-[#0F7B7D] font-medium transition-colors"
+                className="text-sm font-medium text-[#159A9C] transition-colors hover:text-[#0F7B7D]"
               >
                 Ver todas as notificações
               </button>

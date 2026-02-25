@@ -14,6 +14,9 @@
 import * as crypto from 'crypto';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permission } from '../../../common/permissions/permissions.constants';
 import { Public } from '../../../modules/auth/decorators/public.decorator';
 import { JwtAuthGuard } from '../../../modules/auth/jwt-auth.guard';
 import { IniciarTriagemDto, ResponderTriagemDto } from '../dto';
@@ -26,21 +29,24 @@ export class TriagemController {
   constructor(private readonly triagemBotService: TriagemBotService) {}
 
   @Post('iniciar')
-  @UseGuards(JwtAuthGuard, EmpresaGuard)
+  @UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+  @Permissions(Permission.CONFIG_AUTOMACOES_MANAGE)
   @HttpCode(HttpStatus.OK)
   async iniciar(@EmpresaId() empresaId: string, @Body() iniciarDto: IniciarTriagemDto) {
     return this.triagemBotService.iniciarTriagem(empresaId, iniciarDto);
   }
 
   @Post('responder')
-  @UseGuards(JwtAuthGuard, EmpresaGuard)
+  @UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+  @Permissions(Permission.CONFIG_AUTOMACOES_MANAGE)
   @HttpCode(HttpStatus.OK)
   async responder(@EmpresaId() empresaId: string, @Body() responderDto: ResponderTriagemDto) {
     return this.triagemBotService.processarResposta(empresaId, responderDto);
   }
 
   @Get('sessao/:telefone')
-  @UseGuards(JwtAuthGuard, EmpresaGuard)
+  @UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+  @Permissions(Permission.CONFIG_AUTOMACOES_MANAGE)
   async buscarSessao(@EmpresaId() empresaId: string, @Param('telefone') telefone: string) {
     const sessao = await this.triagemBotService.buscarSessaoAtiva(empresaId, telefone);
 
@@ -63,7 +69,8 @@ export class TriagemController {
   }
 
   @Delete('sessao/:sessaoId')
-  @UseGuards(JwtAuthGuard, EmpresaGuard)
+  @UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+  @Permissions(Permission.CONFIG_AUTOMACOES_MANAGE)
   @HttpCode(HttpStatus.NO_CONTENT)
   async cancelarSessao(@EmpresaId() empresaId: string, @Param('sessaoId') sessaoId: string) {
     await this.triagemBotService.cancelarSessao(empresaId, sessaoId);

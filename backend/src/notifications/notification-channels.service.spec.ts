@@ -23,10 +23,15 @@ describe('NotificationChannelsService', () => {
   it('deve encaminhar retryMeta no WhatsApp', async () => {
     const retryMeta: NotificationRetryMeta = { statusCode: 429, retryAfterMs: 5000 };
 
-    await service.sendWhatsapp({ to: '5511999999999', message: 'teste', retryMeta });
+    await service.sendWhatsapp({
+      to: '5511999999999',
+      message: 'teste',
+      empresaId: 'empresa-1',
+      retryMeta,
+    });
 
     expect(mockProducer.enqueueSendWhatsapp).toHaveBeenCalledWith(
-      { to: '5511999999999', message: 'teste', context: undefined },
+      { to: '5511999999999', message: 'teste', empresaId: 'empresa-1', context: undefined },
       retryMeta,
     );
   });
@@ -43,8 +48,14 @@ describe('NotificationChannelsService', () => {
   });
 
   it('deve lançar erro se destino estiver vazio', async () => {
-    await expect(service.sendWhatsapp({ to: '   ', message: 'oi' })).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(
+      service.sendWhatsapp({ to: '   ', message: 'oi', empresaId: 'empresa-1' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('deve lançar erro se empresaId estiver ausente no WhatsApp', async () => {
+    await expect(
+      service.sendWhatsapp({ to: '5511999999999', message: 'oi', empresaId: '   ' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

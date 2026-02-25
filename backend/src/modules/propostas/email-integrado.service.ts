@@ -12,6 +12,35 @@ export class EmailIntegradoService {
     this.setupTransporter();
   }
 
+  private isTestEnv(): boolean {
+    return process.env.NODE_ENV === 'test' || process.env.APP_ENV === 'test';
+  }
+
+  private shouldLogInTest(kind: 'info' | 'warn' | 'error'): boolean {
+    if (!this.isTestEnv()) return true;
+
+    if (kind === 'error') {
+      return process.env.EMAIL_INTEGRADO_ERRORS_IN_TEST === 'true';
+    }
+
+    return process.env.EMAIL_INTEGRADO_LOGS_IN_TEST === 'true';
+  }
+
+  private log(...args: unknown[]) {
+    if (!this.shouldLogInTest('info')) return;
+    console.log(...args);
+  }
+
+  private warn(...args: unknown[]) {
+    if (!this.shouldLogInTest('warn')) return;
+    console.warn(...args);
+  }
+
+  private error(...args: unknown[]) {
+    if (!this.shouldLogInTest('error')) return;
+    console.error(...args);
+  }
+
   private setupTransporter() {
     // Configuração Gmail SMTP
     this.transporter = nodemailer.createTransport({
@@ -22,7 +51,7 @@ export class EmailIntegradoService {
       },
     });
 
-    console.log('📧 Serviço de email integrado configurado');
+    this.log('📧 Serviço de email integrado configurado');
   }
 
   /**
@@ -30,7 +59,7 @@ export class EmailIntegradoService {
    */
   async notificarPropostaAceita(dadosProposta: any): Promise<boolean> {
     try {
-      console.log(`📤 Enviando notificação de proposta aceita: ${dadosProposta.numero}`);
+      this.log(`📤 Enviando notificação de proposta aceita: ${dadosProposta.numero}`);
 
       const mailOptions = {
         from: {
@@ -43,10 +72,10 @@ export class EmailIntegradoService {
       };
 
       const result = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Email de aceitação enviado:', result.messageId);
+      this.log('✅ Email de aceitação enviado:', result.messageId);
       return true;
     } catch (error) {
-      console.error('❌ Erro ao enviar email de aceitação:', error);
+      this.error('❌ Erro ao enviar email de aceitação:', error);
       return false;
     }
   }
@@ -56,7 +85,7 @@ export class EmailIntegradoService {
    */
   async notificarPropostaRejeitada(dadosProposta: any): Promise<boolean> {
     try {
-      console.log(`📤 Enviando notificação de proposta rejeitada: ${dadosProposta.numero}`);
+      this.log(`📤 Enviando notificação de proposta rejeitada: ${dadosProposta.numero}`);
 
       const mailOptions = {
         from: {
@@ -69,10 +98,10 @@ export class EmailIntegradoService {
       };
 
       const result = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Email de rejeição enviado:', result.messageId);
+      this.log('✅ Email de rejeição enviado:', result.messageId);
       return true;
     } catch (error) {
-      console.error('❌ Erro ao enviar email de rejeição:', error);
+      this.error('❌ Erro ao enviar email de rejeição:', error);
       return false;
     }
   }
@@ -87,7 +116,7 @@ export class EmailIntegradoService {
     propostaId?: string,
   ): Promise<boolean> {
     try {
-      console.log(`📤 Enviando proposta para cliente: ${emailCliente}`);
+      this.log(`📤 Enviando proposta para cliente: ${emailCliente}`);
 
       const mailOptions = {
         from: {
@@ -100,22 +129,22 @@ export class EmailIntegradoService {
       };
 
       const result = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Proposta enviada por email:', result.messageId);
+      this.log('✅ Proposta enviada por email:', result.messageId);
 
       // 🔄 SINCRONIZAÇÃO AUTOMÁTICA: Marcar como enviada após sucesso no envio
       if (propostaId && this.propostasService) {
         try {
           await this.propostasService.marcarComoEnviada(propostaId, emailCliente, linkPortal);
-          console.log(`✅ Status automaticamente atualizado para "enviada"`);
+          this.log(`✅ Status automaticamente atualizado para "enviada"`);
         } catch (statusError) {
-          console.warn(`⚠️ Erro ao atualizar status automaticamente:`, statusError.message);
+          this.warn(`⚠️ Erro ao atualizar status automaticamente:`, statusError.message);
           // Não falhar o envio por causa do status
         }
       }
 
       return true;
     } catch (error) {
-      console.error('❌ Erro ao enviar proposta:', error);
+      this.error('❌ Erro ao enviar proposta:', error);
       return false;
     }
   }
@@ -126,10 +155,10 @@ export class EmailIntegradoService {
   async testarConfiguracao(): Promise<boolean> {
     try {
       await this.transporter.verify();
-      console.log('✅ Configuração de email válida');
+      this.log('✅ Configuração de email válida');
       return true;
     } catch (error) {
-      console.error('❌ Erro na configuração de email:', error);
+      this.error('❌ Erro na configuração de email:', error);
       return false;
     }
   }
@@ -145,8 +174,8 @@ export class EmailIntegradoService {
     text?: string;
   }): Promise<boolean> {
     try {
-      console.log(`📤 [EMAIL GENÉRICO] Enviando para: ${emailData.to}`);
-      console.log(`📤 [EMAIL GENÉRICO] Assunto: ${emailData.subject}`);
+      this.log(`📤 [EMAIL GENÉRICO] Enviando para: ${emailData.to}`);
+      this.log(`📤 [EMAIL GENÉRICO] Assunto: ${emailData.subject}`);
 
       // ✅ VALIDAÇÃO: Verificar se é email fictício
       const isFakeEmail =
@@ -155,8 +184,8 @@ export class EmailIntegradoService {
         emailData.to.includes('@test.');
 
       if (isFakeEmail) {
-        console.log(`⚠️ [EMAIL FICTÍCIO] Detectado email fictício: ${emailData.to}`);
-        console.log(`⚠️ [EMAIL FICTÍCIO] Simulando envio bem-sucedido (email não será enviado)`);
+        this.log(`⚠️ [EMAIL FICTÍCIO] Detectado email fictício: ${emailData.to}`);
+        this.log(`⚠️ [EMAIL FICTÍCIO] Simulando envio bem-sucedido (email não será enviado)`);
         // Simular sucesso para emails fictícios - não enviar email real
         return true;
       }
@@ -173,7 +202,7 @@ export class EmailIntegradoService {
         text: emailData.text || emailData.html.replace(/<[^>]*>/g, ''), // Fallback para texto simples
       };
 
-      console.log(`📤 [EMAIL REAL] Configurações do envio:`, {
+      this.log(`📤 [EMAIL REAL] Configurações do envio:`, {
         from: mailOptions.from,
         to: mailOptions.to,
         subject: mailOptions.subject,
@@ -184,7 +213,7 @@ export class EmailIntegradoService {
 
       const result = await this.transporter.sendMail(mailOptions);
 
-      console.log('✅ [EMAIL REAL] Email enviado com sucesso!', {
+      this.log('✅ [EMAIL REAL] Email enviado com sucesso!', {
         messageId: result.messageId,
         accepted: result.accepted,
         rejected: result.rejected,
@@ -192,8 +221,8 @@ export class EmailIntegradoService {
 
       return true;
     } catch (error) {
-      console.error('❌ [EMAIL ERRO] Erro ao enviar email genérico:', error);
-      console.error('❌ [EMAIL ERRO] Detalhes:', {
+      this.error('❌ [EMAIL ERRO] Erro ao enviar email genérico:', error);
+      this.error('❌ [EMAIL ERRO] Detalhes:', {
         message: error.message,
         code: error.code,
         command: error.command,
@@ -315,3 +344,4 @@ export class EmailIntegradoService {
     `;
   }
 }
+

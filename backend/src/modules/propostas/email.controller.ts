@@ -12,9 +12,14 @@ import { EmailIntegradoService } from './email-integrado.service';
 import { PortalService } from './portal.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { Permission } from '../../common/permissions/permissions.constants';
+import { EmpresaId } from '../../common/decorators/empresa.decorator';
 
 @Controller('email')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.COMERCIAL_PROPOSTAS_SEND)
 export class EmailController {
   private readonly logger = new Logger(EmailController.name);
 
@@ -66,6 +71,7 @@ export class EmailController {
    */
   @Post('enviar-proposta')
   async enviarProposta(
+    @EmpresaId() empresaId: string,
     @Body()
     dados: {
       proposta: any;
@@ -79,10 +85,15 @@ export class EmailController {
 
       // Se solicitado, registrar o token no portal service
       if (dados.registrarToken && dados.proposta.token) {
-        this.logger.log('[EMAIL] Registrando token no sistema de portal:', dados.proposta.token);
+        const tokenMask =
+          typeof dados.proposta.token === 'string'
+            ? `${dados.proposta.token.slice(0, 4)}...${dados.proposta.token.slice(-4)}`
+            : '[token]';
+        this.logger.log(`[EMAIL] Registrando token no portal: ${tokenMask}`);
         await this.portalService.registrarTokenProposta(
           dados.proposta.token,
-          dados.proposta.numero || dados.proposta.id,
+          dados.proposta.id || dados.proposta.numero,
+          empresaId,
         );
       }
 
@@ -128,7 +139,16 @@ export class EmailController {
   @Post('enviar')
   async enviarEmailGenerico(@Body() dados: any) {
     try {
-      this.logger.log('[EMAIL] Dados completos recebidos:', JSON.stringify(dados, null, 2));
+      this.logger.log(
+        `[EMAIL] Dados recebidos (resumo): ${JSON.stringify({
+          keys: dados ? Object.keys(dados) : [],
+          toCount: Array.isArray(dados?.para || dados?.to) ? (dados.para || dados.to).length : 0,
+          hasHtml: Boolean(dados?.html || dados?.corpo || dados?.message),
+          subject: (dados?.assunto || dados?.subject)
+            ? String(dados.assunto || dados.subject).slice(0, 120)
+            : null,
+        })}`,
+      );
 
       // CORRECAO: Suportar tanto formato antigo (para/assunto/corpo) quanto novo (to/subject/message)
       const para = dados.para || dados.to;
@@ -140,7 +160,15 @@ export class EmailController {
         throw new Error(`Dados inválidos: para=${para}, tipo=${typeof para}`);
       }
 
-      this.logger.log('[EMAIL] Enviando email generico para:', para);
+      this.logger.log(
+        `[EMAIL] Enviando email generico (resumo): ${JSON.stringify({
+          destinatarios: Array.isArray(para) ? para.length : 0,
+          primeiroDominio:
+            Array.isArray(para) && typeof para[0] === 'string' && para[0].includes('@')
+              ? para[0].split('@')[1]
+              : null,
+        })}`,
+      );
 
       // CORRECAO: Usar o EmailIntegradoService real para envio
       const emailData = {
@@ -151,7 +179,18 @@ export class EmailController {
         text: (corpo || '').replace(/<[^>]*>/g, ''), // Remover HTML para versão texto
       };
 
-      this.logger.log('[EMAIL] Dados preparados para envio:', JSON.stringify(emailData, null, 2));
+      this.logger.log(
+        `[EMAIL] Dados preparados (resumo): ${JSON.stringify({
+          toDomain:
+            typeof emailData?.to === 'string' && emailData.to.includes('@')
+              ? emailData.to.split('@')[1]
+              : null,
+          hasCc: Boolean(emailData?.cc),
+          subject: emailData?.subject ? String(emailData.subject).slice(0, 120) : null,
+          htmlLength: typeof emailData?.html === 'string' ? emailData.html.length : 0,
+          textLength: typeof emailData?.text === 'string' ? emailData.text.length : 0,
+        })}`,
+      );
 
       // Usar o serviço real de email
       const sucesso = await this.emailService.enviarEmailGenerico(emailData);

@@ -10,6 +10,7 @@ import {
 interface WhatsappParams {
   to: string;
   message: string;
+  empresaId: string;
   context?: Record<string, any>;
   retryMeta?: NotificationRetryMeta;
 }
@@ -48,15 +49,17 @@ export class NotificationChannelsService {
   async sendWhatsapp(params: WhatsappParams) {
     const to = this.ensure(params.to, 'Destino (to)');
     const message = this.ensure(params.message, 'Mensagem');
+    const empresaId = this.ensure(params.empresaId, 'empresaId');
 
     const payload: SendWhatsappJobPayload = {
       to,
       message,
+      empresaId,
       context: params.context,
     };
 
     await this.notificationsProducer.enqueueSendWhatsapp(payload, params.retryMeta);
-    this.logger.log(`WhatsApp enfileirado para ${to}`);
+    this.logger.log(`WhatsApp enfileirado para ${to} (empresa=${empresaId})`);
   }
 
   async sendSms(params: SmsParams) {

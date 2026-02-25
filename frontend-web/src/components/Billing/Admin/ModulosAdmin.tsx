@@ -21,12 +21,14 @@ import {
 } from 'lucide-react';
 import { api } from '../../../services/api';
 import { ModuloSistema } from '../../../hooks/useSubscription';
+import { useGlobalConfirmation } from '../../../contexts/GlobalConfirmationContext';
 
 interface ModulosAdminProps {
   onEdit?: (modulo: ModuloSistema) => void;
 }
 
 export const ModulosAdmin: React.FC<ModulosAdminProps> = ({ onEdit }) => {
+  const { confirm } = useGlobalConfirmation();
   const [modulos, setModulos] = useState<ModuloSistema[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -137,7 +139,7 @@ export const ModulosAdmin: React.FC<ModulosAdminProps> = ({ onEdit }) => {
       return;
     }
 
-    if (!window.confirm(`Tem certeza que deseja remover o módulo "${modulo.nome}"?`)) {
+    if (!(await confirm(`Tem certeza que deseja remover o módulo "${modulo.nome}"?`))) {
       return;
     }
 

@@ -87,6 +87,7 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
     user?.role === 'superadmin' ||
     user?.role === 'admin' ||
     user?.role === 'manager' ||
+    user?.role === 'gerente' ||
     user?.email?.includes('admin');
 
   // Fechar painel ao clicar fora
@@ -172,6 +173,15 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
     // 2. OU tem um filho ativo (navegou para uma página filho)
     // Mas não os dois ao mesmo tempo para evitar duplicação visual
     const shouldHighlight = isPanelOpen || hasActiveChild;
+    const itemBaseStateClass = shouldHighlight
+      ? 'bg-white border-[#8FCFC4]/80 shadow-[0_10px_18px_-15px_rgba(15,123,125,0.65)]'
+      : 'hover:bg-[#F4FBF8] hover:border-[#CFE2E5]';
+    const iconColorClass = shouldHighlight
+      ? 'text-[#159A9C]'
+      : 'text-[#5B7382] group-hover:text-[#0F7B7D]';
+    const titleColorClass = shouldHighlight
+      ? 'text-[#159A9C]'
+      : 'text-[#3D5867] group-hover:text-[#0F7B7D]';
 
     // Layout vertical: Ícone em cima, texto embaixo
     if (hasChildren) {
@@ -186,7 +196,7 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
             transition-all duration-200 ease-out
             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white md:focus-visible:ring-offset-[#002333]
             md:min-h-0 md:flex-col md:items-center md:justify-center md:gap-0 md:px-1 md:py-2.5
-            ${shouldHighlight ? 'bg-[#159A9C]/20 border-[#159A9C]/35 shadow-[inset_0_0_0_1px_rgba(21,154,156,0.15)]' : 'hover:bg-white/8 hover:border-white/10'}
+            ${itemBaseStateClass}
           `}
           title={item.title}
           aria-expanded={isPanelOpen}
@@ -195,13 +205,13 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
           <Icon
             className={`
             h-5 w-5 transition-colors duration-200 mb-0 md:mb-1.5
-            ${shouldHighlight ? 'text-[#159A9C]' : 'text-white/80 group-hover:text-white'}
+            ${iconColorClass}
           `}
           />
           <span
             className={`
             text-xs md:text-[9px] font-semibold text-left md:text-center leading-tight max-w-full px-0 md:px-1 truncate uppercase tracking-wide
-            ${shouldHighlight ? 'text-[#159A9C]' : 'text-white/90 group-hover:text-white'}
+            ${titleColorClass}
           `}
           >
             {item.title}
@@ -217,6 +227,15 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
     // Item sem submenu - link direto
     // ✅ Não destacar se houver um painel aberto (prioridade visual para o painel)
     const shouldBeActive = isActive && !activeSubmenuPanel;
+    const linkBaseStateClass = shouldBeActive
+      ? 'bg-white border-[#8FCFC4]/80 shadow-[0_10px_18px_-15px_rgba(15,123,125,0.65)]'
+      : 'hover:bg-[#F4FBF8] hover:border-[#CFE2E5]';
+    const linkIconColorClass = shouldBeActive
+      ? 'text-[#159A9C]'
+      : 'text-[#5B7382] group-hover:text-[#0F7B7D]';
+    const linkTitleColorClass = shouldBeActive
+      ? 'text-[#159A9C]'
+      : 'text-[#3D5867] group-hover:text-[#0F7B7D]';
 
     return (
       <Link
@@ -227,7 +246,7 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
           transition-all duration-200 ease-out
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white md:focus-visible:ring-offset-[#002333]
           md:min-h-0 md:flex-col md:items-center md:justify-center md:gap-0 md:px-1 md:py-2.5
-          ${shouldBeActive ? 'bg-[#159A9C]/20 border-[#159A9C]/35 shadow-[inset_0_0_0_1px_rgba(21,154,156,0.15)]' : 'hover:bg-white/8 hover:border-white/10'}
+          ${linkBaseStateClass}
         `}
         title={item.title}
         aria-current={shouldBeActive ? 'page' : undefined}
@@ -235,13 +254,13 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
         <Icon
           className={`
           h-5 w-5 transition-colors duration-200 mb-0 md:mb-1.5
-          ${shouldBeActive ? 'text-[#159A9C]' : 'text-white/80 group-hover:text-white'}
+          ${linkIconColorClass}
         `}
         />
         <span
           className={`
           text-xs md:text-[9px] font-semibold text-left md:text-center leading-tight max-w-full px-0 md:px-1 truncate uppercase tracking-wide
-          ${shouldBeActive ? 'text-[#159A9C]' : 'text-white/90 group-hover:text-white'}
+          ${linkTitleColorClass}
         `}
         >
           {item.title}

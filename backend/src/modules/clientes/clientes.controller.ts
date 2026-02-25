@@ -27,6 +27,9 @@ import { ClientesService } from './clientes.service';
 import { Cliente, StatusCliente } from './cliente.entity';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { Permission } from '../../common/permissions/permissions.constants';
 import { EmpresaId } from '../../common/decorators/empresa.decorator';
 import { PaginationParams } from '../../common/interfaces/common.interface';
 import { CacheInterceptor, CacheTTL } from '../../common/interceptors/cache.interceptor';
@@ -53,7 +56,7 @@ const ALLOWED_ATTACHMENT_MIME_TYPES = [
 ];
 
 const ensureClientesUploadDirectory = (subdir: string): string => {
-  const uploadDir = path.resolve(__dirname, '../../../uploads', CLIENTES_UPLOADS_SUBDIR, subdir);
+  const uploadDir = path.resolve(process.cwd(), 'uploads', CLIENTES_UPLOADS_SUBDIR, subdir);
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
   }
@@ -62,7 +65,8 @@ const ensureClientesUploadDirectory = (subdir: string): string => {
 
 @ApiTags('clientes')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.CRM_CLIENTES_READ)
 @UseInterceptors(CacheInterceptor)
 @Controller('clientes')
 export class ClientesController {
@@ -249,6 +253,7 @@ export class ClientesController {
   }
 
   @Post()
+  @Permissions(Permission.CRM_CLIENTES_CREATE)
   @ApiOperation({ summary: 'Criar novo cliente' })
   @ApiResponse({ status: 201, description: 'Cliente criado com sucesso' })
   @ApiResponse({ status: 400, description: 'Dados invalidos' })
@@ -268,6 +273,7 @@ export class ClientesController {
   }
 
   @Put(':id')
+  @Permissions(Permission.CRM_CLIENTES_UPDATE)
   @ApiOperation({ summary: 'Atualizar cliente' })
   @ApiResponse({ status: 200, description: 'Cliente atualizado com sucesso' })
   @ApiResponse({ status: 404, description: 'Cliente nao encontrado' })
@@ -295,6 +301,7 @@ export class ClientesController {
   }
 
   @Put(':id/status')
+  @Permissions(Permission.CRM_CLIENTES_UPDATE)
   @ApiOperation({ summary: 'Atualizar status do cliente' })
   @ApiResponse({ status: 200, description: 'Status atualizado com sucesso' })
   async updateStatus(
@@ -314,10 +321,12 @@ export class ClientesController {
   }
 
   @Post(':id/avatar')
+  @Permissions(Permission.CRM_CLIENTES_UPDATE)
   @UseInterceptors(
     FileInterceptor('avatar', {
       storage: diskStorage({
-        destination: () => ensureClientesUploadDirectory(CLIENTES_AVATAR_SUBDIR),
+        destination: (_req, _file, cb) =>
+          cb(null, ensureClientesUploadDirectory(CLIENTES_AVATAR_SUBDIR)),
         filename: (req: any, file, cb) => {
           const clienteId = req?.params?.id || 'cliente';
           const ext = path.extname(file.originalname)?.toLowerCase() || '.png';
@@ -410,10 +419,12 @@ export class ClientesController {
   }
 
   @Post(':id/anexos')
+  @Permissions(Permission.CRM_CLIENTES_UPDATE)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: () => ensureClientesUploadDirectory(CLIENTES_ANEXOS_SUBDIR),
+        destination: (_req, _file, cb) =>
+          cb(null, ensureClientesUploadDirectory(CLIENTES_ANEXOS_SUBDIR)),
         filename: (req: any, file, cb) => {
           const clienteId = req?.params?.id || 'cliente';
           const originalExt = path.extname(file.originalname)?.toLowerCase() || '';
@@ -490,6 +501,7 @@ export class ClientesController {
   }
 
   @Delete(':id/anexos/:anexoId')
+  @Permissions(Permission.CRM_CLIENTES_DELETE)
   @ApiOperation({ summary: 'Remover anexo do cliente' })
   @ApiResponse({ status: 200, description: 'Anexo removido com sucesso' })
   async removeAnexo(
@@ -528,6 +540,7 @@ export class ClientesController {
   }
 
   @Delete(':id')
+  @Permissions(Permission.CRM_CLIENTES_DELETE)
   @ApiOperation({ summary: 'Excluir cliente' })
   @ApiResponse({ status: 200, description: 'Cliente excluido com sucesso' })
   async delete(@EmpresaId() empresaId: string, @Param('id') id: string) {

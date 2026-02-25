@@ -30,6 +30,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { BackToNucleus } from '../components/navigation/BackToNucleus';
+import { useGlobalConfirmation } from '../contexts/GlobalConfirmationContext';
 import { useAuth } from '../hooks/useAuth';
 import configuracaoInactividadeService from '../services/configuracaoInactividadeService';
 import type {
@@ -39,6 +40,7 @@ import type {
 } from '../services/configuracaoInactividadeService';
 
 const FechamentoAutomaticoPage: React.FC = () => {
+  const { confirm } = useGlobalConfirmation();
   const { user } = useAuth();
 
   // Estados principais
@@ -170,9 +172,9 @@ const FechamentoAutomaticoPage: React.FC = () => {
 
   const handleVerificarAgora = async () => {
     if (
-      !window.confirm(
+      !(await confirm(
         'Deseja executar a verificação de inatividade AGORA? Isso pode fechar tickets inativos imediatamente.',
-      )
+      ))
     ) {
       return;
     }

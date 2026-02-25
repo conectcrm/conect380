@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   X,
 } from 'lucide-react';
+import { useGlobalConfirmation } from '../../../contexts/GlobalConfirmationContext';
 
 interface SelecaoMultiplaProps {
   propostasSelecionadas: string[];
@@ -31,6 +32,7 @@ export const SelecaoMultipla: React.FC<SelecaoMultiplaProps> = ({
   onAcoesMassa,
   visible,
 }) => {
+  const { confirm } = useGlobalConfirmation();
   const [showAcoes, setShowAcoes] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -92,13 +94,13 @@ export const SelecaoMultipla: React.FC<SelecaoMultiplaProps> = ({
 
     if (acaoId === 'excluir') {
       if (
-        !window.confirm(`Tem certeza que deseja excluir ${quantidade} proposta(s) selecionada(s)?`)
+        !(await confirm(`Tem certeza que deseja excluir ${quantidade} proposta(s) selecionada(s)?`))
       ) {
         return;
       }
     } else if (acao) {
       if (
-        !window.confirm(`Executar "${acao.label}" em ${quantidade} proposta(s) selecionada(s)?`)
+        !(await confirm(`Executar "${acao.label}" em ${quantidade} proposta(s) selecionada(s)?`))
       ) {
         return;
       }
@@ -122,7 +124,7 @@ export const SelecaoMultipla: React.FC<SelecaoMultiplaProps> = ({
 
   return (
     <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
-      <div className="bg-white rounded-lg shadow-xl border border-gray-200 px-6 py-4 flex items-center gap-4 min-w-[400px]">
+      <div className="bg-white rounded-lg shadow-xl border border-gray-200 px-4 sm:px-6 py-4 flex flex-wrap items-center gap-3 sm:gap-4 w-[calc(100vw-1rem)] sm:w-auto sm:min-w-[400px] max-w-xl sm:max-w-none min-w-0">
         {/* Status da Seleção */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">

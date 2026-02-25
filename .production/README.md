@@ -86,6 +86,16 @@ Smoke UI do MVP (login + rotas core):
 ```powershell
 .\scripts\smoke-mvp-ui.ps1
 ```
+Este comando agora tambem executa o guard de regressao mobile (agenda de responsividade + drawer/perfil).
+Se precisar rodar somente o smoke UI legado:
+```powershell
+.\scripts\smoke-mvp-ui.ps1 -SkipMobileGuard
+```
+
+Execucao direta do guard mobile dedicado:
+```powershell
+npm run test:e2e:mobile:guard
+```
 
 Kickoff de sessao piloto (gera pasta com checklist/evidencias/status):
 ```powershell

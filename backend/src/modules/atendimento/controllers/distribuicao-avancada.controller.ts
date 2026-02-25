@@ -15,6 +15,9 @@ import {
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { Permission } from '../../../common/permissions/permissions.constants';
 import { DistribuicaoAvancadaService } from '../services/distribuicao-avancada.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
@@ -30,7 +33,8 @@ import { UpdateAtendenteSkillDto } from '../dto/distribuicao/update-atendente-sk
  * Controller responsável pela gestão de distribuição automática avançada
  */
 @Controller('distribuicao-avancada')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.ATENDIMENTO_FILAS_MANAGE)
 export class DistribuicaoAvancadaController {
   private readonly logger = new Logger(DistribuicaoAvancadaController.name);
 

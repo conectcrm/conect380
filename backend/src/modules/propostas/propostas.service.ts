@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
+import { randomUUID } from 'crypto';
 import { Proposta as PropostaEntity } from './proposta.entity';
 import { User } from '../users/user.entity';
 import { Cliente } from '../clientes/cliente.entity';
@@ -64,7 +65,9 @@ export interface Proposta {
 
 @Injectable()
 export class PropostasService {
+  private readonly logger = new Logger(PropostasService.name);
   private contadorId = 1;
+  private tableColumnsCache = new Map<string, Set<string>>();
 
   constructor(
     @InjectRepository(PropostaEntity)
@@ -76,6 +79,22 @@ export class PropostasService {
   ) {
     // Inicializar contador baseado nas propostas existentes
     this.inicializarContador();
+  }
+
+  private maskEmail(email?: string | null): string {
+    if (!email) return '[email]';
+    const [local, domain] = String(email).split('@');
+    if (!domain) return '[email]';
+    const localMasked =
+      local.length <= 2 ? `${local[0] || '*'}*` : `${local.slice(0, 2)}***${local.slice(-1)}`;
+    return `${localMasked}@${domain}`;
+  }
+
+  private summarizeText(text?: string | null, max = 60): string {
+    if (!text) return '[vazio]';
+    const normalized = String(text).replace(/\s+/g, ' ').trim();
+    if (!normalized) return '[vazio]';
+    return normalized.length > max ? `${normalized.slice(0, max)}...` : normalized;
   }
 
   private async inicializarContador() {
@@ -97,8 +116,228 @@ export class PropostasService {
         }
       }
     } catch (error) {
-      console.warn('⚠️ Erro ao inicializar contador de propostas:', error.message);
+      this.logger.warn(`Erro ao inicializar contador de propostas: ${error.message}`);
     }
+  }
+
+  private async getTableColumns(tableName: string): Promise<Set<string>> {
+    if (this.tableColumnsCache.has(tableName)) {
+      return this.tableColumnsCache.get(tableName)!;
+    }
+
+    const rows: Array<{ column_name?: string }> = await this.propostaRepository.query(
+      `
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = $1
+      `,
+      [tableName],
+    );
+
+    const columns = new Set(
+      rows
+        .map((row) => row.column_name)
+        .filter((columnName): columnName is string => Boolean(columnName)),
+    );
+
+    this.tableColumnsCache.set(tableName, columns);
+    return columns;
+  }
+
+  private extractQueryRows<T = any>(result: unknown): T[] {
+    if (!result) {
+      return [];
+    }
+
+    if (Array.isArray(result)) {
+      // Some pg/typeorm paths return [rows, rowCount] for write queries.
+      if (result.length === 2 && Array.isArray(result[0]) && typeof result[1] === 'number') {
+        return result[0] as T[];
+      }
+      return result as T[];
+    }
+
+    const maybeObject = result as { rows?: unknown };
+    if (Array.isArray(maybeObject?.rows)) {
+      return maybeObject.rows as T[];
+    }
+
+    return [];
+  }
+
+  private isLegacyPropostasSchema(columns: Set<string>): boolean {
+    return !columns.has('cliente');
+  }
+
+  private toIsoString(value: unknown): string {
+    if (!value) {
+      return new Date().toISOString();
+    }
+
+    const parsed = value instanceof Date ? value : new Date(value as string);
+    if (Number.isNaN(parsed.getTime())) {
+      return new Date().toISOString();
+    }
+
+    return parsed.toISOString();
+  }
+
+  private normalizeStatusToDatabase(status: string | undefined, legacySchema: boolean): string {
+    const normalized = (status || '').toString().toLowerCase().trim();
+
+    if (!legacySchema) {
+      return normalized || 'rascunho';
+    }
+
+    switch (normalized) {
+      case 'aprovada':
+      case 'aceita':
+        return 'aceita';
+      case 'visualizada':
+      case 'enviada':
+        return 'enviada';
+      case 'rejeitada':
+      case 'expirada':
+      case 'rascunho':
+        return normalized;
+      default:
+        return 'rascunho';
+    }
+  }
+
+  private normalizeStatusFromDatabase(status: string | undefined): Proposta['status'] {
+    const normalized = (status || '').toString().toLowerCase().trim();
+    if (normalized === 'aceita') {
+      return 'aprovada';
+    }
+    if (
+      normalized === 'rascunho' ||
+      normalized === 'enviada' ||
+      normalized === 'visualizada' ||
+      normalized === 'aprovada' ||
+      normalized === 'rejeitada' ||
+      normalized === 'expirada'
+    ) {
+      return normalized;
+    }
+    return 'rascunho';
+  }
+
+  private async resolveFallbackUserId(empresaId: string): Promise<string> {
+    const usersRows: Array<{ id?: string }> = await this.propostaRepository.query(
+      `
+        SELECT id
+        FROM users
+        WHERE empresa_id = $1
+        ORDER BY COALESCE(criado_em, NOW()) DESC
+        LIMIT 1
+      `,
+      [empresaId],
+    );
+
+    return usersRows?.[0]?.id || randomUUID();
+  }
+
+  private async ensureLegacyOportunidadeId(
+    empresaId: string,
+    titulo: string,
+    valor: number,
+    vendedorId: string | null,
+  ): Promise<string> {
+    const oportunidadeColumns = await this.getTableColumns('oportunidades');
+    const userColumn = oportunidadeColumns.has('usuario_id')
+      ? 'usuario_id'
+      : oportunidadeColumns.has('responsavel_id')
+        ? 'responsavel_id'
+        : null;
+
+    const insertColumns: string[] = ['empresa_id', 'titulo', 'valor'];
+    const insertValues: unknown[] = [empresaId, titulo, valor];
+
+    if (userColumn) {
+      insertColumns.push(userColumn);
+      insertValues.push(vendedorId || (await this.resolveFallbackUserId(empresaId)));
+    }
+
+    if (oportunidadeColumns.has('estagio')) {
+      insertColumns.push('estagio');
+      insertValues.push('lead');
+    }
+
+    if (oportunidadeColumns.has('probabilidade')) {
+      insertColumns.push('probabilidade');
+      insertValues.push(0);
+    }
+
+    const placeholders = insertValues.map((_, index) => `$${index + 1}`).join(', ');
+    const resultRaw = await this.propostaRepository.query(
+      `
+        INSERT INTO oportunidades (${insertColumns.map((column) => `"${column}"`).join(', ')})
+        VALUES (${placeholders})
+        RETURNING id
+      `,
+      insertValues,
+    );
+    const result = this.extractQueryRows<{ id: string }>(resultRaw);
+    return result?.[0]?.id || randomUUID();
+  }
+
+  private buildLegacyInterface(
+    row: any,
+    overrides: Partial<Proposta> = {},
+    defaultClienteNome = 'Cliente nao informado',
+  ): Proposta {
+    const valor = Number(row?.valor ?? overrides.valor ?? 0);
+    const total = Number(overrides.total ?? overrides.valor ?? row?.total ?? valor);
+    const subtotal = Number(overrides.subtotal ?? total);
+    const descontoGlobal = Number(overrides.descontoGlobal ?? row?.descontoGlobal ?? 0);
+    const impostos = Number(overrides.impostos ?? row?.impostos ?? 0);
+    const criadaEmIso = this.toIsoString(
+      row?.criado_em ?? row?.criadaEm ?? overrides.criadaEm ?? overrides.createdAt,
+    );
+    const atualizadaEmIso = this.toIsoString(
+      row?.atualizado_em ?? row?.atualizadaEm ?? overrides.atualizadaEm ?? overrides.updatedAt,
+    );
+    const dataVencimentoIso = row?.validade
+      ? this.toIsoString(row.validade)
+      : overrides.dataVencimento;
+
+    const clienteFallback: Proposta['cliente'] = {
+      id: 'cliente-legacy',
+      nome: defaultClienteNome,
+      email: '',
+    };
+
+    const cliente =
+      overrides.cliente && typeof overrides.cliente === 'object' ? overrides.cliente : clienteFallback;
+
+    return {
+      id: row?.id ?? overrides.id ?? randomUUID(),
+      numero: row?.numero ?? overrides.numero ?? this.gerarNumero(),
+      titulo: row?.titulo ?? overrides.titulo,
+      cliente,
+      produtos: overrides.produtos ?? [],
+      subtotal,
+      descontoGlobal,
+      impostos,
+      total,
+      valor,
+      formaPagamento: overrides.formaPagamento ?? 'avista',
+      validadeDias: overrides.validadeDias ?? 30,
+      observacoes: overrides.observacoes ?? row?.descricao ?? undefined,
+      incluirImpostosPDF: overrides.incluirImpostosPDF ?? false,
+      status: this.normalizeStatusFromDatabase(row?.status ?? (overrides.status as string)),
+      dataVencimento: dataVencimentoIso,
+      criadaEm: criadaEmIso,
+      atualizadaEm: atualizadaEmIso,
+      createdAt: criadaEmIso,
+      updatedAt: atualizadaEmIso,
+      source: overrides.source ?? row?.source ?? 'api',
+      vendedor: overrides.vendedor,
+      portalAccess: overrides.portalAccess,
+      emailDetails: overrides.emailDetails,
+    };
   }
 
   /**
@@ -132,12 +371,12 @@ export class PropostasService {
             id: entity.vendedor.id,
             nome: entity.vendedor.nome,
             email: entity.vendedor.email,
-            tipo:
-              entity.vendedor.role === 'admin'
-                ? 'admin'
-                : entity.vendedor.role === 'manager'
-                  ? 'gerente'
-                  : 'vendedor',
+            tipo: (() => {
+              const vendedorRole = (entity.vendedor.role || '').toString().toLowerCase();
+              if (vendedorRole === 'admin' || vendedorRole === 'superadmin') return 'admin';
+              if (vendedorRole === 'gerente' || vendedorRole === 'manager') return 'gerente';
+              return 'vendedor';
+            })(),
             ativo: entity.vendedor.ativo,
           }
         : entity.vendedor_id,
@@ -161,16 +400,57 @@ export class PropostasService {
    */
   async listarPropostas(empresaId?: string): Promise<Proposta[]> {
     try {
+      const columns = await this.getTableColumns('propostas');
+      const legacySchema = this.isLegacyPropostasSchema(columns);
+
+      if (legacySchema) {
+        const createdColumn = columns.has('criado_em') ? 'criado_em' : 'criadaEm';
+        const updatedColumn = columns.has('atualizado_em') ? 'atualizado_em' : 'atualizadaEm';
+        const whereClause = empresaId ? 'WHERE p.empresa_id = $1' : '';
+        const params = empresaId ? [empresaId] : [];
+        const descricaoExpr = columns.has('descricao')
+          ? 'p.descricao'
+          : columns.has('observacoes')
+            ? 'p.observacoes'
+            : 'NULL';
+        const validadeExpr = columns.has('validade')
+          ? 'p.validade'
+          : columns.has('dataVencimento')
+            ? 'p."dataVencimento"'
+            : 'NULL';
+
+        const rows: any[] = await this.propostaRepository.query(
+          `
+            SELECT
+              p.id,
+              p.numero,
+              p.titulo,
+              p.valor,
+              p.status,
+              ${descricaoExpr} AS descricao,
+              ${validadeExpr} AS validade,
+              p.${createdColumn} AS criado_em,
+              p.${updatedColumn} AS atualizado_em
+            FROM propostas p
+            ${whereClause}
+            ORDER BY p.${createdColumn} DESC
+          `,
+          params,
+        );
+
+        return rows.map((row) => this.buildLegacyInterface(row));
+      }
+
       const entities = await this.propostaRepository.find({
         where: empresaId ? { empresaId } : undefined,
         order: { criadaEm: 'DESC' },
-        relations: ['vendedor'],
+        relations: columns.has('vendedor_id') ? ['vendedor'] : [],
       });
 
-      console.log(`📊 ${entities.length} propostas encontradas no banco`);
+      this.logger.debug(`${entities.length} propostas encontradas no banco`);
       return entities.map((entity) => this.entityToInterface(entity));
     } catch (error) {
-      console.error('❌ Erro ao listar propostas:', error);
+      this.logger.error('Erro ao listar propostas', error?.stack || String(error));
       return [];
     }
   }
@@ -180,14 +460,61 @@ export class PropostasService {
    */
   async obterProposta(id: string, empresaId?: string): Promise<Proposta | null> {
     try {
+      const columns = await this.getTableColumns('propostas');
+      const legacySchema = this.isLegacyPropostasSchema(columns);
+
+      if (legacySchema) {
+        const createdColumn = columns.has('criado_em') ? 'criado_em' : 'criadaEm';
+        const updatedColumn = columns.has('atualizado_em') ? 'atualizado_em' : 'atualizadaEm';
+        const whereClause = empresaId
+          ? 'WHERE p.id = $1 AND p.empresa_id = $2'
+          : 'WHERE p.id = $1';
+        const params = empresaId ? [id, empresaId] : [id];
+        const descricaoExpr = columns.has('descricao')
+          ? 'p.descricao'
+          : columns.has('observacoes')
+            ? 'p.observacoes'
+            : 'NULL';
+        const validadeExpr = columns.has('validade')
+          ? 'p.validade'
+          : columns.has('dataVencimento')
+            ? 'p."dataVencimento"'
+            : 'NULL';
+
+        const rows: any[] = await this.propostaRepository.query(
+          `
+            SELECT
+              p.id,
+              p.numero,
+              p.titulo,
+              p.valor,
+              p.status,
+              ${descricaoExpr} AS descricao,
+              ${validadeExpr} AS validade,
+              p.${createdColumn} AS criado_em,
+              p.${updatedColumn} AS atualizado_em
+            FROM propostas p
+            ${whereClause}
+            LIMIT 1
+          `,
+          params,
+        );
+
+        if (!rows?.[0]) {
+          return null;
+        }
+
+        return this.buildLegacyInterface(rows[0]);
+      }
+
       const entity = await this.propostaRepository.findOne({
         where: empresaId ? { id, empresaId } : { id },
-        relations: ['vendedor'],
+        relations: columns.has('vendedor_id') ? ['vendedor'] : [],
       });
 
       return entity ? this.entityToInterface(entity) : null;
     } catch (error) {
-      console.error('❌ Erro ao obter proposta:', error);
+      this.logger.error('Erro ao obter proposta', error?.stack || String(error));
       return null;
     }
   }
@@ -208,9 +535,7 @@ export class PropostasService {
         // Se vendedor for um objeto, usar o ID direto
         if (typeof dadosProposta.vendedor === 'object' && dadosProposta.vendedor.id) {
           vendedorId = dadosProposta.vendedor.id;
-          console.log(
-            `👤 Vendedor recebido como objeto: ${dadosProposta.vendedor.nome} -> ${vendedorId}`,
-          );
+          this.logger.debug(`Vendedor recebido (objeto): ${JSON.stringify({ nome: this.summarizeText((dadosProposta.vendedor as any).nome, 40), vendedorId })}`);
         } else {
           // Se vendedor for uma string, buscar pelo nome
           const nomeVendedor =
@@ -226,9 +551,9 @@ export class PropostasService {
 
           if (vendedor) {
             vendedorId = vendedor.id;
-            console.log(`👤 Vendedor encontrado por nome: ${nomeVendedor} -> ${vendedorId}`);
+            this.logger.debug(`Vendedor encontrado por nome: ${JSON.stringify({ nome: this.summarizeText(nomeVendedor, 40), vendedorId })}`);
           } else {
-            console.warn(`⚠️ Vendedor não encontrado: ${nomeVendedor}`);
+            this.logger.warn(`Vendedor nao encontrado: ${this.summarizeText(nomeVendedor, 40)}`);
           }
         }
       }
@@ -238,7 +563,7 @@ export class PropostasService {
       if (typeof dadosProposta.cliente === 'string') {
         // 🔍 BUSCAR CLIENTE REAL NO BANCO ao invés de gerar email fictício
         const nomeCliente = dadosProposta.cliente as string;
-        console.log(`🔍 Buscando cliente real: "${nomeCliente}"`);
+        this.logger.debug(`Buscando cliente real por nome: ${this.summarizeText(nomeCliente, 50)}`);
 
         try {
           // Buscar cliente real pelo nome (busca flexível)
@@ -252,7 +577,7 @@ export class PropostasService {
           });
 
           if (clienteReal) {
-            console.log(`✅ Cliente real encontrado: ${clienteReal.nome} - ${clienteReal.email}`);
+            this.logger.debug(`Cliente real encontrado: ${JSON.stringify({ clienteId: clienteReal.id, nome: this.summarizeText(clienteReal.nome, 50), email: this.maskEmail(clienteReal.email) })}`);
             clienteProcessado = {
               id: clienteReal.id,
               nome: clienteReal.nome,
@@ -262,7 +587,7 @@ export class PropostasService {
               status: clienteReal.status || 'lead',
             };
           } else {
-            console.warn(`⚠️ Cliente "${nomeCliente}" não encontrado no cadastro`);
+            this.logger.warn(`Cliente nao encontrado no cadastro: ${this.summarizeText(nomeCliente, 50)}`);
             // ✅ NÃO gerar email fictício - deixar vazio para busca posterior
             clienteProcessado = {
               id: 'cliente-temp',
@@ -274,7 +599,7 @@ export class PropostasService {
             };
           }
         } catch (error) {
-          console.error('❌ Erro ao buscar cliente no banco:', error);
+          this.logger.error('Erro ao buscar cliente no banco', error?.stack || String(error));
           // Fallback sem email fictício
           clienteProcessado = {
             id: 'cliente-temp',
@@ -298,6 +623,98 @@ export class PropostasService {
           documento: '',
           status: 'lead',
         };
+      }
+
+      const propostaColumns = await this.getTableColumns('propostas');
+      const legacySchema = this.isLegacyPropostasSchema(propostaColumns);
+
+      if (legacySchema) {
+        const titulo = dadosProposta.titulo || `Proposta ${numero}`;
+        const valor = Number(dadosProposta.valor || dadosProposta.total || 0);
+        const validadeDias = dadosProposta.validadeDias || 30;
+        const dataVencimento =
+          dadosProposta.dataVencimento ||
+          new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000).toISOString();
+        const insertColumns: string[] = ['empresa_id', 'numero', 'titulo', 'valor', 'status'];
+        const insertValues: unknown[] = [
+          empresaIdProposta,
+          numero,
+          titulo,
+          valor,
+          this.normalizeStatusToDatabase(dadosProposta.status, true),
+        ];
+
+        if (propostaColumns.has('oportunidade_id')) {
+          insertColumns.push('oportunidade_id');
+          insertValues.push(
+            await this.ensureLegacyOportunidadeId(empresaIdProposta, titulo, valor, vendedorId),
+          );
+        }
+
+        if (propostaColumns.has('descricao')) {
+          insertColumns.push('descricao');
+          insertValues.push(dadosProposta.observacoes ?? null);
+        }
+
+        if (propostaColumns.has('validade')) {
+          insertColumns.push('validade');
+          insertValues.push(new Date(dataVencimento));
+        }
+
+        const placeholders = insertValues.map((_, index) => `$${index + 1}`).join(', ');
+        const createdColumn = propostaColumns.has('criado_em') ? 'criado_em' : 'criadaEm';
+        const updatedColumn = propostaColumns.has('atualizado_em') ? 'atualizado_em' : 'atualizadaEm';
+
+        const rowsRaw = await this.propostaRepository.query(
+          `
+            INSERT INTO propostas (${insertColumns.map((column) => `"${column}"`).join(', ')})
+            VALUES (${placeholders})
+            RETURNING
+              id,
+              numero,
+              titulo,
+              valor,
+              status,
+              ${
+                propostaColumns.has('descricao')
+                  ? 'descricao'
+                  : propostaColumns.has('observacoes')
+                    ? 'observacoes'
+                    : 'NULL'
+              } AS descricao,
+              ${
+                propostaColumns.has('validade')
+                  ? 'validade'
+                  : propostaColumns.has('dataVencimento')
+                    ? '"dataVencimento"'
+                    : 'NULL'
+              } AS validade,
+              ${createdColumn} AS criado_em,
+              ${updatedColumn} AS atualizado_em
+          `,
+          insertValues,
+        );
+        const rows = this.extractQueryRows<any>(rowsRaw);
+
+        return this.buildLegacyInterface(
+          rows?.[0],
+          {
+            cliente: clienteProcessado,
+            produtos: dadosProposta.produtos || [],
+            subtotal: dadosProposta.subtotal || 0,
+            descontoGlobal: dadosProposta.descontoGlobal || 0,
+            impostos: dadosProposta.impostos || 0,
+            total: dadosProposta.total || valor,
+            valor,
+            formaPagamento: dadosProposta.formaPagamento || 'avista',
+            validadeDias,
+            observacoes: dadosProposta.observacoes,
+            incluirImpostosPDF: dadosProposta.incluirImpostosPDF || false,
+            source: dadosProposta.source || 'api',
+            vendedor: dadosProposta.vendedor,
+          },
+          typeof dadosProposta.cliente === 'string' ? dadosProposta.cliente : clienteProcessado?.nome,
+        );
       }
 
       const novaProposta = this.propostaRepository.create({
@@ -324,11 +741,224 @@ export class PropostasService {
       });
 
       const propostaSalva = await this.propostaRepository.save(novaProposta);
-      console.log(`✅ Proposta criada no banco: ${propostaSalva.id} - ${propostaSalva.numero}`);
+      this.logger.log(`✅ Proposta criada no banco: ${propostaSalva.id} - ${propostaSalva.numero}`);
 
       return this.entityToInterface(propostaSalva);
     } catch (error) {
-      console.error('❌ Erro ao criar proposta:', error);
+      this.logger.error('Erro ao criar proposta', error?.stack || String(error));
+      throw error;
+    }
+  }
+
+  /**
+   * Atualiza dados de uma proposta (além de status)
+   */
+  async atualizarProposta(
+    id: string,
+    dadosProposta: Partial<Proposta>,
+    empresaId?: string,
+  ): Promise<Proposta> {
+    try {
+      const propostaColumns = await this.getTableColumns('propostas');
+      const legacySchema = this.isLegacyPropostasSchema(propostaColumns);
+
+      if (legacySchema) {
+        const setClauses: string[] = [];
+        const params: unknown[] = [];
+        let idx = 1;
+
+        if (dadosProposta.titulo !== undefined) {
+          setClauses.push(`"titulo" = $${idx++}`);
+          params.push(dadosProposta.titulo || null);
+        }
+
+        const valorAtualizado =
+          dadosProposta.valor !== undefined
+            ? Number(dadosProposta.valor)
+            : dadosProposta.total !== undefined
+              ? Number(dadosProposta.total)
+              : undefined;
+        if (valorAtualizado !== undefined && Number.isFinite(valorAtualizado)) {
+          setClauses.push(`"valor" = $${idx++}`);
+          params.push(valorAtualizado);
+        }
+
+        if (dadosProposta.status !== undefined) {
+          setClauses.push(`"status" = $${idx++}`);
+          params.push(this.normalizeStatusToDatabase(dadosProposta.status, true));
+        }
+
+        if (dadosProposta.source !== undefined && propostaColumns.has('source')) {
+          setClauses.push(`"source" = $${idx++}`);
+          params.push(dadosProposta.source || null);
+        }
+
+        const observacoesColumn = propostaColumns.has('observacoes')
+          ? 'observacoes'
+          : propostaColumns.has('descricao')
+            ? 'descricao'
+            : null;
+        if (observacoesColumn && dadosProposta.observacoes !== undefined) {
+          setClauses.push(`"${observacoesColumn}" = $${idx++}`);
+          params.push(dadosProposta.observacoes || null);
+        }
+
+        const validadeColumn = propostaColumns.has('validade')
+          ? 'validade'
+          : propostaColumns.has('dataVencimento')
+            ? 'dataVencimento'
+            : null;
+        const validadeDias =
+          dadosProposta.validadeDias !== undefined ? Number(dadosProposta.validadeDias) : undefined;
+        const dataVencimentoValue =
+          dadosProposta.dataVencimento ??
+          (validadeDias && Number.isFinite(validadeDias)
+            ? new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000).toISOString()
+            : undefined);
+        if (validadeColumn && dataVencimentoValue) {
+          setClauses.push(`"${validadeColumn}" = $${idx++}`);
+          params.push(new Date(dataVencimentoValue));
+        }
+
+        if (setClauses.length === 0) {
+          const existente = await this.obterProposta(id, empresaId);
+          if (!existente) throw new Error(`Proposta com ID ${id} nao encontrada`);
+          return existente;
+        }
+
+        params.push(id);
+        const idParam = `$${idx++}`;
+        let whereClause = `id = ${idParam}`;
+
+        if (empresaId) {
+          params.push(empresaId);
+          whereClause += ` AND empresa_id = $${idx++}`;
+        }
+
+        const updateResultRaw = await this.propostaRepository.query(
+          `
+            UPDATE propostas
+            SET ${setClauses.join(', ')}
+            WHERE ${whereClause}
+            RETURNING id
+          `,
+          params,
+        );
+        const updateResult = this.extractQueryRows<{ id: string }>(updateResultRaw);
+
+        if (!updateResult?.[0]?.id) {
+          throw new Error(`Proposta com ID ${id} nao encontrada`);
+        }
+
+        const propostaAtualizada = await this.obterProposta(id, empresaId);
+        if (!propostaAtualizada) {
+          throw new Error(`Proposta com ID ${id} nao encontrada`);
+        }
+        return propostaAtualizada;
+      }
+
+      const proposta = await this.propostaRepository.findOne({
+        where: empresaId ? { id, empresaId } : { id },
+      });
+
+      if (!proposta) {
+        throw new Error(`Proposta com ID ${id} nao encontrada`);
+      }
+
+      if (dadosProposta.titulo !== undefined) {
+        proposta.titulo = dadosProposta.titulo || null;
+      }
+
+      if (dadosProposta.cliente !== undefined) {
+        if (typeof dadosProposta.cliente === 'string') {
+          const clienteAtual = proposta.cliente || { id: 'cliente-temp', nome: '', email: '' };
+          proposta.cliente = {
+            ...clienteAtual,
+            nome: dadosProposta.cliente,
+            email: clienteAtual.email || '',
+          } as any;
+        } else if (dadosProposta.cliente && typeof dadosProposta.cliente === 'object') {
+          proposta.cliente = dadosProposta.cliente as any;
+        }
+      }
+
+      if (dadosProposta.produtos !== undefined) {
+        proposta.produtos = (dadosProposta.produtos || []) as any;
+      }
+
+      if (dadosProposta.subtotal !== undefined) {
+        proposta.subtotal = Number(dadosProposta.subtotal);
+      }
+      if (dadosProposta.descontoGlobal !== undefined) {
+        proposta.descontoGlobal = Number(dadosProposta.descontoGlobal);
+      }
+      if (dadosProposta.impostos !== undefined) {
+        proposta.impostos = Number(dadosProposta.impostos);
+      }
+
+      const totalFoiEnviado = dadosProposta.total !== undefined;
+      const valorFoiEnviado = dadosProposta.valor !== undefined;
+      if (totalFoiEnviado) {
+        proposta.total = Number(dadosProposta.total);
+        if (!valorFoiEnviado) proposta.valor = Number(dadosProposta.total);
+      }
+      if (valorFoiEnviado) {
+        proposta.valor = Number(dadosProposta.valor);
+        if (!totalFoiEnviado) proposta.total = Number(dadosProposta.valor);
+      }
+
+      if (dadosProposta.formaPagamento !== undefined) {
+        proposta.formaPagamento = dadosProposta.formaPagamento as any;
+      }
+
+      if (dadosProposta.validadeDias !== undefined) {
+        proposta.validadeDias = Number(dadosProposta.validadeDias);
+      }
+
+      if (dadosProposta.observacoes !== undefined) {
+        proposta.observacoes = dadosProposta.observacoes || null;
+      }
+
+      if (dadosProposta.incluirImpostosPDF !== undefined) {
+        proposta.incluirImpostosPDF = Boolean(dadosProposta.incluirImpostosPDF);
+      }
+
+      if (dadosProposta.status !== undefined) {
+        proposta.status = dadosProposta.status;
+      }
+
+      if (dadosProposta.dataVencimento !== undefined) {
+        proposta.dataVencimento = dadosProposta.dataVencimento
+          ? new Date(dadosProposta.dataVencimento)
+          : null;
+      } else if (dadosProposta.validadeDias !== undefined && Number.isFinite(proposta.validadeDias)) {
+        proposta.dataVencimento = new Date(Date.now() + proposta.validadeDias * 24 * 60 * 60 * 1000);
+      }
+
+      if (dadosProposta.source !== undefined) {
+        proposta.source = dadosProposta.source || null;
+      }
+
+      if (dadosProposta.vendedor !== undefined) {
+        let vendedorId: string | null = null;
+
+        if (dadosProposta.vendedor && typeof dadosProposta.vendedor === 'object') {
+          vendedorId = (dadosProposta.vendedor as any).id || null;
+        } else if (typeof dadosProposta.vendedor === 'string') {
+          const vendedor = await this.userRepository.findOne({
+            where: empresaId ? { nome: dadosProposta.vendedor, empresa_id: empresaId } : { nome: dadosProposta.vendedor },
+          });
+          vendedorId = vendedor?.id || null;
+        }
+
+        proposta.vendedor_id = vendedorId;
+      }
+
+      const propostaAtualizada = await this.propostaRepository.save(proposta);
+      this.logger.log(`✅ Proposta atualizada: ${propostaAtualizada.id}`);
+      return this.entityToInterface(propostaAtualizada);
+    } catch (error) {
+      this.logger.error('Erro ao atualizar proposta', error?.stack || String(error));
       throw error;
     }
   }
@@ -343,7 +973,7 @@ export class PropostasService {
       );
       return resultado.affected > 0;
     } catch (error) {
-      console.error('❌ Erro ao remover proposta:', error);
+      this.logger.error('Erro ao remover proposta', error?.stack || String(error));
       return false;
     }
   }
@@ -359,10 +989,23 @@ export class PropostasService {
     empresaId?: string,
   ): Promise<Proposta> {
     try {
-      console.log(
-        `🔧 DEBUG: atualizarStatus chamado com propostaId: "${propostaId}" (tipo: ${typeof propostaId})`,
-      );
-      console.log(`🔧 DEBUG: Tentando buscar proposta por ID: ${propostaId}`);
+      this.logger.debug(`atualizarStatus chamado: ${JSON.stringify({ propostaId, tipoPropostaId: typeof propostaId, status, source: source || null, hasObservacoes: Boolean(observacoes) })}`);
+
+      const propostaColumns = await this.getTableColumns('propostas');
+      const legacySchema = this.isLegacyPropostasSchema(propostaColumns);
+      if (legacySchema) {
+        const propostaAtualizada = await this.atualizarProposta(
+          propostaId,
+          {
+            status: status as Proposta['status'],
+            source,
+            observacoes,
+          },
+          empresaId,
+        );
+        this.logger.log(`Status da proposta ${propostaId} atualizado para: ${status} (legacy mode)`);
+        return propostaAtualizada;
+      }
 
       const proposta = await this.propostaRepository.findOne({
         where: empresaId ? { id: propostaId, empresaId } : { id: propostaId },
@@ -377,11 +1020,11 @@ export class PropostasService {
       if (observacoes) proposta.observacoes = observacoes;
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);
-      console.log(`✅ Status da proposta ${propostaId} atualizado para: ${status}`);
+      this.logger.log(`✅ Status da proposta ${propostaId} atualizado para: ${status}`);
 
       return this.entityToInterface(propostaAtualizada);
     } catch (error) {
-      console.error('❌ Erro ao atualizar status:', error);
+      this.logger.error('Erro ao atualizar status', error?.stack || String(error));
       throw error;
     }
   }
@@ -397,6 +1040,39 @@ export class PropostasService {
     empresaId?: string,
   ): Promise<Proposta> {
     try {
+      const propostaColumns = await this.getTableColumns('propostas');
+      const legacySchema = this.isLegacyPropostasSchema(propostaColumns);
+
+      if (legacySchema) {
+        const propostaAtual = await this.obterProposta(propostaId, empresaId);
+        if (!propostaAtual) {
+          throw new Error(`Proposta com ID ${propostaId} nao encontrada`);
+        }
+
+        if (status === 'aprovada' || status === 'rejeitada') {
+          if (propostaAtual.status !== 'visualizada' && propostaAtual.status !== 'enviada') {
+            this.logger.warn(
+              `Transicao automatica de '${propostaAtual.status}' para '${status}' pode nao ser valida`,
+            );
+          }
+        }
+
+        const propostaAtualizada = await this.atualizarProposta(
+          propostaId,
+          {
+            status: status as Proposta['status'],
+            source,
+            observacoes,
+          },
+          empresaId,
+        );
+
+        this.logger.log(
+          `Status da proposta ${propostaId} atualizado com validacao para: ${status} (legacy mode)`,
+        );
+        return propostaAtualizada;
+      }
+
       const proposta = await this.propostaRepository.findOne({
         where: empresaId ? { id: propostaId, empresaId } : { id: propostaId },
       });
@@ -408,7 +1084,7 @@ export class PropostasService {
       // Validações específicas para transições automáticas
       if (status === 'aprovada' || status === 'rejeitada') {
         if (proposta.status !== 'visualizada' && proposta.status !== 'enviada') {
-          console.warn(
+          this.logger.warn(
             `⚠️ Transição automática de '${proposta.status}' para '${status}' pode não ser válida`,
           );
         }
@@ -419,11 +1095,11 @@ export class PropostasService {
       if (observacoes) proposta.observacoes = observacoes;
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);
-      console.log(`✅ Status da proposta ${propostaId} atualizado com validação para: ${status}`);
+      this.logger.log(`✅ Status da proposta ${propostaId} atualizado com validação para: ${status}`);
 
       return this.entityToInterface(propostaAtualizada);
     } catch (error) {
-      console.error('❌ Erro ao atualizar status com validação:', error);
+      this.logger.error('Erro ao atualizar status com validacao', error?.stack || String(error));
       throw error;
     }
   }
@@ -438,6 +1114,24 @@ export class PropostasService {
     empresaId?: string,
   ): Promise<Proposta> {
     try {
+      const propostaColumns = await this.getTableColumns('propostas');
+      const legacySchema = this.isLegacyPropostasSchema(propostaColumns);
+
+      if (legacySchema) {
+        const proposta = await this.obterProposta(propostaId, empresaId);
+        if (!proposta) {
+          throw new Error(`Proposta com ID ${propostaId} nao encontrada`);
+        }
+
+        const propostaAtualizada = await this.atualizarProposta(
+          propostaId,
+          { status: 'visualizada' },
+          empresaId,
+        );
+        this.logger.log(`Proposta ${propostaId} marcada como visualizada (legacy mode)`);
+        return propostaAtualizada;
+      }
+
       const proposta = await this.propostaRepository.findOne({
         where: empresaId ? { id: propostaId, empresaId } : { id: propostaId },
       });
@@ -454,11 +1148,11 @@ export class PropostasService {
       };
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);
-      console.log(`👁️ Proposta ${propostaId} marcada como visualizada`);
+      this.logger.log(`👁️ Proposta ${propostaId} marcada como visualizada`);
 
       return this.entityToInterface(propostaAtualizada);
     } catch (error) {
-      console.error('❌ Erro ao marcar como visualizada:', error);
+      this.logger.error('Erro ao marcar como visualizada', error?.stack || String(error));
       throw error;
     }
   }
@@ -489,11 +1183,11 @@ export class PropostasService {
       };
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);
-      console.log(`📧 Email registrado para proposta ${propostaId}`);
+      this.logger.log(`Email registrado para proposta ${propostaId} (${this.maskEmail(emailCliente)})`);
 
       return this.entityToInterface(propostaAtualizada);
     } catch (error) {
-      console.error('❌ Erro ao registrar envio de email:', error);
+      this.logger.error('Erro ao registrar envio de email', error?.stack || String(error));
       throw error;
     }
   }
@@ -508,7 +1202,7 @@ export class PropostasService {
     empresaId?: string,
   ): Promise<Proposta> {
     try {
-      console.log(`🔄 Marcando proposta ${propostaIdOuNumero} como enviada automaticamente`);
+      this.logger.debug(`Marcando proposta ${propostaIdOuNumero} como enviada automaticamente`);
 
       // Tentar encontrar por ID (UUID) primeiro, depois por número
       let proposta = await this.propostaRepository
@@ -541,11 +1235,11 @@ export class PropostasService {
       };
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);
-      console.log(`✅ Proposta ${proposta.numero} marcada como enviada automaticamente`);
+      this.logger.log(`✅ Proposta ${proposta.numero} marcada como enviada automaticamente`);
 
       return this.entityToInterface(propostaAtualizada);
     } catch (error) {
-      console.error('❌ Erro ao marcar proposta como enviada:', error);
+      this.logger.error('Erro ao marcar proposta como enviada', error?.stack || String(error));
       throw error;
     }
   }

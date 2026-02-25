@@ -22,6 +22,12 @@ export enum AgendaPrioridade {
   BAIXA = 'baixa',
 }
 
+export enum AgendaAttendeeRsvpStatus {
+  PENDING = 'pending',
+  CONFIRMED = 'confirmed',
+  DECLINED = 'declined',
+}
+
 @Entity('agenda_eventos')
 export class AgendaEvento {
   @PrimaryGeneratedColumn('uuid')
@@ -63,6 +69,12 @@ export class AgendaEvento {
 
   @Column({ type: 'jsonb', nullable: true })
   attendees?: string[];
+
+  @Column({ type: 'jsonb', nullable: true })
+  attendee_responses?: Record<string, AgendaAttendeeRsvpStatus>;
+
+  @Column('uuid', { nullable: true })
+  criado_por_id?: string;
 
   @Column('uuid', { nullable: true })
   interacao_id?: string;

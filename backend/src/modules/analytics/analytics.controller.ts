@@ -12,6 +12,10 @@ import { Response } from 'express';
 import { AnalyticsService } from './analytics.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { Permission } from '../../common/permissions/permissions.constants';
+import { EmpresaId } from '../../common/decorators/empresa.decorator';
 
 export interface AnalyticsQueryDto {
   periodo?: '7d' | '30d' | '90d' | '1y';
@@ -21,21 +25,24 @@ export interface AnalyticsQueryDto {
 }
 
 @Controller('analytics')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.RELATORIOS_READ)
 export class AnalyticsController {
   private readonly logger = new Logger(AnalyticsController.name);
 
   constructor(private readonly analyticsService: AnalyticsService) {}
 
+  private withEmpresa(empresaId: string, query: AnalyticsQueryDto) {
+    return { ...query, empresaId };
+  }
+
   @Get('dashboard')
-  async getDashboardData(@Query() query: AnalyticsQueryDto) {
+  async getDashboardData(@EmpresaId() empresaId: string, @Query() query: AnalyticsQueryDto) {
     try {
       this.logger.log(
-        `Buscando dados do dashboard - Período: ${query.periodo}, Vendedor: ${query.vendedor}`,
+        `Buscando dashboard analytics (periodo=${query.periodo}, vendedor=${query.vendedor})`,
       );
-
-      const data = await this.analyticsService.getDashboardData(query);
-      return data;
+      return await this.analyticsService.getDashboardData(this.withEmpresa(empresaId, query));
     } catch (error) {
       this.logger.error('Erro ao buscar dados do dashboard:', error);
       throw new HttpException(
@@ -46,11 +53,11 @@ export class AnalyticsController {
   }
 
   @Get('funil-conversao')
-  async getFunilConversao(@Query() query: AnalyticsQueryDto) {
+  async getFunilConversao(@EmpresaId() empresaId: string, @Query() query: AnalyticsQueryDto) {
     try {
-      return await this.analyticsService.getFunilConversao(query);
+      return await this.analyticsService.getFunilConversao(this.withEmpresa(empresaId, query));
     } catch (error) {
-      this.logger.error('Erro ao buscar funil de conversão:', error);
+      this.logger.error('Erro ao buscar funil de conversao:', error);
       throw new HttpException(
         error.message || 'Erro interno do servidor',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -59,9 +66,14 @@ export class AnalyticsController {
   }
 
   @Get('performance-vendedores')
-  async getPerformanceVendedores(@Query() query: AnalyticsQueryDto) {
+  async getPerformanceVendedores(
+    @EmpresaId() empresaId: string,
+    @Query() query: AnalyticsQueryDto,
+  ) {
     try {
-      return await this.analyticsService.getPerformanceVendedores(query);
+      return await this.analyticsService.getPerformanceVendedores(
+        this.withEmpresa(empresaId, query),
+      );
     } catch (error) {
       this.logger.error('Erro ao buscar performance de vendedores:', error);
       throw new HttpException(
@@ -72,11 +84,11 @@ export class AnalyticsController {
   }
 
   @Get('evolucao-temporal')
-  async getEvolucaoTemporal(@Query() query: AnalyticsQueryDto) {
+  async getEvolucaoTemporal(@EmpresaId() empresaId: string, @Query() query: AnalyticsQueryDto) {
     try {
-      return await this.analyticsService.getEvolucaoTemporal(query);
+      return await this.analyticsService.getEvolucaoTemporal(this.withEmpresa(empresaId, query));
     } catch (error) {
-      this.logger.error('Erro ao buscar evolução temporal:', error);
+      this.logger.error('Erro ao buscar evolucao temporal:', error);
       throw new HttpException(
         error.message || 'Erro interno do servidor',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -85,11 +97,11 @@ export class AnalyticsController {
   }
 
   @Get('tempo-medio-etapas')
-  async getTempoMedioEtapas(@Query() query: AnalyticsQueryDto) {
+  async getTempoMedioEtapas(@EmpresaId() empresaId: string, @Query() query: AnalyticsQueryDto) {
     try {
-      return await this.analyticsService.getTempoMedioEtapas(query);
+      return await this.analyticsService.getTempoMedioEtapas(this.withEmpresa(empresaId, query));
     } catch (error) {
-      this.logger.error('Erro ao buscar tempo médio por etapas:', error);
+      this.logger.error('Erro ao buscar tempo medio por etapas:', error);
       throw new HttpException(
         error.message || 'Erro interno do servidor',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -98,11 +110,11 @@ export class AnalyticsController {
   }
 
   @Get('distribuicao-valores')
-  async getDistribuicaoValores(@Query() query: AnalyticsQueryDto) {
+  async getDistribuicaoValores(@EmpresaId() empresaId: string, @Query() query: AnalyticsQueryDto) {
     try {
-      return await this.analyticsService.getDistribuicaoValores(query);
+      return await this.analyticsService.getDistribuicaoValores(this.withEmpresa(empresaId, query));
     } catch (error) {
-      this.logger.error('Erro ao buscar distribuição de valores:', error);
+      this.logger.error('Erro ao buscar distribuicao de valores:', error);
       throw new HttpException(
         error.message || 'Erro interno do servidor',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -111,11 +123,11 @@ export class AnalyticsController {
   }
 
   @Get('previsao-fechamento')
-  async getPrevisaoFechamento(@Query() query: AnalyticsQueryDto) {
+  async getPrevisaoFechamento(@EmpresaId() empresaId: string, @Query() query: AnalyticsQueryDto) {
     try {
-      return await this.analyticsService.getPrevisaoFechamento(query);
+      return await this.analyticsService.getPrevisaoFechamento(this.withEmpresa(empresaId, query));
     } catch (error) {
-      this.logger.error('Erro ao buscar previsão de fechamento:', error);
+      this.logger.error('Erro ao buscar previsao de fechamento:', error);
       throw new HttpException(
         error.message || 'Erro interno do servidor',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -124,11 +136,11 @@ export class AnalyticsController {
   }
 
   @Get('alertas-gestao')
-  async getAlertasGestao(@Query() query: AnalyticsQueryDto) {
+  async getAlertasGestao(@EmpresaId() empresaId: string, @Query() query: AnalyticsQueryDto) {
     try {
-      return await this.analyticsService.getAlertasGestao(query);
+      return await this.analyticsService.getAlertasGestao(this.withEmpresa(empresaId, query));
     } catch (error) {
-      this.logger.error('Erro ao buscar alertas de gestão:', error);
+      this.logger.error('Erro ao buscar alertas de gestao:', error);
       throw new HttpException(
         error.message || 'Erro interno do servidor',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -137,14 +149,15 @@ export class AnalyticsController {
   }
 
   @Get('export')
-  async exportarRelatorio(@Query() query: AnalyticsQueryDto, @Res() res: Response) {
+  async exportarRelatorio(
+    @EmpresaId() empresaId: string,
+    @Query() query: AnalyticsQueryDto,
+    @Res() res: Response,
+  ) {
     try {
-      this.logger.log(
-        `Exportando relatório - Período: ${query.periodo}, Vendedor: ${query.vendedor}`,
+      const buffer = await this.analyticsService.exportarRelatorio(
+        this.withEmpresa(empresaId, query),
       );
-
-      const buffer = await this.analyticsService.exportarRelatorio(query);
-
       const filename = `relatorio-vendas-${query.periodo || '30d'}-${new Date().toISOString().split('T')[0]}.xlsx`;
 
       res.set({
@@ -155,7 +168,7 @@ export class AnalyticsController {
 
       res.send(buffer);
     } catch (error) {
-      this.logger.error('Erro ao exportar relatório:', error);
+      this.logger.error('Erro ao exportar relatorio:', error);
       throw new HttpException(
         error.message || 'Erro interno do servidor',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -164,9 +177,9 @@ export class AnalyticsController {
   }
 
   @Get('kpis-tempo-real')
-  async getKpisTempoReal() {
+  async getKpisTempoReal(@EmpresaId() empresaId: string) {
     try {
-      return await this.analyticsService.getKpisTempoReal();
+      return await this.analyticsService.getKpisTempoReal(empresaId);
     } catch (error) {
       this.logger.error('Erro ao buscar KPIs em tempo real:', error);
       throw new HttpException(
@@ -177,9 +190,9 @@ export class AnalyticsController {
   }
 
   @Get('metas-progresso')
-  async getMetasProgresso(@Query() query: AnalyticsQueryDto) {
+  async getMetasProgresso(@EmpresaId() empresaId: string, @Query() query: AnalyticsQueryDto) {
     try {
-      return await this.analyticsService.getMetasProgresso(query);
+      return await this.analyticsService.getMetasProgresso(this.withEmpresa(empresaId, query));
     } catch (error) {
       this.logger.error('Erro ao buscar progresso das metas:', error);
       throw new HttpException(

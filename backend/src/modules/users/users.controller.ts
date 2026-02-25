@@ -12,7 +12,9 @@ import { Logger,
   UploadedFile,
   UseInterceptors,
   BadRequestException,
+  ForbiddenException,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -20,20 +22,39 @@ import { diskStorage } from 'multer';
 import { Express, Request } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as bcrypt from 'bcryptjs';
 
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import {
+  ALL_PERMISSIONS,
+  LEGACY_PERMISSION_ALIASES,
+  getPermissionCatalog,
+  Permission,
+} from '../../common/permissions/permissions.constants';
+import { resolveUserPermissions } from '../../common/permissions/permissions.utils';
 import { CurrentUser } from '../../common/decorators/user.decorator';
-import { User } from './user.entity';
+import { User, UserRole } from './user.entity';
 
 const AVATAR_UPLOAD_SUBDIR = 'avatars';
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const AVATAR_SEGMENT = `/uploads/${AVATAR_UPLOAD_SUBDIR}/`;
 const avatarLogger = new Logger('UsersController');
+const ALL_PERMISSION_VALUES = new Set<string>(ALL_PERMISSIONS);
+const LEGACY_ASSIGNABLE_PERMISSIONS = new Set<string>(['ATENDIMENTO']);
+type UsersReadScope = 'company' | 'team' | 'own';
+type UsersReadScopeFilters = {
+  user_ids?: string[];
+  allowed_roles?: UserRole[];
+};
 
 const ensureAvatarDirectory = (): string => {
-  const uploadDir = path.resolve(__dirname, '../../../uploads', AVATAR_UPLOAD_SUBDIR);
+  const uploadDir = path.resolve(process.cwd(), 'uploads', AVATAR_UPLOAD_SUBDIR);
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
     avatarLogger.log('[Uploads] Diretório de avatares criado:', uploadDir);
@@ -43,7 +64,7 @@ const ensureAvatarDirectory = (): string => {
 
 @ApiTags('users')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, RolesGuard, PermissionsGuard)
 @Controller('users')
 export class UsersController {
   private readonly logger = new Logger(UsersController.name);
@@ -71,10 +92,358 @@ export class UsersController {
     return path.join(this.getAvatarUploadDir(), filePart);
   }
 
+  private normalizeRoleInput(role: unknown): UserRole | null {
+    if (typeof role !== 'string') {
+      return null;
+    }
+
+    const normalized = role.trim().toLowerCase();
+    if (!normalized) {
+      return null;
+    }
+
+    switch (normalized) {
+      case 'superadmin':
+        return UserRole.SUPERADMIN;
+      case 'admin':
+      case 'administrador':
+        return UserRole.ADMIN;
+      case 'gerente':
+      case 'manager':
+      case 'gestor':
+        return UserRole.GERENTE;
+      case 'vendedor':
+        return UserRole.VENDEDOR;
+      case 'suporte':
+      case 'support':
+      case 'user':
+      case 'usuario':
+      case 'operacional':
+        return UserRole.SUPORTE;
+      case 'financeiro':
+        return UserRole.FINANCEIRO;
+      default:
+        return null;
+    }
+  }
+
+  private getManageableRoles(actorRole: UserRole): Set<UserRole> {
+    if (actorRole === UserRole.SUPERADMIN) {
+      return new Set([
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+        UserRole.GERENTE,
+        UserRole.VENDEDOR,
+        UserRole.SUPORTE,
+        UserRole.FINANCEIRO,
+      ]);
+    }
+
+    if (actorRole === UserRole.ADMIN) {
+      return new Set([UserRole.GERENTE, UserRole.VENDEDOR, UserRole.SUPORTE, UserRole.FINANCEIRO]);
+    }
+
+    if (actorRole === UserRole.GERENTE) {
+      return new Set([UserRole.VENDEDOR, UserRole.SUPORTE]);
+    }
+
+    return new Set();
+  }
+
+  private resolveUsersReadScope(actor: User): UsersReadScope {
+    const actorRole = this.normalizeRoleInput(actor.role);
+    if (actorRole === UserRole.SUPERADMIN || actorRole === UserRole.ADMIN) {
+      return 'company';
+    }
+
+    if (actorRole === UserRole.GERENTE) {
+      return 'team';
+    }
+
+    return 'own';
+  }
+
+  private resolveUsersReadScopeFilters(actor: User): UsersReadScopeFilters {
+    const scope = this.resolveUsersReadScope(actor);
+
+    if (scope === 'company') {
+      return {};
+    }
+
+    if (scope === 'team') {
+      const actorRole = this.normalizeRoleInput(actor.role) ?? UserRole.VENDEDOR;
+      const manageableRoles = Array.from(this.getManageableRoles(actorRole));
+      if (manageableRoles.length === 0) {
+        return actor.id ? { user_ids: [actor.id] } : {};
+      }
+
+      if (!actor.id) {
+        return { allowed_roles: manageableRoles };
+      }
+
+      return {
+        user_ids: [actor.id],
+        allowed_roles: manageableRoles,
+      };
+    }
+
+    return actor.id ? { user_ids: [actor.id] } : {};
+  }
+
+  private filterUsersByReadScope(users: User[], scopeFilters: UsersReadScopeFilters): User[] {
+    const userIdSet = new Set((scopeFilters.user_ids ?? []).filter((id) => typeof id === 'string' && id));
+    const roleSet = new Set(scopeFilters.allowed_roles ?? []);
+
+    if (userIdSet.size === 0 && roleSet.size === 0) {
+      return users;
+    }
+
+    return users.filter((member) => {
+      if (member.id && userIdSet.has(member.id)) {
+        return true;
+      }
+
+      if (roleSet.size === 0) {
+        return false;
+      }
+
+      const memberRole = this.normalizeRoleInput(member.role);
+      return !!memberRole && roleSet.has(memberRole);
+    });
+  }
+
+  private ensureCanAssignRole(actor: User, requestedRole: unknown): void {
+    const actorRole = this.normalizeRoleInput(actor.role) ?? UserRole.VENDEDOR;
+    const normalizedRequestedRole =
+      requestedRole === undefined
+        ? UserRole.VENDEDOR
+        : this.normalizeRoleInput(requestedRole);
+
+    if (requestedRole !== undefined && !normalizedRequestedRole) {
+      throw new BadRequestException('Perfil de usuario invalido');
+    }
+
+    if (!normalizedRequestedRole || !this.getManageableRoles(actorRole).has(normalizedRequestedRole)) {
+      throw new ForbiddenException('Sem permissao para atribuir este perfil');
+    }
+  }
+
+  private normalizePermissionToken(token: unknown): string | null {
+    if (typeof token !== 'string') {
+      return null;
+    }
+
+    const trimmed = token.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    const canonicalCandidate = trimmed.toLowerCase();
+    if (ALL_PERMISSION_VALUES.has(canonicalCandidate)) {
+      return canonicalCandidate;
+    }
+
+    const legacyCandidate = trimmed.toUpperCase();
+    const mappedLegacy = LEGACY_PERMISSION_ALIASES[legacyCandidate];
+    if (mappedLegacy) {
+      return mappedLegacy;
+    }
+
+    if (LEGACY_ASSIGNABLE_PERMISSIONS.has(legacyCandidate)) {
+      return legacyCandidate;
+    }
+
+    return null;
+  }
+
+  private normalizePermissionInputList(rawPermissions: unknown): string[] {
+    if (rawPermissions === undefined) {
+      return [];
+    }
+
+    if (rawPermissions === null) {
+      return [];
+    }
+
+    if (Array.isArray(rawPermissions)) {
+      return rawPermissions.map((item) => (typeof item === 'string' ? item : String(item)));
+    }
+
+    if (typeof rawPermissions === 'string') {
+      return rawPermissions.includes(',') ? rawPermissions.split(',') : [rawPermissions];
+    }
+
+    throw new BadRequestException('Formato de permissoes invalido');
+  }
+
+  private normalizeAndValidateAssignablePermissions(
+    actor: User,
+    requestedPermissions: unknown,
+  ): string[] | undefined {
+    if (requestedPermissions === undefined) {
+      return undefined;
+    }
+
+    const rawPermissions = this.normalizePermissionInputList(requestedPermissions);
+    const normalizedPermissions: string[] = [];
+    const invalidPermissions: string[] = [];
+
+    for (const rawPermission of rawPermissions) {
+      const normalized = this.normalizePermissionToken(rawPermission);
+      if (!normalized) {
+        const displayValue = typeof rawPermission === 'string' ? rawPermission : String(rawPermission);
+        invalidPermissions.push(displayValue);
+        continue;
+      }
+
+      normalizedPermissions.push(normalized);
+    }
+
+    if (invalidPermissions.length > 0) {
+      const invalidList = invalidPermissions.map((permission) => `"${permission}"`).join(', ');
+      throw new BadRequestException(`Permissoes invalidas: ${invalidList}`);
+    }
+
+    const uniquePermissions = Array.from(new Set(normalizedPermissions));
+    const actorRole = this.normalizeRoleInput(actor.role);
+
+    if (actorRole !== UserRole.SUPERADMIN) {
+      const actorPermissionSet = resolveUserPermissions(actor);
+      const notAssignable = uniquePermissions.filter(
+        (permission) =>
+          !LEGACY_ASSIGNABLE_PERMISSIONS.has(permission) &&
+          !actorPermissionSet.has(permission as Permission),
+      );
+
+      if (notAssignable.length > 0) {
+        const forbiddenList = notAssignable.map((permission) => `"${permission}"`).join(', ');
+        throw new ForbiddenException(`Sem permissao para conceder: ${forbiddenList}`);
+      }
+    }
+
+    return uniquePermissions;
+  }
+
+  private async ensureCanManageUser(actor: User, userId: string, action: string): Promise<User> {
+    const target = await this.usersService.findOne(userId, actor.empresa_id);
+    if (!target) {
+      throw new NotFoundException('Usuario nao encontrado');
+    }
+
+    const actorRole = this.normalizeRoleInput(actor.role) ?? UserRole.VENDEDOR;
+    const targetRole = this.normalizeRoleInput(target.role);
+
+    if (target.id === actor.id && actorRole !== UserRole.SUPERADMIN) {
+      throw new ForbiddenException(
+        `Nao e permitido ${action} o proprio usuario por este endpoint`,
+      );
+    }
+
+    if (!targetRole || !this.getManageableRoles(actorRole).has(targetRole)) {
+      throw new ForbiddenException(`Sem permissao para ${action} este usuario`);
+    }
+
+    return target;
+  }
+
+  private sanitizeUser(user?: User | null): any {
+    if (!user) {
+      return user;
+    }
+
+    const { senha, ...safeUser } = user as User & { senha?: string };
+    return safeUser;
+  }
+
+  private sanitizeProfileUpdatePayload(updateData: Partial<User>): Partial<User> {
+    const allowedKeys = new Set(['nome', 'telefone', 'avatar_url', 'idioma_preferido', 'configuracoes']);
+    const forbiddenKeys = ['role', 'empresa_id', 'ativo', 'senha', 'permissoes', 'deve_trocar_senha'];
+    const payload = updateData ?? {};
+
+    const forbiddenProvided = forbiddenKeys.filter((key) => key in payload);
+    if (forbiddenProvided.length > 0) {
+      throw new ForbiddenException(
+        `Nao e permitido alterar os campos: ${forbiddenProvided.join(', ')}`,
+      );
+    }
+
+    const unknownKeys = Object.keys(payload).filter((key) => !allowedKeys.has(key));
+    if (unknownKeys.length > 0) {
+      throw new BadRequestException(`Campos nao permitidos: ${unknownKeys.join(', ')}`);
+    }
+
+    const sanitized = Object.fromEntries(
+      Object.entries(payload).filter(([key, value]) => allowedKeys.has(key) && value !== undefined),
+    ) as Partial<User>;
+
+    if (Object.keys(sanitized).length === 0) {
+      throw new BadRequestException('Nenhum campo valido para atualizacao de perfil');
+    }
+
+    return sanitized;
+  }
+
+  private sanitizeUserCreatePayload(dadosUsuario: any): Partial<User> {
+    const allowedKeys = new Set([
+      'nome',
+      'email',
+      'senha',
+      'telefone',
+      'role',
+      'permissoes',
+      'avatar_url',
+      'idioma_preferido',
+      'configuracoes',
+      'status_atendente',
+      'capacidade_maxima',
+      'ativo',
+    ]);
+    const payload = dadosUsuario ?? {};
+    const unknownKeys = Object.keys(payload).filter((key) => !allowedKeys.has(key));
+    if (unknownKeys.length > 0) {
+      throw new BadRequestException(`Campos nao permitidos: ${unknownKeys.join(', ')}`);
+    }
+
+    return payload;
+  }
+
+  private sanitizeUserAdminUpdatePayload(dadosAtualizacao: any): Partial<User> {
+    const allowedKeys = new Set([
+      'nome',
+      'email',
+      'telefone',
+      'role',
+      'permissoes',
+      'avatar_url',
+      'idioma_preferido',
+      'configuracoes',
+      'status_atendente',
+      'capacidade_maxima',
+      'ativo',
+    ]);
+    const payload = dadosAtualizacao ?? {};
+    const unknownKeys = Object.keys(payload).filter((key) => !allowedKeys.has(key));
+
+    if (unknownKeys.length > 0) {
+      throw new BadRequestException(`Campos nao permitidos: ${unknownKeys.join(', ')}`);
+    }
+
+    const sanitized = Object.fromEntries(
+      Object.entries(payload).filter(([_, value]) => value !== undefined),
+    ) as Partial<User>;
+
+    if (Object.keys(sanitized).length === 0) {
+      throw new BadRequestException('Nenhum campo valido para atualizacao');
+    }
+
+    return sanitized;
+  }
+
   @Get('profile')
   @ApiOperation({ summary: 'Obter perfil do usuário logado' })
   @ApiResponse({ status: 200, description: 'Perfil retornado com sucesso' })
   async getProfile(@CurrentUser() user: User) {
+    const normalizedPermissions = Array.isArray(user.permissoes) ? user.permissoes : [];
     const empresa = user.empresa
       ? {
           id: user.empresa.id,
@@ -95,30 +464,146 @@ export class UsersController {
         email: user.email,
         telefone: user.telefone,
         role: user.role,
+        permissoes: normalizedPermissions,
+        permissions: normalizedPermissions,
         avatar_url: user.avatar_url,
         idioma_preferido: user.idioma_preferido,
+        configuracoes: user.configuracoes ?? null,
+        empresa_id: user.empresa_id,
+        ativo: user.ativo,
+        ultimo_login: user.ultimo_login ?? null,
+        created_at: user.created_at ?? null,
+        updated_at: user.updated_at ?? null,
         empresa,
       },
     };
   }
 
+  @Get('profile/export')
+  @ApiOperation({ summary: 'Exportar dados do usuario logado (LGPD)' })
+  @ApiResponse({ status: 200, description: 'Dados exportados com sucesso' })
+  async exportOwnProfileData(@CurrentUser() user: User) {
+    const data = await this.usersService.exportOwnData(user.id, user.empresa_id);
+    return {
+      success: true,
+      data,
+      message: 'Exportacao de dados gerada com sucesso',
+    };
+  }
+
+  @Post('profile/privacy-request')
+  @ApiOperation({ summary: 'Registrar solicitacao LGPD do usuario logado' })
+  @ApiResponse({ status: 201, description: 'Solicitacao registrada com sucesso' })
+  async createOwnPrivacyRequest(
+    @CurrentUser() user: User,
+    @Body()
+    body: {
+      type?: 'data_export' | 'account_anonymization' | 'account_deletion';
+      reason?: string;
+    },
+  ) {
+    const allowedTypes = new Set(['data_export', 'account_anonymization', 'account_deletion']);
+    const requestType = typeof body?.type === 'string' ? body.type : '';
+
+    if (!allowedTypes.has(requestType)) {
+      throw new BadRequestException(
+        'Tipo de solicitacao invalido. Use data_export, account_anonymization ou account_deletion.',
+      );
+    }
+
+    if (body?.reason !== undefined && typeof body.reason !== 'string') {
+      throw new BadRequestException('Campo reason invalido.');
+    }
+
+    const data = await this.usersService.createPrivacyRequest(user.id, user.empresa_id, {
+      type: requestType as 'data_export' | 'account_anonymization' | 'account_deletion',
+      reason: body?.reason,
+    });
+
+    return {
+      success: true,
+      data,
+      message: 'Solicitacao LGPD registrada com sucesso',
+    };
+  }
+
   @Put('profile')
+  @Permissions(Permission.USERS_PROFILE_UPDATE)
   @ApiOperation({ summary: 'Atualizar perfil do usuário logado' })
   @ApiResponse({ status: 200, description: 'Perfil atualizado com sucesso' })
   async updateProfile(@CurrentUser() user: User, @Body() updateData: Partial<User>) {
-    const updatedUser = await this.usersService.update(user.id, updateData);
+    const safeUpdateData = this.sanitizeProfileUpdatePayload(updateData);
+    const updatedUser = await this.usersService.update(user.id, safeUpdateData);
     return {
       success: true,
-      data: updatedUser,
+      data: this.sanitizeUser(updatedUser),
       message: 'Perfil atualizado com sucesso',
     };
   }
 
+  @Put('profile/password')
+  @Permissions(Permission.USERS_PROFILE_UPDATE)
+  @ApiOperation({ summary: 'Atualizar senha do usuário logado' })
+  @ApiResponse({ status: 200, description: 'Senha atualizada com sucesso' })
+  async updateOwnPassword(
+    @CurrentUser() user: User,
+    @Body()
+    body: {
+      senha_atual?: string;
+      senha_nova?: string;
+      confirmar_senha?: string;
+    },
+  ) {
+    const senhaAtual = typeof body?.senha_atual === 'string' ? body.senha_atual.trim() : '';
+    const senhaNova = typeof body?.senha_nova === 'string' ? body.senha_nova.trim() : '';
+    const confirmarSenha =
+      typeof body?.confirmar_senha === 'string' ? body.confirmar_senha.trim() : '';
+
+    if (!senhaAtual) {
+      throw new BadRequestException('Informe sua senha atual.');
+    }
+
+    if (!senhaNova) {
+      throw new BadRequestException('Informe a nova senha.');
+    }
+
+    if (senhaNova.length < 6) {
+      throw new BadRequestException('A nova senha deve ter pelo menos 6 caracteres.');
+    }
+
+    if (confirmarSenha && confirmarSenha !== senhaNova) {
+      throw new BadRequestException('A confirmacao da nova senha nao confere.');
+    }
+
+    if (senhaAtual === senhaNova) {
+      throw new BadRequestException('A nova senha deve ser diferente da senha atual.');
+    }
+
+    const userWithPassword = await this.usersService.findOne(user.id, user.empresa_id);
+    if (!userWithPassword || !userWithPassword.senha) {
+      throw new NotFoundException('Usuario nao encontrado.');
+    }
+
+    const senhaAtualValida = await bcrypt.compare(senhaAtual, userWithPassword.senha);
+    if (!senhaAtualValida) {
+      throw new ForbiddenException('Senha atual incorreta.');
+    }
+
+    const hashedPassword = await bcrypt.hash(senhaNova, 10);
+    await this.usersService.updatePassword(user.id, hashedPassword, true);
+
+    return {
+      success: true,
+      message: 'Senha atualizada com sucesso',
+    };
+  }
+
   @Post('profile/avatar')
+  @Permissions(Permission.USERS_PROFILE_UPDATE)
   @UseInterceptors(
     FileInterceptor('avatar', {
       storage: diskStorage({
-        destination: () => ensureAvatarDirectory(),
+        destination: (_req, _file, cb) => cb(null, ensureAvatarDirectory()),
         filename: (req, file, cb) => {
           const request = req as Request & { user?: User };
           const userId = request?.user?.id || 'user';
@@ -212,14 +697,128 @@ export class UsersController {
     }
   }
 
+  @Post(':id/avatar')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
+  @Permissions(Permission.USERS_UPDATE)
+  @UseInterceptors(
+    FileInterceptor('avatar', {
+      storage: diskStorage({
+        destination: (_req, _file, cb) => cb(null, ensureAvatarDirectory()),
+        filename: (req, file, cb) => {
+          const request = req as Request & {
+            params?: Record<string, string>;
+            user?: User;
+          };
+          const targetUserId = request?.params?.id || request?.user?.id || 'user';
+          const ext = path.extname(file.originalname)?.toLowerCase() || '.png';
+          const safeExt = ['.jpg', '.jpeg', '.png', '.webp'].includes(ext) ? ext : '.png';
+          const fileName = `${targetUserId}-${Date.now()}${safeExt}`;
+          cb(null, fileName);
+        },
+      }),
+      limits: {
+        fileSize: parseInt(process.env.AVATAR_MAX_SIZE || '', 10) || 2 * 1024 * 1024,
+      },
+      fileFilter: (req, file, cb) => {
+        if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+          return cb(
+            new BadRequestException(
+              'Formato de imagem não suportado. Use JPG, PNG ou WEBP.',
+            ) as any,
+            false,
+          );
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  @ApiOperation({ summary: 'Atualizar avatar de um usuário da empresa' })
+  @ApiResponse({ status: 200, description: 'Avatar atualizado com sucesso' })
+  async uploadAvatarByAdmin(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException(
+        'Nenhuma imagem foi enviada. Selecione uma foto em JPG, PNG ou WEBP.',
+      );
+    }
+
+    const targetUser = await this.ensureCanManageUser(user, id, 'atualizar avatar de');
+
+    const newAvatarRelativePath = `${AVATAR_SEGMENT}${file.filename}`;
+    const newAvatarFullPath = path.join(this.getAvatarUploadDir(), file.filename);
+    const previousAvatarPath = this.getLocalAvatarPath(targetUser.avatar_url);
+
+    try {
+      const updatedUser = await this.usersService.atualizar(
+        id,
+        { avatar_url: newAvatarRelativePath },
+        user.empresa_id,
+      );
+
+      if (!updatedUser) {
+        throw new InternalServerErrorException('Usuário não encontrado ao atualizar avatar.');
+      }
+
+      if (previousAvatarPath && previousAvatarPath !== newAvatarFullPath) {
+        try {
+          await fs.promises.unlink(previousAvatarPath);
+        } catch (unlinkError) {
+          const errorCode = (unlinkError as NodeJS.ErrnoException)?.code;
+          if (errorCode !== 'ENOENT') {
+            this.logger.warn(
+              '[Uploads] Falha ao remover avatar antigo:',
+              previousAvatarPath,
+              unlinkError,
+            );
+          }
+        }
+      }
+
+      return {
+        success: true,
+        data: {
+          id: updatedUser.id,
+          nome: updatedUser.nome,
+          email: updatedUser.email,
+          avatar_url: updatedUser.avatar_url ?? newAvatarRelativePath,
+        },
+        message: 'Avatar do usuário atualizado com sucesso',
+      };
+    } catch (error) {
+      try {
+        await fs.promises.unlink(newAvatarFullPath);
+      } catch (cleanupError) {
+        const errorCode = (cleanupError as NodeJS.ErrnoException)?.code;
+        if (errorCode !== 'ENOENT') {
+          this.logger.error(
+            '[Uploads] Falha ao remover avatar após erro:',
+            newAvatarFullPath,
+            cleanupError,
+          );
+        }
+      }
+
+      this.logger.error('[Uploads] Erro ao atualizar avatar do usuário por admin:', error);
+      throw new InternalServerErrorException(
+        'Não foi possível atualizar o avatar do usuário. Tente novamente em instantes.',
+      );
+    }
+  }
+
   @Get('team')
+  @Permissions(Permission.USERS_READ)
   @ApiOperation({ summary: 'Listar usuários da empresa' })
   @ApiResponse({ status: 200, description: 'Lista de usuários retornada com sucesso' })
   async getTeam(@CurrentUser() user: User) {
+    const scopeFilters = this.resolveUsersReadScopeFilters(user);
     const team = await this.usersService.findByEmpresa(user.empresa_id);
+    const scopedTeam = this.filterUsersByReadScope(team, scopeFilters);
     return {
       success: true,
-      data: team.map((member) => ({
+      data: scopedTeam.map((member) => ({
         id: member.id,
         nome: member.nome,
         email: member.email,
@@ -231,7 +830,19 @@ export class UsersController {
     };
   }
 
+  @Get('permissoes/catalogo')
+  @Permissions(Permission.USERS_READ)
+  @ApiOperation({ summary: 'Obter catalogo canonico de permissoes para gestao de usuarios' })
+  @ApiResponse({ status: 200, description: 'Catalogo de permissoes retornado com sucesso' })
+  async obterCatalogoPermissoes() {
+    return {
+      success: true,
+      data: getPermissionCatalog(),
+    };
+  }
+
   @Get(['', '/'])
+  @Permissions(Permission.USERS_READ)
   @ApiOperation({ summary: 'Listar usuários com filtros' })
   @ApiResponse({ status: 200, description: 'Lista de usuários com filtros retornada com sucesso' })
   async listarUsuarios(
@@ -244,6 +855,7 @@ export class UsersController {
     @Query('limite') limite?: string,
     @Query('pagina') pagina?: string,
   ) {
+    const scopeFilters = this.resolveUsersReadScopeFilters(user);
     const filtros = {
       busca: busca || '',
       role: role || '',
@@ -253,6 +865,7 @@ export class UsersController {
       limite: limite ? parseInt(limite, 10) : 10,
       pagina: pagina ? parseInt(pagina, 10) : 1,
       empresa_id: user.empresa_id,
+      ...scopeFilters,
     };
 
     const result = await this.usersService.listarComFiltros(filtros);
@@ -260,7 +873,7 @@ export class UsersController {
     return {
       success: true,
       data: {
-        items: result.usuarios,
+        items: result.usuarios.map((usuario) => this.sanitizeUser(usuario)),
         total: result.total,
         pagina: filtros.pagina,
         limite: filtros.limite,
@@ -269,10 +882,12 @@ export class UsersController {
   }
 
   @Get('estatisticas')
+  @Permissions(Permission.USERS_READ)
   @ApiOperation({ summary: 'Obter estatísticas dos usuários' })
   @ApiResponse({ status: 200, description: 'Estatísticas retornadas com sucesso' })
   async obterEstatisticas(@CurrentUser() user: User) {
-    const stats = await this.usersService.obterEstatisticas(user.empresa_id);
+    const scopeFilters = this.resolveUsersReadScopeFilters(user);
+    const stats = await this.usersService.obterEstatisticas(user.empresa_id, scopeFilters);
     return {
       success: true,
       data: stats,
@@ -280,33 +895,125 @@ export class UsersController {
   }
 
   @Get('atendentes')
+  @Permissions(Permission.USERS_READ)
   @ApiOperation({ summary: 'Listar usuários com permissão de atendimento' })
   @ApiResponse({ status: 200, description: 'Atendentes retornados com sucesso' })
   async listarAtendentes(@CurrentUser() user: User) {
-    const atendentes = await this.usersService.listarAtendentes(user.empresa_id);
+    const scopeFilters = this.resolveUsersReadScopeFilters(user);
+    const atendentes = await this.usersService.listarAtendentes(user.empresa_id, scopeFilters);
     return {
       success: true,
-      data: atendentes,
+      data: atendentes.map((atendente) => this.sanitizeUser(atendente)),
+    };
+  }
+
+  @Get('privacy-requests')
+  @Permissions(Permission.USERS_READ)
+  @ApiOperation({ summary: 'Listar solicitacoes LGPD da empresa' })
+  @ApiResponse({ status: 200, description: 'Solicitacoes LGPD retornadas com sucesso' })
+  async listarSolicitacoesPrivacidade(
+    @CurrentUser() user: User,
+    @Query('status') status?: string,
+    @Query('type') type?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const allowedStatus = new Set(['open', 'in_review', 'completed', 'rejected']);
+    const allowedType = new Set(['data_export', 'account_anonymization', 'account_deletion']);
+
+    if (status && !allowedStatus.has(status)) {
+      throw new BadRequestException(
+        'Status invalido. Use open, in_review, completed ou rejected.',
+      );
+    }
+
+    if (type && !allowedType.has(type)) {
+      throw new BadRequestException(
+        'Tipo invalido. Use data_export, account_anonymization ou account_deletion.',
+      );
+    }
+
+    const data = await this.usersService.listPrivacyRequests(user.empresa_id, {
+      status: status as any,
+      type: type as any,
+      limit: limit ? parseInt(limit, 10) : 50,
+    });
+
+    return {
+      success: true,
+      data,
+    };
+  }
+
+  @Patch('privacy-requests/:id')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
+  @Permissions(Permission.USERS_UPDATE)
+  @ApiOperation({ summary: 'Atualizar status de solicitacao LGPD' })
+  @ApiResponse({ status: 200, description: 'Solicitacao LGPD atualizada com sucesso' })
+  async atualizarSolicitacaoPrivacidade(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body()
+    body: {
+      status?: 'open' | 'in_review' | 'completed' | 'rejected';
+      resolution_note?: string;
+    },
+  ) {
+    const allowedStatus = new Set(['open', 'in_review', 'completed', 'rejected']);
+    const status = typeof body?.status === 'string' ? body.status : '';
+
+    if (!allowedStatus.has(status)) {
+      throw new BadRequestException(
+        'Status invalido. Use open, in_review, completed ou rejected.',
+      );
+    }
+
+    if (body?.resolution_note !== undefined && typeof body.resolution_note !== 'string') {
+      throw new BadRequestException('resolution_note invalido.');
+    }
+
+    const data = await this.usersService.updatePrivacyRequestStatus(id, user.empresa_id, user, {
+      status: status as 'open' | 'in_review' | 'completed' | 'rejected',
+      resolution_note: body?.resolution_note,
+    });
+
+    return {
+      success: true,
+      data,
+      message: 'Solicitacao LGPD atualizada com sucesso',
     };
   }
 
   @Post()
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
+  @Permissions(Permission.USERS_CREATE)
   @ApiOperation({ summary: 'Criar novo usuário' })
   @ApiResponse({ status: 201, description: 'Usuário criado com sucesso' })
   async criarUsuario(@CurrentUser() user: User, @Body() dadosUsuario: any) {
+    const payload = this.sanitizeUserCreatePayload(dadosUsuario);
+    this.ensureCanAssignRole(user, payload.role);
+    const normalizedPermissions = this.normalizeAndValidateAssignablePermissions(
+      user,
+      payload.permissoes,
+    );
+    if (normalizedPermissions !== undefined) {
+      payload.permissoes = normalizedPermissions;
+    }
+
     const novoUsuario = await this.usersService.criar({
-      ...dadosUsuario,
+      ...payload,
       empresa_id: user.empresa_id,
     });
 
     return {
       success: true,
-      data: novoUsuario,
+      data: this.sanitizeUser(novoUsuario),
       message: 'Usuário criado com sucesso',
     };
   }
 
   @Put(':id')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
+  @Permissions(Permission.USERS_UPDATE)
   @ApiOperation({ summary: 'Atualizar usuário' })
   @ApiResponse({ status: 200, description: 'Usuário atualizado com sucesso' })
   async atualizarUsuario(
@@ -314,22 +1021,39 @@ export class UsersController {
     @Param('id') id: string,
     @Body() dadosAtualizacao: any,
   ) {
+    await this.ensureCanManageUser(user, id, 'atualizar');
+    const payload = this.sanitizeUserAdminUpdatePayload(dadosAtualizacao);
+    if (payload.role !== undefined) {
+      this.ensureCanAssignRole(user, payload.role);
+    }
+    const normalizedPermissions = this.normalizeAndValidateAssignablePermissions(
+      user,
+      payload.permissoes,
+    );
+    if (normalizedPermissions !== undefined) {
+      payload.permissoes = normalizedPermissions;
+    }
+
     const usuarioAtualizado = await this.usersService.atualizar(
       id,
-      dadosAtualizacao,
+      payload,
       user.empresa_id,
     );
     return {
       success: true,
-      data: usuarioAtualizado,
+      data: this.sanitizeUser(usuarioAtualizado),
       message: 'Usuário atualizado com sucesso',
     };
   }
 
   @Put(':id/reset-senha')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
+  @Permissions(Permission.USERS_RESET_PASSWORD)
   @ApiOperation({ summary: 'Resetar senha do usuário' })
   @ApiResponse({ status: 200, description: 'Senha resetada com sucesso' })
   async resetarSenha(@CurrentUser() user: User, @Param('id') id: string) {
+    await this.ensureCanManageUser(user, id, 'resetar senha de');
+
     const novaSenha = await this.usersService.resetarSenha(id, user.empresa_id);
     return {
       success: true,
@@ -339,6 +1063,8 @@ export class UsersController {
   }
 
   @Patch(':id/status')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
+  @Permissions(Permission.USERS_STATUS_UPDATE)
   @ApiOperation({ summary: 'Alterar status do usuário (ativar/desativar)' })
   @ApiResponse({ status: 200, description: 'Status do usuário alterado com sucesso' })
   async alterarStatusUsuario(
@@ -346,18 +1072,29 @@ export class UsersController {
     @Param('id') id: string,
     @Body('ativo') ativo: boolean,
   ) {
+    await this.ensureCanManageUser(user, id, 'alterar status de');
     const usuarioAtualizado = await this.usersService.alterarStatus(id, ativo, user.empresa_id);
     return {
       success: true,
-      data: usuarioAtualizado,
+      data: this.sanitizeUser(usuarioAtualizado),
       message: `Usuário ${ativo ? 'ativado' : 'desativado'} com sucesso`,
     };
   }
 
   @Put('bulk/ativar')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
+  @Permissions(Permission.USERS_BULK_UPDATE)
   @ApiOperation({ summary: 'Ativar usuários em massa' })
   @ApiResponse({ status: 200, description: 'Usuários ativados com sucesso' })
   async ativarUsuarios(@CurrentUser() user: User, @Body('ids') ids: string[]) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new BadRequestException('Informe ao menos um ID para ativar');
+    }
+
+    for (const id of ids) {
+      await this.ensureCanManageUser(user, id, 'ativar');
+    }
+
     await this.usersService.ativarEmMassa(ids, user.empresa_id);
     return {
       success: true,
@@ -366,9 +1103,19 @@ export class UsersController {
   }
 
   @Put('bulk/desativar')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
+  @Permissions(Permission.USERS_BULK_UPDATE)
   @ApiOperation({ summary: 'Desativar usuários em massa' })
   @ApiResponse({ status: 200, description: 'Usuários desativados com sucesso' })
   async desativarUsuarios(@CurrentUser() user: User, @Body('ids') ids: string[]) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new BadRequestException('Informe ao menos um ID para desativar');
+    }
+
+    for (const id of ids) {
+      await this.ensureCanManageUser(user, id, 'desativar');
+    }
+
     await this.usersService.desativarEmMassa(ids, user.empresa_id);
     return {
       success: true,

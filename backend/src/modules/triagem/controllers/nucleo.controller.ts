@@ -13,12 +13,16 @@
 } from '@nestjs/common';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permission } from '../../../common/permissions/permissions.constants';
 import { JwtAuthGuard } from '../../../modules/auth/jwt-auth.guard';
 import { CreateNucleoDto, FilterNucleoDto, UpdateNucleoDto } from '../dto';
 import { NucleoService } from '../services/nucleo.service';
 
 @Controller('nucleos')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.CONFIG_AUTOMACOES_MANAGE)
 export class NucleoController {
   constructor(private readonly nucleoService: NucleoService) {}
 

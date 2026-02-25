@@ -1,15 +1,17 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Brackets, Repository } from 'typeorm';
 import { Fatura, StatusFatura, TipoFatura } from '../entities/fatura.entity';
 import { ItemFatura } from '../entities/item-fatura.entity';
 import { Contrato } from '../../contratos/entities/contrato.entity';
+import { Cliente } from '../../clientes/cliente.entity';
 import { CreateFaturaDto, UpdateFaturaDto, GerarFaturaAutomaticaDto } from '../dto/fatura.dto';
 import { EmailIntegradoService } from '../../propostas/email-integrado.service';
 
 @Injectable()
 export class FaturamentoService {
   private readonly logger = new Logger(FaturamentoService.name);
+  private propostaRelationEnabled: boolean | null = null;
 
   constructor(
     @InjectRepository(Fatura)
@@ -18,6 +20,8 @@ export class FaturamentoService {
     private itemFaturaRepository: Repository<ItemFatura>,
     @InjectRepository(Contrato)
     private contratoRepository: Repository<Contrato>,
+    @InjectRepository(Cliente)
+    private clienteRepository: Repository<Cliente>,
     private emailService: EmailIntegradoService,
   ) {}
 
@@ -26,18 +30,17 @@ export class FaturamentoService {
       let contrato: Contrato | null = null;
 
       if (createFaturaDto.contratoId) {
-        // 🔒 MULTI-TENANCY: Validar que contrato pertence à empresa
+        // x" MULTI-TENANCY: Validar que contrato pertence  empresa
         contrato = await this.contratoRepository.findOne({
           where: { id: createFaturaDto.contratoId, empresa_id: empresaId },
-          relations: ['proposta'],
         });
 
         if (!contrato) {
-          throw new NotFoundException('Contrato não encontrado');
+          throw new NotFoundException('Contrato no encontrado');
         }
       }
 
-      // Gerar número único da fatura
+      // Gerar nmero nico da fatura
       const numero = await this.gerarNumeroFatura();
 
       // Calcular valor total dos itens
@@ -86,14 +89,13 @@ export class FaturamentoService {
     empresaId: string,
   ): Promise<Fatura> {
     try {
-      // 🔒 MULTI-TENANCY: Validar que contrato pertence à empresa
+      // x" MULTI-TENANCY: Validar que contrato pertence  empresa
       const contrato = await this.contratoRepository.findOne({
         where: { id: gerarFaturaDto.contratoId, empresa_id: empresaId },
-        relations: ['proposta'],
       });
 
       if (!contrato) {
-        throw new NotFoundException('Contrato não encontrado');
+        throw new NotFoundException('Contrato no encontrado');
       }
 
       if (!contrato.isAssinado()) {
@@ -131,12 +133,12 @@ export class FaturamentoService {
       }
 
       this.logger.log(
-        `Fatura automática gerada para contrato ${contrato.numero}: ${fatura.numero}`,
+        `Fatura automtica gerada para contrato ${contrato.numero}: ${fatura.numero}`,
       );
 
       return fatura;
     } catch (error) {
-      this.logger.error(`Erro ao gerar fatura automática: ${error.message}`);
+      this.logger.error(`Erro ao gerar fatura automtica: ${error.message}`);
       throw error;
     }
   }
@@ -145,13 +147,13 @@ export class FaturamentoService {
     empresaId: string,
     filtros?: {
       status?: StatusFatura;
-      clienteId?: number;
+      clienteId?: string;
       contratoId?: number;
       dataInicio?: Date;
       dataFim?: Date;
     },
   ): Promise<Fatura[]> {
-    // 🔒 MULTI-TENANCY: Filtrar por empresa_id
+    // x" MULTI-TENANCY: Filtrar por empresa_id
     const query = this.faturaRepository
       .createQueryBuilder('fatura')
       .leftJoinAndSelect('fatura.contrato', 'contrato')
@@ -190,18 +192,70 @@ export class FaturamentoService {
     pageSize: number = 10,
     sortBy: string = 'createdAt',
     sortOrder: 'ASC' | 'DESC' = 'DESC',
+    filtros?: {
+      status?: StatusFatura;
+      clienteId?: string;
+      contratoId?: number;
+      dataInicio?: Date;
+      dataFim?: Date;
+      q?: string;
+    },
   ): Promise<{ faturas: any[]; total: number; resumo: any }> {
-    // 🔒 MULTI-TENANCY: Filtrar por empresa_id
+    const aplicarFiltros = (qb: any) => {
+      if (filtros?.status) {
+        qb.andWhere('fatura.status = :status', { status: filtros.status });
+      }
+
+      if (filtros?.clienteId) {
+        qb.andWhere('fatura.clienteId = :clienteId', { clienteId: filtros.clienteId });
+      }
+
+      if (filtros?.contratoId) {
+        qb.andWhere('fatura.contratoId = :contratoId', { contratoId: filtros.contratoId });
+      }
+
+      if (filtros?.dataInicio) {
+        qb.andWhere('fatura.dataEmissao >= :dataInicio', { dataInicio: filtros.dataInicio });
+      }
+
+      if (filtros?.dataFim) {
+        qb.andWhere('fatura.dataEmissao <= :dataFim', { dataFim: filtros.dataFim });
+      }
+
+      if (filtros?.q?.trim()) {
+        const q = `%${filtros.q.trim().toLowerCase()}%`;
+        qb.andWhere(
+          new Brackets((searchQb) => {
+            searchQb
+              .where(`LOWER(COALESCE(fatura.numero, '')) LIKE :q`, { q })
+              .orWhere(`LOWER(COALESCE(fatura.descricao, '')) LIKE :q`, { q })
+              .orWhere(`LOWER(COALESCE(cliente.nome, '')) LIKE :q`, { q })
+              .orWhere(`LOWER(COALESCE(contrato.numero, '')) LIKE :q`, { q });
+          }),
+        );
+      }
+
+      return qb;
+    };
+
+    // x MULTI-TENANCY: Filtrar por empresa_id
+    const includePropostaRelation = await this.canLoadPropostaRelation();
+
     const queryBuilder = this.faturaRepository
       .createQueryBuilder('fatura')
       .leftJoinAndSelect('fatura.contrato', 'contrato')
-      .leftJoinAndSelect('contrato.proposta', 'proposta')
-      .leftJoinAndSelect('fatura.cliente', 'cliente') // ✅ CORREÇÃO: Usar relacionamento TypeORM nativo
+      .leftJoinAndSelect('fatura.cliente', 'cliente')
       .leftJoinAndSelect('fatura.usuarioResponsavel', 'usuario')
       .leftJoinAndSelect('fatura.itens', 'itens')
       .leftJoinAndSelect('fatura.pagamentos', 'pagamentos')
       .where('fatura.ativo = :ativo', { ativo: true })
       .andWhere('fatura.empresa_id = :empresaId', { empresaId });
+
+    if (includePropostaRelation) {
+      queryBuilder.leftJoinAndSelect('contrato.proposta', 'proposta');
+    }
+
+    aplicarFiltros(queryBuilder);
 
     const [faturas, total] = await queryBuilder
       .orderBy(`fatura.${sortBy}`, sortOrder)
@@ -209,59 +263,67 @@ export class FaturamentoService {
       .offset((page - 1) * pageSize)
       .getManyAndCount();
 
-    const resumo = await this.faturaRepository.query(`
-      SELECT
-        COALESCE(SUM(f."valorTotal"), 0) AS "valorTotal",
-        COALESCE(SUM(f."valorPago"), 0) AS "valorRecebido",
-        COALESCE(SUM(f."valorTotal" - f."valorPago"), 0) AS "valorEmAberto"
-      FROM faturas f
-      WHERE f.ativo = true
-    `);
+    const resumoQueryBuilder = this.faturaRepository
+      .createQueryBuilder('fatura')
+      .leftJoin('fatura.contrato', 'contrato')
+      .leftJoin('fatura.cliente', 'cliente')
+      .where('fatura.ativo = :ativo', { ativo: true })
+      .andWhere('fatura.empresa_id = :empresaId', { empresaId });
+
+    aplicarFiltros(resumoQueryBuilder);
+
+    const resumo = await resumoQueryBuilder
+      .select([
+        `COALESCE(SUM(fatura."valorTotal"), 0) AS "valorTotal"`,
+        `COALESCE(SUM(fatura."valorPago"), 0) AS "valorRecebido"`,
+        `COALESCE(SUM(fatura."valorTotal" - fatura."valorPago"), 0) AS "valorEmAberto"`,
+      ])
+      .getRawOne();
 
     return {
       faturas,
       total,
-      resumo: resumo[0],
+      resumo: resumo || {
+        valorTotal: 0,
+        valorRecebido: 0,
+        valorEmAberto: 0,
+      },
     };
   }
 
   async buscarFaturaPorId(id: number, empresaId: string): Promise<Fatura> {
-    // 🔒 MULTI-TENANCY: Filtrar por empresa_id
+    const relations = ['contrato', 'usuarioResponsavel', 'itens', 'pagamentos', 'cliente'];
+    if (await this.canLoadPropostaRelation()) {
+      relations.splice(1, 0, 'contrato.proposta');
+    }
+
+    // x" MULTI-TENANCY: Filtrar por empresa_id
     const fatura = await this.faturaRepository.findOne({
       where: { id, empresaId, ativo: true },
-      relations: [
-        'contrato',
-        'contrato.proposta',
-        'usuarioResponsavel',
-        'itens',
-        'pagamentos',
-        'cliente',
-      ],
+      relations,
     });
 
     if (!fatura) {
-      throw new NotFoundException('Fatura não encontrada');
+      throw new NotFoundException('Fatura no encontrada');
     }
 
     return fatura;
   }
 
   async buscarFaturaPorNumero(numero: string, empresaId: string): Promise<any> {
-    // 🔒 MULTI-TENANCY: Filtrar por empresa_id
+    const relations = ['contrato', 'usuarioResponsavel', 'itens', 'pagamentos', 'cliente'];
+    if (await this.canLoadPropostaRelation()) {
+      relations.splice(1, 0, 'contrato.proposta');
+    }
+
+    // x" MULTI-TENANCY: Filtrar por empresa_id
     const fatura = await this.faturaRepository.findOne({
       where: { numero, empresaId, ativo: true },
-      relations: [
-        'contrato',
-        'contrato.proposta',
-        'usuarioResponsavel',
-        'itens',
-        'pagamentos',
-        'cliente',
-      ],
+      relations,
     });
 
     if (!fatura) {
-      throw new NotFoundException('Fatura não encontrada');
+      throw new NotFoundException('Fatura no encontrada');
     }
 
     return fatura;
@@ -272,15 +334,15 @@ export class FaturamentoService {
     updateFaturaDto: UpdateFaturaDto,
     empresaId: string,
   ): Promise<Fatura> {
-    // 🔒 MULTI-TENANCY: Validar empresa_id
+    // x" MULTI-TENANCY: Validar empresa_id
     const fatura = await this.buscarFaturaPorId(id, empresaId);
 
-    // Verificação direta do status em vez de usar o método isPaga()
+    // Verificao direta do status em vez de usar o mtodo isPaga()
     if (fatura.status === StatusFatura.PAGA) {
-      throw new BadRequestException('Não é possível alterar fatura já paga');
+      throw new BadRequestException('No  possvel alterar fatura j paga');
     }
 
-    // Atualizar dados básicos
+    // Atualizar dados bsicos
     Object.assign(fatura, updateFaturaDto);
 
     // Se alterou itens, recalcular valor total
@@ -310,12 +372,12 @@ export class FaturamentoService {
   }
 
   async marcarComoPaga(id: number, valorPago: number, empresaId: string): Promise<Fatura> {
-    // 🔒 MULTI-TENANCY: Validar empresa_id
+    // x" MULTI-TENANCY: Validar empresa_id
     const fatura = await this.buscarFaturaPorId(id, empresaId);
 
-    // Verificação direta do status em vez de usar o método isPaga()
+    // Verificao direta do status em vez de usar o mtodo isPaga()
     if (fatura.status === StatusFatura.PAGA) {
-      throw new BadRequestException('Fatura já está paga');
+      throw new BadRequestException('Fatura j est paga');
     }
 
     fatura.valorPago = valorPago;
@@ -334,69 +396,69 @@ export class FaturamentoService {
   }
 
   async cancelarFatura(id: number, empresaId: string, motivo?: string): Promise<Fatura> {
-    this.logger.log(`🔍 [CANCELAR] Iniciando cancelamento da fatura ID: ${id}`);
+    this.logger.log(`x [CANCELAR] Iniciando cancelamento da fatura ID: ${id}`);
 
     try {
-      // 🔒 MULTI-TENANCY: Validar empresa_id
+      // x" MULTI-TENANCY: Validar empresa_id
       const fatura = await this.buscarFaturaPorId(id, empresaId);
       this.logger.log(
-        `🔍 [CANCELAR] Fatura encontrada: ${fatura.numero}, Status: ${fatura.status}`,
+        `x [CANCELAR] Fatura encontrada: ${fatura.numero}, Status: ${fatura.status}`,
       );
 
-      // Verificação direta do status em vez de usar o método isPaga()
+      // Verificao direta do status em vez de usar o mtodo isPaga()
       if (fatura.status === StatusFatura.PAGA) {
-        this.logger.log(`🔍 [CANCELAR] Erro: Fatura já está paga`);
-        throw new BadRequestException('Não é possível cancelar fatura já paga');
+        this.logger.log(`x [CANCELAR] Erro: Fatura j est paga`);
+        throw new BadRequestException('No  possvel cancelar fatura j paga');
       }
 
-      this.logger.log(`🔍 [CANCELAR] Fatura não está paga, prosseguindo com cancelamento`);
+      this.logger.log(`x [CANCELAR] Fatura no est paga, prosseguindo com cancelamento`);
 
       fatura.status = StatusFatura.CANCELADA;
       if (motivo) {
         fatura.observacoes = `${fatura.observacoes || ''}\n\nCancelada: ${motivo}`;
       }
 
-      this.logger.log(`🔍 [CANCELAR] Salvando fatura cancelada...`);
+      this.logger.log(`x [CANCELAR] Salvando fatura cancelada...`);
       const faturaAtualizada = await this.faturaRepository.save(fatura);
-      this.logger.log(`🔍 [CANCELAR] Fatura cancelada com sucesso: ${faturaAtualizada.numero}`);
+      this.logger.log(`x [CANCELAR] Fatura cancelada com sucesso: ${faturaAtualizada.numero}`);
 
       return faturaAtualizada;
     } catch (error) {
-      this.logger.error(`🔍 [CANCELAR] Erro ao cancelar fatura ID ${id}: ${error.message}`);
+      this.logger.error(`x [CANCELAR] Erro ao cancelar fatura ID ${id}: ${error.message}`);
       throw error;
     }
   }
 
   async excluirFatura(id: number, empresaId: string): Promise<Fatura> {
-    this.logger.log(`🔍 [EXCLUIR] Iniciando exclusão da fatura ID: ${id}`);
+    this.logger.log(`x [EXCLUIR] Iniciando excluso da fatura ID: ${id}`);
 
     try {
       const fatura = await this.buscarFaturaPorId(id, empresaId);
-      this.logger.log(`🔍 [EXCLUIR] Fatura encontrada: ${fatura.numero}, Status: ${fatura.status}`);
+      this.logger.log(`x [EXCLUIR] Fatura encontrada: ${fatura.numero}, Status: ${fatura.status}`);
 
-      // Verificação direta do status em vez de usar o método isPaga()
+      // Verificao direta do status em vez de usar o mtodo isPaga()
       if (fatura.status === StatusFatura.PAGA) {
-        this.logger.log(`🔍 [EXCLUIR] Erro: Fatura já está paga`);
-        throw new BadRequestException('Não é possível excluir fatura já paga');
+        this.logger.log(`x [EXCLUIR] Erro: Fatura j est paga`);
+        throw new BadRequestException('No  possvel excluir fatura j paga');
       }
 
-      this.logger.log(`🔍 [EXCLUIR] Fatura não está paga, prosseguindo com exclusão`);
+      this.logger.log(`x [EXCLUIR] Fatura no est paga, prosseguindo com excluso`);
 
-      // Marcar como inativa (exclusão lógica) e cancelada
+      // Marcar como inativa (excluso lgica) e cancelada
       fatura.ativo = false;
       fatura.status = StatusFatura.CANCELADA;
-      fatura.observacoes = `${fatura.observacoes || ''}\n\nCancelada: Fatura excluída pelo usuário`;
+      fatura.observacoes = `${fatura.observacoes || ''}\n\nCancelada: Fatura excluda pelo usurio`;
 
-      // Também limpar a relação com contrato para evitar problemas de integridade
+      // Tambm limpar a relao com contrato para evitar problemas de integridade
       fatura.contratoId = null;
 
-      this.logger.log(`🔍 [EXCLUIR] Salvando fatura excluída...`);
+      this.logger.log(`x [EXCLUIR] Salvando fatura excluda...`);
       const faturaAtualizada = await this.faturaRepository.save(fatura);
-      this.logger.log(`🔍 [EXCLUIR] Fatura excluída com sucesso: ${faturaAtualizada.numero}`);
+      this.logger.log(`x [EXCLUIR] Fatura excluda com sucesso: ${faturaAtualizada.numero}`);
 
       return faturaAtualizada;
     } catch (error) {
-      this.logger.error(`🔍 [EXCLUIR] Erro ao excluir fatura ID ${id}: ${error.message}`);
+      this.logger.error(`x [EXCLUIR] Erro ao excluir fatura ID ${id}: ${error.message}`);
       throw error;
     }
   }
@@ -416,17 +478,35 @@ export class FaturamentoService {
     }
   }
 
-  async enviarFaturaPorEmail(faturaId: number, empresaId: string): Promise<boolean> {
+  async enviarFaturaPorEmail(
+    faturaId: number,
+    empresaId: string,
+    emailDestinatario?: string,
+  ): Promise<boolean> {
     try {
-      // 🔒 MULTI-TENANCY: Validar empresa_id
       const fatura = await this.buscarFaturaPorId(faturaId, empresaId);
+      const cliente = await this.clienteRepository.findOne({
+        where: { id: fatura.clienteId, empresaId },
+      });
 
-      // Buscar dados do cliente para obter o email
-      // Por enquanto, usar um email de exemplo
-      const emailCliente = `cliente${fatura.clienteId}@exemplo.com`;
+      if (!cliente) {
+        throw new NotFoundException('Cliente da fatura nao encontrado');
+      }
+
+      const emailCliente = cliente.email?.trim();
+      const emailDestino = emailDestinatario?.trim() || emailCliente;
+
+      if (!emailDestino) {
+        throw new BadRequestException('Cliente nao possui email cadastrado');
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(emailDestino)) {
+        throw new BadRequestException('Email de destinatario invalido');
+      }
 
       const emailData = {
-        to: emailCliente,
+        to: emailDestino,
         subject: `Fatura ${fatura.numero} - Vencimento ${fatura.dataVencimento.toLocaleDateString('pt-BR')}`,
         html: this.gerarEmailFatura(fatura),
       };
@@ -442,8 +522,33 @@ export class FaturamentoService {
       return sucesso;
     } catch (error) {
       this.logger.error(`Erro ao enviar fatura por email: ${error.message}`);
+
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+
       return false;
     }
+  }
+
+  private async canLoadPropostaRelation(): Promise<boolean> {
+    if (this.propostaRelationEnabled !== null) {
+      return this.propostaRelationEnabled;
+    }
+
+    const rows: Array<{ column_name?: string }> = await this.faturaRepository.query(
+      `
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'propostas'
+          AND column_name = 'cliente'
+        LIMIT 1
+      `,
+    );
+
+    this.propostaRelationEnabled = Array.isArray(rows) && rows.length > 0;
+    return this.propostaRelationEnabled;
   }
 
   private calcularValorTotalItens(itens: any[]): number {
@@ -485,9 +590,9 @@ export class FaturamentoService {
   private mapearFormaPagamento(formaPagamento?: string): any {
     const mapeamento: Record<string, any> = {
       PIX: 'pix',
-      'Cartão de Crédito': 'cartao_credito',
+      'Carto de Crdito': 'cartao_credito',
       Boleto: 'boleto',
-      Transferência: 'transferencia',
+      Transferncia: 'transferencia',
     };
 
     return mapeamento[formaPagamento] || 'pix';
@@ -497,14 +602,14 @@ export class FaturamentoService {
     const hoje = new Date();
     const vencimento = new Date(hoje);
 
-    // Padrão: 30 dias a partir de hoje
+    // Padro: 30 dias a partir de hoje
     vencimento.setDate(hoje.getDate() + 30);
 
-    // Se o contrato tem condições de pagamento específicas
+    // Se o contrato tem condies de pagamento especficas
     if (contrato.condicoesPagamento?.diaVencimento) {
       vencimento.setDate(contrato.condicoesPagamento.diaVencimento);
 
-      // Se o dia já passou neste mês, vencer no próximo mês
+      // Se o dia j passou neste ms, vencer no prximo ms
       if (vencimento < hoje) {
         vencimento.setMonth(vencimento.getMonth() + 1);
       }
@@ -516,20 +621,20 @@ export class FaturamentoService {
   private gerarEmailFatura(fatura: Fatura): string {
     return `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <h1 style="color: #2c3e50;">💰 Nova Fatura Disponível</h1>
+        <h1 style="color: #2c3e50;">x" Nova Fatura Disponvel</h1>
 
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <h3>Detalhes da Fatura</h3>
-          <p><strong>Número:</strong> ${fatura.numero}</p>
+          <p><strong>Nmero:</strong> ${fatura.numero}</p>
           <p><strong>Valor:</strong> R$ ${fatura.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
           <p><strong>Vencimento:</strong> ${fatura.dataVencimento.toLocaleDateString('pt-BR')}</p>
-          <p><strong>Descrição:</strong> ${fatura.descricao}</p>
+          <p><strong>Descrio:</strong> ${fatura.descricao}</p>
         </div>
 
         <div style="text-align: center; margin: 30px 0;">
           <a href="${process.env.FRONTEND_URL}/faturas/${fatura.id}"
              style="background-color: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-            💳 Pagar Fatura
+            x" Pagar Fatura
           </a>
         </div>
 

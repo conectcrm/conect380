@@ -4,6 +4,7 @@ export enum UserRole {
   MANAGER = 'manager',
   VENDEDOR = 'vendedor',
   USER = 'user',
+  FINANCEIRO = 'financeiro',
 }
 
 export enum StatusAtendente {
@@ -21,7 +22,7 @@ export interface Usuario {
   role: UserRole;
   permissoes?: string[];
   empresa_id: string;
-  avatar_url?: string;
+  avatar_url?: string | null;
   idioma_preferido: string;
   configuracoes?: {
     tema?: string;
@@ -54,7 +55,7 @@ export interface NovoUsuario {
   role: UserRole;
   permissoes?: string[];
   empresa_id: string;
-  avatar_url?: string;
+  avatar_url?: string | null;
   idioma_preferido?: string;
   configuracoes?: {
     tema?: string;
@@ -73,7 +74,7 @@ export interface AtualizarUsuario {
   telefone?: string;
   role?: UserRole;
   permissoes?: string[];
-  avatar_url?: string;
+  avatar_url?: string | null;
   idioma_preferido?: string;
   configuracoes?: {
     tema?: string;
@@ -108,12 +109,35 @@ export interface EstatisticasUsuarios {
   ultimosLogins: number;
 }
 
+export interface PermissionCatalogOption {
+  value: string;
+  label: string;
+  legacy?: boolean;
+}
+
+export interface PermissionCatalogGroup {
+  id: string;
+  label: string;
+  description?: string;
+  roles: string[];
+  options: PermissionCatalogOption[];
+}
+
+export interface PermissionCatalogResponse {
+  version: string;
+  groups: PermissionCatalogGroup[];
+  defaultsByRole: Record<string, string[]>;
+  allPermissions: string[];
+  legacyAssignablePermissions: string[];
+}
+
 export const ROLE_LABELS: Record<UserRole, string> = {
   [UserRole.SUPERADMIN]: 'Super Admin',
   [UserRole.ADMIN]: 'Administrador',
   [UserRole.MANAGER]: 'Gerente',
   [UserRole.VENDEDOR]: 'Vendedor',
   [UserRole.USER]: 'Usuário',
+  [UserRole.FINANCEIRO]: 'Financeiro',
 };
 
 export const ROLE_COLORS: Record<UserRole, string> = {
@@ -122,6 +146,7 @@ export const ROLE_COLORS: Record<UserRole, string> = {
   [UserRole.MANAGER]: 'bg-blue-100 text-blue-800',
   [UserRole.VENDEDOR]: 'bg-green-100 text-green-800',
   [UserRole.USER]: 'bg-gray-100 text-gray-800',
+  [UserRole.FINANCEIRO]: 'bg-amber-100 text-amber-800',
 };
 
 export const STATUS_ATENDENTE_LABELS: Record<StatusAtendente, string> = {

@@ -1,10 +1,16 @@
-import { Injectable } from '@nestjs/common';
-import { PropostasService } from './propostas.service';
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { createHash, randomBytes } from 'crypto';
+import { Repository } from 'typeorm';
 import { EmailIntegradoService } from './email-integrado.service';
+import { Proposta as PropostaEntity } from './proposta.entity';
+import { PropostaPortalToken } from './proposta-portal-token.entity';
+import { PropostasService } from './propostas.service';
 
 interface TokenData {
   token: string;
   propostaId: string;
+  empresaId: string;
   createdAt: string;
   expiresAt?: string;
   isActive: boolean;
@@ -16,267 +22,394 @@ interface ViewData {
   timestamp?: string;
 }
 
+interface PropostaLookup {
+  id: string;
+  numero?: string | null;
+  empresaId: string;
+}
+
 @Injectable()
 export class PortalService {
-  private tokenMappings: Record<string, string> = {
-    // Tokens pré-definidos para desenvolvimento
-    'test-token-123': '1',
-    'token-teste-workflow-999': '1',
-    'portal-token-1': '1',
-    'portal-token-2': '2',
-    'PROP-001': '1',
-    'PROP-002': '2',
-    'TEST-001': '1',
-    'TEST-002': '2',
-    // ✨ ADICIONANDO PROPOSTAS REAIS PARA TESTE
-    'PROP-2025-049': 'bff61bbe-b645-4581-a3d1-d8447b8c2b75',
-    'PROP-2025-051': 'e0003dcb-f81a-4ac5-9661-76233446bfa8',
-  };
+  private readonly logger = new Logger(PortalService.name);
+  private propostasColumnsCache?: Set<string>;
 
   constructor(
     private readonly propostasService: PropostasService,
     private readonly emailService: EmailIntegradoService,
+    @InjectRepository(PropostaPortalToken)
+    private readonly portalTokenRepository: Repository<PropostaPortalToken>,
+    @InjectRepository(PropostaEntity)
+    private readonly propostaRepository: Repository<PropostaEntity>,
   ) {}
 
-  /**
-   * Atualiza status de proposta usando token do portal
-   */
+  private readonly uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+  private isUuid(value?: string | null): boolean {
+    return Boolean(value && this.uuidRegex.test(String(value)));
+  }
+
+  private hashToken(token: string): string {
+    return createHash('sha256').update(String(token)).digest('hex');
+  }
+
+  private maskToken(token?: string): string {
+    if (!token) return '[token]';
+    const value = String(token);
+    if (value.length <= 8) return `${value.slice(0, 2)}***`;
+    return `${value.slice(0, 4)}...${value.slice(-4)}`;
+  }
+
+  private sanitizePortalMetadata(metadata?: unknown): unknown {
+    if (!metadata || typeof metadata !== 'object') return metadata ?? null;
+
+    const clone: Record<string, unknown> = { ...(metadata as Record<string, unknown>) };
+    if (typeof clone.ip === 'string') {
+      const parts = clone.ip.split('.');
+      clone.ip = parts.length === 4 ? `${parts[0]}.${parts[1]}.*.*` : '[ip-redacted]';
+    }
+    if (typeof clone.userAgent === 'string') {
+      const ua = clone.userAgent;
+      clone.userAgent = `${ua.slice(0, 60)}${ua.length > 60 ? '...' : ''}`;
+    }
+    return clone;
+  }
+
+  private buildTokenData(rawToken: string, entity: PropostaPortalToken): TokenData {
+    return {
+      token: rawToken,
+      propostaId: entity.propostaId,
+      empresaId: entity.empresaId,
+      createdAt: entity.criadoEm?.toISOString?.() ?? new Date().toISOString(),
+      expiresAt: entity.expiraEm ? entity.expiraEm.toISOString() : undefined,
+      isActive: Boolean(entity.isActive && !entity.revogadoEm),
+    };
+  }
+
+  private async touchToken(tokenId: string): Promise<void> {
+    try {
+      await this.portalTokenRepository.update(tokenId, { ultimoAcessoEm: new Date() });
+    } catch (error) {
+      this.logger.warn(`Portal: falha ao atualizar ultimo acesso do token (${tokenId})`);
+    }
+  }
+
+  private async expireToken(entity: PropostaPortalToken): Promise<void> {
+    try {
+      await this.portalTokenRepository.update(entity.id, {
+        isActive: false,
+        revogadoEm: entity.revogadoEm ?? new Date(),
+      });
+    } catch (error) {
+      this.logger.warn(`Portal: falha ao expirar token ${this.maskToken(entity.tokenHint || '')}`);
+    }
+  }
+
+  private async findTokenEntity(rawToken: string): Promise<PropostaPortalToken | null> {
+    const tokenHash = this.hashToken(rawToken);
+    return this.portalTokenRepository.findOne({
+      where: { tokenHash },
+    });
+  }
+
+  private async resolvePropostaEntity(
+    propostaIdOuNumero: string,
+    empresaId?: string,
+  ): Promise<PropostaLookup | null> {
+    if (!propostaIdOuNumero) return null;
+
+    if (!this.propostasColumnsCache) {
+      const rows: Array<{ column_name?: string }> = await this.propostaRepository.query(
+        `
+          SELECT column_name
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'propostas'
+        `,
+      );
+      this.propostasColumnsCache = new Set(
+        rows
+          .map((row) => row.column_name)
+          .filter((columnName): columnName is string => Boolean(columnName)),
+      );
+    }
+
+    const columns = this.propostasColumnsCache;
+    const numeroColumn = columns.has('numero');
+    const empresaColumn = columns.has('empresa_id')
+      ? 'empresa_id'
+      : columns.has('empresaId')
+        ? 'empresaId'
+        : null;
+
+    const selectNumero = numeroColumn ? `"numero"` : 'NULL';
+    const selectEmpresa = empresaColumn ? `"${empresaColumn}"` : 'NULL';
+
+    const buscarPorId = async (): Promise<PropostaLookup | null> => {
+      const params: unknown[] = [propostaIdOuNumero];
+      let whereClause = 'id::text = $1';
+
+      if (empresaId) {
+        if (!empresaColumn) return null;
+        params.push(empresaId);
+        whereClause += ` AND "${empresaColumn}" = $2`;
+      }
+
+      const rows: Array<{ id?: string; numero?: string | null; empresa_id?: string }> =
+        await this.propostaRepository.query(
+          `
+            SELECT id::text AS id, ${selectNumero} AS numero, ${selectEmpresa}::text AS empresa_id
+            FROM propostas
+            WHERE ${whereClause}
+            LIMIT 1
+          `,
+          params,
+        );
+
+      if (!rows?.[0]?.id || !rows?.[0]?.empresa_id) return null;
+      return {
+        id: rows[0].id,
+        numero: rows[0].numero ?? null,
+        empresaId: rows[0].empresa_id,
+      };
+    };
+
+    const buscarPorNumero = async (): Promise<PropostaLookup | null> => {
+      if (!numeroColumn) return null;
+      const params: unknown[] = [propostaIdOuNumero];
+      let whereClause = 'numero = $1';
+
+      if (empresaId) {
+        if (!empresaColumn) return null;
+        params.push(empresaId);
+        whereClause += ` AND "${empresaColumn}" = $2`;
+      }
+
+      const rows: Array<{ id?: string; numero?: string | null; empresa_id?: string }> =
+        await this.propostaRepository.query(
+          `
+            SELECT id::text AS id, ${selectNumero} AS numero, ${selectEmpresa}::text AS empresa_id
+            FROM propostas
+            WHERE ${whereClause}
+            LIMIT 1
+          `,
+          params,
+        );
+
+      if (!rows?.[0]?.id || !rows?.[0]?.empresa_id) return null;
+      return {
+        id: rows[0].id,
+        numero: rows[0].numero ?? null,
+        empresaId: rows[0].empresa_id,
+      };
+    };
+
+    if (this.isUuid(propostaIdOuNumero)) {
+      const byId = await buscarPorId();
+      if (byId) return byId;
+    }
+
+    return buscarPorNumero();
+  }
+
+  private async persistTokenForProposta(
+    rawToken: string,
+    proposta: PropostaLookup,
+    expiresInDays = 30,
+  ): Promise<{ token: string; expiresAt: string }> {
+    const empresaId = proposta.empresaId;
+    if (!empresaId) {
+      throw new Error('Proposta sem empresa_id. Nao e possivel gerar token de portal com seguranca.');
+    }
+
+    const tokenHash = this.hashToken(rawToken);
+    const expiresAt = new Date(Date.now() + Math.max(1, expiresInDays) * 24 * 60 * 60 * 1000);
+    const tokenHint = this.maskToken(rawToken);
+
+    // Revoga tokens ativos anteriores desta proposta para reduzir superficie de exposicao.
+    await this.portalTokenRepository
+      .createQueryBuilder()
+      .update(PropostaPortalToken)
+      .set({
+        isActive: false,
+        revogadoEm: new Date(),
+      })
+      .where('proposta_id = :propostaId', { propostaId: proposta.id })
+      .andWhere('is_active = true')
+      .execute();
+
+    const existente = await this.portalTokenRepository.findOne({ where: { tokenHash } });
+    if (existente && existente.propostaId !== proposta.id) {
+      throw new Error('Token ja associado a outra proposta');
+    }
+
+    const entity = existente ?? this.portalTokenRepository.create();
+    entity.empresaId = empresaId;
+    entity.propostaId = proposta.id;
+    entity.tokenHash = tokenHash;
+    entity.tokenHint = tokenHint;
+    entity.isActive = true;
+    entity.expiraEm = expiresAt;
+    entity.revogadoEm = null;
+    entity.ultimoAcessoEm = null;
+
+    await this.portalTokenRepository.save(entity);
+
+    this.logger.log(
+      `Portal: token registrado para proposta ${proposta.id} (${this.maskToken(rawToken)})`,
+    );
+
+    return { token: rawToken, expiresAt: expiresAt.toISOString() };
+  }
+
+  private async validarToken(token: string): Promise<TokenData | null> {
+    this.logger.debug(`Portal: validando token ${this.maskToken(token)}`);
+
+    const tokenEntity = await this.findTokenEntity(token);
+    if (!tokenEntity) {
+      this.logger.warn(`Portal: token nao encontrado ${this.maskToken(token)}`);
+      return null;
+    }
+
+    if (!tokenEntity.isActive || tokenEntity.revogadoEm) {
+      this.logger.warn(`Portal: token inativo ${this.maskToken(token)}`);
+      return null;
+    }
+
+    if (tokenEntity.expiraEm && tokenEntity.expiraEm.getTime() < Date.now()) {
+      this.logger.warn(`Portal: token expirado ${this.maskToken(token)}`);
+      await this.expireToken(tokenEntity);
+      return null;
+    }
+
+    await this.touchToken(tokenEntity.id);
+    return this.buildTokenData(token, tokenEntity);
+  }
+
   async atualizarStatusPorToken(
     token: string,
     novoStatus: string,
     metadata?: ViewData,
   ): Promise<any> {
-    console.log(`🔐 Portal: Processando token ${token}`);
+    this.logger.log(`Portal: processando status via token ${this.maskToken(token)} -> ${novoStatus}`);
 
-    // 1. Validar token e obter proposta ID
     const tokenData = await this.validarToken(token);
-
     if (!tokenData || !tokenData.isActive) {
-      throw new Error('Token inválido ou expirado');
+      throw new Error('Token invalido ou expirado');
     }
 
-    console.log(`✅ Token válido para proposta: ${tokenData.propostaId}`);
-    console.log(
-      `🔧 DEBUG: tokenData.propostaId = "${tokenData.propostaId}" (tipo: ${typeof tokenData.propostaId})`,
-    );
+    await this.registrarAcaoPortal(token, 'status_update', { novoStatus, ...metadata });
 
-    // 2. Registrar ação no log do portal
-    await this.registrarAcaoPortal(token, 'status_update', {
-      novoStatus,
-      ...metadata,
-    });
-
-    // 3. Atualizar status da proposta via service principal com validação automática
     let resultado;
-
     if (novoStatus === 'aprovada' || novoStatus === 'rejeitada') {
-      console.log(`🔄 Portal: Aplicando transição automática para ${novoStatus}`);
-      console.log(
-        `🔧 DEBUG: Chamando atualizarStatusComValidacao com ID: "${tokenData.propostaId}"`,
-      );
       resultado = await this.propostasService.atualizarStatusComValidacao(
         tokenData.propostaId,
         novoStatus,
         'portal-auto',
-        `Cliente ${novoStatus} a proposta via portal (token: ${token.substring(0, 8)}...)`,
+        `Cliente ${novoStatus} a proposta via portal (token: ${this.maskToken(token)})`,
+        tokenData.empresaId,
       );
     } else {
-      console.log(`🔧 DEBUG: Chamando atualizarStatus com ID: "${tokenData.propostaId}"`);
       resultado = await this.propostasService.atualizarStatus(
         tokenData.propostaId,
         novoStatus,
         'portal-cliente',
-        `Atualizado via portal do cliente (token: ${token.substring(0, 8)}...)`,
+        `Atualizado via portal do cliente (token: ${this.maskToken(token)})`,
+        tokenData.empresaId,
       );
     }
 
-    // 4. Enviar notificação por email se foi aceita ou rejeitada
     if (novoStatus === 'aprovada') {
       try {
         await this.emailService.notificarPropostaAceita({
           numero: tokenData.propostaId,
-          titulo: resultado.titulo || 'Proposta sem título',
+          titulo: resultado.titulo || 'Proposta sem titulo',
           cliente: resultado.cliente || 'Cliente',
           valor: resultado.valor || 0,
           status: 'aprovada',
           dataAceite: new Date().toISOString(),
         });
-        console.log('📧 Email de notificação de aceitação enviado com sucesso');
-      } catch (emailError) {
-        console.warn('⚠️ Erro ao enviar email, mas proposta foi aceita:', emailError);
+      } catch (error) {
+        this.logger.warn('Portal: erro ao enviar notificacao de aceite (proposta ja atualizada)');
       }
     } else if (novoStatus === 'rejeitada') {
       try {
         await this.emailService.notificarPropostaRejeitada({
           numero: tokenData.propostaId,
-          titulo: resultado.titulo || 'Proposta sem título',
+          titulo: resultado.titulo || 'Proposta sem titulo',
           cliente: resultado.cliente || 'Cliente',
           valor: resultado.valor || 0,
           status: 'rejeitada',
           dataRejeicao: new Date().toISOString(),
         });
-        console.log('📧 Email de notificação de rejeição enviado com sucesso');
-      } catch (emailError) {
-        console.warn('⚠️ Erro ao enviar email, mas proposta foi rejeitada:', emailError);
+      } catch (error) {
+        this.logger.warn('Portal: erro ao enviar notificacao de rejeicao (proposta ja atualizada)');
       }
     }
-
-    console.log(`✅ Portal: Status atualizado com sucesso`);
 
     return {
       ...resultado,
       tokenInfo: {
-        token: token.substring(0, 8) + '...',
+        token: this.maskToken(token),
         source: 'portal-cliente',
       },
     };
   }
 
-  /**
-   * Obtém proposta por token do portal
-   */
   async obterPropostaPorToken(token: string): Promise<any> {
-    console.log(`🔍 Portal: Buscando proposta por token ${token}`);
+    this.logger.log(`Portal: buscando proposta por token ${this.maskToken(token)}`);
 
-    // 1. Validar token
     const tokenData = await this.validarToken(token);
-
     if (!tokenData || !tokenData.isActive) {
-      throw new Error('Token inválido ou expirado');
+      throw new Error('Token invalido ou expirado');
     }
 
-    // 2. Buscar proposta
-    const proposta = await this.propostasService.obterProposta(tokenData.propostaId);
-
+    const proposta = await this.propostasService.obterProposta(tokenData.propostaId, tokenData.empresaId);
     if (!proposta) {
-      throw new Error('Proposta não encontrada');
+      throw new Error('Proposta nao encontrada');
     }
 
-    // 3. 🔄 SINCRONIZAÇÃO AUTOMÁTICA: Atualizar status para "visualizada" se ainda estiver "enviada"
     if (proposta.status === 'enviada') {
-      console.log(`🔄 Portal: Auto-atualizando status ${proposta.status} → visualizada`);
-
       try {
         await this.propostasService.marcarComoVisualizada(
           tokenData.propostaId,
-          '127.0.0.1', // IP do cliente seria capturado em produção
-          'Portal-Client',
+          undefined,
+          metadataUserAgentFallback(),
+          tokenData.empresaId,
         );
-
-        // Atualizar objeto local
         proposta.status = 'visualizada';
-        proposta.updatedAt = new Date().toISOString();
-
-        console.log(`✅ Portal: Status atualizado automaticamente para "visualizada"`);
+        (proposta as any).updatedAt = new Date().toISOString();
       } catch (error) {
-        console.warn(`⚠️ Portal: Erro ao atualizar status automaticamente:`, error);
+        this.logger.warn('Portal: erro ao atualizar status automaticamente para visualizada');
       }
     }
 
-    // 4. Registrar acesso
     await this.registrarAcaoPortal(token, 'view', {
       timestamp: new Date().toISOString(),
-      statusAnterior: proposta.status === 'visualizada' ? 'enviada' : proposta.status,
       statusAtual: proposta.status,
     });
-
-    console.log(`✅ Portal: Proposta encontrada para token`);
 
     return {
       ...proposta,
       portalAccess: {
-        token: token.substring(0, 8) + '...',
+        token: this.maskToken(token),
         accessedAt: new Date().toISOString(),
       },
     };
   }
 
-  /**
-   * Valida token do portal
-   */
-  private async validarToken(token: string): Promise<TokenData | null> {
-    console.log(`🔐 Validando token: ${token}`);
-
-    // ✅ CORREÇÃO: Usar método centralizado para obter mapeamentos
-    const tokenMappings = this.getTokenMappings();
-
-    // 🔧 CORREÇÃO: Remover validação por tamanho, apenas verificar se existe proposta
-    // A validação real será feita ao buscar a proposta no banco
-
-    // Obter ID real da proposta ou usar mapeamento padrão
-    let propostaId = tokenMappings[token];
-
-    if (!propostaId) {
-      // 🔧 CORREÇÃO: Buscar proposta pelo NÚMERO (token)
-      try {
-        const propostas = await this.propostasService.listarPropostas();
-        console.log(`📊 ${propostas.length} propostas encontradas no banco`);
-        console.log(`🔍 Procurando proposta com número: "${token}"`);
-
-        // Log das primeiras propostas para debug
-        if (propostas.length > 0) {
-          console.log(`📋 Primeiras propostas no banco:`);
-          propostas.slice(0, 3).forEach((p) => {
-            console.log(`   - ${p.numero} (ID: ${p.id})`);
-          });
-        }
-
-        // Tentar encontrar proposta pelo número (token)
-        const propostaEncontrada = propostas.find((p) => p.numero === token);
-
-        if (propostaEncontrada) {
-          propostaId = propostaEncontrada.id;
-          console.log(`✅ Token ${token} mapeado para proposta existente ID: ${propostaId}`);
-          console.log(
-            `🔧 DEBUG: propostaEncontrada.id = "${propostaEncontrada.id}" (tipo: ${typeof propostaEncontrada.id})`,
-          );
-          console.log(`🔧 DEBUG: propostaEncontrada.numero = "${propostaEncontrada.numero}"`);
-        } else {
-          console.log(`❌ Proposta com número ${token} não encontrada no banco`);
-          console.log(`🔍 Buscou entre ${propostas.length} propostas. Token rejeitado.`);
-          return null; // Token inválido se proposta não existe
-        }
-      } catch (error) {
-        console.warn(`⚠️ Erro ao buscar propostas:`, error);
-        return null; // Falhar se não conseguir buscar
-      }
-    } else {
-      console.log(`✅ Token ${token} encontrado no mapeamento: ${propostaId}`);
-    }
-
-    // Simular dados do token para desenvolvimento
-    const tokenMock: TokenData = {
-      token,
-      propostaId, // AGORA USA O ID CORRETO DA PROPOSTA REAL
-      createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 dias
-      isActive: true,
-    };
-
-    console.log(`✅ Token ${token} validado → Proposta ID real: ${propostaId}`);
-    return tokenMock;
-  }
-
-  /**
-   * Registra ação no portal
-   */
   async registrarAcaoPortal(token: string, acao: string, metadata?: any): Promise<void> {
-    console.log(`📝 Portal: Registrando ação "${acao}" para token ${token}`);
-
-    const logEntry = {
-      token: token.substring(0, 8) + '...',
-      acao,
-      timestamp: new Date().toISOString(),
-      metadata,
-    };
-
-    // Em um ambiente real, isso seria salvo no banco de dados
-    console.log(`📋 Log Portal:`, logEntry);
+    this.logger.log(`Portal: acao "${acao}" em ${this.maskToken(token)}`);
+    this.logger.debug(
+      `Portal action: ${JSON.stringify({
+        token: this.maskToken(token),
+        acao,
+        timestamp: new Date().toISOString(),
+        metadata: this.sanitizePortalMetadata(metadata),
+      })}`,
+    );
   }
 
-  /**
-   * Registra visualização da proposta
-   */
   async registrarVisualizacao(token: string, viewData: ViewData): Promise<void> {
     await this.registrarAcaoPortal(token, 'view', {
       ip: viewData.ip,
@@ -285,33 +418,26 @@ export class PortalService {
     });
   }
 
-  /**
-   * Registra ação do cliente na proposta
-   */
   async registrarAcaoCliente(
     token: string,
     acao: string,
     metadata?: any,
   ): Promise<{ sucesso: boolean; mensagem: string; status?: string }> {
-    console.log(`🎯 Portal: Registrando ação "${acao}" do cliente`);
+    this.logger.log(`Portal: registrando acao "${acao}" do cliente`);
 
     try {
-      // 1. Validar token
       const tokenData = await this.validarToken(token);
       if (!tokenData || !tokenData.isActive) {
-        return { sucesso: false, mensagem: 'Token inválido ou expirado' };
+        return { sucesso: false, mensagem: 'Token invalido ou expirado' };
       }
 
-      // 2. Registrar ação no log
       await this.registrarAcaoPortal(token, acao, {
         ...metadata,
         timestamp: new Date().toISOString(),
         source: 'cliente-portal',
       });
 
-      // 3. Atualizar status baseado na ação
       let novoStatus: string | null = null;
-
       switch (acao) {
         case 'visualizada':
           novoStatus = 'visualizada';
@@ -328,72 +454,82 @@ export class PortalService {
           novoStatus = 'em_analise';
           break;
         default:
-          // Para outras ações, apenas registrar sem alterar status
-          console.log(`📝 Ação "${acao}" registrada sem alteração de status`);
           break;
       }
 
-      // 4. Se há mudança de status, aplicar via método centralizado
       if (novoStatus) {
         await this.atualizarStatusPorToken(token, novoStatus, metadata);
-        console.log(`✅ Status atualizado para: ${novoStatus}`);
-
         return {
           sucesso: true,
-          mensagem: `Ação "${acao}" registrada e status atualizado para "${novoStatus}"`,
+          mensagem: `Acao "${acao}" registrada e status atualizado para "${novoStatus}"`,
           status: novoStatus,
         };
       }
 
       return {
         sucesso: true,
-        mensagem: `Ação "${acao}" registrada com sucesso`,
+        mensagem: `Acao "${acao}" registrada com sucesso`,
       };
     } catch (error) {
-      console.error(`❌ Erro ao registrar ação do cliente:`, error);
+      this.logger.error('Portal: erro ao registrar acao do cliente', error);
       return {
         sucesso: false,
-        mensagem: `Erro ao registrar ação: ${error.message}`,
+        mensagem: `Erro ao registrar acao: ${error.message}`,
       };
     }
   }
 
-  /**
-   * Registra um token para uma proposta específica
-   */
-  async registrarTokenProposta(token: string, propostaId: string): Promise<void> {
-    console.log(`🎫 Portal: Registrando token ${token} para proposta ${propostaId}`);
+  async registrarTokenProposta(
+    token: string,
+    propostaIdOuNumero: string,
+    empresaId?: string,
+    expiresInDays = 30,
+  ): Promise<void> {
+    if (!token) {
+      throw new Error('Token do portal e obrigatorio');
+    }
 
-    // Adicionar ao mapeamento em memória
-    this.tokenMappings[token] = propostaId;
+    const proposta = await this.resolvePropostaEntity(propostaIdOuNumero, empresaId);
+    if (!proposta) {
+      throw new Error(`Proposta ${propostaIdOuNumero} nao encontrada para registrar token`);
+    }
 
-    console.log(`✅ Token ${token} registrado com sucesso para proposta ${propostaId}`);
+    await this.persistTokenForProposta(token, proposta, expiresInDays);
   }
 
-  /**
-   * Obtém mapeamentos de tokens (método auxiliar)
-   */
-  private getTokenMappings(): Record<string, string> {
-    return this.tokenMappings;
-  }
-
-  /**
-   * Gera novo token para proposta (para futuras funcionalidades)
-   */
-  async gerarToken(propostaId: string, expiresInDays: number = 30): Promise<string> {
-    const token = `${propostaId}-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
-
-    const tokenData: TokenData = {
-      token,
-      propostaId,
-      createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString(),
-      isActive: true,
-    };
-
-    // Em um ambiente real, salvar no banco de dados
-    console.log(`🎫 Token gerado para proposta ${propostaId}:`, token);
-
+  async gerarToken(
+    propostaId: string,
+    expiresInDays: number = 30,
+    empresaId?: string,
+  ): Promise<string> {
+    const { token } = await this.gerarTokenParaProposta(propostaId, empresaId, expiresInDays);
     return token;
   }
+
+  async gerarTokenParaProposta(
+    propostaIdOuNumero: string,
+    empresaId?: string,
+    expiresInDays = 30,
+  ): Promise<{ token: string; expiresAt: string; propostaId: string }> {
+    const proposta = await this.resolvePropostaEntity(propostaIdOuNumero, empresaId);
+    if (!proposta) {
+      throw new Error(`Proposta ${propostaIdOuNumero} nao encontrada`);
+    }
+
+    const rawToken = randomBytes(24).toString('hex');
+    const persisted = await this.persistTokenForProposta(rawToken, proposta, expiresInDays);
+    this.logger.log(
+      `Portal: token gerado para proposta ${proposta.id} (${this.maskToken(rawToken)})`,
+    );
+
+    return {
+      token: persisted.token,
+      expiresAt: persisted.expiresAt,
+      propostaId: proposta.id,
+    };
+  }
+}
+
+function metadataUserAgentFallback(): string {
+  return 'Portal-Client';
 }

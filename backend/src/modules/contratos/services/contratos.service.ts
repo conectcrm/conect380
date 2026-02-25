@@ -17,6 +17,7 @@ import { AssinaturaDigitalService } from './assinatura-digital.service';
 @Injectable()
 export class ContratosService {
   private readonly logger = new Logger(ContratosService.name);
+  private propostaRelationEnabled: boolean | null = null;
 
   constructor(
     @InjectRepository(Contrato)
@@ -31,30 +32,61 @@ export class ContratosService {
 
   async criarContrato(createContratoDto: CreateContratoDto, empresaId: string): Promise<Contrato> {
     try {
-      let proposta: Proposta | null = null;
+      let propostaIdVinculada: string | null = null;
 
       if (createContratoDto.propostaId) {
-        // 🔒 VALIDAÇÃO MULTI-TENANCY: Verificar se a proposta pertence à empresa
-        proposta = await this.propostaRepository.findOne({
-          where: { id: createContratoDto.propostaId },
-        });
+        // Validacao multi-tenant com lookup SQL enxuto para suportar schema legado de propostas.
+        const propostaColumnsRows: Array<{ column_name?: string }> = await this.propostaRepository.query(
+          `
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'propostas'
+          `,
+        );
+        const propostaColumns = new Set(
+          propostaColumnsRows
+            .map((row) => row.column_name)
+            .filter((columnName): columnName is string => Boolean(columnName)),
+        );
+        const empresaColumn = propostaColumns.has('empresa_id')
+          ? 'empresa_id'
+          : propostaColumns.has('empresaId')
+            ? 'empresaId'
+            : null;
 
-        if (!proposta) {
-          throw new NotFoundException('Proposta não encontrada');
+        if (!empresaColumn) {
+          throw new NotFoundException('Proposta nao encontrada');
         }
 
-        if (proposta.empresa_id !== empresaId) {
+        const propostaRows: Array<{ id?: string; empresa_id?: string }> =
+          await this.propostaRepository.query(
+            `
+              SELECT id::text AS id, "${empresaColumn}"::text AS empresa_id
+              FROM propostas
+              WHERE id::text = $1
+              LIMIT 1
+            `,
+            [createContratoDto.propostaId],
+          );
+        const proposta = propostaRows?.[0];
+
+        if (!proposta?.id) {
+          throw new NotFoundException('Proposta nao encontrada');
+        }
+
+        if (!proposta.empresa_id || proposta.empresa_id !== empresaId) {
           this.logger.warn(
             `Tentativa de criar contrato com proposta de outra empresa. ` +
-              `Empresa do token: ${empresaId}, Empresa da proposta: ${proposta.empresa_id}`,
+              `Empresa do token: ${empresaId}, Empresa da proposta: ${proposta.empresa_id || 'indefinida'}`,
           );
-          throw new ForbiddenException(
-            'Você não tem permissão para criar contrato com esta proposta',
-          );
+          throw new ForbiddenException('Voce nao tem permissao para criar contrato com esta proposta');
         }
+
+        propostaIdVinculada = proposta.id;
       }
 
-      // Gerar número único do contrato
+      // Gerar numero unico do contrato
       const numero = await this.gerarNumeroContrato();
 
       const contrato = this.contratoRepository.create({
@@ -79,7 +111,9 @@ export class ContratosService {
 
       this.logger.log(
         `Contrato criado: ${contratoAtualizado.numero}` +
-          (proposta ? ` (vinculado à proposta ${proposta.id})` : ' (sem proposta vinculada)'),
+          (propostaIdVinculada
+            ? ` (vinculado a proposta ${propostaIdVinculada})`
+            : ' (sem proposta vinculada)'),
       );
 
       return contratoAtualizado;
@@ -129,28 +163,38 @@ export class ContratosService {
   }
 
   async buscarContratoPorId(id: number, empresaId: string): Promise<Contrato> {
-    // 🔒 MULTI-TENANCY: Filtrar por empresa_id
+    const relations = ['usuarioResponsavel', 'assinaturas', 'assinaturas.usuario'];
+    if (await this.canLoadPropostaRelation()) {
+      relations.unshift('proposta');
+    }
+
+    // MULTI-TENANCY: Filtrar por empresa_id
     const contrato = await this.contratoRepository.findOne({
       where: { id, empresa_id: empresaId, ativo: true },
-      relations: ['proposta', 'usuarioResponsavel', 'assinaturas', 'assinaturas.usuario'],
+      relations,
     });
 
     if (!contrato) {
-      throw new NotFoundException('Contrato não encontrado');
+      throw new NotFoundException('Contrato nao encontrado');
     }
 
     return contrato;
   }
 
   async buscarContratoPorNumero(numero: string, empresaId: string): Promise<Contrato> {
-    // 🔒 MULTI-TENANCY: Filtrar por empresa_id
+    const relations = ['usuarioResponsavel', 'assinaturas', 'assinaturas.usuario'];
+    if (await this.canLoadPropostaRelation()) {
+      relations.unshift('proposta');
+    }
+
+    // MULTI-TENANCY: Filtrar por empresa_id
     const contrato = await this.contratoRepository.findOne({
       where: { numero, empresa_id: empresaId, ativo: true },
-      relations: ['proposta', 'usuarioResponsavel', 'assinaturas', 'assinaturas.usuario'],
+      relations,
     });
 
     if (!contrato) {
-      throw new NotFoundException('Contrato não encontrado');
+      throw new NotFoundException('Contrato nao encontrado');
     }
 
     return contrato;
@@ -286,4 +330,25 @@ export class ContratosService {
       .andWhere('status = :status', { status: StatusAssinatura.PENDENTE })
       .execute();
   }
+
+  private async canLoadPropostaRelation(): Promise<boolean> {
+    if (this.propostaRelationEnabled !== null) {
+      return this.propostaRelationEnabled;
+    }
+
+    const rows: Array<{ column_name?: string }> = await this.propostaRepository.query(
+      `
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'propostas'
+          AND column_name = 'cliente'
+        LIMIT 1
+      `,
+    );
+
+    this.propostaRelationEnabled = Array.isArray(rows) && rows.length > 0;
+    return this.propostaRelationEnabled;
+  }
 }
+

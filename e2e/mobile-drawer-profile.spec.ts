@@ -1,0 +1,265 @@
+import { expect, test, type Page } from "@playwright/test";
+
+const BASE_URL = process.env.FRONTEND_URL || "http://localhost:3000";
+const ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL || "admin@conectsuite.com.br";
+const ADMIN_PASSWORD = process.env.TEST_ADMIN_PASSWORD || "admin123";
+const PROFILE_STORAGE_KEY = "selectedProfileId";
+const ADMIN_PROFILE_ID = "administrador";
+
+const BREAKPOINTS = [320, 390, 430];
+
+async function installRateLimitBypass(page: Page): Promise<void> {
+  await page.context().route("**/*", async (route) => {
+    const headers = {
+      ...route.request().headers(),
+      "x-real-ip": `127.0.0.${Math.floor(Math.random() * 200) + 20}`,
+    };
+
+    await route.continue({ headers });
+  });
+}
+
+async function dismissDevOverlay(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const styleId = "pw-hide-wds-overlay-mobile-drawer";
+    if (document.getElementById(styleId)) {
+      return;
+    }
+
+    const style = document.createElement("style");
+    style.id = styleId;
+    style.textContent = `
+      #webpack-dev-server-client-overlay {
+        display: none !important;
+        pointer-events: none !important;
+      }
+    `;
+    document.head.appendChild(style);
+  });
+
+  const dismissButton = page
+    .frameLocator("iframe#webpack-dev-server-client-overlay")
+    .getByRole("button", { name: /dismiss/i });
+
+  const isVisible = await dismissButton.isVisible().catch(() => false);
+  if (isVisible) {
+    await dismissButton.click({ timeout: 5000 }).catch(() => undefined);
+  }
+}
+
+async function forceAdminProfile(page: Page): Promise<void> {
+  await page.evaluate(
+    ({ key, value }) => {
+      window.localStorage.setItem(key, value);
+    },
+    { key: PROFILE_STORAGE_KEY, value: ADMIN_PROFILE_ID },
+  );
+}
+
+async function login(page: Page): Promise<void> {
+  let lastUrl = "";
+  let lastError = "";
+
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    await page.goto(`${BASE_URL}/login`, { waitUntil: "domcontentloaded" });
+    await dismissDevOverlay(page);
+
+    if (/\/dashboard/.test(page.url())) {
+      await forceAdminProfile(page);
+      return;
+    }
+
+    const emailInput = page.locator('input[name="email"], input[type="email"]').first();
+    const passwordInput = page.locator('input[name="password"], input[type="password"]').first();
+    const submitButton = page.locator('button[type="submit"], button:has-text("Entrar")').first();
+
+    await expect(emailInput).toBeVisible({ timeout: 20000 });
+    await expect(passwordInput).toBeVisible({ timeout: 20000 });
+    await expect(submitButton).toBeVisible({ timeout: 20000 });
+
+    await emailInput.fill(ADMIN_EMAIL);
+    await passwordInput.fill(ADMIN_PASSWORD);
+    await submitButton.click({ force: true });
+
+    await Promise.race([
+      page.waitForURL(/.*dashboard.*/, { timeout: 15000 }).catch(() => undefined),
+      page
+        .getByText(/email ou senha incorretos/i)
+        .first()
+        .waitFor({ state: "visible", timeout: 15000 })
+        .catch(() => undefined),
+    ]);
+
+    await page.waitForTimeout(1200);
+    lastUrl = page.url();
+
+    if (/\/dashboard/.test(lastUrl)) {
+      await forceAdminProfile(page);
+      return;
+    }
+
+    const rateLimited = await page
+      .getByText(/muitas requisicoes|muitas tentativas|aguarde/i)
+      .first()
+      .isVisible()
+      .catch(() => false);
+
+    if (rateLimited) {
+      lastError = "rate limited";
+      await page.waitForTimeout(4000 * attempt);
+      continue;
+    }
+
+    const hasInvalidCredentials = await page
+      .getByText(/email ou senha incorretos/i)
+      .first()
+      .isVisible()
+      .catch(() => false);
+
+    if (hasInvalidCredentials) {
+      lastError = "email ou senha incorretos";
+    }
+
+    await page.waitForTimeout(2000);
+  }
+
+  throw new Error(
+    `Login failed after 4 attempts. Last URL: ${lastUrl}. Last error: ${lastError || "unknown"}`,
+  );
+}
+
+async function gotoDashboardWithRecovery(page: Page): Promise<void> {
+  await page.goto(`${BASE_URL}/dashboard`, {
+    waitUntil: "domcontentloaded",
+    timeout: 30000,
+  });
+  await dismissDevOverlay(page);
+
+  if (page.url().includes("/login")) {
+    await login(page);
+    await page.goto(`${BASE_URL}/dashboard`, {
+      waitUntil: "domcontentloaded",
+      timeout: 30000,
+    });
+    await dismissDevOverlay(page);
+  }
+
+  await page.waitForTimeout(800);
+}
+
+test.describe("Mobile Drawer and Profile Regression", () => {
+  test.setTimeout(8 * 60 * 1000);
+
+  test("should block topbar interactions while drawer is open and restore profile interaction after close", async ({
+    page,
+  }) => {
+    await installRateLimitBypass(page);
+    await login(page);
+
+    for (const width of BREAKPOINTS) {
+      await test.step(`${width}px dashboard`, async () => {
+        await page.setViewportSize({ width, height: 932 });
+        await gotoDashboardWithRecovery(page);
+
+        const menuButton = page.getByTestId("mobile-menu-open");
+        await expect(menuButton).toBeVisible({ timeout: 10000 });
+        await menuButton.click({ force: true });
+
+        const drawer = page.getByTestId("mobile-sidebar-drawer");
+        await expect(drawer).toBeVisible({ timeout: 10000 });
+        await expect(drawer.getByText(/dashboard/i).first()).toBeVisible({ timeout: 10000 });
+
+        const topbarActionsTray = page.getByTestId("topbar-actions-tray");
+        await expect(topbarActionsTray).toBeVisible({ timeout: 10000 });
+
+        const openState = await page.evaluate(() => {
+          const tray = document.querySelector<HTMLElement>('[data-testid="topbar-actions-tray"]');
+          const profileButton = document.querySelector<HTMLElement>("button[data-user-menu]");
+          if (!tray || !profileButton) {
+            return null;
+          }
+
+          const trayStyle = window.getComputedStyle(tray);
+          const profileStyle = window.getComputedStyle(profileButton);
+
+          return {
+            trayPointerEvents: trayStyle.pointerEvents,
+            trayClassName: tray.className,
+            profilePointerEvents: profileStyle.pointerEvents,
+          };
+        });
+
+        expect
+          .soft(openState, `${width}px: topbar/profile nodes not found`)
+          .toBeTruthy();
+        expect
+          .soft(
+            openState?.trayPointerEvents,
+            `${width}px: tray should disable pointer events while drawer open`,
+          )
+          .toBe("none");
+        expect
+          .soft(
+            openState?.trayClassName.includes("opacity-0"),
+            `${width}px: tray should include opacity-0 class while drawer open`,
+          )
+          .toBeTruthy();
+        expect
+          .soft(
+            openState?.profilePointerEvents,
+            `${width}px: profile should not receive pointer events while drawer open`,
+          )
+          .toBe("none");
+
+        const closeDrawerButton = page.getByTestId("mobile-menu-close");
+        await closeDrawerButton.click({ force: true });
+        await expect(drawer).toBeHidden({ timeout: 10000 });
+        await page.waitForTimeout(250);
+
+        const closeState = await page.evaluate(() => {
+          const tray = document.querySelector<HTMLElement>('[data-testid="topbar-actions-tray"]');
+          const profileButton = document.querySelector<HTMLElement>("button[data-user-menu]");
+          if (!tray || !profileButton) {
+            return null;
+          }
+
+          const trayStyle = window.getComputedStyle(tray);
+          const profileStyle = window.getComputedStyle(profileButton);
+
+          return {
+            trayPointerEvents: trayStyle.pointerEvents,
+            trayClassName: tray.className,
+            profilePointerEvents: profileStyle.pointerEvents,
+          };
+        });
+
+        expect
+          .soft(closeState, `${width}px: topbar/profile nodes not found after drawer close`)
+          .toBeTruthy();
+        expect
+          .soft(
+            closeState?.trayPointerEvents,
+            `${width}px: tray should restore pointer events after drawer close`,
+          )
+          .toBe("auto");
+        expect
+          .soft(
+            closeState?.trayClassName.includes("opacity-100"),
+            `${width}px: tray should include opacity-100 class after drawer close`,
+          )
+          .toBeTruthy();
+        expect
+          .soft(
+            closeState?.profilePointerEvents,
+            `${width}px: profile should restore pointer events after drawer close`,
+          )
+          .toBe("auto");
+
+        const profileButton = page.locator("button[data-user-menu]").first();
+        await expect(profileButton).toBeVisible({ timeout: 10000 });
+        await profileButton.click({ force: true });
+        await expect(page.getByText("Meu Perfil")).toBeVisible({ timeout: 10000 });
+      });
+    }
+  });
+});

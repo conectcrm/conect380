@@ -23,11 +23,16 @@ export const useCalendarEvents = () => {
       try {
         setLoading(true);
         setError(null);
-        const eventos = await agendaEventosService.listarEventos({
+        let eventos = await agendaEventosService.listarEventos({
           startDate: filtros?.startDate,
           endDate: filtros?.endDate,
           status: filtros?.status,
         });
+
+        if (filtros?.type) {
+          eventos = eventos.filter((event) => event.type === filtros.type);
+        }
+
         setEvents(eventos);
       } catch (error) {
         console.error('Erro ao carregar eventos:', error);
@@ -60,12 +65,32 @@ export const useCalendarEvents = () => {
         setError(null);
 
         const newEvent = await agendaEventosService.criarEvento(event);
-        setEvents((prev) => [...prev, newEvent]);
-        return newEvent;
+        const mergedEvent: CalendarEvent = {
+          ...newEvent,
+          type: event.type ?? newEvent.type,
+          priority: event.priority ?? newEvent.priority,
+          status: event.status ?? newEvent.status,
+          attendees: event.attendees ?? newEvent.attendees,
+          cliente: event.cliente ?? newEvent.cliente,
+          allDay: event.allDay ?? newEvent.allDay,
+          location: event.location ?? newEvent.location,
+          color: event.color ?? newEvent.color,
+          collaborator: event.collaborator ?? newEvent.collaborator,
+          responsavel: event.responsavel ?? newEvent.responsavel,
+          responsavelId: event.responsavelId ?? newEvent.responsavelId,
+          category: event.category ?? newEvent.category,
+          recurring: event.recurring ?? newEvent.recurring,
+          isRecurring: event.isRecurring ?? newEvent.isRecurring,
+          recurringPattern: event.recurringPattern ?? newEvent.recurringPattern,
+          notes: event.notes ?? newEvent.notes,
+        };
+
+        setEvents((prev) => [...prev, mergedEvent]);
+        return mergedEvent;
       } catch (error) {
         console.error('Erro ao criar evento:', error);
         setError('Não foi possível criar o evento');
-        return null;
+        throw error;
       } finally {
         setLoading(false);
       }
@@ -81,15 +106,39 @@ export const useCalendarEvents = () => {
         setError(null);
 
         const updatedEvent = await agendaEventosService.atualizarEvento(eventId, updates);
-        setEvents((prev) => prev.map((event) => (event.id === eventId ? updatedEvent : event)));
+        const mergedUpdatedEvent: CalendarEvent = {
+          ...updatedEvent,
+          type: updates.type ?? updatedEvent.type,
+          priority: updates.priority ?? updatedEvent.priority,
+          status: updates.status ?? updatedEvent.status,
+          attendees: updates.attendees ?? updatedEvent.attendees,
+          cliente: updates.cliente ?? updatedEvent.cliente,
+          allDay: updates.allDay ?? updatedEvent.allDay,
+          location: updates.location ?? updatedEvent.location,
+          color: updates.color ?? updatedEvent.color,
+          collaborator: updates.collaborator ?? updatedEvent.collaborator,
+          responsavel: updates.responsavel ?? updatedEvent.responsavel,
+          responsavelId: updates.responsavelId ?? updatedEvent.responsavelId,
+          category: updates.category ?? updatedEvent.category,
+          recurring: updates.recurring ?? updatedEvent.recurring,
+          isRecurring: updates.isRecurring ?? updatedEvent.isRecurring,
+          recurringPattern: updates.recurringPattern ?? updatedEvent.recurringPattern,
+          notes: updates.notes ?? updatedEvent.notes,
+        };
 
-        // Atualizar selectedEvent se for o mesmo
+        setEvents((prev) =>
+          prev.map((event) => (event.id === eventId ? mergedUpdatedEvent : event)),
+        );
+
         if (selectedEvent?.id === eventId) {
-          setSelectedEvent(updatedEvent);
+          setSelectedEvent(mergedUpdatedEvent);
         }
+
+        return mergedUpdatedEvent;
       } catch (error) {
         console.error('Erro ao atualizar evento:', error);
         setError('Não foi possível atualizar o evento');
+        throw error;
       } finally {
         setLoading(false);
       }
@@ -110,9 +159,12 @@ export const useCalendarEvents = () => {
         if (selectedEvent?.id === eventId) {
           setSelectedEvent(null);
         }
+
+        return true;
       } catch (error) {
         console.error('Erro ao excluir evento:', error);
         setError('Não foi possível excluir o evento');
+        throw error;
       } finally {
         setLoading(false);
       }
@@ -120,6 +172,49 @@ export const useCalendarEvents = () => {
     [selectedEvent],
   );
 
+  // Atualizar somente metadados locais (sem persistência no backend)
+  const updateEventLocalMeta = useCallback(
+    (eventId: string, updates: Partial<CalendarEvent>) => {
+      agendaEventosService.atualizarMetadadosLocaisEvento(eventId, updates);
+
+      setEvents((prev) =>
+        prev.map((event) => (event.id === eventId ? ({ ...event, ...updates } as CalendarEvent) : event)),
+      );
+
+      if (selectedEvent?.id === eventId) {
+        setSelectedEvent((prev) => (prev ? ({ ...prev, ...updates } as CalendarEvent) : prev));
+      }
+    },
+    [selectedEvent],
+  );
+
+  const respondToInvite = useCallback(
+    async (eventId: string, response: Extract<NonNullable<CalendarEvent['myRsvp']>, 'confirmed' | 'declined'>) => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const updatedEvent = await agendaEventosService.responderConviteEvento(eventId, response);
+
+        setEvents((prev) =>
+          prev.map((event) => (event.id === eventId ? ({ ...event, ...updatedEvent } as CalendarEvent) : event)),
+        );
+
+        if (selectedEvent?.id === eventId) {
+          setSelectedEvent((prev) => (prev ? ({ ...prev, ...updatedEvent } as CalendarEvent) : prev));
+        }
+
+        return updatedEvent;
+      } catch (error) {
+        console.error('Erro ao responder convite:', error);
+        setError('Não foi possível responder ao convite');
+        throw error;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [selectedEvent],
+  );
   // Mover evento (drag & drop)
   const moveEvent = useCallback(
     async (eventId: string, newStart: Date, newEnd: Date) => {
@@ -182,10 +277,18 @@ export const useCalendarEvents = () => {
   // Função para obter lista única de colaboradores
   const getCollaborators = useCallback(() => {
     const collaborators = events
-      .map((event) => event.collaborator)
-      .filter((collaborator): collaborator is string => !!collaborator)
-      .filter((collaborator, index, array) => array.indexOf(collaborator) === index)
-      .sort();
+      .flatMap((event) => {
+        const values: string[] = [];
+
+        if (event.collaborator) values.push(event.collaborator);
+        if (event.responsavel) values.push(event.responsavel);
+        if (event.attendees?.length) values.push(...event.attendees);
+
+        return values;
+      })
+      .filter((value): value is string => !!value)
+      .filter((value, index, array) => array.indexOf(value) === index)
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
     return collaborators.map((name) => ({
       value: name,
@@ -202,6 +305,8 @@ export const useCalendarEvents = () => {
     deleteEvent,
     moveEvent,
     duplicateEvent,
+    respondToInvite,
+    updateEventLocalMeta,
     getCollaborators,
     checkConflicts,
     filterByPeriod,

@@ -234,6 +234,7 @@ export class SlaMonitorMinimoService implements OnModuleInit, OnModuleDestroy {
       targets: {
         phone: this.adminPhone,
         userId: this.adminUserId,
+        empresaId: ticket.empresaId,
       },
       message,
       context: {

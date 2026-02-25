@@ -203,7 +203,7 @@ export class TicketService {
         policyKey: this.escalationPolicy,
         channels: this.notificationChannels,
         logger: this.logger,
-        targets: { phone },
+        targets: { phone, empresaId: ticket.empresaId },
         message,
         context: {
           source: 'ticket-priority-high',
@@ -242,7 +242,7 @@ export class TicketService {
         policyKey: this.highPriorityPolicy,
         channels: this.notificationChannels,
         logger: this.logger,
-        targets: { phone },
+        targets: { phone, empresaId: ticket.empresaId },
         message,
         context: {
           source: 'ticket-escalation',
@@ -1062,7 +1062,17 @@ export class TicketService {
     Object.assign(ticket, dados);
 
     const ticketAtualizado = await this.ticketRepository.save(ticket);
-    this.logger.log(`✅ Ticket ${ticketId} atualizado com ${JSON.stringify(dados)}`);
+    this.logger.log(
+      `Ticket ${ticketId} atualizado (resumo): ${JSON.stringify({
+        keys: dados ? Object.keys(dados) : [],
+        status: (dados as any)?.status ?? null,
+        prioridade: (dados as any)?.prioridade ?? null,
+        tipo: (dados as any)?.tipo ?? null,
+        responsavelId: (dados as any)?.responsavel_id ?? (dados as any)?.responsavelId ?? null,
+        hasTitulo: Boolean((dados as any)?.titulo),
+        hasDescricao: Boolean((dados as any)?.descricao),
+      })}`,
+    );
 
     // 🔔 Notificar via WebSocket
     try {

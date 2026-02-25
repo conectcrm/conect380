@@ -12,12 +12,16 @@ import { DistribuicaoService } from '../services/distribuicao.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { Permission } from '../../../common/permissions/permissions.constants';
 
 /**
  * Controller para distribuicao automatica de tickets
  */
 @Controller('atendimento/distribuicao')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.ATENDIMENTO_FILAS_MANAGE)
 export class DistribuicaoController {
   private readonly logger = new Logger(DistribuicaoController.name);
 

@@ -45,6 +45,37 @@ function Resolve-RunDir {
   return $latest.FullName
 }
 
+function Resolve-ImportSourcePath {
+  param(
+    [string]$InputPath,
+    [string]$RunDirectory,
+    [string]$RepoDirectory
+  )
+
+  if ([string]::IsNullOrWhiteSpace($InputPath)) {
+    return ""
+  }
+
+  if ([System.IO.Path]::IsPathRooted($InputPath)) {
+    if (Test-Path $InputPath) {
+      return (Resolve-Path $InputPath).Path
+    }
+    return $InputPath
+  }
+
+  $candidateRunDir = Join-Path $RunDirectory $InputPath
+  if (Test-Path $candidateRunDir) {
+    return (Resolve-Path $candidateRunDir).Path
+  }
+
+  $candidateRepoDir = Join-Path $RepoDirectory $InputPath
+  if (Test-Path $candidateRepoDir) {
+    return (Resolve-Path $candidateRepoDir).Path
+  }
+
+  return $InputPath
+}
+
 function Parse-MetricLine {
   param(
     [string[]]$Lines,
@@ -195,6 +226,8 @@ if (-not $SkipImport -and $templateReady) {
   }
 
   if (-not $importBlocked) {
+    $importSource = Resolve-ImportSourcePath -InputPath $importSource -RunDirectory $resolvedRunDir -RepoDirectory $repoRoot
+
     Write-Host ""
     Write-Host ">> Importando atualizacoes de convite"
     $importArgs = @(

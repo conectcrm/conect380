@@ -16,13 +16,18 @@
     "test:backend": "cd backend && npm test",
     "test:frontend": "cd frontend-web && npm test",
     "test:e2e": "playwright test",
+    "test:e2e:pipeline-ui": "playwright test e2e/pipeline-stage-validation.spec.ts e2e/pipeline-loss-validation.spec.ts --project=chromium --reporter=list",
+    "test:e2e:mobile:guard": "playwright test e2e/mobile-responsiveness-smoke.spec.ts e2e/mobile-drawer-profile.spec.ts --project=chromium --reporter=list",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:report": "playwright show-report",
     "build:all": "npm run build:backend && npm run build:frontend",
     "build:backend": "cd backend && npm run build",
-    "build:frontend": "cd frontend-web && npm run build"
+    "build:frontend": "cd frontend-web && npm run build",
+    "check:encoding": "node scripts/checkEncoding.js",
+    "validate:release:vendas:core": "node scripts/ci/validate-sales-release-mode.mjs --mode core --frontend-env frontend-web/.env.example --backend-env backend/.env.production.example",
+    "preflight:go-live:vendas:core": "node scripts/ci/preflight-sales-go-core.mjs"
   },
   "keywords": [
     "crm",

@@ -126,7 +126,7 @@ export const ChatOmnichannel: React.FC = () => {
   const isMobile = typeof window !== 'undefined'
     ? window.matchMedia('(max-width: 1024px)').matches
     : false;
-  const mobileView: 'chat' = 'chat';
+  const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
 
   // 🆕 Hook de notificações desktop
   const {
@@ -240,10 +240,18 @@ export const ChatOmnichannel: React.FC = () => {
   // ✅ Função de seleção simplificada (sem lógica mobile específica - Tailwind cuida disso)
   const handleSelecionarTicket = useCallback(
     (ticketId: string) => {
+      if (isMobile) {
+        setMobileView('chat');
+      }
       selecionarTicket(ticketId);
     },
-    [selecionarTicket],
+    [isMobile, selecionarTicket],
   );
+
+  const handleVoltarParaListaMobile = useCallback(() => {
+    selecionarTicketStore(null);
+    setMobileView('list');
+  }, [selecionarTicketStore]);
 
   // ✅ Status padrão: 'em_atendimento' (agente vê primeiro os atendimentos ativos)
   const [tabAtiva, setTabAtiva] = useState<StatusAtendimentoType>(filtros.status || 'em_atendimento');
@@ -274,6 +282,11 @@ export const ChatOmnichannel: React.FC = () => {
     },
     [setFiltros],
   );
+
+  useEffect(() => {
+    if (!isMobile) return;
+    setMobileView(ticketSelecionado ? 'chat' : 'list');
+  }, [isMobile, ticketSelecionado]);
 
   // Hooks do backend real - MENSAGENS
   const {
@@ -1036,12 +1049,12 @@ export const ChatOmnichannel: React.FC = () => {
       {/* Grid Responsivo: Mobile (1 col) | Tablet (2 cols) | Desktop (3 cols) */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[320px_1fr] xl:grid-cols-[340px_1fr_320px] gap-0 overflow-hidden">
 
-        {/* COLUNA 1: Sidebar - Hidden no mobile */}
-        <div className="hidden lg:flex flex-col h-full overflow-hidden border-r bg-white">
+        {/* COLUNA 1: Sidebar - Visivel no mobile quando em modo lista */}
+        <div className={`${mobileView === 'list' ? 'flex' : 'hidden'} lg:flex flex-col h-full overflow-hidden border-r bg-white`}>
           <AtendimentosSidebar
             tickets={tickets}
             ticketSelecionado={ticketSelecionado?.id || ''}
-            onSelecionarTicket={selecionarTicket}
+            onSelecionarTicket={handleSelecionarTicket}
             onNovoAtendimento={handleNovoAtendimento}
             theme={currentPalette}
             loading={loadingTickets}
@@ -1051,8 +1064,18 @@ export const ChatOmnichannel: React.FC = () => {
           />
         </div>
 
-        {/* COLUNA 2: Chat Area - Sempre visível */}
-        <div className="flex flex-col h-full overflow-hidden bg-gray-50">
+        {/* COLUNA 2: Chat Area - Mobile em modo chat | Desktop sempre visível */}
+        <div className={`${mobileView === 'chat' ? 'flex' : 'hidden'} lg:flex flex-col h-full overflow-hidden bg-gray-50`}>
+          {isMobile && ticketSelecionado && (
+            <div className="flex items-center border-b bg-white px-3 py-2">
+              <button
+                onClick={handleVoltarParaListaMobile}
+                className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Voltar para lista
+              </button>
+            </div>
+          )}
           {!ticketSelecionado ? (
             <div className="flex items-center justify-center h-full bg-white">
               <div className="text-center px-4 max-w-md">

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Tag, Plus, Edit2, Trash2, Search, X, AlertCircle } from 'lucide-react';
 import tagsService, { Tag as TagItem } from '../../../../services/tagsService';
+import { useGlobalConfirmation } from '../../../../contexts/GlobalConfirmationContext';
 
 export const TagsTab: React.FC = () => {
+  const { confirm } = useGlobalConfirmation();
   const [tags, setTags] = useState<TagItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,7 +80,7 @@ export const TagsTab: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Tem certeza que deseja deletar esta tag?')) return;
+    if (!(await confirm('Tem certeza que deseja deletar esta tag?'))) return;
 
     try {
       setLoading(true);

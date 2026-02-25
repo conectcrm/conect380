@@ -112,9 +112,12 @@ async function bootstrap() {
       }
     }
 
+    const bodySizeLimit = process.env.REQUEST_BODY_LIMIT || '20mb';
+
     const app = await NestFactory.create(AppModule, {
       // logger: customLogger,  // ← Desabilitado temporariamente para debug
       httpsOptions,
+      bodyParser: false, // Permite configurar limite customizado de payload (logos/base64)
     });
     console.log('✅ [NestJS] AppModule criado com sucesso');
 
@@ -280,19 +283,66 @@ async function bootstrap() {
     console.log(`🔒 [CORS] Configurado (${isProduction ? 'RESTRITIVO' : 'PERMISSIVO'})`);
     console.log(`   Origens permitidas: ${corsOrigins.join(', ')}`);
 
-    // ⚠️ COMENTADO: NestJS já gerencia body parsing internamente
-    // Adicionar express.json() manualmente pode causar conflitos (stream not readable)
-    // app.use(express.json({ limit: '50mb' }));
-    // app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+    app.use(express.json({ limit: bodySizeLimit }));
+    app.use(express.urlencoded({ extended: true, limit: bodySizeLimit }));
+    console.log(`📦 [BodyParser] Limite de payload configurado para ${bodySizeLimit}`);
 
     const enableRequestDebug = process.env.REQUEST_DEBUG === 'true';
+    const SENSITIVE_REQUEST_KEYS = new Set([
+      'password',
+      'senha',
+      'token',
+      'accessToken',
+      'refreshToken',
+      'secret',
+      'apiKey',
+      'api_key',
+      'authorization',
+      'cookie',
+      'smtpSenha',
+      'smtp_senha',
+      'whatsappApiToken',
+      'whatsapp_api_token',
+      'smsApiKey',
+      'sms_api_key',
+      'pushApiKey',
+      'push_api_key',
+    ]);
+
+    const redactRequestDebugValue = (value: unknown, depth = 0): unknown => {
+      if (value == null) return value;
+      if (typeof value === 'string') {
+        return value.length > 180 ? `${value.slice(0, 180)}...` : value;
+      }
+      if (typeof value !== 'object') return value;
+      if (depth >= 2) return '[depth-limited]';
+      if (Array.isArray(value)) {
+        return {
+          type: 'array',
+          length: value.length,
+          sample: value.slice(0, 3).map((item) => redactRequestDebugValue(item, depth + 1)),
+        };
+      }
+
+      const entries = Object.entries(value as Record<string, unknown>).slice(0, 25);
+      const result: Record<string, unknown> = {};
+      for (const [key, entryValue] of entries) {
+        if (SENSITIVE_REQUEST_KEYS.has(key)) {
+          result[key] = '[redacted]';
+          continue;
+        }
+        result[key] = redactRequestDebugValue(entryValue, depth + 1);
+      }
+      return result;
+    };
 
     if (enableRequestDebug) {
       // Middleware de debug APÓS configuração do body parser
       app.use((req, res, next) => {
+        const requestBodyKeys =
+          req.body && typeof req.body === 'object' ? Object.keys(req.body) : [];
         console.log(
-          `🔍 [REQUEST] ${req.method} ${req.url} - Body:`,
-          req.body ? JSON.stringify(req.body) : 'Empty',
+          `🔍 [REQUEST] ${req.method} ${req.url} - bodyType=${typeof req.body} keys=${requestBodyKeys.join(',') || 'none'}`,
         );
 
         // Log especial para PUT requests em planos
@@ -301,7 +351,10 @@ async function bootstrap() {
           console.log('🔴 [PUT DEBUG] Content-Length:', req.headers['content-length']);
           console.log('🔴 [PUT DEBUG] Body Type:', typeof req.body);
           console.log('🔴 [PUT DEBUG] Body Keys:', Object.keys(req.body || {}));
-          console.log('🔴 [PUT DEBUG] Full Body:', JSON.stringify(req.body, null, 2));
+          console.log(
+            '🔴 [PUT DEBUG] Body Summary:',
+            JSON.stringify(redactRequestDebugValue(req.body), null, 2),
+          );
         }
 
         // Interceptar resposta para log de sucesso

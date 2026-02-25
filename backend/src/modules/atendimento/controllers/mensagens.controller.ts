@@ -17,6 +17,9 @@ import * as fs from 'fs';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { Permission } from '../../../common/permissions/permissions.constants';
 import { Mensagem, TipoMensagem, StatusMensagem } from '../entities/mensagem.entity';
 import { Ticket } from '../entities/ticket.entity';
 import { AtendimentoGateway } from '../gateways/atendimento.gateway';
@@ -36,7 +39,8 @@ const ensureUploadDir = () => {
 };
 
 @Controller('atendimento/mensagens')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.ATENDIMENTO_CHATS_READ)
 export class MensagensController {
   private readonly logger = new Logger(MensagensController.name);
   constructor(
@@ -83,6 +87,7 @@ export class MensagensController {
   }
 
   @Post()
+  @Permissions(Permission.ATENDIMENTO_CHATS_REPLY)
   async criar(@EmpresaId() empresaId: string, @Body() dto: CriarMensagemDto) {
     // Buscar ticket
     const ticket = await this.ticketRepo.findOne({
@@ -128,6 +133,7 @@ export class MensagensController {
   }
 
   @Post('arquivo')
+  @Permissions(Permission.ATENDIMENTO_CHATS_REPLY)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({

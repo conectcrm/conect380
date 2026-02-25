@@ -10,10 +10,13 @@ import {
   UseGuards,
   Res,
   HttpStatus,
+  HttpException,
+  InternalServerErrorException,
   ParseIntPipe,
   Logger,
 } from '@nestjs/common';
 import { Response } from 'express';
+import * as path from 'path';
 import { ContratosService } from './services/contratos.service';
 import { AssinaturaDigitalService } from './services/assinatura-digital.service';
 import { PdfContratoService } from './services/pdf-contrato.service';
@@ -25,11 +28,15 @@ import {
 } from './dto/assinatura.dto';
 import { StatusContrato } from './entities/contrato.entity';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Public } from '../auth/decorators/public.decorator';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
 import { EmpresaId, SkipEmpresaValidation } from '../../common/decorators/empresa.decorator';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permission } from '../../common/permissions/permissions.constants';
 
 @Controller('contratos')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
 export class ContratosController {
   private readonly logger = new Logger(ContratosController.name);
 
@@ -39,10 +46,21 @@ export class ContratosController {
     private readonly pdfService: PdfContratoService,
   ) {}
 
+  private rethrowPublicSignatureError(error: any, contexto: string): never {
+    this.logger.error(`Erro em ${contexto}: ${error?.message || error}`);
+
+    if (error instanceof HttpException) {
+      throw error;
+    }
+
+    throw new InternalServerErrorException('Erro interno ao processar assinatura');
+  }
+
   /**
    * Criar novo contrato
    */
   @Post()
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_CREATE)
   async criarContrato(
     @Body() createContratoDto: CreateContratoDto,
     @EmpresaId() empresaId: string,
@@ -71,6 +89,7 @@ export class ContratosController {
    * Listar contratos
    */
   @Get()
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_READ)
   async listarContratos(
     @EmpresaId() empresaId: string,
     @Query('status') status?: StatusContrato,
@@ -107,6 +126,7 @@ export class ContratosController {
    * Buscar contrato por ID
    */
   @Get(':id')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_READ)
   async buscarContrato(@Param('id', ParseIntPipe) id: number, @EmpresaId() empresaId: string) {
     // 🔒 MULTI-TENANCY: Passar empresa_id para validar isolamento
     const contrato = await this.contratosService.buscarContratoPorId(id, empresaId);
@@ -123,6 +143,7 @@ export class ContratosController {
    * Buscar contrato por número
    */
   @Get('numero/:numero')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_READ)
   async buscarContratoPorNumero(@Param('numero') numero: string, @EmpresaId() empresaId: string) {
     // 🔒 MULTI-TENANCY: Passar empresa_id para validar isolamento
     const contrato = await this.contratosService.buscarContratoPorNumero(numero, empresaId);
@@ -138,6 +159,7 @@ export class ContratosController {
    * Atualizar contrato
    */
   @Put(':id')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_UPDATE)
   async atualizarContrato(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateContratoDto: UpdateContratoDto,
@@ -172,6 +194,7 @@ export class ContratosController {
    * Cancelar contrato
    */
   @Delete(':id')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_DELETE)
   async cancelarContrato(
     @Param('id', ParseIntPipe) id: number,
     @Body('motivo') motivo: string | undefined,
@@ -202,6 +225,7 @@ export class ContratosController {
    * Download do PDF do contrato
    */
   @Get(':id/pdf')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_SEND)
   async downloadPDF(
     @Param('id', ParseIntPipe) id: number,
     @EmpresaId() empresaId: string,
@@ -220,11 +244,12 @@ export class ContratosController {
 
       const arquivo = await this.pdfService.obterArquivoPDF(contrato.caminhoArquivoPDF);
 
-      res.setHeader('Content-Type', 'text/html');
-      res.setHeader(
-        'Content-Disposition',
-        `attachment; filename="contrato-${contrato.numero}.html"`,
-      );
+      const ext = path.extname(contrato.caminhoArquivoPDF || '').toLowerCase();
+      const isPdf = ext === '.pdf';
+      const nomeArquivo = `contrato-${contrato.numero}.${isPdf ? 'pdf' : 'html'}`;
+
+      res.setHeader('Content-Type', isPdf ? 'application/pdf' : 'text/html; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename=\"${nomeArquivo}\"`);
 
       return res.send(arquivo);
     } catch (error) {
@@ -242,6 +267,7 @@ export class ContratosController {
    * Criar solicitação de assinatura
    */
   @Post(':id/assinaturas')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_SEND)
   async criarAssinatura(
     @Param('id', ParseIntPipe) contratoId: number,
     @Body() createAssinaturaDto: CreateAssinaturaDto,
@@ -272,6 +298,7 @@ export class ContratosController {
    * Listar assinaturas do contrato
    */
   @Get(':id/assinaturas')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_READ)
   async listarAssinaturas(@Param('id', ParseIntPipe) contratoId: number) {
     try {
       const assinaturas = await this.assinaturaService.buscarAssinaturasPorContrato(contratoId);
@@ -295,23 +322,18 @@ export class ContratosController {
    * Página de assinatura (sem autenticação JWT)
    */
   @Get('assinar/:token')
+  @Public()
   @SkipEmpresaValidation()
   async paginaAssinatura(@Param('token') token: string) {
     try {
       const assinatura = await this.assinaturaService.buscarAssinaturaPorToken(token);
-
       return {
         success: true,
         message: 'Dados da assinatura carregados',
         data: assinatura,
       };
     } catch (error) {
-      this.logger.error(`Erro ao carregar página de assinatura: ${error.message}`);
-      return {
-        success: false,
-        message: error.message,
-        data: null,
-      };
+      this.rethrowPublicSignatureError(error, 'carregar pagina de assinatura');
     }
   }
 
@@ -319,6 +341,7 @@ export class ContratosController {
    * Processar assinatura digital (sem autenticação JWT)
    */
   @Post('assinar/processar')
+  @Public()
   @SkipEmpresaValidation()
   async processarAssinatura(@Body() processarAssinaturaDto: ProcessarAssinaturaDto) {
     try {
@@ -332,12 +355,7 @@ export class ContratosController {
         data: assinatura,
       };
     } catch (error) {
-      this.logger.error(`Erro ao processar assinatura: ${error.message}`);
-      return {
-        success: false,
-        message: error.message,
-        data: null,
-      };
+      this.rethrowPublicSignatureError(error, 'processar assinatura');
     }
   }
 
@@ -345,6 +363,7 @@ export class ContratosController {
    * Rejeitar assinatura (sem autenticação JWT)
    */
   @Post('assinar/rejeitar')
+  @Public()
   @SkipEmpresaValidation()
   async rejeitarAssinatura(@Body() rejeitarAssinaturaDto: RejeitarAssinaturaDto) {
     try {
@@ -358,12 +377,7 @@ export class ContratosController {
         data: assinatura,
       };
     } catch (error) {
-      this.logger.error(`Erro ao rejeitar assinatura: ${error.message}`);
-      return {
-        success: false,
-        message: error.message,
-        data: null,
-      };
+      this.rethrowPublicSignatureError(error, 'rejeitar assinatura');
     }
   }
 }

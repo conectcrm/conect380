@@ -7,12 +7,14 @@ import { Cotacao } from './entities/cotacao.entity';
 import { ItemCotacao } from './entities/item-cotacao.entity';
 import { AnexoCotacao } from './entities/anexo-cotacao.entity';
 import { Fornecedor } from '../modules/financeiro/entities/fornecedor.entity';
+import { FinanceiroModule } from '../modules/financeiro/financeiro.module';
 import { User } from '../modules/users/user.entity';
 import { NotificationModule } from '../notifications/notification.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Cotacao, ItemCotacao, AnexoCotacao, Fornecedor, User]),
+    FinanceiroModule,
     NotificationModule,
   ],
   controllers: [CotacaoController],

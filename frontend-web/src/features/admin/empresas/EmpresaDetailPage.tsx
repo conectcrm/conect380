@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
 import { useNotifications } from '../../../contexts/NotificationContext';
+import { useGlobalConfirmation } from '../../../contexts/GlobalConfirmationContext';
 import * as adminEmpresasService from '../../../services/adminEmpresasService';
 import type { EmpresaAdmin } from '../../../services/adminEmpresasService';
 import adminModulosService, { HistoricoPlano } from '../../../services/adminModulosService';
@@ -31,6 +32,7 @@ import {
 export const EmpresaDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { confirm } = useGlobalConfirmation();
   const { addNotification } = useNotifications();
 
   const [empresa, setEmpresa] = useState<EmpresaAdmin | null>(null);
@@ -119,9 +121,9 @@ export const EmpresaDetailPage: React.FC = () => {
 
   const handleSuspender = async () => {
     if (
-      !window.confirm(
+      !(await confirm(
         'Tem certeza que deseja suspender esta empresa? Os usuários não poderão mais acessar o sistema.',
-      )
+      ))
     ) {
       return;
     }
@@ -156,7 +158,7 @@ export const EmpresaDetailPage: React.FC = () => {
   };
 
   const handleReativar = async () => {
-    if (!window.confirm('Tem certeza que deseja reativar esta empresa?')) {
+    if (!(await confirm('Tem certeza que deseja reativar esta empresa?'))) {
       return;
     }
 

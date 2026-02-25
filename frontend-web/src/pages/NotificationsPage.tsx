@@ -1,6 +1,14 @@
-import React, { useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../contexts/NotificationContext';
+import {
+  DataTableCard,
+  EmptyState,
+  FiltersBar,
+  InlineStats,
+  PageHeader,
+  SectionCard,
+} from '../components/layout-v2';
 import {
   ArrowLeft,
   Bell,
@@ -13,7 +21,16 @@ import {
   AlertTriangle,
   Clock,
   Settings,
+  X,
 } from 'lucide-react';
+
+type StatusFilter = 'all' | 'unread' | 'read';
+type TypeFilter = 'all' | 'success' | 'error' | 'warning' | 'info' | 'reminder';
+
+type NotificationItemType = 'success' | 'error' | 'warning' | 'info' | 'reminder';
+
+const controlClassName =
+  'h-10 rounded-lg border border-[#CFDDE2] bg-white px-3 text-sm text-[#19384C] shadow-sm transition-colors focus:border-[#159A9C] focus:outline-none focus:ring-4 focus:ring-[#159A9C]/15';
 
 const NotificationsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -28,343 +45,445 @@ const NotificationsPage: React.FC = () => {
     removeReminder,
   } = useNotifications();
 
-  const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all');
-  const [typeFilter, setTypeFilter] = useState<'all' | 'success' | 'error' | 'warning' | 'info'>(
-    'all',
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+  const [isConfirmingClearAll, setIsConfirmingClearAll] = useState(false);
+
+  const typeCounts = useMemo(
+    () => ({
+      success: notifications.filter((n) => n.type === 'success').length,
+      error: notifications.filter((n) => n.type === 'error').length,
+      warning: notifications.filter((n) => n.type === 'warning').length,
+      info: notifications.filter((n) => n.type === 'info').length,
+      reminder: notifications.filter((n) => n.type === 'reminder').length,
+    }),
+    [notifications],
   );
 
-  // Filtrar notificações
-  const filteredNotifications = notifications.filter((notification) => {
-    const statusMatch =
-      filter === 'all' ||
-      (filter === 'read' && notification.read) ||
-      (filter === 'unread' && !notification.read);
+  const filteredNotifications = useMemo(
+    () =>
+      notifications.filter((notification) => {
+        const statusMatch =
+          statusFilter === 'all' ||
+          (statusFilter === 'read' && notification.read) ||
+          (statusFilter === 'unread' && !notification.read);
 
-    const typeMatch = typeFilter === 'all' || notification.type === typeFilter;
+        const typeMatch = typeFilter === 'all' || notification.type === typeFilter;
 
-    return statusMatch && typeMatch;
-  });
+        return statusMatch && typeMatch;
+      }),
+    [notifications, statusFilter, typeFilter],
+  );
 
-  const getTypeIcon = (type: string) => {
+  const listTitle =
+    statusFilter === 'all'
+      ? 'Todas as notificações'
+      : statusFilter === 'unread'
+        ? 'Notificações não lidas'
+        : 'Notificações lidas';
+
+  const getTypeIcon = (type: NotificationItemType) => {
     switch (type) {
       case 'success':
-        return <CheckCircle className="w-5 h-5 text-green-500" />;
+        return <CheckCircle className="h-5 w-5 text-green-500" />;
       case 'error':
-        return <AlertCircle className="w-5 h-5 text-red-500" />;
+        return <AlertCircle className="h-5 w-5 text-red-500" />;
       case 'warning':
-        return <AlertTriangle className="w-5 h-5 text-yellow-500" />;
+        return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
       case 'info':
-        return <Info className="w-5 h-5 text-[#159A9C]" />;
+        return <Info className="h-5 w-5 text-[#159A9C]" />;
+      case 'reminder':
+        return <Clock className="h-5 w-5 text-[#7C5CFF]" />;
       default:
-        return <Bell className="w-5 h-5 text-gray-500" />;
+        return <Bell className="h-5 w-5 text-[#607B89]" />;
     }
   };
 
-  const getPriorityColor = (priority: string) => {
+  const getPriorityAccentClass = (priority: string) => {
     switch (priority) {
-      case 'high':
+      case 'urgent':
         return 'border-l-red-500';
+      case 'high':
+        return 'border-l-orange-500';
       case 'medium':
         return 'border-l-yellow-500';
       case 'low':
-        return 'border-l-green-500';
+        return 'border-l-[#B4BEC9]';
       default:
-        return 'border-l-gray-300';
+        return 'border-l-[#D7E4E8]';
+    }
+  };
+
+  const getPriorityBadgeClass = (priority: string) => {
+    switch (priority) {
+      case 'urgent':
+        return 'border-red-200 bg-red-50 text-red-700';
+      case 'high':
+        return 'border-orange-200 bg-orange-50 text-orange-700';
+      case 'medium':
+        return 'border-yellow-200 bg-yellow-50 text-yellow-700';
+      case 'low':
+        return 'border-slate-200 bg-slate-50 text-slate-700';
+      default:
+        return 'border-slate-200 bg-slate-50 text-slate-700';
+    }
+  };
+
+  const getTypeBadgeClass = (type: NotificationItemType) => {
+    switch (type) {
+      case 'success':
+        return 'border-green-200 bg-green-50 text-green-700';
+      case 'error':
+        return 'border-red-200 bg-red-50 text-red-700';
+      case 'warning':
+        return 'border-yellow-200 bg-yellow-50 text-yellow-700';
+      case 'info':
+        return 'border-[#BDE5DE] bg-[#F4FBF9] text-[#0F7B7D]';
+      case 'reminder':
+        return 'border-violet-200 bg-violet-50 text-violet-700';
+      default:
+        return 'border-slate-200 bg-slate-50 text-slate-700';
     }
   };
 
   const formatTime = (timestamp: Date) => {
-    const timestampMs = timestamp.getTime();
-    const now = Date.now();
-    const diff = now - timestampMs;
-
+    const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
+    const diff = Date.now() - date.getTime();
     const minutes = Math.floor(diff / (1000 * 60));
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
     if (minutes < 1) return 'Agora';
-    if (minutes < 60) return `${minutes}m atrás`;
+    if (minutes < 60) return `${minutes}min atrás`;
     if (hours < 24) return `${hours}h atrás`;
     if (days < 7) return `${days}d atrás`;
 
-    return timestamp.toLocaleDateString('pt-BR');
+    return date.toLocaleDateString('pt-BR');
+  };
+
+  const handleClearAll = () => {
+    void clearAll();
+    setIsConfirmingClearAll(false);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
+    <div className="space-y-4 pt-1 sm:pt-2">
+      <SectionCard className="space-y-4 p-4 sm:p-5">
+        <PageHeader
+          title={
+            <span className="inline-flex items-center gap-2">
+              <Bell className="h-6 w-6 text-[#159A9C]" />
+              <span>Notificações</span>
+            </span>
+          }
+          description="Central de alertas, lembretes e atualizações do sistema."
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
               <button
+                type="button"
                 onClick={() => navigate('/dashboard')}
-                className="flex md:hidden items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors"
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#CFDDE2] bg-white px-4 text-sm font-medium text-[#355061] transition-colors hover:bg-[#F6FBFC]"
               >
-                <ArrowLeft className="w-5 h-5" />
-                <span>Voltar</span>
+                <ArrowLeft className="h-4 w-4" />
+                Voltar
               </button>
-              <div className="flex items-center space-x-2">
-                <Bell className="w-6 h-6 text-[#159A9C]" />
-                <h1 className="text-2xl font-bold text-gray-900">Notificações</h1>
-                {unreadCount > 0 && (
-                  <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                    {unreadCount}
-                  </span>
-                )}
-              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/perfil?section=notifications')}
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#CFDDE2] bg-white px-4 text-sm font-medium text-[#355061] transition-colors hover:bg-[#F6FBFC]"
+                title="Preferências de notificações"
+              >
+                <Settings className="h-4 w-4" />
+                Preferências
+              </button>
             </div>
+          }
+        />
 
-            <div className="flex items-center space-x-2">
+        <InlineStats
+          stats={[
+            { label: 'Total', value: String(notifications.length), tone: 'neutral' },
+            { label: 'Não lidas', value: String(unreadCount), tone: unreadCount > 0 ? 'warning' : 'neutral' },
+            {
+              label: 'Lidas',
+              value: String(Math.max(notifications.length - unreadCount, 0)),
+              tone: 'accent',
+            },
+            { label: 'Lembretes ativos', value: String(reminders.length), tone: 'neutral' },
+          ]}
+        />
+      </SectionCard>
+
+      <FiltersBar className="gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <label htmlFor="notifications-status-filter" className="text-xs font-semibold uppercase tracking-wide text-[#6A8795]">
+            Status
+          </label>
+          <select
+            id="notifications-status-filter"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+            className={controlClassName}
+          >
+            <option value="all">Todas ({notifications.length})</option>
+            <option value="unread">Não lidas ({unreadCount})</option>
+            <option value="read">Lidas ({Math.max(notifications.length - unreadCount, 0)})</option>
+          </select>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <label htmlFor="notifications-type-filter" className="text-xs font-semibold uppercase tracking-wide text-[#6A8795]">
+            Tipo
+          </label>
+          <select
+            id="notifications-type-filter"
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value as TypeFilter)}
+            className={controlClassName}
+          >
+            <option value="all">Todos os tipos</option>
+            <option value="success">Sucesso ({typeCounts.success})</option>
+            <option value="info">Informação ({typeCounts.info})</option>
+            <option value="warning">Aviso ({typeCounts.warning})</option>
+            <option value="error">Erro ({typeCounts.error})</option>
+            <option value="reminder">Lembrete ({typeCounts.reminder})</option>
+          </select>
+        </div>
+
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {notifications.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => void markAllAsRead()}
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#BDE5DE] bg-[#F4FBF9] px-4 text-sm font-semibold text-[#0F7B7D] transition-colors hover:bg-[#EAF7F4]"
+            >
+              <Check className="h-4 w-4" />
+              Marcar todas como lidas
+            </button>
+          ) : null}
+
+          {notifications.length > 0 ? (
+            isConfirmingClearAll ? (
+              <div className="inline-flex items-center gap-1 rounded-lg border border-[#F5D0D5] bg-[#FFF5F6] p-1">
+                <button
+                  type="button"
+                  onClick={() => setIsConfirmingClearAll(false)}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#607B89] transition-colors hover:bg-white hover:text-[#19384C]"
+                  title="Cancelar limpeza"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearAll}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-red-600 transition-colors hover:bg-white hover:text-red-700"
+                  title="Confirmar limpar todas"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
               <button
-                onClick={() => navigate('/dashboard')}
-                className="p-2 text-gray-400 hover:text-[#159A9C] hover:bg-[#159A9C]/10 rounded-lg transition-colors"
-                title="Configurações"
+                type="button"
+                onClick={() => setIsConfirmingClearAll(true)}
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#F5D0D5] bg-white px-4 text-sm font-semibold text-red-600 transition-colors hover:bg-[#FFF5F6]"
               >
-                <Settings className="w-5 h-5" />
+                <Trash2 className="h-4 w-4" />
+                Limpar todas
               </button>
-              {notifications.length > 0 && (
-                <>
-                  <button
-                    onClick={markAllAsRead}
-                    className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors text-sm font-medium"
-                  >
-                    Marcar Todas como Lidas
-                  </button>
-                  <button
-                    onClick={clearAll}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
-                  >
-                    Limpar Todas
-                  </button>
-                </>
-              )}
-            </div>
+            )
+          ) : null}
+        </div>
+      </FiltersBar>
+
+      {isConfirmingClearAll ? (
+        <SectionCard className="border border-[#FBE4E8] bg-[#FFF8F9] p-3 sm:p-4">
+          <p className="text-sm text-[#9B1C1C]">
+            Confirme a limpeza para remover todas as notificações desta sessão.
+          </p>
+        </SectionCard>
+      ) : null}
+
+      <DataTableCard>
+        <div className="border-b border-[#E5EEF2] bg-[#FBFDFE] px-4 py-3 sm:px-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-[#19384C] sm:text-base">{listTitle}</h2>
+            <span className="text-xs font-medium text-[#6A8795] sm:text-sm">
+              {filteredNotifications.length} de {notifications.length} notificações
+            </span>
           </div>
         </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Sidebar com Filtros */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-sm p-6 sticky top-8">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Filtros</h2>
+        {filteredNotifications.length > 0 ? (
+          <div className="divide-y divide-[#EEF3F5]">
+            {filteredNotifications.map((notification) => (
+              <div
+                key={notification.id}
+                className={`border-l-4 px-4 py-4 transition-colors hover:bg-[#F7FBFC] sm:px-5 ${getPriorityAccentClass(
+                  notification.priority,
+                )} ${!notification.read ? 'bg-[#159A9C]/4' : 'bg-white'}`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 shrink-0">{getTypeIcon(notification.type)}</div>
 
-              {/* Filtro por Status */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                <select
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value as any)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                >
-                  <option value="all">Todas ({notifications.length})</option>
-                  <option value="unread">Não lidas ({unreadCount})</option>
-                  <option value="read">Lidas ({notifications.length - unreadCount})</option>
-                </select>
-              </div>
-
-              {/* Filtro por Tipo */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Tipo</label>
-                <select
-                  value={typeFilter}
-                  onChange={(e) => setTypeFilter(e.target.value as any)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                >
-                  <option value="all">Todos os tipos</option>
-                  <option value="success">Sucesso</option>
-                  <option value="info">Informação</option>
-                  <option value="warning">Aviso</option>
-                  <option value="error">Erro</option>
-                </select>
-              </div>
-
-              {/* Estatísticas */}
-              <div className="space-y-4">
-                <div className="bg-[#DEEFE7] rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">Total</span>
-                    <span className="text-lg font-bold text-[#159A9C]">{notifications.length}</span>
-                  </div>
-                </div>
-                <div className="bg-red-50 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">Não lidas</span>
-                    <span className="text-lg font-bold text-red-600">{unreadCount}</span>
-                  </div>
-                </div>
-                <div className="bg-[#159A9C]/5 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">Lembretes</span>
-                    <span className="text-lg font-bold text-[#159A9C]">{reminders.length}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Lista de Notificações */}
-          <div className="lg:col-span-3">
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-              {/* Header da Lista */}
-              <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    {filter === 'all'
-                      ? 'Todas as Notificações'
-                      : filter === 'unread'
-                        ? 'Notificações Não Lidas'
-                        : 'Notificações Lidas'}
-                  </h2>
-                  <span className="text-sm text-gray-500">
-                    {filteredNotifications.length} de {notifications.length} notificações
-                  </span>
-                </div>
-              </div>
-
-              {/* Lista */}
-              <div className="divide-y divide-gray-200">
-                {filteredNotifications.length > 0 ? (
-                  filteredNotifications.map((notification) => (
-                    <div
-                      key={notification.id}
-                      className={`p-6 hover:bg-gray-50 transition-colors border-l-4 ${getPriorityColor(notification.priority)} ${
-                        !notification.read ? 'bg-[#159A9C]/5' : ''
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start space-x-4 flex-1">
-                          {/* Ícone do Tipo */}
-                          <div className="flex-shrink-0 mt-1">{getTypeIcon(notification.type)}</div>
-
-                          {/* Conteúdo */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center space-x-2 mb-1">
-                              <h3
-                                className={`text-lg font-semibold ${!notification.read ? 'text-gray-900' : 'text-gray-700'}`}
-                              >
-                                {notification.title}
-                              </h3>
-                              {!notification.read && (
-                                <span className="w-2 h-2 bg-[#159A9C] rounded-full"></span>
-                              )}
-                            </div>
-                            <p
-                              className={`text-sm ${!notification.read ? 'text-gray-800' : 'text-gray-600'} mb-2`}
-                            >
-                              {notification.message}
-                            </p>
-                            <div className="flex items-center space-x-4 text-xs text-gray-500">
-                              <span className="flex items-center space-x-1">
-                                <Clock className="w-3 h-3" />
-                                <span>{formatTime(notification.timestamp)}</span>
-                              </span>
-                              <span className="capitalize px-2 py-1 bg-gray-100 rounded-full">
-                                {notification.priority}
-                              </span>
-                              <span className="capitalize px-2 py-1 bg-gray-100 rounded-full">
-                                {notification.type}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Ações */}
-                        <div className="flex items-center space-x-2 ml-4">
-                          {!notification.read && (
-                            <button
-                              onClick={() => markAsRead(notification.id)}
-                              className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                              title="Marcar como lida"
-                            >
-                              <Check className="w-4 h-4" />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => removeNotification(notification.id)}
-                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Excluir notificação"
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3
+                            className={`text-sm font-semibold sm:text-base ${
+                              !notification.read ? 'text-[#19384C]' : 'text-[#355061]'
+                            }`}
                           >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="p-12 text-center">
-                    <Bell className="w-12 h-12 mx-auto text-gray-300 mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">
-                      {filter === 'unread'
-                        ? 'Nenhuma notificação não lida'
-                        : 'Nenhuma notificação encontrada'}
-                    </h3>
-                    <p className="text-gray-500">
-                      {filter === 'unread'
-                        ? 'Você está em dia com suas notificações!'
-                        : 'As notificações aparecerão aqui conforme você usar o sistema.'}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Seção de Lembretes */}
-            {reminders.length > 0 && (
-              <div className="mt-8 bg-white rounded-lg shadow-sm overflow-hidden">
-                <div className="bg-yellow-50 px-6 py-4 border-b border-yellow-200">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Calendar className="w-5 h-5 text-yellow-600" />
-                      <h2 className="text-lg font-semibold text-gray-900">Lembretes Ativos</h2>
-                    </div>
-                    <span className="text-sm text-gray-500">
-                      {reminders.length} lembrete{reminders.length !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="divide-y divide-gray-200">
-                  {reminders.map((reminder) => (
-                    <div key={reminder.id} className="p-6 hover:bg-gray-50 transition-colors">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                            {reminder.title}
+                            {notification.title}
                           </h3>
-                          <div className="flex items-center space-x-4 text-sm text-gray-600">
-                            <span className="flex items-center space-x-1">
-                              <Calendar className="w-4 h-4" />
-                              <span>{new Date(reminder.scheduledFor).toLocaleString('pt-BR')}</span>
-                            </span>
-                            <span className="capitalize px-2 py-1 bg-[#159A9C]/10 text-[#159A9C] rounded-full text-xs">
-                              {reminder.entityType}
-                            </span>
-                            {reminder.recurring && (
-                              <span className="px-2 py-1 bg-[#159A9C]/10 text-[#159A9C] rounded-full text-xs">
-                                Recorrente
-                              </span>
-                            )}
-                          </div>
+                          {!notification.read ? (
+                            <span className="inline-flex h-2 w-2 rounded-full bg-[#159A9C]" />
+                          ) : null}
+                          <span
+                            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${getTypeBadgeClass(
+                              notification.type,
+                            )}`}
+                          >
+                            {notification.type}
+                          </span>
+                          <span
+                            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${getPriorityBadgeClass(
+                              notification.priority,
+                            )}`}
+                          >
+                            {notification.priority}
+                          </span>
                         </div>
+
+                        <p className={`mt-1 text-sm ${!notification.read ? 'text-[#355061]' : 'text-[#607B89]'}`}>
+                          {notification.message}
+                        </p>
+
+                        <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-[#7A8F9B]">
+                          <span className="inline-flex items-center gap-1">
+                            <Clock className="h-3.5 w-3.5" />
+                            {formatTime(notification.timestamp)}
+                          </span>
+                        </div>
+
+                        {notification.action ? (
+                          <button
+                            type="button"
+                            onClick={() => notification.action?.onClick()}
+                            className="mt-2 inline-flex items-center rounded-lg border border-[#BDE5DE] bg-[#F4FBF9] px-3 py-1.5 text-xs font-semibold text-[#0F7B7D] transition-colors hover:bg-[#EAF7F4]"
+                          >
+                            {notification.action.label}
+                          </button>
+                        ) : null}
+                      </div>
+
+                      <div className="flex shrink-0 items-center gap-1 self-start">
+                        {!notification.read ? (
+                          <button
+                            type="button"
+                            onClick={() => void markAsRead(notification.id)}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#DCE8EC] bg-white text-[#607B89] transition-colors hover:bg-[#F4FBF9] hover:text-[#159A9C]"
+                            title="Marcar como lida"
+                          >
+                            <Check className="h-4 w-4" />
+                          </button>
+                        ) : null}
+
                         <button
-                          onClick={() => removeReminder(reminder.id)}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Excluir lembrete"
+                          type="button"
+                          onClick={() => void removeNotification(notification.id)}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#F5D0D5] bg-white text-red-600 transition-colors hover:bg-[#FFF5F6] hover:text-red-700"
+                          title="Excluir notificação"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     </div>
-                  ))}
+                  </div>
                 </div>
               </div>
-            )}
+            ))}
           </div>
-        </div>
-      </div>
+        ) : (
+          <div className="p-4 sm:p-5">
+            <EmptyState
+              icon={<Bell className="h-5 w-5" />}
+              title={
+                statusFilter === 'unread'
+                  ? 'Nenhuma notificação não lida'
+                  : 'Nenhuma notificação encontrada'
+              }
+              description={
+                statusFilter === 'unread'
+                  ? 'Você está em dia com suas notificações.'
+                  : 'As notificações aparecerão aqui conforme você usar o sistema.'
+              }
+              action={
+                <button
+                  type="button"
+                  onClick={() => navigate('/dashboard')}
+                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#CFDDE2] bg-white px-4 text-sm font-medium text-[#355061] transition-colors hover:bg-[#F6FBFC]"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Voltar ao dashboard
+                </button>
+              }
+            />
+          </div>
+        )}
+      </DataTableCard>
+
+      {reminders.length > 0 ? (
+        <DataTableCard>
+          <div className="border-b border-[#F2E7B8] bg-[#FFFBEA] px-4 py-3 sm:px-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="inline-flex items-center gap-2 text-sm font-semibold text-[#19384C] sm:text-base">
+                <Calendar className="h-4 w-4 text-[#C98A19]" />
+                Lembretes ativos
+              </h2>
+              <span className="text-xs font-medium text-[#8F7A3A] sm:text-sm">
+                {reminders.length} lembrete{reminders.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+          </div>
+
+          <div className="divide-y divide-[#EEF3F5]">
+            {reminders.map((reminder) => (
+              <div key={reminder.id} className="bg-white px-4 py-4 transition-colors hover:bg-[#F7FBFC] sm:px-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-sm font-semibold text-[#19384C] sm:text-base">{reminder.title}</h3>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[#607B89] sm:text-sm">
+                      <span className="inline-flex items-center gap-1">
+                        <Calendar className="h-3.5 w-3.5" />
+                        {new Date(reminder.scheduledFor).toLocaleString('pt-BR')}
+                      </span>
+                      <span className="inline-flex items-center rounded-full border border-[#BDE5DE] bg-[#F4FBF9] px-2 py-0.5 text-[11px] font-semibold text-[#0F7B7D]">
+                        {reminder.entityType}
+                      </span>
+                      {reminder.recurring ? (
+                        <span className="inline-flex items-center rounded-full border border-[#DCE8EC] bg-[#FBFDFE] px-2 py-0.5 text-[11px] font-semibold text-[#607B89]">
+                          Recorrente
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => removeReminder(reminder.id)}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#F5D0D5] bg-white text-red-600 transition-colors hover:bg-[#FFF5F6] hover:text-red-700"
+                    title="Excluir lembrete"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </DataTableCard>
+      ) : null}
     </div>
   );
 };

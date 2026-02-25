@@ -17,11 +17,15 @@ import { CreateProdutoDto, UpdateProdutoDto } from './dto/produto.dto';
 import { Produto } from './produto.entity';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { Permission } from '../../common/permissions/permissions.constants';
 import { EmpresaId } from '../../common/decorators/empresa.decorator';
 import { CacheInterceptor, CacheTTL } from '../../common/interceptors/cache.interceptor';
 
 @Controller('produtos')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.CRM_PRODUTOS_READ)
 @UseInterceptors(CacheInterceptor) // 🚀 Cache ativado para produtos
 export class ProdutosController {
   constructor(private readonly produtosService: ProdutosService) {}
@@ -58,6 +62,7 @@ export class ProdutosController {
   }
 
   @Post()
+  @Permissions(Permission.CRM_PRODUTOS_CREATE)
   async create(
     @Body(ValidationPipe) createProdutoDto: CreateProdutoDto,
     @EmpresaId() empresaId: string,
@@ -66,6 +71,7 @@ export class ProdutosController {
   }
 
   @Put(':id')
+  @Permissions(Permission.CRM_PRODUTOS_UPDATE)
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body(ValidationPipe) updateProdutoDto: UpdateProdutoDto,
@@ -75,6 +81,7 @@ export class ProdutosController {
   }
 
   @Delete(':id')
+  @Permissions(Permission.CRM_PRODUTOS_DELETE)
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
     @EmpresaId() empresaId: string,

@@ -32,12 +32,14 @@ import { BackToNucleus } from '../components/navigation/BackToNucleus';
 import { ticketsService, Ticket } from '../services/ticketsService';
 import { TicketFormModal } from '../components/tickets/TicketFormModal';
 import { AtribuirTicketModal } from '../components/tickets/AtribuirTicketModal';
+import { useGlobalConfirmation } from '../contexts/GlobalConfirmationContext';
 
 interface TicketDetailLocationState {
   returnTo?: string;
 }
 
 const TicketDetailPage: React.FC = () => {
+  const { confirm } = useGlobalConfirmation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -98,7 +100,7 @@ const TicketDetailPage: React.FC = () => {
   const handleFechar = async () => {
     if (!ticket) return;
 
-    if (window.confirm('Deseja realmente fechar este ticket?')) {
+    if (await confirm('Deseja realmente fechar este ticket?')) {
       try {
         setAtualizando(true);
         const empresaId = localStorage.getItem('empresaAtiva') || '';
@@ -120,7 +122,7 @@ const TicketDetailPage: React.FC = () => {
   const handleEscalar = async () => {
     if (!ticket) return;
 
-    if (window.confirm('Deseja escalar este ticket para o próximo nível?')) {
+    if (await confirm('Deseja escalar este ticket para o próximo nível?')) {
       try {
         setAtualizando(true);
         // Lógica de escalonamento (implementar na Fase 8)

@@ -1,4 +1,10 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  NotImplementedException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TransacaoGateway } from '../entities/transacao-gateway.entity';
@@ -15,9 +21,15 @@ import {
 } from '../entities/transacao-gateway.entity';
 import { Fatura } from '../../faturamento/entities/fatura.entity';
 import { Pagamento } from '../../faturamento/entities/pagamento.entity';
+import {
+  assertGatewayProviderEnabled,
+  shouldLogGatewayProviderBlockedInEnv,
+} from './gateway-provider-support.util';
 
 @Injectable()
 export class PagamentosGatewayService {
+  private readonly logger = new Logger(PagamentosGatewayService.name);
+
   constructor(
     @InjectRepository(TransacaoGateway)
     private readonly transacaoRepository: Repository<TransacaoGateway>,
@@ -35,6 +47,15 @@ export class PagamentosGatewayService {
   ): Promise<TransacaoGateway> {
     await this.ensureUniqueReferencia(dto.referenciaGateway, empresaId);
     const configuracao = await this.getConfiguracao(dto.configuracaoId, empresaId);
+    this.assertGatewayProviderEnabledWithTelemetry(
+      configuracao.gateway,
+      empresaId,
+      'transacao.registrar',
+      {
+        configuracaoId: configuracao.id,
+        referenciaGateway: dto.referenciaGateway,
+      },
+    );
 
     const fatura = dto.faturaId ? await this.getFatura(dto.faturaId, empresaId) : undefined;
     const pagamento = dto.pagamentoId
@@ -133,10 +154,29 @@ export class PagamentosGatewayService {
     empresaId: string,
   ): Promise<TransacaoGateway> {
     const transacao = await this.obterTransacao(id, empresaId);
+    let gatewayEfetivo = transacao.configuracao?.gateway;
 
     if (dto.configuracaoId && dto.configuracaoId !== transacao.configuracaoId) {
       const configuracao = await this.getConfiguracao(dto.configuracaoId, empresaId);
+      this.assertGatewayProviderEnabledWithTelemetry(
+        configuracao.gateway,
+        empresaId,
+        'transacao.atualizar_configuracao',
+        {
+          transacaoId: transacao.id,
+          configuracaoId: configuracao.id,
+        },
+      );
       transacao.configuracaoId = configuracao.id;
+      (transacao as any).configuracao = configuracao;
+      gatewayEfetivo = configuracao.gateway;
+    }
+
+    if (gatewayEfetivo) {
+      this.assertGatewayProviderEnabledWithTelemetry(gatewayEfetivo, empresaId, 'transacao.atualizar', {
+        transacaoId: transacao.id,
+        configuracaoId: transacao.configuracaoId,
+      });
     }
 
     if (dto.referenciaGateway && dto.referenciaGateway !== transacao.referenciaGateway) {
@@ -253,5 +293,34 @@ export class PagamentosGatewayService {
     }
 
     return pagamento;
+  }
+
+  private assertGatewayProviderEnabledWithTelemetry(
+    gateway: ConfiguracaoGateway['gateway'],
+    empresaId: string,
+    operation: string,
+    extra: Record<string, unknown> = {},
+  ): void {
+    try {
+      assertGatewayProviderEnabled(gateway);
+    } catch (error) {
+      if (error instanceof NotImplementedException && shouldLogGatewayProviderBlockedInEnv()) {
+        this.logger.warn(
+          JSON.stringify({
+            event: 'gateway_provider_blocked',
+            operation,
+            empresaId,
+            gateway,
+            nodeEnv: process.env.NODE_ENV || process.env.APP_ENV || 'unknown',
+            enabledProvidersRaw: process.env.PAGAMENTOS_GATEWAY_ENABLED_PROVIDERS || '',
+            allowUnimplemented:
+              String(process.env.PAGAMENTOS_GATEWAY_ALLOW_UNIMPLEMENTED || '').toLowerCase() ===
+              'true',
+            ...extra,
+          }),
+        );
+      }
+      throw error;
+    }
   }
 }

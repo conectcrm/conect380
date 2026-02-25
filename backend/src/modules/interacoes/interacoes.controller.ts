@@ -14,16 +14,21 @@ import { CreateInteracaoDto, UpdateInteracaoDto, InteracaoFiltroDto } from './dt
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
 import { EmpresaId } from '../../common/decorators/empresa.decorator';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permission } from '../../common/permissions/permissions.constants';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Interações')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.CRM_CLIENTES_READ)
 @Controller('interacoes')
 export class InteracoesController {
   constructor(private readonly interacoesService: InteracoesService) {}
 
   @Post()
+  @Permissions(Permission.CRM_CLIENTES_CREATE)
   create(@Body() dto: CreateInteracaoDto, @EmpresaId() empresaId: string) {
     return this.interacoesService.create(dto, empresaId);
   }
@@ -44,11 +49,13 @@ export class InteracoesController {
   }
 
   @Patch(':id')
+  @Permissions(Permission.CRM_CLIENTES_UPDATE)
   update(@Param('id') id: string, @Body() dto: UpdateInteracaoDto, @EmpresaId() empresaId: string) {
     return this.interacoesService.update(id, dto, empresaId);
   }
 
   @Delete(':id')
+  @Permissions(Permission.CRM_CLIENTES_DELETE)
   remove(@Param('id') id: string, @EmpresaId() empresaId: string) {
     return this.interacoesService.remove(id, empresaId);
   }

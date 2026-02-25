@@ -10,6 +10,7 @@ interface ModalMudancaEstagioProps {
   estagioDestino: string;
   tituloOportunidade: string;
   loading?: boolean;
+  errorMessage?: string | null;
 }
 
 // Motivos predefinidos para mudança de estágio
@@ -43,6 +44,7 @@ const ModalMudancaEstagio: React.FC<ModalMudancaEstagioProps> = ({
   estagioDestino,
   tituloOportunidade,
   loading = false,
+  errorMessage = null,
 }) => {
   const [motivo, setMotivo] = useState('');
   const [comentario, setComentario] = useState('');
@@ -74,7 +76,10 @@ const ModalMudancaEstagio: React.FC<ModalMudancaEstagioProps> = ({
   const isFormValid = motivo && (!mostrarOutroMotivo || comentario.trim().length > 0);
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div
+      data-testid="modal-mudanca-estagio"
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+    >
       <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] text-white p-6 rounded-t-2xl">
@@ -123,6 +128,7 @@ const ModalMudancaEstagio: React.FC<ModalMudancaEstagioProps> = ({
               Motivo da Mudança <span className="text-red-600">*</span>
             </label>
             <select
+              data-testid="modal-mudanca-estagio-motivo"
               value={motivo}
               onChange={(e) => handleMotivoChange(e.target.value)}
               disabled={loading}
@@ -186,13 +192,24 @@ const ModalMudancaEstagio: React.FC<ModalMudancaEstagioProps> = ({
             </p>
           </div>
 
-          {/* Info sobre histórico */}
+          {/* Info sobre hist??rico */}
           <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
             <p className="text-xs text-blue-800">
-              <strong>💡 Histórico:</strong> Esta movimentação será registrada automaticamente no
-              histórico de atividades da oportunidade com data, hora e seu usuário.
+              <strong>???? Hist??rico:</strong> Esta movimenta????o ser?? registrada automaticamente no
+              hist??rico de atividades da oportunidade com data, hora e seu usu??rio.
             </p>
           </div>
+
+          {errorMessage && (
+            <div
+              data-testid="modal-mudanca-estagio-error"
+              className="bg-red-50 rounded-lg p-3 border border-red-200"
+            >
+              <p className="text-sm text-red-800">
+                <strong>Nao foi possivel mover:</strong> {errorMessage}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -205,6 +222,7 @@ const ModalMudancaEstagio: React.FC<ModalMudancaEstagioProps> = ({
             Cancelar
           </button>
           <button
+            data-testid="modal-mudanca-estagio-confirmar"
             onClick={handleConfirmar}
             disabled={!isFormValid || loading}
             className="px-6 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"

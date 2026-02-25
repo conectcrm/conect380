@@ -4,10 +4,98 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  ValueTransformer,
   // ManyToOne,
   // JoinColumn,
 } from 'typeorm';
+import * as crypto from 'crypto';
 // import { Empresa } from '../../../../empresas/entities/empresa.entity';
+
+const ENCRYPTED_PREFIX = 'enc:v1:';
+let invalidEncryptionKeyWarned = false;
+
+const getEncryptionKey = (): Buffer | null => {
+  const rawKey = (process.env.ENCRYPTION_KEY || '').trim();
+
+  if (!rawKey) {
+    return null;
+  }
+
+  const isHex64 = /^[a-fA-F0-9]{64}$/.test(rawKey);
+  if (!isHex64) {
+    if (!invalidEncryptionKeyWarned) {
+      invalidEncryptionKeyWarned = true;
+      // Warning sem expor segredo; fallback mantém compatibilidade de ambiente.
+      // eslint-disable-next-line no-console
+      console.warn('[EmpresaConfig] ENCRYPTION_KEY inválida. Segredos serão mantidos em texto puro.');
+    }
+    return null;
+  }
+
+  return Buffer.from(rawKey, 'hex');
+};
+
+const encryptSecret = (value: string): string => {
+  const key = getEncryptionKey();
+  if (!key) {
+    return value;
+  }
+
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+  let encrypted = cipher.update(value, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+
+  return `${ENCRYPTED_PREFIX}${iv.toString('hex')}:${encrypted}`;
+};
+
+const decryptSecret = (value: string): string => {
+  if (!value.startsWith(ENCRYPTED_PREFIX)) {
+    return value;
+  }
+
+  const key = getEncryptionKey();
+  if (!key) {
+    return value;
+  }
+
+  try {
+    const payload = value.slice(ENCRYPTED_PREFIX.length);
+    const [ivHex, encryptedHex] = payload.split(':');
+    if (!ivHex || !encryptedHex) {
+      return value;
+    }
+
+    const iv = Buffer.from(ivHex, 'hex');
+    const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+    let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
+  } catch {
+    return value;
+  }
+};
+
+const encryptedNullableStringTransformer: ValueTransformer = {
+  to: (value: string | null | undefined) => {
+    if (typeof value !== 'string' || value.length === 0) {
+      return value ?? null;
+    }
+
+    if (value.startsWith(ENCRYPTED_PREFIX)) {
+      return value;
+    }
+
+    return encryptSecret(value);
+  },
+  from: (value: string | null | undefined) => {
+    if (typeof value !== 'string' || value.length === 0) {
+      return value ?? null;
+    }
+
+    return decryptSecret(value);
+  },
+};
 
 @Entity('empresa_configuracoes')
 export class EmpresaConfig {
@@ -86,7 +174,7 @@ export class EmpresaConfig {
   @Column({ name: 'smtp_usuario', nullable: true })
   smtpUsuario: string;
 
-  @Column({ name: 'smtp_senha', nullable: true })
+  @Column({ name: 'smtp_senha', nullable: true, transformer: encryptedNullableStringTransformer })
   smtpSenha: string;
 
   // Configurações de Comunicação (WhatsApp, SMS, Push)
@@ -96,7 +184,11 @@ export class EmpresaConfig {
   @Column({ name: 'whatsapp_numero', nullable: true })
   whatsappNumero: string;
 
-  @Column({ name: 'whatsapp_api_token', nullable: true })
+  @Column({
+    name: 'whatsapp_api_token',
+    nullable: true,
+    transformer: encryptedNullableStringTransformer,
+  })
   whatsappApiToken: string;
 
   @Column({ name: 'sms_habilitado', default: false })
@@ -111,7 +203,7 @@ export class EmpresaConfig {
   })
   smsProvider: 'twilio' | 'nexmo' | 'sinch' | null;
 
-  @Column({ name: 'sms_api_key', nullable: true })
+  @Column({ name: 'sms_api_key', nullable: true, transformer: encryptedNullableStringTransformer })
   smsApiKey: string;
 
   @Column({ name: 'push_habilitado', default: false })
@@ -126,7 +218,7 @@ export class EmpresaConfig {
   })
   pushProvider: 'fcm' | 'apns' | 'onesignal' | null;
 
-  @Column({ name: 'push_api_key', nullable: true })
+  @Column({ name: 'push_api_key', nullable: true, transformer: encryptedNullableStringTransformer })
   pushApiKey: string;
 
   // Configurações de Integrações

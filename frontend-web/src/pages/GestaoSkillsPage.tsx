@@ -23,8 +23,10 @@ import {
   AtendenteSkill,
   CreateAtendenteSkillDto,
 } from '../services/distribuicaoAvancadaService';
+import { useGlobalConfirmation } from '../contexts/GlobalConfirmationContext';
 
 const GestaoSkillsPage: React.FC = () => {
+  const { confirm } = useGlobalConfirmation();
   // Estados
   const [skills, setSkills] = useState<AtendenteSkill[]>([]);
   const [skillsDisponiveis, setSkillsDisponiveis] = useState<string[]>([]);
@@ -136,7 +138,7 @@ const GestaoSkillsPage: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Deseja realmente deletar esta skill?')) return;
+    if (!(await confirm('Deseja realmente deletar esta skill?'))) return;
 
     try {
       setLoading(true);

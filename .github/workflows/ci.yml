@@ -7,6 +7,62 @@ on:
     branches: [main, develop]
 
 jobs:
+  encoding-guardrails:
+    name: Guardrails - Encoding
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+
+      - name: Detectar arquivos alterados
+        run: |
+          set -e
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "PR: verificando diff contra base branch (${{ github.base_ref }})"
+            git fetch --no-tags --prune --depth=1 origin "${{ github.base_ref }}"
+            git diff --name-only --diff-filter=ACMR "origin/${{ github.base_ref }}...HEAD" > changed_files.txt || true
+          else
+            echo "Push: verificando diff do último commit"
+            git diff --name-only --diff-filter=ACMR HEAD^ HEAD > changed_files.txt || true
+          fi
+
+          echo "Arquivos alterados (primeiros 50):"
+          head -n 50 changed_files.txt || true
+
+      - name: Rodar check de encoding (arquivos alterados)
+        run: |
+          if [ ! -s changed_files.txt ]; then
+            echo "Nenhum arquivo alterado para verificar."
+            exit 0
+          fi
+
+          cat changed_files.txt | node scripts/checkEncoding.js --stdin
+
+  release-flags-guardrails:
+    name: Guardrails - Release Flags Vendas (Core Baseline)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+
+      - name: Validar baseline GO Core das flags de vendas
+        run: npm run validate:release:vendas:core
+
   backend:
     name: Backend - Testes e Build
     runs-on: ubuntu-latest
@@ -14,6 +70,8 @@ jobs:
     steps:
       - name: Checkout codigo
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -30,6 +88,246 @@ jobs:
 
       - name: Build backend
         run: npm --prefix backend run build
+
+  backend-e2e-cotacao:
+    name: Backend - E2E Cotacao
+    runs-on: ubuntu-latest
+    needs: backend
+    env:
+      NODE_ENV: test
+      JWT_SECRET: test-jwt-secret
+      DATABASE_HOST: localhost
+      DATABASE_PORT: '5434'
+      DATABASE_USERNAME: conectcrm
+      DATABASE_PASSWORD: conectcrm123
+      DATABASE_NAME: conectcrm_test
+      TYPEORM_USE_TS: 'true'
+      REDIS_HOST: localhost
+      REDIS_PORT: '6379'
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: conectcrm
+          POSTGRES_PASSWORD: conectcrm123
+          POSTGRES_DB: conectcrm_test
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U conectcrm -d conectcrm_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias backend
+        run: npm --prefix backend ci
+
+      - name: Aplicar migrations na base de teste e2e
+        run: npm --prefix backend run migration:run
+
+      - name: Rodar E2E de cotacao
+        run: npm --prefix backend run test:e2e:cotacao
+
+  backend-e2e-contas-pagar:
+    name: Backend - E2E Contas Pagar
+    runs-on: ubuntu-latest
+    needs: backend
+    env:
+      NODE_ENV: test
+      JWT_SECRET: test-jwt-secret
+      DATABASE_HOST: localhost
+      DATABASE_PORT: '5434'
+      DATABASE_USERNAME: conectcrm
+      DATABASE_PASSWORD: conectcrm123
+      DATABASE_NAME: conectcrm_test
+      TYPEORM_USE_TS: 'true'
+      REDIS_HOST: localhost
+      REDIS_PORT: '6379'
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: conectcrm
+          POSTGRES_PASSWORD: conectcrm123
+          POSTGRES_DB: conectcrm_test
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U conectcrm -d conectcrm_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias backend
+        run: npm --prefix backend ci
+
+      - name: Aplicar migrations na base de teste e2e
+        run: npm --prefix backend run migration:run
+
+      - name: Rodar E2E de contas a pagar
+        run: npm --prefix backend run test:e2e:contas-pagar
+
+  backend-e2e-multi-tenancy:
+    name: Backend - E2E Multi-Tenancy
+    runs-on: ubuntu-latest
+    needs: backend
+    env:
+      NODE_ENV: test
+      JWT_SECRET: test-jwt-secret
+      DATABASE_HOST: localhost
+      DATABASE_PORT: '5434'
+      DATABASE_USERNAME: conectcrm
+      DATABASE_PASSWORD: conectcrm123
+      DATABASE_NAME: conectcrm_test
+      TYPEORM_USE_TS: 'true'
+      REDIS_HOST: localhost
+      REDIS_PORT: '6379'
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: conectcrm
+          POSTGRES_PASSWORD: conectcrm123
+          POSTGRES_DB: conectcrm_test
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U conectcrm -d conectcrm_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias backend
+        run: npm --prefix backend ci
+
+      - name: Aplicar migrations na base de teste e2e
+        run: npm --prefix backend run migration:run
+
+      - name: Rodar E2E de multi-tenancy
+        run: npm --prefix backend run test:e2e -- multi-tenancy.e2e-spec.ts
+
+  backend-e2e-vendas:
+    name: Backend - E2E Vendas
+    runs-on: ubuntu-latest
+    needs: backend
+    env:
+      NODE_ENV: test
+      JWT_SECRET: test-jwt-secret
+      DATABASE_HOST: localhost
+      DATABASE_PORT: '5434'
+      DATABASE_USERNAME: conectcrm
+      DATABASE_PASSWORD: conectcrm123
+      DATABASE_NAME: conectcrm_test
+      TYPEORM_USE_TS: 'true'
+      REDIS_HOST: localhost
+      REDIS_PORT: '6379'
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: conectcrm
+          POSTGRES_PASSWORD: conectcrm123
+          POSTGRES_DB: conectcrm_test
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U conectcrm -d conectcrm_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias backend
+        run: npm --prefix backend ci
+
+      - name: Aplicar migrations na base de teste e2e
+        run: npm --prefix backend run migration:run
+
+      - name: Rodar E2E de vendas
+        run: npm --prefix backend run test:e2e:vendas
 
   frontend:
     name: Frontend - Testes e Build
@@ -51,6 +349,117 @@ jobs:
 
       - name: Sanity check frontend
         run: npm --prefix frontend-web run deps:check || true
+
+  frontend-e2e-pipeline-ui:
+    name: Frontend - E2E Pipeline UI (Playwright)
+    runs-on: ubuntu-latest
+    needs: frontend
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detectar mudancas relevantes (Pipeline UI)
+        id: pipeline_ui_changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            pipeline_ui:
+              - '.github/workflows/ci.yml'
+              - 'e2e/pipeline-*.spec.ts'
+              - 'e2e/pipeline-ui.helpers.ts'
+              - 'e2e/fixtures.ts'
+              - 'playwright.config.ts'
+              - 'frontend-web/craco.config.js'
+              - 'frontend-web/src/pages/PipelinePage.tsx'
+              - 'frontend-web/src/components/oportunidades/**'
+              - 'frontend-web/src/services/api.ts'
+              - 'frontend-web/src/services/oportunidadesService.ts'
+              - 'frontend-web/src/services/modulosService.ts'
+              - 'frontend-web/src/services/minhasEmpresasService.ts'
+              - 'frontend-web/src/contexts/AuthContext.tsx'
+              - 'frontend-web/src/contexts/EmpresaContextAPIReal.tsx'
+              - 'frontend-web/src/hooks/useModuloAtivo.ts'
+              - 'frontend-web/src/components/licensing/PermissionPathGuard.tsx'
+              - 'frontend-web/src/types/oportunidades/**'
+              - 'frontend-web/src/App.tsx'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'frontend-web/package.json'
+              - 'frontend-web/package-lock.json'
+
+      - name: Pular E2E Pipeline UI (sem mudancas relevantes)
+        if: steps.pipeline_ui_changes.outputs.pipeline_ui != 'true'
+        run: echo "Sem alteracoes no escopo do pipeline UI; job finalizado sem executar Playwright."
+
+      - name: Setup Node.js
+        if: steps.pipeline_ui_changes.outputs.pipeline_ui == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend-web/package-lock.json
+
+      - name: Instalar dependencias root (Playwright)
+        if: steps.pipeline_ui_changes.outputs.pipeline_ui == 'true'
+        run: npm ci
+
+      - name: Instalar dependencias frontend
+        if: steps.pipeline_ui_changes.outputs.pipeline_ui == 'true'
+        run: npm --prefix frontend-web ci
+
+      - name: Instalar browser Chromium (Playwright)
+        if: steps.pipeline_ui_changes.outputs.pipeline_ui == 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Subir frontend (modo CI)
+        if: steps.pipeline_ui_changes.outputs.pipeline_ui == 'true'
+        env:
+          PORT: '3000'
+          BROWSER: 'none'
+          CI: 'true'
+        run: |
+          nohup npm --prefix frontend-web run start:docker > frontend.log 2>&1 &
+          echo $! > frontend.pid
+
+          for i in $(seq 1 90); do
+            if curl -fsS http://localhost:3000 > /dev/null; then
+              echo "Frontend disponivel em http://localhost:3000"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Frontend nao iniciou a tempo."
+          tail -n 200 frontend.log || true
+          exit 1
+
+      - name: Rodar E2E Pipeline UI (Playwright)
+        if: steps.pipeline_ui_changes.outputs.pipeline_ui == 'true'
+        run: npm run test:e2e:pipeline-ui
+
+      - name: Upload artefatos Playwright (Pipeline UI)
+        if: ${{ !cancelled() && steps.pipeline_ui_changes.outputs.pipeline_ui == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-pipeline-ui-artifacts
+          path: |
+            playwright-report/
+            test-results/
+            frontend.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Encerrar frontend
+        if: ${{ always() && steps.pipeline_ui_changes.outputs.pipeline_ui == 'true' }}
+        run: |
+          if [ -f frontend.pid ]; then
+            kill "$(cat frontend.pid)" || true
+          fi
 
   security:
     name: Analise de Seguranca
@@ -101,19 +510,33 @@ jobs:
   final-status:
     name: Status Final do CI
     runs-on: ubuntu-latest
-    needs: [backend, frontend, security, check-temp-files]
+    needs: [encoding-guardrails, release-flags-guardrails, backend, backend-e2e-cotacao, backend-e2e-contas-pagar, backend-e2e-multi-tenancy, backend-e2e-vendas, frontend, frontend-e2e-pipeline-ui, security, check-temp-files]
     if: always()
 
     steps:
       - name: Verificar status dos jobs
         run: |
+          echo "Encoding Guardrails: ${{ needs.encoding-guardrails.result }}"
+          echo "Release Flags Guardrails: ${{ needs.release-flags-guardrails.result }}"
           echo "Backend: ${{ needs.backend.result }}"
+          echo "Backend E2E Cotacao: ${{ needs.backend-e2e-cotacao.result }}"
+          echo "Backend E2E Contas Pagar: ${{ needs.backend-e2e-contas-pagar.result }}"
+          echo "Backend E2E Multi-Tenancy: ${{ needs.backend-e2e-multi-tenancy.result }}"
+          echo "Backend E2E Vendas: ${{ needs.backend-e2e-vendas.result }}"
           echo "Frontend: ${{ needs.frontend.result }}"
+          echo "Frontend E2E Pipeline UI: ${{ needs.frontend-e2e-pipeline-ui.result }}"
           echo "Security: ${{ needs.security.result }}"
           echo "Temp Files Check: ${{ needs.check-temp-files.result }}"
 
-          if [ "${{ needs.backend.result }}" != "success" ] || \
+          if [ "${{ needs.encoding-guardrails.result }}" != "success" ] || \
+             [ "${{ needs.release-flags-guardrails.result }}" != "success" ] || \
+             [ "${{ needs.backend.result }}" != "success" ] || \
+             [ "${{ needs.backend-e2e-cotacao.result }}" != "success" ] || \
+             [ "${{ needs.backend-e2e-contas-pagar.result }}" != "success" ] || \
+             [ "${{ needs.backend-e2e-multi-tenancy.result }}" != "success" ] || \
+             [ "${{ needs.backend-e2e-vendas.result }}" != "success" ] || \
              [ "${{ needs.frontend.result }}" != "success" ] || \
+             [ "${{ needs.frontend-e2e-pipeline-ui.result }}" != "success" ] || \
              [ "${{ needs.security.result }}" != "success" ] || \
              [ "${{ needs.check-temp-files.result }}" != "success" ]; then
             echo "CI falhou em um ou mais jobs"
