@@ -6,6 +6,7 @@ import {
   FiltroCotacao,
   StatusCotacao,
   CotacaoListResponse,
+  CotacaoMetadataCriacao,
 } from '../types/cotacaoTypes';
 
 export const cotacaoService = {
@@ -162,7 +163,12 @@ export const cotacaoService = {
 
   async buscarProximoNumero(): Promise<string> {
     const response = await api.get('/cotacao/proximo-numero');
-    return response.data.numero;
+    return response.data.proximoNumero ?? response.data.numero;
+  },
+
+  async buscarMetadataCriacao(): Promise<CotacaoMetadataCriacao> {
+    const response = await api.get('/cotacao/metadata/criacao');
+    return response.data;
   },
 
   async minhasAprovacoes(): Promise<Cotacao[]> {
