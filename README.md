@@ -223,6 +223,7 @@ Matriz de rollout do Fluxo de Vendas (GO Core / GO Full):
 - Guardrail automatico (baseline GO Full): `npm run validate:release:vendas:full`
 - Preflight completo GO Core: `npm run preflight:go-live:vendas:core`
 - Preflight completo GO Full: `npm run preflight:go-live:vendas:full`
+- Workflow manual de preflight (CI): `.github/workflows/vendas-go-live-preflight.yml` (input `mode=core|full`)
 - Validacao GO Full (arquivo real de deploy):
   `node scripts/ci/validate-sales-release-mode.mjs --mode full --frontend-env frontend-web/.env --backend-env backend/.env.production`
 
