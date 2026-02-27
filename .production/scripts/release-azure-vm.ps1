@@ -108,11 +108,13 @@ cd $RemoteRoot/.production
 
   if (-not $SkipBackup) {
     $remoteScript += @"
+
 docker exec conectcrm-postgres pg_dump -U postgres -d conectcrm -Fc > /tmp/conectcrm-$timestamp.dump
 "@
   }
 
   $remoteScript += @"
+
 docker compose up -d postgres redis
 docker compose build $buildFlag backend frontend
 docker compose up -d backend
