@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-const ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL || 'admin@conectsuite.com.br';
+const ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL || 'admin@conect360.com.br';
 const ADMIN_PASSWORD = process.env.TEST_ADMIN_PASSWORD || 'admin123';
 const PROFILE_STORAGE_KEY = 'selectedProfileId';
 

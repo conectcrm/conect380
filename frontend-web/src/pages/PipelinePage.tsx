@@ -35,6 +35,8 @@ import {
   Calendar,
   Search,
   X,
+  Maximize2,
+  Minimize2,
   Edit2,
   Trash2,
   Grid3X3,
@@ -71,7 +73,7 @@ import ModalExport from '../components/oportunidades/ModalExport';
 import ModalMotivoPerda from '../components/oportunidades/ModalMotivoPerda';
 import { useAuth } from '../contexts/AuthContext';
 import { useGlobalConfirmation } from '../contexts/GlobalConfirmationContext';
-import { FiltersBar, PageHeader, SectionCard } from '../components/layout-v2';
+import { DataTableCard, FiltersBar, InlineStats, PageHeader, SectionCard } from '../components/layout-v2';
 import ActiveEmpresaBadge from '../components/tenant/ActiveEmpresaBadge';
 
 // Configuração do localizador do calendário (date-fns)
@@ -105,7 +107,8 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.LEADS,
     nome: 'Leads',
-    headerClass: 'bg-[#002333]',
+    headerClass:
+      'bg-white border border-[#B4BEC9]/40 border-b-0 border-t-4 border-t-[#002333]',
     legendClass: 'bg-[#002333]',
     badgeTextClass: 'text-[#002333]',
     badgeBgClass: 'bg-[#DEEFE7]',
@@ -114,7 +117,8 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.QUALIFICACAO,
     nome: 'Qualificação',
-    headerClass: 'bg-[#0F7B7D]',
+    headerClass:
+      'bg-white border border-[#B4BEC9]/40 border-b-0 border-t-4 border-t-[#0F7B7D]',
     legendClass: 'bg-[#0F7B7D]',
     badgeTextClass: 'text-[#0F7B7D]',
     badgeBgClass: 'bg-[#DEEFE7]',
@@ -123,7 +127,8 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.PROPOSTA,
     nome: 'Proposta',
-    headerClass: 'bg-[#159A9C]',
+    headerClass:
+      'bg-white border border-[#B4BEC9]/40 border-b-0 border-t-4 border-t-[#159A9C]',
     legendClass: 'bg-[#159A9C]',
     badgeTextClass: 'text-[#0F7B7D]',
     badgeBgClass: 'bg-[#DEEFE7]',
@@ -132,7 +137,8 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.NEGOCIACAO,
     nome: 'Negociação',
-    headerClass: 'bg-[#0F7B7D]',
+    headerClass:
+      'bg-white border border-[#B4BEC9]/40 border-b-0 border-t-4 border-t-[#0F7B7D]',
     legendClass: 'bg-[#0F7B7D]',
     badgeTextClass: 'text-[#0F7B7D]',
     badgeBgClass: 'bg-[#DEEFE7]',
@@ -141,7 +147,8 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.FECHAMENTO,
     nome: 'Fechamento',
-    headerClass: 'bg-[#159A9C]',
+    headerClass:
+      'bg-white border border-[#B4BEC9]/40 border-b-0 border-t-4 border-t-[#159A9C]',
     legendClass: 'bg-[#159A9C]',
     badgeTextClass: 'text-[#0F7B7D]',
     badgeBgClass: 'bg-[#DEEFE7]',
@@ -150,7 +157,8 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.GANHO,
     nome: 'Ganho',
-    headerClass: 'bg-green-600',
+    headerClass:
+      'bg-white border border-[#B4BEC9]/40 border-b-0 border-t-4 border-t-green-600',
     legendClass: 'bg-green-600',
     badgeTextClass: 'text-green-700',
     badgeBgClass: 'bg-green-50',
@@ -159,7 +167,7 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.PERDIDO,
     nome: 'Perdido',
-    headerClass: 'bg-red-600',
+    headerClass: 'bg-white border border-[#B4BEC9]/40 border-b-0 border-t-4 border-t-red-600',
     legendClass: 'bg-red-600',
     badgeTextClass: 'text-red-700',
     badgeBgClass: 'bg-red-50',
@@ -191,6 +199,7 @@ const PipelinePage: React.FC = () => {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loadingUsuarios, setLoadingUsuarios] = useState(false);
   const [visualizacao, setVisualizacao] = useState<VisualizacaoPipeline>('kanban');
+  const [kanbanExpanded, setKanbanExpanded] = useState(false);
   const [filtros, setFiltros] = useState({
     busca: '',
     estagio: '',
@@ -226,6 +235,30 @@ const PipelinePage: React.FC = () => {
   );
   const [calendarView, setCalendarView] = useState<View>('month');
   const [calendarDate, setCalendarDate] = useState(new Date());
+
+  useEffect(() => {
+    if (visualizacao !== 'kanban' && kanbanExpanded) {
+      setKanbanExpanded(false);
+    }
+  }, [visualizacao, kanbanExpanded]);
+
+  useEffect(() => {
+    if (!kanbanExpanded) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [kanbanExpanded]);
+
+  useEffect(() => {
+    if (!kanbanExpanded) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setKanbanExpanded(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [kanbanExpanded]);
 
   // Estados para ordenação e paginação
   const [ordenacao, setOrdenacao] = useState<{
@@ -1095,6 +1128,71 @@ const PipelinePage: React.FC = () => {
       filtros.valorMax,
   );
 
+  const activeKanbanFilterChips = useMemo(() => {
+    const chips: Array<{ label: string; value: string }> = [];
+
+    const busca = filtros.busca?.trim();
+    if (busca) chips.push({ label: 'Busca', value: busca });
+
+    if (filtros.estagio) {
+      const estagioNome = ESTAGIOS_CONFIG.find((e) => e.id === filtros.estagio)?.nome || filtros.estagio;
+      chips.push({ label: 'Estágio', value: estagioNome });
+    }
+
+    if (filtros.prioridade) {
+      const prioridadeLabelMap: Record<string, string> = {
+        [PrioridadeOportunidade.BAIXA]: 'Baixa',
+        [PrioridadeOportunidade.MEDIA]: 'Média',
+        [PrioridadeOportunidade.ALTA]: 'Alta',
+      };
+      chips.push({
+        label: 'Prioridade',
+        value: prioridadeLabelMap[filtros.prioridade] || filtros.prioridade,
+      });
+    }
+
+    if (filtros.origem) {
+      const origemLabelMap: Record<string, string> = {
+        [OrigemOportunidade.WEBSITE]: 'Website',
+        [OrigemOportunidade.INDICACAO]: 'Indicação',
+        [OrigemOportunidade.REDES_SOCIAIS]: 'Redes Sociais',
+        [OrigemOportunidade.EVENTO]: 'Evento',
+        [OrigemOportunidade.CAMPANHA]: 'Campanha',
+        [OrigemOportunidade.TELEFONE]: 'Telefone',
+        [OrigemOportunidade.EMAIL]: 'Email',
+        [OrigemOportunidade.PARCEIRO]: 'Parceiro',
+      };
+      chips.push({ label: 'Origem', value: origemLabelMap[filtros.origem] || filtros.origem });
+    }
+
+    const valorMin = filtros.valorMin?.trim();
+    const valorMax = filtros.valorMax?.trim();
+    if (valorMin || valorMax) {
+      const minNumber = valorMin ? Number(valorMin) : null;
+      const maxNumber = valorMax ? Number(valorMax) : null;
+      const formatOrRaw = (value: number | null, raw: string | undefined) => {
+        if (value === null) return raw || '';
+        if (Number.isFinite(value)) return formatarMoeda(value);
+        return raw || '';
+      };
+
+      const minLabel = formatOrRaw(minNumber, valorMin);
+      const maxLabel = formatOrRaw(maxNumber, valorMax);
+
+      if (minLabel && maxLabel) chips.push({ label: 'Valor', value: `${minLabel}–${maxLabel}` });
+      else if (minLabel) chips.push({ label: 'Valor ≥', value: minLabel });
+      else if (maxLabel) chips.push({ label: 'Valor ≤', value: maxLabel });
+    }
+
+    if (filtros.responsavel) {
+      const responsavelNome =
+        usuarios.find((u) => u.id === filtros.responsavel)?.nome || filtros.responsavel;
+      chips.push({ label: 'Responsável', value: responsavelNome });
+    }
+
+    return chips;
+  }, [filtros, usuarios]);
+
   if (loading) {
     return (
       <div className="space-y-4 pt-1 sm:pt-2">
@@ -1133,81 +1231,19 @@ const PipelinePage: React.FC = () => {
           }
         />
 
-        {/* Métricas do Pipeline */}
         {estatisticas && (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {/* Total de Oportunidades */}
-            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                    Total de Oportunidades
-                  </p>
-                  <p className="mt-2 text-3xl font-bold text-[#002333]">
-                    {estatisticas.totalOportunidades}
-                  </p>
-                </div>
-                <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
-                  <Target className="h-6 w-6 text-[#159A9C]" />
-                </div>
-              </div>
-            </div>
-
-            {/* Valor Total */}
-            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                    Valor Total
-                  </p>
-                  <p className="mt-2 text-2xl sm:text-3xl font-bold text-[#002333] leading-tight break-words">
-                    {formatarMoeda(estatisticas.valorTotalPipeline)}
-                  </p>
-                </div>
-                <div className="h-12 w-12 rounded-2xl bg-[#0F7B7D]/10 flex items-center justify-center shadow-sm">
-                  <DollarSign className="h-6 w-6 text-[#0F7B7D]" />
-                </div>
-              </div>
-            </div>
-
-            {/* Ticket Médio */}
-            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                    Ticket Médio
-                  </p>
-                  <p className="mt-2 text-2xl sm:text-3xl font-bold text-[#002333] leading-tight break-words">
-                    {formatarMoeda(estatisticas.valorMedio)}
-                  </p>
-                </div>
-                <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
-                  <TrendingUp className="h-6 w-6 text-[#159A9C]" />
-                </div>
-              </div>
-            </div>
-
-            {/* Taxa de Conversão */}
-            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                    Taxa de Conversão
-                  </p>
-                  <p className="mt-2 text-3xl font-bold text-[#002333]">
-                    {estatisticas.taxaConversao.toFixed(1)}%
-                  </p>
-                </div>
-                <div className="h-12 w-12 rounded-2xl bg-[#002333]/10 flex items-center justify-center shadow-sm">
-                  <Target className="h-6 w-6 text-[#002333]" />
-                </div>
-              </div>
-            </div>
-          </div>
+          <InlineStats
+            stats={[
+              { label: 'Oportunidades', value: String(estatisticas.totalOportunidades), tone: 'neutral' },
+              { label: 'Pipeline', value: formatarMoeda(estatisticas.valorTotalPipeline), tone: 'accent' },
+              { label: 'Ticket médio', value: formatarMoeda(estatisticas.valorMedio), tone: 'neutral' },
+              { label: 'Conversão', value: `${estatisticas.taxaConversao.toFixed(1)}%`, tone: 'accent' },
+            ]}
+          />
         )}
       </SectionCard>
       {/* Seletor de Visualização */}
-      <div className="bg-white rounded-lg shadow-sm border p-4 mb-6">
+      <SectionCard className="p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="w-full flex flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
             <span className="text-sm font-medium text-[#002333]">Visualização:</span>
@@ -1215,6 +1251,8 @@ const PipelinePage: React.FC = () => {
               <button
                 data-testid="pipeline-view-kanban"
                 onClick={() => setVisualizacao('kanban')}
+                type="button"
+                aria-pressed={visualizacao === 'kanban'}
                 className={`px-3 py-1.5 rounded-md transition-colors flex items-center justify-center gap-2 text-sm font-medium ${
                   visualizacao === 'kanban'
                     ? 'bg-white text-[#159A9C] shadow-sm'
@@ -1227,6 +1265,8 @@ const PipelinePage: React.FC = () => {
               <button
                 data-testid="pipeline-view-lista"
                 onClick={() => setVisualizacao('lista')}
+                type="button"
+                aria-pressed={visualizacao === 'lista'}
                 className={`px-3 py-1.5 rounded-md transition-colors flex items-center justify-center gap-2 text-sm font-medium ${
                   visualizacao === 'lista'
                     ? 'bg-white text-[#159A9C] shadow-sm'
@@ -1239,6 +1279,8 @@ const PipelinePage: React.FC = () => {
               <button
                 data-testid="pipeline-view-calendario"
                 onClick={() => setVisualizacao('calendario')}
+                type="button"
+                aria-pressed={visualizacao === 'calendario'}
                 className={`px-3 py-1.5 rounded-md transition-colors flex items-center justify-center gap-2 text-sm font-medium ${
                   visualizacao === 'calendario'
                     ? 'bg-white text-[#159A9C] shadow-sm'
@@ -1251,6 +1293,8 @@ const PipelinePage: React.FC = () => {
               <button
                 data-testid="pipeline-view-grafico"
                 onClick={() => setVisualizacao('grafico')}
+                type="button"
+                aria-pressed={visualizacao === 'grafico'}
                 className={`px-3 py-1.5 rounded-md transition-colors flex items-center justify-center gap-2 text-sm font-medium ${
                   visualizacao === 'grafico'
                     ? 'bg-white text-[#159A9C] shadow-sm'
@@ -1264,26 +1308,45 @@ const PipelinePage: React.FC = () => {
           </div>
 
           <div className="w-full sm:w-auto flex items-center justify-end gap-2">
+            {visualizacao === 'kanban' && (
+              <button
+                type="button"
+                onClick={() => setKanbanExpanded((prev) => !prev)}
+                className="p-2 text-[#002333]/60 hover:text-[#002333] hover:bg-[#DEEFE7]/60 rounded-lg transition-colors"
+                title={kanbanExpanded ? 'Sair da visualização ampliada' : 'Ampliar Kanban'}
+                aria-label={kanbanExpanded ? 'Sair da visualização ampliada' : 'Ampliar Kanban'}
+              >
+                {kanbanExpanded ? (
+                  <Minimize2 className="h-4 w-4" />
+                ) : (
+                  <Maximize2 className="h-4 w-4" />
+                )}
+              </button>
+            )}
             <button
               data-testid="pipeline-refresh"
               onClick={() => carregarDados()}
               disabled={loading}
+              type="button"
               className="p-2 text-[#002333]/60 hover:text-[#002333] hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
               title="Atualizar"
+              aria-label="Atualizar dados do pipeline"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
             <button
               data-testid="pipeline-export"
               onClick={() => setShowModalExport(true)}
+              type="button"
               className="p-2 text-[#002333]/60 hover:text-[#002333] hover:bg-gray-100 rounded-lg transition-colors"
               title="Exportar"
+              aria-label="Exportar oportunidades"
             >
               <Download className="h-4 w-4" />
             </button>
           </div>
         </div>
-      </div>
+      </SectionCard>
 
       {/* Barra de Filtros */}
       <FiltersBar className="p-4">
@@ -1536,20 +1599,65 @@ const PipelinePage: React.FC = () => {
 
       {/* Visualização Kanban */}
       {visualizacao === 'kanban' && (
-        <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 -mx-1 px-1 sm:mx-0 sm:px-0">
+        <div className={kanbanExpanded ? 'fixed inset-0 z-50 bg-[#F3F6F7] text-[#1E3A4B]' : undefined}>
+          {kanbanExpanded && (
+            <div className="min-h-14 px-4 sm:px-5 py-2 flex flex-col gap-2 border-b border-[#D6E2E6] bg-white/95 backdrop-blur-[2px]">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-[#19384C]">
+                  <Grid3X3 className="h-4 w-4 text-[#159A9C]" />
+                  <span className="text-sm font-semibold">Pipeline • Kanban</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setKanbanExpanded(false)}
+                  className="p-2 rounded-lg text-[#002333]/70 hover:text-[#002333] hover:bg-[#DEEFE7]/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/25"
+                  aria-label="Fechar visualização ampliada do Kanban"
+                  title="Fechar"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {activeKanbanFilterChips.length > 0 && (
+                <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                  <span className="text-xs font-medium text-[#607B89] whitespace-nowrap">Filtros:</span>
+                  <div className="flex items-center gap-2">
+                    {activeKanbanFilterChips.map((chip) => (
+                      <span
+                        key={`${chip.label}-${chip.value}`}
+                        className="inline-flex items-center gap-1 rounded-full border border-[#B4BEC9]/55 bg-white px-2.5 py-1 text-[12px] text-[#244455] whitespace-nowrap"
+                        title={`${chip.label}: ${chip.value}`}
+                      >
+                        <span className="text-[#6C8794]">{chip.label}:</span>
+                        <strong className="text-[#1E3A4B] font-semibold">{chip.value}</strong>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <div className={kanbanExpanded ? 'h-[calc(100vh-3.5rem)] px-4 sm:px-5 pt-3 pb-4' : undefined}>
+            <div
+              className={
+                kanbanExpanded
+                  ? 'flex gap-3 sm:gap-4 overflow-x-auto pb-3 h-full'
+                  : 'flex gap-3 sm:gap-4 overflow-x-auto pb-3 -mx-1 px-1 sm:mx-0 sm:px-0 h-[min(72vh,calc(100vh-22rem))]'
+              }
+            >
           {agrupadoPorEstagio.map((estagio) => (
             <div
               key={estagio.id}
               data-testid={`pipeline-column-${estagio.id}`}
-              className="flex-shrink-0 w-[min(20rem,calc(100vw-6rem))] sm:w-80"
-              onDragOver={handleDragOver}
-              onDrop={() => handleDrop(estagio.id)}
+              className="flex-shrink-0 w-[min(18rem,calc(100vw-5rem))] sm:w-72 flex flex-col h-full"
+              role="region"
+              aria-labelledby={`pipeline-column-title-${estagio.id}`}
             >
               {/* Header da Coluna */}
-              <div className={`${estagio.headerClass} rounded-t-lg p-3 sm:p-4`}>
-                <div className="flex items-center justify-between mb-2">
+              <div className={`${estagio.headerClass} rounded-t-lg p-2.5 sm:p-3`}>
+                <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
-                    <span className="text-2xl">
+                    <span className="text-xl" aria-hidden="true">
                       {estagio.id === EstagioOportunidade.LEADS
                         ? '🎯'
                         : estagio.id === EstagioOportunidade.QUALIFICACAO
@@ -1560,28 +1668,40 @@ const PipelinePage: React.FC = () => {
                               ? '🤝'
                               : '🎉'}
                     </span>
-                    <h3 className="font-bold text-white">{estagio.nome}</h3>
+                    <h3
+                      id={`pipeline-column-title-${estagio.id}`}
+                      className="text-xs sm:text-sm font-semibold text-[#002333]"
+                    >
+                      {estagio.nome}
+                    </h3>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-white/25 backdrop-blur-sm text-white border border-white/30">
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#DEEFE7] text-[#002333] border border-[#B4BEC9]/55">
                       {estagio.oportunidades.length}
                     </span>
                     <button
                       onClick={() => handleNovaOportunidade(estagio.id)}
-                      className="p-1.5 hover:bg-white/20 rounded-lg transition-colors text-white"
-                      title="Adicionar oportunidade"
+                      type="button"
+                      className="p-1.5 hover:bg-[#DEEFE7]/70 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/25"
+                      aria-label={`Adicionar oportunidade em ${estagio.nome}`}
+                      title={`Adicionar oportunidade em ${estagio.nome}`}
+                      style={{ color: estagio.accentColor }}
                     >
                       <Plus className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
-                <p className="text-sm text-white font-semibold">
+                <p className="text-xs sm:text-sm text-[#002333]/70 font-semibold">
                   {formatarMoeda(calcularValorTotal(estagio.oportunidades))}
                 </p>
               </div>
 
               {/* Cards das Oportunidades */}
-              <div className="bg-gray-100 rounded-b-lg p-2 min-h-[420px] sm:min-h-[500px] space-y-2">
+              <div
+                className="bg-[#DEEFE7]/35 rounded-b-lg p-2 space-y-2 border border-[#B4BEC9]/40 border-t-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]"
+                onDragOver={handleDragOver}
+                onDrop={() => handleDrop(estagio.id)}
+              >
                 {estagio.oportunidades.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-center">
                     <div className="text-6xl mb-4 opacity-20">
@@ -1635,15 +1755,27 @@ const PipelinePage: React.FC = () => {
                         draggable
                         onDragStart={() => handleDragStart(oportunidade)}
                         onClick={() => handleVerDetalhes(oportunidade)}
-                        className="bg-white rounded-xl p-4 shadow-sm border hover:shadow-xl hover:-translate-y-1 transition-all duration-200 cursor-pointer relative group"
+                        onDragEnd={() => setDraggedItem(null)}
+                        onKeyDown={(e) => {
+                          if (e.currentTarget !== e.target) return;
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleVerDetalhes(oportunidade);
+                          }
+                        }}
+                        tabIndex={0}
+                        role="button"
+                        aria-label={`Abrir oportunidade: ${oportunidade.titulo}`}
+                        aria-grabbed={draggedItem?.id === oportunidade.id}
+                        className="bg-white rounded-lg p-3 shadow-sm border border-[#B4BEC9]/35 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer relative group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/30"
                       >
-                        {/* Header com avatar e ações */}
-                        <div className="flex items-center justify-between mb-3">
+                        {/* Header com avatar e badges */}
+                        <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
                             {/* Avatar do responsável */}
                             {oportunidade.responsavel && (
                               <div
-                                className="h-8 w-8 rounded-full bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] flex items-center justify-center text-white text-xs font-bold shadow-sm"
+                                className="h-7 w-7 rounded-full bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] flex items-center justify-center text-white text-[11px] font-bold shadow-sm"
                                 title={oportunidade.responsavel.nome}
                               >
                                 {oportunidade.responsavel.nome?.charAt(0).toUpperCase() || 'U'}
@@ -1661,45 +1793,13 @@ const PipelinePage: React.FC = () => {
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditarOportunidade(oportunidade);
-                              }}
-                              className="text-[#159A9C] hover:bg-[#159A9C]/10 p-1.5 rounded-lg transition-colors"
-                              title="Editar"
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleClonarOportunidade(oportunidade);
-                              }}
-                              className="text-[#0F7B7D] hover:bg-[#159A9C]/10 p-1.5 rounded-lg transition-colors"
-                              title="Duplicar"
-                            >
-                              <Copy className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeletarOportunidade(oportunidade);
-                              }}
-                              className="text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
-                              title="Excluir"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
                         </div>
 
                         {/* Badge de SLA */}
                         {diasAteVencimento !== null && (
                           <>
                             {diasAteVencimento < 0 && (
-                              <div className="mb-3 px-2 py-1 bg-red-100 border border-red-200 rounded-lg flex items-center gap-2">
+                              <div className="mb-2 px-2 py-1 bg-red-100 border border-red-200 rounded-lg flex items-center gap-2">
                                 <AlertCircle className="h-4 w-4 text-red-600" />
                                 <span className="text-xs font-semibold text-red-700">
                                   Atrasado {Math.abs(diasAteVencimento)}d
@@ -1707,7 +1807,7 @@ const PipelinePage: React.FC = () => {
                               </div>
                             )}
                             {diasAteVencimento >= 0 && diasAteVencimento < 7 && (
-                              <div className="mb-3 px-2 py-1 bg-yellow-100 border border-yellow-200 rounded-lg flex items-center gap-2">
+                              <div className="mb-2 px-2 py-1 bg-yellow-100 border border-yellow-200 rounded-lg flex items-center gap-2">
                                 <AlertCircle className="h-4 w-4 text-yellow-600" />
                                 <span className="text-xs font-semibold text-yellow-700">
                                   Vence em {diasAteVencimento}d
@@ -1718,24 +1818,25 @@ const PipelinePage: React.FC = () => {
                         )}
 
                         {/* Título */}
-                        <h4 className="font-bold text-[#002333] text-base mb-3 line-clamp-2 leading-tight">
+                        <h4
+                          className="font-semibold text-[#002333] text-sm mb-2 line-clamp-2 leading-snug"
+                          title={oportunidade.titulo}
+                        >
                           {oportunidade.titulo}
                         </h4>
 
                         {/* Valor em destaque */}
-                        <div className="mb-3 pb-3 border-b border-gray-100">
-                          <p className="text-2xl font-extrabold text-emerald-600">
+                        <div className="mb-2 pb-2 border-b border-gray-100">
+                          <p className="text-lg font-bold text-[#0F7B7D]">
                             {formatarMoeda(Number(oportunidade.valor || 0))}
                           </p>
                         </div>
 
                         {/* Badge de Probabilidade com Heat Map */}
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-xs text-[#002333]/60 font-medium">
-                            Probabilidade
-                          </span>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-[#002333]/60 font-medium">Probabilidade</span>
                           <span
-                            className={`px-3 py-1 rounded-full text-xs font-bold ${probColor} flex items-center gap-1`}
+                            className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${probColor} flex items-center gap-1`}
                           >
                             <span>{probEmoji}</span>
                             <span>{oportunidade.probabilidade}%</span>
@@ -1750,25 +1851,27 @@ const PipelinePage: React.FC = () => {
                               e.stopPropagation();
                               navigate(`/clientes/${oportunidade.cliente.id}`);
                             }}
-                            className="flex items-center gap-2 text-sm text-[#0F7B7D] hover:text-[#159A9C] hover:underline mb-2 transition-colors"
+                            type="button"
+                            className="flex items-center gap-2 text-xs text-[#0F7B7D] hover:text-[#159A9C] hover:underline mb-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/25 rounded"
+                            aria-label={`Abrir cliente ${oportunidade.cliente.nome}`}
                           >
-                            <Users className="h-4 w-4" />
+                            <Users className="h-3.5 w-3.5" />
                             <span className="truncate font-medium">
                               {oportunidade.cliente.nome}
                             </span>
                           </button>
                         ) : oportunidade.nomeContato ? (
                           // Se não tem cliente, mas tem nome de contato, mostra o contato
-                          <div className="flex items-center gap-2 text-sm text-[#002333]/70 mb-2">
-                            <Users className="h-4 w-4 text-[#159A9C]" />
+                          <div className="flex items-center gap-2 text-xs text-[#002333]/70 mb-2">
+                            <Users className="h-3.5 w-3.5 text-[#159A9C]" />
                             <span className="truncate font-medium">{oportunidade.nomeContato}</span>
                           </div>
                         ) : null}
 
                         {/* Data */}
                         {oportunidade.dataFechamentoEsperado && (
-                          <div className="flex items-center gap-2 text-sm text-[#002333]/70">
-                            <Calendar className="h-4 w-4 text-[#159A9C]" />
+                          <div className="flex items-center gap-2 text-xs text-[#002333]/70">
+                            <Calendar className="h-3.5 w-3.5 text-[#159A9C]" />
                             <span className="font-medium">
                               {new Date(oportunidade.dataFechamentoEsperado).toLocaleDateString(
                                 'pt-BR',
@@ -1778,36 +1881,56 @@ const PipelinePage: React.FC = () => {
                         )}
 
                         {/* Botões de ação */}
-                        <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEditarOportunidade(oportunidade);
-                            }}
-                            className="flex-1 px-3 py-2 text-sm font-medium text-[#159A9C] hover:bg-[#159A9C]/10 rounded-lg transition-colors flex items-center justify-center gap-2"
-                            title="Editar"
-                          >
-                            <Edit2 className="h-4 w-4" />
-                            Editar
-                          </button>
-                          <button
-                            onClick={(e) => handleGerarProposta(oportunidade, e)}
-                            className="flex-1 px-3 py-2 text-sm font-medium text-white bg-[#159A9C] hover:bg-[#0F7B7D] rounded-lg transition-colors flex items-center justify-center gap-2"
-                            title="Gerar Proposta"
-                          >
-                            <FileText className="h-4 w-4" />
-                            Proposta
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeletarOportunidade(oportunidade);
-                            }}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Deletar"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100">
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditarOportunidade(oportunidade);
+                              }}
+                              type="button"
+                              className="text-[#159A9C] hover:bg-[#159A9C]/10 p-1.5 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/25"
+                              aria-label="Editar oportunidade"
+                              title="Editar"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleClonarOportunidade(oportunidade);
+                              }}
+                              type="button"
+                              className="text-[#0F7B7D] hover:bg-[#159A9C]/10 p-1.5 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/25"
+                              aria-label="Duplicar oportunidade"
+                              title="Duplicar"
+                            >
+                              <Copy className="h-4 w-4" />
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={(e) => handleGerarProposta(oportunidade, e)}
+                              type="button"
+                              className="text-white bg-[#159A9C] hover:bg-[#0F7B7D] p-1.5 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/25"
+                              aria-label="Gerar proposta"
+                              title="Gerar proposta"
+                            >
+                              <FileText className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeletarOportunidade(oportunidade);
+                              }}
+                              type="button"
+                              className="text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-200"
+                              aria-label="Excluir oportunidade"
+                              title="Excluir"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );
@@ -1816,19 +1939,21 @@ const PipelinePage: React.FC = () => {
               </div>
             </div>
           ))}
+            </div>
+          </div>
         </div>
       )}
 
       {/* Visualização Lista */}
       {visualizacao === 'lista' && (
-        <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+        <DataTableCard>
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b">
+              <thead className="bg-[#DEEFE7]/35 border-b border-[#B4BEC9]/40">
                 <tr>
                   <th
                     onClick={() => handleOrdenar('titulo')}
-                    className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-[#DEEFE7]/55 transition-colors"
                   >
                     <div className="flex items-center gap-2">
                       Título
@@ -1837,7 +1962,7 @@ const PipelinePage: React.FC = () => {
                   </th>
                   <th
                     onClick={() => handleOrdenar('estagio')}
-                    className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-[#DEEFE7]/55 transition-colors"
                   >
                     <div className="flex items-center gap-2">
                       Estágio
@@ -1846,7 +1971,7 @@ const PipelinePage: React.FC = () => {
                   </th>
                   <th
                     onClick={() => handleOrdenar('valor')}
-                    className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-[#DEEFE7]/55 transition-colors"
                   >
                     <div className="flex items-center gap-2">
                       Valor
@@ -1855,7 +1980,7 @@ const PipelinePage: React.FC = () => {
                   </th>
                   <th
                     onClick={() => handleOrdenar('probabilidade')}
-                    className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-[#DEEFE7]/55 transition-colors"
                   >
                     <div className="flex items-center gap-2">
                       Probabilidade
@@ -1867,7 +1992,7 @@ const PipelinePage: React.FC = () => {
                   </th>
                   <th
                     onClick={() => handleOrdenar('dataFechamentoEsperado')}
-                    className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-[#DEEFE7]/55 transition-colors"
                   >
                     <div className="flex items-center gap-2">
                       Data Esperada
@@ -1881,7 +2006,7 @@ const PipelinePage: React.FC = () => {
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-[#B4BEC9]/25">
                 {oportunidadesPaginadas.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-6 py-8 text-center text-[#002333]/60">
@@ -1971,7 +2096,7 @@ const PipelinePage: React.FC = () => {
 
           {/* Paginação */}
           {totalPaginas > 1 && (
-            <div className="border-t px-4 sm:px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-gray-50">
+            <div className="border-t border-[#B4BEC9]/35 px-4 sm:px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-[#DEEFE7]/35">
               <div className="text-xs sm:text-sm text-[#002333]/60">
                 Mostrando {indexInicio + 1} a {Math.min(indexFim, oportunidadesOrdenadas.length)} de{' '}
                 {oportunidadesOrdenadas.length} oportunidades
@@ -1980,7 +2105,7 @@ const PipelinePage: React.FC = () => {
                 <button
                   onClick={() => setPaginaAtual((prev) => Math.max(1, prev - 1))}
                   disabled={paginaAtual === 1}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium text-[#002333] hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                  className="px-3 py-1.5 border border-[#B4BEC9]/70 rounded-lg text-sm font-medium text-[#002333] hover:bg-[#DEEFE7]/55 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
                 >
                   Anterior
                 </button>
@@ -2005,7 +2130,7 @@ const PipelinePage: React.FC = () => {
                             className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
                               paginaAtual === page
                                 ? 'bg-[#159A9C] text-white'
-                                : 'text-[#002333] hover:bg-gray-100'
+                                : 'text-[#002333] hover:bg-[#DEEFE7]/55'
                             }`}
                           >
                             {page}
@@ -2018,19 +2143,19 @@ const PipelinePage: React.FC = () => {
                 <button
                   onClick={() => setPaginaAtual((prev) => Math.min(totalPaginas, prev + 1))}
                   disabled={paginaAtual === totalPaginas}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium text-[#002333] hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                  className="px-3 py-1.5 border border-[#B4BEC9]/70 rounded-lg text-sm font-medium text-[#002333] hover:bg-[#DEEFE7]/55 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
                 >
                   Próxima
                 </button>
               </div>
             </div>
           )}
-        </div>
+        </DataTableCard>
       )}
 
       {/* Visualização Calendário */}
       {visualizacao === 'calendario' && (
-        <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+        <SectionCard className="overflow-hidden">
           <style>{`
                 .rbc-calendar {
                   font-family: inherit;
@@ -2041,15 +2166,15 @@ const PipelinePage: React.FC = () => {
                   font-weight: 600;
                   font-size: 14px;
                   color: #002333;
-                  background-color: #F9FAFB;
-                  border-bottom: 2px solid #E5E7EB;
+                  background-color: #DEEFE7;
+                  border-bottom: 1px solid #B4BEC9;
                 }
                 .rbc-toolbar {
                   padding: 16px 24px;
                   display: flex;
                   justify-content: space-between;
                   align-items: center;
-                  border-bottom: 1px solid #E5E7EB;
+                  border-bottom: 1px solid #B4BEC9;
                   background-color: #FFFFFF;
                 }
                 .rbc-toolbar button {
@@ -2064,7 +2189,7 @@ const PipelinePage: React.FC = () => {
                   transition: all 0.2s;
                 }
                 .rbc-toolbar button:hover {
-                  background-color: #F3F4F6;
+                  background-color: #DEEFE7;
                   border-color: #159A9C;
                 }
                 .rbc-toolbar button.rbc-active {
@@ -2080,10 +2205,10 @@ const PipelinePage: React.FC = () => {
                   overflow: visible;
                 }
                 .rbc-day-bg {
-                  border: 1px solid #E5E7EB;
+                  border: 1px solid #B4BEC9;
                 }
                 .rbc-off-range-bg {
-                  background-color: #F9FAFB;
+                  background-color: #DEEFE7;
                 }
                 .rbc-today {
                   background-color: #DEEFE7 !important;
@@ -2104,7 +2229,7 @@ const PipelinePage: React.FC = () => {
                   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
                 }
                 .rbc-event.rbc-selected {
-                  outline: 2px solid #002333;
+                  outline: 2px solid #159A9C;
                   outline-offset: 2px;
                 }
                 .rbc-event-label {
@@ -2230,7 +2355,7 @@ const PipelinePage: React.FC = () => {
               ))}
             </div>
           </div>
-        </div>
+        </SectionCard>
       )}
 
       {/* Visualização Gráficos */}
@@ -2239,14 +2364,14 @@ const PipelinePage: React.FC = () => {
           {/* Grid 2x3 de gráficos */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* 1. Funil de Conversão */}
-            <div className="bg-white rounded-lg shadow-sm border p-6">
+            <SectionCard className="p-6">
               <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
                 <TrendingUp className="h-5 w-5 text-[#159A9C]" />
                 Funil de Conversão
               </h3>
               <ResponsiveContainer width="100%" height={300}>
                 <RechartsBarChart data={dadosGraficos.funil}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#B4BEC9" />
                   <XAxis
                     dataKey="nome"
                     tick={{ fontSize: 12, fill: '#002333' }}
@@ -2258,7 +2383,7 @@ const PipelinePage: React.FC = () => {
                   <Tooltip
                     contentStyle={{
                       backgroundColor: '#fff',
-                      border: '1px solid #E5E7EB',
+                      border: '1px solid #B4BEC9',
                       borderRadius: '8px',
                       fontSize: '12px',
                     }}
@@ -2267,17 +2392,17 @@ const PipelinePage: React.FC = () => {
                   <Bar dataKey="quantidade" fill="#159A9C" radius={[8, 8, 0, 0]} />
                 </RechartsBarChart>
               </ResponsiveContainer>
-            </div>
+            </SectionCard>
 
             {/* 2. Valor por Estágio */}
-            <div className="bg-white rounded-lg shadow-sm border p-6">
+            <SectionCard className="p-6">
               <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
                 <DollarSign className="h-5 w-5 text-[#159A9C]" />
                 Valor por Estágio
               </h3>
               <ResponsiveContainer width="100%" height={300}>
                 <RechartsBarChart data={dadosGraficos.valorPorEstagio} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#B4BEC9" />
                   <XAxis
                     type="number"
                     tick={{ fontSize: 12, fill: '#002333' }}
@@ -2292,7 +2417,7 @@ const PipelinePage: React.FC = () => {
                   <Tooltip
                     contentStyle={{
                       backgroundColor: '#fff',
-                      border: '1px solid #E5E7EB',
+                      border: '1px solid #B4BEC9',
                       borderRadius: '8px',
                       fontSize: '12px',
                     }}
@@ -2307,17 +2432,17 @@ const PipelinePage: React.FC = () => {
                   <Bar dataKey="valor" fill="#0F7B7D" radius={[0, 8, 8, 0]} />
                 </RechartsBarChart>
               </ResponsiveContainer>
-            </div>
+            </SectionCard>
 
             {/* 3. Taxa de Conversão */}
-            <div className="bg-white rounded-lg shadow-sm border p-6">
+            <SectionCard className="p-6">
               <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
                 <Target className="h-5 w-5 text-[#159A9C]" />
                 Taxa de Conversão
               </h3>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={dadosGraficos.taxaConversao}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#B4BEC9" />
                   <XAxis
                     dataKey="nome"
                     tick={{ fontSize: 12, fill: '#002333' }}
@@ -2332,7 +2457,7 @@ const PipelinePage: React.FC = () => {
                   <Tooltip
                     contentStyle={{
                       backgroundColor: '#fff',
-                      border: '1px solid #E5E7EB',
+                      border: '1px solid #B4BEC9',
                       borderRadius: '8px',
                       fontSize: '12px',
                     }}
@@ -2348,10 +2473,10 @@ const PipelinePage: React.FC = () => {
                   />
                 </LineChart>
               </ResponsiveContainer>
-            </div>
+            </SectionCard>
 
             {/* 4. Origem das Oportunidades */}
-            <div className="bg-white rounded-lg shadow-sm border p-6">
+            <SectionCard className="p-6">
               <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
                 <Users className="h-5 w-5 text-[#159A9C]" />
                 Origem das Oportunidades
@@ -2378,24 +2503,24 @@ const PipelinePage: React.FC = () => {
                   <Tooltip
                     contentStyle={{
                       backgroundColor: '#fff',
-                      border: '1px solid #E5E7EB',
+                      border: '1px solid #B4BEC9',
                       borderRadius: '8px',
                       fontSize: '12px',
                     }}
                   />
                 </PieChart>
               </ResponsiveContainer>
-            </div>
+            </SectionCard>
 
             {/* 5. Performance por Responsável */}
-            <div className="bg-white rounded-lg shadow-sm border p-6 lg:col-span-2">
+            <SectionCard className="p-6 lg:col-span-2">
               <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
                 <Users className="h-5 w-5 text-[#159A9C]" />
                 Top 5 - Performance por Responsável
               </h3>
               <ResponsiveContainer width="100%" height={300}>
                 <RechartsBarChart data={dadosGraficos.performance}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#B4BEC9" />
                   <XAxis dataKey="nome" tick={{ fontSize: 12, fill: '#002333' }} />
                   <YAxis
                     yAxisId="left"
@@ -2411,7 +2536,7 @@ const PipelinePage: React.FC = () => {
                   <Tooltip
                     contentStyle={{
                       backgroundColor: '#fff',
-                      border: '1px solid #E5E7EB',
+                      border: '1px solid #B4BEC9',
                       borderRadius: '8px',
                       fontSize: '12px',
                     }}
@@ -2432,20 +2557,20 @@ const PipelinePage: React.FC = () => {
                   <Bar
                     yAxisId="left"
                     dataKey="valor"
-                    fill="#6366f1"
+                    fill="#159A9C"
                     name="Valor"
                     radius={[8, 8, 0, 0]}
                   />
                   <Bar
                     yAxisId="right"
                     dataKey="quantidade"
-                    fill="#f59e0b"
+                    fill="#FBBF24"
                     name="Quantidade"
                     radius={[8, 8, 0, 0]}
                   />
                 </RechartsBarChart>
               </ResponsiveContainer>
-            </div>
+            </SectionCard>
           </div>
 
           {/* Resumo Estatístico */}

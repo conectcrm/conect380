@@ -397,6 +397,7 @@ export class PagamentoService {
     }
 
     await this.faturaRepository.save(fatura);
+    await this.faturamentoService.sincronizarStatusPropostaPorFaturaId(fatura.id, empresaId);
 
     this.logEvento('FATURA_STATUS_RECALCULADO', {
       empresaId,

@@ -266,6 +266,24 @@ Requisitos:
 - inputs/selects com tokens visuais unificados
 - mensagens de erro visiveis no proprio modal
 
+### Encoding e acentuacao (obrigatorio)
+
+Requisitos:
+
+- todo texto de interface (titulo, label, placeholder, toast, tooltip) deve manter pt-BR com acentuacao correta
+- manter cedilha e caixa correta quando aplicavel (`ç` e `Ç`)
+- e proibido simplificar texto para "sem acento" em campos visiveis para o usuario (ex.: `Descricao`, `Informacoes`, `Acoes`)
+- arquivos `.ts`, `.tsx`, `.js`, `.jsx` do frontend devem ser salvos em UTF-8
+- ao revisar uma tela alterada, validar visualmente acentuacao em:
+  - header e subtitulo
+  - labels/placeholders
+  - mensagens de erro e feedback
+
+Validacao tecnica minima antes do merge:
+
+1. executar `rg -n "Ã|Â|�" frontend-web/src` e garantir que nao existem ocorrencias novas nas telas alteradas
+2. validar que o editor esta salvando com `charset = utf-8` (padrao definido em `.editorconfig`)
+
 ### Modais complexos (ex.: permissoes)
 
 Requisitos adicionais:

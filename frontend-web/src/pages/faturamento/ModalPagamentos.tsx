@@ -42,6 +42,7 @@ export default function ModalPagamentos({
     observacoes: '',
   });
   const [carregando, setCarregando] = useState(false);
+  const [erroFormulario, setErroFormulario] = useState<string | null>(null);
 
   const valorPago = pagamentos.reduce(
     (total, p) => (p.status === StatusPagamento.APROVADO ? total + p.valor : total),
@@ -51,10 +52,11 @@ export default function ModalPagamentos({
 
   const handleRegistrarPagamento = async () => {
     if (novoPagamento.valor <= 0 || novoPagamento.valor > valorRestante) {
-      alert('Valor inválido para pagamento');
+      setErroFormulario('Informe um valor válido, maior que zero e até o valor restante.');
       return;
     }
 
+    setErroFormulario(null);
     setCarregando(true);
     try {
       await onRegistrarPagamento({
@@ -71,6 +73,7 @@ export default function ModalPagamentos({
       });
     } catch (error) {
       console.error('Erro ao registrar pagamento:', error);
+      setErroFormulario('Falha ao registrar pagamento. Tente novamente.');
     } finally {
       setCarregando(false);
     }
@@ -272,6 +275,12 @@ export default function ModalPagamentos({
                   />
                 </div>
               </div>
+
+              {erroFormulario && (
+                <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {erroFormulario}
+                </div>
+              )}
 
               <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t">
                 <button

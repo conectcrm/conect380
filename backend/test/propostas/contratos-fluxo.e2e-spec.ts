@@ -15,9 +15,23 @@ describe('Contratos - Fluxo de Assinatura (E2E)', () => {
     await h.teardown();
   });
 
+  async function obterStatusProposta(propostaId: string): Promise<string> {
+    const resposta = await request(h.httpServer)
+      .get(`/propostas/${propostaId}`)
+      .set('Authorization', `Bearer ${h.tokenAdminEmpresaA}`)
+      .send();
+
+    expect(resposta.status).toBe(200);
+    expect(resposta.body?.success).toBe(true);
+    return String(resposta.body?.proposta?.status || '');
+  }
+
   it('executa fluxo de contrato com PDF real e assinatura publica', async () => {
     const contrato = await h.criarContratoViaApi(h.tokenAdminEmpresaA, h.propostaEmpresaAId);
     h.contratoEmpresaAId = Number(contrato.id);
+
+    const statusAposContratoGerado = await obterStatusProposta(h.propostaEmpresaAId);
+    expect(statusAposContratoGerado).toBe('contrato_gerado');
 
     const pdfResponse = await request(h.httpServer)
       .get(`/contratos/${h.contratoEmpresaAId}/pdf`)
@@ -71,6 +85,9 @@ describe('Contratos - Fluxo de Assinatura (E2E)', () => {
     expect(contratoAtualizado.status).toBe(200);
     expect(contratoAtualizado.body?.success).toBe(true);
     expect(contratoAtualizado.body?.data?.status).toBe('assinado');
+
+    const statusAposContratoAssinado = await obterStatusProposta(h.propostaEmpresaAId);
+    expect(statusAposContratoAssinado).toBe('contrato_assinado');
   });
 
   it('retorna 400 na pagina publica de assinatura quando token esta expirado', async () => {

@@ -67,6 +67,7 @@ import {
 } from '../../hooks/useConfirmacaoInteligente';
 import NotificacaoSucesso from '../../components/common/NotificacaoSucesso';
 import { useNotificacaoFinanceira } from '../../hooks/useNotificacao';
+import { getPagamentosGatewayUiConfig } from '../../config/pagamentosGatewayFlags';
 
 interface DashboardCards {
   totalFaturas: number;
@@ -153,6 +154,9 @@ export default function FaturamentoPage() {
   const confirmacao = useConfirmacaoInteligente();
   const validacao = useValidacaoFinanceira();
   const notificacao = useNotificacaoFinanceira();
+  const gatewayUiConfig = getPagamentosGatewayUiConfig();
+  const gatewayUiHabilitada = gatewayUiConfig.onlineGatewayUiEnabled;
+  const linkPagamentoHabilitado = gatewayUiConfig.paymentLinkEnabled;
 
   // Dados paginados com aggregates (React Query)
   const faturasQuery = useFaturasPaginadas({
@@ -391,6 +395,17 @@ export default function FaturamentoPage() {
     // Implementar lógica para marcar notificação como lida
   };
 
+  const obterMensagemErro = (error: unknown, fallback: string) => {
+    const err = error as any;
+    return (
+      err?.response?.data?.message ||
+      err?.response?.data?.error ||
+      (Array.isArray(err?.response?.data?.errors) ? err.response.data.errors.join(', ') : null) ||
+      err?.message ||
+      fallback
+    );
+  };
+
   const abrirFaturaNotificacao = (faturaId: number) => {
     const fatura = faturas.find((f) => f.id === faturaId);
     if (fatura) {
@@ -400,6 +415,10 @@ export default function FaturamentoPage() {
 
   // Handlers para funcionalidades avançadas da Semana 2
   const abrirModalGateway = (fatura: Fatura) => {
+    if (!gatewayUiHabilitada) {
+      notificacao.mostrarAviso('Gateway indisponivel', gatewayUiConfig.motivoBloqueio);
+      return;
+    }
     setFaturaGateway(fatura);
     setModalGatewayAberto(true);
   };
@@ -426,30 +445,102 @@ export default function FaturamentoPage() {
 
   const handleEnviarEmail = async (faturaIds: number[], templateId: string) => {
     try {
-      // Simula envio de email - integrar com serviço real
-      console.log('Enviando emails para faturas:', faturaIds, 'template:', templateId);
-      // await emailService.enviarEmails(faturaIds, templateId);
-      alert('Emails enviados com sucesso!');
+      if (!faturaIds.length) {
+        notificacao.mostrarAviso('Seleção necessária', 'Selecione ao menos uma fatura para envio.');
+        return;
+      }
+
+      const resultados = await Promise.allSettled(
+        faturaIds.map((faturaId) => faturamentoService.enviarFaturaPorEmail(faturaId)),
+      );
+
+      const enviados = resultados.filter((r) => r.status === 'fulfilled').length;
+      const falhas = resultados.length - enviados;
+
+      if (enviados > 0) {
+        notificacao.mostrarSucesso(
+          'Emails enviados',
+          `${enviados} email(s) enviado(s) com sucesso${templateId ? ` (template ${templateId})` : ''}.`,
+        );
+      }
+
+      if (falhas > 0) {
+        const primeiraFalha = resultados.find(
+          (r): r is PromiseRejectedResult => r.status === 'rejected',
+        );
+        notificacao.erro.operacaoFalhou(
+          'enviar emails em lote',
+          `${falhas} envio(s) falharam. ${obterMensagemErro(primeiraFalha?.reason, 'Falha ao enviar emails.')}`,
+        );
+      }
     } catch (error) {
       console.error('Erro ao enviar emails:', error);
-      alert('Erro ao enviar emails. Tente novamente.');
+      notificacao.erro.operacaoFalhou(
+        'enviar emails',
+        obterMensagemErro(error, 'Erro ao enviar emails.'),
+      );
     }
   };
 
   const handleExportarRelatorio = (tipo: 'pdf' | 'excel' | 'csv') => {
-    // Simula exportação - integrar com serviço real
-    console.log('Exportando relatório:', tipo);
-    alert(`Relatório ${tipo.toUpperCase()} será baixado em breve!`);
+    try {
+      if (tipo !== 'csv') {
+        notificacao.mostrarAviso(
+          'Exportação indisponível',
+          `Exportação ${tipo.toUpperCase()} ainda não está disponível nesta versão.`,
+        );
+        return;
+      }
+
+      if (!faturas.length) {
+        notificacao.mostrarAviso('Sem dados', 'Não há faturas para exportar.');
+        return;
+      }
+
+      const header = ['Número', 'Cliente', 'Valor Total', 'Status', 'Vencimento', 'Emissão'];
+      const rows = faturas.map((f) => [
+        f.numero,
+        obterNomeCliente(f),
+        Number(f.valorTotal || 0).toFixed(2),
+        f.status,
+        f.dataVencimento,
+        f.dataEmissao,
+      ]);
+
+      const csv = [header.join(','), ...rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `relatorio_faturamento_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      notificacao.mostrarSucesso('Relatório exportado', 'Arquivo CSV gerado com sucesso.');
+    } catch (error) {
+      console.error('Erro ao exportar relatório:', error);
+      notificacao.erro.operacaoFalhou(
+        'exportar relatório',
+        obterMensagemErro(error, 'Falha ao exportar relatório CSV.'),
+      );
+    }
   };
 
   const handleExecutarWorkflow = async (config: any) => {
     try {
       console.log('Executando workflow:', config);
-      // Integrar com serviço de workflows
-      alert('Workflow executado com sucesso!');
+      notificacao.mostrarInfo(
+        'Workflow executado',
+        'Execução registrada no modo atual da automação.',
+      );
     } catch (error) {
       console.error('Erro ao executar workflow:', error);
-      alert('Erro ao executar workflow. Tente novamente.');
+      notificacao.erro.operacaoFalhou(
+        'executar workflow',
+        obterMensagemErro(error, 'Erro ao executar workflow.'),
+      );
     }
   };
 
@@ -472,16 +563,27 @@ export default function FaturamentoPage() {
           break;
         default:
           console.log('Ação não implementada:', acao);
+          notificacao.mostrarAviso(
+            'Ação de notificação indisponível',
+            `A ação "${acao}" ainda não está disponível nesta versão.`,
+          );
       }
     } catch (error) {
       console.error('Erro ao executar ação da notificação:', error);
+      notificacao.erro.operacaoFalhou(
+        'executar ação de notificação',
+        obterMensagemErro(error, 'Falha ao executar ação da notificação.'),
+      );
     }
   };
 
   const handleExecutarBackup = async (config?: any) => {
     try {
       console.log('Iniciando backup:', config);
-      // Integrar com serviço de backup
+      notificacao.mostrarAviso(
+        'Backup indisponível',
+        'Execução de backup ainda não está integrada ao backend nesta versão.',
+      );
       return Promise.resolve();
     } catch (error) {
       console.error('Erro ao executar backup:', error);
@@ -492,11 +594,16 @@ export default function FaturamentoPage() {
   const handleRestaurarBackup = async (backupId?: string, opcoes?: any) => {
     try {
       console.log('Restaurando backup:', backupId, opcoes);
-      // Integrar com serviço de restauração
-      alert('Backup restaurado com sucesso!');
+      notificacao.mostrarAviso(
+        'Restauração indisponível',
+        'Restauração de backup ainda não está integrada ao backend nesta versão.',
+      );
     } catch (error) {
       console.error('Erro ao restaurar backup:', error);
-      alert('Erro ao restaurar backup. Tente novamente.');
+      notificacao.erro.operacaoFalhou(
+        'restaurar backup',
+        obterMensagemErro(error, 'Erro ao restaurar backup.'),
+      );
     }
   };
 
@@ -504,15 +611,20 @@ export default function FaturamentoPage() {
     try {
       if (faturaEdicao) {
         await faturamentoService.atualizarFatura(faturaEdicao.id, dadosFatura);
+        notificacao.mostrarSucesso('Fatura atualizada', 'Fatura atualizada com sucesso.');
       } else {
         await faturamentoService.criarFatura(dadosFatura);
+        notificacao.mostrarSucesso('Fatura criada', 'Fatura criada com sucesso.');
       }
 
       fecharModal();
       carregarFaturas();
     } catch (error) {
       console.error('Erro ao salvar fatura:', error);
-      alert('Erro ao salvar fatura. Tente novamente.');
+      notificacao.erro.operacaoFalhou(
+        'salvar fatura',
+        obterMensagemErro(error, 'Erro ao salvar fatura.'),
+      );
     }
   };
 
@@ -522,7 +634,7 @@ export default function FaturamentoPage() {
       const fatura = faturas.find((f) => f.id === id);
       if (!fatura) {
         console.error('Fatura não encontrada:', id);
-        alert('Fatura não encontrada.');
+        notificacao.mostrarAviso('Fatura não encontrada', `Não foi possível localizar a fatura ${id}.`);
         return;
       }
 
@@ -562,19 +674,28 @@ export default function FaturamentoPage() {
             );
           } catch (error) {
             console.error('Erro ao excluir fatura no serviço:', error);
-            alert('Erro ao excluir fatura. Verifique se ela não possui dependências.');
-            throw error; // Re-throw para ser capturado pelo catch externo
+            throw new Error(
+              obterMensagemErro(error, 'Erro ao excluir fatura. Verifique se ela não possui dependências.'),
+            );
           }
         },
         dadosContexto,
       );
     } catch (error) {
       console.error('Erro ao excluir fatura:', error);
-      alert('Erro ao excluir fatura. Tente novamente.');
+      notificacao.erro.operacaoFalhou(
+        'excluir fatura',
+        obterMensagemErro(error, 'Erro ao excluir fatura.'),
+      );
     }
   };
 
   const gerarLinkPagamento = async (id: number) => {
+    if (!linkPagamentoHabilitado) {
+      notificacao.mostrarAviso('Link de pagamento indisponivel', gatewayUiConfig.motivoBloqueio);
+      return;
+    }
+
     try {
       const link = await faturamentoService.gerarLinkPagamento(id);
       navigator.clipboard.writeText(link);
@@ -585,7 +706,10 @@ export default function FaturamentoPage() {
       carregarFaturas(); // Recarregar para atualizar o link
     } catch (error) {
       console.error('Erro ao gerar link de pagamento:', error);
-      notificacao.erro.operacaoFalhou('gerar link de pagamento');
+      notificacao.erro.operacaoFalhou(
+        'gerar link de pagamento',
+        obterMensagemErro(error, 'Recurso indisponivel no backend atual.'),
+      );
     }
   };
 
@@ -595,7 +719,10 @@ export default function FaturamentoPage() {
       notificacao.mostrarSucesso('Email Enviado', 'Fatura enviada por email com sucesso!');
     } catch (error) {
       console.error('Erro ao enviar fatura por email:', error);
-      notificacao.erro.operacaoFalhou('enviar fatura por email');
+      notificacao.erro.operacaoFalhou(
+        'enviar fatura por email',
+        obterMensagemErro(error, 'Falha ao enviar fatura por email.'),
+      );
     }
   };
 
@@ -612,7 +739,10 @@ export default function FaturamentoPage() {
       document.body.removeChild(a);
     } catch (error) {
       console.error('Erro ao baixar PDF:', error);
-      alert('Erro ao baixar PDF. Tente novamente.');
+      notificacao.erro.operacaoFalhou(
+        'baixar PDF da fatura',
+        obterMensagemErro(error, 'Download de PDF indisponivel no backend atual.'),
+      );
     }
   };
 
@@ -672,7 +802,10 @@ export default function FaturamentoPage() {
       fecharModalPagamentos();
     } catch (error) {
       console.error('Erro ao registrar pagamento:', error);
-      notificacao.erro.operacaoFalhou('registrar pagamento');
+      notificacao.erro.operacaoFalhou(
+        'registrar pagamento',
+        obterMensagemErro(error, 'Falha ao registrar/processar pagamento.'),
+      );
       throw error;
     }
   };
@@ -717,15 +850,11 @@ export default function FaturamentoPage() {
           break;
 
         case 'gerar-cobranca':
-          for (let i = 0; i < faturasSelecionadasData.length; i++) {
-            const fatura = faturasSelecionadasData[i];
-            if (fatura.status === StatusFatura.VENCIDA || fatura.status === StatusFatura.PENDENTE) {
-              console.log(`Gerando cobrança da fatura ${fatura.numero}...`);
-              // TODO: Implementar geração de cobrança
-            }
-            setProgressoAcaoMassa(((i + 1) / faturasSelecionadasData.length) * 100);
-          }
-          notificacao.mostrarSucesso('Cobranças Geradas', 'Cobranças geradas com sucesso!');
+          setProgressoAcaoMassa(100);
+          notificacao.mostrarAviso(
+            'Cobrança em lote indisponível',
+            'A geração de cobrança em lote ainda não está integrada ao backend.',
+          );
           break;
 
         case 'exportar':
@@ -775,6 +904,10 @@ export default function FaturamentoPage() {
 
         default:
           console.log('Ação não implementada:', acao);
+          notificacao.mostrarAviso(
+            'Ação indisponível',
+            `A ação "${acao}" ainda não está disponível nesta versão.`,
+          );
           setProgressoAcaoMassa(100);
       }
 
@@ -783,7 +916,10 @@ export default function FaturamentoPage() {
       setMostrarAcoesMassa(false);
     } catch (error) {
       console.error('Erro ao executar ação em massa:', error);
-      alert('Erro ao executar ação. Tente novamente.');
+      notificacao.erro.operacaoFalhou(
+        'executar ação em massa',
+        obterMensagemErro(error, 'Erro ao executar ação em massa.'),
+      );
     } finally {
       setProcessandoAcaoMassa(false);
       setProgressoAcaoMassa(0);
@@ -1667,10 +1803,20 @@ export default function FaturamentoPage() {
                                             </button>
                                             <button
                                               onClick={() => gerarLinkPagamento(fatura.id)}
-                                              className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-orange-50 hover:text-orange-700 flex items-center gap-2 transition-colors"
+                                              disabled={!linkPagamentoHabilitado}
+                                              title={
+                                                !linkPagamentoHabilitado
+                                                  ? gatewayUiConfig.motivoBloqueio
+                                                  : 'Gerar link de pagamento'
+                                              }
+                                              className={`w-full px-3 py-2 text-left text-xs flex items-center gap-2 transition-colors ${
+                                                linkPagamentoHabilitado
+                                                  ? 'text-gray-700 hover:bg-orange-50 hover:text-orange-700'
+                                                  : 'text-gray-400 cursor-not-allowed bg-gray-50'
+                                              }`}
                                             >
                                               <Link2 className="w-3 h-3" />
-                                              Gerar Link
+                                              {linkPagamentoHabilitado ? 'Gerar Link' : 'Gerar Link (off)'}
                                             </button>
                                           </>
                                         )}
@@ -1941,12 +2087,26 @@ export default function FaturamentoPage() {
                                   {fatura.status !== StatusFatura.PAGA && (
                                     <button
                                       onClick={() => abrirModalGateway(fatura)}
-                                      className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-3 transition-colors"
+                                      disabled={!gatewayUiHabilitada}
+                                      title={
+                                        !gatewayUiHabilitada
+                                          ? gatewayUiConfig.motivoBloqueio
+                                          : 'Abrir pagamento online'
+                                      }
+                                      className={`w-full px-4 py-3 text-left text-sm flex items-center gap-3 transition-colors ${
+                                        gatewayUiHabilitada
+                                          ? 'text-gray-700 hover:bg-blue-50 hover:text-blue-700'
+                                          : 'text-gray-400 bg-gray-50 cursor-not-allowed'
+                                      }`}
                                     >
                                       <CreditCard className="w-4 h-4" />
                                       <div>
-                                        <div className="font-medium">Pagar Online</div>
-                                        <div className="text-xs text-gray-500">Gateway</div>
+                                        <div className="font-medium">
+                                          {gatewayUiHabilitada ? 'Pagar Online' : 'Pagar Online (off)'}
+                                        </div>
+                                        <div className="text-xs text-gray-500">
+                                          {gatewayUiHabilitada ? 'Gateway' : 'Gateway indisponivel'}
+                                        </div>
                                       </div>
                                     </button>
                                   )}

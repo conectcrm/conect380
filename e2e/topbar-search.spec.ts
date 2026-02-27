@@ -1,107 +1,37 @@
 import { test, expect } from './fixtures';
 
-test.describe('Topbar Search', () => {
-  test('navega ao clicar em resultado legado de cliente', async ({ authenticatedPage }) => {
-    const legacyClientId = '11111111-1111-1111-1111-111111111111';
-
-    await authenticatedPage.route('**/search**', async (route) => {
-      const requestUrl = new URL(route.request().url());
-      const query = (requestUrl.searchParams.get('q') || '').toLowerCase();
-
-      if (!query.includes('cliente')) {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify([]),
-        });
-        return;
-      }
-
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify([
-          {
-            id: legacyClientId,
-            title: 'CLIENTE E2E',
-            subtitle: 'cliente.e2e@teste.com',
-            type: 'cliente',
-            path: `/clientes/${legacyClientId}`,
-          },
-        ]),
-      });
-    });
-
+test.describe('Topbar Actions', () => {
+  test('abre menu do usuario e navega para perfil', async ({ authenticatedPage }) => {
     await authenticatedPage.goto('/dashboard');
+    await authenticatedPage.waitForLoadState('domcontentloaded');
 
-    const searchInput = authenticatedPage.getByTestId('topbar-search-input');
-    await expect(searchInput).toBeVisible();
+    const topbarTray = authenticatedPage.getByTestId('topbar-actions-tray');
+    await expect(topbarTray).toBeVisible();
 
-    await searchInput.fill('cliente');
+    const userMenuButton = authenticatedPage.locator('button[data-user-menu]').first();
+    await expect(userMenuButton).toBeVisible();
+    await userMenuButton.click();
 
-    const firstResult = authenticatedPage.getByTestId('topbar-search-result').first();
-    await expect(firstResult).toBeVisible();
-    await expect(firstResult).toContainText('CLIENTE E2E');
-    await firstResult.click();
+    const profileLink = authenticatedPage.getByRole('link', { name: /Meu Perfil/i }).first();
+    await expect(profileLink).toBeVisible();
+    await profileLink.click();
 
-    await expect(authenticatedPage).toHaveURL(
-      new RegExp(`/crm/clientes\\?highlight=${legacyClientId}`),
-    );
+    await expect(authenticatedPage).toHaveURL(/\/perfil$/);
   });
 
-  test('abre o primeiro resultado ao pressionar Enter', async ({ authenticatedPage }) => {
-    const legacyProductId = '22222222-2222-2222-2222-222222222222';
-
-    await authenticatedPage.route('**/search**', async (route) => {
-      const requestUrl = new URL(route.request().url());
-      const query = (requestUrl.searchParams.get('q') || '').toLowerCase();
-
-      if (!query.includes('produto')) {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify([]),
-        });
-        return;
-      }
-
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify([
-          {
-            id: legacyProductId,
-            title: 'PRODUTO E2E',
-            subtitle: 'R$ 10.00',
-            type: 'produto',
-            path: `/produtos/${legacyProductId}`,
-          },
-          {
-            id: '33333333-3333-3333-3333-333333333333',
-            title: 'PRODUTO SECUNDARIO',
-            subtitle: 'R$ 20.00',
-            type: 'produto',
-            path: '/vendas/produtos',
-          },
-        ]),
-      });
-    });
-
+  test('abre menu do usuario e executa logout', async ({ authenticatedPage }) => {
     await authenticatedPage.goto('/dashboard');
+    await authenticatedPage.waitForLoadState('domcontentloaded');
 
-    const searchInput = authenticatedPage.getByTestId('topbar-search-input');
-    await expect(searchInput).toBeVisible();
+    const userMenuButton = authenticatedPage.locator('button[data-user-menu]').first();
+    await expect(userMenuButton).toBeVisible();
+    await userMenuButton.click();
 
-    await searchInput.fill('produto');
+    const logoutButton = authenticatedPage.getByRole('button', { name: /Sair/i }).first();
+    await expect(logoutButton).toBeVisible();
+    await logoutButton.click();
 
-    const firstResult = authenticatedPage.getByTestId('topbar-search-result').first();
-    await expect(firstResult).toBeVisible();
-    await expect(firstResult).toContainText('PRODUTO E2E');
-
-    await searchInput.press('Enter');
-
-    await expect(authenticatedPage).toHaveURL(
-      new RegExp(`/vendas/produtos\\?highlight=${legacyProductId}`),
-    );
+    await authenticatedPage.waitForURL('**/login', { timeout: 10000 });
+    await expect(authenticatedPage).toHaveURL(/\/login$/);
   });
 });

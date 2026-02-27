@@ -1,3 +1,25 @@
+export interface CompraCotacaoMetadados {
+  status?: 'pedido_gerado' | 'aguardando_pagamento_externo' | 'adquirido';
+  pedidoId?: string;
+  numeroPedido?: string;
+  contaPagarId?: string;
+  contaPagarNumero?: string;
+  contaPagarStatus?: string;
+  dataGeracaoContaPagar?: string;
+  referenciaPagamento?: string;
+  dataPedido?: string;
+  dataAquisicao?: string;
+  pagamentoExterno?: boolean;
+  observacoes?: string;
+  atualizadoPor?: string;
+  atualizadoEm?: string;
+}
+
+export interface CotacaoMetadados {
+  compra?: CompraCotacaoMetadados;
+  [key: string]: unknown;
+}
+
 export interface Cotacao {
   id: string;
   numero: string;
@@ -45,6 +67,7 @@ export interface Cotacao {
   anexos?: AnexoCotacao[];
   historico?: HistoricoCotacao[];
   tags?: string[];
+  metadados?: CotacaoMetadados;
   origem: OrigemCotacao;
   empresaId: string;
 }
@@ -94,9 +117,11 @@ export enum StatusCotacao {
   APROVADA = 'aprovada',
   REJEITADA = 'rejeitada',
   VENCIDA = 'vencida',
+  PEDIDO_GERADO = 'pedido_gerado',
+  ADQUIRIDO = 'adquirido',
   CONVERTIDA = 'convertida',
   CANCELADA = 'cancelada',
-  PENDENTE = 'pendente', // Alias para EM_ANALISE
+  PENDENTE = 'pendente',
 }
 
 export enum PrioridadeCotacao {
@@ -125,6 +150,8 @@ export type StatusCotacaoType =
   | 'aprovada'
   | 'rejeitada'
   | 'vencida'
+  | 'pedido_gerado'
+  | 'adquirido'
   | 'convertida'
   | 'cancelada'
   | 'pendente';

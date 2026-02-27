@@ -1,7 +1,7 @@
-import api from './api';
+﻿import api from './api';
 
 export interface Fornecedor {
-  id: number;
+  id: string;
   nome: string;
   razaoSocial?: string;
   cnpj?: string;
@@ -45,27 +45,36 @@ export interface NovoFornecedor {
 
 export interface AtualizarFornecedor extends Partial<NovoFornecedor> {}
 
+export type FiltrosFornecedor = {
+  busca?: string;
+  nome?: string; // alias legado
+  ativo?: boolean;
+  cidade?: string;
+  estado?: string;
+};
+
+const buildFornecedorQueryParams = (filtros?: FiltrosFornecedor): URLSearchParams => {
+  const params = new URLSearchParams();
+  if (!filtros) return params;
+
+  const busca = filtros.busca?.trim() || filtros.nome?.trim();
+  if (busca) params.append('busca', busca);
+  if (filtros.ativo !== undefined) params.append('ativo', String(filtros.ativo));
+  if (filtros.cidade) params.append('cidade', filtros.cidade);
+  if (filtros.estado) params.append('estado', filtros.estado);
+
+  return params;
+};
+
 export const fornecedorService = {
-  // Listar todos os fornecedores
-  async listarFornecedores(filtros?: {
-    nome?: string;
-    ativo?: boolean;
-    cidade?: string;
-    estado?: string;
-  }): Promise<Fornecedor[]> {
+  async listarFornecedores(filtros?: FiltrosFornecedor): Promise<Fornecedor[]> {
     try {
       if (!filtros || Object.keys(filtros).length === 0) {
         const response = await api.get('/fornecedores');
         return response.data;
       }
 
-      const params = new URLSearchParams();
-
-      if (filtros.nome) params.append('nome', filtros.nome);
-      if (filtros.ativo !== undefined) params.append('ativo', String(filtros.ativo));
-      if (filtros.cidade) params.append('cidade', filtros.cidade);
-      if (filtros.estado) params.append('estado', filtros.estado);
-
+      const params = buildFornecedorQueryParams(filtros);
       const response = await api.get(`/fornecedores?${params.toString()}`);
       return response.data;
     } catch (error) {
@@ -74,8 +83,7 @@ export const fornecedorService = {
     }
   },
 
-  // Buscar fornecedor por ID
-  async buscarFornecedorPorId(id: number): Promise<Fornecedor> {
+  async buscarFornecedorPorId(id: string): Promise<Fornecedor> {
     try {
       const response = await api.get(`/fornecedores/${id}`);
       return response.data;
@@ -85,7 +93,6 @@ export const fornecedorService = {
     }
   },
 
-  // Criar novo fornecedor
   async criarFornecedor(dados: NovoFornecedor): Promise<Fornecedor> {
     try {
       const response = await api.post('/fornecedores', dados);
@@ -96,8 +103,7 @@ export const fornecedorService = {
     }
   },
 
-  // Atualizar fornecedor
-  async atualizarFornecedor(id: number, dados: AtualizarFornecedor): Promise<Fornecedor> {
+  async atualizarFornecedor(id: string, dados: AtualizarFornecedor): Promise<Fornecedor> {
     try {
       const response = await api.put(`/fornecedores/${id}`, dados);
       return response.data;
@@ -107,8 +113,7 @@ export const fornecedorService = {
     }
   },
 
-  // Excluir fornecedor
-  async excluirFornecedor(id: number): Promise<void> {
+  async excluirFornecedor(id: string): Promise<void> {
     try {
       await api.delete(`/fornecedores/${id}`);
     } catch (error) {
@@ -117,21 +122,9 @@ export const fornecedorService = {
     }
   },
 
-  // Buscar fornecedores com filtros
-  async buscarFornecedores(filtros: {
-    nome?: string;
-    ativo?: boolean;
-    cidade?: string;
-    estado?: string;
-  }): Promise<Fornecedor[]> {
+  async buscarFornecedores(filtros: FiltrosFornecedor): Promise<Fornecedor[]> {
     try {
-      const params = new URLSearchParams();
-
-      if (filtros.nome) params.append('nome', filtros.nome);
-      if (filtros.ativo !== undefined) params.append('ativo', String(filtros.ativo));
-      if (filtros.cidade) params.append('cidade', filtros.cidade);
-      if (filtros.estado) params.append('estado', filtros.estado);
-
+      const params = buildFornecedorQueryParams(filtros);
       const response = await api.get(`/fornecedores?${params.toString()}`);
       return response.data;
     } catch (error) {
@@ -140,10 +133,16 @@ export const fornecedorService = {
     }
   },
 
-  // Alternar status ativo/inativo
-  async alternarStatus(id: number): Promise<Fornecedor> {
+  async alternarStatus(id: string): Promise<Fornecedor> {
     try {
-      const response = await api.patch(`/fornecedores/${id}/toggle-status`);
+      const fornecedor = await fornecedorService.buscarFornecedorPorId(id);
+
+      if (fornecedor.ativo) {
+        const response = await api.patch(`/fornecedores/${id}/desativar`);
+        return response.data?.fornecedor ?? response.data;
+      }
+
+      const response = await api.put(`/fornecedores/${id}`, { ativo: true });
       return response.data;
     } catch (error) {
       console.error('Erro ao alterar status do fornecedor:', error);
@@ -151,17 +150,15 @@ export const fornecedorService = {
     }
   },
 
-  // Excluir múltiplos fornecedores
-  async excluirMultiplosFornecedores(ids: number[]): Promise<void> {
+  async excluirMultiplosFornecedores(ids: string[]): Promise<void> {
     try {
-      await api.delete('/fornecedores/bulk', { data: { ids } });
+      await Promise.all(ids.map((id) => api.delete(`/fornecedores/${id}`)));
     } catch (error) {
       console.error('Erro ao excluir fornecedores:', error);
       throw error;
     }
   },
 
-  // Exportar fornecedores
   async exportarFornecedores(formato: 'csv' | 'excel' = 'csv'): Promise<Blob> {
     try {
       const response = await api.get(`/fornecedores/export?formato=${formato}`, {
@@ -174,7 +171,6 @@ export const fornecedorService = {
     }
   },
 
-  // Obter estatísticas de fornecedores
   async obterEstatisticas(): Promise<{
     totalFornecedores: number;
     fornecedoresAtivos: number;
@@ -185,7 +181,7 @@ export const fornecedorService = {
       const response = await api.get('/fornecedores/estatisticas');
       return response.data;
     } catch (error) {
-      console.error('Erro ao obter estatísticas:', error);
+      console.error('Erro ao obter estatisticas:', error);
       throw error;
     }
   },

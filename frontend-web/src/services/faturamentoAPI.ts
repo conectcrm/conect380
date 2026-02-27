@@ -1,5 +1,18 @@
 import api from './api';
 
+function unwrapEnvelope<T>(payload: any): T {
+  if (payload && typeof payload === 'object' && 'success' in payload) {
+    if (payload.success === false) {
+      throw new Error(payload.message || 'Erro na resposta da API de faturamento');
+    }
+    if ('data' in payload) {
+      return payload.data as T;
+    }
+  }
+
+  return payload as T;
+}
+
 export interface FaturaRequest {
   contratoId: string;
   clienteId: string;
@@ -123,17 +136,17 @@ class FaturamentoAPIService {
 
   async buscarFaturaPorId(id: string): Promise<FaturaResponse> {
     const response = await api.get(`/faturamento/faturas/${id}`);
-    return response.data;
+    return unwrapEnvelope<FaturaResponse>(response.data);
   }
 
   async criarFatura(dados: FaturaRequest): Promise<FaturaResponse> {
     const response = await api.post('/faturamento/faturas', dados);
-    return response.data;
+    return unwrapEnvelope<FaturaResponse>(response.data);
   }
 
   async atualizarFatura(id: string, dados: Partial<FaturaRequest>): Promise<FaturaResponse> {
     const response = await api.put(`/faturamento/faturas/${id}`, dados);
-    return response.data;
+    return unwrapEnvelope<FaturaResponse>(response.data);
   }
 
   async deletarFatura(id: string): Promise<void> {
@@ -143,7 +156,7 @@ class FaturamentoAPIService {
   async gerarFaturaAutomatica(contratoId: string): Promise<FaturaResponse> {
     // Ajuste para a rota real mapeada
     const response = await api.post('/faturamento/faturas/automatica', { contratoId });
-    return response.data;
+    return unwrapEnvelope<FaturaResponse>(response.data);
   }
 
   async enviarFaturaPorEmail(faturaId: string, email?: string): Promise<void> {
@@ -164,12 +177,12 @@ class FaturamentoAPIService {
       : '/faturamento/pagamentos';
 
     const response = await api.get(url);
-    return response.data;
+    return unwrapEnvelope<PagamentoResponse[]>(response.data);
   }
 
   async registrarPagamento(dados: PagamentoRequest): Promise<PagamentoResponse> {
     const response = await api.post('/faturamento/pagamentos', dados);
-    return response.data;
+    return unwrapEnvelope<PagamentoResponse>(response.data);
   }
 
   async atualizarPagamento(
@@ -177,7 +190,7 @@ class FaturamentoAPIService {
     dados: Partial<PagamentoRequest>,
   ): Promise<PagamentoResponse> {
     const response = await api.put(`/faturamento/pagamentos/${id}`, dados);
-    return response.data;
+    return unwrapEnvelope<PagamentoResponse>(response.data);
   }
 
   // Relatórios
@@ -193,8 +206,33 @@ class FaturamentoAPIService {
     if (periodo?.dataInicio) params.append('dataInicio', periodo.dataInicio);
     if (periodo?.dataFim) params.append('dataFim', periodo.dataFim);
 
-    const response = await api.get(`/faturamento/resumo?${params.toString()}`);
-    return response.data;
+    const { faturas, aggregates } = await this.listarFaturas({
+      dataInicio: periodo?.dataInicio,
+      dataFim: periodo?.dataFim,
+      page: 1,
+      pageSize: 1000,
+    });
+
+    const totalFaturas = faturas.length;
+    const valorTotalFaturado = Number(aggregates?.valorTotal ?? 0);
+    const valorTotalPago = Number(aggregates?.valorRecebido ?? 0);
+    const faturasPendentes = faturas.filter((f) =>
+      ['pendente', 'enviada', 'parcialmente_paga'].includes(String(f.status || '').toLowerCase()),
+    ).length;
+    const faturasVencidas = faturas.filter(
+      (f) => String(f.status || '').toLowerCase() === 'vencida',
+    ).length;
+    const taxaRecebimento =
+      valorTotalFaturado > 0 ? (valorTotalPago / valorTotalFaturado) * 100 : 0;
+
+    return {
+      totalFaturas,
+      valorTotalFaturado,
+      valorTotalPago,
+      faturasPendentes,
+      faturasVencidas,
+      taxaRecebimento,
+    };
   }
 
   async obterAnalyticsFaturamento(periodo?: { dataInicio: string; dataFim: string }): Promise<{
@@ -219,8 +257,62 @@ class FaturamentoAPIService {
     if (periodo?.dataInicio) params.append('dataInicio', periodo.dataInicio);
     if (periodo?.dataFim) params.append('dataFim', periodo.dataFim);
 
-    const response = await api.get(`/faturamento/analytics?${params.toString()}`);
-    return response.data;
+    const { faturas } = await this.listarFaturas({
+      dataInicio: periodo?.dataInicio,
+      dataFim: periodo?.dataFim,
+      page: 1,
+      pageSize: 1000,
+    });
+
+    const byMonth = new Map<string, { valor: number; quantidade: number }>();
+    const byStatus = new Map<string, number>();
+    const byCliente = new Map<string, { clienteNome: string; valorTotal: number; quantidadeFaturas: number }>();
+
+    for (const f of faturas) {
+      const dataBase = new Date((f.dataEmissao || f.dataVencimento) as string);
+      const mes = Number.isNaN(dataBase.getTime())
+        ? 'desconhecido'
+        : `${dataBase.getFullYear()}-${String(dataBase.getMonth() + 1).padStart(2, '0')}`;
+
+      const currentMonth = byMonth.get(mes) || { valor: 0, quantidade: 0 };
+      currentMonth.valor += Number(f.valorTotal || 0);
+      currentMonth.quantidade += 1;
+      byMonth.set(mes, currentMonth);
+
+      const status = String(f.status || 'desconhecido');
+      byStatus.set(status, (byStatus.get(status) || 0) + 1);
+
+      const clienteId = String(f.cliente?.id || f.clienteId || 'desconhecido');
+      const clienteNome = f.cliente?.nome || `Cliente ${clienteId}`;
+      const currentCliente = byCliente.get(clienteId) || {
+        clienteNome,
+        valorTotal: 0,
+        quantidadeFaturas: 0,
+      };
+      currentCliente.valorTotal += Number(f.valorTotal || 0);
+      currentCliente.quantidadeFaturas += 1;
+      byCliente.set(clienteId, currentCliente);
+    }
+
+    return {
+      faturamentoPorMes: Array.from(byMonth.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([mes, dados]) => ({ mes, valor: dados.valor, quantidade: dados.quantidade })),
+      statusDistribution: Array.from(byStatus.entries()).map(([status, quantidade]) => ({
+        status,
+        quantidade,
+        percentual: faturas.length > 0 ? (quantidade / faturas.length) * 100 : 0,
+      })),
+      topClientes: Array.from(byCliente.entries())
+        .map(([clienteId, dados]) => ({
+          clienteId,
+          clienteNome: dados.clienteNome,
+          valorTotal: dados.valorTotal,
+          quantidadeFaturas: dados.quantidadeFaturas,
+        }))
+        .sort((a, b) => b.valorTotal - a.valorTotal)
+        .slice(0, 10),
+    };
   }
 }
 

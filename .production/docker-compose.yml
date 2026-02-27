@@ -63,11 +63,12 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-7d}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       WHATSAPP_API_KEY: ${WHATSAPP_API_KEY}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
     ports:
-      - "3500:3001"
+      - "127.0.0.1:3500:3001"
     depends_on:
       postgres:
         condition: service_healthy
@@ -88,10 +89,11 @@ services:
       dockerfile: .production/docker/Dockerfile.frontend
       args:
         REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:3500}
+        REACT_APP_WS_URL: ${REACT_APP_WS_URL:-http://localhost:3500}
     container_name: conectcrm-frontend
     restart: unless-stopped
     ports:
-      - "3000:80"
+      - "127.0.0.1:3000:80"
     depends_on:
       - backend
     networks:
@@ -103,13 +105,16 @@ services:
   nginx:
     image: nginx:alpine
     container_name: conectcrm-nginx
+    profiles:
+      - edge
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - .production/configs/nginx.conf:/etc/nginx/nginx.conf:ro
-      - nginx_certs:/etc/nginx/certs
+      - ./configs/gateway-bootstrap.conf:/etc/nginx/conf.d/default.conf:ro
+      - certbot_www:/var/www/certbot
+      - nginx_certs:/etc/letsencrypt
     depends_on:
       - backend
       - frontend
@@ -130,6 +135,8 @@ volumes:
     name: conectcrm_backend_logs
   nginx_certs:
     name: conectcrm_nginx_certs
+  certbot_www:
+    name: conectcrm_certbot_www
 
 # ============================================
 # Network Isolada

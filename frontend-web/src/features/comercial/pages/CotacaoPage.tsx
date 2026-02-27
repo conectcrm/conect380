@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { cotacaoService } from '../../../services/cotacaoService';
-import { fornecedorService } from '../../../services/fornecedorService';
 import { toastService } from '../../../services/toastService';
 import { exportToCSV, exportToExcel } from '../../../utils/exportUtils';
 import {
   Cotacao,
   FiltroCotacao,
-  StatusCotacao,
   PrioridadeCotacao,
+  StatusCotacao,
 } from '../../../types/cotacaoTypes';
 import { useGlobalConfirmation } from '../../../contexts/GlobalConfirmationContext';
+import { useAuth } from '../../../hooks/useAuth';
+import { userHasPermission } from '../../../config/menuConfig';
 import ModalCadastroCotacao from '../../../components/modals/ModalCadastroCotacao';
 import ModalDetalhesCotacao from '../../../components/modals/ModalDetalhesCotacao';
 import {
@@ -21,138 +21,277 @@ import {
   FileText,
   Filter,
   Download,
-  MoreVertical,
   FileSpreadsheet,
   Eye,
   Check,
   X,
   CheckCircle,
   XCircle,
+  AlertCircle,
   Calendar,
   Activity,
-  Settings,
   DollarSign,
   Clock,
-  AlertCircle,
   User,
-  Mail,
-  Copy,
   Send,
+  RefreshCw,
 } from 'lucide-react';
-import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
+import {
+  DataTableCard,
+  EmptyState,
+  FiltersBar,
+  InlineStats,
+  LoadingSkeleton,
+  PageHeader,
+  SectionCard,
+} from '../../../components/layout-v2';
 
-// Tipos locais
-interface DashboardCards {
-  totalCotacoes: number;
-  cotacoesPendentes: number;
-  cotacoesAprovadas: number;
-  cotacoesReprovadas: number;
-  cotacoesVencidas: number;
+type FiltroStatusUI =
+  | 'todos'
+  | 'vencida'
+  | 'rascunho'
+  | 'enviada'
+  | 'em_analise'
+  | 'aprovada'
+  | 'pedido_gerado'
+  | 'adquirido'
+  | 'rejeitada'
+  | 'convertida'
+  | 'cancelada'
+  | 'pendente';
+
+const FINALIZED_STATUS = new Set<StatusCotacao>([
+  StatusCotacao.APROVADA,
+  StatusCotacao.PEDIDO_GERADO,
+  StatusCotacao.ADQUIRIDO,
+  StatusCotacao.CONVERTIDA,
+  StatusCotacao.CANCELADA,
+  StatusCotacao.REJEITADA,
+]);
+
+const statusOptions: Array<{ value: FiltroStatusUI; label: string }> = [
+  { value: 'todos', label: 'Todos' },
+  { value: 'rascunho', label: 'Rascunho' },
+  { value: 'enviada', label: 'Enviada' },
+  { value: 'pendente', label: 'Pendente' },
+  { value: 'em_analise', label: 'Em analise' },
+  { value: 'aprovada', label: 'Aprovada' },
+  { value: 'pedido_gerado', label: 'Pedido gerado' },
+  { value: 'adquirido', label: 'Adquirido' },
+  { value: 'rejeitada', label: 'Rejeitada' },
+  { value: 'vencida', label: 'Vencida' },
+  { value: 'convertida', label: 'Convertida' },
+  { value: 'cancelada', label: 'Cancelada' },
+];
+
+const quickStatusCards: Array<{
+  value: FiltroStatusUI;
+  label: string;
+  countKey: 'total' | 'pendentes' | 'aprovadas' | 'reprovadas' | 'vencidas';
+  icon: React.ComponentType<{ className?: string }>;
+}> = [
+  { value: 'todos', label: 'Total', countKey: 'total', icon: FileText },
+  { value: 'em_analise', label: 'Pendentes', countKey: 'pendentes', icon: Clock },
+  { value: 'aprovada', label: 'Aprovadas', countKey: 'aprovadas', icon: CheckCircle },
+  { value: 'rejeitada', label: 'Reprovadas', countKey: 'reprovadas', icon: XCircle },
+  { value: 'vencida', label: 'Vencidas', countKey: 'vencidas', icon: AlertCircle },
+];
+
+const moneyFmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
+const btnPrimary =
+  'inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#0F7B7D] disabled:opacity-60 disabled:cursor-not-allowed';
+const btnSecondary =
+  'inline-flex items-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9] disabled:opacity-60 disabled:cursor-not-allowed';
+const btnDanger =
+  'inline-flex items-center gap-2 rounded-lg bg-[#B4233A] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#981E31] disabled:opacity-60 disabled:cursor-not-allowed';
+
+function formatDate(value?: string) {
+  if (!value) return 'Sem vencimento';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'Data invalida';
+  return parsed.toLocaleDateString('pt-BR');
 }
 
-const useValidacaoFinanceira = () => ({
-  validar: () => true,
-});
+function formatDateForExport(value?: string) {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toLocaleDateString('pt-BR');
+}
+
+function formatStatusForExport(status: string) {
+  const map: Record<string, string> = {
+    rascunho: 'Rascunho',
+    enviada: 'Enviada',
+    pendente: 'Pendente',
+    em_analise: 'Em analise',
+    aprovada: 'Aprovada',
+    pedido_gerado: 'Pedido gerado',
+    adquirido: 'Adquirido',
+    rejeitada: 'Rejeitada',
+    vencida: 'Vencida',
+    convertida: 'Convertida',
+    cancelada: 'Cancelada',
+  };
+  return map[status] || status;
+}
+
+function isCotacaoVencida(dataVencimento: string | undefined, status: StatusCotacao) {
+  if (!dataVencimento) return false;
+  if (FINALIZED_STATUS.has(status)) return false;
+  const parsed = new Date(dataVencimento);
+  if (Number.isNaN(parsed.getTime())) return false;
+  return parsed < new Date();
+}
+
+function getStatusBadge(status: StatusCotacao) {
+  return getStatusBadgeForCotacao({ status });
+}
+
+function getStatusBadgeForCotacao(cotacao: Pick<Cotacao, 'status' | 'metadados'>) {
+  const compraStatus = cotacao.metadados?.compra?.status;
+  const config: Record<string, { label: string; className: string }> = {
+    rascunho: { label: 'Rascunho', className: 'bg-gray-100 text-gray-800' },
+    enviada: { label: 'Enviada', className: 'bg-blue-100 text-blue-800' },
+    pendente: { label: 'Pendente', className: 'bg-yellow-100 text-yellow-800' },
+    em_analise: { label: 'Em analise', className: 'bg-yellow-100 text-yellow-800' },
+    aprovada: { label: 'Aprovada', className: 'bg-green-100 text-green-800' },
+    pedido_gerado: { label: 'Pedido gerado', className: 'bg-teal-100 text-teal-800' },
+    adquirido: { label: 'Adquirido', className: 'bg-emerald-100 text-emerald-800' },
+    rejeitada: { label: 'Rejeitada', className: 'bg-red-100 text-red-800' },
+    vencida: { label: 'Vencida', className: 'bg-red-100 text-red-800' },
+    convertida: { label: 'Convertida', className: 'bg-green-100 text-green-800' },
+    cancelada: { label: 'Cancelada', className: 'bg-gray-100 text-gray-800' },
+  };
+  const current =
+    cotacao.status === StatusCotacao.CONVERTIDA && compraStatus === 'adquirido'
+      ? { label: 'Adquirido', className: 'bg-emerald-100 text-emerald-800' }
+    : cotacao.status === StatusCotacao.CONVERTIDA && compraStatus === 'pedido_gerado'
+        ? { label: 'Pedido gerado', className: 'bg-teal-100 text-teal-800' }
+        : config[cotacao.status] || config.rascunho;
+  return (
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${current.className}`}>
+      {current.label}
+    </span>
+  );
+}
+
+function getPrioridadeBadge(prioridade: PrioridadeCotacao) {
+  const config: Record<string, { label: string; className: string }> = {
+    baixa: { label: 'Baixa', className: 'bg-gray-100 text-gray-800' },
+    media: { label: 'Media', className: 'bg-blue-100 text-blue-800' },
+    alta: { label: 'Alta', className: 'bg-yellow-100 text-yellow-800' },
+    urgente: { label: 'Urgente', className: 'bg-red-100 text-red-800' },
+  };
+  const current = config[prioridade] || config.media;
+  return (
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${current.className}`}>
+      {current.label}
+    </span>
+  );
+}
 
 function CotacaoPage() {
-  const navigate = useNavigate();
   const { confirm } = useGlobalConfirmation();
+  const { user } = useAuth();
   const [cotacoes, setCotacoes] = useState<Cotacao[]>([]);
   const [carregando, setCarregando] = useState(true);
+  const [erroCarregamento, setErroCarregamento] = useState<string | null>(null);
   const [modalCadastroAberto, setModalCadastroAberto] = useState(false);
   const [modalDetalhesAberto, setModalDetalhesAberto] = useState(false);
   const [cotacaoEdicao, setCotacaoEdicao] = useState<Cotacao | null>(null);
   const [cotacaoDetalhes, setCotacaoDetalhes] = useState<Cotacao | null>(null);
   const [busca, setBusca] = useState('');
-  const [filtroStatus, setFiltroStatus] = useState('todos');
+  const [filtroStatus, setFiltroStatus] = useState<FiltroStatusUI>('todos');
   const [cotacoesSelecionadas, setCotacoesSelecionadas] = useState<string[]>([]);
-  const [dashboardCards, setDashboardCards] = useState<DashboardCards>({
-    totalCotacoes: 0,
-    cotacoesPendentes: 0,
-    cotacoesAprovadas: 0,
-    cotacoesReprovadas: 0,
-    cotacoesVencidas: 0,
-  });
+  const selectAllRef = useRef<HTMLInputElement | null>(null);
 
-  const validacao = useValidacaoFinanceira();
+  const canCreateCotacao = userHasPermission(user as any, 'comercial.propostas.create');
+  const canUpdateCotacao = userHasPermission(user as any, 'comercial.propostas.update');
+  const canDeleteCotacao = userHasPermission(user as any, 'comercial.propostas.delete');
+  const canSendCotacao = userHasPermission(user as any, 'comercial.propostas.send');
+
+  const resumo = useMemo(() => {
+    const pendentes = cotacoes.filter((c) =>
+      ['rascunho', 'enviada', 'em_analise', 'pendente'].includes(c.status),
+    ).length;
+    const aprovadas = cotacoes.filter((c) =>
+      ['aprovada', 'pedido_gerado', 'adquirido', 'convertida'].includes(c.status),
+    ).length;
+    const reprovadas = cotacoes.filter((c) => c.status === 'rejeitada').length;
+    const vencidas = cotacoes.filter((c) => isCotacaoVencida(c.dataVencimento, c.status)).length;
+
+    return {
+      total: cotacoes.length,
+      pendentes,
+      aprovadas,
+      reprovadas,
+      vencidas,
+    };
+  }, [cotacoes]);
+
+  const hasFilters = busca.trim().length > 0 || filtroStatus !== 'todos';
+  const isAllSelected = cotacoes.length > 0 && cotacoesSelecionadas.length === cotacoes.length;
+  const isSomeSelected = cotacoesSelecionadas.length > 0 && !isAllSelected;
 
   useEffect(() => {
-    carregarCotacoes();
-  }, []);
-
-  useEffect(() => {
-    carregarCotacoes();
+    void carregarCotacoes();
   }, [busca, filtroStatus]);
+
+  useEffect(() => {
+    const visibleIds = new Set(cotacoes.map((c) => c.id));
+    setCotacoesSelecionadas((prev) => prev.filter((id) => visibleIds.has(id)));
+  }, [cotacoes]);
+
+  useEffect(() => {
+    if (!selectAllRef.current) return;
+    selectAllRef.current.indeterminate = isSomeSelected;
+  }, [isSomeSelected]);
 
   const carregarCotacoes = async () => {
     setCarregando(true);
+    setErroCarregamento(null);
     try {
       const filtros: FiltroCotacao = {
-        busca: busca || undefined,
+        busca: busca.trim() || undefined,
         status:
           filtroStatus !== 'todos' && filtroStatus !== 'vencida'
-            ? [filtroStatus as any]
+            ? [filtroStatus as StatusCotacao]
             : undefined,
       };
-      const dados = await cotacaoService.listar(filtros);
-      let listaNormalizada = Array.isArray(dados.items) ? dados.items : [];
 
-      // Filtro especial para vencidas (client-side)
+      const dados = await cotacaoService.listar(filtros);
+      let lista = Array.isArray(dados.items) ? dados.items : [];
+
       if (filtroStatus === 'vencida') {
-        const hoje = new Date();
-        listaNormalizada = listaNormalizada.filter((c) => {
-          const vencimento = new Date(c.dataVencimento);
-          return (
-            vencimento < hoje &&
-            !['aprovada', 'convertida', 'cancelada', 'rejeitada'].includes(c.status)
-          );
-        });
+        lista = lista.filter((c) => isCotacaoVencida(c.dataVencimento, c.status));
       }
 
-      setCotacoes(listaNormalizada);
-      calcularDashboard(listaNormalizada);
+      setCotacoes(lista);
     } catch (error) {
-      console.error('Erro ao carregar cotações:', error);
-      toastService.apiError(error, 'Erro ao carregar cotações');
+      console.error('Erro ao carregar cotacoes:', error);
+      setErroCarregamento('Nao foi possivel carregar as cotacoes.');
+      toastService.apiError(error, 'Erro ao carregar cotacoes');
     } finally {
       setCarregando(false);
     }
   };
 
-  const calcularDashboard = (cotacoes: Cotacao[]) => {
-    const hoje = new Date();
-
-    const pendentes = cotacoes.filter((c) =>
-      ['rascunho', 'enviada', 'em_analise'].includes(c.status),
-    ).length;
-
-    const aprovadas = cotacoes.filter((c) => ['aprovada', 'convertida'].includes(c.status)).length;
-
-    const reprovadas = cotacoes.filter((c) => c.status === 'rejeitada').length;
-
-    const vencidas = cotacoes.filter((c) => {
-      const vencimento = new Date(c.dataVencimento);
-      return (
-        vencimento < hoje &&
-        !['aprovada', 'convertida', 'cancelada', 'rejeitada'].includes(c.status)
-      );
-    }).length;
-
-    setDashboardCards({
-      totalCotacoes: cotacoes.length,
-      cotacoesPendentes: pendentes,
-      cotacoesAprovadas: aprovadas,
-      cotacoesReprovadas: reprovadas,
-      cotacoesVencidas: vencidas,
-    });
-  };
-
   const abrirModalNovo = () => {
+    if (!canCreateCotacao) {
+      toastService.warning('Voce nao possui permissao para criar cotacoes');
+      return;
+    }
     setCotacaoEdicao(null);
     setModalCadastroAberto(true);
   };
 
   const abrirModalEdicao = (cotacao: Cotacao) => {
+    if (!canUpdateCotacao) {
+      toastService.warning('Voce nao possui permissao para editar cotacoes');
+      return;
+    }
     setCotacaoEdicao(cotacao);
     setModalCadastroAberto(true);
   };
@@ -172,50 +311,56 @@ function CotacaoPage() {
     setCotacaoDetalhes(null);
   };
 
-  const handleSalvarCotacao = (cotacao: Cotacao) => {
-    carregarCotacoes();
+  const handleSalvarCotacao = (_cotacao: Cotacao) => {
+    void carregarCotacoes();
   };
 
   const handleAlterarStatus = (cotacaoId: string, novoStatus: StatusCotacao) => {
-    setCotacoes((prevCotacoes) =>
-      prevCotacoes.map((cotacao) =>
-        cotacao.id === cotacaoId ? { ...cotacao, status: novoStatus } : cotacao,
-      ),
+    setCotacoes((prev) =>
+      prev.map((cotacao) => (cotacao.id === cotacaoId ? { ...cotacao, status: novoStatus } : cotacao)),
     );
+    setCotacaoDetalhes((prev) =>
+      prev && prev.id === cotacaoId ? { ...prev, status: novoStatus } : prev,
+    );
+    void carregarCotacoes();
   };
 
   const excluirCotacao = async (id: string) => {
-    if (!(await confirm('Tem certeza que deseja excluir esta cotação?'))) {
+    if (!canDeleteCotacao) {
+      toastService.warning('Voce nao possui permissao para excluir cotacoes');
       return;
     }
-
+    if (!(await confirm('Tem certeza que deseja excluir esta cotacao?'))) return;
     try {
       await cotacaoService.deletar(id);
-      carregarCotacoes();
+      await carregarCotacoes();
       fecharModalDetalhes();
-      toastService.success('Cotação excluída com sucesso!');
+      toastService.success('Cotacao excluida com sucesso!');
     } catch (error) {
-      console.error('Erro ao excluir cotação:', error);
-      toastService.apiError(error, 'Erro ao excluir cotação');
+      console.error('Erro ao excluir cotacao:', error);
+      toastService.apiError(error, 'Erro ao excluir cotacao');
     }
   };
 
   const enviarParaAprovacao = async (cotacao: Cotacao) => {
+    if (!canSendCotacao) {
+      toastService.warning('Voce nao possui permissao para enviar cotacoes');
+      return;
+    }
     if (
       !(await confirm(
-        `Deseja enviar a cotação #${cotacao.numero} para aprovação?\n\nApós enviar, o aprovador será notificado.`,
+        `Deseja enviar a cotacao #${cotacao.numero} para aprovacao?\n\nApos enviar, o aprovador sera notificado.`,
       ))
     ) {
       return;
     }
-
     try {
       await cotacaoService.enviarParaAprovacao(cotacao.id);
-      toastService.success(`Cotação #${cotacao.numero} enviada para aprovação com sucesso!`);
-      carregarCotacoes(); // Recarregar lista
-    } catch (error: any) {
-      console.error('Erro ao enviar cotação para aprovação:', error);
-      toastService.apiError(error, 'Erro ao enviar cotação para aprovação');
+      toastService.success(`Cotacao #${cotacao.numero} enviada para aprovacao com sucesso!`);
+      await carregarCotacoes();
+    } catch (error) {
+      console.error('Erro ao enviar cotacao para aprovacao:', error);
+      toastService.apiError(error, 'Erro ao enviar cotacao para aprovacao');
     }
   };
 
@@ -225,700 +370,570 @@ function CotacaoPage() {
     );
   };
 
-  const selecionarTodos = () => {
-    setCotacoesSelecionadas(cotacoes.map((c) => c.id));
+  const selecionarTodos = () => setCotacoesSelecionadas(cotacoes.map((c) => c.id));
+  const deselecionarTodos = () => setCotacoesSelecionadas([]);
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    void carregarCotacoes();
   };
-
-  const deselecionarTodos = () => {
-    setCotacoesSelecionadas([]);
-  };
-
-  const buscarCotacoes = () => {
-    carregarCotacoes();
-  };
-
-  const handleSearch = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      buscarCotacoes();
-    }
-  };
-
-  // Usar cotações diretamente (já filtradas no backend)
-  const cotacoesFiltradas = cotacoes;
-
-  const mostrarAcoesMassa = cotacoesSelecionadas.length > 0;
 
   const alterarStatusSelecionadas = async (novoStatus: StatusCotacao) => {
+    if (!canUpdateCotacao) {
+      toastService.warning('Voce nao possui permissao para alterar status de cotacoes');
+      return;
+    }
     if (
       !(await confirm(
-        `Tem certeza que deseja alterar o status de ${cotacoesSelecionadas.length} cotação(ões)?`,
+        `Tem certeza que deseja alterar o status de ${cotacoesSelecionadas.length} cotacao(oes)?`,
       ))
     ) {
       return;
     }
-
     try {
-      for (const id of cotacoesSelecionadas) {
-        await cotacaoService.alterarStatus(id, novoStatus);
+      if (novoStatus === StatusCotacao.APROVADA) {
+        const resultado = await cotacaoService.aprovarLote(cotacoesSelecionadas);
+        if (resultado.falhas > 0) {
+          toastService.warning(
+            `${resultado.sucessos} cotacao(oes) aprovada(s), ${resultado.falhas} falharam`,
+          );
+        } else {
+          toastService.success('Cotacoes aprovadas com sucesso!');
+        }
+      } else if (novoStatus === StatusCotacao.REJEITADA) {
+        const justificativa = window.prompt(
+          `Informe a justificativa para reprovar ${cotacoesSelecionadas.length} cotacao(oes):`,
+          '',
+        );
+
+        if (justificativa === null) {
+          return;
+        }
+
+        if (!justificativa.trim()) {
+          toastService.warning('Justificativa obrigatoria para reprovar');
+          return;
+        }
+
+        const resultado = await cotacaoService.reprovarLote(
+          cotacoesSelecionadas,
+          justificativa.trim(),
+        );
+        if (resultado.falhas > 0) {
+          toastService.warning(
+            `${resultado.sucessos} cotacao(oes) reprovada(s), ${resultado.falhas} falharam`,
+          );
+        } else {
+          toastService.success('Cotacoes reprovadas com sucesso!');
+        }
+      } else {
+        for (const id of cotacoesSelecionadas) {
+          await cotacaoService.alterarStatus(id, novoStatus);
+        }
+        toastService.success('Status das cotacoes atualizado com sucesso!');
       }
       deselecionarTodos();
-      carregarCotacoes();
-      toastService.success('Status das cotações atualizado com sucesso!');
+      await carregarCotacoes();
     } catch (error) {
-      console.error('Erro ao alterar status das cotações:', error);
-      toastService.apiError(error, 'Erro ao alterar status das cotações');
+      console.error('Erro ao alterar status das cotacoes:', error);
+      toastService.apiError(error, 'Erro ao alterar status das cotacoes');
     }
   };
 
   const excluirSelecionadas = async () => {
+    if (!canDeleteCotacao) {
+      toastService.warning('Voce nao possui permissao para excluir cotacoes');
+      return;
+    }
     if (
       !(await confirm(
-        `Tem certeza que deseja excluir ${cotacoesSelecionadas.length} cotação(ões)?`,
+        `Tem certeza que deseja excluir ${cotacoesSelecionadas.length} cotacao(oes)?`,
       ))
     ) {
       return;
     }
-
     try {
       for (const id of cotacoesSelecionadas) {
         await cotacaoService.deletar(id);
       }
       deselecionarTodos();
-      carregarCotacoes();
-      toastService.success('Cotações excluídas com sucesso!');
+      await carregarCotacoes();
+      toastService.success('Cotacoes excluidas com sucesso!');
     } catch (error) {
-      console.error('Erro ao excluir cotações em massa:', error);
-      toastService.apiError(error, 'Erro ao excluir cotações em massa');
+      console.error('Erro ao excluir cotacoes em massa:', error);
+      toastService.apiError(error, 'Erro ao excluir cotacoes em massa');
     }
   };
 
-  // Funções de exportação
   const exportarParaCSV = () => {
-    if (cotacoes.length === 0) {
-      toastService.warning('Não há dados para exportar');
+    if (!cotacoes.length) {
+      toastService.warning('Nao ha dados para exportar');
       return;
     }
-    const colunas = [
-      { key: 'numero', label: 'Número' },
-      { key: 'titulo', label: 'Título' },
-      { key: 'fornecedor.nome', label: 'Fornecedor' },
-      { key: 'status', label: 'Status', transform: formatStatusForExport },
-      { key: 'prioridade', label: 'Prioridade' },
-      {
-        key: 'valorTotal',
-        label: 'Valor Total',
-        transform: (valor: number) =>
-          `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-      },
-      { key: 'prazoResposta', label: 'Prazo Resposta', transform: formatDateForExport },
-      { key: 'dataCriacao', label: 'Data Criação', transform: formatDateForExport },
-    ];
-    exportToCSV(cotacoes, colunas, 'cotacoes');
-    toastService.success('Exportação CSV iniciada');
+    exportToCSV(
+      cotacoes,
+      [
+        { key: 'numero', label: 'Numero' },
+        { key: 'titulo', label: 'Titulo' },
+        { key: 'fornecedor.nome', label: 'Fornecedor' },
+        { key: 'status', label: 'Status', transform: formatStatusForExport },
+        { key: 'prioridade', label: 'Prioridade' },
+        { key: 'valorTotal', label: 'Valor Total', transform: (v: number) => moneyFmt.format(v || 0) },
+        { key: 'prazoResposta', label: 'Prazo Resposta', transform: formatDateForExport },
+        { key: 'dataCriacao', label: 'Data Criacao', transform: formatDateForExport },
+      ],
+      'cotacoes',
+    );
+    toastService.success('Exportacao CSV iniciada');
   };
 
   const exportarParaExcel = () => {
-    if (cotacoes.length === 0) {
-      toastService.warning('Não há dados para exportar');
+    if (!cotacoes.length) {
+      toastService.warning('Nao ha dados para exportar');
       return;
     }
-    const colunas = [
-      { key: 'numero', label: 'Número' },
-      { key: 'titulo', label: 'Título' },
-      { key: 'fornecedor.nome', label: 'Fornecedor' },
-      { key: 'status', label: 'Status', transform: formatStatusForExport },
-      { key: 'prioridade', label: 'Prioridade' },
-      { key: 'valorTotal', label: 'Valor Total', transform: (valor: number) => valor },
-      { key: 'prazoResposta', label: 'Prazo Resposta', transform: formatDateForExport },
-      { key: 'dataCriacao', label: 'Data Criação', transform: formatDateForExport },
-    ];
-    exportToExcel(cotacoes, colunas, 'cotacoes');
-    toastService.success('Exportação Excel iniciada');
+    exportToExcel(
+      cotacoes,
+      [
+        { key: 'numero', label: 'Numero' },
+        { key: 'titulo', label: 'Titulo' },
+        { key: 'fornecedor.nome', label: 'Fornecedor' },
+        { key: 'status', label: 'Status', transform: formatStatusForExport },
+        { key: 'prioridade', label: 'Prioridade' },
+        { key: 'valorTotal', label: 'Valor Total', transform: (v: number) => v || 0 },
+        { key: 'prazoResposta', label: 'Prazo Resposta', transform: formatDateForExport },
+        { key: 'dataCriacao', label: 'Data Criacao', transform: formatDateForExport },
+      ],
+      'cotacoes',
+    );
+    toastService.success('Exportacao Excel iniciada');
   };
 
   const exportarSelecionadas = () => {
-    const cotacoesSelecionadasData = cotacoes.filter((cotacao) =>
-      cotacoesSelecionadas.includes(cotacao.id),
-    );
-    if (cotacoesSelecionadasData.length === 0) {
-      toastService.warning('Nenhuma cotação selecionada para exportar');
+    const selecionadas = cotacoes.filter((c) => cotacoesSelecionadas.includes(c.id));
+    if (!selecionadas.length) {
+      toastService.warning('Nenhuma cotacao selecionada para exportar');
       return;
     }
-    const colunas = [
-      { key: 'numero', label: 'Número' },
-      { key: 'titulo', label: 'Título' },
-      { key: 'fornecedor.nome', label: 'Fornecedor' },
-      { key: 'status', label: 'Status', transform: formatStatusForExport },
-      {
-        key: 'valorTotal',
-        label: 'Valor Total',
-        transform: (valor: number) =>
-          `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-      },
-    ];
-    exportToCSV(cotacoesSelecionadasData, colunas, 'cotacoes-selecionadas');
-    toastService.success('Exportação iniciada');
-  };
-
-  // Funções auxiliares
-  const formatStatusForExport = (status: string) => {
-    const statusMap: Record<string, string> = {
-      rascunho: 'Rascunho',
-      enviada: 'Enviada',
-      em_analise: 'Em Análise',
-      aprovada: 'Aprovada',
-      rejeitada: 'Rejeitada',
-      vencida: 'Vencida',
-      convertida: 'Convertida',
-      cancelada: 'Cancelada',
-    };
-    return statusMap[status] || status;
-  };
-
-  const formatDateForExport = (date: string) => {
-    return new Date(date).toLocaleDateString('pt-BR');
-  };
-
-  const getStatusBadge = (status: StatusCotacao) => {
-    const configs = {
-      rascunho: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Rascunho' },
-      enviada: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Enviada' },
-      pendente: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Pendente' },
-      em_analise: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Em Análise' },
-      aprovada: { bg: 'bg-green-100', text: 'text-green-800', label: 'Aprovada' },
-      rejeitada: { bg: 'bg-red-100', text: 'text-red-800', label: 'Rejeitada' },
-      vencida: { bg: 'bg-red-100', text: 'text-red-800', label: 'Vencida' },
-      convertida: { bg: 'bg-green-100', text: 'text-green-800', label: 'Convertida' },
-      cancelada: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Cancelada' },
-    };
-
-    const config = configs[status];
-    return (
-      <span
-        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}
-      >
-        {config.label}
-      </span>
+    exportToCSV(
+      selecionadas,
+      [
+        { key: 'numero', label: 'Numero' },
+        { key: 'titulo', label: 'Titulo' },
+        { key: 'fornecedor.nome', label: 'Fornecedor' },
+        { key: 'status', label: 'Status', transform: formatStatusForExport },
+        { key: 'valorTotal', label: 'Valor Total', transform: (v: number) => moneyFmt.format(v || 0) },
+      ],
+      'cotacoes-selecionadas',
     );
+    toastService.success('Exportacao iniciada');
   };
 
-  const getPrioridadeBadge = (prioridade: PrioridadeCotacao) => {
-    const configs = {
-      baixa: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Baixa' },
-      media: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Média' },
-      alta: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Alta' },
-      urgente: { bg: 'bg-red-100', text: 'text-red-800', label: 'Urgente' },
-    };
-
-    const config = configs[prioridade];
-    return (
-      <span
-        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}
-      >
-        {config.label}
-      </span>
-    );
+  const limparFiltros = () => {
+    setBusca('');
+    setFiltroStatus('todos');
   };
 
-  const isVencida = (dataVencimento: string | undefined, status: StatusCotacao) => {
-    if (!dataVencimento) return false;
-    const vencimento = new Date(dataVencimento);
-    if (isNaN(vencimento.getTime())) return false;
-    const hoje = new Date();
-    return vencimento < hoje && !['aprovada', 'convertida', 'cancelada'].includes(status);
-  };
+  const activeFilterChips = [
+    busca.trim() ? { key: 'busca', label: `Busca: ${busca.trim()}`, onRemove: () => setBusca('') } : null,
+    filtroStatus !== 'todos'
+      ? {
+          key: 'status',
+          label: `Status: ${statusOptions.find((option) => option.value === filtroStatus)?.label || filtroStatus}`,
+          onRemove: () => setFiltroStatus('todos'),
+        }
+      : null,
+  ].filter(Boolean) as Array<{ key: string; label: string; onRemove: () => void }>;
+
+  const renderRowActions = (cotacao: Cotacao) => (
+    <div className="flex items-center gap-1.5">
+      {canSendCotacao && cotacao.status === StatusCotacao.RASCUNHO && (
+        <button
+          type="button"
+          onClick={() => void enviarParaAprovacao(cotacao)}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#159A9C] hover:bg-[#159A9C]/10"
+          title="Enviar para aprovacao"
+        >
+          <Send className="h-4 w-4" />
+        </button>
+      )}
+      <button type="button" onClick={() => abrirModalDetalhes(cotacao)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#159A9C] hover:bg-[#159A9C]/10" title="Visualizar detalhes"><Eye className="h-4 w-4" /></button>
+      {canUpdateCotacao && (
+        <button type="button" onClick={() => abrirModalEdicao(cotacao)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#159A9C] hover:bg-[#159A9C]/10" title="Editar cotacao"><Edit3 className="h-4 w-4" /></button>
+      )}
+      {canDeleteCotacao && (
+        <button type="button" onClick={() => void excluirCotacao(cotacao.id)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#B4233A] hover:bg-[#FFF2F4]" title="Excluir cotacao"><Trash2 className="h-4 w-4" /></button>
+      )}
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus nucleusName="Comercial" nucleusPath="/nuclei/comercial" />
-      </div>
-
-      <div className="p-6">
-        <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="bg-white rounded-lg shadow-sm border mb-6">
-            <div className="px-6 py-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start">
-                <div>
-                  <h1 className="text-3xl font-bold text-[#002333] flex items-center">
-                    <FileText className="h-8 w-8 mr-3 text-[#159A9C]" />
-                    Cotações e Orçamentos
-                    {carregando && (
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#159A9C] ml-3"></div>
-                    )}
-                  </h1>
-                  <p className="mt-2 text-[#B4BEC9]">
-                    {carregando
-                      ? 'Carregando cotações...'
-                      : `Gerencie suas ${dashboardCards.totalCotacoes} cotações e orçamentos`}
-                  </p>
-                </div>
-                <div className="mt-4 sm:mt-0 flex items-center gap-3">
-                  <button
-                    onClick={abrirModalNovo}
-                    className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm text-sm font-medium"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Nova Cotação
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Dashboard Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
-            <div
-              onClick={() => setFiltroStatus('todos')}
-              className={`bg-white rounded-xl shadow-sm border p-6 hover:shadow-lg transition-all duration-300 cursor-pointer ${
-                filtroStatus === 'todos'
-                  ? 'border-[#159A9C] ring-2 ring-[#159A9C]/20'
-                  : 'border-[#DEEFE7]'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                    Total de Cotações
-                  </p>
-                  <p className="text-3xl font-bold text-[#002333] mt-2">
-                    {dashboardCards.totalCotacoes}
-                  </p>
-                  <p className="text-sm text-[#002333]/70 mt-3">📊 Visão geral</p>
-                </div>
-                <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
-                  <FileText className="w-6 h-6 text-[#159A9C]" />
-                </div>
-              </div>
-            </div>
-
-            <div
-              onClick={() => setFiltroStatus('em_analise')}
-              className={`bg-white rounded-xl shadow-sm border p-6 hover:shadow-lg transition-all duration-300 cursor-pointer ${
-                filtroStatus === 'em_analise'
-                  ? 'border-yellow-500 ring-2 ring-yellow-500/20'
-                  : 'border-[#DEEFE7]'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                    Pendentes
-                  </p>
-                  <p className="text-3xl font-bold text-[#002333] mt-2">
-                    {dashboardCards.cotacoesPendentes}
-                  </p>
-                  <p className="text-sm text-[#002333]/70 mt-3">⏳ Em andamento</p>
-                </div>
-                <div className="h-12 w-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center shadow-sm">
-                  <Clock className="w-6 h-6 text-yellow-600" />
-                </div>
-              </div>
-            </div>
-
-            <div
-              onClick={() => setFiltroStatus('aprovada')}
-              className={`bg-white rounded-xl shadow-sm border p-6 hover:shadow-lg transition-all duration-300 cursor-pointer ${
-                filtroStatus === 'aprovada'
-                  ? 'border-green-500 ring-2 ring-green-500/20'
-                  : 'border-[#DEEFE7]'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                    Aprovadas
-                  </p>
-                  <p className="text-3xl font-bold text-[#002333] mt-2">
-                    {dashboardCards.cotacoesAprovadas}
-                  </p>
-                  <p className="text-sm text-[#002333]/70 mt-3">✅ Aprovadas</p>
-                </div>
-                <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center shadow-sm">
-                  <CheckCircle className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-            </div>
-
-            <div
-              onClick={() => setFiltroStatus('rejeitada')}
-              className={`bg-white rounded-xl shadow-sm border p-6 hover:shadow-lg transition-all duration-300 cursor-pointer ${
-                filtroStatus === 'rejeitada'
-                  ? 'border-red-500 ring-2 ring-red-500/20'
-                  : 'border-[#DEEFE7]'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                    Reprovadas
-                  </p>
-                  <p className="text-3xl font-bold text-[#002333] mt-2">
-                    {dashboardCards.cotacoesReprovadas}
-                  </p>
-                  <p className="text-sm text-[#002333]/70 mt-3">❌ Rejeitadas</p>
-                </div>
-                <div className="h-12 w-12 rounded-2xl bg-red-500/10 flex items-center justify-center shadow-sm">
-                  <XCircle className="w-6 h-6 text-red-600" />
-                </div>
-              </div>
-            </div>
-
-            <div
-              onClick={() => setFiltroStatus('vencida')}
-              className={`bg-white rounded-xl shadow-sm border p-6 hover:shadow-lg transition-all duration-300 cursor-pointer ${
-                filtroStatus === 'vencida'
-                  ? 'border-orange-500 ring-2 ring-orange-500/20'
-                  : 'border-[#DEEFE7]'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                    Vencidas
-                  </p>
-                  <p className="text-3xl font-bold text-[#002333] mt-2">
-                    {dashboardCards.cotacoesVencidas}
-                  </p>
-                  <p className="text-sm text-[#002333]/70 mt-3">⚠️ Atrasadas</p>
-                </div>
-                <div className="h-12 w-12 rounded-2xl bg-orange-500/10 flex items-center justify-center shadow-sm">
-                  <AlertCircle className="w-6 h-6 text-orange-600" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Filtros */}
-          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-            <div className="flex flex-col sm:flex-row gap-4 items-end">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Buscar Cotações
-                </label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input
-                    type="text"
-                    placeholder="Buscar por número, título, fornecedor..."
-                    value={busca}
-                    onChange={(e) => setBusca(e.target.value)}
-                    onKeyPress={handleSearch}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <div className="min-w-[140px]">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                  <select
-                    value={filtroStatus}
-                    onChange={(e) => setFiltroStatus(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors"
-                  >
-                    <option value="todos">Todos</option>
-                    <option value="rascunho">Rascunho</option>
-                    <option value="enviada">Enviada</option>
-                    <option value="em_analise">Em Análise</option>
-                    <option value="aprovada">Aprovada</option>
-                    <option value="rejeitada">Rejeitada</option>
-                    <option value="vencida">Vencida</option>
-                    <option value="convertida">Convertida</option>
-                    <option value="cancelada">Cancelada</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={buscarCotacoes}
-                  className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] flex items-center gap-2 transition-colors"
-                >
-                  <Search className="w-4 h-4" />
-                  Buscar
+    <div className="space-y-4 pt-1 sm:pt-2">
+      <SectionCard className="space-y-4 p-4 sm:p-5">
+        <PageHeader
+          title={
+            <span className="inline-flex flex-wrap items-center gap-2">
+              <span>Cotacoes e Orcamentos</span>
+              {hasFilters ? (
+                <span className="inline-flex items-center rounded-full border border-[#CDE6DF] bg-[#ECF7F3] px-2 py-0.5 text-xs font-semibold text-[#0F7B7D]">
+                  filtros ativos
+                </span>
+              ) : null}
+            </span>
+          }
+          description={
+            carregando
+              ? 'Carregando cotacoes...'
+              : `Gerencie cotacoes e aprovacoes (${resumo.total} registros na lista atual).`
+          }
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => void carregarCotacoes()} className={btnSecondary} disabled={carregando}>
+                <RefreshCw className={`h-4 w-4 ${carregando ? 'animate-spin' : ''}`} />
+                Atualizar
+              </button>
+              <button type="button" onClick={exportarParaCSV} className={btnSecondary} disabled={!cotacoes.length}>
+                <Download className="h-4 w-4" />
+                CSV
+              </button>
+              <button type="button" onClick={exportarParaExcel} className={btnSecondary} disabled={!cotacoes.length}>
+                <FileSpreadsheet className="h-4 w-4" />
+                Excel
+              </button>
+              {canCreateCotacao && (
+                <button type="button" onClick={abrirModalNovo} className={btnPrimary}>
+                  <Plus className="h-4 w-4" />
+                  Nova Cotacao
                 </button>
-                <div className="flex gap-1">
-                  <button
-                    onClick={exportarParaCSV}
-                    disabled={cotacoes.length === 0}
-                    className="px-3 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2 transition-colors text-sm font-medium"
-                    title="Exportar para CSV"
-                  >
-                    <Download className="w-4 h-4" />
-                    CSV
-                  </button>
-                  <button
-                    onClick={exportarParaExcel}
-                    disabled={cotacoes.length === 0}
-                    className="px-3 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2 transition-colors text-sm font-medium"
-                    title="Exportar para Excel"
-                  >
-                    <FileSpreadsheet className="w-4 h-4" />
-                    Excel
-                  </button>
-                </div>
-              </div>
+              )}
             </div>
-          </div>
+          }
+        />
 
-          {/* Ações em Massa */}
-          {mostrarAcoesMassa && (
-            <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                      <CheckCircle className="w-4 h-4 text-white" />
+        {!carregando && !erroCarregamento && (
+          <div className="space-y-3">
+            <InlineStats
+              stats={[
+                { label: 'Total', value: String(resumo.total), tone: 'neutral' },
+                { label: 'Pendentes', value: String(resumo.pendentes), tone: 'warning' },
+                { label: 'Aprovadas', value: String(resumo.aprovadas), tone: 'accent' },
+                { label: 'Reprovadas', value: String(resumo.reprovadas), tone: 'neutral' },
+                { label: 'Vencidas', value: String(resumo.vencidas), tone: 'warning' },
+              ]}
+            />
+
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-5">
+              {quickStatusCards.map((card) => {
+                const Icon = card.icon;
+                const ativo = filtroStatus === card.value;
+
+                return (
+                  <button
+                    key={card.value}
+                    type="button"
+                    onClick={() => setFiltroStatus(card.value)}
+                    className={`flex items-center justify-between rounded-xl border px-3 py-2 text-left transition-colors ${
+                      ativo
+                        ? 'border-[#159A9C] bg-[#ECF7F3] ring-1 ring-[#159A9C]/20'
+                        : 'border-[#DCE8EC] bg-white hover:bg-[#F8FBFC]'
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-[#5F7B89]">{card.label}</p>
+                      <p className="text-base font-semibold text-[#173A4D]">{resumo[card.countKey]}</p>
                     </div>
-                    <span className="text-sm font-medium text-blue-900">
-                      {cotacoesSelecionadas.length} cotação(ões) selecionada(s)
+                    <span
+                      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                        ativo ? 'bg-[#159A9C] text-white' : 'bg-[#F0F6F8] text-[#5E7A88]'
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
                     </span>
-                  </div>
-                  <button
-                    onClick={deselecionarTodos}
-                    className="text-sm text-blue-600 hover:text-blue-800 underline transition-colors"
-                  >
-                    Desmarcar todos
                   </button>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    onClick={() => alterarStatusSelecionadas(StatusCotacao.APROVADA)}
-                    className="px-4 py-2 bg-[#159A9C] text-white rounded-lg text-sm font-medium hover:bg-[#0F7B7D] flex items-center gap-2 transition-colors"
-                  >
-                    <Check className="w-4 h-4" />
-                    Aprovar
-                  </button>
-                  <button
-                    onClick={() => alterarStatusSelecionadas(StatusCotacao.REJEITADA)}
-                    className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 flex items-center gap-2 transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                    Rejeitar
-                  </button>
-                  <button
-                    onClick={exportarSelecionadas}
-                    className="px-4 py-2 bg-[#159A9C] text-white rounded-lg text-sm font-medium hover:bg-[#0F7B7D] flex items-center gap-2 transition-colors"
-                  >
-                    <Download className="w-4 h-4" />
-                    Exportar
-                  </button>
-                  <button
-                    onClick={excluirSelecionadas}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 flex items-center gap-2 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Excluir
-                  </button>
-                </div>
-              </div>
+                );
+              })}
             </div>
-          )}
+          </div>
+        )}
+      </SectionCard>
 
-          {/* Tabela de Cotações */}
-          <div className="bg-white rounded-lg shadow-sm border">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Lista de Cotações</h2>
+      <FiltersBar className="p-4">
+        <div className="flex w-full flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
+          <div className="w-full sm:min-w-[280px] sm:flex-1">
+            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Buscar cotacoes</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
+              <input
+                type="text"
+                placeholder="Numero, titulo ou fornecedor..."
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+              />
             </div>
+          </div>
 
-            {carregando ? (
-              <div className="p-8 text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                <p className="mt-2 text-gray-600">Carregando cotações...</p>
-              </div>
-            ) : cotacoes.length === 0 ? (
-              <div className="p-8 text-center">
-                <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Nenhuma cotação encontrada
-                </h3>
-                <p className="text-gray-600 mb-4">
-                  {busca || filtroStatus !== 'todos'
-                    ? 'Tente ajustar os filtros ou criar uma nova cotação.'
-                    : 'Comece criando sua primeira cotação.'}
-                </p>
-                <button
-                  onClick={abrirModalNovo}
-                  className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg inline-flex items-center gap-2 text-sm font-medium"
-                >
-                  <Plus className="w-4 h-4" />
-                  Criar Primeira Cotação
-                </button>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-white border-b border-gray-200">
-                    <tr>
-                      <th className="px-4 py-4 text-left">
-                        <div className="flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={
-                              cotacoesSelecionadas.length === cotacoes.length && cotacoes.length > 0
-                            }
-                            onChange={(e) =>
-                              e.target.checked ? selecionarTodos() : deselecionarTodos()
-                            }
-                            className="w-4 h-4 text-[#159A9C] bg-gray-100 border-gray-300 rounded focus:ring-[#159A9C] focus:ring-2"
-                          />
-                        </div>
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4" />
-                          Cotação
-                        </div>
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <User className="w-4 h-4" />
-                          Fornecedor
-                        </div>
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <Activity className="w-4 h-4" />
-                          Status
-                        </div>
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <AlertCircle className="w-4 h-4" />
-                          Prioridade
-                        </div>
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <DollarSign className="w-4 h-4" />
-                          Valor Total
-                        </div>
-                      </th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4" />
-                          Vencimento
-                        </div>
-                      </th>
-                      <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                        <div className="flex items-center justify-end gap-2">
-                          <Settings className="w-4 h-4" />
-                          Ações
-                        </div>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {cotacoes.map((cotacao) => (
-                      <tr key={cotacao.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-4">
-                          <input
-                            type="checkbox"
-                            checked={cotacoesSelecionadas.includes(cotacao.id)}
-                            onChange={() => toggleSelecionarCotacao(cotacao.id)}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          />
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">
-                              #{cotacao.numero}
-                            </div>
-                            <div className="text-sm text-gray-500">{cotacao.titulo}</div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
-                            {cotacao.fornecedor?.nome || 'Fornecedor não informado'}
-                          </div>
-                          {cotacao.fornecedor?.email && (
-                            <div className="text-sm text-gray-500">{cotacao.fornecedor.email}</div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {getStatusBadge(cotacao.status)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {getPrioridadeBadge(cotacao.prioridade)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {cotacao.valorTotal.toLocaleString('pt-BR', {
-                              style: 'currency',
-                              currency: 'BRL',
-                            })}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {cotacao.dataVencimento ? (
-                            <>
-                              <div
-                                className={`text-sm ${isVencida(cotacao.dataVencimento, cotacao.status) ? 'text-red-600 font-medium' : 'text-gray-900'}`}
-                              >
-                                {new Date(cotacao.dataVencimento).toLocaleDateString('pt-BR')}
-                              </div>
-                              {isVencida(cotacao.dataVencimento, cotacao.status) && (
-                                <div className="text-xs text-red-500">Vencida</div>
-                              )}
-                            </>
-                          ) : (
-                            <div className="text-sm text-gray-400">Sem vencimento</div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex items-center justify-end gap-2">
-                            {/* Botão "Enviar para Aprovação" - Apenas para RASCUNHO */}
-                            {cotacao.status === StatusCotacao.RASCUNHO && (
-                              <button
-                                onClick={() => enviarParaAprovacao(cotacao)}
-                                className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
-                                title="Enviar para aprovação"
-                              >
-                                <Send className="w-4 h-4" />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => abrirModalDetalhes(cotacao)}
-                              className="text-blue-600 hover:text-blue-900 p-1 rounded"
-                              title="Visualizar detalhes"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => abrirModalEdicao(cotacao)}
-                              className="text-green-600 hover:text-green-900 p-1 rounded"
-                              title="Editar cotação"
-                            >
-                              <Edit3 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => excluirCotacao(cotacao.id)}
-                              className="text-red-600 hover:text-red-900 p-1 rounded"
-                              title="Excluir cotação"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                            <div className="relative">
-                              <button className="text-gray-400 hover:text-gray-600 p-1 rounded">
-                                <MoreVertical className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+          <div className="w-full sm:w-auto">
+            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Status</label>
+            <select
+              value={filtroStatus}
+              onChange={(e) => setFiltroStatus(e.target.value as FiltroStatusUI)}
+              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[190px]"
+            >
+              {statusOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            <button type="button" onClick={() => void carregarCotacoes()} className={btnPrimary}>
+              <Search className="h-4 w-4" />
+              Buscar
+            </button>
+            <button type="button" onClick={limparFiltros} className={btnSecondary} disabled={!hasFilters}>
+              <Filter className="h-4 w-4" />
+              Limpar
+            </button>
           </div>
         </div>
-      </div>
+      </FiltersBar>
 
-      {/* Modais */}
+      {activeFilterChips.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {activeFilterChips.map((chip) => (
+            <span key={chip.key} className="inline-flex items-center gap-2 rounded-full border border-[#CDE6DF] bg-[#ECF7F3] px-3 py-1 text-xs font-medium text-[#0F7B7D]">
+              {chip.label}
+              <button type="button" onClick={chip.onRemove} className="inline-flex h-4 w-4 items-center justify-center rounded-full hover:bg-[#D9EFE8]" aria-label={`Remover filtro ${chip.key}`}>
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {cotacoesSelecionadas.length > 0 && (
+        <SectionCard className="p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="inline-flex items-center gap-2 rounded-full border border-[#CDE6DF] bg-[#ECF7F3] px-3 py-1 font-semibold text-[#0F7B7D]">
+                <CheckCircle className="h-4 w-4" />
+                {cotacoesSelecionadas.length} selecionada{cotacoesSelecionadas.length === 1 ? '' : 's'}
+              </span>
+              <button type="button" onClick={deselecionarTodos} className={btnSecondary}>
+                <X className="h-4 w-4" />
+                Limpar selecao
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {canUpdateCotacao && (
+                <>
+                  <button type="button" onClick={() => void alterarStatusSelecionadas(StatusCotacao.APROVADA)} className={btnPrimary}><Check className="h-4 w-4" />Aprovar</button>
+                  <button type="button" onClick={() => void alterarStatusSelecionadas(StatusCotacao.REJEITADA)} className={btnSecondary}><X className="h-4 w-4" />Rejeitar</button>
+                </>
+              )}
+              <button type="button" onClick={exportarSelecionadas} className={btnSecondary}><Download className="h-4 w-4" />Exportar</button>
+              {canDeleteCotacao && (
+                <button type="button" onClick={() => void excluirSelecionadas()} className={btnDanger}><Trash2 className="h-4 w-4" />Excluir</button>
+              )}
+            </div>
+          </div>
+        </SectionCard>
+      )}
+
+      {carregando && <LoadingSkeleton lines={8} />}
+
+      {!carregando && erroCarregamento && (
+        <EmptyState
+          icon={<AlertCircle className="h-5 w-5" />}
+          title="Falha ao carregar cotacoes"
+          description={erroCarregamento}
+          action={
+            <button type="button" onClick={() => void carregarCotacoes()} className={btnPrimary}>
+              <RefreshCw className="h-4 w-4" />
+              Tentar novamente
+            </button>
+          }
+        />
+      )}
+
+      {!carregando && !erroCarregamento && cotacoes.length === 0 && (
+        <EmptyState
+          icon={<FileText className="h-5 w-5" />}
+          title={hasFilters ? 'Nenhuma cotacao encontrada' : 'Nenhuma cotacao cadastrada'}
+          description={
+            hasFilters
+              ? 'Ajuste ou limpe os filtros para visualizar outras cotacoes.'
+              : 'Comece criando sua primeira cotacao para acompanhar o fluxo comercial.'
+          }
+          action={
+            hasFilters ? (
+              <button type="button" onClick={limparFiltros} className={btnSecondary}>
+                <Filter className="h-4 w-4" />
+                Limpar filtros
+              </button>
+            ) : canCreateCotacao ? (
+              <button type="button" onClick={abrirModalNovo} className={btnPrimary}>
+                <Plus className="h-4 w-4" />
+                Criar primeira cotacao
+              </button>
+            ) : undefined
+          }
+        />
+      )}
+
+      {!carregando && !erroCarregamento && cotacoes.length > 0 && (
+        <DataTableCard>
+          <div className="flex flex-col gap-3 border-b border-[#E1EAEE] bg-[#F8FBFC] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <div className="flex flex-wrap items-center gap-3 text-sm text-[#516F7D]">
+              <span>{cotacoes.length} registro{cotacoes.length === 1 ? '' : 's'}</span>
+              {hasFilters && <span className="rounded-full border border-[#CDE6DF] bg-[#ECF7F3] px-2 py-0.5 text-xs font-medium text-[#0F7B7D]">filtrados</span>}
+              {cotacoesSelecionadas.length > 0 && (
+                <span className="rounded-full border border-[#CDE6DF] bg-[#ECF7F3] px-2 py-0.5 text-xs font-semibold text-[#0F7B7D]">
+                  {cotacoesSelecionadas.length} selecionada{cotacoesSelecionadas.length === 1 ? '' : 's'}
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {cotacoes.length > 1 && !isAllSelected && (
+                <button type="button" onClick={selecionarTodos} className={btnSecondary}>
+                  <Check className="h-4 w-4" />
+                  Selecionar todas
+                </button>
+              )}
+              {cotacoesSelecionadas.length > 0 && (
+                <button type="button" onClick={deselecionarTodos} className={btnSecondary}>
+                  <X className="h-4 w-4" />
+                  Limpar selecao
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="p-4 lg:hidden">
+            <div className="grid grid-cols-1 gap-3">
+              {cotacoes.map((cotacao) => (
+                <article key={cotacao.id} className="rounded-xl border border-[#DFE9ED] bg-white p-4 shadow-[0_10px_22px_-20px_rgba(15,57,74,0.4)]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={cotacoesSelecionadas.includes(cotacao.id)}
+                          onChange={() => toggleSelecionarCotacao(cotacao.id)}
+                          className="h-4 w-4 rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
+                        />
+                        <span className="text-sm font-semibold text-[#173A4D]">#{cotacao.numero}</span>
+                      </div>
+                      <p className="mt-1 truncate text-sm text-[#476776]">{cotacao.titulo}</p>
+                    </div>
+                    {getStatusBadgeForCotacao(cotacao)}
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+                    <div className="rounded-lg border border-[#EDF3F5] bg-[#FAFCFD] px-3 py-2">
+                      <div className="flex items-center gap-2 text-[#5F7B89]"><User className="h-4 w-4" /><span className="text-xs uppercase tracking-wide">Fornecedor</span></div>
+                      <p className="mt-1 truncate font-medium text-[#173A4D]">{cotacao.fornecedor?.nome || 'Nao informado'}</p>
+                      {cotacao.fornecedor?.email ? <p className="truncate text-xs text-[#64808E]">{cotacao.fornecedor.email}</p> : null}
+                    </div>
+                    <div className="rounded-lg border border-[#EDF3F5] bg-[#FAFCFD] px-3 py-2">
+                      <div className="flex items-center gap-2 text-[#5F7B89]"><DollarSign className="h-4 w-4" /><span className="text-xs uppercase tracking-wide">Valor</span></div>
+                      <p className="mt-1 font-semibold text-[#173A4D]">{moneyFmt.format(cotacao.valorTotal || 0)}</p>
+                    </div>
+                    <div className="rounded-lg border border-[#EDF3F5] bg-[#FAFCFD] px-3 py-2">
+                      <div className="flex items-center gap-2 text-[#5F7B89]"><Activity className="h-4 w-4" /><span className="text-xs uppercase tracking-wide">Prioridade</span></div>
+                      <div className="mt-1">{getPrioridadeBadge(cotacao.prioridade)}</div>
+                    </div>
+                    <div className="rounded-lg border border-[#EDF3F5] bg-[#FAFCFD] px-3 py-2">
+                      <div className="flex items-center gap-2 text-[#5F7B89]"><Calendar className="h-4 w-4" /><span className="text-xs uppercase tracking-wide">Vencimento</span></div>
+                      <p className={`mt-1 font-medium ${isCotacaoVencida(cotacao.dataVencimento, cotacao.status) ? 'text-[#B4233A]' : 'text-[#173A4D]'}`}>
+                        {formatDate(cotacao.dataVencimento)}
+                      </p>
+                      {isCotacaoVencida(cotacao.dataVencimento, cotacao.status) ? <p className="text-xs text-[#B4233A]">Vencida</p> : null}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-end border-t border-[#EDF3F5] pt-3">
+                    {renderRowActions(cotacao)}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          <div className="hidden lg:block">
+            <div className="max-h-[68vh] overflow-auto">
+              <table className="w-full min-w-[980px] border-collapse">
+                <thead className="sticky top-0 z-10 bg-white shadow-[0_1px_0_0_#E1EAEE]">
+                  <tr>
+                    <th className="px-4 py-3 text-left">
+                      <input
+                        ref={selectAllRef}
+                        type="checkbox"
+                        checked={isAllSelected}
+                        onChange={(e) => (e.target.checked ? selecionarTodos() : deselecionarTodos())}
+                        className="h-4 w-4 rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
+                        aria-label="Selecionar todas as cotacoes da lista"
+                      />
+                    </th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">Cotacao</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">Fornecedor</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">Status</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">Prioridade</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">Valor total</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">Vencimento</th>
+                    <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[#5B7683]">Acoes</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white">
+                  {cotacoes.map((cotacao) => (
+                    <tr key={cotacao.id} className="border-t border-[#EDF3F5] hover:bg-[#FAFCFD]">
+                      <td className="px-4 py-4 align-top">
+                        <input
+                          type="checkbox"
+                          checked={cotacoesSelecionadas.includes(cotacao.id)}
+                          onChange={() => toggleSelecionarCotacao(cotacao.id)}
+                          className="h-4 w-4 rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
+                          aria-label={`Selecionar cotacao ${cotacao.numero}`}
+                        />
+                      </td>
+                      <td className="px-5 py-4 align-top">
+                        <div className="text-sm font-semibold text-[#173A4D]">#{cotacao.numero}</div>
+                        <div className="mt-0.5 max-w-[240px] truncate text-sm text-[#64808E]">{cotacao.titulo}</div>
+                      </td>
+                      <td className="px-5 py-4 align-top">
+                        <div className="text-sm font-medium text-[#173A4D]">{cotacao.fornecedor?.nome || 'Fornecedor nao informado'}</div>
+                        {cotacao.fornecedor?.email ? <div className="mt-0.5 text-xs text-[#64808E]">{cotacao.fornecedor.email}</div> : null}
+                      </td>
+                      <td className="px-5 py-4 align-top">{getStatusBadgeForCotacao(cotacao)}</td>
+                      <td className="px-5 py-4 align-top">{getPrioridadeBadge(cotacao.prioridade)}</td>
+                      <td className="px-5 py-4 align-top text-sm font-semibold text-[#173A4D]">{moneyFmt.format(cotacao.valorTotal || 0)}</td>
+                      <td className="px-5 py-4 align-top">
+                        {cotacao.dataVencimento ? (
+                          <div>
+                            <div className={`text-sm ${isCotacaoVencida(cotacao.dataVencimento, cotacao.status) ? 'font-medium text-[#B4233A]' : 'text-[#173A4D]'}`}>
+                              {formatDate(cotacao.dataVencimento)}
+                            </div>
+                            {isCotacaoVencida(cotacao.dataVencimento, cotacao.status) ? <div className="text-xs text-[#B4233A]">Vencida</div> : null}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-[#8AA1AC]">Sem vencimento</span>
+                        )}
+                      </td>
+                      <td className="px-5 py-4 align-top">
+                        <div className="flex justify-end">{renderRowActions(cotacao)}</div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </DataTableCard>
+      )}
+
       <ModalCadastroCotacao
         isOpen={modalCadastroAberto}
         onClose={fecharModalCadastro}

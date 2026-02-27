@@ -10,6 +10,7 @@ import { Repository } from 'typeorm';
 import { Contrato, StatusContrato } from '../entities/contrato.entity';
 import { AssinaturaContrato, StatusAssinatura } from '../entities/assinatura-contrato.entity';
 import { Proposta } from '../../propostas/proposta.entity';
+import { PropostasService } from '../../propostas/propostas.service';
 import { CreateContratoDto, UpdateContratoDto } from '../dto/contrato.dto';
 import { PdfContratoService } from './pdf-contrato.service';
 import { AssinaturaDigitalService } from './assinatura-digital.service';
@@ -26,6 +27,7 @@ export class ContratosService {
     private assinaturaRepository: Repository<AssinaturaContrato>,
     @InjectRepository(Proposta)
     private propostaRepository: Repository<Proposta>,
+    private propostasService: PropostasService,
     private pdfContratoService: PdfContratoService,
     private assinaturaDigitalService: AssinaturaDigitalService,
   ) {}
@@ -114,6 +116,14 @@ export class ContratosService {
           (propostaIdVinculada
             ? ` (vinculado a proposta ${propostaIdVinculada})`
             : ' (sem proposta vinculada)'),
+      );
+
+      await this.sincronizarStatusProposta(
+        propostaIdVinculada,
+        'contrato_gerado',
+        empresaId,
+        `Contrato ${contratoAtualizado.numero} gerado.`,
+        'contratos',
       );
 
       return contratoAtualizado;
@@ -265,6 +275,14 @@ export class ContratosService {
     const contratoAtualizado = await this.contratoRepository.save(contrato);
     this.logger.log(`Contrato assinado: ${contratoAtualizado.numero}`);
 
+    await this.sincronizarStatusProposta(
+      contratoAtualizado.propostaId,
+      'contrato_assinado',
+      empresaId,
+      `Contrato ${contratoAtualizado.numero} assinado.`,
+      'contratos-assinatura',
+    );
+
     return contratoAtualizado;
   }
 
@@ -349,6 +367,33 @@ export class ContratosService {
 
     this.propostaRelationEnabled = Array.isArray(rows) && rows.length > 0;
     return this.propostaRelationEnabled;
+  }
+
+  private async sincronizarStatusProposta(
+    propostaId: string | null | undefined,
+    status: string,
+    empresaId: string,
+    observacoes: string,
+    source: string,
+  ): Promise<void> {
+    if (!propostaId) {
+      return;
+    }
+
+    try {
+      await this.propostasService.atualizarStatus(
+        propostaId,
+        status,
+        source,
+        observacoes,
+        undefined,
+        empresaId,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao sincronizar status da proposta ${propostaId} para ${status}: ${error.message}`,
+      );
+    }
   }
 }
 

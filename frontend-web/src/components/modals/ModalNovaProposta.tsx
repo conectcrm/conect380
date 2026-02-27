@@ -25,6 +25,7 @@ import {
   Mail,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { shellFieldTokens } from '../layout-v2';
 
 // Hooks e Services
 import { useCalculosProposta } from '../../features/propostas/hooks/useCalculosProposta';
@@ -194,6 +195,13 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
     { id: 'condicoes', titulo: 'Condições', icone: Calculator },
     { id: 'resumo', titulo: 'Resumo', icone: FileText },
   ];
+  const fieldClass = shellFieldTokens.base;
+  const fieldWithIconClass = shellFieldTokens.withIcon;
+  const textareaFieldClass = `${shellFieldTokens.textarea} resize-none`;
+  const primaryButtonClass =
+    'inline-flex h-9 items-center rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition hover:bg-[#117C7E] disabled:cursor-not-allowed disabled:opacity-60';
+  const secondaryButtonClass =
+    'inline-flex h-9 items-center rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-60';
 
   // React Hook Form
   const {
@@ -784,25 +792,25 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-1 sm:p-2">
-      <div className="modal-content modal-nova-proposta bg-white rounded-lg sm:rounded-xl shadow-2xl w-[calc(100%-2rem)] sm:w-[700px] md:w-[900px] lg:w-[1100px] xl:w-[1200px] max-w-[1400px] h-[98vh] max-h-[98vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B1F2A]/45 p-2 backdrop-blur-[1px] sm:p-4">
+      <div className="modal-content modal-nova-proposta flex h-[94vh] max-h-[94vh] w-full max-w-[1240px] flex-col overflow-hidden rounded-[20px] border border-[#DCE7EB] bg-white shadow-[0_30px_70px_-36px_rgba(16,57,74,0.45)]">
         {/* Header do Modal - Compacto */}
-        <div className="bg-[#159A9C] text-white px-3 py-2 flex-shrink-0">
+        <div className="flex-shrink-0 border-b border-[#DEE8EC] bg-white px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
-              <h2 className="text-lg font-bold truncate">Nova Proposta</h2>
+              <h2 className="truncate text-lg font-semibold text-[#19384C]">Nova Proposta</h2>
             </div>
             <button
               onClick={onClose}
-              className="text-white hover:text-gray-200 transition-colors p-1 ml-2 flex-shrink-0"
+              className="ml-2 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-[#607B89] transition-colors hover:bg-[#F6FAFB] hover:text-[#244455]"
             >
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4" />
             </button>
           </div>
         </div>
 
         {/* Progress Indicator - Compacto */}
-        <div className="border-b border-gray-200 px-3 py-2 flex-shrink-0 bg-white">
+        <div className="flex-shrink-0 border-b border-[#DEE8EC] bg-[#F8FBFC] px-4 py-3">
           <ResponsiveStepIndicator
             steps={etapas}
             currentStep={etapaAtual}
@@ -816,8 +824,8 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
         </div>
 
         {/* Conteúdo das Etapas - Compacto */}
-        <div className="flex-1 overflow-y-auto bg-gray-50">
-          <div className="p-2 sm:p-3 md:p-4">
+        <div className="flex-1 overflow-y-auto bg-[#F6FAFB]">
+          <div className="p-3 sm:p-4 md:p-5">
             {/* Conteúdo das etapas com espaçamento reduzido */}
             {/* Etapa 1: Informações Iniciais */}
             {etapaAtual === 0 && (
@@ -825,7 +833,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                 {/* Layout em Duas Colunas - Compacto */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {/* Coluna 1: Dados da Proposta */}
-                  <div className="bg-white rounded-lg p-4 border border-[#DEEFE7]">
+                  <div className="bg-white rounded-lg p-4 border border-[#DEE8EC]">
                     <div className="flex items-center mb-3">
                       <FileText className="w-4 h-4 text-[#159A9C] mr-2" />
                       <h4 className="text-base font-semibold text-gray-900">Dados da Proposta</h4>
@@ -845,7 +853,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                               {...field}
                               type="text"
                               placeholder="Ex: Proposta Comercial - Marketing Digital"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
+                              className={fieldClass}
                             />
                           )}
                         />
@@ -866,7 +874,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                               .toISOString()
                               .split('T')[0]
                           }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
+                          className={fieldClass}
                         />
                       </div>
 
@@ -891,7 +899,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                                 onChange={(e) =>
                                   handleVendedorChange(e.target.value, field.onChange)
                                 }
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
+                                className={fieldClass}
                               >
                                 <option value="">Selecione um vendedor</option>
                                 {vendedores.map((vendedor) => (
@@ -934,14 +942,14 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                         <textarea
                           rows={2}
                           placeholder="Observações sobre esta proposta..."
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm resize-none"
+                          className={textareaFieldClass}
                         />
                       </div>
                     </div>
                   </div>
 
                   {/* Coluna 2: Seleção do Cliente */}
-                  <div className="bg-white rounded-lg p-4 border border-[#DEEFE7]">
+                  <div className="bg-white rounded-lg p-4 border border-[#DEE8EC]">
                     <div className="flex items-center mb-3">
                       <User className="w-4 h-4 text-green-600 mr-2" />
                       <h4 className="text-base font-semibold text-gray-900">Seleção do Cliente</h4>
@@ -973,7 +981,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
 
                     {/* Preview do Cliente Selecionado - Versão Compacta */}
                     {watchedCliente && (
-                      <div className="mt-3 p-3 bg-[#DEEFE7] border border-[#B4BEC9] rounded-lg">
+                      <div className="mt-3 p-3 bg-[#DEEFE7] border border-[#D4E2E7] rounded-lg">
                         <div className="flex items-center">
                           <div className="flex-shrink-0">
                             <div className="w-8 h-8 bg-[#159A9C]/10 rounded-full flex items-center justify-center">
@@ -1030,7 +1038,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                         <select
                           value={tipoSelecionado}
                           onChange={(e) => setTipoSelecionado(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
+                          className={fieldClass}
                         >
                           <option value="">Todos os tipos</option>
                           <option value="produto">Produtos</option>
@@ -1046,7 +1054,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                         <select
                           value={categoriaSelecionada}
                           onChange={(e) => setCategoriaSelecionada(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
+                          className={fieldClass}
                         >
                           <option value="">Todas as categorias</option>
                           {categorias.map((categoria) => (
@@ -1069,7 +1077,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                             placeholder="Nome, categoria ou descrição..."
                             value={buscarProduto}
                             onChange={(e) => setBuscarProduto(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
+                            className={fieldWithIconClass}
                           />
                         </div>
                       </div>
@@ -1133,7 +1141,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                           <div
                             key={produto.id}
                             onClick={() => handleAdicionarProduto(produto)}
-                            className="product-card p-4 border rounded-lg hover:bg-white cursor-pointer transition-colors border-[#DEEFE7] bg-white"
+                            className="product-card p-4 border rounded-lg hover:bg-white cursor-pointer transition-colors border-[#DEE8EC] bg-white"
                           >
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex items-center gap-2">
@@ -1244,9 +1252,9 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                                 <div>
                                   <label className="block text-sm font-medium text-gray-700 mb-1">
                                     {field.produto.tipoItem &&
-                                      ['licenca', 'modulo', 'aplicativo'].includes(
-                                        field.produto.tipoItem,
-                                      )
+                                    ['licenca', 'modulo', 'aplicativo'].includes(
+                                      field.produto.tipoItem,
+                                    )
                                       ? 'Quantidade de Licenças'
                                       : 'Quantidade'}
                                   </label>
@@ -1261,13 +1269,13 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                                         step="1"
                                         placeholder={
                                           field.produto.tipoItem &&
-                                            ['licenca', 'modulo', 'aplicativo'].includes(
-                                              field.produto.tipoItem,
-                                            )
+                                          ['licenca', 'modulo', 'aplicativo'].includes(
+                                            field.produto.tipoItem,
+                                          )
                                             ? 'Ex: 10 licenças'
                                             : 'Ex: 1'
                                         }
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                                        className={fieldClass}
                                         onChange={(e) => {
                                           const quantidade = parseInt(e.target.value) || 1;
                                           controllerField.onChange(quantidade);
@@ -1300,7 +1308,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                                         min="0"
                                         max="100"
                                         step="0.01"
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                                        className={fieldClass}
                                         onChange={(e) => {
                                           const desconto = parseFloat(e.target.value) || 0;
                                           controllerField.onChange(desconto);
@@ -1380,7 +1388,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                             min="0"
                             max="100"
                             step="0.01"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                            className={fieldClass}
                           />
                         )}
                       />
@@ -1401,7 +1409,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                             min="0"
                             max="100"
                             step="0.01"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                            className={fieldClass}
                           />
                         )}
                       />
@@ -1416,10 +1424,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                         name="formaPagamento"
                         control={control}
                         render={({ field }) => (
-                          <select
-                            {...field}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                          >
+                          <select {...field} className={fieldClass}>
                             <option value="avista">{t('common.cashPayment')}</option>
                             <option value="parcelado">Parcelado</option>
                             <option value="boleto">Boleto</option>
@@ -1447,7 +1452,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                               type="number"
                               min="1"
                               max="365"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                              className={fieldClass}
                             />
                           )}
                         />
@@ -1459,7 +1464,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
 
                     {/* Mensagem informativa para produtos Software */}
                     {watchedProdutos?.some((produto) => isProdutoSoftware(produto.produto)) && (
-                      <div className="p-4 bg-[#DEEFE7] border border-[#B4BEC9] rounded-lg">
+                      <div className="p-4 bg-[#DEEFE7] border border-[#D4E2E7] rounded-lg">
                         <div className="flex items-center">
                           <div className="flex-shrink-0">
                             <svg
@@ -1496,7 +1501,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                           <textarea
                             {...field}
                             rows={3}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                            className={fieldClass}
                             placeholder="Observações adicionais sobre a proposta..."
                           />
                         )}
@@ -1600,7 +1605,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                         <span>
                           {produto.produto.nome} (x{produto.quantidade}{' '}
                           {produto.produto.tipoItem &&
-                            ['licenca', 'modulo', 'aplicativo'].includes(produto.produto.tipoItem)
+                          ['licenca', 'modulo', 'aplicativo'].includes(produto.produto.tipoItem)
                             ? 'licenças'
                             : produto.produto.unidade || 'unidades'}
                           )
@@ -1707,10 +1712,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
             {/* Navigation buttons */}
             <div className="flex items-center justify-between">
               {etapaAtual > 0 ? (
-                <button
-                  onClick={etapaAnterior}
-                  className="flex items-center px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-                >
+                <button onClick={etapaAnterior} className={secondaryButtonClass}>
                   <ArrowLeft className="h-4 w-4 mr-1" />
                   Anterior
                 </button>
@@ -1719,10 +1721,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
               )}
 
               {etapaAtual < etapas.length - 1 ? (
-                <button
-                  onClick={proximaEtapa}
-                  className="flex items-center px-3 py-1.5 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors text-sm"
-                >
+                <button onClick={proximaEtapa} className={primaryButtonClass}>
                   Próximo
                   <ArrowRight className="h-4 w-4 ml-1" />
                 </button>
@@ -1730,7 +1729,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                 <button
                   onClick={handleSubmit(onSubmit)}
                   disabled={isLoading || !isValid}
-                  className="flex items-center px-3 py-1.5 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                  className={primaryButtonClass}
                 >
                   {isLoading ? (
                     <>
@@ -1780,20 +1779,14 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
 
             <div className="flex items-center space-x-2">
               {etapaAtual > 0 && (
-                <button
-                  onClick={etapaAnterior}
-                  className="flex items-center px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-                >
+                <button onClick={etapaAnterior} className={secondaryButtonClass}>
                   <ArrowLeft className="h-4 w-4 mr-1" />
                   Anterior
                 </button>
               )}
 
               {etapaAtual < etapas.length - 1 ? (
-                <button
-                  onClick={proximaEtapa}
-                  className="flex items-center px-3 py-1.5 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors text-sm"
-                >
+                <button onClick={proximaEtapa} className={primaryButtonClass}>
                   Próximo
                   <ArrowRight className="h-4 w-4 ml-1" />
                 </button>
@@ -1804,7 +1797,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                     <button
                       onClick={handlePreview}
                       disabled={!isValid}
-                      className="flex items-center px-2 py-1.5 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors text-xs disabled:opacity-50"
+                      className={secondaryButtonClass}
                       title="Pré-visualizar proposta"
                     >
                       <Eye className="h-3 w-3 mr-1" />
@@ -1813,7 +1806,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                     <button
                       onClick={handleSaveAsDraft}
                       disabled={!isValid}
-                      className="flex items-center px-2 py-1.5 border border-[#159A9C] text-[#159A9C] rounded hover:bg-[#159A9C]/10 transition-colors text-xs disabled:opacity-50"
+                      className={secondaryButtonClass}
                       title="Salvar como rascunho"
                     >
                       <Save className="h-3 w-3 mr-1" />
@@ -1822,7 +1815,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                     <button
                       onClick={handleSendWhatsApp}
                       disabled={!isValid}
-                      className="flex items-center px-2 py-1.5 border border-[#159A9C] text-[#159A9C] rounded hover:bg-[#159A9C]/10 transition-colors text-xs disabled:opacity-50"
+                      className={secondaryButtonClass}
                       title="Enviar por WhatsApp"
                     >
                       <MessageCircle className="h-3 w-3 mr-1" />
@@ -1831,7 +1824,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                     <button
                       onClick={handleSendEmail}
                       disabled={!isValid}
-                      className="flex items-center px-2 py-1.5 border border-[#159A9C] text-[#159A9C] rounded hover:bg-[#159A9C]/10 transition-colors text-xs disabled:opacity-50"
+                      className={secondaryButtonClass}
                       title="Enviar por e-mail"
                     >
                       <Mail className="h-3 w-3 mr-1" />
@@ -1843,7 +1836,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                   <button
                     onClick={handleSubmit(onSubmit)}
                     disabled={isLoading || !isValid}
-                    className="flex items-center px-3 py-1.5 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                    className={primaryButtonClass}
                   >
                     {isLoading ? (
                       <>

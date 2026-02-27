@@ -199,3 +199,24 @@ export const roundToNearestSlot = (date: Date, slotMinutes: number = 15): Date =
   const ms = slotMinutes * 60 * 1000;
   return new Date(Math.round(date.getTime() / ms) * ms);
 };
+
+// Helpers para inputs do tipo date (YYYY-MM-DD) sem efeito colateral de timezone.
+export const toLocalDateInputValue = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+export const parseLocalDateInputValue = (value: string): Date => {
+  const [yearRaw, monthRaw, dayRaw] = (value || '').split('-');
+  const year = Number(yearRaw);
+  const monthIndex = Number(monthRaw) - 1;
+  const day = Number(dayRaw);
+
+  if (!yearRaw || !monthRaw || !dayRaw || Number.isNaN(year) || Number.isNaN(monthIndex) || Number.isNaN(day)) {
+    return new Date(''); // Invalid Date
+  }
+
+  return new Date(year, monthIndex, day, 0, 0, 0, 0);
+};

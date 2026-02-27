@@ -4,7 +4,7 @@ export interface DadosProposta {
   numeroProposta?: string;
   titulo: string;
   descricao?: string;
-  status?: 'draft' | 'sent' | 'approved' | 'rejected';
+  status?: 'draft' | 'sent' | 'viewed' | 'approved' | 'rejected' | 'expired';
   dataEmissao?: string;
   dataValidade?: string;
   empresa?: {

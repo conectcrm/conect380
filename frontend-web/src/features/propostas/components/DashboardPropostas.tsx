@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { propostasService } from '../services/propostasService';
-import './dashboard-responsive.css';
+import { SectionCard, shellTokens } from '../../../components/layout-v2';
 import {
   TrendingUp,
   TrendingDown,
   DollarSign,
   Target,
-  Clock,
   Users,
   BarChart3,
   CheckCircle,
@@ -14,6 +13,10 @@ import {
   AlertCircle,
   Send,
   FileText,
+  Eye,
+  FileSignature,
+  CreditCard,
+  Clock,
 } from 'lucide-react';
 
 interface MetricasPropostas {
@@ -23,11 +26,74 @@ interface MetricasPropostas {
   propostasAprovadas: number;
   estatisticasPorStatus: Record<string, number>;
   estatisticasPorVendedor: Record<string, number>;
+  motivosPerdaTop?: Array<{ motivo: string; quantidade: number }>;
+  conversaoPorVendedor?: Array<{
+    vendedor: string;
+    total: number;
+    ganhas: number;
+    perdidas: number;
+    taxaConversao: number;
+  }>;
+  conversaoPorProduto?: Array<{
+    produto: string;
+    total: number;
+    ganhas: number;
+    perdidas: number;
+    taxaConversao: number;
+  }>;
+  aprovacoesPendentes?: number;
+  followupsPendentes?: number;
+  propostasComVersao?: number;
+  mediaVersoesPorProposta?: number;
+  revisoesUltimos7Dias?: number;
 }
 
 interface DashboardPropostasProps {
   onRefresh?: () => void;
 }
+
+type StatusConfig = {
+  icon: React.ComponentType<{ className?: string }>;
+  colorClass: string;
+  bgClass: string;
+  label: string;
+};
+
+const getStatusConfig = (status: string): StatusConfig => {
+  switch (String(status || '').toLowerCase()) {
+    case 'aprovada':
+      return { icon: CheckCircle, colorClass: 'text-[#16A34A]', bgClass: 'bg-[#16A34A]/10', label: 'Aprovadas' };
+    case 'rejeitada':
+      return { icon: XCircle, colorClass: 'text-[#DC2626]', bgClass: 'bg-[#DC2626]/10', label: 'Rejeitadas' };
+    case 'enviada':
+      return { icon: Send, colorClass: 'text-[#0369A1]', bgClass: 'bg-[#38BDF8]/10', label: 'Enviadas' };
+    case 'visualizada':
+      return { icon: Eye, colorClass: 'text-[#0F7B7D]', bgClass: 'bg-[#159A9C]/10', label: 'Visualizadas' };
+    case 'negociacao':
+      return { icon: AlertCircle, colorClass: 'text-[#92400E]', bgClass: 'bg-[#FBBF24]/20', label: 'Em negociacao' };
+    case 'contrato_gerado':
+      return { icon: FileSignature, colorClass: 'text-[#3730A3]', bgClass: 'bg-[#818CF8]/15', label: 'Contrato gerado' };
+    case 'contrato_assinado':
+      return { icon: CheckCircle, colorClass: 'text-[#166534]', bgClass: 'bg-[#16A34A]/10', label: 'Contrato assinado' };
+    case 'fatura_criada':
+      return { icon: CreditCard, colorClass: 'text-[#BE123C]', bgClass: 'bg-[#FB7185]/15', label: 'Fatura criada' };
+    case 'aguardando_pagamento':
+      return { icon: Clock, colorClass: 'text-[#C2410C]', bgClass: 'bg-[#FED7AA]', label: 'Aguardando pagamento' };
+    case 'pago':
+      return { icon: DollarSign, colorClass: 'text-[#166534]', bgClass: 'bg-[#16A34A]/10', label: 'Pago' };
+    case 'expirada':
+      return { icon: AlertCircle, colorClass: 'text-[#9A3412]', bgClass: 'bg-[#F97316]/15', label: 'Expiradas' };
+    default:
+      return { icon: FileText, colorClass: 'text-[#607B89]', bgClass: 'bg-[#E7EDF0]', label: 'Rascunhos' };
+  }
+};
+
+const formatarMoeda = (valor: number): string => {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(valor || 0);
+};
 
 export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefresh }) => {
   const [metricas, setMetricas] = useState<MetricasPropostas | null>(null);
@@ -41,305 +107,313 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
       const dados = await propostasService.obterEstatisticas();
       setMetricas(dados);
     } catch (err) {
-      console.error('Erro ao carregar métricas:', err);
-      setError('Erro ao carregar métricas do dashboard');
+      console.error('Erro ao carregar metricas:', err);
+      setError('Erro ao carregar metricas do dashboard.');
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    carregarMetricas();
+    void carregarMetricas();
   }, []);
 
-  const formatarMoeda = (valor: number): string => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(valor);
-  };
-
-  const getStatusConfig = (status: string) => {
-    switch (status) {
-      case 'aprovada':
-        return {
-          icon: CheckCircle,
-          color: 'text-green-600',
-          bg: 'bg-green-50',
-          label: 'Aprovadas',
-        };
-      case 'rejeitada':
-        return { icon: XCircle, color: 'text-red-600', bg: 'bg-red-50', label: 'Rejeitadas' };
-      case 'enviada':
-        return { icon: Send, color: 'text-blue-600', bg: 'bg-blue-50', label: 'Enviadas' };
-      case 'negociacao':
-        return {
-          icon: AlertCircle,
-          color: 'text-yellow-600',
-          bg: 'bg-yellow-50',
-          label: 'Em Negociação',
-        };
-      default:
-        return { icon: FileText, color: 'text-gray-600', bg: 'bg-gray-50', label: 'Rascunhos' };
+  const valorMedio = useMemo(() => {
+    if (!metricas || metricas.totalPropostas <= 0) {
+      return 0;
     }
-  };
+    return metricas.valorTotalPipeline / metricas.totalPropostas;
+  }, [metricas]);
+
+  const statusOrdenados = useMemo(() => {
+    if (!metricas) {
+      return [] as Array<[string, number]>;
+    }
+    return Object.entries(metricas.estatisticasPorStatus || {}).sort((a, b) => b[1] - a[1]);
+  }, [metricas]);
+
+  const vendedoresOrdenados = useMemo(() => {
+    if (!metricas) {
+      return [] as Array<[string, number]>;
+    }
+    return Object.entries(metricas.estatisticasPorVendedor || {})
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+  }, [metricas]);
+
+  const motivosPerdaTop = useMemo(() => {
+    if (!metricas || !Array.isArray(metricas.motivosPerdaTop)) {
+      return [] as Array<{ motivo: string; quantidade: number }>;
+    }
+    return metricas.motivosPerdaTop.slice(0, 5);
+  }, [metricas]);
+
+  const conversaoPorProduto = useMemo(() => {
+    if (!metricas || !Array.isArray(metricas.conversaoPorProduto)) {
+      return [] as Array<{
+        produto: string;
+        total: number;
+        ganhas: number;
+        perdidas: number;
+        taxaConversao: number;
+      }>;
+    }
+    return metricas.conversaoPorProduto.slice(0, 5);
+  }, [metricas]);
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border animate-pulse">
-              <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-              <div className="h-6 sm:h-8 bg-gray-200 rounded w-1/2"></div>
-            </div>
-          ))}
-        </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[...Array(4)].map((_, index) => (
+          <SectionCard key={index} className="animate-pulse p-4 sm:p-5">
+            <div className="h-4 w-2/3 rounded bg-[#E1EAEE]" />
+            <div className="mt-3 h-7 w-1/2 rounded bg-[#E1EAEE]" />
+          </SectionCard>
+        ))}
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-        <div className="flex items-center">
-          <XCircle className="h-5 w-5 text-red-500 mr-2" />
-          <span className="text-red-700">{error}</span>
+      <SectionCard className="p-4 sm:p-5">
+        <div className="flex items-center gap-3">
+          <XCircle className="h-5 w-5 text-[#DC2626]" />
+          <p className="text-sm text-[#7A2F2F]">{error}</p>
           <button
-            onClick={carregarMetricas}
-            className="ml-auto px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+            type="button"
+            onClick={() => void carregarMetricas()}
+            className="ml-auto inline-flex h-9 items-center rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition hover:bg-[#0F7B7D]"
           >
             Tentar novamente
           </button>
         </div>
-      </div>
+      </SectionCard>
     );
   }
 
   if (!metricas) return null;
 
   return (
-    <div className="space-y-6">
-      {/* Métricas principais */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border kip-card">
-          <div className="flex items-center justify-between">
-            <div className="text-container mr-3">
-              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">
-                Total de Propostas
-              </p>
-              <p className="currency-value font-bold text-gray-900 number-display">
-                {metricas.totalPropostas}
-              </p>
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <SectionCard className="p-4 sm:p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#607B89]">Total de propostas</p>
+              <p className="mt-2 text-2xl font-semibold text-[#19384C]">{metricas.totalPropostas}</p>
             </div>
-            <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 card-icon">
-              <FileText className="h-4 w-4 text-blue-600" />
-            </div>
+            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#159A9C]/10">
+              <FileText className="h-5 w-5 text-[#0F7B7D]" />
+            </span>
           </div>
-        </div>
+        </SectionCard>
 
-        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border kip-card">
-          <div className="flex items-center justify-between">
-            <div className="text-container mr-3">
-              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">
-                Pipeline Total
-              </p>
-              <p className="currency-value font-bold text-gray-900 number-display">
-                {formatarMoeda(metricas.valorTotalPipeline)}
-              </p>
+        <SectionCard className="p-4 sm:p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#607B89]">Pipeline total</p>
+              <p className="mt-2 text-2xl font-semibold text-[#19384C]">{formatarMoeda(metricas.valorTotalPipeline)}</p>
             </div>
-            <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 card-icon">
-              <DollarSign className="h-4 w-4 text-green-600" />
-            </div>
+            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#16A34A]/10">
+              <DollarSign className="h-5 w-5 text-[#166534]" />
+            </span>
           </div>
-        </div>
+        </SectionCard>
 
-        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border kip-card">
-          <div className="flex items-center justify-between">
-            <div className="text-container mr-3">
-              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Valor Médio</p>
-              <p className="currency-value font-bold text-gray-900 number-display">
-                {formatarMoeda(
-                  metricas.totalPropostas > 0
-                    ? metricas.valorTotalPipeline / metricas.totalPropostas
-                    : 0,
-                )}
-              </p>
+        <SectionCard className="p-4 sm:p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#607B89]">Valor medio</p>
+              <p className="mt-2 text-2xl font-semibold text-[#19384C]">{formatarMoeda(valorMedio)}</p>
             </div>
-            <div className="h-8 w-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0 card-icon">
-              <BarChart3 className="h-4 w-4 text-purple-600" />
-            </div>
+            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#818CF8]/15">
+              <BarChart3 className="h-5 w-5 text-[#3730A3]" />
+            </span>
           </div>
-        </div>
+        </SectionCard>
 
-        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border kip-card">
-          <div className="flex items-center justify-between">
-            <div className="text-container mr-3">
-              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">
-                Taxa de Conversão
-              </p>
-              <p className="currency-value font-bold text-gray-900 number-display">
-                {metricas.taxaConversao.toFixed(1)}%
-              </p>
+        <SectionCard className="p-4 sm:p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#607B89]">Taxa de conversao</p>
+              <p className="mt-2 text-2xl font-semibold text-[#19384C]">{metricas.taxaConversao.toFixed(1)}%</p>
             </div>
-            <div className="h-8 w-8 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0 card-icon">
+            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#FBBF24]/20">
               {metricas.taxaConversao >= 50 ? (
-                <TrendingUp className="h-4 w-4 text-orange-600" />
+                <TrendingUp className="h-5 w-5 text-[#92400E]" />
               ) : (
-                <TrendingDown className="h-4 w-4 text-orange-600" />
+                <TrendingDown className="h-5 w-5 text-[#92400E]" />
               )}
-            </div>
+            </span>
           </div>
-        </div>
+        </SectionCard>
       </div>
 
-      {/* Propostas por Status */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Propostas por Status</h3>
-          <div className="space-y-3">
-            {Object.entries(metricas.estatisticasPorStatus).map(([status, quantidade]) => {
-              const config = getStatusConfig(status);
-              const Icon = config.icon;
-              const valorEstimado =
-                quantidade * (metricas.valorTotalPipeline / metricas.totalPropostas);
-              return (
-                <div
-                  key={status}
-                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg border stacked-card-content"
-                >
-                  <div className="flex items-center">
-                    <div
-                      className={`h-8 w-8 ${config.bg} rounded-full flex items-center justify-center mr-3 flex-shrink-0`}
-                    >
-                      <Icon className={`h-4 w-4 ${config.color}`} />
-                    </div>
-                    <div className="text-container">
-                      <p className="font-medium text-gray-900">{config.label}</p>
-                      <p className="text-sm text-gray-500">{quantidade} propostas</p>
-                    </div>
-                  </div>
-                  <div className="text-left sm:text-right ml-11 sm:ml-0">
-                    <p className="font-semibold text-gray-900 text-sm sm:text-base number-display">
-                      {formatarMoeda(valorEstimado)}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {metricas.totalPropostas > 0
-                        ? ((quantidade / metricas.totalPropostas) * 100).toFixed(1)
-                        : 0}
-                      %
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Performance por Vendedor */}
-        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Performance por Vendedor</h3>
-          <div className="space-y-3">
-            {Object.entries(metricas.estatisticasPorVendedor)
-              .sort((a, b) => b[1] - a[1])
-              .slice(0, 5)
-              .map(([vendedorNome, quantidade]) => {
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <SectionCard className="p-4 sm:p-5">
+          <h3 className="text-base font-semibold text-[#19384C]">Propostas por status</h3>
+          <div className="mt-4 space-y-3">
+            {statusOrdenados.length === 0 ? (
+              <p className="text-sm text-[#607B89]">Sem dados de status no periodo.</p>
+            ) : (
+              statusOrdenados.map(([status, quantidade]) => {
+                const config = getStatusConfig(status);
+                const Icone = config.icon;
                 const valorEstimado =
-                  quantidade * (metricas.valorTotalPipeline / metricas.totalPropostas);
+                  metricas.totalPropostas > 0
+                    ? quantidade * (metricas.valorTotalPipeline / metricas.totalPropostas)
+                    : 0;
+
                 return (
-                  <div
-                    key={vendedorNome}
-                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg border stacked-card-content"
-                  >
-                    <div className="flex items-center">
-                      <div className="h-8 w-8 bg-indigo-100 rounded-full flex items-center justify-center mr-3 flex-shrink-0">
-                        <Users className="h-4 w-4 text-indigo-600" />
-                      </div>
-                      <div className="text-container">
-                        <p className="font-medium text-gray-900 vendor-name" title={vendedorNome}>
-                          {vendedorNome}
-                        </p>
-                        <p className="text-sm text-gray-500">{quantidade} propostas</p>
+                  <div key={status} className={`${shellTokens.card} flex items-center justify-between gap-3 p-3`}>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${config.bgClass}`}>
+                        <Icone className={`h-4 w-4 ${config.colorClass}`} />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-[#244455]">{config.label}</p>
+                        <p className="text-xs text-[#607B89]">{quantidade} proposta(s)</p>
                       </div>
                     </div>
-                    <div className="text-left sm:text-right ml-11 sm:ml-0">
-                      <p className="font-semibold text-gray-900 text-sm sm:text-base number-display">
-                        {formatarMoeda(valorEstimado)}
-                      </p>
-                      <p className="text-sm text-gray-500 number-display">
-                        {formatarMoeda(quantidade > 0 ? valorEstimado / quantidade : 0)} médio
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-[#19384C]">{formatarMoeda(valorEstimado)}</p>
+                      <p className="text-xs text-[#607B89]">
+                        {metricas.totalPropostas > 0
+                          ? ((quantidade / metricas.totalPropostas) * 100).toFixed(1)
+                          : '0.0'}
+                        %
                       </p>
                     </div>
                   </div>
                 );
-              })}
+              })
+            )}
           </div>
-        </div>
+        </SectionCard>
+
+        <SectionCard className="p-4 sm:p-5">
+          <h3 className="text-base font-semibold text-[#19384C]">Performance por vendedor</h3>
+          <div className="mt-4 space-y-3">
+            {vendedoresOrdenados.length === 0 ? (
+              <p className="text-sm text-[#607B89]">Sem dados de vendedores no periodo.</p>
+            ) : (
+              vendedoresOrdenados.map(([vendedorNome, quantidade]) => {
+                const valorEstimado =
+                  metricas.totalPropostas > 0
+                    ? quantidade * (metricas.valorTotalPipeline / metricas.totalPropostas)
+                    : 0;
+                return (
+                  <div key={vendedorNome} className={`${shellTokens.card} flex items-center justify-between gap-3 p-3`}>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#159A9C]/10">
+                        <Users className="h-4 w-4 text-[#0F7B7D]" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-[#244455]" title={vendedorNome}>
+                          {vendedorNome}
+                        </p>
+                        <p className="text-xs text-[#607B89]">{quantidade} proposta(s)</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-[#19384C]">{formatarMoeda(valorEstimado)}</p>
+                      <p className="text-xs text-[#607B89]">
+                        {formatarMoeda(quantidade > 0 ? valorEstimado / quantidade : 0)} medio
+                      </p>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </SectionCard>
       </div>
 
-      {/* Métricas Adicionais */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Status das Propostas</h3>
-          <div className="space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg border space-y-2 sm:space-y-0">
-              <div className="flex items-center">
-                <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center mr-3 flex-shrink-0">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                </div>
-                <div className="min-w-0">
-                  <p className="font-medium text-gray-900">Propostas Aprovadas</p>
-                  <p className="text-sm text-gray-500">Status: Aprovadas</p>
-                </div>
-              </div>
-              <div className="text-left sm:text-right ml-11 sm:ml-0">
-                <p className="text-xl sm:text-2xl font-bold text-green-600">
-                  {metricas.propostasAprovadas}
-                </p>
-                <p className="text-sm text-gray-500">de {metricas.totalPropostas}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Métricas de Performance</h3>
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 bg-gray-50 rounded-lg space-y-2 sm:space-y-0">
-              <div className="flex items-center">
-                <div className="h-10 w-10 bg-green-100 rounded-full flex items-center justify-center mr-3 flex-shrink-0">
-                  <Target className="h-5 w-5 text-green-600" />
-                </div>
-                <div className="min-w-0">
-                  <p className="font-medium text-gray-900">Meta de Conversão</p>
-                  <p className="text-sm text-gray-500">Objetivo: 60%</p>
-                </div>
-              </div>
-              <div className="text-left sm:text-right ml-13 sm:ml-0">
-                <p
-                  className={`text-xl sm:text-2xl font-bold ${metricas.taxaConversao >= 60 ? 'text-green-600' : 'text-orange-600'}`}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <SectionCard className="p-4 sm:p-5">
+          <h3 className="text-base font-semibold text-[#19384C]">Motivos de perda</h3>
+          <div className="mt-4 space-y-3">
+            {motivosPerdaTop.length === 0 ? (
+              <p className="text-sm text-[#607B89]">Sem perdas registradas no periodo.</p>
+            ) : (
+              motivosPerdaTop.map((item) => (
+                <div
+                  key={item.motivo}
+                  className={`${shellTokens.card} flex items-center justify-between gap-3 p-3`}
                 >
-                  {metricas.taxaConversao >= 60 ? '✓' : '○'}
-                </p>
-                <p className="text-sm text-gray-500">{metricas.taxaConversao.toFixed(1)}% atual</p>
-              </div>
-            </div>
+                  <p className="truncate text-sm font-medium text-[#244455]" title={item.motivo}>
+                    {item.motivo}
+                  </p>
+                  <span className="text-sm font-semibold text-[#7F1D1D]">{item.quantidade}</span>
+                </div>
+              ))
+            )}
           </div>
-        </div>
+        </SectionCard>
+
+        <SectionCard className="p-4 sm:p-5">
+          <h3 className="text-base font-semibold text-[#19384C]">Conversao por produto</h3>
+          <div className="mt-4 space-y-3">
+            {conversaoPorProduto.length === 0 ? (
+              <p className="text-sm text-[#607B89]">Sem dados de produtos no periodo.</p>
+            ) : (
+              conversaoPorProduto.map((item) => (
+                <div
+                  key={item.produto}
+                  className={`${shellTokens.card} flex items-center justify-between gap-3 p-3`}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-[#244455]" title={item.produto}>
+                      {item.produto}
+                    </p>
+                    <p className="text-xs text-[#607B89]">
+                      {item.ganhas} ganha(s) / {item.perdidas} perda(s)
+                    </p>
+                  </div>
+                  <p className="text-sm font-semibold text-[#19384C]">
+                    {Number(item.taxaConversao || 0).toFixed(1)}%
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+        </SectionCard>
       </div>
 
-      {/* Botão de atualização */}
-      <div className="flex justify-center pt-4">
-        <button
-          onClick={() => {
-            carregarMetricas();
-            onRefresh?.();
-          }}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
-        >
-          Atualizar Métricas
-        </button>
-      </div>
+      <SectionCard className="p-4 sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#16A34A]/10">
+              <Target className="h-5 w-5 text-[#166534]" />
+            </span>
+            <div>
+              <p className="text-sm font-medium text-[#244455]">Propostas aprovadas</p>
+              <p className="text-xs text-[#607B89]">{metricas.propostasAprovadas} de {metricas.totalPropostas} no periodo</p>
+              <p className="mt-1 text-xs text-[#607B89]">
+                {metricas.aprovacoesPendentes || 0} aprovacao(oes) pendente(s) e{' '}
+                {metricas.followupsPendentes || 0} follow-up(s) pendente(s)
+              </p>
+              <p className="mt-1 text-xs text-[#607B89]">
+                {metricas.propostasComVersao || 0} proposta(s) com revisao, media de{' '}
+                {Number(metricas.mediaVersoesPorProposta || 0).toFixed(1)} versao(oes) por proposta
+                e {metricas.revisoesUltimos7Dias || 0} revisao(oes) nos ultimos 7 dias
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              void carregarMetricas();
+              onRefresh?.();
+            }}
+            className="inline-flex h-9 items-center rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+          >
+            Atualizar metricas
+          </button>
+        </div>
+      </SectionCard>
     </div>
   );
 };

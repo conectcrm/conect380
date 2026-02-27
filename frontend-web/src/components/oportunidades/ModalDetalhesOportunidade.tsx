@@ -27,6 +27,7 @@ import {
   PrioridadeOportunidade,
 } from '../../types/oportunidades';
 import { oportunidadesService } from '../../services/oportunidadesService';
+import { toastService } from '../../services/toastService';
 import { differenceInDays } from 'date-fns';
 
 interface ModalDetalhesOportunidadeProps {
@@ -52,6 +53,24 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
     }
   }, [oportunidade?.id]);
 
+  useEffect(() => {
+    if (!oportunidade) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [oportunidade]);
+
+  useEffect(() => {
+    if (!oportunidade) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [oportunidade, onClose]);
+
   const carregarAtividades = async () => {
     if (!oportunidade) return;
 
@@ -61,6 +80,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
       setAtividades(dados);
     } catch (err) {
       console.error('Erro ao carregar atividades:', err);
+      toastService.error('Não foi possível carregar as atividades desta oportunidade.');
     } finally {
       setLoadingAtividades(false);
     }
@@ -92,17 +112,17 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
   const getIconeAtividade = (tipo: string) => {
     switch (tipo) {
       case 'call':
-        return <PhoneCall className="h-4 w-4 text-blue-600" />;
+        return <PhoneCall className="h-4 w-4 text-white" />;
       case 'email':
-        return <Send className="h-4 w-4 text-indigo-600" />;
+        return <Send className="h-4 w-4 text-white" />;
       case 'meeting':
-        return <Users className="h-4 w-4 text-purple-600" />;
+        return <Users className="h-4 w-4 text-white" />;
       case 'note':
-        return <MessageSquare className="h-4 w-4 text-gray-600" />;
+        return <MessageSquare className="h-4 w-4 text-white" />;
       case 'task':
-        return <CheckCircle className="h-4 w-4 text-green-600" />;
+        return <CheckCircle className="h-4 w-4 text-white" />;
       default:
-        return <FileText className="h-4 w-4 text-gray-600" />;
+        return <FileText className="h-4 w-4 text-white" />;
     }
   };
 
@@ -138,12 +158,24 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-[calc(100%-2rem)] sm:w-[600px] md:w-[700px] lg:w-[900px] xl:w-[1000px] max-w-[1100px] max-h-[90vh] overflow-hidden flex flex-col">
+    <div
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-detalhes-oportunidade-title"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-[calc(100%-2rem)] sm:w-[600px] md:w-[700px] lg:w-[900px] xl:w-[1000px] max-w-[1100px] max-h-[90vh] overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header com gradiente */}
         <div className="bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] px-6 py-6 flex items-start justify-between">
           <div className="flex-1">
-            <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-3">
+            <h2
+              id="modal-detalhes-oportunidade-title"
+              className="text-2xl font-bold text-white mb-2 flex items-center gap-3"
+            >
               <TrendingUp className="h-7 w-7" />
               {oportunidade.titulo}
             </h2>
@@ -164,8 +196,10 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                 onEditar(oportunidade);
                 onClose();
               }}
+              type="button"
               className="p-2 hover:bg-white/20 rounded-lg transition-colors text-white"
               title="Editar"
+              aria-label="Editar oportunidade"
             >
               <Edit2 className="h-5 w-5" />
             </button>
@@ -175,15 +209,19 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                   onClonar(oportunidade);
                   onClose();
                 }}
+                type="button"
                 className="p-2 hover:bg-white/20 rounded-lg transition-colors text-white"
                 title="Duplicar"
+                aria-label="Duplicar oportunidade"
               >
                 <Copy className="h-5 w-5" />
               </button>
             )}
             <button
               onClick={onClose}
+              type="button"
               className="p-2 hover:bg-white/20 rounded-lg transition-colors text-white"
+              aria-label="Fechar"
             >
               <X className="h-5 w-5" />
             </button>
@@ -191,24 +229,28 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
         </div>
 
         {/* Abas */}
-        <div className="border-b bg-gray-50">
+        <div className="border-b border-[#B4BEC9]/35 bg-[#DEEFE7]/35">
           <div className="flex">
             <button
               onClick={() => setAbaSelecionada('detalhes')}
+              type="button"
+              aria-pressed={abaSelecionada === 'detalhes'}
               className={`px-6 py-3 font-medium transition-colors border-b-2 ${
                 abaSelecionada === 'detalhes'
                   ? 'border-[#159A9C] text-[#159A9C] bg-white'
-                  : 'border-transparent text-gray-600 hover:text-gray-800'
+                  : 'border-transparent text-[#002333]/60 hover:text-[#002333]'
               }`}
             >
               Detalhes
             </button>
             <button
               onClick={() => setAbaSelecionada('atividades')}
+              type="button"
+              aria-pressed={abaSelecionada === 'atividades'}
               className={`px-6 py-3 font-medium transition-colors border-b-2 flex items-center gap-2 ${
                 abaSelecionada === 'atividades'
                   ? 'border-[#159A9C] text-[#159A9C] bg-white'
-                  : 'border-transparent text-gray-600 hover:text-gray-800'
+                  : 'border-transparent text-[#002333]/60 hover:text-[#002333]'
               }`}
             >
               Atividades
@@ -228,12 +270,12 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
               {/* Métricas Principais */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Valor */}
-                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-                  <div className="flex items-center gap-2 text-emerald-600 mb-1">
+                <div className="bg-[#159A9C]/10 border border-[#159A9C]/20 rounded-xl p-4">
+                  <div className="flex items-center gap-2 text-[#159A9C] mb-1">
                     <DollarSign className="h-5 w-5" />
                     <span className="text-sm font-medium">Valor</span>
                   </div>
-                  <p className="text-2xl font-bold text-emerald-700">
+                  <p className="text-2xl font-bold text-[#0F7B7D]">
                     {formatarMoeda(Number(oportunidade.valor || 0))}
                   </p>
                 </div>
@@ -251,12 +293,12 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                 </div>
 
                 {/* Estágio */}
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                  <div className="flex items-center gap-2 text-blue-600 mb-1">
+                <div className="bg-[#DEEFE7]/55 border border-[#B4BEC9]/35 rounded-xl p-4">
+                  <div className="flex items-center gap-2 text-[#159A9C] mb-1">
                     <CheckCircle className="h-5 w-5" />
                     <span className="text-sm font-medium">Estágio</span>
                   </div>
-                  <p className="text-xl font-bold text-blue-700">
+                  <p className="text-xl font-bold text-[#002333]">
                     {getNomeEstagio(oportunidade.estagio)}
                   </p>
                 </div>
@@ -294,7 +336,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
               )}
 
               {/* Informações de Contato */}
-              <div className="bg-gray-50 rounded-xl p-5 space-y-4">
+              <div className="bg-[#DEEFE7]/35 rounded-xl p-5 space-y-4 border border-[#B4BEC9]/25">
                 <h3 className="text-lg font-bold text-[#002333] flex items-center gap-2 mb-4">
                   <Users className="h-5 w-5 text-[#159A9C]" />
                   Informações de Contato
@@ -304,7 +346,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                   <div className="flex items-start gap-3">
                     <User className="h-5 w-5 text-[#159A9C] mt-0.5" />
                     <div>
-                      <p className="text-sm text-gray-600">Nome do Contato</p>
+                      <p className="text-sm text-[#002333]/60">Nome do Contato</p>
                       <p className="font-semibold text-[#002333]">{oportunidade.nomeContato}</p>
                     </div>
                   </div>
@@ -313,8 +355,8 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                 {oportunidade.empresaContato && (
                   <div className="flex items-start gap-3">
                     <Building className="h-5 w-5 text-[#159A9C] mt-0.5" />
-                    <div>
-                      <p className="text-sm text-gray-600">Empresa</p>
+                      <div>
+                      <p className="text-sm text-[#002333]/60">Empresa</p>
                       <p className="font-semibold text-[#002333]">{oportunidade.empresaContato}</p>
                     </div>
                   </div>
@@ -322,9 +364,9 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
 
                 {oportunidade.emailContato && (
                   <div className="flex items-start gap-3">
-                    <Mail className="h-5 w-5 text-[#159A9C] mt-0.5" />
-                    <div>
-                      <p className="text-sm text-gray-600">Email</p>
+                      <Mail className="h-5 w-5 text-[#159A9C] mt-0.5" />
+                      <div>
+                      <p className="text-sm text-[#002333]/60">Email</p>
                       <a
                         href={`mailto:${oportunidade.emailContato}`}
                         className="font-semibold text-[#159A9C] hover:underline"
@@ -337,9 +379,9 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
 
                 {oportunidade.telefoneContato && (
                   <div className="flex items-start gap-3">
-                    <Phone className="h-5 w-5 text-[#159A9C] mt-0.5" />
-                    <div>
-                      <p className="text-sm text-gray-600">Telefone</p>
+                      <Phone className="h-5 w-5 text-[#159A9C] mt-0.5" />
+                      <div>
+                      <p className="text-sm text-[#002333]/60">Telefone</p>
                       <a
                         href={`tel:${oportunidade.telefoneContato}`}
                         className="font-semibold text-[#159A9C] hover:underline"
@@ -357,14 +399,14 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                   <div className="flex items-start gap-3">
                     <AlertCircle className="h-5 w-5 text-[#159A9C] mt-0.5" />
                     <div>
-                      <p className="text-sm text-gray-600">Prioridade</p>
+                      <p className="text-sm text-[#002333]/60">Prioridade</p>
                       <span
                         className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${
                           oportunidade.prioridade === PrioridadeOportunidade.ALTA
                             ? 'bg-red-100 text-red-700'
-                            : oportunidade.prioridade === PrioridadeOportunidade.MEDIA
-                              ? 'bg-yellow-100 text-yellow-700'
-                              : 'bg-green-100 text-green-700'
+                          : oportunidade.prioridade === PrioridadeOportunidade.MEDIA
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-green-100 text-green-700'
                         }`}
                       >
                         {oportunidade.prioridade === PrioridadeOportunidade.ALTA
@@ -381,7 +423,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                   <div className="flex items-start gap-3">
                     <Tag className="h-5 w-5 text-[#159A9C] mt-0.5" />
                     <div>
-                      <p className="text-sm text-gray-600">Origem</p>
+                      <p className="text-sm text-[#002333]/60">Origem</p>
                       <p className="font-semibold text-[#002333] capitalize">
                         {oportunidade.origem}
                       </p>
@@ -393,7 +435,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                   <div className="flex items-start gap-3">
                     <Calendar className="h-5 w-5 text-[#159A9C] mt-0.5" />
                     <div>
-                      <p className="text-sm text-gray-600">Data Esperada</p>
+                      <p className="text-sm text-[#002333]/60">Data Esperada</p>
                       <p className="font-semibold text-[#002333]">
                         {new Date(oportunidade.dataFechamentoEsperado).toLocaleDateString('pt-BR')}
                       </p>
@@ -406,7 +448,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
               {oportunidade.descricao && (
                 <div>
                   <h3 className="text-lg font-bold text-[#002333] mb-3">Descrição</h3>
-                  <div className="bg-gray-50 rounded-xl p-4">
+                  <div className="bg-[#DEEFE7]/35 rounded-xl p-4 border border-[#B4BEC9]/25">
                     <p className="text-[#002333]/80 whitespace-pre-wrap">
                       {oportunidade.descricao}
                     </p>
@@ -445,15 +487,22 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
               {loadingAtividades ? (
                 <div className="text-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#159A9C] mx-auto"></div>
-                  <p className="text-gray-600 mt-2 text-sm">Carregando atividades...</p>
+                  <p className="text-[#002333]/60 mt-2 text-sm">Carregando atividades...</p>
                 </div>
               ) : atividades.length === 0 ? (
-                <div className="text-center py-12 bg-gray-50 rounded-xl">
-                  <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                  <p className="text-gray-600 font-medium">Nenhuma atividade registrada</p>
-                  <p className="text-gray-500 text-sm mt-1">
+                <div className="text-center py-12 bg-[#DEEFE7]/35 rounded-xl border border-[#B4BEC9]/25">
+                  <MessageSquare className="h-12 w-12 text-[#B4BEC9] mx-auto mb-3" />
+                  <p className="text-[#002333]/70 font-medium">Nenhuma atividade registrada</p>
+                  <p className="text-[#002333]/55 text-sm mt-1">
                     As atividades aparecerão aqui conforme forem criadas
                   </p>
+                  <button
+                    type="button"
+                    onClick={carregarAtividades}
+                    className="mt-4 px-4 py-2 border border-[#B4BEC9]/70 rounded-lg text-sm font-medium text-[#002333] hover:bg-[#DEEFE7]/55 transition-colors"
+                  >
+                    Recarregar
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -465,19 +514,19 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                           {getIconeAtividade(atividade.tipo)}
                         </div>
                         {index < atividades.length - 1 && (
-                          <div className="w-0.5 flex-1 bg-gray-200 my-2 min-h-[30px]" />
+                          <div className="w-0.5 flex-1 bg-[#B4BEC9]/60 my-2 min-h-[30px]" />
                         )}
                       </div>
 
                       {/* Conteúdo da atividade */}
                       <div className="flex-1 pb-6">
-                        <div className="bg-white border border-gray-200 rounded-xl p-4 hover:border-[#159A9C]/30 transition-colors">
+                        <div className="bg-white border border-[#B4BEC9]/35 rounded-xl p-4 hover:border-[#159A9C]/30 transition-colors">
                           <div className="flex items-start justify-between mb-2">
                             <div>
                               <p className="font-semibold text-[#002333] capitalize">
                                 {atividade.tipo.replace('_', ' ')}
                               </p>
-                              <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                              <p className="text-xs text-[#002333]/55 flex items-center gap-1 mt-1">
                                 <User className="h-3 w-3" />
                                 {atividade.criadoPor?.nome || 'Sistema'} •{' '}
                                 {formatarData(atividade.createdAt)}
@@ -498,10 +547,11 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="border-t px-6 py-4 bg-gray-50 flex justify-end gap-3">
+        <div className="border-t border-[#B4BEC9]/35 px-6 py-4 bg-[#DEEFE7]/35 flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors text-sm font-medium"
+            type="button"
+            className="px-4 py-2 border border-[#B4BEC9]/70 text-[#002333] rounded-lg hover:bg-[#DEEFE7]/55 transition-colors text-sm font-medium"
           >
             Fechar
           </button>
@@ -510,6 +560,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
               onEditar(oportunidade);
               onClose();
             }}
+            type="button"
             className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors flex items-center gap-2 text-sm font-medium"
           >
             <Edit2 className="h-4 w-4" />

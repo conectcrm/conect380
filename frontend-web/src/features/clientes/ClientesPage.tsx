@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import toast from 'react-hot-toast';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import ModalCadastroCliente from '../../components/modals/ModalCadastroCliente';
 import { ModalDetalhesCliente } from '../../components/modals/ModalDetalhesCliente';
 import { ClienteCard } from '../../components/clientes';
@@ -63,8 +63,27 @@ const getStatusLabel = (status: string): string =>
 const getTipoLabel = (tipo: string): string =>
   CLIENTE_TIPO_OPTIONS.find((option) => option.value === tipo)?.label ?? tipo;
 
+const formatDocumento = (documento?: string, tipo?: Cliente['tipo']): string => {
+  if (!documento) return '-';
+
+  const digits = documento.replace(/\D/g, '');
+  if (digits.length === 11 || tipo === 'pessoa_fisica') {
+    if (digits.length !== 11) return documento;
+    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+  }
+
+  if (digits.length === 14 || tipo === 'pessoa_juridica') {
+    if (digits.length !== 14) return documento;
+    return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
+  }
+
+  return documento;
+};
+
 const CLIENTES_PAGE_STATE_STORAGE_KEY = 'conectcrm_clientes_page_state_v1';
 const CLIENTES_SAVED_VIEWS_STORAGE_KEY = 'conectcrm_clientes_saved_views_v1';
+const CLIENTES_SEARCH_DEBOUNCE_MS = 500;
+const CLIENTES_SEARCH_MIN_CHARS = 2;
 
 type ClientesViewMode = 'cards' | 'table';
 
@@ -95,6 +114,17 @@ type PersistedClientesPageState = {
 };
 
 type SaveViewModalMode = 'save' | 'rename';
+
+type ClienteNotasResumo = {
+  total: number;
+  importantes: number;
+};
+
+type ClienteDemandasResumo = {
+  total: number;
+  abertas: number;
+  urgentes: number;
+};
 
 const loadPersistedClientesState = (): Partial<PersistedClientesPageState> => {
   if (typeof window === 'undefined') {
@@ -184,6 +214,8 @@ const toCreateClientePayload = (
 });
 
 const ClientesPage: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { confirm } = useGlobalConfirmation();
   const persistedStateRef = useRef<Partial<PersistedClientesPageState>>(
     loadPersistedClientesState(),
@@ -210,6 +242,11 @@ const ClientesPage: React.FC = () => {
   const [isModalLoading, setIsModalLoading] = useState(false);
   const [clienteAttachments, setClienteAttachments] = useState<ClienteAttachment[]>([]);
   const [attachmentsLoading, setAttachmentsLoading] = useState(false);
+  const [clienteNotasResumo, setClienteNotasResumo] = useState<ClienteNotasResumo | null>(null);
+  const [clienteDemandasResumo, setClienteDemandasResumo] = useState<ClienteDemandasResumo | null>(
+    null,
+  );
+  const [relacionamentosLoading, setRelacionamentosLoading] = useState(false);
   const [viewMode, setViewMode] = useState<ClientesViewMode>(() => {
     if (persistedStateRef.current.viewMode) {
       return persistedStateRef.current.viewMode;
@@ -282,7 +319,12 @@ const ClientesPage: React.FC = () => {
   const hasHydratedQueryRef = useRef(false);
   const hasAppliedDefaultViewRef = useRef(false);
   const processedHighlightRef = useRef('');
+  const clientesRequestRef = useRef(0);
   const attachmentsRequestRef = useRef(0);
+  const relacionamentosRequestRef = useRef(0);
+  const inFlightLoadKeyRef = useRef<string | null>(null);
+  const lastEstatisticasLoadedAtRef = useRef(0);
+  const hasLoadedEstatisticasRef = useRef(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   // Funcao para calcular estatisticas baseadas nos dados carregados
@@ -324,20 +366,59 @@ const ClientesPage: React.FC = () => {
   // Carregar clientes (memoizado para evitar loops)
   const loadClientes = useCallback(
     async (forceFresh = false) => {
+      const normalizedFilters: ClienteFilters = {
+        ...filters,
+        page: filters.page ?? 1,
+        limit: filters.limit ?? 10,
+        search: filters.search ?? '',
+        status: filters.status ?? '',
+        tipo: filters.tipo ?? '',
+        sortBy: filters.sortBy ?? 'created_at',
+        sortOrder: filters.sortOrder ?? 'DESC',
+      };
+      const loadKey = JSON.stringify(normalizedFilters);
+
+      if (!forceFresh && inFlightLoadKeyRef.current === loadKey) {
+        return;
+      }
+
+      if (!forceFresh) {
+        inFlightLoadKeyRef.current = loadKey;
+      }
+      const requestId = ++clientesRequestRef.current;
+
       try {
         setIsLoading(true);
 
         const requestFilters: ClienteFilters = forceFresh
-          ? { ...filters, cacheBust: Date.now() }
-          : filters;
+          ? { ...normalizedFilters, cacheBust: Date.now() }
+          : normalizedFilters;
 
         const data = await clientesService.getClientes(requestFilters);
+
+        if (clientesRequestRef.current !== requestId) {
+          return;
+        }
+
         setClientesData(data);
         setClientes(data.data);
 
-        // Calcular estatisticas locais apos carregar dados
-        await loadEstatisticas(data.data);
+        const shouldReloadStats =
+          forceFresh ||
+          !hasLoadedEstatisticasRef.current ||
+          Date.now() - lastEstatisticasLoadedAtRef.current > 30000;
+
+        if (shouldReloadStats) {
+          // Estatisticas sao globais e nao precisam ser buscadas em toda digitacao de filtro.
+          await loadEstatisticas(data.data);
+          hasLoadedEstatisticasRef.current = true;
+          lastEstatisticasLoadedAtRef.current = Date.now();
+        }
       } catch (error) {
+        if (clientesRequestRef.current !== requestId) {
+          return;
+        }
+
         console.error('Erro ao carregar clientes:', error);
 
         toast.error('Erro ao carregar clientes do servidor. Verifique sua conexao.', {
@@ -357,7 +438,12 @@ const ClientesPage: React.FC = () => {
         });
         calcularEstatisticasLocais([]);
       } finally {
-        setIsLoading(false);
+        if (!forceFresh && inFlightLoadKeyRef.current === loadKey) {
+          inFlightLoadKeyRef.current = null;
+        }
+        if (clientesRequestRef.current === requestId) {
+          setIsLoading(false);
+        }
       }
     },
     [filters, loadEstatisticas, calcularEstatisticasLocais],
@@ -372,14 +458,33 @@ const ClientesPage: React.FC = () => {
     }
 
     const delayDebounce = setTimeout(() => {
-      setFilters((prev) => ({
-        ...prev,
-        search: searchTerm,
-        status: selectedStatus,
-        tipo: selectedTipo,
-        page: 1, // Reset para primeira pagina quando filtros mudam
-      }));
-    }, 300); // 300ms de delay para busca
+      setFilters((prev) => {
+        const currentPage = prev.page ?? 1;
+        const normalizedSearch = searchTerm.trim();
+        const shouldApplySearch =
+          normalizedSearch.length === 0 || normalizedSearch.length >= CLIENTES_SEARCH_MIN_CHARS;
+        const nextSearch = shouldApplySearch ? normalizedSearch : (prev.search ?? '');
+        const nextStatus = selectedStatus;
+        const nextTipo = selectedTipo;
+
+        if (
+          (prev.search ?? '') === nextSearch &&
+          (prev.status ?? '') === nextStatus &&
+          (prev.tipo ?? '') === nextTipo &&
+          currentPage === 1
+        ) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          search: nextSearch,
+          status: nextStatus,
+          tipo: nextTipo,
+          page: 1, // Reset para primeira pagina quando filtros mudam
+        };
+      });
+    }, CLIENTES_SEARCH_DEBOUNCE_MS);
 
     return () => clearTimeout(delayDebounce);
   }, [searchTerm, selectedStatus, selectedTipo]);
@@ -437,19 +542,42 @@ const ClientesPage: React.FC = () => {
       setActiveViewId(querySavedView);
     }
 
-    setFilters((prev) => ({
-      ...prev,
-      page: Number.isFinite(queryPage) && queryPage > 0 ? queryPage : (prev.page ?? 1),
-      limit: Number.isFinite(queryLimit) && queryLimit > 0 ? queryLimit : (prev.limit ?? 10),
-      search: querySearch ?? prev.search ?? '',
-      status: queryStatus ?? prev.status ?? '',
-      tipo: queryTipo ?? prev.tipo ?? '',
-      sortBy: querySortBy ?? prev.sortBy ?? 'created_at',
-      sortOrder:
+    setFilters((prev) => {
+      const nextPage = Number.isFinite(queryPage) && queryPage > 0 ? queryPage : (prev.page ?? 1);
+      const nextLimit =
+        Number.isFinite(queryLimit) && queryLimit > 0 ? queryLimit : (prev.limit ?? 10);
+      const nextSearch = querySearch ?? prev.search ?? '';
+      const nextStatus = queryStatus ?? prev.status ?? '';
+      const nextTipo = queryTipo ?? prev.tipo ?? '';
+      const nextSortBy = querySortBy ?? prev.sortBy ?? 'created_at';
+      const nextSortOrder =
         querySortOrder === 'ASC' || querySortOrder === 'DESC'
           ? querySortOrder
-          : (prev.sortOrder ?? 'DESC'),
-    }));
+          : (prev.sortOrder ?? 'DESC');
+
+      if (
+        (prev.page ?? 1) === nextPage &&
+        (prev.limit ?? 10) === nextLimit &&
+        (prev.search ?? '') === nextSearch &&
+        (prev.status ?? '') === nextStatus &&
+        (prev.tipo ?? '') === nextTipo &&
+        (prev.sortBy ?? 'created_at') === nextSortBy &&
+        (prev.sortOrder ?? 'DESC') === nextSortOrder
+      ) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        page: nextPage,
+        limit: nextLimit,
+        search: nextSearch,
+        status: nextStatus,
+        tipo: nextTipo,
+        sortBy: nextSortBy,
+        sortOrder: nextSortOrder,
+      };
+    });
   }, [searchParams]);
 
   useEffect(() => {
@@ -490,8 +618,11 @@ const ClientesPage: React.FC = () => {
     window.localStorage.setItem(CLIENTES_SAVED_VIEWS_STORAGE_KEY, JSON.stringify(savedViews));
   }, [savedViews]);
 
+  const searchParamsSerialized = searchParams.toString();
+
   useEffect(() => {
-    const nextParams = new URLSearchParams(searchParams);
+    const nextParams = new URLSearchParams(searchParamsSerialized);
+    const normalizedSearch = (filters.search ?? '').trim();
 
     const setOrDelete = (key: string, value: string | null | undefined, keepWhenValue = true) => {
       if (!value || !keepWhenValue) {
@@ -502,7 +633,7 @@ const ClientesPage: React.FC = () => {
       nextParams.set(key, value);
     };
 
-    setOrDelete('q', searchTerm.trim());
+    setOrDelete('q', normalizedSearch);
     setOrDelete('status', selectedStatus);
     setOrDelete('tipo', selectedTipo);
     setOrDelete('view', viewMode === 'table' ? null : viewMode);
@@ -520,17 +651,17 @@ const ClientesPage: React.FC = () => {
     );
     setOrDelete('savedView', activeViewId);
 
-    if (nextParams.toString() !== searchParams.toString()) {
+    if (nextParams.toString() !== searchParamsSerialized) {
       setSearchParams(nextParams, { replace: true });
     }
   }, [
     activeViewId,
     filters.limit,
     filters.page,
+    filters.search,
     filters.sortBy,
     filters.sortOrder,
-    searchParams,
-    searchTerm,
+    searchParamsSerialized,
     selectedStatus,
     selectedTipo,
     setSearchParams,
@@ -634,6 +765,38 @@ const ClientesPage: React.FC = () => {
     }
   }, []);
 
+  const loadClienteRelacionamentos = useCallback(async (clienteId: string) => {
+    const requestId = ++relacionamentosRequestRef.current;
+
+    try {
+      setRelacionamentosLoading(true);
+
+      const [notasResumo, demandasResumo] = await Promise.all([
+        clientesService.contarNotasCliente(clienteId).catch(() => null),
+        clientesService.contarDemandasCliente(clienteId).catch(() => null),
+      ]);
+
+      if (relacionamentosRequestRef.current !== requestId) {
+        return;
+      }
+
+      setClienteNotasResumo(notasResumo);
+      setClienteDemandasResumo(demandasResumo);
+    } catch (error) {
+      if (relacionamentosRequestRef.current !== requestId) {
+        return;
+      }
+
+      console.error('Erro ao carregar resumo de relacionamentos do cliente:', error);
+      setClienteNotasResumo(null);
+      setClienteDemandasResumo(null);
+    } finally {
+      if (relacionamentosRequestRef.current === requestId) {
+        setRelacionamentosLoading(false);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     if (typeof window === 'undefined') {
       return;
@@ -677,13 +840,18 @@ const ClientesPage: React.FC = () => {
   useEffect(() => {
     if (!showDetailsModal || !selectedCliente?.id) {
       attachmentsRequestRef.current += 1;
+      relacionamentosRequestRef.current += 1;
       setClienteAttachments([]);
       setAttachmentsLoading(false);
+      setClienteNotasResumo(null);
+      setClienteDemandasResumo(null);
+      setRelacionamentosLoading(false);
       return;
     }
 
     loadClienteAttachments(selectedCliente.id);
-  }, [loadClienteAttachments, selectedCliente?.id, showDetailsModal]);
+    loadClienteRelacionamentos(selectedCliente.id);
+  }, [loadClienteAttachments, loadClienteRelacionamentos, selectedCliente?.id, showDetailsModal]);
 
   // Notificacao de boas-vindas removida - usar apenas toast para feedback imediato
 
@@ -1368,6 +1536,9 @@ const ClientesPage: React.FC = () => {
         setShowDetailsModal(false);
         setSelectedCliente(null);
         setClienteAttachments([]);
+        setClienteNotasResumo(null);
+        setClienteDemandasResumo(null);
+        setRelacionamentosLoading(false);
       }
 
       setSelectedClientes((prev) => prev.filter((clienteId) => clienteId !== id));
@@ -1457,6 +1628,13 @@ const ClientesPage: React.FC = () => {
     setShowDetailsModal(true);
   };
 
+  const handleOpenClienteProfile = (clienteId: string) => {
+    const basePath = location.pathname.startsWith('/crm/') ? '/crm/clientes' : '/clientes';
+    setShowDetailsModal(false);
+    setSelectedCliente(null);
+    navigate(`${basePath}/${clienteId}`);
+  };
+
   const handleAvatarUpdate = (clienteId: string, avatar: UploadResult) => {
     setClientes((prev) =>
       prev.map((c) =>
@@ -1505,9 +1683,13 @@ const ClientesPage: React.FC = () => {
     }
   };
 
-  const pageDescription = isLoading
+  const isInitialLoading = isLoading && clientes.length === 0;
+  const isRefreshingResults = isLoading && clientes.length > 0;
+  const pageDescription = isInitialLoading
     ? 'Carregando clientes...'
-    : `Gerencie seus ${estatisticas.total} clientes e contatos`;
+    : isRefreshingResults
+      ? 'Atualizando resultados...'
+      : `Gerencie seus ${estatisticas.total} clientes e contatos`;
   const hasFilters = Boolean(searchTerm || selectedStatus || selectedTipo);
   const activeView = savedViews.find((view) => view.id === activeViewId) ?? null;
   const hasFilterChips = hasFilters || Boolean(activeView);
@@ -1630,7 +1812,7 @@ const ClientesPage: React.FC = () => {
               <input
                 ref={searchInputRef}
                 type="text"
-                placeholder="Buscar por nome, email, empresa..."
+                placeholder="Buscar por nome, CPF/CNPJ, email ou telefone..."
                 value={searchTerm}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
@@ -1832,7 +2014,13 @@ const ClientesPage: React.FC = () => {
         </div>
       )}
 
-      {isLoading && <LoadingSkeleton lines={7} />}
+      {isInitialLoading && <LoadingSkeleton lines={7} />}
+
+      {isRefreshingResults && (
+        <div className="rounded-xl border border-[#DCE8EC] bg-[#F6FBFC] px-4 py-2 text-sm text-[#446675]">
+          Atualizando resultados da busca...
+        </div>
+      )}
 
       {!isLoading && clientes.length === 0 && (
         <EmptyState
@@ -1868,7 +2056,7 @@ const ClientesPage: React.FC = () => {
         />
       )}
 
-      {!isLoading && clientes.length > 0 && (
+      {clientes.length > 0 && (
         <DataTableCard>
           {viewMode === 'cards' ? (
             <div className="p-4 sm:p-5">
@@ -1973,7 +2161,7 @@ const ClientesPage: React.FC = () => {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="min-w-full bg-white">
+                <table className="min-w-[1180px] bg-white">
                   <thead className="border-b border-[#E1EAEE] bg-[#F8FBFC]">
                     <tr>
                       <th className="w-12 px-4 py-3 text-left" onClick={(e) => e.stopPropagation()}>
@@ -1984,7 +2172,7 @@ const ClientesPage: React.FC = () => {
                           className="h-4 w-4 rounded border-[#BFD0D8] text-[#159A9C] focus:ring-[#159A9C]"
                         />
                       </th>
-                      <th className="w-1/2 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">
+                      <th className="w-[28%] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">
                         <button
                           onClick={() => handleSort('nome')}
                           className="inline-flex items-center gap-1 transition-colors hover:text-[#159A9C]"
@@ -1995,7 +2183,16 @@ const ClientesPage: React.FC = () => {
                           />
                         </button>
                       </th>
-                      <th className="w-36 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">
+                      <th className="w-28 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">
+                        Tipo
+                      </th>
+                      <th className="w-48 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">
+                        CPF/CNPJ
+                      </th>
+                      <th className="w-[26%] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">
+                        Contato
+                      </th>
+                      <th className="w-40 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">
                         <button
                           onClick={() => handleSort('status')}
                           className="inline-flex items-center gap-1 transition-colors hover:text-[#159A9C]"
@@ -2006,7 +2203,7 @@ const ClientesPage: React.FC = () => {
                           />
                         </button>
                       </th>
-                      <th className="w-40 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">
+                      <th className="w-36 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">
                         <button
                           onClick={() => handleSort('created_at')}
                           className="inline-flex items-center gap-1 transition-colors hover:text-[#159A9C]"
@@ -2059,10 +2256,63 @@ const ClientesPage: React.FC = () => {
                               <p className="truncate text-sm font-semibold text-[#19384C]">
                                 {cliente.nome}
                               </p>
-                              {cliente.empresa && (
-                                <p className="truncate text-xs text-[#6B8693]">{cliente.empresa}</p>
+                              {(cliente.cidade || cliente.estado || cliente.empresa) && (
+                                <p className="truncate text-xs text-[#6B8693]">
+                                  {cliente.cidade || cliente.estado
+                                    ? [cliente.cidade, cliente.estado]
+                                        .filter((value): value is string => Boolean(value))
+                                        .join(' - ')
+                                    : cliente.empresa}
+                                </p>
                               )}
                             </div>
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${
+                              cliente.tipo === 'pessoa_juridica'
+                                ? 'border-[#CFE1EC] bg-[#F2F8FB] text-[#325569]'
+                                : 'border-[#D6E7E2] bg-[#EFF7F4] text-[#1A8877]'
+                            }`}
+                          >
+                            {cliente.tipo === 'pessoa_juridica'
+                              ? 'Pessoa juridica'
+                              : 'Pessoa fisica'}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <p className="text-sm font-medium text-[#244455]">
+                            {formatDocumento(cliente.documento, cliente.tipo)}
+                          </p>
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <div className="space-y-1">
+                            {cliente.email ? (
+                              <a
+                                href={`mailto:${cliente.email}`}
+                                onClick={(event) => event.stopPropagation()}
+                                className="block truncate text-sm text-[#159A9C] hover:text-[#0F7B7D]"
+                              >
+                                {cliente.email}
+                              </a>
+                            ) : (
+                              <p className="truncate text-xs text-[#7B95A1]">Sem e-mail</p>
+                            )}
+                            {cliente.telefone ? (
+                              <a
+                                href={`tel:${cliente.telefone}`}
+                                onClick={(event) => event.stopPropagation()}
+                                className="block truncate text-sm text-[#355061]"
+                              >
+                                {cliente.telefone}
+                              </a>
+                            ) : (
+                              <p className="truncate text-xs text-[#7B95A1]">Sem telefone</p>
+                            )}
                           </div>
                         </td>
 
@@ -2324,11 +2574,15 @@ const ClientesPage: React.FC = () => {
           setShowCreateModal(true);
         }}
         onDelete={handleDeleteCliente}
+        onOpenProfile={handleOpenClienteProfile}
         onAvatarUpdate={handleAvatarUpdate}
         onAttachmentAdd={handleAttachmentAdd}
         attachments={clienteAttachments}
         attachmentsLoading={attachmentsLoading}
         onAttachmentRemove={handleAttachmentRemove}
+        notasResumo={clienteNotasResumo}
+        demandasResumo={clienteDemandasResumo}
+        relacionamentosLoading={relacionamentosLoading}
       />
     </div>
   );

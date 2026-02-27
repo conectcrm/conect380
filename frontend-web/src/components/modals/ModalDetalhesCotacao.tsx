@@ -24,6 +24,8 @@ import {
 import { Cotacao, StatusCotacao } from '../../types/cotacaoTypes';
 import { cotacaoService } from '../../services/cotacaoService';
 import { toastService } from '../../services/toastService';
+import { useAuth } from '../../hooks/useAuth';
+import { userHasPermission } from '../../config/menuConfig';
 
 interface ModalDetalhesCotacaoProps {
   isOpen: boolean;
@@ -34,6 +36,13 @@ interface ModalDetalhesCotacaoProps {
   onStatusChange?: (cotacaoId: string, novoStatus: StatusCotacao) => void;
 }
 
+const detailActionPrimaryClass =
+  'inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-50';
+const detailActionSecondaryClass =
+  'inline-flex items-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9] disabled:cursor-not-allowed disabled:opacity-50';
+const detailActionDangerClass =
+  'inline-flex items-center gap-2 rounded-lg bg-[#B4233A] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#981E31] disabled:cursor-not-allowed disabled:opacity-50';
+
 export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
   isOpen,
   onClose,
@@ -42,6 +51,7 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
   onDelete,
   onStatusChange,
 }) => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'info' | 'itens' | 'anexos' | 'historico'>('info');
   const [isChangingStatus, setIsChangingStatus] = useState(false);
 
@@ -51,11 +61,14 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
     const colors = {
       rascunho: 'bg-gray-100 text-gray-800',
       enviada: 'bg-blue-100 text-blue-800',
+      pendente: 'bg-amber-100 text-amber-800',
       em_analise: 'bg-yellow-100 text-yellow-800',
       aprovada: 'bg-green-100 text-green-800',
+      pedido_gerado: 'bg-teal-100 text-teal-800',
+      adquirido: 'bg-emerald-100 text-emerald-800',
       rejeitada: 'bg-red-100 text-red-800',
-      vencida: 'bg-orange-100 text-orange-800',
-      convertida: 'bg-purple-100 text-purple-800',
+      vencida: 'bg-red-100 text-red-800',
+      convertida: 'bg-green-100 text-green-800',
       cancelada: 'bg-gray-100 text-gray-600',
     };
     return colors[status] || colors.rascunho;
@@ -65,8 +78,11 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
     const icons = {
       rascunho: Clock,
       enviada: Send,
+      pendente: Clock,
       em_analise: Eye,
       aprovada: CheckCircle,
+      pedido_gerado: Star,
+      adquirido: CheckCircle,
       rejeitada: XCircle,
       vencida: AlertCircle,
       convertida: Star,
@@ -78,9 +94,9 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
 
   const getPrioridadeColor = (prioridade: string) => {
     const colors = {
-      baixa: 'bg-green-100 text-green-800',
-      media: 'bg-yellow-100 text-yellow-800',
-      alta: 'bg-orange-100 text-orange-800',
+      baixa: 'bg-gray-100 text-gray-800',
+      media: 'bg-blue-100 text-blue-800',
+      alta: 'bg-yellow-100 text-yellow-800',
       urgente: 'bg-red-100 text-red-800',
     };
     return colors[prioridade as keyof typeof colors] || colors.media;
@@ -101,17 +117,174 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
     return new Date(dateString).toLocaleString('pt-BR');
   };
 
+  const compraStatus = cotacao.metadados?.compra?.status;
+  const compraMeta = cotacao.metadados?.compra;
+  const canUpdateCotacao = userHasPermission(user as any, 'comercial.propostas.update');
+  const canDeleteCotacao = userHasPermission(user as any, 'comercial.propostas.delete');
+  const canSendCotacao = userHasPermission(user as any, 'comercial.propostas.send');
+  const canConverterPedido = userHasPermission(user as any, 'comercial.propostas.update');
+  const canMarcarAdquirido = userHasPermission(user as any, 'financeiro.pagamentos.manage');
+  const statusBadgeClass =
+    (cotacao.status === StatusCotacao.CONVERTIDA || cotacao.status === StatusCotacao.ADQUIRIDO) &&
+    compraStatus === 'adquirido'
+      ? 'bg-emerald-100 text-emerald-800'
+      : (cotacao.status === StatusCotacao.CONVERTIDA ||
+          cotacao.status === StatusCotacao.PEDIDO_GERADO) &&
+        compraStatus === 'pedido_gerado'
+        ? 'bg-teal-100 text-teal-800'
+        : getStatusColor(cotacao.status);
+  const statusBadgeLabel =
+    (cotacao.status === StatusCotacao.CONVERTIDA || cotacao.status === StatusCotacao.ADQUIRIDO) &&
+    compraStatus === 'adquirido'
+      ? 'adquirido'
+      : (cotacao.status === StatusCotacao.CONVERTIDA ||
+          cotacao.status === StatusCotacao.PEDIDO_GERADO) &&
+        compraStatus === 'pedido_gerado'
+        ? 'pedido_gerado'
+        : cotacao.status;
+
   const handleStatusChange = async (novoStatus: StatusCotacao) => {
     if (!cotacao) return;
 
+    let justificativa: string | undefined;
+    if (novoStatus === StatusCotacao.REJEITADA) {
+      const resposta = window.prompt('Informe a justificativa para reprovar esta cotacao:', '');
+      if (resposta === null) return;
+
+      justificativa = resposta.trim();
+      if (!justificativa) {
+        toastService.warning('Justificativa obrigatoria para reprovar');
+        return;
+      }
+    }
+
     setIsChangingStatus(true);
     try {
-      await cotacaoService.alterarStatus(cotacao.id, novoStatus);
+      if (novoStatus === StatusCotacao.APROVADA) {
+        await cotacaoService.aprovar(cotacao.id);
+      } else if (novoStatus === StatusCotacao.REJEITADA) {
+        await cotacaoService.reprovar(cotacao.id, justificativa!);
+      } else {
+        await cotacaoService.alterarStatus(cotacao.id, novoStatus);
+      }
       toastService.success('Status alterado com sucesso!');
       onStatusChange?.(cotacao.id, novoStatus);
     } catch (error) {
       console.error('Erro ao alterar status:', error);
       toastService.apiError(error, 'Erro ao alterar status');
+    } finally {
+      setIsChangingStatus(false);
+    }
+  };
+
+  const handleConverterEmPedido = async () => {
+    if (!cotacao) return;
+
+    const resposta = window.prompt('Observacoes da conversao em pedido (opcional):', '');
+    if (resposta === null) return;
+
+    setIsChangingStatus(true);
+    try {
+      const pedido = await cotacaoService.converterEmPedido(cotacao.id, resposta.trim() || undefined);
+      const contaPagarNumero = pedido.contaPagar?.numero || pedido.contaPagar?.id;
+      if (pedido.contaPagarGeradaAutomaticamente && contaPagarNumero) {
+        toastService.success(
+          `Pedido ${pedido.id} criado e conta a pagar ${contaPagarNumero} gerada automaticamente!`,
+        );
+      } else if (pedido.contaPagarErro) {
+        toastService.warning(
+          `Pedido ${pedido.id} criado. Conta a pagar nao foi gerada automaticamente: ${pedido.contaPagarErro}`,
+        );
+      } else {
+        toastService.success(`Pedido ${pedido.id} criado com sucesso!`);
+      }
+      onStatusChange?.(cotacao.id, StatusCotacao.PEDIDO_GERADO);
+      onClose();
+    } catch (error) {
+      console.error('Erro ao converter em pedido:', error);
+      toastService.apiError(error, 'Erro ao converter cotacao em pedido');
+    } finally {
+      setIsChangingStatus(false);
+    }
+  };
+
+  const handleMarcarAdquirido = async () => {
+    if (!cotacao) return;
+
+    if (!window.confirm('Confirmar compra/pagamento externo concluido e marcar como adquirido?')) {
+      return;
+    }
+
+    const numeroPedido =
+      window.prompt('Numero do pedido/compra (opcional):', compraMeta?.numeroPedido || compraMeta?.pedidoId || '') ??
+      null;
+    if (numeroPedido === null) return;
+
+    const referenciaPagamento =
+      window.prompt(
+        'Referencia do pagamento externo (opcional):',
+        compraMeta?.referenciaPagamento || '',
+      ) ?? null;
+    if (referenciaPagamento === null) return;
+
+    const observacoes =
+      window.prompt('Observacoes da compra/pagamento externo (opcional):', compraMeta?.observacoes || '') ??
+      null;
+    if (observacoes === null) return;
+
+    setIsChangingStatus(true);
+    try {
+      await cotacaoService.marcarAdquirido(cotacao.id, {
+        numeroPedido: numeroPedido.trim() || undefined,
+        referenciaPagamento: referenciaPagamento.trim() || undefined,
+        observacoes: observacoes.trim() || undefined,
+      });
+      toastService.success('Compra marcada como adquirida com sucesso!');
+      onStatusChange?.(cotacao.id, StatusCotacao.ADQUIRIDO);
+      onClose();
+    } catch (error) {
+      console.error('Erro ao marcar cotacao como adquirida:', error);
+      toastService.apiError(error, 'Erro ao marcar cotacao como adquirida');
+    } finally {
+      setIsChangingStatus(false);
+    }
+  };
+
+  const handleGerarContaPagar = async () => {
+    if (!cotacao) return;
+
+    const dataVencimentoPadrao =
+      (cotacao.prazoResposta && String(cotacao.prazoResposta).slice(0, 10)) ||
+      new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const dataVencimento =
+      window.prompt('Data de vencimento da conta a pagar (AAAA-MM-DD):', dataVencimentoPadrao) ??
+      null;
+    if (dataVencimento === null) return;
+
+    const observacoes = window.prompt('Observacoes da conta a pagar (opcional):', '') ?? null;
+    if (observacoes === null) return;
+
+    setIsChangingStatus(true);
+    try {
+      const result = await cotacaoService.gerarContaPagar(cotacao.id, {
+        dataVencimento: dataVencimento.trim() || undefined,
+        categoria: 'fornecedores',
+        prioridade: cotacao.prioridade,
+        observacoes: observacoes.trim() || undefined,
+      });
+
+      if (result.alreadyExisted) {
+        toastService.success(`Conta a pagar já existente: ${result.contaPagar.numero}`);
+      } else {
+        toastService.success(`Conta a pagar ${result.contaPagar.numero} gerada com sucesso!`);
+      }
+
+      onStatusChange?.(cotacao.id, cotacao.status);
+      onClose();
+    } catch (error) {
+      console.error('Erro ao gerar conta a pagar:', error);
+      toastService.apiError(error, 'Erro ao gerar conta a pagar');
     } finally {
       setIsChangingStatus(false);
     }
@@ -179,52 +352,77 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
     const vencimento = new Date(cotacao.dataVencimento);
     return (
       vencimento < hoje &&
-      ![StatusCotacao.APROVADA, StatusCotacao.CONVERTIDA, StatusCotacao.CANCELADA].includes(
+      ![
+        StatusCotacao.APROVADA,
+        StatusCotacao.PEDIDO_GERADO,
+        StatusCotacao.ADQUIRIDO,
+        StatusCotacao.CONVERTIDA,
+        StatusCotacao.CANCELADA,
+        StatusCotacao.REJEITADA,
+      ].includes(
         cotacao.status,
       )
     );
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-[calc(100%-2rem)] sm:w-[700px] md:w-[800px] lg:w-[900px] xl:w-[1000px] max-w-[1100px] max-h-[90vh] overflow-hidden">
+    <div
+      className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-[#0F172A]/35 p-4 backdrop-blur-sm sm:items-center"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-detalhes-cotacao-title"
+    >
+      <div
+        className="flex max-h-[92vh] w-[calc(100%-2rem)] max-w-[1100px] flex-col overflow-hidden rounded-2xl border border-[#DCE8EC] bg-white shadow-[0_24px_70px_-28px_rgba(15,57,74,0.45)] sm:w-[700px] md:w-[800px] lg:w-[900px] xl:w-[1000px]"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-[#159A9C]">
+        <div className="flex items-center justify-between border-b border-[#128688] bg-[#159A9C] px-5 py-4 sm:px-6">
           <div className="flex items-center space-x-3">
             <FileText className="w-6 h-6 text-white" />
             <div>
-              <h2 className="text-xl font-semibold text-white">{cotacao.numero}</h2>
+              <h2 id="modal-detalhes-cotacao-title" className="text-lg font-semibold text-white sm:text-xl">
+                {cotacao.numero}
+              </h2>
               <p className="text-[#DEEFE7] text-sm">{cotacao.titulo}</p>
             </div>
           </div>
           <div className="flex items-center space-x-3">
             {/* Status Badge */}
             <span
-              className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(cotacao.status)}`}
+              className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusBadgeClass}`}
             >
               {getStatusIcon(cotacao.status)}
-              <span className="ml-1 capitalize">{cotacao.status.replace('_', ' ')}</span>
+              <span className="ml-1 capitalize">{statusBadgeLabel.replace('_', ' ')}</span>
             </span>
-            <button onClick={onClose} className="text-white hover:text-gray-200 transition-colors">
-              <X className="w-6 h-6" />
+            <button
+              onClick={onClose}
+              type="button"
+              aria-label="Fechar modal"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/10 hover:text-white"
+            >
+              <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
         {/* Quick Actions */}
-        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              onClick={() => onEdit?.(cotacao)}
-              className="flex items-center space-x-2 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
-            >
-              <Edit className="w-4 h-4" />
-              <span>Editar</span>
-            </button>
+        <div className="shrink-0 border-b border-[#E1EAEE] bg-[#F8FBFC] px-5 py-4 sm:px-6">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {canUpdateCotacao && (
+              <button
+                onClick={() => onEdit?.(cotacao)}
+                className={detailActionPrimaryClass}
+              >
+                <Edit className="w-4 h-4" />
+                <span>Editar</span>
+              </button>
+            )}
 
             <button
               onClick={handleDuplicate}
-              className="flex items-center space-x-2 px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm"
+              className={detailActionSecondaryClass}
             >
               <Copy className="w-4 h-4" />
               <span>Duplicar</span>
@@ -232,27 +430,66 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
 
             <button
               onClick={handleGeneratePDF}
-              className="flex items-center space-x-2 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
+              className={detailActionSecondaryClass}
             >
               <Download className="w-4 h-4" />
               <span>PDF</span>
             </button>
 
-            <button
-              onClick={handleSendEmail}
-              className="flex items-center space-x-2 px-3 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0d7a7c] transition-colors text-sm"
-              disabled={!cotacao.fornecedor?.email}
-            >
-              <Send className="w-4 h-4" />
-              <span>Enviar</span>
-            </button>
+            {canSendCotacao && (
+              <button
+                onClick={handleSendEmail}
+                className={detailActionPrimaryClass}
+                disabled={!cotacao.fornecedor?.email}
+              >
+                <Send className="w-4 h-4" />
+                <span>Enviar</span>
+              </button>
+            )}
 
-            {cotacao.status === StatusCotacao.EM_ANALISE && (
+            {cotacao.status === StatusCotacao.APROVADA && canConverterPedido && (
+              <button
+                onClick={handleConverterEmPedido}
+                disabled={isChangingStatus}
+                className={detailActionSecondaryClass}
+              >
+                <Star className="w-4 h-4" />
+                <span>Converter Pedido</span>
+              </button>
+            )}
+
+            {[StatusCotacao.CONVERTIDA, StatusCotacao.PEDIDO_GERADO].includes(cotacao.status) &&
+              !compraMeta?.contaPagarId &&
+              canMarcarAdquirido && (
+              <button
+                onClick={handleGerarContaPagar}
+                disabled={isChangingStatus}
+                className={detailActionSecondaryClass}
+              >
+                <DollarSign className="w-4 h-4" />
+                <span>Gerar Conta a Pagar</span>
+              </button>
+            )}
+
+            {[StatusCotacao.CONVERTIDA, StatusCotacao.PEDIDO_GERADO].includes(cotacao.status) &&
+              compraStatus !== 'adquirido' &&
+              canMarcarAdquirido && (
+              <button
+                onClick={handleMarcarAdquirido}
+                disabled={isChangingStatus}
+                className={detailActionPrimaryClass}
+              >
+                <CheckCircle className="w-4 h-4" />
+                <span>Marcar Adquirido</span>
+              </button>
+            )}
+
+            {canUpdateCotacao && [StatusCotacao.PENDENTE, StatusCotacao.EM_ANALISE].includes(cotacao.status) && (
               <>
                 <button
                   onClick={() => handleStatusChange(StatusCotacao.APROVADA)}
                   disabled={isChangingStatus}
-                  className="flex items-center space-x-2 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm disabled:opacity-50"
+                  className={detailActionPrimaryClass}
                 >
                   <CheckCircle className="w-4 h-4" />
                   <span>Aprovar</span>
@@ -261,7 +498,7 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
                 <button
                   onClick={() => handleStatusChange(StatusCotacao.REJEITADA)}
                   disabled={isChangingStatus}
-                  className="flex items-center space-x-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm disabled:opacity-50"
+                  className={detailActionDangerClass}
                 >
                   <XCircle className="w-4 h-4" />
                   <span>Rejeitar</span>
@@ -269,19 +506,21 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
               </>
             )}
 
-            <button
-              onClick={() => onDelete?.(cotacao.id)}
-              className="flex items-center space-x-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm ml-auto"
-            >
-              <Trash2 className="w-4 h-4" />
-              <span>Excluir</span>
-            </button>
+            {canDeleteCotacao && (
+              <button
+                onClick={() => onDelete?.(cotacao.id)}
+                className={`${detailActionDangerClass} ml-auto`}
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Excluir</span>
+              </button>
+            )}
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-gray-200">
-          <nav className="flex space-x-8 px-6">
+        <div className="shrink-0 border-b border-[#E1EAEE]">
+          <nav className="flex overflow-x-auto px-4 sm:px-6">
             {[
               { id: 'info', label: 'Informações', icon: FileText },
               { id: 'itens', label: 'Itens', icon: Tag },
@@ -291,7 +530,7 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
               <button
                 key={id}
                 onClick={() => setActiveTab(id as any)}
-                className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
+                className={`shrink-0 whitespace-nowrap py-4 px-3 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === id
                     ? 'border-[#159A9C] text-[#159A9C]'
                     : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -307,13 +546,13 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-240px)]">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6 sm:py-6">
           {/* Tab: Informações */}
           {activeTab === 'info' && (
             <div className="space-y-6">
               {/* Alertas */}
               {isVencida() && (
-                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="rounded-xl border border-red-200 bg-red-50/80 p-4">
                   <div className="flex items-center space-x-2">
                     <AlertCircle className="w-5 h-5 text-red-600" />
                     <span className="text-red-800 font-medium">Cotação Vencida</span>
@@ -327,7 +566,7 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Informações Básicas */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2">
+                  <h3 className="border-b border-[#E1EAEE] pb-2 text-lg font-semibold text-[#173A4D]">
                     Informações Básicas
                   </h3>
 
@@ -370,7 +609,7 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
 
                 {/* Datas e Valores */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2">
+                  <h3 className="border-b border-[#E1EAEE] pb-2 text-lg font-semibold text-[#173A4D]">
                     Datas e Valores
                   </h3>
 
@@ -427,10 +666,96 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
               </div>
 
               {/* Descrição */}
+              {(
+                [StatusCotacao.CONVERTIDA, StatusCotacao.PEDIDO_GERADO, StatusCotacao.ADQUIRIDO].includes(
+                  cotacao.status,
+                ) || compraMeta
+              ) && (
+                <div className="rounded-xl border border-[#DCE8EC] bg-[#F8FBFC] p-4">
+                  <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#4F6F7E]">
+                    Fluxo de Compra Interna
+                  </h3>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs text-[#6B8795]">Etapa</p>
+                      <p className="mt-1 font-medium text-[#173A4D]">
+                        {compraStatus === 'adquirido'
+                          ? 'Adquirido'
+                          : compraStatus === 'pedido_gerado'
+                            ? 'Pedido gerado'
+                            : cotacao.status === StatusCotacao.ADQUIRIDO
+                              ? 'Adquirido'
+                              : cotacao.status === StatusCotacao.PEDIDO_GERADO
+                                ? 'Pedido gerado'
+                            : 'Convertida'}
+                      </p>
+                    </div>
+                    {(compraMeta?.numeroPedido || compraMeta?.pedidoId) && (
+                      <div>
+                        <p className="text-xs text-[#6B8795]">Pedido</p>
+                        <p className="mt-1 font-medium text-[#173A4D]">
+                          {compraMeta?.numeroPedido || compraMeta?.pedidoId}
+                        </p>
+                      </div>
+                    )}
+                    {compraMeta?.referenciaPagamento && (
+                      <div>
+                        <p className="text-xs text-[#6B8795]">Ref. pagamento externo</p>
+                        <p className="mt-1 font-medium text-[#173A4D]">
+                          {compraMeta.referenciaPagamento}
+                        </p>
+                      </div>
+                    )}
+                    {compraMeta?.dataPedido && (
+                      <div>
+                        <p className="text-xs text-[#6B8795]">Data do pedido</p>
+                        <p className="mt-1 font-medium text-[#173A4D]">
+                          {formatDateTime(compraMeta.dataPedido)}
+                        </p>
+                      </div>
+                    )}
+                    {compraMeta?.dataAquisicao && (
+                      <div>
+                        <p className="text-xs text-[#6B8795]">Data da aquisição</p>
+                        <p className="mt-1 font-medium text-[#173A4D]">
+                          {formatDateTime(compraMeta.dataAquisicao)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  {(compraMeta?.contaPagarNumero || compraMeta?.contaPagarId || compraMeta?.dataGeracaoContaPagar) && (
+                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {(compraMeta?.contaPagarNumero || compraMeta?.contaPagarId) && (
+                        <div className="rounded-lg border border-[#E3EDF0] bg-white p-3">
+                          <p className="text-xs text-[#6B8795]">Conta a pagar</p>
+                          <p className="mt-1 text-sm font-medium text-[#173A4D]">
+                            {compraMeta?.contaPagarNumero || compraMeta?.contaPagarId}
+                          </p>
+                        </div>
+                      )}
+                      {compraMeta?.dataGeracaoContaPagar && (
+                        <div className="rounded-lg border border-[#E3EDF0] bg-white p-3">
+                          <p className="text-xs text-[#6B8795]">Conta gerada em</p>
+                          <p className="mt-1 text-sm font-medium text-[#173A4D]">
+                            {formatDateTime(compraMeta.dataGeracaoContaPagar)}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {compraMeta?.observacoes && (
+                    <div className="mt-3 rounded-lg border border-[#E3EDF0] bg-white p-3">
+                      <p className="text-xs text-[#6B8795]">Observações da compra</p>
+                      <p className="mt-1 text-sm text-[#355563]">{compraMeta.observacoes}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {cotacao.descricao && (
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-3">Descrição</h3>
-                  <p className="text-gray-700 bg-gray-50 p-4 rounded-lg">{cotacao.descricao}</p>
+                  <p className="rounded-xl border border-[#E6EFF2] bg-[#F8FBFC] p-4 text-[#355563]">{cotacao.descricao}</p>
                 </div>
               )}
 
@@ -439,7 +764,7 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
                 {cotacao.condicoesPagamento && (
                   <div>
                     <h4 className="font-medium text-gray-900 mb-2">Condições de Pagamento</h4>
-                    <p className="text-gray-700 bg-gray-50 p-3 rounded-lg text-sm">
+                    <p className="rounded-xl border border-[#E6EFF2] bg-[#F8FBFC] p-3 text-sm text-[#355563]">
                       {cotacao.condicoesPagamento}
                     </p>
                   </div>
@@ -448,7 +773,7 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
                 {cotacao.prazoEntrega && (
                   <div>
                     <h4 className="font-medium text-gray-900 mb-2">Prazo de Entrega</h4>
-                    <p className="text-gray-700 bg-gray-50 p-3 rounded-lg text-sm">
+                    <p className="rounded-xl border border-[#E6EFF2] bg-[#F8FBFC] p-3 text-sm text-[#355563]">
                       {cotacao.prazoEntrega}
                     </p>
                   </div>
@@ -477,7 +802,7 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
               {cotacao.observacoes && (
                 <div>
                   <h4 className="font-medium text-gray-900 mb-3">Observações</h4>
-                  <p className="text-gray-700 bg-gray-50 p-4 rounded-lg">{cotacao.observacoes}</p>
+                  <p className="rounded-xl border border-[#E6EFF2] bg-[#F8FBFC] p-4 text-[#355563]">{cotacao.observacoes}</p>
                 </div>
               )}
             </div>
@@ -488,28 +813,28 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-900">Itens da Cotação</h3>
 
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+              <div className="overflow-x-auto rounded-xl border border-[#E1EAEE]">
+                <table className="min-w-full divide-y divide-[#E1EAEE]">
+                  <thead className="bg-[#F8FBFC]">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
                         Descrição
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
                         Qtd
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
                         Unidade
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
                         Valor Unit.
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
                         Total
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-white divide-y divide-[#EDF3F5]">
                     {cotacao.itens.map((item, index) => (
                       <tr key={item.id || index}>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -537,7 +862,7 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot className="bg-gray-50">
+                  <tfoot className="bg-[#F8FBFC]">
                     <tr>
                       <td
                         colSpan={4}
@@ -565,7 +890,7 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
                   {cotacao.anexos.map((anexo) => (
                     <div
                       key={anexo.id}
-                      className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                      className="rounded-xl border border-[#DCE8EC] bg-white p-4 transition-colors hover:bg-[#F8FBFC]"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
@@ -579,7 +904,7 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
                         </div>
                         <button
                           onClick={() => window.open(anexo.url, '_blank')}
-                          className="text-[#159A9C] hover:text-[#0d7a7c] transition-colors"
+                          className="text-[#159A9C] hover:text-[#0F7B7D] transition-colors"
                         >
                           <Download className="w-5 h-5" />
                         </button>
@@ -601,7 +926,7 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
             <div className="space-y-6">
               {/* Seção de Aprovação */}
               {(cotacao.statusAprovacao || cotacao.aprovador) && (
-                <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <div className="rounded-xl border border-[#DCE8EC] bg-white p-6 shadow-[0_8px_20px_-22px_rgba(15,57,74,0.35)]">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                     {cotacao.statusAprovacao === 'aprovado' ? (
                       <CheckCircle className="w-5 h-5 text-green-600" />
@@ -682,7 +1007,7 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
                     {cotacao.justificativaAprovacao && (
                       <div className="flex items-start gap-3">
                         <div className="w-32 text-sm font-medium text-gray-500">Justificativa:</div>
-                        <div className="flex-1 bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <div className="flex-1 rounded-xl border border-[#E1EAEE] bg-[#F8FBFC] p-4">
                           <p className="text-gray-700 whitespace-pre-wrap">
                             {cotacao.justificativaAprovacao}
                           </p>
@@ -702,7 +1027,7 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
                 {cotacao.historico && cotacao.historico.length > 0 ? (
                   <div className="space-y-4">
                     {cotacao.historico.map((entrada) => (
-                      <div key={entrada.id} className="border border-gray-200 rounded-lg p-4">
+                      <div key={entrada.id} className="rounded-xl border border-[#DCE8EC] bg-white p-4 shadow-[0_8px_20px_-22px_rgba(15,57,74,0.25)]">
                         <div className="flex items-start justify-between">
                           <div className="flex items-start space-x-3">
                             <History className="w-5 h-5 text-gray-400 mt-0.5" />

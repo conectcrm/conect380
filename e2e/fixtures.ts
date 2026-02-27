@@ -12,7 +12,7 @@ export interface CustomFixtures {
 
 // Dados de usuários de teste
 const ADMIN_USER = {
-  email: process.env.TEST_ADMIN_EMAIL || "admin@conectsuite.com.br",
+  email: process.env.TEST_ADMIN_EMAIL || "admin@conect360.com.br",
   senha: process.env.TEST_ADMIN_PASSWORD || "admin123",
 };
 

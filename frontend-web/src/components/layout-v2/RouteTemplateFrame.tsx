@@ -19,7 +19,8 @@ const routeRules: RouteTemplateRule[] = [
     type: 'FORM',
   },
   {
-    pattern: /^\/(atendimento\/tickets\/[^/]+|admin\/empresas\/[^/]+|admin\/empresas\/[^/]+\/modulos|empresas\/[^/]+\/(configuracoes|relatorios|permissoes|backup)|contratos\/[^/]+)$/,
+    pattern:
+      /^\/(atendimento\/tickets\/[^/]+|admin\/empresas\/[^/]+|admin\/empresas\/[^/]+\/modulos|empresas\/[^/]+\/(configuracoes|relatorios|permissoes|backup)|contratos\/[^/]+|clientes\/[^/]+|crm\/clientes\/[^/]+)$/,
     type: 'DETAIL',
   },
   {

@@ -6,25 +6,28 @@ import {
   MessageSquare,
   Download,
   Share2,
-  Send,
   Loader2,
   FileText,
   CreditCard,
-  PlayCircle,
-  CheckCircle,
   ArrowRight,
-  Clock,
+  ShieldAlert,
+  ShieldCheck,
+  ShieldX,
 } from 'lucide-react';
 import { emailServiceReal } from '../../../services/emailServiceReal';
 import { PropostaCompleta } from '../services/propostasService';
 import { clientesService } from '../../../services/clientesService';
 import { pdfPropostasService } from '../../../services/pdfPropostasService';
-import ModalEnviarWhatsApp from '../../../components/whatsapp/ModalEnviarWhatsApp';
-import { faturamentoService } from '../../../services/faturamentoService';
+import { portalClienteService } from '../../../services/portalClienteService';
 import { contratoService } from '../../../services/contratoService';
-import { faturamentoAPI } from '../../../services/faturamentoAPI';
-import { api } from '../../../services/api';
-import { useGlobalConfirmation } from '../../../contexts/GlobalConfirmationContext';
+import {
+  faturamentoService,
+  FormaPagamento,
+  TipoFatura,
+} from '../../../services/faturamentoService';
+import { propostasService as propostasApiService } from '../../../services/propostasService';
+import { authService } from '../../../services/authService';
+import ModalEnviarWhatsApp from '../../../components/whatsapp/ModalEnviarWhatsApp';
 
 type ClienteContatoData = {
   nome: string;
@@ -35,6 +38,8 @@ type ClienteContatoData = {
 
 const CLIENTE_DETAILS_TTL = 5 * 60 * 1000; // 5 minutos
 const CLIENTE_DETAILS_COOLDOWN_TTL = 30 * 1000; // Evita loop de erros
+const AUTOMACAO_FLUXO_MENSAGEM =
+  'Automacao de contrato/fatura ainda indisponivel nesta versao. Use os modulos de Contratos e Faturamento.';
 const clienteDetailsCache = new Map<
   string,
   { data: ClienteContatoData | null; expiresAt: number }
@@ -178,6 +183,18 @@ type PropostaUI = {
   descricao: string;
   probabilidade: number;
   categoria: string;
+  aprovacaoInterna?: {
+    obrigatoria?: boolean;
+    status?: 'nao_requer' | 'pendente' | 'aprovada' | 'rejeitada' | string;
+    motivo?: string;
+    limiteDesconto?: number;
+    descontoDetectado?: number;
+    observacoes?: string;
+  };
+  lembretes?: Array<{
+    id: string;
+    status?: 'agendado' | 'enviado' | 'cancelado' | string;
+  }>;
 };
 
 interface PropostaActionsProps {
@@ -186,15 +203,17 @@ interface PropostaActionsProps {
   onPropostaUpdated?: () => void;
   className?: string;
   showLabels?: boolean;
+  hideView?: boolean;
 }
 
 const PropostaActions: React.FC<PropostaActionsProps> = ({
   proposta,
   onViewProposta,
+  onPropostaUpdated,
   className = '',
   showLabels = false,
+  hideView = false,
 }) => {
-  const { confirm } = useGlobalConfirmation();
   const [sendingEmail, setSendingEmail] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [clienteData, setClienteData] = useState<{
@@ -209,10 +228,38 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const [gerandoContrato, setGerandoContrato] = useState(false);
   const [criandoFatura, setCriandoFatura] = useState(false);
   const [avancandoFluxo, setAvancandoFluxo] = useState(false);
+  const [decidindoAlcadaAprovacao, setDecidindoAlcadaAprovacao] = useState(false);
+  const [decidindoAlcadaReprovacao, setDecidindoAlcadaReprovacao] = useState(false);
 
   // Função para detectar se é PropostaCompleta ou PropostaUI
   const isPropostaCompleta = (prop: PropostaCompleta | PropostaUI): prop is PropostaCompleta => {
     return 'cliente' in prop && typeof prop.cliente === 'object';
+  };
+
+  const obterAprovacaoInterna = () => {
+    const source = proposta as any;
+    return source?.aprovacaoInterna || source?.emailDetails?.aprovacaoInterna || null;
+  };
+
+  const aprovacaoInternaAtual = obterAprovacaoInterna();
+  const possuiAprovacaoPendente = Boolean(
+    aprovacaoInternaAtual?.obrigatoria && aprovacaoInternaAtual?.status === 'pendente',
+  );
+  const bloqueadoPorAlcada = possuiAprovacaoPendente;
+
+  const getUsuarioAtualAprovador = () => {
+    try {
+      const user = authService.getUser() as any;
+      if (!user) {
+        return { id: undefined, nome: 'Aprovador' };
+      }
+      return {
+        id: user.id || user.userId || undefined,
+        nome: user.nome || user.name || user.email || 'Aprovador',
+      };
+    } catch {
+      return { id: undefined, nome: 'Aprovador' };
+    }
   };
 
   // Carregar dados do cliente quando o componente for montado
@@ -317,6 +364,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const getPropostaData = () => {
     if (isPropostaCompleta(proposta)) {
       return {
+        id: proposta.id || null,
         numero: proposta.numero || 'N/A',
         total: proposta.total || 0,
         dataValidade: proposta.dataValidade
@@ -327,6 +375,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       };
     } else {
       return {
+        id: proposta.id || null,
         numero: proposta.numero || 'N/A',
         total: (proposta as any).valor || 0,
         dataValidade: proposta.data_vencimento || new Date().toISOString().split('T')[0],
@@ -336,13 +385,204 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     }
   };
 
-  // Gerar token de acesso para a proposta
-  const generateAccessToken = () => {
-    // Gera um token numérico de 6 dígitos (mais fácil para o cliente)
-    return Math.floor(Math.random() * 900000 + 100000).toString();
+  const sincronizarStatusProposta = async (
+    novoStatus:
+      | 'rascunho'
+      | 'enviada'
+      | 'visualizada'
+      | 'negociacao'
+      | 'aprovada'
+      | 'contrato_gerado'
+      | 'contrato_assinado'
+      | 'fatura_criada'
+      | 'aguardando_pagamento'
+      | 'pago'
+      | 'rejeitada'
+      | 'expirada',
+    options?: { observacoes?: string; motivoPerda?: string; source?: string },
+  ) => {
+    const propostaData = getPropostaData();
+    const propostaId = (proposta as any)?.id || propostaData.id;
+    if (!propostaId) {
+      return;
+    }
+
+    try {
+      await propostasApiService.updateStatus(propostaId, novoStatus, {
+        source: options?.source || 'fluxo',
+        observacoes: options?.observacoes,
+        motivoPerda: options?.motivoPerda,
+      });
+    } catch (error) {
+      const mensagemErro = getErrorMessage(error, 'Erro ao sincronizar status da proposta.');
+      const exigeAprovacaoInterna =
+        novoStatus === 'aprovada' &&
+        String(mensagemErro || '')
+          .toLowerCase()
+          .includes('aprovacao interna');
+
+      if (exigeAprovacaoInterna) {
+        try {
+          await propostasApiService.solicitarAprovacaoInterna(propostaId, {
+            solicitadaPorId:
+              isPropostaCompleta(proposta) && proposta.vendedor?.id ? proposta.vendedor.id : undefined,
+            solicitadaPorNome:
+              isPropostaCompleta(proposta) && proposta.vendedor?.nome
+                ? proposta.vendedor.nome
+                : 'Fluxo comercial',
+            observacoes:
+              options?.observacoes ||
+              'Solicitacao automatica de aprovacao por alcada durante tentativa de aprovar proposta.',
+          });
+          toastService.info(
+            'A proposta exige aprovacao interna por desconto. Solicitacao enviada para aprovacao.',
+          );
+
+          window.dispatchEvent(
+            new CustomEvent('propostaAtualizada', {
+              detail: {
+                propostaId,
+                novoStatus: 'negociacao',
+                fonte: 'aprovacao-interna',
+                timestamp: new Date().toISOString(),
+              },
+            }),
+          );
+          return;
+        } catch (erroSolicitacao) {
+          throw new Error(
+            getErrorMessage(
+              erroSolicitacao,
+              'Nao foi possivel solicitar aprovacao interna para esta proposta.',
+            ),
+          );
+        }
+      }
+
+      throw error;
+    }
+
+    window.dispatchEvent(
+      new CustomEvent('propostaAtualizada', {
+        detail: {
+          propostaId,
+          novoStatus,
+          motivoPerda: options?.motivoPerda,
+          fonte: options?.source || 'fluxo',
+          timestamp: new Date().toISOString(),
+        },
+      }),
+    );
   };
 
   // 🚀 NOVAS FUNÇÕES DE AUTOMAÇÃO
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+  const isUuid = (value?: string | null): value is string =>
+    Boolean(value && UUID_REGEX.test(String(value).trim()));
+
+  const isNumericId = (value?: string | number | null) => /^\d+$/.test(String(value ?? '').trim());
+
+  const formatDateOnly = (value: Date | string) => {
+    const parsed = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return new Date().toISOString().split('T')[0];
+    }
+    return parsed.toISOString().split('T')[0];
+  };
+
+  const addDays = (base: Date, days: number) => {
+    const copy = new Date(base);
+    copy.setDate(copy.getDate() + days);
+    return copy;
+  };
+
+  const getErrorMessage = (error: unknown, fallback: string) => {
+    const err = error as any;
+    const message =
+      err?.response?.data?.message ||
+      err?.response?.data?.error ||
+      (Array.isArray(err?.response?.data?.errors) ? err.response.data.errors.join(', ') : null);
+    return message || err?.message || fallback;
+  };
+
+  const obterContextoAutomacao = () => {
+    if (!isPropostaCompleta(proposta)) {
+      throw new Error(
+        'Automacao disponivel apenas para propostas com dados completos de cliente e vendedor.',
+      );
+    }
+
+    const propostaId = proposta.id;
+    const clienteId = proposta.cliente?.id;
+    const usuarioResponsavelId = proposta.vendedor?.id;
+
+    if (!isUuid(propostaId)) {
+      throw new Error('Proposta sem ID valido para gerar contrato/fatura.');
+    }
+
+    if (!isUuid(clienteId)) {
+      throw new Error('Cliente da proposta sem ID valido. Atualize a proposta antes de continuar.');
+    }
+
+    if (!isUuid(usuarioResponsavelId)) {
+      throw new Error('Vendedor/responsavel da proposta sem ID valido.');
+    }
+
+    return {
+      propostaCompleta: proposta,
+      propostaId,
+      clienteId,
+      usuarioResponsavelId,
+    };
+  };
+
+  const mapFormaPagamentoProposta = (): FormaPagamento | undefined => {
+    if (!isPropostaCompleta(proposta)) {
+      return undefined;
+    }
+
+    switch (proposta.formaPagamento) {
+      case 'boleto':
+        return FormaPagamento.BOLETO;
+      case 'cartao':
+        return FormaPagamento.CARTAO_CREDITO;
+      default:
+        return undefined;
+    }
+  };
+
+  const montarItensFatura = () => {
+    const propostaData = getPropostaData();
+
+    if (
+      isPropostaCompleta(proposta) &&
+      Array.isArray(proposta.produtos) &&
+      proposta.produtos.length > 0
+    ) {
+      return proposta.produtos.map((item) => ({
+        descricao: item.produto?.nome || 'Item da proposta',
+        quantidade: Math.max(Number(item.quantidade || 1), 0.01),
+        valorUnitario: Math.max(Number(item.produto?.preco || 0), 0.01),
+        unidade: item.produto?.unidade || 'un',
+        percentualDesconto: Number(item.desconto || 0),
+        valorDesconto: 0,
+      }));
+    }
+
+    return [
+      {
+        descricao: propostaData.titulo || `Proposta ${propostaData.numero}`,
+        quantidade: 1,
+        valorUnitario: Math.max(Number(propostaData.total || 0), 0.01),
+        unidade: 'un',
+        percentualDesconto: 0,
+        valorDesconto: 0,
+      },
+    ];
+  };
+
+  const automacaoAvancadaDisponivel = true;
 
   // Verificar se proposta pode gerar contrato
   const podeGerarContrato = () => {
@@ -353,7 +593,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   // Verificar se proposta pode criar fatura
   const podeCriarFatura = () => {
     const status = getPropostaData().status;
-    return status === 'aprovada' || status === 'contrato_assinado';
+    return status === 'contrato_assinado';
   };
 
   // Gerar contrato a partir da proposta
@@ -365,117 +605,123 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
     setGerandoContrato(true);
     try {
+      const { propostaCompleta, propostaId, clienteId, usuarioResponsavelId } =
+        obterContextoAutomacao();
       const propostaData = getPropostaData();
-      const clienteData = await getClienteData();
+      const valorTotal = Number(propostaData.total || 0);
 
-      // Preparar dados no formato esperado pelo backend
-      const contratoData = {
-        propostaId: parseInt(propostaData.numero) || 1, // Converter para number
-        clienteId: Date.now() % 999999, // Gerar ID único simples
-        usuarioResponsavelId: 1, // ID do usuário responsável (vendedor)
-        tipo: 'servico' as const, // Tipo do contrato
-        objeto: propostaData.titulo || `Contrato referente à proposta ${propostaData.numero}`,
-        valorTotal: propostaData.total,
-        dataInicio: new Date().toISOString().split('T')[0], // Data de hoje
-        dataFim: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 1 ano
-        dataVencimento:
-          propostaData.dataValidade ||
-          new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        observacoes: `Contrato gerado automaticamente a partir da proposta ${propostaData.numero}`,
-        condicoesPagamento: {
-          parcelas: 1,
-          formaPagamento: 'À vista',
-          diaVencimento: 10,
-          valorParcela: propostaData.total,
-        },
-      };
-
-      // Usar o serviço de contratos
-      const contrato = await contratoService.criarContrato(contratoData);
-
-      if (contrato) {
-        toastService.success(`Contrato ${contrato.numero} gerado com sucesso!`);
-
-        // Disparar evento para atualizar a interface
-        const eventoAtualizacao = new CustomEvent('propostaAtualizada', {
-          detail: {
-            propostaId: propostaData.numero,
-            novoStatus: 'contrato_gerado',
-            acao: 'contrato_gerado',
-            contratoId: contrato.id,
-            timestamp: new Date().toISOString(),
-          },
-        });
-        window.dispatchEvent(eventoAtualizacao);
-
-        // Abrir página do contrato gerado
-        if (await confirm('Deseja visualizar o contrato gerado?')) {
-          window.open(`/contratos/${contrato.id}`, '_blank');
-        }
+      if (!Number.isFinite(valorTotal) || valorTotal <= 0) {
+        throw new Error('A proposta precisa ter valor total maior que zero para gerar contrato.');
       }
+
+      const contratos = await contratoService.listarContratos();
+      const contratoExistente = contratos.find(
+        (contrato) => contrato.propostaId === propostaId && contrato.status !== 'cancelado',
+      );
+
+      if (contratoExistente) {
+        toastService.info(
+          `Ja existe contrato para esta proposta (${contratoExistente.numero || contratoExistente.id}).`,
+        );
+        onPropostaUpdated?.();
+        return;
+      }
+
+      const hoje = new Date();
+      const dataVencimento = propostaCompleta.dataValidade
+        ? new Date(propostaCompleta.dataValidade)
+        : addDays(hoje, 30);
+      const dataFim = addDays(dataVencimento, 365);
+
+      const contrato = await contratoService.criarContrato({
+        propostaId,
+        clienteId,
+        usuarioResponsavelId,
+        tipo: 'servico',
+        objeto: propostaData.titulo || `Contrato referente a proposta ${propostaData.numero}`,
+        valorTotal,
+        dataInicio: formatDateOnly(hoje),
+        dataFim: formatDateOnly(dataFim),
+        dataVencimento: formatDateOnly(dataVencimento),
+        observacoes: `Gerado automaticamente a partir da proposta ${propostaData.numero}.`,
+      });
+
+      await sincronizarStatusProposta('contrato_gerado', {
+        source: 'automacao-contrato',
+        observacoes: `Contrato ${contrato.numero || contrato.id} gerado a partir da proposta.`,
+      });
+      toastService.success(`Contrato ${contrato.numero || contrato.id} gerado com sucesso.`);
+      onPropostaUpdated?.();
     } catch (error) {
-      console.error('❌ Erro ao gerar contrato:', error);
-      toastService.error('Erro ao gerar contrato. Tente novamente.');
+      console.error('Erro ao gerar contrato automatico:', error);
+      toastService.error(getErrorMessage(error, 'Erro ao gerar contrato a partir da proposta.'));
     } finally {
       setGerandoContrato(false);
     }
   };
 
+  const buscarContratoDaProposta = async (propostaId: string) => {
+    const contratos = await contratoService.listarContratos();
+    return (
+      contratos.find(
+        (contrato) => contrato.propostaId === propostaId && contrato.status !== 'cancelado',
+      ) || null
+    );
+  };
+
   // Criar fatura automática
   const handleCriarFatura = async () => {
     if (!podeCriarFatura()) {
-      toastService.error('Apenas propostas aprovadas podem gerar faturas');
+      toastService.error('Apenas propostas com contrato assinado podem gerar faturas');
       return;
     }
 
     setCriandoFatura(true);
     try {
+      const { propostaId, clienteId, usuarioResponsavelId } = obterContextoAutomacao();
       const propostaData = getPropostaData();
-      const clienteData = await getClienteData();
+      const contrato = await buscarContratoDaProposta(propostaId);
 
-      const faturaData = {
-        contratoId: propostaData.numero, // Temporário até ter contrato real
-        clienteId: propostaData.numero, // Temporário
-        usuarioResponsavelId: 'user_temp', // Temporário
-        tipo: 'entrada' as const,
-        descricao: `Fatura referente à proposta ${propostaData.numero} - ${propostaData.titulo}`,
-        dataVencimento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        itens: [
-          {
-            descricao: propostaData.titulo,
-            quantidade: 1,
-            valorUnitario: propostaData.total,
-            valorDesconto: 0,
-          },
-        ],
-      };
-
-      // Usar o serviço de faturamento
-      const fatura = await faturamentoAPI.criarFatura(faturaData);
-
-      if (fatura) {
-        toastService.success(`Fatura ${fatura.numero} criada com sucesso!`);
-
-        // Disparar evento para atualizar a interface
-        const eventoAtualizacao = new CustomEvent('propostaAtualizada', {
-          detail: {
-            propostaId: propostaData.numero,
-            novoStatus: 'fatura_criada',
-            acao: 'fatura_criada',
-            faturaId: fatura.numero,
-            timestamp: new Date().toISOString(),
-          },
-        });
-        window.dispatchEvent(eventoAtualizacao);
-
-        // Navegar para página de faturamento (opcional)
-        if (await confirm('Deseja visualizar a fatura criada?')) {
-          window.open(`/faturamento#fatura-${fatura.id}`, '_blank');
-        }
+      if (!contrato) {
+        throw new Error(
+          'Nenhum contrato encontrado para esta proposta. Gere o contrato antes da fatura.',
+        );
       }
+
+      if (String(contrato.status || '').toLowerCase() !== 'assinado') {
+        throw new Error('O contrato precisa estar assinado antes de gerar a fatura.');
+      }
+
+      if (!isNumericId(contrato.id)) {
+        throw new Error(
+          'Contrato vinculado com ID invalido para faturamento automatico. Use o modulo de Faturamento.',
+        );
+      }
+
+      const fatura = await faturamentoService.criarFatura({
+        contratoId: String(contrato.id),
+        clienteId,
+        usuarioResponsavelId,
+        tipo: TipoFatura.UNICA,
+        dataVencimento: formatDateOnly(
+          contrato.dataVencimento instanceof Date
+            ? contrato.dataVencimento
+            : propostaData.dataValidade,
+        ),
+        formaPagamento: mapFormaPagamentoProposta(),
+        observacoes: `Fatura gerada automaticamente a partir da proposta ${propostaData.numero}.`,
+        itens: montarItensFatura(),
+      });
+
+      await sincronizarStatusProposta('fatura_criada', {
+        source: 'automacao-fatura',
+        observacoes: `Fatura ${fatura.numero || fatura.id} criada a partir da proposta.`,
+      });
+      toastService.success(`Fatura ${fatura.numero || fatura.id} criada com sucesso.`);
+      onPropostaUpdated?.();
     } catch (error) {
-      console.error('❌ Erro ao criar fatura:', error);
-      toastService.error('Erro ao criar fatura. Tente novamente.');
+      console.error('Erro ao criar fatura automatica:', error);
+      toastService.error(getErrorMessage(error, 'Erro ao criar fatura a partir da proposta.'));
     } finally {
       setCriandoFatura(false);
     }
@@ -488,63 +734,202 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       const propostaData = getPropostaData();
       const status = propostaData.status;
 
-      let proximaAcao = '';
-      let novoStatus = '';
+      if (bloqueadoPorAlcada && status === 'negociacao') {
+        toastService.info(
+          'A proposta esta aguardando aprovacao interna de alcada. Use os botoes de alcada para decidir.',
+        );
+        return;
+      }
 
       // Determinar próxima ação baseada no status atual
       switch (status) {
         case 'rascunho':
-          proximaAcao = 'enviar_proposta';
-          novoStatus = 'enviada';
           await handleSendEmail(); // Enviar proposta por email
-          break;
+          return;
 
         case 'enviada':
-        case 'negociacao':
-          proximaAcao = 'aprovar_proposta';
-          novoStatus = 'aprovada';
-          // Marcar como aprovada no sistema
-          toastService.success('Proposta marcada como aprovada');
+          await sincronizarStatusProposta('negociacao', {
+            source: 'fluxo-avanco',
+            observacoes: 'Status avancado automaticamente para negociacao.',
+          });
+          toastService.success('Proposta avancada para negociacao.');
+          onPropostaUpdated?.();
           break;
 
+        case 'negociacao': {
+          const aprovar = window.confirm(
+            'Deseja marcar esta proposta como APROVADA?\n\nClique em OK para aprovar ou Cancelar para rejeitar.',
+          );
+
+          if (aprovar) {
+            await sincronizarStatusProposta('aprovada', {
+              source: 'fluxo-avanco',
+              observacoes: 'Proposta aprovada durante o fluxo de negociacao.',
+            });
+            toastService.success('Proposta marcada como aprovada.');
+            onPropostaUpdated?.();
+            break;
+          }
+
+          const motivoPerda = window.prompt(
+            'Informe o motivo da perda (opcional):',
+            'Cliente optou por outra proposta',
+          );
+
+          await sincronizarStatusProposta('rejeitada', {
+            source: 'fluxo-avanco',
+            motivoPerda: motivoPerda || undefined,
+            observacoes: 'Proposta rejeitada durante o fluxo de negociacao.',
+          });
+          toastService.success('Proposta marcada como rejeitada.');
+          onPropostaUpdated?.();
+          break;
+        }
+
         case 'aprovada':
-          proximaAcao = 'gerar_contrato';
-          novoStatus = 'contrato_gerado';
           await handleGerarContrato(); // Gerar contrato
           break;
 
-        case 'contrato_gerado':
-          proximaAcao = 'criar_fatura';
-          novoStatus = 'fatura_criada';
+        case 'contrato_gerado': {
+          const { propostaId } = obterContextoAutomacao();
+          const contrato = await buscarContratoDaProposta(propostaId);
+          if (!contrato) {
+            toastService.info('Contrato nao encontrado. Gere o contrato para continuar o fluxo.');
+            break;
+          }
+
+          if (String(contrato.status || '').toLowerCase() !== 'assinado') {
+            toastService.info(
+              'Aguardando assinatura do contrato. Assim que assinar, o fluxo avanca para faturamento.',
+            );
+            break;
+          }
+
+          await sincronizarStatusProposta('contrato_assinado', {
+            source: 'fluxo-avanco',
+            observacoes: `Contrato ${contrato.numero || contrato.id} assinado.`,
+          });
+          await handleCriarFatura();
+          break;
+        }
+
+        case 'contrato_assinado':
           await handleCriarFatura(); // Criar fatura
           break;
 
         case 'fatura_criada':
-          proximaAcao = 'aguardar_pagamento';
-          novoStatus = 'aguardando_pagamento';
-          toastService.info('Fatura enviada para cobrança automática');
+          await sincronizarStatusProposta('aguardando_pagamento', {
+            source: 'fluxo-avanco',
+            observacoes: 'Fatura emitida e aguardando pagamento.',
+          });
+          toastService.success('Status atualizado para aguardando pagamento.');
+          onPropostaUpdated?.();
+          break;
+
+        case 'aguardando_pagamento':
+          await sincronizarStatusProposta('pago', {
+            source: 'fluxo-avanco',
+            observacoes: 'Pagamento confirmado no fluxo de propostas.',
+          });
+          toastService.success('Status atualizado para pago.');
+          onPropostaUpdated?.();
+          break;
+
+        case 'pago':
+          toastService.info('Fluxo finalizado: proposta paga.');
+          break;
+
+        case 'rejeitada':
+        case 'expirada':
+          toastService.info('Fluxo encerrado para este status.');
           break;
 
         default:
-          toastService.info('Esta proposta já está na última etapa do fluxo');
+          toastService.info('Esta proposta ja esta na ultima etapa do fluxo');
           return;
       }
-
-      // Disparar evento para atualizar a interface
-      const eventoAtualizacao = new CustomEvent('propostaAtualizada', {
-        detail: {
-          propostaId: propostaData.numero,
-          novoStatus: novoStatus,
-          acao: proximaAcao,
-          timestamp: new Date().toISOString(),
-        },
-      });
-      window.dispatchEvent(eventoAtualizacao);
     } catch (error) {
       console.error('❌ Erro ao avançar fluxo:', error);
       toastService.error('Erro ao avançar fluxo. Tente novamente.');
     } finally {
       setAvancandoFluxo(false);
+    }
+  };
+
+  const handleAprovarAlcada = async () => {
+    if (!possuiAprovacaoPendente) {
+      return;
+    }
+
+    const propostaData = getPropostaData();
+    const propostaId = (proposta as any)?.id || propostaData.id;
+    if (!propostaId) {
+      toastService.error('Proposta sem identificador para aprovar alçada.');
+      return;
+    }
+
+    setDecidindoAlcadaAprovacao(true);
+    try {
+      const aprovador = getUsuarioAtualAprovador();
+      await propostasApiService.decidirAprovacaoInterna(propostaId, {
+        aprovada: true,
+        usuarioId: aprovador.id,
+        usuarioNome: aprovador.nome,
+        observacoes: 'Aprovacao interna concluida via tela de propostas.',
+      });
+
+      await sincronizarStatusProposta('aprovada', {
+        source: 'alcada-aprovada',
+        observacoes: 'Proposta aprovada apos decisao da alcada interna.',
+      });
+
+      toastService.success('Alçada aprovada e proposta avançada para aprovada.');
+      onPropostaUpdated?.();
+    } catch (error) {
+      console.error('Erro ao aprovar alçada interna:', error);
+      toastService.error(getErrorMessage(error, 'Erro ao aprovar alçada interna.'));
+    } finally {
+      setDecidindoAlcadaAprovacao(false);
+    }
+  };
+
+  const handleReprovarAlcada = async () => {
+    if (!possuiAprovacaoPendente) {
+      return;
+    }
+
+    const motivoReprovacao = window.prompt(
+      'Informe o motivo da reprovação interna (opcional):',
+      'Desconto acima da política comercial',
+    );
+    if (motivoReprovacao === null) {
+      return;
+    }
+
+    const propostaData = getPropostaData();
+    const propostaId = (proposta as any)?.id || propostaData.id;
+    if (!propostaId) {
+      toastService.error('Proposta sem identificador para reprovar alçada.');
+      return;
+    }
+
+    setDecidindoAlcadaReprovacao(true);
+    try {
+      const aprovador = getUsuarioAtualAprovador();
+      await propostasApiService.decidirAprovacaoInterna(propostaId, {
+        aprovada: false,
+        usuarioId: aprovador.id,
+        usuarioNome: aprovador.nome,
+        observacoes: motivoReprovacao || 'Reprovacao interna via tela de propostas.',
+      });
+
+      toastService.success('Alçada reprovada. A proposta permanece bloqueada para aprovação.');
+      onPropostaUpdated?.();
+    } catch (error) {
+      console.error('Erro ao reprovar alçada interna:', error);
+      toastService.error(getErrorMessage(error, 'Erro ao reprovar alçada interna.'));
+    } finally {
+      setDecidindoAlcadaReprovacao(false);
     }
   };
 
@@ -598,8 +983,12 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
     setSendingEmail(true);
     try {
-      const token = generateAccessToken();
       const propostaData = getPropostaData();
+      const propostaId = (proposta as any)?.id || (propostaData as any)?.id;
+      if (!propostaId) {
+        throw new Error('Proposta sem ID para gerar token do portal');
+      }
+      const token = await portalClienteService.gerarTokenPublico(String(propostaId));
 
       const emailData = {
         cliente: {
@@ -607,6 +996,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           email: emailFinal, // ✅ Usar email real corrigido pelo usuário
         },
         proposta: {
+          id: String(propostaId),
           numero: propostaData.numero,
           valorTotal: propostaData.total,
           dataValidade: propostaData.dataValidade,
@@ -629,22 +1019,12 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       const resultado = await emailServiceReal.enviarPropostaParaCliente(emailData);
 
       if (resultado.success) {
-        toastService.success(`Proposta enviada por email para ${clienteData.nome}`);
-        // Criar evento personalizado para notificar a PropostasPage
-        const eventoAtualizacao = new CustomEvent('propostaAtualizada', {
-          detail: {
-            propostaId: propostaData.numero,
-            novoStatus: 'enviada', // Status automaticamente alterado pelo backend
-            fonte: 'email',
-            timestamp: new Date().toISOString(),
-          },
+        await sincronizarStatusProposta('enviada', {
+          source: 'email',
+          observacoes: `Proposta enviada por email para ${clienteData.nome}.`,
         });
-
-        // Disparar o evento globalmente
-        window.dispatchEvent(eventoAtualizacao);
-
-        // ⚡ OTIMIZADO: Remover segundo evento desnecessário para evitar auto-refresh
-        // O evento único acima já é suficiente para atualizar a interface
+        toastService.success(`Proposta enviada por email para ${clienteData.nome}`);
+        onPropostaUpdated?.();
       } else {
         toastService.error(`Erro ao enviar email: ${resultado.error}`);
       }
@@ -747,10 +1127,15 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
   // Compartilhar proposta
   const handleShare = async () => {
-    const token = generateAccessToken();
     const propostaData = getPropostaData();
+    const propostaId = (proposta as any)?.id || (propostaData as any)?.id;
+    if (!propostaId) {
+      toastService.error('Proposta sem ID para gerar link do portal');
+      return;
+    }
+    const token = await portalClienteService.gerarTokenPublico(String(propostaId));
     const clienteData = await getClienteData();
-    const shareUrl = `${window.location.origin}/portal-cliente/${propostaData.numero}/${token}`;
+    const shareUrl = `${window.location.origin}/portal/${propostaData.numero}/${token}`;
 
     if (navigator.share) {
       try {
@@ -779,14 +1164,16 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   return (
     <div className={`flex items-center space-x-1 ${className}`}>
       {/* Visualizar */}
-      <button
-        onClick={() => onViewProposta(proposta)}
-        className={`${buttonClass} text-blue-600 hover:text-blue-900 hover:bg-blue-50`}
-        title="Visualizar proposta"
-      >
-        <Eye className="w-4 h-4" />
-        {showLabels && <span>Visualizar</span>}
-      </button>
+      {!hideView && (
+        <button
+          onClick={() => onViewProposta(proposta)}
+          className={`${buttonClass} text-blue-600 hover:text-blue-900 hover:bg-blue-50`}
+          title="Visualizar proposta"
+        >
+          <Eye className="w-4 h-4" />
+          {showLabels && <span>Visualizar</span>}
+        </button>
+      )}
 
       {/* Email */}
       <button
@@ -837,6 +1224,49 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
       {/* ✨ SEPARADOR VISUAL */}
       <div className="h-6 w-px bg-gray-300 mx-2"></div>
+      {/* Decisao de alcada */}
+      {possuiAprovacaoPendente && (
+        <>
+          <span
+            className={`${buttonClass} text-amber-700 bg-amber-50 border border-amber-200 cursor-default`}
+            title={
+              aprovacaoInternaAtual?.motivo ||
+              'Proposta com desconto acima da politica. Exige aprovacao interna.'
+            }
+          >
+            <ShieldAlert className="w-4 h-4" />
+            {showLabels && <span>Alcada pendente</span>}
+          </span>
+
+          <button
+            onClick={handleAprovarAlcada}
+            disabled={decidindoAlcadaAprovacao || decidindoAlcadaReprovacao}
+            className={`${buttonClass} text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50 disabled:opacity-50`}
+            title="Aprovar alcada interna"
+          >
+            {decidindoAlcadaAprovacao ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <ShieldCheck className="w-4 h-4" />
+            )}
+            {showLabels && <span>Aprovar alcada</span>}
+          </button>
+
+          <button
+            onClick={handleReprovarAlcada}
+            disabled={decidindoAlcadaAprovacao || decidindoAlcadaReprovacao}
+            className={`${buttonClass} text-rose-700 hover:text-rose-900 hover:bg-rose-50 disabled:opacity-50`}
+            title="Reprovar alcada interna"
+          >
+            {decidindoAlcadaReprovacao ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <ShieldX className="w-4 h-4" />
+            )}
+            {showLabels && <span>Reprovar alcada</span>}
+          </button>
+        </>
+      )}
 
       {/* 🚀 NOVOS BOTÕES DE AUTOMAÇÃO */}
 
@@ -844,9 +1274,13 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       {podeGerarContrato() && (
         <button
           onClick={handleGerarContrato}
-          disabled={gerandoContrato}
+          disabled={gerandoContrato || !automacaoAvancadaDisponivel}
           className={`${buttonClass} text-blue-600 hover:text-blue-900 hover:bg-blue-50 disabled:opacity-50`}
-          title="Gerar contrato a partir desta proposta"
+          title={
+            automacaoAvancadaDisponivel
+              ? 'Gerar contrato a partir desta proposta'
+              : 'Geracao automatica indisponivel nesta versao'
+          }
         >
           {gerandoContrato ? (
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -861,9 +1295,13 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       {podeCriarFatura() && (
         <button
           onClick={handleCriarFatura}
-          disabled={criandoFatura}
+          disabled={criandoFatura || !automacaoAvancadaDisponivel}
           className={`${buttonClass} text-green-600 hover:text-green-900 hover:bg-green-50 disabled:opacity-50`}
-          title="Criar fatura automática"
+          title={
+            automacaoAvancadaDisponivel
+              ? 'Criar fatura automatica'
+              : 'Criacao automatica indisponivel nesta versao'
+          }
         >
           {criandoFatura ? (
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -877,7 +1315,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       {/* Avançar Fluxo */}
       <button
         onClick={handleAvançarFluxo}
-        disabled={avancandoFluxo}
+        disabled={avancandoFluxo || bloqueadoPorAlcada}
         className={`${buttonClass} text-orange-600 hover:text-orange-900 hover:bg-orange-50 disabled:opacity-50`}
         title="Avançar para próxima etapa do fluxo automatizado"
       >
@@ -919,4 +1357,3 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 };
 
 export default PropostaActions;
-

@@ -120,6 +120,14 @@ export class Proposta {
     sentAt?: string;
     emailCliente?: string;
     linkPortal?: string;
+    fluxoStatus?: string;
+    motivoPerda?: string;
+    historicoEventos?: Array<Record<string, unknown>>;
+    portalEventos?: Array<Record<string, unknown>>;
+    versoes?: Array<Record<string, unknown>>;
+    aprovacaoInterna?: Record<string, unknown>;
+    lembretes?: Array<Record<string, unknown>>;
+    [key: string]: unknown;
   };
 
   @CreateDateColumn()

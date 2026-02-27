@@ -144,26 +144,35 @@ export class CreateDepartamentos1729180000000 implements MigrationInterface {
     );
 
     // Criar índices
-    await queryRunner.query(`CREATE INDEX idx_departamentos_empresa ON departamentos(empresa_id)`);
-    await queryRunner.query(`CREATE INDEX idx_departamentos_nucleo ON departamentos(nucleo_id)`);
-    await queryRunner.query(`CREATE INDEX idx_departamentos_ativo ON departamentos(ativo)`);
-
-    // Criar foreign keys
-    await queryRunner.createForeignKey(
-      'departamentos',
-      new TableForeignKey({
-        columnNames: ['empresa_id'],
-        referencedColumnNames: ['id'],
-        referencedTableName: 'empresas',
-        onDelete: 'CASCADE',
-        name: 'fk_departamentos_empresa',
-      }),
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS idx_departamentos_empresa ON departamentos(empresa_id)`,
     );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS idx_departamentos_nucleo ON departamentos(nucleo_id)`,
+    );
+    await queryRunner.query(`CREATE INDEX IF NOT EXISTS idx_departamentos_ativo ON departamentos(ativo)`);
+
+    // Criar foreign keys (idempotente para permitir reexecuÃ§Ã£o segura)
+    const table = await queryRunner.getTable('departamentos');
+    const hasFk = (name: string) => table?.foreignKeys?.some((fk) => fk.name === name);
+
+    if (!hasFk('fk_departamentos_empresa')) {
+      await queryRunner.createForeignKey(
+        'departamentos',
+        new TableForeignKey({
+          columnNames: ['empresa_id'],
+          referencedColumnNames: ['id'],
+          referencedTableName: 'empresas',
+          onDelete: 'CASCADE',
+          name: 'fk_departamentos_empresa',
+        }),
+      );
+    }
 
     // Nem sempre a tabela `nucleos_atendimento` existe nesta etapa do histórico.
     // Se ela ainda não existir, pulamos a FK aqui e ela será criada por migrations posteriores.
     const hasNucleosTable = await queryRunner.hasTable('nucleos_atendimento');
-    if (hasNucleosTable) {
+    if (hasNucleosTable && !hasFk('fk_departamentos_nucleo')) {
       await queryRunner.createForeignKey(
         'departamentos',
         new TableForeignKey({
@@ -176,16 +185,18 @@ export class CreateDepartamentos1729180000000 implements MigrationInterface {
       );
     }
 
-    await queryRunner.createForeignKey(
-      'departamentos',
-      new TableForeignKey({
-        columnNames: ['supervisor_id'],
-        referencedColumnNames: ['id'],
-        referencedTableName: 'users',
-        onDelete: 'SET NULL',
-        name: 'fk_departamentos_supervisor',
-      }),
-    );
+    if (!hasFk('fk_departamentos_supervisor')) {
+      await queryRunner.createForeignKey(
+        'departamentos',
+        new TableForeignKey({
+          columnNames: ['supervisor_id'],
+          referencedColumnNames: ['id'],
+          referencedTableName: 'users',
+          onDelete: 'SET NULL',
+          name: 'fk_departamentos_supervisor',
+        }),
+      );
+    }
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

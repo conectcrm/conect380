@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import usuariosService from '../../services/usuariosService';
 import agendaEventosService from '../../services/agendaEventosService';
 import notificationService from '../../services/notificationService';
+import { parseLocalDateInputValue, toLocalDateInputValue } from '../../utils/calendarUtils';
 import {
   getAgendaEventNotificationId,
   getAgendaReminderId,
@@ -425,7 +426,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
           eventType: mapCalendarTypeToModalType(event.type),
           responsavel: event.responsavelId || usuarioAtual?.id || '',
           isAllDay: event.allDay || false,
-          startDate: startDate.toISOString().split('T')[0],
+          startDate: toLocalDateInputValue(startDate),
           startTime: startDate.toTimeString().slice(0, 5),
           duration: durationValue,
           customDurationHours: customHours,
@@ -446,7 +447,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
       } else {
         // Novo evento
         const defaultDate = selectedDate || new Date();
-        const dateStr = defaultDate.toISOString().split('T')[0];
+        const dateStr = toLocalDateInputValue(defaultDate);
 
         reset({
           title: '',
@@ -730,7 +731,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
       let endDate: Date;
 
       if (data.isAllDay) {
-        endDate = new Date(data.startDate);
+        endDate = parseLocalDateInputValue(data.startDate);
       } else {
         // Calcular data final baseada na duração
         const startDateTime = new Date(`${data.startDate}T${data.startTime}`);
@@ -765,7 +766,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
         responsavelId: data.responsavel,
         allDay: data.isAllDay,
         start: data.isAllDay
-          ? new Date(data.startDate)
+          ? parseLocalDateInputValue(data.startDate)
           : new Date(`${data.startDate}T${data.startTime}`),
         end: endDate,
         locationType: data.locationType,
@@ -816,7 +817,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
           isEditing ? 'adicionou voce ao evento' : 'convidou voce para o evento'
         } "${data.title}"${
           data.isAllDay
-            ? ` em ${new Date(data.startDate).toLocaleDateString('pt-BR')}`
+            ? ` em ${parseLocalDateInputValue(data.startDate).toLocaleDateString('pt-BR')}`
             : ` em ${new Date(eventData.start).toLocaleString('pt-BR')}`
         }${data.location ? ` (${data.location})` : ''}.`;
 
@@ -855,7 +856,11 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
         isEditing ? 'Evento Atualizado' : 'Evento Criado',
         isEditing
           ? `Evento "${data.title}" foi atualizado com sucesso`
-          : `Evento "${data.title}" foi criado para ${new Date(data.startDate).toLocaleDateString('pt-BR')}`,
+          : `Evento "${data.title}" foi criado para ${
+              data.isAllDay
+                ? parseLocalDateInputValue(data.startDate).toLocaleDateString('pt-BR')
+                : new Date(eventData.start).toLocaleDateString('pt-BR')
+            }`,
       );
 
       const lifecycleAction =

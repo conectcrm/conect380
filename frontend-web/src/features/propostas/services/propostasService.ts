@@ -70,7 +70,60 @@ interface PropostaCompleta extends PropostaFormData {
   subtotal: number;
   total: number;
   dataValidade: Date;
-  status?: 'rascunho' | 'enviada' | 'aprovada' | 'rejeitada';
+  status?:
+    | 'rascunho'
+    | 'enviada'
+    | 'visualizada'
+    | 'negociacao'
+    | 'aprovada'
+    | 'contrato_gerado'
+    | 'contrato_assinado'
+    | 'fatura_criada'
+    | 'aguardando_pagamento'
+    | 'pago'
+    | 'rejeitada'
+    | 'expirada';
+  motivoPerda?: string;
+  aprovacaoInterna?: {
+    obrigatoria: boolean;
+    status: 'nao_requer' | 'pendente' | 'aprovada' | 'rejeitada';
+    limiteDesconto?: number;
+    descontoDetectado?: number;
+    motivo?: string;
+    solicitadaEm?: string;
+    solicitadaPorId?: string;
+    solicitadaPorNome?: string;
+    aprovadaEm?: string;
+    aprovadaPorId?: string;
+    aprovadaPorNome?: string;
+    rejeitadaEm?: string;
+    rejeitadaPorId?: string;
+    rejeitadaPorNome?: string;
+    observacoes?: string;
+  };
+  lembretes?: Array<{
+    id: string;
+    status: 'agendado' | 'enviado' | 'cancelado';
+    agendadoPara?: string;
+    criadoEm?: string;
+    diasApos?: number;
+    observacoes?: string;
+  }>;
+  historicoEventos?: Array<{
+    id?: string;
+    evento?: string;
+    timestamp?: string;
+    origem?: string;
+    status?: string;
+    detalhes?: string;
+    ip?: string;
+  }>;
+  versoes?: Array<{
+    versao: number;
+    criadaEm?: string;
+    origem?: string;
+    descricao?: string;
+  }>;
   tokenPortal?: string;
   criadaEm?: Date;
   atualizadaEm?: Date;
@@ -238,6 +291,7 @@ class PropostasService {
       numero: propostaAny.numero,
       titulo: propostaAny.titulo || propostaAny.numero || cliente.nome || 'Proposta Comercial',
       status: (propostaAny.status as any) || 'rascunho',
+      motivoPerda: propostaAny.motivoPerda || undefined,
       cliente,
       vendedor,
       produtos,
@@ -252,6 +306,22 @@ class PropostasService {
       dataValidade: propostaAny.dataVencimento
         ? new Date(propostaAny.dataVencimento)
         : new Date(Date.now() + (propostaAny.validadeDias ?? 30) * 24 * 60 * 60 * 1000),
+      aprovacaoInterna: propostaAny.aprovacaoInterna || propostaAny.emailDetails?.aprovacaoInterna,
+      lembretes: Array.isArray(propostaAny.lembretes)
+        ? propostaAny.lembretes
+        : Array.isArray(propostaAny.emailDetails?.lembretes)
+          ? propostaAny.emailDetails.lembretes
+          : [],
+      historicoEventos: Array.isArray(propostaAny.historicoEventos)
+        ? propostaAny.historicoEventos
+        : Array.isArray(propostaAny.emailDetails?.historicoEventos)
+          ? propostaAny.emailDetails.historicoEventos
+          : [],
+      versoes: Array.isArray(propostaAny.versoes)
+        ? propostaAny.versoes
+        : Array.isArray(propostaAny.emailDetails?.versoes)
+          ? propostaAny.emailDetails.versoes
+          : [],
       criadaEm: propostaAny.criadaEm ? new Date(propostaAny.criadaEm) : new Date(),
       atualizadaEm: propostaAny.atualizadaEm ? new Date(propostaAny.atualizadaEm) : new Date(),
     };
@@ -391,10 +461,16 @@ class PropostasService {
         incluirImpostosPDF: dados.incluirImpostosPDF ?? false,
         produtos:
           dados.produtos?.map((produto) => ({
+            id: produto.produto.id,
             produtoId: produto.produto.id,
+            nome: produto.produto.nome,
             quantidade: produto.quantidade,
             precoUnitario: produto.produto.preco,
             desconto: produto.desconto || 0,
+            subtotal:
+              (Number(produto.quantidade || 0) || 0) *
+              (Number(produto.produto.preco || 0) || 0) *
+              (1 - (Number(produto.desconto || 0) || 0) / 100),
           })) || [],
       };
 
@@ -456,11 +532,16 @@ class PropostasService {
   }
 
   // Atualizar status de proposta
-  async atualizarStatus(id: string, novoStatus: string): Promise<PropostaCompleta | null> {
+  async atualizarStatus(
+    id: string,
+    novoStatus: string,
+    metadata?: { source?: string; observacoes?: string; motivoPerda?: string },
+  ): Promise<PropostaCompleta | null> {
     try {
       const propostaAtualizada = await sharedPropostasService.updateStatus(
         id,
         novoStatus as PropostaBasica['status'],
+        metadata,
       );
 
       return this.mapPropostaBasica(propostaAtualizada);
@@ -473,7 +554,40 @@ class PropostasService {
   // Estatísticas das propostas (calculadas do backend)
   async obterEstatisticas() {
     try {
+      try {
+        const dadosBackend = await sharedPropostasService.getEstatisticas();
+        if (dadosBackend && typeof dadosBackend === 'object') {
+          return {
+            ...dadosBackend,
+            motivosPerdaTop: Array.isArray((dadosBackend as any).motivosPerdaTop)
+              ? (dadosBackend as any).motivosPerdaTop
+              : [],
+            conversaoPorVendedor: Array.isArray((dadosBackend as any).conversaoPorVendedor)
+              ? (dadosBackend as any).conversaoPorVendedor
+              : [],
+            conversaoPorProduto: Array.isArray((dadosBackend as any).conversaoPorProduto)
+              ? (dadosBackend as any).conversaoPorProduto
+              : [],
+            aprovacoesPendentes: Number((dadosBackend as any).aprovacoesPendentes || 0),
+            followupsPendentes: Number((dadosBackend as any).followupsPendentes || 0),
+            propostasComVersao: Number((dadosBackend as any).propostasComVersao || 0),
+            mediaVersoesPorProposta: Number((dadosBackend as any).mediaVersoesPorProposta || 0),
+            revisoesUltimos7Dias: Number((dadosBackend as any).revisoesUltimos7Dias || 0),
+          };
+        }
+      } catch (backendError) {
+        console.warn('Falha ao obter estatisticas do backend, usando calculo local.');
+      }
+
       const propostas = await this.listarPropostas();
+      const statusGanho = new Set([
+        'aprovada',
+        'contrato_gerado',
+        'contrato_assinado',
+        'fatura_criada',
+        'aguardando_pagamento',
+        'pago',
+      ]);
 
       const totalPropostas = propostas.length;
       const valorTotalPipeline = propostas.reduce((sum, p) => sum + p.total, 0);
@@ -493,6 +607,98 @@ class PropostasService {
         estatisticasPorVendedor[vendedor] = (estatisticasPorVendedor[vendedor] || 0) + 1;
       });
 
+      const motivosPerdaMap: Record<string, number> = {};
+      const vendedorMap: Record<string, { total: number; ganhas: number; perdidas: number }> = {};
+      const produtoMap: Record<string, { total: number; ganhas: number; perdidas: number }> = {};
+      let aprovacoesPendentes = 0;
+      let followupsPendentes = 0;
+      let propostasComVersao = 0;
+      let totalVersoes = 0;
+      let revisoesUltimos7Dias = 0;
+      const limiteRevisaoRecente = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
+      propostas.forEach((proposta: any) => {
+        const vendedor = proposta.vendedor?.nome || 'Sem vendedor';
+        if (!vendedorMap[vendedor]) {
+          vendedorMap[vendedor] = { total: 0, ganhas: 0, perdidas: 0 };
+        }
+
+        vendedorMap[vendedor].total += 1;
+        if (statusGanho.has(proposta.status || '')) {
+          vendedorMap[vendedor].ganhas += 1;
+        }
+        if (proposta.status === 'rejeitada') {
+          vendedorMap[vendedor].perdidas += 1;
+          const motivo = (proposta.motivoPerda || '').trim() || 'Nao informado';
+          motivosPerdaMap[motivo] = (motivosPerdaMap[motivo] || 0) + 1;
+        }
+
+        (proposta.produtos || []).forEach((item: any) => {
+          const nomeProduto = item?.produto?.nome || item?.nome || 'Produto nao informado';
+          if (!produtoMap[nomeProduto]) {
+            produtoMap[nomeProduto] = { total: 0, ganhas: 0, perdidas: 0 };
+          }
+          produtoMap[nomeProduto].total += 1;
+          if (statusGanho.has(proposta.status || '')) {
+            produtoMap[nomeProduto].ganhas += 1;
+          }
+          if (proposta.status === 'rejeitada') {
+            produtoMap[nomeProduto].perdidas += 1;
+          }
+        });
+
+        if (proposta.aprovacaoInterna?.status === 'pendente') {
+          aprovacoesPendentes += 1;
+        }
+        followupsPendentes += (proposta.lembretes || []).filter(
+          (lembrete: any) => lembrete?.status === 'agendado',
+        ).length;
+
+        const versoes = Array.isArray((proposta as any).versoes)
+          ? (proposta as any).versoes
+          : Array.isArray((proposta as any).emailDetails?.versoes)
+            ? (proposta as any).emailDetails.versoes
+            : [];
+        const quantidadeVersoes = versoes.length;
+        if (quantidadeVersoes > 1) {
+          propostasComVersao += 1;
+        }
+        totalVersoes += Math.max(quantidadeVersoes, 1);
+
+        const possuiRevisaoRecente = versoes.some((versao: any) => {
+          const timestamp = new Date(versao?.criadaEm || versao?.timestamp || '').getTime();
+          return Number.isFinite(timestamp) && timestamp >= limiteRevisaoRecente;
+        });
+        if (possuiRevisaoRecente) {
+          revisoesUltimos7Dias += 1;
+        }
+      });
+
+      const motivosPerdaTop = Object.entries(motivosPerdaMap)
+        .map(([motivo, quantidade]) => ({ motivo, quantidade }))
+        .sort((a, b) => b.quantidade - a.quantidade)
+        .slice(0, 10);
+
+      const conversaoPorVendedor = Object.entries(vendedorMap)
+        .map(([vendedor, dados]) => ({
+          vendedor,
+          total: dados.total,
+          ganhas: dados.ganhas,
+          perdidas: dados.perdidas,
+          taxaConversao: dados.total > 0 ? Math.round((dados.ganhas / dados.total) * 10000) / 100 : 0,
+        }))
+        .sort((a, b) => b.total - a.total);
+
+      const conversaoPorProduto = Object.entries(produtoMap)
+        .map(([produto, dados]) => ({
+          produto,
+          total: dados.total,
+          ganhas: dados.ganhas,
+          perdidas: dados.perdidas,
+          taxaConversao: dados.total > 0 ? Math.round((dados.ganhas / dados.total) * 10000) / 100 : 0,
+        }))
+        .sort((a, b) => b.total - a.total);
+
       return {
         totalPropostas,
         valorTotalPipeline,
@@ -500,9 +706,18 @@ class PropostasService {
         propostasAprovadas,
         estatisticasPorStatus,
         estatisticasPorVendedor,
+        motivosPerdaTop,
+        conversaoPorVendedor,
+        conversaoPorProduto,
+        aprovacoesPendentes,
+        followupsPendentes,
+        propostasComVersao,
+        mediaVersoesPorProposta:
+          totalPropostas > 0 ? Math.round((totalVersoes / totalPropostas) * 100) / 100 : 0,
+        revisoesUltimos7Dias,
       };
     } catch (error) {
-      console.error('❌ Erro ao calcular estatísticas:', error);
+      console.error('Erro ao calcular estatisticas:', error);
       return {
         totalPropostas: 0,
         valorTotalPipeline: 0,
@@ -510,10 +725,17 @@ class PropostasService {
         propostasAprovadas: 0,
         estatisticasPorStatus: {},
         estatisticasPorVendedor: {},
+        motivosPerdaTop: [],
+        conversaoPorVendedor: [],
+        conversaoPorProduto: [],
+        aprovacoesPendentes: 0,
+        followupsPendentes: 0,
+        propostasComVersao: 0,
+        mediaVersoesPorProposta: 0,
+        revisoesUltimos7Dias: 0,
       };
     }
   }
-
   // Verificar status da conexão com o backend
   async verificarConexao(): Promise<boolean> {
     try {
@@ -662,3 +884,4 @@ class PropostasService {
 
 export const propostasService = new PropostasService();
 export type { PropostaCompleta, PropostaFormData, Cliente, Vendedor, Produto, ProdutoProposta };
+

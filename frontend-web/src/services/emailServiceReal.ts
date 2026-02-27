@@ -28,6 +28,7 @@ export interface PropostaEmailData {
     email: string;
   };
   proposta: {
+    id?: string;
     numero: string;
     valorTotal: number;
     dataValidade: string;
@@ -98,16 +99,16 @@ class EmailServiceReal {
         },
         body: JSON.stringify({
           proposta: {
-            id: data.proposta.numero, // Usar número da proposta como ID
+            id: data.proposta.id || data.proposta.numero, // Usar número da proposta como ID
             numero: data.proposta.numero,
             valorTotal: data.proposta.valorTotal,
             dataValidade: data.proposta.dataValidade,
-            token: data.proposta.numero, // ✅ CORREÇÃO: Usar número da proposta como token
+            token: data.proposta.token, // ✅ CORREÇÃO: Usar número da proposta como token
           },
           emailCliente: data.cliente.email,
           linkPortal: data.portalUrl
-            ? `${data.portalUrl}/proposta/${data.proposta.numero}`
-            : `${window.location.origin}/portal/proposta/${data.proposta.numero}`, // ✅ CORREÇÃO: Usar número da proposta
+            ? `${data.portalUrl}/${data.proposta.numero}/${data.proposta.token}`
+            : `${window.location.origin}/portal/${data.proposta.numero}/${data.proposta.token}`, // ✅ CORREÇÃO: Usar número da proposta
           registrarToken: true, // ✅ Solicitar que o backend registre o token
         }),
       });

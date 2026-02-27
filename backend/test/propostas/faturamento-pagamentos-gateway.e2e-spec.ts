@@ -15,6 +15,17 @@ describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
     await h.teardown();
   });
 
+  async function obterStatusProposta(propostaId: string): Promise<string> {
+    const resposta = await request(h.httpServer)
+      .get(`/propostas/${propostaId}`)
+      .set('Authorization', `Bearer ${h.tokenAdminEmpresaA}`)
+      .send();
+
+    expect(resposta.status).toBe(200);
+    expect(resposta.body?.success).toBe(true);
+    return String(resposta.body?.proposta?.status || '');
+  }
+
   async function garantirContratoAssinado(): Promise<number> {
     if (h.contratoEmpresaAId) return h.contratoEmpresaAId;
 
@@ -65,6 +76,9 @@ describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
     expect(gerarFaturaResponse.body?.data?.id).toBeTruthy();
     expect(gerarFaturaResponse.body?.data?.status).toBeTruthy();
     h.faturaEmpresaAId = Number(gerarFaturaResponse.body.data.id);
+
+    const statusAposFaturaCriada = await obterStatusProposta(h.propostaEmpresaAId);
+    expect(statusAposFaturaCriada).toBe('fatura_criada');
 
     const gatewayTransacaoId = `e2e-gw-${h.runId}-${Date.now()}`;
     const transacaoId = `e2e-pay-${h.runId}-${Date.now()}`;
@@ -117,6 +131,9 @@ describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
     expect(faturaFinal.status).toBe(200);
     expect(faturaFinal.body?.data?.status).toBe('paga');
     expect(Number(faturaFinal.body?.data?.valorPago)).toBeGreaterThan(0);
+
+    const statusAposPagamento = await obterStatusProposta(h.propostaEmpresaAId);
+    expect(statusAposPagamento).toBe('pago');
   });
 
   it('retorna 501 ao tentar criar configuracao de gateway em producao sem provider habilitado', async () => {

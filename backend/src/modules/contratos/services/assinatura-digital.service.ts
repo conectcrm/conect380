@@ -13,6 +13,7 @@ import {
   RejeitarAssinaturaDto,
 } from '../dto/assinatura.dto';
 import { EmailIntegradoService } from '../../propostas/email-integrado.service';
+import { PropostasService } from '../../propostas/propostas.service';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -25,6 +26,7 @@ export class AssinaturaDigitalService {
     private assinaturaRepository: Repository<AssinaturaContrato>,
     @InjectRepository(Contrato)
     private contratoRepository: Repository<Contrato>,
+    private propostasService: PropostasService,
     private emailService: EmailIntegradoService,
   ) {}
 
@@ -246,6 +248,23 @@ export class AssinaturaDigitalService {
       await this.contratoRepository.save(contrato);
 
       this.logger.log(`Contrato ${contrato.numero} marcado como assinado`);
+
+      if (contrato.propostaId) {
+        try {
+          await this.propostasService.atualizarStatus(
+            contrato.propostaId,
+            'contrato_assinado',
+            'assinatura-digital',
+            `Contrato ${contrato.numero} assinado digitalmente.`,
+            undefined,
+            contrato.empresa_id,
+          );
+        } catch (error) {
+          this.logger.warn(
+            `Falha ao sincronizar proposta ${contrato.propostaId} apos assinatura digital: ${error.message}`,
+          );
+        }
+      }
     }
   }
 

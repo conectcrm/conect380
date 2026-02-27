@@ -12,7 +12,7 @@
     "start:dev": "nest start --watch",
     "start:dev:nest": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/src/main.js",
+    "start:prod": "node dist/main.js",
     "start:api": "powershell -Command \"$env:APP_PORT=3001; nest start\"",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --max-warnings 0",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",

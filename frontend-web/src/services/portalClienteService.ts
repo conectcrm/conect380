@@ -129,6 +129,10 @@ class PortalClienteService {
       console.warn('API não disponível, verificando tokens locais:', error);
 
       // Fallback: buscar em dados mock baseado no identificador
+      if (process.env.NODE_ENV === 'production') {
+        throw error instanceof Error ? error : new Error('Erro ao carregar proposta do portal');
+      }
+
       return this.obterPropostaMock(identificador);
     }
   }
@@ -202,6 +206,10 @@ class PortalClienteService {
       console.warn('API não disponível, gerando token local:', error);
 
       // Fallback: gera token numérico de 6 dígitos localmente
+      if (process.env.NODE_ENV === 'production') {
+        throw error instanceof Error ? error : new Error('Erro ao gerar token publico');
+      }
+
       const tokenLocal = gerarTokenNumerico();
 
       // Simula armazenamento local para desenvolvimento

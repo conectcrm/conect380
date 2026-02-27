@@ -39,12 +39,12 @@ export enum TipoAtividade {
 }
 
 export enum MotivoPerda {
-  PRECO = 'PRECO',
-  CONCORRENTE = 'CONCORRENTE',
-  TIMING = 'TIMING',
-  ORCAMENTO = 'ORCAMENTO',
-  PRODUTO = 'PRODUTO',
-  PROJETO_CANCELADO = 'PROJETO_CANCELADO',
-  SEM_RESPOSTA = 'SEM_RESPOSTA',
-  OUTRO = 'OUTRO',
+  PRECO = 'preco',
+  CONCORRENTE = 'concorrente',
+  TIMING = 'timing',
+  ORCAMENTO = 'orcamento',
+  PRODUTO = 'produto',
+  PROJETO_CANCELADO = 'projeto_cancelado',
+  SEM_RESPOSTA = 'sem_resposta',
+  OUTRO = 'outro',
 }

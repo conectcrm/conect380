@@ -220,9 +220,16 @@ export const FiltrosAvancados: React.FC<FiltrosAvancadosProps> = ({
             <option value="">Todos os Status</option>
             <option value="rascunho">Rascunho</option>
             <option value="enviada">Enviada</option>
+            <option value="visualizada">Visualizada</option>
             <option value="negociacao">Em Negociação</option>
             <option value="aprovada">Aprovada</option>
+            <option value="contrato_gerado">Contrato Gerado</option>
+            <option value="contrato_assinado">Contrato Assinado</option>
+            <option value="fatura_criada">Fatura Criada</option>
+            <option value="aguardando_pagamento">Aguardando Pagamento</option>
+            <option value="pago">Pago</option>
             <option value="rejeitada">Rejeitada</option>
+            <option value="expirada">Expirada</option>
           </select>
         </div>
 

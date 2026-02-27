@@ -16,7 +16,7 @@ type AuthFixtures = {
  */
 export const TEST_CREDENTIALS = {
   admin: {
-    email: 'admin@conectsuite.com.br',
+    email: 'admin@conect360.com.br',
     password: 'admin123',
   },
   atendente: {

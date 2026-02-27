@@ -5,6 +5,7 @@ import { Fatura, StatusFatura, TipoFatura } from '../entities/fatura.entity';
 import { ItemFatura } from '../entities/item-fatura.entity';
 import { Contrato } from '../../contratos/entities/contrato.entity';
 import { Cliente } from '../../clientes/cliente.entity';
+import { PropostasService } from '../../propostas/propostas.service';
 import { CreateFaturaDto, UpdateFaturaDto, GerarFaturaAutomaticaDto } from '../dto/fatura.dto';
 import { EmailIntegradoService } from '../../propostas/email-integrado.service';
 
@@ -22,6 +23,7 @@ export class FaturamentoService {
     private contratoRepository: Repository<Contrato>,
     @InjectRepository(Cliente)
     private clienteRepository: Repository<Cliente>,
+    private propostasService: PropostasService,
     private emailService: EmailIntegradoService,
   ) {}
 
@@ -76,6 +78,12 @@ export class FaturamentoService {
       const faturaCompleta = await this.buscarFaturaPorId(faturaSalva.id, empresaId);
 
       this.logger.log(`Fatura criada: ${faturaCompleta.numero}`);
+      await this.sincronizarStatusPropostaPelaFatura(
+        faturaCompleta,
+        empresaId,
+        'fatura_criada',
+        'faturamento-criacao',
+      );
 
       return faturaCompleta;
     } catch (error) {
@@ -391,6 +399,12 @@ export class FaturamentoService {
 
     const faturaAtualizada = await this.faturaRepository.save(fatura);
     this.logger.log(`Fatura marcada como paga: ${faturaAtualizada.numero}`);
+    await this.sincronizarStatusPropostaPelaFatura(
+      faturaAtualizada,
+      empresaId,
+      undefined,
+      'faturamento-pagamento',
+    );
 
     return faturaAtualizada;
   }
@@ -515,7 +529,13 @@ export class FaturamentoService {
 
       if (sucesso) {
         fatura.status = StatusFatura.ENVIADA;
-        await this.faturaRepository.save(fatura);
+        const faturaAtualizada = await this.faturaRepository.save(fatura);
+        await this.sincronizarStatusPropostaPelaFatura(
+          faturaAtualizada,
+          empresaId,
+          'aguardando_pagamento',
+          'faturamento-email',
+        );
         this.logger.log(`Fatura enviada por email: ${fatura.numero}`);
       }
 
@@ -528,6 +548,80 @@ export class FaturamentoService {
       }
 
       return false;
+    }
+  }
+
+  async sincronizarStatusPropostaPorFaturaId(faturaId: number, empresaId: string): Promise<void> {
+    try {
+      const fatura = await this.buscarFaturaPorId(faturaId, empresaId);
+      await this.sincronizarStatusPropostaPelaFatura(
+        fatura,
+        empresaId,
+        undefined,
+        'faturamento-recalculo',
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao sincronizar proposta pela fatura ${faturaId}: ${error.message}`,
+      );
+    }
+  }
+
+  private mapStatusFaturaParaStatusProposta(status: StatusFatura): string | null {
+    switch (status) {
+      case StatusFatura.PAGA:
+        return 'pago';
+      case StatusFatura.ENVIADA:
+      case StatusFatura.PENDENTE:
+      case StatusFatura.PARCIALMENTE_PAGA:
+      case StatusFatura.VENCIDA:
+        return 'aguardando_pagamento';
+      default:
+        return null;
+    }
+  }
+
+  private async sincronizarStatusPropostaPelaFatura(
+    fatura: Fatura | null | undefined,
+    empresaId: string,
+    statusOverride?: string,
+    source: string = 'faturamento',
+  ): Promise<void> {
+    if (!fatura?.contratoId) {
+      return;
+    }
+
+    const contratoComProposta =
+      fatura.contrato?.propostaId
+        ? fatura.contrato
+        : await this.contratoRepository.findOne({
+            where: { id: fatura.contratoId, empresa_id: empresaId },
+          });
+
+    const propostaId = contratoComProposta?.propostaId;
+    if (!propostaId) {
+      return;
+    }
+
+    const status = statusOverride || this.mapStatusFaturaParaStatusProposta(fatura.status);
+    if (!status) {
+      return;
+    }
+
+    const observacoes = `Sincronizacao via faturamento (${fatura.numero}) com status ${fatura.status}.`;
+    try {
+      await this.propostasService.atualizarStatus(
+        propostaId,
+        status,
+        source,
+        observacoes,
+        undefined,
+        empresaId,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao atualizar proposta ${propostaId} via faturamento: ${error.message}`,
+      );
     }
   }
 

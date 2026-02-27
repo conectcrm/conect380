@@ -1,28 +1,60 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { cotacaoService } from '../../../services/cotacaoService';
-import { Cotacao } from '../../../types/cotacaoTypes';
 import toast from 'react-hot-toast';
-import ModalAcaoLote from '../../../components/modals/ModalAcaoLote';
 import {
-  CheckCircle,
-  XCircle,
-  Clock,
   AlertCircle,
-  FileText,
-  User,
   Calendar,
+  CheckCircle,
   DollarSign,
   Eye,
+  FileText,
+  Filter,
   RefreshCw,
+  Search,
+  User,
+  XCircle,
 } from 'lucide-react';
-import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
+import {
+  DataTableCard,
+  EmptyState,
+  FiltersBar,
+  InlineStats,
+  LoadingSkeleton,
+  PageHeader,
+  SectionCard,
+} from '../../../components/layout-v2';
+import ModalAcaoLote from '../../../components/modals/ModalAcaoLote';
 import ModalAprovarCotacao from '../../../components/modals/ModalAprovarCotacao';
+import { cotacaoService } from '../../../services/cotacaoService';
+import { Cotacao } from '../../../types/cotacaoTypes';
+
+type FiltroPrioridade = 'todas' | 'urgente' | 'alta' | 'media' | 'baixa';
+
+const btnPrimary =
+  'inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition hover:bg-[#117C7E] disabled:cursor-not-allowed disabled:opacity-60';
+const btnSecondary =
+  'inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-60';
+const btnSuccess =
+  'inline-flex h-9 items-center gap-2 rounded-lg bg-[#14804A] px-3 text-sm font-medium text-white transition hover:bg-[#0E6B3E] disabled:cursor-not-allowed disabled:opacity-60';
+const btnDanger =
+  'inline-flex h-9 items-center gap-2 rounded-lg bg-[#C03449] px-3 text-sm font-medium text-white transition hover:bg-[#A32A3D] disabled:cursor-not-allowed disabled:opacity-60';
+
+const moneyFmt = new Intl.NumberFormat('pt-BR', {
+  style: 'currency',
+  currency: 'BRL',
+});
 
 function MinhasAprovacoesPage() {
   const navigate = useNavigate();
+  const selectAllRef = useRef<HTMLInputElement | null>(null);
+
   const [cotacoes, setCotacoes] = useState<Cotacao[]>([]);
   const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
+
+  const [busca, setBusca] = useState('');
+  const [filtroPrioridade, setFiltroPrioridade] = useState<FiltroPrioridade>('todas');
+
   const [modalAberto, setModalAberto] = useState(false);
   const [cotacaoSelecionada, setCotacaoSelecionada] = useState<Cotacao | null>(null);
   const [cotacoesSelecionadas, setCotacoesSelecionadas] = useState<Set<string>>(new Set());
@@ -30,17 +62,36 @@ function MinhasAprovacoesPage() {
   const [tipoAcaoLote, setTipoAcaoLote] = useState<'aprovar' | 'reprovar'>('aprovar');
 
   useEffect(() => {
-    carregarAprovacoes();
+    void carregarAprovacoes();
   }, []);
+
+  useEffect(() => {
+    setCotacoesSelecionadas((prev) => {
+      const idsAtuais = new Set(cotacoes.map((cotacao) => cotacao.id));
+      const proxima = new Set<string>();
+
+      prev.forEach((id) => {
+        if (idsAtuais.has(id)) {
+          proxima.add(id);
+        }
+      });
+
+      return proxima.size === prev.size ? prev : proxima;
+    });
+  }, [cotacoes]);
 
   const carregarAprovacoes = async () => {
     setCarregando(true);
+    setErro(null);
+
     try {
       const dados = await cotacaoService.minhasAprovacoes();
-      setCotacoes(dados);
+      setCotacoes(Array.isArray(dados) ? dados : []);
     } catch (error: any) {
-      console.error('Erro ao carregar aprovações:', error);
-      toast.error(error.message || 'Erro ao carregar aprovações pendentes');
+      console.error('Erro ao carregar aprovacoes:', error);
+      const mensagem = error?.message || 'Erro ao carregar aprovacoes pendentes';
+      setErro(mensagem);
+      toast.error(mensagem);
     } finally {
       setCarregando(false);
     }
@@ -56,13 +107,13 @@ function MinhasAprovacoesPage() {
 
     try {
       await cotacaoService.aprovar(cotacaoSelecionada.id, justificativa);
-      toast.success('Cotação aprovada com sucesso!');
+      toast.success('Cotacao aprovada com sucesso');
       setModalAberto(false);
       setCotacaoSelecionada(null);
       await carregarAprovacoes();
     } catch (error: any) {
-      console.error('Erro ao aprovar cotação:', error);
-      toast.error(error.message || 'Erro ao aprovar cotação');
+      console.error('Erro ao aprovar cotacao:', error);
+      toast.error(error?.message || 'Erro ao aprovar cotacao');
       throw error;
     }
   };
@@ -72,38 +123,32 @@ function MinhasAprovacoesPage() {
 
     try {
       await cotacaoService.reprovar(cotacaoSelecionada.id, justificativa);
-      toast.success('Cotação reprovada');
+      toast.success('Cotacao reprovada');
       setModalAberto(false);
       setCotacaoSelecionada(null);
       await carregarAprovacoes();
     } catch (error: any) {
-      console.error('Erro ao reprovar cotação:', error);
-      toast.error(error.message || 'Erro ao reprovar cotação');
+      console.error('Erro ao reprovar cotacao:', error);
+      toast.error(error?.message || 'Erro ao reprovar cotacao');
       throw error;
     }
   };
 
   const toggleSelecionarCotacao = (cotacaoId: string) => {
-    const novaSelecao = new Set(cotacoesSelecionadas);
-    if (novaSelecao.has(cotacaoId)) {
-      novaSelecao.delete(cotacaoId);
-    } else {
-      novaSelecao.add(cotacaoId);
-    }
-    setCotacoesSelecionadas(novaSelecao);
-  };
-
-  const toggleSelecionarTodas = () => {
-    if (cotacoesSelecionadas.size === cotacoes.length) {
-      setCotacoesSelecionadas(new Set());
-    } else {
-      setCotacoesSelecionadas(new Set(cotacoes.map((c) => c.id)));
-    }
+    setCotacoesSelecionadas((prev) => {
+      const proxima = new Set(prev);
+      if (proxima.has(cotacaoId)) {
+        proxima.delete(cotacaoId);
+      } else {
+        proxima.add(cotacaoId);
+      }
+      return proxima;
+    });
   };
 
   const abrirModalLote = (tipo: 'aprovar' | 'reprovar') => {
     if (cotacoesSelecionadas.size === 0) {
-      toast.error('Selecione ao menos uma cotação');
+      toast.error('Selecione ao menos uma cotacao');
       return;
     }
     setTipoAcaoLote(tipo);
@@ -121,43 +166,104 @@ function MinhasAprovacoesPage() {
         if (resultado.falhas > 0) {
           toast.error(`${resultado.sucessos} aprovadas, ${resultado.falhas} falharam`);
         } else {
-          toast.success(`${resultado.sucessos} cotação(ões) aprovada(s) com sucesso!`);
+          toast.success(`${resultado.sucessos} cotacao(oes) aprovada(s)`);
         }
       } else {
         if (!justificativa) {
-          toast.error('Justificativa é obrigatória para reprovação');
+          toast.error('Justificativa e obrigatoria para reprovacao');
           return;
         }
         const resultado = await cotacaoService.reprovarLote(ids, justificativa);
         if (resultado.falhas > 0) {
           toast.error(`${resultado.sucessos} reprovadas, ${resultado.falhas} falharam`);
         } else {
-          toast.success(`${resultado.sucessos} cotação(ões) reprovada(s)`);
+          toast.success(`${resultado.sucessos} cotacao(oes) reprovada(s)`);
         }
       }
+
       setModalLoteAberto(false);
       setCotacoesSelecionadas(new Set());
       await carregarAprovacoes();
     } catch (error: any) {
-      console.error('Erro na ação em lote:', error);
-      toast.error(error.message || 'Erro ao processar ação em lote');
+      console.error('Erro na acao em lote:', error);
+      toast.error(error?.message || 'Erro ao processar acao em lote');
     }
   };
 
-  const getPrioridadeColor = (prioridade: string) => {
-    switch (prioridade) {
-      case 'urgente':
-        return 'bg-red-100 text-red-800';
-      case 'alta':
-        return 'bg-orange-100 text-orange-800';
-      case 'media':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'baixa':
-        return 'bg-blue-100 text-blue-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+  const normalizar = (valor: unknown) =>
+    String(valor || '')
+      .toLowerCase()
+      .trim();
+
+  const termoBusca = normalizar(busca);
+
+  const cotacoesFiltradas = cotacoes.filter((cotacao) => {
+    if (filtroPrioridade !== 'todas' && cotacao.prioridade !== filtroPrioridade) {
+      return false;
     }
+
+    if (!termoBusca) return true;
+
+    const campos = [
+      cotacao.numero,
+      cotacao.titulo,
+      cotacao.descricao,
+      cotacao.fornecedor?.nome,
+      cotacao.responsavel?.nome,
+      cotacao.aprovador?.nome,
+    ];
+
+    return campos.some((campo) => normalizar(campo).includes(termoBusca));
+  });
+
+  const hasFilters = busca.trim().length > 0 || filtroPrioridade !== 'todas';
+  const idsFiltrados = cotacoesFiltradas.map((cotacao) => cotacao.id);
+  const selecionadasNaLista = idsFiltrados.filter((id) => cotacoesSelecionadas.has(id)).length;
+  const todasVisiveisSelecionadas =
+    cotacoesFiltradas.length > 0 && selecionadasNaLista === cotacoesFiltradas.length;
+  const selecaoParcialVisivel =
+    selecionadasNaLista > 0 && selecionadasNaLista < cotacoesFiltradas.length;
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = selecaoParcialVisivel;
+    }
+  }, [selecaoParcialVisivel, cotacoesFiltradas.length, todasVisiveisSelecionadas]);
+
+  const toggleSelecionarTodasVisiveis = () => {
+    if (!cotacoesFiltradas.length) return;
+
+    setCotacoesSelecionadas((prev) => {
+      const proxima = new Set(prev);
+
+      if (todasVisiveisSelecionadas) {
+        idsFiltrados.forEach((id) => proxima.delete(id));
+      } else {
+        idsFiltrados.forEach((id) => proxima.add(id));
+      }
+
+      return proxima;
+    });
   };
+
+  const limparSelecao = () => setCotacoesSelecionadas(new Set());
+
+  const limparFiltros = () => {
+    setBusca('');
+    setFiltroPrioridade('todas');
+  };
+
+  const totalValorPendente = cotacoes.reduce((total, cotacao) => total + (cotacao.valorTotal || 0), 0);
+  const totalUrgentes = cotacoes.filter((cotacao) => cotacao.prioridade === 'urgente').length;
+  const totalComPrazoHojeOuAtrasado = cotacoes.filter((cotacao) => {
+    if (!cotacao.prazoResposta) return false;
+    const prazo = new Date(cotacao.prazoResposta);
+    if (Number.isNaN(prazo.getTime())) return false;
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    prazo.setHours(0, 0, 0, 0);
+    return prazo.getTime() <= hoje.getTime();
+  }).length;
 
   const getPrioridadeLabel = (prioridade: string) => {
     switch (prioridade) {
@@ -166,313 +272,502 @@ function MinhasAprovacoesPage() {
       case 'alta':
         return 'Alta';
       case 'media':
-        return 'Média';
+        return 'Media';
       case 'baixa':
         return 'Baixa';
       default:
-        return prioridade;
+        return prioridade || 'N/A';
     }
+  };
+
+  const getPrioridadeBadge = (prioridade: string) => {
+    let className = 'border-[#DCE8EC] bg-white text-[#476776]';
+
+    switch (prioridade) {
+      case 'urgente':
+        className = 'border-[#F4C7CF] bg-[#FFF4F6] text-[#B4233A]';
+        break;
+      case 'alta':
+        className = 'border-[#F9D9AA] bg-[#FFF7EA] text-[#A86400]';
+        break;
+      case 'media':
+        className = 'border-[#CFE3FA] bg-[#F2F8FF] text-[#1E66B4]';
+        break;
+      case 'baixa':
+        className = 'border-[#DCE8EC] bg-[#F8FBFC] text-[#476776]';
+        break;
+      default:
+        break;
+    }
+
+    return (
+      <span
+        className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${className}`}
+      >
+        {getPrioridadeLabel(prioridade)}
+      </span>
+    );
   };
 
   const formatarData = (data: string | Date | null | undefined) => {
     if (!data) return 'N/A';
     try {
       const dataObj = typeof data === 'string' ? new Date(data) : data;
-      if (isNaN(dataObj.getTime())) return 'N/A';
+      if (Number.isNaN(dataObj.getTime())) return 'N/A';
       return dataObj.toLocaleDateString('pt-BR');
     } catch {
       return 'N/A';
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header com BackToNucleus */}
-      <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus nucleusName="Comercial" nucleusPath="/comercial" />
+  const getPrazoInfo = (data: string | null | undefined) => {
+    if (!data) {
+      return { label: 'Sem prazo', statusLabel: '', overdue: false };
+    }
+
+    const prazo = new Date(data);
+    if (Number.isNaN(prazo.getTime())) {
+      return { label: 'Data invalida', statusLabel: '', overdue: false };
+    }
+
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    prazo.setHours(0, 0, 0, 0);
+
+    if (prazo.getTime() < hoje.getTime()) {
+      return { label: prazo.toLocaleDateString('pt-BR'), statusLabel: 'Atrasada', overdue: true };
+    }
+
+    if (prazo.getTime() === hoje.getTime()) {
+      return { label: prazo.toLocaleDateString('pt-BR'), statusLabel: 'Vence hoje', overdue: false };
+    }
+
+    return { label: prazo.toLocaleDateString('pt-BR'), statusLabel: '', overdue: false };
+  };
+
+  const renderRowActions = (cotacao: Cotacao) => (
+    <button
+      type="button"
+      onClick={() => abrirModalAprovacao(cotacao)}
+      className={btnPrimary}
+      title={`Analisar cotacao ${cotacao.numero}`}
+    >
+      <Eye className="h-4 w-4" />
+      Analisar
+    </button>
+  );
+
+  const renderListToolbar = () => (
+    <div className="flex flex-col gap-3 border-b border-[#E1EAEE] bg-[#F8FBFC] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+      <div className="flex flex-wrap items-center gap-2 text-sm text-[#516F7D]">
+        <span>
+          {cotacoesFiltradas.length} registro{cotacoesFiltradas.length === 1 ? '' : 's'}
+        </span>
+        {hasFilters ? (
+          <span className="rounded-full border border-[#CDE6DF] bg-[#ECF7F3] px-2 py-0.5 text-xs font-medium text-[#0F7B7D]">
+            filtrados
+          </span>
+        ) : null}
+        {cotacoesSelecionadas.size > 0 ? (
+          <span className="rounded-full border border-[#CDE6DF] bg-[#ECF7F3] px-2 py-0.5 text-xs font-semibold text-[#0F7B7D]">
+            {cotacoesSelecionadas.size} selecionada{cotacoesSelecionadas.size === 1 ? '' : 's'}
+          </span>
+        ) : null}
       </div>
 
-      <div className="p-6">
-        <div className="max-w-7xl mx-auto">
-          {/* Header da Página */}
-          <div className="bg-white rounded-lg shadow-sm border mb-6 p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
-                  <CheckCircle className="h-6 w-6 text-[#159A9C]" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold text-[#002333]">Minhas Aprovações</h1>
-                  <p className="text-[#002333]/70 mt-1">
-                    {cotacoesSelecionadas.size > 0
-                      ? `${cotacoesSelecionadas.size} cotação(ões) selecionada(s)`
-                      : 'Cotações aguardando sua aprovação'}
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                {cotacoesSelecionadas.size > 0 && (
-                  <>
-                    <button
-                      onClick={() => abrirModalLote('aprovar')}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium flex items-center gap-2"
-                    >
-                      <CheckCircle className="h-4 w-4" />
-                      Aprovar Selecionadas ({cotacoesSelecionadas.size})
-                    </button>
-                    <button
-                      onClick={() => abrirModalLote('reprovar')}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium flex items-center gap-2"
-                    >
-                      <XCircle className="h-4 w-4" />
-                      Reprovar Selecionadas ({cotacoesSelecionadas.size})
-                    </button>
-                  </>
-                )}
-                <button
-                  onClick={carregarAprovacoes}
-                  disabled={carregando}
-                  className="px-4 py-2 bg-white text-[#159A9C] border border-[#159A9C] rounded-lg hover:bg-[#159A9C]/10 transition-colors text-sm font-medium flex items-center gap-2 disabled:opacity-50"
-                >
-                  <RefreshCw className={`h-4 w-4 ${carregando ? 'animate-spin' : ''}`} />
-                  Atualizar
-                </button>
-              </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {cotacoesFiltradas.length > 0 ? (
+          <button type="button" onClick={toggleSelecionarTodasVisiveis} className={btnSecondary}>
+            <CheckCircle className="h-4 w-4" />
+            {todasVisiveisSelecionadas ? 'Desmarcar visiveis' : 'Selecionar visiveis'}
+          </button>
+        ) : null}
+
+        {cotacoesSelecionadas.size > 0 ? (
+          <>
+            <button type="button" onClick={() => abrirModalLote('aprovar')} className={btnSuccess}>
+              <CheckCircle className="h-4 w-4" />
+              Aprovar lote
+            </button>
+            <button type="button" onClick={() => abrirModalLote('reprovar')} className={btnDanger}>
+              <XCircle className="h-4 w-4" />
+              Reprovar lote
+            </button>
+            <button type="button" onClick={limparSelecao} className={btnSecondary}>
+              Limpar selecao
+            </button>
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4 pt-1 sm:pt-2">
+      <SectionCard className="space-y-4 p-4 sm:p-5">
+        <PageHeader
+          title="Minhas Aprovações"
+          description={
+            carregando
+              ? 'Carregando cotacoes pendentes de aprovacao...'
+              : `Acompanhe e decida cotações aguardando sua aprovacao (${cotacoesFiltradas.length} na lista).`
+          }
+          actions={
+            <button
+              type="button"
+              onClick={() => void carregarAprovacoes()}
+              disabled={carregando}
+              className={btnSecondary}
+            >
+              <RefreshCw className={`h-4 w-4 ${carregando ? 'animate-spin' : ''}`} />
+              Atualizar
+            </button>
+          }
+        />
+
+        {!carregando && !erro ? (
+          <InlineStats
+            stats={[
+              { label: 'Pendentes', value: String(cotacoes.length), tone: 'warning' },
+              { label: 'Filtradas', value: String(cotacoesFiltradas.length), tone: 'neutral' },
+              { label: 'Selecionadas', value: String(cotacoesSelecionadas.size), tone: 'accent' },
+              { label: 'Urgentes', value: String(totalUrgentes), tone: 'warning' },
+              { label: 'Prazo hoje/atrasado', value: String(totalComPrazoHojeOuAtrasado), tone: 'warning' },
+              { label: 'Valor total', value: moneyFmt.format(totalValorPendente), tone: 'accent' },
+            ]}
+          />
+        ) : null}
+      </SectionCard>
+
+      <FiltersBar className="p-4">
+        <div className="flex w-full flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
+          <div className="w-full sm:min-w-[280px] sm:flex-1">
+            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Buscar</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
+              <input
+                type="text"
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Numero, titulo, fornecedor ou solicitante..."
+                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+              />
             </div>
           </div>
 
-          {/* KPI Card */}
-          <div className="mb-8">
-            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                    Aprovações Pendentes
-                  </p>
-                  <p className="mt-2 text-3xl font-bold text-[#002333]">{cotacoes.length}</p>
-                  <p className="mt-3 text-sm text-[#002333]/70">
-                    {cotacoes.length === 0
-                      ? 'Nenhuma cotação aguardando aprovação'
-                      : cotacoes.length === 1
-                        ? '1 cotação aguardando sua decisão'
-                        : `${cotacoes.length} cotações aguardando sua decisão`}
-                  </p>
-                </div>
-                <div className="h-12 w-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center shadow-sm">
-                  <Clock className="h-6 w-6 text-yellow-600" />
-                </div>
-              </div>
-            </div>
+          <div className="w-full sm:w-auto">
+            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Prioridade</label>
+            <select
+              value={filtroPrioridade}
+              onChange={(e) => setFiltroPrioridade(e.target.value as FiltroPrioridade)}
+              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[180px]"
+            >
+              <option value="todas">Todas</option>
+              <option value="urgente">Urgente</option>
+              <option value="alta">Alta</option>
+              <option value="media">Media</option>
+              <option value="baixa">Baixa</option>
+            </select>
           </div>
 
-          {/* Loading State */}
-          {carregando && (
-            <div className="flex flex-col items-center justify-center py-16">
-              <RefreshCw className="h-12 w-12 text-[#159A9C] animate-spin mb-4" />
-              <p className="text-gray-600">Carregando aprovações...</p>
-            </div>
-          )}
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            <button
+              type="button"
+              onClick={limparFiltros}
+              className={btnSecondary}
+              disabled={!hasFilters}
+            >
+              <Filter className="h-4 w-4" />
+              Limpar filtros
+            </button>
+          </div>
+        </div>
+      </FiltersBar>
 
-          {/* Empty State */}
-          {!carregando && cotacoes.length === 0 && (
-            <div className="bg-white rounded-lg shadow-sm border p-12 text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-4">
-                <CheckCircle className="h-8 w-8 text-green-600" />
-              </div>
-              <h3 className="text-xl font-semibold text-[#002333] mb-2">
-                Nenhuma aprovação pendente
-              </h3>
-              <p className="text-gray-600 mb-6">
-                Você não possui cotações aguardando sua aprovação no momento.
-              </p>
-              <button
-                onClick={() => navigate('/comercial/cotacoes')}
-                className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors text-sm font-medium"
-              >
-                Ver Todas as Cotações
-              </button>
-            </div>
-          )}
+      {carregando ? <LoadingSkeleton lines={8} /> : null}
 
-          {/* Lista de Cotações */}
-          {!carregando && cotacoes.length > 0 && (
-            <>
-              {/* Header da Lista com Checkbox Selecionar Todas */}
-              {cotacoes.length > 1 && (
-                <div className="bg-white rounded-lg shadow-sm border p-4 mb-4">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={cotacoesSelecionadas.size === cotacoes.length}
-                      onChange={toggleSelecionarTodas}
-                      className="h-5 w-5 text-[#159A9C] border-gray-300 rounded focus:ring-[#159A9C]"
-                    />
-                    <span className="text-sm font-medium text-[#002333]">
-                      {cotacoesSelecionadas.size === cotacoes.length
-                        ? 'Desmarcar todas'
-                        : 'Selecionar todas'}
-                    </span>
-                  </label>
-                </div>
-              )}
+      {!carregando && erro ? (
+        <EmptyState
+          icon={<AlertCircle className="h-5 w-5" />}
+          title="Erro ao carregar aprovacoes"
+          description={erro}
+          action={
+            <button type="button" onClick={() => void carregarAprovacoes()} className={btnPrimary}>
+              <RefreshCw className="h-4 w-4" />
+              Tentar novamente
+            </button>
+          }
+        />
+      ) : null}
 
-              <div className="grid grid-cols-1 gap-6">
-                {cotacoes.map((cotacao) => (
-                  <div
+      {!carregando && !erro && cotacoes.length === 0 ? (
+        <EmptyState
+          icon={<CheckCircle className="h-5 w-5" />}
+          title="Nenhuma aprovacao pendente"
+          description="Voce nao possui cotacoes aguardando sua aprovacao no momento."
+          action={
+            <button type="button" onClick={() => navigate('/vendas/cotacoes')} className={btnPrimary}>
+              <FileText className="h-4 w-4" />
+              Ver todas as cotacoes
+            </button>
+          }
+        />
+      ) : null}
+
+      {!carregando && !erro && cotacoes.length > 0 && cotacoesFiltradas.length === 0 ? (
+        <EmptyState
+          icon={<Filter className="h-5 w-5" />}
+          title="Nenhuma cotacao encontrada"
+          description="Ajuste ou limpe os filtros para visualizar as aprovacoes pendentes."
+          action={
+            <button type="button" onClick={limparFiltros} className={btnSecondary}>
+              <Filter className="h-4 w-4" />
+              Limpar filtros
+            </button>
+          }
+        />
+      ) : null}
+
+      {!carregando && !erro && cotacoesFiltradas.length > 0 ? (
+        <DataTableCard>
+          {renderListToolbar()}
+
+          <div className="p-4 lg:hidden">
+            <div className="grid grid-cols-1 gap-3">
+              {cotacoesFiltradas.map((cotacao) => {
+                const prazoInfo = getPrazoInfo(cotacao.prazoResposta);
+                const itensCount = Array.isArray(cotacao.itens) ? cotacao.itens.length : 0;
+
+                return (
+                  <article
                     key={cotacao.id}
-                    className={`bg-white rounded-lg shadow-sm border hover:shadow-lg transition-all ${
-                      cotacoesSelecionadas.has(cotacao.id) ? 'ring-2 ring-[#159A9C]' : ''
+                    className={`rounded-xl border bg-white p-4 shadow-[0_10px_22px_-20px_rgba(15,57,74,0.4)] ${
+                      cotacoesSelecionadas.has(cotacao.id)
+                        ? 'border-[#159A9C] ring-1 ring-[#159A9C]/20'
+                        : 'border-[#DFE9ED]'
                     }`}
                   >
-                    <div className="p-6">
-                      {/* Header do Card com Checkbox */}
-                      <div className="flex items-start gap-4 mb-4">
-                        <input
-                          type="checkbox"
-                          checked={cotacoesSelecionadas.has(cotacao.id)}
-                          onChange={() => toggleSelecionarCotacao(cotacao.id)}
-                          className="mt-1 h-5 w-5 text-[#159A9C] border-gray-300 rounded focus:ring-[#159A9C] cursor-pointer"
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-lg font-bold text-[#002333]">{cotacao.titulo}</h3>
-                            <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPrioridadeColor(
-                                cotacao.prioridade,
-                              )}`}
-                            >
-                              {getPrioridadeLabel(cotacao.prioridade)}
-                            </span>
-                          </div>
-                          <p className="text-sm text-gray-600">Cotação #{cotacao.numero}</p>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={cotacoesSelecionadas.has(cotacao.id)}
+                            onChange={() => toggleSelecionarCotacao(cotacao.id)}
+                            className="h-4 w-4 rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
+                            aria-label={`Selecionar cotacao ${cotacao.numero}`}
+                          />
+                          <span className="text-sm font-semibold text-[#173A4D]">#{cotacao.numero}</span>
+                          {getPrioridadeBadge(cotacao.prioridade)}
                         </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => abrirModalAprovacao(cotacao)}
-                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium flex items-center gap-2"
-                          >
-                            <CheckCircle className="h-4 w-4" />
-                            Aprovar
-                          </button>
-                          <button
-                            onClick={() => abrirModalAprovacao(cotacao)}
-                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium flex items-center gap-2"
-                          >
-                            <XCircle className="h-4 w-4" />
-                            Rejeitar
-                          </button>
-                        </div>
+                        <p className="mt-1 truncate text-sm font-medium text-[#173A4D]">
+                          {cotacao.titulo || 'Sem titulo'}
+                        </p>
+                        <p className="mt-1 truncate text-xs text-[#64808E]">
+                          {cotacao.fornecedor?.nome || 'Fornecedor nao informado'}
+                        </p>
                       </div>
-
-                      {/* Grid de Informações */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                        <div className="flex items-start gap-3">
-                          <div className="p-2 rounded-lg bg-gray-50">
-                            <User className="h-4 w-4 text-gray-600" />
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500 font-medium">Fornecedor</p>
-                            <p className="text-sm text-[#002333] font-semibold">
-                              {cotacao.fornecedor?.nome || 'N/A'}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-start gap-3">
-                          <div className="p-2 rounded-lg bg-gray-50">
-                            <DollarSign className="h-4 w-4 text-gray-600" />
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500 font-medium">Valor Total</p>
-                            <p className="text-sm text-[#002333] font-semibold">
-                              R${' '}
-                              {cotacao.valorTotal?.toLocaleString('pt-BR', {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              }) || '0,00'}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-start gap-3">
-                          <div className="p-2 rounded-lg bg-gray-50">
-                            <Calendar className="h-4 w-4 text-gray-600" />
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500 font-medium">Prazo Resposta</p>
-                            <p className="text-sm text-[#002333] font-semibold">
-                              {formatarData(cotacao.prazoResposta)}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-start gap-3">
-                          <div className="p-2 rounded-lg bg-gray-50">
-                            <User className="h-4 w-4 text-gray-600" />
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500 font-medium">Solicitante</p>
-                            <p className="text-sm text-[#002333] font-semibold">
-                              {cotacao.responsavel?.nome || 'N/A'}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Descrição */}
-                      {cotacao.descricao && (
-                        <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                          <p className="text-xs text-gray-500 font-medium mb-1">Descrição</p>
-                          <p className="text-sm text-[#002333]">{cotacao.descricao}</p>
-                        </div>
-                      )}
-
-                      {/* Itens */}
-                      {cotacao.itens && cotacao.itens.length > 0 && (
-                        <div className="mt-4">
-                          <p className="text-xs text-gray-500 font-medium mb-2">
-                            Itens ({cotacao.itens.length})
-                          </p>
-                          <div className="space-y-2">
-                            {cotacao.itens.slice(0, 3).map((item, index) => (
-                              <div
-                                key={index}
-                                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg text-sm"
-                              >
-                                <span className="text-[#002333] font-medium">{item.descricao}</span>
-                                <div className="flex items-center gap-4 text-gray-600">
-                                  <span>
-                                    {item.quantidade} {item.unidade}
-                                  </span>
-                                  <span className="font-semibold text-[#002333]">
-                                    R${' '}
-                                    {item.valorUnitario?.toLocaleString('pt-BR', {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    })}
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                            {cotacao.itens.length > 3 && (
-                              <p className="text-xs text-gray-500 text-center py-2">
-                                + {cotacao.itens.length - 3} itens adicionais
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => abrirModalAprovacao(cotacao)}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#D4E2E7] text-[#244455] hover:bg-[#F6FAFB]"
+                        title={`Analisar cotacao ${cotacao.numero}`}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
 
-      {/* Modal de Aprovação/Reprovação */}
-      {modalAberto && cotacaoSelecionada && (
+                    <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+                      <div className="rounded-lg border border-[#EDF3F5] bg-[#FAFCFD] px-3 py-2">
+                        <div className="flex items-center gap-2 text-[#5F7B89]">
+                          <DollarSign className="h-4 w-4" />
+                          <span className="text-xs uppercase tracking-wide">Valor</span>
+                        </div>
+                        <p className="mt-1 font-semibold text-[#173A4D]">
+                          {moneyFmt.format(cotacao.valorTotal || 0)}
+                        </p>
+                      </div>
+
+                      <div className="rounded-lg border border-[#EDF3F5] bg-[#FAFCFD] px-3 py-2">
+                        <div className="flex items-center gap-2 text-[#5F7B89]">
+                          <Calendar className="h-4 w-4" />
+                          <span className="text-xs uppercase tracking-wide">Prazo</span>
+                        </div>
+                        <p
+                          className={`mt-1 font-medium ${
+                            prazoInfo.overdue ? 'text-[#B4233A]' : 'text-[#173A4D]'
+                          }`}
+                        >
+                          {prazoInfo.label}
+                        </p>
+                        {prazoInfo.statusLabel ? (
+                          <p className={`text-xs ${prazoInfo.overdue ? 'text-[#B4233A]' : 'text-[#A86400]'}`}>
+                            {prazoInfo.statusLabel}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <div className="rounded-lg border border-[#EDF3F5] bg-[#FAFCFD] px-3 py-2">
+                        <div className="flex items-center gap-2 text-[#5F7B89]">
+                          <User className="h-4 w-4" />
+                          <span className="text-xs uppercase tracking-wide">Solicitante</span>
+                        </div>
+                        <p className="mt-1 truncate font-medium text-[#173A4D]">
+                          {cotacao.responsavel?.nome || 'Nao informado'}
+                        </p>
+                      </div>
+
+                      <div className="rounded-lg border border-[#EDF3F5] bg-[#FAFCFD] px-3 py-2">
+                        <div className="flex items-center gap-2 text-[#5F7B89]">
+                          <FileText className="h-4 w-4" />
+                          <span className="text-xs uppercase tracking-wide">Itens</span>
+                        </div>
+                        <p className="mt-1 font-medium text-[#173A4D]">
+                          {itensCount} item{itensCount === 1 ? '' : 's'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {cotacao.descricao ? (
+                      <p className="mt-3 line-clamp-2 text-sm text-[#5A7684]">{cotacao.descricao}</p>
+                    ) : null}
+
+                    <div className="mt-3 flex justify-end border-t border-[#EDF3F5] pt-3">
+                      {renderRowActions(cotacao)}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="hidden lg:block">
+            <div className="max-h-[70vh] overflow-auto">
+              <table className="w-full min-w-[1040px] border-collapse">
+                <thead className="sticky top-0 z-10 bg-white shadow-[0_1px_0_0_#E1EAEE]">
+                  <tr>
+                    <th className="px-4 py-3 text-left">
+                      <input
+                        ref={selectAllRef}
+                        type="checkbox"
+                        checked={todasVisiveisSelecionadas}
+                        onChange={toggleSelecionarTodasVisiveis}
+                        className="h-4 w-4 rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
+                        aria-label="Selecionar todas as cotacoes visiveis"
+                      />
+                    </th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
+                      Cotacao
+                    </th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
+                      Fornecedor
+                    </th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
+                      Solicitante
+                    </th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
+                      Prioridade
+                    </th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
+                      Prazo resposta
+                    </th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
+                      Valor total
+                    </th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
+                      Itens
+                    </th>
+                    <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
+                      Acoes
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody className="bg-white">
+                  {cotacoesFiltradas.map((cotacao) => {
+                    const prazoInfo = getPrazoInfo(cotacao.prazoResposta);
+                    const itensCount = Array.isArray(cotacao.itens) ? cotacao.itens.length : 0;
+
+                    return (
+                      <tr key={cotacao.id} className="border-t border-[#EDF3F5] hover:bg-[#FAFCFD]">
+                        <td className="px-4 py-4 align-top">
+                          <input
+                            type="checkbox"
+                            checked={cotacoesSelecionadas.has(cotacao.id)}
+                            onChange={() => toggleSelecionarCotacao(cotacao.id)}
+                            className="h-4 w-4 rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
+                            aria-label={`Selecionar cotacao ${cotacao.numero}`}
+                          />
+                        </td>
+
+                        <td className="px-5 py-4 align-top">
+                          <div className="text-sm font-semibold text-[#173A4D]">#{cotacao.numero}</div>
+                          <div className="mt-0.5 max-w-[250px] truncate text-sm text-[#64808E]">
+                            {cotacao.titulo || 'Sem titulo'}
+                          </div>
+                        </td>
+
+                        <td className="px-5 py-4 align-top">
+                          <div className="text-sm font-medium text-[#173A4D]">
+                            {cotacao.fornecedor?.nome || 'Fornecedor nao informado'}
+                          </div>
+                          {cotacao.fornecedor?.email ? (
+                            <div className="mt-0.5 max-w-[220px] truncate text-xs text-[#64808E]">
+                              {cotacao.fornecedor.email}
+                            </div>
+                          ) : null}
+                        </td>
+
+                        <td className="px-5 py-4 align-top">
+                          <div className="text-sm font-medium text-[#173A4D]">
+                            {cotacao.responsavel?.nome || 'Nao informado'}
+                          </div>
+                          {cotacao.responsavel?.email ? (
+                            <div className="mt-0.5 max-w-[220px] truncate text-xs text-[#64808E]">
+                              {cotacao.responsavel.email}
+                            </div>
+                          ) : null}
+                        </td>
+
+                        <td className="px-5 py-4 align-top">{getPrioridadeBadge(cotacao.prioridade)}</td>
+
+                        <td className="px-5 py-4 align-top">
+                          <div
+                            className={`text-sm ${
+                              prazoInfo.overdue ? 'font-semibold text-[#B4233A]' : 'text-[#173A4D]'
+                            }`}
+                          >
+                            {prazoInfo.label}
+                          </div>
+                          {prazoInfo.statusLabel ? (
+                            <div className={`text-xs ${prazoInfo.overdue ? 'text-[#B4233A]' : 'text-[#A86400]'}`}>
+                              {prazoInfo.statusLabel}
+                            </div>
+                          ) : null}
+                        </td>
+
+                        <td className="px-5 py-4 align-top text-sm font-semibold text-[#173A4D]">
+                          {moneyFmt.format(cotacao.valorTotal || 0)}
+                        </td>
+
+                        <td className="px-5 py-4 align-top text-sm text-[#476776]">
+                          {itensCount} item{itensCount === 1 ? '' : 's'}
+                        </td>
+
+                        <td className="px-5 py-4 align-top">
+                          <div className="flex justify-end">{renderRowActions(cotacao)}</div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </DataTableCard>
+      ) : null}
+
+      {modalAberto && cotacaoSelecionada ? (
         <ModalAprovarCotacao
           cotacao={cotacaoSelecionada}
           onClose={() => {
@@ -482,17 +777,16 @@ function MinhasAprovacoesPage() {
           onAprovar={handleAprovar}
           onReprovar={handleReprovar}
         />
-      )}
+      ) : null}
 
-      {/* Modal de Ação em Lote */}
-      {modalLoteAberto && (
+      {modalLoteAberto ? (
         <ModalAcaoLote
           tipo={tipoAcaoLote}
           quantidadeCotacoes={cotacoesSelecionadas.size}
           onClose={() => setModalLoteAberto(false)}
           onConfirmar={handleAcaoLote}
         />
-      )}
+      ) : null}
     </div>
   );
 }

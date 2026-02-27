@@ -136,7 +136,10 @@ async function bootstrap() {
     }
 
     // Disponibilizar diretório de uploads estáticos
-    const uploadsPath = path.join(__dirname, '..', '..', 'uploads');
+    // Usar `process.cwd()` para evitar depender do layout exato do build (dist/main.js vs dist/src/main.js).
+    const uploadsPath = process.env.UPLOADS_PATH?.trim()
+      ? path.resolve(process.env.UPLOADS_PATH.trim())
+      : path.resolve(process.cwd(), 'uploads');
     if (!fs.existsSync(uploadsPath)) {
       fs.mkdirSync(uploadsPath, { recursive: true });
       console.log('📁 [Uploads] Diretório criado:', uploadsPath);

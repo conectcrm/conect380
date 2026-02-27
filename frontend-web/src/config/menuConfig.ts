@@ -769,7 +769,7 @@ export const menuConfig: MenuConfig[] = [
         icon: Calculator,
         href: '/vendas/cotacoes',
         color: 'blue',
-        permissions: ['comercial.propostas.create'],
+        permissions: ['comercial.propostas.read'],
         requiredModule: 'VENDAS',
         group: 'Vendas',
       },
@@ -1116,13 +1116,7 @@ const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
   { pattern: '/nuclei/atendimento/skills', permissions: ['atendimento.filas.manage'] },
   {
     pattern: '/vendas/cotacoes',
-    permissions: [
-      'comercial.propostas.read',
-      'comercial.propostas.create',
-      'crm.clientes.read',
-      'crm.produtos.read',
-    ],
-    match: 'all',
+    permissions: ['comercial.propostas.read', 'financeiro.pagamentos.manage'],
   },
   {
     pattern: '/combos/novo',

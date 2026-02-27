@@ -52,7 +52,7 @@ interface ValidationError {
   message: string;
 }
 
-type TabType = 'detalhes' | 'atividades' | 'historico';
+type TabType = 'detalhes' | 'atividades';
 
 // ========================================
 // CONSTANTES E CONFIGURAÇÕES
@@ -454,6 +454,24 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
     onClose();
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') void handleClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, handleClose]);
+
   // ========================================
   // HELPERS
   // ========================================
@@ -502,8 +520,17 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-xl w-[calc(100%-2rem)] sm:w-[700px] md:w-[900px] lg:w-[1000px] xl:w-[1100px] max-w-[1200px] max-h-[90vh] overflow-hidden shadow-2xl modal-content flex flex-col">
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-oportunidade-title"
+      onClick={() => void handleClose()}
+    >
+      <div
+        className="bg-white rounded-xl w-[calc(100%-2rem)] sm:w-[700px] md:w-[900px] lg:w-[1000px] xl:w-[1100px] max-w-[1200px] max-h-[90vh] overflow-hidden shadow-2xl modal-content flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* ==================== HEADER ==================== */}
         <div className="sticky top-0 bg-white border-b border-[#DEEFE7] px-6 py-4 flex items-center justify-between z-10">
           <div className="flex items-center gap-4">
@@ -511,7 +538,7 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
               <FileText className="h-6 w-6 text-[#159A9C]" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-[#002333]">
+              <h2 id="modal-oportunidade-title" className="text-2xl font-bold text-[#002333]">
                 {oportunidade ? 'Editar Oportunidade' : 'Nova Oportunidade'}
               </h2>
               <p className="text-sm text-[#002333]/60 mt-0.5">
@@ -539,8 +566,10 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
             <button
               onClick={handleClose}
               disabled={loading}
+              type="button"
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
               title="Fechar"
+              aria-label="Fechar"
             >
               <X className="h-5 w-5 text-[#002333]" />
             </button>

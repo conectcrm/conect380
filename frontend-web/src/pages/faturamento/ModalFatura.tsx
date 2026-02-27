@@ -203,7 +203,10 @@ export default function ModalFatura({
 
   const adicionarItem = () => {
     if (!novoItem.descricao || novoItem.quantidade <= 0 || novoItem.valorUnitario <= 0) {
-      alert('Preencha todos os campos obrigatórios do item');
+      setErros((prev) => ({
+        ...prev,
+        itens: 'Preencha descrição, quantidade e valor unitário válidos para o item.',
+      }));
       return;
     }
 
@@ -212,6 +215,7 @@ export default function ModalFatura({
       ...prev,
       itens: [...prev.itens, item],
     }));
+    setErros((prev) => ({ ...prev, itens: undefined }));
 
     setNovoItem({
       descricao: '',

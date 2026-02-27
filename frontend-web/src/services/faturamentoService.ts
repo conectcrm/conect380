@@ -380,8 +380,10 @@ export const faturamentoService = {
 
   async gerarLinkPagamento(id: number): Promise<string> {
     try {
-      const response = await api.post(`/faturamento/faturas/${id}/link-pagamento`);
-      return response.data.data?.linkPagamento || response.data.linkPagamento;
+      void id;
+      throw new Error(
+        'Link de pagamento ainda nao esta disponivel na API de faturamento desta versao',
+      );
     } catch (error) {
       console.error('Erro ao gerar link de pagamento:', error);
       throw error;
@@ -390,10 +392,10 @@ export const faturamentoService = {
 
   async baixarPDF(id: number): Promise<Blob> {
     try {
-      const response = await api.get(`/faturamento/faturas/${id}/pdf`, {
-        responseType: 'blob',
-      });
-      return response.data;
+      void id;
+      throw new Error(
+        'Download de PDF de fatura ainda nao esta disponivel na API de faturamento desta versao',
+      );
     } catch (error) {
       console.error('Erro ao baixar PDF da fatura:', error);
       throw error;
@@ -462,9 +464,34 @@ export const faturamentoService = {
 
   async obterEstatisticas(periodo?: { inicio: string; fim: string }) {
     try {
-      const params = periodo ? `?inicio=${periodo.inicio}&fim=${periodo.fim}` : '';
-      const response = await api.get(`/faturamento/relatorios/estatisticas${params}`);
-      return response.data.data || response.data;
+      const res = await this.listarFaturasPaginadas({
+        dataInicial: periodo?.inicio,
+        dataFinal: periodo?.fim,
+        page: 1,
+        pageSize: 1000,
+      });
+
+      const faturas = res.data || [];
+      const totalFaturas = res.total ?? faturas.length;
+      const valorTotal = Number(res.aggregates?.valorTotal ?? 0);
+      const valorRecebido = Number(res.aggregates?.valorRecebido ?? 0);
+      const valorEmAberto = Number(res.aggregates?.valorEmAberto ?? 0);
+
+      return {
+        totalFaturas,
+        valorTotal,
+        valorRecebido,
+        valorEmAberto,
+        faturasPagas: faturas.filter((f) => f.status === StatusFatura.PAGA).length,
+        faturasPendentes: faturas.filter((f) =>
+          [
+            StatusFatura.PENDENTE,
+            StatusFatura.ENVIADA,
+            StatusFatura.PARCIALMENTE_PAGA,
+          ].includes(f.status),
+        ).length,
+        faturasVencidas: faturas.filter((f) => f.status === StatusFatura.VENCIDA).length,
+      };
     } catch (error) {
       console.error('Erro ao obter estatísticas:', error);
       throw error;
@@ -473,8 +500,11 @@ export const faturamentoService = {
 
   async obterFaturasVencidas(): Promise<Fatura[]> {
     try {
-      const response = await api.get('/faturamento/relatorios/vencidas');
-      return response.data.data || response.data;
+      return await this.listarFaturas({
+        status: StatusFatura.VENCIDA,
+        page: 1,
+        pageSize: 200,
+      });
     } catch (error) {
       console.error('Erro ao obter faturas vencidas:', error);
       throw error;

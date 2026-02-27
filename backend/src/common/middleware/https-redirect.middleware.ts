@@ -30,6 +30,8 @@ export class HttpsRedirectMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction) {
     const isProduction = process.env.NODE_ENV === 'production';
     const forceHttps = process.env.FORCE_HTTPS === 'true';
+    const sslEnabled = process.env.SSL_ENABLED === 'true';
+    const enableRedirect = forceHttps || sslEnabled || process.env.ENABLE_HTTPS_REDIRECT === 'true';
     const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https';
 
     // Se já for HTTPS, continuar
@@ -38,6 +40,10 @@ export class HttpsRedirectMiddleware implements NestMiddleware {
     }
 
     // Se for desenvolvimento e não forçar HTTPS, permitir HTTP
+    if (!enableRedirect) {
+      return next();
+    }
+
     if (!isProduction && !forceHttps) {
       return next();
     }

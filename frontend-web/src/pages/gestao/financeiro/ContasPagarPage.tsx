@@ -1,176 +1,170 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import toast from 'react-hot-toast';
 import {
-  Plus,
-  Search,
-  Filter,
-  Download,
-  Calendar,
-  CreditCard,
   AlertTriangle,
+  Calendar,
+  Check,
   CheckCircle,
-  Clock,
-  Eye,
-  Edit,
-  Trash2,
-  MoreHorizontal,
+  CreditCard,
   DollarSign,
-  Building,
+  Edit,
+  Filter,
+  RefreshCw,
+  Search,
+  Trash2,
   X,
-  Save,
-  Upload,
 } from 'lucide-react';
-import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
+import {
+  DataTableCard,
+  EmptyState,
+  FiltersBar,
+  InlineStats,
+  LoadingSkeleton,
+  PageHeader,
+  SectionCard,
+} from '../../../components/layout-v2';
 import ModalConfirmacao from '../../../components/common/ModalConfirmacao';
-import {
-  useConfirmacaoInteligente,
-  useValidacaoFinanceira,
-} from '../../../hooks/useConfirmacaoInteligente';
-import {
-  ContaPagar,
-  StatusContaPagar,
-  FiltrosContasPagar,
-  ResumoFinanceiro,
-  NovaContaPagar,
-  RegistrarPagamento,
-  STATUS_LABELS,
-  CATEGORIA_LABELS,
-  FORMA_PAGAMENTO_LABELS,
-  CategoriaContaPagar,
-  FormaPagamento,
-  PrioridadePagamento,
-} from '../../../types/financeiro';
-
-// Importar os novos componentes aprimorados
+import { useConfirmacaoInteligente } from '../../../hooks/useConfirmacaoInteligente';
 import ModalContaPagar from '../../../features/financeiro/components/ModalContaPagarNovo';
+import contasPagarService from '../../../services/contasPagarService';
+import fornecedorService from '../../../services/fornecedorService';
+import {
+  CategoriaContaPagar,
+  CATEGORIA_LABELS,
+  ContaPagar,
+  FormaPagamento,
+  NovaContaPagar,
+  PrioridadePagamento,
+  PRIORIDADE_LABELS,
+  RegistrarPagamento,
+  ResumoFinanceiro,
+  StatusContaPagar,
+  STATUS_LABELS,
+} from '../../../types/financeiro';
 
 interface ContasPagarPageProps {
   className?: string;
 }
 
+type FiltroStatusUI = 'todos' | StatusContaPagar;
+type FiltroCategoriaUI = 'todas' | CategoriaContaPagar;
+
+const btnPrimary =
+  'inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition hover:bg-[#117C7E] disabled:opacity-60 disabled:cursor-not-allowed';
+const btnSecondary =
+  'inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB] disabled:opacity-60 disabled:cursor-not-allowed';
+const btnDanger =
+  'inline-flex h-9 items-center gap-2 rounded-lg bg-[#C03449] px-3 text-sm font-medium text-white transition hover:bg-[#A32A3D] disabled:opacity-60 disabled:cursor-not-allowed';
+const btnSuccess =
+  'inline-flex h-9 items-center gap-2 rounded-lg bg-[#14804A] px-3 text-sm font-medium text-white transition hover:bg-[#0E6B3E] disabled:opacity-60 disabled:cursor-not-allowed';
+
+const moneyFmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
+const formatDate = (value?: string) => {
+  if (!value) return 'N/A';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'N/A';
+  return date.toLocaleDateString('pt-BR');
+};
+
+const sameDay = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() &&
+  a.getMonth() === b.getMonth() &&
+  a.getDate() === b.getDate();
+
+const getStatusBadge = (status: StatusContaPagar) => {
+  const tone =
+    status === StatusContaPagar.PAGO
+      ? 'border-[#BEE6CF] bg-[#F1FBF5] text-[#137A42]'
+      : status === StatusContaPagar.VENCIDO
+        ? 'border-[#F4C7CF] bg-[#FFF4F6] text-[#B4233A]'
+        : status === StatusContaPagar.AGENDADO
+          ? 'border-[#CFE3FA] bg-[#F2F8FF] text-[#1E66B4]'
+          : status === StatusContaPagar.CANCELADO
+            ? 'border-[#DCE8EC] bg-[#F8FBFC] text-[#476776]'
+            : 'border-[#F9D9AA] bg-[#FFF7EA] text-[#A86400]';
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${tone}`}
+    >
+      {STATUS_LABELS[status]}
+    </span>
+  );
+};
+
+const getPrioridadeBadge = (prioridade: PrioridadePagamento) => {
+  const tone =
+    prioridade === PrioridadePagamento.URGENTE
+      ? 'border-[#F4C7CF] bg-[#FFF4F6] text-[#B4233A]'
+      : prioridade === PrioridadePagamento.ALTA
+        ? 'border-[#F9D9AA] bg-[#FFF7EA] text-[#A86400]'
+        : prioridade === PrioridadePagamento.MEDIA
+          ? 'border-[#CFE3FA] bg-[#F2F8FF] text-[#1E66B4]'
+          : 'border-[#DCE8EC] bg-[#F8FBFC] text-[#476776]';
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${tone}`}
+    >
+      {PRIORIDADE_LABELS[prioridade] || prioridade}
+    </span>
+  );
+};
 const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
-  // Estados principais
+  const confirmacao = useConfirmacaoInteligente();
+  const selectAllRef = useRef<HTMLInputElement | null>(null);
+
   const [contas, setContas] = useState<ContaPagar[]>([]);
   const [contaSelecionada, setContaSelecionada] = useState<ContaPagar | null>(null);
+  const [fornecedoresCadastro, setFornecedoresCadastro] = useState<
+    Array<{ id: string; nome: string; cnpjCpf?: string }>
+  >([]);
+  const [loadingFornecedoresCadastro, setLoadingFornecedoresCadastro] = useState(false);
+  const [erroFornecedoresCadastro, setErroFornecedoresCadastro] = useState<string | null>(null);
   const [resumoFinanceiro, setResumoFinanceiro] = useState<ResumoFinanceiro | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Estados dos modais
   const [modalContaAberto, setModalContaAberto] = useState(false);
   const [modalPagamentoAberto, setModalPagamentoAberto] = useState(false);
-  const [mostrarFiltros, setMostrarFiltros] = useState(false);
+  const [comprovantePagamentoArquivo, setComprovantePagamentoArquivo] = useState<File | null>(null);
 
-  // Estados de filtros e busca
-  const [filtros, setFiltros] = useState<FiltrosContasPagar>({});
+  const [filtros] = useState<Record<string, never>>({});
   const [termoBusca, setTermoBusca] = useState('');
-  const [contasSelecionadas, setContasSelecionadas] = useState<string[]>([]);
+  const [filtroStatus, setFiltroStatus] = useState<FiltroStatusUI>('todos');
+  const [filtroCategoria, setFiltroCategoria] = useState<FiltroCategoriaUI>('todas');
+  const [contasSelecionadas, setContasSelecionadas] = useState<Set<string>>(new Set());
 
-  // Hooks para confirmação inteligente
-  const confirmacao = useConfirmacaoInteligente();
-  const validacao = useValidacaoFinanceira();
-
-  // Carregamento inicial dos dados
   useEffect(() => {
-    carregarDados();
+    void carregarDados();
   }, [filtros]);
+
+  useEffect(() => {
+    void carregarFornecedores();
+  }, []);
+
+  useEffect(() => {
+    setContasSelecionadas((prev) => {
+      const ids = new Set(contas.map((c) => c.id));
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        if (ids.has(id)) next.add(id);
+      });
+      return next.size === prev.size ? prev : next;
+    });
+  }, [contas]);
 
   const carregarDados = async () => {
     try {
       setLoading(true);
       setError(null);
-
-      // Mock data para demonstração
-      const mockContas: ContaPagar[] = [
-        {
-          id: '1',
-          numero: 'CP-001',
-          fornecedorId: 'forn1',
-          fornecedor: {
-            id: 'forn1',
-            nome: 'Tech Solutions Ltda',
-            cnpjCpf: '12.345.678/0001-90',
-            email: 'contato@techsolutions.com',
-            ativo: true,
-            criadoEm: '2024-01-01',
-            atualizadoEm: '2024-01-01',
-          },
-          descricao: 'Licenças de software mensal',
-          numeroDocumento: 'NF-001234',
-          dataEmissao: '2024-01-01',
-          dataVencimento: '2024-01-15',
-          valorOriginal: 2500.0,
-          valorDesconto: 0,
-          valorMulta: 0,
-          valorJuros: 0,
-          valorTotal: 2500.0,
-          valorPago: 0,
-          valorRestante: 2500.0,
-          status: StatusContaPagar.EM_ABERTO,
-          categoria: CategoriaContaPagar.TECNOLOGIA,
-          prioridade: PrioridadePagamento.ALTA,
-          recorrente: true,
-          frequenciaRecorrencia: 'mensal',
-          necessitaAprovacao: false,
-          anexos: [],
-          observacoes: 'Pagamento mensal das licenças',
-          criadoPor: 'user1',
-          criadoEm: '2024-01-01',
-          atualizadoEm: '2024-01-01',
-          tags: ['software', 'recorrente'],
-        },
-        {
-          id: '2',
-          numero: 'CP-002',
-          fornecedorId: 'forn2',
-          fornecedor: {
-            id: 'forn2',
-            nome: 'Papelaria Central',
-            cnpjCpf: '98.765.432/0001-10',
-            email: 'vendas@papelaria.com',
-            ativo: true,
-            criadoEm: '2024-01-01',
-            atualizadoEm: '2024-01-01',
-          },
-          descricao: 'Material de escritório',
-          numeroDocumento: 'NF-567890',
-          dataEmissao: '2024-01-10',
-          dataVencimento: '2024-01-20',
-          valorOriginal: 450.0,
-          valorDesconto: 50.0,
-          valorMulta: 0,
-          valorJuros: 0,
-          valorTotal: 400.0,
-          valorPago: 400.0,
-          valorRestante: 0,
-          status: StatusContaPagar.PAGO,
-          categoria: CategoriaContaPagar.ESCRITORIO,
-          prioridade: PrioridadePagamento.MEDIA,
-          recorrente: false,
-          necessitaAprovacao: false,
-          dataPagamento: '2024-01-18',
-          tipoPagamento: FormaPagamento.PIX,
-          anexos: [],
-          criadoPor: 'user1',
-          criadoEm: '2024-01-10',
-          atualizadoEm: '2024-01-18',
-          tags: ['material', 'escritorio'],
-        },
-      ];
-
-      const mockResumo: ResumoFinanceiro = {
-        totalVencendoHoje: 5420.3,
-        quantidadeVencendoHoje: 3,
-        totalMes: 45230.8,
-        quantidadeMes: 28,
-        totalAtrasado: 12450.0,
-        quantidadeAtrasado: 5,
-        totalPagoMes: 38920.5,
-        quantidadePagoMes: 22,
-        proximosVencimentos: mockContas.slice(0, 5),
-      };
-
-      setContas(mockContas);
-      setResumoFinanceiro(mockResumo);
+      const [lista, resumo] = await Promise.all([
+        contasPagarService.listar(),
+        contasPagarService.obterResumo(),
+      ]);
+      setContas(lista);
+      setResumoFinanceiro(resumo);
     } catch (err) {
       setError('Erro ao carregar dados das contas a pagar');
       console.error(err);
@@ -179,7 +173,29 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
     }
   };
 
-  // Funções de manipulação
+  const carregarFornecedores = async () => {
+    try {
+      setLoadingFornecedoresCadastro(true);
+      setErroFornecedoresCadastro(null);
+      const fornecedores = await fornecedorService.buscarFornecedores({ ativo: true });
+      setFornecedoresCadastro(
+        fornecedores.map((fornecedor) => ({
+          id: fornecedor.id,
+          nome: fornecedor.nome,
+          cnpjCpf: fornecedor.cnpjCpf,
+        })),
+      );
+    } catch (err) {
+      setFornecedoresCadastro([]);
+      setErroFornecedoresCadastro(
+        'Não foi possível carregar fornecedores para cadastro de contas.',
+      );
+      console.error('Erro ao carregar fornecedores para contas a pagar:', err);
+    } finally {
+      setLoadingFornecedoresCadastro(false);
+    }
+  };
+
   const handleNovaConta = () => {
     setContaSelecionada(null);
     setModalContaAberto(true);
@@ -192,602 +208,790 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
 
   const handleRegistrarPagamento = (conta: ContaPagar) => {
     setContaSelecionada(conta);
+    setComprovantePagamentoArquivo(null);
     setModalPagamentoAberto(true);
   };
 
   const handleExcluirConta = async (contaId: string) => {
-    try {
-      // Buscar a conta para validação
-      const conta = contas.find((c) => c.id === contaId);
-      if (!conta) return;
+    const conta = contas.find((c) => c.id === contaId);
+    if (!conta) return;
 
-      // Usar confirmação inteligente baseada no status da conta
-      const tipoConfirmacao =
-        conta.status === StatusContaPagar.PAGO ? 'estornar-pagamento' : 'excluir-transacao';
+    const tipoConfirmacao =
+      conta.status === StatusContaPagar.PAGO ? 'estornar-pagamento' : 'excluir-transacao';
 
-      // Obter dados contextuais
-      const dadosContexto = {
+    confirmacao.confirmar(
+      tipoConfirmacao,
+      async () => {
+        await contasPagarService.excluir(contaId);
+        toast.success('Conta excluida com sucesso');
+        await carregarDados();
+      },
+      {
         numero: conta.numero,
         valor: conta.valorTotal,
         cliente: conta.fornecedor?.nome,
         status: STATUS_LABELS[conta.status],
-      };
-
-      // Mostrar confirmação inteligente
-      confirmacao.confirmar(
-        tipoConfirmacao,
-        async () => {
-          setContas(contas.filter((c) => c.id !== contaId));
-        },
-        dadosContexto,
-      );
-    } catch (err) {
-      console.error('Erro ao excluir conta:', err);
-    }
+      },
+    );
   };
 
-  const handleAcaoMassa = async (acao: string) => {
-    if (contasSelecionadas.length === 0) {
-      alert('Selecione pelo menos uma conta');
+  const handleAcaoMassa = async (acao: 'marcar_pago' | 'excluir') => {
+    if (contasSelecionadas.size === 0) {
+      toast.error('Selecione pelo menos uma conta');
       return;
     }
-    console.log('Ação em massa:', acao, contasSelecionadas);
-  };
 
-  const handleSalvarConta = (conta: NovaContaPagar) => {
-    console.log('Salvar conta:', conta);
-    setModalContaAberto(false);
-    carregarDados();
-  };
+    if (acao === 'marcar_pago') {
+      const selecionadas = contas.filter(
+        (conta) =>
+          contasSelecionadas.has(conta.id) &&
+          conta.status !== StatusContaPagar.PAGO &&
+          conta.status !== StatusContaPagar.CANCELADO,
+      );
 
-  const handleSalvarPagamento = (pagamento: RegistrarPagamento) => {
-    console.log('Registrar pagamento:', pagamento);
-    setModalPagamentoAberto(false);
-    carregarDados();
-  };
-
-  // Filtros e busca
-  const contasFiltradas = useMemo(() => {
-    return contas.filter((conta) => {
-      if (termoBusca) {
-        const termo = termoBusca.toLowerCase();
-        return (
-          conta.numero.toLowerCase().includes(termo) ||
-          conta.fornecedor.nome.toLowerCase().includes(termo) ||
-          conta.descricao.toLowerCase().includes(termo) ||
-          conta.numeroDocumento?.toLowerCase().includes(termo)
-        );
+      if (selecionadas.length === 0) {
+        toast.error('Nenhuma conta selecionada esta apta para pagamento');
+        return;
       }
-      return true;
+
+      const resultados = await Promise.allSettled(
+        selecionadas.map((conta) =>
+          contasPagarService.registrarPagamento(conta.id, {
+            contaId: conta.id,
+            valorPago: conta.valorRestante || conta.valorTotal,
+            dataPagamento: new Date().toISOString().slice(0, 10),
+            tipoPagamento: FormaPagamento.PIX,
+          }),
+        ),
+      );
+
+      const sucesso = resultados.filter((r) => r.status === 'fulfilled').length;
+      const falhas = resultados.length - sucesso;
+
+      setContasSelecionadas(new Set());
+      await carregarDados();
+      if (falhas > 0) {
+        toast.error(`${sucesso} conta(s) pagas e ${falhas} com erro`);
+      } else {
+        toast.success(`${sucesso} conta(s) marcadas como pagas`);
+      }
+      return;
+    }
+
+    confirmacao.confirmar(
+      'excluir-categoria-financeira',
+      async () => {
+        const ids = Array.from(contasSelecionadas);
+        const resultados = await Promise.allSettled(
+          ids.map((id) => contasPagarService.excluir(id)),
+        );
+        const sucesso = resultados.filter((r) => r.status === 'fulfilled').length;
+        const falhas = resultados.length - sucesso;
+        setContasSelecionadas(new Set());
+        await carregarDados();
+        if (falhas > 0) {
+          toast.error(`${sucesso} conta(s) excluidas e ${falhas} com erro`);
+        } else {
+          toast.success('Contas excluidas com sucesso');
+        }
+      },
+      { quantidadeItens: contasSelecionadas.size },
+    );
+  };
+
+  const handleSalvarConta = async (conta: NovaContaPagar) => {
+    try {
+      if (contaSelecionada) {
+        await contasPagarService.atualizar(contaSelecionada.id, conta);
+        toast.success('Conta atualizada com sucesso');
+      } else {
+        await contasPagarService.criar(conta);
+        toast.success('Conta criada com sucesso');
+      }
+      setModalContaAberto(false);
+      await carregarDados();
+    } catch (err) {
+      console.error('Erro ao salvar conta:', err);
+      toast.error('Não foi possível salvar a conta');
+      throw err;
+    }
+  };
+
+  const handleSalvarPagamento = async (pagamento: Partial<RegistrarPagamento> = {}) => {
+    if (!contaSelecionada) return;
+
+    try {
+      await contasPagarService.registrarPagamento(contaSelecionada.id, {
+        contaId: contaSelecionada.id,
+        valorPago:
+          pagamento.valorPago || contaSelecionada.valorRestante || contaSelecionada.valorTotal,
+        dataPagamento: pagamento.dataPagamento || new Date().toISOString().slice(0, 10),
+        tipoPagamento: pagamento.tipoPagamento || FormaPagamento.PIX,
+        contaBancariaId: pagamento.contaBancariaId,
+        observacoes: pagamento.observacoes,
+        comprovante: pagamento.comprovante || comprovantePagamentoArquivo || undefined,
+      });
+      setModalPagamentoAberto(false);
+      setComprovantePagamentoArquivo(null);
+      toast.success('Pagamento registrado com sucesso');
+      await carregarDados();
+    } catch (err) {
+      console.error('Erro ao registrar pagamento:', err);
+      toast.error('Não foi possível registrar o pagamento');
+      throw err;
+    }
+  };
+
+  const contasFiltradas = useMemo(() => {
+    const termo = termoBusca.trim().toLowerCase();
+    return contas.filter((conta) => {
+      if (filtroStatus !== 'todos' && conta.status !== filtroStatus) return false;
+      if (filtroCategoria !== 'todas' && conta.categoria !== filtroCategoria) return false;
+      if (!termo) return true;
+      return (
+        conta.numero.toLowerCase().includes(termo) ||
+        conta.fornecedor.nome.toLowerCase().includes(termo) ||
+        conta.descricao.toLowerCase().includes(termo) ||
+        conta.numeroDocumento?.toLowerCase().includes(termo)
+      );
     });
-  }, [contas, termoBusca]);
+  }, [contas, termoBusca, filtroStatus, filtroCategoria]);
 
-  const formatarMoeda = (valor: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(valor);
-  };
+  const hasFilters =
+    termoBusca.trim().length > 0 || filtroStatus !== 'todos' || filtroCategoria !== 'todas';
+  const totalLista = contasFiltradas.length;
+  const totalAberto = contas.filter((c) => c.status === StatusContaPagar.EM_ABERTO).length;
+  const totalPago = contas.filter((c) => c.status === StatusContaPagar.PAGO).length;
+  const totalVencido = contas.filter((c) => c.status === StatusContaPagar.VENCIDO).length;
+  const valorLista = contasFiltradas.reduce((acc, conta) => acc + (conta.valorTotal || 0), 0);
 
-  const formatarData = (data: string) => {
-    return new Date(data).toLocaleDateString('pt-BR');
-  };
+  const selecionadasVisiveis = contasFiltradas.filter((c) => contasSelecionadas.has(c.id)).length;
+  const allVisibleSelected = totalLista > 0 && selecionadasVisiveis === totalLista;
+  const partialVisibleSelected = selecionadasVisiveis > 0 && selecionadasVisiveis < totalLista;
 
-  const getStatusIcon = (status: StatusContaPagar) => {
-    switch (status) {
-      case StatusContaPagar.PAGO:
-        return <CheckCircle className="h-4 w-4 text-green-600" />;
-      case StatusContaPagar.VENCIDO:
-        return <AlertTriangle className="h-4 w-4 text-red-600" />;
-      case StatusContaPagar.AGENDADO:
-        return <Clock className="h-4 w-4 text-blue-600" />;
-      default:
-        return <Clock className="h-4 w-4 text-orange-600" />;
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = partialVisibleSelected;
     }
+  }, [partialVisibleSelected, totalLista, allVisibleSelected]);
+
+  const toggleSelecionarConta = (id: string) => {
+    setContasSelecionadas((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
-  const getStatusColor = (status: StatusContaPagar) => {
-    switch (status) {
-      case StatusContaPagar.PAGO:
-        return 'bg-green-100 text-green-800';
-      case StatusContaPagar.VENCIDO:
-        return 'bg-red-100 text-red-800';
-      case StatusContaPagar.AGENDADO:
-        return 'bg-blue-100 text-blue-800';
-      case StatusContaPagar.CANCELADO:
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-orange-100 text-orange-800';
-    }
+  const toggleSelecionarTodasVisiveis = () => {
+    setContasSelecionadas((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        contasFiltradas.forEach((conta) => next.delete(conta.id));
+      } else {
+        contasFiltradas.forEach((conta) => next.add(conta.id));
+      }
+      return next;
+    });
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
+  const limparFiltros = () => {
+    setTermoBusca('');
+    setFiltroStatus('todos');
+    setFiltroCategoria('todas');
+  };
 
-  if (error) {
-    return (
-      <div className="text-center py-12">
-        <div className="text-red-600 text-lg mb-2">{error}</div>
-        <button onClick={carregarDados} className="text-blue-600 hover:text-blue-800 underline">
-          Tentar novamente
+  const limparSelecao = () => setContasSelecionadas(new Set());
+
+  const getPrazoFlags = (conta: ContaPagar) => {
+    const hoje = new Date();
+    const venc = new Date(conta.dataVencimento);
+    const vencida = venc.getTime() < hoje.getTime() && conta.status === StatusContaPagar.EM_ABERTO;
+    const venceHoje = sameDay(venc, hoje) && conta.status === StatusContaPagar.EM_ABERTO;
+    return { vencida, venceHoje };
+  };
+
+  const renderRowActions = (conta: ContaPagar) => (
+    <div className="flex items-center gap-1">
+      {conta.status === StatusContaPagar.EM_ABERTO ? (
+        <button
+          type="button"
+          onClick={() => handleRegistrarPagamento(conta)}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#137A42] hover:bg-[#F1FBF5]"
+          title="Registrar pagamento"
+        >
+          <CreditCard className="h-4 w-4" />
         </button>
-      </div>
-    );
-  }
+      ) : null}
+      <button
+        type="button"
+        onClick={() => handleEditarConta(conta)}
+        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#159A9C] hover:bg-[#ECF7F3]"
+        title="Editar"
+      >
+        <Edit className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        onClick={() => void handleExcluirConta(conta.id)}
+        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#B4233A] hover:bg-[#FFF2F4]"
+        title="Excluir"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus nucleusPath="/nuclei/financeiro" nucleusName="Financeiro" />
-      </div>
-
-      <div className="p-6">
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-[#002333] flex items-center">
-                <CreditCard className="h-8 w-8 mr-3 text-[#159A9C]" />
-                Contas a Pagar
-                {loading && (
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#159A9C] ml-3"></div>
-                )}
-              </h1>
-              <p className="mt-2 text-[#B4BEC9]">
-                {loading
-                  ? 'Carregando contas...'
-                  : `Gerencie suas ${contasFiltradas.length} obrigações financeiras`}
-              </p>
-            </div>
-
-            {/* Botão de ação principal */}
-            <div className="mt-4 sm:mt-0 flex items-center gap-3">
+    <div className={`space-y-4 pt-1 sm:pt-2 ${className || ''}`}>
+      <SectionCard className="space-y-4 p-4 sm:p-5">
+        <PageHeader
+          title={<span>Contas a Pagar</span>}
+          description={
+            loading
+              ? 'Carregando contas a pagar...'
+              : `Gerencie ${totalLista} obrigacoes financeiras na lista atual.`
+          }
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
               <button
-                onClick={() => setMostrarFiltros(!mostrarFiltros)}
-                className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                type="button"
+                onClick={() => void carregarDados()}
+                className={btnSecondary}
+                disabled={loading}
               >
-                <Filter className="w-4 h-4" />
-                Filtros
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                Atualizar
               </button>
               <button
-                onClick={handleNovaConta}
-                className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm text-sm font-medium"
+                type="button"
+                onClick={() => toast('Exportação ainda não implementada para contas a pagar')}
+                className={btnSecondary}
+                disabled={!contasFiltradas.length}
               >
-                <Plus className="w-4 h-4" />
+                <DollarSign className="h-4 w-4" />
+                Exportar
+              </button>
+              <button type="button" onClick={handleNovaConta} className={btnPrimary}>
+                <CreditCard className="h-4 w-4" />
                 Nova Conta
               </button>
             </div>
-          </div>
-        </div>
+          }
+        />
 
-        {/* Cards de Dashboard */}
-        {resumoFinanceiro && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-            <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                    Vencendo Hoje
-                  </p>
-                  <p className="text-3xl font-bold text-[#002333] mt-2">
-                    {formatarMoeda(resumoFinanceiro.totalVencendoHoje)}
-                  </p>
-                  <p className="text-sm text-[#002333]/70 mt-3">
-                    ⏰ {resumoFinanceiro.quantidadeVencendoHoje} conta(s)
-                  </p>
-                </div>
-                <div className="h-12 w-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center shadow-sm">
-                  <Clock className="w-6 h-6 text-yellow-600" />
-                </div>
-              </div>
-            </div>
+        {!loading && !error && resumoFinanceiro ? (
+          <InlineStats
+            stats={[
+              {
+                label: 'Vencendo hoje',
+                value: moneyFmt.format(resumoFinanceiro.totalVencendoHoje),
+                tone: 'warning',
+              },
+              {
+                label: 'Total do mes',
+                value: moneyFmt.format(resumoFinanceiro.totalMes),
+                tone: 'neutral',
+              },
+              {
+                label: 'Atrasado',
+                value: moneyFmt.format(resumoFinanceiro.totalAtrasado),
+                tone: 'warning',
+              },
+              {
+                label: 'Pago no mes',
+                value: moneyFmt.format(resumoFinanceiro.totalPagoMes),
+                tone: 'accent',
+              },
+              { label: 'Em aberto', value: String(totalAberto), tone: 'warning' },
+              { label: 'Pagas', value: String(totalPago), tone: 'accent' },
+              { label: 'Vencidas', value: String(totalVencido), tone: 'warning' },
+              { label: 'Valor da lista', value: moneyFmt.format(valorLista), tone: 'neutral' },
+            ]}
+          />
+        ) : null}
+      </SectionCard>
 
-            <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                    Total do Mês
-                  </p>
-                  <p className="text-3xl font-bold text-[#002333] mt-2">
-                    {formatarMoeda(resumoFinanceiro.totalMes)}
-                  </p>
-                  <p className="text-sm text-[#002333]/70 mt-3">
-                    📅 {resumoFinanceiro.quantidadeMes} conta(s)
-                  </p>
-                </div>
-                <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
-                  <Calendar className="w-6 h-6 text-[#159A9C]" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                    Em Atraso
-                  </p>
-                  <p className="text-3xl font-bold text-[#002333] mt-2">
-                    {formatarMoeda(resumoFinanceiro.totalAtrasado)}
-                  </p>
-                  <p className="text-sm text-[#002333]/70 mt-3">
-                    🚨 {resumoFinanceiro.quantidadeAtrasado} conta(s)
-                  </p>
-                </div>
-                <div className="h-12 w-12 rounded-2xl bg-red-500/10 flex items-center justify-center shadow-sm">
-                  <AlertTriangle className="w-6 h-6 text-red-600" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm border border-[#DEEFE7] p-6 hover:shadow-lg transition-shadow duration-300">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                    Pago no Mês
-                  </p>
-                  <p className="text-3xl font-bold text-[#002333] mt-2">
-                    {formatarMoeda(resumoFinanceiro.totalPagoMes)}
-                  </p>
-                  <p className="text-sm text-[#002333]/70 mt-3">
-                    ✅ {resumoFinanceiro.quantidadePagoMes} conta(s)
-                  </p>
-                </div>
-                <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center shadow-sm">
-                  <CheckCircle className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Filtros Simples */}
-        {mostrarFiltros && (
-          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-            <div className="flex flex-col sm:flex-row gap-4 items-end">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Buscar Contas
-                </label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input
-                    type="text"
-                    placeholder="Buscar por fornecedor, número ou descrição..."
-                    value={termoBusca}
-                    onChange={(e) => setTermoBusca(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setMostrarFiltros(false)}
-                  className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 flex items-center gap-2 transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                  Fechar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Barra de pesquisa e ações */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
-        <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
-          <div className="flex-1 max-w-md">
+      <FiltersBar className="p-4">
+        <div className="flex w-full flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
+          <div className="w-full sm:min-w-[300px] sm:flex-1">
+            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Buscar contas</label>
             <div className="relative">
-              <Search
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-                size={20}
-              />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
               <input
                 type="text"
-                placeholder="Buscar por número, fornecedor, descrição..."
                 value={termoBusca}
                 onChange={(e) => setTermoBusca(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Número, fornecedor, descrição, documento..."
+                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
               />
             </div>
           </div>
 
-          <div className="flex gap-2">
-            {contasSelecionadas.length > 0 && (
-              <>
-                <button
-                  onClick={() => handleAcaoMassa('marcar_pago')}
-                  className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors text-sm font-medium"
-                >
-                  Marcar como Pago
-                </button>
-                <button
-                  onClick={() => handleAcaoMassa('excluir')}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
-                >
-                  Excluir Selecionadas
-                </button>
-              </>
-            )}
-            <button className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium">
-              <Download size={16} />
-              Exportar
+          <div className="w-full sm:w-auto">
+            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Status</label>
+            <select
+              value={filtroStatus}
+              onChange={(e) => setFiltroStatus(e.target.value as FiltroStatusUI)}
+              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[180px]"
+            >
+              <option value="todos">Todos</option>
+              <option value={StatusContaPagar.EM_ABERTO}>Em aberto</option>
+              <option value={StatusContaPagar.PAGO}>Pago</option>
+              <option value={StatusContaPagar.VENCIDO}>Vencido</option>
+              <option value={StatusContaPagar.AGENDADO}>Agendado</option>
+              <option value={StatusContaPagar.CANCELADO}>Cancelado</option>
+            </select>
+          </div>
+
+          <div className="w-full sm:w-auto">
+            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Categoria</label>
+            <select
+              value={filtroCategoria}
+              onChange={(e) => setFiltroCategoria(e.target.value as FiltroCategoriaUI)}
+              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[190px]"
+            >
+              <option value="todas">Todas</option>
+              {Object.values(CategoriaContaPagar).map((categoria) => (
+                <option key={categoria} value={categoria}>
+                  {CATEGORIA_LABELS[categoria]}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            <button
+              type="button"
+              onClick={limparFiltros}
+              className={btnSecondary}
+              disabled={!hasFilters}
+            >
+              <Filter className="h-4 w-4" />
+              Limpar
             </button>
           </div>
         </div>
-      </div>
+      </FiltersBar>
 
-      {/* Lista de Contas a Pagar */}
-      <div className="bg-white rounded-lg shadow-sm border">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Lista de Contas a Pagar</h2>
-        </div>
+      {contasSelecionadas.size > 0 ? (
+        <SectionCard className="p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="inline-flex items-center gap-2 rounded-full border border-[#CDE6DF] bg-[#ECF7F3] px-3 py-1 font-semibold text-[#0F7B7D]">
+                <CheckCircle className="h-4 w-4" />
+                {contasSelecionadas.size} selecionada{contasSelecionadas.size === 1 ? '' : 's'}
+              </span>
+              {selecionadasVisiveis !== contasSelecionadas.size ? (
+                <span className="text-xs text-[#64808E]">
+                  {selecionadasVisiveis} visiveis na lista atual
+                </span>
+              ) : null}
+              <button type="button" onClick={limparSelecao} className={btnSecondary}>
+                <X className="h-4 w-4" />
+                Limpar selecao
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void handleAcaoMassa('marcar_pago')}
+                className={btnSuccess}
+              >
+                <Check className="h-4 w-4" />
+                Marcar pago
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleAcaoMassa('excluir')}
+                className={btnDanger}
+              >
+                <Trash2 className="h-4 w-4" />
+                Excluir
+              </button>
+            </div>
+          </div>
+        </SectionCard>
+      ) : null}
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-white border-b border-gray-200">
-              <tr>
-                <th className="w-12 px-4 py-4 text-left">
-                  <input
-                    type="checkbox"
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setContasSelecionadas(contas.map((c) => c.id));
-                      } else {
-                        setContasSelecionadas([]);
-                      }
-                    }}
-                    className="w-4 h-4 text-[#159A9C] bg-gray-100 border-gray-300 rounded focus:ring-[#159A9C] focus:ring-2"
-                  />
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  <div className="flex items-center gap-2">
-                    <CreditCard className="w-4 h-4" />
-                    Número
-                  </div>
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  <div className="flex items-center gap-2">
-                    <Building className="w-4 h-4" />
-                    Fornecedor
-                  </div>
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  <div className="flex items-center gap-2">
-                    <Edit className="w-4 h-4" />
-                    Descrição
-                  </div>
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  <div className="flex items-center gap-2">
-                    <Filter className="w-4 h-4" />
-                    Categoria
-                  </div>
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
-                    Vencimento
-                  </div>
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="w-4 h-4" />
-                    Valor
-                  </div>
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4" />
-                    Status
-                  </div>
-                </th>
-                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Ações
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+      {loading ? <LoadingSkeleton lines={8} /> : null}
+
+      {!loading && error ? (
+        <EmptyState
+          icon={<AlertTriangle className="h-5 w-5" />}
+          title="Erro ao carregar contas a pagar"
+          description={error}
+          action={
+            <button type="button" onClick={() => void carregarDados()} className={btnPrimary}>
+              <RefreshCw className="h-4 w-4" />
+              Tentar novamente
+            </button>
+          }
+        />
+      ) : null}
+
+      {!loading && !error && contas.length === 0 ? (
+        <EmptyState
+          icon={<CreditCard className="h-5 w-5" />}
+          title="Nenhuma conta cadastrada"
+          description="Crie uma conta a pagar para iniciar o fluxo financeiro."
+          action={
+            <button type="button" onClick={handleNovaConta} className={btnPrimary}>
+              <CreditCard className="h-4 w-4" />
+              Nova conta
+            </button>
+          }
+        />
+      ) : null}
+
+      {!loading && !error && contas.length > 0 && contasFiltradas.length === 0 ? (
+        <EmptyState
+          icon={<Search className="h-5 w-5" />}
+          title="Nenhuma conta encontrada"
+          description="Ajuste ou limpe os filtros para visualizar outras contas."
+          action={
+            <button type="button" onClick={limparFiltros} className={btnSecondary}>
+              <Filter className="h-4 w-4" />
+              Limpar filtros
+            </button>
+          }
+        />
+      ) : null}
+
+      {!loading && !error && contasFiltradas.length > 0 ? (
+        <DataTableCard>
+          <div className="flex flex-col gap-3 border-b border-[#E1EAEE] bg-[#F8FBFC] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <div className="flex flex-wrap items-center gap-2 text-sm text-[#516F7D]">
+              <span>
+                {contasFiltradas.length} registro{contasFiltradas.length === 1 ? '' : 's'}
+              </span>
+              {hasFilters ? (
+                <span className="rounded-full border border-[#CDE6DF] bg-[#ECF7F3] px-2 py-0.5 text-xs font-medium text-[#0F7B7D]">
+                  filtrados
+                </span>
+              ) : null}
+              {contasSelecionadas.size > 0 ? (
+                <span className="rounded-full border border-[#CDE6DF] bg-[#ECF7F3] px-2 py-0.5 text-xs font-semibold text-[#0F7B7D]">
+                  {contasSelecionadas.size} selecionada{contasSelecionadas.size === 1 ? '' : 's'}
+                </span>
+              ) : null}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={toggleSelecionarTodasVisiveis}
+                className={btnSecondary}
+              >
+                <CheckCircle className="h-4 w-4" />
+                {allVisibleSelected ? 'Desmarcar visiveis' : 'Selecionar visiveis'}
+              </button>
+            </div>
+          </div>
+
+          <div className="p-4 lg:hidden">
+            <div className="grid grid-cols-1 gap-3">
               {contasFiltradas.map((conta) => {
-                const isVencida =
-                  new Date(conta.dataVencimento) < new Date() &&
-                  conta.status === StatusContaPagar.EM_ABERTO;
-                const isVencendoHoje =
-                  new Date(conta.dataVencimento).toDateString() === new Date().toDateString();
+                const prazo = getPrazoFlags(conta);
+                const destaque = prazo.vencida
+                  ? 'border-[#F4C7CF] bg-[#FFF9FA]'
+                  : prazo.venceHoje
+                    ? 'border-[#F9D9AA] bg-[#FFFBF4]'
+                    : 'border-[#DFE9ED] bg-white';
 
                 return (
-                  <tr
+                  <article
                     key={conta.id}
-                    className={`hover:bg-gray-50 transition-colors ${
-                      isVencida ? 'bg-red-50' : isVencendoHoje ? 'bg-orange-50' : ''
-                    }`}
+                    className={`rounded-xl border p-4 shadow-[0_10px_22px_-20px_rgba(15,57,74,0.4)] ${destaque}`}
                   >
-                    <td className="px-4 py-4">
-                      <input
-                        type="checkbox"
-                        checked={contasSelecionadas.includes(conta.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setContasSelecionadas([...contasSelecionadas, conta.id]);
-                          } else {
-                            setContasSelecionadas(
-                              contasSelecionadas.filter((id) => id !== conta.id),
-                            );
-                          }
-                        }}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="text-sm font-medium text-gray-900">{conta.numero}</div>
-                        {conta.recorrente && (
-                          <div className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
-                            Recorrente
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{conta.fornecedor.nome}</div>
-                      <div className="text-sm text-gray-500">{conta.fornecedor.cnpjCpf}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div
-                        className="text-sm text-gray-900 max-w-xs truncate"
-                        title={conta.descricao}
-                      >
-                        {conta.descricao}
-                      </div>
-                      {conta.numeroDocumento && (
-                        <div className="text-sm text-gray-500">Doc: {conta.numeroDocumento}</div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                        {CATEGORIA_LABELS[conta.categoria] || conta.categoria}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div
-                        className={`text-sm ${
-                          isVencida
-                            ? 'text-red-600 font-medium'
-                            : isVencendoHoje
-                              ? 'text-orange-600 font-medium'
-                              : 'text-gray-900'
-                        }`}
-                      >
-                        {formatarData(conta.dataVencimento)}
-                      </div>
-                      {(isVencida || isVencendoHoje) && (
-                        <div className="text-xs text-gray-500">
-                          {isVencida ? 'Vencida' : 'Vence hoje'}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={contasSelecionadas.has(conta.id)}
+                            onChange={() => toggleSelecionarConta(conta.id)}
+                            className="h-4 w-4 rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
+                            aria-label={`Selecionar conta ${conta.numero}`}
+                          />
+                          <span className="text-sm font-semibold text-[#173A4D]">
+                            {conta.numero}
+                          </span>
+                          {conta.recorrente ? (
+                            <span className="inline-flex items-center rounded-full border border-[#E6D6FF] bg-[#F7F0FF] px-2 py-0.5 text-[11px] font-semibold text-[#6A3FB3]">
+                              Recorrente
+                            </span>
+                          ) : null}
                         </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {formatarMoeda(conta.valorTotal)}
+                        <p className="mt-1 truncate text-sm font-medium text-[#173A4D]">
+                          {conta.fornecedor.nome}
+                        </p>
+                        <p className="mt-1 line-clamp-2 text-xs text-[#64808E]">
+                          {conta.descricao}
+                        </p>
                       </div>
-                      {conta.valorPago > 0 && (
-                        <div className="text-xs text-green-600">
-                          Pago: {formatarMoeda(conta.valorPago)}
+                      <div className="flex shrink-0 flex-col items-end gap-2">
+                        {getStatusBadge(conta.status)}
+                        {getPrioridadeBadge(conta.prioridade)}
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+                      <div className="rounded-lg border border-[#EDF3F5] bg-[#FAFCFD] px-3 py-2">
+                        <div className="flex items-center gap-2 text-[#5F7B89]">
+                          <DollarSign className="h-4 w-4" />
+                          <span className="text-xs uppercase tracking-wide">Valor</span>
                         </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        {getStatusIcon(conta.status)}
-                        <span
-                          className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(conta.status)}`}
-                        >
-                          {STATUS_LABELS[conta.status]}
-                        </span>
+                        <p className="mt-1 font-semibold text-[#173A4D]">
+                          {moneyFmt.format(conta.valorTotal)}
+                        </p>
+                        {conta.valorPago > 0 ? (
+                          <p className="text-xs text-[#137A42]">
+                            Pago: {moneyFmt.format(conta.valorPago)}
+                          </p>
+                        ) : null}
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end gap-2">
-                        {conta.status === StatusContaPagar.EM_ABERTO && (
-                          <button
-                            onClick={() => handleRegistrarPagamento(conta)}
-                            className="text-green-600 hover:text-green-800 p-1 rounded"
-                            title="Registrar Pagamento"
-                          >
-                            <CreditCard className="w-4 h-4" />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleEditarConta(conta)}
-                          className="text-blue-600 hover:text-blue-800 p-1 rounded"
-                          title="Editar"
+                      <div className="rounded-lg border border-[#EDF3F5] bg-[#FAFCFD] px-3 py-2">
+                        <div className="flex items-center gap-2 text-[#5F7B89]">
+                          <Calendar className="h-4 w-4" />
+                          <span className="text-xs uppercase tracking-wide">Vencimento</span>
+                        </div>
+                        <p
+                          className={`mt-1 font-medium ${prazo.vencida ? 'text-[#B4233A]' : prazo.venceHoje ? 'text-[#A86400]' : 'text-[#173A4D]'}`}
                         >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleExcluirConta(conta.id)}
-                          className="text-red-600 hover:text-red-800 p-1 rounded"
-                          title="Excluir"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                          {formatDate(conta.dataVencimento)}
+                        </p>
+                        {prazo.vencida ? <p className="text-xs text-[#B4233A]">Vencida</p> : null}
+                        {prazo.venceHoje ? (
+                          <p className="text-xs text-[#A86400]">Vence hoje</p>
+                        ) : null}
                       </div>
-                    </td>
-                  </tr>
+                    </div>
+
+                    <div className="mt-3 flex justify-end border-t border-[#EDF3F5] pt-3">
+                      {renderRowActions(conta)}
+                    </div>
+                  </article>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            </div>
+          </div>
+          <div className="hidden lg:block">
+            <div className="max-h-[70vh] overflow-auto">
+              <table className="w-full min-w-[1180px] border-collapse">
+                <thead className="sticky top-0 z-10 bg-white shadow-[0_1px_0_0_#E1EAEE]">
+                  <tr>
+                    <th className="px-4 py-3 text-left">
+                      <input
+                        ref={selectAllRef}
+                        type="checkbox"
+                        checked={allVisibleSelected}
+                        onChange={toggleSelecionarTodasVisiveis}
+                        className="h-4 w-4 rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
+                        aria-label="Selecionar contas visiveis"
+                      />
+                    </th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
+                      Conta
+                    </th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
+                      Fornecedor
+                    </th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
+                      Descrição
+                    </th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
+                      Categoria
+                    </th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
+                      Prioridade
+                    </th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
+                      Vencimento
+                    </th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
+                      Valor
+                    </th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
+                      Status
+                    </th>
+                    <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[#5B7683]">
+                      Ações
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white">
+                  {contasFiltradas.map((conta) => {
+                    const prazo = getPrazoFlags(conta);
+                    return (
+                      <tr
+                        key={conta.id}
+                        className={`border-t border-[#EDF3F5] hover:bg-[#FAFCFD] ${prazo.vencida ? 'bg-[#FFF9FA]' : prazo.venceHoje ? 'bg-[#FFFBF4]' : ''}`}
+                      >
+                        <td className="px-4 py-4 align-top">
+                          <input
+                            type="checkbox"
+                            checked={contasSelecionadas.has(conta.id)}
+                            onChange={() => toggleSelecionarConta(conta.id)}
+                            className="h-4 w-4 rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
+                            aria-label={`Selecionar conta ${conta.numero}`}
+                          />
+                        </td>
+                        <td className="px-5 py-4 align-top">
+                          <div className="text-sm font-semibold text-[#173A4D]">{conta.numero}</div>
+                          {conta.recorrente ? (
+                            <span className="mt-1 inline-flex items-center rounded-full border border-[#E6D6FF] bg-[#F7F0FF] px-2 py-0.5 text-[11px] font-semibold text-[#6A3FB3]">
+                              Recorrente
+                            </span>
+                          ) : null}
+                        </td>
+                        <td className="px-5 py-4 align-top">
+                          <div className="text-sm font-medium text-[#173A4D]">
+                            {conta.fornecedor.nome}
+                          </div>
+                          <div className="mt-0.5 text-xs text-[#64808E]">
+                            {conta.fornecedor.cnpjCpf}
+                          </div>
+                        </td>
+                        <td className="px-5 py-4 align-top">
+                          <div
+                            className="max-w-[240px] truncate text-sm text-[#173A4D]"
+                            title={conta.descricao}
+                          >
+                            {conta.descricao}
+                          </div>
+                          {conta.numeroDocumento ? (
+                            <div className="mt-0.5 text-xs text-[#64808E]">
+                              Doc: {conta.numeroDocumento}
+                            </div>
+                          ) : null}
+                        </td>
+                        <td className="px-5 py-4 align-top text-sm text-[#173A4D]">
+                          {CATEGORIA_LABELS[conta.categoria] || conta.categoria}
+                        </td>
+                        <td className="px-5 py-4 align-top">
+                          {getPrioridadeBadge(conta.prioridade)}
+                        </td>
+                        <td className="px-5 py-4 align-top">
+                          <div
+                            className={`text-sm ${prazo.vencida ? 'font-semibold text-[#B4233A]' : prazo.venceHoje ? 'font-semibold text-[#A86400]' : 'text-[#173A4D]'}`}
+                          >
+                            {formatDate(conta.dataVencimento)}
+                          </div>
+                          {prazo.vencida ? (
+                            <div className="text-xs text-[#B4233A]">Vencida</div>
+                          ) : null}
+                          {prazo.venceHoje ? (
+                            <div className="text-xs text-[#A86400]">Vence hoje</div>
+                          ) : null}
+                        </td>
+                        <td className="px-5 py-4 align-top">
+                          <div className="text-sm font-semibold text-[#173A4D]">
+                            {moneyFmt.format(conta.valorTotal)}
+                          </div>
+                          {conta.valorPago > 0 ? (
+                            <div className="text-xs text-[#137A42]">
+                              Pago: {moneyFmt.format(conta.valorPago)}
+                            </div>
+                          ) : null}
+                        </td>
+                        <td className="px-5 py-4 align-top">{getStatusBadge(conta.status)}</td>
+                        <td className="px-5 py-4 align-top">
+                          <div className="flex justify-end">{renderRowActions(conta)}</div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </DataTableCard>
+      ) : null}
 
-      {/* Modal Profissional para Nova Conta */}
-      {modalContaAberto && (
+      {modalContaAberto ? (
         <ModalContaPagar
           conta={contaSelecionada}
+          fornecedores={fornecedoresCadastro}
+          fornecedoresLoading={loadingFornecedoresCadastro}
+          fornecedoresError={erroFornecedoresCadastro}
           onClose={() => setModalContaAberto(false)}
           onSave={handleSalvarConta}
         />
-      )}
+      ) : null}
 
-      {/* Modal simplificado para Pagamento */}
-      {modalPagamentoAberto && contaSelecionada && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+      {modalPagamentoAberto && contaSelecionada ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-2xl rounded-2xl border border-[#DCE8EC] bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#E1EAEE] px-6 py-4">
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-[#173A4D]">
                 <CreditCard className="h-5 w-5" />
-                Registrar Pagamento
+                Registrar pagamento
               </h2>
               <button
+                type="button"
                 onClick={() => setModalPagamentoAberto(false)}
-                className="text-gray-400 hover:text-gray-600 p-2"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[#5E7A88] hover:bg-[#F2F7F8]"
+                aria-label="Fechar modal"
               >
-                <X size={20} />
+                <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="p-6">
-              <div className="mb-4">
-                <p className="text-sm text-gray-600">Conta: {contaSelecionada.numero}</p>
-                <p className="text-sm text-gray-600">
+            <div className="space-y-3 px-6 py-5">
+              <div className="rounded-xl border border-[#E8EFF2] bg-[#FAFCFD] p-4">
+                <p className="text-sm text-[#64808E]">Conta: {contaSelecionada.numero}</p>
+                <p className="mt-1 text-sm text-[#64808E]">
                   Fornecedor: {contaSelecionada.fornecedor.nome}
                 </p>
-                <p className="text-lg font-semibold text-red-600">
-                  Valor Restante: {formatarMoeda(contaSelecionada.valorRestante)}
+                <p className="mt-2 text-lg font-semibold text-[#B4233A]">
+                  Valor restante: {moneyFmt.format(contaSelecionada.valorRestante)}
                 </p>
               </div>
-              <p className="text-sm text-gray-500">
-                Modal completo implementado no componente separado ModalPagamento.tsx
+              <p className="text-sm text-[#64808E]">
+                Esta ação registra o pagamento integral da conta com os dados padrão desta tela.
               </p>
+              <div className="rounded-xl border border-[#E8EFF2] bg-white p-4">
+                <label className="mb-2 block text-sm font-medium text-[#244455]">
+                  Comprovante (opcional)
+                </label>
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={(e) => setComprovantePagamentoArquivo(e.target.files?.[0] || null)}
+                  className="block w-full text-sm text-[#5E7A88] file:mr-3 file:rounded-lg file:border-0 file:bg-[#ECF7F3] file:px-3 file:py-2 file:text-sm file:font-medium file:text-[#0F7B7D] hover:file:bg-[#DFF2EC]"
+                />
+                {comprovantePagamentoArquivo ? (
+                  <p className="mt-2 text-xs text-[#5E7A88]">
+                    Selecionado: {comprovantePagamentoArquivo.name}
+                  </p>
+                ) : null}
+              </div>
             </div>
-            <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
+            <div className="flex justify-end gap-3 border-t border-[#E1EAEE] px-6 py-4">
               <button
-                onClick={() => setModalPagamentoAberto(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                type="button"
+                onClick={() => {
+                  setModalPagamentoAberto(false);
+                  setComprovantePagamentoArquivo(null);
+                }}
+                className={btnSecondary}
               >
                 Cancelar
               </button>
               <button
-                onClick={() => handleSalvarPagamento({} as RegistrarPagamento)}
-                className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] text-sm font-medium"
+                type="button"
+                onClick={() => void handleSalvarPagamento()}
+                className={btnPrimary}
               >
-                Registrar Pagamento
+                <Check className="h-4 w-4" />
+                Registrar pagamento
               </button>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* Modal de Confirmação Inteligente */}
-      {confirmacao.tipo && (
+      {confirmacao.tipo ? (
         <ModalConfirmacao
           isOpen={confirmacao.isOpen}
           onClose={confirmacao.fechar}
@@ -796,7 +1000,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
           dados={confirmacao.dados}
           loading={confirmacao.loading}
         />
-      )}
+      ) : null}
     </div>
   );
 };

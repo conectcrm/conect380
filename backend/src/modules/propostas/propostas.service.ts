@@ -1,10 +1,141 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like } from 'typeorm';
+import { In, Like, Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
 import { Proposta as PropostaEntity } from './proposta.entity';
 import { User } from '../users/user.entity';
 import { Cliente } from '../clientes/cliente.entity';
+import { Produto as ProdutoEntity } from '../produtos/produto.entity';
+
+type SalesFlowStatus =
+  | 'rascunho'
+  | 'enviada'
+  | 'visualizada'
+  | 'negociacao'
+  | 'aprovada'
+  | 'contrato_gerado'
+  | 'contrato_assinado'
+  | 'fatura_criada'
+  | 'aguardando_pagamento'
+  | 'pago'
+  | 'rejeitada'
+  | 'expirada';
+
+const FLOW_STATUS_FALLBACK: SalesFlowStatus = 'rascunho';
+const FLOW_STATUS_VALUES = new Set<SalesFlowStatus>([
+  'rascunho',
+  'enviada',
+  'visualizada',
+  'negociacao',
+  'aprovada',
+  'contrato_gerado',
+  'contrato_assinado',
+  'fatura_criada',
+  'aguardando_pagamento',
+  'pago',
+  'rejeitada',
+  'expirada',
+]);
+
+const FLOW_STATUS_ALIAS: Record<string, SalesFlowStatus> = {
+  draft: 'rascunho',
+  rascunho: 'rascunho',
+  sent: 'enviada',
+  enviada: 'enviada',
+  viewed: 'visualizada',
+  visualizada: 'visualizada',
+  negociacao: 'negociacao',
+  'em_negociacao': 'negociacao',
+  emnegociacao: 'negociacao',
+  approved: 'aprovada',
+  aceita: 'aprovada',
+  aprovada: 'aprovada',
+  contrato_gerado: 'contrato_gerado',
+  contratoassinado: 'contrato_assinado',
+  contrato_assinado: 'contrato_assinado',
+  fatura_criada: 'fatura_criada',
+  aguardando_pagamento: 'aguardando_pagamento',
+  pagamento_pendente: 'aguardando_pagamento',
+  paid: 'pago',
+  pago: 'pago',
+  rejected: 'rejeitada',
+  rejeitada: 'rejeitada',
+  expired: 'expirada',
+  expirada: 'expirada',
+};
+
+const WON_STATUS_VALUES = new Set<SalesFlowStatus>([
+  'aprovada',
+  'contrato_gerado',
+  'contrato_assinado',
+  'fatura_criada',
+  'aguardando_pagamento',
+  'pago',
+]);
+
+type ApprovalStatus = 'nao_requer' | 'pendente' | 'aprovada' | 'rejeitada';
+
+interface PropostaHistoricoEvento {
+  id: string;
+  timestamp: string;
+  evento: string;
+  origem?: string;
+  status?: SalesFlowStatus;
+  detalhes?: string;
+  ip?: string;
+  userAgent?: string;
+  metadata?: Record<string, unknown>;
+}
+
+interface PropostaVersao {
+  versao: number;
+  criadaEm: string;
+  origem?: string;
+  descricao?: string;
+  snapshot: {
+    titulo?: string;
+    cliente?: unknown;
+    produtos?: unknown[];
+    subtotal: number;
+    descontoGlobal: number;
+    impostos: number;
+    total: number;
+    valor: number;
+    formaPagamento?: string;
+    validadeDias?: number;
+    dataVencimento?: string;
+    observacoes?: string;
+    status: SalesFlowStatus;
+  };
+}
+
+interface PropostaAprovacaoInterna {
+  obrigatoria: boolean;
+  status: ApprovalStatus;
+  limiteDesconto: number;
+  descontoDetectado: number;
+  motivo?: string;
+  solicitadaEm?: string;
+  solicitadaPorId?: string;
+  solicitadaPorNome?: string;
+  aprovadaEm?: string;
+  aprovadaPorId?: string;
+  aprovadaPorNome?: string;
+  rejeitadaEm?: string;
+  rejeitadaPorId?: string;
+  rejeitadaPorNome?: string;
+  observacoes?: string;
+}
+
+interface PropostaLembrete {
+  id: string;
+  status: 'agendado' | 'enviado' | 'cancelado';
+  agendadoPara: string;
+  criadoEm: string;
+  diasApos: number;
+  observacoes?: string;
+  origem?: string;
+}
 
 export interface Proposta {
   id: string;
@@ -35,7 +166,8 @@ export interface Proposta {
   validadeDias: number;
   observacoes?: string;
   incluirImpostosPDF: boolean;
-  status: 'rascunho' | 'enviada' | 'visualizada' | 'aprovada' | 'rejeitada' | 'expirada';
+  status: SalesFlowStatus;
+  motivoPerda?: string;
   dataVencimento?: string;
   criadaEm: string;
   atualizadaEm: string;
@@ -60,7 +192,18 @@ export interface Proposta {
     sentAt?: string;
     emailCliente?: string;
     linkPortal?: string;
+    fluxoStatus?: SalesFlowStatus;
+    motivoPerda?: string;
+    historicoEventos?: PropostaHistoricoEvento[];
+    portalEventos?: PropostaHistoricoEvento[];
+    versoes?: PropostaVersao[];
+    aprovacaoInterna?: PropostaAprovacaoInterna;
+    lembretes?: PropostaLembrete[];
   };
+  historicoEventos?: PropostaHistoricoEvento[];
+  versoes?: PropostaVersao[];
+  aprovacaoInterna?: PropostaAprovacaoInterna;
+  lembretes?: PropostaLembrete[];
 }
 
 @Injectable()
@@ -68,6 +211,9 @@ export class PropostasService {
   private readonly logger = new Logger(PropostasService.name);
   private contadorId = 1;
   private tableColumnsCache = new Map<string, Set<string>>();
+  private readonly APROVACAO_DESCONTO_PADRAO = 10;
+  private readonly MAX_HISTORICO_EVENTOS = 200;
+  private readonly MAX_VERSOES = 50;
 
   constructor(
     @InjectRepository(PropostaEntity)
@@ -76,9 +222,90 @@ export class PropostasService {
     private userRepository: Repository<User>,
     @InjectRepository(Cliente)
     private clienteRepository: Repository<Cliente>,
+    @InjectRepository(ProdutoEntity)
+    private produtoRepository: Repository<ProdutoEntity>,
   ) {
     // Inicializar contador baseado nas propostas existentes
     this.inicializarContador();
+  }
+
+  private async enrichSnapshotProdutos(produtos: unknown[], empresaId?: string): Promise<unknown[]> {
+    if (!empresaId || !Array.isArray(produtos) || produtos.length === 0) {
+      return Array.isArray(produtos) ? produtos : [];
+    }
+
+    const ids = Array.from(
+      new Set(
+        produtos
+          .map((item) => {
+            if (!item || typeof item !== 'object') {
+              return '';
+            }
+            const record = item as Record<string, unknown>;
+            const nome = typeof record.nome === 'string' ? record.nome.trim() : '';
+            const produtoNome =
+              typeof record.produtoNome === 'string' ? record.produtoNome.trim() : '';
+            if (nome || produtoNome) {
+              return '';
+            }
+
+            const id =
+              record.id ??
+              record.produtoId ??
+              record.produto_id ??
+              (record.produto && typeof record.produto === 'object'
+                ? (record.produto as Record<string, unknown>).id
+                : undefined);
+            return id ? String(id) : '';
+          })
+          .filter((id) => Boolean(id)),
+      ),
+    );
+
+    if (ids.length === 0) {
+      return produtos;
+    }
+
+    const encontrados = await this.produtoRepository.find({
+      select: ['id', 'nome', 'descricao'],
+      where: {
+        empresaId,
+        id: In(ids),
+      },
+    });
+
+    const map = new Map(encontrados.map((p) => [p.id, p]));
+
+    return produtos.map((item) => {
+      if (!item || typeof item !== 'object') {
+        return item;
+      }
+
+      const record = item as Record<string, unknown>;
+      const nome = typeof record.nome === 'string' ? record.nome.trim() : '';
+      const produtoNome = typeof record.produtoNome === 'string' ? record.produtoNome.trim() : '';
+      if (nome || produtoNome) {
+        return item;
+      }
+
+      const id =
+        record.id ??
+        record.produtoId ??
+        record.produto_id ??
+        (record.produto && typeof record.produto === 'object'
+          ? (record.produto as Record<string, unknown>).id
+          : undefined);
+      const resolved = id ? map.get(String(id)) : undefined;
+      if (!resolved) {
+        return item;
+      }
+
+      return {
+        ...record,
+        nome: resolved.nome,
+        descricao: record.descricao ?? resolved.descricao ?? undefined,
+      };
+    });
   }
 
   private maskEmail(email?: string | null): string {
@@ -183,45 +410,522 @@ export class PropostasService {
     return parsed.toISOString();
   }
 
-  private normalizeStatusToDatabase(status: string | undefined, legacySchema: boolean): string {
-    const normalized = (status || '').toString().toLowerCase().trim();
-
-    if (!legacySchema) {
-      return normalized || 'rascunho';
+  private normalizeStatusInput(status: string | undefined | null): SalesFlowStatus {
+    const normalized = (status || '')
+      .toString()
+      .trim()
+      .toLowerCase();
+    if (!normalized) {
+      return FLOW_STATUS_FALLBACK;
     }
 
-    switch (normalized) {
-      case 'aprovada':
-      case 'aceita':
-        return 'aceita';
-      case 'visualizada':
-      case 'enviada':
-        return 'enviada';
-      case 'rejeitada':
-      case 'expirada':
-      case 'rascunho':
-        return normalized;
+    const mapped = FLOW_STATUS_ALIAS[normalized];
+    if (mapped) {
+      return mapped;
+    }
+
+    if (FLOW_STATUS_VALUES.has(normalized as SalesFlowStatus)) {
+      return normalized as SalesFlowStatus;
+    }
+
+    return FLOW_STATUS_FALLBACK;
+  }
+
+  private mapFlowStatusToDatabaseStatus(status: SalesFlowStatus, legacySchema: boolean): string {
+    if (legacySchema) {
+      switch (status) {
+        case 'aprovada':
+        case 'contrato_gerado':
+        case 'contrato_assinado':
+        case 'fatura_criada':
+        case 'aguardando_pagamento':
+        case 'pago':
+          return 'aceita';
+        case 'negociacao':
+        case 'visualizada':
+        case 'enviada':
+          return 'enviada';
+        case 'rejeitada':
+          return 'rejeitada';
+        case 'expirada':
+          return 'expirada';
+        case 'rascunho':
+        default:
+          return 'rascunho';
+      }
+    }
+
+    switch (status) {
+      case 'contrato_gerado':
+      case 'contrato_assinado':
+      case 'fatura_criada':
+      case 'aguardando_pagamento':
+      case 'pago':
+        return 'aprovada';
+      case 'negociacao':
+        return 'visualizada';
       default:
-        return 'rascunho';
+        return status;
     }
   }
 
-  private normalizeStatusFromDatabase(status: string | undefined): Proposta['status'] {
+  private mapDatabaseStatusToFlowStatus(status: string | undefined): SalesFlowStatus {
     const normalized = (status || '').toString().toLowerCase().trim();
+    if (!normalized) {
+      return FLOW_STATUS_FALLBACK;
+    }
     if (normalized === 'aceita') {
       return 'aprovada';
     }
-    if (
-      normalized === 'rascunho' ||
-      normalized === 'enviada' ||
-      normalized === 'visualizada' ||
-      normalized === 'aprovada' ||
-      normalized === 'rejeitada' ||
-      normalized === 'expirada'
-    ) {
-      return normalized;
+    return this.normalizeStatusInput(normalized);
+  }
+
+  private sanitizeMotivoPerda(value: unknown): string | undefined {
+    const motivo = String(value || '').trim();
+    return motivo || undefined;
+  }
+
+  private toFiniteNumber(value: unknown, fallback = 0): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  private toObjectRecord(value: unknown): Record<string, unknown> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return {};
     }
-    return 'rascunho';
+    return { ...(value as Record<string, unknown>) };
+  }
+
+  private parseHistoryEvent(raw: unknown): PropostaHistoricoEvento | null {
+    if (!raw || typeof raw !== 'object') {
+      return null;
+    }
+
+    const record = raw as Record<string, unknown>;
+    const evento = String(record.evento || '').trim();
+    if (!evento) {
+      return null;
+    }
+
+    const timestamp = this.toIsoString(
+      record.timestamp || record.data || record.criadoEm || new Date().toISOString(),
+    );
+    const metadata =
+      record.metadata && typeof record.metadata === 'object'
+        ? (record.metadata as Record<string, unknown>)
+        : undefined;
+
+    return {
+      id: String(record.id || randomUUID()),
+      evento,
+      timestamp,
+      origem: record.origem ? String(record.origem) : undefined,
+      status: record.status ? this.normalizeStatusInput(String(record.status)) : undefined,
+      detalhes: record.detalhes ? String(record.detalhes) : undefined,
+      ip: record.ip ? String(record.ip) : undefined,
+      userAgent: record.userAgent ? String(record.userAgent) : undefined,
+      metadata,
+    };
+  }
+
+  private getHistoricoEventos(emailDetails: unknown): PropostaHistoricoEvento[] {
+    if (!emailDetails || typeof emailDetails !== 'object') {
+      return [];
+    }
+
+    const rawEvents = (emailDetails as Record<string, unknown>).historicoEventos;
+    if (!Array.isArray(rawEvents)) {
+      return [];
+    }
+
+    return rawEvents
+      .map((event) => this.parseHistoryEvent(event))
+      .filter((event): event is PropostaHistoricoEvento => Boolean(event))
+      .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  }
+
+  private getPortalEventos(emailDetails: unknown): PropostaHistoricoEvento[] {
+    if (!emailDetails || typeof emailDetails !== 'object') {
+      return [];
+    }
+
+    const rawEvents = (emailDetails as Record<string, unknown>).portalEventos;
+    if (!Array.isArray(rawEvents)) {
+      return [];
+    }
+
+    return rawEvents
+      .map((event) => this.parseHistoryEvent(event))
+      .filter((event): event is PropostaHistoricoEvento => Boolean(event))
+      .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  }
+
+  private buildHistoryEvent(
+    evento: string,
+    payload?: Partial<PropostaHistoricoEvento>,
+  ): PropostaHistoricoEvento {
+    return {
+      id: payload?.id || randomUUID(),
+      evento,
+      timestamp: this.toIsoString(payload?.timestamp || new Date().toISOString()),
+      origem: payload?.origem,
+      status: payload?.status,
+      detalhes: payload?.detalhes,
+      ip: payload?.ip,
+      userAgent: payload?.userAgent,
+      metadata: payload?.metadata,
+    };
+  }
+
+  private appendHistoricoEvento(
+    emailDetails: unknown,
+    evento: string,
+    payload?: Partial<PropostaHistoricoEvento>,
+  ): Record<string, unknown> {
+    const details = this.toObjectRecord(emailDetails);
+    const historico = this.getHistoricoEventos(details);
+    historico.push(this.buildHistoryEvent(evento, payload));
+    details.historicoEventos = historico.slice(-this.MAX_HISTORICO_EVENTOS);
+    return details;
+  }
+
+  private appendPortalEvento(
+    emailDetails: unknown,
+    evento: string,
+    payload?: Partial<PropostaHistoricoEvento>,
+  ): Record<string, unknown> {
+    const details = this.appendHistoricoEvento(emailDetails, evento, payload);
+    const portalEventos = this.getPortalEventos(details);
+    portalEventos.push(this.buildHistoryEvent(evento, payload));
+    details.portalEventos = portalEventos.slice(-this.MAX_HISTORICO_EVENTOS);
+    return details;
+  }
+
+  private parseVersion(raw: unknown): PropostaVersao | null {
+    if (!raw || typeof raw !== 'object') {
+      return null;
+    }
+
+    const record = raw as Record<string, unknown>;
+    const versao = this.toFiniteNumber(record.versao, 0);
+    if (!versao) {
+      return null;
+    }
+
+    const snapshot = this.toObjectRecord(record.snapshot);
+    return {
+      versao,
+      criadaEm: this.toIsoString(record.criadaEm || record.timestamp || new Date().toISOString()),
+      origem: record.origem ? String(record.origem) : undefined,
+      descricao: record.descricao ? String(record.descricao) : undefined,
+      snapshot: {
+        titulo: snapshot.titulo ? String(snapshot.titulo) : undefined,
+        cliente: snapshot.cliente,
+        produtos: Array.isArray(snapshot.produtos) ? (snapshot.produtos as unknown[]) : [],
+        subtotal: this.toFiniteNumber(snapshot.subtotal, 0),
+        descontoGlobal: this.toFiniteNumber(snapshot.descontoGlobal, 0),
+        impostos: this.toFiniteNumber(snapshot.impostos, 0),
+        total: this.toFiniteNumber(snapshot.total, 0),
+        valor: this.toFiniteNumber(snapshot.valor, 0),
+        formaPagamento: snapshot.formaPagamento ? String(snapshot.formaPagamento) : undefined,
+        validadeDias: this.toFiniteNumber(snapshot.validadeDias, 0),
+        dataVencimento: snapshot.dataVencimento ? this.toIsoString(snapshot.dataVencimento) : undefined,
+        observacoes: snapshot.observacoes ? String(snapshot.observacoes) : undefined,
+        status: snapshot.status
+          ? this.normalizeStatusInput(String(snapshot.status))
+          : FLOW_STATUS_FALLBACK,
+      },
+    };
+  }
+
+  private getVersoes(emailDetails: unknown): PropostaVersao[] {
+    if (!emailDetails || typeof emailDetails !== 'object') {
+      return [];
+    }
+
+    const rawVersions = (emailDetails as Record<string, unknown>).versoes;
+    if (!Array.isArray(rawVersions)) {
+      return [];
+    }
+
+    return rawVersions
+      .map((version) => this.parseVersion(version))
+      .filter((version): version is PropostaVersao => Boolean(version))
+      .sort((a, b) => a.versao - b.versao);
+  }
+
+  private buildVersionSnapshot(entity: PropostaEntity): PropostaVersao['snapshot'] {
+    const status =
+      this.extractFlowStatusFromEmailDetails(entity.emailDetails) ||
+      this.mapDatabaseStatusToFlowStatus(entity.status);
+
+    return {
+      titulo: entity.titulo || undefined,
+      cliente: entity.cliente,
+      produtos: Array.isArray(entity.produtos) ? entity.produtos : [],
+      subtotal: this.toFiniteNumber(entity.subtotal, 0),
+      descontoGlobal: this.toFiniteNumber(entity.descontoGlobal, 0),
+      impostos: this.toFiniteNumber(entity.impostos, 0),
+      total: this.toFiniteNumber(entity.total, 0),
+      valor: this.toFiniteNumber(entity.valor, 0),
+      formaPagamento: entity.formaPagamento || undefined,
+      validadeDias: this.toFiniteNumber(entity.validadeDias, 0),
+      dataVencimento: entity.dataVencimento ? entity.dataVencimento.toISOString() : undefined,
+      observacoes: entity.observacoes || undefined,
+      status,
+    };
+  }
+
+  private appendVersionSnapshot(
+    emailDetails: unknown,
+    entity: PropostaEntity,
+    origem?: string,
+    descricao?: string,
+  ): Record<string, unknown> {
+    const details = this.toObjectRecord(emailDetails);
+    const versoes = this.getVersoes(details);
+    const proximaVersao = versoes.length > 0 ? versoes[versoes.length - 1].versao + 1 : 1;
+
+    versoes.push({
+      versao: proximaVersao,
+      criadaEm: new Date().toISOString(),
+      origem,
+      descricao,
+      snapshot: this.buildVersionSnapshot(entity),
+    });
+
+    details.versoes = versoes.slice(-this.MAX_VERSOES);
+    return details;
+  }
+
+  private getMaxDescontoPercentual(
+    descontoGlobal?: unknown,
+    produtos?: unknown,
+  ): number {
+    const descontoGlobalPercentual = Math.max(this.toFiniteNumber(descontoGlobal, 0), 0);
+    const descontosProdutos = Array.isArray(produtos)
+      ? produtos.map((produto) =>
+          Math.max(
+            this.toFiniteNumber((produto as Record<string, unknown>)?.desconto, 0),
+            0,
+          ),
+        )
+      : [];
+
+    return Math.max(descontoGlobalPercentual, ...descontosProdutos, 0);
+  }
+
+  private calcularAprovacaoInterna(
+    descontoGlobal?: unknown,
+    produtos?: unknown,
+    atual?: PropostaAprovacaoInterna | null,
+  ): PropostaAprovacaoInterna {
+    const limiteDesconto = this.APROVACAO_DESCONTO_PADRAO;
+    const descontoDetectado = this.getMaxDescontoPercentual(descontoGlobal, produtos);
+    const obrigatoria = descontoDetectado > limiteDesconto;
+    const motivo = obrigatoria
+      ? `Desconto de ${descontoDetectado.toFixed(2)}% acima do limite de ${limiteDesconto.toFixed(2)}%`
+      : undefined;
+
+    if (!obrigatoria) {
+      return {
+        obrigatoria: false,
+        status: 'nao_requer',
+        limiteDesconto,
+        descontoDetectado,
+        motivo,
+      };
+    }
+
+    if (!atual) {
+      return {
+        obrigatoria: true,
+        status: 'pendente',
+        limiteDesconto,
+        descontoDetectado,
+        motivo,
+      };
+    }
+
+    const manteveAprovacao =
+      atual.status === 'aprovada' && descontoDetectado <= this.toFiniteNumber(atual.descontoDetectado, 0);
+
+    if (manteveAprovacao) {
+      return {
+        ...atual,
+        obrigatoria: true,
+        status: 'aprovada',
+        limiteDesconto,
+        descontoDetectado,
+        motivo,
+      };
+    }
+
+    return {
+      ...atual,
+      obrigatoria: true,
+      status: atual.status === 'rejeitada' ? 'rejeitada' : 'pendente',
+      limiteDesconto,
+      descontoDetectado,
+      motivo,
+      aprovadaEm: atual.status === 'rejeitada' ? undefined : atual.aprovadaEm,
+      aprovadaPorId: atual.status === 'rejeitada' ? undefined : atual.aprovadaPorId,
+      aprovadaPorNome: atual.status === 'rejeitada' ? undefined : atual.aprovadaPorNome,
+    };
+  }
+
+  private parseAprovacaoInterna(emailDetails: unknown): PropostaAprovacaoInterna | null {
+    if (!emailDetails || typeof emailDetails !== 'object') {
+      return null;
+    }
+
+    const raw = (emailDetails as Record<string, unknown>).aprovacaoInterna;
+    if (!raw || typeof raw !== 'object') {
+      return null;
+    }
+
+    const data = raw as Record<string, unknown>;
+    const statusRaw = String(data.status || '').trim().toLowerCase();
+    const status: ApprovalStatus =
+      statusRaw === 'pendente' || statusRaw === 'aprovada' || statusRaw === 'rejeitada'
+        ? (statusRaw as ApprovalStatus)
+        : 'nao_requer';
+
+    return {
+      obrigatoria: Boolean(data.obrigatoria),
+      status,
+      limiteDesconto: this.toFiniteNumber(data.limiteDesconto, this.APROVACAO_DESCONTO_PADRAO),
+      descontoDetectado: this.toFiniteNumber(data.descontoDetectado, 0),
+      motivo: data.motivo ? String(data.motivo) : undefined,
+      solicitadaEm: data.solicitadaEm ? this.toIsoString(data.solicitadaEm) : undefined,
+      solicitadaPorId: data.solicitadaPorId ? String(data.solicitadaPorId) : undefined,
+      solicitadaPorNome: data.solicitadaPorNome ? String(data.solicitadaPorNome) : undefined,
+      aprovadaEm: data.aprovadaEm ? this.toIsoString(data.aprovadaEm) : undefined,
+      aprovadaPorId: data.aprovadaPorId ? String(data.aprovadaPorId) : undefined,
+      aprovadaPorNome: data.aprovadaPorNome ? String(data.aprovadaPorNome) : undefined,
+      rejeitadaEm: data.rejeitadaEm ? this.toIsoString(data.rejeitadaEm) : undefined,
+      rejeitadaPorId: data.rejeitadaPorId ? String(data.rejeitadaPorId) : undefined,
+      rejeitadaPorNome: data.rejeitadaPorNome ? String(data.rejeitadaPorNome) : undefined,
+      observacoes: data.observacoes ? String(data.observacoes) : undefined,
+    };
+  }
+
+  private getLembretes(emailDetails: unknown): PropostaLembrete[] {
+    if (!emailDetails || typeof emailDetails !== 'object') {
+      return [];
+    }
+
+    const rawLembretes = (emailDetails as Record<string, unknown>).lembretes;
+    if (!Array.isArray(rawLembretes)) {
+      return [];
+    }
+
+    return rawLembretes
+      .map((item) => {
+        if (!item || typeof item !== 'object') return null;
+        const raw = item as Record<string, unknown>;
+        return {
+          id: String(raw.id || randomUUID()),
+          status:
+            String(raw.status || 'agendado') === 'enviado'
+              ? 'enviado'
+              : String(raw.status || 'agendado') === 'cancelado'
+                ? 'cancelado'
+                : 'agendado',
+          agendadoPara: this.toIsoString(raw.agendadoPara || new Date().toISOString()),
+          criadoEm: this.toIsoString(raw.criadoEm || new Date().toISOString()),
+          diasApos: this.toFiniteNumber(raw.diasApos, 0),
+          observacoes: raw.observacoes ? String(raw.observacoes) : undefined,
+          origem: raw.origem ? String(raw.origem) : undefined,
+        } as PropostaLembrete;
+      })
+      .filter((item): item is PropostaLembrete => Boolean(item));
+  }
+
+  private extractFlowStatusFromEmailDetails(emailDetails: unknown): SalesFlowStatus | null {
+    if (!emailDetails || typeof emailDetails !== 'object') {
+      return null;
+    }
+
+    const flowRaw = (emailDetails as { fluxoStatus?: unknown }).fluxoStatus;
+    if (!flowRaw) {
+      return null;
+    }
+    return this.normalizeStatusInput(String(flowRaw));
+  }
+
+  private extractMotivoPerdaFromEmailDetails(emailDetails: unknown): string | undefined {
+    if (!emailDetails || typeof emailDetails !== 'object') {
+      return undefined;
+    }
+
+    const raw = (emailDetails as { motivoPerda?: unknown }).motivoPerda;
+    return this.sanitizeMotivoPerda(raw);
+  }
+
+  private parseLegacyFlowMetadata(observacoes?: string | null): {
+    observacoesLimpa?: string;
+    fluxoStatus?: SalesFlowStatus;
+    motivoPerda?: string;
+  } {
+    const texto = String(observacoes || '');
+    const marker = '\n\n[FLOW_META]';
+    const markerIndex = texto.lastIndexOf(marker);
+
+    if (markerIndex < 0) {
+      return {
+        observacoesLimpa: texto || undefined,
+      };
+    }
+
+    const base = texto.slice(0, markerIndex);
+    const metaRaw = texto.slice(markerIndex + marker.length).trim();
+    try {
+      const meta = JSON.parse(metaRaw) as {
+        fluxoStatus?: string;
+        motivoPerda?: string;
+      };
+      return {
+        observacoesLimpa: base || undefined,
+        fluxoStatus: meta.fluxoStatus ? this.normalizeStatusInput(meta.fluxoStatus) : undefined,
+        motivoPerda: this.sanitizeMotivoPerda(meta.motivoPerda),
+      };
+    } catch {
+      return {
+        observacoesLimpa: texto || undefined,
+      };
+    }
+  }
+
+  private mergeLegacyFlowMetadata(
+    observacoesAtual: string | undefined | null,
+    payload: {
+      fluxoStatus?: SalesFlowStatus;
+      motivoPerda?: string;
+      observacoes?: string;
+    },
+  ): string | undefined {
+    const atual = this.parseLegacyFlowMetadata(observacoesAtual);
+    const observacoesLimpa =
+      payload.observacoes !== undefined ? payload.observacoes : atual.observacoesLimpa;
+    const fluxoStatus = payload.fluxoStatus ?? atual.fluxoStatus;
+    const motivoPerda =
+      payload.motivoPerda !== undefined
+        ? this.sanitizeMotivoPerda(payload.motivoPerda)
+        : atual.motivoPerda;
+
+    const base = String(observacoesLimpa || '').trim();
+    if (!fluxoStatus && !motivoPerda) {
+      return base || undefined;
+    }
+
+    const meta = JSON.stringify({
+      fluxoStatus,
+      ...(motivoPerda ? { motivoPerda } : {}),
+    });
+
+    return base ? `${base}\n\n[FLOW_META]${meta}` : `[FLOW_META]${meta}`;
   }
 
   private async resolveFallbackUserId(empresaId: string): Promise<string> {
@@ -302,6 +1006,16 @@ export class PropostasService {
     const dataVencimentoIso = row?.validade
       ? this.toIsoString(row.validade)
       : overrides.dataVencimento;
+    const observacoesRaw =
+      overrides.observacoes ??
+      row?.observacoes ??
+      row?.descricao ??
+      (row?.cliente ? row?.cliente.observacoes : undefined);
+    const legacyMeta = this.parseLegacyFlowMetadata(observacoesRaw);
+    const statusCalculado = overrides.status
+      ? this.normalizeStatusInput(overrides.status as string)
+      : legacyMeta.fluxoStatus || this.mapDatabaseStatusToFlowStatus(row?.status);
+    const motivoPerda = overrides.motivoPerda ?? legacyMeta.motivoPerda;
 
     const clienteFallback: Proposta['cliente'] = {
       id: 'cliente-legacy',
@@ -325,9 +1039,10 @@ export class PropostasService {
       valor,
       formaPagamento: overrides.formaPagamento ?? 'avista',
       validadeDias: overrides.validadeDias ?? 30,
-      observacoes: overrides.observacoes ?? row?.descricao ?? undefined,
+      observacoes: legacyMeta.observacoesLimpa,
       incluirImpostosPDF: overrides.incluirImpostosPDF ?? false,
-      status: this.normalizeStatusFromDatabase(row?.status ?? (overrides.status as string)),
+      status: statusCalculado,
+      motivoPerda,
       dataVencimento: dataVencimentoIso,
       criadaEm: criadaEmIso,
       atualizadaEm: atualizadaEmIso,
@@ -344,6 +1059,15 @@ export class PropostasService {
    * Converter entidade para interface de retorno
    */
   private entityToInterface(entity: PropostaEntity): Proposta {
+    const fluxoStatus =
+      this.extractFlowStatusFromEmailDetails(entity.emailDetails) ||
+      this.mapDatabaseStatusToFlowStatus(entity.status);
+    const motivoPerda = this.extractMotivoPerdaFromEmailDetails(entity.emailDetails);
+    const historicoEventos = this.getHistoricoEventos(entity.emailDetails);
+    const versoes = this.getVersoes(entity.emailDetails);
+    const aprovacaoInterna = this.parseAprovacaoInterna(entity.emailDetails) || undefined;
+    const lembretes = this.getLembretes(entity.emailDetails);
+
     return {
       id: entity.id,
       numero: entity.numero,
@@ -359,7 +1083,8 @@ export class PropostasService {
       validadeDias: entity.validadeDias,
       observacoes: entity.observacoes,
       incluirImpostosPDF: entity.incluirImpostosPDF,
-      status: entity.status as any,
+      status: fluxoStatus,
+      motivoPerda,
       dataVencimento: entity.dataVencimento?.toISOString(),
       criadaEm: entity.criadaEm?.toISOString(),
       atualizadaEm: entity.atualizadaEm?.toISOString(),
@@ -381,7 +1106,22 @@ export class PropostasService {
           }
         : entity.vendedor_id,
       portalAccess: entity.portalAccess || undefined,
-      emailDetails: entity.emailDetails || undefined,
+      emailDetails: entity.emailDetails
+        ? {
+            ...entity.emailDetails,
+            fluxoStatus,
+            motivoPerda,
+            historicoEventos,
+            portalEventos: this.getPortalEventos(entity.emailDetails),
+            versoes,
+            aprovacaoInterna,
+            lembretes,
+          }
+        : undefined,
+      historicoEventos,
+      versoes,
+      aprovacaoInterna,
+      lembretes,
     };
   }
 
@@ -627,6 +1367,13 @@ export class PropostasService {
 
       const propostaColumns = await this.getTableColumns('propostas');
       const legacySchema = this.isLegacyPropostasSchema(propostaColumns);
+      const fluxoStatus = this.normalizeStatusInput(dadosProposta.status as string | undefined);
+      const motivoPerda = this.sanitizeMotivoPerda((dadosProposta as any).motivoPerda);
+      const observacoesComFluxo = this.mergeLegacyFlowMetadata(undefined, {
+        observacoes: dadosProposta.observacoes,
+        fluxoStatus,
+        motivoPerda,
+      });
 
       if (legacySchema) {
         const titulo = dadosProposta.titulo || `Proposta ${numero}`;
@@ -641,7 +1388,7 @@ export class PropostasService {
           numero,
           titulo,
           valor,
-          this.normalizeStatusToDatabase(dadosProposta.status, true),
+          this.mapFlowStatusToDatabaseStatus(fluxoStatus, true),
         ];
 
         if (propostaColumns.has('oportunidade_id')) {
@@ -653,7 +1400,7 @@ export class PropostasService {
 
         if (propostaColumns.has('descricao')) {
           insertColumns.push('descricao');
-          insertValues.push(dadosProposta.observacoes ?? null);
+          insertValues.push(observacoesComFluxo ?? null);
         }
 
         if (propostaColumns.has('validade')) {
@@ -708,14 +1455,26 @@ export class PropostasService {
             valor,
             formaPagamento: dadosProposta.formaPagamento || 'avista',
             validadeDias,
-            observacoes: dadosProposta.observacoes,
+            observacoes: observacoesComFluxo,
             incluirImpostosPDF: dadosProposta.incluirImpostosPDF || false,
+            status: fluxoStatus,
+            motivoPerda,
             source: dadosProposta.source || 'api',
             vendedor: dadosProposta.vendedor,
           },
           typeof dadosProposta.cliente === 'string' ? dadosProposta.cliente : clienteProcessado?.nome,
         );
       }
+
+      const emailDetailsIniciais: Record<string, unknown> = {
+        fluxoStatus,
+        ...(motivoPerda ? { motivoPerda } : {}),
+        aprovacaoInterna: this.calcularAprovacaoInterna(
+          dadosProposta.descontoGlobal,
+          dadosProposta.produtos,
+          null,
+        ) as any,
+      };
 
       const novaProposta = this.propostaRepository.create({
         empresaId: empresaIdProposta,
@@ -732,13 +1491,30 @@ export class PropostasService {
         validadeDias: dadosProposta.validadeDias || 30,
         observacoes: dadosProposta.observacoes,
         incluirImpostosPDF: dadosProposta.incluirImpostosPDF || false,
-        status: dadosProposta.status || 'rascunho',
+        status: this.mapFlowStatusToDatabaseStatus(fluxoStatus, false) as any,
         dataVencimento: dadosProposta.dataVencimento
           ? new Date(dadosProposta.dataVencimento)
           : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         source: dadosProposta.source || 'api',
         vendedor_id: vendedorId,
+        emailDetails: emailDetailsIniciais as any,
       });
+
+      const detalhesComHistorico = this.appendHistoricoEvento(
+        novaProposta.emailDetails,
+        'proposta_criada',
+        {
+          origem: dadosProposta.source || 'api',
+          status: fluxoStatus,
+          detalhes: 'Proposta criada no sistema',
+        },
+      );
+      novaProposta.emailDetails = this.appendVersionSnapshot(
+        detalhesComHistorico,
+        novaProposta,
+        dadosProposta.source || 'api',
+        'Versao inicial da proposta',
+      ) as any;
 
       const propostaSalva = await this.propostaRepository.save(novaProposta);
       this.logger.log(`✅ Proposta criada no banco: ${propostaSalva.id} - ${propostaSalva.numero}`);
@@ -761,7 +1537,6 @@ export class PropostasService {
     try {
       const propostaColumns = await this.getTableColumns('propostas');
       const legacySchema = this.isLegacyPropostasSchema(propostaColumns);
-
       if (legacySchema) {
         const setClauses: string[] = [];
         const params: unknown[] = [];
@@ -785,7 +1560,12 @@ export class PropostasService {
 
         if (dadosProposta.status !== undefined) {
           setClauses.push(`"status" = $${idx++}`);
-          params.push(this.normalizeStatusToDatabase(dadosProposta.status, true));
+          params.push(
+            this.mapFlowStatusToDatabaseStatus(
+              this.normalizeStatusInput(dadosProposta.status as string),
+              true,
+            ),
+          );
         }
 
         if (dadosProposta.source !== undefined && propostaColumns.has('source')) {
@@ -924,7 +1704,25 @@ export class PropostasService {
       }
 
       if (dadosProposta.status !== undefined) {
-        proposta.status = dadosProposta.status;
+        const fluxoStatus = this.normalizeStatusInput(dadosProposta.status as string);
+        proposta.status = this.mapFlowStatusToDatabaseStatus(fluxoStatus, false) as any;
+        proposta.emailDetails = {
+          ...(proposta.emailDetails || {}),
+          fluxoStatus,
+        };
+      }
+
+      if ((dadosProposta as any).motivoPerda !== undefined) {
+        const motivoPerda = this.sanitizeMotivoPerda((dadosProposta as any).motivoPerda);
+        const details = {
+          ...(proposta.emailDetails || {}),
+        } as Record<string, unknown>;
+        if (motivoPerda) {
+          details.motivoPerda = motivoPerda;
+        } else {
+          delete details.motivoPerda;
+        }
+        proposta.emailDetails = details as any;
       }
 
       if (dadosProposta.dataVencimento !== undefined) {
@@ -953,6 +1751,28 @@ export class PropostasService {
 
         proposta.vendedor_id = vendedorId;
       }
+
+      let detalhesAtualizados = this.toObjectRecord(proposta.emailDetails);
+      detalhesAtualizados.aprovacaoInterna = this.calcularAprovacaoInterna(
+        proposta.descontoGlobal,
+        proposta.produtos,
+        this.parseAprovacaoInterna(detalhesAtualizados),
+      );
+      detalhesAtualizados = this.appendHistoricoEvento(
+        detalhesAtualizados,
+        'proposta_atualizada',
+        {
+          origem: dadosProposta.source || 'api',
+          status: this.extractFlowStatusFromEmailDetails(detalhesAtualizados) || undefined,
+          detalhes: 'Dados da proposta atualizados',
+        },
+      );
+      proposta.emailDetails = this.appendVersionSnapshot(
+        detalhesAtualizados,
+        proposta,
+        dadosProposta.source || 'api',
+        'Atualizacao de dados da proposta',
+      ) as any;
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);
       this.logger.log(`✅ Proposta atualizada: ${propostaAtualizada.id}`);
@@ -986,24 +1806,51 @@ export class PropostasService {
     status: string,
     source?: string,
     observacoes?: string,
+    motivoPerda?: string,
     empresaId?: string,
   ): Promise<Proposta> {
     try {
-      this.logger.debug(`atualizarStatus chamado: ${JSON.stringify({ propostaId, tipoPropostaId: typeof propostaId, status, source: source || null, hasObservacoes: Boolean(observacoes) })}`);
+      const fluxoStatus = this.normalizeStatusInput(status);
+      const motivoPerdaLimpo = this.sanitizeMotivoPerda(motivoPerda);
+      this.logger.debug(
+        `atualizarStatus chamado: ${JSON.stringify({
+          propostaId,
+          tipoPropostaId: typeof propostaId,
+          statusRecebido: status,
+          fluxoStatus,
+          source: source || null,
+          hasObservacoes: Boolean(observacoes),
+          hasMotivoPerda: Boolean(motivoPerdaLimpo),
+        })}`,
+      );
 
       const propostaColumns = await this.getTableColumns('propostas');
       const legacySchema = this.isLegacyPropostasSchema(propostaColumns);
       if (legacySchema) {
+        const propostaAtual = await this.obterProposta(propostaId, empresaId);
+        if (!propostaAtual) {
+          throw new Error(`Proposta com ID ${propostaId} nao encontrada`);
+        }
+
+        const observacoesComFluxo = this.mergeLegacyFlowMetadata(propostaAtual.observacoes, {
+          observacoes,
+          fluxoStatus,
+          motivoPerda,
+        });
+
         const propostaAtualizada = await this.atualizarProposta(
           propostaId,
           {
-            status: status as Proposta['status'],
+            status: fluxoStatus,
             source,
-            observacoes,
+            observacoes: observacoesComFluxo,
+            motivoPerda: motivoPerdaLimpo,
           },
           empresaId,
         );
-        this.logger.log(`Status da proposta ${propostaId} atualizado para: ${status} (legacy mode)`);
+        this.logger.log(
+          `Status da proposta ${propostaId} atualizado para: ${fluxoStatus} (legacy mode)`,
+        );
         return propostaAtualizada;
       }
 
@@ -1015,12 +1862,75 @@ export class PropostasService {
         throw new Error(`Proposta com ID ${propostaId} não encontrada`);
       }
 
-      proposta.status = status;
+      const statusAnterior =
+        this.extractFlowStatusFromEmailDetails(proposta.emailDetails) ||
+        this.mapDatabaseStatusToFlowStatus(proposta.status);
+      let emailDetails = {
+        ...(proposta.emailDetails || {}),
+        fluxoStatus,
+      } as Record<string, unknown>;
+      emailDetails.aprovacaoInterna = this.calcularAprovacaoInterna(
+        proposta.descontoGlobal,
+        proposta.produtos,
+        this.parseAprovacaoInterna(emailDetails),
+      );
+      const aprovacaoInterna = this.parseAprovacaoInterna(emailDetails);
+
+      if (
+        fluxoStatus === 'aprovada' &&
+        aprovacaoInterna?.obrigatoria &&
+        aprovacaoInterna.status !== 'aprovada'
+      ) {
+        emailDetails.aprovacaoInterna = {
+          ...aprovacaoInterna,
+          status: 'pendente',
+          solicitadaEm: aprovacaoInterna.solicitadaEm || new Date().toISOString(),
+          observacoes:
+            aprovacaoInterna.observacoes ||
+            'Aguardando aprovacao interna por alcada para concluir a aprovacao comercial.',
+        } as PropostaAprovacaoInterna;
+        emailDetails = this.appendHistoricoEvento(emailDetails, 'aprovacao_interna_pendente', {
+          origem: source || 'api',
+          status: statusAnterior,
+          detalhes:
+            'Tentativa de aprovar proposta bloqueada por regra de alcada de desconto.',
+          metadata: {
+            limiteDesconto: aprovacaoInterna.limiteDesconto,
+            descontoDetectado: aprovacaoInterna.descontoDetectado,
+          },
+        });
+        proposta.emailDetails = emailDetails as any;
+        if (source) proposta.source = source;
+        await this.propostaRepository.save(proposta);
+        throw new Error(
+          'Proposta exige aprovacao interna por alcada antes de ser marcada como aprovada.',
+        );
+      }
+
+      proposta.status = this.mapFlowStatusToDatabaseStatus(fluxoStatus, false) as any;
       if (source) proposta.source = source;
-      if (observacoes) proposta.observacoes = observacoes;
+      if (observacoes !== undefined) proposta.observacoes = observacoes || null;
+
+      if (motivoPerda !== undefined) {
+        if (motivoPerdaLimpo) {
+          emailDetails.motivoPerda = motivoPerdaLimpo;
+        } else {
+          delete emailDetails.motivoPerda;
+        }
+      } else if (fluxoStatus !== 'rejeitada') {
+        delete emailDetails.motivoPerda;
+      }
+
+      emailDetails = this.appendHistoricoEvento(emailDetails, 'status_alterado', {
+        origem: source || 'api',
+        status: fluxoStatus,
+        detalhes: `Status alterado de "${statusAnterior}" para "${fluxoStatus}"`,
+      });
+
+      proposta.emailDetails = emailDetails as any;
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);
-      this.logger.log(`✅ Status da proposta ${propostaId} atualizado para: ${status}`);
+      this.logger.log(`Status da proposta ${propostaId} atualizado para: ${fluxoStatus}`);
 
       return this.entityToInterface(propostaAtualizada);
     } catch (error) {
@@ -1040,64 +1950,21 @@ export class PropostasService {
     empresaId?: string,
   ): Promise<Proposta> {
     try {
-      const propostaColumns = await this.getTableColumns('propostas');
-      const legacySchema = this.isLegacyPropostasSchema(propostaColumns);
-
-      if (legacySchema) {
-        const propostaAtual = await this.obterProposta(propostaId, empresaId);
-        if (!propostaAtual) {
-          throw new Error(`Proposta com ID ${propostaId} nao encontrada`);
-        }
-
-        if (status === 'aprovada' || status === 'rejeitada') {
-          if (propostaAtual.status !== 'visualizada' && propostaAtual.status !== 'enviada') {
-            this.logger.warn(
-              `Transicao automatica de '${propostaAtual.status}' para '${status}' pode nao ser valida`,
-            );
-          }
-        }
-
-        const propostaAtualizada = await this.atualizarProposta(
-          propostaId,
-          {
-            status: status as Proposta['status'],
-            source,
-            observacoes,
-          },
-          empresaId,
-        );
-
-        this.logger.log(
-          `Status da proposta ${propostaId} atualizado com validacao para: ${status} (legacy mode)`,
-        );
-        return propostaAtualizada;
+      const fluxoStatus = this.normalizeStatusInput(status);
+      const propostaAtual = await this.obterProposta(propostaId, empresaId);
+      if (!propostaAtual) {
+        throw new Error(`Proposta com ID ${propostaId} nao encontrada`);
       }
 
-      const proposta = await this.propostaRepository.findOne({
-        where: empresaId ? { id: propostaId, empresaId } : { id: propostaId },
-      });
-
-      if (!proposta) {
-        throw new Error(`Proposta com ID ${propostaId} não encontrada`);
-      }
-
-      // Validações específicas para transições automáticas
-      if (status === 'aprovada' || status === 'rejeitada') {
-        if (proposta.status !== 'visualizada' && proposta.status !== 'enviada') {
+      if (fluxoStatus === 'aprovada' || fluxoStatus === 'rejeitada') {
+        if (propostaAtual.status !== 'visualizada' && propostaAtual.status !== 'enviada') {
           this.logger.warn(
-            `⚠️ Transição automática de '${proposta.status}' para '${status}' pode não ser válida`,
+            `Transicao automatica de '${propostaAtual.status}' para '${fluxoStatus}' pode nao ser valida`,
           );
         }
       }
 
-      proposta.status = status;
-      if (source) proposta.source = source;
-      if (observacoes) proposta.observacoes = observacoes;
-
-      const propostaAtualizada = await this.propostaRepository.save(proposta);
-      this.logger.log(`✅ Status da proposta ${propostaId} atualizado com validação para: ${status}`);
-
-      return this.entityToInterface(propostaAtualizada);
+      return this.atualizarStatus(propostaId, fluxoStatus, source, observacoes, undefined, empresaId);
     } catch (error) {
       this.logger.error('Erro ao atualizar status com validacao', error?.stack || String(error));
       throw error;
@@ -1123,9 +1990,12 @@ export class PropostasService {
           throw new Error(`Proposta com ID ${propostaId} nao encontrada`);
         }
 
-        const propostaAtualizada = await this.atualizarProposta(
+        const propostaAtualizada = await this.atualizarStatus(
           propostaId,
-          { status: 'visualizada' },
+          'visualizada',
+          'portal',
+          undefined,
+          undefined,
           empresaId,
         );
         this.logger.log(`Proposta ${propostaId} marcada como visualizada (legacy mode)`);
@@ -1140,12 +2010,26 @@ export class PropostasService {
         throw new Error(`Proposta com ID ${propostaId} não encontrada`);
       }
 
-      proposta.status = 'visualizada';
+      proposta.status = this.mapFlowStatusToDatabaseStatus('visualizada', false) as any;
       proposta.portalAccess = {
         accessedAt: new Date().toISOString(),
         ip,
         userAgent,
       };
+      proposta.emailDetails = this.appendPortalEvento(
+        {
+          ...(proposta.emailDetails || {}),
+          fluxoStatus: 'visualizada',
+        },
+        'visualizacao_portal',
+        {
+          origem: 'portal',
+          status: 'visualizada',
+          detalhes: 'Proposta visualizada no portal do cliente',
+          ip,
+          userAgent,
+        },
+      ) as any;
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);
       this.logger.log(`👁️ Proposta ${propostaId} marcada como visualizada`);
@@ -1175,12 +2059,32 @@ export class PropostasService {
         throw new Error(`Proposta com ID ${propostaId} não encontrada`);
       }
 
-      proposta.status = 'enviada';
-      proposta.emailDetails = {
+      proposta.status = this.mapFlowStatusToDatabaseStatus('enviada', false) as any;
+      let emailDetails = {
+        ...(proposta.emailDetails || {}),
         sentAt: new Date().toISOString(),
         emailCliente,
         linkPortal,
+        fluxoStatus: 'enviada',
+      } as Record<string, unknown>;
+      emailDetails = this.appendHistoricoEvento(emailDetails, 'proposta_enviada', {
+        origem: 'email',
+        status: 'enviada',
+        detalhes: `Envio registrado para ${this.maskEmail(emailCliente)}`,
+      });
+
+      const lembretes = this.getLembretes(emailDetails);
+      const lembreteAutomatico: PropostaLembrete = {
+        id: randomUUID(),
+        status: 'agendado',
+        criadoEm: new Date().toISOString(),
+        agendadoPara: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+        diasApos: 3,
+        origem: 'followup-auto',
+        observacoes: 'Lembrete automatico de follow-up apos envio da proposta.',
       };
+      emailDetails.lembretes = [...lembretes, lembreteAutomatico].slice(-this.MAX_HISTORICO_EVENTOS);
+      proposta.emailDetails = emailDetails as any;
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);
       this.logger.log(`Email registrado para proposta ${propostaId} (${this.maskEmail(emailCliente)})`);
@@ -1227,12 +2131,20 @@ export class PropostasService {
       }
 
       // Atualizar status para enviada
-      proposta.status = 'enviada';
-      proposta.emailDetails = {
+      proposta.status = this.mapFlowStatusToDatabaseStatus('enviada', false) as any;
+      let emailDetails = {
+        ...(proposta.emailDetails || {}),
         sentAt: new Date().toISOString(),
         emailCliente,
         linkPortal,
-      };
+        fluxoStatus: 'enviada',
+      } as Record<string, unknown>;
+      emailDetails = this.appendHistoricoEvento(emailDetails, 'proposta_enviada', {
+        origem: 'sync-email',
+        status: 'enviada',
+        detalhes: `Proposta marcada como enviada para ${this.maskEmail(emailCliente)}`,
+      });
+      proposta.emailDetails = emailDetails as any;
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);
       this.logger.log(`✅ Proposta ${proposta.numero} marcada como enviada automaticamente`);
@@ -1243,4 +2155,666 @@ export class PropostasService {
       throw error;
     }
   }
+
+  async registrarEventoPortal(
+    propostaId: string,
+    empresaId: string,
+    evento: string,
+    payload?: Partial<PropostaHistoricoEvento>,
+  ): Promise<void> {
+    try {
+      const proposta = await this.propostaRepository.findOne({
+        where: { id: propostaId, empresaId },
+      });
+
+      if (!proposta) {
+        this.logger.warn(`Proposta ${propostaId} nao encontrada para registrar evento de portal.`);
+        return;
+      }
+
+      proposta.emailDetails = this.appendPortalEvento(proposta.emailDetails, evento, {
+        origem: payload?.origem || 'portal',
+        status: payload?.status,
+        detalhes: payload?.detalhes,
+        ip: payload?.ip,
+        userAgent: payload?.userAgent,
+        metadata: payload?.metadata,
+        timestamp: payload?.timestamp,
+      }) as any;
+
+      await this.propostaRepository.save(proposta);
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao registrar evento de portal para proposta ${propostaId}: ${String(error?.message || error)}`,
+      );
+    }
+  }
+
+  async obterEstatisticasProposta(propostaId: string, empresaId?: string): Promise<{
+    totalVisualizacoes: number;
+    ultimaVisualizacao?: string;
+    tempoMedioVisualizacao: number;
+    dispositivosUtilizados: string[];
+    acoes: Array<{
+      acao: string;
+      timestamp: string;
+      ip?: string;
+      userAgent?: string;
+      observacoes?: string;
+    }>;
+  }> {
+    const proposta = await this.obterProposta(propostaId, empresaId);
+    if (!proposta) {
+      throw new Error(`Proposta com ID ${propostaId} nao encontrada`);
+    }
+
+    const portalEventos = [
+      ...(proposta.emailDetails?.portalEventos || []),
+      ...(proposta.historicoEventos || []).filter((evento) =>
+        String(evento?.origem || '').toLowerCase().includes('portal'),
+      ),
+    ]
+      .map((evento) => this.parseHistoryEvent(evento))
+      .filter((evento): evento is PropostaHistoricoEvento => Boolean(evento))
+      .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+
+    const visualizacoes = portalEventos.filter((evento) => {
+      const chave = String(evento.evento || '').toLowerCase();
+      return (
+        chave.includes('visualizacao') ||
+        chave === 'view' ||
+        chave === 'visualizada' ||
+        chave.includes('abertura')
+      );
+    });
+
+    const intervalosVisualizacao: number[] = [];
+    for (let i = 1; i < visualizacoes.length; i += 1) {
+      const anterior = new Date(visualizacoes[i - 1].timestamp).getTime();
+      const atual = new Date(visualizacoes[i].timestamp).getTime();
+      if (Number.isFinite(anterior) && Number.isFinite(atual) && atual > anterior) {
+        intervalosVisualizacao.push((atual - anterior) / 1000);
+      }
+    }
+
+    const dispositivos = new Set<string>();
+    portalEventos.forEach((evento) => {
+      const userAgent = String(evento.userAgent || '').toLowerCase();
+      if (!userAgent) return;
+      if (userAgent.includes('iphone') || userAgent.includes('ios')) {
+        dispositivos.add('iOS');
+        return;
+      }
+      if (userAgent.includes('android')) {
+        dispositivos.add('Android');
+        return;
+      }
+      if (userAgent.includes('windows')) {
+        dispositivos.add('Windows');
+        return;
+      }
+      if (userAgent.includes('mac')) {
+        dispositivos.add('macOS');
+        return;
+      }
+      dispositivos.add('Outro');
+    });
+
+    return {
+      totalVisualizacoes: visualizacoes.length,
+      ultimaVisualizacao:
+        visualizacoes.length > 0 ? visualizacoes[visualizacoes.length - 1].timestamp : undefined,
+      tempoMedioVisualizacao:
+        intervalosVisualizacao.length > 0
+          ? Math.round(
+              intervalosVisualizacao.reduce((total, atual) => total + atual, 0) /
+                intervalosVisualizacao.length,
+            )
+          : 0,
+      dispositivosUtilizados: Array.from(dispositivos),
+      acoes: portalEventos.map((evento) => ({
+        acao: evento.evento,
+        timestamp: evento.timestamp,
+        ip: evento.ip,
+        userAgent: evento.userAgent,
+        observacoes: evento.detalhes,
+      })),
+    };
+  }
+
+  async agendarLembrete(
+    propostaId: string,
+    diasApos = 7,
+    empresaId?: string,
+  ): Promise<PropostaLembrete> {
+    const proposta = await this.propostaRepository.findOne({
+      where: empresaId ? { id: propostaId, empresaId } : { id: propostaId },
+    });
+
+    if (!proposta) {
+      throw new Error(`Proposta com ID ${propostaId} nao encontrada`);
+    }
+
+    const dias = Math.max(1, Math.floor(this.toFiniteNumber(diasApos, 7)));
+    const lembrete: PropostaLembrete = {
+      id: randomUUID(),
+      status: 'agendado',
+      criadoEm: new Date().toISOString(),
+      agendadoPara: new Date(Date.now() + dias * 24 * 60 * 60 * 1000).toISOString(),
+      diasApos: dias,
+      origem: 'manual',
+    };
+
+    let emailDetails = this.toObjectRecord(proposta.emailDetails);
+    const lembretes = this.getLembretes(emailDetails);
+    emailDetails.lembretes = [...lembretes, lembrete].slice(-this.MAX_HISTORICO_EVENTOS);
+    emailDetails = this.appendHistoricoEvento(emailDetails, 'followup_agendado', {
+      origem: 'api',
+      status:
+        this.extractFlowStatusFromEmailDetails(emailDetails) ||
+        this.mapDatabaseStatusToFlowStatus(proposta.status),
+      detalhes: `Lembrete agendado para ${dias} dia(s) apos o envio.`,
+      metadata: {
+        lembreteId: lembrete.id,
+        agendadoPara: lembrete.agendadoPara,
+        diasApos: dias,
+      },
+    });
+
+    proposta.emailDetails = emailDetails as any;
+    await this.propostaRepository.save(proposta);
+
+    return lembrete;
+  }
+
+  async listarPropostasExpiradas(
+    empresaId: string,
+    vendedorId?: string,
+  ): Promise<
+    Array<{
+      id: string;
+      numero: string;
+      titulo?: string;
+      status: string;
+      dataEnvio?: string;
+      dataValidade?: string;
+      valorTotal: number;
+      cliente?: unknown;
+      vendedor?: unknown;
+      produtos?: unknown[];
+    }>
+  > {
+    const propostas = await this.listarPropostas(empresaId);
+    const agora = Date.now();
+    return propostas
+      .filter((proposta) => {
+        const expiradaPorStatus = proposta.status === 'expirada';
+        const expiradaPorData = proposta.dataVencimento
+          ? new Date(proposta.dataVencimento).getTime() < agora
+          : false;
+        if (!expiradaPorStatus && !expiradaPorData) {
+          return false;
+        }
+
+        if (!vendedorId) {
+          return true;
+        }
+
+        if (typeof proposta.vendedor === 'object' && proposta.vendedor?.id) {
+          return String(proposta.vendedor.id) === String(vendedorId);
+        }
+
+        return String(proposta.vendedor || '') === String(vendedorId);
+      })
+      .map((proposta) => ({
+        id: proposta.id,
+        numero: proposta.numero,
+        titulo: proposta.titulo,
+        status: 'expirada',
+        dataEnvio: proposta.emailDetails?.sentAt || proposta.createdAt,
+        dataValidade: proposta.dataVencimento,
+        valorTotal: this.toFiniteNumber(proposta.total ?? proposta.valor, 0),
+        cliente: proposta.cliente,
+        vendedor: proposta.vendedor,
+        produtos: proposta.produtos || [],
+      }));
+  }
+
+  async reativarProposta(
+    propostaId: string,
+    novaDataValidade: string,
+    empresaId?: string,
+  ): Promise<Proposta> {
+    const proposta = await this.propostaRepository.findOne({
+      where: empresaId ? { id: propostaId, empresaId } : { id: propostaId },
+    });
+
+    if (!proposta) {
+      throw new Error(`Proposta com ID ${propostaId} nao encontrada`);
+    }
+
+    const novaData = new Date(novaDataValidade);
+    if (Number.isNaN(novaData.getTime())) {
+      throw new Error('Data de validade invalida para reativacao da proposta.');
+    }
+
+    const hoje = new Date();
+    const diffDias = Math.max(
+      1,
+      Math.ceil((novaData.getTime() - hoje.getTime()) / (24 * 60 * 60 * 1000)),
+    );
+
+    proposta.dataVencimento = novaData;
+    proposta.validadeDias = diffDias;
+    proposta.status = this.mapFlowStatusToDatabaseStatus('enviada', false) as any;
+
+    let emailDetails = {
+      ...(proposta.emailDetails || {}),
+      fluxoStatus: 'enviada',
+    } as Record<string, unknown>;
+    emailDetails = this.appendHistoricoEvento(emailDetails, 'proposta_reativada', {
+      origem: 'api',
+      status: 'enviada',
+      detalhes: `Proposta reativada com validade ate ${novaData.toISOString().split('T')[0]}.`,
+      metadata: { novaDataValidade: novaData.toISOString(), validadeDias: diffDias },
+    });
+
+    proposta.emailDetails = emailDetails as any;
+    const propostaSalva = await this.propostaRepository.save(proposta);
+    return this.entityToInterface(propostaSalva);
+  }
+
+  async obterHistoricoProposta(propostaId: string, empresaId?: string): Promise<{
+    criacaoEm: string;
+    envioEm?: string;
+    primeiraVisualizacaoEm?: string;
+    decisaoEm?: string;
+    statusAtual: string;
+    aprovacaoInterna?: PropostaAprovacaoInterna;
+    versoes: PropostaVersao[];
+    log: Array<{
+      data: string;
+      evento: string;
+      detalhes: string;
+      ip?: string;
+    }>;
+  }> {
+    const proposta = await this.obterProposta(propostaId, empresaId);
+    if (!proposta) {
+      throw new Error(`Proposta com ID ${propostaId} nao encontrada`);
+    }
+
+    const historico = (proposta.historicoEventos || proposta.emailDetails?.historicoEventos || [])
+      .map((evento) => this.parseHistoryEvent(evento))
+      .filter((evento): evento is PropostaHistoricoEvento => Boolean(evento))
+      .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+
+    const envioEvento = historico.find((evento) =>
+      ['proposta_enviada', 'status_alterado'].includes(String(evento.evento).toLowerCase()) &&
+      evento.status === 'enviada',
+    );
+    const primeiraVisualizacao = historico.find((evento) => {
+      const chave = String(evento.evento || '').toLowerCase();
+      return chave.includes('visualizacao') || chave === 'view' || chave === 'visualizada';
+    });
+    const decisao = historico.find((evento) =>
+      evento.status === 'aprovada' || evento.status === 'rejeitada',
+    );
+
+    const versoesEnriquecidas = await Promise.all(
+      (proposta.versoes || []).map(async (versao) => {
+        const snapshot = versao?.snapshot || ({} as any);
+        const produtosSnapshot = Array.isArray(snapshot.produtos) ? snapshot.produtos : [];
+        const produtos = await this.enrichSnapshotProdutos(produtosSnapshot, empresaId);
+        return {
+          ...versao,
+          snapshot: {
+            ...snapshot,
+            produtos,
+          },
+        };
+      }),
+    );
+
+    return {
+      criacaoEm: proposta.createdAt,
+      envioEm: envioEvento?.timestamp,
+      primeiraVisualizacaoEm: primeiraVisualizacao?.timestamp,
+      decisaoEm: decisao?.timestamp,
+      statusAtual: proposta.status,
+      aprovacaoInterna: proposta.aprovacaoInterna,
+      versoes: versoesEnriquecidas,
+      log: historico.map((evento) => ({
+        data: evento.timestamp,
+        evento: evento.evento,
+        detalhes: evento.detalhes || '',
+        ip: evento.ip,
+      })),
+    };
+  }
+
+  async obterAprovacaoInterna(
+    propostaId: string,
+    empresaId?: string,
+  ): Promise<PropostaAprovacaoInterna> {
+    const proposta = await this.obterProposta(propostaId, empresaId);
+    if (!proposta) {
+      throw new Error(`Proposta com ID ${propostaId} nao encontrada`);
+    }
+
+    if (proposta.aprovacaoInterna) {
+      return proposta.aprovacaoInterna;
+    }
+
+    return this.calcularAprovacaoInterna(proposta.descontoGlobal, proposta.produtos, null);
+  }
+
+  async solicitarAprovacaoInterna(
+    propostaId: string,
+    payload: {
+      solicitadaPorId?: string;
+      solicitadaPorNome?: string;
+      observacoes?: string;
+    },
+    empresaId?: string,
+  ): Promise<PropostaAprovacaoInterna> {
+    const proposta = await this.propostaRepository.findOne({
+      where: empresaId ? { id: propostaId, empresaId } : { id: propostaId },
+    });
+
+    if (!proposta) {
+      throw new Error(`Proposta com ID ${propostaId} nao encontrada`);
+    }
+
+    const aprovacaoBase = this.calcularAprovacaoInterna(
+      proposta.descontoGlobal,
+      proposta.produtos,
+      this.parseAprovacaoInterna(proposta.emailDetails),
+    );
+
+    if (!aprovacaoBase.obrigatoria) {
+      proposta.emailDetails = {
+        ...(proposta.emailDetails || {}),
+        aprovacaoInterna: aprovacaoBase,
+      } as any;
+      await this.propostaRepository.save(proposta);
+      return aprovacaoBase;
+    }
+
+    const aprovacao: PropostaAprovacaoInterna = {
+      ...aprovacaoBase,
+      status: 'pendente',
+      solicitadaEm: new Date().toISOString(),
+      solicitadaPorId: payload?.solicitadaPorId,
+      solicitadaPorNome: payload?.solicitadaPorNome,
+      observacoes: payload?.observacoes,
+      aprovadaEm: undefined,
+      aprovadaPorId: undefined,
+      aprovadaPorNome: undefined,
+      rejeitadaEm: undefined,
+      rejeitadaPorId: undefined,
+      rejeitadaPorNome: undefined,
+    };
+
+    let emailDetails = {
+      ...(proposta.emailDetails || {}),
+      aprovacaoInterna: aprovacao,
+    } as Record<string, unknown>;
+    emailDetails = this.appendHistoricoEvento(emailDetails, 'aprovacao_interna_solicitada', {
+      origem: 'api',
+      status:
+        this.extractFlowStatusFromEmailDetails(emailDetails) ||
+        this.mapDatabaseStatusToFlowStatus(proposta.status),
+      detalhes: 'Aprovacao interna solicitada.',
+      metadata: {
+        solicitadaPorId: payload?.solicitadaPorId,
+        solicitadaPorNome: payload?.solicitadaPorNome,
+      },
+    });
+
+    proposta.emailDetails = emailDetails as any;
+    await this.propostaRepository.save(proposta);
+    return aprovacao;
+  }
+
+  async decidirAprovacaoInterna(
+    propostaId: string,
+    payload: {
+      aprovada: boolean;
+      usuarioId?: string;
+      usuarioNome?: string;
+      observacoes?: string;
+    },
+    empresaId?: string,
+  ): Promise<PropostaAprovacaoInterna> {
+    const proposta = await this.propostaRepository.findOne({
+      where: empresaId ? { id: propostaId, empresaId } : { id: propostaId },
+    });
+
+    if (!proposta) {
+      throw new Error(`Proposta com ID ${propostaId} nao encontrada`);
+    }
+
+    const aprovacaoBase = this.calcularAprovacaoInterna(
+      proposta.descontoGlobal,
+      proposta.produtos,
+      this.parseAprovacaoInterna(proposta.emailDetails),
+    );
+
+    if (!aprovacaoBase.obrigatoria) {
+      return aprovacaoBase;
+    }
+
+    const agora = new Date().toISOString();
+    const aprovacao: PropostaAprovacaoInterna = payload.aprovada
+      ? {
+          ...aprovacaoBase,
+          status: 'aprovada',
+          aprovadaEm: agora,
+          aprovadaPorId: payload?.usuarioId,
+          aprovadaPorNome: payload?.usuarioNome,
+          observacoes: payload?.observacoes,
+        }
+      : {
+          ...aprovacaoBase,
+          status: 'rejeitada',
+          rejeitadaEm: agora,
+          rejeitadaPorId: payload?.usuarioId,
+          rejeitadaPorNome: payload?.usuarioNome,
+          observacoes: payload?.observacoes,
+        };
+
+    let emailDetails = {
+      ...(proposta.emailDetails || {}),
+      aprovacaoInterna: aprovacao,
+    } as Record<string, unknown>;
+    emailDetails = this.appendHistoricoEvento(emailDetails, 'aprovacao_interna_decidida', {
+      origem: 'api',
+      status:
+        this.extractFlowStatusFromEmailDetails(emailDetails) ||
+        this.mapDatabaseStatusToFlowStatus(proposta.status),
+      detalhes: payload.aprovada
+        ? 'Aprovacao interna concluida como APROVADA.'
+        : 'Aprovacao interna concluida como REJEITADA.',
+      metadata: {
+        usuarioId: payload?.usuarioId,
+        usuarioNome: payload?.usuarioNome,
+      },
+    });
+
+    proposta.emailDetails = emailDetails as any;
+    await this.propostaRepository.save(proposta);
+    return aprovacao;
+  }
+
+  async obterEstatisticasDashboard(empresaId?: string): Promise<{
+    totalPropostas: number;
+    valorTotalPipeline: number;
+    taxaConversao: number;
+    propostasAprovadas: number;
+    estatisticasPorStatus: Record<string, number>;
+    estatisticasPorVendedor: Record<string, number>;
+    motivosPerdaTop: Array<{ motivo: string; quantidade: number }>;
+    conversaoPorVendedor: Array<{
+      vendedor: string;
+      total: number;
+      ganhas: number;
+      perdidas: number;
+      taxaConversao: number;
+    }>;
+    conversaoPorProduto: Array<{
+      produto: string;
+      total: number;
+      ganhas: number;
+      perdidas: number;
+      taxaConversao: number;
+    }>;
+    aprovacoesPendentes: number;
+    followupsPendentes: number;
+    propostasComVersao: number;
+    mediaVersoesPorProposta: number;
+    revisoesUltimos7Dias: number;
+  }> {
+    const propostas = await this.listarPropostas(empresaId);
+    const totalPropostas = propostas.length;
+    const valorTotalPipeline = propostas.reduce(
+      (total, proposta) => total + this.toFiniteNumber(proposta.total ?? proposta.valor, 0),
+      0,
+    );
+    const propostasAprovadas = propostas.filter((proposta) => WON_STATUS_VALUES.has(proposta.status))
+      .length;
+    const taxaConversao =
+      totalPropostas > 0 ? Number(((propostasAprovadas / totalPropostas) * 100).toFixed(2)) : 0;
+
+    const estatisticasPorStatus: Record<string, number> = {};
+    const estatisticasPorVendedor: Record<string, number> = {};
+    const motivosPerda: Record<string, number> = {};
+    const vendedorMap = new Map<
+      string,
+      { total: number; ganhas: number; perdidas: number; motivos: Record<string, number> }
+    >();
+    const produtoMap = new Map<string, { total: number; ganhas: number; perdidas: number }>();
+    let aprovacoesPendentes = 0;
+    let followupsPendentes = 0;
+    let propostasComVersao = 0;
+    let totalVersoes = 0;
+    let revisoesUltimos7Dias = 0;
+    const limiteRevisaoRecente = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
+    propostas.forEach((proposta) => {
+      const status = proposta.status || FLOW_STATUS_FALLBACK;
+      estatisticasPorStatus[status] = (estatisticasPorStatus[status] || 0) + 1;
+
+      const vendedorNome =
+        typeof proposta.vendedor === 'object'
+          ? proposta.vendedor?.nome || 'Sem vendedor'
+          : proposta.vendedor || 'Sem vendedor';
+      estatisticasPorVendedor[vendedorNome] = (estatisticasPorVendedor[vendedorNome] || 0) + 1;
+
+      if (!vendedorMap.has(vendedorNome)) {
+        vendedorMap.set(vendedorNome, { total: 0, ganhas: 0, perdidas: 0, motivos: {} });
+      }
+      const vendedorStats = vendedorMap.get(vendedorNome)!;
+      vendedorStats.total += 1;
+      if (WON_STATUS_VALUES.has(status)) {
+        vendedorStats.ganhas += 1;
+      }
+      if (status === 'rejeitada') {
+        vendedorStats.perdidas += 1;
+        const motivo = this.sanitizeMotivoPerda(proposta.motivoPerda) || 'Nao informado';
+        motivosPerda[motivo] = (motivosPerda[motivo] || 0) + 1;
+        vendedorStats.motivos[motivo] = (vendedorStats.motivos[motivo] || 0) + 1;
+      }
+
+      (proposta.produtos || []).forEach((produto) => {
+        const nomeProduto = String((produto as Record<string, unknown>)?.nome || 'Produto nao informado');
+        if (!produtoMap.has(nomeProduto)) {
+          produtoMap.set(nomeProduto, { total: 0, ganhas: 0, perdidas: 0 });
+        }
+        const produtoStats = produtoMap.get(nomeProduto)!;
+        produtoStats.total += 1;
+        if (WON_STATUS_VALUES.has(status)) {
+          produtoStats.ganhas += 1;
+        }
+        if (status === 'rejeitada') {
+          produtoStats.perdidas += 1;
+        }
+      });
+
+      if (proposta.aprovacaoInterna?.status === 'pendente') {
+        aprovacoesPendentes += 1;
+      }
+
+      followupsPendentes += (proposta.lembretes || []).filter(
+        (lembrete) => lembrete.status === 'agendado',
+      ).length;
+
+      const versoesProposta = Array.isArray(proposta.versoes)
+        ? proposta.versoes
+        : Array.isArray((proposta.emailDetails as any)?.versoes)
+          ? ((proposta.emailDetails as any).versoes as Array<Record<string, unknown>>)
+          : [];
+      const quantidadeVersoes = versoesProposta.length;
+
+      if (quantidadeVersoes > 1) {
+        propostasComVersao += 1;
+      }
+      totalVersoes += Math.max(quantidadeVersoes, 1);
+
+      const possuiRevisaoRecente = versoesProposta.some((versao) => {
+        const timestamp = new Date(
+          (versao as any)?.criadaEm || (versao as any)?.timestamp || '',
+        ).getTime();
+        return Number.isFinite(timestamp) && timestamp >= limiteRevisaoRecente;
+      });
+
+      if (possuiRevisaoRecente) {
+        revisoesUltimos7Dias += 1;
+      }
+    });
+
+    const motivosPerdaTop = Object.entries(motivosPerda)
+      .map(([motivo, quantidade]) => ({ motivo, quantidade }))
+      .sort((a, b) => b.quantidade - a.quantidade)
+      .slice(0, 10);
+
+    const conversaoPorVendedor = Array.from(vendedorMap.entries())
+      .map(([vendedor, stats]) => ({
+        vendedor,
+        total: stats.total,
+        ganhas: stats.ganhas,
+        perdidas: stats.perdidas,
+        taxaConversao: stats.total > 0 ? Number(((stats.ganhas / stats.total) * 100).toFixed(2)) : 0,
+      }))
+      .sort((a, b) => b.total - a.total);
+
+    const conversaoPorProduto = Array.from(produtoMap.entries())
+      .map(([produto, stats]) => ({
+        produto,
+        total: stats.total,
+        ganhas: stats.ganhas,
+        perdidas: stats.perdidas,
+        taxaConversao: stats.total > 0 ? Number(((stats.ganhas / stats.total) * 100).toFixed(2)) : 0,
+      }))
+      .sort((a, b) => b.total - a.total);
+
+    return {
+      totalPropostas,
+      valorTotalPipeline,
+      taxaConversao,
+      propostasAprovadas,
+      estatisticasPorStatus,
+      estatisticasPorVendedor,
+      motivosPerdaTop,
+      conversaoPorVendedor,
+      conversaoPorProduto,
+      aprovacoesPendentes,
+      followupsPendentes,
+      propostasComVersao,
+      mediaVersoesPorProposta:
+        totalPropostas > 0 ? Number((totalVersoes / totalPropostas).toFixed(2)) : 0,
+      revisoesUltimos7Dias,
+    };
+  }
 }
+

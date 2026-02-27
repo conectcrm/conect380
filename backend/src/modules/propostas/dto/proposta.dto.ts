@@ -15,6 +15,7 @@ export interface PropostaDto {
   numero: string;
   titulo?: string;
   status: string;
+  motivoPerda?: string;
   cliente: string;
   valor: number;
   createdAt: string;
@@ -192,6 +193,10 @@ export class AtualizarStatusDto {
   @IsOptional()
   @IsString()
   observacoes?: string;
+
+  @IsOptional()
+  @IsString()
+  motivoPerda?: string;
 }
 
 export interface PropostaResponseDto {

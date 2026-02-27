@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { X, Building2, Mail, Phone, MapPin, CreditCard, AlertCircle } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { X, Building2, Mail, Phone, CreditCard, AlertCircle } from 'lucide-react';
 import { useEmpresas } from '../../../contexts/EmpresaContextAPIReal';
 
 interface ModalNovaEmpresaProps {
@@ -133,8 +134,10 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
       setStep(1);
       setErrors({});
       onClose();
+      toast.success('Empresa criada com sucesso!');
     } catch (error) {
       console.error('Erro ao criar empresa:', error);
+      toast.error('Erro ao criar empresa');
     } finally {
       setLoading(false);
     }
@@ -154,24 +157,26 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-[calc(100%-2rem)] sm:w-[500px] md:w-[600px] lg:w-[700px] max-w-[800px] max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-sm border border-[#B4BEC9] w-[calc(100%-2rem)] sm:w-[500px] md:w-[600px] lg:w-[700px] max-w-[800px] max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] rounded-xl flex items-center justify-center">
-                <Building2 className="w-5 h-5 text-white" />
+              <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
+                <Building2 className="h-6 w-6 text-[#159A9C]" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-gray-900">Nova Empresa</h2>
-                <p className="text-sm text-gray-600">
+                <h2 className="text-2xl font-bold text-[#002333]">Nova Empresa</h2>
+                <p className="text-sm text-[#002333]/70">
                   {step === 1 ? 'Informações básicas' : 'Escolha seu plano'}
                 </p>
               </div>
             </div>
             <button
+              type="button"
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+              className="p-2 text-[#159A9C] hover:bg-[#159A9C]/10 rounded-lg transition-colors"
+              aria-label="Fechar modal"
             >
               <X className="w-5 h-5" />
             </button>
@@ -205,8 +210,8 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
                   type="text"
                   value={formData.nome}
                   onChange={(e) => setFormData((prev) => ({ ...prev, nome: e.target.value }))}
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C]/20 focus:border-[#159A9C] ${
-                    errors.nome ? 'border-red-300' : 'border-gray-300'
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C] ${
+                    errors.nome ? 'border-red-300' : 'border-[#B4BEC9]'
                   }`}
                   placeholder="Ex: Minha Empresa Ltda"
                 />
@@ -226,8 +231,8 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
                   onChange={(e) =>
                     setFormData((prev) => ({ ...prev, cnpj: formatCNPJ(e.target.value) }))
                   }
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C]/20 focus:border-[#159A9C] ${
-                    errors.cnpj ? 'border-red-300' : 'border-gray-300'
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C] ${
+                    errors.cnpj ? 'border-red-300' : 'border-[#B4BEC9]'
                   }`}
                   placeholder="00.000.000/0000-00"
                   maxLength={18}
@@ -248,8 +253,8 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
-                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C]/20 focus:border-[#159A9C] ${
-                      errors.email ? 'border-red-300' : 'border-gray-300'
+                    className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C] ${
+                      errors.email ? 'border-red-300' : 'border-[#B4BEC9]'
                     }`}
                     placeholder="contato@empresa.com.br"
                   />
@@ -272,8 +277,8 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
                     onChange={(e) =>
                       setFormData((prev) => ({ ...prev, telefone: formatPhone(e.target.value) }))
                     }
-                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C]/20 focus:border-[#159A9C] ${
-                      errors.telefone ? 'border-red-300' : 'border-gray-300'
+                    className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C] ${
+                      errors.telefone ? 'border-red-300' : 'border-[#B4BEC9]'
                     }`}
                     placeholder="(11) 99999-9999"
                     maxLength={15}
@@ -357,12 +362,12 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
                 ))}
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="bg-[#DEEFE7] border border-[#B4BEC9] rounded-lg p-4">
                 <div className="flex items-start gap-3">
-                  <CreditCard className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <CreditCard className="w-5 h-5 text-[#159A9C] flex-shrink-0 mt-0.5" />
                   <div>
-                    <h4 className="font-medium text-blue-900 mb-1">Trial de 30 dias grátis</h4>
-                    <p className="text-sm text-blue-700">
+                    <h4 className="font-medium text-[#002333] mb-1">Trial de 30 dias grátis</h4>
+                    <p className="text-sm text-[#002333]/70">
                       Você pode testar todos os recursos por 30 dias sem compromisso. Nenhum cartão
                       de crédito necessário.
                     </p>
@@ -379,8 +384,9 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
             <div className="flex items-center gap-3">
               {step > 1 && (
                 <button
+                  type="button"
                   onClick={() => setStep(step - 1)}
-                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="px-4 py-2 bg-white text-[#002333] border border-[#B4BEC9] rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
                 >
                   Voltar
                 </button>
@@ -389,28 +395,31 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
 
             <div className="flex items-center gap-3">
               <button
+                type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="px-4 py-2 bg-white text-[#002333] border border-[#B4BEC9] rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
               >
                 Cancelar
               </button>
 
               {step < 2 ? (
                 <button
+                  type="button"
                   onClick={() => {
                     if (validateForm()) {
                       setStep(2);
                     }
                   }}
-                  className="px-6 py-2 bg-[#159A9C] text-white font-medium rounded-lg hover:bg-[#0F7B7D] transition-colors"
+                  className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm font-medium"
                 >
                   Continuar
                 </button>
               ) : (
                 <button
+                  type="button"
                   onClick={handleSubmit}
                   disabled={loading}
-                  className="px-6 py-2 bg-[#159A9C] text-white font-medium rounded-lg hover:bg-[#0F7B7D] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm font-medium"
                 >
                   {loading ? (
                     <>

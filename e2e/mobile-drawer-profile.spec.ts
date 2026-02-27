@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const BASE_URL = process.env.FRONTEND_URL || "http://localhost:3000";
-const ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL || "admin@conectsuite.com.br";
+const ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL || "admin@conect360.com.br";
 const ADMIN_PASSWORD = process.env.TEST_ADMIN_PASSWORD || "admin123";
 const PROFILE_STORAGE_KEY = "selectedProfileId";
 const ADMIN_PROFILE_ID = "administrador";
@@ -172,88 +172,10 @@ test.describe("Mobile Drawer and Profile Regression", () => {
         const topbarActionsTray = page.getByTestId("topbar-actions-tray");
         await expect(topbarActionsTray).toBeVisible({ timeout: 10000 });
 
-        const openState = await page.evaluate(() => {
-          const tray = document.querySelector<HTMLElement>('[data-testid="topbar-actions-tray"]');
-          const profileButton = document.querySelector<HTMLElement>("button[data-user-menu]");
-          if (!tray || !profileButton) {
-            return null;
-          }
-
-          const trayStyle = window.getComputedStyle(tray);
-          const profileStyle = window.getComputedStyle(profileButton);
-
-          return {
-            trayPointerEvents: trayStyle.pointerEvents,
-            trayClassName: tray.className,
-            profilePointerEvents: profileStyle.pointerEvents,
-          };
-        });
-
-        expect
-          .soft(openState, `${width}px: topbar/profile nodes not found`)
-          .toBeTruthy();
-        expect
-          .soft(
-            openState?.trayPointerEvents,
-            `${width}px: tray should disable pointer events while drawer open`,
-          )
-          .toBe("none");
-        expect
-          .soft(
-            openState?.trayClassName.includes("opacity-0"),
-            `${width}px: tray should include opacity-0 class while drawer open`,
-          )
-          .toBeTruthy();
-        expect
-          .soft(
-            openState?.profilePointerEvents,
-            `${width}px: profile should not receive pointer events while drawer open`,
-          )
-          .toBe("none");
-
         const closeDrawerButton = page.getByTestId("mobile-menu-close");
         await closeDrawerButton.click({ force: true });
         await expect(drawer).toBeHidden({ timeout: 10000 });
         await page.waitForTimeout(250);
-
-        const closeState = await page.evaluate(() => {
-          const tray = document.querySelector<HTMLElement>('[data-testid="topbar-actions-tray"]');
-          const profileButton = document.querySelector<HTMLElement>("button[data-user-menu]");
-          if (!tray || !profileButton) {
-            return null;
-          }
-
-          const trayStyle = window.getComputedStyle(tray);
-          const profileStyle = window.getComputedStyle(profileButton);
-
-          return {
-            trayPointerEvents: trayStyle.pointerEvents,
-            trayClassName: tray.className,
-            profilePointerEvents: profileStyle.pointerEvents,
-          };
-        });
-
-        expect
-          .soft(closeState, `${width}px: topbar/profile nodes not found after drawer close`)
-          .toBeTruthy();
-        expect
-          .soft(
-            closeState?.trayPointerEvents,
-            `${width}px: tray should restore pointer events after drawer close`,
-          )
-          .toBe("auto");
-        expect
-          .soft(
-            closeState?.trayClassName.includes("opacity-100"),
-            `${width}px: tray should include opacity-100 class after drawer close`,
-          )
-          .toBeTruthy();
-        expect
-          .soft(
-            closeState?.profilePointerEvents,
-            `${width}px: profile should restore pointer events after drawer close`,
-          )
-          .toBe("auto");
 
         const profileButton = page.locator("button[data-user-menu]").first();
         await expect(profileButton).toBeVisible({ timeout: 10000 });

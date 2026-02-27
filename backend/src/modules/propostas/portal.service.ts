@@ -298,7 +298,7 @@ export class PortalService {
       throw new Error('Token invalido ou expirado');
     }
 
-    await this.registrarAcaoPortal(token, 'status_update', { novoStatus, ...metadata });
+    await this.registrarAcaoPortal(token, 'status_update', { novoStatus, ...metadata }, tokenData);
 
     let resultado;
     if (novoStatus === 'aprovada' || novoStatus === 'rejeitada') {
@@ -315,6 +315,7 @@ export class PortalService {
         novoStatus,
         'portal-cliente',
         `Atualizado via portal do cliente (token: ${this.maskToken(token)})`,
+        undefined,
         tokenData.empresaId,
       );
     }
@@ -384,10 +385,15 @@ export class PortalService {
       }
     }
 
-    await this.registrarAcaoPortal(token, 'view', {
+    await this.registrarAcaoPortal(
+      token,
+      'view',
+      {
       timestamp: new Date().toISOString(),
       statusAtual: proposta.status,
-    });
+      },
+      tokenData,
+    );
 
     return {
       ...proposta,
@@ -398,7 +404,12 @@ export class PortalService {
     };
   }
 
-  async registrarAcaoPortal(token: string, acao: string, metadata?: any): Promise<void> {
+  async registrarAcaoPortal(
+    token: string,
+    acao: string,
+    metadata?: any,
+    tokenData?: TokenData,
+  ): Promise<void> {
     this.logger.log(`Portal: acao "${acao}" em ${this.maskToken(token)}`);
     this.logger.debug(
       `Portal action: ${JSON.stringify({
@@ -408,14 +419,66 @@ export class PortalService {
         metadata: this.sanitizePortalMetadata(metadata),
       })}`,
     );
+
+    try {
+      const resolvedToken = tokenData || (await this.validarToken(token));
+      if (!resolvedToken || !resolvedToken.isActive) {
+        return;
+      }
+
+      await this.propostasService.registrarEventoPortal(
+        resolvedToken.propostaId,
+        resolvedToken.empresaId,
+        acao,
+        {
+          origem: 'portal',
+          status: metadata?.novoStatus,
+          detalhes: typeof metadata?.detalhes === 'string' ? metadata.detalhes : undefined,
+          ip: metadata?.ip,
+          userAgent: metadata?.userAgent,
+          metadata:
+            metadata && typeof metadata === 'object'
+              ? (this.sanitizePortalMetadata(metadata) as Record<string, unknown>)
+              : undefined,
+          timestamp: metadata?.timestamp,
+        },
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Portal: falha ao persistir acao "${acao}" para ${this.maskToken(token)} - ${String(
+          error?.message || error,
+        )}`,
+      );
+    }
   }
 
   async registrarVisualizacao(token: string, viewData: ViewData): Promise<void> {
-    await this.registrarAcaoPortal(token, 'view', {
+    const tokenData = await this.validarToken(token);
+    if (!tokenData || !tokenData.isActive) {
+      throw new Error('Token invalido ou expirado');
+    }
+
+    await this.registrarAcaoPortal(
+      token,
+      'view',
+      {
       ip: viewData.ip,
       userAgent: viewData.userAgent,
       timestamp: viewData.timestamp || new Date().toISOString(),
-    });
+      },
+      tokenData,
+    );
+
+    try {
+      await this.propostasService.marcarComoVisualizada(
+        tokenData.propostaId,
+        viewData.ip,
+        viewData.userAgent,
+        tokenData.empresaId,
+      );
+    } catch (error) {
+      this.logger.warn('Portal: nao foi possivel atualizar status para visualizada no registro dedicado');
+    }
   }
 
   async registrarAcaoCliente(
@@ -431,11 +494,16 @@ export class PortalService {
         return { sucesso: false, mensagem: 'Token invalido ou expirado' };
       }
 
-      await this.registrarAcaoPortal(token, acao, {
+      await this.registrarAcaoPortal(
+        token,
+        acao,
+        {
         ...metadata,
         timestamp: new Date().toISOString(),
         source: 'cliente-portal',
-      });
+        },
+        tokenData,
+      );
 
       let novoStatus: string | null = null;
       switch (acao) {

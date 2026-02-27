@@ -8,6 +8,7 @@ import { Logger,
   Get,
   Post,
   Delete,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { PropostasService, Proposta } from './propostas.service';
@@ -43,6 +44,7 @@ export class PropostasController {
       numero: proposta.numero,
       titulo: proposta.titulo,
       status: proposta.status,
+      motivoPerda: proposta.motivoPerda,
       cliente:
         typeof proposta.cliente === 'object' && proposta.cliente?.nome
           ? proposta.cliente.nome
@@ -78,6 +80,265 @@ export class PropostasController {
         {
           success: false,
           message: 'Erro ao listar propostas',
+          error: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('estatisticas/dashboard')
+  async obterEstatisticasDashboard(@EmpresaId() empresaId: string) {
+    try {
+      const dados = await this.propostasService.obterEstatisticasDashboard(empresaId);
+      return {
+        success: true,
+        ...dados,
+      };
+    } catch (error) {
+      this.logger.error('[PROPOSTAS] Erro ao carregar estatisticas do dashboard:', error);
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Erro ao carregar estatisticas do dashboard',
+          error: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('expiradas')
+  async obterPropostasExpiradas(
+    @EmpresaId() empresaId: string,
+    @Query('vendedorId') vendedorId?: string,
+  ) {
+    try {
+      const propostas = await this.propostasService.listarPropostasExpiradas(empresaId, vendedorId);
+      return propostas;
+    } catch (error) {
+      this.logger.error('[PROPOSTAS] Erro ao listar propostas expiradas:', error);
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Erro ao listar propostas expiradas',
+          error: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get(':id/estatisticas')
+  async obterEstatisticasProposta(
+    @EmpresaId() empresaId: string,
+    @Param('id') propostaId: string,
+  ) {
+    try {
+      const dados = await this.propostasService.obterEstatisticasProposta(propostaId, empresaId);
+      return dados;
+    } catch (error) {
+      this.logger.error('[PROPOSTAS] Erro ao obter estatisticas da proposta:', error);
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Erro ao obter estatisticas da proposta',
+          error: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post(':id/agendar-lembrete')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_UPDATE)
+  async agendarLembrete(
+    @EmpresaId() empresaId: string,
+    @Param('id') propostaId: string,
+    @Body() body?: { diasApos?: number },
+  ): Promise<any> {
+    try {
+      const lembrete = await this.propostasService.agendarLembrete(
+        propostaId,
+        body?.diasApos,
+        empresaId,
+      );
+      return {
+        success: true,
+        message: 'Lembrete agendado com sucesso',
+        lembrete,
+      };
+    } catch (error) {
+      this.logger.error('[PROPOSTAS] Erro ao agendar lembrete:', error);
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Erro ao agendar lembrete',
+          error: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post(':id/reativar')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_UPDATE)
+  async reativarProposta(
+    @EmpresaId() empresaId: string,
+    @Param('id') propostaId: string,
+    @Body() body: { novaDataValidade: string; expiresInDays?: number },
+  ) {
+    try {
+      const proposta = await this.propostasService.reativarProposta(
+        propostaId,
+        body?.novaDataValidade,
+        empresaId,
+      );
+      const tokenData = await this.portalService.gerarTokenParaProposta(
+        propostaId,
+        empresaId,
+        body?.expiresInDays || 30,
+      );
+
+      return {
+        success: true,
+        message: 'Proposta reativada com sucesso',
+        proposta: this.toPropostaDto(proposta),
+        novoToken: tokenData.token,
+        tokenExpiraEm: tokenData.expiresAt,
+      };
+    } catch (error) {
+      this.logger.error('[PROPOSTAS] Erro ao reativar proposta:', error);
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Erro ao reativar proposta',
+          error: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get(':id/historico')
+  async obterHistoricoProposta(
+    @EmpresaId() empresaId: string,
+    @Param('id') propostaId: string,
+  ): Promise<any> {
+    try {
+      const historico = await this.propostasService.obterHistoricoProposta(propostaId, empresaId);
+      return historico;
+    } catch (error) {
+      this.logger.error('[PROPOSTAS] Erro ao obter historico da proposta:', error);
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Erro ao obter historico da proposta',
+          error: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get(':id/aprovacao')
+  async obterAprovacaoInterna(
+    @EmpresaId() empresaId: string,
+    @Param('id') propostaId: string,
+  ): Promise<any> {
+    try {
+      const aprovacao = await this.propostasService.obterAprovacaoInterna(propostaId, empresaId);
+      return {
+        success: true,
+        aprovacao,
+      };
+    } catch (error) {
+      this.logger.error('[PROPOSTAS] Erro ao obter aprovacao interna da proposta:', error);
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Erro ao obter aprovacao interna',
+          error: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post(':id/aprovacao/solicitar')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_UPDATE)
+  async solicitarAprovacaoInterna(
+    @EmpresaId() empresaId: string,
+    @Param('id') propostaId: string,
+    @Body()
+    body?: {
+      solicitadaPorId?: string;
+      solicitadaPorNome?: string;
+      observacoes?: string;
+    },
+  ): Promise<any> {
+    try {
+      const aprovacao = await this.propostasService.solicitarAprovacaoInterna(
+        propostaId,
+        {
+          solicitadaPorId: body?.solicitadaPorId,
+          solicitadaPorNome: body?.solicitadaPorNome,
+          observacoes: body?.observacoes,
+        },
+        empresaId,
+      );
+      return {
+        success: true,
+        aprovacao,
+      };
+    } catch (error) {
+      this.logger.error('[PROPOSTAS] Erro ao solicitar aprovacao interna:', error);
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Erro ao solicitar aprovacao interna',
+          error: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post(':id/aprovacao/decidir')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_UPDATE)
+  async decidirAprovacaoInterna(
+    @EmpresaId() empresaId: string,
+    @Param('id') propostaId: string,
+    @Body()
+    body: {
+      aprovada: boolean;
+      usuarioId?: string;
+      usuarioNome?: string;
+      observacoes?: string;
+    },
+  ): Promise<any> {
+    try {
+      const aprovacao = await this.propostasService.decidirAprovacaoInterna(
+        propostaId,
+        {
+          aprovada: Boolean(body?.aprovada),
+          usuarioId: body?.usuarioId,
+          usuarioNome: body?.usuarioNome,
+          observacoes: body?.observacoes,
+        },
+        empresaId,
+      );
+
+      return {
+        success: true,
+        aprovacao,
+      };
+    } catch (error) {
+      this.logger.error('[PROPOSTAS] Erro ao decidir aprovacao interna:', error);
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Erro ao decidir aprovacao interna',
           error: error.message,
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -146,6 +407,7 @@ export class PropostasController {
         updateData.status,
         updateData.source || 'api',
         updateData.observacoes,
+        updateData.motivoPerda,
         empresaId,
       );
 

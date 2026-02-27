@@ -1045,12 +1045,13 @@ export const ChatOmnichannel: React.FC = () => {
 
   // ✅ LAYOUT RESPONSIVO SIMPLIFICADO (Grid Tailwind Nativo)
   return (
-    <div className="h-full w-full bg-gray-50 flex flex-col overflow-hidden">
+    <div className="flex h-full w-full flex-col overflow-hidden bg-[#F6FAFB]">
       {/* Grid Responsivo: Mobile (1 col) | Tablet (2 cols) | Desktop (3 cols) */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[320px_1fr] xl:grid-cols-[340px_1fr_320px] gap-0 overflow-hidden">
-
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 overflow-hidden lg:grid-cols-[320px_1fr] xl:grid-cols-[340px_1fr_320px]">
         {/* COLUNA 1: Sidebar - Visivel no mobile quando em modo lista */}
-        <div className={`${mobileView === 'list' ? 'flex' : 'hidden'} lg:flex flex-col h-full overflow-hidden border-r bg-white`}>
+        <div
+          className={`${mobileView === 'list' ? 'flex' : 'hidden'} h-full flex-col overflow-hidden border-r border-[#DEE8EC] bg-white lg:flex`}
+        >
           <AtendimentosSidebar
             tickets={tickets}
             ticketSelecionado={ticketSelecionado?.id || ''}
@@ -1065,23 +1066,25 @@ export const ChatOmnichannel: React.FC = () => {
         </div>
 
         {/* COLUNA 2: Chat Area - Mobile em modo chat | Desktop sempre visível */}
-        <div className={`${mobileView === 'chat' ? 'flex' : 'hidden'} lg:flex flex-col h-full overflow-hidden bg-gray-50`}>
+        <div
+          className={`${mobileView === 'chat' ? 'flex' : 'hidden'} h-full flex-col overflow-hidden bg-[#F6FAFB] lg:flex`}
+        >
           {isMobile && ticketSelecionado && (
-            <div className="flex items-center border-b bg-white px-3 py-2">
+            <div className="flex items-center border-b border-[#DEE8EC] bg-[#F8FBFC] px-3 py-2">
               <button
                 onClick={handleVoltarParaListaMobile}
-                className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="rounded-lg border border-[#D4E2E7] bg-white px-3 py-1.5 text-sm font-medium text-[#244455] transition-colors hover:bg-[#F6FAFB]"
               >
                 Voltar para lista
               </button>
             </div>
           )}
           {!ticketSelecionado ? (
-            <div className="flex items-center justify-center h-full bg-white">
-              <div className="text-center px-4 max-w-md">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="flex h-full items-center justify-center bg-[#F8FBFC]">
+              <div className="max-w-md px-4 text-center">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#ECF3F6]">
                   <svg
-                    className="w-8 h-8 text-gray-400"
+                    className="h-8 w-8 text-[#7A95A2]"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -1094,11 +1097,11 @@ export const ChatOmnichannel: React.FC = () => {
                     />
                   </svg>
                 </div>
-                <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                <h2 className="mb-2 text-xl font-semibold text-[#19384C]">
                   Nenhum atendimento selecionado
                 </h2>
-                <p className="text-sm text-gray-600">
-                  Selecione um atendimento na lista à esquerda ou crie um novo
+                <p className="text-sm text-[#607B89]">
+                  Selecione um atendimento na lista à esquerda ou crie um novo.
                 </p>
               </div>
             </div>
@@ -1126,7 +1129,7 @@ export const ChatOmnichannel: React.FC = () => {
 
         {/* COLUNA 3: Cliente Panel - Hidden no tablet/mobile */}
         {ticketSelecionado && (
-          <div className="hidden xl:flex flex-col overflow-y-auto border-l bg-white">
+          <div className="hidden flex-col overflow-y-auto border-l border-[#DEE8EC] bg-white xl:flex">
             <ClientePanel
               contato={ticketSelecionado.contato}
               historico={historico || []}
