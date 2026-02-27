@@ -26,11 +26,13 @@ import {
 import ModalConfirmacao from '../../../components/common/ModalConfirmacao';
 import { useConfirmacaoInteligente } from '../../../hooks/useConfirmacaoInteligente';
 import ModalContaPagar from '../../../features/financeiro/components/ModalContaPagarNovo';
+import contaBancariaService from '../../../services/contaBancariaService';
 import contasPagarService from '../../../services/contasPagarService';
 import fornecedorService from '../../../services/fornecedorService';
 import {
   CategoriaContaPagar,
   CATEGORIA_LABELS,
+  ContaBancaria,
   ContaPagar,
   FormaPagamento,
   FORMA_PAGAMENTO_LABELS,
@@ -72,6 +74,38 @@ const sameDay = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() &&
   a.getMonth() === b.getMonth() &&
   a.getDate() === b.getDate();
+
+const formasPagamento = Object.values(FormaPagamento);
+const isFormaPagamento = (value?: string): value is FormaPagamento =>
+  Boolean(value && formasPagamento.includes(value as FormaPagamento));
+
+const getApiErrorMessage = (error: unknown, fallback: string): string => {
+  if (!error || typeof error !== 'object') return fallback;
+
+  const response = (error as { response?: { data?: unknown } }).response;
+  const data = response?.data;
+
+  if (typeof data === 'string' && data.trim()) {
+    return data.trim();
+  }
+
+  if (data && typeof data === 'object') {
+    const message = (data as { message?: unknown }).message;
+
+    if (typeof message === 'string' && message.trim()) {
+      return message.trim();
+    }
+
+    if (Array.isArray(message)) {
+      const firstMessage = message.find((item) => typeof item === 'string' && item.trim());
+      if (firstMessage) {
+        return firstMessage.trim();
+      }
+    }
+  }
+
+  return fallback;
+};
 
 const getStatusBadge = (status: StatusContaPagar) => {
   const tone =
@@ -123,6 +157,11 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
   >([]);
   const [loadingFornecedoresCadastro, setLoadingFornecedoresCadastro] = useState(false);
   const [erroFornecedoresCadastro, setErroFornecedoresCadastro] = useState<string | null>(null);
+  const [contasBancariasCadastro, setContasBancariasCadastro] = useState<ContaBancaria[]>([]);
+  const [loadingContasBancariasCadastro, setLoadingContasBancariasCadastro] = useState(false);
+  const [erroContasBancariasCadastro, setErroContasBancariasCadastro] = useState<string | null>(
+    null,
+  );
   const [resumoFinanceiro, setResumoFinanceiro] = useState<ResumoFinanceiro | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -132,6 +171,10 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
   const [modalDetalhesAberto, setModalDetalhesAberto] = useState(false);
   const [contaDetalhesSelecionada, setContaDetalhesSelecionada] = useState<ContaPagar | null>(null);
   const [comprovantePagamentoArquivo, setComprovantePagamentoArquivo] = useState<File | null>(null);
+  const [tipoPagamentoSelecionado, setTipoPagamentoSelecionado] = useState<FormaPagamento>(
+    FormaPagamento.PIX,
+  );
+  const [contaBancariaPagamentoId, setContaBancariaPagamentoId] = useState('');
 
   const [filtros] = useState<Record<string, never>>({});
   const [termoBusca, setTermoBusca] = useState('');
@@ -145,6 +188,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
 
   useEffect(() => {
     void carregarFornecedores();
+    void carregarContasBancarias();
   }, []);
 
   useEffect(() => {
@@ -199,6 +243,23 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
     }
   };
 
+  const carregarContasBancarias = async () => {
+    try {
+      setLoadingContasBancariasCadastro(true);
+      setErroContasBancariasCadastro(null);
+      const contasBancarias = await contaBancariaService.listarAtivas();
+      setContasBancariasCadastro(contasBancarias);
+    } catch (err) {
+      setContasBancariasCadastro([]);
+      setErroContasBancariasCadastro(
+        'Nao foi possivel carregar contas bancarias para cadastro de contas.',
+      );
+      console.error('Erro ao carregar contas bancarias para contas a pagar:', err);
+    } finally {
+      setLoadingContasBancariasCadastro(false);
+    }
+  };
+
   const handleNovaConta = () => {
     setContaSelecionada(null);
     setModalContaAberto(true);
@@ -212,6 +273,10 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
   const handleRegistrarPagamento = (conta: ContaPagar) => {
     setContaSelecionada(conta);
     setComprovantePagamentoArquivo(null);
+    setTipoPagamentoSelecionado(
+      isFormaPagamento(conta.tipoPagamento) ? conta.tipoPagamento : FormaPagamento.PIX,
+    );
+    setContaBancariaPagamentoId(conta.contaBancariaId || '');
     setModalPagamentoAberto(true);
   };
 
@@ -325,7 +390,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
       await carregarDados();
     } catch (err) {
       console.error('Erro ao salvar conta:', err);
-      toast.error('Não foi possível salvar a conta');
+      toast.error(getApiErrorMessage(err, 'Nao foi possivel salvar a conta'));
       throw err;
     }
   };
@@ -334,23 +399,26 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
     if (!contaSelecionada) return;
 
     try {
+      const contaBancariaIdSelecionada = pagamento.contaBancariaId ?? contaBancariaPagamentoId;
       await contasPagarService.registrarPagamento(contaSelecionada.id, {
         contaId: contaSelecionada.id,
         valorPago:
           pagamento.valorPago || contaSelecionada.valorRestante || contaSelecionada.valorTotal,
         dataPagamento: pagamento.dataPagamento || new Date().toISOString().slice(0, 10),
-        tipoPagamento: pagamento.tipoPagamento || FormaPagamento.PIX,
-        contaBancariaId: pagamento.contaBancariaId,
+        tipoPagamento: pagamento.tipoPagamento || tipoPagamentoSelecionado || FormaPagamento.PIX,
+        contaBancariaId: contaBancariaIdSelecionada || undefined,
         observacoes: pagamento.observacoes,
         comprovante: pagamento.comprovante || comprovantePagamentoArquivo || undefined,
       });
       setModalPagamentoAberto(false);
       setComprovantePagamentoArquivo(null);
+      setContaBancariaPagamentoId('');
+      setTipoPagamentoSelecionado(FormaPagamento.PIX);
       toast.success('Pagamento registrado com sucesso');
       await carregarDados();
     } catch (err) {
       console.error('Erro ao registrar pagamento:', err);
-      toast.error('Não foi possível registrar o pagamento');
+      toast.error(getApiErrorMessage(err, 'Nao foi possivel registrar o pagamento'));
       throw err;
     }
   };
@@ -949,6 +1017,9 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
           fornecedores={fornecedoresCadastro}
           fornecedoresLoading={loadingFornecedoresCadastro}
           fornecedoresError={erroFornecedoresCadastro}
+          contasBancarias={contasBancariasCadastro}
+          contasBancariasLoading={loadingContasBancariasCadastro}
+          contasBancariasError={erroContasBancariasCadastro}
           onClose={() => setModalContaAberto(false)}
           onSave={handleSalvarConta}
         />
@@ -1098,7 +1169,12 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
               </h2>
               <button
                 type="button"
-                onClick={() => setModalPagamentoAberto(false)}
+                onClick={() => {
+                  setModalPagamentoAberto(false);
+                  setComprovantePagamentoArquivo(null);
+                  setContaBancariaPagamentoId('');
+                  setTipoPagamentoSelecionado(FormaPagamento.PIX);
+                }}
                 className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[#5E7A88] hover:bg-[#F2F7F8]"
                 aria-label="Fechar modal"
               >
@@ -1118,6 +1194,48 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
               <p className="text-sm text-[#64808E]">
                 Esta ação registra o pagamento integral da conta com os dados padrão desta tela.
               </p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-[#E8EFF2] bg-white p-4">
+                  <label className="mb-2 block text-sm font-medium text-[#244455]">
+                    Forma de pagamento
+                  </label>
+                  <select
+                    value={tipoPagamentoSelecionado}
+                    onChange={(e) => setTipoPagamentoSelecionado(e.target.value as FormaPagamento)}
+                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                  >
+                    {Object.entries(FORMA_PAGAMENTO_LABELS).map(([valor, label]) => (
+                      <option key={valor} value={valor}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="rounded-xl border border-[#E8EFF2] bg-white p-4">
+                  <label className="mb-2 block text-sm font-medium text-[#244455]">
+                    Conta bancaria
+                  </label>
+                  {loadingContasBancariasCadastro ? (
+                    <p className="mb-2 text-xs text-[#64808E]">Carregando contas bancarias...</p>
+                  ) : null}
+                  {erroContasBancariasCadastro ? (
+                    <p className="mb-2 text-xs text-amber-700">{erroContasBancariasCadastro}</p>
+                  ) : null}
+                  <select
+                    value={contaBancariaPagamentoId}
+                    onChange={(e) => setContaBancariaPagamentoId(e.target.value)}
+                    disabled={loadingContasBancariasCadastro}
+                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 disabled:cursor-not-allowed disabled:bg-[#F4F8FA]"
+                  >
+                    <option value="">Selecionar conta (opcional)</option>
+                    {contasBancariasCadastro.map((contaBancaria) => (
+                      <option key={contaBancaria.id} value={contaBancaria.id}>
+                        {contaBancaria.nome} - {contaBancaria.banco}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <div className="rounded-xl border border-[#E8EFF2] bg-white p-4">
                 <label className="mb-2 block text-sm font-medium text-[#244455]">
                   Comprovante (opcional)
@@ -1141,6 +1259,8 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                 onClick={() => {
                   setModalPagamentoAberto(false);
                   setComprovantePagamentoArquivo(null);
+                  setContaBancariaPagamentoId('');
+                  setTipoPagamentoSelecionado(FormaPagamento.PIX);
                 }}
                 className={btnSecondary}
               >
@@ -1148,7 +1268,12 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
               </button>
               <button
                 type="button"
-                onClick={() => void handleSalvarPagamento()}
+                onClick={() =>
+                  void handleSalvarPagamento({
+                    tipoPagamento: tipoPagamentoSelecionado,
+                    contaBancariaId: contaBancariaPagamentoId || undefined,
+                  })
+                }
                 className={btnPrimary}
               >
                 <Check className="h-4 w-4" />

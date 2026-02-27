@@ -21,6 +21,7 @@ import {
 import SearchSelect from '../../../components/common/SearchSelect';
 import { shellFieldTokens } from '../../../components/layout-v2';
 import {
+  ContaBancaria,
   ContaPagar,
   NovaContaPagar,
   CategoriaContaPagar,
@@ -36,6 +37,9 @@ interface ModalContaPagarProps {
   fornecedores?: Array<{ id: string; nome: string; cnpjCpf?: string }>;
   fornecedoresLoading?: boolean;
   fornecedoresError?: string | null;
+  contasBancarias?: ContaBancaria[];
+  contasBancariasLoading?: boolean;
+  contasBancariasError?: string | null;
   onClose: () => void;
   onSave: (conta: NovaContaPagar) => Promise<void> | void;
 }
@@ -45,6 +49,9 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
   fornecedores,
   fornecedoresLoading = false,
   fornecedoresError = null,
+  contasBancarias,
+  contasBancariasLoading = false,
+  contasBancariasError = null,
   onClose,
   onSave,
 }) => {
@@ -77,6 +84,7 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const fornecedoresDisponiveis = fornecedores ?? [];
+  const contasBancariasDisponiveis = contasBancarias ?? [];
   const fornecedorOptions = fornecedoresDisponiveis.map((fornecedor) => ({
     id: fornecedor.id,
     label: fornecedor.nome,
@@ -89,13 +97,6 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
   const readOnlyFieldWithIconClass = shellFieldTokens.readOnlyWithIcon;
   const textareaFieldClass = shellFieldTokens.textarea;
   const invalidFieldClass = shellFieldTokens.invalid;
-
-  const contasBancariasMock = [
-    { id: 'conta1', nome: 'Conta Corrente - Banco do Brasil', banco: 'Banco do Brasil' },
-    { id: 'conta2', nome: 'Conta Poupança - Caixa', banco: 'Caixa Econômica' },
-    { id: 'conta3', nome: 'Conta Empresarial - Santander', banco: 'Santander' },
-  ];
-
   const etapas = [
     { id: 0, nome: 'Informações Básicas', icon: FileText },
     { id: 1, nome: 'Valores e Pagamento', icon: DollarSign },
@@ -694,20 +695,31 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
                 </div>
               </div>
 
-              {/* Conta Bancária */}
+              {/* Conta Banc�ria */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Conta Bancária
+                  Conta Banc�ria
                 </label>
+                {contasBancariasLoading && (
+                  <div className="mb-2 rounded-lg border border-[#DCE8EC] bg-[#F8FBFC] px-3 py-2 text-xs text-[#5E7A88]">
+                    Carregando contas bancarias...
+                  </div>
+                )}
+                {contasBancariasError && (
+                  <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                    {contasBancariasError}
+                  </div>
+                )}
                 <select
                   value={formData.contaBancariaId}
                   onChange={(e) => handleInputChange('contaBancariaId', e.target.value)}
                   className={fieldClass}
+                  disabled={contasBancariasLoading}
                 >
                   <option value="">Selecione uma conta</option>
-                  {contasBancariasMock.map((conta) => (
+                  {contasBancariasDisponiveis.map((conta) => (
                     <option key={conta.id} value={conta.id}>
-                      {conta.nome}
+                      {conta.nome} - {conta.banco}
                     </option>
                   ))}
                 </select>
@@ -1085,3 +1097,4 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
 };
 
 export default ModalContaPagar;
+
