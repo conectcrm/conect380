@@ -15,6 +15,7 @@ import {
 } from '../dto/conta-pagar.dto';
 import { ContaPagar } from '../entities/conta-pagar.entity';
 import { Fornecedor } from '../entities/fornecedor.entity';
+import { ContaBancaria } from '../entities/conta-bancaria.entity';
 
 type StatusContaPagarUI = 'em_aberto' | 'pago' | 'vencido' | 'agendado' | 'cancelado';
 
@@ -101,6 +102,8 @@ export class ContaPagarService {
     private readonly contaPagarRepository: Repository<ContaPagar>,
     @InjectRepository(Fornecedor)
     private readonly fornecedorRepository: Repository<Fornecedor>,
+    @InjectRepository(ContaBancaria)
+    private readonly contaBancariaRepository: Repository<ContaBancaria>,
   ) {}
 
   async findAll(empresaId: string, filtros: QueryContasPagarDto = {}): Promise<ContaPagarResponse[]> {
@@ -135,6 +138,9 @@ export class ContaPagarService {
     empresaId: string,
   ): Promise<ContaPagarResponse> {
     await this.validarFornecedor(createContaPagarDto.fornecedorId, empresaId);
+    if (createContaPagarDto.contaBancariaId) {
+      await this.validarContaBancaria(createContaPagarDto.contaBancariaId, empresaId);
+    }
 
     const valorOriginal = Number(createContaPagarDto.valorOriginal || 0);
     const valorDesconto = Number(createContaPagarDto.valorDesconto || 0);
@@ -291,6 +297,9 @@ export class ContaPagarService {
     }
 
     if (updateContaPagarDto.contaBancariaId !== undefined) {
+      if (updateContaPagarDto.contaBancariaId?.trim()) {
+        await this.validarContaBancaria(updateContaPagarDto.contaBancariaId, empresaId);
+      }
       conta.contaBancariaId = updateContaPagarDto.contaBancariaId?.trim() || undefined;
     }
 
@@ -385,6 +394,9 @@ export class ContaPagarService {
       : new Date();
     conta.tipoPagamento = dto.tipoPagamento?.trim() || conta.tipoPagamento || undefined;
     conta.formaPagamento = dto.tipoPagamento?.trim() || conta.formaPagamento || conta.tipoPagamento;
+    if (dto.contaBancariaId) {
+      await this.validarContaBancaria(dto.contaBancariaId, empresaId);
+    }
     conta.contaBancariaId = dto.contaBancariaId || conta.contaBancariaId || undefined;
     if (dto.comprovantePagamento !== undefined) {
       conta.comprovantePagamento = dto.comprovantePagamento?.trim() || undefined;
@@ -529,6 +541,25 @@ export class ContaPagarService {
     }
 
     return fornecedor;
+  }
+
+  private async validarContaBancaria(
+    contaBancariaId: string,
+    empresaId: string,
+  ): Promise<ContaBancaria> {
+    const contaBancaria = await this.contaBancariaRepository.findOne({
+      where: {
+        id: contaBancariaId,
+        empresaId,
+        ativo: true,
+      },
+    });
+
+    if (!contaBancaria) {
+      throw new BadRequestException('Conta bancaria nao encontrada ou inativa para a empresa ativa');
+    }
+
+    return contaBancaria;
   }
 
   private async findContaEntity(id: string, empresaId: string): Promise<ContaPagar> {

@@ -7,6 +7,7 @@ import * as request from 'supertest';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../../src/app.module';
 import { AddRichFieldsToContasPagar1802867000000 } from '../../src/migrations/1802867000000-AddRichFieldsToContasPagar';
+import { CreateContasBancarias1802881000000 } from '../../src/migrations/1802881000000-CreateContasBancarias';
 
 type ContaPagarApi = {
   id: string;
@@ -33,6 +34,7 @@ describe('ContasPagar (E2E)', () => {
   const superadminId = randomUUID();
   const vendedorId = randomUUID();
   const fornecedorId = randomUUID();
+  const contaBancariaId = randomUUID();
 
   const emailSuperadmin = `e2e.contapagar.superadmin.${runId}@conectcrm.local`;
   const emailVendedor = `e2e.contapagar.vendedor.${runId}@conectcrm.local`;
@@ -47,6 +49,17 @@ describe('ContasPagar (E2E)', () => {
 
   const ensureContasPagarRichFields = async () => {
     const migration = new AddRichFieldsToContasPagar1802867000000();
+    const queryRunner = dataSource.createQueryRunner();
+    try {
+      await queryRunner.connect();
+      await migration.up(queryRunner);
+    } finally {
+      await queryRunner.release();
+    }
+  };
+
+  const ensureContasBancarias = async () => {
+    const migration = new CreateContasBancarias1802881000000();
     const queryRunner = dataSource.createQueryRunner();
     try {
       await queryRunner.connect();
@@ -80,10 +93,12 @@ describe('ContasPagar (E2E)', () => {
 
     dataSource = app.get(DataSource);
     await ensureContasPagarRichFields();
+    await ensureContasBancarias();
 
     await criarEmpresa();
     await criarUsuarios();
     await criarFornecedor();
+    await criarContaBancaria();
 
     tokenSuperadmin = await fazerLogin(emailSuperadmin, testPassword);
     tokenVendedor = await fazerLogin(emailVendedor, testPassword);
@@ -202,7 +217,7 @@ describe('ContasPagar (E2E)', () => {
       .send({
         valorPago: 350,
         tipoPagamento: 'pix',
-        contaBancariaId: 'conta-e2e',
+        contaBancariaId,
         comprovantePagamento: `comp-${runId}.pdf`,
         observacoes: `pagamento e2e ${runId}`,
       })
@@ -359,6 +374,29 @@ describe('ContasPagar (E2E)', () => {
     );
   }
 
+  async function criarContaBancaria() {
+    await dataSource.query(
+      `
+        INSERT INTO contas_bancarias (
+          id, empresa_id, nome, banco, agencia, conta, tipo_conta, saldo, chave_pix, ativo
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `,
+      [
+        contaBancariaId,
+        empresaId,
+        `Conta E2E ${runId}`,
+        'Banco Teste',
+        '0001',
+        '12345-6',
+        'corrente',
+        1000,
+        `pix-${runId}@conectcrm.local`,
+        true,
+      ],
+    );
+  }
+
   async function fazerLogin(email: string, senha: string): Promise<string> {
     const response = await request(app.getHttpServer()).post('/auth/login').send({ email, senha });
     if (![200, 201].includes(response.status)) {
@@ -374,6 +412,7 @@ describe('ContasPagar (E2E)', () => {
   async function limparDadosTeste() {
     try {
       await dataSource.query(`DELETE FROM contas_pagar WHERE empresa_id = $1`, [empresaId]);
+      await dataSource.query(`DELETE FROM contas_bancarias WHERE id = $1`, [contaBancariaId]);
       await dataSource.query(`DELETE FROM fornecedores WHERE id = $1`, [fornecedorId]);
       await dataSource.query(`DELETE FROM users WHERE id = ANY($1::uuid[])`, [[superadminId, vendedorId]]);
       await dataSource.query(`DELETE FROM empresas WHERE id = $1`, [empresaId]);

@@ -13,13 +13,17 @@ describe('ContaPagarService', () => {
     const fornecedorRepository = {
       findOne: jest.fn(),
     };
+    const contaBancariaRepository = {
+      findOne: jest.fn(),
+    };
 
     const service = new ContaPagarService(
       contaPagarRepository as any,
       fornecedorRepository as any,
+      contaBancariaRepository as any,
     );
 
-    return { service, contaPagarRepository, fornecedorRepository };
+    return { service, contaPagarRepository, fornecedorRepository, contaBancariaRepository };
   };
 
   const makeFornecedor = () =>
@@ -172,7 +176,7 @@ describe('ContaPagarService', () => {
   });
 
   it('deve registrar pagamento com comprovante e atualizar status/valores', async () => {
-    const { service, contaPagarRepository } = createService();
+    const { service, contaPagarRepository, contaBancariaRepository } = createService();
     const conta = makeConta({
       valor: 350,
       valorOriginal: 350,
@@ -184,6 +188,11 @@ describe('ContaPagarService', () => {
     });
 
     contaPagarRepository.save.mockImplementation(async (entity: any) => entity);
+    contaBancariaRepository.findOne.mockResolvedValue({
+      id: 'conta-1',
+      empresaId: conta.empresaId,
+      ativo: true,
+    });
     jest.spyOn(service as any, 'findContaEntity').mockResolvedValue(conta);
 
     const result = await service.registrarPagamento(

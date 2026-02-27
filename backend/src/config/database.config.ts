@@ -27,6 +27,7 @@ import { AgendaEvento } from '../modules/agenda/agenda-evento.entity';
 import { Interacao } from '../modules/interacoes/interacao.entity';
 import { Fornecedor } from '../modules/financeiro/entities/fornecedor.entity';
 import { ContaPagar } from '../modules/financeiro/entities/conta-pagar.entity';
+import { ContaBancaria } from '../modules/financeiro/entities/conta-bancaria.entity';
 import { Fatura } from '../modules/faturamento/entities/fatura.entity';
 import { ItemFatura } from '../modules/faturamento/entities/item-fatura.entity';
 import { Pagamento } from '../modules/faturamento/entities/pagamento.entity';
@@ -112,6 +113,7 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         Interacao,
         Fornecedor,
         ContaPagar,
+        ContaBancaria,
         Fatura,
         ItemFatura,
         Pagamento,
