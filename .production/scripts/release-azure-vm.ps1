@@ -95,14 +95,14 @@ Run-Step -Title "Preparar comandos remotos" -Action {
 set -euo pipefail
 mkdir -p $RemoteRoot
 cd $RemoteRoot
-rm -rf .release_extract
-mkdir -p .release_extract
+rm -rf /tmp/conect360-release-extract
+mkdir -p /tmp/conect360-release-extract
 python3 - <<'PY'
 import zipfile
-zipfile.ZipFile('/tmp/conect360-release.zip').extractall('$RemoteRoot/.release_extract')
+zipfile.ZipFile('/tmp/conect360-release.zip').extractall('/tmp/conect360-release-extract')
 PY
-rsync -a --delete --exclude '.production/.env' --exclude '.production/.env.prod' $RemoteRoot/.release_extract/ $RemoteRoot/
-rm -rf $RemoteRoot/.release_extract
+rsync -a --delete --exclude '.production/.env' --exclude '.production/.env.prod' /tmp/conect360-release-extract/ $RemoteRoot/
+rm -rf /tmp/conect360-release-extract
 cd $RemoteRoot/.production
 "@
 
