@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   AlertCircle,
@@ -8,7 +9,6 @@ import {
   CheckCircle,
   Download,
   Edit3,
-  Eye,
   FileSpreadsheet,
   Filter,
   Mail,
@@ -32,7 +32,6 @@ import ModalConfirmacao from '../../../components/common/ModalConfirmacao';
 import { useGlobalConfirmation } from '../../../contexts/GlobalConfirmationContext';
 import { useConfirmacaoInteligente } from '../../../hooks/useConfirmacaoInteligente';
 import ModalFornecedor from '../components/ModalFornecedor';
-import ModalDetalhesFornecedor from '../components/ModalDetalhesFornecedor';
 import { fornecedorService, Fornecedor, NovoFornecedor } from '../../../services/fornecedorService';
 import {
   exportToCSV,
@@ -105,6 +104,7 @@ const formatarData = (data?: string) => {
 };
 
 export default function FornecedoresPage() {
+  const navigate = useNavigate();
   const { confirm } = useGlobalConfirmation();
   const confirmacao = useConfirmacaoInteligente();
   const selectAllRef = useRef<HTMLInputElement | null>(null);
@@ -114,9 +114,7 @@ export default function FornecedoresPage() {
   const [erro, setErro] = useState<string | null>(null);
 
   const [modalAberto, setModalAberto] = useState(false);
-  const [modalDetalhesAberto, setModalDetalhesAberto] = useState(false);
   const [fornecedorEdicao, setFornecedorEdicao] = useState<Fornecedor | null>(null);
-  const [fornecedorDetalhes, setFornecedorDetalhes] = useState<Fornecedor | null>(null);
 
   const [busca, setBusca] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<FiltroStatus>('todos');
@@ -188,14 +186,8 @@ export default function FornecedoresPage() {
     setFornecedorEdicao(null);
   };
 
-  const abrirModalDetalhes = (fornecedor: Fornecedor) => {
-    setFornecedorDetalhes(fornecedor);
-    setModalDetalhesAberto(true);
-  };
-
-  const fecharModalDetalhes = () => {
-    setModalDetalhesAberto(false);
-    setFornecedorDetalhes(null);
+  const abrirPerfilFornecedor = (fornecedor: Fornecedor) => {
+    navigate(`/financeiro/fornecedores/${fornecedor.id}`);
   };
 
   const handleSalvarFornecedor = async (
@@ -366,15 +358,10 @@ export default function FornecedoresPage() {
     <div className="flex items-center gap-1">
       <button
         type="button"
-        onClick={() => abrirModalDetalhes(fornecedor)}
-        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#355766] hover:bg-[#F2F7F8]"
-        title="Ver detalhes"
-      >
-        <Eye className="h-4 w-4" />
-      </button>
-      <button
-        type="button"
-        onClick={() => abrirModalEdicao(fornecedor)}
+        onClick={(event) => {
+          event.stopPropagation();
+          abrirModalEdicao(fornecedor);
+        }}
         className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#159A9C] hover:bg-[#ECF7F3]"
         title="Editar fornecedor"
       >
@@ -382,7 +369,10 @@ export default function FornecedoresPage() {
       </button>
       <button
         type="button"
-        onClick={() => void excluirFornecedor(fornecedor.id)}
+        onClick={(event) => {
+          event.stopPropagation();
+          void excluirFornecedor(fornecedor.id);
+        }}
         className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#B4233A] hover:bg-[#FFF2F4]"
         title="Excluir fornecedor"
       >
@@ -583,11 +573,12 @@ export default function FornecedoresPage() {
               {fornecedores.map((fornecedor) => (
                 <article
                   key={fornecedor.id}
-                  className={`rounded-xl border bg-white p-4 shadow-[0_10px_22px_-20px_rgba(15,57,74,0.4)] ${
+                  className={`cursor-pointer rounded-xl border bg-white p-4 shadow-[0_10px_22px_-20px_rgba(15,57,74,0.4)] ${
                     selecionados.has(fornecedor.id)
                       ? 'border-[#159A9C] ring-1 ring-[#159A9C]/20'
                       : 'border-[#DFE9ED]'
                   }`}
+                  onClick={() => abrirPerfilFornecedor(fornecedor)}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
@@ -596,6 +587,7 @@ export default function FornecedoresPage() {
                           type="checkbox"
                           checked={selecionados.has(fornecedor.id)}
                           onChange={() => toggleSelecionarFornecedor(fornecedor.id)}
+                          onClick={(event) => event.stopPropagation()}
                           className="h-4 w-4 rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
                           aria-label={`Selecionar fornecedor ${fornecedor.nome}`}
                         />
@@ -606,7 +598,12 @@ export default function FornecedoresPage() {
                         {formatarCNPJCPF(fornecedor.cnpjCpf)}
                       </p>
                     </div>
-                    <div className="flex shrink-0 items-center">{rowActions(fornecedor)}</div>
+                    <div
+                      className="flex shrink-0 items-center"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      {rowActions(fornecedor)}
+                    </div>
                   </div>
 
                   <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
@@ -672,12 +669,17 @@ export default function FornecedoresPage() {
                 </thead>
                 <tbody className="bg-white">
                   {fornecedores.map((fornecedor) => (
-                    <tr key={fornecedor.id} className="border-t border-[#EDF3F5] hover:bg-[#FAFCFD]">
+                    <tr
+                      key={fornecedor.id}
+                      className="cursor-pointer border-t border-[#EDF3F5] hover:bg-[#FAFCFD]"
+                      onClick={() => abrirPerfilFornecedor(fornecedor)}
+                    >
                       <td className="px-4 py-4 align-top">
                         <input
                           type="checkbox"
                           checked={selecionados.has(fornecedor.id)}
                           onChange={() => toggleSelecionarFornecedor(fornecedor.id)}
+                          onClick={(event) => event.stopPropagation()}
                           className="h-4 w-4 rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
                           aria-label={`Selecionar fornecedor ${fornecedor.nome}`}
                         />
@@ -707,7 +709,12 @@ export default function FornecedoresPage() {
                       <td className="px-5 py-4 align-top">{statusBadge(fornecedor.ativo)}</td>
                       <td className="px-5 py-4 align-top text-sm text-[#476776]">{formatarData(fornecedor.criadoEm)}</td>
                       <td className="px-5 py-4 align-top">
-                        <div className="flex justify-end">{rowActions(fornecedor)}</div>
+                        <div
+                          className="flex justify-end"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          {rowActions(fornecedor)}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -724,15 +731,6 @@ export default function FornecedoresPage() {
           onClose={fecharModal}
           onSave={handleSalvarFornecedor}
           fornecedor={fornecedorEdicao}
-        />
-      ) : null}
-
-      {modalDetalhesAberto && fornecedorDetalhes ? (
-        <ModalDetalhesFornecedor
-          isOpen={modalDetalhesAberto}
-          onClose={fecharModalDetalhes}
-          fornecedor={fornecedorDetalhes}
-          onEdit={abrirModalEdicao}
         />
       ) : null}
 

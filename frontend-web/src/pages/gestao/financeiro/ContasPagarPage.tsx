@@ -33,6 +33,7 @@ import {
   CATEGORIA_LABELS,
   ContaPagar,
   FormaPagamento,
+  FORMA_PAGAMENTO_LABELS,
   NovaContaPagar,
   PrioridadePagamento,
   PRIORIDADE_LABELS,
@@ -128,6 +129,8 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
 
   const [modalContaAberto, setModalContaAberto] = useState(false);
   const [modalPagamentoAberto, setModalPagamentoAberto] = useState(false);
+  const [modalDetalhesAberto, setModalDetalhesAberto] = useState(false);
+  const [contaDetalhesSelecionada, setContaDetalhesSelecionada] = useState<ContaPagar | null>(null);
   const [comprovantePagamentoArquivo, setComprovantePagamentoArquivo] = useState<File | null>(null);
 
   const [filtros] = useState<Record<string, never>>({});
@@ -210,6 +213,16 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
     setContaSelecionada(conta);
     setComprovantePagamentoArquivo(null);
     setModalPagamentoAberto(true);
+  };
+
+  const handleAbrirDetalhes = (conta: ContaPagar) => {
+    setContaDetalhesSelecionada(conta);
+    setModalDetalhesAberto(true);
+  };
+
+  const handleFecharDetalhes = () => {
+    setModalDetalhesAberto(false);
+    setContaDetalhesSelecionada(null);
   };
 
   const handleExcluirConta = async (contaId: string) => {
@@ -417,7 +430,10 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
       {conta.status === StatusContaPagar.EM_ABERTO ? (
         <button
           type="button"
-          onClick={() => handleRegistrarPagamento(conta)}
+          onClick={(event) => {
+            event.stopPropagation();
+            handleRegistrarPagamento(conta);
+          }}
           className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#137A42] hover:bg-[#F1FBF5]"
           title="Registrar pagamento"
         >
@@ -426,7 +442,10 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
       ) : null}
       <button
         type="button"
-        onClick={() => handleEditarConta(conta)}
+        onClick={(event) => {
+          event.stopPropagation();
+          handleEditarConta(conta);
+        }}
         className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#159A9C] hover:bg-[#ECF7F3]"
         title="Editar"
       >
@@ -434,7 +453,10 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
       </button>
       <button
         type="button"
-        onClick={() => void handleExcluirConta(conta.id)}
+        onClick={(event) => {
+          event.stopPropagation();
+          void handleExcluirConta(conta.id);
+        }}
         className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#B4233A] hover:bg-[#FFF2F4]"
         title="Excluir"
       >
@@ -702,7 +724,8 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                 return (
                   <article
                     key={conta.id}
-                    className={`rounded-xl border p-4 shadow-[0_10px_22px_-20px_rgba(15,57,74,0.4)] ${destaque}`}
+                    className={`cursor-pointer rounded-xl border p-4 shadow-[0_10px_22px_-20px_rgba(15,57,74,0.4)] ${destaque}`}
+                    onClick={() => handleAbrirDetalhes(conta)}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
@@ -711,6 +734,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                             type="checkbox"
                             checked={contasSelecionadas.has(conta.id)}
                             onChange={() => toggleSelecionarConta(conta.id)}
+                            onClick={(event) => event.stopPropagation()}
                             className="h-4 w-4 rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
                             aria-label={`Selecionar conta ${conta.numero}`}
                           />
@@ -768,7 +792,10 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                       </div>
                     </div>
 
-                    <div className="mt-3 flex justify-end border-t border-[#EDF3F5] pt-3">
+                    <div
+                      className="mt-3 flex justify-end border-t border-[#EDF3F5] pt-3"
+                      onClick={(event) => event.stopPropagation()}
+                    >
                       {renderRowActions(conta)}
                     </div>
                   </article>
@@ -826,13 +853,15 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                     return (
                       <tr
                         key={conta.id}
-                        className={`border-t border-[#EDF3F5] hover:bg-[#FAFCFD] ${prazo.vencida ? 'bg-[#FFF9FA]' : prazo.venceHoje ? 'bg-[#FFFBF4]' : ''}`}
+                        className={`cursor-pointer border-t border-[#EDF3F5] hover:bg-[#FAFCFD] ${prazo.vencida ? 'bg-[#FFF9FA]' : prazo.venceHoje ? 'bg-[#FFFBF4]' : ''}`}
+                        onClick={() => handleAbrirDetalhes(conta)}
                       >
                         <td className="px-4 py-4 align-top">
                           <input
                             type="checkbox"
                             checked={contasSelecionadas.has(conta.id)}
                             onChange={() => toggleSelecionarConta(conta.id)}
+                            onClick={(event) => event.stopPropagation()}
                             className="h-4 w-4 rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
                             aria-label={`Selecionar conta ${conta.numero}`}
                           />
@@ -897,7 +926,12 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                         </td>
                         <td className="px-5 py-4 align-top">{getStatusBadge(conta.status)}</td>
                         <td className="px-5 py-4 align-top">
-                          <div className="flex justify-end">{renderRowActions(conta)}</div>
+                          <div
+                            className="flex justify-end"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            {renderRowActions(conta)}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -918,6 +952,140 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
           onClose={() => setModalContaAberto(false)}
           onSave={handleSalvarConta}
         />
+      ) : null}
+
+      {modalDetalhesAberto && contaDetalhesSelecionada ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#072433]/55 p-4 backdrop-blur-[1px]">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-[#DCE7EB] bg-white shadow-[0_30px_60px_-30px_rgba(7,36,51,0.55)]">
+            <div className="flex items-center justify-between border-b border-[#E5EEF2] px-6 py-5">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Detalhes da conta a pagar</h2>
+                <p className="mt-1 text-sm text-[#607B89]">{contaDetalhesSelecionada.numero}</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleFecharDetalhes}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 transition-colors hover:bg-[#F3F8FA] hover:text-gray-600"
+                aria-label="Fechar modal"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="grid gap-3 px-6 py-5 sm:px-7 sm:grid-cols-2">
+              <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#6A8795]">
+                  Fornecedor
+                </p>
+                <p className="mt-1 text-sm font-semibold text-[#1D3B4D]">
+                  {contaDetalhesSelecionada.fornecedor.nome}
+                </p>
+              </div>
+              <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#6A8795]">Status</p>
+                <div className="mt-1">{getStatusBadge(contaDetalhesSelecionada.status)}</div>
+              </div>
+              <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#6A8795]">
+                  Descrição
+                </p>
+                <p className="mt-1 text-sm text-[#1D3B4D]">{contaDetalhesSelecionada.descricao}</p>
+                {contaDetalhesSelecionada.numeroDocumento ? (
+                  <>
+                    <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-[#6A8795]">
+                      Documento
+                    </p>
+                    <p className="mt-1 text-sm text-[#1D3B4D]">
+                      {contaDetalhesSelecionada.numeroDocumento}
+                    </p>
+                  </>
+                ) : null}
+              </div>
+              <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#6A8795]">
+                  Categoria
+                </p>
+                <p className="mt-1 text-sm font-semibold text-[#1D3B4D]">
+                  {CATEGORIA_LABELS[contaDetalhesSelecionada.categoria] ||
+                    contaDetalhesSelecionada.categoria}
+                </p>
+              </div>
+              <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#6A8795]">
+                  Prioridade
+                </p>
+                <div className="mt-1">{getPrioridadeBadge(contaDetalhesSelecionada.prioridade)}</div>
+              </div>
+              <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#6A8795]">
+                  Forma de pagamento
+                </p>
+                <p className="mt-1 text-sm font-semibold text-[#1D3B4D]">
+                  {contaDetalhesSelecionada.tipoPagamento
+                    ? FORMA_PAGAMENTO_LABELS[contaDetalhesSelecionada.tipoPagamento]
+                    : '-'}
+                </p>
+              </div>
+              <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#6A8795]">Datas</p>
+                <p className="mt-2 text-sm text-[#1D3B4D]">
+                  Emissão: {formatDate(contaDetalhesSelecionada.dataEmissao)}
+                </p>
+                <p className="mt-1 text-sm text-[#1D3B4D]">
+                  Vencimento: {formatDate(contaDetalhesSelecionada.dataVencimento)}
+                </p>
+                <p className="mt-1 text-sm text-[#1D3B4D]">
+                  Pagamento: {formatDate(contaDetalhesSelecionada.dataPagamento)}
+                </p>
+              </div>
+              <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#6A8795]">
+                  Valores
+                </p>
+                <p className="mt-2 text-sm text-[#1D3B4D]">
+                  Original: {moneyFmt.format(contaDetalhesSelecionada.valorOriginal || 0)}
+                </p>
+                <p className="mt-1 text-sm text-[#1D3B4D]">
+                  Desconto: {moneyFmt.format(contaDetalhesSelecionada.valorDesconto || 0)}
+                </p>
+                <p className="mt-1 text-sm text-[#1D3B4D]">
+                  Pago: {moneyFmt.format(contaDetalhesSelecionada.valorPago || 0)}
+                </p>
+                <p className="mt-2 text-base font-bold text-[#173A4D]">
+                  Total: {moneyFmt.format(contaDetalhesSelecionada.valorTotal || 0)}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-[#E5EEF2] px-6 py-4">
+              <button type="button" onClick={handleFecharDetalhes} className={btnSecondary}>
+                Fechar
+              </button>
+              {contaDetalhesSelecionada.status === StatusContaPagar.EM_ABERTO ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleFecharDetalhes();
+                    handleRegistrarPagamento(contaDetalhesSelecionada);
+                  }}
+                  className={btnSuccess}
+                >
+                  Registrar pagamento
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => {
+                  handleFecharDetalhes();
+                  handleEditarConta(contaDetalhesSelecionada);
+                }}
+                className={btnPrimary}
+              >
+                Editar conta
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {modalPagamentoAberto && contaSelecionada ? (

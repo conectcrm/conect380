@@ -123,6 +123,9 @@ const FluxoCaixaPage = React.lazy(() => import('./pages/financeiro/FluxoCaixa'))
 const FornecedoresPage = React.lazy(
   () => import('./features/financeiro/fornecedores/FornecedoresPage'),
 );
+const FornecedorPerfilPage = React.lazy(
+  () => import('./features/financeiro/fornecedores/FornecedorPerfilPage'),
+);
 
 const PerfilPage = React.lazy(() => import('./features/perfil'));
 const PortalClientePage = React.lazy(() => import('./pages/PortalClientePage'));
@@ -876,6 +879,10 @@ const AppRoutes: React.FC = () => {
                   <Route
                     path="/financeiro/fornecedores"
                     element={protegerRota(ModuloEnum.FINANCEIRO, <FornecedoresPage />)}
+                  />
+                  <Route
+                    path="/financeiro/fornecedores/:fornecedorId"
+                    element={protegerRota(ModuloEnum.FINANCEIRO, <FornecedorPerfilPage />)}
                   />
                   {/* Módulos financeiros - Protegidos */}
                   <Route

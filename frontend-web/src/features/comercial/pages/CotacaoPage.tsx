@@ -22,7 +22,6 @@ import {
   Filter,
   Download,
   FileSpreadsheet,
-  Eye,
   Check,
   X,
   CheckCircle,
@@ -74,7 +73,7 @@ const statusOptions: Array<{ value: FiltroStatusUI; label: string }> = [
   { value: 'rascunho', label: 'Rascunho' },
   { value: 'enviada', label: 'Enviada' },
   { value: 'pendente', label: 'Pendente' },
-  { value: 'em_analise', label: 'Em analise' },
+  { value: 'em_analise', label: 'Em análise' },
   { value: 'aprovada', label: 'Aprovada' },
   { value: 'pedido_gerado', label: 'Pedido gerado' },
   { value: 'adquirido', label: 'Adquirido' },
@@ -109,7 +108,7 @@ const btnDanger =
 function formatDate(value?: string) {
   if (!value) return 'Sem vencimento';
   const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return 'Data invalida';
+  if (Number.isNaN(parsed.getTime())) return 'Data inválida';
   return parsed.toLocaleDateString('pt-BR');
 }
 
@@ -125,7 +124,7 @@ function formatStatusForExport(status: string) {
     rascunho: 'Rascunho',
     enviada: 'Enviada',
     pendente: 'Pendente',
-    em_analise: 'Em analise',
+    em_analise: 'Em análise',
     aprovada: 'Aprovada',
     pedido_gerado: 'Pedido gerado',
     adquirido: 'Adquirido',
@@ -155,7 +154,7 @@ function getStatusBadgeForCotacao(cotacao: Pick<Cotacao, 'status' | 'metadados'>
     rascunho: { label: 'Rascunho', className: 'bg-gray-100 text-gray-800' },
     enviada: { label: 'Enviada', className: 'bg-blue-100 text-blue-800' },
     pendente: { label: 'Pendente', className: 'bg-yellow-100 text-yellow-800' },
-    em_analise: { label: 'Em analise', className: 'bg-yellow-100 text-yellow-800' },
+    em_analise: { label: 'Em análise', className: 'bg-yellow-100 text-yellow-800' },
     aprovada: { label: 'Aprovada', className: 'bg-green-100 text-green-800' },
     pedido_gerado: { label: 'Pedido gerado', className: 'bg-teal-100 text-teal-800' },
     adquirido: { label: 'Adquirido', className: 'bg-emerald-100 text-emerald-800' },
@@ -270,9 +269,9 @@ function CotacaoPage() {
 
       setCotacoes(lista);
     } catch (error) {
-      console.error('Erro ao carregar cotacoes:', error);
-      setErroCarregamento('Nao foi possivel carregar as cotacoes.');
-      toastService.apiError(error, 'Erro ao carregar cotacoes');
+      console.error('Erro ao carregar cotações:', error);
+      setErroCarregamento('Não foi possível carregar as cotações.');
+      toastService.apiError(error, 'Erro ao carregar cotações');
     } finally {
       setCarregando(false);
     }
@@ -280,7 +279,7 @@ function CotacaoPage() {
 
   const abrirModalNovo = () => {
     if (!canCreateCotacao) {
-      toastService.warning('Voce nao possui permissao para criar cotacoes');
+      toastService.warning('Você não possui permissão para criar cotações');
       return;
     }
     setCotacaoEdicao(null);
@@ -289,7 +288,7 @@ function CotacaoPage() {
 
   const abrirModalEdicao = (cotacao: Cotacao) => {
     if (!canUpdateCotacao) {
-      toastService.warning('Voce nao possui permissao para editar cotacoes');
+      toastService.warning('Você não possui permissão para editar cotações');
       return;
     }
     setCotacaoEdicao(cotacao);
@@ -327,40 +326,40 @@ function CotacaoPage() {
 
   const excluirCotacao = async (id: string) => {
     if (!canDeleteCotacao) {
-      toastService.warning('Voce nao possui permissao para excluir cotacoes');
+      toastService.warning('Você não possui permissão para excluir cotações');
       return;
     }
-    if (!(await confirm('Tem certeza que deseja excluir esta cotacao?'))) return;
+    if (!(await confirm('Tem certeza que deseja excluir esta cotação?'))) return;
     try {
       await cotacaoService.deletar(id);
       await carregarCotacoes();
       fecharModalDetalhes();
-      toastService.success('Cotacao excluida com sucesso!');
+      toastService.success('Cotação excluída com sucesso!');
     } catch (error) {
-      console.error('Erro ao excluir cotacao:', error);
-      toastService.apiError(error, 'Erro ao excluir cotacao');
+      console.error('Erro ao excluir cotação:', error);
+      toastService.apiError(error, 'Erro ao excluir cotação');
     }
   };
 
   const enviarParaAprovacao = async (cotacao: Cotacao) => {
     if (!canSendCotacao) {
-      toastService.warning('Voce nao possui permissao para enviar cotacoes');
+      toastService.warning('Você não possui permissão para enviar cotações');
       return;
     }
     if (
       !(await confirm(
-        `Deseja enviar a cotacao #${cotacao.numero} para aprovacao?\n\nApos enviar, o aprovador sera notificado.`,
+        `Deseja enviar a cotação #${cotacao.numero} para aprovação?\n\nApós enviar, o aprovador será notificado.`,
       ))
     ) {
       return;
     }
     try {
       await cotacaoService.enviarParaAprovacao(cotacao.id);
-      toastService.success(`Cotacao #${cotacao.numero} enviada para aprovacao com sucesso!`);
+      toastService.success(`Cotação #${cotacao.numero} enviada para aprovação com sucesso!`);
       await carregarCotacoes();
     } catch (error) {
-      console.error('Erro ao enviar cotacao para aprovacao:', error);
-      toastService.apiError(error, 'Erro ao enviar cotacao para aprovacao');
+      console.error('Erro ao enviar cotação para aprovação:', error);
+      toastService.apiError(error, 'Erro ao enviar cotação para aprovação');
     }
   };
 
@@ -381,12 +380,12 @@ function CotacaoPage() {
 
   const alterarStatusSelecionadas = async (novoStatus: StatusCotacao) => {
     if (!canUpdateCotacao) {
-      toastService.warning('Voce nao possui permissao para alterar status de cotacoes');
+      toastService.warning('Você não possui permissão para alterar status de cotações');
       return;
     }
     if (
       !(await confirm(
-        `Tem certeza que deseja alterar o status de ${cotacoesSelecionadas.length} cotacao(oes)?`,
+        `Tem certeza que deseja alterar o status de ${cotacoesSelecionadas.length} cotação(ões)?`,
       ))
     ) {
       return;
@@ -396,14 +395,14 @@ function CotacaoPage() {
         const resultado = await cotacaoService.aprovarLote(cotacoesSelecionadas);
         if (resultado.falhas > 0) {
           toastService.warning(
-            `${resultado.sucessos} cotacao(oes) aprovada(s), ${resultado.falhas} falharam`,
+            `${resultado.sucessos} cotação(ões) aprovada(s), ${resultado.falhas} falharam`,
           );
         } else {
-          toastService.success('Cotacoes aprovadas com sucesso!');
+          toastService.success('Cotações aprovadas com sucesso!');
         }
       } else if (novoStatus === StatusCotacao.REJEITADA) {
         const justificativa = window.prompt(
-          `Informe a justificativa para reprovar ${cotacoesSelecionadas.length} cotacao(oes):`,
+          `Informe a justificativa para reprovar ${cotacoesSelecionadas.length} cotação(ões):`,
           '',
         );
 
@@ -412,7 +411,7 @@ function CotacaoPage() {
         }
 
         if (!justificativa.trim()) {
-          toastService.warning('Justificativa obrigatoria para reprovar');
+          toastService.warning('Justificativa obrigatória para reprovar');
           return;
         }
 
@@ -422,33 +421,33 @@ function CotacaoPage() {
         );
         if (resultado.falhas > 0) {
           toastService.warning(
-            `${resultado.sucessos} cotacao(oes) reprovada(s), ${resultado.falhas} falharam`,
+            `${resultado.sucessos} cotação(ões) reprovada(s), ${resultado.falhas} falharam`,
           );
         } else {
-          toastService.success('Cotacoes reprovadas com sucesso!');
+          toastService.success('Cotações reprovadas com sucesso!');
         }
       } else {
         for (const id of cotacoesSelecionadas) {
           await cotacaoService.alterarStatus(id, novoStatus);
         }
-        toastService.success('Status das cotacoes atualizado com sucesso!');
+        toastService.success('Status das cotações atualizado com sucesso!');
       }
       deselecionarTodos();
       await carregarCotacoes();
     } catch (error) {
-      console.error('Erro ao alterar status das cotacoes:', error);
-      toastService.apiError(error, 'Erro ao alterar status das cotacoes');
+      console.error('Erro ao alterar status das cotações:', error);
+      toastService.apiError(error, 'Erro ao alterar status das cotações');
     }
   };
 
   const excluirSelecionadas = async () => {
     if (!canDeleteCotacao) {
-      toastService.warning('Voce nao possui permissao para excluir cotacoes');
+      toastService.warning('Você não possui permissão para excluir cotações');
       return;
     }
     if (
       !(await confirm(
-        `Tem certeza que deseja excluir ${cotacoesSelecionadas.length} cotacao(oes)?`,
+        `Tem certeza que deseja excluir ${cotacoesSelecionadas.length} cotação(ões)?`,
       ))
     ) {
       return;
@@ -459,75 +458,75 @@ function CotacaoPage() {
       }
       deselecionarTodos();
       await carregarCotacoes();
-      toastService.success('Cotacoes excluidas com sucesso!');
+      toastService.success('Cotações excluídas com sucesso!');
     } catch (error) {
-      console.error('Erro ao excluir cotacoes em massa:', error);
-      toastService.apiError(error, 'Erro ao excluir cotacoes em massa');
+      console.error('Erro ao excluir cotações em massa:', error);
+      toastService.apiError(error, 'Erro ao excluir cotações em massa');
     }
   };
 
   const exportarParaCSV = () => {
     if (!cotacoes.length) {
-      toastService.warning('Nao ha dados para exportar');
+      toastService.warning('Não há dados para exportar');
       return;
     }
     exportToCSV(
       cotacoes,
       [
-        { key: 'numero', label: 'Numero' },
-        { key: 'titulo', label: 'Titulo' },
+        { key: 'numero', label: 'Número' },
+        { key: 'titulo', label: 'Título' },
         { key: 'fornecedor.nome', label: 'Fornecedor' },
         { key: 'status', label: 'Status', transform: formatStatusForExport },
         { key: 'prioridade', label: 'Prioridade' },
         { key: 'valorTotal', label: 'Valor Total', transform: (v: number) => moneyFmt.format(v || 0) },
         { key: 'prazoResposta', label: 'Prazo Resposta', transform: formatDateForExport },
-        { key: 'dataCriacao', label: 'Data Criacao', transform: formatDateForExport },
+        { key: 'dataCriacao', label: 'Data de Criação', transform: formatDateForExport },
       ],
       'cotacoes',
     );
-    toastService.success('Exportacao CSV iniciada');
+    toastService.success('Exportação CSV iniciada');
   };
 
   const exportarParaExcel = () => {
     if (!cotacoes.length) {
-      toastService.warning('Nao ha dados para exportar');
+      toastService.warning('Não há dados para exportar');
       return;
     }
     exportToExcel(
       cotacoes,
       [
-        { key: 'numero', label: 'Numero' },
-        { key: 'titulo', label: 'Titulo' },
+        { key: 'numero', label: 'Número' },
+        { key: 'titulo', label: 'Título' },
         { key: 'fornecedor.nome', label: 'Fornecedor' },
         { key: 'status', label: 'Status', transform: formatStatusForExport },
         { key: 'prioridade', label: 'Prioridade' },
         { key: 'valorTotal', label: 'Valor Total', transform: (v: number) => v || 0 },
         { key: 'prazoResposta', label: 'Prazo Resposta', transform: formatDateForExport },
-        { key: 'dataCriacao', label: 'Data Criacao', transform: formatDateForExport },
+        { key: 'dataCriacao', label: 'Data de Criação', transform: formatDateForExport },
       ],
       'cotacoes',
     );
-    toastService.success('Exportacao Excel iniciada');
+    toastService.success('Exportação Excel iniciada');
   };
 
   const exportarSelecionadas = () => {
     const selecionadas = cotacoes.filter((c) => cotacoesSelecionadas.includes(c.id));
     if (!selecionadas.length) {
-      toastService.warning('Nenhuma cotacao selecionada para exportar');
+      toastService.warning('Nenhuma cotação selecionada para exportar');
       return;
     }
     exportToCSV(
       selecionadas,
       [
-        { key: 'numero', label: 'Numero' },
-        { key: 'titulo', label: 'Titulo' },
+        { key: 'numero', label: 'Número' },
+        { key: 'titulo', label: 'Título' },
         { key: 'fornecedor.nome', label: 'Fornecedor' },
         { key: 'status', label: 'Status', transform: formatStatusForExport },
         { key: 'valorTotal', label: 'Valor Total', transform: (v: number) => moneyFmt.format(v || 0) },
       ],
       'cotacoes-selecionadas',
     );
-    toastService.success('Exportacao iniciada');
+    toastService.success('Exportação iniciada');
   };
 
   const limparFiltros = () => {
@@ -551,19 +550,41 @@ function CotacaoPage() {
       {canSendCotacao && cotacao.status === StatusCotacao.RASCUNHO && (
         <button
           type="button"
-          onClick={() => void enviarParaAprovacao(cotacao)}
+          onClick={(event) => {
+            event.stopPropagation();
+            void enviarParaAprovacao(cotacao);
+          }}
           className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#159A9C] hover:bg-[#159A9C]/10"
-          title="Enviar para aprovacao"
+          title="Enviar para aprovação"
         >
           <Send className="h-4 w-4" />
         </button>
       )}
-      <button type="button" onClick={() => abrirModalDetalhes(cotacao)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#159A9C] hover:bg-[#159A9C]/10" title="Visualizar detalhes"><Eye className="h-4 w-4" /></button>
       {canUpdateCotacao && (
-        <button type="button" onClick={() => abrirModalEdicao(cotacao)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#159A9C] hover:bg-[#159A9C]/10" title="Editar cotacao"><Edit3 className="h-4 w-4" /></button>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            abrirModalEdicao(cotacao);
+          }}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#159A9C] hover:bg-[#159A9C]/10"
+          title="Editar cotação"
+        >
+          <Edit3 className="h-4 w-4" />
+        </button>
       )}
       {canDeleteCotacao && (
-        <button type="button" onClick={() => void excluirCotacao(cotacao.id)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#B4233A] hover:bg-[#FFF2F4]" title="Excluir cotacao"><Trash2 className="h-4 w-4" /></button>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            void excluirCotacao(cotacao.id);
+          }}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#B4233A] hover:bg-[#FFF2F4]"
+          title="Excluir cotação"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
       )}
     </div>
   );
@@ -574,7 +595,7 @@ function CotacaoPage() {
         <PageHeader
           title={
             <span className="inline-flex flex-wrap items-center gap-2">
-              <span>Cotacoes e Orcamentos</span>
+              <span>Cotações e Orçamentos</span>
               {hasFilters ? (
                 <span className="inline-flex items-center rounded-full border border-[#CDE6DF] bg-[#ECF7F3] px-2 py-0.5 text-xs font-semibold text-[#0F7B7D]">
                   filtros ativos
@@ -584,8 +605,8 @@ function CotacaoPage() {
           }
           description={
             carregando
-              ? 'Carregando cotacoes...'
-              : `Gerencie cotacoes e aprovacoes (${resumo.total} registros na lista atual).`
+              ? 'Carregando cotações...'
+              : `Gerencie cotações e aprovações (${resumo.total} registros na lista atual).`
           }
           actions={
             <div className="flex flex-wrap items-center gap-2">
@@ -604,7 +625,7 @@ function CotacaoPage() {
               {canCreateCotacao && (
                 <button type="button" onClick={abrirModalNovo} className={btnPrimary}>
                   <Plus className="h-4 w-4" />
-                  Nova Cotacao
+                  Nova Cotação
                 </button>
               )}
             </div>
@@ -661,12 +682,12 @@ function CotacaoPage() {
       <FiltersBar className="p-4">
         <div className="flex w-full flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
           <div className="w-full sm:min-w-[280px] sm:flex-1">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Buscar cotacoes</label>
+            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Buscar cotações</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
               <input
                 type="text"
-                placeholder="Numero, titulo ou fornecedor..."
+                placeholder="Número, título ou fornecedor..."
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
                 onKeyDown={handleSearchKeyDown}
@@ -724,7 +745,7 @@ function CotacaoPage() {
               </span>
               <button type="button" onClick={deselecionarTodos} className={btnSecondary}>
                 <X className="h-4 w-4" />
-                Limpar selecao
+                Limpar seleção
               </button>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -748,7 +769,7 @@ function CotacaoPage() {
       {!carregando && erroCarregamento && (
         <EmptyState
           icon={<AlertCircle className="h-5 w-5" />}
-          title="Falha ao carregar cotacoes"
+          title="Falha ao carregar cotações"
           description={erroCarregamento}
           action={
             <button type="button" onClick={() => void carregarCotacoes()} className={btnPrimary}>
@@ -762,11 +783,11 @@ function CotacaoPage() {
       {!carregando && !erroCarregamento && cotacoes.length === 0 && (
         <EmptyState
           icon={<FileText className="h-5 w-5" />}
-          title={hasFilters ? 'Nenhuma cotacao encontrada' : 'Nenhuma cotacao cadastrada'}
+          title={hasFilters ? 'Nenhuma cotação encontrada' : 'Nenhuma cotação cadastrada'}
           description={
             hasFilters
-              ? 'Ajuste ou limpe os filtros para visualizar outras cotacoes.'
-              : 'Comece criando sua primeira cotacao para acompanhar o fluxo comercial.'
+              ? 'Ajuste ou limpe os filtros para visualizar outras cotações.'
+              : 'Comece criando sua primeira cotação para acompanhar o fluxo comercial.'
           }
           action={
             hasFilters ? (
@@ -777,7 +798,7 @@ function CotacaoPage() {
             ) : canCreateCotacao ? (
               <button type="button" onClick={abrirModalNovo} className={btnPrimary}>
                 <Plus className="h-4 w-4" />
-                Criar primeira cotacao
+                Criar primeira cotação
               </button>
             ) : undefined
           }
@@ -806,7 +827,7 @@ function CotacaoPage() {
               {cotacoesSelecionadas.length > 0 && (
                 <button type="button" onClick={deselecionarTodos} className={btnSecondary}>
                   <X className="h-4 w-4" />
-                  Limpar selecao
+                  Limpar seleção
                 </button>
               )}
             </div>
@@ -815,7 +836,11 @@ function CotacaoPage() {
           <div className="p-4 lg:hidden">
             <div className="grid grid-cols-1 gap-3">
               {cotacoes.map((cotacao) => (
-                <article key={cotacao.id} className="rounded-xl border border-[#DFE9ED] bg-white p-4 shadow-[0_10px_22px_-20px_rgba(15,57,74,0.4)]">
+                <article
+                  key={cotacao.id}
+                  className="cursor-pointer rounded-xl border border-[#DFE9ED] bg-white p-4 shadow-[0_10px_22px_-20px_rgba(15,57,74,0.4)]"
+                  onClick={() => abrirModalDetalhes(cotacao)}
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
@@ -823,6 +848,7 @@ function CotacaoPage() {
                           type="checkbox"
                           checked={cotacoesSelecionadas.includes(cotacao.id)}
                           onChange={() => toggleSelecionarCotacao(cotacao.id)}
+                          onClick={(event) => event.stopPropagation()}
                           className="h-4 w-4 rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
                         />
                         <span className="text-sm font-semibold text-[#173A4D]">#{cotacao.numero}</span>
@@ -835,7 +861,7 @@ function CotacaoPage() {
                   <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
                     <div className="rounded-lg border border-[#EDF3F5] bg-[#FAFCFD] px-3 py-2">
                       <div className="flex items-center gap-2 text-[#5F7B89]"><User className="h-4 w-4" /><span className="text-xs uppercase tracking-wide">Fornecedor</span></div>
-                      <p className="mt-1 truncate font-medium text-[#173A4D]">{cotacao.fornecedor?.nome || 'Nao informado'}</p>
+                      <p className="mt-1 truncate font-medium text-[#173A4D]">{cotacao.fornecedor?.nome || 'Não informado'}</p>
                       {cotacao.fornecedor?.email ? <p className="truncate text-xs text-[#64808E]">{cotacao.fornecedor.email}</p> : null}
                     </div>
                     <div className="rounded-lg border border-[#EDF3F5] bg-[#FAFCFD] px-3 py-2">
@@ -855,7 +881,10 @@ function CotacaoPage() {
                     </div>
                   </div>
 
-                  <div className="mt-3 flex items-center justify-end border-t border-[#EDF3F5] pt-3">
+                  <div
+                    className="mt-3 flex items-center justify-end border-t border-[#EDF3F5] pt-3"
+                    onClick={(event) => event.stopPropagation()}
+                  >
                     {renderRowActions(cotacao)}
                   </div>
                 </article>
@@ -875,28 +904,33 @@ function CotacaoPage() {
                         checked={isAllSelected}
                         onChange={(e) => (e.target.checked ? selecionarTodos() : deselecionarTodos())}
                         className="h-4 w-4 rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
-                        aria-label="Selecionar todas as cotacoes da lista"
+                        aria-label="Selecionar todas as cotações da lista"
                       />
                     </th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">Cotacao</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">Cotação</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">Fornecedor</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">Status</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">Prioridade</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">Valor total</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#5B7683]">Vencimento</th>
-                    <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[#5B7683]">Acoes</th>
+                    <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[#5B7683]">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white">
                   {cotacoes.map((cotacao) => (
-                    <tr key={cotacao.id} className="border-t border-[#EDF3F5] hover:bg-[#FAFCFD]">
+                    <tr
+                      key={cotacao.id}
+                      className="cursor-pointer border-t border-[#EDF3F5] hover:bg-[#FAFCFD]"
+                      onClick={() => abrirModalDetalhes(cotacao)}
+                    >
                       <td className="px-4 py-4 align-top">
                         <input
                           type="checkbox"
                           checked={cotacoesSelecionadas.includes(cotacao.id)}
                           onChange={() => toggleSelecionarCotacao(cotacao.id)}
+                          onClick={(event) => event.stopPropagation()}
                           className="h-4 w-4 rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
-                          aria-label={`Selecionar cotacao ${cotacao.numero}`}
+                          aria-label={`Selecionar cotação ${cotacao.numero}`}
                         />
                       </td>
                       <td className="px-5 py-4 align-top">
@@ -904,7 +938,7 @@ function CotacaoPage() {
                         <div className="mt-0.5 max-w-[240px] truncate text-sm text-[#64808E]">{cotacao.titulo}</div>
                       </td>
                       <td className="px-5 py-4 align-top">
-                        <div className="text-sm font-medium text-[#173A4D]">{cotacao.fornecedor?.nome || 'Fornecedor nao informado'}</div>
+                        <div className="text-sm font-medium text-[#173A4D]">{cotacao.fornecedor?.nome || 'Fornecedor não informado'}</div>
                         {cotacao.fornecedor?.email ? <div className="mt-0.5 text-xs text-[#64808E]">{cotacao.fornecedor.email}</div> : null}
                       </td>
                       <td className="px-5 py-4 align-top">{getStatusBadgeForCotacao(cotacao)}</td>
@@ -923,7 +957,9 @@ function CotacaoPage() {
                         )}
                       </td>
                       <td className="px-5 py-4 align-top">
-                        <div className="flex justify-end">{renderRowActions(cotacao)}</div>
+                        <div className="flex justify-end" onClick={(event) => event.stopPropagation()}>
+                          {renderRowActions(cotacao)}
+                        </div>
                       </td>
                     </tr>
                   ))}

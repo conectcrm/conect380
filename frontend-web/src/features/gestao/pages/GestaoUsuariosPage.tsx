@@ -11,7 +11,7 @@
  * Cor primary: #159A9C (Crevasse-2 teal)
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   RefreshCw,
   Plus,
@@ -392,6 +392,8 @@ const GestaoUsuariosPage: React.FC = () => {
   // Estados de UI
   const [showDialog, setShowDialog] = useState(false);
   const [editingUsuario, setEditingUsuario] = useState<Usuario | null>(null);
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+  const [usuarioDetalhes, setUsuarioDetalhes] = useState<Usuario | null>(null);
   const [usuariosSelecionados, setUsuariosSelecionados] = useState<string[]>([]);
   const [tableDensity, setTableDensity] = useState<'comfortable' | 'compact'>('comfortable');
   const [paginaAtualUsuarios, setPaginaAtualUsuarios] = useState(1);
@@ -628,6 +630,16 @@ const GestaoUsuariosPage: React.FC = () => {
       });
     }
     setShowDialog(true);
+  };
+
+  const handleOpenDetailsDialog = (usuario: Usuario): void => {
+    setUsuarioDetalhes(usuario);
+    setShowDetailsDialog(true);
+  };
+
+  const handleCloseDetailsDialog = (): void => {
+    setShowDetailsDialog(false);
+    setUsuarioDetalhes(null);
   };
 
   const handleCloseDialog = (): void => {
@@ -916,6 +928,16 @@ const GestaoUsuariosPage: React.FC = () => {
       })
     );
   };
+
+  const permissionLabelMap = useMemo(() => {
+    const map = new Map<string, string>();
+    catalogoPermissoes.groups.forEach((group) => {
+      group.options.forEach((option) => {
+        map.set(option.value, option.label);
+      });
+    });
+    return map;
+  }, [catalogoPermissoes.groups]);
 
   const roleSelecionadoFormulario = (formData.role as UserRole) || UserRole.USER;
   const gruposPermissaoDoFormulario = getPermissionGroupsByRole(
@@ -1273,12 +1295,17 @@ const GestaoUsuariosPage: React.FC = () => {
 
           <div className="divide-y divide-[#E7EFF2] md:hidden">
             {usuariosVisiveis.map((usuario) => (
-              <article key={`mobile-${usuario.id}`} className="space-y-3 px-4 py-4">
+              <article
+                key={`mobile-${usuario.id}`}
+                className="space-y-3 px-4 py-4 cursor-pointer transition-colors hover:bg-[#F8FCFD]"
+                onClick={() => handleOpenDetailsDialog(usuario)}
+              >
                 <div className="flex items-start gap-3">
                   <input
                     type="checkbox"
                     checked={usuariosSelecionados.includes(usuario.id)}
                     onChange={() => handleToggleSelecionado(usuario.id)}
+                    onClick={(event) => event.stopPropagation()}
                     className="mt-1 h-4 w-4 rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
                   />
                   {usuario.avatar_url ? (
@@ -1336,7 +1363,7 @@ const GestaoUsuariosPage: React.FC = () => {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-4 gap-2" onClick={(event) => event.stopPropagation()}>
                   <button
                     onClick={() => handleOpenDialog(usuario)}
                     className="inline-flex h-9 items-center justify-center rounded-lg border border-[#D6E5EA] bg-white text-[#159A9C] transition-colors hover:bg-[#EAF8F6]"
@@ -1423,12 +1450,17 @@ const GestaoUsuariosPage: React.FC = () => {
                   </thead>
                   <tbody className="bg-white divide-y divide-[#E7EFF2]">
                     {usuariosVisiveis.map((usuario) => (
-                      <tr key={usuario.id} className="transition-colors hover:bg-[#F8FCFD]">
+                      <tr
+                        key={usuario.id}
+                        className="cursor-pointer transition-colors hover:bg-[#F8FCFD]"
+                        onClick={() => handleOpenDetailsDialog(usuario)}
+                      >
                         <td className={desktopCellPaddingClass}>
                           <input
                             type="checkbox"
                             checked={usuariosSelecionados.includes(usuario.id)}
                             onChange={() => handleToggleSelecionado(usuario.id)}
+                            onClick={(event) => event.stopPropagation()}
                             className="h-4 w-4 text-[#159A9C] focus:ring-[#159A9C] border-gray-300 rounded"
                           />
                         </td>
@@ -1491,7 +1523,7 @@ const GestaoUsuariosPage: React.FC = () => {
                           {formatarDataHora(usuario.ultimo_login)}
                         </td>
                         <td className={`${desktopCellPaddingClass} whitespace-nowrap text-right text-sm font-medium`}>
-                          <div className="flex justify-end gap-2">
+                          <div className="flex justify-end gap-2" onClick={(event) => event.stopPropagation()}>
                             <button
                               onClick={() => handleOpenDialog(usuario)}
                               className="text-[#159A9C] hover:text-blue-900 p-1 hover:bg-blue-50 rounded transition-colors"
@@ -1591,6 +1623,108 @@ const GestaoUsuariosPage: React.FC = () => {
             </div>
           </div>
         </DataTableCard>
+      )}
+
+      {showDetailsDialog && usuarioDetalhes && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#072433]/55 p-4 backdrop-blur-[1px]">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-[#DCE7EB] bg-white shadow-[0_30px_60px_-30px_rgba(7,36,51,0.55)]">
+            <div className="border-b border-[#E5EEF2] px-6 py-5">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900">Detalhes do usuário</h2>
+                <button
+                  onClick={handleCloseDetailsDialog}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 transition-colors hover:bg-[#F3F8FA] hover:text-gray-600"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-5 px-6 py-5 sm:px-7">
+              <div className="flex items-center gap-4">
+                {usuarioDetalhes.avatar_url ? (
+                  <img
+                    className="h-14 w-14 rounded-full object-cover"
+                    src={usuarioDetalhes.avatar_url}
+                    alt={usuarioDetalhes.nome}
+                  />
+                ) : (
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] text-lg font-semibold text-white">
+                    {usuarioDetalhes.nome?.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="truncate text-lg font-semibold text-[#17374B]">{usuarioDetalhes.nome}</p>
+                  <p className="truncate text-sm text-[#607B89]">{usuarioDetalhes.email}</p>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#6A8795]">Papel</p>
+                  <p className="mt-1 text-sm font-semibold text-[#1D3B4D]">{ROLE_LABELS[usuarioDetalhes.role]}</p>
+                </div>
+                <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#6A8795]">Status</p>
+                  <p className="mt-1 text-sm font-semibold text-[#1D3B4D]">
+                    {usuarioDetalhes.ativo ? 'Ativo' : 'Inativo'}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#6A8795]">Telefone</p>
+                  <p className="mt-1 text-sm font-semibold text-[#1D3B4D]">{usuarioDetalhes.telefone || '-'}</p>
+                </div>
+                <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#6A8795]">Idioma</p>
+                  <p className="mt-1 text-sm font-semibold text-[#1D3B4D]">
+                    {usuarioDetalhes.idioma_preferido || '-'}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#6A8795]">Último login</p>
+                  <p className="mt-1 text-sm font-semibold text-[#1D3B4D]">
+                    {formatarDataHora(usuarioDetalhes.ultimo_login)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#6A8795]">Criado em</p>
+                  <p className="mt-1 text-sm font-semibold text-[#1D3B4D]">
+                    {formatarDataHora(usuarioDetalhes.created_at)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-[#E3EDF1] bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#6A8795]">
+                  Permissões ({usuarioDetalhes.permissoes?.length || 0})
+                </p>
+                {usuarioDetalhes.permissoes && usuarioDetalhes.permissoes.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {usuarioDetalhes.permissoes.map((permissao) => (
+                      <span
+                        key={permissao}
+                        className="inline-flex items-center rounded-full border border-[#D7E5EA] bg-[#F6FAFB] px-2.5 py-1 text-xs font-medium text-[#355061]"
+                      >
+                        {permissionLabelMap.get(permissao) || permissao}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-[#607B89]">Nenhuma permissão atribuída.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end border-t border-[#E5EEF2] px-6 py-4">
+              <button
+                onClick={handleCloseDetailsDialog}
+                className="inline-flex h-10 items-center rounded-lg border border-[#D1DFE5] px-4 text-sm font-semibold text-[#355061] transition-colors hover:bg-[#F4F9FA]"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modal de Criar/Editar Usuário */}
