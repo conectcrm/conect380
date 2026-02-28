@@ -326,7 +326,7 @@ class EmpresaService {
   ): Promise<EmpresaResponse> {
     try {
       const response = await api.put(`/empresas/${id}`, dados);
-      return response.data;
+      return response.data?.data || response.data;
     } catch (error: unknown) {
       console.error('Erro ao atualizar empresa:', error);
       throw new Error(getErrorMessage(error, 'Erro ao atualizar dados da empresa'));

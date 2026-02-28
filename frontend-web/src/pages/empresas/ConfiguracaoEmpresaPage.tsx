@@ -18,14 +18,19 @@ import {
   ImageIcon,
 } from 'lucide-react';
 import { LoadingSkeleton, PageHeader, SectionCard } from '../../components/layout-v2';
-import { empresaConfigService, ConfiguracoesEmpresa } from '../../services/empresaConfigService';
+import {
+  BackupSnapshotInfo,
+  ConfiguracoesEmpresa,
+  empresaConfigService,
+} from '../../services/empresaConfigService';
 import { empresaService, EmpresaResponse } from '../../services/empresaService';
 import { useAuth } from '../../hooks/useAuth';
 import { useGlobalConfirmation } from '../../contexts/GlobalConfirmationContext';
+import { userHasPermission } from '../../config/menuConfig';
 
 const ConfiguracaoEmpresaPage: React.FC = () => {
   const { confirm } = useGlobalConfirmation();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('geral');
   const [config, setConfig] = useState<ConfiguracoesEmpresa | null>(null);
   const [empresa, setEmpresa] = useState<EmpresaResponse | null>(null);
@@ -44,9 +49,11 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
   const [backupResult, setBackupResult] = useState<{ success: boolean; message: string } | null>(
     null,
   );
+  const [backupHistory, setBackupHistory] = useState<BackupSnapshotInfo[]>([]);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const canUpdateConfig = userHasPermission(user, 'config.empresa.update');
 
   // 🔐 empresaId removido - backend pega do JWT automaticamente
 
@@ -60,29 +67,36 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
   ];
 
   useEffect(() => {
-    carregarConfig();
-  }, []);
+    if (authLoading) {
+      return;
+    }
 
-  const carregarConfig = async () => {
+    const empresaId = user?.empresa?.id;
+    if (!empresaId) {
+      setLoading(false);
+      setError('Usuário não possui empresa associada');
+      return;
+    }
+
+    void carregarConfig(empresaId);
+  }, [authLoading, user?.empresa?.id]);
+
+  const carregarConfig = async (empresaId: string) => {
     try {
       setLoading(true);
       setError(null);
 
-      // 🔐 Pegar empresaId do usuário autenticado
-      const empresaId = user?.empresa?.id;
-      if (!empresaId) {
-        throw new Error('Usuário não possui empresa associada');
-      }
+      const [configData, empresaInfo, snapshots] = await Promise.all([
+        empresaConfigService.getConfig(),
+        empresaService.obterEmpresaPorId(empresaId),
+        empresaConfigService.getBackupHistory().catch(() => [] as BackupSnapshotInfo[]),
+      ]);
 
-      // Carregar configurações avançadas (JWT automático)
-      const configData = await empresaConfigService.getConfig();
       setConfig(configData);
       setFormData(configData);
-
-      // Carregar dados básicos da empresa
-      const empresaData = await empresaService.obterEmpresaPorId(empresaId);
-      setEmpresa(empresaData);
-      setEmpresaData(empresaData);
+      setEmpresa(empresaInfo);
+      setEmpresaData(empresaInfo);
+      setBackupHistory(snapshots);
     } catch (err: unknown) {
       console.error('Erro ao carregar:', err);
       setError(err instanceof Error ? err.message : 'Erro ao carregar');
@@ -92,16 +106,27 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
   };
 
   const handleInputChange = (field: keyof ConfiguracoesEmpresa, value: any) => {
+    if (!canUpdateConfig) {
+      return;
+    }
     setFormData((prev) => ({ ...prev, [field]: value }));
     setHasChanges(true);
   };
 
   const handleEmpresaInputChange = (field: keyof EmpresaResponse, value: any) => {
+    if (!canUpdateConfig) {
+      return;
+    }
     setEmpresaData((prev) => ({ ...prev, [field]: value }));
     setHasChanges(true);
   };
 
   const handleSave = async () => {
+    if (!canUpdateConfig) {
+      setError('Você não possui permissão para atualizar as configurações da empresa.');
+      return;
+    }
+
     try {
       setSaving(true);
       setError(null);
@@ -125,12 +150,10 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
         pushApiKeyConfigurada: Boolean(formData.pushApiKey),
       });
 
-      // Salvar configurações avançadas (JWT automático)
       const updatedConfig = await empresaConfigService.updateConfig(formData);
       setConfig(updatedConfig);
       setFormData(updatedConfig);
 
-      // Salvar dados básicos da empresa
       const updatedEmpresa = await empresaService.atualizarEmpresa(empresaId, empresaData);
       setEmpresa(updatedEmpresa);
       setEmpresaData(updatedEmpresa);
@@ -154,6 +177,11 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
   };
 
   const handleReset = async () => {
+    if (!canUpdateConfig) {
+      setError('Você não possui permissão para restaurar as configurações.');
+      return;
+    }
+
     if (
       !(await confirm(
         'Tem certeza que deseja restaurar todas as configurações para os valores padrão?',
@@ -235,6 +263,10 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
   };
 
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!canUpdateConfig) {
+      return;
+    }
+
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -272,6 +304,10 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
   };
 
   const handleRemoveLogo = () => {
+    if (!canUpdateConfig) {
+      return;
+    }
+
     setLogoPreview(null);
     handleInputChange('logoUrl', null);
     if (fileInputRef.current) {
@@ -280,33 +316,28 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
   };
 
   const handleTestSMTP = async () => {
+    if (!canUpdateConfig) {
+      return;
+    }
+
     setTestingSMTP(true);
     setSMTPTestResult(null);
 
     try {
-      // Simular teste de conexão SMTP
-      // TODO: Implementar endpoint real no backend
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // Validar campos obrigatórios
-      if (!formData.servidorSMTP || !formData.smtpUsuario || !formData.smtpSenha) {
-        setSMTPTestResult({
-          success: false,
-          message: 'Preencha todos os campos obrigatórios (Servidor, Usuário e Senha)',
-        });
-        return;
-      }
-
-      // Simular sucesso (em produção, chamar endpoint real)
-      setSMTPTestResult({
-        success: true,
-        message: 'Conexão SMTP testada com sucesso! Email de teste enviado.',
+      const response = await empresaConfigService.testSMTP({
+        servidorSMTP: formData.servidorSMTP,
+        portaSMTP: formData.portaSMTP,
+        smtpUsuario: formData.smtpUsuario,
+        smtpSenha: formData.smtpSenha,
       });
-    } catch (err: unknown) {
+      setSMTPTestResult(response);
+    } catch (err: any) {
       console.error('Erro ao testar SMTP:', err);
       setSMTPTestResult({
         success: false,
-        message: err instanceof Error ? err.message : 'Erro ao testar conexão SMTP',
+        message:
+          err?.response?.data?.message ||
+          (err instanceof Error ? err.message : 'Erro ao testar conexão SMTP'),
       });
     } finally {
       setTestingSMTP(false);
@@ -314,30 +345,77 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
   };
 
   const handleExecutarBackup = async () => {
+    if (!canUpdateConfig) {
+      return;
+    }
+
     setExecutingBackup(true);
     setBackupResult(null);
 
     try {
-      // Simular execução de backup
-      // TODO: Implementar endpoint real no backend
-      await new Promise((resolve) => setTimeout(resolve, 3000));
+      const result = await empresaConfigService.executeBackup();
+      setBackupResult({ success: result.success, message: result.message });
 
-      setBackupResult({
-        success: true,
-        message: `Backup executado com sucesso em ${new Date().toLocaleString('pt-BR')}`,
-      });
-    } catch (err: unknown) {
+      const history = await empresaConfigService.getBackupHistory();
+      setBackupHistory(history);
+    } catch (err: any) {
       console.error('Erro ao executar backup:', err);
       setBackupResult({
         success: false,
-        message: err instanceof Error ? err.message : 'Erro ao executar backup',
+        message:
+          err?.response?.data?.message ||
+          (err instanceof Error ? err.message : 'Erro ao executar backup'),
       });
     } finally {
       setExecutingBackup(false);
     }
   };
 
-  if (loading) {
+  const handleVerHistoricoBackups = async () => {
+    try {
+      const latestHistory = await empresaConfigService.getBackupHistory();
+      setBackupHistory(latestHistory);
+
+      if (latestHistory.length === 0) {
+        alert('Nenhum backup disponível para esta empresa.');
+        return;
+      }
+
+      const resumo = latestHistory
+        .slice(0, 10)
+        .map(
+          (item, index) =>
+            `${index + 1}. ${new Date(item.generatedAt).toLocaleString('pt-BR')} - ${Math.max(
+              1,
+              Math.round(item.sizeBytes / 1024),
+            )} KB`,
+        )
+        .join('\n');
+
+      alert(`Histórico de backups:\n\n${resumo}`);
+    } catch (err) {
+      console.error('Erro ao carregar histórico de backups:', err);
+      alert('Não foi possível carregar o histórico de backups.');
+    }
+  };
+
+  const ultimoBackup = backupHistory[0];
+  const ultimoBackupDescricao = ultimoBackup
+    ? `${new Date(ultimoBackup.generatedAt).toLocaleString('pt-BR')} - ${Math.max(
+        1,
+        Math.round(ultimoBackup.sizeBytes / 1024),
+      )} KB`
+    : 'Nenhum backup executado ainda.';
+
+  const ultimoBackupIcon = ultimoBackup ? (
+    <CheckCircle className="h-6 w-6 text-blue-600" />
+  ) : (
+    <Info className="h-6 w-6 text-gray-500" />
+  );
+
+  const canUploadLogo = canUpdateConfig && !uploadingLogo;
+
+  if (loading || authLoading) {
     return (
       <div className="space-y-4 pt-1 sm:pt-2">
         <LoadingSkeleton lines={8} />
@@ -370,6 +448,12 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
       {error && (
         <div className="rounded-[18px] border border-red-200 bg-red-50 px-4 py-3 text-red-800">
           {error}
+        </div>
+      )}
+
+      {!canUpdateConfig && (
+        <div className="rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+          Você possui acesso somente leitura para as configurações da empresa.
         </div>
       )}
 
@@ -581,6 +665,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                                 </div>
                                 <button
                                   onClick={handleRemoveLogo}
+                                  disabled={!canUpdateConfig}
                                   className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:bg-red-600"
                                   title="Remover logo"
                                 >
@@ -601,12 +686,17 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                               type="file"
                               accept="image/*"
                               onChange={handleLogoUpload}
+                              disabled={!canUploadLogo}
                               className="hidden"
                               id="logo-upload"
                             />
                             <label
-                              htmlFor="logo-upload"
-                              className="inline-flex items-center px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                              htmlFor={canUploadLogo ? 'logo-upload' : undefined}
+                              className={`inline-flex items-center px-4 py-2 rounded-lg transition-colors ${
+                                canUploadLogo
+                                  ? 'bg-[#159A9C] text-white hover:bg-[#0F7B7D] cursor-pointer'
+                                  : 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                              }`}
                             >
                               <Upload className="h-4 w-4 mr-2" />
                               {uploadingLogo ? 'Enviando...' : 'Fazer Upload'}
@@ -930,6 +1020,29 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                       </p>
                     </div>
 
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Alçada de Aprovação Financeira (R$)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={formData.alcadaAprovacaoFinanceira ?? 0}
+                        onChange={(e) =>
+                          handleInputChange(
+                            'alcadaAprovacaoFinanceira',
+                            Number(e.target.value || 0),
+                          )
+                        }
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Contas a pagar com valor total igual ou acima deste valor exigem aprovação.
+                        Use 0 para desativar a regra automática.
+                      </p>
+                    </div>
+
                     {/* Card Informativo */}
                     <div className="flex items-start gap-3 p-4 bg-[#DEEFE7] rounded-lg border border-[#B4BEC9]">
                       <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
@@ -1052,6 +1165,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                         <button
                           onClick={handleTestSMTP}
                           disabled={
+                            !canUpdateConfig ||
                             testingSMTP ||
                             !formData.servidorSMTP ||
                             !formData.smtpUsuario ||
@@ -1348,11 +1462,9 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium text-[#002333]">Último Backup</p>
-                        <p className="text-xs text-[#002333] mt-1">
-                          03/11/2025 às 14:30 (há 2 horas)
-                        </p>
+                        <p className="text-xs text-[#002333] mt-1">{ultimoBackupDescricao}</p>
                       </div>
-                      <CheckCircle className="h-6 w-6 text-blue-600" />
+                      {ultimoBackupIcon}
                     </div>
                   </div>
 
@@ -1422,7 +1534,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                     <div className="flex flex-col sm:flex-row gap-3">
                       <button
                         onClick={handleExecutarBackup}
-                        disabled={executingBackup}
+                        disabled={executingBackup || !canUpdateConfig}
                         className="flex items-center justify-center gap-2 px-6 py-3 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                         <Database className="h-4 w-4" />
@@ -1430,7 +1542,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                       </button>
 
                       <button
-                        onClick={() => alert('Histórico de backups em desenvolvimento')}
+                        onClick={handleVerHistoricoBackups}
                         className="flex items-center justify-center gap-2 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                       >
                         <Info className="h-4 w-4" />
@@ -1518,7 +1630,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
           <div className="flex flex-col sm:flex-row gap-3 sm:justify-between">
             <button
               onClick={handleReset}
-              disabled={saving}
+              disabled={saving || !canUpdateConfig}
               className="flex items-center justify-center gap-2 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             >
               <RotateCcw className="h-4 w-4" />
@@ -1526,7 +1638,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
             </button>
             <button
               onClick={handleSave}
-              disabled={!hasChanges || saving}
+              disabled={!canUpdateConfig || !hasChanges || saving}
               className="flex items-center justify-center gap-2 px-6 py-3 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50"
             >
               <Save className="h-4 w-4" />
@@ -1540,3 +1652,4 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
 };
 
 export default ConfiguracaoEmpresaPage;
+
