@@ -188,13 +188,19 @@ Entregar um fluxo funcional de contas a pagar ponta a ponta no Conect360, cobrin
   - Taxa minima de matching automatico acordada com negocio.
   - Toda acao manual gera trilha de auditoria.
 
-### AP-203 - Dashboard de conciliacao
+### AP-203 - Dashboard financeiro por perfil (modelo V2)
 
 - Tipo: Story
 - Estimativa: 3 pontos
-- Objetivo: visao de pendencias e taxa de conciliacao.
+- Objetivo: entregar dashboard do perfil financeiro no mesmo modelo V2 usado por gestor/administrador.
+- Frontend:
+  - Implementar dashboard financeiro com componentes base do V2 (`KpiTrendCard`, `GoalProgressCard`, `InsightsPanel`).
+  - Exibir indicadores financeiros reais (faturamento, recebimento, atrasos, aprovacoes, posicao de caixa e conciliacao).
+  - Retirar o dashboard legado de rota principal para o perfil financeiro.
 - Criterios de aceite:
-  - Indicadores de conciliado, pendente, divergente.
+  - Perfil financeiro acessa dashboard no padrao V2.
+  - Dashboard legado nao e mais utilizado na rota principal do financeiro.
+  - Carregamento parcial de dados e mensagens de fallback operacionais.
 
 ## EPIC AP-04 - Integracao externa e fechamento contabil (Sprint 4)
 
@@ -300,3 +306,140 @@ Entregar um fluxo funcional de contas a pagar ponta a ponta no Conect360, cobrin
 3. Definir capacidade do time para Sprint 1 (pontos).
 4. Iniciar AP-001 e AP-002 em paralelo.
 
+## 13. Status de execucao (atualizado em 2026-02-28)
+
+### EPIC AP-01 - Base financeira operacional
+
+1. AP-001 - Modelar contas bancarias no backend: CONCLUIDO
+   - CRUD de contas bancarias disponivel em `contas-bancarias`.
+   - Endpoints de listagem, listagem de ativas, update, desativacao e exclusao operacionais.
+   - Cobertura de permissoes em controller + cobertura de regras criticas no service.
+2. AP-002 - Substituir mock de conta bancaria no modal de conta a pagar: CONCLUIDO
+   - `ModalContaPagarNovo.tsx` integrado com API real.
+   - Mensagem de orientacao exibida quando nao houver contas bancarias cadastradas.
+   - Tela de cadastro de contas bancarias entregue em `/financeiro/contas-bancarias`.
+3. AP-003 - Validacao de conta bancaria no fluxo de pagamento: CONCLUIDO
+   - Validacao no backend para create/update/registrar pagamento por `empresaId` e `ativo=true`.
+   - Cobertura de testes para cenario valido e invalido (retorno 400 em conta invalida).
+4. AP-004 - Hardening de testes do modulo financeiro: CONCLUIDO (escopo Sprint 1)
+   - Backend: testes unitarios para `ContaPagarService` e `ContaBancariaService`.
+   - Frontend: testes de contrato para `contasPagarService`.
+
+### Pendencia operacional de Sprint 1
+
+1. QA funcional manual do fluxo ponta a ponta (cadastro, pagamento valido/invalido, filtros e permissoes por perfil).
+
+### EPIC AP-02 - Workflow de aprovacao financeira
+
+1. AP-101 - Habilitar estados de aprovacao em contas a pagar: CONCLUIDO
+   - Endpoints adicionados:
+     - `POST /contas-pagar/:id/aprovar`
+     - `POST /contas-pagar/:id/reprovar`
+   - Regra aplicada: conta com `necessitaAprovacao=true` e sem `dataAprovacao` nao pode registrar pagamento.
+   - Auditoria aplicada: `aprovadoPor`, `dataAprovacao` e `atualizadoPor`.
+   - Frontend atualizado com acoes de aprovar/reprovar e bloqueio visual/funcional de pagamento enquanto pendente.
+2. AP-102 - Regra de alcada por empresa: CONCLUIDO
+   - Campo de configuracao entregue em `empresa_configuracoes.alcada_aprovacao_financeira` (via `GET/PUT /empresas/config`).
+   - Regra automatica aplicada no backend: contas com valor total igual/acima da alcada passam a exigir aprovacao.
+   - Fluxo mantido para valores abaixo da alcada, sem obrigatoriedade de aprovacao.
+   - Frontend atualizado para permitir cadastro da alcada na tela de configuracoes da empresa.
+3. AP-103 - Fila de aprovacoes financeiras: CONCLUIDO
+   - Endpoint de listagem das pendencias entregue:
+     - `GET /contas-pagar/aprovacoes/pendentes`
+   - Endpoint de decisao em lote entregue:
+     - `POST /contas-pagar/aprovacoes/lote`
+   - Frontend entregue em `/financeiro/aprovacoes` com aprovacao/reprovacao individual e em lote.
+   - Cobertura de testes adicionada para service/controller e contrato do `contasPagarService`.
+
+### EPIC AP-03 - Conciliacao bancaria
+
+1. AP-201 - Importacao de extrato (OFX/CSV): CONCLUIDO
+   - Backend entregue com parser de OFX/CSV, persistencia de importacoes e itens de extrato.
+   - Endpoints entregues:
+     - `POST /conciliacao-bancaria/importacoes`
+     - `GET /conciliacao-bancaria/importacoes`
+     - `GET /conciliacao-bancaria/importacoes/:id/itens`
+   - Migration adicionada para tabelas:
+     - `extratos_bancarios_importacoes`
+     - `extratos_bancarios_itens`
+   - Frontend entregue em `/financeiro/conciliacao` com upload, resumo de importacao, historico e visualizacao de lancamentos.
+   - Testes adicionados:
+     - Backend: service/controller da conciliacao bancaria.
+     - Frontend: contrato de `conciliacaoBancariaService`.
+     - E2E: cobertura de listagem/importacao em ambiente real de app para prevenir regressao de metadata TypeORM (`backend/test/financeiro/conciliacao-bancaria.e2e-spec.ts`, comando `npm run test:e2e:conciliacao-bancaria`).
+2. AP-202 - Matching automatico e conciliacao manual: CONCLUIDO
+   - Backend entregue com motor inicial de matching por valor/data/referencia:
+     - `POST /conciliacao-bancaria/importacoes/:id/matching-automatico`
+   - Backend entregue com reconciliacao manual operacional:
+     - `GET /conciliacao-bancaria/itens/:id/candidatos`
+     - `POST /conciliacao-bancaria/itens/:id/conciliar`
+     - `POST /conciliacao-bancaria/itens/:id/desconciliar`
+   - Trilha de auditoria de conciliacao adicionada em `extratos_bancarios_itens`:
+     - `auditoria_conciliacao`, `data_conciliacao`, `conciliado_por`, `conciliacao_origem`, `motivo_conciliacao`.
+   - Frontend atualizado em `/financeiro/conciliacao`:
+     - acao de matching automatico;
+     - conciliacao manual com candidatos e ajuste de vinculo;
+     - desfazer conciliacao e visualizacao do vinculo conta extrato -> conta a pagar.
+   - Testes adicionados/atualizados:
+     - Backend: `conciliacao-bancaria.service.spec.ts` e `conciliacao-bancaria.controller.spec.ts`.
+     - Frontend: `conciliacaoBancariaService.test.ts`.
+3. AP-203 - Dashboard financeiro por perfil (modelo V2): CONCLUIDO
+   - Dashboard do perfil financeiro migrado para o padrao V2, reutilizando componentes visuais e de insight.
+   - Indicadores financeiros consolidados com dados reais de faturamento, contas a pagar, aprovacoes, contas bancarias e conciliacao.
+   - Roteamento atualizado para remover o dashboard legado da rota principal do perfil financeiro.
+
+### Proximo foco recomendado
+
+1. Fechar pendencia operacional de Sprint 1 com QA funcional manual ponta a ponta.
+2. Concluir AP-301 com homologacao QA em gateway real/sandbox (fluxo webhook ponta a ponta).
+3. Na sequencia, aprovar planejamento de AP-302/AP-303 (requisitos finais + sequenciamento de sprint).
+
+## 14. Checklist executavel (responsavel e data)
+
+### 14.1 QA funcional ponta a ponta (pendencia Sprint 1)
+
+- [x] Publicar roteiro oficial de QA com cenarios obrigatorios (cadastro, pagamento valido/invalido, filtros e permissoes).
+  - Responsavel sugerido: QA + Produto
+  - Prazo: 2026-03-02
+  - Evidencia de conclusao: roteiro versionado em docs + casos vinculados (`docs/features/ROTEIRO_QA_CONTAS_PAGAR_SPRINT1_2026-03.md`).
+- [ ] Executar bateria completa de testes manuais em homologacao.
+  - Responsavel sugerido: QA
+  - Prazo: 2026-03-03
+  - Evidencia de conclusao: relatorio de execucao com aprovado/reprovado por cenario (`docs/features/RELATORIO_QA_CONTAS_PAGAR_SPRINT1_2026-03_TEMPLATE.md`).
+- [ ] Consolidar bugs, aplicar correcoes e revalidar cenarios criticos.
+  - Responsavel sugerido: Backend + Frontend + QA
+  - Prazo: 2026-03-05
+  - Evidencia de conclusao: todos os bugs criticos/altos resolvidos e retestados.
+
+### 14.2 AP-301 - Integracao de pagamento externo (fase 1)
+
+- [x] Definir contrato tecnico do webhook (payload, assinatura, codigos de retorno e estrategia de retry).
+  - Responsavel sugerido: Backend
+  - Prazo: 2026-03-03
+  - Evidencia de conclusao: especificacao publicada e revisada (`docs/features/AP301_CONTRATO_WEBHOOK_PAGAMENTOS_2026-03.md`).
+- [x] Implementar endpoint/webhook com idempotencia e validacao de assinatura.
+  - Responsavel sugerido: Backend
+  - Prazo: 2026-03-06
+  - Evidencia de conclusao: endpoint funcional + testes unitarios cobrindo retorno duplicado (`backend/src/modules/pagamentos/controllers/gateway-webhook.controller.ts`, `backend/src/modules/pagamentos/services/gateway-webhook.service.ts`, `backend/src/modules/pagamentos/services/gateway-webhook.service.spec.ts`).
+- [ ] Validar sincronizacao de status da conta e trilha de auditoria no fluxo completo.
+  - Responsavel sugerido: Backend + QA
+  - Prazo: 2026-03-09
+  - Evidencia de conclusao: cenarios de homologacao aprovados com logs de auditoria.
+  - Status atual: em andamento (pre-validacao tecnica concluida com cobertura ampliada de webhook service/controller em `docs/features/AP301_VALIDACAO_TECNICA_WEBHOOK_2026-02-27.md`, `backend/src/modules/pagamentos/services/gateway-webhook.service.spec.ts` e `backend/src/modules/pagamentos/controllers/gateway-webhook.controller.spec.ts`; validacao E2E adicional de sincronizacao + idempotencia + rejeicao em `backend/test/propostas/faturamento-pagamentos-gateway.e2e-spec.ts`; revalidacao automatizada em 2026-02-28 com `npm run test -- gateway-webhook.service.spec.ts gateway-webhook.controller.spec.ts --runInBand` e `npm run test:e2e -- ./propostas/faturamento-pagamentos-gateway.e2e-spec.ts` (15/15 PASS); roteiro de homologacao publicado em `docs/features/AP301_ROTEIRO_HOMOLOGACAO_WEBHOOK_2026-03.md`; execucao assistida publicada em `scripts/test-ap301-webhook-homologacao.ps1` + `docs/features/AP301_HOMOLOGACAO_ASSISTIDA_WEBHOOK_2026-03.md` com coleta SQL automatica opcional; template de relatorio QA publicado em `docs/features/RELATORIO_QA_AP301_WEBHOOK_2026-03_TEMPLATE.md`; pendente execucao QA em homologacao com gateway real/sandbox).
+
+### 14.3 Planejamento AP-302 e AP-303
+
+- [ ] Levantar requisitos com financeiro/contabil para layout de exportacao e regras de alertas.
+  - Responsavel sugerido: Produto + Financeiro
+  - Prazo: 2026-03-04
+  - Evidencia de conclusao: minuta de requisitos validada pelas areas.
+  - Status atual: em andamento (minuta inicial publicada em `docs/features/AP302_AP303_MINUTA_REQUISITOS_2026-03.md`; pendente validacao formal com Financeiro/Contabil).
+- [x] Quebrar AP-302 e AP-303 em stories tecnicas com criterios de aceite e estimativa.
+  - Responsavel sugerido: Produto + Tech Lead
+  - Prazo: 2026-03-05
+  - Evidencia de conclusao: backlog refinado (stories prontas para desenvolvimento).
+  - Status atual: concluido tecnicamente (backlog tecnico refinado e publicado em `docs/features/AP302_AP303_BACKLOG_TECNICO_2026-03.md`; AP302-01 a AP302-05 e AP303-01 a AP303-05 implementados e cobertos por testes; regressao automatizada confirmada em 2026-02-28 com backend `14/14 PASS` para alertas, e2e financeiro `5/5 PASS` para exportacao/historico e frontend `17/17 PASS` para contratos/estado de alertas; pendente apenas aprovacao de planejamento).
+- [ ] Aprovar sequenciamento no planejamento da proxima sprint.
+  - Responsavel sugerido: Produto + Tech Lead + Financeiro
+  - Prazo: 2026-03-06
+  - Evidencia de conclusao: sprint planejada com capacidade e ordem de execucao definidas.
