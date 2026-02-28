@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Like, Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
@@ -72,6 +72,21 @@ const WON_STATUS_VALUES = new Set<SalesFlowStatus>([
   'aguardando_pagamento',
   'pago',
 ]);
+
+const FLOW_STATUS_TRANSITIONS: Record<SalesFlowStatus, readonly SalesFlowStatus[]> = {
+  rascunho: ['enviada', 'aprovada', 'rejeitada', 'expirada'],
+  enviada: ['visualizada', 'negociacao', 'aprovada', 'rejeitada', 'expirada'],
+  visualizada: ['negociacao', 'aprovada', 'rejeitada', 'expirada'],
+  negociacao: ['aprovada', 'rejeitada', 'expirada', 'visualizada'],
+  aprovada: ['contrato_gerado', 'rejeitada'],
+  contrato_gerado: ['contrato_assinado'],
+  contrato_assinado: ['fatura_criada'],
+  fatura_criada: ['contrato_assinado', 'aguardando_pagamento', 'pago'],
+  aguardando_pagamento: ['contrato_assinado', 'pago', 'rejeitada'],
+  pago: ['aguardando_pagamento'],
+  rejeitada: ['negociacao', 'enviada'],
+  expirada: ['enviada', 'negociacao'],
+};
 
 type ApprovalStatus = 'nao_requer' | 'pendente' | 'aprovada' | 'rejeitada';
 
@@ -465,6 +480,21 @@ export class PropostasService {
     }
 
     return FLOW_STATUS_FALLBACK;
+  }
+
+  private getAllowedStatusTransitions(currentStatus: SalesFlowStatus): readonly SalesFlowStatus[] {
+    return FLOW_STATUS_TRANSITIONS[currentStatus] || [];
+  }
+
+  private isStatusTransitionAllowed(
+    currentStatus: SalesFlowStatus,
+    nextStatus: SalesFlowStatus,
+  ): boolean {
+    if (currentStatus === nextStatus) {
+      return true;
+    }
+
+    return this.getAllowedStatusTransitions(currentStatus).includes(nextStatus);
   }
 
   private mapFlowStatusToDatabaseStatus(status: SalesFlowStatus, legacySchema: boolean): string {
@@ -1844,6 +1874,7 @@ export class PropostasService {
     observacoes?: string,
     motivoPerda?: string,
     empresaId?: string,
+    metadata?: Record<string, unknown>,
   ): Promise<Proposta> {
     try {
       const fluxoStatus = this.normalizeStatusInput(status);
@@ -1866,6 +1897,14 @@ export class PropostasService {
         const propostaAtual = await this.obterProposta(propostaId, empresaId);
         if (!propostaAtual) {
           throw new Error(`Proposta com ID ${propostaId} nao encontrada`);
+        }
+
+        if (!this.isStatusTransitionAllowed(propostaAtual.status, fluxoStatus)) {
+          const allowed = this.getAllowedStatusTransitions(propostaAtual.status);
+          throw new BadRequestException(
+            `Transicao de status invalida: ${propostaAtual.status} -> ${fluxoStatus}. ` +
+              `Permitidos: ${allowed.join(', ') || 'nenhum'}`,
+          );
         }
 
         const observacoesComFluxo = this.mergeLegacyFlowMetadata(propostaAtual.observacoes, {
@@ -1901,6 +1940,14 @@ export class PropostasService {
       const statusAnterior =
         this.extractFlowStatusFromEmailDetails(proposta.emailDetails) ||
         this.mapDatabaseStatusToFlowStatus(proposta.status);
+      if (!this.isStatusTransitionAllowed(statusAnterior, fluxoStatus)) {
+        const allowed = this.getAllowedStatusTransitions(statusAnterior);
+        throw new BadRequestException(
+          `Transicao de status invalida: ${statusAnterior} -> ${fluxoStatus}. ` +
+            `Permitidos: ${allowed.join(', ') || 'nenhum'}`,
+        );
+      }
+
       let emailDetails = {
         ...(proposta.emailDetails || {}),
         fluxoStatus,
@@ -1933,6 +1980,7 @@ export class PropostasService {
           metadata: {
             limiteDesconto: aprovacaoInterna.limiteDesconto,
             descontoDetectado: aprovacaoInterna.descontoDetectado,
+            ...(metadata || {}),
           },
         });
         proposta.emailDetails = emailDetails as any;
@@ -1961,6 +2009,7 @@ export class PropostasService {
         origem: source || 'api',
         status: fluxoStatus,
         detalhes: `Status alterado de "${statusAnterior}" para "${fluxoStatus}"`,
+        metadata: metadata || undefined,
       });
 
       proposta.emailDetails = emailDetails as any;

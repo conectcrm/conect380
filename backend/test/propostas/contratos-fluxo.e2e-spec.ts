@@ -91,7 +91,11 @@ describe('Contratos - Fluxo de Assinatura (E2E)', () => {
   });
 
   it('retorna 400 na pagina publica de assinatura quando token esta expirado', async () => {
-    const contratoExpiracao = await h.criarContratoViaApi(h.tokenAdminEmpresaA, h.propostaEmpresaAId);
+    const propostaExpiracaoId = await h.criarPropostaViaApi(
+      h.tokenAdminEmpresaA,
+      `Portal E2E Expiracao ${h.runId}`,
+    );
+    const contratoExpiracao = await h.criarContratoViaApi(h.tokenAdminEmpresaA, propostaExpiracaoId);
     const contratoIdExpiracao = Number(contratoExpiracao.id);
 
     const criarAssinaturaExpirada = await request(h.httpServer)
@@ -114,5 +118,30 @@ describe('Contratos - Fluxo de Assinatura (E2E)', () => {
 
     expect(paginaAssinatura.status).toBe(400);
     expect(String(paginaAssinatura.body?.message || '')).toMatch(/expirado/i);
+  });
+
+  it('bloqueia criacao de contrato quando proposta ainda nao foi aprovada', async () => {
+    const propostaRascunhoId = await h.criarPropostaViaApi(
+      h.tokenAdminEmpresaA,
+      `Portal E2E Bloqueio Contrato ${h.runId}`,
+    );
+
+    const response = await request(h.httpServer)
+      .post('/contratos')
+      .set('Authorization', `Bearer ${h.tokenAdminEmpresaA}`)
+      .send({
+        propostaId: propostaRascunhoId,
+        clienteId: h.clienteEmpresaAId,
+        usuarioResponsavelId: h.adminEmpresaAId,
+        tipo: 'servico',
+        objeto: `Contrato bloqueado E2E ${h.runId}`,
+        valorTotal: 3200,
+        dataInicio: '2026-02-01',
+        dataFim: '2027-02-01',
+        dataVencimento: '2026-03-01',
+      });
+
+    expect(response.status).toBe(400);
+    expect(String(response.body?.message || '')).toMatch(/deve estar aprovada/i);
   });
 });

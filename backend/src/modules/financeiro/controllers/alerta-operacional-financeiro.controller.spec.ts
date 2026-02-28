@@ -35,4 +35,12 @@ describe('AlertaOperacionalFinanceiroController (permissions)', () => {
     );
     expect(permissions).toEqual([Permission.FINANCEIRO_PAGAMENTOS_MANAGE]);
   });
+
+  it('deve exigir permissao de gestao para reprocessar alerta', () => {
+    const permissions = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      AlertaOperacionalFinanceiroController.prototype.reprocessar,
+    );
+    expect(permissions).toEqual([Permission.FINANCEIRO_PAGAMENTOS_MANAGE]);
+  });
 });

@@ -10,7 +10,7 @@ Consolidar uma minuta unica de requisitos para:
 Status deste documento:
 
 1. proposta tecnica inicial (backend/frontend);
-2. pendente validacao formal com Financeiro e Contabil.
+2. validacao formal registrada em 2026-02-28 no modelo de responsavel unico.
 
 ## 2. AP-302 - Exportacao contabil/fiscal
 

@@ -130,4 +130,41 @@ describe('alertasOperacionaisFinanceiroService', () => {
       ativos: 7,
     });
   });
+
+  it('deve reprocessar alerta operacional e normalizar payload/auditoria', async () => {
+    apiMock.post.mockResolvedValue({
+      data: {
+        data: {
+          sucesso: true,
+          mensagem: 'Reprocessamento executado com sucesso',
+          alerta: {
+            id: 'alt-3',
+            tipo: 'status_sincronizacao_divergente',
+            severidade: 'critical',
+            status: 'resolvido',
+            titulo: 'Divergencia de status',
+            payload: null,
+            auditoria: null,
+            createdAt: '2026-02-28T10:00:00.000Z',
+            updatedAt: '2026-02-28T10:10:00.000Z',
+          },
+          detalhes: {
+            faturaId: 123,
+          },
+        },
+      },
+    });
+
+    const resultado = await alertasOperacionaisFinanceiroService.reprocessar('alt-3', {
+      observacao: 'Retry manual',
+    });
+
+    expect(apiMock.post).toHaveBeenCalledWith('/financeiro/alertas-operacionais/alt-3/reprocessar', {
+      observacao: 'Retry manual',
+    });
+    expect(resultado.sucesso).toBe(true);
+    expect(resultado.alerta.payload).toEqual({});
+    expect(resultado.alerta.auditoria).toEqual([]);
+    expect(resultado.detalhes).toEqual({ faturaId: 123 });
+  });
 });

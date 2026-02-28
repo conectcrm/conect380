@@ -18,6 +18,7 @@ import { CurrentUser } from '../../../common/decorators/user.decorator';
 import {
   AtualizarStatusAlertaOperacionalFinanceiroDto,
   QueryAlertasOperacionaisFinanceiroDto,
+  ReprocessarAlertaOperacionalFinanceiroDto,
 } from '../dto/alerta-operacional-financeiro.dto';
 import { AlertaOperacionalFinanceiroService } from '../services/alerta-operacional-financeiro.service';
 
@@ -64,5 +65,17 @@ export class AlertaOperacionalFinanceiroController {
   async recalcular(@EmpresaId() empresaId: string, @CurrentUser() user: { id?: string; sub?: string }) {
     const userId = user?.id || user?.sub || 'sistema';
     return this.alertaService.recalcularAlertas(empresaId, userId);
+  }
+
+  @Post(':id/reprocessar')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  async reprocessar(
+    @EmpresaId() empresaId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ReprocessarAlertaOperacionalFinanceiroDto,
+    @CurrentUser() user: { id?: string; sub?: string },
+  ) {
+    const userId = user?.id || user?.sub || 'sistema';
+    return this.alertaService.reprocessar(id, empresaId, userId, dto);
   }
 }

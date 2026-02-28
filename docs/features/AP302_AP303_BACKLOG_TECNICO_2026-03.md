@@ -184,11 +184,12 @@ Referencias:
 1. AP302-01 -> AP302-02 -> AP302-03 -> AP302-04 -> AP302-05
 2. AP303-01 -> AP303-02 -> AP303-03 -> AP303-04 -> AP303-05
 
-## 5. Dependencias abertas para aprovacao
+## 5. Dependencias de aprovacao (status)
 
-1. Validacao de layout final AP-302 com Contabil.
-2. Definicao de threshold de criticidade AP-303 com Financeiro.
-3. Confirmacao da capacidade da sprint para absorver AP-302/AP-303 em paralelo ou sequencial.
+1. Validacao de layout final AP-302 com Contabil: RESOLVIDO em 2026-02-28 (opcao A, sem colunas extras neste ciclo).
+2. Definicao de threshold de criticidade AP-303 com Financeiro: RESOLVIDO em 2026-02-28 (janela de 3 dias).
+3. Confirmacao da capacidade da sprint para absorver AP-302/AP-303: RESOLVIDO em 2026-02-28 (execucao em paralelo para sustentacao incremental).
+4. Registro de aprovacao: `docs/features/PAUTA_APROVACAO_AP302_AP303_2026-03.md` (modelo de responsavel unico).
 
 ## 6. Evidencias de regressao automatizada (2026-02-28)
 

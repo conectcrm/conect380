@@ -434,6 +434,12 @@ export class FaturamentoService {
 
       this.logger.log(`x [CANCELAR] Salvando fatura cancelada...`);
       const faturaAtualizada = await this.faturaRepository.save(fatura);
+      await this.sincronizarStatusPropostaPelaFatura(
+        faturaAtualizada,
+        empresaId,
+        undefined,
+        'faturamento-cancelamento',
+      );
       this.logger.log(`x [CANCELAR] Fatura cancelada com sucesso: ${faturaAtualizada.numero}`);
 
       return faturaAtualizada;
@@ -459,6 +465,7 @@ export class FaturamentoService {
       this.logger.log(`x [EXCLUIR] Fatura no est paga, prosseguindo com excluso`);
 
       // Marcar como inativa (excluso lgica) e cancelada
+      const contratoIdOriginal = fatura.contratoId;
       fatura.ativo = false;
       fatura.status = StatusFatura.CANCELADA;
       fatura.observacoes = `${fatura.observacoes || ''}\n\nCancelada: Fatura excluda pelo usurio`;
@@ -468,6 +475,15 @@ export class FaturamentoService {
 
       this.logger.log(`x [EXCLUIR] Salvando fatura excluda...`);
       const faturaAtualizada = await this.faturaRepository.save(fatura);
+      await this.sincronizarStatusPropostaPelaFatura(
+        {
+          ...faturaAtualizada,
+          contratoId: contratoIdOriginal,
+        } as Fatura,
+        empresaId,
+        undefined,
+        'faturamento-cancelamento',
+      );
       this.logger.log(`x [EXCLUIR] Fatura excluda com sucesso: ${faturaAtualizada.numero}`);
 
       return faturaAtualizada;
@@ -551,7 +567,11 @@ export class FaturamentoService {
     }
   }
 
-  async sincronizarStatusPropostaPorFaturaId(faturaId: number, empresaId: string): Promise<void> {
+  async sincronizarStatusPropostaPorFaturaId(
+    faturaId: number,
+    empresaId: string,
+    contexto?: { correlationId?: string; origemId?: string; strict?: boolean },
+  ): Promise<void> {
     try {
       const fatura = await this.buscarFaturaPorId(faturaId, empresaId);
       await this.sincronizarStatusPropostaPelaFatura(
@@ -559,8 +579,12 @@ export class FaturamentoService {
         empresaId,
         undefined,
         'faturamento-recalculo',
+        contexto,
       );
     } catch (error) {
+      if (contexto?.strict) {
+        throw error;
+      }
       this.logger.warn(
         `Falha ao sincronizar proposta pela fatura ${faturaId}: ${error.message}`,
       );
@@ -571,6 +595,8 @@ export class FaturamentoService {
     switch (status) {
       case StatusFatura.PAGA:
         return 'pago';
+      case StatusFatura.CANCELADA:
+        return 'contrato_assinado';
       case StatusFatura.ENVIADA:
       case StatusFatura.PENDENTE:
       case StatusFatura.PARCIALMENTE_PAGA:
@@ -586,6 +612,7 @@ export class FaturamentoService {
     empresaId: string,
     statusOverride?: string,
     source: string = 'faturamento',
+    contexto?: { correlationId?: string; origemId?: string; strict?: boolean },
   ): Promise<void> {
     if (!fatura?.contratoId) {
       return;
@@ -617,10 +644,114 @@ export class FaturamentoService {
         observacoes,
         undefined,
         empresaId,
+        {
+          correlationId: contexto?.correlationId,
+          origemId: contexto?.origemId,
+          entidade: 'fatura',
+          entidadeId: fatura.id,
+          numeroFatura: fatura.numero,
+        },
       );
     } catch (error) {
       this.logger.warn(
         `Falha ao atualizar proposta ${propostaId} via faturamento: ${error.message}`,
+      );
+      await this.registrarAlertaStatusSincronizacaoDivergente({
+        empresaId,
+        faturaId: fatura.id,
+        faturaNumero: fatura.numero,
+        propostaId,
+        statusFatura: fatura.status,
+        statusPropostaDestino: status,
+        erro: String(error?.message || error),
+        source,
+        correlationId: contexto?.correlationId,
+        origemId: contexto?.origemId,
+      });
+      if (contexto?.strict) {
+        throw error;
+      }
+    }
+  }
+
+  private async registrarAlertaStatusSincronizacaoDivergente(payload: {
+    empresaId: string;
+    faturaId: number;
+    faturaNumero?: string;
+    propostaId?: string | null;
+    statusFatura: string;
+    statusPropostaDestino: string;
+    erro: string;
+    source?: string;
+    correlationId?: string;
+    origemId?: string;
+  }): Promise<void> {
+    try {
+      const referencia = `sync_status:fatura:${payload.faturaId}`;
+      const auditoria = [
+        {
+          acao: 'gerado_automaticamente',
+          origem: payload.source || 'faturamento',
+          erro: payload.erro,
+          timestamp: new Date().toISOString(),
+        },
+      ];
+
+      await this.faturaRepository.manager.query(
+        `
+          INSERT INTO alertas_operacionais_financeiro (
+            empresa_id,
+            tipo,
+            severidade,
+            titulo,
+            descricao,
+            referencia,
+            status,
+            payload,
+            auditoria,
+            created_at,
+            updated_at
+          )
+          VALUES (
+            $1,
+            $2::alertas_operacionais_financeiro_tipo_enum,
+            $3::alertas_operacionais_financeiro_severidade_enum,
+            $4,
+            $5,
+            $6,
+            'ativo'::alertas_operacionais_financeiro_status_enum,
+            $7::jsonb,
+            $8::jsonb,
+            NOW(),
+            NOW()
+          )
+        `,
+        [
+          payload.empresaId,
+          'status_sincronizacao_divergente',
+          'critical',
+          'Divergencia de sincronizacao entre financeiro e vendas',
+          `Falha ao sincronizar fatura ${payload.faturaNumero || payload.faturaId} para proposta.`,
+          referencia,
+          JSON.stringify({
+            faturaId: payload.faturaId,
+            faturaNumero: payload.faturaNumero || null,
+            propostaId: payload.propostaId || null,
+            statusFatura: payload.statusFatura,
+            statusPropostaDestino: payload.statusPropostaDestino,
+            erro: payload.erro,
+            source: payload.source || 'faturamento',
+            correlationId: payload.correlationId || null,
+            origemId: payload.origemId || null,
+          }),
+          JSON.stringify(auditoria),
+        ],
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao registrar alerta de sincronizacao divergente (fatura=${payload.faturaId}): ${
+          error?.message || error
+        }`,
       );
     }
   }

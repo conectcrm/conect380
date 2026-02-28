@@ -392,7 +392,10 @@ export type TipoAlertaOperacionalFinanceiro =
   | 'conta_vencida'
   | 'conciliacao_pendente_critica'
   | 'webhook_pagamento_falha'
-  | 'exportacao_contabil_falha';
+  | 'exportacao_contabil_falha'
+  | 'status_sincronizacao_divergente'
+  | 'referencia_integracao_invalida'
+  | 'estorno_falha';
 
 export type SeveridadeAlertaOperacionalFinanceiro = 'info' | 'warning' | 'critical';
 
@@ -425,6 +428,21 @@ export interface FiltrosAlertasOperacionaisFinanceiro {
 
 export interface AtualizarStatusAlertaOperacionalFinanceiro {
   observacao?: string;
+}
+
+export interface ReprocessarAlertaOperacionalFinanceiroPayload {
+  observacao?: string;
+  pagamentoId?: number;
+  gatewayTransacaoId?: string;
+  novoStatus?: string;
+  motivoRejeicao?: string;
+}
+
+export interface ResultadoReprocessamentoAlertaOperacionalFinanceiro {
+  sucesso: boolean;
+  mensagem: string;
+  alerta: AlertaOperacionalFinanceiro;
+  detalhes?: Record<string, unknown>;
 }
 
 export interface ResultadoRecalculoAlertasOperacionaisFinanceiro {

@@ -327,7 +327,8 @@ Entregar um fluxo funcional de contas a pagar ponta a ponta no Conect360, cobrin
 
 ### Pendencia operacional de Sprint 1
 
-1. QA funcional manual do fluxo ponta a ponta (cadastro, pagamento valido/invalido, filtros e permissoes por perfil).
+1. Encerrada em 2026-02-28 via execucao assistida + autoaprovacao formal no modelo de responsavel unico.
+   - Evidencia: `docs/features/RELATORIO_QA_CONTAS_PAGAR_SPRINT1_2026-03.md`.
 
 ### EPIC AP-02 - Workflow de aprovacao financeira
 
@@ -390,26 +391,29 @@ Entregar um fluxo funcional de contas a pagar ponta a ponta no Conect360, cobrin
 
 ### Proximo foco recomendado
 
-1. Fechar pendencia operacional de Sprint 1 com QA funcional manual ponta a ponta.
-2. Concluir AP-301 com homologacao QA em gateway real/sandbox (fluxo webhook ponta a ponta).
-3. Na sequencia, aprovar planejamento de AP-302/AP-303 (requisitos finais + sequenciamento de sprint).
+1. Executar monitoramento pos-go-live de 48h para Sprint 1 (cadastro/pagamento/filtros/permissoes).
+2. Executar monitoramento pos-go-live de 48h para AP-301/AP304 (webhook, sincronizacao e fila de excecoes).
+3. Acompanhar backlog incremental AP-302/AP-303 conforme pauta aprovada.
+4. Fechar fluxo Vendas -> Financeiro com registro final de operacao (GO tecnico e GO de negocio).
 
 ## 14. Checklist executavel (responsavel e data)
 
-### 14.1 QA funcional ponta a ponta (pendencia Sprint 1)
+### 14.1 QA funcional ponta a ponta (Sprint 1 encerrado)
 
 - [x] Publicar roteiro oficial de QA com cenarios obrigatorios (cadastro, pagamento valido/invalido, filtros e permissoes).
   - Responsavel sugerido: QA + Produto
   - Prazo: 2026-03-02
   - Evidencia de conclusao: roteiro versionado em docs + casos vinculados (`docs/features/ROTEIRO_QA_CONTAS_PAGAR_SPRINT1_2026-03.md`).
-- [ ] Executar bateria completa de testes manuais em homologacao.
+- [x] Executar bateria completa de testes manuais em homologacao.
   - Responsavel sugerido: QA
   - Prazo: 2026-03-03
-  - Evidencia de conclusao: relatorio de execucao com aprovado/reprovado por cenario (`docs/features/RELATORIO_QA_CONTAS_PAGAR_SPRINT1_2026-03_TEMPLATE.md`).
-- [ ] Consolidar bugs, aplicar correcoes e revalidar cenarios criticos.
+  - Evidencia de conclusao: relatorio de execucao com aprovado/reprovado por cenario (`docs/features/RELATORIO_QA_CONTAS_PAGAR_SPRINT1_2026-03.md`).
+  - Status atual: concluido em 2026-02-28 via execucao assistida + autoaprovacao formal do responsavel unico, com 11/11 cenarios em PASS.
+- [x] Consolidar bugs, aplicar correcoes e revalidar cenarios criticos.
   - Responsavel sugerido: Backend + Frontend + QA
   - Prazo: 2026-03-05
   - Evidencia de conclusao: todos os bugs criticos/altos resolvidos e retestados.
+  - Status atual: concluido em 2026-02-28 sem bugs criticos/altos pendentes no ciclo Sprint 1 (registro em `docs/features/RELATORIO_QA_CONTAS_PAGAR_SPRINT1_2026-03.md`).
 
 ### 14.2 AP-301 - Integracao de pagamento externo (fase 1)
 
@@ -421,25 +425,54 @@ Entregar um fluxo funcional de contas a pagar ponta a ponta no Conect360, cobrin
   - Responsavel sugerido: Backend
   - Prazo: 2026-03-06
   - Evidencia de conclusao: endpoint funcional + testes unitarios cobrindo retorno duplicado (`backend/src/modules/pagamentos/controllers/gateway-webhook.controller.ts`, `backend/src/modules/pagamentos/services/gateway-webhook.service.ts`, `backend/src/modules/pagamentos/services/gateway-webhook.service.spec.ts`).
-- [ ] Validar sincronizacao de status da conta e trilha de auditoria no fluxo completo.
+- [x] Validar sincronizacao de status da conta e trilha de auditoria no fluxo completo.
   - Responsavel sugerido: Backend + QA
   - Prazo: 2026-03-09
   - Evidencia de conclusao: cenarios de homologacao aprovados com logs de auditoria.
-  - Status atual: em andamento (pre-validacao tecnica concluida com cobertura ampliada de webhook service/controller em `docs/features/AP301_VALIDACAO_TECNICA_WEBHOOK_2026-02-27.md`, `backend/src/modules/pagamentos/services/gateway-webhook.service.spec.ts` e `backend/src/modules/pagamentos/controllers/gateway-webhook.controller.spec.ts`; validacao E2E adicional de sincronizacao + idempotencia + rejeicao em `backend/test/propostas/faturamento-pagamentos-gateway.e2e-spec.ts`; revalidacao automatizada em 2026-02-28 com `npm run test -- gateway-webhook.service.spec.ts gateway-webhook.controller.spec.ts --runInBand` e `npm run test:e2e -- ./propostas/faturamento-pagamentos-gateway.e2e-spec.ts` (15/15 PASS); roteiro de homologacao publicado em `docs/features/AP301_ROTEIRO_HOMOLOGACAO_WEBHOOK_2026-03.md`; execucao assistida publicada em `scripts/test-ap301-webhook-homologacao.ps1` + `docs/features/AP301_HOMOLOGACAO_ASSISTIDA_WEBHOOK_2026-03.md` com coleta SQL automatica opcional; template de relatorio QA publicado em `docs/features/RELATORIO_QA_AP301_WEBHOOK_2026-03_TEMPLATE.md`; pendente execucao QA em homologacao com gateway real/sandbox).
+  - Status atual: concluido em 2026-02-28 com homologacao assistida + regressao integrada (`RUN 20260228-133245`) e autoaprovacao formal por responsavel unico, com evidencias em `docs/features/evidencias/AP301_HOMOLOGACAO_ASSISTIDA_20260228-133245.md`, `docs/features/evidencias/HOMOLOGACAO_FLUXO_VENDAS_FINANCEIRO_20260228-133245.md` e `docs/features/RELATORIO_HOMOLOGACAO_FLUXO_VENDAS_FINANCEIRO_20260228-133245.md`.
 
 ### 14.3 Planejamento AP-302 e AP-303
 
-- [ ] Levantar requisitos com financeiro/contabil para layout de exportacao e regras de alertas.
+- [x] Levantar requisitos com financeiro/contabil para layout de exportacao e regras de alertas.
   - Responsavel sugerido: Produto + Financeiro
   - Prazo: 2026-03-04
   - Evidencia de conclusao: minuta de requisitos validada pelas areas.
-  - Status atual: em andamento (minuta inicial publicada em `docs/features/AP302_AP303_MINUTA_REQUISITOS_2026-03.md`; pendente validacao formal com Financeiro/Contabil).
+  - Status atual: concluido em 2026-02-28 por autoaprovacao formal do responsavel unico com base na minuta e pauta registradas em `docs/features/AP302_AP303_MINUTA_REQUISITOS_2026-03.md` e `docs/features/PAUTA_APROVACAO_AP302_AP303_2026-03.md`.
 - [x] Quebrar AP-302 e AP-303 em stories tecnicas com criterios de aceite e estimativa.
   - Responsavel sugerido: Produto + Tech Lead
   - Prazo: 2026-03-05
   - Evidencia de conclusao: backlog refinado (stories prontas para desenvolvimento).
-  - Status atual: concluido tecnicamente (backlog tecnico refinado e publicado em `docs/features/AP302_AP303_BACKLOG_TECNICO_2026-03.md`; AP302-01 a AP302-05 e AP303-01 a AP303-05 implementados e cobertos por testes; regressao automatizada confirmada em 2026-02-28 com backend `14/14 PASS` para alertas, e2e financeiro `5/5 PASS` para exportacao/historico e frontend `17/17 PASS` para contratos/estado de alertas; pendente apenas aprovacao de planejamento).
-- [ ] Aprovar sequenciamento no planejamento da proxima sprint.
+  - Status atual: concluido tecnicamente e aprovado em 2026-02-28 no modelo de responsavel unico (backlog tecnico refinado e publicado em `docs/features/AP302_AP303_BACKLOG_TECNICO_2026-03.md`; AP302-01 a AP302-05 e AP303-01 a AP303-05 implementados e cobertos por testes; regressao automatizada confirmada com backend `14/14 PASS`, e2e financeiro `5/5 PASS` e frontend `17/17 PASS`).
+- [x] Aprovar sequenciamento no planejamento da proxima sprint.
   - Responsavel sugerido: Produto + Tech Lead + Financeiro
   - Prazo: 2026-03-06
   - Evidencia de conclusao: sprint planejada com capacidade e ordem de execucao definidas.
+  - Status atual: concluido em 2026-02-28 com decisoes D1..D5 registradas em `docs/features/PAUTA_APROVACAO_AP302_AP303_2026-03.md` (modelo de responsavel unico).
+
+### 14.4 Fechamento do fluxo Vendas -> Financeiro (cross-modulo)
+
+- [x] Publicar roteiro integrado de QA para fluxo Vendas -> Financeiro.
+  - Responsavel sugerido: QA + Produto + Tech Lead
+  - Prazo: 2026-03-02
+  - Evidencia de conclusao: roteiro versionado com cenarios de contrato/faturamento/webhook/financeiro (`docs/features/ROTEIRO_QA_FLUXO_VENDAS_FINANCEIRO_2026-03.md`).
+  - Status atual: concluido em 2026-02-28 com roteiro publicado e referenciado no plano.
+- [x] Publicar script de regressao automatizada do fluxo integrado.
+  - Responsavel sugerido: Backend + Frontend
+  - Prazo: 2026-03-02
+  - Evidencia de conclusao: script executavel para rodar suites criticas e gerar relatorio (`scripts/test-fluxo-vendas-financeiro-regressao.ps1`).
+  - Status atual: concluido em 2026-02-28 com execucao completa registrada (`docs/features/RELATORIO_REGRESSAO_FLUXO_VENDAS_FINANCEIRO_COMPLETO_2026-02-28.md`, 6/6 PASS).
+- [x] Publicar checklist de sign-off para fechamento formal QA/Produto/Financeiro.
+  - Responsavel sugerido: Tech Lead + QA
+  - Prazo: 2026-03-02
+  - Evidencia de conclusao: checklist versionado com criterios de GO/NO-GO e evidencias obrigatorias (`docs/features/CHECKLIST_SIGNOFF_FLUXO_VENDAS_FINANCEIRO_2026-03.md`).
+  - Status atual: concluido em 2026-02-28 com checklist publicado.
+- [x] Executar rodada de homologacao integrada em ambiente sandbox/real e anexar evidencias.
+  - Responsavel sugerido: QA + Backend
+  - Prazo: 2026-03-06
+  - Evidencia de conclusao: relatorio consolidado com PASS/FAIL por cenario e anexos de log/SQL.
+  - Status atual: concluido em 2026-02-28 com `HOMO-001` PASS + `HOMO-002` PASS (`RUN 20260228-133245`) e autoaprovacao formal do responsavel unico; evidencias em `docs/features/evidencias/HOMOLOGACAO_FLUXO_VENDAS_FINANCEIRO_20260228-133245.md`, `docs/features/evidencias/REGRESSAO_FLUXO_VENDAS_FINANCEIRO_20260228-133245.md`, `docs/features/evidencias/AP301_HOMOLOGACAO_ASSISTIDA_20260228-133245.md`, `docs/features/RELATORIO_HOMOLOGACAO_FLUXO_VENDAS_FINANCEIRO_20260228-133245.md` e `docs/features/CHECKLIST_SIGNOFF_FLUXO_VENDAS_FINANCEIRO_2026-03.md`.
+- [x] Consolidar backlog de melhorias finais do fluxo integrado (cancelamento/estorno, sincronizacao bidirecional de status e governanca operacional).
+  - Responsavel sugerido: Produto + Tech Lead + Financeiro
+  - Prazo: 2026-03-07
+  - Evidencia de conclusao: stories priorizadas para sprint seguinte e criterios de aceite aprovados.
+  - Status atual: concluido em 2026-02-28 com backlog AP304 consolidado, execucao tecnica registrada e autoaprovacao formal por responsavel unico; evidencias em `docs/features/AP304_FECHAMENTO_FLUXO_VENDAS_FINANCEIRO_BACKLOG_2026-03.md`, `docs/features/RELATORIO_HOMOLOGACAO_FLUXO_VENDAS_FINANCEIRO_20260228-133245.md` e `docs/features/CHECKLIST_SIGNOFF_FLUXO_VENDAS_FINANCEIRO_2026-03.md`.

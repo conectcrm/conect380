@@ -28,6 +28,7 @@ export class GatewayWebhookController {
     @Headers('x-request-id') requestId: string,
     @Headers('x-idempotency-key') idempotencyKey: string,
     @Headers('x-event-id') eventId: string,
+    @Headers('x-correlation-id') correlationId: string,
   ) {
     return this.gatewayWebhookService.processarWebhook({
       gatewayParam: gateway,
@@ -38,6 +39,7 @@ export class GatewayWebhookController {
         requestId,
         idempotencyKey,
         eventId,
+        correlationId,
       },
     });
   }

@@ -61,10 +61,28 @@ export class ContratosService {
           throw new NotFoundException('Proposta nao encontrada');
         }
 
-        const propostaRows: Array<{ id?: string; empresa_id?: string }> =
+        const emailDetailsColumn = propostaColumns.has('emailDetails')
+          ? 'emailDetails'
+          : propostaColumns.has('email_details')
+            ? 'email_details'
+            : propostaColumns.has('emaildetails')
+              ? 'emaildetails'
+              : null;
+
+        const selectEmailDetails = emailDetailsColumn
+          ? `, "${emailDetailsColumn}" AS email_details`
+          : ', NULL::jsonb AS email_details';
+
+        const propostaRows: Array<{
+          id?: string;
+          empresa_id?: string;
+          status?: string;
+          email_details?: unknown;
+        }> =
           await this.propostaRepository.query(
             `
-              SELECT id::text AS id, "${empresaColumn}"::text AS empresa_id
+              SELECT id::text AS id, "${empresaColumn}"::text AS empresa_id, status::text AS status
+              ${selectEmailDetails}
               FROM propostas
               WHERE id::text = $1
               LIMIT 1
@@ -83,6 +101,17 @@ export class ContratosService {
               `Empresa do token: ${empresaId}, Empresa da proposta: ${proposta.empresa_id || 'indefinida'}`,
           );
           throw new ForbiddenException('Voce nao tem permissao para criar contrato com esta proposta');
+        }
+
+        const statusAtual = this.resolvePropostaFlowStatus(
+          proposta.status,
+          proposta.email_details,
+        );
+        if (!this.isPropostaElegivelParaContrato(statusAtual)) {
+          throw new BadRequestException(
+            `Proposta ${proposta.id} com status "${statusAtual}" nao pode gerar contrato. ` +
+              'A proposta deve estar aprovada.',
+          );
         }
 
         propostaIdVinculada = proposta.id;
@@ -130,7 +159,11 @@ export class ContratosService {
     } catch (error) {
       this.logger.error(`Erro ao criar contrato: ${error.message}`);
 
-      if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
 
@@ -347,6 +380,42 @@ export class ContratosService {
       .where('contratoId = :contratoId', { contratoId })
       .andWhere('status = :status', { status: StatusAssinatura.PENDENTE })
       .execute();
+  }
+
+  private isPropostaElegivelParaContrato(status: string): boolean {
+    return status === 'aprovada';
+  }
+
+  private resolvePropostaFlowStatus(status: unknown, emailDetails: unknown): string {
+    const emailDetailsObj =
+      emailDetails && typeof emailDetails === 'object' && !Array.isArray(emailDetails)
+        ? (emailDetails as Record<string, unknown>)
+        : {};
+    const fluxoStatus = String(emailDetailsObj.fluxoStatus || '').trim();
+
+    return this.normalizePropostaFlowStatus(fluxoStatus || status);
+  }
+
+  private normalizePropostaFlowStatus(value: unknown): string {
+    const normalized = String(value || '')
+      .trim()
+      .toLowerCase();
+
+    if (!normalized) {
+      return 'rascunho';
+    }
+
+    switch (normalized) {
+      case 'aceita':
+      case 'approved':
+        return 'aprovada';
+      case 'contratoassinado':
+        return 'contrato_assinado';
+      case 'paid':
+        return 'pago';
+      default:
+        return normalized;
+    }
   }
 
   private async canLoadPropostaRelation(): Promise<boolean> {

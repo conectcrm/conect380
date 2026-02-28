@@ -80,3 +80,25 @@ where empresa_id = :empresaId and gateway_transacao_id in (:referenciaAprovado, 
    - saida do script;
    - evidencias SQL (manuais ou automaticas via `-ColetarEvidenciasSql`);
    - logs da API com `eventId/idempotencyKey`.
+
+## 8. Orquestracao integrada (opcional)
+
+Para executar AP-301 junto com a regressao Vendas -> Financeiro e gerar relatorio consolidado:
+
+- Script: `scripts/test-homologacao-fluxo-vendas-financeiro.ps1`
+- Template de conclusao: `docs/features/RELATORIO_HOMOLOGACAO_FLUXO_VENDAS_FINANCEIRO_2026-03_TEMPLATE.md`
+
+Exemplo (sandbox/real):
+
+```powershell
+powershell -File scripts/test-homologacao-fluxo-vendas-financeiro.ps1 `
+  -EmpresaId "11111111-1111-1111-1111-111111111111" `
+  -WebhookSecret "whsec_hml_123" `
+  -ReferenciaGatewayAprovado "gw-ref-aprovado-001" `
+  -ReferenciaGatewayRejeitado "gw-ref-rejeitado-001" `
+  -Gateway "pagseguro" `
+  -BaseUrl "https://hml-api.exemplo.com" `
+  -ColetarEvidenciasSql `
+  -PostgresContainer "conectsuite-postgres" `
+  -OutputDir "docs/features/evidencias"
+```

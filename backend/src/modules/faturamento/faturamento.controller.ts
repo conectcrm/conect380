@@ -326,6 +326,20 @@ export class FaturamentoController {
     }
   }
 
+  @Get('auditoria/correlacao/:correlationId')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_READ)
+  async obterTrilhaCorrelacao(
+    @Param('correlationId') correlationId: string,
+    @EmpresaId() empresaId: string,
+  ) {
+    const trilha = await this.pagamentoService.obterTrilhaPorCorrelacao(correlationId, empresaId);
+    return {
+      status: HttpStatus.OK,
+      message: 'Trilha de correlacao recuperada com sucesso',
+      data: trilha,
+    };
+  }
+
   @Get('pagamentos')
   @Permissions(Permission.FINANCEIRO_PAGAMENTOS_READ)
   async buscarPagamentos(

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Pagamento, StatusPagamento, TipoPagamento } from '../entities/pagamento.entity';
 import { Fatura, StatusFatura } from '../entities/fatura.entity';
 import {
@@ -20,6 +20,7 @@ export class PagamentoService {
     @InjectRepository(Fatura)
     private faturaRepository: Repository<Fatura>,
     private faturamentoService: FaturamentoService,
+    private readonly dataSource: DataSource,
   ) {}
 
   private logEvento(evento: string, payload: Record<string, unknown>): void {
@@ -29,6 +30,11 @@ export class PagamentoService {
         ...payload,
       })}`,
     );
+  }
+
+  private normalizeTraceId(value: unknown): string | undefined {
+    const normalized = String(value || '').trim();
+    return normalized ? normalized.slice(0, 180) : undefined;
   }
 
   async criarPagamento(
@@ -113,23 +119,47 @@ export class PagamentoService {
         pagamento.motivoRejeicao = processarPagamentoDto.motivoRejeicao;
       }
 
+      const correlationId = this.normalizeTraceId(processarPagamentoDto.correlationId);
+      const origemId = this.normalizeTraceId(processarPagamentoDto.origemId);
+
       if (processarPagamentoDto.webhookData) {
         pagamento.dadosCompletos = {
           ...pagamento.dadosCompletos,
-          webhookData: processarPagamentoDto.webhookData,
+          webhookData: {
+            ...(processarPagamentoDto.webhookData || {}),
+            ...(correlationId ? { correlationId } : {}),
+            ...(origemId ? { origemId } : {}),
+          },
+        };
+      }
+      if (correlationId || origemId) {
+        pagamento.dadosCompletos = {
+          ...(pagamento.dadosCompletos || {}),
+          ...(correlationId ? { correlationId } : {}),
+          ...(origemId ? { origemId } : {}),
         };
       }
 
-      // Se aprovado, marcar data de aprovao
+      // Mantem data de aprovacao consistente com o status atual.
       if (processarPagamentoDto.novoStatus === StatusPagamento.APROVADO) {
         pagamento.dataAprovacao = new Date();
+      } else if (statusAnteriorPagamento === StatusPagamento.APROVADO) {
+        pagamento.dataAprovacao = null;
       }
 
       const pagamentoAtualizado = await this.pagamentoRepository.save(pagamento);
 
-      if (processarPagamentoDto.novoStatus === StatusPagamento.APROVADO) {
-        // Persistir primeiro para que o recalculo da fatura enxergue este pagamento como aprovado.
-        await this.atualizarStatusFatura(pagamento.faturaId, pagamento.valor, empresaId);
+      const deveRecalcularFatura =
+        statusAnteriorPagamento === StatusPagamento.APROVADO ||
+        processarPagamentoDto.novoStatus === StatusPagamento.APROVADO;
+
+      if (deveRecalcularFatura) {
+        // Persistir primeiro para que o recalculo da fatura use o estado mais recente do pagamento.
+        await this.atualizarStatusFatura(pagamento.faturaId, pagamento.valor, empresaId, {
+          correlationId,
+          origemId,
+          source: processarPagamentoDto.webhookData ? 'pagamento.webhook' : 'pagamento.processar',
+        });
       }
 
       this.logEvento('PAGAMENTO_STATUS_CHANGE', {
@@ -139,6 +169,8 @@ export class PagamentoService {
         gatewayTransacaoId: pagamentoAtualizado.gatewayTransacaoId,
         statusAnterior: statusAnteriorPagamento,
         statusNovo: processarPagamentoDto.novoStatus,
+        correlationId: correlationId || null,
+        origemId: origemId || null,
       });
 
       this.logger.log(
@@ -263,6 +295,15 @@ export class PagamentoService {
     const pagamento = await this.buscarPagamentoPorId(id, empresaId);
 
     if (!pagamento.isAprovado()) {
+      await this.registrarAlertaEstornoFalha({
+        empresaId,
+        pagamentoId: pagamento.id,
+        faturaId: pagamento.faturaId,
+        transacaoId: pagamento.transacaoId,
+        gatewayTransacaoId: pagamento.gatewayTransacaoId || null,
+        motivo: motivo || null,
+        erro: 'Somente pagamentos aprovados podem ser estornados.',
+      });
       throw new BadRequestException('S  possvel estornar pagamentos aprovados');
     }
 
@@ -286,7 +327,11 @@ export class PagamentoService {
     const estornoSalvo = await this.pagamentoRepository.save(estorno);
 
     // Atualizar status da fatura
-    await this.atualizarStatusFatura(pagamento.faturaId, -pagamento.valor, empresaId);
+    await this.atualizarStatusFatura(pagamento.faturaId, -pagamento.valor, empresaId, {
+      correlationId: `estorno-${pagamento.id}-${Date.now()}`,
+      origemId: `pagamento:${pagamento.id}`,
+      source: 'pagamento.estorno',
+    });
 
     this.logger.log(
       `Estorno criado: ${estornoSalvo.transacaoId} para pagamento ${pagamento.transacaoId}`,
@@ -361,10 +406,223 @@ export class PagamentoService {
     return estatisticas;
   }
 
+  async obterTrilhaPorCorrelacao(correlationId: string, empresaId: string): Promise<{
+    correlationId: string;
+    resumo: {
+      pagamentos: number;
+      faturas: number;
+      webhooks: number;
+      totalEventos: number;
+    };
+    pagamentos: Array<Record<string, unknown>>;
+    faturas: Array<Record<string, unknown>>;
+    webhooks: Array<Record<string, unknown>>;
+    geradoEm: string;
+  }> {
+    const correlationIdNormalizado = this.normalizeTraceId(correlationId);
+    if (!correlationIdNormalizado) {
+      throw new BadRequestException('correlationId e obrigatorio');
+    }
+
+    const pagamentos = await this.pagamentoRepository.find({
+      where: { empresaId },
+      order: { createdAt: 'DESC' },
+    });
+
+    const pagamentosFiltrados = pagamentos
+      .filter((pagamento) => {
+        const dados = (pagamento.dadosCompletos || {}) as Record<string, unknown>;
+        const webhookData =
+          dados.webhookData && typeof dados.webhookData === 'object'
+            ? (dados.webhookData as Record<string, unknown>)
+            : {};
+
+        return (
+          this.normalizeTraceId(dados.correlationId) === correlationIdNormalizado ||
+          this.normalizeTraceId(webhookData.correlationId) === correlationIdNormalizado
+        );
+      })
+      .map((pagamento) => {
+        const dados = (pagamento.dadosCompletos || {}) as Record<string, unknown>;
+        const webhookData =
+          dados.webhookData && typeof dados.webhookData === 'object'
+            ? (dados.webhookData as Record<string, unknown>)
+            : {};
+
+        return {
+          id: pagamento.id,
+          faturaId: pagamento.faturaId,
+          transacaoId: pagamento.transacaoId,
+          gatewayTransacaoId: pagamento.gatewayTransacaoId,
+          status: pagamento.status,
+          tipo: pagamento.tipo,
+          valor: Number(pagamento.valor || 0),
+          criadoEm: pagamento.createdAt,
+          processadoEm: pagamento.dataProcessamento,
+          correlationId:
+            this.normalizeTraceId(dados.correlationId) ||
+            this.normalizeTraceId(webhookData.correlationId) ||
+            null,
+          origemId:
+            this.normalizeTraceId(dados.origemId) || this.normalizeTraceId(webhookData.origemId) || null,
+        };
+      });
+
+    const faturas = await this.faturaRepository.find({
+      where: { empresaId },
+      order: { createdAt: 'DESC' },
+    });
+
+    const faturasFiltradas = faturas
+      .map((fatura) => {
+        const metadados =
+          fatura.metadados && typeof fatura.metadados === 'object'
+            ? (fatura.metadados as Record<string, unknown>)
+            : {};
+        const historico = Array.isArray(metadados.baixasFinanceiras)
+          ? (metadados.baixasFinanceiras as Array<Record<string, unknown>>)
+          : [];
+        const eventosCorrelacionados = historico.filter(
+          (evento) => this.normalizeTraceId(evento?.correlationId) === correlationIdNormalizado,
+        );
+
+        if (eventosCorrelacionados.length === 0) {
+          return null;
+        }
+
+        return {
+          id: fatura.id,
+          numero: fatura.numero,
+          status: fatura.status,
+          valorTotal: Number(fatura.valorTotal || 0),
+          valorPago: Number(fatura.valorPago || 0),
+          dataPagamento: fatura.dataPagamento || null,
+          eventos: eventosCorrelacionados.map((evento) => ({
+            timestamp: evento.timestamp || null,
+            origem: evento.origem || null,
+            origemId: evento.origemId || null,
+            statusAnterior: evento.statusAnterior || null,
+            statusNovo: evento.statusNovo || null,
+            valorMovimento: Number(evento.valorMovimento || 0),
+            correlationId: this.normalizeTraceId(evento.correlationId) || null,
+          })),
+        };
+      })
+      .filter(Boolean) as Array<Record<string, unknown>>;
+
+    const webhooks = await this.dataSource.query(
+      `
+        SELECT
+          id,
+          gateway,
+          idempotency_key,
+          event_id,
+          request_id,
+          referencia_gateway,
+          status,
+          erro,
+          processado_em,
+          created_at,
+          COALESCE(payload_raw->'_trace'->>'correlationId', payload_raw->>'correlationId') AS correlation_id,
+          COALESCE(payload_raw->'_trace'->>'origemId', payload_raw->>'origemId') AS origem_id
+        FROM webhooks_gateway_eventos
+        WHERE empresa_id = $1
+          AND (
+            COALESCE(payload_raw->'_trace'->>'correlationId', payload_raw->>'correlationId') = $2
+            OR event_id = $2
+            OR idempotency_key = $2
+          )
+        ORDER BY created_at DESC
+      `,
+      [empresaId, correlationIdNormalizado],
+    );
+
+    return {
+      correlationId: correlationIdNormalizado,
+      resumo: {
+        pagamentos: pagamentosFiltrados.length,
+        faturas: faturasFiltradas.length,
+        webhooks: Array.isArray(webhooks) ? webhooks.length : 0,
+        totalEventos:
+          pagamentosFiltrados.length + faturasFiltradas.length + (Array.isArray(webhooks) ? webhooks.length : 0),
+      },
+      pagamentos: pagamentosFiltrados,
+      faturas: faturasFiltradas,
+      webhooks: Array.isArray(webhooks) ? webhooks : [],
+      geradoEm: new Date().toISOString(),
+    };
+  }
+
+  private mapStatusFaturaParaStatusRecebivel(status: StatusFatura): 'aberto' | 'parcial' | 'baixado' {
+    switch (status) {
+      case StatusFatura.PAGA:
+        return 'baixado';
+      case StatusFatura.PARCIALMENTE_PAGA:
+        return 'parcial';
+      default:
+        return 'aberto';
+    }
+  }
+
+  private appendBaixaFinanceiraMetadados(
+    metadadosAtual: unknown,
+    payload: {
+      statusAnterior: StatusFatura;
+      statusNovo: StatusFatura;
+      valorTotal: number;
+      valorPago: number;
+      valorMovimento: number;
+      pagamentoCount: number;
+      correlationId?: string;
+      origemId?: string;
+      source?: string;
+    },
+  ): Record<string, unknown> {
+    const metadadosBase =
+      metadadosAtual && typeof metadadosAtual === 'object' && !Array.isArray(metadadosAtual)
+        ? { ...(metadadosAtual as Record<string, unknown>) }
+        : {};
+
+    const historicoAtual = Array.isArray(metadadosBase.baixasFinanceiras)
+      ? [...(metadadosBase.baixasFinanceiras as Array<Record<string, unknown>>)]
+      : [];
+
+    historicoAtual.push({
+      timestamp: new Date().toISOString(),
+      origem: payload.source || 'faturamento.pagamento',
+      correlationId: payload.correlationId || null,
+      origemId: payload.origemId || null,
+      statusAnterior: payload.statusAnterior,
+      statusNovo: payload.statusNovo,
+      valorTotal: payload.valorTotal,
+      valorPago: payload.valorPago,
+      valorMovimento: payload.valorMovimento,
+      quantidadePagamentosAprovados: payload.pagamentoCount,
+    });
+
+    const valorEmAberto = Math.max(payload.valorTotal - payload.valorPago, 0);
+
+    metadadosBase.baixasFinanceiras = historicoAtual.slice(-100);
+    metadadosBase.recebivel = {
+      status: this.mapStatusFaturaParaStatusRecebivel(payload.statusNovo),
+      valorTotal: payload.valorTotal,
+      valorPago: payload.valorPago,
+      valorEmAberto,
+      atualizadoEm: new Date().toISOString(),
+    };
+
+    return metadadosBase;
+  }
+
   private async atualizarStatusFatura(
     faturaId: number,
     valorPagamento: number,
     empresaId: string,
+    contexto?: {
+      correlationId?: string;
+      origemId?: string;
+      source?: string;
+    },
   ): Promise<void> {
     const fatura = await this.faturaRepository.findOne({
       where: { id: faturaId, empresaId },
@@ -396,8 +654,23 @@ export class PagamentoService {
       fatura.dataPagamento = null;
     }
 
+    fatura.metadados = this.appendBaixaFinanceiraMetadados(fatura.metadados, {
+      statusAnterior,
+      statusNovo: fatura.status,
+      valorTotal: valorTotalFatura,
+      valorPago: totalPago,
+      valorMovimento: Number(valorPagamento || 0),
+      pagamentoCount: pagamentosAprovados.length,
+      correlationId: contexto?.correlationId,
+      origemId: contexto?.origemId,
+      source: contexto?.source,
+    }) as any;
+
     await this.faturaRepository.save(fatura);
-    await this.faturamentoService.sincronizarStatusPropostaPorFaturaId(fatura.id, empresaId);
+    await this.faturamentoService.sincronizarStatusPropostaPorFaturaId(fatura.id, empresaId, {
+      correlationId: contexto?.correlationId,
+      origemId: contexto?.origemId,
+    });
 
     this.logEvento('FATURA_STATUS_RECALCULADO', {
       empresaId,
@@ -408,9 +681,87 @@ export class PagamentoService {
       valorTotal: valorTotalFatura,
       valorPago: totalPago,
       qtdPagamentosAprovados: pagamentosAprovados.length,
+      correlationId: contexto?.correlationId || null,
+      origemId: contexto?.origemId || null,
     });
 
     this.logger.log(`Status da fatura ${fatura.numero} atualizado para: ${fatura.status}`);
+  }
+
+  private async registrarAlertaEstornoFalha(payload: {
+    empresaId: string;
+    pagamentoId: number;
+    faturaId?: number;
+    transacaoId?: string | null;
+    gatewayTransacaoId?: string | null;
+    motivo?: string | null;
+    erro: string;
+  }): Promise<void> {
+    try {
+      const referencia = `estorno:pagamento:${payload.pagamentoId}`;
+      const auditoria = [
+        {
+          acao: 'gerado_automaticamente',
+          origem: 'pagamento.estorno',
+          erro: payload.erro,
+          timestamp: new Date().toISOString(),
+        },
+      ];
+
+      await this.pagamentoRepository.manager.query(
+        `
+          INSERT INTO alertas_operacionais_financeiro (
+            empresa_id,
+            tipo,
+            severidade,
+            titulo,
+            descricao,
+            referencia,
+            status,
+            payload,
+            auditoria,
+            created_at,
+            updated_at
+          )
+          VALUES (
+            $1,
+            $2::alertas_operacionais_financeiro_tipo_enum,
+            $3::alertas_operacionais_financeiro_severidade_enum,
+            $4,
+            $5,
+            $6,
+            'ativo'::alertas_operacionais_financeiro_status_enum,
+            $7::jsonb,
+            $8::jsonb,
+            NOW(),
+            NOW()
+          )
+        `,
+        [
+          payload.empresaId,
+          'estorno_falha',
+          'critical',
+          'Falha ao processar estorno',
+          `Nao foi possivel processar estorno para o pagamento ${payload.transacaoId || payload.pagamentoId}.`,
+          referencia,
+          JSON.stringify({
+            pagamentoId: payload.pagamentoId,
+            faturaId: payload.faturaId || null,
+            transacaoId: payload.transacaoId || null,
+            gatewayTransacaoId: payload.gatewayTransacaoId || null,
+            motivo: payload.motivo || null,
+            erro: payload.erro,
+          }),
+          JSON.stringify(auditoria),
+        ],
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao registrar alerta de estorno (pagamento=${payload.pagamentoId}): ${
+          error?.message || error
+        }`,
+      );
+    }
   }
 }
 

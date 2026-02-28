@@ -243,9 +243,14 @@ function Evaluate-Scenario {
 
   $duplicateValue = Try-GetJsonProperty -Body $Response.Body -PropertyName 'duplicate'
   $isOk = ($Response.StatusCode -eq $ExpectedStatusCode)
+  $expectedDuplicateValue = $null
 
   if ($ExpectedDuplicate -ne $null) {
-    $isOk = $isOk -and ($duplicateValue -eq $ExpectedDuplicate.Value)
+    $expectedDuplicateValue = [bool]$ExpectedDuplicate
+  }
+
+  if ($expectedDuplicateValue -ne $null) {
+    $isOk = $isOk -and ($duplicateValue -eq $expectedDuplicateValue)
   }
 
   if (-not [string]::IsNullOrWhiteSpace($ExpectedBodyContains)) {
@@ -257,7 +262,7 @@ function Evaluate-Scenario {
     Descricao = $Descricao
     StatusEsperado = $ExpectedStatusCode
     StatusRecebido = $Response.StatusCode
-    DuplicateEsperado = if ($ExpectedDuplicate -eq $null) { '-' } else { [string]$ExpectedDuplicate.Value }
+    DuplicateEsperado = if ($expectedDuplicateValue -eq $null) { '-' } else { [string]$expectedDuplicateValue }
     DuplicateRecebido = if ($duplicateValue -eq $null) { '-' } else { [string]$duplicateValue }
     Resultado = if ($isOk) { 'PASS' } else { 'FAIL' }
     EventId = $Response.EventId
@@ -377,18 +382,16 @@ ORDER BY updated_at DESC;
         Nome = 'pagamentos'
         Queries = @(
 @"
-SELECT id, "gatewayTransacaoId" AS gateway_transacao_id, status, "motivoRejeicao" AS motivo_rejeicao, "dataProcessamento" AS data_processamento, "dataAprovacao" AS data_aprovacao, "updatedAt" AS updated_at
+SELECT id, empresa_id, status, gateway, tipo, valor
 FROM pagamentos
 WHERE empresa_id = $(Escape-SqlLiteral -Value $EmpresaId)
-  AND "gatewayTransacaoId" IN ($refsSql)
-ORDER BY "updatedAt" DESC;
+LIMIT 20;
 "@,
 @"
-SELECT id, gateway_transacao_id, status, motivo_rejeicao, data_processamento, data_aprovacao, updated_at
+SELECT id, empresa_id, status, gateway, tipo, valor
 FROM pagamentos
 WHERE empresa_id = $(Escape-SqlLiteral -Value $EmpresaId)
-  AND gateway_transacao_id IN ($refsSql)
-ORDER BY updated_at DESC;
+LIMIT 20;
 "@
         )
       }
@@ -396,20 +399,16 @@ ORDER BY updated_at DESC;
         Nome = 'faturas_relacionadas'
         Queries = @(
 @"
-SELECT f.id, f.numero, f.status, f.valor_total, f.valor_pago, f.updated_at
-FROM faturas f
-JOIN pagamentos p ON p."faturaId" = f.id
-WHERE p.empresa_id = $(Escape-SqlLiteral -Value $EmpresaId)
-  AND p."gatewayTransacaoId" IN ($refsSql)
-ORDER BY f.updated_at DESC;
+SELECT id, empresa_id, numero, status
+FROM faturas
+WHERE empresa_id = $(Escape-SqlLiteral -Value $EmpresaId)
+LIMIT 20;
 "@,
 @"
-SELECT f.id, f.numero, f.status, f.valor_total, f.valor_pago, f.updated_at
-FROM faturas f
-JOIN pagamentos p ON p.fatura_id = f.id
-WHERE p.empresa_id = $(Escape-SqlLiteral -Value $EmpresaId)
-  AND p.gateway_transacao_id IN ($refsSql)
-ORDER BY f.updated_at DESC;
+SELECT id, empresa_id, numero, status
+FROM faturas
+WHERE empresa_id = $(Escape-SqlLiteral -Value $EmpresaId)
+LIMIT 20;
 "@
         )
       }

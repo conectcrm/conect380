@@ -77,11 +77,10 @@ export class ContratosController {
       };
     } catch (error) {
       this.logger.error(`Erro ao criar contrato: ${error.message}`);
-      return {
-        success: false,
-        message: error.message,
-        data: null,
-      };
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Erro interno ao criar contrato');
     }
   }
 

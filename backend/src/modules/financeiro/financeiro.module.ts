@@ -21,9 +21,11 @@ import { ExtratoBancarioItem } from './entities/extrato-bancario-item.entity';
 import { Empresa } from '../../empresas/entities/empresa.entity';
 import { EmpresaConfig } from '../empresas/entities/empresa-config.entity';
 import { GatewayWebhookEvento } from '../pagamentos/entities/gateway-webhook-evento.entity';
+import { FaturamentoModule } from '../faturamento/faturamento.module';
 
 @Module({
   imports: [
+    FaturamentoModule,
     TypeOrmModule.forFeature([
       Fornecedor,
       ContaPagar,

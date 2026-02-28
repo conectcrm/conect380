@@ -3,7 +3,9 @@ import {
   AlertaOperacionalFinanceiro,
   AtualizarStatusAlertaOperacionalFinanceiro,
   FiltrosAlertasOperacionaisFinanceiro,
+  ReprocessarAlertaOperacionalFinanceiroPayload,
   ResultadoRecalculoAlertasOperacionaisFinanceiro,
+  ResultadoReprocessamentoAlertaOperacionalFinanceiro,
 } from '../types/financeiro';
 
 const unwrap = <T>(payload: unknown): T => {
@@ -64,6 +66,21 @@ export const alertasOperacionaisFinanceiroService = {
     });
     const payload = unwrap<AlertaOperacionalFinanceiro>(response.data);
     return normalizeAlerta(payload);
+  },
+
+  async reprocessar(
+    id: string,
+    dados?: ReprocessarAlertaOperacionalFinanceiroPayload,
+  ): Promise<ResultadoReprocessamentoAlertaOperacionalFinanceiro> {
+    const response = await api.post(`/financeiro/alertas-operacionais/${id}/reprocessar`, {
+      ...dados,
+    });
+    const payload = unwrap<ResultadoReprocessamentoAlertaOperacionalFinanceiro>(response.data);
+
+    return {
+      ...payload,
+      alerta: normalizeAlerta(payload.alerta),
+    };
   },
 
   async recalcular(): Promise<ResultadoRecalculoAlertasOperacionaisFinanceiro> {

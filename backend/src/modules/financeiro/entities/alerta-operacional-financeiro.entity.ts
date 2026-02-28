@@ -16,6 +16,9 @@ export enum AlertaOperacionalFinanceiroTipo {
   CONCILIACAO_PENDENTE_CRITICA = 'conciliacao_pendente_critica',
   WEBHOOK_PAGAMENTO_FALHA = 'webhook_pagamento_falha',
   EXPORTACAO_CONTABIL_FALHA = 'exportacao_contabil_falha',
+  STATUS_SINCRONIZACAO_DIVERGENTE = 'status_sincronizacao_divergente',
+  REFERENCIA_INTEGRACAO_INVALIDA = 'referencia_integracao_invalida',
+  ESTORNO_FALHA = 'estorno_falha',
 }
 
 export enum AlertaOperacionalFinanceiroSeveridade {

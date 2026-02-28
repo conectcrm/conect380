@@ -356,7 +356,47 @@ export class SalesFlowE2EHarness {
     return response.body;
   }
 
+  async garantirPropostaAprovada(token: string, propostaId: string): Promise<void> {
+    const obterAtual = async (): Promise<string> => {
+      const response = await request(this.httpServer)
+        .get(`/propostas/${propostaId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send();
+
+      expect(response.status).toBe(200);
+      expect(response.body?.success).toBe(true);
+      return String(response.body?.proposta?.status || '').toLowerCase();
+    };
+
+    const atualizarStatus = async (status: 'enviada' | 'aprovada') => {
+      const response = await request(this.httpServer)
+        .put(`/propostas/${propostaId}/status`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          status,
+          source: `e2e-portal-${this.runId}`,
+          observacoes: `Ajuste de status para contrato (${status})`,
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body?.success).toBe(true);
+    };
+
+    const statusAtual = await obterAtual();
+    if (statusAtual === 'aprovada') return;
+    if (statusAtual === 'rascunho') {
+      await atualizarStatus('enviada');
+    }
+
+    const statusIntermediario = await obterAtual();
+    if (statusIntermediario !== 'aprovada') {
+      await atualizarStatus('aprovada');
+    }
+  }
+
   async criarContratoViaApi(token: string, propostaId: string) {
+    await this.garantirPropostaAprovada(token, propostaId);
+
     const response = await request(this.httpServer)
       .post('/contratos')
       .set('Authorization', `Bearer ${token}`)

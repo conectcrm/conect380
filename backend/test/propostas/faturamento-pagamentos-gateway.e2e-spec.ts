@@ -63,6 +63,44 @@ describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
     return h.contratoEmpresaAId;
   }
 
+  async function criarContratoAssinadoParaNovaProposta(
+    suffix: string,
+  ): Promise<{ contratoId: number; propostaId: string }> {
+    const propostaId = await h.criarPropostaViaApi(
+      h.tokenAdminEmpresaA,
+      `Portal E2E ${h.runId} ${suffix}`,
+    );
+    const contrato = await h.criarContratoViaApi(h.tokenAdminEmpresaA, propostaId);
+    const contratoId = Number(contrato.id);
+
+    const criarAssinaturaResponse = await request(h.httpServer)
+      .post(`/contratos/${contratoId}/assinaturas`)
+      .set('Authorization', `Bearer ${h.tokenAdminEmpresaA}`)
+      .send({
+        usuarioId: h.adminEmpresaAId,
+        tipo: 'digital',
+        dataExpiracao: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      });
+
+    expect([200, 201]).toContain(criarAssinaturaResponse.status);
+    const tokenAssinatura = criarAssinaturaResponse.body?.data?.tokenValidacao as string;
+    expect(tokenAssinatura).toBeTruthy();
+
+    const processarAssinatura = await request(h.httpServer)
+      .post('/contratos/assinar/processar')
+      .send({
+        tokenValidacao: tokenAssinatura,
+        hashAssinatura: `sha256-e2e-${h.runId}-${suffix}`,
+        ipAssinatura: '127.0.0.1',
+        userAgent: 'jest-e2e',
+      });
+
+    expect(processarAssinatura.status).toBe(201);
+    expect(processarAssinatura.body?.success).toBe(true);
+
+    return { contratoId, propostaId };
+  }
+
   async function ensureWebhooksGatewayEventos(): Promise<void> {
     const migration = new CreateWebhooksGatewayEventos1802885000000();
     const queryRunner = h.dataSource.createQueryRunner();
@@ -207,9 +245,43 @@ describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
     expect(faturaFinal.status).toBe(200);
     expect(faturaFinal.body?.data?.status).toBe('paga');
     expect(Number(faturaFinal.body?.data?.valorPago)).toBeGreaterThan(0);
+    expect(faturaFinal.body?.data?.metadados?.recebivel?.status).toBe('baixado');
 
     const statusAposPagamento = await obterStatusProposta(h.propostaEmpresaAId);
     expect(statusAposPagamento).toBe('pago');
+  });
+
+  it('sincroniza proposta para contrato_assinado ao cancelar fatura', async () => {
+    const { contratoId, propostaId } = await criarContratoAssinadoParaNovaProposta('cancelamento');
+
+    const gerarFaturaResponse = await request(h.httpServer)
+      .post('/faturamento/faturas/automatica')
+      .set('Authorization', `Bearer ${h.tokenAdminEmpresaA}`)
+      .send({
+        contratoId,
+        enviarEmail: false,
+        observacoes: `Fatura cancelamento E2E ${h.runId}`,
+      });
+
+    expect([200, 201]).toContain(gerarFaturaResponse.status);
+    const faturaId = Number(gerarFaturaResponse.body?.data?.id);
+    expect(faturaId).toBeTruthy();
+
+    const statusAposCriacao = await obterStatusProposta(propostaId);
+    expect(statusAposCriacao).toBe('fatura_criada');
+
+    const cancelarResponse = await request(h.httpServer)
+      .put(`/faturamento/faturas/${faturaId}/cancelar`)
+      .set('Authorization', `Bearer ${h.tokenAdminEmpresaA}`)
+      .send({
+        motivo: 'Cancelamento operacional de teste',
+      });
+
+    expect(cancelarResponse.status).toBe(200);
+    expect(cancelarResponse.body?.data?.status).toBe('cancelada');
+
+    const statusAposCancelamento = await obterStatusProposta(propostaId);
+    expect(statusAposCancelamento).toBe('contrato_assinado');
   });
 
   it('processa webhook valido com assinatura, sincroniza pagamento e registra auditoria idempotente', async () => {
@@ -303,6 +375,51 @@ describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
     expect(Number(auditoriaPosDuplicado[0].total)).toBe(1);
   });
 
+  it('consulta trilha de auditoria por correlationId no fluxo webhook', async () => {
+    const webhookSecret = `whsec-${h.runId}`;
+    await garantirConfiguracaoWebhookPagSeguro(webhookSecret);
+
+    const { gatewayTransacaoId, valorPagamento } = await criarPagamentoPendente();
+    const eventId = `evt-whk-corr-${h.runId}-${Date.now()}`;
+    const correlationId = `corr-${h.runId}-${Date.now()}`;
+    const payload = {
+      eventId,
+      referenciaGateway: gatewayTransacaoId,
+      status: 'approved',
+      amount: valorPagamento,
+      fee: 0,
+      method: 'pix',
+    };
+
+    const signature =
+      'sha256=' + createHmac('sha256', webhookSecret).update(JSON.stringify(payload)).digest('hex');
+
+    const webhookResponse = await request(h.httpServer)
+      .post(`/pagamentos/gateways/webhooks/pagseguro/${h.empresaAId}`)
+      .set('x-signature', signature)
+      .set('x-event-id', eventId)
+      .set('x-correlation-id', correlationId)
+      .send(payload);
+
+    expect(webhookResponse.status).toBe(200);
+    expect(webhookResponse.body?.correlationId).toBe(correlationId);
+
+    const trilhaResponse = await request(h.httpServer)
+      .get(`/faturamento/auditoria/correlacao/${correlationId}`)
+      .set('Authorization', `Bearer ${h.tokenAdminEmpresaA}`);
+
+    expect(trilhaResponse.status).toBe(200);
+    expect(trilhaResponse.body?.data?.correlationId).toBe(correlationId);
+    expect(Number(trilhaResponse.body?.data?.resumo?.pagamentos || 0)).toBeGreaterThan(0);
+    expect(Number(trilhaResponse.body?.data?.resumo?.faturas || 0)).toBeGreaterThan(0);
+    expect(Number(trilhaResponse.body?.data?.resumo?.webhooks || 0)).toBeGreaterThan(0);
+    expect(
+      (trilhaResponse.body?.data?.pagamentos || []).some(
+        (item: any) => String(item?.correlationId || '') === correlationId,
+      ),
+    ).toBe(true);
+  });
+
   it('processa webhook rejected e sincroniza pagamento com motivo de rejeicao', async () => {
     const webhookSecret = `whsec-${h.runId}`;
     await garantirConfiguracaoWebhookPagSeguro(webhookSecret);
@@ -367,6 +484,144 @@ describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
     expect(auditoria[0].referencia_gateway).toBe(gatewayTransacaoId);
     expect(auditoria[0].status).toBe('processado');
     expect(auditoria[0].processado_em).toBeTruthy();
+  });
+
+  it('reabre recebivel quando pagamento aprovado recebe rejeicao posterior', async () => {
+    const webhookSecret = `whsec-${h.runId}`;
+    await garantirConfiguracaoWebhookPagSeguro(webhookSecret);
+
+    const { faturaId, pagamentoId, gatewayTransacaoId, valorPagamento } = await criarPagamentoPendente();
+
+    const payloadAprovado = {
+      eventId: `evt-whk-approved-${h.runId}-${Date.now()}`,
+      referenciaGateway: gatewayTransacaoId,
+      status: 'approved',
+      amount: valorPagamento,
+      fee: 0,
+      method: 'pix',
+    };
+    const assinaturaAprovado =
+      'sha256=' + createHmac('sha256', webhookSecret).update(JSON.stringify(payloadAprovado)).digest('hex');
+
+    const aprovadoResponse = await request(h.httpServer)
+      .post(`/pagamentos/gateways/webhooks/pagseguro/${h.empresaAId}`)
+      .set('x-signature', assinaturaAprovado)
+      .set('x-event-id', payloadAprovado.eventId)
+      .send(payloadAprovado);
+
+    expect(aprovadoResponse.status).toBe(200);
+    expect(aprovadoResponse.body?.success).toBe(true);
+
+    const payloadRejeitado = {
+      eventId: `evt-whk-chargeback-${h.runId}-${Date.now()}`,
+      referenciaGateway: gatewayTransacaoId,
+      status: 'rejected',
+      amount: valorPagamento,
+      fee: 0,
+      method: 'pix',
+    };
+    const assinaturaRejeitado =
+      'sha256=' + createHmac('sha256', webhookSecret).update(JSON.stringify(payloadRejeitado)).digest('hex');
+
+    const rejeitadoResponse = await request(h.httpServer)
+      .post(`/pagamentos/gateways/webhooks/pagseguro/${h.empresaAId}`)
+      .set('x-signature', assinaturaRejeitado)
+      .set('x-event-id', payloadRejeitado.eventId)
+      .send(payloadRejeitado);
+
+    expect(rejeitadoResponse.status).toBe(200);
+    expect(rejeitadoResponse.body?.success).toBe(true);
+
+    const pagamentoAtualizado = await request(h.httpServer)
+      .get(`/faturamento/pagamentos/${pagamentoId}`)
+      .set('Authorization', `Bearer ${h.tokenAdminEmpresaA}`);
+
+    expect(pagamentoAtualizado.status).toBe(200);
+    expect(pagamentoAtualizado.body?.data?.status).toBe('rejeitado');
+
+    const faturaAtualizada = await request(h.httpServer)
+      .get(`/faturamento/faturas/${faturaId}`)
+      .set('Authorization', `Bearer ${h.tokenAdminEmpresaA}`);
+
+    expect(faturaAtualizada.status).toBe(200);
+    expect(String(faturaAtualizada.body?.data?.status || '')).toBe('pendente');
+    expect(faturaAtualizada.body?.data?.metadados?.recebivel?.status).toBe('aberto');
+  });
+
+  it('estorna pagamento aprovado e retorna proposta para aguardando_pagamento', async () => {
+    const contratoId = await garantirContratoAssinado();
+
+    const gerarFaturaResponse = await request(h.httpServer)
+      .post('/faturamento/faturas/automatica')
+      .set('Authorization', `Bearer ${h.tokenAdminEmpresaA}`)
+      .send({
+        contratoId,
+        enviarEmail: false,
+        observacoes: `Fatura estorno E2E ${h.runId}`,
+      });
+
+    expect([200, 201]).toContain(gerarFaturaResponse.status);
+    const faturaId = Number(gerarFaturaResponse.body?.data?.id);
+    const valorFatura = Number(gerarFaturaResponse.body?.data?.valorTotal || 0);
+
+    const gatewayTransacaoId = `e2e-estorno-gw-${h.runId}-${Date.now()}`;
+    const transacaoId = `e2e-estorno-pay-${h.runId}-${Date.now()}`;
+
+    const criarPagamentoResponse = await request(h.httpServer)
+      .post('/faturamento/pagamentos')
+      .set('Authorization', `Bearer ${h.tokenAdminEmpresaA}`)
+      .send({
+        faturaId,
+        transacaoId,
+        tipo: 'pagamento',
+        valor: valorFatura,
+        metodoPagamento: 'pix',
+        gateway: 'manual',
+        gatewayTransacaoId,
+        observacoes: 'Pagamento para estorno e2e',
+      });
+
+    expect([200, 201]).toContain(criarPagamentoResponse.status);
+    const pagamentoId = Number(criarPagamentoResponse.body?.data?.id);
+    expect(pagamentoId).toBeTruthy();
+
+    const processarPagamentoResponse = await request(h.httpServer)
+      .post('/faturamento/pagamentos/processar')
+      .set('Authorization', `Bearer ${h.tokenAdminEmpresaA}`)
+      .send({
+        gatewayTransacaoId,
+        novoStatus: 'aprovado',
+        webhookData: {
+          source: 'e2e-estorno',
+          timestamp: new Date().toISOString(),
+        },
+      });
+
+    expect(processarPagamentoResponse.status).toBe(200);
+    expect(processarPagamentoResponse.body?.data?.status).toBe('aprovado');
+    expect(await obterStatusProposta(h.propostaEmpresaAId)).toBe('pago');
+
+    const estornoResponse = await request(h.httpServer)
+      .post(`/faturamento/pagamentos/${pagamentoId}/estornar`)
+      .set('Authorization', `Bearer ${h.tokenAdminEmpresaA}`)
+      .send({
+        motivo: 'Estorno operacional de teste',
+      });
+
+    expect(estornoResponse.status).toBe(201);
+    expect(estornoResponse.body?.data?.tipo).toBe('estorno');
+    expect(Number(estornoResponse.body?.data?.valor)).toBeLessThan(0);
+
+    const faturaAtualizada = await request(h.httpServer)
+      .get(`/faturamento/faturas/${faturaId}`)
+      .set('Authorization', `Bearer ${h.tokenAdminEmpresaA}`);
+
+    expect(faturaAtualizada.status).toBe(200);
+    expect(String(faturaAtualizada.body?.data?.status || '')).toBe('pendente');
+    expect(faturaAtualizada.body?.data?.metadados?.recebivel?.status).toBe('aberto');
+
+    const statusAposEstorno = await obterStatusProposta(h.propostaEmpresaAId);
+    expect(statusAposEstorno).toBe('aguardando_pagamento');
   });
 
   it('retorna 501 ao tentar criar configuracao de gateway em producao sem provider habilitado', async () => {

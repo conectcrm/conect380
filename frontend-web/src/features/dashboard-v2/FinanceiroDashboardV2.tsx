@@ -34,6 +34,11 @@ import {
   contarAlertasOperacionais,
   priorizarAlertasOperacionais,
 } from './financeiro-alertas-state';
+import {
+  isAlertaReprocessavel,
+  montarPayloadReprocessamento,
+  REPROCESSAMENTO_CANCELADO,
+} from './financeiro-alertas-reprocessamento';
 
 type PeriodoFiltro = '7d' | '30d' | '90d';
 
@@ -81,7 +86,7 @@ const FinanceiroDashboardV2: React.FC = () => {
   const [warning, setWarning] = useState<string | null>(null);
   const [warningAlertas, setWarningAlertas] = useState<string | null>(null);
   const [alertaActionById, setAlertaActionById] = useState<
-    Record<string, 'ack' | 'resolver' | undefined>
+    Record<string, 'ack' | 'resolver' | 'reprocessar' | undefined>
   >({});
 
   const carregarDados = useCallback(async () => {
@@ -200,26 +205,55 @@ const FinanceiroDashboardV2: React.FC = () => {
     [alertasPriorizados],
   );
 
-  const atualizarAlerta = useCallback(async (id: string, acao: 'ack' | 'resolver') => {
-    setAlertaActionById((prev) => ({ ...prev, [id]: acao }));
-    try {
-      const atualizado =
-        acao === 'ack'
-          ? await alertasOperacionaisFinanceiroService.ack(id, {
-              observacao: 'Atualizado pelo painel financeiro',
-            })
-          : await alertasOperacionaisFinanceiroService.resolver(id, {
-              observacao: 'Resolvido pelo painel financeiro',
-            });
+  const atualizarAlerta = useCallback(
+    async (alerta: AlertaOperacionalFinanceiro, acao: 'ack' | 'resolver' | 'reprocessar') => {
+      const id = alerta.id;
+      setAlertaActionById((prev) => ({ ...prev, [id]: acao }));
 
-      setAlertasOperacionais((prev) => aplicarAtualizacaoAlertaOperacional(prev, atualizado));
-      setWarningAlertas(null);
-    } catch (error) {
-      setWarningAlertas('Nao foi possivel atualizar o alerta selecionado.');
-    } finally {
-      setAlertaActionById((prev) => ({ ...prev, [id]: undefined }));
-    }
-  }, []);
+      try {
+        let atualizado: AlertaOperacionalFinanceiro;
+        let limparWarning = true;
+
+        if (acao === 'ack') {
+          atualizado = await alertasOperacionaisFinanceiroService.ack(id, {
+            observacao: 'Atualizado pelo painel financeiro',
+          });
+        } else if (acao === 'resolver') {
+          atualizado = await alertasOperacionaisFinanceiroService.resolver(id, {
+            observacao: 'Resolvido pelo painel financeiro',
+          });
+        } else {
+          const dados = montarPayloadReprocessamento(alerta);
+          if (!dados) {
+            throw new Error(REPROCESSAMENTO_CANCELADO);
+          }
+          const resultado = await alertasOperacionaisFinanceiroService.reprocessar(id, dados);
+          atualizado = resultado.alerta;
+          if (!resultado.sucesso) {
+            limparWarning = false;
+            setWarningAlertas(resultado.mensagem || 'Nao foi possivel reprocessar o alerta.');
+          }
+        }
+
+        setAlertasOperacionais((prev) => aplicarAtualizacaoAlertaOperacional(prev, atualizado));
+        if (limparWarning) {
+          setWarningAlertas(null);
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message === REPROCESSAMENTO_CANCELADO) {
+          return;
+        }
+        if (acao === 'reprocessar' && error instanceof Error && error.message) {
+          setWarningAlertas(error.message);
+        } else {
+          setWarningAlertas('Nao foi possivel atualizar o alerta selecionado.');
+        }
+      } finally {
+        setAlertaActionById((prev) => ({ ...prev, [id]: undefined }));
+      }
+    },
+    [],
+  );
 
   const insights = useMemo<DashboardV2Insight[]>(
     () => [
@@ -346,7 +380,8 @@ const FinanceiroDashboardV2: React.FC = () => {
             ) : (
               <div className="space-y-2.5">
                 {alertasPriorizados.slice(0, 6).map((alerta) => {
-                  const isProcessing = Boolean(alertaActionById[alerta.id]);
+                  const currentAction = alertaActionById[alerta.id];
+                  const isProcessing = Boolean(currentAction);
                   return (
                     <div
                       key={alerta.id}
@@ -383,20 +418,30 @@ const FinanceiroDashboardV2: React.FC = () => {
                         {alerta.status === 'ativo' ? (
                           <button
                             type="button"
-                            onClick={() => void atualizarAlerta(alerta.id, 'ack')}
+                            onClick={() => void atualizarAlerta(alerta, 'ack')}
                             disabled={isProcessing}
                             className="rounded-[10px] border border-[#D9E7EB] px-2.5 py-1 text-[12px] font-semibold text-[#305C70] disabled:opacity-60"
                           >
-                            {isProcessing ? 'Processando...' : 'Reconhecer'}
+                            {currentAction === 'ack' ? 'Processando...' : 'Reconhecer'}
+                          </button>
+                        ) : null}
+                        {isAlertaReprocessavel(alerta.tipo) ? (
+                          <button
+                            type="button"
+                            onClick={() => void atualizarAlerta(alerta, 'reprocessar')}
+                            disabled={isProcessing}
+                            className="rounded-[10px] border border-[#D9E7EB] px-2.5 py-1 text-[12px] font-semibold text-[#305C70] disabled:opacity-60"
+                          >
+                            {currentAction === 'reprocessar' ? 'Reprocessando...' : 'Reprocessar'}
                           </button>
                         ) : null}
                         <button
                           type="button"
-                          onClick={() => void atualizarAlerta(alerta.id, 'resolver')}
+                          onClick={() => void atualizarAlerta(alerta, 'resolver')}
                           disabled={isProcessing}
                           className="rounded-[10px] border border-[#D9E7EB] px-2.5 py-1 text-[12px] font-semibold text-[#305C70] disabled:opacity-60"
                         >
-                          {isProcessing ? 'Processando...' : 'Resolver'}
+                          {currentAction === 'resolver' ? 'Processando...' : 'Resolver'}
                         </button>
                       </div>
                     </div>

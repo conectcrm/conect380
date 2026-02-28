@@ -25,6 +25,12 @@ export class PortalController {
   private resolvePortalErrorStatus(error: unknown): HttpStatus {
     const message = String((error as any)?.message || '').toLowerCase();
     if (
+      message.includes('transicao de status invalida') ||
+      message.includes('exige aprovacao interna')
+    ) {
+      return HttpStatus.BAD_REQUEST;
+    }
+    if (
       message.includes('token invalido') ||
       message.includes('token inválido') ||
       message.includes('token expirado') ||

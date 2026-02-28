@@ -96,6 +96,26 @@ describe('Portal Propostas Token - Core (E2E)', () => {
     expect(response.body?.success).toBe(false);
   });
 
+  it('retorna 400 para transicao invalida de status da proposta', async () => {
+    const propostaInvalidaId = await h.criarPropostaViaApi(
+      h.tokenAdminEmpresaA,
+      `Portal E2E Invalid Status ${h.runId}`,
+    );
+
+    const response = await request(h.httpServer)
+      .put(`/propostas/${propostaInvalidaId}/status`)
+      .set('Authorization', `Bearer ${h.tokenAdminEmpresaA}`)
+      .send({
+        status: 'contrato_assinado',
+        source: `e2e-portal-${h.runId}`,
+      });
+
+    expect(response.status).toBe(400);
+    expect(String(response.body?.message || response.body?.error || '')).toMatch(
+      /transicao de status invalida/i,
+    );
+  });
+
   it('retorna 400 para transicao de estagio invalida no pipeline', async () => {
     const lead = await h.criarLeadViaApi(
       h.tokenAdminEmpresaA,

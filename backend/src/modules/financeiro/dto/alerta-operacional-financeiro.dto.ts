@@ -32,3 +32,27 @@ export class AtualizarStatusAlertaOperacionalFinanceiroDto {
   @IsString()
   observacao?: string;
 }
+
+export class ReprocessarAlertaOperacionalFinanceiroDto {
+  @IsOptional()
+  @IsString()
+  observacao?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  pagamentoId?: number;
+
+  @IsOptional()
+  @IsString()
+  gatewayTransacaoId?: string;
+
+  @IsOptional()
+  @IsString()
+  novoStatus?: string;
+
+  @IsOptional()
+  @IsString()
+  motivoRejeicao?: string;
+}

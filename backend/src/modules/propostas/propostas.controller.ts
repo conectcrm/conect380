@@ -422,6 +422,10 @@ export class PropostasController {
     } catch (error) {
       this.logger.error('[PROPOSTAS] Erro ao atualizar status:', error);
 
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
       throw new HttpException(
         {
           success: false,

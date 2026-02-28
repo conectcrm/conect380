@@ -15,13 +15,22 @@ describe('PagamentoService - processarPagamento / status da fatura', () => {
     save: jest.fn(),
   };
 
+  const mockFaturamentoService = {
+    sincronizarStatusPropostaPorFaturaId: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const mockDataSource = {
+    query: jest.fn().mockResolvedValue([]),
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
 
     service = new PagamentoService(
       mockPagamentoRepository as any,
       mockFaturaRepository as any,
-      {} as any,
+      mockFaturamentoService as any,
+      mockDataSource as any,
     );
   });
 
@@ -82,6 +91,11 @@ describe('PagamentoService - processarPagamento / status da fatura', () => {
         id: faturaId,
         status: StatusFatura.PAGA,
         valorPago: 3200,
+        metadados: expect.objectContaining({
+          recebivel: expect.objectContaining({
+            status: 'baixado',
+          }),
+        }),
       }),
     );
   });
@@ -177,6 +191,71 @@ describe('PagamentoService - processarPagamento / status da fatura', () => {
         id: faturaId,
         status: StatusFatura.PAGA,
         valorPago: 0.3,
+      }),
+    );
+  });
+
+  it('recalcula fatura para pendente quando pagamento aprovado muda para rejeitado', async () => {
+    const empresaId = 'empresa-1';
+    const faturaId = 999;
+    const pagamentoId = 1234;
+    const gatewayTransacaoId = 'gw-trx-999';
+
+    mockPagamentoRepository.findOne.mockResolvedValueOnce({
+      id: pagamentoId,
+      empresaId,
+      faturaId,
+      transacaoId: 'trx-999',
+      gatewayTransacaoId,
+      tipo: TipoPagamento.PAGAMENTO,
+      status: StatusPagamento.APROVADO,
+      valor: 120,
+      valorLiquido: 120,
+      dataAprovacao: new Date('2026-02-01T10:00:00.000Z'),
+      fatura: { id: faturaId },
+    });
+    mockPagamentoRepository.save.mockImplementation(async (payload: any) => ({ ...payload }));
+
+    mockFaturaRepository.findOne.mockResolvedValueOnce({
+      id: faturaId,
+      empresaId,
+      numero: 'FT2026000004',
+      status: StatusFatura.PAGA,
+      valorTotal: '120.00',
+      valorPago: '120.00',
+      dataPagamento: new Date('2026-02-01T10:01:00.000Z'),
+      pagamentos: [
+        {
+          id: pagamentoId,
+          status: StatusPagamento.REJEITADO,
+          valor: '120.00',
+          isAprovado: () => false,
+        },
+      ],
+    });
+    mockFaturaRepository.save.mockImplementation(async (payload: any) => ({ ...payload }));
+
+    const result = await service.processarPagamento(
+      {
+        gatewayTransacaoId,
+        novoStatus: StatusPagamento.REJEITADO,
+        motivoRejeicao: 'chargeback',
+      },
+      empresaId,
+    );
+
+    expect(result.status).toBe(StatusPagamento.REJEITADO);
+    expect(result.dataAprovacao).toBeNull();
+    expect(mockFaturaRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: faturaId,
+        status: StatusFatura.PENDENTE,
+        valorPago: 0,
+        metadados: expect.objectContaining({
+          recebivel: expect.objectContaining({
+            status: 'aberto',
+          }),
+        }),
       }),
     );
   });

@@ -32,6 +32,7 @@ type WebhookHeaders = {
   requestId?: string;
   idempotencyKey?: string;
   eventId?: string;
+  correlationId?: string;
 };
 
 type ProcessarWebhookInput = {
@@ -81,6 +82,16 @@ export class GatewayWebhookService {
       input.payload,
       input.headers,
     );
+    const correlationId = this.resolveCorrelationId(input.payload, input.headers, idempotencyKey);
+    const origemId = this.resolveOrigemId(input.payload, input.headers, idempotencyKey);
+
+    const payloadComTrilha: Record<string, unknown> = {
+      ...(input.payload || {}),
+      _trace: {
+        correlationId,
+        origemId,
+      },
+    };
 
     const eventoExistente = await this.webhookEventoRepository.findOne({
       where: { empresaId: input.empresaId, gateway, idempotencyKey },
@@ -96,6 +107,8 @@ export class GatewayWebhookService {
         duplicate: true,
         eventId: eventoExistente.eventId || null,
         idempotencyKey,
+        correlationId,
+        origemId,
       };
     }
 
@@ -107,15 +120,21 @@ export class GatewayWebhookService {
       requestId: input.headers.requestId,
       status: GatewayWebhookEventoStatus.PROCESSANDO,
       tentativas: 1,
-      payloadRaw: input.payload,
+      payloadRaw: payloadComTrilha,
     });
     await this.webhookEventoRepository.save(evento);
 
     try {
       const normalized = this.normalizeEvent(input.payload, input.headers);
       evento.referenciaGateway = normalized.referenciaGateway;
-      await this.upsertTransacao(configuracao.id, input.empresaId, normalized, input.payload);
-      await this.sincronizarPagamento(input.empresaId, normalized, input.payload);
+      await this.upsertTransacao(configuracao.id, input.empresaId, normalized, payloadComTrilha);
+      await this.sincronizarPagamento(
+        input.empresaId,
+        normalized,
+        payloadComTrilha,
+        correlationId,
+        origemId,
+      );
 
       evento.status = GatewayWebhookEventoStatus.PROCESSADO;
       evento.processadoEm = new Date();
@@ -128,12 +147,26 @@ export class GatewayWebhookService {
         duplicate: false,
         eventId: evento.eventId || normalized.eventId || null,
         idempotencyKey,
+        correlationId,
+        origemId,
       };
     } catch (error: unknown) {
       const mensagem = error instanceof Error ? error.message : 'Erro ao processar webhook';
       evento.status = GatewayWebhookEventoStatus.FALHA;
       evento.erro = mensagem;
       await this.webhookEventoRepository.save(evento);
+
+      if (mensagem.toLowerCase().includes('payload sem referencia de transacao')) {
+        await this.registrarAlertaReferenciaIntegracaoInvalida({
+          empresaId: input.empresaId,
+          gateway,
+          idempotencyKey,
+          eventId: evento.eventId || this.resolveEventId(input.payload, input.headers),
+          requestId: input.headers.requestId,
+          erro: mensagem,
+          payload: payloadComTrilha,
+        });
+      }
 
       this.logger.error(
         `Falha ao processar webhook gateway=${gateway} empresa=${input.empresaId} key=${idempotencyKey}: ${mensagem}`,
@@ -252,6 +285,36 @@ export class GatewayWebhookService {
       payload['id'],
       (payload['data'] as Record<string, unknown> | undefined)?.['id'],
     )?.slice(0, 180);
+  }
+
+  private resolveCorrelationId(
+    payload: Record<string, unknown>,
+    headers: WebhookHeaders,
+    fallback: string,
+  ): string {
+    return (
+      this.resolveString(
+        headers.correlationId,
+        payload['correlationId'],
+        payload['correlation_id'],
+        (payload['_trace'] as Record<string, unknown> | undefined)?.['correlationId'],
+      ) || fallback
+    ).slice(0, 180);
+  }
+
+  private resolveOrigemId(
+    payload: Record<string, unknown>,
+    headers: WebhookHeaders,
+    fallback: string,
+  ): string {
+    return (
+      this.resolveString(
+        payload['origemId'],
+        payload['origem_id'],
+        headers.requestId,
+        headers.eventId,
+      ) || `webhook:${fallback}`
+    ).slice(0, 180);
   }
 
   private normalizeEvent(
@@ -450,6 +513,8 @@ export class GatewayWebhookService {
     empresaId: string,
     normalized: NormalizedEvent,
     payloadRaw: Record<string, unknown>,
+    correlationId?: string,
+    origemId?: string,
   ): Promise<void> {
     try {
       await this.pagamentoService.processarPagamento(
@@ -462,6 +527,8 @@ export class GatewayWebhookService {
               ? normalized.statusExterno
               : undefined,
           webhookData: payloadRaw,
+          correlationId,
+          origemId,
         },
         empresaId,
       );
@@ -474,6 +541,82 @@ export class GatewayWebhookService {
       }
 
       throw error;
+    }
+  }
+
+  private async registrarAlertaReferenciaIntegracaoInvalida(payload: {
+    empresaId: string;
+    gateway: GatewayProvider;
+    idempotencyKey: string;
+    eventId?: string;
+    requestId?: string;
+    erro: string;
+    payload: Record<string, unknown>;
+  }): Promise<void> {
+    try {
+      const referencia = `webhook:referencia_invalida:${payload.idempotencyKey}`;
+      const auditoria = [
+        {
+          acao: 'gerado_automaticamente',
+          origem: 'pagamentos.webhook',
+          erro: payload.erro,
+          timestamp: new Date().toISOString(),
+        },
+      ];
+
+      await this.webhookEventoRepository.manager.query(
+        `
+          INSERT INTO alertas_operacionais_financeiro (
+            empresa_id,
+            tipo,
+            severidade,
+            titulo,
+            descricao,
+            referencia,
+            status,
+            payload,
+            auditoria,
+            created_at,
+            updated_at
+          )
+          VALUES (
+            $1,
+            $2::alertas_operacionais_financeiro_tipo_enum,
+            $3::alertas_operacionais_financeiro_severidade_enum,
+            $4,
+            $5,
+            $6,
+            'ativo'::alertas_operacionais_financeiro_status_enum,
+            $7::jsonb,
+            $8::jsonb,
+            NOW(),
+            NOW()
+          )
+        `,
+        [
+          payload.empresaId,
+          'referencia_integracao_invalida',
+          'warning',
+          'Referencia de integracao invalida no webhook',
+          'Webhook recebido sem referencia de transacao valida para conciliacao automatica.',
+          referencia,
+          JSON.stringify({
+            gateway: payload.gateway,
+            idempotencyKey: payload.idempotencyKey,
+            eventId: payload.eventId || null,
+            requestId: payload.requestId || null,
+            erro: payload.erro,
+            payload: payload.payload,
+          }),
+          JSON.stringify(auditoria),
+        ],
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao registrar alerta de referencia invalida (empresa=${payload.empresaId}): ${
+          error?.message || error
+        }`,
+      );
     }
   }
 

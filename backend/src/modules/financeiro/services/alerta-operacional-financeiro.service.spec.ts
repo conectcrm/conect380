@@ -53,6 +53,13 @@ describe('AlertaOperacionalFinanceiroService', () => {
     const exportacaoRepository = {
       createQueryBuilder: jest.fn(() => makeQueryBuilder()),
     };
+    const faturamentoService = {
+      sincronizarStatusPropostaPorFaturaId: jest.fn().mockResolvedValue(undefined),
+    };
+    const pagamentoService = {
+      estornarPagamento: jest.fn().mockResolvedValue({ id: 99 }),
+      processarPagamento: jest.fn().mockResolvedValue({ id: 98 }),
+    };
 
     const service = new AlertaOperacionalFinanceiroService(
       alertaRepository as any,
@@ -60,6 +67,8 @@ describe('AlertaOperacionalFinanceiroService', () => {
       extratoItemRepository as any,
       webhookEventoRepository as any,
       exportacaoRepository as any,
+      faturamentoService as any,
+      pagamentoService as any,
     );
     const logger = {
       log: jest.fn(),
@@ -76,6 +85,8 @@ describe('AlertaOperacionalFinanceiroService', () => {
       extratoItemRepository,
       webhookEventoRepository,
       exportacaoRepository,
+      faturamentoService,
+      pagamentoService,
     };
   };
 
@@ -227,6 +238,78 @@ describe('AlertaOperacionalFinanceiroService', () => {
     await expect(
       service.resolver('alerta-x', 'emp-1', 'user-1', {} as any),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('deve reprocessar alerta de sincronizacao divergente e resolver item', async () => {
+    const { service, alertaRepository, faturamentoService } = createService();
+    alertaRepository.findOne.mockResolvedValue(
+      makeAlerta({
+        id: 'alerta-sync-1',
+        tipo: AlertaOperacionalFinanceiroTipo.STATUS_SINCRONIZACAO_DIVERGENTE,
+        referencia: 'sync_status:fatura:321',
+        payload: {
+          faturaId: 321,
+          correlationId: 'corr-sync-321',
+        },
+      }),
+    );
+
+    const resultado = await service.reprocessar('alerta-sync-1', 'emp-1', 'user-1', {
+      observacao: 'reprocessamento manual',
+    } as any);
+
+    expect(resultado.sucesso).toBe(true);
+    expect(resultado.alerta.status).toBe('resolvido');
+    expect(faturamentoService.sincronizarStatusPropostaPorFaturaId).toHaveBeenCalledWith(
+      321,
+      'emp-1',
+      expect.objectContaining({
+        correlationId: 'corr-sync-321',
+        strict: true,
+      }),
+    );
+  });
+
+  it('deve reprocessar alerta de estorno falho e resolver item', async () => {
+    const { service, alertaRepository, pagamentoService } = createService();
+    alertaRepository.findOne.mockResolvedValue(
+      makeAlerta({
+        id: 'alerta-estorno-1',
+        tipo: AlertaOperacionalFinanceiroTipo.ESTORNO_FALHA,
+        referencia: 'estorno:pagamento:55',
+        payload: {
+          pagamentoId: 55,
+          motivo: 'falha em tentativa anterior',
+        },
+      }),
+    );
+
+    const resultado = await service.reprocessar('alerta-estorno-1', 'emp-1', 'user-1', {
+      observacao: 'retry estorno',
+    } as any);
+
+    expect(resultado.sucesso).toBe(true);
+    expect(resultado.alerta.status).toBe('resolvido');
+    expect(pagamentoService.estornarPagamento).toHaveBeenCalledWith(55, 'retry estorno', 'emp-1');
+  });
+
+  it('deve sinalizar erro acionavel ao reprocessar alerta de referencia invalida sem dados minimos', async () => {
+    const { service, alertaRepository, pagamentoService } = createService();
+    alertaRepository.findOne.mockResolvedValue(
+      makeAlerta({
+        id: 'alerta-ref-1',
+        tipo: AlertaOperacionalFinanceiroTipo.REFERENCIA_INTEGRACAO_INVALIDA,
+        referencia: 'webhook:referencia_invalida:abc',
+        payload: {},
+      }),
+    );
+
+    const resultado = await service.reprocessar('alerta-ref-1', 'emp-1', 'user-1', {} as any);
+
+    expect(resultado.sucesso).toBe(false);
+    expect(String(resultado.mensagem || '')).toContain('gatewayTransacaoId');
+    expect(pagamentoService.processarPagamento).not.toHaveBeenCalled();
+    expect(resultado.alerta.status).toBe('ativo');
   });
 
   it('deve recalcular alertas operacionais sem duplicar referencias existentes', async () => {

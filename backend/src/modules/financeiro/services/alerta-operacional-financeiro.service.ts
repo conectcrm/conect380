@@ -10,6 +10,7 @@ import {
 import {
   AtualizarStatusAlertaOperacionalFinanceiroDto,
   QueryAlertasOperacionaisFinanceiroDto,
+  ReprocessarAlertaOperacionalFinanceiroDto,
 } from '../dto/alerta-operacional-financeiro.dto';
 import { ContaPagar } from '../entities/conta-pagar.entity';
 import { ExtratoBancarioItem } from '../entities/extrato-bancario-item.entity';
@@ -21,6 +22,9 @@ import {
   ContaPagarExportacao,
   ContaPagarExportacaoStatus,
 } from '../entities/conta-pagar-exportacao.entity';
+import { FaturamentoService } from '../../faturamento/services/faturamento.service';
+import { PagamentoService } from '../../faturamento/services/pagamento.service';
+import { StatusPagamento } from '../../faturamento/entities/pagamento.entity';
 
 type AlertaOperacionalFinanceiroResponse = {
   id: string;
@@ -55,6 +59,8 @@ export class AlertaOperacionalFinanceiroService {
     private readonly webhookEventoRepository: Repository<GatewayWebhookEvento>,
     @InjectRepository(ContaPagarExportacao)
     private readonly exportacaoRepository: Repository<ContaPagarExportacao>,
+    private readonly faturamentoService: FaturamentoService,
+    private readonly pagamentoService: PagamentoService,
   ) {}
 
   async listar(
@@ -162,6 +168,87 @@ export class AlertaOperacionalFinanceiroService {
       usuarioId,
     });
     return this.mapResponse(atualizado);
+  }
+
+  async reprocessar(
+    id: string,
+    empresaId: string,
+    usuarioId: string,
+    dto: ReprocessarAlertaOperacionalFinanceiroDto = {},
+  ): Promise<{
+    sucesso: boolean;
+    mensagem: string;
+    alerta: AlertaOperacionalFinanceiroResponse;
+    detalhes?: Record<string, unknown>;
+  }> {
+    const alerta = await this.findById(id, empresaId);
+    const statusAnterior = alerta.status;
+
+    try {
+      const resultado = await this.executarReprocessamento(alerta, empresaId, dto);
+
+      alerta.status = AlertaOperacionalFinanceiroStatus.RESOLVIDO;
+      alerta.resolvidoPor = usuarioId;
+      alerta.resolvidoEm = new Date();
+      if (!alerta.acknowledgedPor) {
+        alerta.acknowledgedPor = usuarioId;
+        alerta.acknowledgedEm = new Date();
+      }
+      alerta.auditoria = this.appendAuditoria(alerta.auditoria, {
+        acao: 'reprocessar',
+        usuarioId,
+        observacao: dto.observacao,
+        statusAnterior,
+        statusNovo: alerta.status,
+        sucesso: true,
+        detalhes: resultado,
+      });
+
+      const atualizado = await this.alertaRepository.save(alerta);
+      this.logStructured('financeiro.alertas_operacionais.reprocessamento', {
+        empresaId,
+        alertaId: atualizado.id,
+        tipo: atualizado.tipo,
+        referencia: atualizado.referencia || null,
+        sucesso: true,
+        usuarioId,
+      });
+
+      return {
+        sucesso: true,
+        mensagem: 'Reprocessamento executado com sucesso',
+        alerta: this.mapResponse(atualizado),
+        detalhes: resultado,
+      };
+    } catch (error) {
+      const mensagem = String(error?.message || error || 'Falha ao reprocessar alerta');
+      alerta.auditoria = this.appendAuditoria(alerta.auditoria, {
+        acao: 'reprocessar',
+        usuarioId,
+        observacao: dto.observacao,
+        statusAnterior,
+        statusNovo: alerta.status,
+        sucesso: false,
+        erro: mensagem,
+      });
+      const atualizado = await this.alertaRepository.save(alerta);
+
+      this.logStructured('financeiro.alertas_operacionais.reprocessamento', {
+        empresaId,
+        alertaId: atualizado.id,
+        tipo: atualizado.tipo,
+        referencia: atualizado.referencia || null,
+        sucesso: false,
+        erro: mensagem,
+        usuarioId,
+      });
+
+      return {
+        sucesso: false,
+        mensagem,
+        alerta: this.mapResponse(atualizado),
+      };
+    }
   }
 
   async recalcularAlertas(
@@ -342,7 +429,15 @@ export class AlertaOperacionalFinanceiroService {
       if (foiCriado) gerados += 1;
     }
 
-    for (const tipo of Object.values(AlertaOperacionalFinanceiroTipo)) {
+    const tiposComMonitoramentoAutomatico: AlertaOperacionalFinanceiroTipo[] = [
+      AlertaOperacionalFinanceiroTipo.CONTA_VENCE_EM_3_DIAS,
+      AlertaOperacionalFinanceiroTipo.CONTA_VENCIDA,
+      AlertaOperacionalFinanceiroTipo.CONCILIACAO_PENDENTE_CRITICA,
+      AlertaOperacionalFinanceiroTipo.WEBHOOK_PAGAMENTO_FALHA,
+      AlertaOperacionalFinanceiroTipo.EXPORTACAO_CONTABIL_FALHA,
+    ];
+
+    for (const tipo of tiposComMonitoramentoAutomatico) {
       const referencias = referenciasAtivas.get(tipo) || new Set<string>();
       resolvidos += await this.resolverAlertasAusentes(empresaId, tipo, referencias, usuarioId);
     }
@@ -370,6 +465,108 @@ export class AlertaOperacionalFinanceiroService {
       resolvidos,
       ativos,
     };
+  }
+
+  private async executarReprocessamento(
+    alerta: AlertaOperacionalFinanceiro,
+    empresaId: string,
+    dto: ReprocessarAlertaOperacionalFinanceiroDto,
+  ): Promise<Record<string, unknown>> {
+    const payload = alerta.payload && typeof alerta.payload === 'object' ? alerta.payload : {};
+
+    if (alerta.tipo === AlertaOperacionalFinanceiroTipo.STATUS_SINCRONIZACAO_DIVERGENTE) {
+      const faturaId = this.toPositiveInt((payload as any).faturaId);
+      if (!faturaId) {
+        throw new BadRequestException(
+          'Reprocessamento indisponivel: alerta sem faturaId para sincronizacao de status.',
+        );
+      }
+
+      const correlationId = this.toOptionalString((payload as any).correlationId) || `alerta:${alerta.id}`;
+      await this.faturamentoService.sincronizarStatusPropostaPorFaturaId(
+        faturaId,
+        empresaId,
+        {
+          correlationId,
+          origemId: `alerta:${alerta.id}:reprocessar`,
+          strict: true,
+        },
+      );
+
+      return {
+        tipo: alerta.tipo,
+        faturaId,
+        correlationId,
+      };
+    }
+
+    if (alerta.tipo === AlertaOperacionalFinanceiroTipo.ESTORNO_FALHA) {
+      const pagamentoId =
+        this.toPositiveInt(dto.pagamentoId) || this.toPositiveInt((payload as any).pagamentoId);
+      if (!pagamentoId) {
+        throw new BadRequestException(
+          'Reprocessamento indisponivel: informe pagamentoId para tentar novamente o estorno.',
+        );
+      }
+
+      const motivo =
+        this.toOptionalString(dto.observacao) ||
+        this.toOptionalString((payload as any).motivo) ||
+        'Reprocessamento de alerta operacional de estorno falho.';
+      const estorno = await this.pagamentoService.estornarPagamento(pagamentoId, motivo, empresaId);
+
+      return {
+        tipo: alerta.tipo,
+        pagamentoId,
+        estornoId: estorno.id,
+      };
+    }
+
+    if (alerta.tipo === AlertaOperacionalFinanceiroTipo.REFERENCIA_INTEGRACAO_INVALIDA) {
+      const gatewayTransacaoId =
+        this.toOptionalString(dto.gatewayTransacaoId) ||
+        this.toOptionalString((payload as any).gatewayTransacaoId) ||
+        this.toOptionalString((payload as any).referenciaGateway);
+
+      if (!gatewayTransacaoId) {
+        throw new BadRequestException(
+          'Reprocessamento requer gatewayTransacaoId para vincular o pagamento manualmente.',
+        );
+      }
+
+      const statusRaw =
+        this.toOptionalString(dto.novoStatus) ||
+        this.toOptionalString((payload as any).novoStatus) ||
+        this.toOptionalString((payload as any).statusMapeado) ||
+        'rejeitado';
+      const novoStatus = this.normalizarStatusPagamento(statusRaw);
+
+      await this.pagamentoService.processarPagamento(
+        {
+          gatewayTransacaoId,
+          novoStatus,
+          motivoRejeicao:
+            dto.motivoRejeicao || this.toOptionalString((payload as any).motivoRejeicao) || undefined,
+          webhookData: {
+            origem: 'alerta_operacional_reprocessamento',
+            alertaId: alerta.id,
+          },
+          correlationId: this.toOptionalString((payload as any).correlationId) || `alerta:${alerta.id}`,
+          origemId: `alerta:${alerta.id}:reprocessar`,
+        },
+        empresaId,
+      );
+
+      return {
+        tipo: alerta.tipo,
+        gatewayTransacaoId,
+        novoStatus,
+      };
+    }
+
+    throw new BadRequestException(
+      `Tipo de alerta ${alerta.tipo} nao suporta reprocessamento automatico.`,
+    );
   }
 
   private async findById(id: string, empresaId: string): Promise<AlertaOperacionalFinanceiro> {
@@ -531,6 +728,46 @@ export class AlertaOperacionalFinanceiroService {
     });
 
     return historico.slice(-100);
+  }
+
+  private toPositiveInt(value: unknown): number | undefined {
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed <= 0) return undefined;
+    return parsed;
+  }
+
+  private toOptionalString(value: unknown): string | undefined {
+    const normalized = String(value || '').trim();
+    return normalized || undefined;
+  }
+
+  private normalizarStatusPagamento(value: string): StatusPagamento {
+    const normalized = value.trim().toLowerCase();
+    switch (normalized) {
+      case StatusPagamento.APROVADO:
+      case 'approved':
+      case 'paid':
+      case 'pago':
+        return StatusPagamento.APROVADO;
+      case StatusPagamento.PROCESSANDO:
+      case 'processing':
+      case 'processando':
+        return StatusPagamento.PROCESSANDO;
+      case StatusPagamento.CANCELADO:
+      case 'cancelado':
+      case 'cancelled':
+        return StatusPagamento.CANCELADO;
+      case StatusPagamento.PENDENTE:
+      case 'pending':
+      case 'pendente':
+        return StatusPagamento.PENDENTE;
+      case StatusPagamento.REJEITADO:
+      case 'rejeitado':
+      case 'rejected':
+      case 'failed':
+      default:
+        return StatusPagamento.REJEITADO;
+    }
   }
 
   private mapResponse(alerta: AlertaOperacionalFinanceiro): AlertaOperacionalFinanceiroResponse {
