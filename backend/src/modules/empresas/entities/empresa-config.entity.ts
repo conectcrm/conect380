@@ -97,6 +97,52 @@ const encryptedNullableStringTransformer: ValueTransformer = {
   },
 };
 
+const ipWhitelistTransformer: ValueTransformer = {
+  to: (value: string[] | string | null | undefined) => {
+    if (value == null) {
+      return null;
+    }
+
+    if (Array.isArray(value)) {
+      const normalized = value.map((ip) => ip.trim()).filter(Boolean);
+      return normalized.length > 0 ? JSON.stringify(normalized) : null;
+    }
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : null;
+    }
+
+    return null;
+  },
+  from: (value: string | null | undefined) => {
+    if (!value) {
+      return null;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((ip) => (typeof ip === 'string' ? ip.trim() : ''))
+          .filter((ip) => ip.length > 0);
+      }
+    } catch {
+      // Legacy fallback: aceita dados antigos separados por linha/virgula.
+    }
+
+    return trimmed
+      .split(/[\r\n,]+/)
+      .map((ip) => ip.trim())
+      .filter((ip) => ip.length > 0);
+  },
+};
+
 @Entity('empresa_configuracoes')
 export class EmpresaConfig {
   @PrimaryGeneratedColumn('uuid')
@@ -148,8 +194,8 @@ export class EmpresaConfig {
   @Column({ name: 'force_ssl', default: false })
   forceSsl: boolean;
 
-  @Column({ name: 'ip_whitelist', type: 'text', nullable: true })
-  ipWhitelist: string;
+  @Column({ name: 'ip_whitelist', type: 'text', nullable: true, transformer: ipWhitelistTransformer })
+  ipWhitelist: string[] | null;
 
   // Configurações de Usuários
   @Column({ name: 'limite_usuarios', default: 10 })
@@ -160,6 +206,15 @@ export class EmpresaConfig {
 
   @Column({ name: 'convite_expiracao_horas', default: 48 })
   conviteExpiracaoHoras: number;
+
+  @Column({
+    name: 'alcada_aprovacao_financeira',
+    type: 'decimal',
+    precision: 15,
+    scale: 2,
+    nullable: true,
+  })
+  alcadaAprovacaoFinanceira: number | null;
 
   // Configurações de Email/SMTP
   @Column({ name: 'emails_habilitados', default: true })

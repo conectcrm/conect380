@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
@@ -8,6 +8,7 @@ import { RolesGuard } from '../../../common/guards/roles.guard';
 import { Permission } from '../../../common/permissions/permissions.constants';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { UserRole } from '../../users/user.entity';
+import { TestSmtpDto } from '../dto/smtp-test.dto';
 import { UpdateEmpresaConfigDto } from '../dto/update-empresa-config.dto';
 import { EmpresaConfigService } from '../services/empresa-config.service';
 
@@ -34,5 +35,25 @@ export class EmpresaConfigController {
   @Permissions(Permission.CONFIG_EMPRESA_UPDATE)
   async resetConfig(@EmpresaId() empresaId: string) {
     return this.configService.resetToDefaults(empresaId);
+  }
+
+  @Post('smtp/test')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
+  @Permissions(Permission.CONFIG_EMPRESA_UPDATE)
+  async testSmtp(@EmpresaId() empresaId: string, @Body() smtpDto: TestSmtpDto) {
+    return this.configService.testSmtpConnection(empresaId, smtpDto);
+  }
+
+  @Post('backup/execute')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
+  @Permissions(Permission.CONFIG_EMPRESA_UPDATE)
+  async executeBackup(@EmpresaId() empresaId: string) {
+    return this.configService.executeBackupSnapshot(empresaId);
+  }
+
+  @Get('backup/history')
+  async getBackupHistory(@EmpresaId() empresaId: string, @Query('limit') limit?: string) {
+    const parsedLimit = limit ? Number(limit) : undefined;
+    return this.configService.listBackupSnapshots(empresaId, parsedLimit);
   }
 }

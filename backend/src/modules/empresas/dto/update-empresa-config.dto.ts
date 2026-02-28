@@ -1,4 +1,16 @@
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, IsUrl, Max, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsArray,
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUrl,
+  Max,
+  Min,
+} from 'class-validator';
 
 export class UpdateEmpresaConfigDto {
   // Geral
@@ -11,7 +23,7 @@ export class UpdateEmpresaConfigDto {
   site?: string;
 
   @IsOptional()
-  @IsUrl()
+  @IsString()
   logoUrl?: string;
 
   @IsOptional()
@@ -22,7 +34,7 @@ export class UpdateEmpresaConfigDto {
   @IsString()
   corSecundaria?: string;
 
-  // Segurança
+  // Seguranca
   @IsOptional()
   @IsBoolean()
   autenticacao2FA?: boolean;
@@ -41,7 +53,16 @@ export class UpdateEmpresaConfigDto {
   @IsBoolean()
   auditoria?: boolean;
 
-  // Usuários
+  @IsOptional()
+  @IsBoolean()
+  forceSsl?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  ipWhitelist?: string[];
+
+  // Usuarios
   @IsOptional()
   @IsInt()
   @Min(1)
@@ -52,7 +73,20 @@ export class UpdateEmpresaConfigDto {
   @IsBoolean()
   aprovacaoNovoUsuario?: boolean;
 
-  // Notificações
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(720)
+  conviteExpiracaoHoras?: number;
+
+  // Financeiro
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  alcadaAprovacaoFinanceira?: number;
+
+  // Email/SMTP
   @IsOptional()
   @IsBoolean()
   emailsHabilitados?: boolean;
@@ -73,10 +107,52 @@ export class UpdateEmpresaConfigDto {
   @IsString()
   smtpSenha?: string;
 
-  // Integrações
+  // Comunicacao
+  @IsOptional()
+  @IsBoolean()
+  whatsappHabilitado?: boolean;
+
+  @IsOptional()
+  @IsString()
+  whatsappNumero?: string;
+
+  @IsOptional()
+  @IsString()
+  whatsappApiToken?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  smsHabilitado?: boolean;
+
+  @IsOptional()
+  @IsEnum(['twilio', 'nexmo', 'sinch'])
+  smsProvider?: 'twilio' | 'nexmo' | 'sinch';
+
+  @IsOptional()
+  @IsString()
+  smsApiKey?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  pushHabilitado?: boolean;
+
+  @IsOptional()
+  @IsEnum(['fcm', 'apns', 'onesignal'])
+  pushProvider?: 'fcm' | 'apns' | 'onesignal';
+
+  @IsOptional()
+  @IsString()
+  pushApiKey?: string;
+
+  // Integracoes
   @IsOptional()
   @IsBoolean()
   apiHabilitada?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  webhooksAtivos?: number;
 
   // Backup
   @IsOptional()

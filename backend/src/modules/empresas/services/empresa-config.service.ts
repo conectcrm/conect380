@@ -1,25 +1,33 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { promises as fs } from 'fs';
+import * as nodemailer from 'nodemailer';
+import * as path from 'path';
 import { Repository } from 'typeorm';
-import { EmpresaConfig } from '../entities/empresa-config.entity';
 import { UpdateEmpresaConfigDto } from '../dto/update-empresa-config.dto';
+import { EmpresaConfig } from '../entities/empresa-config.entity';
+
+type EmpresaConfigSecretField = 'smtpSenha' | 'whatsappApiToken' | 'smsApiKey' | 'pushApiKey';
+
+type BackupSnapshotInfo = {
+  fileName: string;
+  generatedAt: string;
+  sizeBytes: number;
+};
+
+type SmtpTestPayload = Pick<UpdateEmpresaConfigDto, 'servidorSMTP' | 'portaSMTP' | 'smtpUsuario' | 'smtpSenha'>;
 
 @Injectable()
 export class EmpresaConfigService {
-  private static readonly SECRET_FIELD_NAMES = [
+  private static readonly SECRET_FIELD_NAMES: EmpresaConfigSecretField[] = [
     'smtpSenha',
     'whatsappApiToken',
     'smsApiKey',
     'pushApiKey',
-  ] as const;
+  ];
   private static readonly SECRET_MASK_VALUE = '__CONFIGURED_SECRET__';
   private static readonly SECRET_ENCRYPTED_PREFIX = 'enc:v1:';
-  private static readonly SECRET_FIELDS: Array<(typeof EmpresaConfigService.SECRET_FIELD_NAMES)[number]> =
-    [...EmpresaConfigService.SECRET_FIELD_NAMES];
-  private static readonly SECRET_DB_COLUMNS: Record<
-    (typeof EmpresaConfigService.SECRET_FIELD_NAMES)[number],
-    string
-  > = {
+  private static readonly SECRET_DB_COLUMNS: Record<EmpresaConfigSecretField, string> = {
     smtpSenha: 'smtp_senha',
     whatsappApiToken: 'whatsapp_api_token',
     smsApiKey: 'sms_api_key',
@@ -35,6 +43,45 @@ export class EmpresaConfigService {
   private hasValidEncryptionKey(): boolean {
     const rawKey = (process.env.ENCRYPTION_KEY || '').trim();
     return /^[a-fA-F0-9]{64}$/.test(rawKey);
+  }
+
+  private getBackupDirectory(empresaId: string): string {
+    return path.resolve(process.cwd(), 'backups', 'empresa-configuracoes', empresaId);
+  }
+
+  private sanitizeBackupLimit(limit?: number): number {
+    if (!Number.isFinite(limit)) {
+      return 20;
+    }
+
+    const normalized = Math.trunc(limit as number);
+    if (normalized < 1) {
+      return 1;
+    }
+
+    if (normalized > 100) {
+      return 100;
+    }
+
+    return normalized;
+  }
+
+  private resolveSecretInput(
+    incomingValue: string | null | undefined,
+    currentValue: string | null | undefined,
+  ): string | null {
+    if (
+      incomingValue == null ||
+      incomingValue === EmpresaConfigService.SECRET_MASK_VALUE
+    ) {
+      return currentValue ?? null;
+    }
+
+    if (incomingValue.trim() === '') {
+      return null;
+    }
+
+    return incomingValue;
   }
 
   private async maybeBackfillLegacyPlainSecrets(config: EmpresaConfig): Promise<EmpresaConfig> {
@@ -56,9 +103,9 @@ export class EmpresaConfigService {
       return config;
     }
 
-    const fieldsToBackfill: Array<keyof EmpresaConfig> = [];
+    const fieldsToBackfill: EmpresaConfigSecretField[] = [];
 
-    for (const field of EmpresaConfigService.SECRET_FIELDS) {
+    for (const field of EmpresaConfigService.SECRET_FIELD_NAMES) {
       const dbColumn = EmpresaConfigService.SECRET_DB_COLUMNS[field];
       const rawValue = rawSecrets[dbColumn];
       const currentValue = config[field];
@@ -82,7 +129,7 @@ export class EmpresaConfigService {
     for (const field of fieldsToBackfill) {
       const currentValue = config[field];
       if (typeof currentValue === 'string') {
-        (config[field] as any) = currentValue;
+        (config[field] as string) = currentValue;
       }
     }
 
@@ -98,7 +145,7 @@ export class EmpresaConfigService {
       where: { empresaId },
     });
 
-    // Se não existe, criar configuração padrão
+    // Se nao existe, cria com padrao.
     if (!config) {
       config = this.configRepository.create({ empresaId });
       await this.configRepository.save(config);
@@ -115,10 +162,10 @@ export class EmpresaConfigService {
   private sanitizeSecretsForResponse(config: EmpresaConfig): EmpresaConfig {
     const sanitized = { ...config } as EmpresaConfig;
 
-    for (const field of EmpresaConfigService.SECRET_FIELDS) {
+    for (const field of EmpresaConfigService.SECRET_FIELD_NAMES) {
       const currentValue = sanitized[field];
       if (typeof currentValue === 'string' || currentValue === null) {
-        (sanitized[field] as any) = this.maskSecret(currentValue as string | null);
+        (sanitized[field] as string | null) = this.maskSecret(currentValue as string | null);
       }
     }
 
@@ -131,7 +178,7 @@ export class EmpresaConfigService {
   ): Partial<UpdateEmpresaConfigDto> {
     const normalized: Partial<UpdateEmpresaConfigDto> = { ...updateDto };
 
-    for (const field of EmpresaConfigService.SECRET_FIELDS) {
+    for (const field of EmpresaConfigService.SECRET_FIELD_NAMES) {
       const key = field as keyof UpdateEmpresaConfigDto;
       const incomingValue = normalized[key];
 
@@ -145,7 +192,7 @@ export class EmpresaConfigService {
       }
 
       if (typeof incomingValue === 'string' && incomingValue.trim() === '') {
-        (config[field] as any) = null;
+        (config[field] as string | null) = null;
         delete normalized[key];
       }
     }
@@ -162,28 +209,182 @@ export class EmpresaConfigService {
     const config = await this.getOrCreateRawByEmpresaId(empresaId);
     const normalizedUpdate = this.normalizeSecretUpdates(config, updateDto);
 
-    // Atualizar campos
     Object.assign(config, normalizedUpdate);
 
     const saved = await this.configRepository.save(config);
     return this.sanitizeSecretsForResponse(saved);
   }
 
+  async testSmtpConnection(
+    empresaId: string,
+    payload: Partial<SmtpTestPayload>,
+  ): Promise<{ success: boolean; message: string }> {
+    const config = await this.getOrCreateRawByEmpresaId(empresaId);
+
+    const host = payload.servidorSMTP?.trim() || config.servidorSMTP;
+    const port = payload.portaSMTP ?? config.portaSMTP ?? 587;
+    const user = payload.smtpUsuario?.trim() || config.smtpUsuario;
+    const pass = this.resolveSecretInput(payload.smtpSenha, config.smtpSenha);
+
+    if (!host || !user || !pass) {
+      throw new BadRequestException(
+        'Preencha Servidor SMTP, Usuario SMTP e Senha SMTP para testar a conexao.',
+      );
+    }
+
+    try {
+      const transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465,
+        auth: { user, pass },
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 10000,
+      });
+
+      await transporter.verify();
+
+      return {
+        success: true,
+        message: 'Conexao SMTP validada com sucesso.',
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Falha no teste SMTP (empresaId=${empresaId}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+
+      throw new BadRequestException(
+        'Falha ao validar SMTP. Confira host, porta, usuario, senha e conectividade de rede.',
+      );
+    }
+  }
+
+  async executeBackupSnapshot(empresaId: string): Promise<{
+    success: boolean;
+    message: string;
+    backup: BackupSnapshotInfo;
+  }> {
+    const generatedAt = new Date().toISOString();
+    const safeTimestamp = generatedAt.replace(/[:.]/g, '-');
+    const fileName = `snapshot-${safeTimestamp}.json`;
+    const backupDir = this.getBackupDirectory(empresaId);
+    const backupFilePath = path.join(backupDir, fileName);
+
+    try {
+      const config = await this.getByEmpresaId(empresaId);
+
+      const snapshotPayload = {
+        empresaId,
+        type: 'empresa-configuracoes',
+        generatedAt,
+        config,
+      };
+
+      await fs.mkdir(backupDir, { recursive: true });
+      await fs.writeFile(backupFilePath, JSON.stringify(snapshotPayload, null, 2), 'utf8');
+
+      const stats = await fs.stat(backupFilePath);
+
+      return {
+        success: true,
+        message: `Snapshot criado com sucesso em ${new Date(generatedAt).toLocaleString('pt-BR')}.`,
+        backup: {
+          fileName,
+          generatedAt,
+          sizeBytes: stats.size,
+        },
+      };
+    } catch (error) {
+      this.logger.error(
+        `Falha ao criar snapshot de configuracoes (empresaId=${empresaId})`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new InternalServerErrorException(
+        'Nao foi possivel executar o backup das configuracoes da empresa.',
+      );
+    }
+  }
+
+  async listBackupSnapshots(empresaId: string, limit = 20): Promise<BackupSnapshotInfo[]> {
+    const backupDir = this.getBackupDirectory(empresaId);
+    const normalizedLimit = this.sanitizeBackupLimit(limit);
+
+    let entries: import('fs').Dirent[];
+    try {
+      entries = await fs.readdir(backupDir, { withFileTypes: true });
+    } catch {
+      return [];
+    }
+
+    const files = entries.filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.json'));
+
+    const snapshots = await Promise.all(
+      files.map(async (entry) => {
+        const filePath = path.join(backupDir, entry.name);
+        const stats = await fs.stat(filePath);
+        return {
+          fileName: entry.name,
+          generatedAt: stats.mtime.toISOString(),
+          sizeBytes: stats.size,
+        } as BackupSnapshotInfo;
+      }),
+    );
+
+    return snapshots
+      .sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))
+      .slice(0, normalizedLimit);
+  }
+
   async resetToDefaults(empresaId: string): Promise<EmpresaConfig> {
     const config = await this.getOrCreateRawByEmpresaId(empresaId);
 
-    // Resetar para valores padrão
+    // Geral
+    config.descricao = null;
+    config.site = null;
+    config.logoUrl = null;
     config.corPrimaria = '#159A9C';
     config.corSecundaria = '#002333';
+
+    // Seguranca
     config.autenticacao2FA = false;
     config.sessaoExpiracaoMinutos = 30;
     config.senhaComplexidade = 'media';
     config.auditoria = true;
+    config.forceSsl = true;
+    config.ipWhitelist = null;
+
+    // Usuarios
     config.limiteUsuarios = 10;
     config.aprovacaoNovoUsuario = false;
+    config.conviteExpiracaoHoras = 48;
+    config.alcadaAprovacaoFinanceira = null;
+
+    // Email/SMTP
     config.emailsHabilitados = true;
+    config.servidorSMTP = null;
     config.portaSMTP = 587;
+    config.smtpUsuario = null;
+    config.smtpSenha = null;
+
+    // Comunicacao
+    config.whatsappHabilitado = false;
+    config.whatsappNumero = null;
+    config.whatsappApiToken = null;
+    config.smsHabilitado = false;
+    config.smsProvider = null;
+    config.smsApiKey = null;
+    config.pushHabilitado = false;
+    config.pushProvider = null;
+    config.pushApiKey = null;
+
+    // Integracoes
     config.apiHabilitada = false;
+    config.webhooksAtivos = 0;
+
+    // Backup
     config.backupAutomatico = true;
     config.backupFrequencia = 'diario';
     config.backupRetencaoDias = 30;

@@ -14,7 +14,13 @@ import {
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { EmpresasService } from './empresas.service';
 import { CreateEmpresaDto, VerificarEmailDto } from './dto/empresas.dto';
+import { Permissions } from '../common/decorators/permissions.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
+import { PermissionsGuard } from '../common/guards/permissions.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Permission } from '../common/permissions/permissions.constants';
 import { JwtAuthGuard } from '../modules/auth/jwt-auth.guard';
+import { UserRole } from '../modules/users/user.entity';
 
 @ApiTags('empresas')
 @Controller('empresas')
@@ -161,7 +167,9 @@ export class EmpresasController {
   }
 
   @Put(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
+  @Permissions(Permission.CONFIG_EMPRESA_UPDATE)
   @ApiOperation({ summary: 'Atualizar dados da empresa' })
   async atualizarEmpresa(
     @Request() req,
