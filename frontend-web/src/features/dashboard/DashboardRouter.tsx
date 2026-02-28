@@ -1,13 +1,11 @@
 import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useProfile, type PerfilUsuario } from '../../contexts/ProfileContext';
-import DashboardPage from './DashboardPage';
-import FinanceiroDashboard from './FinanceiroDashboard';
 import OperacionalDashboard from './OperacionalDashboard';
 import SuporteDashboard from './SuporteDashboard';
 import VendedorDashboard from './VendedorDashboard';
 import DashboardV2Page from '../dashboard-v2/DashboardV2Page';
-import { useDashboardV2Flag } from '../dashboard-v2/useDashboardV2';
+import FinanceiroDashboardV2 from '../dashboard-v2/FinanceiroDashboardV2';
 
 type UserRecord =
   | {
@@ -81,19 +79,13 @@ const resolveBaseProfile = (user: UserRecord): PerfilUsuario => {
   );
 };
 
-type DashboardRouterProps = {
-  forceLegacy?: boolean;
-};
-
-const DashboardRouter: React.FC<DashboardRouterProps> = ({ forceLegacy = false }) => {
+const DashboardRouter: React.FC = () => {
   const { user } = useAuth();
   const { perfilSelecionado } = useProfile();
-  const { flag, loading: dashboardV2FlagLoading } = useDashboardV2Flag(!forceLegacy);
 
   const userRecord: UserRecord = user;
   const perfilBase = resolveBaseProfile(userRecord);
   const perfilAtivo = canSwitchProfile(userRecord) ? perfilSelecionado : perfilBase;
-  const shouldUseDashboardV2 = !forceLegacy && !dashboardV2FlagLoading && flag.enabled;
 
   const renderDashboard = (): React.ReactNode => {
     switch (perfilAtivo) {
@@ -104,12 +96,12 @@ const DashboardRouter: React.FC<DashboardRouterProps> = ({ forceLegacy = false }
       case 'suporte':
         return <SuporteDashboard />;
       case 'financeiro':
-        return <FinanceiroDashboard />;
+        return <FinanceiroDashboardV2 />;
       case 'gerente':
       case 'administrador':
-        return shouldUseDashboardV2 ? <DashboardV2Page /> : <DashboardPage />;
+        return <DashboardV2Page />;
       default:
-        return shouldUseDashboardV2 ? <DashboardV2Page /> : <DashboardPage />;
+        return <DashboardV2Page />;
     }
   };
 

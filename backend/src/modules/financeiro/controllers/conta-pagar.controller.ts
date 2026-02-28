@@ -7,18 +7,26 @@ import {
   Post,
   Put,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { Permission } from '../../../common/permissions/permissions.constants';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
+import { CurrentUser } from '../../../common/decorators/user.decorator';
 import {
+  AprovarLoteContasPagarDto,
+  AprovarContaPagarDto,
   CreateContaPagarDto,
+  QueryExportacaoContasPagarDto,
+  QueryHistoricoExportacaoContasPagarDto,
   QueryContasPagarDto,
   RegistrarPagamentoContaPagarDto,
+  ReprovarContaPagarDto,
   UpdateContaPagarDto,
 } from '../dto/conta-pagar.dto';
 import { ContaPagarService } from '../services/conta-pagar.service';
@@ -37,6 +45,51 @@ export class ContaPagarController {
   @Get('resumo')
   async obterResumo(@EmpresaId() empresaId: string, @Query() query: QueryContasPagarDto) {
     return this.contaPagarService.obterResumo(empresaId, query);
+  }
+
+  @Get('aprovacoes/pendentes')
+  async listarPendenciasAprovacao(
+    @EmpresaId() empresaId: string,
+    @Query() query: QueryContasPagarDto,
+  ) {
+    return this.contaPagarService.listarPendenciasAprovacao(empresaId, query);
+  }
+
+  @Get('exportacao')
+  async exportarContasPagar(
+    @EmpresaId() empresaId: string,
+    @Query() query: QueryExportacaoContasPagarDto,
+    @CurrentUser() user: { id?: string; sub?: string },
+    @Res() res: Response,
+  ) {
+    const userId = user?.id || user?.sub || 'sistema';
+    const exportacao = await this.contaPagarService.exportarContasPagar(empresaId, query, userId);
+    res.set({
+      'Content-Type': exportacao.contentType,
+      'Content-Disposition': `attachment; filename="${exportacao.filename}"`,
+      'Content-Length': exportacao.buffer.length.toString(),
+      'X-Total-Registros': exportacao.totalRegistros.toString(),
+    });
+    res.send(exportacao.buffer);
+  }
+
+  @Get('exportacao/historico')
+  async listarHistoricoExportacoes(
+    @EmpresaId() empresaId: string,
+    @Query() query: QueryHistoricoExportacaoContasPagarDto,
+  ) {
+    return this.contaPagarService.listarHistoricoExportacoes(empresaId, query);
+  }
+
+  @Post('aprovacoes/lote')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  async aprovarLote(
+    @EmpresaId() empresaId: string,
+    @Body() dto: AprovarLoteContasPagarDto,
+    @CurrentUser() user: { id?: string; sub?: string },
+  ) {
+    const userId = user?.id || user?.sub || 'sistema';
+    return this.contaPagarService.aprovarLote(dto, empresaId, userId);
   }
 
   @Get(':id')
@@ -78,5 +131,29 @@ export class ContaPagarController {
     @Body() dto: RegistrarPagamentoContaPagarDto,
   ) {
     return this.contaPagarService.registrarPagamento(id, dto, empresaId);
+  }
+
+  @Post(':id/aprovar')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  async aprovar(
+    @EmpresaId() empresaId: string,
+    @Param('id') id: string,
+    @Body() dto: AprovarContaPagarDto,
+    @CurrentUser() user: { id?: string; sub?: string },
+  ) {
+    const userId = user?.id || user?.sub || 'sistema';
+    return this.contaPagarService.aprovar(id, dto, empresaId, userId);
+  }
+
+  @Post(':id/reprovar')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  async reprovar(
+    @EmpresaId() empresaId: string,
+    @Param('id') id: string,
+    @Body() dto: ReprovarContaPagarDto,
+    @CurrentUser() user: { id?: string; sub?: string },
+  ) {
+    const userId = user?.id || user?.sub || 'sistema';
+    return this.contaPagarService.reprovar(id, dto, empresaId, userId);
   }
 }

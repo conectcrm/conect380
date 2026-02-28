@@ -36,6 +36,7 @@ import {
 } from '../../features/propostas/services/propostasService';
 import { clientesService, Cliente as ClienteService } from '../../services/clientesService';
 import { emailServiceReal } from '../../services/emailServiceReal';
+import { portalClienteService } from '../../services/portalClienteService';
 import { gerarTokenNumerico } from '../../utils/tokenUtils';
 import { BadgeProdutoSoftware } from '../common/BadgeProdutoSoftware';
 
@@ -728,9 +729,47 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
       };
 
       const proposta = await propostasService.criarProposta(propostaData);
-      // await propostasService.enviarPorEmail(proposta.id, formData.cliente.email);
+      const propostaId = (proposta as any)?.id;
+      if (!propostaId) {
+        throw new Error('Proposta criada sem identificador para envio de e-mail.');
+      }
 
-      toast.success('Proposta criada! Função de email será implementada em breve.');
+      const tokenPortal = await portalClienteService.gerarTokenPublico(String(propostaId));
+      const emailData = {
+        cliente: {
+          nome: formData.cliente.nome,
+          email: formData.cliente.email,
+        },
+        proposta: {
+          id: String(propostaId),
+          numero: String((proposta as any)?.numero || propostaData.numero || 'N/A'),
+          valorTotal: propostaData.total || 0,
+          dataValidade:
+            propostaData.dataValidade instanceof Date
+              ? propostaData.dataValidade.toISOString().split('T')[0]
+              : new Date().toISOString().split('T')[0],
+          token: tokenPortal,
+        },
+        vendedor: {
+          nome: formData.vendedor?.nome || 'Vendedor',
+          email: formData.vendedor?.email || 'vendedor@conectcrm.com',
+          telefone: '(62) 99668-9991',
+        },
+        empresa: {
+          nome: 'ConectCRM',
+          email: 'conectcrm@gmail.com',
+          telefone: '(62) 99668-9991',
+          endereco: 'Goiânia/GO',
+        },
+        portalUrl: `${window.location.origin}/portal`,
+      };
+
+      const resultado = await emailServiceReal.enviarPropostaParaCliente(emailData);
+      if (!resultado.success) {
+        throw new Error(resultado.error || 'Falha no envio de e-mail da proposta.');
+      }
+
+      toast.success('Proposta criada e enviada por e-mail com sucesso!');
       onClose();
     } catch (error) {
       console.error('Erro ao enviar por e-mail:', error);

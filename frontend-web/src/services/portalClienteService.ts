@@ -8,23 +8,34 @@ import { API_BASE_URL } from './api';
 
 const api = {
   get: async (url: string) => {
-    const response = await fetch(`${API_BASE_URL}${url}`);
+    const token = localStorage.getItem('authToken');
+    const response = await fetch(`${API_BASE_URL}${url}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
     if (!response.ok) throw new Error('Request failed');
     return { data: await response.json() };
   },
   post: async (url: string, data?: any) => {
+    const token = localStorage.getItem('authToken');
     const response = await fetch(`${API_BASE_URL}${url}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: data ? JSON.stringify(data) : undefined,
     });
     if (!response.ok) throw new Error('Request failed');
     return { data: await response.json() };
   },
   put: async (url: string, data?: any) => {
+    const token = localStorage.getItem('authToken');
     const response = await fetch(`${API_BASE_URL}${url}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: data ? JSON.stringify(data) : undefined,
     });
     if (!response.ok) throw new Error('Request failed');
@@ -89,6 +100,86 @@ interface LogAcao {
 }
 
 class PortalClienteService {
+  private mapStatusPortal(status: unknown): PropostaPublica['status'] {
+    const normalized = String(status || '').toLowerCase();
+    if (normalized === 'visualizada') return 'visualizada';
+    if (normalized === 'aprovada') return 'aprovada';
+    if (normalized === 'rejeitada') return 'rejeitada';
+    if (normalized === 'expirada') return 'expirada';
+    return 'enviada';
+  }
+
+  private mapPropostaPortal(raw: any): PropostaPublica {
+    const clienteRaw =
+      raw?.cliente && typeof raw.cliente === 'object'
+        ? raw.cliente
+        : { nome: String(raw?.cliente || 'Cliente'), email: '' };
+
+    const vendedorRaw =
+      raw?.vendedor && typeof raw.vendedor === 'object'
+        ? raw.vendedor
+        : { nome: 'Vendedor', email: '', telefone: '' };
+
+    const empresaRaw =
+      raw?.empresa && typeof raw.empresa === 'object'
+        ? raw.empresa
+        : { nome: 'Conect360', endereco: 'Goiânia/GO', telefone: '', email: '' };
+
+    const produtos = Array.isArray(raw?.produtos)
+      ? raw.produtos.map((produto: any, index: number) => {
+          const quantidade = Number(produto?.quantidade ?? 1) || 1;
+          const valorUnitario = Number(produto?.valorUnitario ?? produto?.precoUnitario ?? 0) || 0;
+          return {
+            nome: String(produto?.nome || `Item ${index + 1}`),
+            descricao: String(produto?.descricao || ''),
+            quantidade,
+            valorUnitario,
+            valorTotal: Number(produto?.valorTotal ?? quantidade * valorUnitario) || 0,
+          };
+        })
+      : [];
+
+    const dataEnvio = raw?.emailDetails?.sentAt || raw?.criadaEm || raw?.createdAt || new Date();
+    const dataValidade =
+      raw?.dataValidade ||
+      raw?.dataVencimento ||
+      new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString();
+
+    return {
+      id: String(raw?.id || ''),
+      numero: String(raw?.numero || ''),
+      titulo: String(raw?.titulo || 'Proposta Comercial'),
+      status: this.mapStatusPortal(raw?.status),
+      dataEnvio: new Date(dataEnvio),
+      dataValidade: new Date(dataValidade),
+      valorTotal: Number(raw?.valor ?? raw?.total ?? 0) || 0,
+      token: String(raw?.token || ''),
+      empresa: {
+        nome: String(empresaRaw?.nome || 'Conect360'),
+        logo: typeof empresaRaw?.logo === 'string' ? empresaRaw.logo : undefined,
+        endereco: String(empresaRaw?.endereco || 'Goiânia/GO'),
+        telefone: String(empresaRaw?.telefone || ''),
+        email: String(empresaRaw?.email || ''),
+      },
+      cliente: {
+        nome: String(clienteRaw?.nome || 'Cliente'),
+        email: String(clienteRaw?.email || ''),
+      },
+      vendedor: {
+        nome: String(vendedorRaw?.nome || 'Vendedor'),
+        email: String(vendedorRaw?.email || ''),
+        telefone: String(vendedorRaw?.telefone || ''),
+      },
+      produtos,
+      condicoes: {
+        formaPagamento: String(raw?.formaPagamento || 'A combinar'),
+        prazoEntrega: String(raw?.prazoEntrega || 'A combinar'),
+        garantia: String(raw?.garantia || 'Conforme contrato'),
+        observacoes: typeof raw?.observacoes === 'string' ? raw.observacoes : undefined,
+      },
+    };
+  }
+
   /**
    * Obtém uma proposta pelo token público ou número da proposta
    * Inclui fallback para tokens armazenados localmente
@@ -99,8 +190,7 @@ class PortalClienteService {
     const isNumeroPropostaPossivel = /^\d{7,}$/.test(identificador);
 
     try {
-      let endpoint = `/api/portal/proposta/${identificador}`;
-
+      const endpoint = `${API_BASE_URL}/api/portal/proposta/${encodeURIComponent(identificador)}`;
       const response = await fetch(endpoint, {
         method: 'GET',
         headers: {
@@ -116,15 +206,13 @@ class PortalClienteService {
       }
 
       const data = await response.json();
+      const propostaRaw = data?.proposta || data;
+      const proposta = this.mapPropostaPortal(propostaRaw);
 
       // Registrar visualização
       await this.registrarVisualizacao(identificador);
 
-      return {
-        ...data,
-        dataEnvio: new Date(data.dataEnvio),
-        dataValidade: new Date(data.dataValidade),
-      };
+      return proposta;
     } catch (error) {
       console.warn('API não disponível, verificando tokens locais:', error);
 
@@ -436,12 +524,20 @@ class PortalClienteService {
         observacoes,
       };
 
-      await fetch('/api/portal/log/acao', {
+      await fetch(`${API_BASE_URL}/api/portal/proposta/${encodeURIComponent(token)}/acao`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(log),
+        body: JSON.stringify({
+          acao,
+          timestamp: log.timestamp.toISOString(),
+          ip: log.ip,
+          userAgent: log.userAgent,
+          dados: {
+            observacoes: log.observacoes,
+          },
+        }),
       });
     } catch (error) {
       console.warn('Erro ao registrar ação:', error);
@@ -453,7 +549,7 @@ class PortalClienteService {
    */
   private async obterIP(): Promise<string> {
     try {
-      const response = await fetch('/api/portal/ip');
+      const response = await fetch('https://api.ipify.org?format=json');
       const data = await response.json();
       return data.ip || 'unknown';
     } catch (error) {

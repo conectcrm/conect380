@@ -137,6 +137,7 @@ export interface ContaBancaria {
   conta: string;
   tipoConta: 'corrente' | 'poupanca';
   saldo: number;
+  chavePix?: string;
   ativo: boolean;
   criadoEm: string;
   atualizadoEm: string;
@@ -178,6 +179,42 @@ export interface FiltrosContasPagar {
   termo?: string; // Busca por texto livre
 }
 
+export type FormatoExportacaoContasPagar = 'csv' | 'xlsx';
+
+export interface FiltrosExportacaoContasPagar {
+  formato?: FormatoExportacaoContasPagar;
+  status?: StatusContaPagar[];
+  fornecedorId?: string;
+  contaBancariaId?: string;
+  centroCustoId?: string;
+  dataVencimentoInicio?: string;
+  dataVencimentoFim?: string;
+  dataEmissaoInicio?: string;
+  dataEmissaoFim?: string;
+}
+
+export type StatusExportacaoContasPagar = 'processando' | 'sucesso' | 'falha';
+
+export interface FiltrosHistoricoExportacaoContasPagar {
+  formato?: FormatoExportacaoContasPagar;
+  status?: StatusExportacaoContasPagar;
+  limite?: number;
+}
+
+export interface HistoricoExportacaoContaPagar {
+  id: string;
+  formato: FormatoExportacaoContasPagar;
+  status: StatusExportacaoContasPagar;
+  nomeArquivo?: string;
+  totalRegistros: number;
+  erro?: string;
+  filtros: Record<string, unknown>;
+  usuarioId?: string;
+  iniciadoEm: string;
+  finalizadoEm?: string;
+  createdAt: string;
+}
+
 export interface ResumoFinanceiro {
   totalVencendoHoje: number;
   quantidadeVencendoHoje: number;
@@ -210,6 +247,7 @@ export interface NovaContaPagar {
   frequenciaRecorrencia?: 'mensal' | 'bimestral' | 'trimestral' | 'semestral' | 'anual';
   numeroParcelas?: number;
   prioridade?: PrioridadePagamento;
+  necessitaAprovacao?: boolean;
 }
 
 export interface AtualizarContaPagar extends Partial<NovaContaPagar> {
@@ -226,7 +264,176 @@ export interface RegistrarPagamento {
   observacoes?: string;
 }
 
-// Interface para ações em massa
+export interface AprovarContaPagar {
+  observacoes?: string;
+}
+
+export interface ReprovarContaPagar {
+  justificativa: string;
+}
+
+export interface AprovarLoteContasPagar {
+  contaIds: string[];
+  acao: 'aprovar' | 'reprovar';
+  observacoes?: string;
+  justificativa?: string;
+}
+
+export interface ResultadoAprovacaoLoteItem {
+  contaId: string;
+  acao: 'aprovar' | 'reprovar';
+  sucesso: boolean;
+  mensagem?: string;
+  conta?: ContaPagar;
+}
+
+export interface ResultadoAprovacaoLote {
+  total: number;
+  sucesso: number;
+  falha: number;
+  itens: ResultadoAprovacaoLoteItem[];
+}
+
+export type TipoArquivoExtrato = 'csv' | 'ofx';
+export type TipoLancamentoExtrato = 'credito' | 'debito';
+export type OrigemConciliacaoExtrato = 'automatica' | 'manual';
+
+export interface ErroImportacaoExtrato {
+  linha?: number;
+  mensagem: string;
+  conteudo?: unknown;
+}
+
+export interface ImportacaoExtrato {
+  id: string;
+  contaBancariaId: string;
+  nomeArquivo: string;
+  tipoArquivo: TipoArquivoExtrato;
+  totalLancamentos: number;
+  totalEntradas: number;
+  totalSaidas: number;
+  periodoInicio?: string;
+  periodoFim?: string;
+  createdAt: string;
+}
+
+export interface ItemImportacaoExtrato {
+  id: string;
+  importacaoId: string;
+  dataLancamento: string;
+  descricao: string;
+  documento?: string;
+  referenciaExterna?: string;
+  tipo: TipoLancamentoExtrato;
+  valor: number;
+  saldoPosLancamento?: number;
+  conciliado: boolean;
+  contaPagarId?: string;
+  contaPagarNumero?: string;
+  contaPagarDescricao?: string;
+  contaPagarFornecedorNome?: string;
+  dataConciliacao?: string;
+  conciliadoPor?: string;
+  conciliacaoOrigem?: OrigemConciliacaoExtrato;
+  motivoConciliacao?: string;
+  auditoriaConciliacao: Array<Record<string, unknown>>;
+  createdAt: string;
+}
+
+export interface ResultadoImportacaoExtrato {
+  importacao: ImportacaoExtrato;
+  resumo: {
+    totalLancamentos: number;
+    totalEntradas: number;
+    totalSaidas: number;
+    periodoInicio?: string;
+    periodoFim?: string;
+  };
+  erros: ErroImportacaoExtrato[];
+  itensPreview: ItemImportacaoExtrato[];
+}
+
+export interface FiltrosImportacoesExtrato {
+  contaBancariaId?: string;
+  limite?: number;
+}
+
+export interface ContaPagarCandidataConciliacao {
+  id: string;
+  numero: string;
+  numeroDocumento?: string;
+  descricao: string;
+  fornecedorNome?: string;
+  dataPagamento?: string;
+  dataVencimento?: string;
+  valorTotal: number;
+  valorPago: number;
+  score: number;
+  criterios: string[];
+}
+
+export interface ItemConciliadoAutomaticamente {
+  itemId: string;
+  contaPagarId: string;
+  score: number;
+  criterios: string[];
+}
+
+export interface ResultadoMatchingAutomaticoExtrato {
+  importacaoId: string;
+  totalItensAnalisados: number;
+  totalConciliados: number;
+  totalPendentes: number;
+  itensConciliados: ItemConciliadoAutomaticamente[];
+}
+
+export type TipoAlertaOperacionalFinanceiro =
+  | 'conta_vence_em_3_dias'
+  | 'conta_vencida'
+  | 'conciliacao_pendente_critica'
+  | 'webhook_pagamento_falha'
+  | 'exportacao_contabil_falha';
+
+export type SeveridadeAlertaOperacionalFinanceiro = 'info' | 'warning' | 'critical';
+
+export type StatusAlertaOperacionalFinanceiro = 'ativo' | 'acknowledged' | 'resolvido';
+
+export interface AlertaOperacionalFinanceiro {
+  id: string;
+  tipo: TipoAlertaOperacionalFinanceiro;
+  severidade: SeveridadeAlertaOperacionalFinanceiro;
+  status: StatusAlertaOperacionalFinanceiro;
+  titulo: string;
+  descricao?: string;
+  referencia?: string;
+  payload: Record<string, unknown>;
+  auditoria: Array<Record<string, unknown>>;
+  acknowledgedPor?: string;
+  acknowledgedEm?: string;
+  resolvidoPor?: string;
+  resolvidoEm?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FiltrosAlertasOperacionaisFinanceiro {
+  status?: StatusAlertaOperacionalFinanceiro;
+  severidade?: SeveridadeAlertaOperacionalFinanceiro;
+  tipo?: TipoAlertaOperacionalFinanceiro;
+  limite?: number;
+}
+
+export interface AtualizarStatusAlertaOperacionalFinanceiro {
+  observacao?: string;
+}
+
+export interface ResultadoRecalculoAlertasOperacionaisFinanceiro {
+  gerados: number;
+  resolvidos: number;
+  ativos: number;
+}
+
+// Interface para acoes em massa
 export interface AcaoMassa {
   contasIds: string[];
   acao: 'marcar_pago' | 'excluir' | 'alterar_status' | 'alterar_categoria';
@@ -279,3 +486,4 @@ export const PRIORIDADE_LABELS = {
   [PrioridadePagamento.ALTA]: 'Alta',
   [PrioridadePagamento.URGENTE]: 'Urgente',
 };
+

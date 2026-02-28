@@ -13,9 +13,10 @@ import { PropostaPortalToken } from './proposta-portal-token.entity';
 import { User } from '../users/user.entity';
 import { Cliente } from '../clientes/cliente.entity';
 import { Produto } from '../produtos/produto.entity';
+import { EmpresasModule } from '../../empresas/empresas.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Proposta, PropostaPortalToken, User, Cliente, Produto])],
+  imports: [TypeOrmModule.forFeature([Proposta, PropostaPortalToken, User, Cliente, Produto]), EmpresasModule],
   providers: [PdfService, PropostasService, PortalService, EmailIntegradoService],
   controllers: [PdfController, PropostasController, PortalController, EmailController],
   exports: [PdfService, PropostasService, PortalService, EmailIntegradoService],

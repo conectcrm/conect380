@@ -102,6 +102,7 @@ export class EmailController {
         dados.emailCliente,
         dados.linkPortal,
         dados.proposta.numero || dados.proposta.id, // Passar ID da proposta para sincronização automática
+        empresaId,
       );
 
       if (sucesso) {
@@ -137,7 +138,7 @@ export class EmailController {
    * Envia email genérico (agora com envio real)
    */
   @Post('enviar')
-  async enviarEmailGenerico(@Body() dados: any) {
+  async enviarEmailGenerico(@EmpresaId() empresaId: string, @Body() dados: any) {
     try {
       this.logger.log(
         `[EMAIL] Dados recebidos (resumo): ${JSON.stringify({
@@ -193,7 +194,7 @@ export class EmailController {
       );
 
       // Usar o serviço real de email
-      const sucesso = await this.emailService.enviarEmailGenerico(emailData);
+      const sucesso = await this.emailService.enviarEmailGenerico(emailData, empresaId);
 
       if (sucesso) {
         return {

@@ -31,4 +31,38 @@ describe('ContaPagarController (permissions)', () => {
     );
     expect(permissions).toEqual([Permission.FINANCEIRO_PAGAMENTOS_MANAGE]);
   });
+
+  it('deve exigir permissao de gestao para aprovar', () => {
+    const permissions = Reflect.getMetadata(PERMISSIONS_KEY, ContaPagarController.prototype.aprovar);
+    expect(permissions).toEqual([Permission.FINANCEIRO_PAGAMENTOS_MANAGE]);
+  });
+
+  it('deve exigir permissao de gestao para aprovar em lote', () => {
+    const permissions = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      ContaPagarController.prototype.aprovarLote,
+    );
+    expect(permissions).toEqual([Permission.FINANCEIRO_PAGAMENTOS_MANAGE]);
+  });
+
+  it('deve manter exportacao no escopo de leitura (sem override de gestao)', () => {
+    const permissions = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      ContaPagarController.prototype.exportarContasPagar,
+    );
+    expect(permissions).toBeUndefined();
+  });
+
+  it('deve manter historico de exportacao no escopo de leitura (sem override de gestao)', () => {
+    const permissions = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      ContaPagarController.prototype.listarHistoricoExportacoes,
+    );
+    expect(permissions).toBeUndefined();
+  });
+
+  it('deve exigir permissao de gestao para reprovar', () => {
+    const permissions = Reflect.getMetadata(PERMISSIONS_KEY, ContaPagarController.prototype.reprovar);
+    expect(permissions).toEqual([Permission.FINANCEIRO_PAGAMENTOS_MANAGE]);
+  });
 });

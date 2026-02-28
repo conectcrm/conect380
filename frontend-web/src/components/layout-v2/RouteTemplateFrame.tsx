@@ -37,7 +37,7 @@ const routeRules: RouteTemplateRule[] = [
   },
   {
     pattern: /^\/(configuracoes\/empresa)$/,
-    type: 'LIST',
+    type: 'SETTINGS',
   },
   {
     // Meu Perfil usa layout mais denso (sidebar + cards de formulario/seguranca/atividade)

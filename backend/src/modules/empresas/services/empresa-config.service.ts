@@ -16,6 +16,13 @@ type BackupSnapshotInfo = {
 };
 
 type SmtpTestPayload = Pick<UpdateEmpresaConfigDto, 'servidorSMTP' | 'portaSMTP' | 'smtpUsuario' | 'smtpSenha'>;
+type SmtpRuntimeConfig = {
+  emailsHabilitados: boolean;
+  host: string | null;
+  port: number;
+  user: string | null;
+  pass: string | null;
+};
 
 @Injectable()
 export class EmpresaConfigService {
@@ -260,6 +267,18 @@ export class EmpresaConfigService {
         'Falha ao validar SMTP. Confira host, porta, usuario, senha e conectividade de rede.',
       );
     }
+  }
+
+  async getSmtpRuntimeConfig(empresaId: string): Promise<SmtpRuntimeConfig> {
+    const config = await this.getOrCreateRawByEmpresaId(empresaId);
+
+    return {
+      emailsHabilitados: config.emailsHabilitados ?? true,
+      host: config.servidorSMTP?.trim() || null,
+      port: Number.isFinite(config.portaSMTP) ? config.portaSMTP : 587,
+      user: config.smtpUsuario?.trim() || null,
+      pass: config.smtpSenha || null,
+    };
   }
 
   async executeBackupSnapshot(empresaId: string): Promise<{

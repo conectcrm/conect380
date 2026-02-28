@@ -74,6 +74,7 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
     frequenciaRecorrencia: 'mensal',
     numeroParcelas: 1,
     prioridade: PrioridadePagamento.MEDIA,
+    necessitaAprovacao: false,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -124,6 +125,7 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
         recorrente: conta.recorrente,
         frequenciaRecorrencia: conta.frequenciaRecorrencia,
         prioridade: conta.prioridade,
+        necessitaAprovacao: conta.necessitaAprovacao,
       });
     }
   }, [conta]);
@@ -710,6 +712,13 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
                     {contasBancariasError}
                   </div>
                 )}
+                {!contasBancariasLoading &&
+                  !contasBancariasError &&
+                  contasBancariasDisponiveis.length === 0 && (
+                    <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                      Nenhuma conta bancaria cadastrada. Acesse Financeiro &gt; Contas Bancarias para cadastrar.
+                    </div>
+                  )}
                 <select
                   value={formData.contaBancariaId}
                   onChange={(e) => handleInputChange('contaBancariaId', e.target.value)}
@@ -726,6 +735,18 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
               </div>
             </div>
 
+
+            <div className="rounded-xl border border-[#DCE8EC] bg-[#F8FBFC] p-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-[#244455]">
+                <input
+                  type="checkbox"
+                  checked={Boolean(formData.necessitaAprovacao)}
+                  onChange={(e) => handleInputChange('necessitaAprovacao', e.target.checked)}
+                  className="h-4 w-4 rounded border-[#D4E2E7] text-[#159A9C] focus:ring-[#1A9E87]/20"
+                />
+                Exigir aprovacao financeira antes do pagamento
+              </label>
+            </div>
             {/* Recorrência */}
             <div className="border-t border-[#E1EAEE] pt-6">
               <div className="flex items-center space-x-3 mb-4">
@@ -1097,4 +1118,5 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
 };
 
 export default ModalContaPagar;
+
 

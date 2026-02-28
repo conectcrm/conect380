@@ -350,3 +350,69 @@ groups:
           summary: "Benchmark Dashboard V2 encontrou respostas nao-2xx"
           description: "Foram detectadas respostas HTTP nao-2xx no ultimo benchmark"
           action: "Revisar rate-limit, auth e disponibilidade das rotas /dashboard/v2/*"
+
+  # ========================================
+  # GRUPO 8: Financeiro - Monitor de Alertas Operacionais
+  # ========================================
+  - name: financeiro_alertas_monitor
+    interval: 1m
+    rules:
+      # Alerta 19: Monitor sem ciclo recente
+      - alert: FinanceiroAlertasMonitorStaleCycle
+        expr: |
+          time() - conectcrm_financeiro_alertas_monitor_ultimo_ciclo_timestamp_seconds > 900
+        for: 5m
+        labels:
+          severity: critical
+          component: financeiro
+          type: monitor
+        annotations:
+          summary: "Monitor de alertas financeiros sem ciclo recente"
+          description: "Nao ha ciclo concluido do monitor financeiro ha mais de 15 minutos"
+          action: "Verificar logs do backend e status do monitor automatico"
+
+      # Alerta 20: Ciclo fatal do monitor
+      - alert: FinanceiroAlertasMonitorFatalCycle
+        expr: |
+          sum(increase(conectcrm_financeiro_alertas_monitor_ciclos_total{status="fatal_error"}[15m])) >= 1
+        for: 1m
+        labels:
+          severity: critical
+          component: financeiro
+          type: monitor
+        annotations:
+          summary: "Monitor de alertas financeiros com ciclo fatal"
+          description: "Foi detectado ao menos um ciclo fatal do monitor nos ultimos 15 minutos"
+          action: "Investigar falha global de recalculo de alertas financeiros"
+
+      # Alerta 21: Taxa de falhas/parciais elevada
+      - alert: FinanceiroAlertasMonitorHighFailureRate
+        expr: |
+          (
+            sum(increase(conectcrm_financeiro_alertas_monitor_ciclos_total{status=~"partial|fatal_error"}[30m]))
+            /
+            clamp_min(sum(increase(conectcrm_financeiro_alertas_monitor_ciclos_total[30m])), 1)
+          ) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+          component: financeiro
+          type: monitor
+        annotations:
+          summary: "Taxa de falha do monitor financeiro acima do limite"
+          description: "Mais de 20% dos ciclos do monitor financeiro estao em partial/fatal nos ultimos 30 minutos"
+          action: "Analisar empresas com erro recorrente e capacidade de processamento"
+
+      # Alerta 22: Duracao do ciclo acima do baseline esperado
+      - alert: FinanceiroAlertasMonitorSlowCycle
+        expr: |
+          conectcrm_financeiro_alertas_monitor_ultimo_ciclo_duracao_segundos > 120
+        for: 10m
+        labels:
+          severity: warning
+          component: financeiro
+          type: monitor
+        annotations:
+          summary: "Ciclo do monitor financeiro lento"
+          description: "Duracao do ultimo ciclo acima de 120 segundos"
+          action: "Validar volume de dados e performance das queries do motor de alertas"

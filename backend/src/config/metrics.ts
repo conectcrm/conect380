@@ -406,6 +406,63 @@ export const dashboardV2CacheHitsTotal = new promClient.Counter({
   labelNames: ['empresaId', 'status'],
   registers: [register],
 });
+/**
+ * Counter: Total de ciclos do monitor automatico de alertas financeiros
+ * Labels: status (success, partial, skipped_concurrent, fatal_error)
+ */
+export const financeiroAlertasMonitorCiclosTotal = new promClient.Counter({
+  name: 'conectcrm_financeiro_alertas_monitor_ciclos_total',
+  help: 'Total de ciclos do monitor automatico de alertas financeiros por status',
+  labelNames: ['status'],
+  registers: [register],
+});
+
+/**
+ * Gauge: Timestamp do ultimo ciclo finalizado (epoch seconds)
+ */
+export const financeiroAlertasMonitorUltimoCicloTimestamp = new promClient.Gauge({
+  name: 'conectcrm_financeiro_alertas_monitor_ultimo_ciclo_timestamp_seconds',
+  help: 'Timestamp epoch do ultimo ciclo finalizado do monitor de alertas financeiros',
+  registers: [register],
+});
+
+/**
+ * Gauge: Duracao do ultimo ciclo finalizado (segundos)
+ */
+export const financeiroAlertasMonitorDuracaoUltimoCicloSegundos = new promClient.Gauge({
+  name: 'conectcrm_financeiro_alertas_monitor_ultimo_ciclo_duracao_segundos',
+  help: 'Duracao em segundos do ultimo ciclo finalizado do monitor de alertas financeiros',
+  registers: [register],
+});
+
+/**
+ * Gauge: Quantidade de empresas processadas no ultimo ciclo
+ */
+export const financeiroAlertasMonitorEmpresasProcessadasUltimoCiclo = new promClient.Gauge({
+  name: 'conectcrm_financeiro_alertas_monitor_empresas_processadas_ultimo_ciclo',
+  help: 'Quantidade de empresas processadas no ultimo ciclo do monitor de alertas financeiros',
+  registers: [register],
+});
+
+/**
+ * Gauge: Quantidade de empresas com falha no ultimo ciclo
+ */
+export const financeiroAlertasMonitorEmpresasFalhaUltimoCiclo = new promClient.Gauge({
+  name: 'conectcrm_financeiro_alertas_monitor_empresas_falha_ultimo_ciclo',
+  help: 'Quantidade de empresas com falha no ultimo ciclo do monitor de alertas financeiros',
+  registers: [register],
+});
+
+/**
+ * Gauge: Totais de alertas no ultimo ciclo
+ * Labels: tipo (gerados, resolvidos, ativos)
+ */
+export const financeiroAlertasMonitorTotaisUltimoCiclo = new promClient.Gauge({
+  name: 'conectcrm_financeiro_alertas_monitor_totais_ultimo_ciclo',
+  help: 'Totais de alertas no ultimo ciclo do monitor de alertas financeiros',
+  labelNames: ['tipo'],
+  registers: [register],
+});
 
 /**
  * ═══════════════════════════════════════════════════════════════
@@ -487,3 +544,4 @@ export function initializeMetrics(): void {
   console.log('✅ Prometheus metrics initialized');
   console.log(`📊 Metrics configured: counters, histograms, gauges`);
 }
+

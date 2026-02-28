@@ -14,3 +14,12 @@ providers:
     allowUiUpdates: true
     options:
       path: /etc/grafana/dashboards
+  - name: 'ConectCRM Dashboards (VarLib)'
+    orgId: 1
+    folder: 'ConectCRM'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards

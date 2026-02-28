@@ -7,15 +7,27 @@ import { randomUUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
+  AprovarLoteContasPagarDto,
+  AprovarContaPagarDto,
   ContaPagarAnexoDto,
   CreateContaPagarDto,
+  QueryExportacaoContasPagarDto,
+  QueryHistoricoExportacaoContasPagarDto,
   QueryContasPagarDto,
   RegistrarPagamentoContaPagarDto,
+  ReprovarContaPagarDto,
   UpdateContaPagarDto,
 } from '../dto/conta-pagar.dto';
 import { ContaPagar } from '../entities/conta-pagar.entity';
 import { Fornecedor } from '../entities/fornecedor.entity';
 import { ContaBancaria } from '../entities/conta-bancaria.entity';
+import {
+  ContaPagarExportacao,
+  ContaPagarExportacaoFormato,
+  ContaPagarExportacaoStatus,
+} from '../entities/conta-pagar-exportacao.entity';
+import { EmpresaConfig } from '../../empresas/entities/empresa-config.entity';
+import * as ExcelJS from 'exceljs';
 
 type StatusContaPagarUI = 'em_aberto' | 'pago' | 'vencido' | 'agendado' | 'cancelado';
 
@@ -52,6 +64,8 @@ type ContaPagarResponse = {
   recorrente: boolean;
   frequenciaRecorrencia?: string;
   necessitaAprovacao: boolean;
+  aprovadoPor?: string;
+  dataAprovacao?: string;
   observacoes?: string;
   comprovantePagamento?: string;
   criadoPor: string;
@@ -78,6 +92,23 @@ type ResumoContasPagarResponse = {
   proximosVencimentos: ContaPagarResponse[];
 };
 
+type AcaoAprovacaoLote = 'aprovar' | 'reprovar';
+
+type ResultadoAprovacaoLoteItem = {
+  contaId: string;
+  acao: AcaoAprovacaoLote;
+  sucesso: boolean;
+  mensagem?: string;
+  conta?: ContaPagarResponse;
+};
+
+type ResultadoAprovacaoLoteResponse = {
+  total: number;
+  sucesso: number;
+  falha: number;
+  itens: ResultadoAprovacaoLoteItem[];
+};
+
 type ContaPagarResponseOverrides = Partial<{
   dataEmissao: string;
   categoria: string;
@@ -95,6 +126,47 @@ type ContaPagarResponseOverrides = Partial<{
   numero: string;
 }>;
 
+type ExportacaoContasPagarResponse = {
+  filename: string;
+  contentType: string;
+  buffer: Buffer;
+  totalRegistros: number;
+};
+
+type HistoricoExportacaoContasPagarItem = {
+  id: string;
+  formato: ContaPagarExportacaoFormato;
+  status: ContaPagarExportacaoStatus;
+  nomeArquivo?: string;
+  totalRegistros: number;
+  erro?: string;
+  filtros: Record<string, unknown>;
+  usuarioId?: string;
+  iniciadoEm: string;
+  finalizadoEm?: string;
+  createdAt: string;
+};
+
+type ExportacaoContaPagarLinha = {
+  numero: string;
+  numeroDocumento: string;
+  fornecedor: string;
+  cnpjCpfFornecedor: string;
+  categoria: string;
+  centroCustoId: string;
+  dataEmissao: string;
+  dataVencimento: string;
+  dataPagamento: string;
+  statusConta: string;
+  valorOriginal: number;
+  valorPago: number;
+  valorRestante: number;
+  valorTotal: number;
+  contaBancariaId: string;
+  formaPagamento: string;
+  observacoes: string;
+};
+
 @Injectable()
 export class ContaPagarService {
   constructor(
@@ -104,6 +176,10 @@ export class ContaPagarService {
     private readonly fornecedorRepository: Repository<Fornecedor>,
     @InjectRepository(ContaBancaria)
     private readonly contaBancariaRepository: Repository<ContaBancaria>,
+    @InjectRepository(ContaPagarExportacao)
+    private readonly contaPagarExportacaoRepository: Repository<ContaPagarExportacao>,
+    @InjectRepository(EmpresaConfig)
+    private readonly empresaConfigRepository: Repository<EmpresaConfig>,
   ) {}
 
   async findAll(empresaId: string, filtros: QueryContasPagarDto = {}): Promise<ContaPagarResponse[]> {
@@ -126,6 +202,98 @@ export class ContaPagarService {
     }
 
     return mapped;
+  }
+
+  async exportarContasPagar(
+    empresaId: string,
+    filtros: QueryExportacaoContasPagarDto = {},
+    usuarioId = 'sistema',
+  ): Promise<ExportacaoContasPagarResponse> {
+    const formato = this.normalizarFormatoExportacao(filtros.formato);
+    const filtrosNormalizados = this.normalizarFiltrosExportacao(filtros);
+    const exportacao = this.contaPagarExportacaoRepository.create({
+      empresaId,
+      usuarioId,
+      formato,
+      status: ContaPagarExportacaoStatus.PROCESSANDO,
+      filtros: filtrosNormalizados,
+      totalRegistros: 0,
+      iniciadoEm: new Date(),
+    });
+    await this.contaPagarExportacaoRepository.save(exportacao);
+
+    try {
+      const contas = await this.buscarContasParaExportacao(empresaId, filtros);
+      const linhas = contas.map((conta) => this.mapContaPagarExportacao(conta));
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const filename =
+        formato === ContaPagarExportacaoFormato.XLSX
+          ? `contas-pagar-${timestamp}.xlsx`
+          : `contas-pagar-${timestamp}.csv`;
+      const contentType =
+        formato === ContaPagarExportacaoFormato.XLSX
+          ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          : 'text/csv; charset=utf-8';
+      const buffer =
+        formato === ContaPagarExportacaoFormato.XLSX
+          ? await this.gerarBufferXlsxExportacao(linhas)
+          : this.gerarBufferCsvExportacao(linhas);
+
+      exportacao.status = ContaPagarExportacaoStatus.SUCESSO;
+      exportacao.nomeArquivo = filename;
+      exportacao.totalRegistros = linhas.length;
+      exportacao.finalizadoEm = new Date();
+      exportacao.erro = undefined;
+      await this.contaPagarExportacaoRepository.save(exportacao);
+
+      return {
+        filename,
+        contentType,
+        buffer,
+        totalRegistros: linhas.length,
+      };
+    } catch (error) {
+      exportacao.status = ContaPagarExportacaoStatus.FALHA;
+      exportacao.finalizadoEm = new Date();
+      exportacao.erro = this.extrairMensagemErro(error);
+      await this.contaPagarExportacaoRepository.save(exportacao);
+      throw error;
+    }
+  }
+
+  async listarHistoricoExportacoes(
+    empresaId: string,
+    filtros: QueryHistoricoExportacaoContasPagarDto = {},
+  ): Promise<HistoricoExportacaoContasPagarItem[]> {
+    const qb = this.contaPagarExportacaoRepository
+      .createQueryBuilder('exportacao')
+      .where('exportacao.empresaId = :empresaId', { empresaId })
+      .orderBy('exportacao.createdAt', 'DESC');
+
+    if (filtros.formato) {
+      qb.andWhere('exportacao.formato = :formato', { formato: filtros.formato });
+    }
+
+    if (filtros.status) {
+      qb.andWhere('exportacao.status = :status', { status: filtros.status });
+    }
+
+    qb.limit(Math.max(1, Number(filtros.limite || 20)));
+
+    const itens = await qb.getMany();
+    return itens.map((item) => ({
+      id: item.id,
+      formato: item.formato,
+      status: item.status,
+      nomeArquivo: item.nomeArquivo,
+      totalRegistros: item.totalRegistros,
+      erro: item.erro,
+      filtros: item.filtros || {},
+      usuarioId: item.usuarioId,
+      iniciadoEm: this.toIso(item.iniciadoEm),
+      finalizadoEm: item.finalizadoEm ? this.toIso(item.finalizadoEm) : undefined,
+      createdAt: this.toIso(item.createdAt),
+    }));
   }
 
   async findOne(id: string, empresaId: string): Promise<ContaPagarResponse> {
@@ -151,6 +319,12 @@ export class ContaPagarService {
     const valorMulta = 0;
     const valorJuros = 0;
     const valorTotal = this.calcularValorTotal(valorOriginal, valorDesconto, valorMulta, valorJuros);
+    const alcadaAprovacaoFinanceira = await this.obterAlcadaAprovacaoFinanceira(empresaId);
+    const necessitaAprovacao = this.calcularNecessitaAprovacaoConta(
+      valorTotal,
+      !!createContaPagarDto.necessitaAprovacao,
+      alcadaAprovacaoFinanceira,
+    );
     const dataEmissaoBase = createContaPagarDto.dataEmissao
       ? this.parseDateInputPreservingDay(createContaPagarDto.dataEmissao)
       : new Date();
@@ -212,7 +386,9 @@ export class ContaPagarService {
         centroCustoId: createContaPagarDto.centroCustoId?.trim() || undefined,
         recorrente: !!createContaPagarDto.recorrente,
         frequenciaRecorrencia: createContaPagarDto.frequenciaRecorrencia || undefined,
-        necessitaAprovacao: false,
+        necessitaAprovacao,
+        aprovadoPor: undefined,
+        dataAprovacao: undefined,
         tags: tagsParcela,
         anexos: anexosNormalizados,
         fornecedorId: createContaPagarDto.fornecedorId,
@@ -353,6 +529,26 @@ export class ContaPagarService {
       conta.valorRestante = Math.max(valorTotal - valorPago, 0);
     }
 
+    const valorContaAtualizado = Number(conta.valorTotal ?? conta.valor ?? 0);
+    const alcadaAprovacaoFinanceira = await this.obterAlcadaAprovacaoFinanceira(empresaId);
+    const necessitaAprovacaoManual =
+      updateContaPagarDto.necessitaAprovacao !== undefined
+        ? !!updateContaPagarDto.necessitaAprovacao
+        : !!conta.necessitaAprovacao;
+    const necessitaAprovacaoCalculada = this.calcularNecessitaAprovacaoConta(
+      valorContaAtualizado,
+      necessitaAprovacaoManual,
+      alcadaAprovacaoFinanceira,
+    );
+    const necessitaAprovacaoAnterior = !!conta.necessitaAprovacao;
+
+    conta.necessitaAprovacao = necessitaAprovacaoCalculada;
+
+    if (!necessitaAprovacaoCalculada || !necessitaAprovacaoAnterior) {
+      conta.aprovadoPor = undefined;
+      conta.dataAprovacao = undefined;
+    }
+
     conta.atualizadoPor = 'sistema';
 
     const saved = await this.contaPagarRepository.save(conta);
@@ -387,6 +583,12 @@ export class ContaPagarService {
 
     if (conta.status === 'cancelada') {
       throw new BadRequestException('Nao e possivel registrar pagamento em conta cancelada');
+    }
+
+    if (conta.necessitaAprovacao && !conta.dataAprovacao) {
+      throw new BadRequestException(
+        'Conta aguardando aprovacao financeira. Aprove a conta antes de registrar pagamento.',
+      );
     }
 
     conta.dataPagamento = dto.dataPagamento
@@ -428,6 +630,88 @@ export class ContaPagarService {
       contaBancariaId: dto.contaBancariaId,
       valorPago: novoValorPago,
     });
+  }
+
+  async aprovar(
+    id: string,
+    dto: AprovarContaPagarDto,
+    empresaId: string,
+    userId: string,
+  ): Promise<ContaPagarResponse> {
+    const conta = await this.findContaEntity(id, empresaId);
+
+    if (conta.status === 'cancelada') {
+      throw new BadRequestException('Nao e possivel aprovar conta cancelada');
+    }
+
+    if (conta.status === 'paga') {
+      throw new BadRequestException('Nao e possivel aprovar conta ja paga');
+    }
+
+    if (!conta.necessitaAprovacao) {
+      throw new BadRequestException('Conta nao exige aprovacao financeira');
+    }
+
+    if (conta.dataAprovacao) {
+      throw new BadRequestException('Conta ja foi aprovada');
+    }
+
+    conta.aprovadoPor = userId || 'sistema';
+    conta.dataAprovacao = new Date();
+    conta.atualizadoPor = userId || 'sistema';
+    conta.status = this.calcularStatusAberto(conta);
+
+    if (dto.observacoes?.trim()) {
+      conta.observacoes = conta.observacoes
+        ? `${conta.observacoes}\n${dto.observacoes.trim()}`
+        : dto.observacoes.trim();
+    }
+
+    const saved = await this.contaPagarRepository.save(conta);
+    const withFornecedor = await this.findContaEntity(saved.id, empresaId);
+    return this.mapContaPagarResponse(withFornecedor);
+  }
+
+  async reprovar(
+    id: string,
+    dto: ReprovarContaPagarDto,
+    empresaId: string,
+    userId: string,
+  ): Promise<ContaPagarResponse> {
+    const conta = await this.findContaEntity(id, empresaId);
+
+    if (conta.status === 'cancelada') {
+      throw new BadRequestException('Conta ja esta cancelada');
+    }
+
+    if (conta.status === 'paga') {
+      throw new BadRequestException('Nao e possivel reprovar conta ja paga');
+    }
+
+    if (!conta.necessitaAprovacao) {
+      throw new BadRequestException('Conta nao exige aprovacao financeira');
+    }
+
+    if (conta.dataAprovacao) {
+      throw new BadRequestException('Conta ja foi aprovada e nao pode ser reprovada');
+    }
+
+    const justificativa = dto.justificativa?.trim();
+    if (!justificativa) {
+      throw new BadRequestException('Justificativa obrigatoria para reprovar conta');
+    }
+
+    conta.status = 'cancelada';
+    conta.aprovadoPor = undefined;
+    conta.dataAprovacao = undefined;
+    conta.atualizadoPor = userId || 'sistema';
+    conta.observacoes = conta.observacoes
+      ? `${conta.observacoes}\nReprovada por ${userId || 'sistema'}: ${justificativa}`
+      : `Reprovada por ${userId || 'sistema'}: ${justificativa}`;
+
+    const saved = await this.contaPagarRepository.save(conta);
+    const withFornecedor = await this.findContaEntity(saved.id, empresaId);
+    return this.mapContaPagarResponse(withFornecedor);
   }
 
   async obterResumo(
@@ -498,6 +782,80 @@ export class ContaPagarService {
     };
   }
 
+  async listarPendenciasAprovacao(
+    empresaId: string,
+    filtros: QueryContasPagarDto = {},
+  ): Promise<ContaPagarResponse[]> {
+    const contas = await this.findAll(empresaId, filtros);
+    return contas.filter((conta) => this.isContaAguardandoAprovacao(conta));
+  }
+
+  async aprovarLote(
+    dto: AprovarLoteContasPagarDto,
+    empresaId: string,
+    userId: string,
+  ): Promise<ResultadoAprovacaoLoteResponse> {
+    const contaIds = Array.from(
+      new Set(
+        (dto.contaIds || [])
+          .map((item) => String(item || '').trim())
+          .filter(Boolean),
+      ),
+    );
+
+    if (contaIds.length === 0) {
+      throw new BadRequestException('Informe ao menos uma conta para aprovacao em lote');
+    }
+
+    if (dto.acao === 'reprovar' && !dto.justificativa?.trim()) {
+      throw new BadRequestException('Justificativa obrigatoria para reprovar em lote');
+    }
+
+    const itens: ResultadoAprovacaoLoteItem[] = [];
+
+    for (const contaId of contaIds) {
+      try {
+        const conta =
+          dto.acao === 'aprovar'
+            ? await this.aprovar(
+                contaId,
+                { observacoes: dto.observacoes },
+                empresaId,
+                userId,
+              )
+            : await this.reprovar(
+                contaId,
+                { justificativa: String(dto.justificativa || '').trim() },
+                empresaId,
+                userId,
+              );
+
+        itens.push({
+          contaId,
+          acao: dto.acao,
+          sucesso: true,
+          conta,
+        });
+      } catch (error) {
+        itens.push({
+          contaId,
+          acao: dto.acao,
+          sucesso: false,
+          mensagem: this.extrairMensagemErro(error),
+        });
+      }
+    }
+
+    const sucesso = itens.filter((item) => item.sucesso).length;
+
+    return {
+      total: itens.length,
+      sucesso,
+      falha: itens.length - sucesso,
+      itens,
+    };
+  }
+
   private async buscarContasComFornecedor(
     empresaId: string,
     filtros: QueryContasPagarDto,
@@ -529,6 +887,199 @@ export class ContaPagarService {
 
     qb.orderBy('conta.dataVencimento', 'ASC').addOrderBy('conta.createdAt', 'DESC');
     return qb.getMany();
+  }
+
+  private async buscarContasParaExportacao(
+    empresaId: string,
+    filtros: QueryExportacaoContasPagarDto,
+  ): Promise<ContaPagar[]> {
+    const qb = this.contaPagarRepository
+      .createQueryBuilder('conta')
+      .leftJoinAndSelect('conta.fornecedor', 'fornecedor')
+      .where('conta.empresaId = :empresaId', { empresaId });
+
+    if (filtros.fornecedorId) {
+      qb.andWhere('conta.fornecedorId = :fornecedorId', { fornecedorId: filtros.fornecedorId });
+    }
+
+    if (filtros.contaBancariaId?.trim()) {
+      qb.andWhere('conta.contaBancariaId = :contaBancariaId', {
+        contaBancariaId: filtros.contaBancariaId.trim(),
+      });
+    }
+
+    if (filtros.centroCustoId?.trim()) {
+      qb.andWhere('conta.centroCustoId = :centroCustoId', {
+        centroCustoId: filtros.centroCustoId.trim(),
+      });
+    }
+
+    const statusFiltros = this.mapStatusFiltrosExportacao(filtros.status);
+    if (statusFiltros.length > 0) {
+      qb.andWhere('conta.status IN (:...status)', { status: statusFiltros });
+    }
+
+    if (filtros.dataVencimentoInicio) {
+      qb.andWhere('conta.dataVencimento >= :dataVencimentoInicio', {
+        dataVencimentoInicio: filtros.dataVencimentoInicio,
+      });
+    }
+
+    if (filtros.dataVencimentoFim) {
+      qb.andWhere('conta.dataVencimento <= :dataVencimentoFim', {
+        dataVencimentoFim: filtros.dataVencimentoFim,
+      });
+    }
+
+    if (filtros.dataEmissaoInicio) {
+      qb.andWhere('conta.dataEmissao >= :dataEmissaoInicio', {
+        dataEmissaoInicio: filtros.dataEmissaoInicio,
+      });
+    }
+
+    if (filtros.dataEmissaoFim) {
+      qb.andWhere('conta.dataEmissao <= :dataEmissaoFim', {
+        dataEmissaoFim: filtros.dataEmissaoFim,
+      });
+    }
+
+    qb.orderBy('conta.dataVencimento', 'ASC').addOrderBy('conta.id', 'ASC');
+    return qb.getMany();
+  }
+
+  private normalizarFormatoExportacao(formato?: string): ContaPagarExportacaoFormato {
+    return String(formato || 'csv').trim().toLowerCase() === 'xlsx'
+      ? ContaPagarExportacaoFormato.XLSX
+      : ContaPagarExportacaoFormato.CSV;
+  }
+
+  private normalizarFiltrosExportacao(
+    filtros: QueryExportacaoContasPagarDto,
+  ): Record<string, unknown> {
+    const payload: Record<string, unknown> = {
+      formato: this.normalizarFormatoExportacao(filtros.formato),
+      status: this.mapStatusFiltrosExportacao(filtros.status),
+      fornecedorId: filtros.fornecedorId || null,
+      contaBancariaId: filtros.contaBancariaId?.trim() || null,
+      centroCustoId: filtros.centroCustoId?.trim() || null,
+      dataVencimentoInicio: filtros.dataVencimentoInicio || null,
+      dataVencimentoFim: filtros.dataVencimentoFim || null,
+      dataEmissaoInicio: filtros.dataEmissaoInicio || null,
+      dataEmissaoFim: filtros.dataEmissaoFim || null,
+    };
+
+    return payload;
+  }
+
+  private mapContaPagarExportacao(conta: ContaPagar): ExportacaoContaPagarLinha {
+    const valorTotal = this.toNumber(conta.valorTotal ?? conta.valor, 0);
+    const valorPago = this.toNumber(conta.valorPago, conta.status === 'paga' ? valorTotal : 0);
+    const valorRestante = Math.max(this.toNumber(conta.valorRestante, valorTotal - valorPago), 0);
+
+    return {
+      numero: this.buildNumero(conta),
+      numeroDocumento: conta.numeroDocumento || '',
+      fornecedor: conta.fornecedor?.nome || '',
+      cnpjCpfFornecedor: conta.fornecedor?.cnpjCpf || '',
+      categoria: conta.categoria || '',
+      centroCustoId: conta.centroCustoId || '',
+      dataEmissao: this.toDateOnly(conta.dataEmissao),
+      dataVencimento: this.toDateOnly(conta.dataVencimento),
+      dataPagamento: this.toDateOnly(conta.dataPagamento),
+      statusConta: this.mapStatusToUi(conta),
+      valorOriginal: this.toNumber(conta.valorOriginal ?? conta.valor, 0),
+      valorPago,
+      valorRestante,
+      valorTotal,
+      contaBancariaId: conta.contaBancariaId || '',
+      formaPagamento: conta.tipoPagamento || conta.formaPagamento || '',
+      observacoes: conta.observacoes || '',
+    };
+  }
+
+  private gerarBufferCsvExportacao(linhas: ExportacaoContaPagarLinha[]): Buffer {
+    const headers = [
+      'numero',
+      'numero_documento',
+      'fornecedor',
+      'cnpj_cpf_fornecedor',
+      'categoria',
+      'centro_custo_id',
+      'data_emissao',
+      'data_vencimento',
+      'data_pagamento',
+      'status_conta',
+      'valor_original',
+      'valor_pago',
+      'valor_restante',
+      'valor_total',
+      'conta_bancaria_id',
+      'forma_pagamento',
+      'observacoes',
+    ];
+
+    const escape = (value: unknown): string => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const rows = linhas.map((linha) =>
+      [
+        linha.numero,
+        linha.numeroDocumento,
+        linha.fornecedor,
+        linha.cnpjCpfFornecedor,
+        linha.categoria,
+        linha.centroCustoId,
+        linha.dataEmissao,
+        linha.dataVencimento,
+        linha.dataPagamento,
+        linha.statusConta,
+        linha.valorOriginal.toFixed(2),
+        linha.valorPago.toFixed(2),
+        linha.valorRestante.toFixed(2),
+        linha.valorTotal.toFixed(2),
+        linha.contaBancariaId,
+        linha.formaPagamento,
+        linha.observacoes,
+      ]
+        .map(escape)
+        .join(';'),
+    );
+
+    const csv = [headers.join(';'), ...rows].join('\n');
+    return Buffer.from(`\uFEFF${csv}`, 'utf-8');
+  }
+
+  private async gerarBufferXlsxExportacao(linhas: ExportacaoContaPagarLinha[]): Promise<Buffer> {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Contas a pagar');
+
+    worksheet.columns = [
+      { header: 'Numero', key: 'numero', width: 20 },
+      { header: 'Documento', key: 'numeroDocumento', width: 24 },
+      { header: 'Fornecedor', key: 'fornecedor', width: 36 },
+      { header: 'CNPJ/CPF', key: 'cnpjCpfFornecedor', width: 22 },
+      { header: 'Categoria', key: 'categoria', width: 20 },
+      { header: 'Centro de custo', key: 'centroCustoId', width: 20 },
+      { header: 'Data emissao', key: 'dataEmissao', width: 14 },
+      { header: 'Data vencimento', key: 'dataVencimento', width: 16 },
+      { header: 'Data pagamento', key: 'dataPagamento', width: 16 },
+      { header: 'Status', key: 'statusConta', width: 14 },
+      { header: 'Valor original', key: 'valorOriginal', width: 16 },
+      { header: 'Valor pago', key: 'valorPago', width: 14 },
+      { header: 'Valor restante', key: 'valorRestante', width: 16 },
+      { header: 'Valor total', key: 'valorTotal', width: 14 },
+      { header: 'Conta bancaria', key: 'contaBancariaId', width: 38 },
+      { header: 'Forma pagamento', key: 'formaPagamento', width: 18 },
+      { header: 'Observacoes', key: 'observacoes', width: 40 },
+    ];
+
+    linhas.forEach((linha) => {
+      worksheet.addRow(linha);
+    });
+
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { bold: true };
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
   }
 
   private async validarFornecedor(fornecedorId: string, empresaId: string): Promise<Fornecedor> {
@@ -691,6 +1242,84 @@ export class ContaPagarService {
     return raw.map((item) => item.trim()).filter(Boolean);
   }
 
+  private mapStatusFiltrosExportacao(value?: string | string[]): string[] {
+    const raw = this.parseArrayFilter(value);
+    if (raw.length === 0) return [];
+
+    const mapped = raw
+      .map((item) => {
+        const status = item.toLowerCase();
+        if (status === 'pago') return 'paga';
+        if (status === 'vencido') return 'vencida';
+        if (status === 'cancelado') return 'cancelada';
+        if (status === 'em_aberto') return 'pendente';
+        if (status === 'pendente' || status === 'paga' || status === 'vencida' || status === 'cancelada') {
+          return status;
+        }
+        return '';
+      })
+      .filter(Boolean);
+
+    return Array.from(new Set(mapped));
+  }
+
+  private isContaAguardandoAprovacao(
+    conta: Pick<ContaPagarResponse, 'necessitaAprovacao' | 'dataAprovacao' | 'status'>,
+  ): boolean {
+    return Boolean(
+      conta.necessitaAprovacao &&
+        !conta.dataAprovacao &&
+        conta.status !== 'pago' &&
+        conta.status !== 'cancelado',
+    );
+  }
+
+  private extrairMensagemErro(error: unknown): string {
+    if (error && typeof error === 'object' && 'message' in (error as Record<string, unknown>)) {
+      const message = (error as { message?: unknown }).message;
+      if (typeof message === 'string' && message.trim()) {
+        return message.trim();
+      }
+      if (Array.isArray(message)) {
+        const first = message.find((item) => typeof item === 'string' && item.trim());
+        if (first) {
+          return first.trim();
+        }
+      }
+    }
+
+    return 'Falha ao processar aprovacao em lote';
+  }
+
+  private async obterAlcadaAprovacaoFinanceira(empresaId: string): Promise<number | null> {
+    const config = await this.empresaConfigRepository.findOne({
+      where: { empresaId },
+    });
+
+    const valor = Number(config?.alcadaAprovacaoFinanceira ?? 0);
+    if (!Number.isFinite(valor) || valor <= 0) {
+      return null;
+    }
+
+    return Number(valor.toFixed(2));
+  }
+
+  private calcularNecessitaAprovacaoConta(
+    valorTotal: number,
+    necessitaAprovacaoManual: boolean,
+    alcadaAprovacaoFinanceira: number | null,
+  ): boolean {
+    if (necessitaAprovacaoManual) {
+      return true;
+    }
+
+    if (alcadaAprovacaoFinanceira === null) {
+      return false;
+    }
+
+    return Number(valorTotal || 0) >= alcadaAprovacaoFinanceira;
+  }
+
   private toNumber(value: unknown, fallback = 0): number {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
@@ -804,6 +1433,8 @@ export class ContaPagarService {
       frequenciaRecorrencia:
         overrides?.frequenciaRecorrencia || conta.frequenciaRecorrencia || undefined,
       necessitaAprovacao: !!conta.necessitaAprovacao,
+      aprovadoPor: conta.aprovadoPor || undefined,
+      dataAprovacao: conta.dataAprovacao ? this.toIso(conta.dataAprovacao) : undefined,
       observacoes: conta.observacoes || undefined,
       comprovantePagamento: conta.comprovantePagamento || undefined,
       criadoPor: conta.criadoPor || 'sistema',

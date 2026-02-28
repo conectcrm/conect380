@@ -126,6 +126,15 @@ const FornecedoresPage = React.lazy(
 const FornecedorPerfilPage = React.lazy(
   () => import('./features/financeiro/fornecedores/FornecedorPerfilPage'),
 );
+const ContasBancariasPage = React.lazy(
+  () => import('./pages/gestao/financeiro/ContasBancariasPage'),
+);
+const AprovacoesFinanceirasPage = React.lazy(
+  () => import('./pages/gestao/financeiro/AprovacoesFinanceirasPage'),
+);
+const ConciliacaoBancariaPage = React.lazy(
+  () => import('./pages/gestao/financeiro/ConciliacaoBancariaPage'),
+);
 
 const PerfilPage = React.lazy(() => import('./features/perfil'));
 const PortalClientePage = React.lazy(() => import('./pages/PortalClientePage'));
@@ -884,6 +893,14 @@ const AppRoutes: React.FC = () => {
                     path="/financeiro/fornecedores/:fornecedorId"
                     element={protegerRota(ModuloEnum.FINANCEIRO, <FornecedorPerfilPage />)}
                   />
+                  <Route
+                    path="/financeiro/contas-bancarias"
+                    element={protegerRota(ModuloEnum.FINANCEIRO, <ContasBancariasPage />)}
+                  />
+                  <Route
+                    path="/financeiro/aprovacoes"
+                    element={protegerRota(ModuloEnum.FINANCEIRO, <AprovacoesFinanceirasPage />)}
+                  />
                   {/* Módulos financeiros - Protegidos */}
                   <Route
                     path="/financeiro/faturamento"
@@ -908,20 +925,7 @@ const AppRoutes: React.FC = () => {
                   />
                   <Route
                     path="/financeiro/conciliacao"
-                    element={
-                      <ModuleUnderConstruction
-                        moduleName="Conciliação Bancária"
-                        description="Conciliação automática de extratos bancários"
-                        estimatedCompletion="Q2 2025"
-                        features={[
-                          'Importação de extratos OFX/CSV',
-                          'Conciliação automática',
-                          'Lançamentos pendentes',
-                          'Reconciliação manual',
-                          'Múltiplas contas bancárias',
-                        ]}
-                      />
-                    }
+                    element={protegerRota(ModuloEnum.FINANCEIRO, <ConciliacaoBancariaPage />)}
                   />
                   <Route
                     path="/financeiro/centro-custos"
@@ -1082,3 +1086,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+

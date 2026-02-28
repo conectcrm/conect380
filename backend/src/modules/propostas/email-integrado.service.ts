@@ -1,5 +1,6 @@
 import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
+import { EmpresaConfigService } from '../empresas/services/empresa-config.service';
 
 @Injectable()
 export class EmailIntegradoService {
@@ -8,6 +9,7 @@ export class EmailIntegradoService {
   constructor(
     @Inject(forwardRef(() => require('./propostas.service').PropostasService))
     private propostasService?: any,
+    private readonly empresaConfigService?: EmpresaConfigService,
   ) {
     this.setupTransporter();
   }
@@ -52,6 +54,128 @@ export class EmailIntegradoService {
     });
 
     this.log('📧 Serviço de email integrado configurado');
+  }
+
+  private isProductionEnv(): boolean {
+    const runtime = String(process.env.NODE_ENV || process.env.APP_ENV || '').toLowerCase();
+    return runtime === 'production';
+  }
+
+  private hasEnvSmtpConfig(): boolean {
+    const user = process.env.GMAIL_USER || process.env.SMTP_USER;
+    const pass = process.env.GMAIL_PASSWORD || process.env.SMTP_PASS;
+    return Boolean(user && pass);
+  }
+
+  private buildTransporterFromSmtpConfig(
+    host: string,
+    port: number,
+    user: string,
+    pass: string,
+  ): nodemailer.Transporter {
+    return nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      auth: { user, pass },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 10000,
+    });
+  }
+
+  private async resolveEmailTransportContext(empresaId?: string): Promise<{
+    transporter: nodemailer.Transporter;
+    fromAddress: string;
+    smtpConfigured: boolean;
+    emailsEnabled: boolean;
+    source: 'empresa' | 'env';
+  }> {
+    if (empresaId && this.empresaConfigService) {
+      try {
+        const empresaSmtp = await this.empresaConfigService.getSmtpRuntimeConfig(empresaId);
+
+        if (!empresaSmtp.emailsHabilitados) {
+          return {
+            transporter: this.transporter,
+            fromAddress:
+              process.env.EMAIL_FROM ||
+              empresaSmtp.user ||
+              process.env.GMAIL_USER ||
+              process.env.SMTP_USER ||
+              'conectcrm@gmail.com',
+            smtpConfigured: false,
+            emailsEnabled: false,
+            source: 'empresa',
+          };
+        }
+
+        if (empresaSmtp.host && empresaSmtp.user && empresaSmtp.pass) {
+          return {
+            transporter: this.buildTransporterFromSmtpConfig(
+              empresaSmtp.host,
+              empresaSmtp.port || 587,
+              empresaSmtp.user,
+              empresaSmtp.pass,
+            ),
+            fromAddress: empresaSmtp.user || process.env.EMAIL_FROM || 'conectcrm@gmail.com',
+            smtpConfigured: true,
+            emailsEnabled: true,
+            source: 'empresa',
+          };
+        }
+
+        this.warn(
+          `⚠️ SMTP da empresa ${empresaId} incompleto. Fallback para configuração global do ambiente.`,
+        );
+      } catch (error: any) {
+        this.warn(
+          `⚠️ Falha ao ler SMTP da empresa ${empresaId}. Fallback para ambiente: ${
+            error?.message || error
+          }`,
+        );
+      }
+    }
+
+    const envUser = process.env.GMAIL_USER || process.env.SMTP_USER;
+
+    return {
+      transporter: this.transporter,
+      fromAddress: process.env.EMAIL_FROM || envUser || 'conectcrm@gmail.com',
+      smtpConfigured: this.hasEnvSmtpConfig(),
+      emailsEnabled: true,
+      source: 'env',
+    };
+  }
+
+  private isFakeEmail(email: string): boolean {
+    const normalized = String(email || '').toLowerCase();
+    return (
+      normalized.includes('@cliente.com') ||
+      normalized.includes('@cliente.temp') ||
+      normalized.includes('@email.com') ||
+      normalized.includes('@exemplo.') ||
+      normalized.includes('@test.') ||
+      normalized.includes('@ficticio.')
+    );
+  }
+
+  private async syncStatusAfterSend(
+    propostaId: string | undefined,
+    emailCliente: string,
+    linkPortal: string,
+  ): Promise<void> {
+    if (!propostaId || !this.propostasService) {
+      return;
+    }
+
+    try {
+      await this.propostasService.marcarComoEnviada(propostaId, emailCliente, linkPortal);
+      this.log(`✅ Status automaticamente atualizado para "enviada"`);
+    } catch (statusError: any) {
+      this.warn(`⚠️ Erro ao atualizar status automaticamente:`, statusError?.message || statusError);
+      // Não falhar o envio por causa do status.
+    }
   }
 
   /**
@@ -114,33 +238,51 @@ export class EmailIntegradoService {
     emailCliente: string,
     linkPortal: string,
     propostaId?: string,
+    empresaId?: string,
   ): Promise<boolean> {
     try {
       this.log(`📤 Enviando proposta para cliente: ${emailCliente}`);
 
+      const fakeEmail = this.isFakeEmail(emailCliente);
+      const transportContext = await this.resolveEmailTransportContext(empresaId);
+
+      if (fakeEmail) {
+        this.warn(`⚠️ [EMAIL FICTÍCIO] Envio simulado para: ${emailCliente}`);
+        await this.syncStatusAfterSend(propostaId, emailCliente, linkPortal);
+        return true;
+      }
+
+      if (!transportContext.emailsEnabled) {
+        this.warn(`⚠️ E-mails desabilitados na configuração da empresa ${empresaId || '[sem-id]'}.`);
+        return false;
+      }
+
+      if (!transportContext.smtpConfigured && !this.isProductionEnv()) {
+        this.warn('⚠️ SMTP não configurado no ambiente local. Envio de proposta será simulado.');
+        await this.syncStatusAfterSend(propostaId, emailCliente, linkPortal);
+        return true;
+      }
+
+      if (!transportContext.smtpConfigured) {
+        this.error('❌ SMTP não configurado. Defina GMAIL_USER/GMAIL_PASSWORD ou SMTP_USER/SMTP_PASS.');
+        return false;
+      }
+
       const mailOptions = {
         from: {
           name: process.env.EMAIL_FROM_NAME || 'Conect CRM',
-          address: process.env.EMAIL_FROM || process.env.GMAIL_USER,
+          address: transportContext.fromAddress,
         },
         to: emailCliente,
-        subject: `📋 Proposta ${dadosProposta.numero} - ${dadosProposta.titulo}`,
+        subject: `📋 Proposta ${dadosProposta.numero} - ${dadosProposta.titulo || 'Proposta Comercial'}`,
         html: this.gerarTemplateProposta(dadosProposta, linkPortal),
       };
 
-      const result = await this.transporter.sendMail(mailOptions);
+      const result = await transportContext.transporter.sendMail(mailOptions);
       this.log('✅ Proposta enviada por email:', result.messageId);
 
       // 🔄 SINCRONIZAÇÃO AUTOMÁTICA: Marcar como enviada após sucesso no envio
-      if (propostaId && this.propostasService) {
-        try {
-          await this.propostasService.marcarComoEnviada(propostaId, emailCliente, linkPortal);
-          this.log(`✅ Status automaticamente atualizado para "enviada"`);
-        } catch (statusError) {
-          this.warn(`⚠️ Erro ao atualizar status automaticamente:`, statusError.message);
-          // Não falhar o envio por causa do status
-        }
-      }
+      await this.syncStatusAfterSend(propostaId, emailCliente, linkPortal);
 
       return true;
     } catch (error) {
@@ -172,7 +314,7 @@ export class EmailIntegradoService {
     subject: string;
     html: string;
     text?: string;
-  }): Promise<boolean> {
+  }, empresaId?: string): Promise<boolean> {
     try {
       this.log(`📤 [EMAIL GENÉRICO] Enviando para: ${emailData.to}`);
       this.log(`📤 [EMAIL GENÉRICO] Assunto: ${emailData.subject}`);
@@ -190,10 +332,27 @@ export class EmailIntegradoService {
         return true;
       }
 
+      const transportContext = await this.resolveEmailTransportContext(empresaId);
+
+      if (!transportContext.emailsEnabled) {
+        this.warn(`⚠️ E-mails desabilitados na configuração da empresa ${empresaId || '[sem-id]'}.`);
+        return false;
+      }
+
+      if (!transportContext.smtpConfigured && !this.isProductionEnv()) {
+        this.warn('⚠️ SMTP não configurado no ambiente local. Envio genérico será simulado.');
+        return true;
+      }
+
+      if (!transportContext.smtpConfigured) {
+        this.error('❌ SMTP não configurado. Defina GMAIL_USER/GMAIL_PASSWORD ou SMTP_USER/SMTP_PASS.');
+        return false;
+      }
+
       const mailOptions = {
         from: {
           name: process.env.EMAIL_FROM_NAME || 'ConectCRM',
-          address: process.env.EMAIL_FROM || process.env.GMAIL_USER || 'conectcrm@gmail.com',
+          address: transportContext.fromAddress,
         },
         to: emailData.to,
         cc: emailData.cc || undefined,
@@ -208,10 +367,11 @@ export class EmailIntegradoService {
         subject: mailOptions.subject,
         hasHtml: !!mailOptions.html,
         hasText: !!mailOptions.text,
-        smtp_configured: !!process.env.GMAIL_USER,
+        smtp_configured: transportContext.smtpConfigured,
+        source: transportContext.source,
       });
 
-      const result = await this.transporter.sendMail(mailOptions);
+      const result = await transportContext.transporter.sendMail(mailOptions);
 
       this.log('✅ [EMAIL REAL] Email enviado com sucesso!', {
         messageId: result.messageId,

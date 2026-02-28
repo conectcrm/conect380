@@ -397,6 +397,42 @@ export class PropostasService {
     return !columns.has('cliente');
   }
 
+  private isLegacyStatusEnumMismatch(error: unknown): boolean {
+    const message = String((error as any)?.message || '').toLowerCase();
+    return (
+      message.includes('invalid input value for enum propostas_status_enum') ||
+      (message.includes('propostas_status_enum') && message.includes('invalid input value'))
+    );
+  }
+
+  private async savePropostaWithStatusFallback(
+    proposta: any,
+    fluxoStatus: SalesFlowStatus,
+  ): Promise<any> {
+    try {
+      return await this.propostaRepository.save(proposta);
+    } catch (error) {
+      if (!this.isLegacyStatusEnumMismatch(error)) {
+        throw error;
+      }
+
+      const fallbackStatus = this.mapFlowStatusToDatabaseStatus(fluxoStatus, true);
+      this.logger.warn(
+        `Enum legado de status detectado em propostas. Aplicando fallback de status "${fluxoStatus}" -> "${fallbackStatus}".`,
+      );
+      proposta.status = fallbackStatus as any;
+
+      const emailDetails =
+        proposta.emailDetails && typeof proposta.emailDetails === 'object'
+          ? { ...(proposta.emailDetails as Record<string, unknown>) }
+          : {};
+      (emailDetails as Record<string, unknown>).fluxoStatus = fluxoStatus;
+      proposta.emailDetails = emailDetails as any;
+
+      return await this.propostaRepository.save(proposta);
+    }
+  }
+
   private toIsoString(value: unknown): string {
     if (!value) {
       return new Date().toISOString();
@@ -1929,7 +1965,7 @@ export class PropostasService {
 
       proposta.emailDetails = emailDetails as any;
 
-      const propostaAtualizada = await this.propostaRepository.save(proposta);
+      const propostaAtualizada = await this.savePropostaWithStatusFallback(proposta, fluxoStatus);
       this.logger.log(`Status da proposta ${propostaId} atualizado para: ${fluxoStatus}`);
 
       return this.entityToInterface(propostaAtualizada);
@@ -2031,7 +2067,7 @@ export class PropostasService {
         },
       ) as any;
 
-      const propostaAtualizada = await this.propostaRepository.save(proposta);
+      const propostaAtualizada = await this.savePropostaWithStatusFallback(proposta, 'visualizada');
       this.logger.log(`👁️ Proposta ${propostaId} marcada como visualizada`);
 
       return this.entityToInterface(propostaAtualizada);

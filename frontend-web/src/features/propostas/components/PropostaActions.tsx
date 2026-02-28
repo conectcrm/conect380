@@ -937,29 +937,37 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const handleSendEmail = async () => {
     const clienteData = await getClienteData();
 
-    if (!clienteData.email) {
-      toastService.error('Cliente não possui email cadastrado');
-      return;
-    }
-
     // Validar se o email é válido
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(clienteData.email)) {
-      toastService.error('Email do cliente é inválido: ' + clienteData.email);
-      return;
+    let emailFinal = (clienteData.email || '').trim();
+
+    if (!emailFinal) {
+      const emailInformado = prompt(
+        `O cliente "${clienteData.nome}" não possui e-mail cadastrado.\n\nDigite o e-mail para envio da proposta:`,
+      );
+
+      if (!emailInformado) {
+        toastService.error('Envio cancelado - E-mail é obrigatório');
+        return;
+      }
+
+      if (!emailRegex.test(emailInformado)) {
+        toastService.error('E-mail informado é inválido: ' + emailInformado);
+        return;
+      }
+
+      emailFinal = emailInformado;
     }
 
     // 🚨 DETECÇÃO DE EMAIL FICTÍCIO - Solicitar email real
     const isEmailFicticio =
-      clienteData.email.includes('@cliente.com') ||
-      clienteData.email.includes('@cliente.temp') ||
-      clienteData.email.includes('@email.com') ||
-      clienteData.email.includes('@exemplo.com') ||
-      clienteData.email.includes('@cliente.') ||
-      clienteData.email.includes('@temp.') ||
-      clienteData.email.includes('@ficticio.');
-
-    let emailFinal = clienteData.email;
+      emailFinal.includes('@cliente.com') ||
+      emailFinal.includes('@cliente.temp') ||
+      emailFinal.includes('@email.com') ||
+      emailFinal.includes('@exemplo.com') ||
+      emailFinal.includes('@cliente.') ||
+      emailFinal.includes('@temp.') ||
+      emailFinal.includes('@ficticio.');
 
     if (isEmailFicticio) {
       // Solicitar email real do usuário
@@ -978,7 +986,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       }
 
       emailFinal = emailReal; // Usar o email real
-      toastService.success(`Email corrigido de "${clienteData.email}" para "${emailReal}"`);
+      toastService.success(`Email corrigido para "${emailReal}"`);
     }
 
     setSendingEmail(true);
@@ -1018,14 +1026,14 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
       const resultado = await emailServiceReal.enviarPropostaParaCliente(emailData);
 
-      if (resultado.success) {
-        await sincronizarStatusProposta('enviada', {
-          source: 'email',
-          observacoes: `Proposta enviada por email para ${clienteData.nome}.`,
-        });
-        toastService.success(`Proposta enviada por email para ${clienteData.nome}`);
-        onPropostaUpdated?.();
-      } else {
+        if (resultado.success) {
+          await sincronizarStatusProposta('enviada', {
+            source: 'email',
+            observacoes: `Proposta enviada por email para ${clienteData.nome} (${emailFinal}).`,
+          });
+          toastService.success(`Proposta enviada por email para ${emailFinal}`);
+          onPropostaUpdated?.();
+        } else {
         toastService.error(`Erro ao enviar email: ${resultado.error}`);
       }
     } catch (error) {
@@ -1178,9 +1186,9 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       {/* Email */}
       <button
         onClick={handleSendEmail}
-        disabled={sendingEmail || !clienteData?.email}
+        disabled={sendingEmail}
         className={`${buttonClass} text-green-600 hover:text-green-900 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed`}
-        title={clienteData?.email ? 'Enviar por email' : 'Cliente sem email'}
+        title={clienteData?.email ? 'Enviar por email' : 'Informar e-mail e enviar'}
       >
         {sendingEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
         {showLabels && <span>Email</span>}

@@ -6,6 +6,7 @@ import {
   Check,
   CheckCircle,
   CreditCard,
+  Download,
   DollarSign,
   Edit,
   Filter,
@@ -34,6 +35,7 @@ import {
   CATEGORIA_LABELS,
   ContaBancaria,
   ContaPagar,
+  FiltrosExportacaoContasPagar,
   FormaPagamento,
   FORMA_PAGAMENTO_LABELS,
   NovaContaPagar,
@@ -51,6 +53,7 @@ interface ContasPagarPageProps {
 
 type FiltroStatusUI = 'todos' | StatusContaPagar;
 type FiltroCategoriaUI = 'todas' | CategoriaContaPagar;
+type FiltroStatusExportacaoUI = 'todos' | StatusContaPagar;
 
 const btnPrimary =
   'inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition hover:bg-[#117C7E] disabled:opacity-60 disabled:cursor-not-allowed';
@@ -146,6 +149,21 @@ const getPrioridadeBadge = (prioridade: PrioridadePagamento) => {
     </span>
   );
 };
+
+const isContaAguardandoAprovacao = (conta: ContaPagar): boolean =>
+  Boolean(
+    conta.necessitaAprovacao &&
+      !conta.dataAprovacao &&
+      conta.status !== StatusContaPagar.CANCELADO &&
+      conta.status !== StatusContaPagar.PAGO,
+  );
+
+const getAprovacaoBadge = () => (
+  <span className="inline-flex items-center rounded-full border border-[#CFE3FA] bg-[#F2F8FF] px-2.5 py-1 text-xs font-semibold text-[#1E66B4]">
+    Aguardando aprovacao
+  </span>
+);
+
 const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
   const confirmacao = useConfirmacaoInteligente();
   const selectAllRef = useRef<HTMLInputElement | null>(null);
@@ -168,9 +186,20 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
 
   const [modalContaAberto, setModalContaAberto] = useState(false);
   const [modalPagamentoAberto, setModalPagamentoAberto] = useState(false);
+  const [modalExportacaoAberto, setModalExportacaoAberto] = useState(false);
   const [modalDetalhesAberto, setModalDetalhesAberto] = useState(false);
   const [contaDetalhesSelecionada, setContaDetalhesSelecionada] = useState<ContaPagar | null>(null);
   const [comprovantePagamentoArquivo, setComprovantePagamentoArquivo] = useState<File | null>(null);
+  const [exportando, setExportando] = useState(false);
+  const [formatoExportacao, setFormatoExportacao] = useState<'csv' | 'xlsx'>('csv');
+  const [statusExportacao, setStatusExportacao] = useState<FiltroStatusExportacaoUI>('todos');
+  const [fornecedorExportacaoId, setFornecedorExportacaoId] = useState('');
+  const [contaBancariaExportacaoId, setContaBancariaExportacaoId] = useState('');
+  const [centroCustoExportacaoId, setCentroCustoExportacaoId] = useState('');
+  const [dataVencimentoInicioExportacao, setDataVencimentoInicioExportacao] = useState('');
+  const [dataVencimentoFimExportacao, setDataVencimentoFimExportacao] = useState('');
+  const [dataEmissaoInicioExportacao, setDataEmissaoInicioExportacao] = useState('');
+  const [dataEmissaoFimExportacao, setDataEmissaoFimExportacao] = useState('');
   const [tipoPagamentoSelecionado, setTipoPagamentoSelecionado] = useState<FormaPagamento>(
     FormaPagamento.PIX,
   );
@@ -271,6 +300,11 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
   };
 
   const handleRegistrarPagamento = (conta: ContaPagar) => {
+    if (isContaAguardandoAprovacao(conta)) {
+      toast.error('Conta aguardando aprovacao financeira antes do pagamento');
+      return;
+    }
+
     setContaSelecionada(conta);
     setComprovantePagamentoArquivo(null);
     setTipoPagamentoSelecionado(
@@ -324,7 +358,8 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
         (conta) =>
           contasSelecionadas.has(conta.id) &&
           conta.status !== StatusContaPagar.PAGO &&
-          conta.status !== StatusContaPagar.CANCELADO,
+          conta.status !== StatusContaPagar.CANCELADO &&
+          !isContaAguardandoAprovacao(conta),
       );
 
       if (selecionadas.length === 0) {
@@ -423,6 +458,86 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
     }
   };
 
+  const handleAprovarConta = async (conta: ContaPagar) => {
+    try {
+      await contasPagarService.aprovar(conta.id);
+      toast.success('Conta aprovada com sucesso');
+      await carregarDados();
+    } catch (err) {
+      console.error('Erro ao aprovar conta:', err);
+      toast.error(getApiErrorMessage(err, 'Nao foi possivel aprovar a conta'));
+    }
+  };
+
+  const handleReprovarConta = async (conta: ContaPagar) => {
+    const justificativa = window.prompt('Informe a justificativa para reprovar esta conta:');
+    if (justificativa === null) return;
+
+    if (!justificativa.trim()) {
+      toast.error('Justificativa obrigatoria para reprovar');
+      return;
+    }
+
+    try {
+      await contasPagarService.reprovar(conta.id, { justificativa: justificativa.trim() });
+      toast.success('Conta reprovada e cancelada');
+      await carregarDados();
+    } catch (err) {
+      console.error('Erro ao reprovar conta:', err);
+      toast.error(getApiErrorMessage(err, 'Nao foi possivel reprovar a conta'));
+    }
+  };
+
+  const limparFiltrosExportacao = () => {
+    setFormatoExportacao('csv');
+    setStatusExportacao('todos');
+    setFornecedorExportacaoId('');
+    setContaBancariaExportacaoId('');
+    setCentroCustoExportacaoId('');
+    setDataVencimentoInicioExportacao('');
+    setDataVencimentoFimExportacao('');
+    setDataEmissaoInicioExportacao('');
+    setDataEmissaoFimExportacao('');
+  };
+
+  const handleExportarContas = async () => {
+    try {
+      setExportando(true);
+      const filtrosExportacao: FiltrosExportacaoContasPagar = {
+        formato: formatoExportacao,
+        status: statusExportacao === 'todos' ? undefined : [statusExportacao],
+        fornecedorId: fornecedorExportacaoId || undefined,
+        contaBancariaId: contaBancariaExportacaoId || undefined,
+        centroCustoId: centroCustoExportacaoId || undefined,
+        dataVencimentoInicio: dataVencimentoInicioExportacao || undefined,
+        dataVencimentoFim: dataVencimentoFimExportacao || undefined,
+        dataEmissaoInicio: dataEmissaoInicioExportacao || undefined,
+        dataEmissaoFim: dataEmissaoFimExportacao || undefined,
+      };
+
+      const blob = await contasPagarService.exportar(filtrosExportacao);
+      const extension = formatoExportacao === 'xlsx' ? 'xlsx' : 'csv';
+      const dataRef = new Date().toISOString().slice(0, 10);
+      const filename = `contas-pagar-${dataRef}.${extension}`;
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      setModalExportacaoAberto(false);
+      toast.success('Exportacao iniciada com sucesso');
+    } catch (err) {
+      console.error('Erro ao exportar contas a pagar:', err);
+      toast.error(getApiErrorMessage(err, 'Nao foi possivel exportar contas a pagar'));
+    } finally {
+      setExportando(false);
+    }
+  };
+
   const contasFiltradas = useMemo(() => {
     const termo = termoBusca.trim().toLowerCase();
     return contas.filter((conta) => {
@@ -495,7 +610,33 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
 
   const renderRowActions = (conta: ContaPagar) => (
     <div className="flex items-center gap-1">
-      {conta.status === StatusContaPagar.EM_ABERTO ? (
+      {isContaAguardandoAprovacao(conta) ? (
+        <>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              void handleAprovarConta(conta);
+            }}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#137A42] hover:bg-[#F1FBF5]"
+            title="Aprovar conta"
+          >
+            <Check className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              void handleReprovarConta(conta);
+            }}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#B4233A] hover:bg-[#FFF2F4]"
+            title="Reprovar conta"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </>
+      ) : null}
+      {conta.status === StatusContaPagar.EM_ABERTO && !isContaAguardandoAprovacao(conta) ? (
         <button
           type="button"
           onClick={(event) => {
@@ -556,11 +697,11 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
               </button>
               <button
                 type="button"
-                onClick={() => toast('Exportação ainda não implementada para contas a pagar')}
+                onClick={() => setModalExportacaoAberto(true)}
                 className={btnSecondary}
-                disabled={!contasFiltradas.length}
+                disabled={loading || !contas.length}
               >
-                <DollarSign className="h-4 w-4" />
+                <Download className="h-4 w-4" />
                 Exportar
               </button>
               <button type="button" onClick={handleNovaConta} className={btnPrimary}>
@@ -824,6 +965,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-2">
                         {getStatusBadge(conta.status)}
+                        {isContaAguardandoAprovacao(conta) ? getAprovacaoBadge() : null}
                         {getPrioridadeBadge(conta.prioridade)}
                       </div>
                     </div>
@@ -992,7 +1134,12 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                             </div>
                           ) : null}
                         </td>
-                        <td className="px-5 py-4 align-top">{getStatusBadge(conta.status)}</td>
+                        <td className="px-5 py-4 align-top">
+                          <div className="flex flex-col items-start gap-1">
+                            {getStatusBadge(conta.status)}
+                            {isContaAguardandoAprovacao(conta) ? getAprovacaoBadge() : null}
+                          </div>
+                        </td>
                         <td className="px-5 py-4 align-top">
                           <div
                             className="flex justify-end"
@@ -1054,7 +1201,25 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
               </div>
               <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-[#6A8795]">Status</p>
-                <div className="mt-1">{getStatusBadge(contaDetalhesSelecionada.status)}</div>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  {getStatusBadge(contaDetalhesSelecionada.status)}
+                  {isContaAguardandoAprovacao(contaDetalhesSelecionada) ? getAprovacaoBadge() : null}
+                </div>
+              </div>
+              <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#6A8795]">Aprovacao</p>
+                <p className="mt-1 text-sm text-[#1D3B4D]">
+                  {contaDetalhesSelecionada.dataAprovacao
+                    ? `Aprovada em ${formatDate(contaDetalhesSelecionada.dataAprovacao)}`
+                    : contaDetalhesSelecionada.necessitaAprovacao
+                      ? 'Pendente de aprovacao'
+                      : 'Nao requerida'}
+                </p>
+                {contaDetalhesSelecionada.aprovadoPor ? (
+                  <p className="mt-1 text-xs text-[#64808E]">
+                    Responsavel: {contaDetalhesSelecionada.aprovadoPor}
+                  </p>
+                ) : null}
               </div>
               <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-[#6A8795]">
@@ -1132,7 +1297,8 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
               <button type="button" onClick={handleFecharDetalhes} className={btnSecondary}>
                 Fechar
               </button>
-              {contaDetalhesSelecionada.status === StatusContaPagar.EM_ABERTO ? (
+              {contaDetalhesSelecionada.status === StatusContaPagar.EM_ABERTO &&
+              !isContaAguardandoAprovacao(contaDetalhesSelecionada) ? (
                 <button
                   type="button"
                   onClick={() => {
@@ -1279,6 +1445,178 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                 <Check className="h-4 w-4" />
                 Registrar pagamento
               </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {modalExportacaoAberto ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-3xl rounded-2xl border border-[#DCE8EC] bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#E1EAEE] px-6 py-4">
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-[#173A4D]">
+                <Download className="h-5 w-5" />
+                Exportar contas a pagar
+              </h2>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!exportando) setModalExportacaoAberto(false);
+                }}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[#5E7A88] hover:bg-[#F2F7F8]"
+                aria-label="Fechar modal de exportacao"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 px-6 py-5 sm:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#244455]">Formato</label>
+                <select
+                  value={formatoExportacao}
+                  onChange={(event) => setFormatoExportacao(event.target.value as 'csv' | 'xlsx')}
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                >
+                  <option value="csv">CSV</option>
+                  <option value="xlsx">Excel (XLSX)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#244455]">Status</label>
+                <select
+                  value={statusExportacao}
+                  onChange={(event) => setStatusExportacao(event.target.value as FiltroStatusExportacaoUI)}
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                >
+                  <option value="todos">Todos</option>
+                  <option value={StatusContaPagar.EM_ABERTO}>Em aberto</option>
+                  <option value={StatusContaPagar.PAGO}>Pago</option>
+                  <option value={StatusContaPagar.VENCIDO}>Vencido</option>
+                  <option value={StatusContaPagar.CANCELADO}>Cancelado</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#244455]">Fornecedor</label>
+                <select
+                  value={fornecedorExportacaoId}
+                  onChange={(event) => setFornecedorExportacaoId(event.target.value)}
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                >
+                  <option value="">Todos</option>
+                  {fornecedoresCadastro.map((fornecedor) => (
+                    <option key={fornecedor.id} value={fornecedor.id}>
+                      {fornecedor.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#244455]">Conta bancaria</label>
+                <select
+                  value={contaBancariaExportacaoId}
+                  onChange={(event) => setContaBancariaExportacaoId(event.target.value)}
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                >
+                  <option value="">Todas</option>
+                  {contasBancariasCadastro.map((contaBancaria) => (
+                    <option key={contaBancaria.id} value={contaBancaria.id}>
+                      {contaBancaria.nome} - {contaBancaria.banco}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#244455]">Centro de custo</label>
+                <input
+                  type="text"
+                  value={centroCustoExportacaoId}
+                  onChange={(event) => setCentroCustoExportacaoId(event.target.value)}
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                  placeholder="ID do centro de custo (opcional)"
+                />
+              </div>
+
+              <div />
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#244455]">
+                  Vencimento de
+                </label>
+                <input
+                  type="date"
+                  value={dataVencimentoInicioExportacao}
+                  onChange={(event) => setDataVencimentoInicioExportacao(event.target.value)}
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#244455]">
+                  Vencimento ate
+                </label>
+                <input
+                  type="date"
+                  value={dataVencimentoFimExportacao}
+                  onChange={(event) => setDataVencimentoFimExportacao(event.target.value)}
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#244455]">Emissao de</label>
+                <input
+                  type="date"
+                  value={dataEmissaoInicioExportacao}
+                  onChange={(event) => setDataEmissaoInicioExportacao(event.target.value)}
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#244455]">Emissao ate</label>
+                <input
+                  type="date"
+                  value={dataEmissaoFimExportacao}
+                  onChange={(event) => setDataEmissaoFimExportacao(event.target.value)}
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-between gap-3 border-t border-[#E1EAEE] px-6 py-4">
+              <button
+                type="button"
+                onClick={limparFiltrosExportacao}
+                className={btnSecondary}
+                disabled={exportando}
+              >
+                Limpar filtros
+              </button>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setModalExportacaoAberto(false)}
+                  className={btnSecondary}
+                  disabled={exportando}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleExportarContas()}
+                  className={btnPrimary}
+                  disabled={exportando}
+                >
+                  {exportando ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  {exportando ? 'Exportando...' : 'Baixar arquivo'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

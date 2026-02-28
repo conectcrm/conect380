@@ -16,14 +16,32 @@ describe('ContaPagarService', () => {
     const contaBancariaRepository = {
       findOne: jest.fn(),
     };
+    const contaPagarExportacaoRepository = {
+      findOne: jest.fn(),
+      save: jest.fn(async (payload) => payload),
+      create: jest.fn((payload) => payload),
+      createQueryBuilder: jest.fn(),
+    };
+    const empresaConfigRepository = {
+      findOne: jest.fn(),
+    };
 
     const service = new ContaPagarService(
       contaPagarRepository as any,
       fornecedorRepository as any,
       contaBancariaRepository as any,
+      contaPagarExportacaoRepository as any,
+      empresaConfigRepository as any,
     );
 
-    return { service, contaPagarRepository, fornecedorRepository, contaBancariaRepository };
+    return {
+      service,
+      contaPagarRepository,
+      fornecedorRepository,
+      contaBancariaRepository,
+      contaPagarExportacaoRepository,
+      empresaConfigRepository,
+    };
   };
 
   const makeFornecedor = () =>
@@ -153,6 +171,98 @@ describe('ContaPagarService', () => {
     ]);
   });
 
+  it('deve marcar conta automaticamente como pendente de aprovacao quando exceder alcada da empresa', async () => {
+    const { service, contaPagarRepository, fornecedorRepository, empresaConfigRepository } =
+      createService();
+    const fornecedor = makeFornecedor();
+    let contaSalva: any;
+
+    fornecedorRepository.findOne.mockResolvedValue(fornecedor);
+    empresaConfigRepository.findOne.mockResolvedValue({
+      empresaId: fornecedor.empresaId,
+      alcadaAprovacaoFinanceira: 500,
+    });
+    contaPagarRepository.create.mockImplementation((data: any) => ({
+      ...data,
+      id: 'cp-1',
+      createdAt: new Date('2026-02-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-02-01T00:00:00.000Z'),
+    }));
+    contaPagarRepository.save.mockImplementation(async (entity: any) => {
+      contaSalva = entity;
+      return entity;
+    });
+
+    jest.spyOn(service as any, 'gerarNumeroConta').mockResolvedValue('CP-202602-0001');
+    jest.spyOn(service as any, 'findContaEntity').mockImplementation(async () =>
+      makeConta({
+        ...contaSalva,
+        fornecedor,
+      }),
+    );
+
+    const resposta = await service.create(
+      {
+        fornecedorId: fornecedor.id,
+        descricao: 'Compra acima da alcada',
+        dataVencimento: '2026-03-10',
+        dataEmissao: '2026-03-01',
+        valorOriginal: 900,
+        valorDesconto: 0,
+      } as any,
+      fornecedor.empresaId,
+    );
+
+    expect(contaSalva.necessitaAprovacao).toBe(true);
+    expect(resposta.necessitaAprovacao).toBe(true);
+  });
+
+  it('deve manter fluxo direto para valores abaixo da alcada da empresa', async () => {
+    const { service, contaPagarRepository, fornecedorRepository, empresaConfigRepository } =
+      createService();
+    const fornecedor = makeFornecedor();
+    let contaSalva: any;
+
+    fornecedorRepository.findOne.mockResolvedValue(fornecedor);
+    empresaConfigRepository.findOne.mockResolvedValue({
+      empresaId: fornecedor.empresaId,
+      alcadaAprovacaoFinanceira: 1000,
+    });
+    contaPagarRepository.create.mockImplementation((data: any) => ({
+      ...data,
+      id: 'cp-1',
+      createdAt: new Date('2026-02-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-02-01T00:00:00.000Z'),
+    }));
+    contaPagarRepository.save.mockImplementation(async (entity: any) => {
+      contaSalva = entity;
+      return entity;
+    });
+
+    jest.spyOn(service as any, 'gerarNumeroConta').mockResolvedValue('CP-202602-0001');
+    jest.spyOn(service as any, 'findContaEntity').mockImplementation(async () =>
+      makeConta({
+        ...contaSalva,
+        fornecedor,
+      }),
+    );
+
+    const resposta = await service.create(
+      {
+        fornecedorId: fornecedor.id,
+        descricao: 'Compra abaixo da alcada',
+        dataVencimento: '2026-03-10',
+        dataEmissao: '2026-03-01',
+        valorOriginal: 300,
+        valorDesconto: 0,
+      } as any,
+      fornecedor.empresaId,
+    );
+
+    expect(contaSalva.necessitaAprovacao).toBe(false);
+    expect(resposta.necessitaAprovacao).toBe(false);
+  });
+
   it('deve atualizar conta persistindo anexos normalizados', async () => {
     const { service, contaPagarRepository } = createService();
     const conta = makeConta();
@@ -173,6 +283,38 @@ describe('ContaPagarService', () => {
 
     expect(conta.anexos).toEqual([{ nome: 'boleto.pdf', tipo: 'application/pdf', tamanho: 500 }]);
     expect(result.anexos).toEqual([{ nome: 'boleto.pdf', tipo: 'application/pdf', tamanho: 500 }]);
+  });
+
+  it('deve exigir aprovacao quando atualizacao ultrapassar alcada da empresa', async () => {
+    const { service, contaPagarRepository, empresaConfigRepository } = createService();
+    const conta = makeConta({
+      valor: 200,
+      valorOriginal: 200,
+      valorTotal: 200,
+      valorPago: 0,
+      valorRestante: 200,
+      necessitaAprovacao: false,
+      aprovadoPor: undefined,
+      dataAprovacao: undefined,
+    });
+
+    empresaConfigRepository.findOne.mockResolvedValue({
+      empresaId: conta.empresaId,
+      alcadaAprovacaoFinanceira: 1000,
+    });
+    contaPagarRepository.save.mockImplementation(async (entity: any) => entity);
+    jest.spyOn(service as any, 'findContaEntity').mockResolvedValue(conta);
+
+    const result = await service.update(
+      conta.id,
+      {
+        valorOriginal: 1200,
+      } as any,
+      conta.empresaId,
+    );
+
+    expect(conta.necessitaAprovacao).toBe(true);
+    expect(result.necessitaAprovacao).toBe(true);
   });
 
   it('deve registrar pagamento com comprovante e atualizar status/valores', async () => {
@@ -220,6 +362,225 @@ describe('ContaPagarService', () => {
     expect(result.valorRestante).toBe(0);
   });
 
+  it('deve bloquear criacao quando conta bancaria informada nao for valida para a empresa', async () => {
+    const { service, contaPagarRepository, fornecedorRepository, contaBancariaRepository } = createService();
+    const fornecedor = makeFornecedor();
+
+    fornecedorRepository.findOne.mockResolvedValue(fornecedor);
+    contaBancariaRepository.findOne.mockResolvedValue(null);
+
+    await expect(
+      service.create(
+        {
+          fornecedorId: fornecedor.id,
+          descricao: 'Despesa com banco invalido',
+          dataVencimento: '2026-03-10',
+          dataEmissao: '2026-03-01',
+          valorOriginal: 300,
+          categoria: 'fornecedores',
+          prioridade: 'media',
+          contaBancariaId: 'conta-inativa',
+        } as any,
+        fornecedor.empresaId,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(contaPagarRepository.create).not.toHaveBeenCalled();
+    expect(contaPagarRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('deve bloquear atualizacao quando conta bancaria informada nao for valida para a empresa', async () => {
+    const { service, contaPagarRepository, contaBancariaRepository } = createService();
+    const conta = makeConta();
+
+    jest.spyOn(service as any, 'findContaEntity').mockResolvedValue(conta);
+    contaBancariaRepository.findOne.mockResolvedValue(null);
+
+    await expect(
+      service.update(
+        conta.id,
+        {
+          contaBancariaId: 'conta-invalida',
+        } as any,
+        conta.empresaId,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(contaPagarRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('deve bloquear pagamento quando conta bancaria informada nao for valida para a empresa', async () => {
+    const { service, contaPagarRepository, contaBancariaRepository } = createService();
+    const conta = makeConta();
+
+    jest.spyOn(service as any, 'findContaEntity').mockResolvedValue(conta);
+    contaBancariaRepository.findOne.mockResolvedValue(null);
+
+    await expect(
+      service.registrarPagamento(
+        conta.id,
+        {
+          valorPago: 50,
+          contaBancariaId: 'conta-inativa',
+        } as any,
+        conta.empresaId,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(contaPagarRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('deve bloquear pagamento de conta aguardando aprovacao financeira', async () => {
+    const { service, contaPagarRepository } = createService();
+    const conta = makeConta({
+      necessitaAprovacao: true,
+      dataAprovacao: undefined,
+    });
+
+    jest.spyOn(service as any, 'findContaEntity').mockResolvedValue(conta);
+
+    await expect(
+      service.registrarPagamento(
+        conta.id,
+        {
+          valorPago: 100,
+          tipoPagamento: 'pix',
+        } as any,
+        conta.empresaId,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(contaPagarRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('deve aprovar conta com aprovacao pendente registrando auditoria', async () => {
+    const { service, contaPagarRepository } = createService();
+    const conta = makeConta({
+      necessitaAprovacao: true,
+      dataAprovacao: undefined,
+      aprovadoPor: undefined,
+      status: 'pendente',
+    });
+
+    contaPagarRepository.save.mockImplementation(async (entity: any) => entity);
+    jest.spyOn(service as any, 'findContaEntity').mockResolvedValue(conta);
+
+    const result = await service.aprovar(
+      conta.id,
+      { observacoes: 'Aprovado pelo financeiro' } as any,
+      conta.empresaId,
+      'user-financeiro',
+    );
+
+    expect(conta.aprovadoPor).toBe('user-financeiro');
+    expect(conta.dataAprovacao).toBeInstanceOf(Date);
+    expect(conta.atualizadoPor).toBe('user-financeiro');
+    expect(conta.observacoes).toContain('Aprovado pelo financeiro');
+    expect(result.aprovadoPor).toBe('user-financeiro');
+    expect(result.dataAprovacao).toBeTruthy();
+  });
+
+  it('deve reprovar conta em aprovacao pendente e cancelar status', async () => {
+    const { service, contaPagarRepository } = createService();
+    const conta = makeConta({
+      necessitaAprovacao: true,
+      dataAprovacao: undefined,
+      status: 'pendente',
+    });
+
+    contaPagarRepository.save.mockImplementation(async (entity: any) => entity);
+    jest.spyOn(service as any, 'findContaEntity').mockResolvedValue(conta);
+
+    const result = await service.reprovar(
+      conta.id,
+      { justificativa: 'Documento fiscal incompleto' } as any,
+      conta.empresaId,
+      'user-aprovador',
+    );
+
+    expect(conta.status).toBe('cancelada');
+    expect(conta.atualizadoPor).toBe('user-aprovador');
+    expect(conta.observacoes).toContain('Documento fiscal incompleto');
+    expect(result.status).toBe('cancelado');
+  });
+
+  it('deve listar apenas contas aguardando aprovacao na fila de pendencias', async () => {
+    const { service } = createService();
+
+    jest.spyOn(service, 'findAll').mockResolvedValue([
+      {
+        id: 'cp-1',
+        status: 'em_aberto',
+        necessitaAprovacao: true,
+        dataAprovacao: undefined,
+      } as any,
+      {
+        id: 'cp-2',
+        status: 'pago',
+        necessitaAprovacao: true,
+        dataAprovacao: '2026-02-20T10:00:00.000Z',
+      } as any,
+      {
+        id: 'cp-3',
+        status: 'em_aberto',
+        necessitaAprovacao: false,
+        dataAprovacao: undefined,
+      } as any,
+      {
+        id: 'cp-4',
+        status: 'vencido',
+        necessitaAprovacao: true,
+        dataAprovacao: undefined,
+      } as any,
+    ]);
+
+    const resultado = await service.listarPendenciasAprovacao('emp-1');
+
+    expect(resultado.map((item) => item.id)).toEqual(['cp-1', 'cp-4']);
+  });
+
+  it('deve processar aprovacao em lote com sucesso parcial', async () => {
+    const { service } = createService();
+
+    jest.spyOn(service, 'aprovar').mockImplementation(async (id: string) => {
+      if (id === 'cp-erro') {
+        throw new BadRequestException('Conta nao exige aprovacao financeira');
+      }
+      return { id, necessitaAprovacao: true, dataAprovacao: '2026-02-27T12:00:00.000Z' } as any;
+    });
+
+    const resultado = await service.aprovarLote(
+      {
+        contaIds: ['cp-ok', 'cp-erro'],
+        acao: 'aprovar',
+      } as any,
+      'emp-1',
+      'user-financeiro',
+    );
+
+    expect(resultado.total).toBe(2);
+    expect(resultado.sucesso).toBe(1);
+    expect(resultado.falha).toBe(1);
+    expect(resultado.itens.find((item) => item.contaId === 'cp-ok')?.sucesso).toBe(true);
+    expect(resultado.itens.find((item) => item.contaId === 'cp-erro')?.sucesso).toBe(false);
+  });
+
+  it('deve exigir justificativa para reprovar em lote', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.aprovarLote(
+        {
+          contaIds: ['cp-1'],
+          acao: 'reprovar',
+          justificativa: ' ',
+        } as any,
+        'emp-1',
+        'user-financeiro',
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it('deve bloquear pagamento de conta cancelada', async () => {
     const { service, contaPagarRepository } = createService();
     const conta = makeConta({ status: 'cancelada' });
@@ -235,5 +596,172 @@ describe('ContaPagarService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
 
     expect(contaPagarRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('deve exportar contas a pagar em csv aplicando filtros principais e registrando auditoria', async () => {
+    const { service, contaPagarRepository, contaPagarExportacaoRepository } = createService();
+    const conta = makeConta({
+      numeroDocumento: 'NF-2026-001',
+      contaBancariaId: 'conta-1',
+      centroCustoId: 'cc-1',
+      fornecedor: makeFornecedor(),
+    });
+
+    const queryBuilder = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([conta]),
+    };
+    contaPagarRepository.createQueryBuilder.mockReturnValue(queryBuilder as any);
+
+    const resultado = await service.exportarContasPagar('emp-1', {
+      formato: 'csv',
+      fornecedorId: 'forn-1',
+      status: 'pago,vencido',
+      contaBancariaId: 'conta-1',
+      centroCustoId: 'cc-1',
+      dataVencimentoInicio: '2026-02-01',
+      dataVencimentoFim: '2026-02-28',
+      dataEmissaoInicio: '2026-01-01',
+      dataEmissaoFim: '2026-02-10',
+    } as any, 'user-1');
+
+    expect(resultado.filename).toMatch(/^contas-pagar-\d{4}-\d{2}-\d{2}\.csv$/);
+    expect(resultado.contentType).toBe('text/csv; charset=utf-8');
+    expect(resultado.totalRegistros).toBe(1);
+    expect(resultado.buffer.toString('utf-8')).toContain('numero_documento');
+    expect(resultado.buffer.toString('utf-8')).toContain('NF-2026-001');
+
+    expect(queryBuilder.where).toHaveBeenCalledWith('conta.empresaId = :empresaId', {
+      empresaId: 'emp-1',
+    });
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith('conta.fornecedorId = :fornecedorId', {
+      fornecedorId: 'forn-1',
+    });
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith('conta.status IN (:...status)', {
+      status: ['paga', 'vencida'],
+    });
+    expect(contaPagarExportacaoRepository.save).toHaveBeenCalledTimes(2);
+    expect(contaPagarExportacaoRepository.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        status: 'sucesso',
+        totalRegistros: 1,
+        nomeArquivo: expect.stringMatching(/^contas-pagar-\d{4}-\d{2}-\d{2}\.csv$/),
+      }),
+    );
+  });
+
+  it('deve exportar contas a pagar em xlsx', async () => {
+    const { service, contaPagarRepository, contaPagarExportacaoRepository } = createService();
+
+    const queryBuilder = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([]),
+    };
+    contaPagarRepository.createQueryBuilder.mockReturnValue(queryBuilder as any);
+
+    const resultado = await service.exportarContasPagar('emp-1', {
+      formato: 'xlsx',
+    } as any);
+
+    expect(resultado.filename).toMatch(/^contas-pagar-\d{4}-\d{2}-\d{2}\.xlsx$/);
+    expect(resultado.contentType).toBe(
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    expect(resultado.totalRegistros).toBe(0);
+    expect(resultado.buffer.length).toBeGreaterThan(0);
+    expect(queryBuilder.getMany).toHaveBeenCalled();
+    expect(contaPagarExportacaoRepository.save).toHaveBeenCalledTimes(2);
+  });
+
+  it('deve registrar falha na auditoria quando exportacao quebra', async () => {
+    const { service, contaPagarRepository, contaPagarExportacaoRepository } = createService();
+    const queryBuilder = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockRejectedValue(new Error('erro-exportacao')),
+    };
+    contaPagarRepository.createQueryBuilder.mockReturnValue(queryBuilder as any);
+
+    await expect(
+      service.exportarContasPagar(
+        'emp-1',
+        {
+          formato: 'csv',
+        } as any,
+        'user-2',
+      ),
+    ).rejects.toThrow('erro-exportacao');
+
+    expect(contaPagarExportacaoRepository.save).toHaveBeenCalledTimes(2);
+    expect(contaPagarExportacaoRepository.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        status: 'falha',
+        erro: 'erro-exportacao',
+      }),
+    );
+  });
+
+  it('deve listar historico de exportacoes com filtros', async () => {
+    const { service, contaPagarExportacaoRepository } = createService();
+    const queryBuilder = {
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([
+        {
+          id: 'exp-1',
+          formato: 'csv',
+          status: 'sucesso',
+          nomeArquivo: 'contas-pagar-2026-02-27.csv',
+          totalRegistros: 25,
+          erro: null,
+          filtros: { status: ['paga'] },
+          usuarioId: 'user-1',
+          iniciadoEm: new Date('2026-02-27T10:00:00.000Z'),
+          finalizadoEm: new Date('2026-02-27T10:00:05.000Z'),
+          createdAt: new Date('2026-02-27T10:00:00.000Z'),
+        },
+      ]),
+    };
+    contaPagarExportacaoRepository.createQueryBuilder.mockReturnValue(queryBuilder as any);
+
+    const resultado = await service.listarHistoricoExportacoes('emp-1', {
+      formato: 'csv',
+      status: 'sucesso',
+      limite: 30,
+    } as any);
+
+    expect(resultado).toHaveLength(1);
+    expect(resultado[0]).toEqual(
+      expect.objectContaining({
+        id: 'exp-1',
+        formato: 'csv',
+        status: 'sucesso',
+        totalRegistros: 25,
+        usuarioId: 'user-1',
+      }),
+    );
+    expect(queryBuilder.where).toHaveBeenCalledWith('exportacao.empresaId = :empresaId', {
+      empresaId: 'emp-1',
+    });
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith('exportacao.formato = :formato', {
+      formato: 'csv',
+    });
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith('exportacao.status = :status', {
+      status: 'sucesso',
+    });
+    expect(queryBuilder.limit).toHaveBeenCalledWith(30);
   });
 });

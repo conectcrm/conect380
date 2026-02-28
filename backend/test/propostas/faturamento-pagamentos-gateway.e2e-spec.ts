@@ -1,5 +1,7 @@
 import * as request from 'supertest';
+import { createHmac } from 'crypto';
 import { SalesFlowE2EHarness } from '../_support/sales-flow-e2e.harness';
+import { CreateWebhooksGatewayEventos1802885000000 } from '../../src/migrations/1802885000000-CreateWebhooksGatewayEventos';
 
 describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
   let h: SalesFlowE2EHarness;
@@ -9,6 +11,7 @@ describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
   beforeAll(async () => {
     h = new SalesFlowE2EHarness();
     await h.setup();
+    await ensureWebhooksGatewayEventos();
   });
 
   afterAll(async () => {
@@ -58,6 +61,79 @@ describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
     expect(processarAssinatura.body?.success).toBe(true);
 
     return h.contratoEmpresaAId;
+  }
+
+  async function ensureWebhooksGatewayEventos(): Promise<void> {
+    const migration = new CreateWebhooksGatewayEventos1802885000000();
+    const queryRunner = h.dataSource.createQueryRunner();
+    try {
+      await queryRunner.connect();
+      await migration.up(queryRunner);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async function criarPagamentoPendente(valor?: number) {
+    const contratoId = await garantirContratoAssinado();
+
+    const gerarFaturaResponse = await request(h.httpServer)
+      .post('/faturamento/faturas/automatica')
+      .set('Authorization', `Bearer ${h.tokenAdminEmpresaA}`)
+      .send({
+        contratoId,
+        enviarEmail: false,
+        observacoes: `Fatura webhook E2E ${h.runId}`,
+      });
+
+    expect([200, 201]).toContain(gerarFaturaResponse.status);
+    expect(gerarFaturaResponse.body?.data?.id).toBeTruthy();
+    const faturaId = Number(gerarFaturaResponse.body.data.id);
+    const valorFatura = Number(gerarFaturaResponse.body.data.valorTotal || 0);
+    const valorPagamento = Number(valor ?? valorFatura);
+
+    const gatewayTransacaoId = `e2e-whk-${h.runId}-${Date.now()}`;
+    const transacaoId = `e2e-whk-pay-${h.runId}-${Date.now()}`;
+
+    const criarPagamentoResponse = await request(h.httpServer)
+      .post('/faturamento/pagamentos')
+      .set('Authorization', `Bearer ${h.tokenAdminEmpresaA}`)
+      .send({
+        faturaId,
+        transacaoId,
+        tipo: 'pagamento',
+        valor: valorPagamento,
+        metodoPagamento: 'pix',
+        gateway: 'manual',
+        gatewayTransacaoId,
+        observacoes: 'Pagamento pendente para webhook e2e',
+      });
+
+    expect([200, 201]).toContain(criarPagamentoResponse.status);
+    expect(criarPagamentoResponse.body?.data?.id).toBeTruthy();
+
+    return {
+      faturaId,
+      pagamentoId: Number(criarPagamentoResponse.body.data.id),
+      gatewayTransacaoId,
+      valorPagamento,
+    };
+  }
+
+  async function garantirConfiguracaoWebhookPagSeguro(webhookSecret: string): Promise<void> {
+    const configResponse = await request(h.httpServer)
+      .post('/pagamentos/gateways/configuracoes')
+      .set('Authorization', `Bearer ${h.tokenAdminEmpresaA}`)
+      .send({
+        nome: `PagSeguro Webhook ${h.runId}`,
+        gateway: 'pagseguro',
+        modoOperacao: 'sandbox',
+        status: 'ativo',
+        webhookSecret,
+        credenciais: { token: `fake-${h.runId}` },
+      });
+
+    expect([200, 201, 409]).toContain(configResponse.status);
   }
 
   it('executa fluxo de faturamento e pagamento apos contrato assinado', async () => {
@@ -134,6 +210,163 @@ describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
 
     const statusAposPagamento = await obterStatusProposta(h.propostaEmpresaAId);
     expect(statusAposPagamento).toBe('pago');
+  });
+
+  it('processa webhook valido com assinatura, sincroniza pagamento e registra auditoria idempotente', async () => {
+    const webhookSecret = `whsec-${h.runId}`;
+    await garantirConfiguracaoWebhookPagSeguro(webhookSecret);
+
+    const { faturaId, pagamentoId, gatewayTransacaoId, valorPagamento } = await criarPagamentoPendente();
+    const eventId = `evt-whk-${h.runId}-${Date.now()}`;
+    const payload = {
+      eventId,
+      referenciaGateway: gatewayTransacaoId,
+      status: 'approved',
+      amount: valorPagamento,
+      fee: 0,
+      method: 'pix',
+    };
+
+    const signature =
+      'sha256=' + createHmac('sha256', webhookSecret).update(JSON.stringify(payload)).digest('hex');
+
+    const response = await request(h.httpServer)
+      .post(`/pagamentos/gateways/webhooks/pagseguro/${h.empresaAId}`)
+      .set('x-signature', signature)
+      .set('x-event-id', eventId)
+      .send(payload);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual(
+      expect.objectContaining({
+        success: true,
+        accepted: true,
+        duplicate: false,
+      }),
+    );
+
+    const pagamentoAtualizado = await request(h.httpServer)
+      .get(`/faturamento/pagamentos/${pagamentoId}`)
+      .set('Authorization', `Bearer ${h.tokenAdminEmpresaA}`);
+
+    expect(pagamentoAtualizado.status).toBe(200);
+    expect(pagamentoAtualizado.body?.data?.status).toBe('aprovado');
+
+    const faturaAtualizada = await request(h.httpServer)
+      .get(`/faturamento/faturas/${faturaId}`)
+      .set('Authorization', `Bearer ${h.tokenAdminEmpresaA}`);
+
+    expect(faturaAtualizada.status).toBe(200);
+    expect(faturaAtualizada.body?.data?.status).toBe('paga');
+
+    const auditoria = await h.dataSource.query(
+      `
+        SELECT idempotency_key, event_id, referencia_gateway, status, processado_em
+        FROM webhooks_gateway_eventos
+        WHERE empresa_id = $1 AND gateway = $2 AND idempotency_key = $3
+        ORDER BY created_at DESC
+      `,
+      [h.empresaAId, 'pagseguro', eventId],
+    );
+
+    expect(auditoria).toHaveLength(1);
+    expect(auditoria[0].idempotency_key).toBe(eventId);
+    expect(auditoria[0].event_id).toBe(eventId);
+    expect(auditoria[0].referencia_gateway).toBe(gatewayTransacaoId);
+    expect(auditoria[0].status).toBe('processado');
+    expect(auditoria[0].processado_em).toBeTruthy();
+
+    const duplicateResponse = await request(h.httpServer)
+      .post(`/pagamentos/gateways/webhooks/pagseguro/${h.empresaAId}`)
+      .set('x-signature', signature)
+      .set('x-event-id', eventId)
+      .send(payload);
+
+    expect(duplicateResponse.status).toBe(200);
+    expect(duplicateResponse.body).toEqual(
+      expect.objectContaining({
+        success: true,
+        accepted: true,
+        duplicate: true,
+      }),
+    );
+
+    const auditoriaPosDuplicado = await h.dataSource.query(
+      `
+        SELECT COUNT(*)::int AS total
+        FROM webhooks_gateway_eventos
+        WHERE empresa_id = $1 AND gateway = $2 AND idempotency_key = $3
+      `,
+      [h.empresaAId, 'pagseguro', eventId],
+    );
+
+    expect(Number(auditoriaPosDuplicado[0].total)).toBe(1);
+  });
+
+  it('processa webhook rejected e sincroniza pagamento com motivo de rejeicao', async () => {
+    const webhookSecret = `whsec-${h.runId}`;
+    await garantirConfiguracaoWebhookPagSeguro(webhookSecret);
+
+    const { faturaId, pagamentoId, gatewayTransacaoId, valorPagamento } = await criarPagamentoPendente();
+    const eventId = `evt-whk-rejected-${h.runId}-${Date.now()}`;
+    const payload = {
+      eventId,
+      referenciaGateway: gatewayTransacaoId,
+      status: 'rejected',
+      amount: valorPagamento,
+      fee: 0,
+      method: 'pix',
+    };
+
+    const signature =
+      'sha256=' + createHmac('sha256', webhookSecret).update(JSON.stringify(payload)).digest('hex');
+
+    const response = await request(h.httpServer)
+      .post(`/pagamentos/gateways/webhooks/pagseguro/${h.empresaAId}`)
+      .set('x-signature', signature)
+      .set('x-event-id', eventId)
+      .send(payload);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual(
+      expect.objectContaining({
+        success: true,
+        accepted: true,
+        duplicate: false,
+      }),
+    );
+
+    const pagamentoAtualizado = await request(h.httpServer)
+      .get(`/faturamento/pagamentos/${pagamentoId}`)
+      .set('Authorization', `Bearer ${h.tokenAdminEmpresaA}`);
+
+    expect(pagamentoAtualizado.status).toBe(200);
+    expect(pagamentoAtualizado.body?.data?.status).toBe('rejeitado');
+    expect(String(pagamentoAtualizado.body?.data?.motivoRejeicao || '')).toContain('rejected');
+
+    const faturaAtualizada = await request(h.httpServer)
+      .get(`/faturamento/faturas/${faturaId}`)
+      .set('Authorization', `Bearer ${h.tokenAdminEmpresaA}`);
+
+    expect(faturaAtualizada.status).toBe(200);
+    expect(String(faturaAtualizada.body?.data?.status || '')).not.toBe('paga');
+
+    const auditoria = await h.dataSource.query(
+      `
+        SELECT idempotency_key, event_id, referencia_gateway, status, processado_em
+        FROM webhooks_gateway_eventos
+        WHERE empresa_id = $1 AND gateway = $2 AND idempotency_key = $3
+        ORDER BY created_at DESC
+      `,
+      [h.empresaAId, 'pagseguro', eventId],
+    );
+
+    expect(auditoria).toHaveLength(1);
+    expect(auditoria[0].idempotency_key).toBe(eventId);
+    expect(auditoria[0].event_id).toBe(eventId);
+    expect(auditoria[0].referencia_gateway).toBe(gatewayTransacaoId);
+    expect(auditoria[0].status).toBe('processado');
+    expect(auditoria[0].processado_em).toBeTruthy();
   });
 
   it('retorna 501 ao tentar criar configuracao de gateway em producao sem provider habilitado', async () => {

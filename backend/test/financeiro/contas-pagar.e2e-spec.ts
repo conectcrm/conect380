@@ -8,6 +8,8 @@ import { DataSource } from 'typeorm';
 import { AppModule } from '../../src/app.module';
 import { AddRichFieldsToContasPagar1802867000000 } from '../../src/migrations/1802867000000-AddRichFieldsToContasPagar';
 import { CreateContasBancarias1802881000000 } from '../../src/migrations/1802881000000-CreateContasBancarias';
+import { AddAlcadaAprovacaoFinanceiraToEmpresaConfiguracoes1802882000000 } from '../../src/migrations/1802882000000-AddAlcadaAprovacaoFinanceiraToEmpresaConfiguracoes';
+import { CreateContasPagarExportacoes1802886000000 } from '../../src/migrations/1802886000000-CreateContasPagarExportacoes';
 
 type ContaPagarApi = {
   id: string;
@@ -69,6 +71,28 @@ describe('ContasPagar (E2E)', () => {
     }
   };
 
+  const ensureAlcadaAprovacaoFinanceira = async () => {
+    const migration = new AddAlcadaAprovacaoFinanceiraToEmpresaConfiguracoes1802882000000();
+    const queryRunner = dataSource.createQueryRunner();
+    try {
+      await queryRunner.connect();
+      await migration.up(queryRunner);
+    } finally {
+      await queryRunner.release();
+    }
+  };
+
+  const ensureContasPagarExportacoes = async () => {
+    const migration = new CreateContasPagarExportacoes1802886000000();
+    const queryRunner = dataSource.createQueryRunner();
+    try {
+      await queryRunner.connect();
+      await migration.up(queryRunner);
+    } finally {
+      await queryRunner.release();
+    }
+  };
+
   beforeAll(async () => {
     consoleLogSpy = jest.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
       const firstArg = typeof args[0] === 'string' ? args[0] : '';
@@ -94,6 +118,8 @@ describe('ContasPagar (E2E)', () => {
     dataSource = app.get(DataSource);
     await ensureContasPagarRichFields();
     await ensureContasBancarias();
+    await ensureAlcadaAprovacaoFinanceira();
+    await ensureContasPagarExportacoes();
 
     await criarEmpresa();
     await criarUsuarios();
@@ -259,6 +285,67 @@ describe('ContasPagar (E2E)', () => {
       .expect(403);
   });
 
+  it('deve exportar contas a pagar em csv e registrar auditoria de sucesso', async () => {
+    const descricao = `Conta exportacao e2e ${runId}`;
+    await request(app.getHttpServer())
+      .post('/contas-pagar')
+      .set('Authorization', `Bearer ${tokenSuperadmin}`)
+      .send({
+        fornecedorId,
+        descricao,
+        dataVencimento: '2026-04-01',
+        valorOriginal: 222,
+        categoria: 'fornecedores',
+      })
+      .expect(201);
+
+    const response = await request(app.getHttpServer())
+      .get('/contas-pagar/exportacao?formato=csv&status=em_aberto')
+      .set('Authorization', `Bearer ${tokenSuperadmin}`)
+      .expect(200);
+
+    expect(response.header['content-type']).toContain('text/csv');
+    expect(response.header['content-disposition']).toContain('attachment; filename="contas-pagar-');
+    expect(response.header['x-total-registros']).toBeTruthy();
+    expect(response.text).toContain('numero_documento');
+
+    const rows = await dataSource.query(
+      `
+        SELECT formato, status, nome_arquivo, total_registros, erro
+        FROM contas_pagar_exportacoes
+        WHERE empresa_id = $1
+        ORDER BY created_at DESC
+        LIMIT 1
+      `,
+      [empresaId],
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].formato).toBe('csv');
+    expect(rows[0].status).toBe('sucesso');
+    expect(rows[0].nome_arquivo).toMatch(/^contas-pagar-\d{4}-\d{2}-\d{2}\.csv$/);
+    expect(Number(rows[0].total_registros)).toBeGreaterThanOrEqual(1);
+    expect(rows[0].erro).toBeNull();
+  });
+
+  it('deve listar historico de exportacoes por empresa', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/contas-pagar/exportacao/historico?status=sucesso&limite=5')
+      .set('Authorization', `Bearer ${tokenSuperadmin}`)
+      .expect(200);
+
+    const payload = response.body?.data ?? response.body;
+    expect(Array.isArray(payload)).toBe(true);
+    expect(payload.length).toBeGreaterThan(0);
+    expect(payload[0]).toEqual(
+      expect.objectContaining({
+        id: expect.any(String),
+        formato: expect.any(String),
+        status: 'sucesso',
+      }),
+    );
+  });
+
   async function criarEmpresa() {
     const suffix = runId.slice(-12).padStart(12, '0');
     const slug = `e2e-contas-pagar-${runId}`.slice(0, 60);
@@ -412,6 +499,7 @@ describe('ContasPagar (E2E)', () => {
   async function limparDadosTeste() {
     try {
       await dataSource.query(`DELETE FROM contas_pagar WHERE empresa_id = $1`, [empresaId]);
+      await dataSource.query(`DELETE FROM contas_pagar_exportacoes WHERE empresa_id = $1`, [empresaId]);
       await dataSource.query(`DELETE FROM contas_bancarias WHERE id = $1`, [contaBancariaId]);
       await dataSource.query(`DELETE FROM fornecedores WHERE id = $1`, [fornecedorId]);
       await dataSource.query(`DELETE FROM users WHERE id = ANY($1::uuid[])`, [[superadminId, vendedorId]]);

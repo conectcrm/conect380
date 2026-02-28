@@ -27,6 +27,7 @@ import { empresaService, EmpresaResponse } from '../../services/empresaService';
 import { useAuth } from '../../hooks/useAuth';
 import { useGlobalConfirmation } from '../../contexts/GlobalConfirmationContext';
 import { userHasPermission } from '../../config/menuConfig';
+import { toastService } from '../../services/toastService';
 
 const ConfiguracaoEmpresaPage: React.FC = () => {
   const { confirm } = useGlobalConfirmation();
@@ -50,6 +51,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
     null,
   );
   const [backupHistory, setBackupHistory] = useState<BackupSnapshotInfo[]>([]);
+  const [showBackupHistory, setShowBackupHistory] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -159,7 +161,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
       setEmpresaData(updatedEmpresa);
 
       setHasChanges(false);
-      alert('✅ Configurações salvas com sucesso!');
+      toastService.success('Configurações salvas com sucesso!');
     } catch (err: any) {
       console.error('❌ Erro ao salvar:', err);
 
@@ -170,7 +172,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
         : errorMessage || err.message || 'Erro desconhecido ao salvar';
 
       setError(detailedError);
-      alert(`❌ Erro ao salvar: ${detailedError}`);
+      toastService.error(`Erro ao salvar: ${detailedError}`);
     } finally {
       setSaving(false);
     }
@@ -196,7 +198,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
       setConfig(reset);
       setFormData(reset);
       setHasChanges(false);
-      alert('Configurações restauradas!');
+      toastService.success('Configurações restauradas!');
     } catch (err: unknown) {
       console.error('Erro ao resetar:', err);
       setError(err instanceof Error ? err.message : 'Erro ao resetar');
@@ -272,13 +274,13 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
 
     // Validar tipo de arquivo
     if (!file.type.startsWith('image/')) {
-      alert('Por favor, selecione apenas arquivos de imagem.');
+      toastService.warning('Selecione apenas arquivos de imagem.');
       return;
     }
 
     // Validar tamanho original (max 10MB antes da compressão)
     if (file.size > 10 * 1024 * 1024) {
-      alert('A imagem deve ter no máximo 10MB.');
+      toastService.warning('A imagem deve ter no máximo 10MB.');
       return;
     }
 
@@ -297,7 +299,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
       console.log(`✅ Logo processada com sucesso: ${sizeInKB}KB`);
     } catch (err) {
       console.error('Erro ao fazer upload da logo:', err);
-      alert('Erro ao processar a imagem. Tente novamente ou escolha outra imagem.');
+      toastService.error('Erro ao processar a imagem. Tente novamente ou escolha outra imagem.');
     } finally {
       setUploadingLogo(false);
     }
@@ -358,6 +360,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
 
       const history = await empresaConfigService.getBackupHistory();
       setBackupHistory(history);
+      setShowBackupHistory(history.length > 0);
     } catch (err: any) {
       console.error('Erro ao executar backup:', err);
       setBackupResult({
@@ -377,25 +380,17 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
       setBackupHistory(latestHistory);
 
       if (latestHistory.length === 0) {
-        alert('Nenhum backup disponível para esta empresa.');
+        toastService.info('Nenhum backup disponível para esta empresa.');
+        setShowBackupHistory(false);
         return;
       }
 
-      const resumo = latestHistory
-        .slice(0, 10)
-        .map(
-          (item, index) =>
-            `${index + 1}. ${new Date(item.generatedAt).toLocaleString('pt-BR')} - ${Math.max(
-              1,
-              Math.round(item.sizeBytes / 1024),
-            )} KB`,
-        )
-        .join('\n');
-
-      alert(`Histórico de backups:\n\n${resumo}`);
+      toastService.info(`Histórico atualizado: ${latestHistory.length} backup${latestHistory.length > 1 ? 's' : ''}.`);
+      setShowBackupHistory(true);
     } catch (err) {
       console.error('Erro ao carregar histórico de backups:', err);
-      alert('Não foi possível carregar o histórico de backups.');
+      toastService.error('Não foi possível carregar o histórico de backups.');
+      setShowBackupHistory(false);
     }
   };
 
@@ -408,7 +403,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
     : 'Nenhum backup executado ainda.';
 
   const ultimoBackupIcon = ultimoBackup ? (
-    <CheckCircle className="h-6 w-6 text-blue-600" />
+    <CheckCircle className="h-6 w-6 text-[#159A9C]" />
   ) : (
     <Info className="h-6 w-6 text-gray-500" />
   );
@@ -710,8 +705,8 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                               <br />• A imagem será redimensionada para 500x500px mantendo a
                               proporção
                             </p>
-                            <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                              <p className="text-xs text-blue-800">
+                            <div className="mt-3 p-3 bg-[#DEEFE7] rounded-lg border border-[#B4BEC9]">
+                              <p className="text-xs text-[#002333]">
                                 <Info className="h-3 w-3 inline mr-1" />
                                 Esta logo aparecerá em propostas, relatórios e no portal do cliente.
                                 A compressão automática garante carregamento rápido.
@@ -1045,7 +1040,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
 
                     {/* Card Informativo */}
                     <div className="flex items-start gap-3 p-4 bg-[#DEEFE7] rounded-lg border border-[#B4BEC9]">
-                      <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                      <Info className="h-5 w-5 text-[#159A9C] flex-shrink-0 mt-0.5" />
                       <div>
                         <p className="text-sm font-medium text-[#002333]">Gestão de Permissões</p>
                         <p className="text-xs text-[#002333] mt-1">
@@ -1171,7 +1166,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                             !formData.smtpUsuario ||
                             !formData.smtpSenha
                           }
-                          className="flex items-center gap-2 px-6 py-3 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                           <Send className="h-4 w-4" />
                           {testingSMTP ? 'Testando Conexão...' : 'Testar Conexão SMTP'}
@@ -1244,9 +1239,9 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                   </h2>
 
                   {/* SEÇÃO 1: WhatsApp */}
-                  <div className="border-l-4 border-green-500 pl-6 py-4 bg-green-50/30">
+                  <div className="border-l-4 border-[#159A9C] pl-6 py-4 bg-[#DEEFE7]/30">
                     <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                      <MessageSquare className="h-5 w-5 text-green-600" />
+                      <MessageSquare className="h-5 w-5 text-[#159A9C]" />
                       WhatsApp Business API
                     </h3>
 
@@ -1267,7 +1262,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                           onChange={(e) =>
                             handleInputChange('whatsappHabilitado', e.target.checked)
                           }
-                          className="h-5 w-5 text-green-600 rounded focus:ring-green-500 cursor-pointer"
+                          className="h-5 w-5 text-[#159A9C] rounded focus:ring-[#159A9C] cursor-pointer"
                         />
                       </div>
 
@@ -1283,7 +1278,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                               onChange={(e) => handleInputChange('whatsappNumero', e.target.value)}
                               placeholder="+55 11 98765-4321"
                               maxLength={20}
-                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
                             />
                           </div>
 
@@ -1298,7 +1293,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                                 handleInputChange('whatsappApiToken', e.target.value)
                               }
                               placeholder="••••••••••••••••••••••••••••"
-                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
                             />
                             <p className="text-xs text-gray-500 mt-1">
                               Token de acesso da Meta Business API
@@ -1312,7 +1307,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                   {/* SEÇÃO 2: SMS */}
                   <div className="border-l-4 border-[#159A9C] pl-6 py-4 bg-[#DEEFE7]/30">
                     <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                      <MessageSquare className="h-5 w-5 text-blue-600" />
+                      <MessageSquare className="h-5 w-5 text-[#159A9C]" />
                       SMS
                     </h3>
 
@@ -1331,7 +1326,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                           type="checkbox"
                           checked={formData.smsHabilitado || false}
                           onChange={(e) => handleInputChange('smsHabilitado', e.target.checked)}
-                          className="h-5 w-5 text-blue-600 rounded focus:ring-[#159A9C] cursor-pointer"
+                          className="h-5 w-5 text-[#159A9C] rounded focus:ring-[#159A9C] cursor-pointer"
                         />
                       </div>
 
@@ -1373,9 +1368,9 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                   </div>
 
                   {/* SEÇÃO 3: Push Notifications */}
-                  <div className="border-l-4 border-purple-500 pl-6 py-4 bg-purple-50/30">
+                  <div className="border-l-4 border-[#159A9C] pl-6 py-4 bg-[#DEEFE7]/30">
                     <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                      <MessageSquare className="h-5 w-5 text-purple-600" />
+                      <MessageSquare className="h-5 w-5 text-[#159A9C]" />
                       Push Notifications
                     </h3>
 
@@ -1394,7 +1389,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                           type="checkbox"
                           checked={formData.pushHabilitado || false}
                           onChange={(e) => handleInputChange('pushHabilitado', e.target.checked)}
-                          className="h-5 w-5 text-purple-600 rounded focus:ring-purple-500 cursor-pointer"
+                          className="h-5 w-5 text-[#159A9C] rounded focus:ring-[#159A9C] cursor-pointer"
                         />
                       </div>
 
@@ -1407,7 +1402,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                             <select
                               value={formData.pushProvider || 'fcm'}
                               onChange={(e) => handleInputChange('pushProvider', e.target.value)}
-                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
                             >
                               <option value="fcm">Firebase Cloud Messaging (FCM)</option>
                               <option value="apns">Apple Push Notification (APNS)</option>
@@ -1424,7 +1419,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                               value={formData.pushApiKey || ''}
                               onChange={(e) => handleInputChange('pushApiKey', e.target.value)}
                               placeholder="••••••••••••••••••••••••••••"
-                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
                             />
                             <p className="text-xs text-gray-500 mt-1">
                               Chave de servidor ou token de autenticação
@@ -1535,7 +1530,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                       <button
                         onClick={handleExecutarBackup}
                         disabled={executingBackup || !canUpdateConfig}
-                        className="flex items-center justify-center gap-2 px-6 py-3 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                         <Database className="h-4 w-4" />
                         {executingBackup ? 'Executando Backup...' : 'Executar Backup Agora'}
@@ -1543,7 +1538,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
 
                       <button
                         onClick={handleVerHistoricoBackups}
-                        className="flex items-center justify-center gap-2 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                        className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                       >
                         <Info className="h-4 w-4" />
                         Ver Histórico
@@ -1580,6 +1575,35 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                             {backupResult.message}
                           </p>
                         </div>
+                      </div>
+                    )}
+
+                    {showBackupHistory && backupHistory.length > 0 && (
+                      <div className="rounded-lg border border-[#B4BEC9] bg-white">
+                        <div className="border-b border-[#DCE6EA] px-4 py-3">
+                          <p className="text-sm font-medium text-[#002333]">Histórico de Backups</p>
+                          <p className="text-xs text-gray-500 mt-1">Exibindo os 10 mais recentes.</p>
+                        </div>
+                        <ul className="divide-y divide-[#EEF3F5]">
+                          {backupHistory.slice(0, 10).map((item) => (
+                            <li
+                              key={`${item.fileName}-${item.generatedAt}`}
+                              className="flex items-center justify-between gap-3 px-4 py-3"
+                            >
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-[#002333] truncate">
+                                  {item.fileName}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                  {new Date(item.generatedAt).toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                              <span className="text-xs font-medium text-[#355061] whitespace-nowrap">
+                                {Math.max(1, Math.round(item.sizeBytes / 1024))} KB
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     )}
                   </div>
@@ -1631,7 +1655,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
             <button
               onClick={handleReset}
               disabled={saving || !canUpdateConfig}
-              className="flex items-center justify-center gap-2 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             >
               <RotateCcw className="h-4 w-4" />
               Restaurar Padrões
@@ -1639,7 +1663,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
             <button
               onClick={handleSave}
               disabled={!canUpdateConfig || !hasChanges || saving}
-              className="flex items-center justify-center gap-2 px-6 py-3 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50"
+              className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50"
             >
               <Save className="h-4 w-4" />
               {saving ? 'Salvando...' : 'Salvar Alterações'}

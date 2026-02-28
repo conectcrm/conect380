@@ -21,6 +21,7 @@ import {
   Home,
   AlertTriangle,
   ClipboardList,
+  ListChecks,
 } from 'lucide-react';
 import menuConfig, { MenuConfig } from './menuConfig';
 import { ModuleItem, NucleusModulesData } from '../components/navigation/ModulesScreen';
@@ -240,8 +241,18 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
       },
       {
         menuId: 'financeiro-fornecedores',
-        description: 'Gestão completa de fornecedores e parceiros comerciais.',
+        description: 'GestÃ£o completa de fornecedores e parceiros comerciais.',
         icon: Users,
+      },
+      {
+        menuId: 'financeiro-contas-bancarias',
+        description: 'Cadastro e gestao das contas bancarias usadas no fluxo de pagamentos.',
+        icon: Building2,
+      },
+      {
+        menuId: 'financeiro-aprovacoes',
+        description: 'Fila de pendencias para aprovacao financeira individual e em lote.',
+        icon: ListChecks,
       },
       {
         menuId: 'financeiro-faturamento',
@@ -260,14 +271,9 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
         status: 'coming_soon',
       },
       {
-        id: 'conciliacao',
-        name: 'Conciliação Bancária',
-        description: 'Conciliação automática de extratos bancários e controle de divergências.',
-        href: '/financeiro/conciliacao',
+        menuId: 'financeiro-conciliacao',
+        description: 'Importacao de extratos OFX/CSV e preparacao de lancamentos para conciliacao.',
         icon: Building2,
-        badge: 'Q2 2025',
-        badgeColor: 'blue',
-        status: 'coming_soon',
       },
       {
         id: 'centro-custos',

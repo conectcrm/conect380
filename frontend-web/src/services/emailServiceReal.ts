@@ -6,7 +6,7 @@
 
 import { TEMPLATE_PROPOSTA_EMAIL, EMAIL_PROVIDERS } from '../config/emailConfig';
 import { formatarTokenParaExibicao } from '../utils/tokenUtils';
-import { API_BASE_URL } from './api';
+import { api, API_BASE_URL } from './api';
 
 export interface EmailData {
   to: string;
@@ -91,33 +91,23 @@ class EmailServiceReal {
         });
       }
 
-      // ✅ CORREÇÃO: Chamar API específica para propostas que faz sincronização automática
-      const response = await fetch(`${this.emailServerUrl}/email/enviar-proposta`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      // Usa cliente autenticado (axios) para enviar JWT automaticamente.
+      const response = await api.post('/email/enviar-proposta', {
+        proposta: {
+          id: data.proposta.id || data.proposta.numero,
+          numero: data.proposta.numero,
+          valorTotal: data.proposta.valorTotal,
+          dataValidade: data.proposta.dataValidade,
+          token: data.proposta.token,
         },
-        body: JSON.stringify({
-          proposta: {
-            id: data.proposta.id || data.proposta.numero, // Usar número da proposta como ID
-            numero: data.proposta.numero,
-            valorTotal: data.proposta.valorTotal,
-            dataValidade: data.proposta.dataValidade,
-            token: data.proposta.token, // ✅ CORREÇÃO: Usar número da proposta como token
-          },
-          emailCliente: data.cliente.email,
-          linkPortal: data.portalUrl
-            ? `${data.portalUrl}/${data.proposta.numero}/${data.proposta.token}`
-            : `${window.location.origin}/portal/${data.proposta.numero}/${data.proposta.token}`, // ✅ CORREÇÃO: Usar número da proposta
-          registrarToken: true, // ✅ Solicitar que o backend registre o token
-        }),
+        emailCliente: data.cliente.email,
+        linkPortal: data.portalUrl
+          ? `${data.portalUrl}/${data.proposta.numero}/${data.proposta.token}`
+          : `${window.location.origin}/portal/${data.proposta.numero}/${data.proposta.token}`,
+        registrarToken: true,
       });
 
-      if (!response.ok) {
-        throw new Error(`Erro na API /email/enviar-proposta: ${response.statusText}`);
-      }
-
-      const result = await response.json();
+      const result = response.data;
 
       if (result.success) {
         console.log('✅ Proposta enviada com sincronização automática:', result);
@@ -131,10 +121,16 @@ class EmailServiceReal {
         throw new Error(result.message || 'Erro desconhecido na API');
       }
     } catch (error) {
+      const apiMessage =
+        (error as any)?.response?.data?.message ||
+        (error as any)?.response?.data?.error ||
+        (error as Error)?.message ||
+        'Erro desconhecido';
+
       console.error('❌ Erro ao enviar e-mail de proposta:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Erro desconhecido',
+        error: apiMessage,
         timestamp: new Date(),
       };
     }

@@ -28,6 +28,10 @@ import { Interacao } from '../modules/interacoes/interacao.entity';
 import { Fornecedor } from '../modules/financeiro/entities/fornecedor.entity';
 import { ContaPagar } from '../modules/financeiro/entities/conta-pagar.entity';
 import { ContaBancaria } from '../modules/financeiro/entities/conta-bancaria.entity';
+import { AlertaOperacionalFinanceiro } from '../modules/financeiro/entities/alerta-operacional-financeiro.entity';
+import { ContaPagarExportacao } from '../modules/financeiro/entities/conta-pagar-exportacao.entity';
+import { ExtratoBancarioImportacao } from '../modules/financeiro/entities/extrato-bancario-importacao.entity';
+import { ExtratoBancarioItem } from '../modules/financeiro/entities/extrato-bancario-item.entity';
 import { Fatura } from '../modules/faturamento/entities/fatura.entity';
 import { ItemFatura } from '../modules/faturamento/entities/item-fatura.entity';
 import { Pagamento } from '../modules/faturamento/entities/pagamento.entity';
@@ -66,6 +70,7 @@ import { Lead } from '../modules/leads/lead.entity'; // ✅ Módulo de Leads CRM
 import { Meta } from '../modules/metas/entities/meta.entity';
 import { ConfiguracaoGateway } from '../modules/pagamentos/entities/configuracao-gateway.entity';
 import { TransacaoGateway } from '../modules/pagamentos/entities/transacao-gateway.entity';
+import { GatewayWebhookEvento } from '../modules/pagamentos/entities/gateway-webhook-evento.entity';
 import { Cotacao } from '../cotacao/entities/cotacao.entity';
 import { ItemCotacao } from '../cotacao/entities/item-cotacao.entity';
 import { AnexoCotacao } from '../cotacao/entities/anexo-cotacao.entity';
@@ -114,6 +119,10 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         Fornecedor,
         ContaPagar,
         ContaBancaria,
+        AlertaOperacionalFinanceiro,
+        ContaPagarExportacao,
+        ExtratoBancarioImportacao,
+        ExtratoBancarioItem,
         Fatura,
         ItemFatura,
         Pagamento,
@@ -139,6 +148,7 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         SlaEventLog, // ✅ SLA Tracking - Logs de eventos SLA
         ConfiguracaoGateway,
         TransacaoGateway,
+        GatewayWebhookEvento,
         Cotacao,
         ItemCotacao,
         AnexoCotacao,
