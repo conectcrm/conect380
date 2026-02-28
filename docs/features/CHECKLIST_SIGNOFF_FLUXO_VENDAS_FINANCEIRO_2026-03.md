@@ -36,5 +36,5 @@ Registrar aprovacao formal de QA, Produto e Financeiro para encerramento do cicl
 ## 5. Decisao final
 
 - Status final: [x] GO  [ ] NO-GO
-- Condicionantes (se houver): monitoramento pos-go-live de 48h com observabilidade ativa.
-- Proxima acao: encerrar ciclo AP-301/AP304 no plano e seguir para backlog incremental.
+- Condicionantes (se houver): monitoramento pos-go-live de 48h com observabilidade ativa (guia/script publicados em `docs/features/MONITORAMENTO_POS_GO_LIVE_48H_VENDAS_FINANCEIRO_2026-03.md`).
+- Proxima acao: executar janela real de 48h, anexar relatorio em `docs/features/evidencias/` e atualizar o sign-off final.

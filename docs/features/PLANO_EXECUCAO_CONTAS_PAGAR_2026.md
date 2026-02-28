@@ -392,7 +392,9 @@ Entregar um fluxo funcional de contas a pagar ponta a ponta no Conect360, cobrin
 ### Proximo foco recomendado
 
 1. Executar monitoramento pos-go-live de 48h para Sprint 1 (cadastro/pagamento/filtros/permissoes).
+   - Status atual: preparado em 2026-02-28 com script de coleta e consolidacao (`scripts/monitor-pos-go-live-vendas-financeiro.ps1`) e guia operacional (`docs/features/MONITORAMENTO_POS_GO_LIVE_48H_VENDAS_FINANCEIRO_2026-03.md`).
 2. Executar monitoramento pos-go-live de 48h para AP-301/AP304 (webhook, sincronizacao e fila de excecoes).
+   - Status atual: preparado em 2026-02-28; pendente apenas execucao da janela real de 48h e publicacao do relatorio final.
 3. Acompanhar backlog incremental AP-302/AP-303 conforme pauta aprovada.
 4. Fechar fluxo Vendas -> Financeiro com registro final de operacao (GO tecnico e GO de negocio).
 
@@ -476,3 +478,19 @@ Entregar um fluxo funcional de contas a pagar ponta a ponta no Conect360, cobrin
   - Prazo: 2026-03-07
   - Evidencia de conclusao: stories priorizadas para sprint seguinte e criterios de aceite aprovados.
   - Status atual: concluido em 2026-02-28 com backlog AP304 consolidado, execucao tecnica registrada e autoaprovacao formal por responsavel unico; evidencias em `docs/features/AP304_FECHAMENTO_FLUXO_VENDAS_FINANCEIRO_BACKLOG_2026-03.md`, `docs/features/RELATORIO_HOMOLOGACAO_FLUXO_VENDAS_FINANCEIRO_20260228-133245.md` e `docs/features/CHECKLIST_SIGNOFF_FLUXO_VENDAS_FINANCEIRO_2026-03.md`.
+
+### 14.5 Monitoramento pos-go-live (48h)
+
+- [x] Publicar guia operacional e automacao da janela de monitoramento.
+  - Responsavel sugerido: Backend + Tech Lead
+  - Prazo: 2026-03-01
+  - Evidencia de conclusao: script e guia publicados (`scripts/monitor-pos-go-live-vendas-financeiro.ps1`, `docs/features/MONITORAMENTO_POS_GO_LIVE_48H_VENDAS_FINANCEIRO_2026-03.md`).
+  - Status atual: concluido em 2026-02-28.
+- [ ] Executar janela real de monitoramento por 48h apos go-live.
+  - Responsavel sugerido: Operacoes + Tech Lead
+  - Prazo: primeiro ciclo apos publicacao em producao
+  - Evidencia de conclusao: relatorio de monitoramento gerado em `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_<runId>.md`.
+- [ ] Registrar decisao final de operacao (GO tecnico/negocio) apos janela de 48h.
+  - Responsavel sugerido: Responsavel unico do projeto
+  - Prazo: D+2 do go-live monitorado
+  - Evidencia de conclusao: atualizacao do checklist de sign-off com data e resultado final.
