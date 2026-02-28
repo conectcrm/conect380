@@ -1,467 +1,534 @@
-/**
- * Página de Gestão do Portal do Cliente
- * Central de controle e administração do portal
- */
-
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
-  Globe,
-  BarChart3,
-  Settings,
-  Users,
-  Eye,
-  ExternalLink,
-  Shield,
-  Bell,
-  FileText,
-  Calendar,
-  TrendingUp,
   Activity,
+  CheckCircle2,
   Copy,
+  ExternalLink,
+  Eye,
+  FileText,
   Mail,
-  Plus,
+  RefreshCw,
+  XCircle,
 } from 'lucide-react';
-import { BackToNucleus } from '../components/navigation/BackToNucleus';
+import {
+  DataTableCard,
+  EmptyState,
+  InlineStats,
+  LoadingSkeleton,
+  PageHeader,
+  SectionCard,
+} from '../components/layout-v2';
+import { propostasService, type Proposta } from '../services/propostasService';
+import { portalClienteService } from '../services/portalClienteService';
+
+const STATUS_ENVIADAS = new Set([
+  'enviada',
+  'visualizada',
+  'negociacao',
+  'aprovada',
+  'contrato_gerado',
+  'contrato_assinado',
+  'fatura_criada',
+  'aguardando_pagamento',
+  'pago',
+  'rejeitada',
+  'expirada',
+]);
+
+const STATUS_APROVADAS = new Set([
+  'aprovada',
+  'contrato_gerado',
+  'contrato_assinado',
+  'fatura_criada',
+  'aguardando_pagamento',
+  'pago',
+]);
+
+type PortalEvent = {
+  propostaId: string;
+  propostaNumero: string;
+  cliente: string;
+  acao: string;
+  status: string;
+  ip: string;
+  timestamp: string;
+  tempoVisualizacao?: number;
+};
+
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(Number(value || 0));
+
+const formatDateTime = (value?: string) => {
+  if (!value) return '-';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '-';
+  return parsed.toLocaleString('pt-BR');
+};
+
+const formatTempo = (seconds: number) => {
+  if (!Number.isFinite(seconds) || seconds <= 0) return '0s';
+  const total = Math.round(seconds);
+  const minutes = Math.floor(total / 60);
+  const remaining = total % 60;
+  if (minutes <= 0) return `${remaining}s`;
+  return `${minutes}m ${remaining}s`;
+};
+
+const normalizarAcao = (raw: string) => {
+  const value = String(raw || '').toLowerCase();
+  if (value.includes('visual') || value.includes('view')) return 'Visualizacao';
+  if (value.includes('aceite') || value.includes('aprov')) return 'Aceite';
+  if (value.includes('rejei')) return 'Rejeicao';
+  if (value.includes('download')) return 'Download';
+  if (value.includes('contrato')) return 'Solicitacao de contrato';
+  if (value.includes('scroll')) return 'Scroll';
+  return raw || 'Acesso';
+};
+
+const extrairEventosPortal = (proposta: Proposta): PortalEvent[] => {
+  const numero = String(proposta.numero || proposta.id || '-');
+  const cliente = String(proposta.cliente?.nome || 'Cliente nao informado');
+  const propostaId = String(proposta.id || proposta.numero || '');
+
+  const eventosRaw = [
+    ...(((proposta as any)?.emailDetails?.portalEventos as any[]) || []),
+    ...(((proposta as any)?.historicoEventos as any[]) || []).filter((evento: any) =>
+      String(evento?.origem || '').toLowerCase().includes('portal'),
+    ),
+  ];
+
+  return eventosRaw
+    .map((evento: any) => {
+      const timestamp =
+        evento?.timestamp ||
+        evento?.data ||
+        evento?.createdAt ||
+        evento?.criadoEm ||
+        null;
+
+      if (!timestamp) {
+        return null;
+      }
+
+      return {
+        propostaId,
+        propostaNumero: numero,
+        cliente,
+        acao: normalizarAcao(String(evento?.evento || evento?.acao || 'Acesso')),
+        status: String(evento?.status || proposta.status || ''),
+        ip: String(evento?.ip || evento?.dados?.ip || '-'),
+        timestamp: String(timestamp),
+        tempoVisualizacao: Number(evento?.dados?.tempoVisualizacao || 0) || undefined,
+      } satisfies PortalEvent;
+    })
+    .filter(Boolean) as PortalEvent[];
+};
 
 const PortalClientePage: React.FC = () => {
-  console.log('DEBUG: PortalClientePage carregada');
-  const [activeTab, setActiveTab] = useState('overview');
+  const [propostas, setPropostas] = useState<Proposta[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
+  const [generatingLinkId, setGeneratingLinkId] = useState<string | null>(null);
+  const [linksGerados, setLinksGerados] = useState<Record<string, string>>({});
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(
+    null,
+  );
 
-  // Dados simulados para demonstração
-  const estatisticas = {
-    totalAcessos: 1247,
-    acessosHoje: 23,
-    propostas: {
-      enviadas: 156,
-      visualizadas: 134,
-      aceitas: 89,
-      rejeitadas: 12,
-    },
-    tempoMedioVisualizacao: '4.2 min',
-  };
+  const showFeedback = useCallback((type: 'success' | 'error', message: string) => {
+    setFeedback({ type, message });
+    window.setTimeout(() => setFeedback(null), 4000);
+  }, []);
 
-  const acessosRecentes = [
-    {
-      id: 1,
-      cliente: 'João Silva Ltda',
-      proposta: 'PROP-2025-001',
-      dataAcesso: '2025-01-27 14:30',
-      acao: 'Visualizou proposta',
-      ip: '192.168.1.100',
-    },
-    {
-      id: 2,
-      cliente: 'Tech Solutions',
-      proposta: 'PROP-2025-002',
-      dataAcesso: '2025-01-27 13:15',
-      acao: 'Aceitou proposta',
-      ip: '10.0.0.45',
-    },
-    {
-      id: 3,
-      cliente: 'Marina Costa ME',
-      proposta: 'PROP-2025-003',
-      dataAcesso: '2025-01-27 11:20',
-      acao: 'Rejeitou proposta',
-      ip: '172.16.0.12',
-    },
-  ];
+  const carregarDados = useCallback(async () => {
+    setLoading(true);
+    setErro(null);
 
-  const propostas = [
-    {
-      id: 'PROP-2025-001',
-      cliente: 'João Silva Ltda',
-      valor: 15500.0,
-      status: 'Enviada',
-      dataEnvio: '2025-01-25',
-      acessos: 3,
-      ultimoAcesso: '2025-01-27 14:30',
-    },
-    {
-      id: 'PROP-2025-002',
-      cliente: 'Tech Solutions',
-      valor: 28900.0,
-      status: 'Aceita',
-      dataEnvio: '2025-01-24',
-      acessos: 5,
-      ultimoAcesso: '2025-01-27 13:15',
-    },
-    {
-      id: 'PROP-2025-003',
-      cliente: 'Marina Costa ME',
-      valor: 7800.0,
-      status: 'Rejeitada',
-      dataEnvio: '2025-01-23',
-      acessos: 2,
-      ultimoAcesso: '2025-01-27 11:20',
-    },
-  ];
-
-  const tabs = [
-    { id: 'overview', label: 'Visão Geral', icon: BarChart3 },
-    { id: 'propostas', label: 'Propostas', icon: FileText },
-    { id: 'acessos', label: 'Log de Acessos', icon: Activity },
-    { id: 'configuracoes', label: 'Configurações', icon: Settings },
-  ];
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Aceita':
-        return 'bg-green-100 text-green-800';
-      case 'Rejeitada':
-        return 'bg-red-100 text-red-800';
-      case 'Enviada':
-        return 'bg-blue-100 text-blue-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+    try {
+      const dados = await propostasService.findAll();
+      setPropostas(Array.isArray(dados) ? dados : []);
+    } catch (error) {
+      console.error('Erro ao carregar dados do portal:', error);
+      setErro('Nao foi possivel carregar os dados do portal.');
+    } finally {
+      setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    void carregarDados();
+  }, [carregarDados]);
+
+  const propostasPortal = useMemo(
+    () => propostas.filter((proposta) => STATUS_ENVIADAS.has(String(proposta.status || ''))),
+    [propostas],
+  );
+
+  const eventosPortal = useMemo(
+    () =>
+      propostasPortal
+        .flatMap((proposta) => extrairEventosPortal(proposta))
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()),
+    [propostasPortal],
+  );
+
+  const estatisticas = useMemo(() => {
+    const enviadas = propostasPortal.length;
+    const visualizadas = propostasPortal.filter((proposta) =>
+      ['visualizada', 'negociacao', 'aprovada', 'rejeitada'].includes(String(proposta.status || '')),
+    ).length;
+    const aprovadas = propostasPortal.filter((proposta) =>
+      STATUS_APROVADAS.has(String(proposta.status || '')),
+    ).length;
+    const rejeitadas = propostasPortal.filter(
+      (proposta) => String(proposta.status || '') === 'rejeitada',
+    ).length;
+
+    const tempos = eventosPortal
+      .map((evento) => Number(evento.tempoVisualizacao || 0))
+      .filter((value) => value > 0);
+    const tempoMedio = tempos.length
+      ? formatTempo(tempos.reduce((sum, value) => sum + value, 0) / tempos.length)
+      : '0s';
+
+    return {
+      enviadas,
+      visualizadas,
+      aprovadas,
+      rejeitadas,
+      totalAcessos: eventosPortal.length,
+      tempoMedio,
+      taxaAceite: enviadas > 0 ? Math.round((aprovadas / enviadas) * 100) : 0,
+    };
+  }, [eventosPortal, propostasPortal]);
+
+  const acessosPorProposta = useMemo(() => {
+    const mapa: Record<string, number> = {};
+    eventosPortal.forEach((evento) => {
+      mapa[evento.propostaId] = (mapa[evento.propostaId] || 0) + 1;
+    });
+    return mapa;
+  }, [eventosPortal]);
+
+  const ultimoAcessoPorProposta = useMemo(() => {
+    const mapa: Record<string, string> = {};
+    eventosPortal.forEach((evento) => {
+      if (!mapa[evento.propostaId]) {
+        mapa[evento.propostaId] = evento.timestamp;
+      }
+    });
+    return mapa;
+  }, [eventosPortal]);
+
+  const obterStatusBadge = (status: string) => {
+    const normalized = String(status || '').toLowerCase();
+    if (['aprovada', 'contrato_gerado', 'contrato_assinado', 'fatura_criada', 'pago'].includes(normalized)) {
+      return 'bg-[#DCFCE7] text-[#166534]';
+    }
+    if (normalized === 'rejeitada') {
+      return 'bg-[#FEE2E2] text-[#991B1B]';
+    }
+    if (normalized === 'visualizada' || normalized === 'negociacao') {
+      return 'bg-[#FEF3C7] text-[#92400E]';
+    }
+    if (normalized === 'expirada') {
+      return 'bg-[#E5E7EB] text-[#374151]';
+    }
+    return 'bg-[#DBEAFE] text-[#1D4ED8]';
   };
+
+  const montarLinkPortal = useCallback(
+    async (proposta: Proposta) => {
+      const propostaId = String(proposta.id || proposta.numero || '');
+      if (!propostaId) {
+        throw new Error('Proposta sem identificador para gerar link do portal.');
+      }
+
+      const cacheLink = linksGerados[propostaId];
+      if (cacheLink) {
+        return cacheLink;
+      }
+
+      setGeneratingLinkId(propostaId);
+      try {
+        const token = await portalClienteService.gerarTokenPublico(propostaId);
+        const numero = String(proposta.numero || propostaId);
+        const link = `${window.location.origin}/portal/${encodeURIComponent(numero)}/${encodeURIComponent(token)}`;
+
+        setLinksGerados((prev) => ({
+          ...prev,
+          [propostaId]: link,
+        }));
+
+        return link;
+      } finally {
+        setGeneratingLinkId(null);
+      }
+    },
+    [linksGerados],
+  );
+
+  const handleAbrirPortal = useCallback(
+    async (proposta: Proposta) => {
+      try {
+        const link = await montarLinkPortal(proposta);
+        window.open(link, '_blank', 'noopener,noreferrer');
+      } catch (error) {
+        console.error('Erro ao abrir portal:', error);
+        showFeedback('error', 'Nao foi possivel abrir o link do portal.');
+      }
+    },
+    [montarLinkPortal, showFeedback],
+  );
+
+  const handleCopiarLink = useCallback(
+    async (proposta: Proposta) => {
+      try {
+        const link = await montarLinkPortal(proposta);
+        await navigator.clipboard.writeText(link);
+        showFeedback('success', `Link da proposta ${proposta.numero || proposta.id} copiado.`);
+      } catch (error) {
+        console.error('Erro ao copiar link:', error);
+        showFeedback('error', 'Nao foi possivel copiar o link do portal.');
+      }
+    },
+    [montarLinkPortal, showFeedback],
+  );
+
+  const handleEmailCliente = useCallback(
+    async (proposta: Proposta) => {
+      const email = String(proposta.cliente?.email || '').trim();
+      if (!email) {
+        showFeedback('error', 'Cliente sem email cadastrado para envio.');
+        return;
+      }
+
+      try {
+        const link = await montarLinkPortal(proposta);
+        const assunto = encodeURIComponent(`Proposta ${proposta.numero || proposta.id}`);
+        const corpo = encodeURIComponent(
+          `Ola ${proposta.cliente?.nome || 'cliente'},\n\nSegue o link da sua proposta:\n${link}\n\nAtenciosamente.`,
+        );
+        window.location.href = `mailto:${email}?subject=${assunto}&body=${corpo}`;
+      } catch (error) {
+        console.error('Erro ao preparar email:', error);
+        showFeedback('error', 'Nao foi possivel preparar o email com o link da proposta.');
+      }
+    },
+    [montarLinkPortal, showFeedback],
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* DEBUG: Título temporário para confirmar que a página carrega */}
-      <div className="bg-red-500 text-white p-4 text-center font-bold">
-        DEBUG: Portal do Cliente Carregado com Sucesso!
-      </div>
-
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <BackToNucleus nucleusPath="/nuclei/gestao" nucleusName="Gestão" />
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] rounded-lg flex items-center justify-center">
-                  <Globe className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900">Portal do Cliente</h1>
-                  <p className="text-sm text-gray-600">Gestão e controle de acesso</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-                <Plus className="h-4 w-4" />
-                Nova Proposta
+    <div className="space-y-4">
+      <SectionCard className="p-4 sm:p-5">
+        <PageHeader
+          title="Portal de Propostas"
+          description="Acompanhe links enviados, visualizacoes e aceite de propostas no portal do cliente."
+          actions={
+            <div className="flex items-center gap-2">
+              <Link
+                to="/nuclei/administracao"
+                className="inline-flex h-9 items-center rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+              >
+                Voltar ao nucleo
+              </Link>
+              <button
+                type="button"
+                onClick={() => void carregarDados()}
+                className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition hover:bg-[#117C7E]"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Atualizar
               </button>
             </div>
-          </div>
+          }
+        />
+
+        <InlineStats
+          className="mt-3"
+          stats={[
+            { label: 'Propostas no portal', value: String(estatisticas.enviadas), tone: 'neutral' },
+            { label: 'Visualizadas', value: String(estatisticas.visualizadas), tone: 'accent' },
+            { label: 'Aprovadas', value: String(estatisticas.aprovadas), tone: 'accent' },
+            { label: 'Rejeitadas', value: String(estatisticas.rejeitadas), tone: 'warning' },
+            { label: 'Total de acessos', value: String(estatisticas.totalAcessos), tone: 'neutral' },
+            { label: 'Taxa de aceite', value: `${estatisticas.taxaAceite}%`, tone: 'accent' },
+            { label: 'Tempo medio de visualizacao', value: estatisticas.tempoMedio, tone: 'neutral' },
+          ]}
+        />
+      </SectionCard>
+
+      {feedback && (
+        <SectionCard
+          className={`p-3 text-sm font-medium ${
+            feedback.type === 'success'
+              ? 'border border-[#A7F3D0] bg-[#ECFDF5] text-[#166534]'
+              : 'border border-[#FECACA] bg-[#FEF2F2] text-[#991B1B]'
+          }`}
+        >
+          {feedback.message}
+        </SectionCard>
+      )}
+
+      {erro && (
+        <SectionCard className="border border-[#FECACA] bg-[#FEF2F2] p-3 text-sm font-medium text-[#991B1B]">
+          {erro}
+        </SectionCard>
+      )}
+
+      {loading ? (
+        <div className="space-y-4">
+          <LoadingSkeleton lines={5} />
+          <LoadingSkeleton lines={4} />
         </div>
-      </div>
-
-      {/* Tabs Navigation */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-8">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 py-4 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id
-                      ? 'border-[#159A9C] text-[#159A9C]'
-                      : 'border-transparent text-gray-500 hover:text-gray-700'
-                    }`}
-                >
-                  <Icon className="h-4 w-4" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Overview Tab */}
-        {activeTab === 'overview' && (
-          <div className="space-y-6">
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                <div className="flex items-center">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-600">Total de Acessos</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {estatisticas.totalAcessos.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <Eye className="h-6 w-6 text-blue-600" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                <div className="flex items-center">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-600">Acessos Hoje</p>
-                    <p className="text-2xl font-bold text-gray-900">{estatisticas.acessosHoje}</p>
-                  </div>
-                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                    <TrendingUp className="h-6 w-6 text-green-600" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                <div className="flex items-center">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-600">Taxa de Aceite</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {Math.round(
-                        (estatisticas.propostas.aceitas / estatisticas.propostas.enviadas) * 100,
-                      )}
-                      %
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <BarChart3 className="h-6 w-6 text-purple-600" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                <div className="flex items-center">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-600">Tempo Médio</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {estatisticas.tempoMedioVisualizacao}
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                    <Calendar className="h-6 w-6 text-orange-600" />
-                  </div>
-                </div>
-              </div>
+      ) : (
+        <>
+          <DataTableCard>
+            <div className="border-b border-[#DEE8EC] px-4 py-3">
+              <h3 className="text-sm font-semibold text-[#1B3B4E]">Propostas publicadas no portal</h3>
             </div>
 
-            {/* Recent Activity */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-              <div className="p-6 border-b">
-                <h3 className="text-lg font-semibold text-gray-900">Atividade Recente</h3>
+            {propostasPortal.length === 0 ? (
+              <div className="p-4">
+                <EmptyState
+                  title="Nenhuma proposta publicada"
+                  description="Envie propostas para clientes para acompanhar acessos no portal."
+                  icon={<FileText className="h-5 w-5" />}
+                />
               </div>
-              <div className="p-6">
-                <div className="space-y-4">
-                  {acessosRecentes.map((acesso) => (
-                    <div
-                      key={acesso.id}
-                      className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                          <Users className="h-5 w-5 text-blue-600" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">{acesso.cliente}</p>
-                          <p className="text-sm text-gray-600">
-                            {acesso.acao} - {acesso.proposta}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-gray-900">{acesso.dataAcesso}</p>
-                        <p className="text-xs text-gray-500">{acesso.ip}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Propostas Tab */}
-        {activeTab === 'propostas' && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-            <div className="p-6 border-b">
-              <h3 className="text-lg font-semibold text-gray-900">Propostas no Portal</h3>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Proposta
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Cliente
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Valor
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Acessos
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ações
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {propostas.map((proposta) => (
-                    <tr key={proposta.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="font-medium text-gray-900">{proposta.id}</div>
-                        <div className="text-sm text-gray-500">Enviada em {proposta.dataEnvio}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {proposta.cliente}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        R$ {proposta.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(proposta.status)}`}
-                        >
-                          {proposta.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {proposta.acessos} visualizações
-                        </div>
-                        <div className="text-xs text-gray-500">Último: {proposta.ultimoAcesso}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex items-center gap-2">
-                          <button className="text-blue-600 hover:text-blue-900">
-                            <ExternalLink className="h-4 w-4" />
-                          </button>
-                          <button className="text-gray-600 hover:text-gray-900">
-                            <Copy className="h-4 w-4" />
-                          </button>
-                          <button className="text-green-600 hover:text-green-900">
-                            <Mail className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-[#F8FBFC]">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">Proposta</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">Cliente</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">Valor</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">Acessos</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">Ultimo acesso</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-[#607B89]">Acoes</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white">
+                    {propostasPortal.map((proposta) => {
+                      const propostaId = String(proposta.id || proposta.numero || '');
+                      const acessos = acessosPorProposta[propostaId] || 0;
+                      const ultimoAcesso = ultimoAcessoPorProposta[propostaId];
 
-        {/* Log de Acessos Tab */}
-        {activeTab === 'acessos' && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-            <div className="p-6 border-b">
-              <h3 className="text-lg font-semibold text-gray-900">Log de Acessos Detalhado</h3>
-            </div>
-            <div className="p-6">
-              <div className="space-y-4">
-                {acessosRecentes.map((acesso) => (
-                  <div
-                    key={acesso.id}
-                    className="flex items-center justify-between p-4 border rounded-lg"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <div>
-                        <p className="font-medium text-gray-900">{acesso.cliente}</p>
-                        <p className="text-sm text-gray-600">{acesso.acao}</p>
-                        <p className="text-xs text-gray-500">Proposta: {acesso.proposta}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-gray-900">{acesso.dataAcesso}</p>
-                      <p className="text-xs text-gray-500">IP: {acesso.ip}</p>
-                    </div>
-                  </div>
-                ))}
+                      return (
+                        <tr key={propostaId} className="hover:bg-[#F8FBFC]">
+                          <td className="px-4 py-3 text-sm text-[#1B3B4E]">
+                            <div className="font-semibold">{proposta.numero || proposta.id}</div>
+                            <div className="text-xs text-[#607B89]">{formatDateTime((proposta as any).createdAt)}</div>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-[#244455]">
+                            <div className="font-medium">{proposta.cliente?.nome || 'Cliente nao informado'}</div>
+                            <div className="text-xs text-[#607B89]">{proposta.cliente?.email || '-'}</div>
+                          </td>
+                          <td className="px-4 py-3 text-sm font-semibold text-[#19384C]">{formatCurrency(proposta.total || 0)}</td>
+                          <td className="px-4 py-3 text-sm">
+                            <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${obterStatusBadge(String(proposta.status || ''))}`}>
+                              {String(proposta.status || '-').replace(/_/g, ' ')}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-[#244455]">{acessos}</td>
+                          <td className="px-4 py-3 text-sm text-[#244455]">{formatDateTime(ultimoAcesso)}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                type="button"
+                                onClick={() => void handleAbrirPortal(proposta)}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#0F7B7D] transition hover:bg-[#E6F4F5]"
+                                title="Abrir portal"
+                              >
+                                {generatingLinkId === propostaId ? (
+                                  <RefreshCw className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <ExternalLink className="h-4 w-4" />
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleCopiarLink(proposta)}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#244455] transition hover:bg-[#F1F5F7]"
+                                title="Copiar link"
+                              >
+                                <Copy className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleEmailCliente(proposta)}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#166534] transition hover:bg-[#ECFDF5]"
+                                title="Enviar link por email"
+                              >
+                                <Mail className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
+            )}
+          </DataTableCard>
+
+          <DataTableCard>
+            <div className="border-b border-[#DEE8EC] px-4 py-3">
+              <h3 className="text-sm font-semibold text-[#1B3B4E]">Log recente de acessos do portal</h3>
             </div>
-          </div>
-        )}
 
-        {/* Configurações Tab */}
-        {activeTab === 'configuracoes' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-              <div className="p-6 border-b">
-                <h3 className="text-lg font-semibold text-gray-900">Configurações do Portal</h3>
+            {eventosPortal.length === 0 ? (
+              <div className="p-4">
+                <EmptyState
+                  title="Sem eventos registrados"
+                  description="Os acessos e interacoes do cliente aparecem aqui apos a visualizacao da proposta."
+                  icon={<Activity className="h-5 w-5" />}
+                />
               </div>
-              <div className="p-6 space-y-6">
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-4">Segurança</h4>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-gray-900">Expiração automática de links</p>
-                        <p className="text-sm text-gray-600">
-                          Links expiram automaticamente após o período configurado
-                        </p>
-                      </div>
-                      <div className="flex items-center">
-                        <input
-                          type="number"
-                          defaultValue={30}
-                          className="w-20 px-3 py-1 border border-gray-300 rounded mr-2"
-                        />
-                        <span className="text-sm text-gray-600">dias</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-4">Notificações</h4>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          Notificar vendedor sobre acessos
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          Enviar email quando cliente acessar proposta
-                        </p>
-                      </div>
-                      <input type="checkbox" defaultChecked className="rounded" />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          Notificar sobre aceites/rejeições
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          Alerta imediato para decisões do cliente
-                        </p>
-                      </div>
-                      <input type="checkbox" defaultChecked className="rounded" />
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-4">Personalização</h4>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Mensagem de boas-vindas
-                      </label>
-                      <textarea
-                        rows={3}
-                        defaultValue="Obrigado por acessar nossa proposta. Analise com cuidado e entre em contato se tiver dúvidas."
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                      />
-                    </div>
-                  </div>
-                </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-[#F8FBFC]">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">Data</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">Proposta</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">Cliente</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">Acao</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">IP</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">Tempo</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white">
+                    {eventosPortal.slice(0, 30).map((evento, index) => (
+                      <tr key={`${evento.propostaId}-${evento.timestamp}-${index}`} className="hover:bg-[#F8FBFC]">
+                        <td className="px-4 py-3 text-sm text-[#244455]">{formatDateTime(evento.timestamp)}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-[#1B3B4E]">{evento.propostaNumero}</td>
+                        <td className="px-4 py-3 text-sm text-[#244455]">{evento.cliente}</td>
+                        <td className="px-4 py-3 text-sm">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-[#EEF7F8] px-2 py-1 text-xs font-semibold text-[#0F7B7D]">
+                            {evento.acao === 'Aceite' ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
+                            {evento.acao === 'Rejeicao' ? <XCircle className="h-3.5 w-3.5" /> : null}
+                            {evento.acao === 'Visualizacao' ? <Eye className="h-3.5 w-3.5" /> : null}
+                            {evento.acao}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-[#607B89]">{evento.ip || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-[#607B89]">{formatTempo(Number(evento.tempoVisualizacao || 0))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </div>
-          </div>
-        )}
-      </div>
+            )}
+          </DataTableCard>
+        </>
+      )}
     </div>
   );
 };

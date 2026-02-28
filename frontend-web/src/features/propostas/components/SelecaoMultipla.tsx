@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Check,
   ChevronDown,
@@ -8,7 +8,6 @@ import {
   Receipt,
   Trash2,
   UserCheck,
-  AlertTriangle,
   X,
 } from 'lucide-react';
 import { useGlobalConfirmation } from '../../../contexts/GlobalConfirmationContext';
@@ -86,7 +85,6 @@ export const SelecaoMultipla: React.FC<SelecaoMultiplaProps> = ({
 
   const handleAcao = async (acaoId: string) => {
     if (quantidade === 0) {
-      alert('Selecione pelo menos uma proposta');
       return;
     }
 

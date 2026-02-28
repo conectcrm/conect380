@@ -12,9 +12,10 @@ import {
 } from '../../components/layout-v2';
 import { propostasService, Proposta as PropostaCompleta } from '../../services/propostasService';
 import { pdfPropostasService, DadosProposta } from '../../services/pdfPropostasService';
+import { emailServiceReal } from '../../services/emailServiceReal';
+import { portalClienteService } from '../../services/portalClienteService';
 import { useGlobalConfirmation } from '../../contexts/GlobalConfirmationContext';
 import DashboardPropostas from './components/DashboardPropostas';
-import BulkActions from './components/BulkActions';
 import FiltrosAvancados from './components/FiltrosAvancados';
 import PropostaActions from './components/PropostaActions';
 import StatusFluxo from './components/StatusFluxo';
@@ -294,6 +295,16 @@ const actionSecondaryButtonClass =
 const viewToggleBaseClass =
   'inline-flex h-8 items-center justify-center rounded-md px-3 text-sm font-medium transition-colors';
 const MOTIVOS_PERDA_STORAGE_KEY = 'conect360:propostas:motivos-perda';
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DOMINIOS_EMAIL_FICTICIO = [
+  '@cliente.com',
+  '@cliente.temp',
+  '@email.com',
+  '@exemplo.com',
+  '@cliente.',
+  '@temp.',
+  '@ficticio.',
+];
 
 type MotivoPerdaMap = Record<
   string,
@@ -340,7 +351,6 @@ const PropostasPage: React.FC = () => {
   const logUpdate = (_action: string, _details: any = {}) => {};
 
   // Novos estados para funcionalidades avançadas
-  const [selectedPropostas, setSelectedPropostas] = useState<string[]>([]);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [sortBy, setSortBy] = useState<'data_criacao' | 'valor' | 'cliente' | 'status'>(
     'data_criacao',
@@ -348,7 +358,6 @@ const PropostasPage: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [valueRange, setValueRange] = useState({ min: '', max: '' });
-  const [showBulkActions, setShowBulkActions] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'cards' | 'dashboard'>('dashboard'); // Novo modo dashboard
   const [filtrosAvancados, setFiltrosAvancados] = useState<any>({});
   const [notification, setNotification] = useState<{
@@ -370,6 +379,10 @@ const PropostasPage: React.FC = () => {
       return {};
     }
   });
+  const [showMotivoPerdaModal, setShowMotivoPerdaModal] = useState(false);
+  const [motivoPerdaDraft, setMotivoPerdaDraft] = useState('');
+  const [propostaMotivoPerda, setPropostaMotivoPerda] = useState<any | null>(null);
+  const [savingMotivoPerda, setSavingMotivoPerda] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedPropostaForView, setSelectedPropostaForView] =
     useState<PropostaCompletaFeature | null>(null);
@@ -416,33 +429,14 @@ const PropostasPage: React.FC = () => {
     [getPropostaStorageKey, motivosPerda],
   );
 
-  const handleRegistrarMotivoPerda = useCallback(
-    async (proposta: any) => {
+  const persistirMotivoPerda = useCallback(
+    async (proposta: any, motivoInformado: string) => {
       const propostaChave = getPropostaStorageKey(proposta);
       if (!propostaChave) {
         showNotification(
           'Nao foi possivel identificar a proposta para registrar o motivo.',
           'error',
         );
-        return;
-      }
-
-      const statusAtual = safeRender(proposta?.status);
-      if (statusAtual !== 'rejeitada') {
-        showNotification(
-          'O motivo de perda so pode ser registrado para propostas rejeitadas.',
-          'error',
-        );
-        return;
-      }
-
-      const motivoAtual = getMotivoPerda(proposta);
-      const motivoInformado = window.prompt(
-        `Informe o motivo de perda da proposta ${safeRender(proposta?.numero) || propostaChave}:`,
-        motivoAtual,
-      );
-
-      if (motivoInformado === null) {
         return;
       }
 
@@ -500,7 +494,6 @@ const PropostasPage: React.FC = () => {
           'success',
         );
       } catch (error) {
-        // Fallback local para nao bloquear a operacao em caso de indisponibilidade da API.
         setMotivosPerda((prev) => {
           if (!motivoLimpo) {
             const next = { ...prev };
@@ -519,8 +512,49 @@ const PropostasPage: React.FC = () => {
         showNotification('Falha ao persistir no servidor. Motivo salvo localmente.', 'error');
       }
     },
+    [getPropostaStorageKey, showNotification],
+  );
+
+  const handleRegistrarMotivoPerda = useCallback(
+    (proposta: any) => {
+      const propostaChave = getPropostaStorageKey(proposta);
+      if (!propostaChave) {
+        showNotification(
+          'Nao foi possivel identificar a proposta para registrar o motivo.',
+          'error',
+        );
+        return;
+      }
+
+      const statusAtual = safeRender(proposta?.status);
+      if (statusAtual !== 'rejeitada') {
+        showNotification(
+          'O motivo de perda so pode ser registrado para propostas rejeitadas.',
+          'error',
+        );
+        return;
+      }
+
+      setPropostaMotivoPerda(proposta);
+      setMotivoPerdaDraft(getMotivoPerda(proposta));
+      setShowMotivoPerdaModal(true);
+    },
     [getMotivoPerda, getPropostaStorageKey, showNotification],
   );
+
+  const confirmarMotivoPerda = useCallback(async () => {
+    if (!propostaMotivoPerda) return;
+
+    setSavingMotivoPerda(true);
+    try {
+      await persistirMotivoPerda(propostaMotivoPerda, motivoPerdaDraft);
+      setShowMotivoPerdaModal(false);
+      setPropostaMotivoPerda(null);
+      setMotivoPerdaDraft('');
+    } finally {
+      setSavingMotivoPerda(false);
+    }
+  }, [motivoPerdaDraft, persistirMotivoPerda, propostaMotivoPerda]);
 
   // Sistema Inteligente de Atualizações v2
   const carregarPropostas = useCallback(
@@ -949,20 +983,6 @@ const PropostasPage: React.FC = () => {
     filtrosAvancados,
   ]);
 
-  // Função para lidar com ações em lote
-  const handleBulkAction = (action: string, success: boolean) => {
-    showNotification(action, success ? 'success' : 'error');
-    if (success) {
-      // Recarregar propostas após ação bem-sucedida (forçar para garantir consistência)
-      carregarPropostas({ force: true });
-    }
-  };
-
-  // Função para limpar seleção
-  const clearSelection = () => {
-    setSelectedPropostas([]);
-  };
-
   // Função para aplicar filtros avançados
   const handleAdvancedFilters = (filtros: any) => {
     setFiltrosAvancados(filtros);
@@ -1067,71 +1087,270 @@ const PropostasPage: React.FC = () => {
     }
   };
 
-  // Executar ações em massa
+  const getPropostasSelecionadas = useCallback(
+    () =>
+      propostas.filter((proposta) =>
+        propostasSelecionadas.includes(proposta.id?.toString() || proposta.numero),
+      ),
+    [propostas, propostasSelecionadas],
+  );
+
+  const isEmailFicticio = useCallback((email: string) => {
+    const normalized = String(email || '').toLowerCase();
+    return DOMINIOS_EMAIL_FICTICIO.some((dominio) => normalized.includes(dominio));
+  }, []);
+
+  const enviarPropostaPorEmail = useCallback(
+    async (proposta: any) => {
+      const propostaId = safeRender(proposta?.id) || safeRender(proposta?.numero);
+      if (!propostaId) {
+        throw new Error('Proposta sem identificador para envio de email.');
+      }
+
+      const emailCliente = String(safeRender(proposta?.cliente_contato) || '').trim();
+      if (!emailCliente || !EMAIL_REGEX.test(emailCliente)) {
+        throw new Error(
+          `Cliente da proposta ${safeRender(proposta?.numero) || propostaId} sem email valido.`,
+        );
+      }
+
+      if (isEmailFicticio(emailCliente)) {
+        throw new Error(
+          `Email ficticio detectado em ${safeRender(proposta?.numero) || propostaId}. Atualize o cadastro do cliente.`,
+        );
+      }
+
+      const token = await portalClienteService.gerarTokenPublico(String(propostaId));
+      const numeroProposta = safeRender(proposta?.numero) || String(propostaId);
+      const valorTotal = Number((proposta as any)?.valor || 0);
+
+      const resultado = await emailServiceReal.enviarPropostaParaCliente({
+        cliente: {
+          nome: safeRender(proposta?.cliente) || 'Cliente',
+          email: emailCliente,
+        },
+        proposta: {
+          id: String(propostaId),
+          numero: numeroProposta,
+          valorTotal,
+          dataValidade:
+            safeRender(proposta?.data_vencimento) || new Date().toISOString().split('T')[0],
+          token,
+        },
+        vendedor: {
+          nome: safeRender(proposta?.vendedor) || 'Vendedor',
+          email: 'vendedor@conectcrm.com',
+          telefone: '',
+        },
+        empresa: {
+          nome: 'ConectCRM',
+          email: 'conectcrm@gmail.com',
+          telefone: '',
+          endereco: '',
+        },
+        portalUrl: `${window.location.origin}/portal`,
+      });
+
+      if (!resultado.success) {
+        throw new Error(resultado.error || 'Falha ao enviar email.');
+      }
+
+      await propostasService.updateStatus(String(propostaId), 'enviada' as any, {
+        source: 'bulk-email',
+        observacoes: `Proposta enviada por email em lote para ${emailCliente}.`,
+      });
+    },
+    [isEmailFicticio],
+  );
+
+  const atualizarStatusEmLote = useCallback(
+    async (propostasAlvo: any[], novoStatus: string, source: string, observacoes: string) => {
+      let atualizadas = 0;
+      for (const proposta of propostasAlvo) {
+        const propostaId = safeRender(proposta?.id) || safeRender(proposta?.numero);
+        if (!propostaId) continue;
+
+        const updated = await propostasService.updateStatus(String(propostaId), novoStatus as any, {
+          source,
+          observacoes,
+        });
+        if (updated) {
+          atualizadas += 1;
+        }
+      }
+
+      return atualizadas;
+    },
+    [],
+  );
+
+  const proximoStatusFluxo = useCallback((statusAtual: string) => {
+    const status = String(statusAtual || '').toLowerCase();
+    const mapa: Record<string, string> = {
+      rascunho: 'enviada',
+      enviada: 'negociacao',
+      visualizada: 'negociacao',
+      negociacao: 'aprovada',
+      aprovada: 'contrato_gerado',
+      contrato_gerado: 'contrato_assinado',
+      contrato_assinado: 'fatura_criada',
+      fatura_criada: 'aguardando_pagamento',
+      aguardando_pagamento: 'pago',
+    };
+
+    return mapa[status] || '';
+  }, []);
+
+  // Executar acoes em massa
   const handleAcoesMassa = async (acao: string) => {
     if (propostasSelecionadas.length === 0) {
       showNotification('Selecione pelo menos uma proposta', 'error');
       return;
     }
 
+    const propostasAlvo = getPropostasSelecionadas();
+    if (!propostasAlvo.length) {
+      showNotification('Nao foi possivel localizar as propostas selecionadas.', 'error');
+      return;
+    }
+
     try {
       switch (acao) {
-        case 'enviar-email':
-          showNotification(
-            `Enviando ${propostasSelecionadas.length} proposta(s) por email...`,
-            'success',
-          );
-          break;
+        case 'enviar-email': {
+          let sucesso = 0;
+          let falhas = 0;
 
-        case 'gerar-contratos':
-          showNotification(
-            `Gerando contratos para ${propostasSelecionadas.length} proposta(s)...`,
-            'success',
-          );
-          break;
+          for (const proposta of propostasAlvo) {
+            try {
+              await enviarPropostaPorEmail(proposta);
+              sucesso += 1;
+            } catch (error) {
+              falhas += 1;
+              console.error('Falha ao enviar proposta por email:', error);
+            }
+          }
 
-        case 'criar-faturas':
-          showNotification(
-            `Criando faturas para ${propostasSelecionadas.length} proposta(s)...`,
-            'success',
-          );
-          break;
+          if (sucesso === 0) {
+            showNotification('Nenhuma proposta foi enviada por email.', 'error');
+            break;
+          }
 
-        case 'avancar-fluxo':
           showNotification(
-            `Avançando fluxo de ${propostasSelecionadas.length} proposta(s)...`,
-            'success',
+            falhas > 0
+              ? `${sucesso} proposta(s) enviada(s); ${falhas} falharam.`
+              : `${sucesso} proposta(s) enviada(s) por email.`,
+            falhas > 0 ? 'error' : 'success',
           );
           break;
+        }
+
+        case 'gerar-contratos': {
+          const elegiveis = propostasAlvo.filter(
+            (proposta) => String(safeRender(proposta?.status)) === 'aprovada',
+          );
+          const atualizadas = await atualizarStatusEmLote(
+            elegiveis,
+            'contrato_gerado',
+            'bulk-gerar-contratos',
+            'Status atualizado em lote para contrato gerado.',
+          );
+          showNotification(
+            atualizadas > 0
+              ? `${atualizadas} proposta(s) avancada(s) para contrato gerado.`
+              : 'Nenhuma proposta elegivel para gerar contrato.',
+            atualizadas > 0 ? 'success' : 'error',
+          );
+          break;
+        }
+
+        case 'criar-faturas': {
+          const elegiveis = propostasAlvo.filter((proposta) =>
+            ['contrato_assinado', 'fatura_criada'].includes(String(safeRender(proposta?.status))),
+          );
+          const atualizadas = await atualizarStatusEmLote(
+            elegiveis,
+            'fatura_criada',
+            'bulk-criar-faturas',
+            'Status atualizado em lote para fatura criada.',
+          );
+          showNotification(
+            atualizadas > 0
+              ? `${atualizadas} proposta(s) marcada(s) com fatura criada.`
+              : 'Nenhuma proposta elegivel para criar fatura.',
+            atualizadas > 0 ? 'success' : 'error',
+          );
+          break;
+        }
+
+        case 'avancar-fluxo': {
+          let avancadas = 0;
+
+          for (const proposta of propostasAlvo) {
+            const propostaId = safeRender(proposta?.id) || safeRender(proposta?.numero);
+            if (!propostaId) continue;
+
+            const novoStatus = proximoStatusFluxo(safeRender(proposta?.status));
+            if (!novoStatus) continue;
+
+            const updated = await propostasService.updateStatus(String(propostaId), novoStatus as any, {
+              source: 'bulk-avancar-fluxo',
+              observacoes: `Status avancado em lote de ${safeRender(proposta?.status)} para ${novoStatus}.`,
+            });
+
+            if (updated) {
+              avancadas += 1;
+            }
+          }
+
+          showNotification(
+            avancadas > 0
+              ? `${avancadas} proposta(s) avancada(s) no fluxo.`
+              : 'Nenhuma proposta elegivel para avancar no fluxo.',
+            avancadas > 0 ? 'success' : 'error',
+          );
+          break;
+        }
 
         case 'exportar-pdf':
           await handleExportarSelecionadas();
           break;
 
         case 'excluir':
-          if (
-            await confirm(
-              `Tem certeza que deseja excluir ${propostasSelecionadas.length} proposta(s)?`,
-            )
-          ) {
-            showNotification(`Excluindo ${propostasSelecionadas.length} proposta(s)...`, 'success');
-            setPropostasSelecionadas([]);
+          if (await confirm(`Tem certeza que deseja excluir ${propostasSelecionadas.length} proposta(s)?`)) {
+            let excluidas = 0;
+            for (const proposta of propostasAlvo) {
+              const propostaId = safeRender(proposta?.id);
+              if (!propostaId) continue;
+              try {
+                await propostasService.delete(String(propostaId));
+                excluidas += 1;
+              } catch (error) {
+                console.error('Falha ao excluir proposta em lote:', error);
+              }
+            }
+
+            showNotification(
+              excluidas > 0
+                ? `${excluidas} proposta(s) excluida(s) com sucesso.`
+                : 'Nenhuma proposta foi excluida.',
+              excluidas > 0 ? 'success' : 'error',
+            );
           }
           break;
 
         default:
-          showNotification(`Ação "${acao}" executada com sucesso!`, 'success');
+          showNotification(`Acao "${acao}" executada.`, 'success');
       }
 
-      // Recarregar propostas após a ação
-      carregarPropostas({ force: true });
+      setPropostasSelecionadas([]);
+      await carregarPropostas({ force: true });
     } catch (error) {
-      console.error('Erro ao executar ação em massa:', error);
-      showNotification('Erro ao executar ação', 'error');
+      console.error('Erro ao executar acao em massa:', error);
+      showNotification('Erro ao executar acao', 'error');
     }
   };
 
-  // Função auxiliar para o preview
+  // Funcao auxiliar para o preview
   const handleGeneratePDF = async (proposta: any) => {
     try {
       const numero = safeRender(proposta?.numero) || safeRender(proposta?.id) || 'sem-numero';
@@ -1147,68 +1366,7 @@ const PropostasPage: React.FC = () => {
       showNotification(message, 'error');
     }
   };
-
-  // Função para clonar proposta
-  const handleCloneProposta = async (propostaId: string) => {
-    try {
-      void propostaId;
-      showNotification('Clonacao de proposta ainda indisponivel nesta versao.', 'error');
-    } catch (error) {
-      console.error('Erro ao clonar proposta:', error);
-      showNotification('Erro ao clonar proposta', 'error');
-    }
-  };
-
-  // Ações em massa usando serviços reais
-  const handleBulkDelete = async () => {
-    if (await confirm(`Deseja excluir ${selectedPropostas.length} proposta(s) selecionada(s)?`)) {
-      try {
-        showNotification('Exclusao em lote ainda indisponivel nesta versao.', 'error');
-      } catch (error) {
-        console.error('❌ Erro ao excluir propostas em lote:', error);
-        showNotification('Erro ao excluir propostas. Tente novamente.', 'error');
-      }
-    }
-  };
-
-  const handleBulkStatusChange = async (newStatus: string) => {
-    try {
-      void newStatus;
-      showNotification('Alteracao de status em lote ainda indisponivel nesta versao.', 'error');
-    } catch (error) {
-      console.error('❌ Erro ao alterar status em lote:', error);
-      showNotification('Erro ao alterar status das propostas. Tente novamente.', 'error');
-    }
-  };
-
-  const handleBulkExport = async () => {
-    const selectedData = propostas.filter((p) => selectedPropostas.includes(p.id));
-
-    // Criar CSV
-    const headers = ['Número', 'Cliente', 'Título', 'Valor', 'Status', 'Data Criação', 'Vendedor'];
-    const csvContent = [
-      headers.join(','),
-      ...selectedData.map((p) =>
-        [p.numero, p.cliente, p.titulo, p.valor, p.status, p.data_criacao, p.vendedor].join(','),
-      ),
-    ].join('\n');
-
-    // Download
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `propostas_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    setSelectedPropostas([]);
-    setShowBulkActions(false);
-  };
-
-  // Calcular métricas do dashboard
+  // Calcular metricas do dashboard
   // 🎯 Função específica para refresh manual do dashboard
   const handleManualRefresh = () => {
     carregarPropostas({ force: true }); // Forçar reload quando usuário solicita manualmente
@@ -1619,7 +1777,7 @@ const PropostasPage: React.FC = () => {
       setShowViewModal(true);
     } catch (error) {
       console.error('❌ Erro ao preparar visualização da proposta:', error);
-      alert('Erro ao preparar visualização da proposta. Tente novamente.');
+      showNotification('Erro ao preparar visualizacao da proposta. Tente novamente.', 'error');
     }
   };
 
@@ -1851,9 +2009,9 @@ const PropostasPage: React.FC = () => {
 </html>`;
   };
 
-  const handleEditProposta = (proposta: any) => {
-    // Navegar para página de edição ou abrir modal de edição
-    alert(`Editando proposta: ${proposta.numero}\nEsta funcionalidade será implementada em breve!`);
+  const handleEditProposta = async (proposta: any) => {
+    if (!proposta) return;
+    await handleViewProposta(proposta);
   };
 
   const handleDeleteProposta = async (proposta: any) => {
@@ -1875,30 +2033,6 @@ const PropostasPage: React.FC = () => {
         showNotification(friendlyMessage, 'error');
       } finally {
         setIsLoading(false);
-      }
-    }
-  };
-
-  const handleMoreOptions = (proposta: any) => {
-    // Criar um menu de contexto simples
-    const opcoes = [
-      'Duplicar Proposta',
-      'Gerar PDF',
-      'Enviar por Email',
-      'Histórico',
-      'Alterar Status',
-    ];
-
-    const opcaoEscolhida = window.prompt(
-      `Selecione uma opção para ${proposta.numero}:\n\n` +
-        opcoes.map((opcao, index) => `${index + 1}. ${opcao}`).join('\n') +
-        '\n\nDigite o número da opção:',
-    );
-
-    if (opcaoEscolhida && opcaoEscolhida !== '') {
-      const opcaoIndex = parseInt(opcaoEscolhida) - 1;
-      if (opcaoIndex >= 0 && opcaoIndex < opcoes.length) {
-        alert(`Funcionalidade "${opcoes[opcaoIndex]}" será implementada em breve!`);
       }
     }
   };
@@ -2844,14 +2978,57 @@ const PropostasPage: React.FC = () => {
               />
             )}
 
+
+            {showMotivoPerdaModal && propostaMotivoPerda && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B1A2B]/50 p-4">
+                <div className="w-full max-w-lg rounded-xl border border-[#DDE3EA] bg-white p-6 shadow-2xl">
+                  <h3 className="text-lg font-semibold text-[#002333]">Motivo de perda</h3>
+                  <p className="mt-1 text-sm text-[#355166]">
+                    Proposta {safeRender(propostaMotivoPerda?.numero) || safeRender(propostaMotivoPerda?.id)}
+                  </p>
+
+                  <label htmlFor="motivo-perda" className="mt-4 block text-sm font-medium text-[#133147]">
+                    Informe o motivo (opcional)
+                  </label>
+                  <textarea
+                    id="motivo-perda"
+                    value={motivoPerdaDraft}
+                    onChange={(event) => setMotivoPerdaDraft(event.target.value)}
+                    rows={4}
+                    maxLength={600}
+                    className="mt-2 w-full rounded-lg border border-[#C6D2DE] px-3 py-2 text-sm text-[#002333] shadow-sm outline-none transition focus:border-[#159A9C] focus:ring-2 focus:ring-[#159A9C]/20"
+                    placeholder="Ex.: escopo fora do orcamento, prazo nao atende, concorrencia..."
+                  />
+                  <div className="mt-1 text-right text-xs text-[#5A768C]">{motivoPerdaDraft.length}/600</div>
+
+                  <div className="mt-5 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (savingMotivoPerda) return;
+                        setShowMotivoPerdaModal(false);
+                        setPropostaMotivoPerda(null);
+                        setMotivoPerdaDraft('');
+                      }}
+                      className="rounded-lg border border-[#C6D2DE] px-4 py-2 text-sm font-medium text-[#355166] hover:bg-[#F4F7FA] disabled:opacity-60"
+                      disabled={savingMotivoPerda}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={confirmarMotivoPerda}
+                      className="rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-semibold text-white hover:bg-[#127F81] disabled:opacity-60"
+                      disabled={savingMotivoPerda}
+                    >
+                      {savingMotivoPerda ? 'Salvando...' : 'Salvar motivo'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             {/* Modal Wizard removido daqui - movido para o início do JSX */}
 
-            {/* Componentes adicionais */}
-            <BulkActions
-              selectedIds={selectedPropostas}
-              onAction={handleBulkAction}
-              onClearSelection={clearSelection}
-            />
           </>
         )}
 
@@ -2881,7 +3058,7 @@ const PropostasPage: React.FC = () => {
           }}
           onEdit={() => {
             if (previewProposta) {
-              handleEditProposta(previewProposta.id);
+              void handleEditProposta(previewProposta);
               setShowPreview(false);
             }
           }}
@@ -2891,11 +3068,21 @@ const PropostasPage: React.FC = () => {
               setShowPreview(false);
             }
           }}
-          onSend={() => {
+          onSend={async () => {
             if (previewProposta) {
-              // Implementar envio por email
-              showNotification(`Proposta ${previewProposta.numero} enviada por email!`, 'success');
-              setShowPreview(false);
+              try {
+                await enviarPropostaPorEmail(previewProposta);
+                await carregarPropostas({ force: true, source: 'preview-send' });
+                showNotification(
+                  `Proposta ${previewProposta.numero} enviada por email com sucesso.`,
+                  'success',
+                );
+              } catch (error) {
+                const message = error instanceof Error ? error.message : 'Erro ao enviar proposta.';
+                showNotification(message, 'error');
+              } finally {
+                setShowPreview(false);
+              }
             }
           }}
           position={previewPosition}
