@@ -17,7 +17,7 @@ import {
 import { emailServiceReal } from '../../../services/emailServiceReal';
 import { PropostaCompleta } from '../services/propostasService';
 import { clientesService } from '../../../services/clientesService';
-import { pdfPropostasService } from '../../../services/pdfPropostasService';
+import { DadosProposta, pdfPropostasService } from '../../../services/pdfPropostasService';
 import { portalClienteService } from '../../../services/portalClienteService';
 import { contratoService } from '../../../services/contratoService';
 import {
@@ -38,6 +38,7 @@ type ClienteContatoData = {
 
 const CLIENTE_DETAILS_TTL = 5 * 60 * 1000; // 5 minutos
 const CLIENTE_DETAILS_COOLDOWN_TTL = 30 * 1000; // Evita loop de erros
+const CLIENTE_DETAILS_MIN_INTERVAL_MS = 300; // Debounce/throttle curto entre buscas
 const AUTOMACAO_FLUXO_MENSAGEM =
   'Automacao de contrato/fatura ainda indisponivel nesta versao. Use os modulos de Contratos e Faturamento.';
 const clienteDetailsCache = new Map<
@@ -45,6 +46,7 @@ const clienteDetailsCache = new Map<
   { data: ClienteContatoData | null; expiresAt: number }
 >();
 const clienteDetailsPending = new Map<string, Promise<ClienteContatoData | null>>();
+let lastClienteLookupAt = 0;
 
 const normalizarNomeCliente = (nome: string) => nome.trim().toLowerCase();
 
@@ -70,6 +72,15 @@ const obterClienteNoCache = (nome: string): ClienteContatoData | null | undefine
   }
 
   return cache.data;
+};
+
+const aguardarJanelaBuscaCliente = async () => {
+  const agora = Date.now();
+  const diff = agora - lastClienteLookupAt;
+  if (diff < CLIENTE_DETAILS_MIN_INTERVAL_MS) {
+    await new Promise((resolve) => setTimeout(resolve, CLIENTE_DETAILS_MIN_INTERVAL_MS - diff));
+  }
+  lastClienteLookupAt = Date.now();
 };
 
 const buscarClienteComCache = async (nome: string): Promise<ClienteContatoData | null> => {
@@ -103,25 +114,24 @@ const buscarClienteComCache = async (nome: string): Promise<ClienteContatoData |
         return null;
       }
 
+      await aguardarJanelaBuscaCliente();
       let clientes = await clientesService.searchClientes(nome);
 
       if ((!clientes || clientes.length === 0) && nome.includes(' ')) {
-        const partes = nome
+        const termoAlternativo = nome
           .split(' ')
           .map((parte) => parte.trim())
-          .filter((parte) => parte.length >= 3);
+          .filter((parte) => parte.length >= 3)
+          .sort((a, b) => b.length - a.length)[0];
 
-        for (const parte of partes) {
+        if (termoAlternativo && termoAlternativo.toLowerCase() !== nome.toLowerCase()) {
           if (clientesService.isSearchRateLimited()) {
             console.warn(
               `⚠️ Busca de clientes interrompida por cooldown durante variação do nome "${nome}".`,
             );
-            break;
-          }
-
-          clientes = await clientesService.searchClientes(parte);
-          if (clientes && clientes.length > 0) {
-            break;
+          } else {
+            await aguardarJanelaBuscaCliente();
+            clientes = await clientesService.searchClientes(termoAlternativo);
           }
         }
       }
@@ -262,102 +272,64 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     }
   };
 
-  // Carregar dados do cliente quando o componente for montado
-  const propostaIdentificador = React.useMemo(() => {
-    if (!proposta) {
-      return 'proposta_desconhecida';
-    }
-
+  const clienteDataBase = React.useMemo<ClienteContatoData>(() => {
     if (isPropostaCompleta(proposta)) {
-      return (
-        proposta.id ||
-        proposta.numero ||
-        proposta.cliente?.id ||
-        proposta.cliente?.nome ||
-        'proposta_completa'
-      );
+      return {
+        nome: proposta.cliente?.nome || 'Cliente',
+        email: proposta.cliente?.email || '',
+        telefone: proposta.cliente?.telefone || '',
+      };
     }
 
-    return proposta.id || proposta.numero || proposta.cliente;
+    const nome = proposta.cliente || 'Cliente';
+    const contato = String(proposta.cliente_contato || '').trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const telefoneRegex = /\d{8,}/;
+
+    return {
+      nome,
+      email: emailRegex.test(contato) ? contato : '',
+      telefone: !emailRegex.test(contato) && telefoneRegex.test(contato) ? contato : '',
+    };
   }, [proposta]);
 
   React.useEffect(() => {
-    let isMounted = true;
+    setClienteData(clienteDataBase);
+  }, [clienteDataBase]);
 
-    const loadClienteData = async () => {
-      const data = await getClienteData();
-      if (isMounted) {
-        setClienteData(data);
-      }
-    };
-
-    loadClienteData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [propostaIdentificador]);
-
-  // Função para extrair dados do cliente independente do formato
-  const getClienteData = async () => {
-    if (isPropostaCompleta(proposta)) {
-      // ✅ Formato completo - verificar se precisa buscar dados reais
-      const nome = proposta.cliente?.nome || 'Cliente';
-      const email = proposta.cliente?.email || '';
-      const telefone = proposta.cliente?.telefone || '';
-
-      // 🚨 VERIFICAR SE EMAIL É FICTÍCIO E BUSCAR DADOS REAIS
-      const isEmailFicticio =
-        email.includes('@cliente.com') ||
-        email.includes('@cliente.temp') ||
-        email.includes('@email.com');
-
-      if (nome && nome !== 'Cliente' && (isEmailFicticio || !telefone)) {
-        const dadosReais = await buscarClienteComCache(nome);
-
-        if (dadosReais) {
-          return {
-            nome: dadosReais.nome,
-            email: dadosReais.email || email,
-            telefone: dadosReais.telefone || telefone,
-          };
-        }
-      }
-
-      // Retornar dados originais se não conseguiu buscar reais
-      return { nome, email, telefone };
-    } else {
-      // 🔧 Formato UI - buscar dados reais do cliente no backend
-      const nome = proposta.cliente || 'Cliente';
-
-      // 1️⃣ TENTATIVA: Verificar se cliente_contato já é um email válido
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      let email = '';
-      let telefone = '';
-
-      // Verificar se cliente_contato contém email válido
-      if (proposta.cliente_contato && emailRegex.test(proposta.cliente_contato)) {
-        email = proposta.cliente_contato;
-      } else if (proposta.cliente_contato && proposta.cliente_contato.includes('(')) {
-        // Se contém parênteses, provavelmente é telefone
-        telefone = proposta.cliente_contato;
-      }
-
-      // 2️⃣ TENTATIVA: Buscar cliente real por nome no backend (com cache para evitar 429)
-      if (nome && nome !== 'Cliente') {
-        const dadosReais = await buscarClienteComCache(nome);
-
-        if (dadosReais) {
-          return {
-            nome: dadosReais.nome,
-            email: dadosReais.email || email,
-            telefone: dadosReais.telefone || telefone,
-          };
-        }
-      }
-
-      return { nome, email, telefone };
+  // Busca remota apenas sob demanda (acoes como email/whatsapp)
+  const getClienteData = async (options?: { allowLookup?: boolean }) => {
+    const dadosLocais = clienteDataBase;
+    if (!options?.allowLookup) {
+      return dadosLocais;
     }
+
+    const nome = dadosLocais.nome || 'Cliente';
+    const email = dadosLocais.email || '';
+    const telefone = dadosLocais.telefone || '';
+
+    const isEmailFicticio =
+      email.includes('@cliente.com') ||
+      email.includes('@cliente.temp') ||
+      email.includes('@email.com');
+    const precisaBuscarDadosReais = Boolean(nome && nome !== 'Cliente' && (isEmailFicticio || !email || !telefone));
+
+    if (!precisaBuscarDadosReais) {
+      return dadosLocais;
+    }
+
+    const dadosReais = await buscarClienteComCache(nome);
+    if (!dadosReais) {
+      return dadosLocais;
+    }
+
+    const dadosResolvidos: ClienteContatoData = {
+      nome: dadosReais.nome || nome,
+      email: dadosReais.email || email,
+      telefone: dadosReais.telefone || telefone,
+    };
+    setClienteData(dadosResolvidos);
+    return dadosResolvidos;
   };
 
   // Função para extrair dados da proposta independente do formato
@@ -383,6 +355,279 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         status: proposta.status || 'rascunho',
       };
     }
+  };
+
+  const formatarDataIso = (value: unknown, fallback: Date) => {
+    const parsed = value ? new Date(String(value)) : fallback;
+    if (Number.isNaN(parsed.getTime())) {
+      return fallback.toISOString().split('T')[0];
+    }
+    return parsed.toISOString().split('T')[0];
+  };
+
+  const normalizarTextoComparacao = (value: unknown) =>
+    String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+
+  const formatarTelefoneBr = (value: unknown) => {
+    const cleaned = String(value || '').replace(/\D/g, '');
+    if (cleaned.length === 11) {
+      return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`;
+    }
+    if (cleaned.length === 10) {
+      return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 6)}-${cleaned.slice(6)}`;
+    }
+    return String(value || '').trim();
+  };
+
+  const descreverFormaPagamentoPdf = (formaPagamento: unknown, parcelas?: unknown) => {
+    const normalized = String(formaPagamento || '')
+      .trim()
+      .toLowerCase();
+    const numeroParcelas = Number(parcelas || 0);
+
+    if (normalized === 'avista' || normalized === 'a_vista' || normalized === 'a-vista') {
+      return 'À vista';
+    }
+    if (normalized === 'boleto') {
+      return 'Boleto bancário';
+    }
+    if (normalized === 'cartao' || normalized === 'cartao_credito') {
+      return 'Cartão de crédito';
+    }
+    if (normalized === 'pix') {
+      return 'PIX';
+    }
+    if (normalized === 'parcelado') {
+      return numeroParcelas > 0 ? `Parcelado em até ${numeroParcelas}x` : 'Parcelado';
+    }
+
+    return 'Conforme negociação comercial';
+  };
+
+  const montarDadosPdfProposta = async (): Promise<DadosProposta> => {
+    const cliente = await getClienteData({ allowLookup: true });
+    const propostaData = getPropostaData();
+    const propostaId = (proposta as any)?.id || propostaData.id;
+
+    const extrairItensDaProposta = (fonte: any): any[] => {
+      if (!fonte) {
+        return [];
+      }
+
+      const listasDiretas = [
+        fonte.produtos,
+        fonte.itens,
+        fonte.items,
+        fonte.produtosSelecionados,
+        fonte.snapshot?.produtos,
+      ];
+
+      for (const lista of listasDiretas) {
+        if (Array.isArray(lista) && lista.length > 0) {
+          return lista;
+        }
+      }
+
+      const versoes = Array.isArray(fonte.versoes)
+        ? fonte.versoes
+        : Array.isArray(fonte.emailDetails?.versoes)
+          ? fonte.emailDetails.versoes
+          : [];
+      if (versoes.length > 0) {
+        const versoesOrdenadas = [...versoes].sort(
+          (a: any, b: any) => Number(a?.versao || 0) - Number(b?.versao || 0),
+        );
+        const ultimaVersao = versoesOrdenadas[versoesOrdenadas.length - 1];
+        const itensVersao = ultimaVersao?.snapshot?.produtos;
+        if (Array.isArray(itensVersao) && itensVersao.length > 0) {
+          return itensVersao;
+        }
+      }
+
+      return [];
+    };
+
+    let fonteProposta: any = proposta as any;
+    let itensOriginais = extrairItensDaProposta(fonteProposta);
+
+    // Quando a linha da lista não carrega produtos completos, busca o detalhe da proposta.
+    if (itensOriginais.length === 0 && propostaId) {
+      try {
+        const propostaDetalhada = await propostasApiService.findById(String(propostaId));
+        if (propostaDetalhada) {
+          fonteProposta = {
+            ...fonteProposta,
+            ...propostaDetalhada,
+            cliente: (propostaDetalhada as any).cliente || fonteProposta.cliente,
+            vendedor: (propostaDetalhada as any).vendedor || fonteProposta.vendedor,
+          };
+          itensOriginais = extrairItensDaProposta(propostaDetalhada as any);
+        }
+      } catch (error) {
+        console.warn('Não foi possível carregar os itens detalhados da proposta para o PDF:', error);
+      }
+    }
+
+    const itens = (
+      itensOriginais.length > 0
+        ? itensOriginais
+        : [
+            {
+              nome: propostaData.titulo || 'Item da proposta',
+              quantidade: 1,
+              valorUnitario: Number(propostaData.total || 0),
+              desconto: 0,
+              valorTotal: Number(propostaData.total || 0),
+            },
+          ]
+    ).map((item: any, index: number) => {
+      const produto = item?.produto && typeof item.produto === 'object' ? item.produto : item;
+      const nome = String(
+        produto?.nome ||
+          produto?.titulo ||
+          item?.nome ||
+          item?.produtoNome ||
+          item?.descricao ||
+          `Item ${index + 1}`,
+      ).trim();
+      const quantidade = Math.max(0.01, Number(item?.quantidade ?? produto?.quantidade ?? 1));
+      const valorUnitario = Math.max(
+        0,
+        Number(
+          item?.precoUnitario ??
+            item?.valorUnitario ??
+            produto?.precoUnitario ??
+            produto?.valorUnitario ??
+            produto?.preco ??
+            0,
+        ),
+      );
+      const desconto = Math.max(0, Number(item?.desconto ?? produto?.desconto ?? 0));
+      const valorTotalCalculado = valorUnitario * quantidade * (1 - desconto / 100);
+      const valorTotal = Number(item?.subtotal ?? item?.valorTotal ?? valorTotalCalculado);
+
+      return {
+        nome,
+        descricao: String(
+          produto?.descricao || item?.descricao || item?.detalhes || item?.observacoes || '',
+        ).trim(),
+        quantidade,
+        unidade:
+          String(produto?.unidade || item?.unidade || item?.unidadeMedida || 'un').trim() || 'un',
+        valorUnitario,
+        desconto,
+        valorTotal: Number.isFinite(valorTotal) ? valorTotal : valorTotalCalculado,
+      };
+    });
+
+    const subtotalCalculado = itens.reduce((sum, item) => sum + Number(item.valorTotal || 0), 0);
+    const subtotal = Number(fonteProposta?.subtotal ?? subtotalCalculado);
+    const descontoGeral = Number(fonteProposta?.descontoGlobal ?? 0);
+    const impostos = Number(fonteProposta?.impostos ?? 0);
+    const valorTotal = Number(
+      fonteProposta?.total ??
+        propostaData.total ??
+        fonteProposta?.valor ??
+        subtotal - descontoGeral + impostos,
+    );
+    const validadeDias = Number(fonteProposta?.validadeDias || 30);
+
+    const dataEmissaoFonte =
+      fonteProposta?.criadaEm ||
+      fonteProposta?.createdAt ||
+      fonteProposta?.data_criacao ||
+      fonteProposta?.created_at;
+    const dataValidadeFonte =
+      fonteProposta?.dataValidade || fonteProposta?.data_vencimento || fonteProposta?.dataVencimento;
+    const clienteFonte =
+      fonteProposta?.cliente && typeof fonteProposta.cliente === 'object'
+        ? fonteProposta.cliente
+        : undefined;
+    const vendedorFonte =
+      fonteProposta?.vendedor && typeof fonteProposta.vendedor === 'object'
+        ? fonteProposta.vendedor
+        : undefined;
+    const statusFonte = String(
+      fonteProposta?.status || propostaData.status || 'rascunho',
+    )
+      .trim()
+      .toLowerCase();
+    const dataEmissaoIso = formatarDataIso(dataEmissaoFonte, new Date());
+    const dataValidadeIso = formatarDataIso(
+      dataValidadeFonte,
+      new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    );
+    const dataEmissaoDate = new Date(dataEmissaoIso);
+    const dataValidadeDate = new Date(dataValidadeIso);
+    const diasPorPeriodo =
+      !Number.isNaN(dataEmissaoDate.getTime()) && !Number.isNaN(dataValidadeDate.getTime())
+        ? Math.max(
+            1,
+            Math.ceil(
+              (dataValidadeDate.getTime() - dataEmissaoDate.getTime()) / (1000 * 60 * 60 * 24),
+            ),
+          )
+        : undefined;
+    const validadeProposta =
+      diasPorPeriodo && Number.isFinite(diasPorPeriodo)
+        ? `${diasPorPeriodo} dias corridos`
+        : Number.isFinite(validadeDias) && validadeDias > 0
+          ? `${validadeDias} dias corridos`
+          : undefined;
+
+    const descricaoRaw = String(fonteProposta?.descricao || '').trim();
+    const observacoesRaw = String(fonteProposta?.observacoes || '').trim();
+    const descricaoNormalizada = normalizarTextoComparacao(descricaoRaw);
+    const observacoesNormalizada = normalizarTextoComparacao(observacoesRaw);
+    const descricaoFinal =
+      descricaoRaw && descricaoNormalizada !== observacoesNormalizada ? descricaoRaw : undefined;
+    const observacoesFinal = observacoesRaw || undefined;
+
+    return {
+      numeroProposta: propostaData.numero,
+      titulo: propostaData.titulo || 'Proposta Comercial',
+      descricao: descricaoFinal,
+      observacoes: observacoesFinal,
+      status: statusFonte as DadosProposta['status'],
+      dataEmissao: dataEmissaoIso,
+      dataValidade: dataValidadeIso,
+      empresa: {
+        nome: 'ConectCRM',
+      },
+      cliente: {
+        nome: String(clienteFonte?.nome || cliente.nome || '').trim() || 'Cliente',
+        email: String(clienteFonte?.email || cliente.email || '').trim(),
+        telefone: formatarTelefoneBr(clienteFonte?.telefone || cliente.telefone),
+        empresa: String(clienteFonte?.empresa || (cliente as any)?.empresa || '').trim() || undefined,
+      },
+      vendedor: {
+        nome:
+          String(vendedorFonte?.nome || fonteProposta?.vendedor || '').trim() ||
+          'Equipe comercial',
+        email:
+          String(vendedorFonte?.email || '').trim() ||
+          'comercial@conectcrm.com',
+        telefone: formatarTelefoneBr(vendedorFonte?.telefone),
+      },
+      itens,
+      subtotal: Number.isFinite(subtotal) ? subtotal : subtotalCalculado,
+      descontoGeral: Number.isFinite(descontoGeral) ? descontoGeral : 0,
+      percentualDesconto:
+        subtotal > 0 && Number.isFinite(descontoGeral) ? (descontoGeral / subtotal) * 100 : 0,
+      impostos: Number.isFinite(impostos) ? impostos : 0,
+      valorTotal: Number.isFinite(valorTotal) ? valorTotal : subtotalCalculado,
+      formaPagamento: descreverFormaPagamentoPdf(
+        fonteProposta?.formaPagamento,
+        fonteProposta?.parcelas,
+      ),
+      validadeProposta,
+      condicoesGerais: [],
+    };
   };
 
   const sincronizarStatusProposta = async (
@@ -586,8 +831,10 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
   // Verificar se proposta pode gerar contrato
   const podeGerarContrato = () => {
-    const status = getPropostaData().status;
-    return status === 'aprovada' || status === 'aceita' || status === 'negociacao';
+    const status = String(getPropostaData().status || '')
+      .trim()
+      .toLowerCase();
+    return status === 'aprovada' || status === 'aceita';
   };
 
   // Verificar se proposta pode criar fatura
@@ -827,12 +1074,9 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           break;
 
         case 'aguardando_pagamento':
-          await sincronizarStatusProposta('pago', {
-            source: 'fluxo-avanco',
-            observacoes: 'Pagamento confirmado no fluxo de propostas.',
-          });
-          toastService.success('Status atualizado para pago.');
-          onPropostaUpdated?.();
+          toastService.info(
+            'Pagamento deve ser confirmado no módulo de faturamento. A proposta será sincronizada automaticamente após a baixa da fatura.',
+          );
           break;
 
         case 'pago':
@@ -935,7 +1179,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
   // Enviar proposta por email
   const handleSendEmail = async () => {
-    const clienteData = await getClienteData();
+    const clienteData = await getClienteData({ allowLookup: true });
 
     // Validar se o email é válido
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -1046,38 +1290,16 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
   // Enviar proposta por WhatsApp
   const handleSendWhatsApp = async () => {
-    const clienteData = await getClienteData();
+    const dadosPDF = await montarDadosPdfProposta();
 
-    if (!clienteData?.telefone) {
+    if (!dadosPDF.cliente?.telefone) {
       toastService.error('Cliente não possui telefone cadastrado');
       return;
     }
 
     // Gerar PDF para anexar
     try {
-      const propostaData = getPropostaData();
-      const pdfBlob = await pdfPropostasService.gerarPdf('proposta', {
-        numeroProposta: propostaData.numero,
-        titulo: propostaData.titulo,
-        cliente: {
-          nome: clienteData.nome,
-          email: clienteData.email || '',
-          telefone: clienteData.telefone,
-        },
-        vendedor: {
-          nome: 'ConectCRM',
-          email: 'vendedor@conectcrm.com',
-        },
-        empresa: { nome: 'ConectCRM' },
-        valorTotal: propostaData.total,
-        itens: [],
-        formaPagamento: 'Conforme acordo',
-        prazoEntrega: '30 dias',
-        garantia: '12 meses',
-        validadeProposta: '30 dias',
-        condicoesGerais: [],
-        observacoes: propostaData.titulo,
-      });
+      const pdfBlob = await pdfPropostasService.gerarPdf('comercial', dadosPDF);
 
       // Converter Blob para Uint8Array
       const arrayBuffer = await pdfBlob.arrayBuffer();
@@ -1088,6 +1310,12 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       setPropostaPdfBuffer(null);
     }
 
+    setClienteData((prev) => ({
+      nome: dadosPDF.cliente.nome || prev?.nome || 'Cliente',
+      email: dadosPDF.cliente.email || prev?.email || '',
+      telefone: dadosPDF.cliente.telefone || prev?.telefone || '',
+    }));
+
     // Abrir modal do WhatsApp
     setShowWhatsAppModal(true);
   };
@@ -1096,32 +1324,8 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const handleDownloadPdf = async () => {
     setDownloadingPdf(true);
     try {
-      const clienteData = await getClienteData();
       const propostaData = getPropostaData();
-
-      // Usar serviço real de PDF
-      const dadosPDF = {
-        numeroProposta: propostaData.numero,
-        titulo: propostaData.titulo || 'Proposta Comercial',
-        cliente: {
-          nome: clienteData.nome,
-          email: clienteData.email || '',
-          telefone: clienteData.telefone,
-          empresa: (clienteData as any).empresa,
-        },
-        vendedor: {
-          nome: 'Admin',
-          email: 'admin@conectcrm.com',
-          telefone: '(11) 99999-9999',
-        },
-        itens: (propostaData as any).produtos || [],
-        subtotal: (propostaData as any).subtotal || 0,
-        valorTotal: propostaData.total || 0,
-        formaPagamento: (propostaData as any).formaPagamento || 'A vista',
-        prazoEntrega: '30 dias',
-        validadeProposta: `${(propostaData as any).validadeDias || 30} dias`,
-      };
-
+      const dadosPDF = await montarDadosPdfProposta();
       await pdfPropostasService.downloadPdf('comercial', dadosPDF);
 
       toastService.success(`PDF da proposta ${propostaData.numero} baixado`);
@@ -1168,6 +1372,13 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const buttonClass = showLabels
     ? 'flex items-center space-x-2 px-3 py-2 text-sm font-medium rounded-md transition-colors'
     : 'p-2 rounded-md transition-colors';
+  const statusFluxoAtual = String(getPropostaData().status || '')
+    .trim()
+    .toLowerCase();
+  const pagamentoControladoNoFinanceiro = statusFluxoAtual === 'aguardando_pagamento';
+  const tituloBotaoFluxo = pagamentoControladoNoFinanceiro
+    ? 'Pagamento desta proposta é controlado no módulo de faturamento'
+    : 'Avançar para próxima etapa do fluxo automatizado';
 
   return (
     <div className={`flex items-center space-x-1 ${className}`}>
@@ -1197,9 +1408,13 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       {/* WhatsApp */}
       <button
         onClick={handleSendWhatsApp}
-        disabled={!clienteData?.telefone}
+        disabled={!clienteData?.nome}
         className={`${buttonClass} text-green-500 hover:text-green-700 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed`}
-        title={clienteData?.telefone ? 'Enviar por WhatsApp' : 'Cliente sem telefone'}
+        title={
+          clienteData?.telefone
+            ? 'Enviar por WhatsApp'
+            : 'Enviar por WhatsApp (o telefone será validado ao iniciar o envio)'
+        }
       >
         <MessageSquare className="w-4 h-4" />
         {showLabels && <span>WhatsApp</span>}
@@ -1325,7 +1540,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         onClick={handleAvançarFluxo}
         disabled={avancandoFluxo || bloqueadoPorAlcada}
         className={`${buttonClass} text-orange-600 hover:text-orange-900 hover:bg-orange-50 disabled:opacity-50`}
-        title="Avançar para próxima etapa do fluxo automatizado"
+        title={tituloBotaoFluxo}
       >
         {avancandoFluxo ? (
           <Loader2 className="w-4 h-4 animate-spin" />

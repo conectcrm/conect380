@@ -137,6 +137,19 @@ type PermissionCatalogState = {
   defaultsByRole: Record<string, string[]>;
 };
 
+const ATENDIMENTO_GROUP_ROLES: string[] = [
+  UserRole.USER,
+  UserRole.VENDEDOR,
+  UserRole.MANAGER,
+  UserRole.ADMIN,
+  UserRole.SUPERADMIN,
+];
+
+const ATENDIMENTO_ANALYTICS_OPTION: PermissaoModalOption = {
+  value: 'relatorios.read',
+  label: 'Analytics de atendimento: visualizar',
+};
+
 const PERMISSOES_MODAL_GROUPS_FALLBACK: PermissaoModalGroup[] = [
   {
     id: 'insights',
@@ -193,14 +206,8 @@ const PERMISSOES_MODAL_GROUPS_FALLBACK: PermissaoModalGroup[] = [
   {
     id: 'atendimento',
     label: 'Atendimento',
-    description: 'Controle de acesso para chats e tickets',
-    roles: [
-      UserRole.USER,
-      UserRole.VENDEDOR,
-      UserRole.MANAGER,
-      UserRole.ADMIN,
-      UserRole.SUPERADMIN,
-    ],
+    description: 'Controle de acesso para chats, tickets e analytics',
+    roles: ATENDIMENTO_GROUP_ROLES,
     options: [
       { value: 'atendimento.chats.read', label: 'Chats: visualizar' },
       { value: 'atendimento.chats.reply', label: 'Chats: responder' },
@@ -211,6 +218,7 @@ const PERMISSOES_MODAL_GROUPS_FALLBACK: PermissaoModalGroup[] = [
       { value: 'atendimento.tickets.close', label: 'Tickets: encerrar/reabrir' },
       { value: 'atendimento.filas.manage', label: 'Filas: gerenciar' },
       { value: 'atendimento.sla.manage', label: 'SLA: gerenciar' },
+      ATENDIMENTO_ANALYTICS_OPTION,
       { value: 'atendimento.dlq.manage', label: 'Atendimento: DLQ' },
       { value: 'ATENDIMENTO', label: 'Atendimento (legado)' },
     ],
@@ -277,10 +285,56 @@ const PERMISSOES_MODAL_GROUPS_FALLBACK: PermissaoModalGroup[] = [
   },
 ];
 
-const DEFAULT_PERMISSION_CATALOG: PermissionCatalogState = {
+const ensureAtendimentoAnalyticsPermission = (
+  catalog: PermissionCatalogState,
+): PermissionCatalogState => {
+  const atendimentoGroupIndex = catalog.groups.findIndex(
+    (group) => group.id.toLowerCase() === 'atendimento',
+  );
+
+  if (atendimentoGroupIndex === -1) {
+    return {
+      ...catalog,
+      groups: [
+        ...catalog.groups,
+        {
+          id: 'atendimento',
+          label: 'Atendimento',
+          description: 'Controle de acesso para chats, tickets e analytics',
+          roles: ATENDIMENTO_GROUP_ROLES,
+          options: [ATENDIMENTO_ANALYTICS_OPTION],
+        },
+      ],
+    };
+  }
+
+  const atendimentoGroup = catalog.groups[atendimentoGroupIndex];
+  const hasAnalyticsPermission = atendimentoGroup.options.some(
+    (option) => option.value === ATENDIMENTO_ANALYTICS_OPTION.value,
+  );
+
+  if (hasAnalyticsPermission) {
+    return catalog;
+  }
+
+  const nextGroups = [...catalog.groups];
+  nextGroups[atendimentoGroupIndex] = {
+    ...atendimentoGroup,
+    description:
+      atendimentoGroup.description || 'Controle de acesso para chats, tickets e analytics',
+    options: [...atendimentoGroup.options, ATENDIMENTO_ANALYTICS_OPTION],
+  };
+
+  return {
+    ...catalog,
+    groups: nextGroups,
+  };
+};
+
+const DEFAULT_PERMISSION_CATALOG: PermissionCatalogState = ensureAtendimentoAnalyticsPermission({
   groups: PERMISSOES_MODAL_GROUPS_FALLBACK,
   defaultsByRole: {},
-};
+});
 
 const getRoleCandidates = (role?: UserRole): string[] => {
   const selectedRole = role ?? UserRole.USER;
@@ -365,13 +419,13 @@ const mapPermissionCatalogPayload = (payload: PermissionCatalogResponse): Permis
         .filter((group) => group.options.length > 0 && group.roles.length > 0)
     : [];
 
-  return {
+  return ensureAtendimentoAnalyticsPermission({
     groups: groups.length > 0 ? groups : DEFAULT_PERMISSION_CATALOG.groups,
     defaultsByRole:
       payload.defaultsByRole && typeof payload.defaultsByRole === 'object'
         ? payload.defaultsByRole
         : DEFAULT_PERMISSION_CATALOG.defaultsByRole,
-  };
+  });
 };
 
 const GestaoUsuariosPage: React.FC = () => {
@@ -933,7 +987,9 @@ const GestaoUsuariosPage: React.FC = () => {
     const map = new Map<string, string>();
     catalogoPermissoes.groups.forEach((group) => {
       group.options.forEach((option) => {
-        map.set(option.value, option.label);
+        if (!map.has(option.value)) {
+          map.set(option.value, option.label);
+        }
       });
     });
     return map;
@@ -1814,7 +1870,7 @@ const GestaoUsuariosPage: React.FC = () => {
                     {editingUsuario?.role === UserRole.SUPERADMIN && (
                       <option value={UserRole.SUPERADMIN}>Super Admin</option>
                     )}
-                    <option value={UserRole.USER}>Usu??rio</option>
+                    <option value={UserRole.USER}>Usuário</option>
                     <option value={UserRole.VENDEDOR}>Vendedor</option>
                     <option value={UserRole.FINANCEIRO}>Financeiro</option>
                     <option value={UserRole.MANAGER}>Gerente</option>
@@ -1835,7 +1891,7 @@ const GestaoUsuariosPage: React.FC = () => {
                       value={formData.senha || ''}
                       onChange={(e) => setFormData((prev) => ({ ...prev, senha: e.target.value }))}
                       className={modalInputClass}
-                      placeholder="M??nimo 6 caracteres"
+                      placeholder="Mínimo 6 caracteres"
                       required
                     />
                   </div>
@@ -1861,7 +1917,7 @@ const GestaoUsuariosPage: React.FC = () => {
                         value={permissionSearch}
                         onChange={(e) => setPermissionSearch(e.target.value)}
                         className={modalInputWithIconClass}
-                        placeholder="Buscar permissao por nome ou chave"
+                        placeholder="Buscar permissão por nome ou chave"
                       />
                     </div>
                     {permissionSearchNormalized && (
@@ -1908,7 +1964,7 @@ const GestaoUsuariosPage: React.FC = () => {
                             />
                             <span className="ml-2 text-xs font-medium text-gray-600 whitespace-nowrap">
                               {permissionSearchNormalized
-                                ? 'Selecionar visiveis'
+                                ? 'Selecionar visíveis'
                                 : 'Selecionar todos'}{' '}
                               ({selectedCount}/{groupValues.length})
                             </span>
@@ -1942,7 +1998,7 @@ const GestaoUsuariosPage: React.FC = () => {
                     gruposPermissaoFiltrados.length === 0 &&
                     permissionSearchNormalized && (
                       <p className="text-sm text-gray-500">
-                        Nenhuma permissao encontrada para o filtro informado.
+                        Nenhuma permissão encontrada para o filtro informado.
                       </p>
                     )}
                   </div>
@@ -1959,7 +2015,7 @@ const GestaoUsuariosPage: React.FC = () => {
                         alt="Preview avatar"
                         className="h-7 w-7 rounded-full object-cover"
                       />
-                      <span className="text-xs font-medium text-[#607B89]">Previa</span>
+                      <span className="text-xs font-medium text-[#607B89]">Prévia</span>
                     </div>
                   ) : null}
                   <div className="relative">
@@ -1986,7 +2042,7 @@ const GestaoUsuariosPage: React.FC = () => {
                     className={modalCheckboxClass}
                   />
                   <label htmlFor="ativo" className="ml-2 cursor-pointer text-sm font-medium text-[#355061] whitespace-nowrap">
-                    Usu??rio ativo
+                    Usuário ativo
                   </label>
                 </div>
               </div>

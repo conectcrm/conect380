@@ -99,8 +99,13 @@ export class ContaPagarController {
 
   @Post()
   @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
-  async create(@EmpresaId() empresaId: string, @Body() dto: CreateContaPagarDto) {
-    return this.contaPagarService.create(dto, empresaId);
+  async create(
+    @EmpresaId() empresaId: string,
+    @Body() dto: CreateContaPagarDto,
+    @CurrentUser() user: { id?: string; sub?: string },
+  ) {
+    const userId = user?.id || user?.sub || 'sistema';
+    return this.contaPagarService.create(dto, empresaId, userId);
   }
 
   @Put(':id')
@@ -109,8 +114,10 @@ export class ContaPagarController {
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
     @Body() dto: UpdateContaPagarDto,
+    @CurrentUser() user: { id?: string; sub?: string },
   ) {
-    return this.contaPagarService.update(id, dto, empresaId);
+    const userId = user?.id || user?.sub || 'sistema';
+    return this.contaPagarService.update(id, dto, empresaId, userId);
   }
 
   @Delete(':id')
@@ -129,8 +136,10 @@ export class ContaPagarController {
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
     @Body() dto: RegistrarPagamentoContaPagarDto,
+    @CurrentUser() user: { id?: string; sub?: string },
   ) {
-    return this.contaPagarService.registrarPagamento(id, dto, empresaId);
+    const userId = user?.id || user?.sub || 'sistema';
+    return this.contaPagarService.registrarPagamento(id, dto, empresaId, userId);
   }
 
   @Post(':id/aprovar')

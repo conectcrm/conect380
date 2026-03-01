@@ -62,7 +62,7 @@
     "start": "set PORT=3000 && set NODE_OPTIONS=--max_old_space_size=4096 && craco start",
     "start:network": "set PORT=3000 && set HOST=0.0.0.0 && set NODE_OPTIONS=--max_old_space_size=4096 && set REACT_APP_API_URL=http://172.23.192.1:3001 && set REACT_APP_WS_URL=ws://172.23.192.1:3001 && craco start",
     "start:low-memory": "set PORT=3000 && set NODE_OPTIONS=--max_old_space_size=2048 && craco start",
-    "build": "set DISABLE_ESLINT_PLUGIN=true && craco build",
+    "build": "npm run check:encoding && set DISABLE_ESLINT_PLUGIN=true && craco build",
     "test": "craco test",
     "eject": "react-scripts eject",
     "serve": "node server.js",
@@ -80,7 +80,8 @@
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "type-check": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.{ts,tsx,json,css,scss,md}\"",
-    "quality": "npm run lint && npm run type-check"
+    "quality": "npm run lint && npm run type-check && npm run check:encoding",
+    "check:encoding": "node scripts/check-mojibake.js"
   },
   "browserslist": {
     "production": [

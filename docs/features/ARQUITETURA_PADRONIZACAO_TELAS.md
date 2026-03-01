@@ -135,6 +135,12 @@ Larguras padrao (referencia tecnica em `PageTemplates.tsx`):
 - `SETTINGS`: contida e centralizada (ex.: `max-w-[1280px]` + `mx-auto`)
 - `FORM`: contida e centralizada (ex.: `max-w-[1200px]` + `mx-auto`)
 
+Padrao operacional de implementacao (telas `LIST`):
+
+- o container raiz da pagina deve seguir `className="space-y-4 pt-1 sm:pt-2"` quando aplicavel ao padrao V2
+- o espacamento lateral global deve vir do shell (`shellSpacing.pageOuterX`)
+- evitar duplicidade de padding lateral no root da pagina (`p-4`, `sm:p-5`) quando o shell ja controla o perimetro util
+
 ### Checklist de largura
 
 Antes de dizer que "a largura esta errada", validar:
@@ -256,6 +262,28 @@ Este requisito complementa o guia de modais existente, mas define o minimo visua
 - header com titulo + fechar
 - corpo com espacamento consistente
 - footer sticky para CTA (em modais longos)
+
+### Largura padrao de modais (obrigatorio)
+
+- nenhum modal administrativo/financeiro deve ocupar toda a largura util em desktop
+- usar sempre container com `w-full max-h-[90vh] overflow-y-auto` e limite de largura por tipologia
+
+Largura por tipologia:
+
+- detalhe/consulta: `max-w-[980px]`
+- formulario complexo: `max-w-[1200px]`
+- fluxo simples/confirmacao: entre `max-w-lg` e `max-w-3xl` conforme densidade
+
+Regras complementares:
+
+- evitar `max-w-4xl` generico para modal de detalhe quando causar efeito de "esticado" em monitores largos
+- em resolucoes pequenas, manter `w-full` + padding do overlay (`p-4`) para nao gerar overflow horizontal
+
+Referencias implementadas:
+
+- `frontend-web/src/pages/faturamento/ModalDetalhesFatura.tsx` (`max-w-[980px]`)
+- `frontend-web/src/pages/faturamento/ModalFatura.tsx` (`max-w-[1200px]`)
+- `frontend-web/src/pages/faturamento/ModalPagamentos.tsx` (`max-w-3xl`)
 
 ### Formularios em modal
 

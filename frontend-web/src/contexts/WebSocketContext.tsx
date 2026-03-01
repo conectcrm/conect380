@@ -1,11 +1,11 @@
-﻿/**
- * ðŸ”Œ WebSocketContext - Contexto Global para Gerenciamento de WebSocket
+/**
+ * xR WebSocketContext - Contexto Global para Gerenciamento de WebSocket
  *
  * Funcionalidades:
- * - ConexÃ£o WebSocket Ãºnica em toda aplicaÃ§Ã£o (Singleton)
- * - Estado global de conexÃ£o (connected, error)
- * - ReconexÃ£o automÃ¡tica
- * - Eventos globais para toda aplicaÃ§Ã£o
+ * - Conexão WebSocket única em toda aplicação (Singleton)
+ * - Estado global de conexão (connected, error)
+ * - Reconexão automática
+ * - Eventos globais para toda aplicação
  *
  * Uso:
  * - Wrap App.tsx com <WebSocketProvider>
@@ -39,9 +39,9 @@ const SOCKET_BASE_URL = resolveSocketBaseUrl({
   envUrl: process.env.REACT_APP_WEBSOCKET_URL || process.env.REACT_APP_WS_URL,
   onEnvIgnored: ({ envUrl, currentHost }) => {
     console.warn(
-      'âš ï¸ [WebSocketContext] Ignorando URL de WebSocket local em acesso via rede:',
+      'a️ [WebSocketContext] Ignorando URL de WebSocket local em acesso via rede:',
       envUrl,
-      'â†’ host atual',
+      '  host atual',
       currentHost,
     );
   },
@@ -55,7 +55,7 @@ const AUTH_TOKEN_EVENT_NAME = 'authTokenChanged';
 const EMPRESA_EVENT_NAME = 'empresaAtivaChanged';
 const DEBUG = process.env.REACT_APP_DEBUG_WS === 'true';
 
-// ðŸ”’ SINGLETON: Garantir apenas 1 instÃ¢ncia WebSocket
+// x SINGLETON: Garantir apenas 1 instância WebSocket
 let globalSocket: Socket | null = null;
 
 export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }) => {
@@ -71,15 +71,15 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
   }, [connecting]);
 
   const connect = () => {
-    // Se jÃ¡ estÃ¡ conectado, nÃ£o fazer nada
+    // Se já está conectado, não fazer nada
     if (globalSocket?.connected) {
-      if (DEBUG) console.log('â™»ï¸ [WebSocketContext] WebSocket jÃ¡ conectado');
+      if (DEBUG) console.log('"️ [WebSocketContext] WebSocket já conectado');
       return;
     }
 
-    // Se jÃ¡ estÃ¡ conectando, nÃ£o fazer nada
+    // Se já está conectando, não fazer nada
     if (connecting) {
-      if (DEBUG) console.log('â³ [WebSocketContext] ConexÃ£o jÃ¡ em progresso');
+      if (DEBUG) console.log('⏳ [WebSocketContext] Conexão já em progresso');
       return;
     }
 
@@ -90,12 +90,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
       const token = localStorage.getItem(TOKEN_STORAGE_KEY);
 
       if (!token) {
-        console.warn('âš ï¸ [WebSocketContext] Token nÃ£o encontrado - aguardando login');
+        console.warn('a️ [WebSocketContext] Token não encontrado - aguardando login');
         setConnecting(false);
         return;
       }
 
-      if (DEBUG) console.log('ðŸ”Œ [WebSocketContext] Conectando ao WebSocket:', WEBSOCKET_URL);
+      if (DEBUG) console.log('xR [WebSocketContext] Conectando ao WebSocket:', WEBSOCKET_URL);
 
       const socket = io(WEBSOCKET_URL, {
         auth: { token },
@@ -109,7 +109,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
       // Event: connect
       socket.on('connect', () => {
-        if (DEBUG) console.log('âœ… [WebSocketContext] WebSocket conectado! ID:', socket.id);
+        if (DEBUG) console.log('S& [WebSocketContext] WebSocket conectado! ID:', socket.id);
         setConnected(true);
         setConnecting(false);
         setError(null);
@@ -117,19 +117,19 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
       // Event: disconnect
       socket.on('disconnect', (reason) => {
-        if (DEBUG) console.log('ðŸ”´ [WebSocketContext] WebSocket desconectado. RazÃ£o:', reason);
+        if (DEBUG) console.log('x [WebSocketContext] WebSocket desconectado. Razão:', reason);
         setConnected(false);
         setConnecting(false);
 
         if (reason === 'io server disconnect') {
-          // Servidor forÃ§ou desconexÃ£o, reconectar
+          // Servidor forçou desconexão, reconectar
           setTimeout(() => socket.connect(), 1000);
         }
       });
 
       // Event: connect_error
       socket.on('connect_error', (err) => {
-        console.error('âŒ [WebSocketContext] Erro de conexÃ£o:', err.message);
+        console.error('R [WebSocketContext] Erro de conexão:', err.message);
         setError(err.message);
         setConnected(false);
         setConnecting(false);
@@ -137,28 +137,28 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
       // Event: error
       socket.on('error', (err) => {
-        console.error('âŒ [WebSocketContext] Erro:', err);
+        console.error('R [WebSocketContext] Erro:', err);
         setError(typeof err === 'string' ? err : 'Erro desconhecido');
       });
 
       // Event: reconnect_attempt
       socket.io.on('reconnect_attempt', (attempt) => {
-        if (DEBUG) console.log(`ðŸ”„ [WebSocketContext] Tentativa de reconexÃ£o #${attempt}`);
+        if (DEBUG) console.log(`x [WebSocketContext] Tentativa de reconexão #${attempt}`);
         setConnecting(true);
         setError(null);
       });
 
       // Event: reconnect_failed
       socket.io.on('reconnect_failed', () => {
-        console.error('âŒ [WebSocketContext] Falha ao reconectar apÃ³s mÃºltiplas tentativas');
-        setError('Falha ao conectar. Verifique sua conexÃ£o.');
+        console.error('R [WebSocketContext] Falha ao reconectar após múltiplas tentativas');
+        setError('Falha ao conectar. Verifique sua conexão.');
         setConnecting(false);
       });
 
       globalSocket = socket;
     } catch (err) {
-      console.error('âŒ [WebSocketContext] Erro ao criar socket:', err);
-      setError('Erro ao criar conexÃ£o');
+      console.error('R [WebSocketContext] Erro ao criar socket:', err);
+      setError('Erro ao criar conexão');
       setConnecting(false);
     }
   };
@@ -178,7 +178,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
       return;
     }
 
-    if (DEBUG) console.log('ðŸ”„ [WebSocketContext] Reconectando manualmente...');
+    if (DEBUG) console.log('x [WebSocketContext] Reconectando manualmente...');
 
     if (globalSocket) {
       globalSocket.disconnect();
@@ -197,7 +197,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     if (isAuthenticated) {
       connect();
     } else if (globalSocket) {
-      if (DEBUG) console.log('ðŸ”Œ [WebSocketContext] Finalizando conexÃ£o por logout');
+      if (DEBUG) console.log('xR [WebSocketContext] Finalizando conexão por logout');
       globalSocket.disconnect();
       globalSocket = null;
       setConnected(false);
@@ -213,7 +213,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
     const handleRealtimeContextChange = () => {
       if (DEBUG) {
-        console.log('ðŸ”„ [WebSocketContext] Contexto alterado, forÃ§ando reconexÃ£o do socket');
+        console.log('x [WebSocketContext] Contexto alterado, forçando reconexão do socket');
       }
       reconnect();
     };
@@ -234,18 +234,18 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
   // Cleanup ao desmontar
   useEffect(
     () => () => {
-      // âœ… Delay pequeno para evitar desconexÃ£o prematura no StrictMode
+      // S& Delay pequeno para evitar desconexão prematura no StrictMode
       setTimeout(() => {
         if (globalSocket) {
           try {
-            if (DEBUG) console.log('ðŸ”Œ [WebSocketContext] Desconectando WebSocket');
-            // âœ… Verificar se estÃ¡ conectado antes de desconectar
+            if (DEBUG) console.log('xR [WebSocketContext] Desconectando WebSocket');
+            // S& Verificar se está conectado antes de desconectar
             if (globalSocket.connected || globalSocket.active) {
               globalSocket.disconnect();
             }
           } catch (err) {
-            // âœ… Ignorar erros no cleanup (esperado em React StrictMode)
-            // NÃ£o logar - erro esperado no desenvolvimento
+            // S& Ignorar erros no cleanup (esperado em React StrictMode)
+            // Não logar - erro esperado no desenvolvimento
           } finally {
             globalSocket = null;
             if (reconnectTimeoutRef.current) {
@@ -271,7 +271,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
 /**
  * Hook para acessar status do WebSocket
- * Use em qualquer componente que precise saber se estÃ¡ conectado
+ * Use em qualquer componente que precise saber se está conectado
  */
 export const useWebSocketStatus = () => {
   const context = useContext(WebSocketContext);

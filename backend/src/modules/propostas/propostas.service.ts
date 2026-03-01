@@ -338,25 +338,50 @@ export class PropostasService {
     if (!normalized) return '[vazio]';
     return normalized.length > max ? `${normalized.slice(0, max)}...` : normalized;
   }
+  
+  private getAnoPropostaAtual(): string {
+    return String(new Date().getFullYear());
+  }
+
+  private extrairSequenciaNumeroProposta(numero: string | undefined, ano: string): number {
+    if (!numero) {
+      return 0;
+    }
+
+    const regexAnoAtual = new RegExp(`^PROP-${ano}-(\\d+)$`, 'i');
+    const matchAnoAtual = String(numero).trim().match(regexAnoAtual);
+    if (!matchAnoAtual?.[1]) {
+      return 0;
+    }
+
+    const parsed = Number(matchAnoAtual[1]);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
 
   private async inicializarContador() {
     try {
-      // Importante: não usar findOne() aqui.
-      // Em ambientes com schema legado, o entity atual pode conter colunas ainda não existentes
-      // (ex.: cliente/produtos em JSONB). Então buscamos apenas o campo `numero`.
+      // Importante: nao usar findOne() aqui.
+      // Em ambientes com schema legado, o entity atual pode conter colunas ainda nao existentes
+      // (ex.: cliente/produtos em JSONB). Entao buscamos apenas o campo `numero`.
+      const anoAtual = this.getAnoPropostaAtual();
+      const prefixoAnoAtual = `PROP-${anoAtual}-%`;
       const ultima = await this.propostaRepository
         .createQueryBuilder('p')
         .select('p.numero', 'numero')
+        .where('p.numero LIKE :prefixoAnoAtual', { prefixoAnoAtual })
         .orderBy('p.numero', 'DESC')
         .limit(1)
         .getRawOne<{ numero?: string }>();
 
       if (ultima?.numero) {
-        const numeroMatch = ultima.numero.match(/(\d+)$/);
-        if (numeroMatch) {
-          this.contadorId = parseInt(numeroMatch[1]) + 1;
+        const sequenciaAtual = this.extrairSequenciaNumeroProposta(ultima.numero, anoAtual);
+        if (sequenciaAtual > 0) {
+          this.contadorId = sequenciaAtual + 1;
+          return;
         }
       }
+
+      this.contadorId = 1;
     } catch (error) {
       this.logger.warn(`Erro ao inicializar contador de propostas: ${error.message}`);
     }
@@ -561,6 +586,33 @@ export class PropostasService {
       return {};
     }
     return { ...(value as Record<string, unknown>) };
+  }
+
+  private toJsonRecordOrUndefined(value: unknown): Record<string, unknown> | undefined {
+    if (!value) {
+      return undefined;
+    }
+
+    if (typeof value === 'object' && !Array.isArray(value)) {
+      return { ...(value as Record<string, unknown>) };
+    }
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return undefined;
+      }
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          return parsed as Record<string, unknown>;
+        }
+      } catch {
+        return undefined;
+      }
+    }
+
+    return undefined;
   }
 
   private parseHistoryEvent(raw: unknown): PropostaHistoricoEvento | null {
@@ -1077,11 +1129,25 @@ export class PropostasService {
       row?.observacoes ??
       row?.descricao ??
       (row?.cliente ? row?.cliente.observacoes : undefined);
+    const emailDetailsFonte = overrides.emailDetails ?? row?.emailDetails ?? row?.email_details;
+    const emailDetails = this.toJsonRecordOrUndefined(emailDetailsFonte);
+    const versoes = this.getVersoes(emailDetails);
+    const historicoEventos = this.getHistoricoEventos(emailDetails);
+    const portalEventos = this.getPortalEventos(emailDetails);
+    const aprovacaoInterna = this.parseAprovacaoInterna(emailDetails) || undefined;
+    const lembretes = this.getLembretes(emailDetails);
     const legacyMeta = this.parseLegacyFlowMetadata(observacoesRaw);
+    const statusFromEmail = this.extractFlowStatusFromEmailDetails(emailDetails);
+    const motivoPerdaFromEmail = this.extractMotivoPerdaFromEmailDetails(emailDetails);
+    const produtosDaUltimaVersao =
+      versoes.length > 0 &&
+      Array.isArray(versoes[versoes.length - 1]?.snapshot?.produtos)
+        ? (versoes[versoes.length - 1].snapshot.produtos as unknown[])
+        : [];
     const statusCalculado = overrides.status
       ? this.normalizeStatusInput(overrides.status as string)
-      : legacyMeta.fluxoStatus || this.mapDatabaseStatusToFlowStatus(row?.status);
-    const motivoPerda = overrides.motivoPerda ?? legacyMeta.motivoPerda;
+      : statusFromEmail || legacyMeta.fluxoStatus || this.mapDatabaseStatusToFlowStatus(row?.status);
+    const motivoPerda = overrides.motivoPerda ?? motivoPerdaFromEmail ?? legacyMeta.motivoPerda;
 
     const clienteFallback: Proposta['cliente'] = {
       id: 'cliente-legacy',
@@ -1091,13 +1157,29 @@ export class PropostasService {
 
     const cliente =
       overrides.cliente && typeof overrides.cliente === 'object' ? overrides.cliente : clienteFallback;
+    const produtos =
+      Array.isArray(overrides.produtos) && overrides.produtos.length > 0
+        ? overrides.produtos
+        : produtosDaUltimaVersao;
+    const emailDetailsNormalizado = emailDetails
+      ? {
+          ...emailDetails,
+          fluxoStatus: statusCalculado,
+          ...(motivoPerda !== undefined ? { motivoPerda } : {}),
+          historicoEventos,
+          portalEventos,
+          versoes,
+          aprovacaoInterna,
+          lembretes,
+        }
+      : undefined;
 
     return {
       id: row?.id ?? overrides.id ?? randomUUID(),
       numero: row?.numero ?? overrides.numero ?? this.gerarNumero(),
       titulo: row?.titulo ?? overrides.titulo,
       cliente,
-      produtos: overrides.produtos ?? [],
+      produtos: produtos as Proposta['produtos'],
       subtotal,
       descontoGlobal,
       impostos,
@@ -1117,7 +1199,11 @@ export class PropostasService {
       source: overrides.source ?? row?.source ?? 'api',
       vendedor: overrides.vendedor,
       portalAccess: overrides.portalAccess,
-      emailDetails: overrides.emailDetails,
+      emailDetails: emailDetailsNormalizado as any,
+      historicoEventos,
+      versoes,
+      aprovacaoInterna,
+      lembretes,
     };
   }
 
@@ -1194,11 +1280,13 @@ export class PropostasService {
   private gerarId(): string {
     const timestamp = Date.now();
     const random = Math.floor(Math.random() * 100000);
-    return `PROP-2025-${timestamp}-${random}`;
+    const anoAtual = this.getAnoPropostaAtual();
+    return `PROP-${anoAtual}-${timestamp}-${random}`;
   }
 
   private gerarNumero(): string {
-    return `PROP-2025-${this.contadorId.toString().padStart(3, '0')}`;
+    const anoAtual = this.getAnoPropostaAtual();
+    return `PROP-${anoAtual}-${this.contadorId.toString().padStart(3, '0')}`;
   }
 
   /**
@@ -1224,6 +1312,11 @@ export class PropostasService {
           : columns.has('dataVencimento')
             ? 'p."dataVencimento"'
             : 'NULL';
+        const emailDetailsExpr = columns.has('emailDetails')
+          ? 'p."emailDetails"'
+          : columns.has('email_details')
+            ? 'p.email_details'
+            : 'NULL';
 
         const rows: any[] = await this.propostaRepository.query(
           `
@@ -1235,6 +1328,7 @@ export class PropostasService {
               p.status,
               ${descricaoExpr} AS descricao,
               ${validadeExpr} AS validade,
+              ${emailDetailsExpr} AS email_details,
               p.${createdColumn} AS criado_em,
               p.${updatedColumn} AS atualizado_em
             FROM propostas p
@@ -1286,6 +1380,11 @@ export class PropostasService {
           : columns.has('dataVencimento')
             ? 'p."dataVencimento"'
             : 'NULL';
+        const emailDetailsExpr = columns.has('emailDetails')
+          ? 'p."emailDetails"'
+          : columns.has('email_details')
+            ? 'p.email_details'
+            : 'NULL';
 
         const rows: any[] = await this.propostaRepository.query(
           `
@@ -1297,6 +1396,7 @@ export class PropostasService {
               p.status,
               ${descricaoExpr} AS descricao,
               ${validadeExpr} AS validade,
+              ${emailDetailsExpr} AS email_details,
               p.${createdColumn} AS criado_em,
               p.${updatedColumn} AS atualizado_em
             FROM propostas p

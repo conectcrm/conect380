@@ -2,6 +2,18 @@ import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import { EmpresaConfigService } from '../empresas/services/empresa-config.service';
 
+export interface EmailEnvioResultado {
+  sucesso: boolean;
+  simulado: boolean;
+  motivo:
+    | 'enviado_real'
+    | 'smtp_nao_configurado'
+    | 'email_ficticio'
+    | 'emails_desabilitados'
+    | 'erro_envio';
+  detalhes?: string;
+}
+
 @Injectable()
 export class EmailIntegradoService {
   private transporter: nodemailer.Transporter;
@@ -315,38 +327,70 @@ export class EmailIntegradoService {
     html: string;
     text?: string;
   }, empresaId?: string): Promise<boolean> {
-    try {
-      this.log(`📤 [EMAIL GENÉRICO] Enviando para: ${emailData.to}`);
-      this.log(`📤 [EMAIL GENÉRICO] Assunto: ${emailData.subject}`);
+    const resultado = await this.enviarEmailGenericoDetalhado(emailData, empresaId);
+    return resultado.sucesso;
+  }
 
-      // ✅ VALIDAÇÃO: Verificar se é email fictício
+  async enviarEmailGenericoDetalhado(
+    emailData: {
+      to: string;
+      cc?: string;
+      subject: string;
+      html: string;
+      text?: string;
+    },
+    empresaId?: string,
+  ): Promise<EmailEnvioResultado> {
+    try {
+      this.log(`[EMAIL GENERICO] Enviando para: ${emailData.to}`);
+      this.log(`[EMAIL GENERICO] Assunto: ${emailData.subject}`);
+
       const isFakeEmail =
         emailData.to.includes('@cliente.temp') ||
         emailData.to.includes('@exemplo.') ||
         emailData.to.includes('@test.');
 
       if (isFakeEmail) {
-        this.log(`⚠️ [EMAIL FICTÍCIO] Detectado email fictício: ${emailData.to}`);
-        this.log(`⚠️ [EMAIL FICTÍCIO] Simulando envio bem-sucedido (email não será enviado)`);
-        // Simular sucesso para emails fictícios - não enviar email real
-        return true;
+        this.log(`[EMAIL FICTICIO] Detectado email ficticio: ${emailData.to}`);
+        this.log('[EMAIL FICTICIO] Simulando envio bem-sucedido (email nao sera enviado)');
+        return {
+          sucesso: true,
+          simulado: true,
+          motivo: 'email_ficticio',
+          detalhes: `Destinatario ${emailData.to} identificado como email ficticio`,
+        };
       }
 
       const transportContext = await this.resolveEmailTransportContext(empresaId);
 
       if (!transportContext.emailsEnabled) {
-        this.warn(`⚠️ E-mails desabilitados na configuração da empresa ${empresaId || '[sem-id]'}.`);
-        return false;
+        this.warn(`E-mails desabilitados na configuracao da empresa ${empresaId || '[sem-id]'}.`);
+        return {
+          sucesso: false,
+          simulado: false,
+          motivo: 'emails_desabilitados',
+          detalhes: `Emails desabilitados para empresa ${empresaId || '[sem-id]'}`,
+        };
       }
 
       if (!transportContext.smtpConfigured && !this.isProductionEnv()) {
-        this.warn('⚠️ SMTP não configurado no ambiente local. Envio genérico será simulado.');
-        return true;
+        this.warn('SMTP nao configurado no ambiente local. Envio generico sera simulado.');
+        return {
+          sucesso: true,
+          simulado: true,
+          motivo: 'smtp_nao_configurado',
+          detalhes: `SMTP nao configurado (origem=${transportContext.source})`,
+        };
       }
 
       if (!transportContext.smtpConfigured) {
-        this.error('❌ SMTP não configurado. Defina GMAIL_USER/GMAIL_PASSWORD ou SMTP_USER/SMTP_PASS.');
-        return false;
+        this.error('SMTP nao configurado. Defina GMAIL_USER/GMAIL_PASSWORD ou SMTP_USER/SMTP_PASS.');
+        return {
+          sucesso: false,
+          simulado: false,
+          motivo: 'smtp_nao_configurado',
+          detalhes: 'SMTP nao configurado para envio em producao',
+        };
       }
 
       const mailOptions = {
@@ -358,10 +402,10 @@ export class EmailIntegradoService {
         cc: emailData.cc || undefined,
         subject: emailData.subject,
         html: emailData.html,
-        text: emailData.text || emailData.html.replace(/<[^>]*>/g, ''), // Fallback para texto simples
+        text: emailData.text || emailData.html.replace(/<[^>]*>/g, ''),
       };
 
-      this.log(`📤 [EMAIL REAL] Configurações do envio:`, {
+      this.log('[EMAIL REAL] Configuracoes do envio:', {
         from: mailOptions.from,
         to: mailOptions.to,
         subject: mailOptions.subject,
@@ -373,22 +417,32 @@ export class EmailIntegradoService {
 
       const result = await transportContext.transporter.sendMail(mailOptions);
 
-      this.log('✅ [EMAIL REAL] Email enviado com sucesso!', {
+      this.log('[EMAIL REAL] Email enviado com sucesso!', {
         messageId: result.messageId,
         accepted: result.accepted,
         rejected: result.rejected,
       });
 
-      return true;
+      return {
+        sucesso: true,
+        simulado: false,
+        motivo: 'enviado_real',
+      };
     } catch (error) {
-      this.error('❌ [EMAIL ERRO] Erro ao enviar email genérico:', error);
-      this.error('❌ [EMAIL ERRO] Detalhes:', {
-        message: error.message,
-        code: error.code,
-        command: error.command,
-        response: error.response,
+      const err = error as any;
+      this.error('[EMAIL ERRO] Erro ao enviar email generico:', err);
+      this.error('[EMAIL ERRO] Detalhes:', {
+        message: err?.message,
+        code: err?.code,
+        command: err?.command,
+        response: err?.response,
       });
-      return false;
+      return {
+        sucesso: false,
+        simulado: false,
+        motivo: 'erro_envio',
+        detalhes: err?.message || String(err),
+      };
     }
   }
 

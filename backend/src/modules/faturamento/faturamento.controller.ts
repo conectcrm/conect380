@@ -29,6 +29,7 @@ import { CreatePlanoCobrancaDto, UpdatePlanoCobrancaDto } from './dto/plano-cobr
 import { StatusFatura } from './entities/fatura.entity';
 import { StatusPagamento } from './entities/pagamento.entity';
 import { StatusPlanoCobranca } from './entities/plano-cobranca.entity';
+import { EnvioFaturaEmailOpcoes } from './services/faturamento.service';
 
 @Controller('faturamento')
 @UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
@@ -84,18 +85,23 @@ export class FaturamentoController {
     @Query('contratoId') contratoId?: number,
     @Query('dataInicio') dataInicio?: string,
     @Query('dataFim') dataFim?: string,
+    @Query('periodoCampo') periodoCampo?: 'emissao' | 'vencimento',
     @Query('q') q?: string,
     @Query('page') page = '1',
     @Query('pageSize') pageSize = '10',
     @Query('sortBy') sortBy: 'createdAt' | 'dataVencimento' | 'valorTotal' | 'numero' = 'createdAt',
     @Query('sortOrder') sortOrder: 'ASC' | 'DESC' = 'DESC',
   ) {
+    const periodoCampoFiltro: 'emissao' | 'vencimento' =
+      periodoCampo === 'vencimento' ? 'vencimento' : 'emissao';
+
     const filtros = {
       status,
       clienteId: clienteId?.trim() || undefined,
       contratoId: contratoId ? Number(contratoId) : undefined,
       dataInicio: dataInicio ? new Date(dataInicio) : undefined,
       dataFim: dataFim ? new Date(dataFim) : undefined,
+      periodoCampo: periodoCampoFiltro,
       q,
     };
 
@@ -130,18 +136,23 @@ export class FaturamentoController {
     @Query('contratoId') contratoId?: number,
     @Query('dataInicio') dataInicio?: string,
     @Query('dataFim') dataFim?: string,
+    @Query('periodoCampo') periodoCampo?: 'emissao' | 'vencimento',
     @Query('q') q?: string,
     @Query('page') page = '1',
     @Query('pageSize') pageSize = '10',
     @Query('sortBy') sortBy: 'createdAt' | 'dataVencimento' | 'valorTotal' | 'numero' = 'createdAt',
     @Query('sortOrder') sortOrder: 'ASC' | 'DESC' = 'DESC',
   ) {
+    const periodoCampoFiltro: 'emissao' | 'vencimento' =
+      periodoCampo === 'vencimento' ? 'vencimento' : 'emissao';
+
     const filtros = {
       status,
       clienteId: clienteId?.trim() || undefined,
       contratoId: contratoId ? Number(contratoId) : undefined,
       dataInicio: dataInicio ? new Date(dataInicio) : undefined,
       dataFim: dataFim ? new Date(dataFim) : undefined,
+      periodoCampo: periodoCampoFiltro,
       q,
     };
 
@@ -241,18 +252,25 @@ export class FaturamentoController {
   }
 
   @Post('faturas/:id/enviar-email')
+  @HttpCode(HttpStatus.OK)
   @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
   async enviarFaturaPorEmail(
     @Param('id', ParseIntPipe) id: number,
     @EmpresaId() empresaId: string,
-    @Body('email') email?: string,
+    @Body() envio?: EnvioFaturaEmailOpcoes,
   ) {
-    const sucesso = await this.faturamentoService.enviarFaturaPorEmail(id, empresaId, email);
+    const resultado = await this.faturamentoService.enviarFaturaPorEmail(id, empresaId, envio);
+
+    const message = resultado.enviado
+      ? resultado.simulado
+        ? `Envio de email simulado (${resultado.motivo || 'motivo_desconhecido'})`
+        : 'Fatura enviada por email'
+      : 'Erro ao enviar fatura';
 
     return {
       status: HttpStatus.OK,
-      message: sucesso ? 'Fatura enviada por email' : 'Erro ao enviar fatura',
-      data: { enviado: sucesso },
+      message,
+      data: resultado,
     };
   }
 

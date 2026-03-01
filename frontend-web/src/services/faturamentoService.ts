@@ -138,6 +138,7 @@ export interface FiltrosFatura {
   clienteId?: number;
   dataInicial?: string;
   dataFinal?: string;
+  periodoCampo?: 'emissao' | 'vencimento';
   valorMinimo?: number;
   valorMaximo?: number;
   usuarioResponsavelId?: number;
@@ -195,6 +196,21 @@ export type FaturasPaginadasResponse = {
   aggregates?: Aggregates;
 };
 
+export interface EnvioFaturaEmailResultado {
+  enviado: boolean;
+  simulado: boolean;
+  motivo?: string;
+  detalhes?: string;
+  message?: string;
+}
+
+export interface EnvioFaturaEmailPayload {
+  email?: string;
+  templateId?: string;
+  assunto?: string;
+  conteudo?: string;
+}
+
 // Serviço
 export const faturamentoService = {
   // ==================== FATURAS ====================
@@ -218,6 +234,7 @@ export const faturamentoService = {
           clienteId: 'clienteId',
           dataInicial: 'dataInicio',
           dataFinal: 'dataFim',
+          periodoCampo: 'periodoCampo',
           formaPagamento: 'formaPagamento',
           vencidas: 'vencidas',
           q: 'q',
@@ -369,9 +386,32 @@ export const faturamentoService = {
     }
   },
 
-  async enviarFaturaPorEmail(id: number, email?: string): Promise<void> {
+  async enviarFaturaPorEmail(
+    id: number,
+    payload?: string | EnvioFaturaEmailPayload,
+  ): Promise<EnvioFaturaEmailResultado> {
     try {
-      await api.post(`/faturamento/faturas/${id}/enviar-email`, { email });
+      const body = typeof payload === 'string' ? { email: payload } : payload || {};
+      const response = await api.post(`/faturamento/faturas/${id}/enviar-email`, body);
+      const responsePayload = response?.data ?? {};
+      const data = responsePayload?.data ?? responsePayload ?? {};
+      const enviado = typeof data?.enviado === 'boolean' ? data.enviado : true;
+      const simulado = Boolean(data?.simulado);
+      const motivo =
+        typeof data?.motivo === 'string' && data.motivo.trim().length > 0 ? data.motivo : undefined;
+      const detalhes =
+        typeof data?.detalhes === 'string' && data.detalhes.trim().length > 0
+          ? data.detalhes
+          : undefined;
+      const message =
+        typeof responsePayload?.message === 'string' && responsePayload.message.trim().length > 0
+          ? responsePayload.message
+          : undefined;
+
+      if (!enviado) {
+        throw new Error(message || 'Falha ao enviar fatura por email.');
+      }
+      return { enviado, simulado, motivo, detalhes, message };
     } catch (error) {
       console.error('Erro ao enviar fatura por email:', error);
       throw error;
@@ -526,6 +566,33 @@ export const faturamentoService = {
       return response.data?.data || response.data;
     } catch (error) {
       console.error('Erro ao obter estatísticas de pagamentos:', error);
+      throw error;
+    }
+  },
+
+  async enviarLembretesVencimento(): Promise<void> {
+    try {
+      await api.post('/faturamento/enviar-lembretes-vencimento');
+    } catch (error) {
+      console.error('Erro ao enviar lembretes de vencimento:', error);
+      throw error;
+    }
+  },
+
+  async verificarFaturasVencidas(): Promise<void> {
+    try {
+      await api.post('/faturamento/verificar-faturas-vencidas');
+    } catch (error) {
+      console.error('Erro ao verificar faturas vencidas:', error);
+      throw error;
+    }
+  },
+
+  async processarCobrancasRecorrentes(): Promise<void> {
+    try {
+      await api.post('/faturamento/processar-cobrancas-recorrentes');
+    } catch (error) {
+      console.error('Erro ao processar cobrancas recorrentes:', error);
       throw error;
     }
   },

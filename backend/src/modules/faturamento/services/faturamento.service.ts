@@ -9,6 +9,20 @@ import { PropostasService } from '../../propostas/propostas.service';
 import { CreateFaturaDto, UpdateFaturaDto, GerarFaturaAutomaticaDto } from '../dto/fatura.dto';
 import { EmailIntegradoService } from '../../propostas/email-integrado.service';
 
+export interface ResultadoEnvioFaturaEmail {
+  enviado: boolean;
+  simulado: boolean;
+  motivo?: string;
+  detalhes?: string;
+}
+
+export interface EnvioFaturaEmailOpcoes {
+  email?: string;
+  templateId?: string;
+  assunto?: string;
+  conteudo?: string;
+}
+
 @Injectable()
 export class FaturamentoService {
   private readonly logger = new Logger(FaturamentoService.name);
@@ -159,6 +173,7 @@ export class FaturamentoService {
       contratoId?: number;
       dataInicio?: Date;
       dataFim?: Date;
+      periodoCampo?: 'emissao' | 'vencimento';
     },
   ): Promise<Fatura[]> {
     // x" MULTI-TENANCY: Filtrar por empresa_id
@@ -183,12 +198,15 @@ export class FaturamentoService {
       query.andWhere('fatura.contratoId = :contratoId', { contratoId: filtros.contratoId });
     }
 
+    const campoPeriodo =
+      filtros?.periodoCampo === 'vencimento' ? 'fatura.dataVencimento' : 'fatura.dataEmissao';
+
     if (filtros?.dataInicio) {
-      query.andWhere('fatura.dataEmissao >= :dataInicio', { dataInicio: filtros.dataInicio });
+      query.andWhere(`${campoPeriodo} >= :dataInicio`, { dataInicio: filtros.dataInicio });
     }
 
     if (filtros?.dataFim) {
-      query.andWhere('fatura.dataEmissao <= :dataFim', { dataFim: filtros.dataFim });
+      query.andWhere(`${campoPeriodo} <= :dataFim`, { dataFim: filtros.dataFim });
     }
 
     return query.orderBy('fatura.createdAt', 'DESC').getMany();
@@ -206,6 +224,7 @@ export class FaturamentoService {
       contratoId?: number;
       dataInicio?: Date;
       dataFim?: Date;
+      periodoCampo?: 'emissao' | 'vencimento';
       q?: string;
     },
   ): Promise<{ faturas: any[]; total: number; resumo: any }> {
@@ -222,12 +241,15 @@ export class FaturamentoService {
         qb.andWhere('fatura.contratoId = :contratoId', { contratoId: filtros.contratoId });
       }
 
+      const campoPeriodo =
+        filtros?.periodoCampo === 'vencimento' ? 'fatura.dataVencimento' : 'fatura.dataEmissao';
+
       if (filtros?.dataInicio) {
-        qb.andWhere('fatura.dataEmissao >= :dataInicio', { dataInicio: filtros.dataInicio });
+        qb.andWhere(`${campoPeriodo} >= :dataInicio`, { dataInicio: filtros.dataInicio });
       }
 
       if (filtros?.dataFim) {
-        qb.andWhere('fatura.dataEmissao <= :dataFim', { dataFim: filtros.dataFim });
+        qb.andWhere(`${campoPeriodo} <= :dataFim`, { dataFim: filtros.dataFim });
       }
 
       if (filtros?.q?.trim()) {
@@ -511,10 +533,11 @@ export class FaturamentoService {
   async enviarFaturaPorEmail(
     faturaId: number,
     empresaId: string,
-    emailDestinatario?: string,
-  ): Promise<boolean> {
+    opcoesEnvio?: string | EnvioFaturaEmailOpcoes,
+  ): Promise<ResultadoEnvioFaturaEmail> {
     try {
       const fatura = await this.buscarFaturaPorId(faturaId, empresaId);
+      const opcoesNormalizadas = this.normalizarOpcoesEnvioEmail(opcoesEnvio);
       const cliente = await this.clienteRepository.findOne({
         where: { id: fatura.clienteId, empresaId },
       });
@@ -524,7 +547,7 @@ export class FaturamentoService {
       }
 
       const emailCliente = cliente.email?.trim();
-      const emailDestino = emailDestinatario?.trim() || emailCliente;
+      const emailDestino = opcoesNormalizadas.email?.trim() || emailCliente;
 
       if (!emailDestino) {
         throw new BadRequestException('Cliente nao possui email cadastrado');
@@ -535,15 +558,23 @@ export class FaturamentoService {
         throw new BadRequestException('Email de destinatario invalido');
       }
 
+      const assuntoPadrao = `Fatura ${fatura.numero} - Vencimento ${this.formatDatePtBr(
+        fatura.dataVencimento,
+      )}`;
+      const assunto = opcoesNormalizadas.assunto?.trim() || assuntoPadrao;
+      const conteudoTemplate = opcoesNormalizadas.conteudo?.trim();
+
       const emailData = {
         to: emailDestino,
-        subject: `Fatura ${fatura.numero} - Vencimento ${fatura.dataVencimento.toLocaleDateString('pt-BR')}`,
-        html: this.gerarEmailFatura(fatura),
+        subject: assunto,
+        html: conteudoTemplate
+          ? this.gerarEmailFaturaCustomizado(fatura, conteudoTemplate)
+          : this.gerarEmailFaturaPadrao(fatura),
       };
 
-      const sucesso = await this.emailService.enviarEmailGenerico(emailData);
+      const envio = await this.emailService.enviarEmailGenericoDetalhado(emailData, empresaId);
 
-      if (sucesso) {
+      if (envio.sucesso && !envio.simulado) {
         fatura.status = StatusFatura.ENVIADA;
         const faturaAtualizada = await this.faturaRepository.save(fatura);
         await this.sincronizarStatusPropostaPelaFatura(
@@ -555,7 +586,24 @@ export class FaturamentoService {
         this.logger.log(`Fatura enviada por email: ${fatura.numero}`);
       }
 
-      return sucesso;
+      if (envio.sucesso && envio.simulado) {
+        this.logger.warn(
+          `Envio simulado da fatura ${fatura.numero}. Motivo: ${envio.motivo || 'desconhecido'}`,
+        );
+      }
+
+      if (opcoesNormalizadas.templateId) {
+        this.logger.log(
+          `Template aplicado no envio da fatura ${fatura.numero}: ${opcoesNormalizadas.templateId}`,
+        );
+      }
+
+      return {
+        enviado: envio.sucesso,
+        simulado: envio.simulado,
+        motivo: envio.motivo,
+        detalhes: envio.detalhes,
+      };
     } catch (error) {
       this.logger.error(`Erro ao enviar fatura por email: ${error.message}`);
 
@@ -563,7 +611,12 @@ export class FaturamentoService {
         throw error;
       }
 
-      return false;
+      return {
+        enviado: false,
+        simulado: false,
+        motivo: 'erro_envio',
+        detalhes: error instanceof Error ? error.message : String(error),
+      };
     }
   }
 
@@ -843,23 +896,46 @@ export class FaturamentoService {
     return vencimento.toISOString().split('T')[0];
   }
 
-  private gerarEmailFatura(fatura: Fatura): string {
+  private normalizarOpcoesEnvioEmail(
+    opcoesEnvio?: string | EnvioFaturaEmailOpcoes,
+  ): EnvioFaturaEmailOpcoes {
+    if (!opcoesEnvio) {
+      return {};
+    }
+
+    if (typeof opcoesEnvio === 'string') {
+      return { email: opcoesEnvio };
+    }
+
+    return opcoesEnvio;
+  }
+
+  private getFaturamentoPublicUrl(faturaId: number): string {
+    const frontendBaseUrl = (process.env.FRONTEND_URL || '').replace(/\/+$/, '');
+    const faturamentoPath = `/financeiro/faturamento?faturaId=${faturaId}`;
+    return frontendBaseUrl ? `${frontendBaseUrl}${faturamentoPath}` : faturamentoPath;
+  }
+
+  private gerarEmailFaturaPadrao(fatura: Fatura): string {
+    const urlFatura = this.getFaturamentoPublicUrl(fatura.id);
+    const dataVencimentoFormatada = this.formatDatePtBr(fatura.dataVencimento);
+
     return `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <h1 style="color: #2c3e50;">x" Nova Fatura Disponvel</h1>
+        <h1 style="color: #2c3e50;">Nova Fatura Disponivel</h1>
 
         <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <h3>Detalhes da Fatura</h3>
-          <p><strong>Nmero:</strong> ${fatura.numero}</p>
+          <p><strong>Numero:</strong> ${fatura.numero}</p>
           <p><strong>Valor:</strong> R$ ${fatura.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-          <p><strong>Vencimento:</strong> ${fatura.dataVencimento.toLocaleDateString('pt-BR')}</p>
-          <p><strong>Descrio:</strong> ${fatura.descricao}</p>
+          <p><strong>Vencimento:</strong> ${dataVencimentoFormatada}</p>
+          <p><strong>Descricao:</strong> ${fatura.descricao}</p>
         </div>
 
         <div style="text-align: center; margin: 30px 0;">
-          <a href="${process.env.FRONTEND_URL}/faturas/${fatura.id}"
+          <a href="${urlFatura}"
              style="background-color: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-            x" Pagar Fatura
+            Acessar Fatura
           </a>
         </div>
 
@@ -868,5 +944,51 @@ export class FaturamentoService {
         </p>
       </div>
     `;
+  }
+
+  private gerarEmailFaturaCustomizado(fatura: Fatura, conteudo: string): string {
+    const urlFatura = this.getFaturamentoPublicUrl(fatura.id);
+    const conteudoSeguro = this.escapeHtml(conteudo).replace(/\r?\n/g, '<br />');
+
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="line-height: 1.6; color: #2c3e50;">
+          ${conteudoSeguro}
+        </div>
+
+        <div style="text-align: center; margin: 32px 0 12px;">
+          <a href="${urlFatura}"
+             style="background-color: #28a745; color: white; padding: 14px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+            Acessar Fatura
+          </a>
+        </div>
+
+        <p style="color: #666; font-size: 13px; text-align: center;">
+          Este email foi enviado automaticamente pelo sistema ConectCRM.
+        </p>
+      </div>
+    `;
+  }
+
+  private escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  private formatDatePtBr(value: Date | string | null | undefined): string {
+    if (!value) {
+      return '-';
+    }
+
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return '-';
+    }
+
+    return date.toLocaleDateString('pt-BR');
   }
 }

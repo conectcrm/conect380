@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AlertCircle, Loader2, Save, X } from 'lucide-react';
 import { ContaBancaria } from '../../../types/financeiro';
 import { NovaContaBancaria } from '../../../services/contaBancariaService';
+import MoneyInput from '../../../components/inputs/MoneyInput';
 
 interface ModalContaBancariaProps {
   isOpen: boolean;
@@ -17,7 +18,7 @@ type FormDataState = {
   agencia: string;
   conta: string;
   tipoConta: 'corrente' | 'poupanca';
-  saldo: string;
+  saldo: number;
   chavePix: string;
   ativo: boolean;
 };
@@ -31,7 +32,7 @@ const emptyForm: FormDataState = {
   agencia: '',
   conta: '',
   tipoConta: 'corrente',
-  saldo: '0',
+  saldo: 0,
   chavePix: '',
   ativo: true,
 };
@@ -57,7 +58,7 @@ const ModalContaBancaria: React.FC<ModalContaBancariaProps> = ({
         agencia: conta.agencia || '',
         conta: conta.conta || '',
         tipoConta: conta.tipoConta || 'corrente',
-        saldo: String(Number(conta.saldo || 0)),
+        saldo: Number(conta.saldo || 0),
         chavePix: conta.chavePix || '',
         ativo: conta.ativo ?? true,
       });
@@ -71,7 +72,10 @@ const ModalContaBancaria: React.FC<ModalContaBancariaProps> = ({
 
   if (!isOpen) return null;
 
-  const handleInputChange = (field: keyof FormDataState, value: string | boolean) => {
+  const handleInputChange = (
+    field: keyof FormDataState,
+    value: string | number | boolean,
+  ) => {
     setFormData((prev) => ({
       ...prev,
       [field]: value,
@@ -243,13 +247,11 @@ const ModalContaBancaria: React.FC<ModalContaBancariaProps> = ({
 
             <div>
               <label className="mb-1 block text-sm font-medium text-[#385A6A]">Saldo inicial</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
+              <MoneyInput
                 value={formData.saldo}
-                onChange={(e) => handleInputChange('saldo', e.target.value)}
+                onValueChange={(value) => handleInputChange('saldo', Math.max(0, value || 0))}
                 className={fieldClass}
+                placeholder="R$ 0,00"
                 disabled={disabled}
               />
               {errors.saldo ? (

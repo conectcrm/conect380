@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { X, Settings, Eye, EyeOff, Check, AlertCircle } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { X, Settings, Check, AlertCircle } from 'lucide-react';
 
 interface CardConfig {
   id: string;
   title: string;
   value: string | number;
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<{ className?: string }>;
   color: string;
   gradient: string;
   description: string;
@@ -29,41 +29,52 @@ export default function ModalConfigurarCards({
   const [erro, setErro] = useState<string>('');
 
   useEffect(() => {
-    if (isOpen) {
-      // Inicializar com os cards atualmente ativos
-      const cardsAtivos = cardsDisponiveis.filter((card) => card.isActive).map((card) => card.id);
-      setCardsSelecionados(cardsAtivos);
-      setErro('');
-    }
+    if (!isOpen) return;
+
+    const cardsAtivos = cardsDisponiveis.filter((card) => card.isActive).map((card) => card.id);
+    setCardsSelecionados(cardsAtivos);
+    setErro('');
   }, [isOpen, cardsDisponiveis]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
 
   const toggleCard = (cardId: string) => {
     setCardsSelecionados((prev) => {
       const isSelected = prev.includes(cardId);
 
       if (isSelected) {
-        // Remover o card
         return prev.filter((id) => id !== cardId);
-      } else {
-        // Adicionar o card (máximo 4)
-        if (prev.length >= 4) {
-          setErro('Você pode selecionar no máximo 4 cards');
-          return prev;
-        }
-        setErro('');
-        return [...prev, cardId];
       }
+
+      if (prev.length >= 4) {
+        setErro('Você pode selecionar no máximo 4 cards.');
+        return prev;
+      }
+
+      setErro('');
+      return [...prev, cardId];
     });
   };
 
   const handleSave = () => {
     if (cardsSelecionados.length === 0) {
-      setErro('Selecione pelo menos 1 card');
+      setErro('Selecione pelo menos 1 card.');
       return;
     }
 
     if (cardsSelecionados.length > 4) {
-      setErro('Você pode selecionar no máximo 4 cards');
+      setErro('Você pode selecionar no máximo 4 cards.');
       return;
     }
 
@@ -76,41 +87,63 @@ export default function ModalConfigurarCards({
     onClose();
   };
 
+  const cardsSelecionadosDetalhes = useMemo(
+    () =>
+      cardsSelecionados
+        .map((cardId) => cardsDisponiveis.find((card) => card.id === cardId))
+        .filter((card): card is CardConfig => Boolean(card)),
+    [cardsDisponiveis, cardsSelecionados],
+  );
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-[calc(100%-2rem)] sm:w-[600px] md:w-[700px] lg:w-[900px] xl:w-[1000px] max-w-[1100px] max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0D1F2A]/45 p-4"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          handleCancel();
+        }
+      }}
+    >
+      <div
+        className="max-h-[90vh] w-full max-w-[980px] overflow-y-auto rounded-2xl border border-[#DCE8EC] bg-white shadow-[0_30px_60px_-30px_rgba(7,36,51,0.55)]"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-configurar-cards-title"
+      >
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#E1EAEE] bg-white px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gradient-to-r from-gray-500 to-gray-600 rounded-lg flex items-center justify-center">
-              <Settings className="w-4 h-4 text-white" />
+            <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#ECF7F3]">
+              <Settings className="h-4 w-4 text-[#159A9C]" />
             </div>
-            <h2 className="text-xl font-semibold text-gray-900">Configurar Cards do Dashboard</h2>
+            <h2 id="modal-configurar-cards-title" className="text-lg font-semibold text-[#173A4D]">
+              Configurar cards do dashboard
+            </h2>
           </div>
           <button
+            type="button"
             onClick={handleCancel}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[#5E7784] transition hover:bg-[#F4F8FA]"
+            aria-label="Fechar modal"
           >
-            <X className="w-5 h-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
         <div className="p-6">
           <div className="mb-6">
-            <p className="text-gray-600 mb-2">
+            <p className="mb-2 text-sm text-[#5E7784]">
               Selecione de 1 a 4 cards que deseja exibir no dashboard. Os cards selecionados se
               distribuirão automaticamente no espaço disponível.
             </p>
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-gray-500">Cards selecionados:</span>
+            <div className="flex items-center gap-2 text-sm text-[#5E7784]">
+              <span>Cards selecionados:</span>
               <span
-                className={`font-semibold ${
-                  cardsSelecionados.length > 4
-                    ? 'text-red-600'
-                    : cardsSelecionados.length >= 1
-                      ? 'text-green-600'
-                      : 'text-blue-600'
+                className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+                  cardsSelecionados.length >= 1
+                    ? 'border-[#CDE6DF] bg-[#ECF7F3] text-[#0F7B7D]'
+                    : 'border-[#D4E2E7] bg-[#F6FAFB] text-[#5E7784]'
                 }`}
               >
                 {cardsSelecionados.length}/4
@@ -118,87 +151,87 @@ export default function ModalConfigurarCards({
             </div>
 
             {erro && (
-              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-red-500" />
-                <span className="text-red-700 text-sm">{erro}</span>
+              <div className="mt-3 flex items-center gap-2 rounded-xl border border-[#F7D2D9] bg-[#FFF4F6] px-3 py-2 text-sm text-[#B4233A]">
+                <AlertCircle className="h-4 w-4" />
+                <span>{erro}</span>
               </div>
             )}
           </div>
 
-          {/* Grid de Cards Disponíveis */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            {cardsDisponiveis.map((card, index) => {
+          <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+            {cardsDisponiveis.map((card) => {
               const IconComponent = card.icon;
               const isSelected = cardsSelecionados.includes(card.id);
               const selectionOrder = cardsSelecionados.indexOf(card.id) + 1;
 
               return (
-                <div
+                <button
+                  type="button"
                   key={card.id}
-                  className={`relative border-2 rounded-lg p-4 cursor-pointer transition-all duration-200 ${
+                  className={`relative w-full rounded-xl border p-4 text-left transition-all duration-200 ${
                     isSelected
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:border-gray-300 bg-white'
+                      ? 'border-[#1A9E87] bg-[#ECF7F3] shadow-[0_10px_22px_-20px_rgba(15,57,74,0.4)]'
+                      : 'border-[#DCE8EC] bg-white hover:border-[#C7D8DE] hover:bg-[#FAFCFD]'
                   }`}
                   onClick={() => toggleCard(card.id)}
                 >
-                  {/* Indicador de seleção */}
-                  <div className="absolute top-2 right-2 flex items-center gap-1">
-                    {isSelected && (
-                      <div className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
-                        {selectionOrder}
-                      </div>
-                    )}
-                    <div
-                      className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                        isSelected ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
-                      }`}
-                    >
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <div className="min-h-5">
                       {isSelected ? (
-                        <Check className="w-3 h-3 text-white" />
-                      ) : (
-                        <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                        <span className="inline-flex items-center rounded bg-[#159A9C] px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                          Selecionado
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      {isSelected && (
+                        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#159A9C] text-[10px] font-bold text-white">
+                          {selectionOrder}
+                        </div>
                       )}
-                    </div>
-                  </div>
-
-                  {/* Preview do Card */}
-                  <div className="pr-16">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">
-                          {card.title}
-                        </p>
-                        <p className={`text-2xl font-bold mt-1 ${card.color}`}>{card.value}</p>
-                        <p className="text-xs text-gray-400 mt-1">{card.description}</p>
-                      </div>
-                      <div className={`p-3 bg-gradient-to-br ${card.gradient} rounded-lg`}>
-                        <IconComponent className={`w-6 h-6 ${card.color}`} />
+                      <div
+                        className={`flex h-6 w-6 items-center justify-center rounded-full border-2 ${
+                          isSelected ? 'border-[#159A9C] bg-[#159A9C]' : 'border-[#C7D8DE]'
+                        }`}
+                      >
+                        {isSelected ? (
+                          <Check className="h-3 w-3 text-white" />
+                        ) : (
+                          <div className="h-2 w-2 rounded-full bg-[#D4E2E7]" />
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Indicador visual de seleção */}
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[#5E7784]">
+                        {card.title}
+                      </p>
+                      <p className={`mt-1 text-2xl font-bold ${card.color}`}>{card.value}</p>
+                      <p className="mt-1 text-xs text-[#7D95A3]">{card.description}</p>
+                    </div>
+                    <div className={`rounded-lg bg-gradient-to-br p-3 ${card.gradient}`}>
+                      <IconComponent className={`h-6 w-6 ${card.color}`} />
+                    </div>
+                  </div>
+
                   {isSelected && (
-                    <div className="absolute inset-0 border-2 border-blue-500 rounded-lg pointer-events-none">
-                      <div className="absolute top-0 left-0 bg-blue-500 text-white px-2 py-1 text-xs font-semibold rounded-tl-lg rounded-br-lg">
-                        Selecionado
-                      </div>
-                    </div>
+                    <div className="pointer-events-none absolute inset-0 rounded-xl border-2 border-[#1A9E87]" />
                   )}
-                </div>
+                </button>
               );
             })}
           </div>
 
-          {/* Preview dos Cards Selecionados */}
           {cardsSelecionados.length > 0 && (
             <div className="mb-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-3">
-                Preview - Como ficará no dashboard:
+              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#173A4D]">
+                Preview dos cards selecionados
               </h3>
               <div
-                className={`grid gap-4 p-4 bg-gray-50 rounded-lg ${
+                className={`grid gap-4 rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-4 ${
                   cardsSelecionados.length === 1
                     ? 'grid-cols-1'
                     : cardsSelecionados.length === 2
@@ -208,31 +241,25 @@ export default function ModalConfigurarCards({
                         : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'
                 }`}
               >
-                {cardsSelecionados.map((cardId) => {
-                  const card = cardsDisponiveis.find((c) => c.id === cardId);
-                  if (!card) return null;
-
+                {cardsSelecionadosDetalhes.map((card) => {
                   const IconComponent = card.icon;
 
                   return (
-                    <div
-                      key={cardId}
-                      className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 scale-90 transform"
-                    >
+                    <div key={card.id} className="rounded-xl border border-[#E3EDF1] bg-white p-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-[#5E7784]">
                             {card.title}
                           </p>
-                          <p className={`text-lg font-bold mt-1 ${card.color}`}>
+                          <p className={`mt-1 text-lg font-bold ${card.color}`}>
                             {typeof card.value === 'string' && card.value.length > 15
                               ? card.value.substring(0, 15) + '...'
                               : card.value}
                           </p>
-                          <p className="text-xs text-gray-400 mt-1">{card.description}</p>
+                          <p className="mt-1 text-xs text-[#7D95A3]">{card.description}</p>
                         </div>
-                        <div className={`p-2 bg-gradient-to-br ${card.gradient} rounded-lg`}>
-                          <IconComponent className={`w-4 h-4 ${card.color}`} />
+                        <div className={`rounded-lg bg-gradient-to-br p-2 ${card.gradient}`}>
+                          <IconComponent className={`h-4 w-4 ${card.color}`} />
                         </div>
                       </div>
                     </div>
@@ -243,12 +270,11 @@ export default function ModalConfigurarCards({
           )}
         </div>
 
-        {/* Botões de Ação */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <div className="flex items-center justify-end gap-3 border-t border-[#E1EAEE] bg-[#F9FBFC] px-6 py-4">
           <button
             type="button"
             onClick={handleCancel}
-            className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+            className="inline-flex h-9 items-center rounded-lg border border-[#D4E2E7] bg-white px-4 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
           >
             Cancelar
           </button>
@@ -256,9 +282,9 @@ export default function ModalConfigurarCards({
             type="button"
             onClick={handleSave}
             disabled={cardsSelecionados.length === 0 || cardsSelecionados.length > 4}
-            className="px-6 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-md hover:from-blue-600 hover:to-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex h-9 items-center rounded-lg bg-[#159A9C] px-4 text-sm font-medium text-white transition hover:bg-[#117C7E] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Salvar Configuração
+            Salvar configuração
           </button>
         </div>
       </div>

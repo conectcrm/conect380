@@ -89,7 +89,7 @@ const tipoBadge = (tipo: TipoLancamentoExtrato) => (
         : 'border-[#F4C7CF] bg-[#FFF4F6] text-[#B4233A]'
     }`}
   >
-    {tipo === 'credito' ? 'Credito' : 'Debito'}
+    {tipo === 'credito' ? 'Crédito' : 'Débito'}
   </span>
 );
 
@@ -153,7 +153,7 @@ export default function ConciliacaoBancariaPage() {
         setContaBancariaId((prev) => prev || contas[0].id);
       }
     } catch (error) {
-      const mensagem = getApiErrorMessage(error, 'Nao foi possivel carregar contas bancarias');
+      const mensagem = getApiErrorMessage(error, 'Não foi possível carregar contas bancárias');
       setErro(mensagem);
       toast.error(mensagem);
       setContasBancarias([]);
@@ -172,7 +172,7 @@ export default function ConciliacaoBancariaPage() {
       });
       setImportacoes(Array.isArray(dados) ? dados : []);
     } catch (error) {
-      const mensagem = getApiErrorMessage(error, 'Nao foi possivel carregar importacoes');
+      const mensagem = getApiErrorMessage(error, 'Não foi possível carregar importações');
       setErro(mensagem);
       toast.error(mensagem);
       setImportacoes([]);
@@ -191,7 +191,7 @@ export default function ConciliacaoBancariaPage() {
       const dados = await conciliacaoBancariaService.listarItensImportacao(importacaoId, 200);
       setItensImportacao(Array.isArray(dados) ? dados : []);
     } catch (error) {
-      const mensagem = getApiErrorMessage(error, 'Nao foi possivel carregar lancamentos importados');
+      const mensagem = getApiErrorMessage(error, 'Não foi possível carregar lançamentos importados');
       setErroItens(mensagem);
       toast.error(mensagem);
       setItensImportacao([]);
@@ -202,7 +202,7 @@ export default function ConciliacaoBancariaPage() {
 
   const executarMatchingAutomatico = async () => {
     if (!importacaoSelecionadaId) {
-      toast.error('Selecione uma importacao para executar matching automatico');
+      toast.error('Selecione uma importação para executar matching automático');
       return;
     }
 
@@ -210,14 +210,14 @@ export default function ConciliacaoBancariaPage() {
       setExecutandoMatching(true);
       const resultado = await conciliacaoBancariaService.executarMatchingAutomatico(importacaoSelecionadaId, 3);
       toast.success(
-        `Matching concluido: ${resultado.totalConciliados} conciliado(s), ${resultado.totalPendentes} pendente(s)`,
+        `Matching concluído: ${resultado.totalConciliados} conciliado(s), ${resultado.totalPendentes} pendente(s)`,
       );
       await carregarItensImportacao(importacaoSelecionadaId);
       if (contaBancariaId) {
         await carregarImportacoes(contaBancariaId);
       }
     } catch (error) {
-      const mensagem = getApiErrorMessage(error, 'Falha ao executar matching automatico');
+      const mensagem = getApiErrorMessage(error, 'Falha ao executar matching automático');
       toast.error(mensagem);
     } finally {
       setExecutandoMatching(false);
@@ -238,7 +238,7 @@ export default function ConciliacaoBancariaPage() {
         setContaPagarSelecionadaId(candidatos[0].id);
       }
     } catch (error) {
-      const mensagem = getApiErrorMessage(error, 'Nao foi possivel carregar candidatos para conciliacao');
+      const mensagem = getApiErrorMessage(error, 'Não foi possível carregar candidatos para conciliação');
       toast.error(mensagem);
       setItemEmEdicao(null);
       setCandidatosConciliacao([]);
@@ -275,7 +275,7 @@ export default function ConciliacaoBancariaPage() {
       setItemEmEdicao(itemAtualizado);
       toast.success('Item conciliado com sucesso');
     } catch (error) {
-      const mensagem = getApiErrorMessage(error, 'Nao foi possivel conciliar item');
+      const mensagem = getApiErrorMessage(error, 'Não foi possível conciliar item');
       toast.error(mensagem);
     } finally {
       setProcessandoItemId(null);
@@ -287,7 +287,7 @@ export default function ConciliacaoBancariaPage() {
       setProcessandoItemId(item.id);
       const itemAtualizado = await conciliacaoBancariaService.desconciliarItem(
         item.id,
-        'Desconciliacao manual',
+        'Desconciliação manual',
       );
       setItensImportacao((prev) =>
         prev.map((atual) => (atual.id === itemAtualizado.id ? itemAtualizado : atual)),
@@ -295,9 +295,9 @@ export default function ConciliacaoBancariaPage() {
       if (itemEmEdicao?.id === item.id) {
         setItemEmEdicao(itemAtualizado);
       }
-      toast.success('Conciliacao desfeita com sucesso');
+      toast.success('Conciliação desfeita com sucesso');
     } catch (error) {
-      const mensagem = getApiErrorMessage(error, 'Nao foi possivel desfazer conciliacao');
+      const mensagem = getApiErrorMessage(error, 'Não foi possível desfazer conciliação');
       toast.error(mensagem);
     } finally {
       setProcessandoItemId(null);
@@ -306,7 +306,7 @@ export default function ConciliacaoBancariaPage() {
 
   const handleImportarExtrato = async () => {
     if (!contaBancariaId) {
-      toast.error('Selecione uma conta bancaria para importar');
+      toast.error('Selecione uma conta bancária para importar');
       return;
     }
 
@@ -317,7 +317,7 @@ export default function ConciliacaoBancariaPage() {
 
     const nomeArquivo = arquivo.name.toLowerCase();
     if (!nomeArquivo.endsWith('.csv') && !nomeArquivo.endsWith('.ofx')) {
-      toast.error('Formato invalido. Envie apenas arquivo CSV ou OFX');
+      toast.error('Formato inválido. Envie apenas arquivo CSV ou OFX');
       return;
     }
 
@@ -329,12 +329,12 @@ export default function ConciliacaoBancariaPage() {
       setArquivo(null);
       setInputArquivoKey((prev) => prev + 1);
       toast.success(
-        `Extrato importado com sucesso (${resultado.resumo.totalLancamentos} lancamento(s))`,
+        `Extrato importado com sucesso (${resultado.resumo.totalLancamentos} lançamento(s))`,
       );
       await carregarImportacoes(contaBancariaId);
       await carregarItensImportacao(resultado.importacao.id);
     } catch (error) {
-      const mensagem = getApiErrorMessage(error, 'Nao foi possivel importar o extrato');
+      const mensagem = getApiErrorMessage(error, 'Não foi possível importar o extrato');
       setErro(mensagem);
       toast.error(mensagem);
     } finally {
@@ -370,11 +370,11 @@ export default function ConciliacaoBancariaPage() {
     <div className="space-y-4 pt-1 sm:pt-2">
       <SectionCard className="space-y-4 p-4 sm:p-5">
         <PageHeader
-          title="Conciliacao Bancaria"
+          title="Conciliação Bancária"
           description={
             contaAtual
               ? `Importe extratos OFX/CSV para a conta ${contaAtual.nome}.`
-              : 'Importe extratos OFX/CSV e acompanhe os lancamentos pendentes de conciliacao.'
+              : 'Importe extratos OFX/CSV e acompanhe os lançamentos pendentes de conciliação.'
           }
           actions={
             <div className="flex flex-wrap items-center gap-2">
@@ -394,10 +394,10 @@ export default function ConciliacaoBancariaPage() {
         {!carregando && !erro ? (
           <InlineStats
             stats={[
-              { label: 'Importacoes', value: String(totalImportacoes), tone: 'neutral' },
-              { label: 'Lancamentos', value: String(totalLancamentos), tone: 'accent' },
+              { label: 'Importações', value: String(totalImportacoes), tone: 'neutral' },
+              { label: 'Lançamentos', value: String(totalLancamentos), tone: 'accent' },
               { label: 'Entradas', value: moneyFmt.format(totalEntradas), tone: 'neutral' },
-              { label: 'Saidas', value: moneyFmt.format(totalSaidas), tone: 'warning' },
+              { label: 'Saídas', value: moneyFmt.format(totalSaidas), tone: 'warning' },
             ]}
           />
         ) : null}
@@ -406,7 +406,7 @@ export default function ConciliacaoBancariaPage() {
       <FiltersBar className="p-4">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
           <div className="lg:col-span-4">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Conta bancaria</label>
+            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Conta bancária</label>
             <select
               value={contaBancariaId}
               onChange={(event) => setContaBancariaId(event.target.value)}
@@ -433,7 +433,7 @@ export default function ConciliacaoBancariaPage() {
           </div>
 
           <div className="lg:col-span-4">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Acoes</label>
+            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Ações</label>
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
@@ -454,7 +454,7 @@ export default function ConciliacaoBancariaPage() {
       {!carregando && erro ? (
         <EmptyState
           icon={<AlertCircle className="h-5 w-5" />}
-          title="Erro ao carregar conciliacao bancaria"
+          title="Erro ao carregar conciliação bancária"
           description={erro}
           action={
             <button type="button" className={btnPrimary} onClick={() => void carregarContasBancarias()}>
@@ -469,13 +469,13 @@ export default function ConciliacaoBancariaPage() {
         <SectionCard className="space-y-3 p-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-[#245468]">
             <FileText className="h-4 w-4" />
-            Resultado da ultima importacao ({resultadoImportacao.importacao.nomeArquivo})
+            Resultado da última importação ({resultadoImportacao.importacao.nomeArquivo})
           </div>
 
           <InlineStats
             stats={[
               {
-                label: 'Lancamentos importados',
+                label: 'Lançamentos importados',
                 value: String(resultadoImportacao.resumo.totalLancamentos),
                 tone: 'accent',
               },
@@ -485,7 +485,7 @@ export default function ConciliacaoBancariaPage() {
                 tone: 'neutral',
               },
               {
-                label: 'Saidas',
+                label: 'Saídas',
                 value: moneyFmt.format(resultadoImportacao.resumo.totalSaidas),
                 tone: 'warning',
               },
@@ -495,7 +495,7 @@ export default function ConciliacaoBancariaPage() {
           {resultadoImportacao.erros.length > 0 ? (
             <div className="rounded-xl border border-[#F2D8A6] bg-[#FFF8EA] p-3">
               <p className="text-sm font-semibold text-[#8C5A07]">
-                Importacao concluida com {resultadoImportacao.erros.length} aviso(s)
+                Importação concluída com {resultadoImportacao.erros.length} aviso(s)
               </p>
               <ul className="mt-2 space-y-1 text-xs text-[#8C5A07]">
                 {resultadoImportacao.erros.slice(0, 8).map((erro, index) => (
@@ -516,7 +516,7 @@ export default function ConciliacaoBancariaPage() {
             <div className="flex w-full flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
               <div className="w-full sm:min-w-[280px] sm:flex-1">
                 <label className="mb-2 block text-sm font-medium text-[#385A6A]">
-                  Buscar no historico
+                  Buscar no histórico
                 </label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
@@ -559,12 +559,12 @@ export default function ConciliacaoBancariaPage() {
                   <tr>
                     <th className="px-3 py-3">Arquivo</th>
                     <th className="px-3 py-3">Tipo</th>
-                    <th className="px-3 py-3">Periodo</th>
-                    <th className="px-3 py-3">Lancamentos</th>
+                    <th className="px-3 py-3">Período</th>
+                    <th className="px-3 py-3">Lançamentos</th>
                     <th className="px-3 py-3">Entradas</th>
-                    <th className="px-3 py-3">Saidas</th>
+                    <th className="px-3 py-3">Saídas</th>
                     <th className="px-3 py-3">Importado em</th>
-                    <th className="px-3 py-3 text-right">Acoes</th>
+                    <th className="px-3 py-3 text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -580,7 +580,7 @@ export default function ConciliacaoBancariaPage() {
                       <td className="px-3 py-3">
                         {item.periodoInicio || item.periodoFim
                           ? `${formatDate(item.periodoInicio)} a ${formatDate(item.periodoFim)}`
-                          : 'Nao informado'}
+                          : 'Não informado'}
                       </td>
                       <td className="px-3 py-3">{item.totalLancamentos}</td>
                       <td className="px-3 py-3">{moneyFmt.format(item.totalEntradas)}</td>
@@ -607,8 +607,8 @@ export default function ConciliacaoBancariaPage() {
             {!carregandoImportacoes && importacoesFiltradas.length === 0 ? (
               <EmptyState
                 icon={<FileText className="h-5 w-5" />}
-                title="Nenhuma importacao encontrada"
-                description="Importe um arquivo OFX/CSV para iniciar a conciliacao bancaria."
+                title="Nenhuma importação encontrada"
+                description="Importe um arquivo OFX/CSV para iniciar a conciliação bancária."
               />
             ) : null}
           </DataTableCard>
@@ -618,7 +618,7 @@ export default function ConciliacaoBancariaPage() {
               <DataTableCard>
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#EDF2F4] px-3 py-3">
                   <h3 className="text-sm font-semibold text-[#244455]">
-                    Lancamentos importados ({itensImportacao.length})
+                    Lançamentos importados ({itensImportacao.length})
                   </h3>
                   <button
                     type="button"
@@ -627,7 +627,7 @@ export default function ConciliacaoBancariaPage() {
                     disabled={executandoMatching || carregandoItens || itensImportacao.length === 0}
                   >
                     <Sparkles className={`h-4 w-4 ${executandoMatching ? 'animate-pulse' : ''}`} />
-                    {executandoMatching ? 'Executando...' : 'Matching automatico'}
+                    {executandoMatching ? 'Executando...' : 'Matching automático'}
                   </button>
                 </div>
 
@@ -636,7 +636,7 @@ export default function ConciliacaoBancariaPage() {
                 {!carregandoItens && erroItens ? (
                   <EmptyState
                     icon={<AlertCircle className="h-5 w-5" />}
-                    title="Erro ao carregar lancamentos"
+                    title="Erro ao carregar lançamentos"
                     description={erroItens}
                   />
                 ) : null}
@@ -644,8 +644,8 @@ export default function ConciliacaoBancariaPage() {
                 {!carregandoItens && !erroItens && itensImportacao.length === 0 ? (
                   <EmptyState
                     icon={<FileText className="h-5 w-5" />}
-                    title="Sem lancamentos para a importacao selecionada"
-                    description="Selecione outra importacao ou envie um novo arquivo."
+                    title="Sem lançamentos para a importação selecionada"
+                    description="Selecione outra importação ou envie um novo arquivo."
                   />
                 ) : null}
 
@@ -655,13 +655,13 @@ export default function ConciliacaoBancariaPage() {
                       <thead className="bg-[#F7FAFB] text-xs uppercase tracking-wide text-[#6B8794]">
                         <tr>
                           <th className="px-3 py-3">Data</th>
-                          <th className="px-3 py-3">Descricao</th>
+                          <th className="px-3 py-3">Descrição</th>
                           <th className="px-3 py-3">Documento</th>
                           <th className="px-3 py-3">Tipo</th>
                           <th className="px-3 py-3">Valor</th>
                           <th className="px-3 py-3">Status</th>
                           <th className="px-3 py-3">Conta vinculada</th>
-                          <th className="px-3 py-3 text-right">Acoes</th>
+                          <th className="px-3 py-3 text-right">Ações</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -694,7 +694,7 @@ export default function ConciliacaoBancariaPage() {
                                     <p className="text-xs text-[#6B8794]">{item.contaPagarDescricao || '-'}</p>
                                   </div>
                                 ) : (
-                                  <span className="text-xs text-[#6B8794]">Nao conciliado</span>
+                                  <span className="text-xs text-[#6B8794]">Não conciliado</span>
                                 )}
                               </td>
                               <td className="px-3 py-3">
@@ -734,7 +734,7 @@ export default function ConciliacaoBancariaPage() {
                 <SectionCard className="space-y-3 p-4">
                   <div className="flex items-center justify-between gap-2">
                     <div>
-                      <p className="text-sm font-semibold text-[#244455]">Conciliacao manual do item</p>
+                      <p className="text-sm font-semibold text-[#244455]">Conciliação manual do item</p>
                       <p className="text-xs text-[#6B8794]">
                         {formatDate(itemEmEdicao.dataLancamento)} - {itemEmEdicao.descricao} (
                         {moneyFmt.format(itemEmEdicao.valor)})
@@ -768,7 +768,7 @@ export default function ConciliacaoBancariaPage() {
                       </div>
                       <div className="lg:col-span-4">
                         <label className="mb-2 block text-sm font-medium text-[#385A6A]">
-                          Observacao (opcional)
+                          Observação (opcional)
                         </label>
                         <input
                           type="text"
@@ -785,7 +785,7 @@ export default function ConciliacaoBancariaPage() {
                     <p className="text-xs text-[#6B8794]">
                       Melhor candidato: {candidatosConciliacao[0].numero} com score{' '}
                       {candidatosConciliacao[0].score.toFixed(1)} (
-                      {candidatosConciliacao[0].criterios.join(', ') || 'sem criterio'})
+                      {candidatosConciliacao[0].criterios.join(', ') || 'sem critério'})
                     </p>
                   ) : null}
 
@@ -797,7 +797,7 @@ export default function ConciliacaoBancariaPage() {
                       disabled={!contaPagarSelecionadaId || processandoItemId === itemEmEdicao.id}
                     >
                       <Link2 className="h-4 w-4" />
-                      Confirmar conciliacao
+                      Confirmar conciliação
                     </button>
                     {itemEmEdicao.conciliado ? (
                       <button
@@ -807,7 +807,7 @@ export default function ConciliacaoBancariaPage() {
                         disabled={processandoItemId === itemEmEdicao.id}
                       >
                         <Link2Off className="h-4 w-4" />
-                        Desfazer conciliacao
+                        Desfazer conciliação
                       </button>
                     ) : null}
                   </div>

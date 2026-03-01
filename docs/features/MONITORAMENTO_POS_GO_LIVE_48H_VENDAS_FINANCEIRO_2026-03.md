@@ -71,4 +71,5 @@ powershell -ExecutionPolicy Bypass -File scripts/monitor-pos-go-live-vendas-fina
 ## 7. Status atual
 
 - Guia e automacao publicados em 2026-02-28.
+- Dry-run tecnico executado em 2026-02-28 (`RunId 20260228-144233`) com coleta concluida e evidencias em `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260228-144233.md` e `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260228-144233.csv`.
 - Janela real de 48h: pendente da data efetiva de go-live no ambiente alvo.

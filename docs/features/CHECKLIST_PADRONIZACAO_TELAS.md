@@ -92,6 +92,9 @@ Usar este checklist em qualquer uma destas situacoes:
 ## Fase 7: Modais (se aplicavel)
 
 - [ ] Modal com overlay, borda e sombra consistentes.
+- [ ] Modal usa `w-full max-h-[90vh] overflow-y-auto` no container principal.
+- [ ] Largura do modal esta correta por tipologia (detalhe `max-w-[980px]`, formulario complexo `max-w-[1200px]`, simples `max-w-lg` a `max-w-3xl`).
+- [ ] Modal nao ficou "esticado" em desktop (sem ocupar largura excessiva).
 - [ ] Header do modal com titulo + fechar.
 - [ ] Corpo com espacamento uniforme.
 - [ ] Footer sticky (em modais longos) com CTAs padronizados.

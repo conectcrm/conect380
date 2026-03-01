@@ -116,10 +116,7 @@ const CategoriasProdutosPage = React.lazy(
 const CombosPage = React.lazy(() => import('./features/combos/CombosPage'));
 const NovoComboPage = React.lazy(() => import('./features/combos/NovoComboPage'));
 
-const FinanceiroPage = React.lazy(() => import('./features/financeiro/FinanceiroPage'));
-const ContasReceberPage = React.lazy(() => import('./features/financeiro/ContasReceberPage'));
 const ContasPagarPage = React.lazy(() => import('./pages/gestao/financeiro/ContasPagarPage'));
-const FluxoCaixaPage = React.lazy(() => import('./pages/financeiro/FluxoCaixa'));
 const FornecedoresPage = React.lazy(
   () => import('./features/financeiro/fornecedores/FornecedoresPage'),
 );
@@ -871,11 +868,27 @@ const AppRoutes: React.FC = () => {
                   {/* Rotas do Núcleo Financeiro - Protegidas */}
                   <Route
                     path="/financeiro"
-                    element={protegerRota(ModuloEnum.FINANCEIRO, <FinanceiroPage />)}
+                    element={protegerRota(
+                      ModuloEnum.FINANCEIRO,
+                      <Navigate to="/nuclei/financeiro" replace />,
+                    )}
                   />
                   <Route
                     path="/financeiro/contas-receber"
-                    element={protegerRota(ModuloEnum.FINANCEIRO, <ContasReceberPage />)}
+                    element={protegerRota(
+                      ModuloEnum.FINANCEIRO,
+                      <ModuleUnderConstruction
+                        moduleName="Contas a Receber"
+                        description="Este fluxo ainda esta em desenvolvimento para a versao atual do financeiro."
+                        estimatedCompletion="Q2 2026"
+                        features={[
+                          'Controle de inadimplencia por cliente',
+                          'Reguas de cobranca',
+                          'Consolidado de recebiveis por periodo',
+                          'Relatorio de aging de recebimentos',
+                        ]}
+                      />,
+                    )}
                   />
                   <Route
                     path="/financeiro/contas-pagar"
@@ -883,7 +896,20 @@ const AppRoutes: React.FC = () => {
                   />
                   <Route
                     path="/financeiro/fluxo-caixa"
-                    element={protegerRota(ModuloEnum.FINANCEIRO, <FluxoCaixaPage />)}
+                    element={protegerRota(
+                      ModuloEnum.FINANCEIRO,
+                      <ModuleUnderConstruction
+                        moduleName="Fluxo de Caixa"
+                        description="Painel consolidado de entradas, saidas e projecoes de caixa."
+                        estimatedCompletion="Q2 2026"
+                        features={[
+                          'Projecao diaria de caixa',
+                          'Comparativo realizado vs previsto',
+                          'Alertas de saldo minimo',
+                          'Exportacao de relatorio gerencial',
+                        ]}
+                      />,
+                    )}
                   />
                   <Route
                     path="/financeiro/fornecedores"

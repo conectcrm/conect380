@@ -25,6 +25,7 @@ import {
   SectionCard,
 } from '../../../components/layout-v2';
 import ModalConfirmacao from '../../../components/common/ModalConfirmacao';
+import ModalJustificativa from '../../../components/common/ModalJustificativa';
 import { useConfirmacaoInteligente } from '../../../hooks/useConfirmacaoInteligente';
 import ModalContaPagar from '../../../features/financeiro/components/ModalContaPagarNovo';
 import contaBancariaService from '../../../services/contaBancariaService';
@@ -188,6 +189,10 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
   const [modalPagamentoAberto, setModalPagamentoAberto] = useState(false);
   const [modalExportacaoAberto, setModalExportacaoAberto] = useState(false);
   const [modalDetalhesAberto, setModalDetalhesAberto] = useState(false);
+  const [contaReprovacaoSelecionada, setContaReprovacaoSelecionada] = useState<ContaPagar | null>(
+    null,
+  );
+  const [processandoReprovacao, setProcessandoReprovacao] = useState(false);
   const [contaDetalhesSelecionada, setContaDetalhesSelecionada] = useState<ContaPagar | null>(null);
   const [comprovantePagamentoArquivo, setComprovantePagamentoArquivo] = useState<File | null>(null);
   const [exportando, setExportando] = useState(false);
@@ -328,11 +333,8 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
     const conta = contas.find((c) => c.id === contaId);
     if (!conta) return;
 
-    const tipoConfirmacao =
-      conta.status === StatusContaPagar.PAGO ? 'estornar-pagamento' : 'excluir-transacao';
-
     confirmacao.confirmar(
-      tipoConfirmacao,
+      'excluir-transacao',
       async () => {
         await contasPagarService.excluir(contaId);
         toast.success('Conta excluida com sucesso');
@@ -469,22 +471,33 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
     }
   };
 
-  const handleReprovarConta = async (conta: ContaPagar) => {
-    const justificativa = window.prompt('Informe a justificativa para reprovar esta conta:');
-    if (justificativa === null) return;
+  const handleReprovarConta = (conta: ContaPagar) => {
+    setContaReprovacaoSelecionada(conta);
+  };
 
-    if (!justificativa.trim()) {
-      toast.error('Justificativa obrigatoria para reprovar');
-      return;
-    }
+  const fecharModalReprovacao = () => {
+    if (processandoReprovacao) return;
+    setContaReprovacaoSelecionada(null);
+  };
+
+  const confirmarReprovarConta = async (justificativa: string) => {
+    if (!contaReprovacaoSelecionada) return;
 
     try {
-      await contasPagarService.reprovar(conta.id, { justificativa: justificativa.trim() });
+      setProcessandoReprovacao(true);
+      await contasPagarService.reprovar(contaReprovacaoSelecionada.id, {
+        justificativa,
+      });
       toast.success('Conta reprovada e cancelada');
+      setContaReprovacaoSelecionada(null);
       await carregarDados();
     } catch (err) {
       console.error('Erro ao reprovar conta:', err);
-      toast.error(getApiErrorMessage(err, 'Nao foi possivel reprovar a conta'));
+      const mensagem = getApiErrorMessage(err, 'Nao foi possivel reprovar a conta');
+      toast.error(mensagem);
+      throw new Error(mensagem);
+    } finally {
+      setProcessandoReprovacao(false);
     }
   };
 
@@ -1632,6 +1645,22 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
           loading={confirmacao.loading}
         />
       ) : null}
+
+      <ModalJustificativa
+        isOpen={Boolean(contaReprovacaoSelecionada)}
+        title="Reprovar conta"
+        description={
+          contaReprovacaoSelecionada
+            ? `Informe a justificativa para reprovar a conta ${contaReprovacaoSelecionada.numero}.`
+            : undefined
+        }
+        placeholder="Explique o motivo da reprovacao desta conta."
+        confirmLabel="Reprovar conta"
+        minLength={3}
+        loading={processandoReprovacao}
+        onClose={fecharModalReprovacao}
+        onConfirm={confirmarReprovarConta}
+      />
     </div>
   );
 };

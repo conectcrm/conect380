@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   CreditCard,
   Smartphone,
@@ -6,8 +6,6 @@ import {
   Building,
   Check,
   X,
-  Clock,
-  AlertCircle,
 } from 'lucide-react';
 import { Fatura } from '../../services/faturamentoService';
 import { formatarValorCompletoBRL, converterParaNumero } from '../../utils/formatacao';
@@ -157,18 +155,33 @@ export default function GatewayPagamento({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0D1F2A]/45 p-4"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !processandoPagamento) {
+          onFechar();
+        }
+      }}
+    >
+      <div
+        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[#DCE8EC] bg-white shadow-[0_30px_60px_-30px_rgba(7,36,51,0.55)]"
+        role="dialog"
+        aria-modal="true"
+      >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#E1EAEE] bg-white p-6">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Pagamento da Fatura</h2>
+            <h2 className="text-xl font-semibold text-[#173A4D]">Pagamento da Fatura</h2>
             <p className="text-gray-600">
               #{fatura.numero} - {formatarValorCompletoBRL(fatura.valorTotal)}
             </p>
           </div>
-          <button onClick={onFechar} className="text-gray-400 hover:text-gray-600">
-            <X className="w-6 h-6" />
+          <button
+            onClick={onFechar}
+            disabled={processandoPagamento}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[#5E7784] transition hover:bg-[#F4F8FA] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <X className="h-5 w-5" />
           </button>
         </div>
 
@@ -185,15 +198,15 @@ export default function GatewayPagamento({
                     <button
                       key={metodo.id}
                       onClick={() => setMetodoSelecionado(metodo)}
-                      className={`p-4 border-2 rounded-lg text-left transition-all ${
+                      className={`rounded-xl border-2 p-4 text-left transition-all ${
                         metodoSelecionado?.id === metodo.id
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
+                          ? 'border-[#159A9C] bg-[#E8F6F6]'
+                          : 'border-[#D4E2E7] hover:border-[#BFD3DA]'
                       }`}
                     >
                       <div className="flex items-center gap-3 mb-2">
                         <div
-                          className={`${metodoSelecionado?.id === metodo.id ? 'text-blue-600' : 'text-gray-400'}`}
+                          className={`${metodoSelecionado?.id === metodo.id ? 'text-[#159A9C]' : 'text-gray-400'}`}
                         >
                           {metodo.icone}
                         </div>
@@ -215,7 +228,7 @@ export default function GatewayPagamento({
 
               {/* Formulário específico do método selecionado */}
               {metodoSelecionado && (
-                <div className="border rounded-lg p-6 bg-gray-50">
+                <div className="rounded-xl border border-[#D4E2E7] bg-[#F8FCFC] p-6">
                   <h4 className="font-medium text-gray-900 mb-4">
                     Dados para {metodoSelecionado.nome}
                   </h4>
@@ -237,7 +250,7 @@ export default function GatewayPagamento({
                           }
                           placeholder="1234 5678 9012 3456"
                           maxLength={19}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full rounded-lg border border-[#D4E2E7] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
                         />
                       </div>
 
@@ -255,7 +268,7 @@ export default function GatewayPagamento({
                             }))
                           }
                           placeholder="NOME COMO NO CARTÃO"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full rounded-lg border border-[#D4E2E7] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
                         />
                       </div>
 
@@ -274,7 +287,7 @@ export default function GatewayPagamento({
                           }
                           placeholder="MM/AA"
                           maxLength={5}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full rounded-lg border border-[#D4E2E7] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
                         />
                       </div>
 
@@ -291,7 +304,7 @@ export default function GatewayPagamento({
                           }
                           placeholder="123"
                           maxLength={4}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full rounded-lg border border-[#D4E2E7] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
                         />
                       </div>
 
@@ -307,7 +320,7 @@ export default function GatewayPagamento({
                               parcelas: parseInt(e.target.value),
                             }))
                           }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full rounded-lg border border-[#D4E2E7] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
                         >
                           {Array.from(
                             { length: metodoSelecionado.configuracao.maxParcelas },
@@ -348,7 +361,7 @@ export default function GatewayPagamento({
 
               {/* Resumo do Pagamento */}
               {metodoSelecionado && (
-                <div className="bg-white border rounded-lg p-6">
+                <div className="rounded-xl border border-[#D4E2E7] bg-white p-6">
                   <h4 className="font-medium text-gray-900 mb-4">Resumo do Pagamento</h4>
                   <div className="space-y-2">
                     <div className="flex justify-between">
@@ -385,7 +398,7 @@ export default function GatewayPagamento({
                         !dadosCartao.validade ||
                         !dadosCartao.cvv))
                   }
-                  className="w-full py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-medium"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#159A9C] py-3 font-medium text-white transition hover:bg-[#117C7E] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {processandoPagamento ? (
                     <>
@@ -424,7 +437,7 @@ export default function GatewayPagamento({
                       {transacaoAtual.linkPagamento && (
                         <a
                           href={transacaoAtual.linkPagamento}
-                          className="text-blue-600 hover:underline text-sm"
+                          className="text-sm text-[#159A9C] hover:underline"
                           target="_blank"
                           rel="noopener noreferrer"
                         >
@@ -443,7 +456,7 @@ export default function GatewayPagamento({
                       {transacaoAtual.linkPagamento && (
                         <a
                           href={transacaoAtual.linkPagamento}
-                          className="text-blue-600 hover:underline text-sm mt-2 inline-block"
+                          className="mt-2 inline-block text-sm text-[#159A9C] hover:underline"
                           target="_blank"
                           rel="noopener noreferrer"
                         >
@@ -467,7 +480,7 @@ export default function GatewayPagamento({
                       setTransacaoAtual(null);
                       setMetodoSelecionado(null);
                     }}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                    className="rounded-lg bg-[#159A9C] px-6 py-2 text-white transition hover:bg-[#117C7E]"
                   >
                     Tentar Novamente
                   </button>

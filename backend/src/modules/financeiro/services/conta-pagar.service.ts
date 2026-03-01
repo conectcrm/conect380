@@ -304,6 +304,7 @@ export class ContaPagarService {
   async create(
     createContaPagarDto: CreateContaPagarDto,
     empresaId: string,
+    userId: string = 'sistema',
   ): Promise<ContaPagarResponse> {
     await this.validarFornecedor(createContaPagarDto.fornecedorId, empresaId);
     if (createContaPagarDto.contaBancariaId) {
@@ -393,7 +394,7 @@ export class ContaPagarService {
         anexos: anexosNormalizados,
         fornecedorId: createContaPagarDto.fornecedorId,
         empresaId,
-        criadoPor: 'sistema',
+        criadoPor: userId || 'sistema',
         observacoes: createContaPagarDto.observacoes?.trim() || undefined,
         numeroDocumento,
       });
@@ -431,6 +432,7 @@ export class ContaPagarService {
     id: string,
     updateContaPagarDto: UpdateContaPagarDto,
     empresaId: string,
+    userId: string = 'sistema',
   ): Promise<ContaPagarResponse> {
     const conta = await this.findContaEntity(id, empresaId);
 
@@ -549,7 +551,7 @@ export class ContaPagarService {
       conta.dataAprovacao = undefined;
     }
 
-    conta.atualizadoPor = 'sistema';
+    conta.atualizadoPor = userId || 'sistema';
 
     const saved = await this.contaPagarRepository.save(conta);
     const withFornecedor = await this.findContaEntity(saved.id, empresaId);
@@ -578,6 +580,7 @@ export class ContaPagarService {
     id: string,
     dto: RegistrarPagamentoContaPagarDto,
     empresaId: string,
+    userId: string = 'sistema',
   ): Promise<ContaPagarResponse> {
     const conta = await this.findContaEntity(id, empresaId);
 
@@ -614,7 +617,7 @@ export class ContaPagarService {
     conta.valorPago = novoValorPago;
     conta.valorRestante = novoValorRestante;
     conta.status = novoValorRestante <= 0 ? 'paga' : this.calcularStatusAberto(conta);
-    conta.atualizadoPor = 'sistema';
+    conta.atualizadoPor = userId || 'sistema';
 
     if (dto.observacoes?.trim()) {
       conta.observacoes = conta.observacoes

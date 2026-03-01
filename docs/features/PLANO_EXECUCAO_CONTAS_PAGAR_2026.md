@@ -490,7 +490,16 @@ Entregar um fluxo funcional de contas a pagar ponta a ponta no Conect360, cobrin
   - Responsavel sugerido: Operacoes + Tech Lead
   - Prazo: primeiro ciclo apos publicacao em producao
   - Evidencia de conclusao: relatorio de monitoramento gerado em `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_<runId>.md`.
+  - Status atual: dry-run tecnico concluido em 2026-02-28 (`RunId 20260228-144233`) com evidencias em `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260228-144233.md` e `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260228-144233.csv`; aguardando execucao da janela real de 48h em ambiente de go-live.
 - [ ] Registrar decisao final de operacao (GO tecnico/negocio) apos janela de 48h.
   - Responsavel sugerido: Responsavel unico do projeto
   - Prazo: D+2 do go-live monitorado
   - Evidencia de conclusao: atualizacao do checklist de sign-off com data e resultado final.
+  - Status atual: preparado para fechamento apos janela real de 48h.
+
+## 15. Referencia canonica de padroes de tela/modal (Layout V2)
+
+- Os requisitos oficiais de largura de tela, responsividade e padrao de modais foram consolidados em:
+  - `docs/features/ARQUITETURA_PADRONIZACAO_TELAS.md`
+- Checklist de validacao visual/QA:
+  - `docs/features/CHECKLIST_PADRONIZACAO_TELAS.md`

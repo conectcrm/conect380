@@ -38,3 +38,10 @@ Registrar aprovacao formal de QA, Produto e Financeiro para encerramento do cicl
 - Status final: [x] GO  [ ] NO-GO
 - Condicionantes (se houver): monitoramento pos-go-live de 48h com observabilidade ativa (guia/script publicados em `docs/features/MONITORAMENTO_POS_GO_LIVE_48H_VENDAS_FINANCEIRO_2026-03.md`).
 - Proxima acao: executar janela real de 48h, anexar relatorio em `docs/features/evidencias/` e atualizar o sign-off final.
+
+## 6. Preparacao operacional pos-go-live
+
+- [x] Dry-run tecnico do monitoramento executado (`RunId 20260228-144233`) com artefatos em `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260228-144233.md` e `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260228-144233.csv`.
+- [x] Migration de consistencia multi-tenant para fornecedores aplicada no banco local (`AlignFornecedorUniqueByEmpresa1802861000000`).
+- [ ] Janela real de 48h no ambiente de go-live.
+- [ ] Atualizacao final de GO tecnico/negocio apos janela real.

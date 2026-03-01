@@ -237,7 +237,7 @@ const converterPropostaParaUI = async (proposta: any) => {
     cliente: clienteNome,
     cliente_contato: clienteEmail, // ✅ Agora contém dados reais quando possível
     cliente_telefone: clienteTelefone, // ✅ Incluir telefone real
-    titulo: `Proposta para ${clienteNome}`,
+    titulo: safeRender(proposta.titulo) || `Proposta para ${clienteNome}`,
     valor: Number(proposta.total) || 0,
     status: safeRender(proposta.status) || 'rascunho',
     data_criacao: dataCreated,
@@ -275,6 +275,7 @@ const converterPropostaParaUI = async (proposta: any) => {
       : Array.isArray((proposta as any).emailDetails?.historicoEventos)
         ? (proposta as any).emailDetails.historicoEventos
         : [],
+    produtos: Array.isArray((proposta as any).produtos) ? (proposta as any).produtos : [],
     versoes,
     totalVersoes,
     ultimaVersao,
@@ -1195,7 +1196,6 @@ const PropostasPage: React.FC = () => {
       contrato_gerado: 'contrato_assinado',
       contrato_assinado: 'fatura_criada',
       fatura_criada: 'aguardando_pagamento',
-      aguardando_pagamento: 'pago',
     };
 
     return mapa[status] || '';
@@ -1284,12 +1284,19 @@ const PropostasPage: React.FC = () => {
 
         case 'avancar-fluxo': {
           let avancadas = 0;
+          let bloqueadasNoFinanceiro = 0;
 
           for (const proposta of propostasAlvo) {
             const propostaId = safeRender(proposta?.id) || safeRender(proposta?.numero);
             if (!propostaId) continue;
 
-            const novoStatus = proximoStatusFluxo(safeRender(proposta?.status));
+            const statusAtual = String(safeRender(proposta?.status) || '').toLowerCase();
+            if (statusAtual === 'aguardando_pagamento') {
+              bloqueadasNoFinanceiro += 1;
+              continue;
+            }
+
+            const novoStatus = proximoStatusFluxo(statusAtual);
             if (!novoStatus) continue;
 
             const updated = await propostasService.updateStatus(String(propostaId), novoStatus as any, {
@@ -1302,10 +1309,15 @@ const PropostasPage: React.FC = () => {
             }
           }
 
+          const detalheFinanceiro =
+            bloqueadasNoFinanceiro > 0
+              ? ` ${bloqueadasNoFinanceiro} proposta(s) aguardando pagamento dependem da baixa da fatura no financeiro.`
+              : '';
+
           showNotification(
             avancadas > 0
-              ? `${avancadas} proposta(s) avancada(s) no fluxo.`
-              : 'Nenhuma proposta elegivel para avancar no fluxo.',
+              ? `${avancadas} proposta(s) avancada(s) no fluxo.${detalheFinanceiro}`
+              : `Nenhuma proposta elegivel para avancar no fluxo.${detalheFinanceiro}`,
             avancadas > 0 ? 'success' : 'error',
           );
           break;
@@ -1626,6 +1638,17 @@ const PropostasPage: React.FC = () => {
     const valorTotal = Number(
       propostaCompleta.total ?? propostaCompleta.valor ?? subtotal - descontoGeral + impostos,
     );
+    const prazoEntrega =
+      safeRender((propostaCompleta as any).prazoEntrega) ||
+      safeRender((propostaCompleta as any)?.condicoes?.prazoEntrega) ||
+      undefined;
+    const garantia =
+      safeRender((propostaCompleta as any).garantia) ||
+      safeRender((propostaCompleta as any)?.condicoes?.garantia) ||
+      undefined;
+    const observacoesNormalizadas =
+      safeRender(propostaCompleta.observacoes) ||
+      'Proposta gerada pelo módulo comercial do ConectCRM.';
 
     const clienteObj =
       propostaCompleta.cliente && typeof propostaCompleta.cliente === 'object'
@@ -1690,17 +1713,11 @@ const PropostasPage: React.FC = () => {
         propostaCompleta.formaPagamento,
         propostaCompleta.parcelas,
       ),
-      prazoEntrega: `${Number(propostaCompleta.validadeDias || 30)} dias uteis`,
-      garantia: 'Conforme contrato comercial',
+      prazoEntrega,
+      garantia,
       validadeProposta: `${Number(propostaCompleta.validadeDias || 30)} dias corridos`,
-      condicoesGerais: [
-        `Proposta valida por ${Number(propostaCompleta.validadeDias || 30)} dias corridos`,
-        'Pagamento conforme condicoes comerciais acordadas',
-        'Alteracoes de escopo podem gerar custos adicionais',
-      ],
-      observacoes:
-        safeRender(propostaCompleta.observacoes) ||
-        'Proposta gerada pelo modulo comercial do ConectCRM.',
+      condicoesGerais: observacoesNormalizadas ? [observacoesNormalizadas] : [],
+      observacoes: observacoesNormalizadas,
     };
   };
 

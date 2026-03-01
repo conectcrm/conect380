@@ -3,7 +3,6 @@ import {
   X,
   FileText,
   User,
-  Calendar,
   DollarSign,
   CreditCard,
   MapPin,
@@ -79,16 +78,27 @@ export default function ModalDetalhesFatura({
   const valorPendente = fatura.valorTotal - valorPago;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-[calc(100%-2rem)] sm:w-[600px] md:w-[700px] lg:w-[900px] xl:w-[1000px] max-w-[1100px] max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0D1F2A]/45 p-4"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        className="max-h-[90vh] w-full max-w-[980px] overflow-y-auto rounded-2xl border border-[#DCE8EC] bg-white shadow-[0_30px_60px_-30px_rgba(7,36,51,0.55)]"
+        role="dialog"
+        aria-modal="true"
+      >
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#E1EAEE] bg-white px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <FileText className="w-5 h-5 text-white" />
+            <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[#ECF7F3]">
+              <FileText className="h-5 w-5 text-[#159A9C]" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">
+              <h2 className="text-xl font-semibold text-[#173A4D]">
                 Fatura #{faturamentoService.formatarNumeroFatura(fatura.numero)}
               </h2>
               <div className="flex items-center gap-2 mt-1">
@@ -111,7 +121,7 @@ export default function ModalDetalhesFatura({
             {onEdit && (
               <button
                 onClick={onEdit}
-                className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#D4E2E7] text-[#244455] transition hover:bg-[#F6FAFB]"
                 title="Editar Fatura"
               >
                 <Eye className="w-4 h-4" />
@@ -120,7 +130,7 @@ export default function ModalDetalhesFatura({
             {onDownloadPDF && (
               <button
                 onClick={() => onDownloadPDF(fatura.id)}
-                className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#D4E2E7] text-[#244455] transition hover:bg-[#F6FAFB]"
                 title="Baixar PDF"
               >
                 <Download className="w-4 h-4" />
@@ -129,7 +139,7 @@ export default function ModalDetalhesFatura({
             {onSendEmail && (
               <button
                 onClick={() => onSendEmail(fatura.id)}
-                className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#D4E2E7] text-[#244455] transition hover:bg-[#F6FAFB]"
                 title="Enviar por Email"
               >
                 <Send className="w-4 h-4" />
@@ -138,7 +148,7 @@ export default function ModalDetalhesFatura({
             {onGeneratePaymentLink && fatura.status !== StatusFatura.PAGA && (
               <button
                 onClick={() => onGeneratePaymentLink(fatura.id)}
-                className="p-2 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#D4E2E7] text-[#244455] transition hover:bg-[#F6FAFB]"
                 title="Gerar Link de Pagamento"
               >
                 <Link2 className="w-4 h-4" />
@@ -146,7 +156,7 @@ export default function ModalDetalhesFatura({
             )}
             <button
               onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[#5E7784] transition hover:bg-[#F4F8FA]"
             >
               <X className="w-5 h-5" />
             </button>
@@ -434,3 +444,4 @@ export default function ModalDetalhesFatura({
     </div>
   );
 }
+

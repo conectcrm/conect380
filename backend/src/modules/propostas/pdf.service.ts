@@ -6,11 +6,34 @@ import * as path from 'path';
 
 @Injectable()
 export class PdfService {
-  private readonly templatesPath = path.join(__dirname, '../../templates/pdf');
+  private readonly templatesPath: string;
 
   constructor() {
+    this.templatesPath = this.resolveTemplatesPath();
     // Registrar helpers do Handlebars
     this.registerHandlebarsHelpers();
+  }
+
+  private resolveTemplatesPath(): string {
+    const envTemplatesPath = process.env.PDF_TEMPLATES_DIR?.trim();
+    const candidates = [
+      envTemplatesPath ? path.resolve(envTemplatesPath) : null,
+      path.join(__dirname, '../../templates/pdf'),
+      path.resolve(process.cwd(), 'dist/src/templates/pdf'),
+      path.resolve(process.cwd(), 'src/templates/pdf'),
+      path.resolve(process.cwd(), 'backend/dist/src/templates/pdf'),
+      path.resolve(process.cwd(), 'backend/src/templates/pdf'),
+    ].filter((candidate): candidate is string => Boolean(candidate));
+
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
+        return candidate;
+      }
+    }
+
+    throw new Error(
+      `Diretorio de templates PDF nao encontrado. Caminhos verificados: ${candidates.join(' | ')}`,
+    );
   }
 
   private registerHandlebarsHelpers() {
@@ -68,10 +91,26 @@ export class PdfService {
   }
 
   async gerarHtml(tipo: string, dados: any): Promise<string> {
-    const templatePath = path.join(this.templatesPath, `proposta-${tipo}.html`);
+    const templateName = `proposta-${tipo}.html`;
+    const templatePath = path.join(this.templatesPath, templateName);
 
     if (!fs.existsSync(templatePath)) {
-      throw new Error(`Template ${tipo} não encontrado em ${templatePath}`);
+      const fallbackCandidates = [
+        path.resolve(process.cwd(), 'src/templates/pdf', templateName),
+        path.resolve(process.cwd(), 'dist/src/templates/pdf', templateName),
+        path.resolve(process.cwd(), 'backend/src/templates/pdf', templateName),
+        path.resolve(process.cwd(), 'backend/dist/src/templates/pdf', templateName),
+      ];
+      const fallback = fallbackCandidates.find((candidate) => fs.existsSync(candidate));
+      if (!fallback) {
+        throw new Error(
+          `Template ${tipo} não encontrado. Caminhos verificados: ${[templatePath, ...fallbackCandidates].join(' | ')}`,
+        );
+      }
+      const templateSourceFallback = fs.readFileSync(fallback, 'utf8');
+      const templateFallback = handlebars.compile(templateSourceFallback);
+      const dadosProcessadosFallback = await this.processarDados(dados);
+      return templateFallback(dadosProcessadosFallback);
     }
 
     const templateSource = fs.readFileSync(templatePath, 'utf8');
@@ -112,83 +151,241 @@ export class PdfService {
 
   private async processarDados(dados: any) {
     const agora = new Date();
+    const numeroProposta = String(dados?.numeroProposta || dados?.numero || `PROP-${agora.getTime()}`);
+    const titulo = String(dados?.titulo || 'Proposta comercial').trim();
+    const statusNormalizado = String(dados?.status || 'rascunho')
+      .trim()
+      .toLowerCase();
 
-    // Dados padrão
-    const dadosProcessados = {
-      ...dados,
-      dataGeracao: agora.toLocaleDateString('pt-BR'),
-      horaGeracao: agora.toLocaleTimeString('pt-BR'),
+    const dataEmissao = this.toDatePtBr(dados?.dataEmissao, agora);
+    const dataValidade = this.toDatePtBr(
+      dados?.dataValidade,
+      new Date(agora.getTime() + 30 * 24 * 60 * 60 * 1000),
+    );
+
+    const valorTotalEntrada = this.toNumber(dados?.valorTotal ?? dados?.total ?? dados?.valor, 0);
+    const itensOriginais = Array.isArray(dados?.itens) ? dados.itens : [];
+    const itens = this.normalizarItens(itensOriginais, titulo, valorTotalEntrada);
+
+    const subtotalCalculado = itens.reduce((sum, item) => sum + this.toNumber(item.valorTotal, 0), 0);
+    const subtotal = this.toNumber(dados?.subtotal, subtotalCalculado);
+    const descontoGeral = Math.max(0, this.toNumber(dados?.descontoGeral, 0));
+    const impostos = Math.max(0, this.toNumber(dados?.impostos, 0));
+    const valorTotalCalculado = subtotal - descontoGeral + impostos;
+    const valorTotal = this.toNumber(
+      dados?.valorTotal ?? dados?.total ?? dados?.valor,
+      valorTotalCalculado,
+    );
+    const percentualDesconto = this.toNumber(
+      dados?.percentualDesconto,
+      subtotal > 0 ? (descontoGeral / subtotal) * 100 : 0,
+    );
+
+    const formaPagamento = this.descreverFormaPagamento(dados?.formaPagamento);
+    const prazoEntrega = this.toNonEmptyString(dados?.prazoEntrega);
+    const garantia = this.toNonEmptyString(dados?.garantia);
+    const validadeProposta =
+      this.toNonEmptyString(dados?.validadeProposta) || `Até ${dataValidade}`;
+    const condicoesGerais = Array.isArray(dados?.condicoesGerais)
+      ? dados.condicoesGerais
+          .map((item: unknown) => this.toNonEmptyString(item))
+          .filter((item): item is string => Boolean(item))
+      : [];
+    const observacoes = this.toNonEmptyString(dados?.observacoes);
+    const descricao = this.toNonEmptyString(dados?.descricao);
+
+    const empresaBase = {
+      nome: 'ConectCRM',
+      endereco: '',
+      cidade: '',
+      estado: '',
+      cep: '',
+      telefone: '',
+      email: '',
+      cnpj: '',
+      logo: '',
+    };
+    const empresa = {
+      ...empresaBase,
+      ...(dados?.empresa || {}),
+    };
+    empresa.nome = this.toNonEmptyString(empresa.nome) || 'ConectCRM';
+
+    const clienteRaw = dados?.cliente || {};
+    const cliente = {
+      nome: this.toNonEmptyString(clienteRaw?.nome) || 'Cliente não informado',
+      empresa: this.toNonEmptyString(clienteRaw?.empresa),
+      email: this.toNonEmptyString(clienteRaw?.email),
+      telefone: this.toNonEmptyString(clienteRaw?.telefone),
+      documento: this.toNonEmptyString(clienteRaw?.documento),
+      tipoDocumento: this.toNonEmptyString(clienteRaw?.tipoDocumento),
+      endereco: this.toNonEmptyString(clienteRaw?.endereco),
     };
 
-    // Processar datas
-    if (dadosProcessados.dataEmissao) {
-      dadosProcessados.dataEmissao = new Date(dadosProcessados.dataEmissao).toLocaleDateString(
-        'pt-BR',
-      );
-    } else {
-      dadosProcessados.dataEmissao = agora.toLocaleDateString('pt-BR');
+    const vendedorRaw = dados?.vendedor || {};
+    const vendedor = {
+      nome: this.toNonEmptyString(vendedorRaw?.nome) || 'Equipe comercial',
+      email: this.toNonEmptyString(vendedorRaw?.email),
+      telefone: this.toNonEmptyString(vendedorRaw?.telefone),
+      cargo: this.toNonEmptyString(vendedorRaw?.cargo),
+    };
+
+    return {
+      ...dados,
+      numeroProposta,
+      titulo,
+      status: statusNormalizado,
+      statusText: this.getStatusText(statusNormalizado),
+      statusClass: this.getStatusClass(statusNormalizado),
+      dataEmissao,
+      dataValidade,
+      dataGeracao: agora.toLocaleDateString('pt-BR'),
+      horaGeracao: agora.toLocaleTimeString('pt-BR'),
+      empresa,
+      cliente,
+      vendedor,
+      itens,
+      subtotal,
+      descontoGeral,
+      percentualDesconto,
+      impostos,
+      valorTotal,
+      formaPagamento,
+      prazoEntrega,
+      garantia,
+      validadeProposta,
+      condicoesGerais,
+      observacoes,
+      descricao,
+      temDescricao: Boolean(descricao),
+      temObservacoes: Boolean(observacoes),
+      temCondicoesGerais: condicoesGerais.length > 0,
+      temDescontoGeral: descontoGeral > 0,
+      temImpostos: impostos > 0,
+      temPrazoEntrega: Boolean(prazoEntrega),
+      temGarantia: Boolean(garantia),
+    };
+  }
+
+  private normalizarItens(
+    itensOriginais: any[],
+    tituloFallback: string,
+    valorFallback: number,
+  ): Array<{
+    nome: string;
+    descricao: string;
+    quantidade: number;
+    unidade: string;
+    valorUnitario: number;
+    desconto: number;
+    valorTotal: number;
+  }> {
+    const itensProcessados = itensOriginais
+      .map((item: any, index: number) => {
+        const nome = this.toNonEmptyString(item?.nome || item?.descricao) || `Item ${index + 1}`;
+        const descricao = this.toNonEmptyString(item?.descricao);
+        const quantidade = Math.max(0.01, this.toNumber(item?.quantidade, 1));
+        const unidade = this.toNonEmptyString(item?.unidade) || 'un';
+        const valorUnitario = Math.max(
+          0,
+          this.toNumber(item?.valorUnitario ?? item?.precoUnitario ?? item?.preco, 0),
+        );
+        const desconto = Math.max(0, this.toNumber(item?.desconto, 0));
+        const valorTotal =
+          this.toNumber(item?.valorTotal ?? item?.subtotal, 0) ||
+          valorUnitario * quantidade * (1 - desconto / 100);
+
+        return {
+          nome,
+          descricao,
+          quantidade,
+          unidade,
+          valorUnitario,
+          desconto,
+          valorTotal: Math.max(0, valorTotal),
+        };
+      })
+      .filter((item) => item.nome);
+
+    if (itensProcessados.length > 0) {
+      return itensProcessados;
     }
 
-    if (dadosProcessados.dataValidade) {
-      dadosProcessados.dataValidade = new Date(dadosProcessados.dataValidade).toLocaleDateString(
-        'pt-BR',
-      );
+    const valorUnitarioFallback = Math.max(0, this.toNumber(valorFallback, 0));
+    return [
+      {
+        nome: tituloFallback || 'Item da proposta',
+        descricao: '',
+        quantidade: 1,
+        unidade: 'un',
+        valorUnitario: valorUnitarioFallback,
+        desconto: 0,
+        valorTotal: valorUnitarioFallback,
+      },
+    ];
+  }
+
+  private toNumber(value: unknown, fallback = 0): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  private toDatePtBr(value: unknown, fallback: Date): string {
+    if (!value) {
+      return fallback.toLocaleDateString('pt-BR');
     }
 
-    // Processar valores monetários - removendo formatação pois será feita no template
-    // if (dadosProcessados.itens && Array.isArray(dadosProcessados.itens)) {
-    //   dadosProcessados.itens = dadosProcessados.itens.map(item => ({
-    //     ...item,
-    //     valorUnitario: this.formatarMoeda(item.valorUnitario),
-    //     valorTotal: this.formatarMoeda(item.valorTotal),
-    //   }));
-    // }
-
-    // Processar totais - removendo formatação pois será feita no template
-    // if (dadosProcessados.subtotal) {
-    //   dadosProcessados.subtotal = this.formatarMoeda(dadosProcessados.subtotal);
-    // }
-    // if (dadosProcessados.valorTotal) {
-    //   dadosProcessados.valorTotal = this.formatarMoeda(dadosProcessados.valorTotal);
-    // }
-    // if (dadosProcessados.descontoGeral) {
-    //   dadosProcessados.descontoGeral = this.formatarMoeda(dadosProcessados.descontoGeral);
-    // }
-    // if (dadosProcessados.impostos) {
-    //   dadosProcessados.impostos = this.formatarMoeda(dadosProcessados.impostos);
-    // }
-
-    // Processar status
-    if (dadosProcessados.status) {
-      dadosProcessados.statusText = this.getStatusText(dadosProcessados.status);
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+      return value.toLocaleDateString('pt-BR');
     }
 
-    // Condições gerais padrão se não fornecidas
-    if (!dadosProcessados.condicoesGerais || dadosProcessados.condicoesGerais.length === 0) {
-      dadosProcessados.condicoesGerais = [
-        'Os preços apresentados têm validade conforme especificado nesta proposta.',
-        'O prazo de entrega será contado a partir da confirmação do pedido e aprovação do projeto.',
-        'Eventuais alterações no escopo do projeto poderão gerar custos adicionais.',
-        'O pagamento deverá ser realizado conforme as condições estabelecidas.',
-        'Esta proposta não gera vínculo contratual até sua formal aceitação.',
-      ];
+    const raw = String(value).trim();
+    if (!raw) {
+      return fallback.toLocaleDateString('pt-BR');
     }
 
-    // Dados da empresa padrão se não fornecidos
-    if (!dadosProcessados.empresa) {
-      dadosProcessados.empresa = {
-        nome: 'Conect CRM',
-        endereco: 'Rua Exemplo, 123',
-        cidade: 'São Paulo',
-        estado: 'SP',
-        cep: '01234-567',
-        telefone: '(11) 99999-9999',
-        email: 'contato@conectcrm.com',
-        cnpj: '12.345.678/0001-90',
-      };
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
+      const [dia, mes, ano] = raw.split('/').map((item) => Number(item));
+      const parsedBr = new Date(ano, mes - 1, dia);
+      if (!Number.isNaN(parsedBr.getTime())) {
+        return parsedBr.toLocaleDateString('pt-BR');
+      }
     }
 
-    return dadosProcessados;
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleDateString('pt-BR');
+    }
+
+    return fallback.toLocaleDateString('pt-BR');
+  }
+
+  private toNonEmptyString(value: unknown): string {
+    if (value === null || value === undefined) {
+      return '';
+    }
+    const text = String(value).trim();
+    return text.length > 0 ? text : '';
+  }
+
+  private descreverFormaPagamento(value: unknown): string {
+    const normalized = String(value || '')
+      .trim()
+      .toLowerCase();
+
+    const map: Record<string, string> = {
+      avista: 'À vista',
+      'a-vista': 'À vista',
+      a_vista: 'À vista',
+      boleto: 'Boleto bancário',
+      cartao: 'Cartão de crédito',
+      cartao_credito: 'Cartão de crédito',
+      pix: 'PIX',
+      recorrente: 'Recorrente',
+      parcelado: 'Parcelado',
+    };
+
+    return map[normalized] || this.toNonEmptyString(value) || 'Conforme negociação comercial';
   }
 
   private formatarMoeda(valor: number): string {
@@ -208,13 +405,44 @@ export class PdfService {
       enviada: 'Enviada',
       viewed: 'Visualizada',
       visualizada: 'Visualizada',
+      negociacao: 'Em negociação',
       approved: 'Aprovada',
       aprovada: 'Aprovada',
+      contrato_gerado: 'Contrato gerado',
+      contrato_assinado: 'Contrato assinado',
+      fatura_criada: 'Fatura criada',
+      aguardando_pagamento: 'Aguardando pagamento',
+      pago: 'Pago',
       rejected: 'Rejeitada',
       rejeitada: 'Rejeitada',
       expired: 'Expirada',
       expirada: 'Expirada',
     };
     return statusMap[normalized] || 'Desconhecido';
+  }
+
+  private getStatusClass(status: string): string {
+    const normalized = String(status || '').trim().toLowerCase();
+    if (['rascunho', 'draft'].includes(normalized)) return 'status-muted';
+    if (['enviada', 'sent', 'visualizada', 'viewed', 'negociacao'].includes(normalized)) {
+      return 'status-info';
+    }
+    if (
+      [
+        'aprovada',
+        'approved',
+        'contrato_gerado',
+        'contrato_assinado',
+        'fatura_criada',
+        'aguardando_pagamento',
+      ].includes(normalized)
+    ) {
+      return 'status-warning';
+    }
+    if (['pago'].includes(normalized)) return 'status-success';
+    if (['rejeitada', 'rejected', 'expirada', 'expired'].includes(normalized)) {
+      return 'status-danger';
+    }
+    return 'status-muted';
   }
 }

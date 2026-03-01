@@ -159,8 +159,38 @@ class FaturamentoAPIService {
     return unwrapEnvelope<FaturaResponse>(response.data);
   }
 
-  async enviarFaturaPorEmail(faturaId: string, email?: string): Promise<void> {
-    await api.post(`/faturamento/faturas/${faturaId}/enviar-email`, { email });
+  async enviarFaturaPorEmail(
+    faturaId: string,
+    payload?: string | { email?: string; templateId?: string; assunto?: string; conteudo?: string },
+  ): Promise<{
+    enviado: boolean;
+    simulado: boolean;
+    motivo?: string;
+    detalhes?: string;
+    message?: string;
+  }> {
+    const body = typeof payload === 'string' ? { email: payload } : payload || {};
+    const response = await api.post(`/faturamento/faturas/${faturaId}/enviar-email`, body);
+    const responsePayload = response?.data ?? {};
+    const data = responsePayload?.data ?? responsePayload ?? {};
+    const enviado = typeof data?.enviado === 'boolean' ? data.enviado : true;
+    const simulado = Boolean(data?.simulado);
+    const motivo =
+      typeof data?.motivo === 'string' && data.motivo.trim().length > 0 ? data.motivo : undefined;
+    const detalhes =
+      typeof data?.detalhes === 'string' && data.detalhes.trim().length > 0
+        ? data.detalhes
+        : undefined;
+    const message =
+      typeof responsePayload?.message === 'string' && responsePayload.message.trim().length > 0
+        ? responsePayload.message
+        : undefined;
+
+    if (!enviado) {
+      throw new Error(message || 'Falha ao enviar fatura por email.');
+    }
+
+    return { enviado, simulado, motivo, detalhes, message };
   }
 
   async baixarPDFFatura(faturaId: string): Promise<Blob> {

@@ -10,6 +10,7 @@ import {
   PageHeader,
   SectionCard,
 } from '../../../components/layout-v2';
+import ModalJustificativa from '../../../components/common/ModalJustificativa';
 import contasPagarService from '../../../services/contasPagarService';
 import {
   CategoriaContaPagar,
@@ -82,6 +83,10 @@ const getPrioridadeBadge = (prioridade: PrioridadePagamento) => {
   );
 };
 
+type ReprovacaoContexto =
+  | { tipo: 'conta'; contaId: string }
+  | { tipo: 'lote'; contaIds: string[] };
+
 export default function AprovacoesFinanceirasPage() {
   const selectAllRef = useRef<HTMLInputElement | null>(null);
 
@@ -91,6 +96,8 @@ export default function AprovacoesFinanceirasPage() {
   const [busca, setBusca] = useState('');
   const [contasSelecionadas, setContasSelecionadas] = useState<Set<string>>(new Set());
   const [processandoLote, setProcessandoLote] = useState(false);
+  const [processandoReprovacao, setProcessandoReprovacao] = useState(false);
+  const [reprovacaoContexto, setReprovacaoContexto] = useState<ReprovacaoContexto | null>(null);
 
   useEffect(() => {
     void carregarPendencias();
@@ -181,21 +188,8 @@ export default function AprovacoesFinanceirasPage() {
     }
   };
 
-  const reprovarConta = async (id: string) => {
-    const justificativa = window.prompt('Informe a justificativa para reprovar esta conta:');
-    if (justificativa === null) return;
-    if (!justificativa.trim()) {
-      toast.error('Justificativa obrigatoria para reprovar');
-      return;
-    }
-
-    try {
-      await contasPagarService.reprovar(id, { justificativa: justificativa.trim() });
-      toast.success('Conta reprovada com sucesso');
-      await carregarPendencias();
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, 'Nao foi possivel reprovar a conta'));
-    }
+  const reprovarConta = (id: string) => {
+    setReprovacaoContexto({ tipo: 'conta', contaId: id });
   };
 
   const processarLote = async (acao: 'aprovar' | 'reprovar') => {
@@ -208,15 +202,9 @@ export default function AprovacoesFinanceirasPage() {
       return;
     }
 
-    let justificativa: string | undefined;
     if (acao === 'reprovar') {
-      const resposta = window.prompt('Informe a justificativa para reprovar em lote:');
-      if (resposta === null) return;
-      if (!resposta.trim()) {
-        toast.error('Justificativa obrigatoria para reprovar em lote');
-        return;
-      }
-      justificativa = resposta.trim();
+      setReprovacaoContexto({ tipo: 'lote', contaIds: ids });
+      return;
     }
 
     try {
@@ -224,7 +212,6 @@ export default function AprovacoesFinanceirasPage() {
       const resultado = await contasPagarService.aprovarLote({
         contaIds: ids,
         acao,
-        justificativa,
       });
 
       if (resultado.falha > 0) {
@@ -237,6 +224,46 @@ export default function AprovacoesFinanceirasPage() {
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'Nao foi possivel processar lote'));
     } finally {
+      setProcessandoLote(false);
+    }
+  };
+
+  const fecharModalReprovacao = () => {
+    if (processandoReprovacao) return;
+    setReprovacaoContexto(null);
+  };
+
+  const confirmarReprovacao = async (justificativa: string) => {
+    if (!reprovacaoContexto) return;
+
+    try {
+      setProcessandoReprovacao(true);
+
+      if (reprovacaoContexto.tipo === 'conta') {
+        await contasPagarService.reprovar(reprovacaoContexto.contaId, { justificativa });
+        toast.success('Conta reprovada com sucesso');
+      } else {
+        setProcessandoLote(true);
+        const resultado = await contasPagarService.aprovarLote({
+          contaIds: reprovacaoContexto.contaIds,
+          acao: 'reprovar',
+          justificativa,
+        });
+        if (resultado.falha > 0) {
+          toast.error(`${resultado.sucesso} conta(s) processadas e ${resultado.falha} com erro`);
+        } else {
+          toast.success(`${resultado.sucesso} conta(s) processadas com sucesso`);
+        }
+      }
+
+      setReprovacaoContexto(null);
+      await carregarPendencias();
+    } catch (error) {
+      const mensagem = getApiErrorMessage(error, 'Nao foi possivel reprovar conta(s)');
+      toast.error(mensagem);
+      throw new Error(mensagem);
+    } finally {
+      setProcessandoReprovacao(false);
       setProcessandoLote(false);
     }
   };
@@ -257,7 +284,7 @@ export default function AprovacoesFinanceirasPage() {
                 type="button"
                 onClick={() => void carregarPendencias()}
                 className={btnSecondary}
-                disabled={carregando || processandoLote}
+                disabled={carregando || processandoLote || processandoReprovacao}
               >
                 <RefreshCw className={`h-4 w-4 ${carregando ? 'animate-spin' : ''}`} />
                 Atualizar
@@ -266,7 +293,7 @@ export default function AprovacoesFinanceirasPage() {
                 type="button"
                 onClick={() => void processarLote('aprovar')}
                 className={btnSuccess}
-                disabled={processandoLote}
+                disabled={processandoLote || processandoReprovacao}
               >
                 <Check className="h-4 w-4" />
                 Aprovar lote
@@ -275,7 +302,7 @@ export default function AprovacoesFinanceirasPage() {
                 type="button"
                 onClick={() => void processarLote('reprovar')}
                 className={btnDanger}
-                disabled={processandoLote}
+                disabled={processandoLote || processandoReprovacao}
               >
                 <X className="h-4 w-4" />
                 Reprovar lote
@@ -444,7 +471,7 @@ export default function AprovacoesFinanceirasPage() {
                           onClick={() => void aprovarConta(conta.id)}
                           className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#137A42] hover:bg-[#F1FBF5]"
                           title="Aprovar conta"
-                          disabled={processandoLote}
+                          disabled={processandoLote || processandoReprovacao}
                         >
                           <Check className="h-4 w-4" />
                         </button>
@@ -453,7 +480,7 @@ export default function AprovacoesFinanceirasPage() {
                           onClick={() => void reprovarConta(conta.id)}
                           className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#B4233A] hover:bg-[#FFF2F4]"
                           title="Reprovar conta"
-                          disabled={processandoLote}
+                          disabled={processandoLote || processandoReprovacao}
                         >
                           <X className="h-4 w-4" />
                         </button>
@@ -480,6 +507,22 @@ export default function AprovacoesFinanceirasPage() {
           }
         />
       ) : null}
+
+      <ModalJustificativa
+        isOpen={Boolean(reprovacaoContexto)}
+        title={reprovacaoContexto?.tipo === 'lote' ? 'Reprovar contas em lote' : 'Reprovar conta'}
+        description={
+          reprovacaoContexto?.tipo === 'lote'
+            ? `Informe a justificativa para reprovar ${reprovacaoContexto.contaIds.length} conta(s).`
+            : 'Informe a justificativa para reprovar esta conta.'
+        }
+        placeholder="Explique o motivo da reprovacao."
+        confirmLabel="Confirmar reprovacao"
+        minLength={3}
+        loading={processandoReprovacao}
+        onClose={fecharModalReprovacao}
+        onConfirm={confirmarReprovacao}
+      />
     </div>
   );
 }

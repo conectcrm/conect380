@@ -4,7 +4,25 @@ export interface DadosProposta {
   numeroProposta?: string;
   titulo: string;
   descricao?: string;
-  status?: 'draft' | 'sent' | 'viewed' | 'approved' | 'rejected' | 'expired';
+  status?:
+    | 'draft'
+    | 'sent'
+    | 'viewed'
+    | 'approved'
+    | 'rejected'
+    | 'expired'
+    | 'rascunho'
+    | 'enviada'
+    | 'visualizada'
+    | 'negociacao'
+    | 'aprovada'
+    | 'contrato_gerado'
+    | 'contrato_assinado'
+    | 'fatura_criada'
+    | 'aguardando_pagamento'
+    | 'pago'
+    | 'rejeitada'
+    | 'expirada';
   dataEmissao?: string;
   dataValidade?: string;
   empresa?: {
@@ -37,6 +55,7 @@ export interface DadosProposta {
     nome: string;
     descricao?: string;
     quantidade: number;
+    unidade?: string;
     valorUnitario: number;
     desconto?: number;
     valorTotal: number;
@@ -46,8 +65,8 @@ export interface DadosProposta {
   percentualDesconto?: number;
   impostos?: number;
   valorTotal: number;
-  formaPagamento: string;
-  prazoEntrega: string;
+  formaPagamento?: string;
+  prazoEntrega?: string;
   garantia?: string;
   validadeProposta?: string;
   condicoesGerais?: string[];

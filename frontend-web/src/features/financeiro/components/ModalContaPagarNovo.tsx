@@ -697,10 +697,10 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
                 </div>
               </div>
 
-              {/* Conta Banc·ria */}
+              {/* Conta Banc√°ria */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Conta Banc·ria
+                  Conta Banc√°ria
                 </label>
                 {contasBancariasLoading && (
                   <div className="mb-2 rounded-lg border border-[#DCE8EC] bg-[#F8FBFC] px-3 py-2 text-xs text-[#5E7A88]">
