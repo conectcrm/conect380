@@ -74,6 +74,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    env:
+      AWS_EC2_HOST: ${{ secrets.AWS_EC2_HOST }}
+      AZURE_WEBAPP_NAME: ${{ secrets.AZURE_WEBAPP_NAME }}
+      DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
     
     steps:
       - name: 📥 Checkout código
@@ -87,7 +91,7 @@ jobs:
       
       # Opção 1: Deploy para AWS EC2
       - name: 🚀 Deploy para AWS EC2 (SSH)
-        if: ${{ secrets.AWS_EC2_HOST }}
+        if: ${{ env.AWS_EC2_HOST != '' }}
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.AWS_EC2_HOST }}
@@ -106,7 +110,7 @@ jobs:
       
       # Opção 2: Deploy para Azure App Service
       - name: 🚀 Deploy para Azure App Service
-        if: ${{ secrets.AZURE_WEBAPP_NAME }}
+        if: ${{ env.AZURE_WEBAPP_NAME != '' }}
         uses: azure/webapps-deploy@v2
         with:
           app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
@@ -115,7 +119,7 @@ jobs:
       
       # Opção 3: Deploy com Docker
       - name: 🐳 Build e Push Docker Image
-        if: ${{ secrets.DOCKER_HUB_USERNAME }}
+        if: ${{ env.DOCKER_HUB_USERNAME != '' }}
         run: |
           echo ${{ secrets.DOCKER_HUB_PASSWORD }} | docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} --password-stdin
           docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/conectsuite-backend:${{ github.sha }} ./backend
@@ -131,6 +135,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+      AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+      AWS_CLOUDFRONT_DISTRIBUTION: ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION }}
     
     steps:
       - name: 📥 Checkout código
@@ -144,7 +153,7 @@ jobs:
       
       # Opção 1: Deploy para Vercel
       - name: 🚀 Deploy para Vercel
-        if: ${{ secrets.VERCEL_TOKEN }}
+        if: ${{ env.VERCEL_TOKEN != '' }}
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
@@ -155,7 +164,7 @@ jobs:
       
       # Opção 2: Deploy para Netlify
       - name: 🚀 Deploy para Netlify
-        if: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+        if: ${{ env.NETLIFY_AUTH_TOKEN != '' }}
         uses: nwtgck/actions-netlify@v2.0
         with:
           publish-dir: frontend-web/build
@@ -168,7 +177,7 @@ jobs:
       
       # Opção 3: Deploy para AWS S3 + CloudFront
       - name: 🚀 Deploy para AWS S3
-        if: ${{ secrets.AWS_S3_BUCKET }}
+        if: ${{ env.AWS_S3_BUCKET != '' }}
         uses: jakejarvis/s3-sync-action@v0.5.1
         with:
           args: --acl public-read --follow-symlinks --delete
@@ -180,7 +189,7 @@ jobs:
           SOURCE_DIR: 'frontend-web/build'
       
       - name: 🔄 Invalidar CloudFront Cache
-        if: ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION }}
+        if: ${{ env.AWS_CLOUDFRONT_DISTRIBUTION != '' }}
         run: |
           aws cloudfront create-invalidation \
             --distribution-id ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION }} \
@@ -279,10 +288,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: [deploy-backend, deploy-frontend, health-check]
     if: always()
+    env:
+      SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
     
     steps:
       - name: 📧 Notificar Slack
-        if: ${{ secrets.SLACK_WEBHOOK }}
+        if: ${{ env.SLACK_WEBHOOK != '' }}
         uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
@@ -293,7 +305,7 @@ jobs:
           webhook_url: ${{ secrets.SLACK_WEBHOOK }}
       
       - name: 📧 Notificar Discord
-        if: ${{ secrets.DISCORD_WEBHOOK }}
+        if: ${{ env.DISCORD_WEBHOOK != '' }}
         uses: sarisia/actions-status-discord@v1
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
@@ -303,3 +315,4 @@ jobs:
             **Branch**: ${{ github.ref }}
             **Commit**: ${{ github.sha }}
             **Status**: ${{ job.status }}
+
