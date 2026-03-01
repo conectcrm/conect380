@@ -84,7 +84,7 @@ jobs:
         uses: actions/checkout@v4
       
       - name: 📦 Download Backend Build
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: backend-dist
           path: backend/dist
@@ -146,7 +146,7 @@ jobs:
         uses: actions/checkout@v4
       
       - name: 📦 Download Frontend Build
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: frontend-build
           path: frontend-web/build
@@ -206,6 +206,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    env:
+      DATABASE_HOST: ${{ secrets.DATABASE_HOST }}
+      DATABASE_PORT: ${{ secrets.DATABASE_PORT }}
+      DATABASE_USERNAME: ${{ secrets.DATABASE_USERNAME }}
+      DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
+      DATABASE_NAME: ${{ secrets.DATABASE_NAME }}
     
     steps:
       - name: 📥 Checkout código
@@ -221,14 +227,9 @@ jobs:
         run: npm ci
       
       - name: 🗄️ Rodar Migrations
+        if: ${{ env.DATABASE_HOST != '' && env.DATABASE_USERNAME != '' && env.DATABASE_NAME != '' }}
         working-directory: backend
         run: npm run migration:run
-        env:
-          DATABASE_HOST: ${{ secrets.DATABASE_HOST }}
-          DATABASE_PORT: ${{ secrets.DATABASE_PORT }}
-          DATABASE_USERNAME: ${{ secrets.DATABASE_USERNAME }}
-          DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
-          DATABASE_NAME: ${{ secrets.DATABASE_NAME }}
 
   # ==============================================================================
   # Job 5: Health Check Pós-Deploy
@@ -315,4 +316,3 @@ jobs:
             **Branch**: ${{ github.ref }}
             **Commit**: ${{ github.sha }}
             **Status**: ${{ job.status }}
-
