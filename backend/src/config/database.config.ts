@@ -2,6 +2,9 @@
 import { TypeOrmOptionsFactory, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { User } from '../modules/users/user.entity';
+import { UserActivity } from '../modules/users/entities/user-activity.entity';
+import { UserAccessChangeRequest } from '../modules/users/entities/user-access-change-request.entity';
+import { AdminBreakGlassAccess } from '../modules/users/entities/admin-break-glass-access.entity';
 import { Empresa } from '../empresas/entities/empresa.entity';
 import { Cliente } from '../modules/clientes/cliente.entity';
 import { ClienteAnexo } from '../modules/clientes/cliente-anexo.entity';
@@ -66,6 +69,8 @@ import { TriagemLog } from '../modules/triagem/entities/triagem-log.entity';
 import { EmpresaModulo } from '../modules/empresas/entities/empresa-modulo.entity'; // ✅ Sistema de licenciamento modular
 import { EmpresaConfig } from '../modules/empresas/entities/empresa-config.entity'; // ✅ Configurações de empresa
 import { PasswordResetToken } from '../modules/auth/entities/password-reset-token.entity'; // ✅ Tokens de recuperação de senha
+import { AuthLoginAttempt } from '../modules/auth/entities/auth-login-attempt.entity';
+import { MfaLoginChallenge } from '../modules/auth/entities/mfa-login-challenge.entity';
 import { Lead } from '../modules/leads/lead.entity'; // ✅ Módulo de Leads CRM
 import { Meta } from '../modules/metas/entities/meta.entity';
 import { ConfiguracaoGateway } from '../modules/pagamentos/entities/configuracao-gateway.entity';
@@ -93,6 +98,9 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
       database: this.configService.get('DATABASE_NAME', 'conectcrm'),
       entities: [
         User,
+        UserActivity,
+        UserAccessChangeRequest,
+        AdminBreakGlassAccess,
         Empresa,
         Cliente,
         ClienteAnexo,
@@ -165,10 +173,13 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         EmpresaModulo, // ✅ Sistema de licenciamento modular
         EmpresaConfig, // ✅ Configurações de empresa
         PasswordResetToken, // ✅ Tokens de recuperação de senha
+        AuthLoginAttempt,
+        MfaLoginChallenge,
         Lead, // ✅ Módulo de Leads CRM
         Meta, // ✅ Metas comerciais
         SystemBranding, // ✅ Branding global do sistema
       ],
+      autoLoadEntities: true,
       synchronize: false, // ✅ DESABILITADO - usar migrations para segurança
       logging: this.configService.get('APP_ENV') === 'development',
       cache: false, // ⚡ CRITICAL: Desabilita cache do TypeORM para evitar dados obsoletos

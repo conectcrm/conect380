@@ -115,19 +115,6 @@ const COMERCIAL_FULL_PERMISSIONS: Permission[] = [
   Permission.COMERCIAL_PROPOSTAS_SEND,
 ];
 
-const ATENDIMENTO_FULL_PERMISSIONS: Permission[] = [
-  Permission.ATENDIMENTO_CHATS_READ,
-  Permission.ATENDIMENTO_CHATS_REPLY,
-  Permission.ATENDIMENTO_TICKETS_READ,
-  Permission.ATENDIMENTO_TICKETS_CREATE,
-  Permission.ATENDIMENTO_TICKETS_UPDATE,
-  Permission.ATENDIMENTO_TICKETS_ASSIGN,
-  Permission.ATENDIMENTO_TICKETS_CLOSE,
-  Permission.ATENDIMENTO_FILAS_MANAGE,
-  Permission.ATENDIMENTO_SLA_MANAGE,
-  Permission.ATENDIMENTO_DLQ_MANAGE,
-];
-
 const ATENDIMENTO_MANAGER_PERMISSIONS: Permission[] = [
   Permission.ATENDIMENTO_CHATS_READ,
   Permission.ATENDIMENTO_CHATS_REPLY,
@@ -138,13 +125,6 @@ const ATENDIMENTO_MANAGER_PERMISSIONS: Permission[] = [
   Permission.ATENDIMENTO_TICKETS_CLOSE,
   Permission.ATENDIMENTO_FILAS_MANAGE,
   Permission.ATENDIMENTO_SLA_MANAGE,
-];
-
-const FINANCEIRO_FULL_PERMISSIONS: Permission[] = [
-  Permission.FINANCEIRO_FATURAMENTO_READ,
-  Permission.FINANCEIRO_FATURAMENTO_MANAGE,
-  Permission.FINANCEIRO_PAGAMENTOS_READ,
-  Permission.FINANCEIRO_PAGAMENTOS_MANAGE,
 ];
 
 const CONFIG_FULL_PERMISSIONS: Permission[] = [
@@ -202,20 +182,18 @@ const FINANCEIRO_DEFAULT_PERMISSIONS: Permission[] = [
   Permission.CRM_CLIENTES_READ,
 ];
 
+const ADMIN_GOVERNANCE_PERMISSIONS: Permission[] = [
+  ...USER_MANAGEMENT_PERMISSIONS,
+  ...BASIC_PROFILE_PERMISSIONS,
+  ...INSIGHTS_PERMISSIONS,
+  ...CONFIG_FULL_PERMISSIONS,
+  Permission.PLANOS_MANAGE,
+  Permission.ADMIN_EMPRESAS_MANAGE,
+];
+
 export const ROLE_DEFAULT_PERMISSIONS: Record<string, Permission[]> = {
   [UserRole.SUPERADMIN]: ALL_PERMISSIONS,
-  [UserRole.ADMIN]: [
-    ...USER_MANAGEMENT_PERMISSIONS,
-    ...BASIC_PROFILE_PERMISSIONS,
-    ...INSIGHTS_PERMISSIONS,
-    ...CRM_FULL_PERMISSIONS,
-    ...COMERCIAL_FULL_PERMISSIONS,
-    ...ATENDIMENTO_FULL_PERMISSIONS,
-    ...FINANCEIRO_FULL_PERMISSIONS,
-    ...CONFIG_FULL_PERMISSIONS,
-    Permission.PLANOS_MANAGE,
-    Permission.ADMIN_EMPRESAS_MANAGE,
-  ],
+  [UserRole.ADMIN]: [...ADMIN_GOVERNANCE_PERMISSIONS],
   [UserRole.GERENTE]: [
     ...USER_MANAGEMENT_PERMISSIONS,
     ...BASIC_PROFILE_PERMISSIONS,
@@ -303,12 +281,19 @@ export interface PermissionCatalog {
 
 const ROLE_SUPORTE_KEYS: PermissionCatalogRole[] = [UserRole.SUPORTE, 'user'];
 const ROLE_GERENTE_KEYS: PermissionCatalogRole[] = [UserRole.GERENTE, 'manager'];
-const ROLE_ALL_OPERATIONAL_KEYS: PermissionCatalogRole[] = [
+const ROLE_ALL_BASE_KEYS: PermissionCatalogRole[] = [
   ...ROLE_SUPORTE_KEYS,
   UserRole.VENDEDOR,
   UserRole.FINANCEIRO,
   ...ROLE_GERENTE_KEYS,
   UserRole.ADMIN,
+  UserRole.SUPERADMIN,
+];
+const ROLE_OPERATIONAL_KEYS: PermissionCatalogRole[] = [
+  ...ROLE_SUPORTE_KEYS,
+  UserRole.VENDEDOR,
+  UserRole.FINANCEIRO,
+  ...ROLE_GERENTE_KEYS,
   UserRole.SUPERADMIN,
 ];
 
@@ -317,14 +302,14 @@ export const PERMISSION_CATALOG_GROUPS: PermissionCatalogGroup[] = [
     id: 'perfil',
     label: 'Conta',
     description: 'Permissoes para ajustes do proprio perfil',
-    roles: [...ROLE_ALL_OPERATIONAL_KEYS],
+    roles: [...ROLE_ALL_BASE_KEYS],
     options: [{ value: Permission.USERS_PROFILE_UPDATE, label: 'Perfil: atualizar dados pessoais' }],
   },
   {
     id: 'insights',
     label: 'Dashboards e Relatorios',
     description: 'Visualizacao de indicadores e analises',
-    roles: [...ROLE_ALL_OPERATIONAL_KEYS],
+    roles: [...ROLE_ALL_BASE_KEYS],
     options: [
       { value: Permission.DASHBOARD_READ, label: 'Dashboard: visualizar' },
       { value: Permission.RELATORIOS_READ, label: 'Relatorios: visualizar' },
@@ -334,7 +319,7 @@ export const PERMISSION_CATALOG_GROUPS: PermissionCatalogGroup[] = [
     id: 'crm',
     label: 'CRM',
     description: 'Clientes, leads, oportunidades, produtos e agenda',
-    roles: [...ROLE_ALL_OPERATIONAL_KEYS],
+    roles: [...ROLE_OPERATIONAL_KEYS],
     options: [
       { value: Permission.CRM_CLIENTES_READ, label: 'Clientes: visualizar' },
       { value: Permission.CRM_CLIENTES_CREATE, label: 'Clientes: criar' },
@@ -362,7 +347,7 @@ export const PERMISSION_CATALOG_GROUPS: PermissionCatalogGroup[] = [
     id: 'atendimento',
     label: 'Atendimento',
     description: 'Controle de acesso para chats, tickets e filas',
-    roles: [...ROLE_SUPORTE_KEYS, UserRole.VENDEDOR, ...ROLE_GERENTE_KEYS, UserRole.ADMIN, UserRole.SUPERADMIN],
+    roles: [...ROLE_SUPORTE_KEYS, UserRole.VENDEDOR, ...ROLE_GERENTE_KEYS, UserRole.SUPERADMIN],
     options: [
       { value: Permission.ATENDIMENTO_CHATS_READ, label: 'Chats: visualizar' },
       { value: Permission.ATENDIMENTO_CHATS_REPLY, label: 'Chats: responder' },
@@ -381,7 +366,7 @@ export const PERMISSION_CATALOG_GROUPS: PermissionCatalogGroup[] = [
     id: 'comercial',
     label: 'Comercial',
     description: 'Acesso aos recursos comerciais',
-    roles: [...ROLE_SUPORTE_KEYS, UserRole.VENDEDOR, UserRole.FINANCEIRO, ...ROLE_GERENTE_KEYS, UserRole.ADMIN, UserRole.SUPERADMIN],
+    roles: [...ROLE_SUPORTE_KEYS, UserRole.VENDEDOR, UserRole.FINANCEIRO, ...ROLE_GERENTE_KEYS, UserRole.SUPERADMIN],
     options: [
       { value: Permission.COMERCIAL_PROPOSTAS_READ, label: 'Propostas: visualizar' },
       { value: Permission.COMERCIAL_PROPOSTAS_CREATE, label: 'Propostas: criar' },
@@ -394,7 +379,7 @@ export const PERMISSION_CATALOG_GROUPS: PermissionCatalogGroup[] = [
     id: 'financeiro',
     label: 'Financeiro',
     description: 'Faturamento e pagamentos',
-    roles: [UserRole.FINANCEIRO, ...ROLE_GERENTE_KEYS, UserRole.ADMIN, UserRole.SUPERADMIN],
+    roles: [UserRole.FINANCEIRO, ...ROLE_GERENTE_KEYS, UserRole.SUPERADMIN],
     options: [
       { value: Permission.FINANCEIRO_FATURAMENTO_READ, label: 'Faturamento: visualizar' },
       { value: Permission.FINANCEIRO_FATURAMENTO_MANAGE, label: 'Faturamento: gerenciar' },
@@ -458,7 +443,7 @@ const buildRoleDefaultPermissionsWithAliases = (): Record<string, string[]> => {
 };
 
 export const PERMISSION_CATALOG: PermissionCatalog = {
-  version: '2026-02-20',
+  version: '2026-03-02',
   groups: PERMISSION_CATALOG_GROUPS,
   defaultsByRole: buildRoleDefaultPermissionsWithAliases(),
   allPermissions: [...ALL_PERMISSIONS],

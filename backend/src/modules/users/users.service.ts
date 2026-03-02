@@ -1,12 +1,26 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User, UserRole } from './user.entity';
 import { Empresa } from '../../empresas/entities/empresa.entity';
+import { EmpresaConfig } from '../empresas/entities/empresa-config.entity';
 import { AtividadeTipo, UserActivity } from './entities/user-activity.entity';
+import {
+  UserAccessChangeAction,
+  UserAccessChangeRequest,
+  UserAccessChangeStatus,
+} from './entities/user-access-change-request.entity';
 import { Notification, NotificationType } from '../../notifications/entities/notification.entity';
 import { NotificationService } from '../../notifications/notification.service';
+import { securityLogger } from '../../config/logger.config';
 
 type UsersReadScopeInput = {
   user_ids?: unknown;
@@ -20,6 +34,29 @@ type UsersReadScopeFilters = {
 
 type LgpdPrivacyRequestType = 'data_export' | 'account_anonymization' | 'account_deletion';
 type LgpdPrivacyRequestStatus = 'open' | 'in_review' | 'completed' | 'rejected';
+type AdministrativeAuditActor = Pick<User, 'id' | 'nome' | 'email'>;
+type AdministrativeAuditContext = {
+  actor?: AdministrativeAuditActor;
+  source?: string;
+  reason?: string | null;
+  relatedRequestId?: string | null;
+};
+type AdminSecurityAlertSeverity = 'medium' | 'high' | 'critical';
+type AdministrativeAuditField =
+  | 'id'
+  | 'nome'
+  | 'email'
+  | 'role'
+  | 'permissoes'
+  | 'empresa_id'
+  | 'ativo'
+  | 'telefone'
+  | 'avatar_url'
+  | 'idioma_preferido'
+  | 'status_atendente'
+  | 'capacidade_maxima'
+  | 'tickets_ativos'
+  | 'deve_trocar_senha';
 
 const ATENDIMENTO_PERMISSION_TOKENS = [
   'ATENDIMENTO',
@@ -45,6 +82,23 @@ const ATENDIMENTO_PERMISSION_TOKENS = [
   'atendimento.sla.manage',
 ];
 
+const ADMIN_AUDIT_USER_FIELDS: AdministrativeAuditField[] = [
+  'id',
+  'nome',
+  'email',
+  'role',
+  'permissoes',
+  'empresa_id',
+  'ativo',
+  'telefone',
+  'avatar_url',
+  'idioma_preferido',
+  'status_atendente',
+  'capacidade_maxima',
+  'tickets_ativos',
+  'deve_trocar_senha',
+];
+
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
@@ -55,8 +109,12 @@ export class UsersService {
     private userRepository: Repository<User>,
     @InjectRepository(Empresa)
     private empresaRepository: Repository<Empresa>,
+    @InjectRepository(EmpresaConfig)
+    private empresaConfigRepository: Repository<EmpresaConfig>,
     @InjectRepository(UserActivity)
     private userActivityRepository: Repository<UserActivity>,
+    @InjectRepository(UserAccessChangeRequest)
+    private userAccessChangeRequestRepository: Repository<UserAccessChangeRequest>,
     @InjectRepository(Notification)
     private notificationRepository: Repository<Notification>,
     private notificationService: NotificationService,
@@ -266,6 +324,332 @@ export class UsersService {
       userIds: this.normalizeReadScopeUserIds(input?.user_ids),
       allowedRoles: this.normalizeReadScopeRoles(input?.allowed_roles),
     };
+  }
+
+  private toAuditIsoString(value: unknown): string | null {
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value;
+    }
+
+    return null;
+  }
+
+  private normalizeAuditComparableValue(value: unknown): unknown {
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((item) => this.normalizeAuditComparableValue(item));
+    }
+
+    if (value && typeof value === 'object') {
+      return Object.entries(value as Record<string, unknown>)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .reduce<Record<string, unknown>>((acc, [key, entryValue]) => {
+          acc[key] = this.normalizeAuditComparableValue(entryValue);
+          return acc;
+        }, {});
+    }
+
+    return value ?? null;
+  }
+
+  private buildAdministrativeUserSnapshot(user?: User | null): Record<string, unknown> | null {
+    if (!user) {
+      return null;
+    }
+
+    const rawPermissions = user.permissoes as unknown;
+    const normalizedPermissions = Array.isArray(rawPermissions)
+      ? rawPermissions.filter((permission): permission is string => typeof permission === 'string')
+      : typeof rawPermissions === 'string'
+        ? rawPermissions
+            .split(',')
+            .map((permission) => permission.trim())
+            .filter(Boolean)
+        : [];
+
+    return {
+      id: user.id,
+      nome: user.nome ?? null,
+      email: user.email ?? null,
+      role: user.role ?? null,
+      permissoes: normalizedPermissions,
+      empresa_id: user.empresa_id ?? null,
+      ativo: user.ativo,
+      telefone: user.telefone ?? null,
+      avatar_url: user.avatar_url ?? null,
+      idioma_preferido: user.idioma_preferido ?? null,
+      status_atendente: user.status_atendente ?? null,
+      capacidade_maxima: user.capacidade_maxima ?? null,
+      tickets_ativos: user.tickets_ativos ?? null,
+      deve_trocar_senha: user.deve_trocar_senha,
+      ultimo_login: this.toAuditIsoString(user.ultimo_login),
+      created_at: this.toAuditIsoString(user.created_at),
+      updated_at: this.toAuditIsoString(user.updated_at),
+    };
+  }
+
+  private buildAdministrativeChangedFields(
+    beforeSnapshot: Record<string, unknown> | null,
+    afterSnapshot: Record<string, unknown> | null,
+  ): string[] {
+    const changedFields: string[] = [];
+
+    for (const field of ADMIN_AUDIT_USER_FIELDS) {
+      const beforeValue = this.normalizeAuditComparableValue(beforeSnapshot?.[field]);
+      const afterValue = this.normalizeAuditComparableValue(afterSnapshot?.[field]);
+      if (JSON.stringify(beforeValue) !== JSON.stringify(afterValue)) {
+        changedFields.push(field);
+      }
+    }
+
+    return changedFields;
+  }
+
+  private async addAdministrativeUserActivityLog(params: {
+    empresaId: string;
+    event: 'user_create' | 'user_update' | 'user_password_reset' | 'user_status_change' | 'user_delete';
+    tipo: AtividadeTipo;
+    descricao: string;
+    targetUser: User;
+    beforeSnapshot?: Record<string, unknown> | null;
+    afterSnapshot?: Record<string, unknown> | null;
+    auditContext?: AdministrativeAuditContext;
+  }): Promise<void> {
+    const actorId = params.auditContext?.actor?.id || params.targetUser.id;
+    const changedFields = this.buildAdministrativeChangedFields(
+      params.beforeSnapshot ?? null,
+      params.afterSnapshot ?? null,
+    );
+
+    await this.userActivityRepository.save(
+      this.userActivityRepository.create({
+        usuarioId: actorId,
+        empresaId: params.empresaId,
+        tipo: params.tipo,
+        descricao: params.descricao,
+        detalhes: JSON.stringify({
+          categoria: 'admin_user_audit',
+          evento: params.event,
+          target_user_id: params.targetUser.id,
+          actor: params.auditContext?.actor
+            ? {
+                id: params.auditContext.actor.id,
+                nome: params.auditContext.actor.nome ?? null,
+                email: params.auditContext.actor.email ?? null,
+              }
+            : null,
+          before: params.beforeSnapshot ?? null,
+          after: params.afterSnapshot ?? null,
+          changed_fields: changedFields,
+          source: params.auditContext?.source ?? null,
+          request_id: params.auditContext?.relatedRequestId ?? null,
+          reason: params.auditContext?.reason ?? null,
+          timestamp: new Date().toISOString(),
+        }),
+      }),
+    );
+  }
+
+  private extractNormalizedPermissions(input: unknown): string[] {
+    if (Array.isArray(input)) {
+      return input
+        .filter((permission): permission is string => typeof permission === 'string')
+        .map((permission) => permission.trim())
+        .filter(Boolean);
+    }
+
+    if (typeof input === 'string') {
+      return input
+        .split(',')
+        .map((permission) => permission.trim())
+        .filter(Boolean);
+    }
+
+    return [];
+  }
+
+  private isSensitivePermissionToken(permission: string): boolean {
+    const normalized = permission.trim().toLowerCase();
+    if (!normalized) {
+      return false;
+    }
+
+    if (normalized.startsWith('admin.')) {
+      return true;
+    }
+
+    if (normalized.startsWith('users.')) {
+      return true;
+    }
+
+    if (normalized.endsWith('.manage')) {
+      return true;
+    }
+
+    const explicitSensitivePermissions = new Set<string>([
+      'atendimento.dlq.manage',
+      'financeiro.pagamentos.manage',
+      'financeiro.alertas.manage',
+      'financeiro.contas_pagar.manage',
+      'financeiro.contas-bancarias.manage',
+      'config.system.branding.manage',
+      'config.automacoes.manage',
+    ]);
+
+    return explicitSensitivePermissions.has(normalized);
+  }
+
+  private getRoleSecurityRank(role: unknown): number {
+    const normalizedRole = this.normalizeRoleInput(role);
+
+    switch (normalizedRole) {
+      case UserRole.SUPERADMIN:
+        return 6;
+      case UserRole.ADMIN:
+        return 5;
+      case UserRole.GERENTE:
+        return 4;
+      case UserRole.FINANCEIRO:
+        return 3;
+      case UserRole.SUPORTE:
+        return 2;
+      case UserRole.VENDEDOR:
+      default:
+        return 1;
+    }
+  }
+
+  private detectPrivilegeEscalation(params: {
+    beforeUser: User;
+    afterUser: User;
+  }): { isEscalation: boolean; reasons: string[]; addedSensitivePermissions: string[] } {
+    const reasons: string[] = [];
+    const beforeRoleRank = this.getRoleSecurityRank(params.beforeUser.role);
+    const afterRoleRank = this.getRoleSecurityRank(params.afterUser.role);
+    if (afterRoleRank > beforeRoleRank) {
+      reasons.push(`role_upgrade:${params.beforeUser.role || 'unknown'}->${params.afterUser.role || 'unknown'}`);
+    }
+
+    const beforePermissions = new Set(this.extractNormalizedPermissions(params.beforeUser.permissoes));
+    const afterPermissions = this.extractNormalizedPermissions(params.afterUser.permissoes);
+    const addedSensitivePermissions = afterPermissions.filter(
+      (permission) => !beforePermissions.has(permission) && this.isSensitivePermissionToken(permission),
+    );
+    if (addedSensitivePermissions.length > 0) {
+      reasons.push('sensitive_permission_granted');
+    }
+
+    return {
+      isEscalation: reasons.length > 0,
+      reasons,
+      addedSensitivePermissions,
+    };
+  }
+
+  private detectPrivilegedUserCreation(user: User): {
+    isPrivileged: boolean;
+    reasons: string[];
+    sensitivePermissions: string[];
+  } {
+    const reasons: string[] = [];
+    const roleRank = this.getRoleSecurityRank(user.role);
+    if (roleRank >= this.getRoleSecurityRank(UserRole.GERENTE)) {
+      reasons.push(`privileged_role_created:${user.role || 'unknown'}`);
+    }
+
+    const permissions = this.extractNormalizedPermissions(user.permissoes);
+    const sensitivePermissions = permissions.filter((permission) => this.isSensitivePermissionToken(permission));
+    if (sensitivePermissions.length > 0) {
+      reasons.push('sensitive_permission_granted');
+    }
+
+    return {
+      isPrivileged: reasons.length > 0,
+      reasons,
+      sensitivePermissions,
+    };
+  }
+
+  private async notifyAdminsSecurityAlert(params: {
+    empresaId: string;
+    event: 'privilege_escalation' | 'auth_login_lockout';
+    severity: AdminSecurityAlertSeverity;
+    title: string;
+    message: string;
+    actor?: AdministrativeAuditActor | null;
+    targetUser?: Pick<User, 'id' | 'nome' | 'email' | 'role'> | null;
+    metadata?: Record<string, unknown>;
+    source?: string;
+  }): Promise<void> {
+    const adminRoles = new Set<UserRole>([UserRole.SUPERADMIN, UserRole.ADMIN]);
+    const companyUsers = await this.userRepository.find({
+      where: { empresa_id: params.empresaId, ativo: true },
+      select: ['id', 'nome', 'email', 'role', 'empresa_id'],
+    });
+
+    const recipients = companyUsers.filter((candidate) => {
+      if (!candidate?.id) {
+        return false;
+      }
+
+      const normalizedRole = this.normalizeRoleInput(candidate.role);
+      return !!normalizedRole && adminRoles.has(normalizedRole);
+    });
+
+    if (recipients.length === 0) {
+      return;
+    }
+
+    const results = await Promise.allSettled(
+      recipients.map((recipient) =>
+        this.notificationService.create({
+          empresaId: params.empresaId,
+          userId: recipient.id,
+          type: NotificationType.SISTEMA,
+          title: params.title,
+          message: params.message,
+          data: {
+            category: 'admin_security_alert',
+            event: params.event,
+            severity: params.severity,
+            channel: 'in_app_notification',
+            actor: params.actor || null,
+            target_user: params.targetUser || null,
+            metadata: params.metadata || null,
+            source: params.source || null,
+            generated_at: new Date().toISOString(),
+          },
+        }),
+      ),
+    );
+
+    const failed = results.filter((result) => result.status === 'rejected').length;
+    if (failed > 0) {
+      this.logger.warn(
+        `Falha parcial ao enviar alerta de seguranca admin (${params.event}): ${failed}/${results.length}`,
+      );
+    }
+  }
+
+  async emitAdminSecurityAlert(params: {
+    empresaId: string;
+    event: 'privilege_escalation' | 'auth_login_lockout';
+    severity: AdminSecurityAlertSeverity;
+    title: string;
+    message: string;
+    actor?: AdministrativeAuditActor | null;
+    targetUser?: Pick<User, 'id' | 'nome' | 'email' | 'role'> | null;
+    metadata?: Record<string, unknown>;
+    source?: string;
+  }): Promise<void> {
+    await this.notifyAdminsSecurityAlert(params);
   }
 
   private parseActivityDetailsJson(value?: string | null): Record<string, unknown> | null {
@@ -719,6 +1103,398 @@ export class UsersService {
    * Busca usuário por ID (inclui senha - para validação de senha antiga)
    * Diferente de findById que NÃO retorna senha
    */
+  private isBcryptHash(value: string): boolean {
+    return /^\$2[aby]\$\d{2}\$/.test(value);
+  }
+
+  private normalizeAccessChangeReason(reason?: string): string | null {
+    if (typeof reason !== 'string') {
+      return null;
+    }
+
+    const normalized = reason.trim();
+    if (!normalized) {
+      return null;
+    }
+
+    return normalized.slice(0, 2000);
+  }
+
+  private isMissingTableError(error: unknown, tableName: string): boolean {
+    if (!(error instanceof QueryFailedError)) {
+      return false;
+    }
+
+    const driverCode = String((error as QueryFailedError & { driverError?: { code?: string } }).driverError?.code || '');
+    if (driverCode === '42P01') {
+      return true;
+    }
+
+    const rawMessage = String(
+      (error as QueryFailedError & { driverError?: { message?: string } }).driverError?.message || error.message || '',
+    ).toLowerCase();
+
+    return rawMessage.includes(tableName.toLowerCase());
+  }
+
+  private normalizeAccessChangeStatus(status?: string): UserAccessChangeStatus | undefined {
+    if (typeof status !== 'string') {
+      return undefined;
+    }
+
+    const normalized = status.trim().toUpperCase();
+    if (normalized === UserAccessChangeStatus.REQUESTED) {
+      return UserAccessChangeStatus.REQUESTED;
+    }
+
+    if (normalized === UserAccessChangeStatus.APPROVED) {
+      return UserAccessChangeStatus.APPROVED;
+    }
+
+    if (normalized === UserAccessChangeStatus.REJECTED) {
+      return UserAccessChangeStatus.REJECTED;
+    }
+
+    return undefined;
+  }
+
+  private parseStoredAccessRequestPayload(payload: unknown): Partial<User> {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      return {};
+    }
+
+    return { ...(payload as Record<string, unknown>) } as Partial<User>;
+  }
+
+  private async addAccessChangeActivityLog(params: {
+    empresaId: string;
+    actorId: string;
+    actorNome?: string | null;
+    actorEmail?: string | null;
+    requestId: string;
+    action: UserAccessChangeAction;
+    status: UserAccessChangeStatus;
+    targetUserId?: string | null;
+    detailReason?: string | null;
+  }): Promise<void> {
+    await this.userActivityRepository.save(
+      this.userActivityRepository.create({
+        usuarioId: params.actorId,
+        empresaId: params.empresaId,
+        tipo: AtividadeTipo.EDICAO,
+        descricao: `Workflow de acesso ${params.status.toLowerCase()} (${params.action})`,
+        detalhes: JSON.stringify({
+          categoria: 'user_access_change_workflow',
+          request_id: params.requestId,
+          action: params.action,
+          status: params.status,
+          target_user_id: params.targetUserId ?? null,
+          reason: params.detailReason ?? null,
+          actor: {
+            id: params.actorId,
+            nome: params.actorNome ?? null,
+            email: params.actorEmail ?? null,
+          },
+          timestamp: new Date().toISOString(),
+        }),
+      }),
+    );
+  }
+
+  isSensitiveAccessChangePayload(payload: Partial<User> | null | undefined): boolean {
+    if (!payload || typeof payload !== 'object') {
+      return false;
+    }
+
+    return ['role', 'permissoes', 'ativo', 'deve_trocar_senha'].some((field) => field in payload);
+  }
+
+  async isDualApprovalRequiredForAccessChanges(empresaId: string): Promise<boolean> {
+    if (!empresaId) {
+      return false;
+    }
+
+    try {
+      const config = await this.empresaConfigRepository.findOne({
+        where: { empresaId },
+        select: ['id', 'aprovacaoNovoUsuario'],
+      });
+
+      return Boolean(config?.aprovacaoNovoUsuario);
+    } catch (error) {
+      if (this.isMissingTableError(error, 'empresa_configuracoes')) {
+        this.logger.warn(
+          '[ADM-102] Tabela empresa_configuracoes indisponivel. Dupla aprovacao mantida desabilitada por fallback seguro.',
+        );
+        return false;
+      }
+
+      throw error;
+    }
+  }
+
+  async createAccessChangeRequest(params: {
+    empresaId: string;
+    action: UserAccessChangeAction;
+    requestedByUser: Pick<User, 'id' | 'nome' | 'email'>;
+    targetUserId?: string | null;
+    requestPayload: Partial<User>;
+    requestReason?: string;
+  }): Promise<UserAccessChangeRequest> {
+    const normalizedReason = this.normalizeAccessChangeReason(params.requestReason);
+    const payload: Record<string, unknown> = {
+      ...(params.requestPayload as Record<string, unknown>),
+    };
+
+    if (params.action === UserAccessChangeAction.USER_CREATE) {
+      const rawPassword = typeof payload.senha === 'string' ? payload.senha.trim() : '';
+      if (!rawPassword) {
+        throw new BadRequestException('Nao foi possivel registrar solicitacao: senha ausente.');
+      }
+
+      payload.senha = this.isBcryptHash(rawPassword) ? rawPassword : await bcrypt.hash(rawPassword, 10);
+    }
+
+    const request = await this.userAccessChangeRequestRepository.save(
+      this.userAccessChangeRequestRepository.create({
+        empresaId: params.empresaId,
+        action: params.action,
+        status: UserAccessChangeStatus.REQUESTED,
+        requestedByUserId: params.requestedByUser.id,
+        targetUserId: params.targetUserId ?? null,
+        requestPayload: payload,
+        requestReason: normalizedReason,
+      }),
+    );
+
+    await this.addAccessChangeActivityLog({
+      empresaId: params.empresaId,
+      actorId: params.requestedByUser.id,
+      actorNome: params.requestedByUser.nome,
+      actorEmail: params.requestedByUser.email,
+      requestId: request.id,
+      action: params.action,
+      status: UserAccessChangeStatus.REQUESTED,
+      targetUserId: params.targetUserId ?? null,
+      detailReason: normalizedReason,
+    });
+
+    return request;
+  }
+
+  async listAccessChangeRequests(
+    empresaId: string,
+    filters: {
+      status?: string;
+      limit?: number;
+    } = {},
+  ): Promise<UserAccessChangeRequest[]> {
+    const requestedLimit =
+      typeof filters.limit === 'number' && Number.isFinite(filters.limit) ? filters.limit : 50;
+    const limit = Math.max(1, Math.min(200, Math.trunc(requestedLimit)));
+    const normalizedStatus = this.normalizeAccessChangeStatus(filters.status);
+
+    const query = this.userAccessChangeRequestRepository
+      .createQueryBuilder('request')
+      .leftJoinAndSelect('request.requestedByUser', 'requestedByUser')
+      .leftJoinAndSelect('request.decidedByUser', 'decidedByUser')
+      .leftJoinAndSelect('request.targetUser', 'targetUser')
+      .leftJoinAndSelect('request.appliedUser', 'appliedUser')
+      .where('request.empresaId = :empresaId', { empresaId })
+      .orderBy('request.createdAt', 'DESC')
+      .take(limit);
+
+    if (normalizedStatus) {
+      query.andWhere('request.status = :status', { status: normalizedStatus });
+    }
+
+    return query.getMany();
+  }
+
+  async approveAccessChangeRequest(params: {
+    requestId: string;
+    empresaId: string;
+    approver: Pick<User, 'id' | 'nome' | 'email'>;
+    decisionReason?: string;
+  }): Promise<{ request: UserAccessChangeRequest; appliedUser: User }> {
+    const request = await this.userAccessChangeRequestRepository.findOne({
+      where: { id: params.requestId, empresaId: params.empresaId },
+    });
+
+    if (!request) {
+      throw new NotFoundException('Solicitacao de acesso nao encontrada');
+    }
+
+    if (request.status !== UserAccessChangeStatus.REQUESTED) {
+      throw new BadRequestException('Solicitacao ja foi decidida');
+    }
+
+    if (request.requestedByUserId && request.requestedByUserId === params.approver.id) {
+      throw new ForbiddenException('O solicitante nao pode aprovar a propria solicitacao');
+    }
+
+    const now = new Date();
+    const normalizedReason = this.normalizeAccessChangeReason(params.decisionReason);
+    const payload = this.parseStoredAccessRequestPayload(request.requestPayload);
+
+    let appliedUser: User;
+    if (request.action === UserAccessChangeAction.USER_CREATE) {
+      const createPayload: Partial<User> = {
+        ...(payload as Partial<User>),
+        empresa_id: params.empresaId,
+      };
+
+      const storedPassword = typeof createPayload.senha === 'string' ? createPayload.senha.trim() : '';
+      if (!storedPassword) {
+        throw new BadRequestException('Solicitacao sem senha armazenada para aprovacao');
+      }
+
+      appliedUser = await this.createWithHash({
+        ...createPayload,
+        senha: storedPassword,
+      });
+
+      await this.addAdministrativeUserActivityLog({
+        empresaId: params.empresaId,
+        event: 'user_create',
+        tipo: AtividadeTipo.CRIACAO,
+        descricao: `Usuario criado por aprovacao (${appliedUser.email})`,
+        targetUser: appliedUser,
+        beforeSnapshot: null,
+        afterSnapshot: this.buildAdministrativeUserSnapshot(appliedUser),
+        auditContext: {
+          actor: params.approver,
+          source: 'users.service.approveAccessChangeRequest',
+          reason: normalizedReason,
+          relatedRequestId: request.id,
+        },
+      });
+
+      const privilegedCreation = this.detectPrivilegedUserCreation(appliedUser);
+      if (privilegedCreation.isPrivileged) {
+        securityLogger.adminCreated(params.approver.id, appliedUser.id);
+        await this.emitAdminSecurityAlert({
+          empresaId: params.empresaId,
+          event: 'privilege_escalation',
+          severity: 'high',
+          title: 'Alerta de seguranca: criacao de acesso privilegiado',
+          message: `${params.approver.nome || params.approver.email || 'Aprovador'} aprovou criacao de usuario privilegiado (${appliedUser.email}).`,
+          actor: params.approver,
+          targetUser: {
+            id: appliedUser.id,
+            nome: appliedUser.nome,
+            email: appliedUser.email,
+            role: appliedUser.role,
+          },
+          metadata: {
+            reasons: privilegedCreation.reasons,
+            sensitive_permissions: privilegedCreation.sensitivePermissions,
+            request_id: request.id,
+          },
+          source: 'users.service.approveAccessChangeRequest',
+        });
+      }
+      request.targetUserId = appliedUser.id;
+    } else if (request.action === UserAccessChangeAction.USER_UPDATE) {
+      const targetUserId = request.targetUserId;
+      if (!targetUserId) {
+        throw new BadRequestException('Solicitacao de atualizacao sem usuario alvo');
+      }
+
+      const { id, empresa_id, senha, ...updatePayload } = payload as Record<string, unknown>;
+      void id;
+      void empresa_id;
+      void senha;
+
+      appliedUser = await this.atualizar(
+        targetUserId,
+        updatePayload as Partial<User>,
+        params.empresaId,
+        {
+          actor: params.approver,
+          source: 'users.service.approveAccessChangeRequest',
+          reason: normalizedReason,
+          relatedRequestId: request.id,
+        },
+      );
+    } else {
+      throw new BadRequestException('Tipo de solicitacao de acesso invalido');
+    }
+
+    request.status = UserAccessChangeStatus.APPROVED;
+    request.decidedByUserId = params.approver.id;
+    request.decisionReason = normalizedReason;
+    request.decidedAt = now;
+    request.appliedAt = now;
+    request.appliedUserId = appliedUser.id;
+
+    const saved = await this.userAccessChangeRequestRepository.save(request);
+
+    await this.addAccessChangeActivityLog({
+      empresaId: params.empresaId,
+      actorId: params.approver.id,
+      actorNome: params.approver.nome,
+      actorEmail: params.approver.email,
+      requestId: saved.id,
+      action: saved.action,
+      status: UserAccessChangeStatus.APPROVED,
+      targetUserId: saved.targetUserId,
+      detailReason: normalizedReason,
+    });
+
+    return {
+      request: saved,
+      appliedUser,
+    };
+  }
+
+  async rejectAccessChangeRequest(params: {
+    requestId: string;
+    empresaId: string;
+    reviewer: Pick<User, 'id' | 'nome' | 'email'>;
+    decisionReason?: string;
+  }): Promise<UserAccessChangeRequest> {
+    const request = await this.userAccessChangeRequestRepository.findOne({
+      where: { id: params.requestId, empresaId: params.empresaId },
+    });
+
+    if (!request) {
+      throw new NotFoundException('Solicitacao de acesso nao encontrada');
+    }
+
+    if (request.status !== UserAccessChangeStatus.REQUESTED) {
+      throw new BadRequestException('Solicitacao ja foi decidida');
+    }
+
+    if (request.requestedByUserId && request.requestedByUserId === params.reviewer.id) {
+      throw new ForbiddenException('O solicitante nao pode rejeitar a propria solicitacao');
+    }
+
+    const normalizedReason = this.normalizeAccessChangeReason(params.decisionReason);
+    request.status = UserAccessChangeStatus.REJECTED;
+    request.decidedByUserId = params.reviewer.id;
+    request.decisionReason = normalizedReason;
+    request.decidedAt = new Date();
+    request.appliedAt = null;
+    request.appliedUserId = null;
+
+    const saved = await this.userAccessChangeRequestRepository.save(request);
+
+    await this.addAccessChangeActivityLog({
+      empresaId: params.empresaId,
+      actorId: params.reviewer.id,
+      actorNome: params.reviewer.nome,
+      actorEmail: params.reviewer.email,
+      requestId: saved.id,
+      action: saved.action,
+      status: UserAccessChangeStatus.REJECTED,
+      targetUserId: saved.targetUserId,
+      detailReason: normalizedReason,
+    });
+
+    return saved;
+  }
+
   async findOne(id: string, empresaId?: string): Promise<User | undefined> {
     const user = await this.findByIdWithPassword(id);
     if (!user) {
@@ -1062,6 +1838,234 @@ export class UsersService {
     return this.serializeLgpdRequestActivity(saved as UserActivity & { usuario?: User });
   }
 
+  async generateAccessReviewReport(
+    empresaId: string,
+    options: {
+      role?: string;
+      includeInactive?: boolean;
+      limit?: number;
+    } = {},
+  ): Promise<Record<string, unknown>> {
+    const normalizedRole = this.normalizeRoleInput(options.role);
+    const hasRoleFilter = typeof options.role === 'string' && options.role.trim().length > 0;
+    if (hasRoleFilter && !normalizedRole) {
+      throw new BadRequestException('Perfil de usuario invalido para filtro role');
+    }
+    const includeInactive = options.includeInactive !== false;
+    const requestedLimit =
+      typeof options.limit === 'number' && Number.isFinite(options.limit) ? options.limit : 200;
+    const limit = Math.max(1, Math.min(500, Math.trunc(requestedLimit)));
+
+    const whereClauses: string[] = ['empresa_id = $1'];
+    const whereValues: unknown[] = [empresaId];
+
+    if (normalizedRole) {
+      whereValues.push(normalizedRole);
+      whereClauses.push(`role = $${whereValues.length}`);
+    }
+
+    if (!includeInactive) {
+      whereValues.push(true);
+      whereClauses.push(`ativo = $${whereValues.length}`);
+    }
+
+    const whereSql = whereClauses.join(' AND ');
+
+    const summaryRows: Array<{
+      role: string;
+      total: string | number;
+      ativos: string | number;
+      inativos: string | number;
+    }> = await this.userRepository.query(
+      `
+        SELECT
+          role,
+          COUNT(*)::int AS total,
+          SUM(CASE WHEN ativo = true THEN 1 ELSE 0 END)::int AS ativos,
+          SUM(CASE WHEN ativo = true THEN 0 ELSE 1 END)::int AS inativos
+        FROM users
+        WHERE ${whereSql}
+        GROUP BY role
+        ORDER BY role ASC
+      `,
+      whereValues,
+    );
+
+    const columns = await this.getUsersTableColumns();
+    const detailValues = [...whereValues, limit];
+    const permissionsSelect = columns.has('permissoes')
+      ? 'u.permissoes AS permissoes'
+      : 'NULL::text AS permissoes';
+    const lastLoginSelect = columns.has('ultimo_login')
+      ? 'u.ultimo_login AS ultimo_login'
+      : 'NULL::timestamp AS ultimo_login';
+    const createdAtSelect = this.resolveUsersColumnExpression(
+      columns,
+      'created_at_ref',
+      ['created_at', 'criado_em'],
+      'NULL::timestamp',
+    );
+    const updatedAtSelect = this.resolveUsersColumnExpression(
+      columns,
+      'updated_at_ref',
+      ['updated_at', 'atualizado_em'],
+      'NULL::timestamp',
+    );
+
+    const detailRows: Array<{
+      id: string;
+      nome: string;
+      email: string;
+      role: string;
+      ativo: boolean;
+      permissoes?: string | null;
+      ultimo_login?: string | null;
+      created_at_ref?: string | null;
+      updated_at_ref?: string | null;
+    }> = await this.userRepository.query(
+      `
+        SELECT
+          u.id,
+          u.nome,
+          u.email,
+          u.role,
+          u.ativo,
+          ${permissionsSelect},
+          ${lastLoginSelect},
+          ${createdAtSelect},
+          ${updatedAtSelect}
+        FROM users u
+        WHERE ${whereSql}
+        ORDER BY u.nome ASC
+        LIMIT $${whereValues.length + 1}
+      `,
+      detailValues,
+    );
+
+    const users = detailRows.map((row) => ({
+      id: row.id,
+      nome: row.nome,
+      email: row.email,
+      role: this.normalizeRoleInput(row.role) ?? row.role,
+      ativo: this.isActiveFlag(row.ativo),
+      permissoes: this.extractNormalizedPermissions(row.permissoes),
+      ultimo_login: this.toAuditIsoString(row.ultimo_login),
+      created_at: this.toAuditIsoString(row.created_at_ref),
+      updated_at: this.toAuditIsoString(row.updated_at_ref),
+    }));
+
+    const byProfile = summaryRows.map((row) => {
+      const profile = this.normalizeRoleInput(row.role) ?? row.role;
+      return {
+        role: profile,
+        total: typeof row.total === 'number' ? row.total : Number(row.total) || 0,
+        ativos: typeof row.ativos === 'number' ? row.ativos : Number(row.ativos) || 0,
+        inativos: typeof row.inativos === 'number' ? row.inativos : Number(row.inativos) || 0,
+      };
+    });
+
+    const totalUsers = byProfile.reduce((acc, entry) => acc + entry.total, 0);
+    const activeUsers = byProfile.reduce((acc, entry) => acc + entry.ativos, 0);
+    const inactiveUsers = byProfile.reduce((acc, entry) => acc + entry.inativos, 0);
+
+    return {
+      empresa_id: empresaId,
+      generated_at: new Date().toISOString(),
+      filters: {
+        role: normalizedRole ?? null,
+        include_inactive: includeInactive,
+        detail_limit: limit,
+      },
+      summary: {
+        total_users: totalUsers,
+        active_users: activeUsers,
+        inactive_users: inactiveUsers,
+        by_profile: byProfile,
+      },
+      users,
+    };
+  }
+
+  async recertifyUserAccess(params: {
+    empresaId: string;
+    targetUserId: string;
+    approved: boolean;
+    reason?: string | null;
+    responsible: Pick<User, 'id' | 'nome' | 'email'>;
+    source?: string;
+  }): Promise<{
+    decision: 'approved' | 'rejected';
+    action_taken: 'kept' | 'deactivated' | 'already_inactive';
+    activity_id: string;
+    targetUser: User;
+  }> {
+    const targetUser = await this.findById(params.targetUserId);
+    if (!targetUser || targetUser.empresa_id !== params.empresaId) {
+      throw new NotFoundException('Usuario alvo da recertificacao nao encontrado');
+    }
+
+    const normalizedReason = this.normalizeAccessChangeReason(params.reason ?? undefined);
+    const beforeSnapshot = this.buildAdministrativeUserSnapshot(targetUser);
+    const decision: 'approved' | 'rejected' = params.approved ? 'approved' : 'rejected';
+
+    let actionTaken: 'kept' | 'deactivated' | 'already_inactive' = 'kept';
+    let updatedTargetUser = targetUser;
+
+    if (!params.approved) {
+      if (targetUser.ativo) {
+        await this.userRepository.update(
+          { id: targetUser.id, empresa_id: params.empresaId },
+          { ativo: false },
+        );
+        const refreshed = await this.findById(targetUser.id);
+        if (!refreshed || refreshed.empresa_id !== params.empresaId) {
+          throw new NotFoundException('Usuario alvo da recertificacao nao encontrado');
+        }
+        updatedTargetUser = refreshed;
+        actionTaken = 'deactivated';
+      } else {
+        actionTaken = 'already_inactive';
+      }
+    }
+
+    const afterSnapshot = this.buildAdministrativeUserSnapshot(updatedTargetUser);
+    const changedFields = this.buildAdministrativeChangedFields(beforeSnapshot, afterSnapshot);
+
+    const activity = await this.userActivityRepository.save(
+      this.userActivityRepository.create({
+        usuarioId: params.responsible.id,
+        empresaId: params.empresaId,
+        tipo: AtividadeTipo.EDICAO,
+        descricao: `Recertificacao de acesso ${decision} (${updatedTargetUser.email})`,
+        detalhes: JSON.stringify({
+          categoria: 'admin_access_review',
+          evento: 'access_recertification',
+          decision,
+          action_taken: actionTaken,
+          target_user_id: updatedTargetUser.id,
+          actor: {
+            id: params.responsible.id,
+            nome: params.responsible.nome ?? null,
+            email: params.responsible.email ?? null,
+          },
+          before: beforeSnapshot,
+          after: afterSnapshot,
+          changed_fields: changedFields,
+          reason: normalizedReason ?? null,
+          source: params.source ?? 'users.service.recertifyUserAccess',
+          timestamp: new Date().toISOString(),
+        }),
+      }),
+    );
+
+    return {
+      decision,
+      action_taken: actionTaken,
+      activity_id: activity.id,
+      targetUser: updatedTargetUser,
+    };
+  }
+
   async findByEmpresa(empresaId: string): Promise<User[]> {
     return this.userRepository.find({
       where: { empresa_id: empresaId },
@@ -1300,7 +2304,10 @@ export class UsersService {
     return this.filterUsersByReadScope(atendentes, scopeFilters);
   }
 
-  async criar(userData: Partial<User>): Promise<User> {
+  async criar(
+    userData: Partial<User>,
+    auditContext: AdministrativeAuditContext = {},
+  ): Promise<User> {
     // Validação de campos obrigatórios
     if (!userData.nome || !userData.email || !userData.senha || !userData.empresa_id) {
       throw new Error('Campos obrigatórios ausentes: nome, email, senha, empresa_id');
@@ -1318,7 +2325,53 @@ export class UsersService {
     try {
       const savedUser = await this.userRepository.save(user);
       await this.persistOptionalUsersColumns(savedUser.id, userDataWithHashedPassword, savedUser.empresa_id);
-      return this.findById(savedUser.id);
+      const createdUser = await this.findById(savedUser.id);
+      if (!createdUser) {
+        throw new NotFoundException('Usuario recem-criado nao encontrado');
+      }
+
+      await this.addAdministrativeUserActivityLog({
+        empresaId: createdUser.empresa_id,
+        event: 'user_create',
+        tipo: AtividadeTipo.CRIACAO,
+        descricao: `Usuario criado (${createdUser.email})`,
+        targetUser: createdUser,
+        beforeSnapshot: null,
+        afterSnapshot: this.buildAdministrativeUserSnapshot(createdUser),
+        auditContext,
+      });
+
+      const privilegedCreation = this.detectPrivilegedUserCreation(createdUser);
+      if (privilegedCreation.isPrivileged) {
+        const actor = auditContext.actor ?? null;
+        if (actor?.id) {
+          securityLogger.adminCreated(actor.id, createdUser.id);
+        }
+
+        await this.emitAdminSecurityAlert({
+          empresaId: createdUser.empresa_id,
+          event: 'privilege_escalation',
+          severity: 'high',
+          title: 'Alerta de seguranca: criacao de acesso privilegiado',
+          message: `${
+            actor?.nome || actor?.email || 'Sistema'
+          } criou um usuario com acesso privilegiado (${createdUser.email}).`,
+          actor,
+          targetUser: {
+            id: createdUser.id,
+            nome: createdUser.nome,
+            email: createdUser.email,
+            role: createdUser.role,
+          },
+          metadata: {
+            reasons: privilegedCreation.reasons,
+            sensitive_permissions: privilegedCreation.sensitivePermissions,
+          },
+          source: auditContext.source || 'users.service.criar',
+        });
+      }
+
+      return createdUser;
     } catch (err: any) {
       console.error('Erro ao salvar usuário:', err);
       if (err.code === '23505' && String(err.detail).includes('email')) {
@@ -1328,7 +2381,17 @@ export class UsersService {
     }
   }
 
-  async atualizar(id: string, userData: Partial<User>, empresa_id: string): Promise<User> {
+  async atualizar(
+    id: string,
+    userData: Partial<User>,
+    empresa_id: string,
+    auditContext: AdministrativeAuditContext = {},
+  ): Promise<User> {
+    const beforeUser = await this.findById(id);
+    if (!beforeUser || beforeUser.empresa_id !== empresa_id) {
+      throw new NotFoundException('Usuario nao encontrado');
+    }
+
     const normalizedData = this.normalizeRoleForUpdate(userData);
     const repositoryUpdatableData = this.extractRepositoryUpdatableFields(normalizedData);
 
@@ -1342,16 +2405,84 @@ export class UsersService {
       throw new NotFoundException('Usuario nao encontrado');
     }
 
+    await this.addAdministrativeUserActivityLog({
+      empresaId: empresa_id,
+      event: 'user_update',
+      tipo: AtividadeTipo.EDICAO,
+      descricao: `Usuario atualizado (${user.email})`,
+      targetUser: user,
+      beforeSnapshot: this.buildAdministrativeUserSnapshot(beforeUser),
+      afterSnapshot: this.buildAdministrativeUserSnapshot(user),
+      auditContext,
+    });
+
+    const escalation = this.detectPrivilegeEscalation({
+      beforeUser,
+      afterUser: user,
+    });
+    if (escalation.isEscalation) {
+      if (auditContext.actor?.id) {
+        securityLogger.permissionChange(
+          auditContext.actor.id,
+          user.id,
+          escalation.reasons.join(','),
+        );
+      }
+
+      await this.emitAdminSecurityAlert({
+        empresaId: empresa_id,
+        event: 'privilege_escalation',
+        severity: 'high',
+        title: 'Alerta de seguranca: elevacao de privilegio',
+        message: `${
+          auditContext.actor?.nome || auditContext.actor?.email || 'Sistema'
+        } alterou privilegios de ${user.email}.`,
+        actor: auditContext.actor ?? null,
+        targetUser: {
+          id: user.id,
+          nome: user.nome,
+          email: user.email,
+          role: user.role,
+        },
+        metadata: {
+          reasons: escalation.reasons,
+          added_sensitive_permissions: escalation.addedSensitivePermissions,
+          before_role: beforeUser.role,
+          after_role: user.role,
+        },
+        source: auditContext.source || 'users.service.atualizar',
+      });
+    }
+
     return user;
   }
 
-  async excluir(id: string, empresa_id: string): Promise<void> {
+  async excluir(
+    id: string,
+    empresa_id: string,
+    auditContext: AdministrativeAuditContext = {},
+  ): Promise<void> {
+    const beforeUser = await this.findById(id);
+    if (!beforeUser || beforeUser.empresa_id !== empresa_id) {
+      throw new NotFoundException('Usuario nao encontrado');
+    }
+
     try {
       const resultado = await this.userRepository.delete({ id, empresa_id });
 
       if (!resultado.affected) {
         throw new NotFoundException('Usuário não encontrado');
       }
+      await this.addAdministrativeUserActivityLog({
+        empresaId: empresa_id,
+        event: 'user_delete',
+        tipo: AtividadeTipo.EXCLUSAO,
+        descricao: `Usuario excluido (${beforeUser.email})`,
+        targetUser: beforeUser,
+        beforeSnapshot: this.buildAdministrativeUserSnapshot(beforeUser),
+        afterSnapshot: null,
+        auditContext,
+      });
     } catch (error) {
       if (
         error instanceof QueryFailedError &&
@@ -1367,11 +2498,15 @@ export class UsersService {
     }
   }
 
-  async resetarSenha(id: string, empresa_id: string): Promise<string> {
-    const usuario = await this.userRepository.findOne({ where: { id, empresa_id } });
+  async resetarSenha(
+    id: string,
+    empresa_id: string,
+    auditContext: AdministrativeAuditContext = {},
+  ): Promise<string> {
+    const beforeUser = await this.findById(id);
 
-    if (!usuario) {
-      throw new NotFoundException('Usuário não encontrado');
+    if (!beforeUser || beforeUser.empresa_id !== empresa_id) {
+      throw new NotFoundException('Usuario nao encontrado');
     }
 
     const novaSenha = this.gerarSenhaTemporaria();
@@ -1384,6 +2519,22 @@ export class UsersService {
         deve_trocar_senha: true,
       },
     );
+
+    const afterUser = await this.findById(id);
+    if (!afterUser || afterUser.empresa_id !== empresa_id) {
+      throw new NotFoundException('Usuario nao encontrado');
+    }
+
+    await this.addAdministrativeUserActivityLog({
+      empresaId: empresa_id,
+      event: 'user_password_reset',
+      tipo: AtividadeTipo.RESET_SENHA,
+      descricao: `Senha resetada para usuario (${afterUser.email})`,
+      targetUser: afterUser,
+      beforeSnapshot: this.buildAdministrativeUserSnapshot(beforeUser),
+      afterSnapshot: this.buildAdministrativeUserSnapshot(afterUser),
+      auditContext,
+    });
 
     return novaSenha;
   }
@@ -1416,14 +2567,17 @@ export class UsersService {
     return base.join('');
   }
 
-  async alterarStatus(id: string, ativo: boolean, empresa_id: string): Promise<User> {
+  async alterarStatus(
+    id: string,
+    ativo: boolean,
+    empresa_id: string,
+    auditContext: AdministrativeAuditContext = {},
+  ): Promise<User> {
 
     // Verificar se o usuário existe e pertence à empresa
-    const usuario = await this.userRepository.findOne({
-      where: { id, empresa_id },
-    });
+    const beforeUser = await this.findById(id);
 
-    if (!usuario) {
+    if (!beforeUser || beforeUser.empresa_id !== empresa_id) {
       throw new NotFoundException('Usuário não encontrado');
     }
 
@@ -1431,8 +2585,20 @@ export class UsersService {
     await this.userRepository.update({ id, empresa_id }, { ativo });
 
     // Buscar o usuário atualizado
-    const usuarioAtualizado = await this.userRepository.findOne({
-      where: { id, empresa_id },
+    const usuarioAtualizado = await this.findById(id);
+    if (!usuarioAtualizado || usuarioAtualizado.empresa_id !== empresa_id) {
+      throw new NotFoundException('Usuario nao encontrado');
+    }
+
+    await this.addAdministrativeUserActivityLog({
+      empresaId: empresa_id,
+      event: 'user_status_change',
+      tipo: AtividadeTipo.ALTERACAO_STATUS,
+      descricao: `Status de usuario alterado para ${ativo ? 'ativo' : 'inativo'} (${usuarioAtualizado.email})`,
+      targetUser: usuarioAtualizado,
+      beforeSnapshot: this.buildAdministrativeUserSnapshot(beforeUser),
+      afterSnapshot: this.buildAdministrativeUserSnapshot(usuarioAtualizado),
+      auditContext,
     });
 
     return usuarioAtualizado;
@@ -1450,3 +2616,4 @@ export class UsersService {
     }
   }
 }
+

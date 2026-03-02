@@ -181,7 +181,7 @@ describe('Permissoes por Perfil - Vendas (E2E)', () => {
 
     const propostaBaseResponse = await request(app.getHttpServer())
       .post('/propostas')
-      .set('Authorization', `Bearer ${tokens.admin}`)
+      .set('Authorization', `Bearer ${tokens.gerente}`)
       .send({
         titulo: `Proposta Base Vendas E2E ${Date.now()}`,
         cliente: 'Cliente Base Vendas E2E',
@@ -204,42 +204,62 @@ describe('Permissoes por Perfil - Vendas (E2E)', () => {
       {
         nome: 'crm leads',
         route: '/leads',
-        allowedPerfis: ['admin', 'gerente', 'vendedor', 'suporte'],
+        allowedPerfis: ['gerente', 'vendedor', 'suporte'],
       },
       {
         nome: 'crm oportunidades',
         route: '/oportunidades',
-        allowedPerfis: ['admin', 'gerente', 'vendedor'],
+        allowedPerfis: ['gerente', 'vendedor'],
       },
       {
         nome: 'comercial propostas',
         route: '/propostas',
-        allowedPerfis: ['admin', 'gerente', 'vendedor', 'financeiro'],
+        allowedPerfis: ['gerente', 'vendedor', 'financeiro'],
       },
       {
         nome: 'comercial contratos',
         route: '/contratos',
-        allowedPerfis: ['admin', 'gerente', 'vendedor', 'financeiro'],
+        allowedPerfis: ['gerente', 'vendedor', 'financeiro'],
       },
       {
         nome: 'financeiro faturamento',
         route: '/faturamento/faturas',
-        allowedPerfis: ['admin', 'financeiro'],
+        allowedPerfis: ['financeiro'],
       },
       {
         nome: 'financeiro pagamentos configuracoes',
         route: '/pagamentos/gateways/configuracoes',
-        allowedPerfis: ['admin', 'financeiro'],
+        allowedPerfis: ['financeiro'],
       },
       {
         nome: 'financeiro pagamentos transacoes',
         route: '/pagamentos/gateways/transacoes',
-        allowedPerfis: ['admin', 'financeiro'],
+        allowedPerfis: ['financeiro'],
       },
       {
         nome: 'financeiro fornecedores',
         route: '/fornecedores',
-        allowedPerfis: ['admin', 'financeiro'],
+        allowedPerfis: ['financeiro'],
+      },
+      {
+        nome: 'financeiro contas a pagar',
+        route: '/contas-pagar',
+        allowedPerfis: ['financeiro'],
+      },
+      {
+        nome: 'financeiro contas bancarias',
+        route: '/contas-bancarias',
+        allowedPerfis: ['financeiro'],
+      },
+      {
+        nome: 'financeiro conciliacao bancaria',
+        route: '/conciliacao-bancaria/importacoes',
+        allowedPerfis: ['financeiro'],
+      },
+      {
+        nome: 'financeiro alertas operacionais',
+        route: '/financeiro/alertas-operacionais',
+        allowedPerfis: ['financeiro'],
       },
     ] as const;
 
@@ -252,7 +272,7 @@ describe('Permissoes por Perfil - Vendas (E2E)', () => {
 
   describe('matriz write - vendas', () => {
     it('comercial.propostas.create', async () => {
-      await assertWriteAccess('post', '/propostas', ['admin', 'gerente', 'vendedor'], {
+      await assertWriteAccess('post', '/propostas', ['gerente', 'vendedor'], {
         allowedStatuses: [200, 201],
         payloadFactory: (perfil: Perfil) => {
           writeSequence += 1;
@@ -269,7 +289,7 @@ describe('Permissoes por Perfil - Vendas (E2E)', () => {
       await assertWriteAccess(
         'put',
         `/propostas/${propostaBaseId}/status`,
-        ['admin', 'gerente', 'vendedor'],
+        ['gerente', 'vendedor'],
         {
           allowedStatuses: [200],
           payload: { status: 'enviada' },
@@ -278,32 +298,32 @@ describe('Permissoes por Perfil - Vendas (E2E)', () => {
     });
 
     it('comercial.propostas.delete', async () => {
-      await assertWriteAccess('delete', `/propostas/${UNKNOWN_UUID}`, ['admin', 'gerente'], {
+      await assertWriteAccess('delete', `/propostas/${UNKNOWN_UUID}`, ['gerente'], {
         allowedStatuses: [200, 404],
       });
     });
 
     it('financeiro.faturamento.create', async () => {
-      await assertWriteAccess('post', '/faturamento/faturas', ['admin', 'financeiro'], {
+      await assertWriteAccess('post', '/faturamento/faturas', ['financeiro'], {
         payload: {},
       });
     });
 
     it('financeiro.faturamento.update', async () => {
-      await assertWriteAccess('put', '/faturamento/faturas/999999', ['admin', 'financeiro'], {
+      await assertWriteAccess('put', '/faturamento/faturas/999999', ['financeiro'], {
         payload: {},
       });
     });
 
     it('financeiro.faturamento.delete', async () => {
-      await assertWriteAccess('delete', '/faturamento/faturas/999999', ['admin', 'financeiro']);
+      await assertWriteAccess('delete', '/faturamento/faturas/999999', ['financeiro']);
     });
 
     it('financeiro.pagamentos.configuracoes.create', async () => {
       await assertWriteAccess(
         'post',
         '/pagamentos/gateways/configuracoes',
-        ['admin', 'financeiro'],
+        ['financeiro'],
         {
           payload: {},
         },
@@ -314,7 +334,7 @@ describe('Permissoes por Perfil - Vendas (E2E)', () => {
       await assertWriteAccess(
         'patch',
         `/pagamentos/gateways/configuracoes/${UNKNOWN_UUID}`,
-        ['admin', 'financeiro'],
+        ['financeiro'],
         {
           payload: {},
         },
@@ -325,7 +345,7 @@ describe('Permissoes por Perfil - Vendas (E2E)', () => {
       await assertWriteAccess(
         'delete',
         `/pagamentos/gateways/configuracoes/${UNKNOWN_UUID}`,
-        ['admin', 'financeiro'],
+        ['financeiro'],
       );
     });
 
@@ -333,7 +353,7 @@ describe('Permissoes por Perfil - Vendas (E2E)', () => {
       await assertWriteAccess(
         'patch',
         `/pagamentos/gateways/transacoes/${UNKNOWN_UUID}`,
-        ['admin', 'financeiro'],
+        ['financeiro'],
         {
           payload: {},
         },
@@ -341,19 +361,82 @@ describe('Permissoes por Perfil - Vendas (E2E)', () => {
     });
 
     it('financeiro.fornecedores.create', async () => {
-      await assertWriteAccess('post', '/fornecedores', ['admin', 'financeiro'], {
+      await assertWriteAccess('post', '/fornecedores', ['financeiro'], {
         payload: {},
       });
     });
 
     it('financeiro.fornecedores.update', async () => {
-      await assertWriteAccess('put', `/fornecedores/${UNKNOWN_UUID}`, ['admin', 'financeiro'], {
+      await assertWriteAccess('put', `/fornecedores/${UNKNOWN_UUID}`, ['financeiro'], {
         payload: {},
       });
     });
 
     it('financeiro.fornecedores.delete', async () => {
-      await assertWriteAccess('delete', `/fornecedores/${UNKNOWN_UUID}`, ['admin', 'financeiro']);
+      await assertWriteAccess('delete', `/fornecedores/${UNKNOWN_UUID}`, ['financeiro']);
+    });
+
+    it('financeiro.contas-pagar.create', async () => {
+      await assertWriteAccess('post', '/contas-pagar', ['financeiro'], {
+        payload: {},
+      });
+    });
+
+    it('financeiro.contas-pagar.registrar-pagamento', async () => {
+      await assertWriteAccess(
+        'post',
+        `/contas-pagar/${UNKNOWN_UUID}/registrar-pagamento`,
+        ['financeiro'],
+        {
+          payload: {},
+        },
+      );
+    });
+
+    it('financeiro.contas-pagar.aprovar', async () => {
+      await assertWriteAccess('post', `/contas-pagar/${UNKNOWN_UUID}/aprovar`, ['financeiro'], {
+        payload: {},
+      });
+    });
+
+    it('financeiro.contas-pagar.aprovacoes.lote', async () => {
+      await assertWriteAccess('post', '/contas-pagar/aprovacoes/lote', ['financeiro'], {
+        payload: {},
+      });
+    });
+
+    it('financeiro.contas-bancarias.create', async () => {
+      await assertWriteAccess('post', '/contas-bancarias', ['financeiro'], {
+        payload: {},
+      });
+    });
+
+    it('financeiro.conciliacao.importar', async () => {
+      await assertWriteAccess('post', '/conciliacao-bancaria/importacoes', ['financeiro'], {
+        payload: {},
+      });
+    });
+
+    it('financeiro.alertas.recalcular', async () => {
+      await assertWriteAccess(
+        'post',
+        '/financeiro/alertas-operacionais/recalcular',
+        ['financeiro'],
+        {
+          payload: {},
+        },
+      );
+    });
+
+    it('financeiro.alertas.ack', async () => {
+      await assertWriteAccess(
+        'post',
+        `/financeiro/alertas-operacionais/${UNKNOWN_UUID}/ack`,
+        ['financeiro'],
+        {
+          payload: {},
+        },
+      );
     });
   });
 });

@@ -1,25 +1,69 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
-import { randomBytes, createHash } from 'crypto';
+import { randomBytes, createHash, randomInt } from 'crypto';
 import { UsersService } from '../users/users.service';
 import { User, UserRole } from '../users/user.entity';
 import { PasswordResetToken } from './entities/password-reset-token.entity';
+import { MfaLoginChallenge } from './entities/mfa-login-challenge.entity';
+import { AuthLoginAttempt } from './entities/auth-login-attempt.entity';
+import { EmpresaConfig } from '../empresas/entities/empresa-config.entity';
 import { MailService } from '../../mail/mail.service';
 import { securityLogger } from '../../config/logger.config';
 
 const RESET_TOKEN_EXPIRATION_MINUTES = 60;
+const MFA_LOGIN_CODE_EXPIRATION_MINUTES = 10;
+const MFA_LOGIN_MAX_ATTEMPTS = 5;
+const MFA_LOGIN_RESEND_COOLDOWN_SECONDS = 30;
+const MFA_INVALID_MESSAGE = 'Codigo MFA invalido ou expirado';
+const DEFAULT_ACCESS_TOKEN_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
+const ADMIN_SESSION_MINUTES_DEFAULT = 30;
+const ADMIN_SESSION_MINUTES_MIN = 5;
+const ADMIN_SESSION_MINUTES_MAX = 480;
+const AUTH_LOCKOUT_ATTEMPTS_DEFAULT = 5;
+const AUTH_LOCKOUT_WINDOW_MINUTES_DEFAULT = 15;
+const AUTH_LOCKOUT_BASE_MINUTES_DEFAULT = 15;
+const AUTH_LOCKOUT_MAX_MULTIPLIER = 8;
+const ADMIN_ROLES_FOR_MFA = new Set<UserRole>([UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE]);
+
+type AuthRequestMetadata = {
+  ip?: string;
+  userAgent?: string;
+};
+
+type MfaChallengeResponseData = {
+  challengeId: string;
+  email: string;
+  expiresInSeconds: number;
+  canResendAfterSeconds: number;
+};
+
+type TokenIssueContext = 'login' | 'mfa_verify' | 'refresh';
+
+type LoginLockoutConfig = {
+  maxAttempts: number;
+  windowMs: number;
+  baseLockoutMs: number;
+};
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
     private mailService: MailService,
     @InjectRepository(PasswordResetToken)
     private passwordResetTokenRepository: Repository<PasswordResetToken>,
+    @InjectRepository(MfaLoginChallenge)
+    private mfaLoginChallengeRepository: Repository<MfaLoginChallenge>,
+    @InjectRepository(AuthLoginAttempt)
+    private authLoginAttemptRepository: Repository<AuthLoginAttempt>,
+    @InjectRepository(EmpresaConfig)
+    private empresaConfigRepository: Repository<EmpresaConfig>,
   ) {}
 
   private gerarTokenRecuperacao(): { token: string; hash: string } {
@@ -28,36 +72,320 @@ export class AuthService {
     return { token, hash };
   }
 
-  async validateUser(email: string, password: string): Promise<any> {
-    const user = await this.usersService.findByEmail(email);
-
-    if (user && (await bcrypt.compare(password, user.senha))) {
-      // ✅ NOTA: Não bloquear login se ativo=false
-      // Isso permite primeiro login com senha temporária
-      // O método login() vai detectar e retornar ação de trocar senha
-
-      const { senha, ...result } = user;
-      return result;
-    }
-    return null;
+  private gerarCodigoMfa(): string {
+    return randomInt(100000, 1000000).toString();
   }
 
-  async login(user: User & { deve_trocar_senha?: boolean }) {
-    // ✅ VERIFICAR SE É PRIMEIRO LOGIN (ativo = false)
-    // Se ativo = false, usuário precisa trocar senha temporária
-    if (!user.ativo || user.deve_trocar_senha) {
-      return {
-        success: false,
-        action: 'TROCAR_SENHA',
-        data: {
-          userId: user.id,
-          email: user.email,
-          nome: user.nome,
-        },
-        message: 'Por segurança, é necessário cadastrar uma nova senha antes de continuar.',
-      };
+  private hashValor(value: string): string {
+    return createHash('sha256').update(value).digest('hex');
+  }
+
+  private parseInteger(value: string | undefined): number | null {
+    if (!value || typeof value !== 'string') {
+      return null;
     }
 
+    const parsed = Number.parseInt(value.trim(), 10);
+    if (!Number.isFinite(parsed)) {
+      return null;
+    }
+
+    return parsed;
+  }
+
+  private parseBooleanFlag(value: string | undefined, fallback: boolean): boolean {
+    if (!value || typeof value !== 'string') {
+      return fallback;
+    }
+
+    const normalized = value.trim().toLowerCase();
+
+    if (['1', 'true', 'yes', 'on'].includes(normalized)) {
+      return true;
+    }
+
+    if (['0', 'false', 'no', 'off'].includes(normalized)) {
+      return false;
+    }
+
+    return fallback;
+  }
+
+  private isLoginLockoutEnabled(): boolean {
+    return this.parseBooleanFlag(process.env.AUTH_LOGIN_LOCKOUT_ENABLED, true);
+  }
+
+  private normalizarIp(ip?: string): string {
+    if (!ip || typeof ip !== 'string') {
+      return 'desconhecido';
+    }
+
+    const sanitized = ip.trim().slice(0, 45);
+    return sanitized.length > 0 ? sanitized : 'desconhecido';
+  }
+
+  private maskEmail(email?: string | null): string {
+    if (!email || typeof email !== 'string') {
+      return '';
+    }
+
+    const [local, domain] = email.split('@');
+    if (!local || !domain) {
+      return email;
+    }
+
+    if (local.length <= 2) {
+      return `${local[0] ?? '*'}*@${domain}`;
+    }
+
+    return `${local.slice(0, 2)}***@${domain}`;
+  }
+
+  private isAdminRoleForMfa(role?: UserRole | string | null): boolean {
+    if (!role || typeof role !== 'string') {
+      return false;
+    }
+
+    const normalizedRole = role.trim().toLowerCase();
+    if (normalizedRole === UserRole.MANAGER) {
+      return true;
+    }
+
+    return ADMIN_ROLES_FOR_MFA.has(normalizedRole as UserRole);
+  }
+
+  private getAdminSessionFallbackMinutes(): number {
+    const envMinutes = this.parseInteger(process.env.AUTH_ADMIN_SESSION_MINUTES);
+    if (!envMinutes) {
+      return ADMIN_SESSION_MINUTES_DEFAULT;
+    }
+
+    return Math.min(
+      ADMIN_SESSION_MINUTES_MAX,
+      Math.max(ADMIN_SESSION_MINUTES_MIN, envMinutes),
+    );
+  }
+
+  private async resolveAdminSessionMinutes(user: Pick<User, 'empresa_id'>): Promise<number> {
+    const fallbackMinutes = this.getAdminSessionFallbackMinutes();
+
+    if (!user.empresa_id) {
+      return fallbackMinutes;
+    }
+
+    try {
+      const config = await this.empresaConfigRepository.findOne({
+        where: { empresaId: user.empresa_id },
+      });
+
+      const minutes = Number(config?.sessaoExpiracaoMinutos);
+      if (!Number.isFinite(minutes)) {
+        return fallbackMinutes;
+      }
+
+      return Math.min(
+        ADMIN_SESSION_MINUTES_MAX,
+        Math.max(ADMIN_SESSION_MINUTES_MIN, Math.trunc(minutes)),
+      );
+    } catch {
+      return fallbackMinutes;
+    }
+  }
+
+  private async resolveAccessTokenExpiresIn(user: Pick<User, 'role' | 'empresa_id'>): Promise<string> {
+    if (!this.isAdminRoleForMfa(user.role)) {
+      return DEFAULT_ACCESS_TOKEN_EXPIRES_IN;
+    }
+
+    const adminSessionMinutes = await this.resolveAdminSessionMinutes(user);
+    return `${adminSessionMinutes}m`;
+  }
+
+  private normalizeIdentityEmail(email: string): string {
+    return (email || '').trim().toLowerCase();
+  }
+
+  private getLoginLockoutConfig(): LoginLockoutConfig {
+    const maxAttempts = this.parseInteger(process.env.AUTH_LOCKOUT_MAX_ATTEMPTS);
+    const windowMinutes = this.parseInteger(process.env.AUTH_LOCKOUT_WINDOW_MINUTES);
+    const baseMinutes = this.parseInteger(process.env.AUTH_LOCKOUT_DURATION_MINUTES);
+
+    const safeMaxAttempts = Math.max(3, Math.min(20, maxAttempts || AUTH_LOCKOUT_ATTEMPTS_DEFAULT));
+    const safeWindowMinutes = Math.max(
+      5,
+      Math.min(240, windowMinutes || AUTH_LOCKOUT_WINDOW_MINUTES_DEFAULT),
+    );
+    const safeBaseMinutes = Math.max(
+      1,
+      Math.min(1440, baseMinutes || AUTH_LOCKOUT_BASE_MINUTES_DEFAULT),
+    );
+
+    return {
+      maxAttempts: safeMaxAttempts,
+      windowMs: safeWindowMinutes * 60 * 1000,
+      baseLockoutMs: safeBaseMinutes * 60 * 1000,
+    };
+  }
+
+  private async getLoginAttempt(identity: string): Promise<AuthLoginAttempt | null> {
+    if (!identity) {
+      return null;
+    }
+
+    return this.authLoginAttemptRepository.findOne({
+      where: { identity },
+    });
+  }
+
+  private async ensureLoginIdentityUnlocked(identity: string): Promise<void> {
+    const attempt = await this.getLoginAttempt(identity);
+    if (!attempt) {
+      return;
+    }
+
+    if (!attempt.lockedUntil) {
+      return;
+    }
+
+    const now = Date.now();
+    if (attempt.lockedUntil.getTime() > now) {
+      const remainingSeconds = Math.max(1, Math.ceil((attempt.lockedUntil.getTime() - now) / 1000));
+      securityLogger.loginFailed(identity, this.normalizarIp(attempt.lastIp || undefined), 'locked');
+      throw new UnauthorizedException(
+        `Conta temporariamente bloqueada. Tente novamente em ${Math.ceil(remainingSeconds / 60)} minuto(s).`,
+      );
+    }
+
+    attempt.lockedUntil = null;
+    attempt.failedAttempts = 0;
+    attempt.firstFailedAt = null;
+    await this.authLoginAttemptRepository.save(attempt);
+  }
+
+  private async clearLoginAttempts(identity: string): Promise<void> {
+    const attempt = await this.getLoginAttempt(identity);
+    if (!attempt) {
+      return;
+    }
+
+    attempt.failedAttempts = 0;
+    attempt.consecutiveLockouts = 0;
+    attempt.firstFailedAt = null;
+    attempt.lastFailedAt = null;
+    attempt.lockedUntil = null;
+    await this.authLoginAttemptRepository.save(attempt);
+  }
+
+  private async registerFailedLoginAttempt(
+    identity: string,
+    user: User | undefined,
+    metadata?: AuthRequestMetadata,
+  ): Promise<void> {
+    const lockoutConfig = this.getLoginLockoutConfig();
+    const now = Date.now();
+    const ip = this.normalizarIp(metadata?.ip);
+    const userAgent = metadata?.userAgent || null;
+
+    let attempt = await this.getLoginAttempt(identity);
+    if (!attempt) {
+      attempt = this.authLoginAttemptRepository.create({
+        identity,
+        failedAttempts: 0,
+        consecutiveLockouts: 0,
+        firstFailedAt: null,
+        lastFailedAt: null,
+        lockedUntil: null,
+        userId: user?.id || null,
+        empresaId: user?.empresa_id || null,
+        lastIp: ip,
+        lastUserAgent: userAgent,
+      });
+    }
+
+    const firstFailedAtMs = attempt.firstFailedAt ? attempt.firstFailedAt.getTime() : null;
+    const shouldResetWindow =
+      firstFailedAtMs === null || now - firstFailedAtMs > lockoutConfig.windowMs;
+
+    if (shouldResetWindow) {
+      attempt.failedAttempts = 0;
+      attempt.firstFailedAt = new Date(now);
+    }
+
+    attempt.failedAttempts += 1;
+    attempt.lastFailedAt = new Date(now);
+    attempt.lastIp = ip;
+    attempt.lastUserAgent = userAgent;
+    attempt.userId = user?.id || attempt.userId || null;
+    attempt.empresaId = user?.empresa_id || attempt.empresaId || null;
+
+    const reachedLimit = attempt.failedAttempts >= lockoutConfig.maxAttempts;
+
+    if (reachedLimit) {
+      attempt.consecutiveLockouts = Math.max(1, (attempt.consecutiveLockouts || 0) + 1);
+      const multiplier = Math.min(
+        AUTH_LOCKOUT_MAX_MULTIPLIER,
+        Math.pow(2, Math.max(0, attempt.consecutiveLockouts - 1)),
+      );
+      const lockoutMs = lockoutConfig.baseLockoutMs * multiplier;
+      attempt.lockedUntil = new Date(now + lockoutMs);
+      attempt.failedAttempts = 0;
+      attempt.firstFailedAt = null;
+
+      securityLogger.loginLockoutTriggered(
+        identity,
+        ip,
+        attempt.lockedUntil,
+        attempt.consecutiveLockouts,
+        user?.role,
+      );
+
+      // Alerta operacional para lockout em identidade administrativa.
+      if (user?.role && this.isAdminRoleForMfa(user.role)) {
+        securityLogger.rateLimitExceeded(ip, 'auth/login', lockoutConfig.maxAttempts);
+
+        if (user?.empresa_id) {
+          try {
+            await this.usersService.emitAdminSecurityAlert({
+              empresaId: user.empresa_id,
+              event: 'auth_login_lockout',
+              severity: attempt.consecutiveLockouts >= 2 ? 'critical' : 'high',
+              title: 'Alerta de seguranca: bloqueio por falha de autenticacao',
+              message: `Conta administrativa ${this.maskEmail(identity)} bloqueada temporariamente por tentativas de login sem sucesso.`,
+              actor: null,
+              targetUser: {
+                id: user.id,
+                nome: user.nome,
+                email: user.email,
+                role: user.role,
+              },
+              metadata: {
+                identity,
+                ip,
+                failed_attempts_threshold: lockoutConfig.maxAttempts,
+                lockout_level: attempt.consecutiveLockouts,
+                locked_until: attempt.lockedUntil?.toISOString() || null,
+              },
+              source: 'auth.service.registerFailedLoginAttempt',
+            });
+          } catch (alertError) {
+            this.logger.warn(
+              `Falha ao emitir alerta de lockout administrativo para ${identity}: ${
+                alertError instanceof Error ? alertError.message : String(alertError)
+              }`,
+            );
+          }
+        }
+      }
+    }
+
+    await this.authLoginAttemptRepository.save(attempt);
+  }
+
+  private async issueAccessToken(
+    user: Pick<User, 'id' | 'email' | 'role' | 'empresa_id'>,
+    context: TokenIssueContext,
+    metadata?: AuthRequestMetadata,
+  ): Promise<string> {
     const payload = {
       email: user.email,
       sub: user.id,
@@ -65,14 +393,63 @@ export class AuthService {
       role: user.role,
     };
 
-    // Atualizar último login
+    const expiresIn = await this.resolveAccessTokenExpiresIn(user);
+    const token = this.jwtService.sign(payload, { expiresIn });
+
+    if (context === 'refresh' && this.isAdminRoleForMfa(user.role)) {
+      securityLogger.adminSessionRefresh(
+        user.id,
+        String(user.role || ''),
+        this.normalizarIp(metadata?.ip),
+      );
+    }
+
+    return token;
+  }
+
+  private async shouldRequireAdminMfa(user: Pick<User, 'role' | 'empresa_id'>): Promise<boolean> {
+    if (!this.isAdminRoleForMfa(user.role)) {
+      return false;
+    }
+
+    const globalAdminMfaRequired = this.parseBooleanFlag(
+      process.env.AUTH_ADMIN_MFA_REQUIRED,
+      true,
+    );
+
+    if (globalAdminMfaRequired) {
+      return true;
+    }
+
+    if (!user.empresa_id) {
+      return false;
+    }
+
+    try {
+      const config = await this.empresaConfigRepository.findOne({
+        where: { empresaId: user.empresa_id },
+      });
+
+      return !!config?.autenticacao2FA;
+    } catch {
+      return false;
+    }
+  }
+
+  private async buildAuthenticatedLoginResponse(
+    user: User,
+    context: Exclude<TokenIssueContext, 'refresh'> = 'login',
+    metadata?: AuthRequestMetadata,
+  ) {
     await this.usersService.updateLastLogin(user.id);
+
     const normalizedPermissions = Array.isArray(user.permissoes) ? user.permissoes : [];
+    const accessToken = await this.issueAccessToken(user, context, metadata);
 
     return {
       success: true,
       data: {
-        access_token: this.jwtService.sign(payload),
+        access_token: accessToken,
         user: {
           id: user.id,
           nome: user.nome,
@@ -87,6 +464,237 @@ export class AuthService {
     };
   }
 
+  private async criarDesafioMfaLogin(
+    user: Pick<User, 'id' | 'email' | 'nome' | 'empresa_id'>,
+    metadata?: AuthRequestMetadata,
+  ): Promise<MfaChallengeResponseData> {
+    await this.mfaLoginChallengeRepository.update(
+      { userId: user.id, usedAt: IsNull() },
+      { usedAt: new Date() },
+    );
+
+    const codigo = this.gerarCodigoMfa();
+    const expiresAt = new Date(Date.now() + MFA_LOGIN_CODE_EXPIRATION_MINUTES * 60 * 1000);
+    const challenge = this.mfaLoginChallengeRepository.create({
+      empresaId: user.empresa_id ?? null,
+      userId: user.id,
+      codeHash: this.hashValor(codigo),
+      expiresAt,
+      failedAttempts: 0,
+      maxAttempts: MFA_LOGIN_MAX_ATTEMPTS,
+      requestedIp: metadata?.ip?.slice(0, 45) ?? null,
+      userAgent: metadata?.userAgent ?? null,
+    });
+
+    const saved = await this.mfaLoginChallengeRepository.save(challenge);
+
+    try {
+      await this.mailService.enviarEmailCodigoMfa({
+        to: user.email,
+        usuario: user.nome,
+        codigo,
+        expiracaoMinutos: MFA_LOGIN_CODE_EXPIRATION_MINUTES,
+      });
+    } catch {
+      await this.mfaLoginChallengeRepository.update(saved.id, { usedAt: new Date() });
+      throw new UnauthorizedException(
+        'Nao foi possivel concluir a validacao em duas etapas. Tente novamente.',
+      );
+    }
+
+    securityLogger.mfaChallengeIssued(
+      user.id,
+      user.email,
+      this.normalizarIp(metadata?.ip),
+      saved.id,
+    );
+
+    return {
+      challengeId: saved.id,
+      email: this.maskEmail(user.email),
+      expiresInSeconds: MFA_LOGIN_CODE_EXPIRATION_MINUTES * 60,
+      canResendAfterSeconds: MFA_LOGIN_RESEND_COOLDOWN_SECONDS,
+    };
+  }
+
+  async validateUser(email: string, password: string, metadata?: AuthRequestMetadata): Promise<any> {
+    const identity = this.normalizeIdentityEmail(email);
+    if (!identity || !password) {
+      return null;
+    }
+
+    const lockoutEnabled = this.isLoginLockoutEnabled();
+    if (lockoutEnabled) {
+      await this.ensureLoginIdentityUnlocked(identity);
+    }
+
+    const user = await this.usersService.findByEmail(identity);
+
+    if (user && (await bcrypt.compare(password, user.senha))) {
+      if (lockoutEnabled) {
+        await this.clearLoginAttempts(identity);
+      }
+      // Do not block login when ativo=false so first access can change password.
+      const { senha, ...result } = user;
+      return result;
+    }
+
+    if (lockoutEnabled) {
+      await this.registerFailedLoginAttempt(identity, user, metadata);
+    }
+    securityLogger.loginFailed(identity, this.normalizarIp(metadata?.ip), 'invalid_credentials');
+    return null;
+  }
+
+  async login(user: User & { deve_trocar_senha?: boolean }, metadata?: AuthRequestMetadata) {
+    if (!user.ativo || user.deve_trocar_senha) {
+      return {
+        success: false,
+        action: 'TROCAR_SENHA',
+        data: {
+          userId: user.id,
+          email: user.email,
+          nome: user.nome,
+        },
+        message: 'Por seguranca, e necessario cadastrar uma nova senha antes de continuar.',
+      };
+    }
+
+    const shouldRequireMfa = await this.shouldRequireAdminMfa(user);
+    if (shouldRequireMfa) {
+      const mfaChallenge = await this.criarDesafioMfaLogin(user, metadata);
+      return {
+        success: false,
+        action: 'MFA_REQUIRED',
+        data: mfaChallenge,
+        message:
+          'Validacao em duas etapas obrigatoria para concluir o acesso administrativo.',
+      };
+    }
+
+    return this.buildAuthenticatedLoginResponse(user, 'login', metadata);
+  }
+
+  async verificarCodigoMfaLogin(
+    challengeId: string,
+    codigo: string,
+    metadata?: AuthRequestMetadata,
+  ) {
+    const challengeIdNormalizado = challengeId?.trim();
+    const codigoNormalizado = codigo?.trim();
+
+    if (!challengeIdNormalizado || !codigoNormalizado) {
+      throw new BadRequestException('Challenge e codigo MFA sao obrigatorios');
+    }
+
+    if (!/^\d{6}$/.test(codigoNormalizado)) {
+      throw new BadRequestException('Codigo MFA deve conter 6 digitos numericos');
+    }
+
+    const challenge = await this.mfaLoginChallengeRepository.findOne({
+      where: { id: challengeIdNormalizado },
+      relations: ['user', 'user.empresa'],
+    });
+
+    if (!challenge) {
+      throw new UnauthorizedException(MFA_INVALID_MESSAGE);
+    }
+
+    const ip = this.normalizarIp(metadata?.ip ?? challenge.requestedIp ?? undefined);
+    const now = Date.now();
+    const isExpired = challenge.expiresAt.getTime() < now;
+    const isLocked = challenge.failedAttempts >= challenge.maxAttempts;
+    const isConsumed = !!challenge.usedAt;
+
+    if (isConsumed || isExpired || isLocked) {
+      if (!challenge.usedAt) {
+        challenge.usedAt = new Date();
+        await this.mfaLoginChallengeRepository.save(challenge);
+      }
+
+      securityLogger.mfaChallengeFailed(
+        challenge.userId,
+        ip,
+        isExpired ? 'expired' : isLocked ? 'max_attempts' : 'already_used',
+        challenge.id,
+      );
+
+      throw new UnauthorizedException(MFA_INVALID_MESSAGE);
+    }
+
+    const codigoHash = this.hashValor(codigoNormalizado);
+    if (codigoHash !== challenge.codeHash) {
+      challenge.failedAttempts = (challenge.failedAttempts ?? 0) + 1;
+      if (challenge.failedAttempts >= challenge.maxAttempts) {
+        challenge.usedAt = new Date();
+      }
+
+      await this.mfaLoginChallengeRepository.save(challenge);
+      securityLogger.mfaChallengeFailed(challenge.userId, ip, 'invalid_code', challenge.id);
+      throw new UnauthorizedException(MFA_INVALID_MESSAGE);
+    }
+
+    challenge.usedAt = new Date();
+    await this.mfaLoginChallengeRepository.save(challenge);
+
+    const user = challenge.user ?? (await this.usersService.findById(challenge.userId));
+
+    if (!user) {
+      throw new UnauthorizedException('Usuario nao encontrado para validacao MFA');
+    }
+
+    if (!user.ativo || user.deve_trocar_senha) {
+      throw new UnauthorizedException(
+        'Sessao de autenticacao invalida. Refaca o login para continuar.',
+      );
+    }
+
+    securityLogger.mfaChallengeVerified(user.id, ip, challenge.id);
+
+    return this.buildAuthenticatedLoginResponse(user, 'mfa_verify', metadata);
+  }
+
+  async reenviarCodigoMfaLogin(challengeId: string, metadata?: AuthRequestMetadata) {
+    const challengeIdNormalizado = challengeId?.trim();
+    if (!challengeIdNormalizado) {
+      throw new BadRequestException('Challenge MFA invalido');
+    }
+
+    const challenge = await this.mfaLoginChallengeRepository.findOne({
+      where: { id: challengeIdNormalizado },
+      relations: ['user', 'user.empresa'],
+    });
+
+    if (!challenge || challenge.usedAt) {
+      throw new UnauthorizedException('Desafio MFA invalido ou finalizado');
+    }
+
+    const elapsedSeconds = Math.floor((Date.now() - challenge.createdAt.getTime()) / 1000);
+    if (elapsedSeconds < MFA_LOGIN_RESEND_COOLDOWN_SECONDS) {
+      throw new BadRequestException(
+        `Aguarde ${MFA_LOGIN_RESEND_COOLDOWN_SECONDS - elapsedSeconds}s para reenviar o codigo`,
+      );
+    }
+
+    const user = challenge.user ?? (await this.usersService.findById(challenge.userId));
+    if (!user) {
+      throw new UnauthorizedException('Usuario nao encontrado para reenvio do MFA');
+    }
+
+    const shouldRequireMfa = await this.shouldRequireAdminMfa(user);
+    if (!shouldRequireMfa) {
+      throw new BadRequestException('MFA nao e mais obrigatorio para este usuario');
+    }
+
+    const novoDesafio = await this.criarDesafioMfaLogin(user, metadata);
+
+    return {
+      success: true,
+      data: novoDesafio,
+      message: 'Codigo de verificacao reenviado com sucesso',
+    };
+  }
+
   async register(userData: {
     nome: string;
     email: string;
@@ -94,16 +702,13 @@ export class AuthService {
     telefone?: string;
     empresa_id: string;
   }) {
-    // Verificar se email já existe
     const existingUser = await this.usersService.findByEmail(userData.email);
     if (existingUser) {
-      throw new UnauthorizedException('Email já está em uso');
+      throw new UnauthorizedException('Email ja esta em uso');
     }
 
-    // Hash da senha
     const hashedPassword = await bcrypt.hash(userData.senha, 10);
 
-    // Criar usuário
     const user = await this.usersService.create({
       ...userData,
       senha: hashedPassword,
@@ -113,80 +718,115 @@ export class AuthService {
     return {
       success: true,
       data: result,
-      message: 'Usuário criado com sucesso',
+      message: 'Usuario criado com sucesso',
     };
   }
 
-  async refreshToken(user: User) {
-    const payload = {
-      email: user.email,
-      sub: user.id,
-      empresa_id: user.empresa_id,
-      role: user.role,
-    };
+  async refreshToken(user: User, metadata?: AuthRequestMetadata) {
+    const accessToken = await this.issueAccessToken(user, 'refresh', metadata);
 
     return {
       success: true,
       data: {
-        access_token: this.jwtService.sign(payload),
+        access_token: accessToken,
       },
     };
   }
 
-  /**
-   * Troca senha temporária (primeiro acesso)
-   * Valida senha antiga, cria hash da nova, ativa usuário (ativo=true)
-   */
+  async logout(user: User, metadata?: AuthRequestMetadata, reason?: string) {
+    if (this.isAdminRoleForMfa(user.role)) {
+      securityLogger.adminSessionLogout(
+        user.id,
+        String(user.role || ''),
+        this.normalizarIp(metadata?.ip),
+        reason,
+      );
+    }
+
+    return {
+      success: true,
+      message: 'Logout registrado com sucesso',
+    };
+  }
+
+  async unlockLoginIdentity(
+    email: string,
+    actor: Pick<User, 'id' | 'role'>,
+    reason?: string,
+  ): Promise<{ success: boolean; message: string }> {
+    const identity = this.normalizeIdentityEmail(email);
+    if (!identity) {
+      throw new BadRequestException('Email e obrigatorio para desbloqueio');
+    }
+
+    const attempt = await this.getLoginAttempt(identity);
+    if (!attempt) {
+      return {
+        success: true,
+        message: 'Nenhum bloqueio ativo encontrado para o e-mail informado',
+      };
+    }
+
+    attempt.failedAttempts = 0;
+    attempt.consecutiveLockouts = 0;
+    attempt.firstFailedAt = null;
+    attempt.lastFailedAt = null;
+    attempt.lockedUntil = null;
+    await this.authLoginAttemptRepository.save(attempt);
+
+    securityLogger.loginLockoutUnlocked(identity, actor.id, reason);
+
+    return {
+      success: true,
+      message: 'Bloqueio de login removido com sucesso',
+    };
+  }
+
   async trocarSenha(userId: string, senhaAntiga: string, senhaNova: string): Promise<any> {
     if (!userId) {
-      throw new BadRequestException('Identificador do usuário é obrigatório');
+      throw new BadRequestException('Identificador do usuario e obrigatorio');
     }
 
     if (!senhaAntiga || typeof senhaAntiga !== 'string') {
-      throw new BadRequestException('Senha temporária é obrigatória');
+      throw new BadRequestException('Senha temporaria e obrigatoria');
     }
 
     if (!senhaNova || typeof senhaNova !== 'string') {
-      throw new BadRequestException('Nova senha é obrigatória');
+      throw new BadRequestException('Nova senha e obrigatoria');
     }
 
     const senhaAntigaNormalizada = senhaAntiga.trim();
     const senhaNovaNormalizada = senhaNova.trim();
 
     if (senhaAntigaNormalizada.length === 0) {
-      throw new BadRequestException('Senha temporária não pode ser vazia');
+      throw new BadRequestException('Senha temporaria nao pode ser vazia');
     }
 
     if (senhaNovaNormalizada.length < 6) {
       throw new BadRequestException('A nova senha deve ter pelo menos 6 caracteres');
     }
 
-    // Buscar usuário completo (com senha)
     const user = await this.usersService.findOne(userId);
 
     if (!user) {
-      throw new UnauthorizedException('Usuário não encontrado');
+      throw new UnauthorizedException('Usuario nao encontrado');
     }
 
     if (!user.senha) {
-      throw new BadRequestException('Usuário não possui senha cadastrada');
+      throw new BadRequestException('Usuario nao possui senha cadastrada');
     }
 
-    // Validar senha antiga
     const senhaValida = await bcrypt.compare(senhaAntigaNormalizada, user.senha);
     if (!senhaValida) {
       throw new UnauthorizedException('Senha atual incorreta');
     }
 
-    // Hash da senha nova
     const hashedPassword = await bcrypt.hash(senhaNovaNormalizada, 10);
-
-    // Atualizar senha E ativar usuário (primeiro acesso concluído)
     await this.usersService.updatePassword(userId, hashedPassword, true);
 
     return {
       success: true,
-      message: 'Senha alterada com sucesso! Você já pode fazer login.',
+      message: 'Senha alterada com sucesso! Voce ja pode fazer login.',
     };
   }
 
@@ -203,11 +843,9 @@ export class AuthService {
     const user = await this.usersService.findByEmail(emailNormalizado);
 
     if (!user) {
-      // Evitar enumeração de usuários - retorno silencioso
       return;
     }
 
-    // Invalidar tokens anteriores não utilizados
     await this.passwordResetTokenRepository.update(
       { user_id: user.id, used_at: IsNull() },
       { used_at: new Date() },
@@ -247,7 +885,7 @@ export class AuthService {
     const tokenNormalizado = token?.trim();
 
     if (!tokenNormalizado) {
-      throw new BadRequestException('Token inválido ou expirado');
+      throw new BadRequestException('Token invalido ou expirado');
     }
 
     const tokenHash = createHash('sha256').update(tokenNormalizado).digest('hex');
@@ -257,7 +895,7 @@ export class AuthService {
     });
 
     if (!registro || registro.used_at || registro.expires_at.getTime() < Date.now()) {
-      throw new BadRequestException('Token inválido ou expirado');
+      throw new BadRequestException('Token invalido ou expirado');
     }
 
     const senhaNormalizada = senhaNova?.trim();
@@ -275,23 +913,21 @@ export class AuthService {
 
     return {
       success: true,
-      message: 'Senha alterada com sucesso! Você já pode fazer login.',
+      message: 'Senha alterada com sucesso! Voce ja pode fazer login.',
     };
   }
 
   async createTestUser() {
     const email = 'cache.test@conectcrm.com';
 
-    // Verificar se já existe
     const existingUser = await this.usersService.findByEmail(email);
     if (existingUser) {
-      // Atualizar senha do usuário existente com hash correto
       const hashedPassword = await bcrypt.hash('Test@123', 10);
       await this.usersService.updatePassword(existingUser.id, hashedPassword, true);
 
       return {
         success: true,
-        message: 'Usuário de teste atualizado com senha correta',
+        message: 'Usuario de teste atualizado com senha correta',
         credentials: {
           email: 'cache.test@conectcrm.com',
           password: 'Test@123',
@@ -299,14 +935,13 @@ export class AuthService {
       };
     }
 
-    // Hash da senha Test@123 gerado dinamicamente
     const hashedPassword = await bcrypt.hash('Test@123', 10);
 
     const userData = {
       nome: 'Cache Test User',
       email,
       senha: hashedPassword,
-      empresa_id: null, // Será preenchido pela service
+      empresa_id: null,
       ativo: true,
       role: UserRole.ADMIN,
     };
@@ -316,7 +951,7 @@ export class AuthService {
 
       return {
         success: true,
-        message: 'Usuário de teste criado com sucesso!',
+        message: 'Usuario de teste criado com sucesso!',
         credentials: {
           email: 'cache.test@conectcrm.com',
           password: 'Test@123',
@@ -328,7 +963,7 @@ export class AuthService {
         },
       };
     } catch (error) {
-      throw new BadRequestException('Erro ao criar usuário de teste: ' + error.message);
+      throw new BadRequestException('Erro ao criar usuario de teste: ' + error.message);
     }
   }
 }

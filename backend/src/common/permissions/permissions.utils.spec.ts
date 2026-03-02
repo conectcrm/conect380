@@ -29,6 +29,18 @@ describe('permissions.utils', () => {
       expect(financeiroPerms.has(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)).toBe(true);
       expect(financeiroPerms.has(Permission.USERS_CREATE)).toBe(false);
     });
+
+    it('deve manter admin com escopo de governanca e sem permissoes operacionais por padrao', () => {
+      const adminPerms = new Set(ROLE_DEFAULT_PERMISSIONS[UserRole.ADMIN]);
+
+      expect(adminPerms.has(Permission.USERS_CREATE)).toBe(true);
+      expect(adminPerms.has(Permission.CONFIG_EMPRESA_UPDATE)).toBe(true);
+      expect(adminPerms.has(Permission.PLANOS_MANAGE)).toBe(true);
+      expect(adminPerms.has(Permission.CRM_CLIENTES_READ)).toBe(false);
+      expect(adminPerms.has(Permission.COMERCIAL_PROPOSTAS_READ)).toBe(false);
+      expect(adminPerms.has(Permission.ATENDIMENTO_TICKETS_READ)).toBe(false);
+      expect(adminPerms.has(Permission.FINANCEIRO_PAGAMENTOS_READ)).toBe(false);
+    });
   });
 
   describe('resolveUserPermissions', () => {
@@ -84,7 +96,7 @@ describe('permissions.utils', () => {
     it('deve permitir quando usuario tem todas as permissoes requeridas', () => {
       const allowed = hasRequiredPermissions(
         {
-          role: UserRole.ADMIN,
+          role: UserRole.GERENTE,
         },
         [Permission.ATENDIMENTO_TICKETS_ASSIGN, Permission.CRM_CLIENTES_READ],
       );

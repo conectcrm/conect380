@@ -36,10 +36,16 @@ import {
   LEGACY_PERMISSION_ALIASES,
   getPermissionCatalog,
   Permission,
+  ROLE_DEFAULT_PERMISSIONS,
 } from '../../common/permissions/permissions.constants';
 import { resolveUserPermissions } from '../../common/permissions/permissions.utils';
 import { CurrentUser } from '../../common/decorators/user.decorator';
 import { User, UserRole } from './user.entity';
+import {
+  UserAccessChangeAction,
+  UserAccessChangeRequest,
+  UserAccessChangeStatus,
+} from './entities/user-access-change-request.entity';
 
 const AVATAR_UPLOAD_SUBDIR = 'avatars';
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -279,6 +285,7 @@ export class UsersController {
   private normalizeAndValidateAssignablePermissions(
     actor: User,
     requestedPermissions: unknown,
+    targetRole?: unknown,
   ): string[] | undefined {
     if (requestedPermissions === undefined) {
       return undefined;
@@ -306,13 +313,35 @@ export class UsersController {
 
     const uniquePermissions = Array.from(new Set(normalizedPermissions));
     const actorRole = this.normalizeRoleInput(actor.role);
+    const normalizedTargetRole = this.normalizeRoleInput(targetRole);
+    const targetDefaultPermissions = new Set<string>(
+      normalizedTargetRole ? ROLE_DEFAULT_PERMISSIONS[normalizedTargetRole] ?? [] : [],
+    );
 
     if (actorRole !== UserRole.SUPERADMIN) {
       const actorPermissionSet = resolveUserPermissions(actor);
       const notAssignable = uniquePermissions.filter(
-        (permission) =>
-          !LEGACY_ASSIGNABLE_PERMISSIONS.has(permission) &&
-          !actorPermissionSet.has(permission as Permission),
+        (permission) => {
+          if (LEGACY_ASSIGNABLE_PERMISSIONS.has(permission)) {
+            return false;
+          }
+
+          if (actorPermissionSet.has(permission as Permission)) {
+            return false;
+          }
+
+          // Admin de governanca pode conceder templates canonicos de perfis que ele gerencia.
+          if (
+            actorRole === UserRole.ADMIN &&
+            normalizedTargetRole &&
+            this.getManageableRoles(actorRole).has(normalizedTargetRole) &&
+            targetDefaultPermissions.has(permission)
+          ) {
+            return false;
+          }
+
+          return true;
+        },
       );
 
       if (notAssignable.length > 0) {
@@ -439,11 +468,129 @@ export class UsersController {
     return sanitized;
   }
 
+  private normalizeOptionalReason(input: unknown): string | undefined {
+    if (input === undefined || input === null) {
+      return undefined;
+    }
+
+    if (typeof input !== 'string') {
+      throw new BadRequestException('Campo reason invalido');
+    }
+
+    const normalized = input.trim();
+    if (!normalized) {
+      return undefined;
+    }
+
+    return normalized.slice(0, 2000);
+  }
+
+  private parseLimit(limit?: string): number | undefined {
+    if (limit === undefined) {
+      return undefined;
+    }
+
+    const parsed = Number.parseInt(limit, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      throw new BadRequestException('Parametro limit invalido');
+    }
+
+    return parsed;
+  }
+
+  private parseOptionalBoolean(value: string | undefined, fieldName: string): boolean | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true' || normalized === '1') {
+      return true;
+    }
+
+    if (normalized === 'false' || normalized === '0') {
+      return false;
+    }
+
+    throw new BadRequestException(`Parametro ${fieldName} invalido`);
+  }
+
+  private serializeAccessChangeRequest(request: UserAccessChangeRequest) {
+    const safePayload =
+      request.requestPayload && typeof request.requestPayload === 'object'
+        ? { ...request.requestPayload }
+        : {};
+
+    if ('senha' in safePayload) {
+      safePayload.senha = '[REDACTED]';
+    }
+
+    return {
+      id: request.id,
+      empresa_id: request.empresaId,
+      action: request.action,
+      status: request.status,
+      target_user_id: request.targetUserId,
+      request_payload: safePayload,
+      request_reason: request.requestReason,
+      decision_reason: request.decisionReason,
+      decided_at: request.decidedAt ?? null,
+      applied_at: request.appliedAt ?? null,
+      applied_user_id: request.appliedUserId ?? null,
+      created_at: request.createdAt,
+      updated_at: request.updatedAt,
+      requested_by: request.requestedByUser
+        ? {
+            id: request.requestedByUser.id,
+            nome: request.requestedByUser.nome,
+            email: request.requestedByUser.email,
+          }
+        : null,
+      decided_by: request.decidedByUser
+        ? {
+            id: request.decidedByUser.id,
+            nome: request.decidedByUser.nome,
+            email: request.decidedByUser.email,
+          }
+        : null,
+      target_user: request.targetUser
+        ? {
+            id: request.targetUser.id,
+            nome: request.targetUser.nome,
+            email: request.targetUser.email,
+            role: request.targetUser.role,
+          }
+        : null,
+      applied_user: request.appliedUser
+        ? {
+            id: request.appliedUser.id,
+            nome: request.appliedUser.nome,
+            email: request.appliedUser.email,
+            role: request.appliedUser.role,
+          }
+        : null,
+    };
+  }
+
   @Get('profile')
   @ApiOperation({ summary: 'Obter perfil do usuário logado' })
   @ApiResponse({ status: 200, description: 'Perfil retornado com sucesso' })
   async getProfile(@CurrentUser() user: User) {
-    const normalizedPermissions = Array.isArray(user.permissoes) ? user.permissoes : [];
+    const effectivePermissions =
+      Array.isArray((user as User & { permissions?: unknown }).permissions) &&
+      (user as User & { permissions?: unknown }).permissions
+        ? ((user as User & { permissions?: string[] }).permissions as string[])
+        : Array.isArray(user.permissoes)
+          ? user.permissoes
+          : [];
+    const breakGlassMeta = (
+      user as User & {
+        break_glass?: {
+          active?: boolean;
+          grants?: Array<{ id: string; expires_at: string; permissions: string[] }>;
+        };
+      }
+    ).break_glass;
     const empresa = user.empresa
       ? {
           id: user.empresa.id,
@@ -464,8 +611,12 @@ export class UsersController {
         email: user.email,
         telefone: user.telefone,
         role: user.role,
-        permissoes: normalizedPermissions,
-        permissions: normalizedPermissions,
+        permissoes: effectivePermissions,
+        permissions: effectivePermissions,
+        break_glass: {
+          active: Boolean(breakGlassMeta?.active),
+          grants: Array.isArray(breakGlassMeta?.grants) ? breakGlassMeta?.grants : [],
+        },
         avatar_url: user.avatar_url,
         idioma_preferido: user.idioma_preferido,
         configuracoes: user.configuracoes ?? null,
@@ -756,6 +907,14 @@ export class UsersController {
         id,
         { avatar_url: newAvatarRelativePath },
         user.empresa_id,
+        {
+          actor: {
+            id: user.id,
+            nome: user.nome,
+            email: user.email,
+          },
+          source: 'users.controller.uploadAvatarByAdmin',
+        },
       );
 
       if (!updatedUser) {
@@ -907,6 +1066,89 @@ export class UsersController {
     };
   }
 
+  @Get('access-review/report')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
+  @Permissions(Permission.USERS_READ)
+  @ApiOperation({ summary: 'Gerar relatorio de revisao de acessos por empresa/perfil' })
+  @ApiResponse({ status: 200, description: 'Relatorio de revisao de acessos gerado com sucesso' })
+  async gerarRelatorioRevisaoAcessos(
+    @CurrentUser() user: User,
+    @Query('role') role?: string,
+    @Query('include_inactive') includeInactive?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const data = await this.usersService.generateAccessReviewReport(user.empresa_id, {
+      role,
+      includeInactive: this.parseOptionalBoolean(includeInactive, 'include_inactive'),
+      limit: this.parseLimit(limit),
+    });
+
+    return {
+      success: true,
+      data,
+    };
+  }
+
+  @Post('access-review/recertify')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
+  @Permissions(Permission.USERS_UPDATE)
+  @ApiOperation({ summary: 'Registrar decisao de recertificacao de acesso de usuario' })
+  @ApiResponse({ status: 201, description: 'Recertificacao registrada com sucesso' })
+  async recertificarAcessoUsuario(
+    @CurrentUser() user: User,
+    @Body()
+    body: {
+      target_user_id?: string;
+      approved?: boolean;
+      reason?: string;
+    },
+  ) {
+    const targetUserId =
+      typeof body?.target_user_id === 'string' ? body.target_user_id.trim() : '';
+    if (!targetUserId) {
+      throw new BadRequestException('Campo target_user_id obrigatorio');
+    }
+
+    if (typeof body?.approved !== 'boolean') {
+      throw new BadRequestException('Campo approved obrigatorio e deve ser booleano');
+    }
+
+    if (body?.reason !== undefined && typeof body.reason !== 'string') {
+      throw new BadRequestException('Campo reason invalido');
+    }
+
+    const normalizedReason = this.normalizeOptionalReason(body?.reason);
+    if (!body.approved && !normalizedReason) {
+      throw new BadRequestException('Informe reason ao reprovar uma recertificacao');
+    }
+
+    await this.ensureCanManageUser(user, targetUserId, 'recertificar acesso de');
+
+    const result = await this.usersService.recertifyUserAccess({
+      empresaId: user.empresa_id,
+      targetUserId,
+      approved: body.approved,
+      reason: normalizedReason,
+      responsible: {
+        id: user.id,
+        nome: user.nome,
+        email: user.email,
+      },
+      source: 'users.controller.recertificarAcessoUsuario',
+    });
+
+    return {
+      success: true,
+      data: {
+        decision: result.decision,
+        action_taken: result.action_taken,
+        activity_id: result.activity_id,
+        target_user: this.sanitizeUser(result.targetUser),
+      },
+      message: 'Recertificacao registrada com sucesso',
+    };
+  }
+
   @Get('privacy-requests')
   @Permissions(Permission.USERS_READ)
   @ApiOperation({ summary: 'Listar solicitacoes LGPD da empresa' })
@@ -983,6 +1225,105 @@ export class UsersController {
     };
   }
 
+  @Get('access-change-requests')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
+  @Permissions(Permission.USERS_READ)
+  @ApiOperation({ summary: 'Listar pendencias de alteracao sensivel de acesso' })
+  @ApiResponse({ status: 200, description: 'Pendencias de aprovacao retornadas com sucesso' })
+  async listarSolicitacoesAcesso(
+    @CurrentUser() user: User,
+    @Query('status') status?: string,
+    @Query('limit') limit?: string,
+  ) {
+    if (status !== undefined) {
+      const normalizedStatus = status.trim().toUpperCase();
+      const allowed = new Set<string>([
+        UserAccessChangeStatus.REQUESTED,
+        UserAccessChangeStatus.APPROVED,
+        UserAccessChangeStatus.REJECTED,
+      ]);
+      if (!allowed.has(normalizedStatus)) {
+        throw new BadRequestException('Status invalido. Use REQUESTED, APPROVED ou REJECTED.');
+      }
+      status = normalizedStatus;
+    }
+
+    const data = await this.usersService.listAccessChangeRequests(user.empresa_id, {
+      status,
+      limit: this.parseLimit(limit),
+    });
+
+    return {
+      success: true,
+      data: data.map((item) => this.serializeAccessChangeRequest(item)),
+    };
+  }
+
+  @Post('access-change-requests/:id/approve')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
+  @Permissions(Permission.USERS_UPDATE)
+  @ApiOperation({ summary: 'Aprovar alteracao sensivel de acesso e aplicar mudanca' })
+  @ApiResponse({ status: 200, description: 'Solicitacao aprovada e aplicada com sucesso' })
+  async aprovarSolicitacaoAcesso(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body()
+    body: {
+      reason?: string;
+    },
+  ) {
+    const result = await this.usersService.approveAccessChangeRequest({
+      requestId: id,
+      empresaId: user.empresa_id,
+      approver: {
+        id: user.id,
+        nome: user.nome,
+        email: user.email,
+      },
+      decisionReason: this.normalizeOptionalReason(body?.reason),
+    });
+
+    return {
+      success: true,
+      data: {
+        request: this.serializeAccessChangeRequest(result.request),
+        applied_user: this.sanitizeUser(result.appliedUser),
+      },
+      message: 'Solicitacao aprovada e aplicada com sucesso',
+    };
+  }
+
+  @Post('access-change-requests/:id/reject')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
+  @Permissions(Permission.USERS_UPDATE)
+  @ApiOperation({ summary: 'Rejeitar alteracao sensivel de acesso' })
+  @ApiResponse({ status: 200, description: 'Solicitacao rejeitada com sucesso' })
+  async rejeitarSolicitacaoAcesso(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body()
+    body: {
+      reason?: string;
+    },
+  ) {
+    const request = await this.usersService.rejectAccessChangeRequest({
+      requestId: id,
+      empresaId: user.empresa_id,
+      reviewer: {
+        id: user.id,
+        nome: user.nome,
+        email: user.email,
+      },
+      decisionReason: this.normalizeOptionalReason(body?.reason),
+    });
+
+    return {
+      success: true,
+      data: this.serializeAccessChangeRequest(request),
+      message: 'Solicitacao rejeitada com sucesso',
+    };
+  }
+
   @Post()
   @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
   @Permissions(Permission.USERS_CREATE)
@@ -994,14 +1335,46 @@ export class UsersController {
     const normalizedPermissions = this.normalizeAndValidateAssignablePermissions(
       user,
       payload.permissoes,
+      payload.role,
     );
     if (normalizedPermissions !== undefined) {
       payload.permissoes = normalizedPermissions;
     }
 
+    const requiresDualApproval =
+      await this.usersService.isDualApprovalRequiredForAccessChanges(user.empresa_id);
+    if (requiresDualApproval) {
+      const request = await this.usersService.createAccessChangeRequest({
+        empresaId: user.empresa_id,
+        action: UserAccessChangeAction.USER_CREATE,
+        requestedByUser: {
+          id: user.id,
+          nome: user.nome,
+          email: user.email,
+        },
+        requestPayload: {
+          ...payload,
+          empresa_id: user.empresa_id,
+        },
+      });
+
+      return {
+        success: true,
+        data: this.serializeAccessChangeRequest(request),
+        message: 'Solicitacao registrada e pendente de segunda aprovacao',
+      };
+    }
+
     const novoUsuario = await this.usersService.criar({
       ...payload,
       empresa_id: user.empresa_id,
+    }, {
+      actor: {
+        id: user.id,
+        nome: user.nome,
+        email: user.email,
+      },
+      source: 'users.controller.criarUsuario',
     });
 
     return {
@@ -1021,7 +1394,7 @@ export class UsersController {
     @Param('id') id: string,
     @Body() dadosAtualizacao: any,
   ) {
-    await this.ensureCanManageUser(user, id, 'atualizar');
+    const targetUser = await this.ensureCanManageUser(user, id, 'atualizar');
     const payload = this.sanitizeUserAdminUpdatePayload(dadosAtualizacao);
     if (payload.role !== undefined) {
       this.ensureCanAssignRole(user, payload.role);
@@ -1029,15 +1402,47 @@ export class UsersController {
     const normalizedPermissions = this.normalizeAndValidateAssignablePermissions(
       user,
       payload.permissoes,
+      payload.role ?? targetUser.role,
     );
     if (normalizedPermissions !== undefined) {
       payload.permissoes = normalizedPermissions;
+    }
+
+    const requiresDualApproval =
+      await this.usersService.isDualApprovalRequiredForAccessChanges(user.empresa_id);
+    const isSensitiveUpdate = this.usersService.isSensitiveAccessChangePayload(payload);
+    if (requiresDualApproval && isSensitiveUpdate) {
+      const request = await this.usersService.createAccessChangeRequest({
+        empresaId: user.empresa_id,
+        action: UserAccessChangeAction.USER_UPDATE,
+        requestedByUser: {
+          id: user.id,
+          nome: user.nome,
+          email: user.email,
+        },
+        targetUserId: targetUser.id,
+        requestPayload: payload,
+      });
+
+      return {
+        success: true,
+        data: this.serializeAccessChangeRequest(request),
+        message: 'Solicitacao registrada e pendente de segunda aprovacao',
+      };
     }
 
     const usuarioAtualizado = await this.usersService.atualizar(
       id,
       payload,
       user.empresa_id,
+      {
+        actor: {
+          id: user.id,
+          nome: user.nome,
+          email: user.email,
+        },
+        source: 'users.controller.atualizarUsuario',
+      },
     );
     return {
       success: true,
@@ -1054,7 +1459,14 @@ export class UsersController {
   async resetarSenha(@CurrentUser() user: User, @Param('id') id: string) {
     await this.ensureCanManageUser(user, id, 'resetar senha de');
 
-    const novaSenha = await this.usersService.resetarSenha(id, user.empresa_id);
+    const novaSenha = await this.usersService.resetarSenha(id, user.empresa_id, {
+      actor: {
+        id: user.id,
+        nome: user.nome,
+        email: user.email,
+      },
+      source: 'users.controller.resetarSenha',
+    });
     return {
       success: true,
       data: { novaSenha },
@@ -1073,7 +1485,14 @@ export class UsersController {
     @Body('ativo') ativo: boolean,
   ) {
     await this.ensureCanManageUser(user, id, 'alterar status de');
-    const usuarioAtualizado = await this.usersService.alterarStatus(id, ativo, user.empresa_id);
+    const usuarioAtualizado = await this.usersService.alterarStatus(id, ativo, user.empresa_id, {
+      actor: {
+        id: user.id,
+        nome: user.nome,
+        email: user.email,
+      },
+      source: 'users.controller.alterarStatusUsuario',
+    });
     return {
       success: true,
       data: this.sanitizeUser(usuarioAtualizado),

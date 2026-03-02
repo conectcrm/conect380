@@ -90,6 +90,17 @@ describe('permissions governance', () => {
     expect(invalidRoleDefaults).toEqual([]);
   });
 
+  it('mantem role admin com menor privilegio operacional por default', () => {
+    const adminDefaults = new Set(ROLE_DEFAULT_PERMISSIONS.admin);
+
+    expect(adminDefaults.has(Permission.USERS_READ)).toBe(true);
+    expect(adminDefaults.has(Permission.CONFIG_EMPRESA_UPDATE)).toBe(true);
+    expect(adminDefaults.has(Permission.CRM_CLIENTES_READ)).toBe(false);
+    expect(adminDefaults.has(Permission.COMERCIAL_PROPOSTAS_READ)).toBe(false);
+    expect(adminDefaults.has(Permission.FINANCEIRO_PAGAMENTOS_READ)).toBe(false);
+    expect(adminDefaults.has(Permission.ATENDIMENTO_TICKETS_READ)).toBe(false);
+  });
+
   it('mantem tokens legados atribuiveis consistentes no catalogo', () => {
     const legacyOptionValues = PERMISSION_CATALOG.groups.flatMap((group) =>
       group.options.filter((option) => option.legacy).map((option) => option.value),

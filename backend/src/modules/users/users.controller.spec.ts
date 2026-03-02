@@ -8,6 +8,14 @@ describe('UsersController Security', () => {
     criar: jest.fn(),
     findOne: jest.fn(),
     atualizar: jest.fn(),
+    isDualApprovalRequiredForAccessChanges: jest.fn().mockResolvedValue(false),
+    isSensitiveAccessChangePayload: jest.fn((payload: Record<string, unknown>) =>
+      ['role', 'permissoes', 'ativo', 'deve_trocar_senha'].some((field) => field in (payload ?? {})),
+    ),
+    createAccessChangeRequest: jest.fn(),
+    listAccessChangeRequests: jest.fn(),
+    approveAccessChangeRequest: jest.fn(),
+    rejectAccessChangeRequest: jest.fn(),
     listarComFiltros: jest.fn(),
     obterEstatisticas: jest.fn(),
     listarAtendentes: jest.fn(),
@@ -18,6 +26,7 @@ describe('UsersController Security', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    usersServiceMock.isDualApprovalRequiredForAccessChanges.mockResolvedValue(false);
     controller = new UsersController(usersServiceMock as any);
   });
 
@@ -74,6 +83,54 @@ describe('UsersController Security', () => {
     expect(result.data.senha).toBeUndefined();
   });
 
+  it('registra solicitacao pendente ao criar usuario quando dupla aprovacao estiver ativa', async () => {
+    const admin = {
+      id: 'admin-1',
+      nome: 'Admin',
+      email: 'admin@empresa.com',
+      role: UserRole.ADMIN,
+      empresa_id: 'empresa-1',
+    } as any;
+
+    usersServiceMock.isDualApprovalRequiredForAccessChanges.mockResolvedValue(true);
+    usersServiceMock.createAccessChangeRequest.mockResolvedValue({
+      id: 'request-1',
+      empresaId: 'empresa-1',
+      action: 'USER_CREATE',
+      status: 'REQUESTED',
+      targetUserId: null,
+      requestPayload: { nome: 'Novo Usuario', senha: '$2b$10$fakehash' },
+      requestReason: null,
+      decisionReason: null,
+      decidedAt: null,
+      appliedAt: null,
+      appliedUserId: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      requestedByUser: null,
+      decidedByUser: null,
+      targetUser: null,
+      appliedUser: null,
+    });
+
+    const result = await controller.criarUsuario(admin, {
+      nome: 'Novo Usuario',
+      email: 'novo@empresa.com',
+      senha: '123456',
+      role: UserRole.VENDEDOR,
+    });
+
+    expect(usersServiceMock.criar).not.toHaveBeenCalled();
+    expect(usersServiceMock.createAccessChangeRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        empresaId: 'empresa-1',
+        action: 'USER_CREATE',
+      }),
+    );
+    expect(result.message).toContain('pendente');
+    expect(result.data.request_payload.senha).toBe('[REDACTED]');
+  });
+
   it('impede admin de gerenciar outro admin da mesma empresa', async () => {
     const admin = {
       id: 'admin-1',
@@ -128,6 +185,62 @@ describe('UsersController Security', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it('permite admin conceder permissoes padrao de role gerenciavel', async () => {
+    const admin = {
+      id: 'admin-1',
+      role: UserRole.ADMIN,
+      empresa_id: 'empresa-1',
+    } as any;
+
+    usersServiceMock.criar.mockResolvedValue({
+      id: 'novo-financeiro',
+      nome: 'Financeiro',
+      email: 'financeiro@empresa.com',
+      role: UserRole.FINANCEIRO,
+      empresa_id: 'empresa-1',
+      permissoes: ['financeiro.pagamentos.read', 'financeiro.pagamentos.manage'],
+    });
+
+    await controller.criarUsuario(admin, {
+      nome: 'Financeiro',
+      email: 'financeiro@empresa.com',
+      senha: '123456',
+      role: UserRole.FINANCEIRO,
+      permissoes: ['financeiro.pagamentos.read', 'financeiro.pagamentos.manage'],
+    });
+
+    expect(usersServiceMock.criar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: UserRole.FINANCEIRO,
+        permissoes: expect.arrayContaining(['financeiro.pagamentos.read', 'financeiro.pagamentos.manage']),
+      }),
+      expect.objectContaining({
+        source: 'users.controller.criarUsuario',
+        actor: expect.objectContaining({
+          id: 'admin-1',
+        }),
+      }),
+    );
+  });
+
+  it('impede admin de conceder permissao fora do template do perfil alvo', async () => {
+    const admin = {
+      id: 'admin-1',
+      role: UserRole.ADMIN,
+      empresa_id: 'empresa-1',
+    } as any;
+
+    await expect(
+      controller.criarUsuario(admin, {
+        nome: 'Financeiro',
+        email: 'financeiro2@empresa.com',
+        senha: '123456',
+        role: UserRole.FINANCEIRO,
+        permissoes: ['atendimento.dlq.manage'],
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
   it('normaliza aliases legados de permissao antes de criar usuario', async () => {
     const admin = {
       id: 'admin-1',
@@ -160,6 +273,12 @@ describe('UsersController Security', () => {
           'comercial.propostas.read',
         ]),
       }),
+      expect.objectContaining({
+        source: 'users.controller.criarUsuario',
+        actor: expect.objectContaining({
+          id: 'admin-1',
+        }),
+      }),
     );
   });
 
@@ -181,6 +300,56 @@ describe('UsersController Security', () => {
         permissoes: ['PERMISSAO_FANTASMA'],
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('registra solicitacao pendente ao atualizar acesso sensivel quando dupla aprovacao estiver ativa', async () => {
+    const admin = {
+      id: 'admin-1',
+      nome: 'Admin',
+      email: 'admin@empresa.com',
+      role: UserRole.ADMIN,
+      empresa_id: 'empresa-1',
+    } as any;
+
+    usersServiceMock.findOne.mockResolvedValue({
+      id: 'user-3',
+      role: UserRole.VENDEDOR,
+      empresa_id: 'empresa-1',
+    });
+    usersServiceMock.isDualApprovalRequiredForAccessChanges.mockResolvedValue(true);
+    usersServiceMock.createAccessChangeRequest.mockResolvedValue({
+      id: 'request-2',
+      empresaId: 'empresa-1',
+      action: 'USER_UPDATE',
+      status: 'REQUESTED',
+      targetUserId: 'user-3',
+      requestPayload: { role: UserRole.SUPORTE },
+      requestReason: null,
+      decisionReason: null,
+      decidedAt: null,
+      appliedAt: null,
+      appliedUserId: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      requestedByUser: null,
+      decidedByUser: null,
+      targetUser: null,
+      appliedUser: null,
+    });
+
+    const result = await controller.atualizarUsuario(admin, 'user-3', {
+      role: UserRole.SUPORTE,
+    });
+
+    expect(usersServiceMock.atualizar).not.toHaveBeenCalled();
+    expect(usersServiceMock.createAccessChangeRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        empresaId: 'empresa-1',
+        action: 'USER_UPDATE',
+        targetUserId: 'user-3',
+      }),
+    );
+    expect(result.message).toContain('pendente');
   });
 
   it('aplica escopo de leitura de time para gerente na listagem', async () => {
