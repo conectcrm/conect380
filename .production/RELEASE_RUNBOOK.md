@@ -76,3 +76,38 @@ Padronizar a subida de ajustes do ambiente de testes para produção sem perda d
 - Status dos containers após deploy.
 - Resultado dos endpoints críticos.
 - Confirmação de purge do Cloudflare.
+
+## Deploy sem re-informar dados (perfil local)
+Use o fluxo de perfil local para rodar o deploy sem repetir IP/usuario/chave.
+
+- Guia: `.production/DEPLOY_AGENT_PROFILE.md`
+- Atalho recomendado: `.\.production\scripts\release-production.ps1 -Execute`
+
+## Execucao recomendada (deploy + smoke ADM-303)
+Para validar o fluxo administrativo critico imediatamente apos o deploy, execute com smoke ADM-303 habilitado:
+
+```powershell
+.\.production\scripts\release-production.ps1 `
+  -ProfileName production `
+  -AllowDirtyWorktree `
+  -SkipPreflight `
+  -Execute `
+  -RunAdm303Smoke `
+  -Adm303BaseUrl "https://api.conect360.com" `
+  -Adm303RequesterEmail "<requester@email>" `
+  -Adm303RequesterPassword "<senha>" `
+  -Adm303ApproverEmail "<approver@email>" `
+  -Adm303ApproverPassword "<senha>" `
+  -Adm303TargetEmail "<target@email>" `
+  -Adm303TargetPassword "<senha>"
+```
+
+Opcao sem credenciais na linha de comando:
+- configurar `Adm303Smoke` no `deploy-profile.local.psd1` e executar apenas:
+  - `.\.production\scripts\release-production.ps1 -ProfileName production -Execute`
+- referencia: `.production/RELEASE_ADM303_POST_DEPLOY_SMOKE.md`
+
+## Checklist complementar
+- ADM-303 break-glass rollout:
+  - `.production/ADM303_BREAK_GLASS_ROLLOUT_CHECKLIST.md`
+  - smoke automatizado: `.production/scripts/smoke-adm303-break-glass.ps1`
