@@ -185,11 +185,25 @@ export class ProdutosService {
   }
 
   async findByStatus(status: string, empresaId: string): Promise<Produto[]> {
-    const ativo = status !== 'inativo';
-    const produtos = await this.produtoRepository.find({
-      where: { ativo, empresaId },
-      order: { nome: 'ASC' },
-    });
+    const normalizedStatus = (status || '').trim().toLowerCase();
+
+    const query = this.produtoRepository
+      .createQueryBuilder('produto')
+      .where('produto.empresa_id = :empresaId', { empresaId });
+
+    if (normalizedStatus === 'ativo') {
+      query.andWhere('(produto.status = :status OR (produto.status IS NULL AND produto.ativo = true))', {
+        status: 'ativo',
+      });
+    } else if (normalizedStatus === 'inativo') {
+      query.andWhere('(produto.status = :status OR (produto.status IS NULL AND produto.ativo = false))', {
+        status: 'inativo',
+      });
+    } else if (normalizedStatus === 'descontinuado') {
+      query.andWhere('produto.status = :status', { status: 'descontinuado' });
+    }
+
+    const produtos = await query.orderBy('produto.nome', 'ASC').getMany();
     return produtos.map((produto) => this.normalizeProduto(produto));
   }
 
@@ -198,9 +212,13 @@ export class ProdutosService {
       where: { empresaId },
     });
 
-    const produtosAtivos = await this.produtoRepository.count({
-      where: { ativo: true, empresaId },
-    });
+    const produtosAtivos = await this.produtoRepository
+      .createQueryBuilder('produto')
+      .where('produto.empresa_id = :empresaId', { empresaId })
+      .andWhere('(produto.status = :status OR (produto.status IS NULL AND produto.ativo = true))', {
+        status: 'ativo',
+      })
+      .getCount();
 
     const valorTotal = await this.produtoRepository
       .createQueryBuilder('produto')
@@ -211,7 +229,8 @@ export class ProdutosService {
     const estoquesBaixos = await this.produtoRepository
       .createQueryBuilder('produto')
       .where('produto.empresa_id = :empresaId', { empresaId })
-      .andWhere('COALESCE(produto.estoqueAtual, 0) <= 5')
+      .andWhere("COALESCE(produto.tipoItem, 'produto') = 'produto'")
+      .andWhere('COALESCE(produto.estoque, 0) <= COALESCE(produto."estoqueMinimo", 5)')
       .getCount();
 
     return {
