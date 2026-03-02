@@ -30,6 +30,8 @@
 9. Smoke ADM-303 local (modo real) reexecutado com PASS apos ajustes operacionais:
    - `docs/features/evidencias/ADM303_SMOKE_20260302-145832.json`
    - `docs/features/evidencias/ADM303_SMOKE_20260302-145832.md`
+10. Fluxo de release com smoke ADM-303 (dry-run) validado:
+   - `docs/features/evidencias/RELEASE_ADM303_DRYRUN_20260302-152035.md`
 
 ## 3. Itens pendentes para go-live
 

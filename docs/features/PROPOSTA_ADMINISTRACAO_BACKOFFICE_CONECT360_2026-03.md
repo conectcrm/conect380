@@ -291,6 +291,8 @@ Diretriz recomendada:
      - `docs/features/evidencias/ADM303_SMOKE_20260302-145832.md`
    - evidencia operacional do deploy ADM-301:
      - `docs/features/evidencias/ADM301_DEPLOY_ADMIN_WEB_20260302-132151.md`
+   - dry-run do release com smoke ADM-303 integrado: PASS:
+     - `docs/features/evidencias/RELEASE_ADM303_DRYRUN_20260302-152035.md`
 
 3. Ajustes tecnicos aplicados no fechamento:
    - script oficial de smoke ADM-303 atualizado para compatibilidade com PowerShell 5.1 em `.production/scripts/smoke-adm303-break-glass.ps1`;
