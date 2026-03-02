@@ -177,9 +177,22 @@ class ProdutosService {
     return {
       id: produto.id,
       nome: produto.nome,
+      tipoItem: (produto.tipoItem || 'produto') as
+        | 'produto'
+        | 'servico'
+        | 'licenca'
+        | 'modulo'
+        | 'aplicativo',
       categoria: produto.categoria,
       preco: produto.preco,
       custoUnitario: produto.custoUnitario,
+      frequencia: (produto.frequencia || 'unico') as 'unico' | 'mensal' | 'anual',
+      unidadeMedida: (produto.unidadeMedida || 'unidade') as
+        | 'unidade'
+        | 'saca'
+        | 'hectare'
+        | 'pacote'
+        | 'licenca',
       estoque: {
         atual: produto.estoqueAtual,
         minimo: produto.estoqueMinimo,

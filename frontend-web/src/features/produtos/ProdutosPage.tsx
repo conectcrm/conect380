@@ -48,9 +48,12 @@ interface ProdutoFormData {
 interface ProdutoLegacy {
   id: string;
   nome: string;
+  tipoItem: 'produto' | 'servico' | 'licenca' | 'modulo' | 'aplicativo';
   categoria: string;
   preco: number;
   custoUnitario: number;
+  frequencia: 'unico' | 'mensal' | 'anual';
+  unidadeMedida: 'unidade' | 'saca' | 'hectare' | 'pacote' | 'licenca';
   estoque: {
     atual: number;
     minimo: number;
@@ -86,6 +89,14 @@ const statusConfig = {
   },
 };
 
+const tipoItemConfig = {
+  produto: 'Produto',
+  servico: 'Serviço',
+  licenca: 'Licença',
+  modulo: 'Módulo',
+  aplicativo: 'Aplicativo',
+};
+
 const ProdutosPage: React.FC = () => {
   const navigate = useNavigate();
   const { confirmationState, showConfirmation } = useConfirmation();
@@ -103,6 +114,7 @@ const ProdutosPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
+  const [tipoFilter, setTipoFilter] = useState<string>('todos');
   const [categoriaFilter, setCategoriaFilter] = useState<string>('todas');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -152,19 +164,25 @@ const ProdutosPage: React.FC = () => {
         produto.fornecedor.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesStatus = statusFilter === 'todos' || produto.status === statusFilter;
+      const matchesTipo = tipoFilter === 'todos' || produto.tipoItem === tipoFilter;
       const matchesCategoria = categoriaFilter === 'todas' || produto.categoria === categoriaFilter;
 
-      return matchesSearch && matchesStatus && matchesCategoria;
+      return matchesSearch && matchesStatus && matchesTipo && matchesCategoria;
     });
-  }, [produtos, searchTerm, statusFilter, categoriaFilter]);
+  }, [produtos, searchTerm, statusFilter, tipoFilter, categoriaFilter]);
 
   const categorias = useMemo(
     () => Array.from(new Set(produtos.map((produto) => produto.categoria))),
     [produtos],
   );
 
+  const tipos = useMemo(() => Array.from(new Set(produtos.map((produto) => produto.tipoItem))), [produtos]);
+
   const hasFilters =
-    searchTerm.trim().length > 0 || statusFilter !== 'todos' || categoriaFilter !== 'todas';
+    searchTerm.trim().length > 0 ||
+    statusFilter !== 'todos' ||
+    tipoFilter !== 'todos' ||
+    categoriaFilter !== 'todas';
 
   const totalPages = Math.max(1, Math.ceil(produtosFiltrados.length / itemsPerPage));
 
@@ -175,7 +193,7 @@ const ProdutosPage: React.FC = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, categoriaFilter, itemsPerPage]);
+  }, [searchTerm, statusFilter, tipoFilter, categoriaFilter, itemsPerPage]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -186,6 +204,7 @@ const ProdutosPage: React.FC = () => {
   const handleClearFilters = () => {
     setSearchTerm('');
     setStatusFilter('todos');
+    setTipoFilter('todos');
     setCategoriaFilter('todas');
     setCurrentPage(1);
   };
@@ -286,7 +305,7 @@ const ProdutosPage: React.FC = () => {
   };
 
   const getEstoqueStatus = (produto: ProdutoLegacy) => {
-    if (produto.categoria === 'Serviços') return null;
+    if (produto.tipoItem !== 'produto') return null;
 
     if (produto.estoque.atual <= produto.estoque.minimo) {
       return { label: 'Baixo', color: 'text-[#002333]', icon: AlertTriangle };
@@ -318,11 +337,11 @@ const ProdutosPage: React.FC = () => {
     setProdutoParaEditar({
       produtoId: produto.id,
       nome: produto.nome,
-      tipoItem: 'produto', // Mapear para as opções do novo modal
+      tipoItem: produto.tipoItem,
       categoria: produto.categoria,
       precoUnitario: produto.preco,
-      frequencia: 'unico',
-      unidadeMedida: 'unidade',
+      frequencia: produto.frequencia,
+      unidadeMedida: produto.unidadeMedida,
       status: produto.status === 'ativo',
       descricao: produto.descricao,
       tags: [],
@@ -440,10 +459,10 @@ const ProdutosPage: React.FC = () => {
           title={
             <span className="inline-flex items-center gap-2">
               <Package className="h-6 w-6 text-[#159A9C]" />
-              Produtos
+              Catálogo de Itens
             </span>
           }
-          description="Gestão completa do catálogo de produtos e serviços"
+          description="Gestão completa de produtos, serviços, planos, licenças, módulos e aplicativos"
           actions={
             <>
               <button
@@ -467,7 +486,7 @@ const ProdutosPage: React.FC = () => {
                 onClick={handleNovoProduto}
               >
                 <Plus className="h-4 w-4" />
-                Novo Produto
+                Novo Item
               </button>
             </>
           }
@@ -483,8 +502,8 @@ const ProdutosPage: React.FC = () => {
       </SectionCard>
 
       <FiltersBar className="p-4">
-        <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-3">
-          <div className="lg:col-span-2">
+        <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-4">
+          <div className="lg:col-span-2 xl:col-span-2">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8FA6B2]" />
               <input
@@ -497,7 +516,7 @@ const ProdutosPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row lg:flex-col xl:flex-row">
+          <div className="flex flex-col gap-3 sm:flex-row lg:col-span-2 xl:col-span-2">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -507,6 +526,19 @@ const ProdutosPage: React.FC = () => {
               <option value="ativo">Ativo</option>
               <option value="inativo">Inativo</option>
               <option value="descontinuado">Descontinuado</option>
+            </select>
+
+            <select
+              value={tipoFilter}
+              onChange={(e) => setTipoFilter(e.target.value)}
+              className="h-10 rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+            >
+              <option value="todos">Todos os Tipos</option>
+              {tipos.map((tipo) => (
+                <option key={tipo} value={tipo}>
+                  {tipoItemConfig[tipo as keyof typeof tipoItemConfig] || tipo}
+                </option>
+              ))}
             </select>
 
             <select
@@ -539,7 +571,7 @@ const ProdutosPage: React.FC = () => {
         <div className="border-b border-[#E1EAEE] bg-[#F8FBFC] px-4 py-3 sm:px-5">
           <div className="flex flex-wrap items-center gap-3 text-sm text-[#516F7D]">
             <h3 className="text-sm font-semibold text-[#1B3B4E]">
-              Lista de Produtos ({produtosFiltrados.length})
+              Lista de Itens ({produtosFiltrados.length})
             </h3>
             {hasFilters && (
               <span className="rounded-full border border-[#CDE6DF] bg-[#ECF7F3] px-2 py-0.5 text-xs font-medium text-[#0F7B7D]">
@@ -567,10 +599,10 @@ const ProdutosPage: React.FC = () => {
           <div className="p-4 sm:p-5">
             <EmptyState
               icon={<Package className="h-5 w-5" />}
-              title="Nenhum produto encontrado"
+              title="Nenhum item encontrado"
               description={
                 produtos.length === 0
-                  ? 'Comece criando seu primeiro produto.'
+                  ? 'Comece criando seu primeiro item.'
                   : 'Tente ajustar os filtros ou termos de busca.'
               }
             />
@@ -599,6 +631,12 @@ const ProdutosPage: React.FC = () => {
 
                     <div className="grid grid-cols-2 gap-3 text-xs text-[#486978]">
                       <div>
+                        <p className="text-[#6B8693]">Tipo</p>
+                        <p className="font-medium text-[#1E3A4B]">
+                          {tipoItemConfig[produto.tipoItem] || produto.tipoItem}
+                        </p>
+                      </div>
+                      <div>
                         <p className="text-[#6B8693]">Categoria</p>
                         <p className="font-medium text-[#1E3A4B]">{produto.categoria}</p>
                       </div>
@@ -609,7 +647,7 @@ const ProdutosPage: React.FC = () => {
                       <div>
                         <p className="text-[#6B8693]">Estoque</p>
                         <p className="font-medium text-[#1E3A4B]">
-                          {produto.categoria === 'Serviços' ? 'N/A' : `${produto.estoque.atual} un.`}
+                          {produto.tipoItem === 'produto' ? `${produto.estoque.atual} un.` : 'N/A'}
                         </p>
                       </div>
                       <div>
@@ -651,7 +689,10 @@ const ProdutosPage: React.FC = () => {
                 <thead className="sticky top-0 z-10 bg-[#DEEFE7]">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-[#002333] uppercase tracking-wider">
-                      Produto
+                      Item
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-[#002333] uppercase tracking-wider">
+                      Tipo
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-[#002333] uppercase tracking-wider">
                       Categoria
@@ -691,6 +732,11 @@ const ProdutosPage: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="text-sm text-[#002333] font-medium">
+                            {tipoItemConfig[produto.tipoItem] || produto.tipoItem}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="text-sm text-[#002333] font-medium">
                             {produto.categoria}
                           </span>
                         </td>
@@ -703,7 +749,7 @@ const ProdutosPage: React.FC = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          {produto.categoria === 'Serviços' ? (
+                          {produto.tipoItem !== 'produto' ? (
                             <span className="text-sm text-[#002333]/70">N/A</span>
                           ) : (
                             <div className="text-sm">
@@ -829,6 +875,12 @@ const ProdutosPage: React.FC = () => {
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
+                    <h4 className="text-sm font-semibold text-[#002333]">Tipo</h4>
+                    <p className="text-sm text-[#002333]/70">
+                      {tipoItemConfig[selectedProduto.tipoItem] || selectedProduto.tipoItem}
+                    </p>
+                  </div>
+                  <div>
                     <h4 className="text-sm font-semibold text-[#002333]">SKU</h4>
                     <p className="text-sm text-[#002333]/70">{selectedProduto.sku}</p>
                   </div>
@@ -853,7 +905,7 @@ const ProdutosPage: React.FC = () => {
                   </div>
                 </div>
 
-                {selectedProduto.categoria !== 'Serviços' && (
+                {selectedProduto.tipoItem === 'produto' && (
                   <div>
                     <h4 className="text-sm font-semibold text-[#002333]">Estoque</h4>
                     <p className="text-sm text-[#002333]/70">

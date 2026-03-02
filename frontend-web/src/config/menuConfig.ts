@@ -760,7 +760,8 @@ export const menuConfig: MenuConfig[] = [
       },
       {
         id: 'comercial-produtos',
-        title: 'Produtos',
+        title: 'Catálogo de Itens',
+        shortTitle: 'Itens',
         icon: ShoppingBag,
         href: '/vendas/produtos',
         color: 'blue',
