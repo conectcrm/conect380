@@ -896,7 +896,6 @@ const ProdutosPage: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
       )}
 
       {/* Modal de Cadastro/Edição - Landscape */}
@@ -918,4 +917,3 @@ const ProdutosPage: React.FC = () => {
 };
 
 export default ProdutosPage;
-
