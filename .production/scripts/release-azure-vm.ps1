@@ -9,6 +9,18 @@ param(
   [switch]$SkipBackup,
   [switch]$NoCacheBuild,
   [switch]$AllowDirtyWorktree,
+  [switch]$RunAdm303Smoke,
+  [string]$Adm303BaseUrl = "https://api.conect360.com",
+  [string]$Adm303RequesterEmail,
+  [string]$Adm303RequesterPassword,
+  [string]$Adm303RequesterMfaCode,
+  [string]$Adm303ApproverEmail,
+  [string]$Adm303ApproverPassword,
+  [string]$Adm303ApproverMfaCode,
+  [string]$Adm303TargetEmail,
+  [string]$Adm303TargetPassword,
+  [string]$Adm303TargetMfaCode,
+  [switch]$Adm303SkipTargetAccessCheck,
   [switch]$Execute
 )
 
@@ -91,6 +103,31 @@ function Invoke-Remote {
   if ($LASTEXITCODE -ne 0) {
     throw "Falha em comando remoto."
   }
+}
+
+function Ensure-RequiredValue {
+  param(
+    [string]$Name,
+    [string]$Value
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Value)) {
+    throw "Parametro obrigatorio ausente para smoke ADM-303: $Name"
+  }
+}
+
+function Mask-SecretValue {
+  param([string]$Value)
+
+  if ([string]::IsNullOrWhiteSpace($Value)) {
+    return "<vazio>"
+  }
+
+  if ($Value.Length -le 2) {
+    return "**"
+  }
+
+  return ($Value.Substring(0, 1) + ("*" * ($Value.Length - 2)) + $Value.Substring($Value.Length - 1, 1))
 }
 
 Require-Command git
@@ -246,6 +283,67 @@ docker compose ps
 
 if (Test-Path $artifactPath) {
   Remove-Item $artifactPath -Force
+}
+
+if ($RunAdm303Smoke) {
+  Ensure-RequiredValue -Name "Adm303RequesterEmail" -Value $Adm303RequesterEmail
+  Ensure-RequiredValue -Name "Adm303RequesterPassword" -Value $Adm303RequesterPassword
+  Ensure-RequiredValue -Name "Adm303ApproverEmail" -Value $Adm303ApproverEmail
+  Ensure-RequiredValue -Name "Adm303ApproverPassword" -Value $Adm303ApproverPassword
+  Ensure-RequiredValue -Name "Adm303TargetEmail" -Value $Adm303TargetEmail
+  Ensure-RequiredValue -Name "Adm303TargetPassword" -Value $Adm303TargetPassword
+
+  $smokeScriptPath = Join-Path $repoRoot ".production\scripts\smoke-adm303-break-glass.ps1"
+  if (-not (Test-Path $smokeScriptPath)) {
+    throw "Script de smoke ADM-303 nao encontrado: $smokeScriptPath"
+  }
+
+  if (-not $Execute) {
+    Run-Step -Title "Dry-run do smoke ADM-303 pos-deploy" -Action {
+      Write-Host "Smoke sera executado com os parametros abaixo (senhas mascaradas):"
+      Write-Host "  BaseUrl: $Adm303BaseUrl"
+      Write-Host "  RequesterEmail: $Adm303RequesterEmail"
+      Write-Host "  RequesterPassword: $(Mask-SecretValue -Value $Adm303RequesterPassword)"
+      Write-Host "  ApproverEmail: $Adm303ApproverEmail"
+      Write-Host "  ApproverPassword: $(Mask-SecretValue -Value $Adm303ApproverPassword)"
+      Write-Host "  TargetEmail: $Adm303TargetEmail"
+      Write-Host "  TargetPassword: $(Mask-SecretValue -Value $Adm303TargetPassword)"
+      if ($Adm303SkipTargetAccessCheck) {
+        Write-Host "  SkipTargetAccessCheck: true"
+      }
+    }
+  }
+  else {
+    Run-Step -Title "Executar smoke ADM-303 pos-deploy" -Action {
+      $smokeParams = @{
+        BaseUrl = $Adm303BaseUrl
+        RequesterEmail = $Adm303RequesterEmail
+        RequesterPassword = $Adm303RequesterPassword
+        ApproverEmail = $Adm303ApproverEmail
+        ApproverPassword = $Adm303ApproverPassword
+        TargetEmail = $Adm303TargetEmail
+        TargetPassword = $Adm303TargetPassword
+      }
+
+      if (-not [string]::IsNullOrWhiteSpace($Adm303RequesterMfaCode)) {
+        $smokeParams.RequesterMfaCode = $Adm303RequesterMfaCode
+      }
+      if (-not [string]::IsNullOrWhiteSpace($Adm303ApproverMfaCode)) {
+        $smokeParams.ApproverMfaCode = $Adm303ApproverMfaCode
+      }
+      if (-not [string]::IsNullOrWhiteSpace($Adm303TargetMfaCode)) {
+        $smokeParams.TargetMfaCode = $Adm303TargetMfaCode
+      }
+      if ($Adm303SkipTargetAccessCheck) {
+        $smokeParams.SkipTargetAccessCheck = $true
+      }
+
+      & $smokeScriptPath @smokeParams
+      if ($LASTEXITCODE -ne 0) {
+        throw "Smoke ADM-303 pos-deploy falhou."
+      }
+    }
+  }
 }
 
 Write-Host ""
