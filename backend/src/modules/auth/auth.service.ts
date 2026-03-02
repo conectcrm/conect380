@@ -38,6 +38,8 @@ type MfaChallengeResponseData = {
   email: string;
   expiresInSeconds: number;
   canResendAfterSeconds: number;
+  deliveryChannel?: 'email' | 'dev_fallback';
+  devCode?: string;
 };
 
 type TokenIssueContext = 'login' | 'mfa_verify' | 'refresh';
@@ -113,6 +115,15 @@ export class AuthService {
 
   private isLoginLockoutEnabled(): boolean {
     return this.parseBooleanFlag(process.env.AUTH_LOGIN_LOCKOUT_ENABLED, true);
+  }
+
+  private isDevMfaFallbackEnabled(): boolean {
+    const nodeEnv = (process.env.NODE_ENV || '').trim().toLowerCase();
+    if (nodeEnv === 'production') {
+      return false;
+    }
+
+    return this.parseBooleanFlag(process.env.AUTH_MFA_DEV_FALLBACK_ENABLED, true);
   }
 
   private normalizarIp(ip?: string): string {
@@ -488,6 +499,9 @@ export class AuthService {
 
     const saved = await this.mfaLoginChallengeRepository.save(challenge);
 
+    let deliveryChannel: MfaChallengeResponseData['deliveryChannel'] = 'email';
+    let devCode: string | undefined;
+
     try {
       await this.mailService.enviarEmailCodigoMfa({
         to: user.email,
@@ -495,10 +509,21 @@ export class AuthService {
         codigo,
         expiracaoMinutos: MFA_LOGIN_CODE_EXPIRATION_MINUTES,
       });
-    } catch {
-      await this.mfaLoginChallengeRepository.update(saved.id, { usedAt: new Date() });
-      throw new UnauthorizedException(
-        'Nao foi possivel concluir a validacao em duas etapas. Tente novamente.',
+    } catch (error) {
+      if (!this.isDevMfaFallbackEnabled()) {
+        await this.mfaLoginChallengeRepository.update(saved.id, { usedAt: new Date() });
+        throw new UnauthorizedException(
+          'Nao foi possivel concluir a validacao em duas etapas. Tente novamente.',
+        );
+      }
+
+      deliveryChannel = 'dev_fallback';
+      devCode = codigo;
+      this.logger.warn(
+        `Falha ao enviar e-mail MFA para ${this.maskEmail(user.email)}. ` +
+          `Fallback de desenvolvimento habilitado (challengeId=${saved.id}, codigo=${codigo}). Detalhes: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
       );
     }
 
@@ -514,6 +539,8 @@ export class AuthService {
       email: this.maskEmail(user.email),
       expiresInSeconds: MFA_LOGIN_CODE_EXPIRATION_MINUTES * 60,
       canResendAfterSeconds: MFA_LOGIN_RESEND_COOLDOWN_SECONDS,
+      deliveryChannel,
+      devCode,
     };
   }
 
