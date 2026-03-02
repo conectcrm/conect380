@@ -1,0 +1,96 @@
+﻿{
+    "started_at":  "2026-03-02T14:56:47",
+    "finished_at":  "2026-03-02T14:56:48",
+    "base_url":  "http://localhost:3001",
+    "requester_email":  "teste@teste.com",
+    "approver_email":  "admin@conectsuite.com.br",
+    "target_email":  "lucas@gmail.com",
+    "target_user_id":  "",
+    "request_id":  "",
+    "permission":  "admin.empresas.manage",
+    "duration_minutes":  20,
+    "target_companies_status_before":  -1,
+    "target_companies_status_after_approve":  -1,
+    "target_companies_status_after_revoke":  -1,
+    "dry_run":  false,
+    "results":  [
+                    {
+                        "Step":  "Login requester",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 401 em POST http://localhost:3001/auth/login. ",
+                        "Timestamp":  "2026-03-02T14:56:47"
+                    },
+                    {
+                        "Step":  "Login approver",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 401 em POST http://localhost:3001/auth/login. ",
+                        "Timestamp":  "2026-03-02T14:56:48"
+                    },
+                    {
+                        "Step":  "Login target",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 401 em POST http://localhost:3001/auth/login. ",
+                        "Timestamp":  "2026-03-02T14:56:48"
+                    },
+                    {
+                        "Step":  "Resolver target_user_id pelo admin-bff/users",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 401 em GET http://localhost:3001/admin/bff/users?limite=200\u0026pagina=1. ",
+                        "Timestamp":  "2026-03-02T14:56:48"
+                    },
+                    {
+                        "Step":  "Validar acesso alvo antes do break-glass (esperado 403)",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 401 em GET http://localhost:3001/admin/bff/companies?page=1\u0026limit=10. ",
+                        "Timestamp":  "2026-03-02T14:56:48"
+                    },
+                    {
+                        "Step":  "Criar solicitacao break-glass",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 401 em POST http://localhost:3001/admin/bff/break-glass/requests. ",
+                        "Timestamp":  "2026-03-02T14:56:48"
+                    },
+                    {
+                        "Step":  "Aprovar solicitacao break-glass com segundo responsavel",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 404 em POST http://localhost:3001/admin/bff/break-glass/requests//approve. ",
+                        "Timestamp":  "2026-03-02T14:56:48"
+                    },
+                    {
+                        "Step":  "Validar listagem de break-glass ativo",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 401 em GET http://localhost:3001/admin/bff/break-glass/active?limit=20\u0026target_user_id=. ",
+                        "Timestamp":  "2026-03-02T14:56:48"
+                    },
+                    {
+                        "Step":  "Validar acesso alvo durante vigencia (esperado 200)",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 401 em GET http://localhost:3001/admin/bff/companies?page=1\u0026limit=10. ",
+                        "Timestamp":  "2026-03-02T14:56:48"
+                    },
+                    {
+                        "Step":  "Revogar acesso break-glass ativo",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 404 em POST http://localhost:3001/admin/bff/break-glass//revoke. ",
+                        "Timestamp":  "2026-03-02T14:56:48"
+                    },
+                    {
+                        "Step":  "Validar remocao de break-glass ativo",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 401 em GET http://localhost:3001/admin/bff/break-glass/active?limit=20\u0026target_user_id=. ",
+                        "Timestamp":  "2026-03-02T14:56:48"
+                    },
+                    {
+                        "Step":  "Validar acesso alvo apos revogacao (esperado 403)",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 401 em GET http://localhost:3001/admin/bff/companies?page=1\u0026limit=10. ",
+                        "Timestamp":  "2026-03-02T14:56:48"
+                    },
+                    {
+                        "Step":  "Validar trilha de auditoria admin_break_glass",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 401 em GET http://localhost:3001/admin/bff/audit/activities?admin_only=true\u0026limit=150. ",
+                        "Timestamp":  "2026-03-02T14:56:48"
+                    }
+                ]
+}

@@ -1,0 +1,96 @@
+﻿{
+    "started_at":  "2026-03-02T14:04:11",
+    "finished_at":  "2026-03-02T14:04:15",
+    "base_url":  "https://api.conect360.com",
+    "requester_email":  "admin@conectsuite.com.br",
+    "approver_email":  "superadmin@conectsuite.com.br",
+    "target_email":  "mvp.manager.dashboard@conectsuite.com.br",
+    "target_user_id":  "",
+    "request_id":  "",
+    "permission":  "admin.empresas.manage",
+    "duration_minutes":  20,
+    "target_companies_status_before":  -1,
+    "target_companies_status_after_approve":  -1,
+    "target_companies_status_after_revoke":  -1,
+    "dry_run":  false,
+    "results":  [
+                    {
+                        "Step":  "Login requester",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 401 em POST https://api.conect360.com/auth/login. ",
+                        "Timestamp":  "2026-03-02T14:04:12"
+                    },
+                    {
+                        "Step":  "Login approver",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 401 em POST https://api.conect360.com/auth/login. ",
+                        "Timestamp":  "2026-03-02T14:04:13"
+                    },
+                    {
+                        "Step":  "Login target",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 401 em POST https://api.conect360.com/auth/login. ",
+                        "Timestamp":  "2026-03-02T14:04:13"
+                    },
+                    {
+                        "Step":  "Resolver target_user_id pelo admin-bff/users",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 401 em GET https://api.conect360.com/admin/bff/users?limite=200\u0026pagina=1. ",
+                        "Timestamp":  "2026-03-02T14:04:13"
+                    },
+                    {
+                        "Step":  "Validar acesso alvo antes do break-glass (esperado 403)",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 401 em GET https://api.conect360.com/admin/bff/companies?page=1\u0026limit=10. ",
+                        "Timestamp":  "2026-03-02T14:04:13"
+                    },
+                    {
+                        "Step":  "Criar solicitacao break-glass",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 401 em POST https://api.conect360.com/admin/bff/break-glass/requests. ",
+                        "Timestamp":  "2026-03-02T14:04:13"
+                    },
+                    {
+                        "Step":  "Aprovar solicitacao break-glass com segundo responsavel",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 404 em POST https://api.conect360.com/admin/bff/break-glass/requests//approve. ",
+                        "Timestamp":  "2026-03-02T14:04:14"
+                    },
+                    {
+                        "Step":  "Validar listagem de break-glass ativo",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 401 em GET https://api.conect360.com/admin/bff/break-glass/active?limit=20\u0026target_user_id=. ",
+                        "Timestamp":  "2026-03-02T14:04:14"
+                    },
+                    {
+                        "Step":  "Validar acesso alvo durante vigencia (esperado 200)",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 401 em GET https://api.conect360.com/admin/bff/companies?page=1\u0026limit=10. ",
+                        "Timestamp":  "2026-03-02T14:04:14"
+                    },
+                    {
+                        "Step":  "Revogar acesso break-glass ativo",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 404 em POST https://api.conect360.com/admin/bff/break-glass//revoke. ",
+                        "Timestamp":  "2026-03-02T14:04:14"
+                    },
+                    {
+                        "Step":  "Validar remocao de break-glass ativo",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 401 em GET https://api.conect360.com/admin/bff/break-glass/active?limit=20\u0026target_user_id=. ",
+                        "Timestamp":  "2026-03-02T14:04:14"
+                    },
+                    {
+                        "Step":  "Validar acesso alvo apos revogacao (esperado 403)",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 401 em GET https://api.conect360.com/admin/bff/companies?page=1\u0026limit=10. ",
+                        "Timestamp":  "2026-03-02T14:04:14"
+                    },
+                    {
+                        "Step":  "Validar trilha de auditoria admin_break_glass",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 401 em GET https://api.conect360.com/admin/bff/audit/activities?admin_only=true\u0026limit=150. ",
+                        "Timestamp":  "2026-03-02T14:04:15"
+                    }
+                ]
+}
