@@ -210,8 +210,23 @@ docker compose build $buildFlag backend frontend
 docker compose up -d backend
 docker compose run --rm backend npm run migration:run
 docker compose up -d frontend
-curl -fsS http://127.0.0.1:3500/health > /dev/null
-curl -fsS http://127.0.0.1:3000 > /dev/null
+wait_http() {
+  url="\$1"
+  attempts="\${2:-30}"
+  sleep_seconds="\${3:-2}"
+  i=1
+  while [ "\$i" -le "\$attempts" ]; do
+    if curl -fsS "\$url" > /dev/null; then
+      return 0
+    fi
+    sleep "\$sleep_seconds"
+    i=\$((i + 1))
+  done
+  echo "Endpoint nao respondeu em tempo: \$url" >&2
+  return 1
+}
+wait_http http://127.0.0.1:3500/health 30 2
+wait_http http://127.0.0.1:3000 45 2
 docker compose ps
 "@
 
