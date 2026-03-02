@@ -15,13 +15,15 @@ export class MailService {
   }
 
   constructor() {
+    const smtpPassword = process.env.SMTP_PASS || process.env.SMTP_PASSWORD;
+
     this.transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: parseInt(process.env.SMTP_PORT || '587'),
       secure: false,
       auth: {
         user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+        pass: smtpPassword,
       },
     });
   }
@@ -296,6 +298,71 @@ export class MailService {
     } catch (error) {
       this.logger.error(
         `Erro ao enviar email de recuperacao de senha para ${this.maskEmail(to)}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw error;
+    }
+  }
+
+  async enviarEmailCodigoMfa(dados: {
+    to: string;
+    usuario: string;
+    codigo: string;
+    expiracaoMinutos: number;
+  }): Promise<void> {
+    const { to, usuario, codigo, expiracaoMinutos } = dados;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Codigo de verificacao - Conect CRM</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #002333; background: #f4f7fb; }
+          .container { max-width: 560px; margin: 0 auto; padding: 24px; }
+          .card { background: #ffffff; border-radius: 12px; box-shadow: 0 12px 40px rgba(21, 154, 156, 0.12); overflow: hidden; }
+          .header { background: linear-gradient(135deg, #159A9C, #0F7B7D); color: #ffffff; padding: 24px; text-align: center; }
+          .content { padding: 28px; }
+          .code { letter-spacing: 8px; font-size: 32px; font-weight: bold; text-align: center; margin: 20px 0; color: #159A9C; }
+          .footer { padding: 18px 28px 24px 28px; background: #DEEFE7; color: #002333; font-size: 13px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="card">
+            <div class="header">
+              <h1>Verificacao em duas etapas</h1>
+            </div>
+            <div class="content">
+              <p>Ola <strong>${usuario}</strong>,</p>
+              <p>Para concluir seu login administrativo no Conect CRM, informe o codigo abaixo:</p>
+              <div class="code">${codigo}</div>
+              <p>Este codigo expira em <strong>${expiracaoMinutos} minuto${expiracaoMinutos > 1 ? 's' : ''}</strong>.</p>
+              <p>Se voce nao solicitou este acesso, ignore este e-mail e revise sua senha imediatamente.</p>
+            </div>
+            <div class="footer">
+              Conect CRM • Codigo de uso unico para autenticacao administrativa.
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const mailOptions = {
+      from: `"Conect CRM" <${process.env.SMTP_USER}>`,
+      to,
+      subject: 'Codigo de verificacao de login - Conect CRM',
+      html: htmlContent,
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+      this.logger.log(`Email de MFA enviado para ${this.maskEmail(to)}`);
+    } catch (error) {
+      this.logger.error(
+        `Erro ao enviar email de MFA para ${this.maskEmail(to)}`,
         error instanceof Error ? error.stack : String(error),
       );
       throw error;

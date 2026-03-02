@@ -44,6 +44,7 @@ import { PagamentosModule } from './modules/pagamentos/pagamentos.module';
 import { NotificationModule } from './notifications/notification.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
 import { SystemBrandingModule } from './modules/system-branding/system-branding.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 const nodeEnv = (process.env.NODE_ENV || '').toLowerCase();
 const isProduction = nodeEnv === 'production';
@@ -54,7 +55,12 @@ const throttlerShortLimit = isProduction ? 10 : 200;
     ConfigModule.forRoot({
       isGlobal: true,
       // Usa caminho absoluto para não depender do cwd (evita cair em defaults de outro DB)
-      envFilePath: path.resolve(__dirname, '..', '.env'),
+      envFilePath: [
+        path.resolve(process.cwd(), '.env'),
+        path.resolve(process.cwd(), 'backend', '.env'),
+        path.resolve(__dirname, '..', '.env'),
+        path.resolve(__dirname, '..', '..', '.env'),
+      ],
     }),
     // 📊 Winston Logger: Logs estruturados e rotação automática
     WinstonModule.forRoot(winstonConfig),
@@ -112,6 +118,7 @@ const throttlerShortLimit = isProduction ? 10 : 200;
     NotificationModule,
     MetricsModule, // 📊 Prometheus metrics endpoint
     SystemBrandingModule,
+    AdminModule,
   ],
   controllers: [HealthController, RateLimitController], // 📊 Health + Rate Limit monitoring
   providers: [

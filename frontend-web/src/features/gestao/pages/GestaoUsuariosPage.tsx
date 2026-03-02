@@ -1,12 +1,12 @@
 /**
- * GESTÃO DE USUÁRIOS - CONECT CRM
+ * GESTAO DE USUARIOS - CONECT CRM
  *
- * Tela unificada de gestão de usuários do sistema.
- * Substitui a antiga GestaoAtendentesPage, consolidando gestão de:
- * - Usuários gerais (todos os roles)
- * - Atendentes (usuários com permissão ATENDIMENTO)
+ * Tela unificada de gestao de usuarios do sistema.
+ * Substitui a antiga GestaoAtendentesPage, consolidando gestao de:
+ * - Usuarios gerais (todos os roles)
+ * - Atendentes (usuarios com permissao ATENDIMENTO)
  *
- * Padrão: HubSpot/Salesforce/Pipedrive
+ * Padrao: HubSpot/Salesforce/Pipedrive
  * Tema: Crevasse Professional
  * Cor primary: #159A9C (Crevasse-2 teal)
  */
@@ -27,6 +27,7 @@ import {
   Phone,
   Upload,
   Copy,
+  Clock3,
 } from 'lucide-react';
 import {
   DataTableCard,
@@ -40,12 +41,15 @@ import {
 import ActiveEmpresaBadge from '../../../components/tenant/ActiveEmpresaBadge';
 import { toastService } from '../../../services/toastService';
 import { usuariosService } from '../../../services/usuariosService';
+import { useAuth } from '../../../contexts/AuthContext';
 import {
+  AccessReviewReport,
   Usuario,
   NovoUsuario,
   AtualizarUsuario,
   UserRole,
   PermissionCatalogResponse,
+  UserAccessChangeRequest,
   ROLE_LABELS,
   ROLE_COLORS,
   STATUS_ATENDENTE_LABELS,
@@ -141,7 +145,6 @@ const ATENDIMENTO_GROUP_ROLES: string[] = [
   UserRole.USER,
   UserRole.VENDEDOR,
   UserRole.MANAGER,
-  UserRole.ADMIN,
   UserRole.SUPERADMIN,
 ];
 
@@ -160,7 +163,6 @@ const PERMISSOES_MODAL_GROUPS_FALLBACK: PermissaoModalGroup[] = [
       UserRole.VENDEDOR,
       UserRole.FINANCEIRO,
       UserRole.MANAGER,
-      UserRole.ADMIN,
       UserRole.SUPERADMIN,
     ],
     options: [
@@ -177,7 +179,6 @@ const PERMISSOES_MODAL_GROUPS_FALLBACK: PermissaoModalGroup[] = [
       UserRole.VENDEDOR,
       UserRole.FINANCEIRO,
       UserRole.MANAGER,
-      UserRole.ADMIN,
       UserRole.SUPERADMIN,
     ],
     options: [
@@ -247,7 +248,7 @@ const PERMISSOES_MODAL_GROUPS_FALLBACK: PermissaoModalGroup[] = [
     id: 'financeiro',
     label: 'Financeiro',
     description: 'Faturamento e pagamentos',
-    roles: [UserRole.FINANCEIRO, UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPERADMIN],
+    roles: [UserRole.FINANCEIRO, UserRole.MANAGER, UserRole.SUPERADMIN],
     options: [
       { value: 'financeiro.faturamento.read', label: 'Faturamento: visualizar' },
       { value: 'financeiro.faturamento.manage', label: 'Faturamento: gerenciar' },
@@ -429,6 +430,17 @@ const mapPermissionCatalogPayload = (payload: PermissionCatalogResponse): Permis
 };
 
 const GestaoUsuariosPage: React.FC = () => {
+  const { user: authUser } = useAuth();
+  const normalizedAuthRole = String(authUser?.role || '').toLowerCase();
+  const canManageAccessApprovals =
+    normalizedAuthRole === UserRole.ADMIN || normalizedAuthRole === UserRole.SUPERADMIN;
+  const canManageAccessReview =
+    canManageAccessApprovals ||
+    normalizedAuthRole === 'gerente' ||
+    normalizedAuthRole === UserRole.MANAGER;
+  const canViewAccessApprovals =
+    canManageAccessApprovals || normalizedAuthRole === 'gerente' || normalizedAuthRole === UserRole.MANAGER;
+
   // Estados principais
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
@@ -437,6 +449,14 @@ const GestaoUsuariosPage: React.FC = () => {
   const [busca, setBusca] = useState('');
   const [abaAtiva, setAbaAtiva] = useState<AbaAtiva>('todos');
   const [permissionCatalog, setPermissionCatalog] = useState<PermissionCatalogState | null>(null);
+  const [accessRequests, setAccessRequests] = useState<UserAccessChangeRequest[]>([]);
+  const [loadingAccessRequests, setLoadingAccessRequests] = useState(false);
+  const [accessRequestsError, setAccessRequestsError] = useState<string | null>(null);
+  const [accessRequestDecisionId, setAccessRequestDecisionId] = useState<string | null>(null);
+  const [accessReviewReport, setAccessReviewReport] = useState<AccessReviewReport | null>(null);
+  const [loadingAccessReview, setLoadingAccessReview] = useState(false);
+  const [accessReviewError, setAccessReviewError] = useState<string | null>(null);
+  const [accessReviewDecisionId, setAccessReviewDecisionId] = useState<string | null>(null);
 
   // Filtros
   const [filtroRole, setFiltroRole] = useState<UserRole | ''>('');
@@ -536,9 +556,9 @@ const GestaoUsuariosPage: React.FC = () => {
       await confirmDialog.onConfirm();
       closeConfirmDialog();
     } catch (error) {
-      console.error('Erro na ação confirmada:', error);
+      console.error('Erro na acao confirmada:', error);
       setConfirmLoading(false);
-      const message = getErrorMessage(error, 'Não foi possível concluir a ação. Tente novamente.');
+      const message = getErrorMessage(error, 'Nao foi possivel concluir a acao. Tente novamente.');
       setConfirmDialog((prev) => ({
         ...prev,
         errorMessage: message,
@@ -577,8 +597,8 @@ const GestaoUsuariosPage: React.FC = () => {
       setUsuarios(lista);
       setTotalUsuariosSistema(total);
     } catch (err: unknown) {
-      console.error('Erro ao carregar usuários:', err);
-      setError(getErrorMessage(err, 'Erro ao carregar usuários'));
+      console.error('Erro ao carregar usuarios:', err);
+      setError(getErrorMessage(err, 'Erro ao carregar usuarios'));
       setUsuarios([]);
       setTotalUsuariosSistema(0);
     } finally {
@@ -596,7 +616,75 @@ const GestaoUsuariosPage: React.FC = () => {
     }
   };
 
-  // Filtrar usuários
+  const carregarSolicitacoesAcesso = async (): Promise<void> => {
+    if (!canViewAccessApprovals) {
+      setAccessRequests([]);
+      setAccessRequestsError(null);
+      return;
+    }
+
+    try {
+      setLoadingAccessRequests(true);
+      setAccessRequestsError(null);
+      const requests = await usuariosService.listarSolicitacoesAcesso({
+        status: 'REQUESTED',
+        limit: 50,
+      });
+      setAccessRequests(requests);
+    } catch (err: unknown) {
+      console.error('Erro ao carregar solicitacoes de acesso:', err);
+      setAccessRequestsError(getErrorMessage(err, 'Erro ao carregar pendencias de aprovacao'));
+      setAccessRequests([]);
+    } finally {
+      setLoadingAccessRequests(false);
+    }
+  };
+
+  const carregarRelatorioRevisaoAcessos = async (): Promise<void> => {
+    if (!canViewAccessApprovals) {
+      setAccessReviewReport(null);
+      setAccessReviewError(null);
+      return;
+    }
+
+    try {
+      setLoadingAccessReview(true);
+      setAccessReviewError(null);
+      const report = await usuariosService.gerarRelatorioRevisaoAcessos({
+        include_inactive: true,
+        limit: 100,
+      });
+      setAccessReviewReport(report);
+    } catch (err: unknown) {
+      console.error('Erro ao carregar relatorio de revisao de acessos:', err);
+      setAccessReviewError(getErrorMessage(err, 'Erro ao carregar relatorio de recertificacao'));
+      setAccessReviewReport(null);
+    } finally {
+      setLoadingAccessReview(false);
+    }
+  };
+
+  const handleRefreshAll = async (): Promise<void> => {
+    await carregarDados();
+    if (canViewAccessApprovals) {
+      await Promise.all([carregarSolicitacoesAcesso(), carregarRelatorioRevisaoAcessos()]);
+    }
+  };
+
+  useEffect(() => {
+    if (!canViewAccessApprovals) {
+      setAccessRequests([]);
+      setAccessRequestsError(null);
+      setAccessReviewReport(null);
+      setAccessReviewError(null);
+      return;
+    }
+
+    void carregarSolicitacoesAcesso();
+    void carregarRelatorioRevisaoAcessos();
+  }, [canViewAccessApprovals]);
+
+  // Filtrar usuarios
   const usuariosFiltrados = usuarios.filter((usuario) => {
     // Filtro de busca (nome ou email)
     if (busca) {
@@ -717,6 +805,7 @@ const GestaoUsuariosPage: React.FC = () => {
     try {
       setFormError(null);
       let successMessage = '';
+      let infoMessage = '';
 
       if (editingUsuario) {
         const dadosAtualizacao: AtualizarUsuario = {
@@ -730,27 +819,47 @@ const GestaoUsuariosPage: React.FC = () => {
           avatar_url: formData.avatar_url,
           idioma_preferido: formData.idioma_preferido,
         };
-        await usuariosService.atualizarUsuario(dadosAtualizacao);
-        setUsuarios((prev) =>
-          prev.map((u) => (u.id === editingUsuario.id ? { ...u, ...dadosAtualizacao } : u)),
-        );
-        successMessage = 'Usuário atualizado com sucesso.';
+        const resultado = await usuariosService.atualizarUsuario(dadosAtualizacao);
+
+        if (resultado.mode === 'applied' && resultado.usuario) {
+          setUsuarios((prev) =>
+            prev.map((u) => (u.id === editingUsuario.id ? (resultado.usuario as Usuario) : u)),
+          );
+          successMessage = resultado.message || 'Usuario atualizado com sucesso.';
+        } else {
+          infoMessage =
+            resultado.message || 'Alteracao registrada e pendente de segunda aprovacao.';
+        }
       } else {
         if (!formData.senha) {
-          setFormError('Senha é obrigatória para criar novo usuário.');
+          setFormError('Senha e obrigatoria para criar novo usuario.');
           return;
         }
-        const novoUsuario = await usuariosService.criarUsuario(formData as NovoUsuario);
-        setUsuarios((prev) => [...prev, novoUsuario]);
-        successMessage = 'Usuário criado com sucesso.';
+        const resultado = await usuariosService.criarUsuario(formData as NovoUsuario);
+
+        if (resultado.mode === 'applied' && resultado.usuario) {
+          setUsuarios((prev) => [...prev, resultado.usuario as Usuario]);
+          successMessage = resultado.message || 'Usuario criado com sucesso.';
+        } else {
+          infoMessage = resultado.message || 'Criacao registrada e pendente de segunda aprovacao.';
+        }
       }
 
       handleCloseDialog();
       await carregarDados();
-      showFeedback('success', successMessage);
+      if (canViewAccessApprovals) {
+        await Promise.all([carregarSolicitacoesAcesso(), carregarRelatorioRevisaoAcessos()]);
+      }
+
+      if (successMessage) {
+        showFeedback('success', successMessage);
+      }
+      if (infoMessage) {
+        showFeedback('info', infoMessage);
+      }
     } catch (err: unknown) {
-      console.error('Erro ao salvar usuário:', err);
-      const message = getErrorMessage(err, 'Erro ao salvar usuário');
+      console.error('Erro ao salvar usuario:', err);
+      const message = getErrorMessage(err, 'Erro ao salvar usuario');
       setFormError(message);
       showFeedback('error', message);
     }
@@ -758,8 +867,8 @@ const GestaoUsuariosPage: React.FC = () => {
 
   const handleDelete = (usuario: Usuario): void => {
     openConfirmDialog({
-      title: 'Excluir usuário',
-      description: `Deseja realmente excluir o usuário "${usuario.nome}"? Esta ação não pode ser desfeita.`,
+      title: 'Excluir usuario',
+      description: `Deseja realmente excluir o usuario "${usuario.nome}"? Esta acao nao pode ser desfeita.`,
       confirmLabel: 'Excluir',
       cancelLabel: 'Cancelar',
       variant: 'danger',
@@ -767,10 +876,10 @@ const GestaoUsuariosPage: React.FC = () => {
         try {
           await usuariosService.excluirUsuario(usuario.id);
           setUsuarios((prev) => prev.filter((u) => u.id !== usuario.id));
-          showFeedback('success', `Usuário "${usuario.nome}" excluído com sucesso.`);
+          showFeedback('success', `Usuario "${usuario.nome}" excluido com sucesso.`);
         } catch (err: unknown) {
-          console.error('Erro ao excluir usuário:', err);
-          const message = getErrorMessage(err, 'Erro ao excluir usuário');
+          console.error('Erro ao excluir usuario:', err);
+          const message = getErrorMessage(err, 'Erro ao excluir usuario');
           throw new Error(message);
         }
       },
@@ -786,11 +895,11 @@ const GestaoUsuariosPage: React.FC = () => {
       );
       showFeedback(
         'success',
-        `Usuário "${usuario.nome}" ${novoStatus ? 'ativado' : 'desativado'} com sucesso.`,
+        `Usuario "${usuario.nome}" ${novoStatus ? 'ativado' : 'desativado'} com sucesso.`,
       );
     } catch (err: unknown) {
       console.error('Erro ao alterar status:', err);
-      showFeedback('error', getErrorMessage(err, 'Erro ao alterar status do usuário'));
+      showFeedback('error', getErrorMessage(err, 'Erro ao alterar status do usuario'));
     }
   };
 
@@ -810,10 +919,10 @@ const GestaoUsuariosPage: React.FC = () => {
       setResetSenhaError(null);
       const novaSenha = await usuariosService.resetarSenha(usuarioResetSenha.id);
       setNovaSenhaGerada(novaSenha);
-      showFeedback('success', `Senha temporária gerada para ${usuarioResetSenha.email}.`);
+      showFeedback('success', `Senha temporaria gerada para ${usuarioResetSenha.email}.`);
     } catch (err: unknown) {
       console.error('Erro ao resetar senha:', err);
-      const message = getErrorMessage(err, 'Erro ao resetar senha do usuário');
+      const message = getErrorMessage(err, 'Erro ao resetar senha do usuario');
       setResetSenhaError(message);
       showFeedback('error', message);
     } finally {
@@ -835,13 +944,13 @@ const GestaoUsuariosPage: React.FC = () => {
     try {
       if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(novaSenhaGerada);
-        showFeedback('success', 'Senha temporária copiada para a área de transferência.');
+        showFeedback('success', 'Senha temporaria copiada para a area de transferencia.');
       } else {
-        throw new Error('Recurso de copiar não disponível');
+        throw new Error('Recurso de copiar nao disponivel');
       }
     } catch (err) {
-      console.error('Erro ao copiar senha temporária:', err);
-      showFeedback('error', 'Não foi possível copiar a senha automaticamente. Copie manualmente.');
+      console.error('Erro ao copiar senha temporaria:', err);
+      showFeedback('error', 'Nao foi possivel copiar a senha automaticamente. Copie manualmente.');
     }
   };
 
@@ -868,14 +977,14 @@ const GestaoUsuariosPage: React.FC = () => {
 
   const handleBulkAction = (acao: 'ativar' | 'desativar' | 'excluir'): void => {
     if (usuariosSelecionados.length === 0) {
-      showFeedback('info', 'Selecione pelo menos um usuário para realizar a ação.');
+      showFeedback('info', 'Selecione pelo menos um usuario para realizar a acao.');
       return;
     }
 
     const quantidade = usuariosSelecionados.length;
-    const descricaoAcao = `Deseja ${acao} ${quantidade} usuário(s) selecionado(s)?`;
+    const descricaoAcao = `Deseja ${acao} ${quantidade} usuario(s) selecionado(s)?`;
     const tituloAcao =
-      acao === 'excluir' ? 'Excluir usuários selecionados' : 'Atualizar status dos usuários';
+      acao === 'excluir' ? 'Excluir usuarios selecionados' : 'Atualizar status dos usuarios';
 
     openConfirmDialog({
       title: tituloAcao,
@@ -899,18 +1008,18 @@ const GestaoUsuariosPage: React.FC = () => {
             );
             showFeedback(
               'success',
-              `Usuários ${novoStatus ? 'ativados' : 'desativados'} com sucesso.`,
+              `Usuarios ${novoStatus ? 'ativados' : 'desativados'} com sucesso.`,
             );
           } else {
             await Promise.all(usuariosSelecionados.map((id) => usuariosService.excluirUsuario(id)));
             setUsuarios((prev) => prev.filter((u) => !usuariosSelecionados.includes(u.id)));
-            showFeedback('success', 'Usuários excluídos com sucesso.');
+            showFeedback('success', 'Usuarios excluidos com sucesso.');
           }
 
           setUsuariosSelecionados([]);
         } catch (err: unknown) {
-          console.error(`Erro ao ${acao} usuários:`, err);
-          const message = getErrorMessage(err, `Erro ao ${acao} usuários`);
+          console.error(`Erro ao ${acao} usuarios:`, err);
+          const message = getErrorMessage(err, `Erro ao ${acao} usuarios`);
           throw new Error(message);
         }
       },
@@ -983,6 +1092,158 @@ const GestaoUsuariosPage: React.FC = () => {
     );
   };
 
+  const formatarRoleSolicitacao = (role: unknown): string => {
+    if (typeof role !== 'string') {
+      return '-';
+    }
+
+    const normalized = role.toLowerCase();
+    if (normalized === 'gerente') {
+      return ROLE_LABELS[UserRole.MANAGER];
+    }
+    if (normalized === 'suporte') {
+      return ROLE_LABELS[UserRole.USER];
+    }
+
+    return ROLE_LABELS[normalized as UserRole] ?? role;
+  };
+
+  const getResumoSolicitacaoAcesso = (request: UserAccessChangeRequest): string => {
+    const payload = request.request_payload ?? {};
+    if (request.action === 'USER_CREATE') {
+      const nome = typeof payload.nome === 'string' ? payload.nome : 'Novo usuario';
+      const email = typeof payload.email === 'string' ? payload.email : '-';
+      const role = formatarRoleSolicitacao(payload.role);
+      return `${nome} (${email}) • papel ${role}`;
+    }
+
+    const parts: string[] = [];
+    if (payload.role) {
+      parts.push(`papel => ${formatarRoleSolicitacao(payload.role)}`);
+    }
+    if (Array.isArray(payload.permissoes)) {
+      parts.push(`permissoes (${payload.permissoes.length})`);
+    }
+    if (typeof payload.ativo === 'boolean') {
+      parts.push(`status => ${payload.ativo ? 'Ativo' : 'Inativo'}`);
+    }
+
+    if (parts.length === 0) {
+      return 'Alteracao de acesso sensivel registrada para avaliacao.';
+    }
+
+    return parts.join(' | ');
+  };
+
+  const handleRecertificarAcesso = (usuarioId: string, approved: boolean): void => {
+    if (!canManageAccessReview) {
+      showFeedback('error', 'Seu perfil nao possui permissao para recertificar acessos.');
+      return;
+    }
+
+    const alvo = accessReviewReport?.users.find((user) => user.id === usuarioId);
+    if (!alvo) {
+      showFeedback('error', 'Usuario nao encontrado no relatorio de revisao.');
+      return;
+    }
+
+    const title = approved ? 'Confirmar recertificacao' : 'Revogar acesso por recertificacao';
+    const description = approved
+      ? `Deseja confirmar a manutencao do acesso para ${alvo.nome}?`
+      : `Deseja reprovar a recertificacao e revogar o acesso de ${alvo.nome}?`;
+
+    openConfirmDialog({
+      title,
+      description,
+      confirmLabel: approved ? 'Confirmar' : 'Revogar acesso',
+      cancelLabel: 'Cancelar',
+      variant: approved ? 'primary' : 'danger',
+      onConfirm: async () => {
+        try {
+          setAccessReviewDecisionId(alvo.id);
+          const result = await usuariosService.recertificarAcesso({
+            target_user_id: alvo.id,
+            approved,
+            reason: approved
+              ? 'Recertificacao trimestral concluida com manutencao de acesso'
+              : 'Recertificacao trimestral: acesso nao mais necessario',
+          });
+
+          await carregarDados();
+          await carregarRelatorioRevisaoAcessos();
+
+          if (result.action_taken === 'deactivated') {
+            showFeedback('success', `Acesso de ${alvo.nome} revogado com sucesso.`);
+            return;
+          }
+
+          if (result.action_taken === 'already_inactive') {
+            showFeedback('info', `${alvo.nome} ja estava inativo.`);
+            return;
+          }
+
+          showFeedback('success', `Recertificacao registrada para ${alvo.nome}.`);
+        } catch (err: unknown) {
+          console.error('Erro ao recertificar acesso:', err);
+          const message = getErrorMessage(err, 'Erro ao recertificar acesso do usuario');
+          throw new Error(message);
+        } finally {
+          setAccessReviewDecisionId(null);
+        }
+      },
+    });
+  };
+
+  const handleAprovarSolicitacaoAcesso = (request: UserAccessChangeRequest): void => {
+    openConfirmDialog({
+      title: 'Aprovar alteracao sensivel',
+      description: `Deseja aprovar e aplicar agora a solicitacao ${request.id}?`,
+      confirmLabel: 'Aprovar',
+      cancelLabel: 'Cancelar',
+      variant: 'primary',
+      onConfirm: async () => {
+        try {
+          setAccessRequestDecisionId(request.id);
+          const result = await usuariosService.aprovarSolicitacaoAcesso(request.id);
+          await carregarDados();
+          await Promise.all([carregarSolicitacoesAcesso(), carregarRelatorioRevisaoAcessos()]);
+          const nomeAplicado = result.applied_user?.nome || 'Usuario';
+          showFeedback('success', `Solicitacao aprovada com sucesso para ${nomeAplicado}.`);
+        } catch (err: unknown) {
+          console.error('Erro ao aprovar solicitacao de acesso:', err);
+          const message = getErrorMessage(err, 'Erro ao aprovar solicitacao de acesso');
+          throw new Error(message);
+        } finally {
+          setAccessRequestDecisionId(null);
+        }
+      },
+    });
+  };
+
+  const handleRejeitarSolicitacaoAcesso = (request: UserAccessChangeRequest): void => {
+    openConfirmDialog({
+      title: 'Rejeitar alteracao sensivel',
+      description: `Deseja rejeitar a solicitacao ${request.id}?`,
+      confirmLabel: 'Rejeitar',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          setAccessRequestDecisionId(request.id);
+          await usuariosService.rejeitarSolicitacaoAcesso(request.id);
+          await Promise.all([carregarSolicitacoesAcesso(), carregarRelatorioRevisaoAcessos()]);
+          showFeedback('success', 'Solicitacao rejeitada com sucesso.');
+        } catch (err: unknown) {
+          console.error('Erro ao rejeitar solicitacao de acesso:', err);
+          const message = getErrorMessage(err, 'Erro ao rejeitar solicitacao de acesso');
+          throw new Error(message);
+        } finally {
+          setAccessRequestDecisionId(null);
+        }
+      },
+    });
+  };
+
   const permissionLabelMap = useMemo(() => {
     const map = new Map<string, string>();
     catalogoPermissoes.groups.forEach((group) => {
@@ -1034,6 +1295,17 @@ const GestaoUsuariosPage: React.FC = () => {
     idsUsuariosVisiveis.some((id) => usuariosSelecionados.includes(id));
   const podeCriarPrimeiroUsuario =
     !busca && !filtroRole && filtroStatus === 'todos' && !apenasAtendentes;
+  const resumoRevisaoPorPerfil = accessReviewReport?.summary?.by_profile ?? [];
+  const usuariosParaRecertificacao = (accessReviewReport?.users ?? [])
+    .filter((usuario) => usuario.ativo && usuario.id !== authUser?.id)
+    .sort((a, b) => {
+      const roleCompare = String(a.role || '').localeCompare(String(b.role || ''));
+      if (roleCompare !== 0) {
+        return roleCompare;
+      }
+      return String(a.nome || '').localeCompare(String(b.nome || ''));
+    })
+    .slice(0, 8);
   const modalLabelClass = 'mb-2 block text-sm font-semibold text-[#284858]';
   const modalInputClass =
     'h-10 w-full rounded-xl border border-[#CFDDE2] bg-[#FBFDFE] px-3 text-sm text-[#244455] outline-none transition focus:border-[#159A9C]/45 focus:ring-2 focus:ring-[#159A9C]/15';
@@ -1053,7 +1325,7 @@ const GestaoUsuariosPage: React.FC = () => {
           actions={
             <>
               <button
-                onClick={carregarDados}
+                onClick={() => void handleRefreshAll()}
                 disabled={loading}
                 className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#CFDDE2] bg-white px-4 text-sm font-medium text-[#355061] transition-colors hover:bg-[#F6FBFC] disabled:cursor-not-allowed disabled:opacity-60"
               >
@@ -1239,6 +1511,247 @@ const GestaoUsuariosPage: React.FC = () => {
         </div>
       </FiltersBar>
 
+      {canViewAccessApprovals ? (
+        <SectionCard className="p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-[#1D3B4D]">
+                Dupla aprovacao - alteracoes sensiveis
+              </h2>
+              <p className="mt-1 text-xs text-[#67818E]">
+                Fila de solicitacoes pendentes para mudancas criticas de acesso.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void carregarSolicitacoesAcesso()}
+              disabled={loadingAccessRequests}
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#CFDDE2] bg-white px-3 text-xs font-semibold text-[#355061] transition-colors hover:bg-[#F6FBFC] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${loadingAccessRequests ? 'animate-spin' : ''}`} />
+              Atualizar fila
+            </button>
+          </div>
+
+          <div className="mt-4">
+            {loadingAccessRequests ? (
+              <p className="text-sm text-[#5F7A88]">Carregando pendencias de aprovacao...</p>
+            ) : null}
+
+            {!loadingAccessRequests && accessRequestsError ? (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {accessRequestsError}
+              </div>
+            ) : null}
+
+            {!loadingAccessRequests && !accessRequestsError && accessRequests.length === 0 ? (
+              <div className="rounded-xl border border-[#D9E8ED] bg-[#F8FCFD] px-3 py-3 text-sm text-[#5F7A88]">
+                Nenhuma solicitacao pendente no momento.
+              </div>
+            ) : null}
+
+            {!loadingAccessRequests && !accessRequestsError && accessRequests.length > 0 ? (
+              <div className="space-y-3">
+                {accessRequests.map((request) => (
+                  <article
+                    key={request.id}
+                    className="rounded-xl border border-[#D9E8ED] bg-white px-3 py-3"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-[#1D3B4D]">
+                          {request.action === 'USER_CREATE'
+                            ? 'Criacao de usuario'
+                            : 'Atualizacao sensivel de acesso'}
+                        </p>
+                        <p className="mt-1 text-xs text-[#67818E]">
+                          Solicitacao: {request.id}
+                        </p>
+                      </div>
+                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-800">
+                        <Clock3 className="h-3.5 w-3.5" />
+                        Pendente
+                      </span>
+                    </div>
+
+                    <p className="mt-2 text-sm text-[#2D4A59]">{getResumoSolicitacaoAcesso(request)}</p>
+
+                    <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-[#67818E]">
+                      <span>Solicitado em: {formatarDataHora(request.created_at)}</span>
+                      <span>
+                        Solicitante: {request.requested_by?.nome || request.requested_by?.email || '-'}
+                      </span>
+                    </div>
+
+                    {canManageAccessReview ? (
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleAprovarSolicitacaoAcesso(request)}
+                          disabled={accessRequestDecisionId === request.id}
+                          className="inline-flex h-9 items-center rounded-lg bg-[#159A9C] px-3 text-xs font-semibold text-white transition-colors hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Aprovar e aplicar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRejeitarSolicitacaoAcesso(request)}
+                          disabled={accessRequestDecisionId === request.id}
+                          className="inline-flex h-9 items-center rounded-lg border border-red-200 bg-red-50 px-3 text-xs font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Rejeitar
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-xs text-[#67818E]">
+                        Somente administradores podem aprovar ou rejeitar estas solicitacoes.
+                      </p>
+                    )}
+                  </article>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </SectionCard>
+      ) : null}
+
+      {canViewAccessApprovals ? (
+        <SectionCard className="p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-[#1D3B4D]">
+                Revisao trimestral de acessos
+              </h2>
+              <p className="mt-1 text-xs text-[#67818E]">
+                Resumo por perfil e recertificacao rapida dos acessos ativos.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void carregarRelatorioRevisaoAcessos()}
+              disabled={loadingAccessReview}
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#CFDDE2] bg-white px-3 text-xs font-semibold text-[#355061] transition-colors hover:bg-[#F6FBFC] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${loadingAccessReview ? 'animate-spin' : ''}`} />
+              Atualizar revisao
+            </button>
+          </div>
+
+          <div className="mt-3 text-xs text-[#67818E]">
+            Ultima atualizacao: {formatarDataHora(accessReviewReport?.generated_at)}
+          </div>
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <div className="rounded-xl border border-[#D9E8ED] bg-[#F8FCFD] px-3 py-2">
+              <p className="text-[11px] uppercase tracking-wide text-[#6A8795]">Total usuarios</p>
+              <p className="mt-1 text-lg font-semibold text-[#1D3B4D]">
+                {accessReviewReport?.summary?.total_users ?? 0}
+              </p>
+            </div>
+            <div className="rounded-xl border border-[#D7EFD7] bg-[#F3FBF3] px-3 py-2">
+              <p className="text-[11px] uppercase tracking-wide text-[#5B8A5F]">Ativos</p>
+              <p className="mt-1 text-lg font-semibold text-[#1C5A25]">
+                {accessReviewReport?.summary?.active_users ?? 0}
+              </p>
+            </div>
+            <div className="rounded-xl border border-[#EFE3D7] bg-[#FEF9F2] px-3 py-2">
+              <p className="text-[11px] uppercase tracking-wide text-[#9A6A36]">Inativos</p>
+              <p className="mt-1 text-lg font-semibold text-[#7A4A1A]">
+                {accessReviewReport?.summary?.inactive_users ?? 0}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {resumoRevisaoPorPerfil.map((entry) => (
+              <span
+                key={`access-review-role-${entry.role}`}
+                className="inline-flex items-center gap-1 rounded-full border border-[#D8E6EA] bg-[#F7FBFC] px-3 py-1 text-xs text-[#4F6C7B]"
+              >
+                <strong className="font-semibold text-[#214251]">
+                  {formatarRoleSolicitacao(entry.role)}
+                </strong>
+                <span>({entry.total})</span>
+              </span>
+            ))}
+          </div>
+
+          <div className="mt-4">
+            {loadingAccessReview ? (
+              <p className="text-sm text-[#5F7A88]">Carregando relatorio de recertificacao...</p>
+            ) : null}
+
+            {!loadingAccessReview && accessReviewError ? (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {accessReviewError}
+              </div>
+            ) : null}
+
+            {!loadingAccessReview &&
+            !accessReviewError &&
+            usuariosParaRecertificacao.length === 0 ? (
+              <div className="rounded-xl border border-[#D9E8ED] bg-[#F8FCFD] px-3 py-3 text-sm text-[#5F7A88]">
+                Nao ha usuarios ativos para recertificar no momento.
+              </div>
+            ) : null}
+
+            {!loadingAccessReview &&
+            !accessReviewError &&
+            usuariosParaRecertificacao.length > 0 ? (
+              <div className="space-y-3">
+                {usuariosParaRecertificacao.map((usuario) => (
+                  <article
+                    key={`access-review-user-${usuario.id}`}
+                    className="rounded-xl border border-[#D9E8ED] bg-white px-3 py-3"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-[#1D3B4D]">{usuario.nome}</p>
+                        <p className="mt-1 text-xs text-[#67818E]">
+                          {usuario.email} • {formatarRoleSolicitacao(usuario.role)}
+                        </p>
+                      </div>
+                      <span className="inline-flex items-center gap-1 rounded-full border border-[#D8E6EA] bg-[#F7FBFC] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#355061]">
+                        Ativo
+                      </span>
+                    </div>
+
+                    <div className="mt-2 text-xs text-[#67818E]">
+                      Ultimo login: {formatarDataHora(usuario.ultimo_login || undefined)}
+                    </div>
+
+                    {canManageAccessApprovals ? (
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleRecertificarAcesso(usuario.id, true)}
+                          disabled={accessReviewDecisionId === usuario.id}
+                          className="inline-flex h-9 items-center rounded-lg bg-[#159A9C] px-3 text-xs font-semibold text-white transition-colors hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Manter acesso
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRecertificarAcesso(usuario.id, false)}
+                          disabled={accessReviewDecisionId === usuario.id}
+                          className="inline-flex h-9 items-center rounded-lg border border-red-200 bg-red-50 px-3 text-xs font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Revogar acesso
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-xs text-[#67818E]">
+                        Somente perfis administrativos podem registrar a decisao de recertificacao.
+                      </p>
+                    )}
+                  </article>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </SectionCard>
+      ) : null}
+
       {usuariosSelecionados.length > 0 && (
         <SectionCard className="p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1278,7 +1791,7 @@ const GestaoUsuariosPage: React.FC = () => {
           description={error}
           action={
             <button
-              onClick={carregarDados}
+              onClick={() => void handleRefreshAll()}
               className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0F7B7D]"
             >
               <RefreshCw className="h-4 w-4" />
@@ -1483,7 +1996,7 @@ const GestaoUsuariosPage: React.FC = () => {
                         />
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Usuário
+                        Usuario
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Papel
@@ -1497,10 +2010,10 @@ const GestaoUsuariosPage: React.FC = () => {
                         </th>
                       )}
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Último Login
+                        Ultimo Login
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Ações
+                        Acoes
                       </th>
                     </tr>
                   </thead>
@@ -1686,7 +2199,7 @@ const GestaoUsuariosPage: React.FC = () => {
           <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-[#DCE7EB] bg-white shadow-[0_30px_60px_-30px_rgba(7,36,51,0.55)]">
             <div className="border-b border-[#E5EEF2] px-6 py-5">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-gray-900">Detalhes do usuário</h2>
+                <h2 className="text-xl font-bold text-gray-900">Detalhes do usuario</h2>
                 <button
                   onClick={handleCloseDetailsDialog}
                   className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 transition-colors hover:bg-[#F3F8FA] hover:text-gray-600"
@@ -1737,7 +2250,7 @@ const GestaoUsuariosPage: React.FC = () => {
                   </p>
                 </div>
                 <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#6A8795]">Último login</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#6A8795]">Ultimo login</p>
                   <p className="mt-1 text-sm font-semibold text-[#1D3B4D]">
                     {formatarDataHora(usuarioDetalhes.ultimo_login)}
                   </p>
@@ -1752,7 +2265,7 @@ const GestaoUsuariosPage: React.FC = () => {
 
               <div className="rounded-xl border border-[#E3EDF1] bg-white p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-[#6A8795]">
-                  Permissões ({usuarioDetalhes.permissoes?.length || 0})
+                  Permissoes ({usuarioDetalhes.permissoes?.length || 0})
                 </p>
                 {usuarioDetalhes.permissoes && usuarioDetalhes.permissoes.length > 0 ? (
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -1766,7 +2279,7 @@ const GestaoUsuariosPage: React.FC = () => {
                     ))}
                   </div>
                 ) : (
-                  <p className="mt-2 text-sm text-[#607B89]">Nenhuma permissão atribuída.</p>
+                  <p className="mt-2 text-sm text-[#607B89]">Nenhuma permissao atribuida.</p>
                 )}
               </div>
             </div>
@@ -1783,14 +2296,14 @@ const GestaoUsuariosPage: React.FC = () => {
         </div>
       )}
 
-      {/* Modal de Criar/Editar Usuário */}
+      {/* Modal de Criar/Editar Usuario */}
       {showDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#072433]/55 p-4 backdrop-blur-[1px]">
           <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-[#DCE7EB] bg-white shadow-[0_30px_60px_-30px_rgba(7,36,51,0.55)]">
             <div className="border-b border-[#E5EEF2] px-6 py-5">
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-bold text-gray-900">
-                  {editingUsuario ? 'Editar Usuário' : 'Novo Usuário'}
+                  {editingUsuario ? 'Editar Usuario' : 'Novo Usuario'}
                 </h2>
                 <button
                   onClick={handleCloseDialog}
@@ -1813,7 +2326,7 @@ const GestaoUsuariosPage: React.FC = () => {
                   value={formData.nome || ''}
                   onChange={(e) => setFormData((prev) => ({ ...prev, nome: e.target.value }))}
                   className={modalInputClass}
-                  placeholder="Nome completo do usuário"
+                  placeholder="Nome completo do usuario"
                   required
                 />
               </div>
@@ -1870,7 +2383,7 @@ const GestaoUsuariosPage: React.FC = () => {
                     {editingUsuario?.role === UserRole.SUPERADMIN && (
                       <option value={UserRole.SUPERADMIN}>Super Admin</option>
                     )}
-                    <option value={UserRole.USER}>Usuário</option>
+                    <option value={UserRole.USER}>Usuario</option>
                     <option value={UserRole.VENDEDOR}>Vendedor</option>
                     <option value={UserRole.FINANCEIRO}>Financeiro</option>
                     <option value={UserRole.MANAGER}>Gerente</option>
@@ -1891,15 +2404,15 @@ const GestaoUsuariosPage: React.FC = () => {
                       value={formData.senha || ''}
                       onChange={(e) => setFormData((prev) => ({ ...prev, senha: e.target.value }))}
                       className={modalInputClass}
-                      placeholder="Mínimo 6 caracteres"
+                      placeholder="Minimo 6 caracteres"
                       required
                     />
                   </div>
                 </div>
               )}
-              {/* Permissões */}
+              {/* Permissoes */}
               <div>
-                <label className={modalLabelClass}>Permissões</label>
+                <label className={modalLabelClass}>Permissoes</label>
                 <div className="rounded-xl border border-[#DCE7EB] bg-[#F9FBFC] p-4">
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#E5EEF2] bg-white px-3 py-2">
                     <span className="text-xs font-semibold uppercase tracking-wide text-[#607B89]">
@@ -1917,7 +2430,7 @@ const GestaoUsuariosPage: React.FC = () => {
                         value={permissionSearch}
                         onChange={(e) => setPermissionSearch(e.target.value)}
                         className={modalInputWithIconClass}
-                        placeholder="Buscar permissão por nome ou chave"
+                        placeholder="Buscar permissao por nome ou chave"
                       />
                     </div>
                     {permissionSearchNormalized && (
@@ -1964,7 +2477,7 @@ const GestaoUsuariosPage: React.FC = () => {
                             />
                             <span className="ml-2 text-xs font-medium text-gray-600 whitespace-nowrap">
                               {permissionSearchNormalized
-                                ? 'Selecionar visíveis'
+                                ? 'Selecionar visiveis'
                                 : 'Selecionar todos'}{' '}
                               ({selectedCount}/{groupValues.length})
                             </span>
@@ -1991,14 +2504,14 @@ const GestaoUsuariosPage: React.FC = () => {
                   })}
                   {gruposPermissaoDoFormulario.length === 0 && (
                     <p className="text-sm text-gray-500">
-                      Nenhuma permissão disponível para o papel selecionado.
+                      Nenhuma permissao disponivel para o papel selecionado.
                     </p>
                   )}
                   {gruposPermissaoDoFormulario.length > 0 &&
                     gruposPermissaoFiltrados.length === 0 &&
                     permissionSearchNormalized && (
                       <p className="text-sm text-gray-500">
-                        Nenhuma permissão encontrada para o filtro informado.
+                        Nenhuma permissao encontrada para o filtro informado.
                       </p>
                     )}
                   </div>
@@ -2015,7 +2528,7 @@ const GestaoUsuariosPage: React.FC = () => {
                         alt="Preview avatar"
                         className="h-7 w-7 rounded-full object-cover"
                       />
-                      <span className="text-xs font-medium text-[#607B89]">Prévia</span>
+                      <span className="text-xs font-medium text-[#607B89]">Previa</span>
                     </div>
                   ) : null}
                   <div className="relative">
@@ -2042,7 +2555,7 @@ const GestaoUsuariosPage: React.FC = () => {
                     className={modalCheckboxClass}
                   />
                   <label htmlFor="ativo" className="ml-2 cursor-pointer text-sm font-medium text-[#355061] whitespace-nowrap">
-                    Usuário ativo
+                    Usuario ativo
                   </label>
                 </div>
               </div>
@@ -2068,7 +2581,7 @@ const GestaoUsuariosPage: React.FC = () => {
                 onClick={handleSave}
                 className="inline-flex h-10 items-center rounded-lg bg-[#159A9C] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#0F7B7D]"
               >
-                {editingUsuario ? 'Salvar Alterações' : 'Criar Usuário'}
+                {editingUsuario ? 'Salvar Alteracoes' : 'Criar Usuario'}
               </button>
             </div>
           </div>
@@ -2081,7 +2594,7 @@ const GestaoUsuariosPage: React.FC = () => {
           <div className="w-full max-w-md rounded-2xl border border-[#DCE7EB] bg-white shadow-[0_30px_60px_-30px_rgba(7,36,51,0.55)]">
             <div className="border-b border-[#E5EEF2] px-6 py-5">
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-gray-900">Resetar senha do usuário</h2>
+                <h2 className="text-xl font-bold text-gray-900">Resetar senha do usuario</h2>
                 <button
                   onClick={handleCloseResetSenhaDialog}
                   className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 transition-colors hover:bg-[#F3F8FA] hover:text-gray-600"
@@ -2102,42 +2615,42 @@ const GestaoUsuariosPage: React.FC = () => {
                 <>
                   <div>
                     <p className="text-gray-700">
-                      Uma senha temporária foi gerada para o usuário{' '}
+                      Uma senha temporaria foi gerada para o usuario{' '}
                       <span className="font-medium">{usuarioResetSenha.nome}</span>.
                     </p>
                     <p className="text-sm text-gray-600 mt-2">
-                      Compartilhe esta senha de forma segura e oriente o usuário a alterá-la após o
-                      próximo acesso.
+                      Compartilhe esta senha de forma segura e oriente o usuario a altera-la apos o
+                      proximo acesso.
                     </p>
                     <p className="text-sm text-gray-600 mt-2">
-                      No próximo login, o sistema solicitará obrigatoriamente o cadastro de uma nova
+                      No proximo login, o sistema solicitara obrigatoriamente o cadastro de uma nova
                       senha pessoal.
                     </p>
                   </div>
                   <div className="rounded-lg border border-[#B4BEC9] bg-[#DEEFE7] px-4 py-3">
-                    <span className="text-xs uppercase text-[#002333]/70">Senha temporária</span>
+                    <span className="text-xs uppercase text-[#002333]/70">Senha temporaria</span>
                     <p className="mt-1 font-mono text-lg font-semibold text-[#002333] break-all">
                       {novaSenhaGerada}
                     </p>
                   </div>
                   <p className="text-sm text-gray-600">
-                    Registre esta senha de forma segura. Ela não ficará visível novamente.
+                    Registre esta senha de forma segura. Ela nao ficara visivel novamente.
                   </p>
                 </>
               ) : (
                 <>
                   <p className="text-gray-700">
-                    Geraremos uma senha temporária forte e segura para que o usuário acesse
+                    Geraremos uma senha temporaria forte e segura para que o usuario acesse
                     novamente a plataforma.
                   </p>
                   <div className="rounded-lg border border-[#B4BEC9] bg-white px-4 py-3">
-                    <p className="text-sm text-gray-600">Usuário selecionado</p>
+                    <p className="text-sm text-gray-600">Usuario selecionado</p>
                     <p className="font-medium text-[#002333]">{usuarioResetSenha.nome}</p>
                     <p className="text-sm text-gray-600">{usuarioResetSenha.email}</p>
                   </div>
                   <p className="text-sm text-gray-600">
-                    Após a geração, exibiremos a senha temporária para compartilhamento. Ao acessar
-                    com ela, o sistema exigirá o cadastro de uma nova senha definitiva.
+                    Apos a geracao, exibiremos a senha temporaria para compartilhamento. Ao acessar
+                    com ela, o sistema exigira o cadastro de uma nova senha definitiva.
                   </p>
                 </>
               )}
@@ -2165,7 +2678,7 @@ const GestaoUsuariosPage: React.FC = () => {
                   className={`inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-semibold text-white transition-colors ${resetSenhaLoading ? 'bg-[#159A9C]/80 cursor-not-allowed' : 'bg-[#159A9C] hover:bg-[#0F7B7D]'}`}
                 >
                   {resetSenhaLoading && <RefreshCw className="h-4 w-4 animate-spin" />}
-                  {resetSenhaLoading ? 'Gerando...' : 'Gerar senha temporária'}
+                  {resetSenhaLoading ? 'Gerando...' : 'Gerar senha temporaria'}
                 </button>
               )}
             </div>
@@ -2184,7 +2697,7 @@ const GestaoUsuariosPage: React.FC = () => {
             <div className="flex items-start justify-between gap-4 border-b px-6 py-5">
               <div>
                 <h3 className="text-lg font-semibold text-[#002333]">
-                  {confirmDialog.title || 'Confirmação necessária'}
+                  {confirmDialog.title || 'Confirmacao necessaria'}
                 </h3>
                 {confirmDialog.description && (
                   <p className="mt-2 text-sm text-gray-600">{confirmDialog.description}</p>
@@ -2193,7 +2706,7 @@ const GestaoUsuariosPage: React.FC = () => {
               <button
                 type="button"
                 onClick={closeConfirmDialog}
-                aria-label="Fechar confirmação"
+                aria-label="Fechar confirmacao"
                 className="rounded-full p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
               >
                 <X className="h-5 w-5" />
@@ -2240,3 +2753,6 @@ const GestaoUsuariosPage: React.FC = () => {
 };
 
 export default GestaoUsuariosPage;
+
+
+
