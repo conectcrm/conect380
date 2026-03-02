@@ -211,18 +211,18 @@ docker compose up -d backend
 docker compose run --rm backend npm run migration:run
 docker compose up -d frontend
 wait_http() {
-  url="\$1"
-  attempts="\${2:-30}"
-  sleep_seconds="\${3:-2}"
+  url="`$1"
+  attempts="`${2:-30}"
+  sleep_seconds="`${3:-2}"
   i=1
-  while [ "\$i" -le "\$attempts" ]; do
-    if curl -fsS "\$url" > /dev/null; then
+  while [ "`$i" -le "`$attempts" ]; do
+    if curl -fsS "`$url" > /dev/null; then
       return 0
     fi
-    sleep "\$sleep_seconds"
-    i=\$((i + 1))
+    sleep "`$sleep_seconds"
+    i=`$((i + 1))
   done
-  echo "Endpoint nao respondeu em tempo: \$url" >&2
+  echo "Endpoint nao respondeu em tempo: `$url" >&2
   return 1
 }
 wait_http http://127.0.0.1:3500/health 30 2
