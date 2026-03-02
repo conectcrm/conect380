@@ -20,7 +20,8 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { combosService, ComboFormData, Combo } from '../../services/combosService';
-import { useProdutosParaPropostas, ProdutoPropostaBase } from '../../shared/produtosAdapter';
+import { ProdutoPropostaBase } from '../../shared/produtosAdapter';
+import { produtosService } from '../../services/produtosService';
 
 // Schema de validação
 const comboSchema = yup.object({
@@ -64,9 +65,44 @@ const NovoComboPage: React.FC = () => {
   const [showProdutoSearch, setShowProdutoSearch] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [comboOriginal, setComboOriginal] = useState<Combo | null>(null);
+  const [produtosDisponiveis, setProdutosDisponiveis] = useState<ProdutoPropostaBase[]>([]);
+  const [isLoadingProdutos, setIsLoadingProdutos] = useState(false);
 
   // Produtos
-  const { produtos: produtosDisponiveis, buscarProdutos, categorias } = useProdutosParaPropostas();
+  useEffect(() => {
+    carregarProdutosCatalogo();
+  }, []);
+
+  const carregarProdutosCatalogo = async () => {
+    try {
+      setIsLoadingProdutos(true);
+      const produtos = await produtosService.findAll();
+
+      const itensCatalogo = (produtos || [])
+        .filter((produto) => (produto.status || 'ativo') !== 'descontinuado')
+        .map<ProdutoPropostaBase>((produto) => ({
+          id: produto.id,
+          nome: produto.nome,
+          preco: Number(produto.preco || 0),
+          categoria: produto.categoria || 'Geral',
+          subcategoria: undefined,
+          tipo: produto.tipoItem || 'produto',
+          descricao: produto.descricao || '',
+          unidade: produto.unidadeMedida || 'unidade',
+          status: (produto.status || 'ativo') as 'ativo' | 'inativo' | 'descontinuado',
+          sku: produto.sku,
+          fornecedor: produto.fornecedor,
+        }));
+
+      setProdutosDisponiveis(itensCatalogo);
+    } catch (error) {
+      console.error('Erro ao carregar catálogo de itens:', error);
+      toast.error('Erro ao carregar catálogo de itens');
+      setProdutosDisponiveis([]);
+    } finally {
+      setIsLoadingProdutos(false);
+    }
+  };
 
   // Form
   const {
@@ -160,10 +196,21 @@ const NovoComboPage: React.FC = () => {
   const economia = precoOriginal - precoCombo;
   const percentualDesconto = precoOriginal > 0 ? (economia / precoOriginal) * 100 : 0;
 
-  // Filtrar produtos
-  const produtosFiltrados = buscarProdutos({
-    termo: searchTerm,
-  }).filter((produto) => !watchedProdutos?.some((item) => item.produto.id === produto.id));
+  const produtosFiltradosCatalogo = produtosDisponiveis
+    .filter((produto) => {
+      if (!searchTerm.trim()) {
+        return true;
+      }
+
+      const termo = searchTerm.toLowerCase();
+      return (
+        produto.nome.toLowerCase().includes(termo) ||
+        produto.categoria.toLowerCase().includes(termo) ||
+        (produto.descricao && produto.descricao.toLowerCase().includes(termo)) ||
+        (produto.tipo && produto.tipo.toLowerCase().includes(termo))
+      );
+    })
+    .filter((produto) => !watchedProdutos?.some((item) => item.produto.id === produto.id));
 
   // Handlers
   const handleAdicionarProduto = (produto: ProdutoPropostaBase) => {
@@ -429,38 +476,44 @@ const NovoComboPage: React.FC = () => {
                 </div>
 
                 <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {produtosFiltrados.map((produto) => (
-                    <div
-                      key={produto.id}
-                      onClick={() => handleAdicionarProduto(produto)}
-                      className="p-3 border border-gray-200 rounded-lg hover:bg-white cursor-pointer transition-colors"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="font-medium text-gray-900">{produto.nome}</div>
-                          <div className="text-sm text-gray-600">{produto.descricao}</div>
-                          <div className="flex gap-1 mt-1">
-                            <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
-                              {produto.categoria}
-                            </span>
-                            {produto.tipo && (
-                              <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">
-                                {produto.tipo}
-                              </span>
-                            )}
+                  {isLoadingProdutos ? (
+                    <p className="text-gray-500 text-center py-4">Carregando catálogo de itens...</p>
+                  ) : (
+                    <>
+                      {produtosFiltradosCatalogo.map((produto) => (
+                        <div
+                          key={produto.id}
+                          onClick={() => handleAdicionarProduto(produto)}
+                          className="p-3 border border-gray-200 rounded-lg hover:bg-white cursor-pointer transition-colors"
+                        >
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900">{produto.nome}</div>
+                              <div className="text-sm text-gray-600">{produto.descricao}</div>
+                              <div className="flex gap-1 mt-1">
+                                <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
+                                  {produto.categoria}
+                                </span>
+                                {produto.tipo && (
+                                  <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">
+                                    {produto.tipo}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right ml-4">
+                              <div className="font-medium text-green-600">
+                                {formatCurrency(produto.preco)}
+                              </div>
+                              <div className="text-xs text-gray-500">por {produto.unidade}</div>
+                            </div>
                           </div>
                         </div>
-                        <div className="text-right ml-4">
-                          <div className="font-medium text-green-600">
-                            {formatCurrency(produto.preco)}
-                          </div>
-                          <div className="text-xs text-gray-500">por {produto.unidade}</div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {produtosFiltrados.length === 0 && (
-                    <p className="text-gray-500 text-center py-4">Nenhum produto encontrado</p>
+                      ))}
+                      {produtosFiltradosCatalogo.length === 0 && (
+                        <p className="text-gray-500 text-center py-4">Nenhum produto encontrado</p>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

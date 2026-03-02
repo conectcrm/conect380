@@ -71,6 +71,7 @@ interface Produto {
   categoria: string;
   subcategoria?: string;
   tipo?: 'produto' | 'combo' | 'software'; // Adicionando software
+  status?: 'ativo' | 'inativo' | 'descontinuado' | 'rascunho';
   descricao?: string;
   unidade: string; // Mudando para obrigatório para compatibilidade
   // Campos específicos para software
@@ -113,6 +114,13 @@ const isProdutoSoftware = (produto: Produto): boolean => {
     produto.categoria?.toLowerCase().includes('software') ||
     (produto.tipoItem && ['licenca', 'modulo', 'aplicativo'].includes(produto.tipoItem))
   );
+};
+
+const comboContemItemDescontinuado = (produto: Produto): boolean => {
+  if (produto.tipo !== 'combo' || !Array.isArray(produto.produtosCombo)) {
+    return false;
+  }
+  return produto.produtosCombo.some((item) => item.status === 'descontinuado');
 };
 
 // Schema de validação por etapa
@@ -489,6 +497,10 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
   const produtosFiltrados = useMemo(() => {
     let filtered = produtosDisponiveis;
 
+    filtered = filtered.filter(
+      (p) => p.tipo === 'combo' || (p.status || 'ativo') !== 'descontinuado',
+    );
+
     if (categoriaSelecionada) {
       filtered = filtered.filter((p) => p.categoria === categoriaSelecionada);
     }
@@ -522,6 +534,11 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
   };
 
   const handleAdicionarProduto = (produto: Produto) => {
+    if (produto.tipo !== 'combo' && produto.status === 'descontinuado') {
+      toast.error('Item descontinuado não pode ser adicionado em novas propostas.');
+      return;
+    }
+
     const novoProduto: ProdutoProposta = {
       produto,
       quantidade: 1,
@@ -532,6 +549,14 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
     adicionarProduto(novoProduto);
     setBuscarProduto('');
     setShowProdutoSearch(false);
+
+    if (comboContemItemDescontinuado(produto)) {
+      toast.success(
+        `${produto.nome} adicionado. Itens descontinuados no combo serão preservados por snapshot.`,
+      );
+      return;
+    }
+
     toast.success(`${produto.nome} adicionado à proposta!`);
   };
 

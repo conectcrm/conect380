@@ -357,9 +357,9 @@ Entregavel:
 
 #### Fase C - Integracao com propostas e combos (Sprint 2)
 
-- [ ] Atualizar fluxo de proposta para consumir catalogo unificado como fonte primaria.
-- [ ] Manter combos como composicao de itens, com calculo transparente no resumo da proposta.
-- [ ] Garantir fallback seguro quando item referenciado for descontinuado (snapshot imutavel na proposta).
+- [x] Atualizar fluxo de proposta para consumir catalogo unificado como fonte primaria.
+- [x] Manter combos como composicao de itens, com calculo transparente no resumo da proposta.
+- [x] Garantir fallback seguro quando item referenciado for descontinuado (snapshot imutavel na proposta).
 - [ ] Validar fluxo ponta a ponta: criar item -> criar combo -> gerar proposta -> aprovar.
 
 Entregavel:

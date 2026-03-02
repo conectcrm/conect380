@@ -33,6 +33,7 @@ interface Produto {
   descricao?: string;
   unidade: string;
   tipo?: 'produto' | 'combo' | 'software';
+  status?: 'ativo' | 'inativo' | 'descontinuado' | 'rascunho';
   produtosCombo?: Produto[];
   precoOriginal?: number;
   desconto?: number;
@@ -171,13 +172,75 @@ class PropostasService {
 
       this.isLoadingProdutos = true;
 
-      // Carregar produtos do backend
+      // Carregar catálogo de itens do backend
       const { produtosService } = await import('../../../services/produtosService');
       const produtosAPI = await produtosService.findAll();
 
+      const itensCatalogo: Produto[] = Array.isArray(produtosAPI)
+        ? produtosAPI
+            .filter((produto: any) => (produto?.status || 'ativo') !== 'descontinuado')
+            .map((produto: any) => ({
+              id: produto.id || `prod_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              nome: produto.nome || 'Item sem nome',
+              preco: Number(produto.preco || 0),
+              categoria: produto.categoria || 'Geral',
+              descricao: produto.descricao || '',
+              unidade: produto.unidade || produto.unidadeMedida || 'unidade',
+              tipo: 'produto',
+              tipoItem: produto.tipoItem,
+              status: produto.status || 'ativo',
+              tipoLicenciamento: produto.frequencia,
+              periodicidadeLicenca: produto.frequencia,
+            }))
+        : [];
+
+      let itensCombo: Produto[] = [];
+      try {
+        const { combosService } = await import('../../../services/combosService');
+        const combos = await combosService.listarCombos();
+
+        itensCombo = (Array.isArray(combos) ? combos : [])
+          .filter((combo) => combo.status === 'ativo')
+          .map((combo) => ({
+            id: combo.id,
+            nome: combo.nome,
+            preco: Number(combo.precoCombo || 0),
+            categoria: combo.categoria || 'Combo',
+            descricao: combo.descricao || '',
+            unidade: 'combo',
+            tipo: 'combo',
+            status: combo.status,
+            precoOriginal: Number(combo.precoOriginal || 0),
+            desconto: Number(combo.desconto || 0),
+            produtosCombo: (combo.produtos || []).map((item) => ({
+              id: item.produto.id,
+              nome: item.produto.nome,
+              preco: Number(item.produto.preco || 0),
+              categoria: item.produto.categoria || 'Geral',
+              descricao: item.produto.descricao,
+              unidade: item.produto.unidade || 'unidade',
+              tipo: 'produto',
+              tipoItem: item.produto.tipo as Produto['tipoItem'],
+              status: item.produto.status || 'ativo',
+            })),
+          }));
+      } catch (comboError) {
+        console.warn('⚠️ Não foi possível carregar combos para propostas:', comboError);
+      }
+
+      const produtosFormatados: Produto[] = [...itensCatalogo, ...itensCombo];
+
+      if (produtosFormatados.length > 0) {
+        // Atualizar cache
+        this.produtosCache = produtosFormatados;
+        this.produtosCacheTimestamp = Date.now();
+
+        return produtosFormatados;
+      }
+
       if (produtosAPI && produtosAPI.length > 0) {
-        // Converter produtos da API para o formato de propostas
-        const produtosFormatados: Produto[] = produtosAPI.map((produto: any) => ({
+        // Compatibilidade defensiva para payloads inesperados
+        const fallbackFormatado: Produto[] = produtosAPI.map((produto: any) => ({
           id: produto.id || `prod_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           nome: produto.nome || 'Produto sem nome',
           preco: produto.preco || 0,
@@ -185,13 +248,14 @@ class PropostasService {
           descricao: produto.descricao || '',
           unidade: produto.unidade || 'unidade',
           tipo: produto.tipo || 'produto',
+          status: produto.status || 'ativo',
         }));
 
         // Atualizar cache
-        this.produtosCache = produtosFormatados;
+        this.produtosCache = fallbackFormatado;
         this.produtosCacheTimestamp = Date.now();
 
-        return produtosFormatados;
+        return fallbackFormatado;
       }
     } catch (error) {
       console.error('❌ Erro ao carregar produtos do backend:', error);
@@ -464,6 +528,12 @@ class PropostasService {
             id: produto.produto.id,
             produtoId: produto.produto.id,
             nome: produto.produto.nome,
+            tipo: produto.produto.tipo || 'produto',
+            status: produto.produto.status || 'ativo',
+            categoria: produto.produto.categoria || 'Geral',
+            descricao: produto.produto.descricao || '',
+            unidade: produto.produto.unidade || 'unidade',
+            tipoItem: produto.produto.tipoItem || 'produto',
             quantidade: produto.quantidade,
             precoUnitario: produto.produto.preco,
             desconto: produto.desconto || 0,
@@ -471,6 +541,19 @@ class PropostasService {
               (Number(produto.quantidade || 0) || 0) *
               (Number(produto.produto.preco || 0) || 0) *
               (1 - (Number(produto.desconto || 0) || 0) / 100),
+            produtosCombo:
+              produto.produto.tipo === 'combo' && Array.isArray(produto.produto.produtosCombo)
+                ? produto.produto.produtosCombo.map((itemCombo) => ({
+                    id: itemCombo.id,
+                    nome: itemCombo.nome,
+                    status: itemCombo.status || 'ativo',
+                    categoria: itemCombo.categoria || 'Geral',
+                    descricao: itemCombo.descricao || '',
+                    unidade: itemCombo.unidade || 'unidade',
+                    tipoItem: itemCombo.tipoItem || 'produto',
+                    precoUnitario: Number(itemCombo.preco || 0),
+                  }))
+                : undefined,
           })) || [],
       };
 
