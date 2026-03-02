@@ -1,14 +1,14 @@
 param(
-  [Parameter(Mandatory = $true)]
   [string]$ServerIp,
-  [Parameter(Mandatory = $true)]
   [string]$SshUser,
-  [Parameter(Mandatory = $true)]
   [string]$PemPath,
-  [string]$RemoteRoot = "/home/azureuser/conect360",
+  [string]$RemoteRoot,
+  [string]$ProfileName = "production",
+  [string]$ProfilePath,
   [switch]$SkipPreflight,
   [switch]$SkipBackup,
   [switch]$NoCacheBuild,
+  [switch]$AllowDirtyWorktree,
   [switch]$Execute
 )
 
@@ -18,7 +18,7 @@ function Require-Command {
   param([string]$Name)
   $cmd = Get-Command $Name -ErrorAction SilentlyContinue
   if (-not $cmd) {
-    throw "Comando obrigatório não encontrado: $Name"
+    throw "Comando obrigatorio nao encontrado: $Name"
   }
 }
 
@@ -30,6 +30,59 @@ function Run-Step {
   Write-Host ""
   Write-Host "==> $Title" -ForegroundColor Cyan
   & $Action
+}
+
+function Load-DeployProfile {
+  param(
+    [string]$Path,
+    [string]$Name
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Path)) {
+    return $null
+  }
+
+  if (-not (Test-Path $Path)) {
+    throw "Arquivo de perfil nao encontrado: $Path"
+  }
+
+  $data = Import-PowerShellDataFile -Path $Path
+  if ($null -eq $data -or -not $data.ContainsKey("Profiles")) {
+    throw "Arquivo de perfil invalido: chave 'Profiles' ausente em $Path"
+  }
+
+  $profiles = $data.Profiles
+  if ($null -eq $profiles -or -not $profiles.ContainsKey($Name)) {
+    $available = @()
+    foreach ($key in $profiles.Keys) {
+      $available += [string]$key
+    }
+    $availableText = if ($available.Count -gt 0) { $available -join ", " } else { "<nenhum>" }
+    throw "Perfil '$Name' nao encontrado em $Path. Perfis disponiveis: $availableText"
+  }
+
+  return $profiles[$Name]
+}
+
+function Resolve-MissingArgs {
+  param([hashtable]$ProfileData)
+
+  if ($null -eq $ProfileData) {
+    return
+  }
+
+  if ([string]::IsNullOrWhiteSpace($ServerIp) -and $ProfileData.ContainsKey("ServerIp")) {
+    $script:ServerIp = [string]$ProfileData.ServerIp
+  }
+  if ([string]::IsNullOrWhiteSpace($SshUser) -and $ProfileData.ContainsKey("SshUser")) {
+    $script:SshUser = [string]$ProfileData.SshUser
+  }
+  if ([string]::IsNullOrWhiteSpace($PemPath) -and $ProfileData.ContainsKey("PemPath")) {
+    $script:PemPath = [string]$ProfileData.PemPath
+  }
+  if ([string]::IsNullOrWhiteSpace($RemoteRoot) -and $ProfileData.ContainsKey("RemoteRoot")) {
+    $script:RemoteRoot = [string]$ProfileData.RemoteRoot
+  }
 }
 
 function Invoke-Remote {
@@ -44,11 +97,42 @@ Require-Command git
 Require-Command ssh
 Require-Command scp
 
-if (-not (Test-Path $PemPath)) {
-  throw "Arquivo PEM não encontrado: $PemPath"
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$defaultProfilePath = Join-Path $repoRoot ".production\configs\deploy-profile.local.psd1"
+
+if ([string]::IsNullOrWhiteSpace($ProfilePath) -and -not [string]::IsNullOrWhiteSpace($env:CONNECT360_DEPLOY_PROFILE_PATH)) {
+  $ProfilePath = $env:CONNECT360_DEPLOY_PROFILE_PATH
 }
 
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+if ([string]::IsNullOrWhiteSpace($ProfilePath) -and (Test-Path $defaultProfilePath)) {
+  $ProfilePath = $defaultProfilePath
+}
+
+$profileData = Load-DeployProfile -Path $ProfilePath -Name $ProfileName
+Resolve-MissingArgs -ProfileData $profileData
+
+if ([string]::IsNullOrWhiteSpace($RemoteRoot)) {
+  $RemoteRoot = "/home/azureuser/conect360"
+}
+
+$missing = @()
+if ([string]::IsNullOrWhiteSpace($ServerIp)) { $missing += "ServerIp" }
+if ([string]::IsNullOrWhiteSpace($SshUser)) { $missing += "SshUser" }
+if ([string]::IsNullOrWhiteSpace($PemPath)) { $missing += "PemPath" }
+if ($missing.Count -gt 0) {
+  $missingText = $missing -join ", "
+  throw "Parametros obrigatorios ausentes: $missingText. Passe por argumento ou configure o perfil em .production/configs/deploy-profile.local.psd1"
+}
+
+if (-not (Test-Path $PemPath)) {
+  throw "Arquivo PEM nao encontrado: $PemPath"
+}
+
+if ($profileData) {
+  Write-Host "Perfil de deploy carregado: '$ProfileName'" -ForegroundColor DarkCyan
+  Write-Host "Arquivo de perfil: $ProfilePath" -ForegroundColor DarkCyan
+}
+
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $artifactPath = Join-Path $repoRoot ".production\release-$timestamp.zip"
 $shortSha = (git -C $repoRoot rev-parse --short HEAD).Trim()
@@ -56,7 +140,13 @@ $shortSha = (git -C $repoRoot rev-parse --short HEAD).Trim()
 Run-Step -Title "Validar git status" -Action {
   $status = git -C $repoRoot status --porcelain
   if ($status) {
-    throw "Working tree com alterações locais. Commit/stash antes da release."
+    if (-not $AllowDirtyWorktree) {
+      throw "Working tree com alteracoes locais. Commit/stash antes da release."
+    }
+
+    Write-Host "AVISO: release executando com working tree sujo (AllowDirtyWorktree)." -ForegroundColor Yellow
+    Write-Host "AVISO: o artifact continua sendo gerado a partir do HEAD commitado." -ForegroundColor Yellow
+    return
   }
   Write-Host "OK - working tree limpo"
 }
@@ -126,7 +216,7 @@ docker compose ps
 "@
 
   if (-not $Execute) {
-    Write-Host "Modo dry-run. Comandos que serão executados na VM:"
+    Write-Host "Modo dry-run. Comandos que serao executados na VM:"
     Write-Host "--------------------------------------------------"
     Write-Host $remoteScript
     Write-Host "--------------------------------------------------"
@@ -134,6 +224,8 @@ docker compose ps
     return
   }
 
+  # Normaliza fim de linha para LF antes de enviar ao shell remoto.
+  $remoteScript = $remoteScript -replace "`r", ""
   Invoke-Remote -ScriptText $remoteScript
 }
 
@@ -142,5 +234,5 @@ if (Test-Path $artifactPath) {
 }
 
 Write-Host ""
-Write-Host "Release concluída." -ForegroundColor Green
-Write-Host "Próximo passo: purge de cache no Cloudflare (/index.html, /brand/*, /static/*)." -ForegroundColor Yellow
+Write-Host "Release concluida." -ForegroundColor Green
+Write-Host "Proximo passo: purge de cache no Cloudflare (/index.html, /brand/*, /static/*)." -ForegroundColor Yellow
