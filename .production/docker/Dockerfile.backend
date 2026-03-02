@@ -51,6 +51,8 @@ COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/package*.json ./
 COPY --from=builder --chown=nestjs:nodejs /app/ormconfig.js ./
+# Garantir templates estáticos (PDF/e-mail) disponíveis em runtime
+COPY --from=builder --chown=nestjs:nodejs /app/src/templates ./src/templates
 
 # Criar diretórios necessários para uploads e logs
 RUN mkdir -p uploads logs && \
