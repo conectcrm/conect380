@@ -27,6 +27,9 @@
 8. Smoke ADM-303 pos-deploy executado com PASS:
    - `docs/features/evidencias/ADM303_SMOKE_20260302-131702.json`
    - `docs/features/evidencias/ADM303_SMOKE_20260302-131702.md`
+9. Smoke ADM-303 local (modo real) reexecutado com PASS apos ajustes operacionais:
+   - `docs/features/evidencias/ADM303_SMOKE_20260302-145832.json`
+   - `docs/features/evidencias/ADM303_SMOKE_20260302-145832.md`
 
 ## 3. Itens pendentes para go-live
 

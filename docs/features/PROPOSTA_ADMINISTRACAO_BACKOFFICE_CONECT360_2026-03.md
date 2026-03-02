@@ -287,6 +287,8 @@ Diretriz recomendada:
      - `docs/features/evidencias/ADM303_SMOKE_20260302-123509.md`
      - `docs/features/evidencias/ADM303_SMOKE_20260302-131702.json`
      - `docs/features/evidencias/ADM303_SMOKE_20260302-131702.md`
+     - `docs/features/evidencias/ADM303_SMOKE_20260302-145832.json`
+     - `docs/features/evidencias/ADM303_SMOKE_20260302-145832.md`
    - evidencia operacional do deploy ADM-301:
      - `docs/features/evidencias/ADM301_DEPLOY_ADMIN_WEB_20260302-132151.md`
 
