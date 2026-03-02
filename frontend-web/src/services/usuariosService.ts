@@ -1,12 +1,19 @@
 import { api } from './api';
 import {
+  AccessReviewReport,
+  AccessReviewReportSummaryEntry,
+  AccessReviewReportUser,
   Usuario,
   NovoUsuario,
   AtualizarUsuario,
   FiltrosUsuarios,
   EstatisticasUsuarios,
   PermissionCatalogResponse,
+  UserAccessChangeRequest,
+  UserAccessChangeStatus,
   UserRole,
+  UsuarioMutationResult,
+  RecertifyAccessResult,
 } from '../types/usuarios/index';
 import { User } from '../types';
 
@@ -22,6 +29,17 @@ export interface UploadAvatarResponse {
   nome?: string;
   email?: string;
   avatar_url?: string | null;
+}
+
+export interface AprovarSolicitacaoAcessoResult {
+  request: UserAccessChangeRequest;
+  applied_user?: Usuario | null;
+}
+
+export interface AccessReviewReportFilters {
+  role?: UserRole | '';
+  include_inactive?: boolean;
+  limit?: number;
 }
 
 export type PrivacyRequestType = 'data_export' | 'account_anonymization' | 'account_deletion';
@@ -129,7 +147,43 @@ class UsuariosService {
     };
   }
 
-  async criarUsuario(usuario: NovoUsuario): Promise<Usuario> {
+  private isAccessChangeRequestPayload(data: unknown): data is UserAccessChangeRequest {
+    if (!data || typeof data !== 'object') {
+      return false;
+    }
+
+    const value = data as Record<string, unknown>;
+    return (
+      typeof value.id === 'string' &&
+      typeof value.action === 'string' &&
+      typeof value.status === 'string' &&
+      typeof value.created_at === 'string'
+    );
+  }
+
+  private formatarSolicitacaoAcesso(data: any): UserAccessChangeRequest {
+    return {
+      id: data.id,
+      empresa_id: data.empresa_id,
+      action: data.action,
+      status: data.status as UserAccessChangeStatus,
+      target_user_id: data.target_user_id ?? null,
+      request_payload: data.request_payload ?? {},
+      request_reason: data.request_reason ?? null,
+      decision_reason: data.decision_reason ?? null,
+      decided_at: data.decided_at ?? null,
+      applied_at: data.applied_at ?? null,
+      applied_user_id: data.applied_user_id ?? null,
+      created_at: data.created_at,
+      updated_at: data.updated_at ?? null,
+      requested_by: data.requested_by ?? null,
+      decided_by: data.decided_by ?? null,
+      target_user: data.target_user ?? null,
+      applied_user: data.applied_user ?? null,
+    };
+  }
+
+  async criarUsuario(usuario: NovoUsuario): Promise<UsuarioMutationResult> {
     const dadosBackend = {
       nome: usuario.nome,
       email: usuario.email,
@@ -151,10 +205,25 @@ class UsuariosService {
     };
 
     const response = await api.post(this.getUrl(), dadosBackend);
-    return this.formatarUsuario(response.data.data);
+    const payload = response.data;
+    const data = payload?.data ?? payload;
+
+    if (this.isAccessChangeRequestPayload(data)) {
+      return {
+        mode: 'pending_approval',
+        request: this.formatarSolicitacaoAcesso(data),
+        message: payload?.message,
+      };
+    }
+
+    return {
+      mode: 'applied',
+      usuario: this.formatarUsuario(data),
+      message: payload?.message,
+    };
   }
 
-  async atualizarUsuario(usuario: AtualizarUsuario): Promise<Usuario> {
+  async atualizarUsuario(usuario: AtualizarUsuario): Promise<UsuarioMutationResult> {
     const { id, ...dados } = usuario;
 
     const dadosBackend = {
@@ -170,7 +239,22 @@ class UsuariosService {
     };
 
     const response = await api.put(this.getUrl(`/${id}`), dadosBackend);
-    return this.formatarUsuario(response.data.data);
+    const payload = response.data;
+    const data = payload?.data ?? payload;
+
+    if (this.isAccessChangeRequestPayload(data)) {
+      return {
+        mode: 'pending_approval',
+        request: this.formatarSolicitacaoAcesso(data),
+        message: payload?.message,
+      };
+    }
+
+    return {
+      mode: 'applied',
+      usuario: this.formatarUsuario(data),
+      message: payload?.message,
+    };
   }
 
   async excluirUsuario(id: string): Promise<void> {
@@ -376,6 +460,67 @@ class UsuariosService {
     return response.data?.data ?? response.data ?? {};
   }
 
+  async listarSolicitacoesAcesso(params?: {
+    status?: UserAccessChangeStatus;
+    limit?: number;
+  }): Promise<UserAccessChangeRequest[]> {
+    const response = await api.get(this.getUrl('/access-change-requests'), { params });
+    const data = Array.isArray(response.data?.data) ? response.data.data : [];
+    return data.map((item: any) => this.formatarSolicitacaoAcesso(item));
+  }
+
+  async aprovarSolicitacaoAcesso(
+    id: string,
+    payload?: {
+      reason?: string;
+    },
+  ): Promise<AprovarSolicitacaoAcessoResult> {
+    const response = await api.post(this.getUrl(`/access-change-requests/${id}/approve`), payload || {});
+    const data = response.data?.data ?? response.data ?? {};
+
+    return {
+      request: this.formatarSolicitacaoAcesso(data.request ?? {}),
+      applied_user: data.applied_user ? this.formatarUsuario(data.applied_user) : null,
+    };
+  }
+
+  async rejeitarSolicitacaoAcesso(
+    id: string,
+    payload?: {
+      reason?: string;
+    },
+  ): Promise<UserAccessChangeRequest> {
+    const response = await api.post(this.getUrl(`/access-change-requests/${id}/reject`), payload || {});
+    return this.formatarSolicitacaoAcesso(response.data?.data ?? response.data ?? {});
+  }
+
+  async gerarRelatorioRevisaoAcessos(
+    params?: AccessReviewReportFilters,
+  ): Promise<AccessReviewReport> {
+    const response = await api.get(this.getUrl('/access-review/report'), { params });
+    const payload = response.data?.data ?? response.data ?? {};
+    return this.formatarRelatorioRevisaoAcessos(payload);
+  }
+
+  async recertificarAcesso(payload: {
+    target_user_id: string;
+    approved: boolean;
+    reason?: string;
+  }): Promise<RecertifyAccessResult> {
+    const response = await api.post(this.getUrl('/access-review/recertify'), payload, {
+      timeout: this.requestTimeoutMs,
+    });
+
+    const data = response.data?.data ?? response.data ?? {};
+
+    return {
+      decision: data.decision,
+      action_taken: data.action_taken,
+      activity_id: data.activity_id,
+      target_user: this.formatarUsuario(data.target_user ?? {}),
+    };
+  }
+
   async uploadAvatarUsuario(id: string, file: File): Promise<UploadAvatarResponse> {
     const formData = new FormData();
     formData.append('avatar', file);
@@ -411,6 +556,54 @@ class UsuariosService {
   }
 
   // Formatação de dados
+  private formatarRelatorioRevisaoAcessos(data: any): AccessReviewReport {
+    const summary = data?.summary ?? {};
+    const byProfileRaw = Array.isArray(summary.by_profile) ? summary.by_profile : [];
+    const usersRaw = Array.isArray(data?.users) ? data.users : [];
+
+    const by_profile: AccessReviewReportSummaryEntry[] = byProfileRaw.map((entry: any) => ({
+      role: String(entry?.role ?? ''),
+      total: Number(entry?.total ?? 0),
+      ativos: Number(entry?.ativos ?? 0),
+      inativos: Number(entry?.inativos ?? 0),
+    }));
+
+    const users: AccessReviewReportUser[] = usersRaw.map((user: any) => ({
+      id: String(user?.id ?? ''),
+      nome: String(user?.nome ?? ''),
+      email: String(user?.email ?? ''),
+      role: String(user?.role ?? ''),
+      ativo: Boolean(user?.ativo),
+      permissoes: Array.isArray(user?.permissoes) ? user.permissoes : [],
+      ultimo_login:
+        typeof user?.ultimo_login === 'string' ? user.ultimo_login : null,
+      created_at:
+        typeof user?.created_at === 'string' ? user.created_at : null,
+      updated_at:
+        typeof user?.updated_at === 'string' ? user.updated_at : null,
+    }));
+
+    return {
+      empresa_id: String(data?.empresa_id ?? ''),
+      generated_at:
+        typeof data?.generated_at === 'string'
+          ? data.generated_at
+          : new Date().toISOString(),
+      filters: {
+        role: typeof data?.filters?.role === 'string' ? data.filters.role : null,
+        include_inactive: Boolean(data?.filters?.include_inactive),
+        detail_limit: Number(data?.filters?.detail_limit ?? users.length),
+      },
+      summary: {
+        total_users: Number(summary.total_users ?? users.length),
+        active_users: Number(summary.active_users ?? 0),
+        inactive_users: Number(summary.inactive_users ?? 0),
+        by_profile,
+      },
+      users,
+    };
+  }
+
   private formatarUsuario(usuario: any): Usuario {
     return {
       id: usuario.id,

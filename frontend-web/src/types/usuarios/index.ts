@@ -131,6 +131,100 @@ export interface PermissionCatalogResponse {
   legacyAssignablePermissions: string[];
 }
 
+export type UserAccessChangeAction = 'USER_CREATE' | 'USER_UPDATE';
+
+export type UserAccessChangeStatus = 'REQUESTED' | 'APPROVED' | 'REJECTED';
+
+export interface UserAccessChangeRequest {
+  id: string;
+  empresa_id: string;
+  action: UserAccessChangeAction;
+  status: UserAccessChangeStatus;
+  target_user_id?: string | null;
+  request_payload?: Record<string, unknown>;
+  request_reason?: string | null;
+  decision_reason?: string | null;
+  decided_at?: string | null;
+  applied_at?: string | null;
+  applied_user_id?: string | null;
+  created_at: string;
+  updated_at?: string | null;
+  requested_by?: {
+    id?: string | null;
+    nome?: string | null;
+    email?: string | null;
+  } | null;
+  decided_by?: {
+    id?: string | null;
+    nome?: string | null;
+    email?: string | null;
+  } | null;
+  target_user?: {
+    id?: string | null;
+    nome?: string | null;
+    email?: string | null;
+    role?: string | null;
+  } | null;
+  applied_user?: {
+    id?: string | null;
+    nome?: string | null;
+    email?: string | null;
+    role?: string | null;
+  } | null;
+}
+
+export interface AccessReviewReportUser {
+  id: string;
+  nome: string;
+  email: string;
+  role: string;
+  ativo: boolean;
+  permissoes: string[];
+  ultimo_login?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface AccessReviewReportSummaryEntry {
+  role: string;
+  total: number;
+  ativos: number;
+  inativos: number;
+}
+
+export interface AccessReviewReport {
+  empresa_id: string;
+  generated_at: string;
+  filters: {
+    role?: string | null;
+    include_inactive?: boolean;
+    detail_limit?: number;
+  };
+  summary: {
+    total_users: number;
+    active_users: number;
+    inactive_users: number;
+    by_profile: AccessReviewReportSummaryEntry[];
+  };
+  users: AccessReviewReportUser[];
+}
+
+export interface RecertifyAccessResult {
+  decision: 'approved' | 'rejected';
+  action_taken: 'kept' | 'deactivated' | 'already_inactive';
+  activity_id: string;
+  target_user: Usuario;
+}
+
+export type UserMutationMode = 'applied' | 'pending_approval';
+
+export interface UsuarioMutationResult {
+  mode: UserMutationMode;
+  usuario?: Usuario;
+  request?: UserAccessChangeRequest;
+  message?: string;
+}
+
 export const ROLE_LABELS: Record<UserRole, string> = {
   [UserRole.SUPERADMIN]: 'Super Admin',
   [UserRole.ADMIN]: 'Administrador',
