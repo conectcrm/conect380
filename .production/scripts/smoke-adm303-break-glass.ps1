@@ -376,6 +376,16 @@ function Login-Session {
     }
 
     if ([string]::IsNullOrWhiteSpace($MfaCode)) {
+      $deliveryChannel = [string]$body.data.deliveryChannel
+      $devCode = [string]$body.data.devCode
+
+      if ($deliveryChannel -eq "dev_fallback" -and -not [string]::IsNullOrWhiteSpace($devCode)) {
+        $MfaCode = $devCode
+        Write-Host "   [MFA] Fallback de desenvolvimento detectado para $Email (codigo obtido automaticamente)."
+      }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($MfaCode)) {
       throw "MFA obrigatorio para $Email. Informe parametro de codigo MFA correspondente."
     }
 
