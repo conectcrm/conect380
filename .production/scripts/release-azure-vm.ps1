@@ -206,6 +206,11 @@ Run-Step -Title "Gerar artifact zip do HEAD ($shortSha)" -Action {
 }
 
 Run-Step -Title "Enviar artifact para VM" -Action {
+  if (-not $Execute) {
+    Write-Host "Modo dry-run. Upload do artifact nao sera executado."
+    return
+  }
+
   scp -i $PemPath $artifactPath "$SshUser@${ServerIp}:/tmp/conect360-release.zip"
   if ($LASTEXITCODE -ne 0) {
     throw "Falha no upload do artifact."
