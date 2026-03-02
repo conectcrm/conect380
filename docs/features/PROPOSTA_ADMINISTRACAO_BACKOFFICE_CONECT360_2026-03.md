@@ -310,3 +310,93 @@ Diretriz recomendada:
    - `preflight-go-live` executado em 2026-03-02 com `PASS` (`-SkipE2E`);
    - bloqueio de encoding removido em `frontend-web/src/features/gestao/pages/GestaoUsuariosPage.tsx`;
    - budget de lint alinhado ao baseline atual em `scripts/ci/lint-budget.json`.
+
+## 11. Roadmap comercial - Catalogo de Itens + Combos (proposta de execucao)
+
+Objetivo:
+
+1. Consolidar `Produtos` como `Catalogo de Itens` (produto, servico, plano, licenca, modulo, aplicativo).
+2. Manter `Combos` como pacotes/ofertas comerciais compostos por itens do catalogo.
+3. Evitar duplicidade de conceito e preservar compatibilidade com fluxo atual de propostas.
+
+### 11.1 Modelo funcional recomendado
+
+1. Catalogo de Itens (base de negociacao)
+  - Cadastro mestre de item com tipo, preco base, recorrencia, unidade, status e metadados.
+  - Estoque aplicado apenas para itens fisicos (quando tipo exigir).
+
+2. Combos/Pacotes (acelerador comercial)
+  - Conjunto de itens com regra de quantidade, desconto e vigencia.
+  - Nao substitui item: combo referencia itens do catalogo.
+
+3. Propostas
+  - Permitir adicionar item avulso, combo, ou ambos.
+  - Persistir snapshot dos itens para historico e auditoria comercial.
+
+### 11.2 Plano em fases (checklist executavel)
+
+#### Fase A - Semantica e UX (Sprint 1)
+
+- [ ] Renomear menu/tela `Produtos` para `Catalogo de Itens` (mantendo rota legada por compatibilidade).
+- [ ] Padronizar filtros por `tipoItem` (remover regras baseadas em texto de categoria como "Servicos").
+- [ ] Ajustar labels e estados visuais para itens recorrentes (plano/licenca) x item unico.
+- [ ] Ocultar campos nao aplicaveis por tipo (ex.: estoque para servico/plano).
+
+Entregavel:
+- UX clara para o usuario comercial: item avulso x pacote.
+
+#### Fase B - Consistencia de dados (Sprint 1-2)
+
+- [ ] Revisar `produto.entity.ts` para remover flags que impedem persistencia/leitura de campos necessarios (`insert/update/select` indevidos).
+- [ ] Alinhar `produtos.service.ts` para status triplo real (`ativo/inativo/descontinuado`) sem perda de semantica.
+- [ ] Validar DTO e mapeamento frontend-backend para todos os tipos de item.
+- [ ] Garantir que estatisticas considerem status e tipos corretamente.
+
+Entregavel:
+- Persistencia completa e previsivel no CRUD de itens.
+
+#### Fase C - Integracao com propostas e combos (Sprint 2)
+
+- [ ] Atualizar fluxo de proposta para consumir catalogo unificado como fonte primaria.
+- [ ] Manter combos como composicao de itens, com calculo transparente no resumo da proposta.
+- [ ] Garantir fallback seguro quando item referenciado for descontinuado (snapshot imutavel na proposta).
+- [ ] Validar fluxo ponta a ponta: criar item -> criar combo -> gerar proposta -> aprovar.
+
+Entregavel:
+- Fluxo comercial completo funcionando para venda unitario + empacotada.
+
+#### Fase D - Governanca e adocao (Sprint 3)
+
+- [ ] Separar permissoes de `catalogo` e `combos` por role (read/create/update/delete).
+- [ ] Permitir ocultar menu de combos por modulo/perfil quando cliente nao usa pacotes.
+- [ ] Criar guia rapido in-app (2-3 bullets) explicando quando usar item x combo.
+- [ ] Adicionar metricas de uso (itens avulsos vs combos em propostas).
+
+Entregavel:
+- Operacao governada e aderente ao perfil de cada tenant.
+
+### 11.3 Ordem sugerida de PRs
+
+1. PR-01 (Frontend UX): nomenclatura e filtros por tipoItem.
+2. PR-02 (Backend dados): entity/service/dto de itens + status.
+3. PR-03 (Integracao comercial): propostas + combos com snapshot consistente.
+4. PR-04 (Governanca): permissoes, feature flags de menu e telemetria de uso.
+
+### 11.4 Criterios de aceite globais
+
+1. CRUD de item salva e retorna todos os campos esperados por tipo.
+2. Proposta aceita item avulso e combo no mesmo fluxo sem divergencia de total.
+3. Status `descontinuado` nao aparece como `ativo` em filtros/estatisticas.
+4. Tenant sem uso de combo pode operar apenas com catalogo sem perda funcional.
+5. Build frontend/backend e smoke comercial passam sem regressao.
+
+### 11.5 Risco e mitigacao
+
+1. Risco: regressao em propostas existentes.
+  - Mitigacao: manter rotas/contratos legados e usar adaptadores de compatibilidade.
+
+2. Risco: confusao de usuario na transicao de nomenclatura.
+  - Mitigacao: manter alias temporario (`Produtos`) com texto orientativo por 1 ciclo.
+
+3. Risco: inconsistencias de dados historicos.
+  - Mitigacao: migracao incremental com backfill e validacao por amostragem.
