@@ -2161,7 +2161,7 @@ const ClientesPage: React.FC = () => {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="min-w-[1180px] bg-white">
+                <table className="w-full min-w-[1180px] bg-white">
                   <thead className="border-b border-[#E1EAEE] bg-[#F8FBFC]">
                     <tr>
                       <th className="w-12 px-4 py-3 text-left" onClick={(e) => e.stopPropagation()}>

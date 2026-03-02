@@ -15,7 +15,17 @@ import {
   DollarSign,
   Settings,
 } from 'lucide-react';
-import { BackToNucleus } from '../../components/navigation/BackToNucleus';
+import {
+  DataTableCard,
+  EmptyState,
+  FiltersBar,
+  InlineStats,
+  LoadingSkeleton,
+  PageHeader,
+  SectionCard,
+} from '../../components/layout-v2';
+import { ConfirmationModal } from '../../components/common/ConfirmationModal';
+import { useConfirmation } from '../../hooks/useConfirmation';
 import { ModalCadastroProduto } from '../../components/modals/ModalCadastroProdutoLandscape';
 import { produtosService, Produto, ProdutoEstatisticas } from '../../services/produtosService';
 import toast from 'react-hot-toast';
@@ -78,6 +88,7 @@ const statusConfig = {
 
 const ProdutosPage: React.FC = () => {
   const navigate = useNavigate();
+  const { confirmationState, showConfirmation } = useConfirmation();
 
   // Estados principais
   const [produtos, setProdutos] = useState<ProdutoLegacy[]>([]);
@@ -89,9 +100,12 @@ const ProdutosPage: React.FC = () => {
     estoquesBaixos: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [categoriaFilter, setCategoriaFilter] = useState<string>('todas');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [selectedProduto, setSelectedProduto] = useState<ProdutoLegacy | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -103,14 +117,11 @@ const ProdutosPage: React.FC = () => {
   const [isLoadingSave, setIsLoadingSave] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
-  // Estados para confirmação de exclusão
-  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
-  const [produtoParaExcluir, setProdutoParaExcluir] = useState<ProdutoLegacy | null>(null);
-
   // Função para carregar produtos do backend
   const carregarProdutos = async () => {
     try {
       setIsLoading(true);
+      setError(null);
       const produtosAPI = await produtosService.findAll();
       const produtosFormatados = produtosAPI.map(produtosService.transformApiToLegacy);
       setProdutos(produtosFormatados);
@@ -120,6 +131,7 @@ const ProdutosPage: React.FC = () => {
       setEstatisticas(estatisticasAPI);
     } catch (error) {
       console.error('Erro ao carregar produtos:', error);
+      setError('Erro ao carregar produtos. Tente novamente.');
       toast.error('Erro ao carregar produtos. Verifique se o backend está funcionando.');
     } finally {
       setIsLoading(false);
@@ -150,6 +162,33 @@ const ProdutosPage: React.FC = () => {
     () => Array.from(new Set(produtos.map((produto) => produto.categoria))),
     [produtos],
   );
+
+  const hasFilters =
+    searchTerm.trim().length > 0 || statusFilter !== 'todos' || categoriaFilter !== 'todas';
+
+  const totalPages = Math.max(1, Math.ceil(produtosFiltrados.length / itemsPerPage));
+
+  const produtosPagina = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return produtosFiltrados.slice(startIndex, startIndex + itemsPerPage);
+  }, [produtosFiltrados, currentPage, itemsPerPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, categoriaFilter, itemsPerPage]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('todos');
+    setCategoriaFilter('todas');
+    setCurrentPage(1);
+  };
 
   const handleExport = useCallback(async () => {
     if (produtosFiltrados.length === 0) {
@@ -293,28 +332,24 @@ const ProdutosPage: React.FC = () => {
   };
 
   const handleExcluirProduto = (produto: ProdutoLegacy) => {
-    setProdutoParaExcluir(produto);
-    setShowConfirmDelete(true);
-  };
-
-  const confirmarExclusao = async () => {
-    if (produtoParaExcluir) {
-      try {
-        await produtosService.delete(produtoParaExcluir.id);
-        await carregarProdutos(); // Recarregar lista
-        toast.success(`Produto "${produtoParaExcluir.nome}" excluído com sucesso!`);
-        setShowConfirmDelete(false);
-        setProdutoParaExcluir(null);
-      } catch (error) {
-        console.error('Erro ao excluir produto:', error);
-        toast.error('Erro ao excluir produto');
-      }
-    }
-  };
-
-  const cancelarExclusao = () => {
-    setShowConfirmDelete(false);
-    setProdutoParaExcluir(null);
+    showConfirmation({
+      title: 'Confirmar Exclusão',
+      message: `Tem certeza que deseja excluir o produto "${produto.nome}"?\n\nEsta ação não pode ser desfeita.`,
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      icon: 'danger',
+      confirmButtonClass: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
+      onConfirm: async () => {
+        try {
+          await produtosService.delete(produto.id);
+          await carregarProdutos();
+          toast.success(`Produto "${produto.nome}" excluído com sucesso!`);
+        } catch (error) {
+          console.error('Erro ao excluir produto:', error);
+          toast.error('Erro ao excluir produto');
+        }
+      },
+    });
   };
 
   const handleSaveProduto = async (data: ProdutoFormData) => {
@@ -392,146 +427,228 @@ const ProdutosPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#159A9C] mx-auto"></div>
-          <p className="mt-4 text-[#002333]/70">Carregando produtos...</p>
-        </div>
+      <div className="space-y-4 pt-1 sm:pt-2">
+        <LoadingSkeleton lines={7} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header Padronizado */}
-      <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus nucleusName="Produtos" nucleusPath="/nuclei/produtos" />
-      </div>
-
-      <div className="p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
-          {/* Header da Página */}
-          <div className="bg-white rounded-lg shadow-sm border border-[#DEEFE7] p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-[#002333] flex items-center">
-                  <Package className="h-8 w-8 mr-3 text-[#159A9C]" />
-                  Produtos
-                </h1>
-                <p className="mt-2 text-[#002333]/70">
-                  Gestão completa do catálogo de produtos e serviços
-                </p>
-              </div>
-              <div className="mt-4 sm:mt-0 flex flex-col sm:flex-row gap-3">
-                <button
-                  onClick={() => navigate('/produtos/categorias')}
-                  className="inline-flex items-center px-4 py-2 border border-[#B4BEC9] text-sm font-medium rounded-lg text-[#002333] bg-white hover:bg-[#DEEFE7] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#159A9C]/40 transition-colors"
-                >
-                  <Settings className="w-4 h-4 mr-2" />
-                  Categorias
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleExport}
-                  disabled={isExporting || produtosFiltrados.length === 0}
-                  className="inline-flex items-center px-4 py-2 border border-[#B4BEC9] text-sm font-medium rounded-lg text-[#002333] bg-white hover:bg-[#DEEFE7] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#159A9C]/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  {isExporting ? 'Exportando...' : 'Exportar'}
-                </button>
-
-                <button
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-semibold rounded-lg text-white bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] hover:from-[#0F7B7D] hover:to-[#0C6062] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#159A9C]/40 transition-all shadow-sm hover:shadow-md"
-                  onClick={handleNovoProduto}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Novo Produto
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Cards de Estatísticas */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {statCards.map(({ key, label, value, description, iconWrapper, iconColor, Icon }) => (
-              <div
-                key={key}
-                className="rounded-xl p-6 shadow-sm border border-[#DEEFE7] bg-white hover:shadow-md transition-shadow"
+    <div className="space-y-4 pt-1 sm:pt-2">
+      <SectionCard className="space-y-4 p-4 sm:p-5">
+        <PageHeader
+          title={
+            <span className="inline-flex items-center gap-2">
+              <Package className="h-6 w-6 text-[#159A9C]" />
+              Produtos
+            </span>
+          }
+          description="Gestão completa do catálogo de produtos e serviços"
+          actions={
+            <>
+              <button
+                onClick={() => navigate('/produtos/categorias')}
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
               >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-[#002333]/70 uppercase tracking-wide">
-                      {label}
-                    </p>
-                    <p className="mt-2 text-3xl font-bold text-[#002333]">{value}</p>
-                    <p className="mt-3 text-xs text-[#002333]/70">{description}</p>
-                  </div>
-                  <div
-                    className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-inner ${iconWrapper}`}
-                  >
-                    <Icon className={`w-6 h-6 ${iconColor}`} />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+                <Settings className="h-4 w-4" />
+                Categorias
+              </button>
+              <button
+                type="button"
+                onClick={handleExport}
+                disabled={isExporting || produtosFiltrados.length === 0}
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Download className="h-4 w-4" />
+                {isExporting ? 'Exportando...' : 'Exportar'}
+              </button>
+              <button
+                className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition hover:bg-[#117C7E]"
+                onClick={handleNovoProduto}
+              >
+                <Plus className="h-4 w-4" />
+                Novo Produto
+              </button>
+            </>
+          }
+        />
 
-          {/* Filtros */}
-          <div className="bg-white rounded-lg shadow-sm border border-[#DEEFE7] p-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="lg:col-span-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#B4BEC9] w-5 h-5" />
-                  <input
-                    type="text"
-                    placeholder="Buscar por nome, SKU ou fornecedor..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C]/40 focus:border-[#159A9C] text-[#002333] placeholder-[#B4BEC9]"
-                  />
-                </div>
-              </div>
+        <InlineStats
+          stats={statCards.map((card, index) => ({
+            label: card.label,
+            value: String(card.value),
+            tone: index === 3 ? 'warning' : index === 1 ? 'accent' : 'neutral',
+          }))}
+        />
+      </SectionCard>
 
-              <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row gap-3">
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C]/40 focus:border-[#159A9C] text-[#002333]"
-                >
-                  <option value="todos">Todos os Status</option>
-                  <option value="ativo">Ativo</option>
-                  <option value="inativo">Inativo</option>
-                  <option value="descontinuado">Descontinuado</option>
-                </select>
-
-                <select
-                  value={categoriaFilter}
-                  onChange={(e) => setCategoriaFilter(e.target.value)}
-                  className="px-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C]/40 focus:border-[#159A9C] text-[#002333]"
-                >
-                  <option value="todas">Todas as Categorias</option>
-                  {categorias.map((categoria) => (
-                    <option key={categoria} value={categoria}>
-                      {categoria}
-                    </option>
-                  ))}
-                </select>
-              </div>
+      <FiltersBar className="p-4">
+        <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8FA6B2]" />
+              <input
+                type="text"
+                placeholder="Buscar por nome, SKU ou fornecedor..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+              />
             </div>
           </div>
 
-          {/* Lista de Produtos */}
-          <div className="bg-white rounded-lg shadow-sm border border-[#DEEFE7]">
-            <div className="px-6 py-4 border-b border-[#DEEFE7]">
-              <h3 className="text-lg font-semibold text-[#002333]">
-                Lista de Produtos ({produtosFiltrados.length})
-              </h3>
+          <div className="flex flex-col gap-3 sm:flex-row lg:flex-col xl:flex-row">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="h-10 rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+            >
+              <option value="todos">Todos os Status</option>
+              <option value="ativo">Ativo</option>
+              <option value="inativo">Inativo</option>
+              <option value="descontinuado">Descontinuado</option>
+            </select>
+
+            <select
+              value={categoriaFilter}
+              onChange={(e) => setCategoriaFilter(e.target.value)}
+              className="h-10 rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+            >
+              <option value="todas">Todas as Categorias</option>
+              {categorias.map((categoria) => (
+                <option key={categoria} value={categoria}>
+                  {categoria}
+                </option>
+              ))}
+            </select>
+
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={handleClearFilters}
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+              >
+                Limpar filtros
+              </button>
+            )}
+          </div>
+        </div>
+      </FiltersBar>
+
+      <DataTableCard>
+        <div className="border-b border-[#E1EAEE] bg-[#F8FBFC] px-4 py-3 sm:px-5">
+          <div className="flex flex-wrap items-center gap-3 text-sm text-[#516F7D]">
+            <h3 className="text-sm font-semibold text-[#1B3B4E]">
+              Lista de Produtos ({produtosFiltrados.length})
+            </h3>
+            {hasFilters && (
+              <span className="rounded-full border border-[#CDE6DF] bg-[#ECF7F3] px-2 py-0.5 text-xs font-medium text-[#0F7B7D]">
+                filtros ativos
+              </span>
+            )}
+          </div>
+        </div>
+
+        {error && (
+          <div className="border-b border-[#E1EAEE] bg-[#FFF7F7] px-4 py-3 sm:px-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-[#B4233A]">{error}</p>
+              <button
+                onClick={() => void carregarProdutos()}
+                className="inline-flex h-8 items-center gap-2 rounded-lg border border-[#E7C4CB] bg-white px-3 text-xs font-medium text-[#B4233A] transition hover:bg-[#FFF2F4]"
+              >
+                Tentar novamente
+              </button>
+            </div>
+          </div>
+        )}
+
+        {produtosFiltrados.length === 0 ? (
+          <div className="p-4 sm:p-5">
+            <EmptyState
+              icon={<Package className="h-5 w-5" />}
+              title="Nenhum produto encontrado"
+              description={
+                produtos.length === 0
+                  ? 'Comece criando seu primeiro produto.'
+                  : 'Tente ajustar os filtros ou termos de busca.'
+              }
+            />
+          </div>
+        ) : (
+          <>
+            <div className="divide-y divide-[#EAF0F2] lg:hidden">
+              {produtosPagina.map((produto) => {
+                const statusInfo = statusConfig[produto.status];
+                const StatusIcon = statusInfo.icon;
+
+                return (
+                  <div key={produto.id} className="space-y-3 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-[#19384C]">{produto.nome}</p>
+                        <p className="mt-0.5 text-xs text-[#6B8693]">SKU: {produto.sku}</p>
+                      </div>
+                      <span
+                        className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${statusInfo.color}`}
+                      >
+                        <StatusIcon className="mr-1 h-3 w-3" />
+                        {statusInfo.label}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-xs text-[#486978]">
+                      <div>
+                        <p className="text-[#6B8693]">Categoria</p>
+                        <p className="font-medium text-[#1E3A4B]">{produto.categoria}</p>
+                      </div>
+                      <div>
+                        <p className="text-[#6B8693]">Preço</p>
+                        <p className="font-medium text-[#1E3A4B]">{formatCurrency(produto.preco)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[#6B8693]">Estoque</p>
+                        <p className="font-medium text-[#1E3A4B]">
+                          {produto.categoria === 'Serviços' ? 'N/A' : `${produto.estoque.atual} un.`}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[#6B8693]">Vendas (Mês)</p>
+                        <p className="font-medium text-[#1E3A4B]">{produto.vendas.mes}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => openModal(produto)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#159A9C] hover:bg-[#ECF7F3]"
+                        title="Visualizar"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleEditarProduto(produto)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#0F7B7D] hover:bg-[#ECF7F3]"
+                        title="Editar"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleExcluirProduto(produto)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#B4233A] hover:bg-[#FFF2F4]"
+                        title="Excluir"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-[#DEEFE7]">
-                <thead className="bg-[#DEEFE7]">
+            <div className="hidden overflow-x-auto lg:block">
+              <table className="w-full min-w-full divide-y divide-[#DEEFE7]">
+                <thead className="sticky top-0 z-10 bg-[#DEEFE7]">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-[#002333] uppercase tracking-wider">
                       Produto
@@ -557,7 +674,7 @@ const ProdutosPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-[#DEEFE7]">
-                  {produtosFiltrados.map((produto) => {
+                  {produtosPagina.map((produto) => {
                     const statusInfo = statusConfig[produto.status];
                     const estoqueStatus = getEstoqueStatus(produto);
                     const StatusIcon = statusInfo.icon;
@@ -643,47 +760,74 @@ const ProdutosPage: React.FC = () => {
                   })}
                 </tbody>
               </table>
+            </div>
+          </>
+        )}
 
-              {produtosFiltrados.length === 0 && (
-                <div className="text-center py-12">
-                  <Package className="mx-auto h-12 w-12 text-[#B4BEC9]" />
-                  <h3 className="mt-2 text-sm font-semibold text-[#002333]">
-                    Nenhum produto encontrado
-                  </h3>
-                  <p className="mt-1 text-sm text-[#002333]/70">
-                    {produtos.length === 0
-                      ? 'Comece criando seu primeiro produto.'
-                      : 'Tente ajustar os filtros ou termos de busca.'}
-                  </p>
-                </div>
-              )}
+        {produtosFiltrados.length > 0 && (
+          <div className="flex flex-col gap-3 border-t border-[#E1EAEE] bg-[#F8FBFC] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <div className="flex flex-wrap items-center gap-3 text-xs text-[#5F7B89] sm:text-sm">
+              <span>
+                {produtosPagina.length} de {produtosFiltrados.length} registros
+              </span>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                className="h-8 rounded-lg border border-[#D4E2E7] bg-white px-2 text-xs text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+              >
+                <option value={10}>Exibir: 10</option>
+                <option value={25}>Exibir: 25</option>
+                <option value={50}>Exibir: 50</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="inline-flex h-8 items-center rounded-lg border border-[#D4E2E7] bg-white px-3 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Anterior
+              </button>
+              <span className="text-xs text-[#5F7B89] sm:text-sm">
+                Página {currentPage} de {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="inline-flex h-8 items-center rounded-lg border border-[#D4E2E7] bg-white px-3 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Próxima
+              </button>
             </div>
           </div>
-        </div>
-      </div>
+        )}
+      </DataTableCard>
 
       {/* Modal de Visualização */}
       {isModalOpen && selectedProduto && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-96 overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-lg font-semibold text-[#002333]">Detalhes do Produto</h3>
-                <button
-                  onClick={closeModal}
-                  className="text-[#B4BEC9] hover:text-[#002333] transition-colors"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-[1px]">
+          <div className="max-h-[90vh] w-full max-w-[980px] overflow-y-auto rounded-2xl border border-[#DCE7EB] bg-white shadow-[0_30px_60px_-30px_rgba(7,36,51,0.55)]">
+            <div className="flex items-center justify-between border-b border-[#E1EAEE] px-6 py-4">
+              <h3 className="text-lg font-semibold text-[#19384C]">Detalhes do Produto</h3>
+              <button
+                onClick={closeModal}
+                className="rounded-lg p-1 text-[#7A95A3] transition-colors hover:bg-[#F3F8FA] hover:text-[#19384C]"
+                title="Fechar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
 
-              <div className="space-y-4">
+            <div className="space-y-4 px-6 py-5">
                 <div>
                   <h4 className="text-sm font-semibold text-[#002333]">Nome</h4>
                   <p className="text-sm text-[#002333]/70">{selectedProduto.nome}</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
                     <h4 className="text-sm font-semibold text-[#002333]">SKU</h4>
                     <p className="text-sm text-[#002333]/70">{selectedProduto.sku}</p>
@@ -694,7 +838,7 @@ const ProdutosPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
                     <h4 className="text-sm font-semibold text-[#002333]">Preço</h4>
                     <p className="text-sm text-[#002333]/70">
@@ -726,7 +870,7 @@ const ProdutosPage: React.FC = () => {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
                     <h4 className="text-sm font-semibold text-[#002333]">Criado em</h4>
                     <p className="text-sm text-[#002333]/70">
@@ -740,6 +884,15 @@ const ProdutosPage: React.FC = () => {
                     </p>
                   </div>
                 </div>
+              </div>
+
+              <div className="flex justify-end border-t border-[#E1EAEE] px-6 py-4">
+                <button
+                  onClick={closeModal}
+                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+                >
+                  Fechar
+                </button>
               </div>
             </div>
           </div>
@@ -759,45 +912,7 @@ const ProdutosPage: React.FC = () => {
         produtoEditando={produtoParaEditar}
         loading={isLoadingSave}
       />
-
-      {/* Modal de Confirmação de Exclusão */}
-      {showConfirmDelete && produtoParaExcluir && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full">
-            <div className="p-6">
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-[#DEEFE7] rounded-full flex items-center justify-center mr-4">
-                  <AlertTriangle className="w-6 h-6 text-[#002333]" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-[#002333]">Confirmar Exclusão</h3>
-                  <p className="text-sm text-[#002333]/70">Esta ação não pode ser desfeita.</p>
-                </div>
-              </div>
-
-              <p className="text-sm text-[#002333] mb-6">
-                Tem certeza que deseja excluir o produto{' '}
-                <strong>"{produtoParaExcluir.nome}"</strong>?
-              </p>
-
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={cancelarExclusao}
-                  className="px-4 py-2 border border-[#B4BEC9] text-sm font-medium rounded-lg text-[#002333] bg-white hover:bg-[#DEEFE7] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#159A9C]/40"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={confirmarExclusao}
-                  className="px-4 py-2 border border-transparent text-sm font-semibold rounded-lg text-white bg-[#002333] hover:bg-[#0F7B7D] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#159A9C]/40"
-                >
-                  Excluir
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmationModal confirmationState={confirmationState} />
     </div>
   );
 };

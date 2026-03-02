@@ -20,8 +20,8 @@ const containerByType: Record<PageTypology, string> = {
   DASHBOARD: 'space-y-4',
   LIST: 'space-y-3.5',
   DETAIL: 'space-y-4',
-  FORM: 'space-y-4 w-full max-w-[1200px] mx-auto',
-  SETTINGS: 'space-y-4 w-full max-w-[1280px] mx-auto',
+  FORM: 'space-y-4',
+  SETTINGS: 'space-y-4',
   AUTH: 'space-y-4',
   UTILITY: 'space-y-4',
 };

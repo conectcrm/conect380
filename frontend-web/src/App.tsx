@@ -74,8 +74,6 @@ const FinanceiroNucleusPage = React.lazy(() => import('./pages/nuclei/Financeiro
 
 const ConfiguracoesWrapper = React.lazy(() => import('./pages/ConfiguracoesWrapper'));
 const GestaoModulosPage = React.lazy(() => import('./pages/GestaoModulosPage'));
-const AdminConsolePage = React.lazy(() => import('./pages/AdminConsolePage'));
-const AdminConformidadePage = React.lazy(() => import('./pages/admin/AdminConformidadePage'));
 const GestaoUsuariosPage = React.lazy(() => import('./features/gestao/pages/GestaoUsuariosPage'));
 const SystemBrandingPage = React.lazy(
   () => import('./features/admin/system-branding/SystemBrandingPage'),
@@ -192,11 +190,6 @@ const ConfiguracaoEmpresaPage = React.lazy(
 const RelatoriosAnalyticsPage = React.lazy(() =>
   import('./pages/empresas/RelatoriosAnalyticsPage').then((m) => ({
     default: m.RelatoriosAnalyticsPage,
-  })),
-);
-const SistemaPermissoesPage = React.lazy(() =>
-  import('./pages/empresas/SistemaPermissoesPage').then((m) => ({
-    default: m.SistemaPermissoesPage,
   })),
 );
 const BackupSincronizacaoPage = React.lazy(() =>
@@ -324,10 +317,6 @@ const AppRoutes: React.FC = () => {
                     element={protegerRotaSuperadmin(<GestaoModulosPage />)}
                   />
                   <Route
-                    path="/admin/console"
-                    element={protegerRotaSuperadmin(<AdminConsolePage />)}
-                  />
-                  <Route
                     path="/admin/usuarios"
                     element={<Navigate to="/configuracoes/usuarios" replace />}
                   />
@@ -384,96 +373,6 @@ const AppRoutes: React.FC = () => {
                     path="/gestao/fluxos/novo/builder"
                     element={protegerRota(ModuloEnum.ATENDIMENTO, <FluxoBuilderPage />)}
                   />
-                  {/* Rotas do módulo de Administração */}
-                  <Route
-                    path="/admin/relatorios"
-                    element={protegerRotaSuperadmin(
-                      <ModuleUnderConstruction
-                        moduleName="Relatórios Avançados"
-                        description="Analytics empresarial, dashboards executivos e KPIs estratégicos"
-                        estimatedCompletion="Q2 2025"
-                        features={[
-                          'Dashboards executivos',
-                          'KPIs estratégicos',
-                          'Analytics de vendas',
-                          'Relatórios customizados',
-                          'Exportação avançada',
-                        ]}
-                      />,
-                    )}
-                  />
-                  <Route
-                    path="/admin/auditoria"
-                    element={protegerRotaSuperadmin(
-                      <ModuleUnderConstruction
-                        moduleName="Auditoria & Logs"
-                        description="Rastreamento de ações, logs de sistema e conformidade"
-                        estimatedCompletion="Q3 2025"
-                        features={[
-                          'Log de atividades',
-                          'Auditoria de acessos',
-                          'Histórico de alterações',
-                          'Relatórios de conformidade',
-                          'Monitoramento em tempo real',
-                        ]}
-                      />,
-                    )}
-                  />
-                  <Route
-                    path="/admin/monitoramento"
-                    element={protegerRotaSuperadmin(
-                      <ModuleUnderConstruction
-                        moduleName="Monitoramento de Sistema"
-                        description="Status do sistema, performance e alertas de infraestrutura"
-                        estimatedCompletion="Q3 2025"
-                        features={[
-                          'Monitor de performance',
-                          'Alertas em tempo real',
-                          'Status de serviços',
-                          'Métricas de uso',
-                          'Dashboard de infraestrutura',
-                        ]}
-                      />,
-                    )}
-                  />
-                  <Route
-                    path="/admin/analytics"
-                    element={protegerRotaSuperadmin(
-                      <ModuleUnderConstruction
-                        moduleName="Dados & Analytics"
-                        description="Análise de dados, métricas de uso e inteligência de negócios"
-                        estimatedCompletion="Q4 2025"
-                        features={[
-                          'Análise de dados',
-                          'Métricas de uso',
-                          'Business Intelligence',
-                          'Dashboards interativos',
-                          'Relatórios estatísticos',
-                        ]}
-                      />,
-                    )}
-                  />
-                  <Route
-                    path="/admin/conformidade"
-                    element={protegerRotaSuperadmin(<AdminConformidadePage />)}
-                  />
-                  <Route
-                    path="/admin/acesso"
-                    element={protegerRotaSuperadmin(
-                      <ModuleUnderConstruction
-                        moduleName="Controle de Acesso"
-                        description="Configuração de roles, permissões e políticas de segurança avançadas"
-                        estimatedCompletion="Q2 2025"
-                        features={[
-                          'Gestão de roles',
-                          'Permissões granulares',
-                          'Políticas de segurança',
-                          'Autenticação 2FA',
-                          'Controle de sessões',
-                        ]}
-                      />,
-                    )}
-                  />
                   {/* Gerenciamento de Empresas do Usuário */}
                   <Route path="/empresas/minhas" element={<MinhasEmpresasPage />} />
                   <Route
@@ -486,7 +385,7 @@ const AppRoutes: React.FC = () => {
                   />
                   <Route
                     path="/empresas/:empresaId/permissoes"
-                    element={<SistemaPermissoesPage />}
+                    element={<Navigate to="/configuracoes/usuarios" replace />}
                   />
                   <Route path="/empresas/:empresaId/backup" element={<BackupSincronizacaoPage />} />
                   {/* Configurações globais da empresa ativa - Padrão consolidado */}
@@ -637,7 +536,10 @@ const AppRoutes: React.FC = () => {
                     element={<Navigate to="/configuracoes/tickets/tipos" replace />}
                   />
                   <Route path="/relatorios/analytics" element={<AnalyticsPage />} />
-                  <Route path="/gestao/permissoes" element={<SistemaPermissoesPage />} />
+                  <Route
+                    path="/gestao/permissoes"
+                    element={<Navigate to="/configuracoes/usuarios" replace />}
+                  />
                   <Route path="/sistema/backup" element={<BackupSincronizacaoPage />} />
                   {/* Atendimento Omnichannel - Protegido */}
                   <Route
@@ -1112,4 +1014,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-

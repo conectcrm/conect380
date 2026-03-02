@@ -33,7 +33,6 @@ const MVP_ALLOWED_CHILD_MENU_IDS = new Set<string>([
   'comercial-produtos',
   'configuracoes-empresa',
   'configuracoes-usuarios',
-  'admin-console',
   'admin-empresas',
   'admin-usuarios',
   'admin-sistema',

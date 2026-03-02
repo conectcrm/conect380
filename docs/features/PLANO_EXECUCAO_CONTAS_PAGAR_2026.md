@@ -48,6 +48,8 @@ Entregar um fluxo funcional de contas a pagar ponta a ponta no Conect360, cobrin
    - UI ainda usa `contasBancariasMock` no modal de conta a pagar.
 5. Rota de conciliacao existe, mas tela ainda esta em `ModuleUnderConstruction`.
 
+Observacao de status (2026-03-02): os gaps do baseline acima foram tratados durante AP-01, AP-02 e AP-03. O baseline e mantido apenas para rastreabilidade historica.
+
 ## 4. Macro cronograma (4 sprints / 8 semanas)
 
 1. Sprint 1 (semanas 1-2): Base bancaria real + fim de mock.
@@ -306,7 +308,16 @@ Entregar um fluxo funcional de contas a pagar ponta a ponta no Conect360, cobrin
 3. Definir capacidade do time para Sprint 1 (pontos).
 4. Iniciar AP-001 e AP-002 em paralelo.
 
-## 13. Status de execucao (atualizado em 2026-02-28)
+## 13. Status de execucao (atualizado em 2026-03-02)
+
+### Resumo executivo
+
+1. AP-01, AP-02 e AP-03 concluidos com evidencias publicadas.
+2. AP-301 concluido e homologado.
+3. AP-302 e AP-303 refinados, implementados e validados no ciclo tecnico.
+4. Pendencias remanescentes para encerramento formal do plano:
+   - executar janela real de monitoramento de 48h pos-go-live;
+   - registrar decisao final GO tecnico/GO negocio apos a janela.
 
 ### EPIC AP-01 - Base financeira operacional
 
@@ -490,7 +501,7 @@ Entregar um fluxo funcional de contas a pagar ponta a ponta no Conect360, cobrin
   - Responsavel sugerido: Operacoes + Tech Lead
   - Prazo: primeiro ciclo apos publicacao em producao
   - Evidencia de conclusao: relatorio de monitoramento gerado em `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_<runId>.md`.
-  - Status atual: dry-run tecnico concluido em 2026-02-28 (`RunId 20260228-144233`) com evidencias em `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260228-144233.md` e `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260228-144233.csv`; aguardando execucao da janela real de 48h em ambiente de go-live.
+  - Status atual: dry-run tecnico concluido em 2026-02-28 (`RunId 20260228-144233`) e dry-run complementar concluido em 2026-03-01 (`RunId 20260301-232945`) com evidencias em `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260228-144233.md`, `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260228-144233.csv`, `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260301-232945.md` e `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260301-232945.csv`; aguardando execucao da janela real de 48h em ambiente de go-live.
 - [ ] Registrar decisao final de operacao (GO tecnico/negocio) apos janela de 48h.
   - Responsavel sugerido: Responsavel unico do projeto
   - Prazo: D+2 do go-live monitorado
@@ -503,3 +514,24 @@ Entregar um fluxo funcional de contas a pagar ponta a ponta no Conect360, cobrin
   - `docs/features/ARQUITETURA_PADRONIZACAO_TELAS.md`
 - Checklist de validacao visual/QA:
   - `docs/features/CHECKLIST_PADRONIZACAO_TELAS.md`
+
+## 16. Matriz de permissoes revisada (2026-03-01)
+
+- Revisao consolidada de permissoes por perfil, rotas e APIs em:
+  - `docs/features/MATRIZ_PERMISSOES_ATUALIZADA_2026-03.md`
+- Ajustes aplicados nesta revisao:
+  - `Financeiro > Contas a Pagar` alinhado para `financeiro.pagamentos.read`.
+  - `Financeiro > Fornecedores` alinhado para `financeiro.pagamentos.read`.
+  - Matriz de cotacoes consolidada sem dependencia obrigatoria de CRM extra no acesso da rota.
+
+## 17. Proximo passo operacional (go-live)
+
+1. Executar a janela real de monitoramento de 48h:
+   - `npm run monitor:go-live:vendas-financeiro:48h`
+2. Publicar evidencias geradas em:
+   - `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_<runId>.md`
+   - `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_<runId>.csv`
+3. Registrar decisao final de operacao no checklist de sign-off:
+   - `docs/features/CHECKLIST_SIGNOFF_FLUXO_VENDAS_FINANCEIRO_2026-03.md`
+4. Guia rapido de execucao desta etapa:
+   - `docs/features/ORDEM_EXECUCAO_GO_LIVE_48H_CONTAS_PAGAR_2026-03.md`

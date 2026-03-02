@@ -63,7 +63,7 @@ Exemplos:
 
 Requisitos:
 
-- layout mais contido (tipologia `SETTINGS`)
+- layout em largura aberta (tipologia `SETTINGS`), seguindo o padrao global atual do shell
 - cards empilhados por secao
 - CTA de salvar consistente (preferencialmente em footer sticky em formularios longos)
 
@@ -71,6 +71,7 @@ Observacao:
 
 - se a tela de configuracao tiver comportamento de listagem pesada (tabela + filtros + acoes em massa), pode receber excecao para `LIST` via `RouteTemplateFrame`.
 - Exemplo real: `/configuracoes/usuarios`.
+- Exemplo real adicional: `/configuracoes/empresa` (usa largura operacional de `LIST` por decisao de UX).
 - Exemplo adicional: `/perfil` (apesar de ser "configuracao pessoal", usa composicao densa e largura de `LIST`).
 
 ### 3. DASHBOARD
@@ -94,7 +95,7 @@ Exemplos:
 
 Requisitos:
 
-- tipologia `FORM` (largura contida)
+- tipologia `FORM` (largura aberta), mantendo estrutura por etapas/secoes
 - secao principal em cards por etapa
 - CTA primario claro e persistente
 
@@ -127,13 +128,13 @@ Requisitos:
 
 A largura da tela deve ser controlada por `RouteTemplateFrame` + `PageTemplate`, nao por `max-width` arbitrario dentro da pagina.
 
-Obs: tipologias contidas (`SETTINGS` / `FORM`) devem ficar centralizadas pelo proprio `PageTemplate` (ex.: `max-w-*` + `mx-auto`). A pagina nao deve adicionar `mx-auto`/`max-w-*` local para "consertar".
+Obs: o padrao global atual e largura aberta para as tipologias do `layout-v2`. A pagina nao deve adicionar `mx-auto`/`max-w-*` local para "consertar" largura, salvo excecao formalmente documentada.
 
 Larguras padrao (referencia tecnica em `PageTemplates.tsx`):
 
 - `LIST`: full width (sem `max-w-*` no template)
-- `SETTINGS`: contida e centralizada (ex.: `max-w-[1280px]` + `mx-auto`)
-- `FORM`: contida e centralizada (ex.: `max-w-[1200px]` + `mx-auto`)
+- `SETTINGS`: full width (sem `max-w-*` no template)
+- `FORM`: full width (sem `max-w-*` no template)
 
 Padrao operacional de implementacao (telas `LIST`):
 
@@ -156,6 +157,7 @@ Se a tipologia estiver correta e ainda assim a largura parecer "errada" (conteud
 Referencias praticas (padrao observado):
 
 - `/configuracoes/usuarios` (arquivo `frontend-web/src/features/gestao/pages/GestaoUsuariosPage.tsx`) e um exemplo de `LIST` em Configuracoes e nao usa `max-w-*` local.
+- `/configuracoes/empresa` (arquivo `frontend-web/src/pages/empresas/ConfiguracaoEmpresaPage.tsx`) segue excecao de `LIST` para evitar contencao lateral excessiva em monitores largos.
 - `/perfil` (arquivo `frontend-web/src/features/perfil/PerfilPage.tsx`) e um exemplo de tela pessoal com composicao densa que deve usar `LIST` para evitar largura contida excessiva.
 
 ### Anti-pattern (nao fazer)

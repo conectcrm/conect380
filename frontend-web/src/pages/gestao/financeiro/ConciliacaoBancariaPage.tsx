@@ -554,7 +554,7 @@ export default function ConciliacaoBancariaPage() {
 
           <DataTableCard>
             <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
+              <table className="w-full min-w-full text-left text-sm">
                 <thead className="bg-[#F7FAFB] text-xs uppercase tracking-wide text-[#6B8794]">
                   <tr>
                     <th className="px-3 py-3">Arquivo</th>
@@ -651,7 +651,7 @@ export default function ConciliacaoBancariaPage() {
 
                 {!carregandoItens && !erroItens && itensImportacao.length > 0 ? (
                   <div className="overflow-x-auto">
-                    <table className="min-w-full text-left text-sm">
+                    <table className="w-full min-w-full text-left text-sm">
                       <thead className="bg-[#F7FAFB] text-xs uppercase tracking-wide text-[#6B8794]">
                         <tr>
                           <th className="px-3 py-3">Data</th>

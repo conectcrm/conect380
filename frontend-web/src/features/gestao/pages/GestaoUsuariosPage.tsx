@@ -1979,7 +1979,7 @@ const GestaoUsuariosPage: React.FC = () => {
           </div>
 
           <div className="hidden max-h-[68vh] md:block overflow-auto">
-            <table className="min-w-full divide-y divide-[#E2ECF0]">
+            <table className="w-full min-w-full divide-y divide-[#E2ECF0]">
               <thead className="sticky top-0 z-10 bg-[#F6FAFB]">
                     <tr>
                       <th className="px-6 py-3 text-left">

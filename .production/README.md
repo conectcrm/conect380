@@ -97,6 +97,19 @@ Execucao direta do guard mobile dedicado:
 npm run test:e2e:mobile:guard
 ```
 
+Smoke automatizado do ADM-303 (break-glass):
+```powershell
+.\scripts\smoke-adm303-break-glass.ps1 `
+  -BaseUrl "http://localhost:3001" `
+  -RequesterEmail "<admin-requester@email>" `
+  -RequesterPassword "<password>" `
+  -ApproverEmail "<admin-approver@email>" `
+  -ApproverPassword "<password>" `
+  -TargetEmail "<target-usuario@email>" `
+  -TargetPassword "<password>"
+```
+Com MFA habilitado, informar `-RequesterMfaCode`, `-ApproverMfaCode` e `-TargetMfaCode`.
+
 Kickoff de sessao piloto (gera pasta com checklist/evidencias/status):
 ```powershell
 .\scripts\start-mvp-pilot.ps1 -PilotName "piloto-comercial-lote-1" -SkipPreflight
@@ -356,3 +369,7 @@ $env:GITHUB_TOKEN = "ghp_xxx"
 # Aplicar apenas em main (quando develop ainda nao existe)
 .\scripts\configure-branch-protection.ps1 -Owner conectcrm -Repo conect380 -Branches main
 ```
+
+## Deploy remoto com perfil local (Azure VM)
+Quando usar VM remota, consulte `.production/DEPLOY_AGENT_PROFILE.md`.
+Esse fluxo permite deploy sem repetir `ServerIp`, `SshUser` e `PemPath` em cada execucao.

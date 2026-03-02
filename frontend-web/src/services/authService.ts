@@ -1,9 +1,31 @@
-import api from './api';
+import api, { apiPublic } from './api';
 import { LoginRequest, LoginResponse, User, ApiResponse } from '../types';
 
 export const authService = {
   async login(credentials: LoginRequest): Promise<LoginResponse> {
     const response = await api.post<LoginResponse>('/auth/login', credentials);
+    return response.data;
+  },
+
+  async verifyMfaCode(payload: {
+    challengeId: string;
+    codigo: string;
+  }): Promise<LoginResponse> {
+    const response = await api.post<LoginResponse>('/auth/mfa/verify', payload);
+    return response.data;
+  },
+
+  async resendMfaCode(payload: {
+    challengeId: string;
+  }): Promise<ApiResponse<{ challengeId: string; email: string; expiresInSeconds: number; canResendAfterSeconds: number }>> {
+    const response = await api.post<
+      ApiResponse<{
+        challengeId: string;
+        email: string;
+        expiresInSeconds: number;
+        canResendAfterSeconds: number;
+      }>
+    >('/auth/mfa/resend', payload);
     return response.data;
   },
 
@@ -35,6 +57,25 @@ export const authService = {
 
   async redefinirSenhaComToken(dados: { token: string; senhaNova: string }): Promise<ApiResponse> {
     const response = await api.post<ApiResponse>('/auth/reset-password', dados);
+    return response.data;
+  },
+
+  async logoutSession(payload?: { reason?: string }): Promise<ApiResponse> {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      return { success: true, message: 'Sessao local encerrada sem token ativo.' };
+    }
+
+    const response = await apiPublic.post<ApiResponse>(
+      '/auth/logout',
+      payload || {},
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
     return response.data;
   },
 

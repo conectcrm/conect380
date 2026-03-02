@@ -19,7 +19,6 @@ import {
   TrendingUp,
   AlertCircle,
   RefreshCw,
-  BarChart,
 } from 'lucide-react';
 
 interface Empresa {
@@ -320,15 +319,6 @@ export const EmpresasListPage: React.FC = () => {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-end">
-                <button
-                  onClick={() => navigate('/admin/console')}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-white border-2 border-[#159A9C] text-[#159A9C] rounded-lg hover:bg-[#159A9C]/5 transition-colors text-sm font-medium"
-                  title="Ver métricas executivas e alertas do sistema"
-                >
-                  <BarChart className="h-4 w-4" />
-                  Dashboard Executivo
-                </button>
-
                 <button
                   onClick={handleRefresh}
                   disabled={loading}

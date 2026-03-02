@@ -11,7 +11,7 @@ type RouteTemplateRule = {
 const routeRules: RouteTemplateRule[] = [
   {
     pattern:
-      /^\/(dashboard|admin\/console|atendimento\/analytics|atendimento\/distribuicao\/dashboard|nuclei\/administracao|nuclei\/crm|nuclei\/financeiro|nuclei\/vendas|relatorios\/analytics)$/,
+      /^\/(dashboard|atendimento\/analytics|atendimento\/distribuicao\/dashboard|nuclei\/administracao|nuclei\/crm|nuclei\/financeiro|nuclei\/vendas|relatorios\/analytics)$/,
     type: 'DASHBOARD',
   },
   {
@@ -37,7 +37,7 @@ const routeRules: RouteTemplateRule[] = [
   },
   {
     pattern: /^\/(configuracoes\/empresa)$/,
-    type: 'SETTINGS',
+    type: 'LIST',
   },
   {
     // Meu Perfil usa layout mais denso (sidebar + cards de formulario/seguranca/atividade)

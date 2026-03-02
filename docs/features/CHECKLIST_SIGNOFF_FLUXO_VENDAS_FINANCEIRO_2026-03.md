@@ -42,6 +42,7 @@ Registrar aprovacao formal de QA, Produto e Financeiro para encerramento do cicl
 ## 6. Preparacao operacional pos-go-live
 
 - [x] Dry-run tecnico do monitoramento executado (`RunId 20260228-144233`) com artefatos em `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260228-144233.md` e `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260228-144233.csv`.
+- [x] Dry-run tecnico complementar executado (`RunId 20260301-232945`) com artefatos em `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260301-232945.md` e `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260301-232945.csv` (health e metrics OK; anomalias `MONITOR_STALE_CYCLE` para triagem no go-live real).
 - [x] Migration de consistencia multi-tenant para fornecedores aplicada no banco local (`AlignFornecedorUniqueByEmpresa1802861000000`).
 - [ ] Janela real de 48h no ambiente de go-live.
 - [ ] Atualizacao final de GO tecnico/negocio apos janela real.

@@ -490,7 +490,7 @@ export const EmpresaDetailPage: React.FC = () => {
             <p className="text-gray-500 text-center py-8">Nenhum usuário cadastrado</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="w-full min-w-full divide-y divide-gray-200">
                 <thead>
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">

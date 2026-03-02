@@ -1,5 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User } from '../types';
+import {
+  User,
+  LoginSuccessData,
+  TrocarSenhaActionData,
+  MfaRequiredActionData,
+} from '../types';
 import { authService } from '../services/authService';
 
 const DEBUG = process.env.NODE_ENV === 'development';
@@ -46,6 +51,8 @@ interface AuthContextData {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  verifyMfa: (challengeId: string, codigo: string) => Promise<void>;
+  resendMfa: (challengeId: string) => Promise<MfaRequiredActionData>;
   logout: () => void;
   updateUser: (userData: Partial<User>) => void;
 }
@@ -59,6 +66,44 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const isLoginSuccessData = (data: unknown): data is LoginSuccessData => {
+    return (
+      typeof data === 'object' &&
+      data !== null &&
+      typeof (data as LoginSuccessData).access_token === 'string' &&
+      typeof (data as LoginSuccessData).user === 'object'
+    );
+  };
+
+  const isMfaRequiredActionData = (data: unknown): data is MfaRequiredActionData => {
+    return (
+      typeof data === 'object' &&
+      data !== null &&
+      typeof (data as MfaRequiredActionData).challengeId === 'string' &&
+      typeof (data as MfaRequiredActionData).email === 'string'
+    );
+  };
+
+  const applyAuthenticatedSession = (loginData: LoginSuccessData) => {
+    const { access_token, user: userData } = loginData;
+
+    authService.setToken(access_token);
+    dispatchAuthTokenChanged();
+
+    authService.setUser(userData);
+    setUser(userData);
+
+    if (userData.empresa?.id) {
+      syncEmpresaAtiva(userData.empresa.id);
+      if (DEBUG) {
+        console.log('[AuthContext] empresaId saved:', userData.empresa.id);
+      }
+    } else {
+      syncEmpresaAtiva(null);
+      console.warn('[AuthContext] userData.empresa.id not found:', userData);
+    }
+  };
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -118,7 +163,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await authService.login({ email, senha: password });
 
       if (response.action === 'TROCAR_SENHA') {
-        const trocarSenhaData = response.data as { userId: string; email: string; nome: string };
+        const trocarSenhaData = response.data as TrocarSenhaActionData;
         const error = new Error('TROCAR_SENHA') as any;
         error.data = {
           userId: trocarSenhaData.userId,
@@ -129,24 +174,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw error;
       }
 
+      if (response.action === 'MFA_REQUIRED') {
+        const mfaData = response.data as MfaRequiredActionData;
+        const error = new Error('MFA_REQUIRED') as any;
+        error.data = mfaData;
+        throw error;
+      }
+
       if (response.success && response.data) {
-        const loginData = response.data as { access_token: string; user: User };
-        const { access_token, user: userData } = loginData;
-
-        authService.setToken(access_token);
-        dispatchAuthTokenChanged();
-
-        authService.setUser(userData);
-        setUser(userData);
-
-        if (userData.empresa?.id) {
-          syncEmpresaAtiva(userData.empresa.id);
-          if (DEBUG) {
-            console.log('[AuthContext] empresaId saved:', userData.empresa.id);
-          }
+        if (isLoginSuccessData(response.data)) {
+          applyAuthenticatedSession(response.data);
         } else {
-          syncEmpresaAtiva(null);
-          console.warn('[AuthContext] userData.empresa.id not found:', userData);
+          throw new Error('Authentication failed');
         }
       } else {
         throw new Error('Authentication failed');
@@ -157,7 +196,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const verifyMfa = async (challengeId: string, codigo: string) => {
+    const response = await authService.verifyMfaCode({ challengeId, codigo });
+
+    if (response.success && response.data && isLoginSuccessData(response.data)) {
+      applyAuthenticatedSession(response.data);
+      return;
+    }
+
+    if (response.action === 'MFA_REQUIRED' && isMfaRequiredActionData(response.data)) {
+      const error = new Error('MFA_REQUIRED') as any;
+      error.data = response.data;
+      throw error;
+    }
+
+    throw new Error('Falha ao validar codigo MFA');
+  };
+
+  const resendMfa = async (challengeId: string): Promise<MfaRequiredActionData> => {
+    const response = await authService.resendMfaCode({ challengeId });
+    if (response.success && response.data && isMfaRequiredActionData(response.data)) {
+      return response.data;
+    }
+
+    throw new Error(response.message || 'Falha ao reenviar codigo MFA');
+  };
+
   const logout = () => {
+    void authService.logoutSession({ reason: 'user_initiated' }).catch((error) => {
+      if (DEBUG) {
+        console.warn('[AuthContext] Falha ao registrar logout no backend:', error);
+      }
+    });
+
     authService.logout();
     setUser(null);
     syncEmpresaAtiva(null);
@@ -182,6 +253,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated: !!user,
     isLoading,
     login,
+    verifyMfa,
+    resendMfa,
     logout,
     updateUser,
   };

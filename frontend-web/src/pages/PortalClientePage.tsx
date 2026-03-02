@@ -401,7 +401,7 @@ const PortalClientePage: React.FC = () => {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="w-full min-w-full divide-y divide-gray-200">
                   <thead className="bg-[#F8FBFC]">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">Proposta</th>
@@ -493,7 +493,7 @@ const PortalClientePage: React.FC = () => {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="w-full min-w-full divide-y divide-gray-200">
                   <thead className="bg-[#F8FBFC]">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">Data</th>

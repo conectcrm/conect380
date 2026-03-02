@@ -228,3 +228,7 @@ temp-docker-export/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# Deploy profile local (dados de ambiente/ssh)
+.production/configs/deploy-profile.local.psd1
+.production/configs/deploy-profile.*.local.psd1

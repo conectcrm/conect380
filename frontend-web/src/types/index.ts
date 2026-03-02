@@ -85,18 +85,30 @@ export interface LoginRequest {
   senha: string;
 }
 
+export interface LoginSuccessData {
+  access_token: string;
+  user: User;
+}
+
+export interface TrocarSenhaActionData {
+  userId: string;
+  email: string;
+  nome: string;
+}
+
+export interface MfaRequiredActionData {
+  challengeId: string;
+  email: string;
+  expiresInSeconds: number;
+  canResendAfterSeconds: number;
+}
+
 export interface LoginResponse {
   success: boolean;
-  action?: 'TROCAR_SENHA'; // ✅ Ação de trocar senha (primeiro acesso)
+  action?: 'TROCAR_SENHA' | 'MFA_REQUIRED';
   data:
-  | {
-    access_token: string;
-    user: User;
-  }
-  | {
-    userId: string;
-    email: string;
-    nome: string;
-  }; // ✅ Data pode ser token+user OU dados para trocar senha
+  | LoginSuccessData
+  | TrocarSenhaActionData
+  | MfaRequiredActionData;
   message: string;
 }

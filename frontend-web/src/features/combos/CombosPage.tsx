@@ -60,6 +60,8 @@ const CombosPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [categoriaFilter, setCategoriaFilter] = useState<string>('todas');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [selectedCombo, setSelectedCombo] = useState<Combo | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
@@ -102,6 +104,32 @@ const CombosPage: React.FC = () => {
   }, [combos, searchTerm, statusFilter, categoriaFilter]);
 
   const categorias = Array.from(new Set(combos.map((combo) => combo.categoria)));
+  const hasFilters =
+    searchTerm.trim().length > 0 || statusFilter !== 'todos' || categoriaFilter !== 'todas';
+
+  const totalPages = Math.max(1, Math.ceil(combosFiltrados.length / itemsPerPage));
+
+  const combosPagina = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return combosFiltrados.slice(startIndex, startIndex + itemsPerPage);
+  }, [combosFiltrados, currentPage, itemsPerPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, categoriaFilter, itemsPerPage]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('todos');
+    setCategoriaFilter('todas');
+    setCurrentPage(1);
+  };
 
   // Formatação
   const formatCurrency = (value: number) => {
@@ -288,14 +316,39 @@ const CombosPage: React.FC = () => {
                 ))}
               </select>
             </div>
+
+            {hasFilters && (
+              <div>
+                <button
+                  type="button"
+                  onClick={handleClearFilters}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Limpar filtros
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Lista de Combos */}
         <div className="bg-white rounded-lg shadow-sm">
+          <div className="border-b border-gray-200 bg-gray-50 px-6 py-3">
+            <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600">
+              <span className="font-medium text-gray-800">
+                Lista de Combos ({combosFiltrados.length})
+              </span>
+              {hasFilters && (
+                <span className="rounded-full border border-[#CDE6DF] bg-[#ECF7F3] px-2 py-0.5 text-xs font-medium text-[#0F7B7D]">
+                  filtros ativos
+                </span>
+              )}
+            </div>
+          </div>
+
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="w-full min-w-full divide-y divide-gray-200">
+              <thead className="sticky top-0 z-10 bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Combo
@@ -321,7 +374,7 @@ const CombosPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {combosFiltrados.map((combo) => {
+                {combosPagina.map((combo) => {
                   const StatusIcon = statusConfig[combo.status].icon;
 
                   return (
@@ -456,6 +509,47 @@ const CombosPage: React.FC = () => {
               </div>
             )}
           </div>
+
+          {combosFiltrados.length > 0 && (
+            <div className="flex flex-col gap-3 border-t border-gray-200 bg-gray-50 px-6 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600">
+                <span>
+                  {combosPagina.length} de {combosFiltrados.length} registros
+                </span>
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                  className="h-8 rounded-lg border border-gray-300 bg-white px-2 text-xs text-gray-700 focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                >
+                  <option value={10}>Exibir: 10</option>
+                  <option value={25}>Exibir: 25</option>
+                  <option value={50}>Exibir: 50</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  Anterior
+                </button>
+                <span className="text-sm text-gray-600">
+                  Página {currentPage} de {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  Próxima
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

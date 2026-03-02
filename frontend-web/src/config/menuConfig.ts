@@ -11,7 +11,6 @@ import {
   TrendingUp,
   Target,
   BarChart3,
-  BarChart,
   FileText,
   Shield,
   Database,
@@ -207,19 +206,6 @@ const COMERCIAL_FULL_PERMISSIONS = [
   'comercial.propostas.send',
 ];
 
-const ATENDIMENTO_FULL_PERMISSIONS = [
-  'atendimento.chats.read',
-  'atendimento.chats.reply',
-  'atendimento.tickets.read',
-  'atendimento.tickets.create',
-  'atendimento.tickets.update',
-  'atendimento.tickets.assign',
-  'atendimento.tickets.close',
-  'atendimento.filas.manage',
-  'atendimento.sla.manage',
-  'atendimento.dlq.manage',
-];
-
 const ATENDIMENTO_MANAGER_PERMISSIONS = [
   'atendimento.chats.read',
   'atendimento.chats.reply',
@@ -230,13 +216,6 @@ const ATENDIMENTO_MANAGER_PERMISSIONS = [
   'atendimento.tickets.close',
   'atendimento.filas.manage',
   'atendimento.sla.manage',
-];
-
-const FINANCEIRO_FULL_PERMISSIONS = [
-  'financeiro.faturamento.read',
-  'financeiro.faturamento.manage',
-  'financeiro.pagamentos.read',
-  'financeiro.pagamentos.manage',
 ];
 
 const CONFIG_FULL_PERMISSIONS = [
@@ -300,10 +279,6 @@ const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
     ...USER_MANAGEMENT_PERMISSIONS,
     ...BASIC_PROFILE_PERMISSIONS,
     ...INSIGHTS_PERMISSIONS,
-    ...CRM_FULL_PERMISSIONS,
-    ...COMERCIAL_FULL_PERMISSIONS,
-    ...ATENDIMENTO_FULL_PERMISSIONS,
-    ...FINANCEIRO_FULL_PERMISSIONS,
     ...CONFIG_FULL_PERMISSIONS,
     'planos.manage',
     'admin.empresas.manage',
@@ -833,7 +808,7 @@ export const menuConfig: MenuConfig[] = [
         icon: Calculator,
         href: '/financeiro/contas-pagar',
         color: 'orange',
-        permissions: ['financeiro.faturamento.read'],
+        permissions: ['financeiro.pagamentos.read'],
         group: 'Fluxo Financeiro',
       },
       {
@@ -842,7 +817,7 @@ export const menuConfig: MenuConfig[] = [
         icon: Building2,
         href: '/financeiro/fornecedores',
         color: 'orange',
-        permissions: ['financeiro.faturamento.read'],
+        permissions: ['financeiro.pagamentos.read'],
         group: 'Cadastros',
       },
       {
@@ -1035,16 +1010,6 @@ export const menuConfig: MenuConfig[] = [
     section: 'Administra\u00e7\u00e3o',
     children: [
       {
-        id: 'admin-console',
-        title: 'Dashboard Executivo',
-        shortTitle: 'Dashboard',
-        icon: BarChart,
-        href: '/admin/console',
-        color: 'blue',
-        permissions: ['relatorios.read'],
-        group: 'Vis\u00e3o Executiva',
-      },
-      {
         id: 'admin-empresas',
         title: 'Gest\u00e3o de Empresas',
         shortTitle: 'Empresas',
@@ -1149,6 +1114,11 @@ const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
     match: 'all',
   },
   { pattern: '/financeiro', permissions: ['financeiro.faturamento.read', 'financeiro.pagamentos.read'] },
+  { pattern: '/financeiro/faturamento', permissions: ['financeiro.faturamento.read'] },
+  { pattern: '/financeiro/contas-pagar', permissions: ['financeiro.pagamentos.read'] },
+  { pattern: '/financeiro/fornecedores', permissions: ['financeiro.pagamentos.read'] },
+  { pattern: '/financeiro/fornecedores/:fornecedorId', permissions: ['financeiro.pagamentos.read'] },
+  { pattern: '/financeiro/contas-bancarias', permissions: ['financeiro.pagamentos.read'] },
   {
     pattern: '/financeiro/relatorios',
     permissions: ['financeiro.faturamento.read', 'relatorios.read'],
@@ -1162,7 +1132,11 @@ const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
   { pattern: '/financeiro/tesouraria', permissions: ['financeiro.faturamento.read'] },
   { pattern: '/configuracoes/departamentos', permissions: ['config.automacoes.manage'] },
   { pattern: '/relatorios/analytics', permissions: ['relatorios.read'] },
-  { pattern: '/gestao/permissoes', permissions: ['users.read', 'admin.empresas.manage'] },
+  {
+    pattern: '/gestao/permissoes',
+    permissions: ['users.read', 'admin.empresas.manage'],
+    match: 'all',
+  },
   { pattern: '/gestao/nucleos', permissions: ['admin.empresas.manage'] },
   { pattern: '/gestao/equipes', permissions: ['users.read'] },
   { pattern: '/gestao/atendentes', permissions: ['atendimento.filas.manage'] },
@@ -1174,12 +1148,6 @@ const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
   { pattern: '/gestao/fluxos/novo/builder', permissions: ['config.automacoes.manage'] },
   { pattern: '/agenda/eventos/:id', permissions: ['crm.agenda.read'] },
   { pattern: '/crm/agenda/eventos/:id', permissions: ['crm.agenda.read'] },
-  { pattern: '/admin/relatorios', permissions: ['admin.empresas.manage'] },
-  { pattern: '/admin/auditoria', permissions: ['admin.empresas.manage'] },
-  { pattern: '/admin/monitoramento', permissions: ['admin.empresas.manage'] },
-  { pattern: '/admin/analytics', permissions: ['admin.empresas.manage'] },
-  { pattern: '/admin/conformidade', permissions: ['admin.empresas.manage'] },
-  { pattern: '/admin/acesso', permissions: ['admin.empresas.manage'] },
   { pattern: '/admin/sistema', permissions: ['admin.empresas.manage'] },
   { pattern: '/admin/branding', permissions: ['admin.empresas.manage'] },
   { pattern: '/nuclei/configuracoes/empresas', permissions: ['admin.empresas.manage'] },
@@ -1187,7 +1155,11 @@ const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
   { pattern: '/sistema/backup', permissions: ['admin.empresas.manage'] },
   { pattern: '/empresas/:empresaId/configuracoes', permissions: ['admin.empresas.manage'] },
   { pattern: '/empresas/:empresaId/relatorios', permissions: ['admin.empresas.manage'] },
-  { pattern: '/empresas/:empresaId/permissoes', permissions: ['admin.empresas.manage'] },
+  {
+    pattern: '/empresas/:empresaId/permissoes',
+    permissions: ['users.read', 'admin.empresas.manage'],
+    match: 'all',
+  },
   { pattern: '/empresas/:empresaId/backup', permissions: ['admin.empresas.manage'] },
 ];
 
