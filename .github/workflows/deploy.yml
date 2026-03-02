@@ -90,7 +90,7 @@ jobs:
           path: backend/dist
       
       # Opção 1: Deploy para AWS EC2
-      - name: 🚀 Deploy para AWS EC2 (SSH)
+      - name: 🚀 Deploy para Azure VM (SSH)
         if: ${{ env.AWS_EC2_HOST != '' }}
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -99,16 +99,16 @@ jobs:
           key: ${{ secrets.AWS_SSH_PRIVATE_KEY }}
           port: 22
           script: |
-            cd /var/www/conectsuite/backend
+            cd /home/azureuser/conect360
             git fetch --all --tags
             git checkout -f ${{ github.ref_name }}
-            npm ci --production
-            npm run build
-            npm run migration:run
-            pm2 restart conectsuite-backend
-            pm2 save
-      
-      # Opção 2: Deploy para Azure App Service
+            cd .production
+            docker compose up -d postgres redis
+            docker compose build backend frontend
+            docker compose up -d backend
+            docker compose run --rm backend npm run migration:run
+            docker compose up -d frontend
+            curl -fsS http://127.0.0.1:3500/health > /dev/null
       - name: 🚀 Deploy para Azure App Service
         if: ${{ env.AZURE_WEBAPP_NAME != '' }}
         uses: azure/webapps-deploy@v2
