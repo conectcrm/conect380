@@ -84,7 +84,7 @@ jobs:
       
       - name: Upload error budget status
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: error-budget-status
           path: /tmp/error-budget-status.json
@@ -119,7 +119,7 @@ jobs:
         run: npm run build
       
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-build
           path: backend/dist
