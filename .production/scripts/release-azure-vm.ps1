@@ -97,6 +97,57 @@ function Resolve-MissingArgs {
   }
 }
 
+function Resolve-Adm303ArgsFromProfile {
+  param([hashtable]$ProfileData)
+
+  if ($null -eq $ProfileData -or -not $ProfileData.ContainsKey("Adm303Smoke")) {
+    return
+  }
+
+  $adm303 = $ProfileData.Adm303Smoke
+  if ($null -eq $adm303) {
+    return
+  }
+
+  if (-not $RunAdm303Smoke -and $adm303.ContainsKey("Run") -and [bool]$adm303.Run) {
+    $script:RunAdm303Smoke = $true
+  }
+
+  if ([string]::IsNullOrWhiteSpace($Adm303BaseUrl) -and $adm303.ContainsKey("BaseUrl")) {
+    $script:Adm303BaseUrl = [string]$adm303.BaseUrl
+  }
+  if ([string]::IsNullOrWhiteSpace($Adm303RequesterEmail) -and $adm303.ContainsKey("RequesterEmail")) {
+    $script:Adm303RequesterEmail = [string]$adm303.RequesterEmail
+  }
+  if ([string]::IsNullOrWhiteSpace($Adm303RequesterPassword) -and $adm303.ContainsKey("RequesterPassword")) {
+    $script:Adm303RequesterPassword = [string]$adm303.RequesterPassword
+  }
+  if ([string]::IsNullOrWhiteSpace($Adm303RequesterMfaCode) -and $adm303.ContainsKey("RequesterMfaCode")) {
+    $script:Adm303RequesterMfaCode = [string]$adm303.RequesterMfaCode
+  }
+  if ([string]::IsNullOrWhiteSpace($Adm303ApproverEmail) -and $adm303.ContainsKey("ApproverEmail")) {
+    $script:Adm303ApproverEmail = [string]$adm303.ApproverEmail
+  }
+  if ([string]::IsNullOrWhiteSpace($Adm303ApproverPassword) -and $adm303.ContainsKey("ApproverPassword")) {
+    $script:Adm303ApproverPassword = [string]$adm303.ApproverPassword
+  }
+  if ([string]::IsNullOrWhiteSpace($Adm303ApproverMfaCode) -and $adm303.ContainsKey("ApproverMfaCode")) {
+    $script:Adm303ApproverMfaCode = [string]$adm303.ApproverMfaCode
+  }
+  if ([string]::IsNullOrWhiteSpace($Adm303TargetEmail) -and $adm303.ContainsKey("TargetEmail")) {
+    $script:Adm303TargetEmail = [string]$adm303.TargetEmail
+  }
+  if ([string]::IsNullOrWhiteSpace($Adm303TargetPassword) -and $adm303.ContainsKey("TargetPassword")) {
+    $script:Adm303TargetPassword = [string]$adm303.TargetPassword
+  }
+  if ([string]::IsNullOrWhiteSpace($Adm303TargetMfaCode) -and $adm303.ContainsKey("TargetMfaCode")) {
+    $script:Adm303TargetMfaCode = [string]$adm303.TargetMfaCode
+  }
+  if (-not $Adm303SkipTargetAccessCheck -and $adm303.ContainsKey("SkipTargetAccessCheck") -and [bool]$adm303.SkipTargetAccessCheck) {
+    $script:Adm303SkipTargetAccessCheck = $true
+  }
+}
+
 function Invoke-Remote {
   param([string]$ScriptText)
   ssh -i $PemPath -o StrictHostKeyChecking=no "$SshUser@$ServerIp" $ScriptText
@@ -147,6 +198,7 @@ if ([string]::IsNullOrWhiteSpace($ProfilePath) -and (Test-Path $defaultProfilePa
 
 $profileData = Load-DeployProfile -Path $ProfilePath -Name $ProfileName
 Resolve-MissingArgs -ProfileData $profileData
+Resolve-Adm303ArgsFromProfile -ProfileData $profileData
 
 if ([string]::IsNullOrWhiteSpace($RemoteRoot)) {
   $RemoteRoot = "/home/azureuser/conect360"

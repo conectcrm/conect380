@@ -6,6 +6,7 @@ Executar o smoke de break-glass (ADM-303) imediatamente apos o deploy para valid
 ## Opcoes disponiveis
 - Script principal: `.production/scripts/release-azure-vm.ps1`
 - Wrapper (perfil local): `.production/scripts/release-production.ps1`
+- Perfil local opcional: `.production/configs/deploy-profile.local.psd1` (chave `Adm303Smoke`)
 
 ## Parametros do smoke
 - `-RunAdm303Smoke`
@@ -40,6 +41,34 @@ Opcional:
   -Adm303ApproverPassword "<senha>" `
   -Adm303TargetEmail "<target@email>" `
   -Adm303TargetPassword "<senha>"
+```
+
+## Exemplo com perfil (sem credenciais na linha de comando)
+```powershell
+@{
+  Profiles = @{
+    production = @{
+      ServerIp = 'SEU_IP'
+      SshUser = 'SEU_USUARIO'
+      PemPath = 'C:\caminho\chave.pem'
+      RemoteRoot = '/home/azureuser/conect360'
+      Adm303Smoke = @{
+        Run = $true
+        BaseUrl = 'https://api.conect360.com'
+        RequesterEmail = 'requester@empresa.com'
+        RequesterPassword = '<SENHA_REQUESTER>'
+        ApproverEmail = 'approver@empresa.com'
+        ApproverPassword = '<SENHA_APPROVER>'
+        TargetEmail = 'target@empresa.com'
+        TargetPassword = '<SENHA_TARGET>'
+      }
+    }
+  }
+}
+```
+Com isso, basta executar:
+```powershell
+.\.production\scripts\release-production.ps1 -ProfileName production -Execute
 ```
 
 ## Exemplo direto (sem wrapper)
