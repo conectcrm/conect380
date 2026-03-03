@@ -367,8 +367,8 @@ Entregavel:
 
 #### Fase D - Governanca e adocao (Sprint 3)
 
-- [ ] Separar permissoes de `catalogo` e `combos` por role (read/create/update/delete).
-- [ ] Permitir ocultar menu de combos por modulo/perfil quando cliente nao usa pacotes.
+- [x] Separar permissoes de `catalogo` e `combos` por role (read/create/update/delete).
+- [x] Permitir ocultar menu de combos por modulo/perfil quando cliente nao usa pacotes.
 - [ ] Criar guia rapido in-app (2-3 bullets) explicando quando usar item x combo.
 - [ ] Adicionar metricas de uso (itens avulsos vs combos em propostas).
 

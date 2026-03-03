@@ -173,7 +173,7 @@ const PERMISSOES_MODAL_GROUPS_FALLBACK: PermissaoModalGroup[] = [
   {
     id: 'crm',
     label: 'CRM',
-    description: 'Clientes, leads, oportunidades, produtos e agenda',
+    description: 'Clientes, leads, oportunidades, produtos, combos e agenda',
     roles: [
       UserRole.USER,
       UserRole.VENDEDOR,
@@ -198,6 +198,10 @@ const PERMISSOES_MODAL_GROUPS_FALLBACK: PermissaoModalGroup[] = [
       { value: 'crm.produtos.create', label: 'Produtos: criar' },
       { value: 'crm.produtos.update', label: 'Produtos: editar' },
       { value: 'crm.produtos.delete', label: 'Produtos: excluir' },
+      { value: 'crm.combos.read', label: 'Combos: visualizar' },
+      { value: 'crm.combos.create', label: 'Combos: criar' },
+      { value: 'crm.combos.update', label: 'Combos: editar' },
+      { value: 'crm.combos.delete', label: 'Combos: excluir' },
       { value: 'crm.agenda.read', label: 'Agenda: visualizar' },
       { value: 'crm.agenda.create', label: 'Agenda: criar' },
       { value: 'crm.agenda.update', label: 'Agenda: editar' },
@@ -2753,6 +2757,5 @@ const GestaoUsuariosPage: React.FC = () => {
 };
 
 export default GestaoUsuariosPage;
-
 
 

@@ -34,6 +34,11 @@ export enum Permission {
   CRM_PRODUTOS_UPDATE = 'crm.produtos.update',
   CRM_PRODUTOS_DELETE = 'crm.produtos.delete',
 
+  CRM_COMBOS_READ = 'crm.combos.read',
+  CRM_COMBOS_CREATE = 'crm.combos.create',
+  CRM_COMBOS_UPDATE = 'crm.combos.update',
+  CRM_COMBOS_DELETE = 'crm.combos.delete',
+
   CRM_AGENDA_READ = 'crm.agenda.read',
   CRM_AGENDA_CREATE = 'crm.agenda.create',
   CRM_AGENDA_UPDATE = 'crm.agenda.update',
@@ -101,6 +106,10 @@ const CRM_FULL_PERMISSIONS: Permission[] = [
   Permission.CRM_PRODUTOS_CREATE,
   Permission.CRM_PRODUTOS_UPDATE,
   Permission.CRM_PRODUTOS_DELETE,
+  Permission.CRM_COMBOS_READ,
+  Permission.CRM_COMBOS_CREATE,
+  Permission.CRM_COMBOS_UPDATE,
+  Permission.CRM_COMBOS_DELETE,
   Permission.CRM_AGENDA_READ,
   Permission.CRM_AGENDA_CREATE,
   Permission.CRM_AGENDA_UPDATE,
@@ -145,6 +154,7 @@ const VENDEDOR_CRM_PERMISSIONS: Permission[] = [
   Permission.CRM_OPORTUNIDADES_CREATE,
   Permission.CRM_OPORTUNIDADES_UPDATE,
   Permission.CRM_PRODUTOS_READ,
+  Permission.CRM_COMBOS_READ,
   Permission.CRM_AGENDA_READ,
   Permission.CRM_AGENDA_CREATE,
   Permission.CRM_AGENDA_UPDATE,
@@ -318,7 +328,7 @@ export const PERMISSION_CATALOG_GROUPS: PermissionCatalogGroup[] = [
   {
     id: 'crm',
     label: 'CRM',
-    description: 'Clientes, leads, oportunidades, produtos e agenda',
+    description: 'Clientes, leads, oportunidades, produtos, combos e agenda',
     roles: [...ROLE_OPERATIONAL_KEYS],
     options: [
       { value: Permission.CRM_CLIENTES_READ, label: 'Clientes: visualizar' },
@@ -337,6 +347,10 @@ export const PERMISSION_CATALOG_GROUPS: PermissionCatalogGroup[] = [
       { value: Permission.CRM_PRODUTOS_CREATE, label: 'Produtos: criar' },
       { value: Permission.CRM_PRODUTOS_UPDATE, label: 'Produtos: editar' },
       { value: Permission.CRM_PRODUTOS_DELETE, label: 'Produtos: excluir' },
+      { value: Permission.CRM_COMBOS_READ, label: 'Combos: visualizar' },
+      { value: Permission.CRM_COMBOS_CREATE, label: 'Combos: criar' },
+      { value: Permission.CRM_COMBOS_UPDATE, label: 'Combos: editar' },
+      { value: Permission.CRM_COMBOS_DELETE, label: 'Combos: excluir' },
       { value: Permission.CRM_AGENDA_READ, label: 'Agenda: visualizar' },
       { value: Permission.CRM_AGENDA_CREATE, label: 'Agenda: criar' },
       { value: Permission.CRM_AGENDA_UPDATE, label: 'Agenda: editar' },
@@ -443,7 +457,7 @@ const buildRoleDefaultPermissionsWithAliases = (): Record<string, string[]> => {
 };
 
 export const PERMISSION_CATALOG: PermissionCatalog = {
-  version: '2026-03-02',
+  version: '2026-03-03',
   groups: PERMISSION_CATALOG_GROUPS,
   defaultsByRole: buildRoleDefaultPermissionsWithAliases(),
   allPermissions: [...ALL_PERMISSIONS],

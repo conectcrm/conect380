@@ -1,4 +1,4 @@
-# Matriz de Permissoes Atualizada (2026-03-02)
+# Matriz de Permissoes Atualizada (2026-03-03)
 
 ## 1. Objetivo
 
@@ -38,6 +38,16 @@ Consolidar a matriz de permissoes apos a evolucao recente de telas e ferramentas
    - `admin` deixou de receber, por default, permissoes operacionais de CRM/Comercial/Atendimento/Financeiro;
    - `admin` permanece com escopo de governanca (`usuarios`, `configuracoes`, `planos`, `admin.empresas`, `insights`);
    - matriz E2E foi atualizada para garantir bloqueio operacional do role `admin` sem permissoes explicitas.
+8. Catalogo e combos foram separados por permissao canonica:
+   - `crm.produtos.*` permanece para itens avulsos do catalogo;
+   - `crm.combos.*` passou a governar leitura/escrita de combos.
+9. Menu e rotas de combos passaram a usar permissao dedicada:
+   - `comercial-combos` exige `crm.combos.read`;
+   - `/combos/novo` e `/vendas/combos/novo` exigem `crm.combos.create` + `crm.combos.read`;
+   - `/combos/:id/editar` e `/vendas/combos/:id/editar` exigem `crm.combos.update` + `crm.combos.read`.
+10. Fallback do modal de usuarios foi alinhado ao catalogo canonico:
+   - inclui opcoes `crm.combos.read/create/update/delete`;
+   - default de `vendedor` mantem acesso de leitura a combos (`crm.combos.read`) para preservar operacao comercial.
 
 ## 4. Matriz por perfil (defaults)
 
@@ -62,6 +72,9 @@ Consolidar a matriz de permissoes apos a evolucao recente de telas e ferramentas
 | `/financeiro/aprovacoes` | `financeiro.pagamentos.manage` |
 | `/financeiro/conciliacao` | `financeiro.pagamentos.read` |
 | `/financeiro/relatorios` | `financeiro.faturamento.read` **e** `relatorios.read` |
+| `/vendas/combos` | `crm.combos.read` |
+| `/combos/novo` | `crm.combos.create` **e** `crm.combos.read` |
+| `/combos/:id/editar` | `crm.combos.update` **e** `crm.combos.read` |
 | `/admin/empresas` | `admin.empresas.manage` + guard de superadmin na navegacao |
 | `/admin/sistema` | `admin.empresas.manage` + guard de superadmin na navegacao |
 
