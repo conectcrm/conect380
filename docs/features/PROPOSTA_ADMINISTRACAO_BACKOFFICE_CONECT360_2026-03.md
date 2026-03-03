@@ -369,8 +369,8 @@ Entregavel:
 
 - [x] Separar permissoes de `catalogo` e `combos` por role (read/create/update/delete).
 - [x] Permitir ocultar menu de combos por modulo/perfil quando cliente nao usa pacotes.
-- [ ] Criar guia rapido in-app (2-3 bullets) explicando quando usar item x combo.
-- [ ] Adicionar metricas de uso (itens avulsos vs combos em propostas).
+- [x] Criar guia rapido in-app (2-3 bullets) explicando quando usar item x combo.
+- [x] Adicionar metricas de uso (itens avulsos vs combos em propostas).
 
 Entregavel:
 - Operacao governada e aderente ao perfil de cada tenant.

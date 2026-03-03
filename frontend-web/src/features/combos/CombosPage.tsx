@@ -21,6 +21,7 @@ import {
   AlertTriangle,
   Check,
   X,
+  Lightbulb,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { BackToNucleus } from '../../components/navigation/BackToNucleus';
@@ -269,6 +270,22 @@ const CombosPage: React.FC = () => {
                   {formatCurrency(estatisticas.faturamentoMes)}
                 </p>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm p-5 mb-6">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[#F2F8FB]">
+              <Lightbulb className="h-4 w-4 text-[#0F7B7D]" />
+            </span>
+            <div>
+              <h2 className="text-sm font-semibold text-[#244455]">Guia rapido: item avulso x combo</h2>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-[#607B89]">
+                <li>Item avulso e ideal para venda pontual e personalizacao de preco por proposta.</li>
+                <li>Combo e ideal para pacote repetitivo, com desconto e composicao padronizada.</li>
+                <li>Se o cliente compra sempre o mesmo conjunto, publique como combo no catalogo.</li>
+              </ul>
             </div>
           </div>
         </div>

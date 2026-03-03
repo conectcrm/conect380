@@ -148,6 +148,105 @@ class PropostasService {
   private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutos em milliseconds
   private isLoadingVendedores = false;
 
+  private isComboItem(item: unknown): boolean {
+    if (!item || typeof item !== 'object') {
+      return false;
+    }
+
+    const record = item as Record<string, unknown>;
+    const tipo = String(record.tipo ?? record.itemTipo ?? '').trim().toLowerCase();
+    if (tipo === 'combo' || tipo.includes('combo')) {
+      return true;
+    }
+
+    const origem = String(record.origem ?? '').trim().toLowerCase();
+    if (origem === 'combo' || origem.includes('combo')) {
+      return true;
+    }
+
+    const unidade = String(record.unidade ?? '').trim().toLowerCase();
+    if (unidade === 'combo' || unidade === 'pacote') {
+      return true;
+    }
+
+    if (record.comboId || record.combo_id || record.idCombo) {
+      return true;
+    }
+
+    return Array.isArray(record.produtosCombo) && record.produtosCombo.length > 0;
+  }
+
+  private normalizeUsoItensVsCombos(payload: unknown) {
+    const usage = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
+    const itensAvulsos = Number(usage.itensAvulsos || 0);
+    const combos = Number(usage.combos || 0);
+    const totalItens = Math.max(itensAvulsos + combos, 0);
+    const percentualItensAvulsosPayload = Number(usage.percentualItensAvulsos);
+    const percentualCombosPayload = Number(usage.percentualCombos);
+
+    return {
+      itensAvulsos,
+      combos,
+      propostasComItensAvulsos: Number(usage.propostasComItensAvulsos || 0),
+      propostasComCombos: Number(usage.propostasComCombos || 0),
+      propostasMistas: Number(usage.propostasMistas || 0),
+      percentualItensAvulsos:
+        Number.isFinite(percentualItensAvulsosPayload) && percentualItensAvulsosPayload >= 0
+          ? percentualItensAvulsosPayload
+          : totalItens > 0
+            ? Math.round((itensAvulsos / totalItens) * 10000) / 100
+            : 0,
+      percentualCombos:
+        Number.isFinite(percentualCombosPayload) && percentualCombosPayload >= 0
+          ? percentualCombosPayload
+          : totalItens > 0
+            ? Math.round((combos / totalItens) * 10000) / 100
+            : 0,
+    };
+  }
+
+  private calcularUsoItensVsCombos(propostas: PropostaCompleta[]) {
+    let itensAvulsos = 0;
+    let combos = 0;
+    let propostasComItensAvulsos = 0;
+    let propostasComCombos = 0;
+    let propostasMistas = 0;
+
+    propostas.forEach((proposta) => {
+      let propostaTemItemAvulso = false;
+      let propostaTemCombo = false;
+
+      (proposta.produtos || []).forEach((item) => {
+        if (this.isComboItem(item?.produto)) {
+          combos += 1;
+          propostaTemCombo = true;
+          return;
+        }
+
+        itensAvulsos += 1;
+        propostaTemItemAvulso = true;
+      });
+
+      if (propostaTemItemAvulso) {
+        propostasComItensAvulsos += 1;
+      }
+      if (propostaTemCombo) {
+        propostasComCombos += 1;
+      }
+      if (propostaTemItemAvulso && propostaTemCombo) {
+        propostasMistas += 1;
+      }
+    });
+
+    return this.normalizeUsoItensVsCombos({
+      itensAvulsos,
+      combos,
+      propostasComItensAvulsos,
+      propostasComCombos,
+      propostasMistas,
+    });
+  }
+
   // Método para obter produtos do sistema com cache
   async obterProdutos(): Promise<Produto[]> {
     try {
@@ -656,6 +755,9 @@ class PropostasService {
             propostasComVersao: Number((dadosBackend as any).propostasComVersao || 0),
             mediaVersoesPorProposta: Number((dadosBackend as any).mediaVersoesPorProposta || 0),
             revisoesUltimos7Dias: Number((dadosBackend as any).revisoesUltimos7Dias || 0),
+            usoItensVsCombos: this.normalizeUsoItensVsCombos(
+              (dadosBackend as any).usoItensVsCombos,
+            ),
           };
         }
       } catch (backendError) {
@@ -674,6 +776,7 @@ class PropostasService {
 
       const totalPropostas = propostas.length;
       const valorTotalPipeline = propostas.reduce((sum, p) => sum + p.total, 0);
+      const usoItensVsCombos = this.calcularUsoItensVsCombos(propostas);
 
       const propostasAprovadas = propostas.filter((p) => p.status === 'aprovada').length;
       const taxaConversao = totalPropostas > 0 ? (propostasAprovadas / totalPropostas) * 100 : 0;
@@ -798,6 +901,7 @@ class PropostasService {
         mediaVersoesPorProposta:
           totalPropostas > 0 ? Math.round((totalVersoes / totalPropostas) * 100) / 100 : 0,
         revisoesUltimos7Dias,
+        usoItensVsCombos,
       };
     } catch (error) {
       console.error('Erro ao calcular estatisticas:', error);
@@ -816,6 +920,7 @@ class PropostasService {
         propostasComVersao: 0,
         mediaVersoesPorProposta: 0,
         revisoesUltimos7Dias: 0,
+        usoItensVsCombos: this.normalizeUsoItensVsCombos(null),
       };
     }
   }
@@ -967,4 +1072,3 @@ class PropostasService {
 
 export const propostasService = new PropostasService();
 export type { PropostaCompleta, PropostaFormData, Cliente, Vendedor, Produto, ProdutoProposta };
-

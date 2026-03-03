@@ -338,6 +338,39 @@ export class PropostasService {
     if (!normalized) return '[vazio]';
     return normalized.length > max ? `${normalized.slice(0, max)}...` : normalized;
   }
+
+  private isComboSnapshotItem(item: unknown): boolean {
+    if (!item || typeof item !== 'object') {
+      return false;
+    }
+
+    const record = item as Record<string, unknown>;
+    const tipo = String(record.tipo ?? record.itemTipo ?? '').trim().toLowerCase();
+    if (tipo === 'combo' || tipo.includes('combo')) {
+      return true;
+    }
+
+    const origem = String(record.origem ?? '').trim().toLowerCase();
+    if (origem === 'combo' || origem.includes('combo')) {
+      return true;
+    }
+
+    const unidade = String(record.unidade ?? '').trim().toLowerCase();
+    if (unidade === 'combo' || unidade === 'pacote') {
+      return true;
+    }
+
+    const categoria = String(record.categoria ?? '').trim().toLowerCase();
+    if (categoria === 'combo' || categoria.includes('combo')) {
+      return true;
+    }
+
+    if (record.comboId || record.combo_id || record.idCombo) {
+      return true;
+    }
+
+    return Array.isArray(record.produtosCombo) && record.produtosCombo.length > 0;
+  }
   
   private getAnoPropostaAtual(): string {
     return String(new Date().getFullYear());
@@ -2859,6 +2892,15 @@ export class PropostasService {
     propostasComVersao: number;
     mediaVersoesPorProposta: number;
     revisoesUltimos7Dias: number;
+    usoItensVsCombos: {
+      itensAvulsos: number;
+      combos: number;
+      propostasComItensAvulsos: number;
+      propostasComCombos: number;
+      propostasMistas: number;
+      percentualItensAvulsos: number;
+      percentualCombos: number;
+    };
   }> {
     const propostas = await this.listarPropostas(empresaId);
     const totalPropostas = propostas.length;
@@ -2884,6 +2926,11 @@ export class PropostasService {
     let propostasComVersao = 0;
     let totalVersoes = 0;
     let revisoesUltimos7Dias = 0;
+    let totalItensAvulsos = 0;
+    let totalCombos = 0;
+    let propostasComItensAvulsos = 0;
+    let propostasComCombos = 0;
+    let propostasMistas = 0;
     const limiteRevisaoRecente = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
     propostas.forEach((proposta) => {
@@ -2911,8 +2958,12 @@ export class PropostasService {
         vendedorStats.motivos[motivo] = (vendedorStats.motivos[motivo] || 0) + 1;
       }
 
+      let propostaTemItemAvulso = false;
+      let propostaTemCombo = false;
+
       (proposta.produtos || []).forEach((produto) => {
-        const nomeProduto = String((produto as Record<string, unknown>)?.nome || 'Produto nao informado');
+        const record = produto as Record<string, unknown>;
+        const nomeProduto = String(record?.nome || 'Produto nao informado');
         if (!produtoMap.has(nomeProduto)) {
           produtoMap.set(nomeProduto, { total: 0, ganhas: 0, perdidas: 0 });
         }
@@ -2924,7 +2975,26 @@ export class PropostasService {
         if (status === 'rejeitada') {
           produtoStats.perdidas += 1;
         }
+
+        if (this.isComboSnapshotItem(record)) {
+          totalCombos += 1;
+          propostaTemCombo = true;
+          return;
+        }
+
+        totalItensAvulsos += 1;
+        propostaTemItemAvulso = true;
       });
+
+      if (propostaTemItemAvulso) {
+        propostasComItensAvulsos += 1;
+      }
+      if (propostaTemCombo) {
+        propostasComCombos += 1;
+      }
+      if (propostaTemItemAvulso && propostaTemCombo) {
+        propostasMistas += 1;
+      }
 
       if (proposta.aprovacaoInterna?.status === 'pendente') {
         aprovacoesPendentes += 1;
@@ -2983,6 +3053,14 @@ export class PropostasService {
       }))
       .sort((a, b) => b.total - a.total);
 
+    const totalRegistrosCatalogo = totalItensAvulsos + totalCombos;
+    const percentualItensAvulsos =
+      totalRegistrosCatalogo > 0
+        ? Number(((totalItensAvulsos / totalRegistrosCatalogo) * 100).toFixed(2))
+        : 0;
+    const percentualCombos =
+      totalRegistrosCatalogo > 0 ? Number(((totalCombos / totalRegistrosCatalogo) * 100).toFixed(2)) : 0;
+
     return {
       totalPropostas,
       valorTotalPipeline,
@@ -2999,6 +3077,15 @@ export class PropostasService {
       mediaVersoesPorProposta:
         totalPropostas > 0 ? Number((totalVersoes / totalPropostas).toFixed(2)) : 0,
       revisoesUltimos7Dias,
+      usoItensVsCombos: {
+        itensAvulsos: totalItensAvulsos,
+        combos: totalCombos,
+        propostasComItensAvulsos,
+        propostasComCombos,
+        propostasMistas,
+        percentualItensAvulsos,
+        percentualCombos,
+      },
     };
   }
 }

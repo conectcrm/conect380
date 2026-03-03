@@ -17,6 +17,8 @@ import {
   FileSignature,
   CreditCard,
   Clock,
+  Package,
+  Layers,
 } from 'lucide-react';
 
 interface MetricasPropostas {
@@ -46,6 +48,15 @@ interface MetricasPropostas {
   propostasComVersao?: number;
   mediaVersoesPorProposta?: number;
   revisoesUltimos7Dias?: number;
+  usoItensVsCombos?: {
+    itensAvulsos: number;
+    combos: number;
+    propostasComItensAvulsos: number;
+    propostasComCombos: number;
+    propostasMistas: number;
+    percentualItensAvulsos: number;
+    percentualCombos: number;
+  };
 }
 
 interface DashboardPropostasProps {
@@ -159,6 +170,31 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
       }>;
     }
     return metricas.conversaoPorProduto.slice(0, 5);
+  }, [metricas]);
+
+  const usoItensVsCombos = useMemo(() => {
+    if (!metricas?.usoItensVsCombos) {
+      return {
+        itensAvulsos: 0,
+        combos: 0,
+        propostasComItensAvulsos: 0,
+        propostasComCombos: 0,
+        propostasMistas: 0,
+        percentualItensAvulsos: 0,
+        percentualCombos: 0,
+      };
+    }
+
+    const uso = metricas.usoItensVsCombos;
+    return {
+      itensAvulsos: Number(uso.itensAvulsos || 0),
+      combos: Number(uso.combos || 0),
+      propostasComItensAvulsos: Number(uso.propostasComItensAvulsos || 0),
+      propostasComCombos: Number(uso.propostasComCombos || 0),
+      propostasMistas: Number(uso.propostasMistas || 0),
+      percentualItensAvulsos: Number(uso.percentualItensAvulsos || 0),
+      percentualCombos: Number(uso.percentualCombos || 0),
+    };
   }, [metricas]);
 
   if (isLoading) {
@@ -380,6 +416,56 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
           </div>
         </SectionCard>
       </div>
+
+      <SectionCard className="p-4 sm:p-5">
+        <h3 className="text-base font-semibold text-[#19384C]">Uso de catalogo: itens avulsos x combos</h3>
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className={`${shellTokens.card} p-3`}>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#607B89]">Itens avulsos</p>
+                <p className="mt-1 text-xl font-semibold text-[#19384C]">{usoItensVsCombos.itensAvulsos}</p>
+              </div>
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#159A9C]/10">
+                <Package className="h-4 w-4 text-[#0F7B7D]" />
+              </span>
+            </div>
+            <p className="mt-2 text-xs text-[#607B89]">
+              {usoItensVsCombos.percentualItensAvulsos.toFixed(1)}% dos itens usados em propostas
+            </p>
+          </div>
+
+          <div className={`${shellTokens.card} p-3`}>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#607B89]">Combos</p>
+                <p className="mt-1 text-xl font-semibold text-[#19384C]">{usoItensVsCombos.combos}</p>
+              </div>
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#818CF8]/15">
+                <Layers className="h-4 w-4 text-[#3730A3]" />
+              </span>
+            </div>
+            <p className="mt-2 text-xs text-[#607B89]">
+              {usoItensVsCombos.percentualCombos.toFixed(1)}% dos itens usados em propostas
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-3 text-xs text-[#607B89] sm:grid-cols-3">
+          <div className={`${shellTokens.card} p-3`}>
+            <p className="font-semibold text-[#244455]">Propostas com item avulso</p>
+            <p className="mt-1">{usoItensVsCombos.propostasComItensAvulsos}</p>
+          </div>
+          <div className={`${shellTokens.card} p-3`}>
+            <p className="font-semibold text-[#244455]">Propostas com combo</p>
+            <p className="mt-1">{usoItensVsCombos.propostasComCombos}</p>
+          </div>
+          <div className={`${shellTokens.card} p-3`}>
+            <p className="font-semibold text-[#244455]">Propostas mistas</p>
+            <p className="mt-1">{usoItensVsCombos.propostasMistas}</p>
+          </div>
+        </div>
+      </SectionCard>
 
       <SectionCard className="p-4 sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

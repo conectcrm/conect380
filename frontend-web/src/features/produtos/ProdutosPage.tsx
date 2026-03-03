@@ -14,6 +14,7 @@ import {
   X,
   DollarSign,
   Settings,
+  Lightbulb,
 } from 'lucide-react';
 import {
   DataTableCard,
@@ -499,6 +500,22 @@ const ProdutosPage: React.FC = () => {
             tone: index === 3 ? 'warning' : index === 1 ? 'accent' : 'neutral',
           }))}
         />
+      </SectionCard>
+
+      <SectionCard className="p-4 sm:p-5">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[#F2F8FB]">
+            <Lightbulb className="h-4 w-4 text-[#0F7B7D]" />
+          </span>
+          <div>
+            <h2 className="text-sm font-semibold text-[#244455]">Guia rapido: quando usar item ou combo</h2>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-[#607B89]">
+              <li>Use item avulso quando o preco e a negociacao forem independentes.</li>
+              <li>Use combo quando dois ou mais itens sempre saem juntos com condicao comercial unica.</li>
+              <li>Prefira combo para padronizar proposta recorrente e reduzir erro de montagem.</li>
+            </ul>
+          </div>
+        </div>
       </SectionCard>
 
       <FiltersBar className="p-4">

@@ -145,6 +145,15 @@ export interface PropostaEstatisticas {
   propostasComVersao?: number;
   mediaVersoesPorProposta?: number;
   revisoesUltimos7Dias?: number;
+  usoItensVsCombos?: {
+    itensAvulsos: number;
+    combos: number;
+    propostasComItensAvulsos: number;
+    propostasComCombos: number;
+    propostasMistas: number;
+    percentualItensAvulsos: number;
+    percentualCombos: number;
+  };
 }
 
 class PropostasService {
@@ -223,6 +232,107 @@ class PropostasService {
         ? proposta.produtos.map((produto) => ({ ...produto }))
         : [],
     };
+  }
+
+  private isComboItem(item: unknown): boolean {
+    if (!item || typeof item !== 'object') {
+      return false;
+    }
+
+    const record = item as Record<string, unknown>;
+    const tipo = String(record.tipo ?? record.itemTipo ?? '').trim().toLowerCase();
+    if (tipo === 'combo' || tipo.includes('combo')) {
+      return true;
+    }
+
+    const origem = String(record.origem ?? '').trim().toLowerCase();
+    if (origem === 'combo' || origem.includes('combo')) {
+      return true;
+    }
+
+    const unidade = String(record.unidade ?? '').trim().toLowerCase();
+    if (unidade === 'combo' || unidade === 'pacote') {
+      return true;
+    }
+
+    if (record.comboId || record.combo_id || record.idCombo) {
+      return true;
+    }
+
+    return Array.isArray(record.produtosCombo) && record.produtosCombo.length > 0;
+  }
+
+  private normalizeUsoItensVsCombos(
+    payload: unknown,
+  ): NonNullable<PropostaEstatisticas['usoItensVsCombos']> {
+    const usage = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
+    const itensAvulsos = Number(usage.itensAvulsos || 0);
+    const combos = Number(usage.combos || 0);
+    const totalItens = Math.max(itensAvulsos + combos, 0);
+    const percentualItensAvulsosPayload = Number(usage.percentualItensAvulsos);
+    const percentualCombosPayload = Number(usage.percentualCombos);
+
+    return {
+      itensAvulsos,
+      combos,
+      propostasComItensAvulsos: Number(usage.propostasComItensAvulsos || 0),
+      propostasComCombos: Number(usage.propostasComCombos || 0),
+      propostasMistas: Number(usage.propostasMistas || 0),
+      percentualItensAvulsos:
+        Number.isFinite(percentualItensAvulsosPayload) && percentualItensAvulsosPayload >= 0
+          ? percentualItensAvulsosPayload
+          : totalItens > 0
+            ? Number(((itensAvulsos / totalItens) * 100).toFixed(2))
+            : 0,
+      percentualCombos:
+        Number.isFinite(percentualCombosPayload) && percentualCombosPayload >= 0
+          ? percentualCombosPayload
+          : totalItens > 0
+            ? Number(((combos / totalItens) * 100).toFixed(2))
+            : 0,
+    };
+  }
+
+  private calcularUsoItensVsCombos(propostas: Proposta[]): NonNullable<PropostaEstatisticas['usoItensVsCombos']> {
+    let itensAvulsos = 0;
+    let combos = 0;
+    let propostasComItensAvulsos = 0;
+    let propostasComCombos = 0;
+    let propostasMistas = 0;
+
+    propostas.forEach((proposta) => {
+      let propostaTemItemAvulso = false;
+      let propostaTemCombo = false;
+
+      (proposta.produtos || []).forEach((item) => {
+        if (this.isComboItem(item)) {
+          combos += 1;
+          propostaTemCombo = true;
+          return;
+        }
+
+        itensAvulsos += 1;
+        propostaTemItemAvulso = true;
+      });
+
+      if (propostaTemItemAvulso) {
+        propostasComItensAvulsos += 1;
+      }
+      if (propostaTemCombo) {
+        propostasComCombos += 1;
+      }
+      if (propostaTemItemAvulso && propostaTemCombo) {
+        propostasMistas += 1;
+      }
+    });
+
+    return this.normalizeUsoItensVsCombos({
+      itensAvulsos,
+      combos,
+      propostasComItensAvulsos,
+      propostasComCombos,
+      propostasMistas,
+    });
   }
 
   private isRateLimitError(error: unknown): boolean {
@@ -406,6 +516,7 @@ class PropostasService {
             propostasComVersao: Number(payload.propostasComVersao || 0),
             mediaVersoesPorProposta: Number(payload.mediaVersoesPorProposta || 0),
             revisoesUltimos7Dias: Number(payload.revisoesUltimos7Dias || 0),
+            usoItensVsCombos: this.normalizeUsoItensVsCombos(payload.usoItensVsCombos),
           };
         }
       } catch (dashboardError) {
@@ -417,6 +528,7 @@ class PropostasService {
       const valorTotalPipeline = propostas.reduce((total, p) => total + (p.total || 0), 0);
       const propostasAprovadas = propostas.filter((p) => p.status === 'aprovada').length;
       const taxaConversao = totalPropostas > 0 ? (propostasAprovadas / totalPropostas) * 100 : 0;
+      const usoItensVsCombos = this.calcularUsoItensVsCombos(propostas);
       const limiteRevisaoRecente = Date.now() - 7 * 24 * 60 * 60 * 1000;
       let propostasComVersao = 0;
       let totalVersoes = 0;
@@ -470,6 +582,7 @@ class PropostasService {
         mediaVersoesPorProposta:
           totalPropostas > 0 ? Number((totalVersoes / totalPropostas).toFixed(2)) : 0,
         revisoesUltimos7Dias,
+        usoItensVsCombos,
       };
     } catch (error) {
       console.error('Erro ao calcular estatísticas:', error);
