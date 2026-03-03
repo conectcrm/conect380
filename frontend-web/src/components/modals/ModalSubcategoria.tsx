@@ -2,14 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import { X, Save, Tag } from 'lucide-react';
+import { X, Save, Tag, DollarSign, SlidersHorizontal } from 'lucide-react';
 
-// Interfaces
+interface CamposPersonalizados {
+  duracao?: boolean;
+  usuarios?: boolean;
+  modalidade?: boolean;
+  recursos?: boolean;
+}
+
 interface Subcategoria {
   id?: string;
   nome: string;
   descricao: string;
   categoriaId: string;
+  precoBase: number;
+  unidade: string;
+  camposPersonalizados?: CamposPersonalizados;
   ativa: boolean;
 }
 
@@ -29,7 +38,26 @@ interface ModalSubcategoriaProps {
   isLoading?: boolean;
 }
 
-// Schema de validação
+const categoriaColorDotClassMap: Record<string, string> = {
+  blue: 'bg-blue-500',
+  green: 'bg-green-500',
+  purple: 'bg-purple-500',
+  orange: 'bg-orange-500',
+  red: 'bg-red-500',
+  yellow: 'bg-yellow-500',
+  pink: 'bg-pink-500',
+  indigo: 'bg-indigo-500',
+};
+
+const unidadesDisponiveis = [
+  { value: 'unidade', label: 'Unidade' },
+  { value: 'pacote', label: 'Pacote' },
+  { value: 'licenca', label: 'Licença' },
+  { value: 'hora', label: 'Hora' },
+  { value: 'dia', label: 'Dia' },
+  { value: 'mensal', label: 'Mensal' },
+];
+
 const subcategoriaSchema = yup.object().shape({
   nome: yup.string().required('Nome é obrigatório').min(2, 'Nome deve ter pelo menos 2 caracteres'),
   descricao: yup
@@ -37,8 +65,29 @@ const subcategoriaSchema = yup.object().shape({
     .required('Descrição é obrigatória')
     .min(10, 'Descrição deve ter pelo menos 10 caracteres'),
   categoriaId: yup.string().required('Categoria é obrigatória'),
+  precoBase: yup
+    .number()
+    .required('Preço base é obrigatório')
+    .min(0, 'Preço base deve ser maior ou igual a zero')
+    .typeError('Preço base deve ser um número válido'),
+  unidade: yup.string().required('Unidade é obrigatória'),
+  camposPersonalizados: yup
+    .object({
+      duracao: yup.boolean().optional(),
+      usuarios: yup.boolean().optional(),
+      modalidade: yup.boolean().optional(),
+      recursos: yup.boolean().optional(),
+    })
+    .optional(),
   ativa: yup.boolean(),
 });
+
+const defaultCamposPersonalizados: CamposPersonalizados = {
+  duracao: false,
+  usuarios: false,
+  modalidade: false,
+  recursos: false,
+};
 
 const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
   isOpen,
@@ -62,17 +111,25 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
       nome: '',
       descricao: '',
       categoriaId: categoriaAtual?.id || '',
+      precoBase: 0,
+      unidade: 'unidade',
+      camposPersonalizados: defaultCamposPersonalizados,
       ativa: true,
     },
   });
 
-  // Reset form quando subcategoria ou categoria atual muda
   useEffect(() => {
     if (subcategoria) {
       reset({
         nome: subcategoria.nome,
         descricao: subcategoria.descricao,
         categoriaId: subcategoria.categoriaId,
+        precoBase: Number(subcategoria.precoBase || 0),
+        unidade: subcategoria.unidade || 'unidade',
+        camposPersonalizados: {
+          ...defaultCamposPersonalizados,
+          ...(subcategoria.camposPersonalizados || {}),
+        },
         ativa: subcategoria.ativa,
       });
     } else {
@@ -80,6 +137,9 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
         nome: '',
         descricao: '',
         categoriaId: categoriaAtual?.id || '',
+        precoBase: 0,
+        unidade: 'unidade',
+        camposPersonalizados: defaultCamposPersonalizados,
         ativa: true,
       });
     }
@@ -89,12 +149,12 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
     try {
       setIsSaving(true);
 
-      const subcategoriaData: Subcategoria = {
+      await onSave({
         ...data,
         id: subcategoria?.id,
-      };
+        precoBase: Number(data.precoBase || 0),
+      });
 
-      await onSave(subcategoriaData);
       onClose();
     } catch (error) {
       console.error('Erro ao salvar subcategoria:', error);
@@ -104,49 +164,45 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
   };
 
   const handleClose = () => {
-    if (!isSaving) {
-      reset();
-      onClose();
-    }
+    if (isSaving) return;
+    reset();
+    onClose();
   };
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        {/* Overlay */}
+      <div className="flex min-h-screen items-center justify-center px-4 pb-20 pt-4 text-center sm:block sm:p-0">
         <div
           className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
           onClick={handleClose}
         />
 
-        {/* Modal */}
-        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-          {/* Header */}
-          <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-            <div className="flex items-center justify-between mb-4">
+        <div className="inline-block w-full max-w-2xl transform overflow-hidden rounded-lg bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:align-middle">
+          <div className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+            <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center">
-                <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-green-100 sm:mx-0 sm:h-10 sm:w-10">
+                <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-green-100 sm:mx-0 sm:h-10 sm:w-10">
                   <Tag className="h-6 w-6 text-green-600" />
                 </div>
                 <div className="ml-4">
-                  <h3 className="text-lg leading-6 font-medium text-gray-900">
+                  <h3 className="text-lg font-medium leading-6 text-gray-900">
                     {subcategoria ? 'Editar Subcategoria' : 'Nova Subcategoria'}
                   </h3>
                   <p className="text-sm text-gray-500">
                     {subcategoria
-                      ? 'Atualize as informações da subcategoria'
-                      : 'Crie uma nova subcategoria'}
+                      ? 'Atualize os detalhes comerciais da subcategoria'
+                      : 'Defina estrutura e base comercial da nova subcategoria'}
                   </p>
                   {categoriaAtual && (
                     <div className="mt-2 flex items-center">
                       <div
-                        className={`w-3 h-3 rounded-full bg-${categoriaAtual.cor}-500 mr-2`}
-                      ></div>
-                      <span className="text-xs text-gray-600">
-                        Categoria: {categoriaAtual.nome}
-                      </span>
+                        className={`mr-2 h-3 w-3 rounded-full ${
+                          categoriaColorDotClassMap[categoriaAtual.cor] || categoriaColorDotClassMap.blue
+                        }`}
+                      />
+                      <span className="text-xs text-gray-600">Categoria: {categoriaAtual.nome}</span>
                     </div>
                   )}
                 </div>
@@ -160,18 +216,16 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
               </button>
             </div>
 
-            {/* Form */}
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              {/* Categoria */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Categoria *</label>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Categoria *</label>
                 <Controller
                   name="categoriaId"
                   control={control}
                   render={({ field }) => (
                     <select
                       {...field}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-green-500"
                     >
                       <option value="">Selecione uma categoria</option>
                       {categorias.map((categoria) => (
@@ -183,51 +237,162 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
                   )}
                 />
                 {errors.categoriaId && (
-                  <p className="text-red-500 text-sm mt-1">{errors.categoriaId.message}</p>
+                  <p className="mt-1 text-sm text-red-500">{errors.categoriaId.message}</p>
                 )}
               </div>
 
-              {/* Nome */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nome da Subcategoria *
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Nome da Subcategoria *
+                  </label>
+                  <Controller
+                    name="nome"
+                    control={control}
+                    render={({ field }) => (
+                      <input
+                        {...field}
+                        type="text"
+                        placeholder="Ex: Sistema de Gestão"
+                        className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                    )}
+                  />
+                  {errors.nome && <p className="mt-1 text-sm text-red-500">{errors.nome.message}</p>}
+                </div>
+
+                <div>
+                  <label className="mb-1 flex items-center text-sm font-medium text-gray-700">
+                    <DollarSign className="mr-1 h-4 w-4 text-green-600" />
+                    Preço Base *
+                  </label>
+                  <Controller
+                    name="precoBase"
+                    control={control}
+                    render={({ field }) => (
+                      <input
+                        {...field}
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0,00"
+                        className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-green-500"
+                        onChange={(event) => field.onChange(Number(event.target.value || 0))}
+                      />
+                    )}
+                  />
+                  {errors.precoBase && (
+                    <p className="mt-1 text-sm text-red-500">{errors.precoBase.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Unidade *</label>
+                  <Controller
+                    name="unidade"
+                    control={control}
+                    render={({ field }) => (
+                      <select
+                        {...field}
+                        className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-green-500"
+                      >
+                        {unidadesDisponiveis.map((unidade) => (
+                          <option key={unidade.value} value={unidade.value}>
+                            {unidade.label}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  />
+                  {errors.unidade && (
+                    <p className="mt-1 text-sm text-red-500">{errors.unidade.message}</p>
+                  )}
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Descrição *</label>
+                  <Controller
+                    name="descricao"
+                    control={control}
+                    render={({ field }) => (
+                      <textarea
+                        {...field}
+                        rows={3}
+                        placeholder="Descreva escopo, público e regras comerciais desta subcategoria..."
+                        className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                    )}
+                  />
+                  {errors.descricao && (
+                    <p className="mt-1 text-sm text-red-500">{errors.descricao.message}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-md border border-gray-200 p-3">
+                <label className="mb-3 flex items-center text-sm font-medium text-gray-700">
+                  <SlidersHorizontal className="mr-2 h-4 w-4 text-green-600" />
+                  Campos Personalizáveis
                 </label>
+
                 <Controller
-                  name="nome"
+                  name="camposPersonalizados"
                   control={control}
-                  render={({ field }) => (
-                    <input
-                      {...field}
-                      type="text"
-                      placeholder="Ex: Sistema de Gestão"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    />
-                  )}
+                  render={({ field }) => {
+                    const value = { ...defaultCamposPersonalizados, ...(field.value || {}) };
+
+                    return (
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <label className="flex items-center text-sm text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(value.duracao)}
+                            onChange={(event) =>
+                              field.onChange({ ...value, duracao: event.target.checked })
+                            }
+                            className="mr-2 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                          />
+                          Duração
+                        </label>
+                        <label className="flex items-center text-sm text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(value.usuarios)}
+                            onChange={(event) =>
+                              field.onChange({ ...value, usuarios: event.target.checked })
+                            }
+                            className="mr-2 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                          />
+                          Usuários
+                        </label>
+                        <label className="flex items-center text-sm text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(value.modalidade)}
+                            onChange={(event) =>
+                              field.onChange({ ...value, modalidade: event.target.checked })
+                            }
+                            className="mr-2 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                          />
+                          Modalidade
+                        </label>
+                        <label className="flex items-center text-sm text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(value.recursos)}
+                            onChange={(event) =>
+                              field.onChange({ ...value, recursos: event.target.checked })
+                            }
+                            className="mr-2 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                          />
+                          Recursos
+                        </label>
+                      </div>
+                    );
+                  }}
                 />
-                {errors.nome && <p className="text-red-500 text-sm mt-1">{errors.nome.message}</p>}
               </div>
 
-              {/* Descrição */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Descrição *</label>
-                <Controller
-                  name="descricao"
-                  control={control}
-                  render={({ field }) => (
-                    <textarea
-                      {...field}
-                      rows={3}
-                      placeholder="Descreva esta subcategoria..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    />
-                  )}
-                />
-                {errors.descricao && (
-                  <p className="text-red-500 text-sm mt-1">{errors.descricao.message}</p>
-                )}
-              </div>
-
-              {/* Status */}
               <div>
                 <label className="flex items-center">
                   <Controller
@@ -238,7 +403,7 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
                         type="checkbox"
                         checked={field.value}
                         onChange={field.onChange}
-                        className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                        className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
                       />
                     )}
                   />
@@ -246,21 +411,20 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
                 </label>
               </div>
 
-              {/* Buttons */}
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse mt-6 -mx-4 -mb-4 sm:-mx-6 sm:-mb-6">
+              <div className="-mx-4 -mb-4 mt-6 bg-gray-50 px-4 py-3 sm:-mx-6 sm:-mb-6 sm:flex sm:flex-row-reverse sm:px-6">
                 <button
                   type="submit"
                   disabled={isSaving || isLoading}
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  className="inline-flex w-full justify-center rounded-md border border-transparent bg-green-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-400 sm:ml-3 sm:w-auto sm:text-sm"
                 >
                   {isSaving ? (
                     <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white" />
                       Salvando...
                     </>
                   ) : (
                     <>
-                      <Save className="h-4 w-4 mr-2" />
+                      <Save className="mr-2 h-4 w-4" />
                       {subcategoria ? 'Atualizar' : 'Criar'} Subcategoria
                     </>
                   )}
@@ -269,7 +433,7 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
                   type="button"
                   onClick={handleClose}
                   disabled={isSaving}
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm disabled:bg-gray-100"
+                  className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:bg-gray-100 sm:ml-3 sm:mt-0 sm:w-auto sm:text-sm"
                 >
                   Cancelar
                 </button>

@@ -31,6 +31,14 @@ interface Subcategoria {
   nome: string;
   descricao: string;
   categoriaId: string;
+  precoBase: number;
+  unidade: string;
+  camposPersonalizados?: {
+    duracao?: boolean;
+    usuarios?: boolean;
+    modalidade?: boolean;
+    recursos?: boolean;
+  };
   ativa: boolean;
   configuracoes: Configuracao[];
 }
@@ -40,7 +48,6 @@ interface Configuracao {
   nome: string;
   descricao: string;
   subcategoriaId: string;
-  precoBase: number;
   multiplicador: number;
   ativa: boolean;
 }
@@ -52,6 +59,13 @@ const CATEGORY_COLOR_CLASS_MAP: Record<string, { border: string; dot: string }> 
   orange: { border: 'border-orange-500', dot: 'bg-orange-500' },
   red: { border: 'border-red-500', dot: 'bg-red-500' },
   yellow: { border: 'border-yellow-500', dot: 'bg-yellow-500' },
+};
+
+const SUBCATEGORIA_CAMPO_LABELS: Record<string, string> = {
+  duracao: 'Duracao',
+  usuarios: 'Usuarios',
+  modalidade: 'Modalidade',
+  recursos: 'Recursos',
 };
 
 const CategoriasProdutosPage: React.FC = () => {
@@ -89,23 +103,25 @@ const CategoriasProdutosPage: React.FC = () => {
         nome: cat.nome,
         descricao: cat.descricao,
         cor: cat.cor || 'blue',
-        ativa: cat.ativo,
+        ativa: cat.ativo ?? true,
         subcategorias: cat.subcategorias
           ? cat.subcategorias.map((sub) => ({
               id: sub.id,
               nome: sub.nome,
               descricao: sub.descricao || '',
-              categoriaId: cat.id,
-              ativa: sub.ativo,
+              categoriaId: sub.categoria_id || cat.id,
+              precoBase: Number(sub.precoBase || 0),
+              unidade: sub.unidade || 'unidade',
+              camposPersonalizados: sub.camposPersonalizados || undefined,
+              ativa: sub.ativo ?? true,
               configuracoes: sub.configuracoes
                 ? sub.configuracoes.map((conf) => ({
                     id: conf.id,
                     nome: conf.nome,
                     descricao: conf.descricao || '',
                     subcategoriaId: sub.id,
-                    precoBase: sub.precoBase || 0,
-                    multiplicador: conf.multiplicador || 1,
-                    ativa: conf.ativo,
+                    multiplicador: Number(conf.multiplicador ?? 1),
+                    ativa: conf.ativo ?? true,
                   }))
                 : [],
             }))
@@ -379,11 +395,24 @@ const CategoriasProdutosPage: React.FC = () => {
   };
 
   // Renderização do conteúdo por aba
-  const renderCategorias = () => (
-    <div className="space-y-4">
-      {categorias
-        .filter((cat) => cat.nome.toLowerCase().includes(searchTerm.toLowerCase()))
-        .map((categoria) => (
+  const renderCategorias = () => {
+    const categoriasFiltradas = categorias.filter((cat) =>
+      cat.nome.toLowerCase().includes(searchTerm.toLowerCase()),
+    );
+
+    if (categoriasFiltradas.length === 0) {
+      return (
+        <div className="text-center py-12">
+          <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma categoria encontrada</h3>
+          <p className="text-gray-500">Ajuste o filtro de busca ou cadastre uma nova categoria</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        {categoriasFiltradas.map((categoria) => (
           <div
             key={categoria.id}
             className={`bg-white rounded-lg p-6 border-l-4 ${getCategoryColorClasses(categoria.cor).border} shadow-sm cursor-pointer hover:shadow-md transition-shadow ${
@@ -437,8 +466,9 @@ const CategoriasProdutosPage: React.FC = () => {
             </div>
           </div>
         ))}
-    </div>
-  );
+      </div>
+    );
+  };
 
   const renderSubcategorias = () => {
     if (!selectedCategoria) {
@@ -453,6 +483,10 @@ const CategoriasProdutosPage: React.FC = () => {
       );
     }
 
+    const subcategoriasFiltradas = selectedCategoria.subcategorias.filter((sub) =>
+      sub.nome.toLowerCase().includes(searchTerm.toLowerCase()),
+    );
+
     return (
       <div className="space-y-4">
         <div className="bg-blue-50 p-4 rounded-lg mb-4">
@@ -466,9 +500,19 @@ const CategoriasProdutosPage: React.FC = () => {
           </div>
         </div>
 
-        {selectedCategoria.subcategorias
-          .filter((sub) => sub.nome.toLowerCase().includes(searchTerm.toLowerCase()))
-          .map((subcategoria) => (
+        {subcategoriasFiltradas.length === 0 && (
+          <div className="text-center py-8 border border-dashed border-gray-300 rounded-lg">
+            <Tag className="w-10 h-10 text-gray-400 mx-auto mb-3" />
+            <p className="text-gray-600">Nenhuma subcategoria encontrada para o filtro aplicado</p>
+          </div>
+        )}
+
+        {subcategoriasFiltradas.map((subcategoria) => {
+          const camposAtivos = Object.entries(subcategoria.camposPersonalizados || {})
+            .filter(([, enabled]) => Boolean(enabled))
+            .map(([campo]) => SUBCATEGORIA_CAMPO_LABELS[campo] || campo);
+
+          return (
             <div
               key={subcategoria.id}
               className={`bg-white rounded-lg p-4 border shadow-sm cursor-pointer hover:shadow-md transition-shadow ${
@@ -484,6 +528,10 @@ const CategoriasProdutosPage: React.FC = () => {
                     <span className="text-gray-500">
                       {subcategoria.configuracoes.length} configurações
                     </span>
+                    <span className="text-gray-700">
+                      <strong>Base:</strong> {formatCurrency(subcategoria.precoBase)} /{' '}
+                      {subcategoria.unidade}
+                    </span>
                     <span
                       className={`px-2 py-1 rounded-full text-xs font-medium ${
                         subcategoria.ativa
@@ -494,6 +542,11 @@ const CategoriasProdutosPage: React.FC = () => {
                       {subcategoria.ativa ? 'Ativa' : 'Inativa'}
                     </span>
                   </div>
+                  {camposAtivos.length > 0 && (
+                    <p className="mt-2 text-xs text-gray-500">
+                      Campos customizáveis: {camposAtivos.join(', ')}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center space-x-2">
                   <button
@@ -517,7 +570,8 @@ const CategoriasProdutosPage: React.FC = () => {
                 </div>
               </div>
             </div>
-          ))}
+          );
+        })}
       </div>
     );
   };
@@ -533,6 +587,10 @@ const CategoriasProdutosPage: React.FC = () => {
       );
     }
 
+    const configuracoesFiltradas = selectedSubcategoria.configuracoes.filter((conf) =>
+      conf.nome.toLowerCase().includes(searchTerm.toLowerCase()),
+    );
+
     return (
       <div className="space-y-4">
         <div className="bg-green-50 p-4 rounded-lg mb-4">
@@ -544,9 +602,14 @@ const CategoriasProdutosPage: React.FC = () => {
           </div>
         </div>
 
-        {selectedSubcategoria.configuracoes
-          .filter((conf) => conf.nome.toLowerCase().includes(searchTerm.toLowerCase()))
-          .map((configuracao) => (
+        {configuracoesFiltradas.length === 0 && (
+          <div className="text-center py-8 border border-dashed border-gray-300 rounded-lg">
+            <Settings className="w-10 h-10 text-gray-400 mx-auto mb-3" />
+            <p className="text-gray-600">Nenhuma configuração encontrada para o filtro aplicado</p>
+          </div>
+        )}
+
+        {configuracoesFiltradas.map((configuracao) => (
             <div key={configuracao.id} className="bg-white rounded-lg p-4 border shadow-sm">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
@@ -554,10 +617,14 @@ const CategoriasProdutosPage: React.FC = () => {
                   <p className="text-gray-600 text-sm">{configuracao.descricao}</p>
                   <div className="mt-2 flex items-center space-x-4 text-sm">
                     <span className="text-gray-700">
-                      <strong>Preço Base:</strong> {formatCurrency(configuracao.precoBase)}
+                      <strong>Preço Base:</strong> {formatCurrency(selectedSubcategoria.precoBase)}
                     </span>
                     <span className="text-gray-700">
                       <strong>Multiplicador:</strong> {configuracao.multiplicador}x
+                    </span>
+                    <span className="text-gray-700">
+                      <strong>Preço Final:</strong>{' '}
+                      {formatCurrency(selectedSubcategoria.precoBase * configuracao.multiplicador)}
                     </span>
                     <span
                       className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -737,7 +804,16 @@ const CategoriasProdutosPage: React.FC = () => {
         }}
         onSave={handleSalvarConfiguracao}
         configuracao={editingItem}
-        subcategoriaAtual={selectedSubcategoria}
+        subcategoriaAtual={
+          selectedSubcategoria
+            ? {
+                ...selectedSubcategoria,
+                categoria: selectedCategoria
+                  ? { nome: selectedCategoria.nome, cor: selectedCategoria.cor }
+                  : undefined,
+              }
+            : null
+        }
         subcategorias={categorias.flatMap((cat) =>
           cat.subcategorias.map((sub) => ({
             ...sub,
