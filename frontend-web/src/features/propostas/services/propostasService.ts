@@ -2,6 +2,9 @@ import {
   propostasService as sharedPropostasService,
   Proposta as PropostaBasica,
 } from '../../../services/propostasService';
+import { getCatalogoFeaturesConfig } from '../../../config/catalogoFeaturesFlags';
+
+const catalogoFeatures = getCatalogoFeaturesConfig();
 
 interface Cliente {
   id: string;
@@ -37,7 +40,7 @@ interface Produto {
   produtosCombo?: Produto[];
   precoOriginal?: number;
   desconto?: number;
-  tipoItem?: 'produto' | 'servico' | 'licenca' | 'modulo' | 'aplicativo';
+  tipoItem?: 'produto' | 'servico' | 'licenca' | 'modulo' | 'plano' | 'aplicativo';
   tipoLicenciamento?: string;
   periodicidadeLicenca?: string;
   renovacaoAutomatica?: boolean;
@@ -294,37 +297,39 @@ class PropostasService {
         : [];
 
       let itensCombo: Produto[] = [];
-      try {
-        const { combosService } = await import('../../../services/combosService');
-        const combos = await combosService.listarCombos();
+      if (catalogoFeatures.combosEnabled) {
+        try {
+          const { combosService } = await import('../../../services/combosService');
+          const combos = await combosService.listarCombos();
 
-        itensCombo = (Array.isArray(combos) ? combos : [])
-          .filter((combo) => combo.status === 'ativo')
-          .map((combo) => ({
-            id: combo.id,
-            nome: combo.nome,
-            preco: Number(combo.precoCombo || 0),
-            categoria: combo.categoria || 'Combo',
-            descricao: combo.descricao || '',
-            unidade: 'combo',
-            tipo: 'combo',
-            status: combo.status,
-            precoOriginal: Number(combo.precoOriginal || 0),
-            desconto: Number(combo.desconto || 0),
-            produtosCombo: (combo.produtos || []).map((item) => ({
-              id: item.produto.id,
-              nome: item.produto.nome,
-              preco: Number(item.produto.preco || 0),
-              categoria: item.produto.categoria || 'Geral',
-              descricao: item.produto.descricao,
-              unidade: item.produto.unidade || 'unidade',
-              tipo: 'produto',
-              tipoItem: item.produto.tipo as Produto['tipoItem'],
-              status: item.produto.status || 'ativo',
-            })),
-          }));
-      } catch (comboError) {
-        console.warn('⚠️ Não foi possível carregar combos para propostas:', comboError);
+          itensCombo = (Array.isArray(combos) ? combos : [])
+            .filter((combo) => combo.status === 'ativo')
+            .map((combo) => ({
+              id: combo.id,
+              nome: combo.nome,
+              preco: Number(combo.precoCombo || 0),
+              categoria: combo.categoria || 'Combo',
+              descricao: combo.descricao || '',
+              unidade: 'combo',
+              tipo: 'combo',
+              status: combo.status,
+              precoOriginal: Number(combo.precoOriginal || 0),
+              desconto: Number(combo.desconto || 0),
+              produtosCombo: (combo.produtos || []).map((item) => ({
+                id: item.produto.id,
+                nome: item.produto.nome,
+                preco: Number(item.produto.preco || 0),
+                categoria: item.produto.categoria || 'Geral',
+                descricao: item.produto.descricao,
+                unidade: item.produto.unidade || 'unidade',
+                tipo: 'produto',
+                tipoItem: item.produto.tipo as Produto['tipoItem'],
+                status: item.produto.status || 'ativo',
+              })),
+            }));
+        } catch (comboError) {
+          console.warn('⚠️ Não foi possível carregar combos para propostas:', comboError);
+        }
       }
 
       const produtosFormatados: Produto[] = [...itensCatalogo, ...itensCombo];

@@ -31,6 +31,7 @@ import Conect360Logo from './components/ui/Conect360Logo';
 import ScrollToTop from './components/common/ScrollToTop';
 import { useAuth } from './hooks/useAuth';
 import { getMvpBlockedRouteInfo } from './config/mvpScope';
+import { getCatalogoFeaturesConfig } from './config/catalogoFeaturesFlags';
 // ⚠️ Demandas agora são Tickets - imports removidos (apenas redirects mantidos)
 // Sprint 2 - Fase 3e: Admin Console Tickets Configuráveis
 // (code splitting) imports estáticos removidos
@@ -197,6 +198,8 @@ const BackupSincronizacaoPage = React.lazy(() =>
     default: m.BackupSincronizacaoPage,
   })),
 );
+
+const catalogoFeatures = getCatalogoFeaturesConfig();
 
 // Componente principal de rotas
 const AppRoutes: React.FC = () => {
@@ -709,28 +712,35 @@ const AppRoutes: React.FC = () => {
                     path="/produtos/categorias"
                     element={protegerRota(ModuloEnum.VENDAS, <CategoriasProdutosPage />)}
                   />
-                  {/* Rotas dos Combos - Protegidas */}
-                  <Route path="/combos" element={protegerRota(ModuloEnum.VENDAS, <CombosPage />)} />
-                  <Route
-                    path="/vendas/combos"
-                    element={protegerRota(ModuloEnum.VENDAS, <CombosPage />)}
-                  />
-                  <Route
-                    path="/combos/novo"
-                    element={protegerRota(ModuloEnum.VENDAS, <NovoComboPage />)}
-                  />
-                  <Route
-                    path="/vendas/combos/novo"
-                    element={protegerRota(ModuloEnum.VENDAS, <NovoComboPage />)}
-                  />
-                  <Route
-                    path="/combos/:id/editar"
-                    element={protegerRota(ModuloEnum.VENDAS, <NovoComboPage />)}
-                  />
-                  <Route
-                    path="/vendas/combos/:id/editar"
-                    element={protegerRota(ModuloEnum.VENDAS, <NovoComboPage />)}
-                  />
+                  {catalogoFeatures.combosEnabled && (
+                    <>
+                      {/* Rotas dos Combos - Protegidas */}
+                      <Route
+                        path="/combos"
+                        element={protegerRota(ModuloEnum.VENDAS, <CombosPage />)}
+                      />
+                      <Route
+                        path="/vendas/combos"
+                        element={protegerRota(ModuloEnum.VENDAS, <CombosPage />)}
+                      />
+                      <Route
+                        path="/combos/novo"
+                        element={protegerRota(ModuloEnum.VENDAS, <NovoComboPage />)}
+                      />
+                      <Route
+                        path="/vendas/combos/novo"
+                        element={protegerRota(ModuloEnum.VENDAS, <NovoComboPage />)}
+                      />
+                      <Route
+                        path="/combos/:id/editar"
+                        element={protegerRota(ModuloEnum.VENDAS, <NovoComboPage />)}
+                      />
+                      <Route
+                        path="/vendas/combos/:id/editar"
+                        element={protegerRota(ModuloEnum.VENDAS, <NovoComboPage />)}
+                      />
+                    </>
+                  )}
                   <Route path="/agenda" element={protegerRota(ModuloEnum.CRM, <AgendaPage />)} />
                   <Route
                     path="/agenda/eventos/:id"

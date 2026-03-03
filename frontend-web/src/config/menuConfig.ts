@@ -33,7 +33,10 @@ import {
   Tag,
 } from 'lucide-react';
 import { isMenuItemAllowedInMvp } from './mvpScope';
+import { getCatalogoFeaturesConfig } from './catalogoFeaturesFlags';
 import type { User } from '../types';
+
+const catalogoFeatures = getCatalogoFeaturesConfig();
 
 export interface MenuConfig {
   id: string;
@@ -671,7 +674,7 @@ export const menuConfig: MenuConfig[] = [
       'crm.oportunidades.read',
       'comercial.propostas.read',
       'crm.produtos.read',
-      'crm.combos.read',
+      ...(catalogoFeatures.combosEnabled ? (['crm.combos.read'] as const) : []),
     ],
     requiredModule: 'CRM', //  Requer licenca CRM (base para comercial)
     section: 'Opera\u00e7\u00f5es',
@@ -785,16 +788,20 @@ export const menuConfig: MenuConfig[] = [
         requiredModule: 'VENDAS',
         group: 'Cat\u00e1logo',
       },
-      {
-        id: 'comercial-combos',
-        title: 'Combos',
-        icon: Archive,
-        href: '/vendas/combos',
-        color: 'blue',
-        permissions: ['crm.combos.read'],
-        requiredModule: 'VENDAS',
-        group: 'Cat\u00e1logo',
-      },
+      ...(catalogoFeatures.combosEnabled
+        ? [
+            {
+              id: 'comercial-combos',
+              title: 'Combos',
+              icon: Archive,
+              href: '/vendas/combos',
+              color: 'blue',
+              permissions: ['crm.combos.read'],
+              requiredModule: 'VENDAS',
+              group: 'Cat\u00e1logo',
+            } satisfies MenuConfig,
+          ]
+        : []),
     ],
   },
   {
@@ -1110,26 +1117,30 @@ const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
     pattern: '/vendas/cotacoes',
     permissions: ['comercial.propostas.read', 'financeiro.pagamentos.manage'],
   },
-  {
-    pattern: '/combos/novo',
-    permissions: ['crm.combos.create', 'crm.combos.read'],
-    match: 'all',
-  },
-  {
-    pattern: '/vendas/combos/novo',
-    permissions: ['crm.combos.create', 'crm.combos.read'],
-    match: 'all',
-  },
-  {
-    pattern: '/combos/:id/editar',
-    permissions: ['crm.combos.update', 'crm.combos.read'],
-    match: 'all',
-  },
-  {
-    pattern: '/vendas/combos/:id/editar',
-    permissions: ['crm.combos.update', 'crm.combos.read'],
-    match: 'all',
-  },
+  ...(catalogoFeatures.combosEnabled
+    ? ([
+        {
+          pattern: '/combos/novo',
+          permissions: ['crm.combos.create', 'crm.combos.read'],
+          match: 'all',
+        },
+        {
+          pattern: '/vendas/combos/novo',
+          permissions: ['crm.combos.create', 'crm.combos.read'],
+          match: 'all',
+        },
+        {
+          pattern: '/combos/:id/editar',
+          permissions: ['crm.combos.update', 'crm.combos.read'],
+          match: 'all',
+        },
+        {
+          pattern: '/vendas/combos/:id/editar',
+          permissions: ['crm.combos.update', 'crm.combos.read'],
+          match: 'all',
+        },
+      ] satisfies RoutePermissionRule[])
+    : []),
   { pattern: '/financeiro', permissions: ['financeiro.faturamento.read', 'financeiro.pagamentos.read'] },
   { pattern: '/financeiro/faturamento', permissions: ['financeiro.faturamento.read'] },
   { pattern: '/financeiro/contas-pagar', permissions: ['financeiro.pagamentos.read'] },
@@ -1194,7 +1205,7 @@ const ROUTE_PATH_ALIASES: Record<string, string[]> = {
   '/aprovacoes/pendentes': ['/vendas/aprovacoes'],
   '/produtos': ['/vendas/produtos'],
   '/produtos/categorias': ['/vendas/produtos'],
-  '/combos': ['/vendas/combos'],
+  ...(catalogoFeatures.combosEnabled ? { '/combos': ['/vendas/combos'] } : {}),
   '/agenda': ['/crm/agenda'],
   '/assinaturas': ['/billing/assinaturas'],
   '/faturamento': ['/financeiro/faturamento'],
@@ -1406,12 +1417,21 @@ const ALL_PROTECTED_ROUTE_PREFIXES: string[] = (() => {
   return Array.from(all);
 })();
 
+const COMBOS_ROUTE_PREFIXES = ['/combos', '/vendas/combos'];
+
 export const canUserAccessPath = (
   pathname: string,
   modulosAtivos: string[],
   user?: PermissionAwareUser | null,
 ): boolean => {
   const normalizedPath = normalizePathname(pathname);
+
+  if (
+    !catalogoFeatures.combosEnabled &&
+    COMBOS_ROUTE_PREFIXES.some((prefix) => isPathMatch(normalizedPath, prefix))
+  ) {
+    return false;
+  }
 
   const matchedRule = ROUTE_PERMISSION_RULES.find((rule) => matchesPattern(normalizedPath, rule.pattern));
   if (matchedRule) {

@@ -361,7 +361,7 @@ describe('menuConfig permission filtering', () => {
     expect(empresaPermissoesFull).toBe(true);
   });
 
-  it('requires read + create for combos create route', () => {
+  it('blocks combos create route when combos feature is disabled', () => {
     const createOnly = canUserAccessPath('/combos/novo', ALL_MODULES, {
       email: 'catalog.create@empresa.com',
       role: 'custom',
@@ -374,7 +374,7 @@ describe('menuConfig permission filtering', () => {
     } as any);
 
     expect(createOnly).toBe(false);
-    expect(full).toBe(true);
+    expect(full).toBe(false);
   });
 
   it('hides combos menu when user has only catalog read permission', () => {
@@ -389,7 +389,7 @@ describe('menuConfig permission filtering', () => {
     expect(ids).not.toContain('comercial-combos');
   });
 
-  it('shows combos menu when user has combos read permission', () => {
+  it('hides combos menu when user has combos read permission but feature is disabled', () => {
     const menu = getMenuParaEmpresa(ALL_MODULES, {
       email: 'combo.reader@empresa.com',
       role: 'custom',
@@ -397,10 +397,10 @@ describe('menuConfig permission filtering', () => {
     } as any);
 
     const ids = collectIds(menu);
-    expect(ids).toContain('comercial-combos');
+    expect(ids).not.toContain('comercial-combos');
   });
 
-  it('keeps combos menu for vendedor defaults without explicit permissions', () => {
+  it('removes combos menu for vendedor defaults when feature is disabled', () => {
     const menu = getMenuParaEmpresa(ALL_MODULES, {
       email: 'seller@empresa.com',
       role: 'vendedor',
@@ -409,7 +409,7 @@ describe('menuConfig permission filtering', () => {
 
     const ids = collectIds(menu);
     expect(ids).toContain('comercial-produtos');
-    expect(ids).toContain('comercial-combos');
+    expect(ids).not.toContain('comercial-combos');
   });
 
   it('requires financeiro + relatorios for financeiro relatorios route', () => {
