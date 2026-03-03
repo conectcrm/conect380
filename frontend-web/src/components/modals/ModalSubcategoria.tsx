@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
@@ -89,6 +89,16 @@ const defaultCamposPersonalizados: CamposPersonalizados = {
   recursos: false,
 };
 
+const labelClass = 'mb-1 block text-sm font-medium text-[#244455]';
+const inputClass =
+  'w-full rounded-lg border border-[#D4E2E7] px-3 py-2 text-sm text-[#19384C] placeholder:text-[#8AA0AB] focus:border-[#159A9C] focus:outline-none focus:ring-2 focus:ring-[#159A9C]/25';
+const inputErrorClass =
+  'w-full rounded-lg border border-red-300 px-3 py-2 text-sm text-[#19384C] placeholder:text-[#8AA0AB] focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-200';
+const primaryButtonClass =
+  'inline-flex w-full justify-center rounded-lg border border-transparent bg-[#159A9C] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-[#117C7E] focus:outline-none focus:ring-2 focus:ring-[#159A9C] focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-400 sm:ml-3 sm:w-auto';
+const secondaryButtonClass =
+  'mt-3 inline-flex w-full justify-center rounded-lg border border-[#D4E2E7] bg-white px-4 py-2 text-sm font-medium text-[#244455] shadow-sm transition hover:bg-[#F6FAFB] focus:outline-none focus:ring-2 focus:ring-[#159A9C] focus:ring-offset-2 disabled:bg-gray-100 sm:ml-3 sm:mt-0 sm:w-auto';
+
 const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
   isOpen,
   onClose,
@@ -99,6 +109,8 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
   isLoading = false,
 }) => {
   const [isSaving, setIsSaving] = useState(false);
+  const titleId = useId();
+  const descriptionId = useId();
 
   const {
     control,
@@ -148,13 +160,11 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
   const onSubmit = async (data: Subcategoria) => {
     try {
       setIsSaving(true);
-
       await onSave({
         ...data,
         id: subcategoria?.id,
         precoBase: Number(data.precoBase || 0),
       });
-
       onClose();
     } catch (error) {
       console.error('Erro ao salvar subcategoria:', error);
@@ -175,22 +185,28 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex min-h-screen items-center justify-center px-4 pb-20 pt-4 text-center sm:block sm:p-0">
         <div
-          className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+          className="fixed inset-0 bg-[#0B1F2A]/45 transition-opacity backdrop-blur-[1px]"
           onClick={handleClose}
         />
 
-        <div className="inline-block w-full max-w-2xl transform overflow-hidden rounded-lg bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:align-middle">
+        <div
+          className="inline-block w-full max-w-2xl transform overflow-hidden rounded-[20px] border border-[#DCE7EB] bg-white text-left align-bottom shadow-[0_30px_70px_-36px_rgba(16,57,74,0.45)] transition-all sm:my-8 sm:align-middle"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          aria-describedby={descriptionId}
+        >
           <div className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center">
-                <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-green-100 sm:mx-0 sm:h-10 sm:w-10">
-                  <Tag className="h-6 w-6 text-green-600" />
+                <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-[#F2F8FB] sm:mx-0 sm:h-10 sm:w-10">
+                  <Tag className="h-6 w-6 text-[#159A9C]" />
                 </div>
                 <div className="ml-4">
-                  <h3 className="text-lg font-medium leading-6 text-gray-900">
+                  <h3 id={titleId} className="text-lg font-semibold leading-6 text-[#19384C]">
                     {subcategoria ? 'Editar Subcategoria' : 'Nova Subcategoria'}
                   </h3>
-                  <p className="text-sm text-gray-500">
+                  <p id={descriptionId} className="text-sm text-[#5F7380]">
                     {subcategoria
                       ? 'Atualize os detalhes comerciais da subcategoria'
                       : 'Defina estrutura e base comercial da nova subcategoria'}
@@ -202,7 +218,7 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
                           categoriaColorDotClassMap[categoriaAtual.cor] || categoriaColorDotClassMap.blue
                         }`}
                       />
-                      <span className="text-xs text-gray-600">Categoria: {categoriaAtual.nome}</span>
+                      <span className="text-xs text-[#5F7380]">Categoria: {categoriaAtual.nome}</span>
                     </div>
                   )}
                 </div>
@@ -210,23 +226,21 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
               <button
                 onClick={handleClose}
                 disabled={isSaving}
-                className="rounded-md text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="rounded-lg p-2 text-[#7A8D99] transition-colors hover:bg-[#F6FAFB] hover:text-[#244455] focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
+                aria-label="Fechar modal de subcategoria"
               >
-                <X className="h-6 w-6" />
+                <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 rounded-xl border border-[#DEE8EC] bg-[#F6FAFB] p-4">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Categoria *</label>
+                <label className={labelClass}>Categoria *</label>
                 <Controller
                   name="categoriaId"
                   control={control}
                   render={({ field }) => (
-                    <select
-                      {...field}
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-green-500"
-                    >
+                    <select {...field} className={errors.categoriaId ? inputErrorClass : inputClass}>
                       <option value="">Selecione uma categoria</option>
                       {categorias.map((categoria) => (
                         <option key={categoria.id} value={categoria.id}>
@@ -243,9 +257,7 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2">
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Nome da Subcategoria *
-                  </label>
+                  <label className={labelClass}>Nome da Subcategoria *</label>
                   <Controller
                     name="nome"
                     control={control}
@@ -254,7 +266,7 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
                         {...field}
                         type="text"
                         placeholder="Ex: Sistema de Gestão"
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-green-500"
+                        className={errors.nome ? inputErrorClass : inputClass}
                       />
                     )}
                   />
@@ -262,8 +274,8 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
                 </div>
 
                 <div>
-                  <label className="mb-1 flex items-center text-sm font-medium text-gray-700">
-                    <DollarSign className="mr-1 h-4 w-4 text-green-600" />
+                  <label className="mb-1 flex items-center text-sm font-medium text-[#244455]">
+                    <DollarSign className="mr-1 h-4 w-4 text-[#159A9C]" />
                     Preço Base *
                   </label>
                   <Controller
@@ -276,7 +288,7 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
                         step="0.01"
                         min="0"
                         placeholder="0,00"
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-green-500"
+                        className={errors.precoBase ? inputErrorClass : inputClass}
                         onChange={(event) => field.onChange(Number(event.target.value || 0))}
                       />
                     )}
@@ -287,15 +299,12 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Unidade *</label>
+                  <label className={labelClass}>Unidade *</label>
                   <Controller
                     name="unidade"
                     control={control}
                     render={({ field }) => (
-                      <select
-                        {...field}
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-green-500"
-                      >
+                      <select {...field} className={errors.unidade ? inputErrorClass : inputClass}>
                         {unidadesDisponiveis.map((unidade) => (
                           <option key={unidade.value} value={unidade.value}>
                             {unidade.label}
@@ -310,7 +319,7 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Descrição *</label>
+                  <label className={labelClass}>Descrição *</label>
                   <Controller
                     name="descricao"
                     control={control}
@@ -319,7 +328,7 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
                         {...field}
                         rows={3}
                         placeholder="Descreva escopo, público e regras comerciais desta subcategoria..."
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-green-500"
+                        className={errors.descricao ? inputErrorClass : inputClass}
                       />
                     )}
                   />
@@ -329,9 +338,9 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
                 </div>
               </div>
 
-              <div className="rounded-md border border-gray-200 p-3">
-                <label className="mb-3 flex items-center text-sm font-medium text-gray-700">
-                  <SlidersHorizontal className="mr-2 h-4 w-4 text-green-600" />
+              <div className="rounded-lg border border-[#D4E2E7] bg-white p-3">
+                <label className="mb-3 flex items-center text-sm font-medium text-[#244455]">
+                  <SlidersHorizontal className="mr-2 h-4 w-4 text-[#159A9C]" />
                   Campos Personalizáveis
                 </label>
 
@@ -343,47 +352,47 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
 
                     return (
                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        <label className="flex items-center text-sm text-gray-700">
+                        <label className="flex items-center text-sm text-[#244455]">
                           <input
                             type="checkbox"
                             checked={Boolean(value.duracao)}
                             onChange={(event) =>
                               field.onChange({ ...value, duracao: event.target.checked })
                             }
-                            className="mr-2 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                            className="mr-2 h-4 w-4 rounded border-[#B4BEC9] text-[#159A9C] focus:ring-[#159A9C]"
                           />
                           Duração
                         </label>
-                        <label className="flex items-center text-sm text-gray-700">
+                        <label className="flex items-center text-sm text-[#244455]">
                           <input
                             type="checkbox"
                             checked={Boolean(value.usuarios)}
                             onChange={(event) =>
                               field.onChange({ ...value, usuarios: event.target.checked })
                             }
-                            className="mr-2 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                            className="mr-2 h-4 w-4 rounded border-[#B4BEC9] text-[#159A9C] focus:ring-[#159A9C]"
                           />
                           Usuários
                         </label>
-                        <label className="flex items-center text-sm text-gray-700">
+                        <label className="flex items-center text-sm text-[#244455]">
                           <input
                             type="checkbox"
                             checked={Boolean(value.modalidade)}
                             onChange={(event) =>
                               field.onChange({ ...value, modalidade: event.target.checked })
                             }
-                            className="mr-2 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                            className="mr-2 h-4 w-4 rounded border-[#B4BEC9] text-[#159A9C] focus:ring-[#159A9C]"
                           />
                           Modalidade
                         </label>
-                        <label className="flex items-center text-sm text-gray-700">
+                        <label className="flex items-center text-sm text-[#244455]">
                           <input
                             type="checkbox"
                             checked={Boolean(value.recursos)}
                             onChange={(event) =>
                               field.onChange({ ...value, recursos: event.target.checked })
                             }
-                            className="mr-2 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                            className="mr-2 h-4 w-4 rounded border-[#B4BEC9] text-[#159A9C] focus:ring-[#159A9C]"
                           />
                           Recursos
                         </label>
@@ -403,20 +412,16 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
                         type="checkbox"
                         checked={field.value}
                         onChange={field.onChange}
-                        className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                        className="h-4 w-4 rounded border-[#B4BEC9] text-[#159A9C] focus:ring-[#159A9C]"
                       />
                     )}
                   />
-                  <span className="ml-2 text-sm text-gray-700">Subcategoria ativa</span>
+                  <span className="ml-2 text-sm text-[#244455]">Subcategoria ativa</span>
                 </label>
               </div>
 
-              <div className="-mx-4 -mb-4 mt-6 bg-gray-50 px-4 py-3 sm:-mx-6 sm:-mb-6 sm:flex sm:flex-row-reverse sm:px-6">
-                <button
-                  type="submit"
-                  disabled={isSaving || isLoading}
-                  className="inline-flex w-full justify-center rounded-md border border-transparent bg-green-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-400 sm:ml-3 sm:w-auto sm:text-sm"
-                >
+              <div className="-mx-4 -mb-4 mt-6 border-t border-[#DEE8EC] bg-white px-4 py-3 sm:-mx-6 sm:-mb-6 sm:flex sm:flex-row-reverse sm:px-6">
+                <button type="submit" disabled={isSaving || isLoading} className={primaryButtonClass}>
                   {isSaving ? (
                     <>
                       <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white" />
@@ -429,12 +434,7 @@ const ModalSubcategoria: React.FC<ModalSubcategoriaProps> = ({
                     </>
                   )}
                 </button>
-                <button
-                  type="button"
-                  onClick={handleClose}
-                  disabled={isSaving}
-                  className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:bg-gray-100 sm:ml-3 sm:mt-0 sm:w-auto sm:text-sm"
-                >
+                <button type="button" onClick={handleClose} disabled={isSaving} className={secondaryButtonClass}>
                   Cancelar
                 </button>
               </div>

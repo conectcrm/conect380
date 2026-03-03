@@ -4,7 +4,7 @@
  * Versão com modal customizado para alterações não salvas
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
@@ -231,6 +231,20 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
   );
 
   const watchedFields = watch();
+  const dialogTitleId = useId();
+  const dialogDescriptionId = useId();
+  const isItemRecorrente = ['plano', 'licenca', 'modulo', 'aplicativo'].includes(tipoAtual);
+
+  const labelClass = 'mb-1 block text-sm font-medium text-[#244455]';
+  const inputClass =
+    'w-full rounded-lg border border-[#D4E2E7] px-3 py-2 text-sm text-[#19384C] placeholder:text-[#8AA0AB] focus:border-[#159A9C] focus:outline-none focus:ring-2 focus:ring-[#159A9C]/25';
+  const inputErrorClass =
+    'w-full rounded-lg border border-red-300 px-3 py-2 text-sm text-[#19384C] placeholder:text-[#8AA0AB] focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-200';
+  const sectionTitleClass = 'flex items-center text-lg font-semibold text-[#19384C]';
+  const primaryButtonClass =
+    'inline-flex items-center rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#117C7E] disabled:cursor-not-allowed disabled:opacity-60';
+  const secondaryButtonClass =
+    'inline-flex items-center rounded-lg border border-[#D4E2E7] bg-white px-4 py-2 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-60';
 
   // Primeiro vou declarar as funções que serão usadas nos hooks
   const onFormSubmit = async (data: ProdutoFormData) => {
@@ -374,26 +388,30 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
     <>
       {/* Modal de Confirmação de Alterações Não Salvas */}
       {showUnsavedChangesModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl w-[calc(100%-2rem)] sm:w-[450px] max-w-[500px]">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0B1F2A]/45 p-4 backdrop-blur-[1px]">
+          <div
+            className="w-[calc(100%-2rem)] max-w-[500px] rounded-2xl border border-[#DCE7EB] bg-white shadow-[0_30px_70px_-36px_rgba(16,57,74,0.45)]"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="unsaved-product-title"
+          >
             <div className="p-6">
               <div className="flex items-center mb-4">
-                <AlertTriangle className="w-6 h-6 text-amber-500 mr-3" />
-                <h3 className="text-lg font-medium text-gray-900">Alterações não salvas</h3>
+                <AlertTriangle className="mr-3 h-6 w-6 text-[#D97706]" />
+                <h3 id="unsaved-product-title" className="text-lg font-semibold text-[#19384C]">
+                  Alterações não salvas
+                </h3>
               </div>
-              <p className="text-gray-600 mb-6">
+              <p className="mb-6 text-sm text-[#4F6470]">
                 Você tem alterações não salvas no produto. Deseja realmente sair sem salvar?
               </p>
               <div className="flex justify-end space-x-3">
-                <button
-                  onClick={handleCancelClose}
-                  className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
+                <button onClick={handleCancelClose} className={secondaryButtonClass}>
                   Continuar editando
                 </button>
                 <button
                   onClick={handleConfirmClose}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                  className="inline-flex items-center rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700"
                 >
                   Sair sem salvar
                 </button>
@@ -407,24 +425,32 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
       <div className="fixed inset-0 z-50 overflow-y-auto">
         {/* Backdrop */}
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+          className="fixed inset-0 bg-[#0B1F2A]/45 transition-opacity backdrop-blur-[1px]"
           onClick={handleClose}
         />
 
         {/* Modal - Layout Paisagem */}
         <div className="flex min-h-full items-center justify-center p-2 sm:p-4">
-          <div className="relative w-[calc(100%-2rem)] sm:w-[700px] md:w-[900px] lg:w-[1100px] xl:w-[1200px] max-w-[1400px] bg-white rounded-xl shadow-2xl transform transition-all">
+          <div
+            className="relative w-[calc(100%-2rem)] max-w-[1400px] rounded-[20px] border border-[#DCE7EB] bg-white shadow-[0_30px_70px_-36px_rgba(16,57,74,0.45)] sm:w-[700px] md:w-[900px] lg:w-[1100px] xl:w-[1200px]"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={dialogTitleId}
+            aria-describedby={dialogDescriptionId}
+          >
             {/* Header */}
-            <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between border-b border-[#DEE8EC] p-4 sm:p-6">
               <div className="flex items-center space-x-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Package className="w-6 h-6 text-blue-600" />
+                <div className="rounded-xl bg-[#F2F8FB] p-2">
+                  <Package className="h-6 w-6 text-[#159A9C]" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-900">
+                  <h2 id={dialogTitleId} className="text-xl font-semibold text-[#19384C]">
                     {produtoEditando ? 'Editar Produto' : 'Novo Produto'}
                   </h2>
-                  <p className="text-sm text-gray-500">Preencha as informações do produto</p>
+                  <p id={dialogDescriptionId} className="text-sm text-[#5F7380]">
+                    Preencha as informações do item do catálogo
+                  </p>
                 </div>
               </div>
 
@@ -443,35 +469,36 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                 <button
                   onClick={handleClose}
                   disabled={isSubmitting}
-                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:cursor-not-allowed"
+                  className="rounded-lg p-2 text-[#7A8D99] transition-colors hover:bg-[#F6FAFB] hover:text-[#244455] disabled:cursor-not-allowed"
+                  aria-label="Fechar modal de cadastro de item"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="h-5 w-5" />
                 </button>
               </div>
             </div>
 
             {/* Formulário em Grid */}
-            <form onSubmit={handleSubmit(onFormSubmit)} className="p-4 sm:p-6">
+            <form onSubmit={handleSubmit(onFormSubmit)} className="bg-[#F6FAFB] p-4 sm:p-6">
               <div
                 className={`grid grid-cols-1 gap-6 ${isSoftware ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}
               >
                 {/* Coluna 1: Informações Básicas */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium text-gray-900 flex items-center">
-                    <Package className="w-5 h-5 mr-2 text-blue-600" />
+                <div className="space-y-4 rounded-xl border border-[#DEE8EC] bg-white p-4">
+                  <h3 className={sectionTitleClass}>
+                    <Package className="mr-2 h-5 w-5 text-[#159A9C]" />
                     Informações Básicas
                   </h3>
 
                   {/* Nome */}
                   <div>
-                    <label htmlFor="nome" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="nome" className={labelClass}>
                       Nome do Produto *
                     </label>
                     <input
                       {...register('nome')}
                       type="text"
                       id="nome"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className={errors.nome ? inputErrorClass : inputClass}
                       placeholder="Digite o nome do produto"
                     />
                     {errors.nome && (
@@ -481,16 +508,13 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
                   {/* Tipo */}
                   <div>
-                    <label
-                      htmlFor="tipoItem"
-                      className="block text-sm font-medium text-gray-700 mb-1"
-                    >
+                    <label htmlFor="tipoItem" className={labelClass}>
                       Tipo *
                     </label>
                     <select
                       {...register('tipoItem')}
                       id="tipoItem"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className={errors.tipoItem ? inputErrorClass : inputClass}
                     >
                       {tiposItem.map((tipo) => (
                         <option key={tipo.value} value={tipo.value}>
@@ -505,21 +529,18 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
                   {/* Categoria */}
                   <div>
-                    <label
-                      htmlFor="categoria"
-                      className="block text-sm font-medium text-gray-700 mb-1"
-                    >
+                    <label htmlFor="categoria" className={labelClass}>
                       Categoria *
                     </label>
                     {loadingCategorias ? (
-                      <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
+                      <div className="w-full rounded-lg border border-[#D4E2E7] bg-[#F9FCFD] px-3 py-2 text-sm text-[#7A8D99]">
                         Carregando categorias...
                       </div>
                     ) : (
                       <select
                         {...register('categoria')}
                         id="categoria"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className={errors.categoria ? inputErrorClass : inputClass}
                       >
                         <option value="">Selecione uma categoria</option>
                         {categorias.map((categoria, index) => (
@@ -536,10 +557,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
                   {/* Preço */}
                   <div>
-                    <label
-                      htmlFor="precoUnitario"
-                      className="block text-sm font-medium text-gray-700 mb-1"
-                    >
+                    <label htmlFor="precoUnitario" className={labelClass}>
                       Preço Unitário *
                     </label>
                     <Controller
@@ -550,9 +568,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                           value={field.value}
                           onChange={field.onChange}
                           placeholder="R$ 0,00"
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                            errors.precoUnitario ? 'border-red-300' : 'border-gray-300'
-                          }`}
+                          className={errors.precoUnitario ? inputErrorClass : inputClass}
                         />
                       )}
                     />
@@ -563,24 +579,27 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                 </div>
 
                 {/* Coluna 2: Configurações */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium text-gray-900 flex items-center">
-                    <DollarSign className="w-5 h-5 mr-2 text-green-600" />
+                <div className="space-y-4 rounded-xl border border-[#DEE8EC] bg-white p-4">
+                  <h3 className={sectionTitleClass}>
+                    <DollarSign className="mr-2 h-5 w-5 text-[#159A9C]" />
                     Configurações
                   </h3>
 
+                  <div className="rounded-lg border border-[#DEEFE7] bg-[#F7FCFA] p-3 text-sm text-[#35616D]">
+                    {isItemRecorrente
+                      ? 'Item recorrente: configure frequência mensal ou anual para refletir o ciclo comercial.'
+                      : 'Item de cobrança única: mantenha frequência em único para evitar distorção no catálogo.'}
+                  </div>
+
                   {/* Frequência */}
                   <div>
-                    <label
-                      htmlFor="frequencia"
-                      className="block text-sm font-medium text-gray-700 mb-1"
-                    >
+                    <label htmlFor="frequencia" className={labelClass}>
                       {t('common.frequency')} *
                     </label>
                     <select
                       {...register('frequencia')}
                       id="frequencia"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className={errors.frequencia ? inputErrorClass : inputClass}
                     >
                       {frequencias.map((freq) => (
                         <option key={freq.value} value={freq.value}>
@@ -595,16 +614,13 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
                   {/* Unidade de Medida */}
                   <div>
-                    <label
-                      htmlFor="unidadeMedida"
-                      className="block text-sm font-medium text-gray-700 mb-1"
-                    >
+                    <label htmlFor="unidadeMedida" className={labelClass}>
                       Unidade de Medida *
                     </label>
                     <select
                       {...register('unidadeMedida')}
                       id="unidadeMedida"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className={errors.unidadeMedida ? inputErrorClass : inputClass}
                     >
                       {unidadesMedida.map((unidade) => (
                         <option key={unidade.value} value={unidade.value}>
@@ -619,7 +635,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
                   {/* Status */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Status *</label>
+                    <label className={labelClass}>Status *</label>
                     <Controller
                       name="status"
                       control={control}
@@ -627,7 +643,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                         <select
                           value={field.value}
                           onChange={(event) => field.onChange(event.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className={errors.status ? inputErrorClass : inputClass}
                         >
                           <option value="ativo">Ativo</option>
                           <option value="inativo">Inativo</option>
@@ -642,17 +658,14 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
                   {/* Descrição */}
                   <div>
-                    <label
-                      htmlFor="descricao"
-                      className="block text-sm font-medium text-gray-700 mb-1"
-                    >
+                    <label htmlFor="descricao" className={labelClass}>
                       Descrição
                     </label>
                     <textarea
                       {...register('descricao')}
                       id="descricao"
                       rows={4}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className={errors.descricao ? inputErrorClass : inputClass}
                       placeholder="Descrição detalhada do produto..."
                     />
                     {errors.descricao && (
@@ -663,31 +676,28 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
                 {/* Coluna 2.5: Campos Específicos para Software (Condicional) */}
                 {isSoftware && (
-                  <div className="space-y-4 lg:col-span-1">
-                    <h3 className="text-lg font-medium text-gray-900 flex items-center">
-                      <Keyboard className="w-5 h-5 mr-2 text-indigo-600" />
+                  <div className="space-y-4 rounded-xl border border-[#DEE8EC] bg-white p-4 lg:col-span-1">
+                    <h3 className={sectionTitleClass}>
+                      <Keyboard className="mr-2 h-5 w-5 text-[#159A9C]" />
                       Configurações de Software
                     </h3>
 
                     {/* Alerta informativo */}
                     {campos.alertaEspecial && (
-                      <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
-                        <p className="text-sm text-indigo-700">{campos.alertaEspecial}</p>
+                      <div className="rounded-lg border border-[#CDE4F5] bg-[#F4F9FD] p-3">
+                        <p className="text-sm text-[#2A5C86]">{campos.alertaEspecial}</p>
                       </div>
                     )}
 
                     {/* Tipo de Licenciamento */}
                     <div>
-                      <label
-                        htmlFor="tipoLicenciamento"
-                        className="block text-sm font-medium text-gray-700 mb-1"
-                      >
+                      <label htmlFor="tipoLicenciamento" className={labelClass}>
                         Tipo de Licenciamento *
                       </label>
                       <select
                         {...register('tipoLicenciamento')}
                         id="tipoLicenciamento"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className={errors.tipoLicenciamento ? inputErrorClass : inputClass}
                       >
                         <option value="">Selecione o tipo</option>
                         {TIPOS_LICENCIAMENTO.map((tipo) => (
@@ -705,16 +715,13 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
                     {/* Periodicidade da Licença */}
                     <div>
-                      <label
-                        htmlFor="periodicidadeLicenca"
-                        className="block text-sm font-medium text-gray-700 mb-1"
-                      >
+                      <label htmlFor="periodicidadeLicenca" className={labelClass}>
                         Periodicidade da Licença *
                       </label>
                       <select
                         {...register('periodicidadeLicenca')}
                         id="periodicidadeLicenca"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className={errors.periodicidadeLicenca ? inputErrorClass : inputClass}
                       >
                         <option value="">Selecione a periodicidade</option>
                         {PERIODICIDADES_LICENCA.map((periodo) => (
@@ -736,10 +743,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
                     {/* Quantidade de Licenças */}
                     <div>
-                      <label
-                        htmlFor="quantidadeLicencas"
-                        className="block text-sm font-medium text-gray-700 mb-1"
-                      >
+                      <label htmlFor="quantidadeLicencas" className={labelClass}>
                         {campos.labelQuantidade}
                       </label>
                       <input
@@ -750,7 +754,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                         type="number"
                         id="quantidadeLicencas"
                         min="1"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className={errors.quantidadeLicencas ? inputErrorClass : inputClass}
                         placeholder="Ex: 10"
                       />
                       {errors.quantidadeLicencas && (
@@ -765,7 +769,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
                     {/* Renovação Automática */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className={labelClass}>
                         {t('common.automaticRenewal')}
                       </label>
                       <Controller
@@ -778,18 +782,18 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                                 type="radio"
                                 checked={field.value === true}
                                 onChange={() => field.onChange(true)}
-                                className="mr-2 text-green-600 focus:ring-green-500"
+                                className="mr-2 text-[#159A9C] focus:ring-[#159A9C]"
                               />
-                              <span className="text-sm text-gray-700">{t('common.yes')}</span>
+                              <span className="text-sm text-[#244455]">{t('common.yes')}</span>
                             </label>
                             <label className="flex items-center">
                               <input
                                 type="radio"
                                 checked={field.value === false}
                                 onChange={() => field.onChange(false)}
-                                className="mr-2 text-red-600 focus:ring-red-500"
+                                className="mr-2 text-[#B4BEC9] focus:ring-[#B4BEC9]"
                               />
-                              <span className="text-sm text-gray-700">{t('common.no')}</span>
+                              <span className="text-sm text-[#244455]">{t('common.no')}</span>
                             </label>
                           </div>
                         )}
@@ -802,30 +806,30 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                 )}
 
                 {/* Coluna 3: Tags e Variações */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium text-gray-900 flex items-center">
-                    <Tag className="w-5 h-5 mr-2 text-purple-600" />
+                <div className="space-y-4 rounded-xl border border-[#DEE8EC] bg-white p-4">
+                  <h3 className={sectionTitleClass}>
+                    <Tag className="mr-2 h-5 w-5 text-[#159A9C]" />
                     Tags e Variações
                   </h3>
 
                   {/* Tags */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Tags</label>
+                    <label className={labelClass}>Tags</label>
                     <div className="flex gap-2 mb-2">
                       <input
                         type="text"
                         value={tagInput}
                         onChange={(e) => setTagInput(e.target.value)}
-                        onKeyPress={(e) =>
+                        onKeyDown={(e) =>
                           e.key === 'Enter' && (e.preventDefault(), adicionarTag())
                         }
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className={inputClass}
                         placeholder="Digite uma tag e pressione Enter"
                       />
                       <button
                         type="button"
                         onClick={adicionarTag}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        className={primaryButtonClass}
                       >
                         Adicionar
                       </button>
@@ -834,13 +838,14 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                       {watchedFields.tags?.map((tag, index) => (
                         <span
                           key={index}
-                          className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+                          className="inline-flex items-center rounded-full border border-[#CFE7E8] bg-[#EFF8F8] px-3 py-1 text-sm text-[#0F7B7D]"
                         >
                           {tag}
                           <button
                             type="button"
                             onClick={() => removerTag(tag)}
-                            className="ml-2 text-blue-600 hover:text-blue-800"
+                            className="ml-2 text-[#0F7B7D] hover:text-[#0A5F61]"
+                            aria-label={`Remover tag ${tag}`}
                           >
                             <X className="w-3 h-3" />
                           </button>
@@ -852,23 +857,23 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
               </div>
 
               {/* Botões de Ação */}
-              <div className="flex justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
+              <div className="mt-6 flex justify-end space-x-3 border-t border-[#DEE8EC] pt-6">
                 <button
                   type="button"
                   onClick={handleClose}
                   disabled={isSubmitting}
-                  className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                  className={secondaryButtonClass}
                 >
                   {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={!isValid || isSubmitting || loading}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                  className={primaryButtonClass}
                 >
                   {loading ? (
                     <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
                       Salvando...
                     </>
                   ) : (

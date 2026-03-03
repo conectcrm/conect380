@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useId, useMemo, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
@@ -46,20 +46,30 @@ const categoriaColorDotClassMap: Record<string, string> = {
 };
 
 const configuracaoSchema = yup.object().shape({
-  nome: yup.string().required('Nome é obrigatório').min(2, 'Nome deve ter pelo menos 2 caracteres'),
+  nome: yup.string().required('Nome e obrigatorio').min(2, 'Nome deve ter pelo menos 2 caracteres'),
   descricao: yup
     .string()
-    .required('Descrição é obrigatória')
-    .min(10, 'Descrição deve ter pelo menos 10 caracteres'),
-  subcategoriaId: yup.string().required('Subcategoria é obrigatória'),
+    .required('Descricao e obrigatoria')
+    .min(10, 'Descricao deve ter pelo menos 10 caracteres'),
+  subcategoriaId: yup.string().required('Subcategoria e obrigatoria'),
   multiplicador: yup
     .number()
-    .required('Multiplicador é obrigatório')
+    .required('Multiplicador e obrigatorio')
     .min(0.1, 'Multiplicador deve ser maior que 0')
     .max(10, 'Multiplicador deve ser menor ou igual a 10')
-    .typeError('Multiplicador deve ser um número válido'),
+    .typeError('Multiplicador deve ser um numero valido'),
   ativa: yup.boolean(),
 });
+
+const labelClass = 'mb-1 block text-sm font-medium text-[#244455]';
+const inputClass =
+  'w-full rounded-lg border border-[#D4E2E7] px-3 py-2 text-sm text-[#19384C] placeholder:text-[#8AA0AB] focus:border-[#159A9C] focus:outline-none focus:ring-2 focus:ring-[#159A9C]/25';
+const inputErrorClass =
+  'w-full rounded-lg border border-red-300 px-3 py-2 text-sm text-[#19384C] placeholder:text-[#8AA0AB] focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-200';
+const primaryButtonClass =
+  'inline-flex w-full justify-center rounded-lg border border-transparent bg-[#159A9C] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-[#117C7E] focus:outline-none focus:ring-2 focus:ring-[#159A9C] focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-400 sm:ml-3 sm:w-auto';
+const secondaryButtonClass =
+  'mt-3 inline-flex w-full justify-center rounded-lg border border-[#D4E2E7] bg-white px-4 py-2 text-sm font-medium text-[#244455] shadow-sm transition hover:bg-[#F6FAFB] focus:outline-none focus:ring-2 focus:ring-[#159A9C] focus:ring-offset-2 disabled:bg-gray-100 sm:ml-3 sm:mt-0 sm:w-auto';
 
 const ModalConfiguracao: React.FC<ModalConfiguracaoProps> = ({
   isOpen,
@@ -71,6 +81,8 @@ const ModalConfiguracao: React.FC<ModalConfiguracaoProps> = ({
   isLoading = false,
 }) => {
   const [isSaving, setIsSaving] = useState(false);
+  const titleId = useId();
+  const descriptionId = useId();
 
   const {
     control,
@@ -125,16 +137,14 @@ const ModalConfiguracao: React.FC<ModalConfiguracaoProps> = ({
   const onSubmit = async (data: Configuracao) => {
     try {
       setIsSaving(true);
-
       await onSave({
         ...data,
         id: configuracao?.id,
         multiplicador: Number(data.multiplicador || 1),
       });
-
       onClose();
     } catch (error) {
-      console.error('Erro ao salvar configuração:', error);
+      console.error('Erro ao salvar configuracao:', error);
     } finally {
       setIsSaving(false);
     }
@@ -158,25 +168,31 @@ const ModalConfiguracao: React.FC<ModalConfiguracaoProps> = ({
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex min-h-screen items-center justify-center px-4 pb-20 pt-4 text-center sm:block sm:p-0">
         <div
-          className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+          className="fixed inset-0 bg-[#0B1F2A]/45 transition-opacity backdrop-blur-[1px]"
           onClick={handleClose}
         />
 
-        <div className="inline-block w-full max-w-2xl transform overflow-hidden rounded-lg bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:align-middle">
+        <div
+          className="inline-block w-full max-w-2xl transform overflow-hidden rounded-[20px] border border-[#DCE7EB] bg-white text-left align-bottom shadow-[0_30px_70px_-36px_rgba(16,57,74,0.45)] transition-all sm:my-8 sm:align-middle"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          aria-describedby={descriptionId}
+        >
           <div className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center">
-                <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
-                  <Settings className="h-6 w-6 text-blue-600" />
+                <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-[#F2F8FB] sm:mx-0 sm:h-10 sm:w-10">
+                  <Settings className="h-6 w-6 text-[#159A9C]" />
                 </div>
                 <div className="ml-4">
-                  <h3 className="text-lg font-medium leading-6 text-gray-900">
-                    {configuracao ? 'Editar Configuração' : 'Nova Configuração'}
+                  <h3 id={titleId} className="text-lg font-semibold leading-6 text-[#19384C]">
+                    {configuracao ? 'Editar Configuracao' : 'Nova Configuracao'}
                   </h3>
-                  <p className="text-sm text-gray-500">
+                  <p id={descriptionId} className="text-sm text-[#5F7380]">
                     {configuracao
-                      ? 'Atualize a composição comercial da configuração'
-                      : 'Defina multiplicador e descrição da configuração'}
+                      ? 'Atualize a composicao comercial da configuracao'
+                      : 'Defina multiplicador e descricao da configuracao'}
                   </p>
                   {subcategoriaAtual && (
                     <div className="mt-2 flex items-center">
@@ -188,8 +204,10 @@ const ModalConfiguracao: React.FC<ModalConfiguracaoProps> = ({
                           }`}
                         />
                       )}
-                      <span className="text-xs text-gray-600">
-                        {subcategoriaAtual.categoria?.nome} → {subcategoriaAtual.nome}
+                      <span className="text-xs text-[#5F7380]">
+                        {subcategoriaAtual.categoria?.nome}
+                        {' -> '}
+                        {subcategoriaAtual.nome}
                       </span>
                     </div>
                   )}
@@ -198,27 +216,30 @@ const ModalConfiguracao: React.FC<ModalConfiguracaoProps> = ({
               <button
                 onClick={handleClose}
                 disabled={isSaving}
-                className="rounded-md text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="rounded-lg p-2 text-[#7A8D99] transition-colors hover:bg-[#F6FAFB] hover:text-[#244455] focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
+                aria-label="Fechar modal de configuracao"
               >
-                <X className="h-6 w-6" />
+                <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <form
+              onSubmit={handleSubmit(onSubmit)}
+              className="space-y-4 rounded-xl border border-[#DEE8EC] bg-[#F6FAFB] p-4"
+            >
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Subcategoria *</label>
+                <label className={labelClass}>Subcategoria *</label>
                 <Controller
                   name="subcategoriaId"
                   control={control}
                   render={({ field }) => (
-                    <select
-                      {...field}
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
+                    <select {...field} className={errors.subcategoriaId ? inputErrorClass : inputClass}>
                       <option value="">Selecione uma subcategoria</option>
                       {subcategorias.map((subcategoria) => (
                         <option key={subcategoria.id} value={subcategoria.id}>
-                          {subcategoria.categoria?.nome} → {subcategoria.nome}
+                          {subcategoria.categoria?.nome}
+                          {' -> '}
+                          {subcategoria.nome}
                         </option>
                       ))}
                     </select>
@@ -230,9 +251,7 @@ const ModalConfiguracao: React.FC<ModalConfiguracaoProps> = ({
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Nome da Configuração *
-                </label>
+                <label className={labelClass}>Nome da Configuracao *</label>
                 <Controller
                   name="nome"
                   control={control}
@@ -241,7 +260,7 @@ const ModalConfiguracao: React.FC<ModalConfiguracaoProps> = ({
                       {...field}
                       type="text"
                       placeholder="Ex: Pacote Profissional"
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className={errors.nome ? inputErrorClass : inputClass}
                     />
                   )}
                 />
@@ -249,7 +268,7 @@ const ModalConfiguracao: React.FC<ModalConfiguracaoProps> = ({
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Descrição *</label>
+                <label className={labelClass}>Descricao *</label>
                 <Controller
                   name="descricao"
                   control={control}
@@ -257,8 +276,8 @@ const ModalConfiguracao: React.FC<ModalConfiguracaoProps> = ({
                     <textarea
                       {...field}
                       rows={3}
-                      placeholder="Descreva os diferenciais desta configuração..."
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Descreva os diferenciais desta configuracao..."
+                      className={errors.descricao ? inputErrorClass : inputClass}
                     />
                   )}
                 />
@@ -268,9 +287,7 @@ const ModalConfiguracao: React.FC<ModalConfiguracaoProps> = ({
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Multiplicador *
-                </label>
+                <label className={labelClass}>Multiplicador *</label>
                 <Controller
                   name="multiplicador"
                   control={control}
@@ -282,7 +299,7 @@ const ModalConfiguracao: React.FC<ModalConfiguracaoProps> = ({
                       min="0.1"
                       max="10"
                       placeholder="1.0"
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className={errors.multiplicador ? inputErrorClass : inputClass}
                       onChange={(event) => field.onChange(parseFloat(event.target.value) || 1)}
                     />
                   )}
@@ -292,19 +309,19 @@ const ModalConfiguracao: React.FC<ModalConfiguracaoProps> = ({
                 )}
               </div>
 
-              <div className="rounded-md bg-blue-50 p-3">
+              <div className="rounded-lg border border-[#D8E8EF] bg-[#F3F9FC] p-3">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Preço Base da Subcategoria:</span>
-                  <span className="font-medium">{formatCurrency(precoBaseAtual)}</span>
+                  <span className="text-[#4F6470]">Preco base da subcategoria:</span>
+                  <span className="font-medium text-[#19384C]">{formatCurrency(precoBaseAtual)}</span>
                 </div>
                 <div className="mt-1 flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Multiplicador:</span>
-                  <span className="font-medium">{Number(watchedMultiplicador || 1)}x</span>
+                  <span className="text-[#4F6470]">Multiplicador:</span>
+                  <span className="font-medium text-[#19384C]">{Number(watchedMultiplicador || 1)}x</span>
                 </div>
-                <hr className="my-2 border-blue-200" />
+                <hr className="my-2 border-[#C7DEE8]" />
                 <div className="flex items-center justify-between text-base font-semibold">
-                  <span className="text-blue-900">Preço Final Estimado:</span>
-                  <span className="text-blue-900">{formatCurrency(precoFinal)}</span>
+                  <span className="text-[#19384C]">Preco final estimado:</span>
+                  <span className="text-[#19384C]">{formatCurrency(precoFinal)}</span>
                 </div>
               </div>
 
@@ -318,20 +335,16 @@ const ModalConfiguracao: React.FC<ModalConfiguracaoProps> = ({
                         type="checkbox"
                         checked={field.value}
                         onChange={field.onChange}
-                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        className="h-4 w-4 rounded border-[#B4BEC9] text-[#159A9C] focus:ring-[#159A9C]"
                       />
                     )}
                   />
-                  <span className="ml-2 text-sm text-gray-700">Configuração ativa</span>
+                  <span className="ml-2 text-sm text-[#244455]">Configuracao ativa</span>
                 </label>
               </div>
 
-              <div className="-mx-4 -mb-4 mt-6 bg-gray-50 px-4 py-3 sm:-mx-6 sm:-mb-6 sm:flex sm:flex-row-reverse sm:px-6">
-                <button
-                  type="submit"
-                  disabled={isSaving || isLoading}
-                  className="inline-flex w-full justify-center rounded-md border border-transparent bg-[#159A9C] px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-[#0F7B7D] focus:outline-none focus:ring-2 focus:ring-[#159A9C] focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-400 sm:ml-3 sm:w-auto sm:text-sm"
-                >
+              <div className="-mx-4 -mb-4 mt-6 border-t border-[#DEE8EC] bg-white px-4 py-3 sm:-mx-6 sm:-mb-6 sm:flex sm:flex-row-reverse sm:px-6">
+                <button type="submit" disabled={isSaving || isLoading} className={primaryButtonClass}>
                   {isSaving ? (
                     <>
                       <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white" />
@@ -340,16 +353,11 @@ const ModalConfiguracao: React.FC<ModalConfiguracaoProps> = ({
                   ) : (
                     <>
                       <Save className="mr-2 h-4 w-4" />
-                      {configuracao ? 'Atualizar' : 'Criar'} Configuração
+                      {configuracao ? 'Atualizar' : 'Criar'} Configuracao
                     </>
                   )}
                 </button>
-                <button
-                  type="button"
-                  onClick={handleClose}
-                  disabled={isSaving}
-                  className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-100 sm:ml-3 sm:mt-0 sm:w-auto sm:text-sm"
-                >
+                <button type="button" onClick={handleClose} disabled={isSaving} className={secondaryButtonClass}>
                   Cancelar
                 </button>
               </div>
