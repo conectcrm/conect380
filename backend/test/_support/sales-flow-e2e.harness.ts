@@ -118,7 +118,7 @@ export class SalesFlowE2EHarness {
         INSERT INTO users (id, nome, email, senha, empresa_id, role, ativo)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
       `,
-      [id, nome, email, senhaHash, empresaId, 'admin', true],
+      [id, nome, email, senhaHash, empresaId, 'superadmin', true],
     );
   }
 
