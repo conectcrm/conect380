@@ -360,7 +360,7 @@ Entregavel:
 - [x] Atualizar fluxo de proposta para consumir catalogo unificado como fonte primaria.
 - [x] Manter combos como composicao de itens, com calculo transparente no resumo da proposta.
 - [x] Garantir fallback seguro quando item referenciado for descontinuado (snapshot imutavel na proposta).
-- [ ] Validar fluxo ponta a ponta: criar item -> criar combo -> gerar proposta -> aprovar.
+- [x] Validar fluxo ponta a ponta: criar item -> criar combo -> gerar proposta -> aprovar.
 
 Entregavel:
 - Fluxo comercial completo funcionando para venda unitario + empacotada.
