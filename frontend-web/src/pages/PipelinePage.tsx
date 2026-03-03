@@ -1698,6 +1698,7 @@ const PipelinePage: React.FC = () => {
 
               {/* Cards das Oportunidades */}
               <div
+                data-testid={`pipeline-column-dropzone-${estagio.id}`}
                 className="bg-[#DEEFE7]/35 rounded-b-lg p-2 space-y-2 border border-[#B4BEC9]/40 border-t-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]"
                 onDragOver={handleDragOver}
                 onDrop={() => handleDrop(estagio.id)}
@@ -1753,7 +1754,13 @@ const PipelinePage: React.FC = () => {
                         key={oportunidade.id}
                         data-testid={`pipeline-card-${oportunidade.id}`}
                         draggable
-                        onDragStart={() => handleDragStart(oportunidade)}
+                        onDragStart={(event) => {
+                          event.dataTransfer?.setData('text/plain', String(oportunidade.id));
+                          if (event.dataTransfer) {
+                            event.dataTransfer.effectAllowed = 'move';
+                          }
+                          handleDragStart(oportunidade);
+                        }}
                         onClick={() => handleVerDetalhes(oportunidade)}
                         onDragEnd={() => setDraggedItem(null)}
                         onKeyDown={(e) => {

@@ -50,6 +50,19 @@ const mockPipelineLossApis = async (
   });
 };
 
+const dragPipelineCardToColumn = async (
+  page: Parameters<typeof bootstrapPipelineUiAuthenticatedSession>[0],
+  cardTestId: string,
+  columnDropzoneTestId: string,
+) => {
+  const card = page.getByTestId(cardTestId);
+  const dropzone = page.getByTestId(columnDropzoneTestId);
+
+  await card.scrollIntoViewIfNeeded();
+  await dropzone.scrollIntoViewIfNeeded();
+  await card.dragTo(dropzone);
+};
+
 test.describe('Pipeline - validacao de perda (UI)', () => {
   test('exibe erro contextual no modal de motivo de perda quando backend retorna 400', async ({ page }) => {
     await bootstrapPipelineUiAuthenticatedSession(page);
@@ -68,16 +81,10 @@ test.describe('Pipeline - validacao de perda (UI)', () => {
     await page.goto('/pipeline');
     await expect(page.getByTestId('pipeline-view-kanban')).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('pipeline-card-1')).toBeVisible({ timeout: 15000 });
-
-    const card = page.getByTestId('pipeline-card-1');
-    const colunaPerdido = page.getByTestId('pipeline-column-lost');
-    await colunaPerdido.scrollIntoViewIfNeeded();
-    await card.dispatchEvent('dragstart');
-    await colunaPerdido.dispatchEvent('dragover');
-    await colunaPerdido.dispatchEvent('drop');
+    await dragPipelineCardToColumn(page, 'pipeline-card-1', 'pipeline-column-dropzone-lost');
 
     await expect(page.getByTestId('modal-motivo-perda')).toBeVisible();
-    await page.getByTestId('modal-motivo-perda-option-PRECO').click();
+    await page.getByTestId('modal-motivo-perda-option-preco').click();
     await page.getByTestId('modal-motivo-perda-confirmar').click();
 
     await expect(page.getByTestId('modal-motivo-perda-error')).toContainText('Motivo de perda invalido');
@@ -95,7 +102,7 @@ test.describe('Pipeline - validacao de perda (UI)', () => {
       return json(route, 200, {
         ...OPORTUNIDADE_LOSS_BASE,
         estagio: 'lost',
-        motivoPerda: 'PRECO',
+        motivoPerda: 'preco',
         updatedAt: new Date().toISOString(),
       });
     });
@@ -103,16 +110,10 @@ test.describe('Pipeline - validacao de perda (UI)', () => {
     await page.goto('/pipeline');
     await expect(page.getByTestId('pipeline-view-kanban')).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('pipeline-card-1')).toBeVisible({ timeout: 15000 });
-
-    const card = page.getByTestId('pipeline-card-1');
-    const colunaPerdido = page.getByTestId('pipeline-column-lost');
-    await colunaPerdido.scrollIntoViewIfNeeded();
-    await card.dispatchEvent('dragstart');
-    await colunaPerdido.dispatchEvent('dragover');
-    await colunaPerdido.dispatchEvent('drop');
+    await dragPipelineCardToColumn(page, 'pipeline-card-1', 'pipeline-column-dropzone-lost');
 
     await expect(page.getByTestId('modal-motivo-perda')).toBeVisible();
-    await page.getByTestId('modal-motivo-perda-option-PRECO').click();
+    await page.getByTestId('modal-motivo-perda-option-preco').click();
     await page.getByTestId('modal-motivo-perda-confirmar').click();
 
     await expect(page.getByTestId('modal-motivo-perda')).toHaveCount(0);

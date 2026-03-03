@@ -50,6 +50,19 @@ const mockPipelineStageApis = async (
   });
 };
 
+const dragPipelineCardToColumn = async (
+  page: Parameters<typeof bootstrapPipelineUiAuthenticatedSession>[0],
+  cardTestId: string,
+  columnDropzoneTestId: string,
+) => {
+  const card = page.getByTestId(cardTestId);
+  const dropzone = page.getByTestId(columnDropzoneTestId);
+
+  await card.scrollIntoViewIfNeeded();
+  await dropzone.scrollIntoViewIfNeeded();
+  await card.dragTo(dropzone);
+};
+
 test.describe('Pipeline - validacao de estagio (UI)', () => {
   test('exibe erro contextual no modal de mudanca de estagio quando backend retorna 400', async ({ page }) => {
     await bootstrapPipelineUiAuthenticatedSession(page);
@@ -68,8 +81,11 @@ test.describe('Pipeline - validacao de estagio (UI)', () => {
     await page.goto('/pipeline');
     await expect(page.getByTestId('pipeline-view-kanban')).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('pipeline-card-1')).toBeVisible({ timeout: 15000 });
-
-    await page.getByTestId('pipeline-card-1').dragTo(page.getByTestId('pipeline-column-qualification'));
+    await dragPipelineCardToColumn(
+      page,
+      'pipeline-card-1',
+      'pipeline-column-dropzone-qualification',
+    );
 
     await expect(page.getByTestId('modal-mudanca-estagio')).toBeVisible();
     await page.getByTestId('modal-mudanca-estagio-motivo').selectOption('avanco_natural');
@@ -97,8 +113,11 @@ test.describe('Pipeline - validacao de estagio (UI)', () => {
     await page.goto('/pipeline');
     await expect(page.getByTestId('pipeline-view-kanban')).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('pipeline-card-1')).toBeVisible({ timeout: 15000 });
-
-    await page.getByTestId('pipeline-card-1').dragTo(page.getByTestId('pipeline-column-qualification'));
+    await dragPipelineCardToColumn(
+      page,
+      'pipeline-card-1',
+      'pipeline-column-dropzone-qualification',
+    );
 
     await expect(page.getByTestId('modal-mudanca-estagio')).toBeVisible();
     await page.getByTestId('modal-mudanca-estagio-motivo').selectOption('avanco_natural');
