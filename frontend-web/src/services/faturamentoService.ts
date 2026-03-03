@@ -51,7 +51,7 @@ export interface ItemFatura {
 export interface Fatura {
   id: number;
   numero: string;
-  contratoId: string;
+  contratoId?: string;
   contrato?: any;
   clienteId: number;
   cliente?: any;
@@ -82,7 +82,7 @@ export interface Fatura {
 }
 
 export interface NovaFatura {
-  contratoId: string;
+  contratoId?: string;
   clienteId: string; // UUID string
   usuarioResponsavelId: string;
   tipo: TipoFatura;
@@ -136,6 +136,7 @@ export interface FiltrosFatura {
   status?: StatusFatura;
   tipo?: TipoFatura;
   clienteId?: number;
+  contratoId?: number;
   dataInicial?: string;
   dataFinal?: string;
   periodoCampo?: 'emissao' | 'vencimento';
@@ -362,6 +363,16 @@ export const faturamentoService = {
       return response.data.data || response.data;
     } catch (error) {
       console.error('Erro ao atualizar fatura:', error);
+      throw error;
+    }
+  },
+
+  async marcarFaturaComoPaga(id: number, valorPago: number): Promise<Fatura> {
+    try {
+      const response = await api.put(`/faturamento/faturas/${id}/pagar`, { valorPago });
+      return response.data.data || response.data;
+    } catch (error) {
+      console.error('Erro ao marcar fatura como paga:', error);
       throw error;
     }
   },

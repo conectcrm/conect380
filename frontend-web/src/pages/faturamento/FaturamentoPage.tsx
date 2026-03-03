@@ -496,11 +496,10 @@ export default function FaturamentoPage() {
 
   const handlePagamentoConcluido = async (_transacao: unknown) => {
     try {
-      // Atualiza o status da fatura para pago
+      // Marca como paga no endpoint dedicado para manter sincronizacao com proposta.
       if (faturaGateway) {
-        await faturamentoService.atualizarFatura(faturaGateway.id, {
-          status: StatusFatura.PAGA,
-        });
+        const valorPago = Number(faturaGateway.valorTotal || 0);
+        await faturamentoService.marcarFaturaComoPaga(faturaGateway.id, valorPago);
         carregarFaturas();
         fecharModalGateway();
       }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { toastService } from '../../../services/toastService';
 import {
   Eye,
@@ -27,6 +27,7 @@ import {
 } from '../../../services/faturamentoService';
 import { propostasService as propostasApiService } from '../../../services/propostasService';
 import { authService } from '../../../services/authService';
+import { useNavigate } from 'react-router-dom';
 import ModalEnviarWhatsApp from '../../../components/whatsapp/ModalEnviarWhatsApp';
 
 type ClienteContatoData = {
@@ -108,7 +109,7 @@ const buscarClienteComCache = async (nome: string): Promise<ClienteContatoData |
           clientesService.getSearchCooldownRemaining(),
         );
         console.warn(
-          `⚠️ Busca de clientes em cooldown (${cooldownMs}ms restantes). Ignorando requisição para "${nome}".`,
+          `Busca de clientes em cooldown (${cooldownMs}ms restantes). Ignorando requisicao para "${nome}".`, 
         );
         armazenarNoCache(nome, null, cooldownMs);
         return null;
@@ -127,7 +128,7 @@ const buscarClienteComCache = async (nome: string): Promise<ClienteContatoData |
         if (termoAlternativo && termoAlternativo.toLowerCase() !== nome.toLowerCase()) {
           if (clientesService.isSearchRateLimited()) {
             console.warn(
-              `⚠️ Busca de clientes interrompida por cooldown durante variação do nome "${nome}".`,
+              `Busca de clientes interrompida por cooldown durante variacao do nome "${nome}".`,
             );
           } else {
             await aguardarJanelaBuscaCliente();
@@ -159,7 +160,7 @@ const buscarClienteComCache = async (nome: string): Promise<ClienteContatoData |
       const status = (error as any)?.response?.status;
       if (status === 429) {
         console.warn(
-          `⚠️ Limite de requisições atingido ao buscar cliente "${nome}". Aplicando cooldown curto.`,
+          `Limite de requisicoes atingido ao buscar cliente "${nome}". Aplicando cooldown curto.`,
         );
         const cooldownMs = Math.max(
           CLIENTE_DETAILS_COOLDOWN_TTL,
@@ -177,7 +178,7 @@ const buscarClienteComCache = async (nome: string): Promise<ClienteContatoData |
   return promessa;
 };
 
-// Tipo união para aceitar tanto PropostaCompleta quanto o formato da UI
+// Tipo uniao para aceitar tanto PropostaCompleta quanto o formato da UI
 type PropostaUI = {
   id: string;
   numero: string;
@@ -224,6 +225,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   showLabels = false,
   hideView = false,
 }) => {
+  const navigate = useNavigate();
   const [sendingEmail, setSendingEmail] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [clienteData, setClienteData] = useState<{
@@ -234,14 +236,14 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [propostaPdfBuffer, setPropostaPdfBuffer] = useState<Uint8Array | null>(null);
 
-  // 🚀 NOVOS ESTADOS PARA AUTOMAÇÃO
+  // NOVOS ESTADOS PARA AUTOMACAO
   const [gerandoContrato, setGerandoContrato] = useState(false);
   const [criandoFatura, setCriandoFatura] = useState(false);
   const [avancandoFluxo, setAvancandoFluxo] = useState(false);
   const [decidindoAlcadaAprovacao, setDecidindoAlcadaAprovacao] = useState(false);
   const [decidindoAlcadaReprovacao, setDecidindoAlcadaReprovacao] = useState(false);
 
-  // Função para detectar se é PropostaCompleta ou PropostaUI
+  // Funcao para detectar se e PropostaCompleta ou PropostaUI
   const isPropostaCompleta = (prop: PropostaCompleta | PropostaUI): prop is PropostaCompleta => {
     return 'cliente' in prop && typeof prop.cliente === 'object';
   };
@@ -332,7 +334,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     return dadosResolvidos;
   };
 
-  // Função para extrair dados da proposta independente do formato
+  // Funcao para extrair dados da proposta independente do formato
   const getPropostaData = () => {
     if (isPropostaCompleta(proposta)) {
       return {
@@ -391,22 +393,22 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     const numeroParcelas = Number(parcelas || 0);
 
     if (normalized === 'avista' || normalized === 'a_vista' || normalized === 'a-vista') {
-      return 'À vista';
+        return 'A vista';
     }
     if (normalized === 'boleto') {
-      return 'Boleto bancário';
+        return 'Boleto bancario';
     }
     if (normalized === 'cartao' || normalized === 'cartao_credito') {
-      return 'Cartão de crédito';
+        return 'Cartao de credito';
     }
     if (normalized === 'pix') {
       return 'PIX';
     }
     if (normalized === 'parcelado') {
-      return numeroParcelas > 0 ? `Parcelado em até ${numeroParcelas}x` : 'Parcelado';
+      return numeroParcelas > 0 ? `Parcelado em ate ${numeroParcelas}x` : 'Parcelado';
     }
 
-    return 'Conforme negociação comercial';
+    return 'Conforme negociacao comercial';
   };
 
   const montarDadosPdfProposta = async (): Promise<DadosProposta> => {
@@ -455,7 +457,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     let fonteProposta: any = proposta as any;
     let itensOriginais = extrairItensDaProposta(fonteProposta);
 
-    // Quando a linha da lista não carrega produtos completos, busca o detalhe da proposta.
+  // Quando a linha da lista nao carrega produtos completos, busca o detalhe da proposta.
     if (itensOriginais.length === 0 && propostaId) {
       try {
         const propostaDetalhada = await propostasApiService.findById(String(propostaId));
@@ -469,7 +471,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           itensOriginais = extrairItensDaProposta(propostaDetalhada as any);
         }
       } catch (error) {
-        console.warn('Não foi possível carregar os itens detalhados da proposta para o PDF:', error);
+      console.warn('Nao foi possivel carregar os itens detalhados da proposta para o PDF:', error);
       }
     }
 
@@ -720,7 +722,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     );
   };
 
-  // 🚀 NOVAS FUNÇÕES DE AUTOMAÇÃO
+  // NOVAS FUNCOES DE AUTOMACAO
   const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
   const isUuid = (value?: string | null): value is string =>
@@ -797,6 +799,22 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     }
   };
 
+  const abrirContrato = (contratoId: string | number) => {
+    const id = String(contratoId || '').trim();
+    if (!id) {
+      return;
+    }
+    navigate(`/contratos/${id}`);
+  };
+
+  const abrirFaturamento = (faturaId?: string | number) => {
+    if (faturaId !== undefined && faturaId !== null && String(faturaId).trim() !== '') {
+      navigate(`/financeiro/faturamento?faturaId=${String(faturaId)}`);
+      return;
+    }
+    navigate('/financeiro/faturamento');
+  };
+
   const montarItensFatura = () => {
     const propostaData = getPropostaData();
 
@@ -861,15 +879,13 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         throw new Error('A proposta precisa ter valor total maior que zero para gerar contrato.');
       }
 
-      const contratos = await contratoService.listarContratos();
-      const contratoExistente = contratos.find(
-        (contrato) => contrato.propostaId === propostaId && contrato.status !== 'cancelado',
-      );
+      const contratoExistente = await buscarContratoDaProposta(propostaId);
 
       if (contratoExistente) {
         toastService.info(
           `Ja existe contrato para esta proposta (${contratoExistente.numero || contratoExistente.id}).`,
         );
+        abrirContrato(contratoExistente.id);
         onPropostaUpdated?.();
         return;
       }
@@ -898,6 +914,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         observacoes: `Contrato ${contrato.numero || contrato.id} gerado a partir da proposta.`,
       });
       toastService.success(`Contrato ${contrato.numero || contrato.id} gerado com sucesso.`);
+      abrirContrato(contrato.id);
       onPropostaUpdated?.();
     } catch (error) {
       console.error('Erro ao gerar contrato automatico:', error);
@@ -908,6 +925,18 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   };
 
   const buscarContratoDaProposta = async (propostaId: string) => {
+    try {
+      const contratoFiltrado = await contratoService.buscarContratoPorPropostaId(propostaId);
+      if (contratoFiltrado) {
+        return contratoFiltrado;
+      }
+    } catch (error) {
+      console.warn(
+        'Falha ao buscar contrato por proposta via filtro dedicado. Aplicando fallback local.',
+        error,
+      );
+    }
+
     const contratos = await contratoService.listarContratos();
     return (
       contratos.find(
@@ -916,7 +945,78 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     );
   };
 
-  // Criar fatura automática
+  const localizarFaturaRelacionada = async (): Promise<number | null> => {
+    const propostaData = getPropostaData();
+    const propostaId = String((proposta as any)?.id || propostaData.id || '').trim();
+
+    if (propostaId) {
+      try {
+        const contrato = await buscarContratoDaProposta(propostaId);
+        if (contrato && isNumericId(contrato.id)) {
+          const respostaContrato = await faturamentoService.listarFaturasPaginadas({
+            contratoId: Number(contrato.id),
+            page: 1,
+            pageSize: 1,
+            sortBy: 'createdAt',
+            sortOrder: 'DESC',
+          });
+
+          const faturaContrato = Array.isArray(respostaContrato.data)
+            ? respostaContrato.data[0]
+            : undefined;
+          if (faturaContrato?.id) {
+            return Number(faturaContrato.id);
+          }
+        }
+      } catch (error) {
+        console.warn('Falha ao localizar fatura por contrato vinculado:', error);
+      }
+    }
+
+    const numeroProposta = String(propostaData.numero || '').trim();
+    if (!numeroProposta) {
+      return null;
+    }
+
+    try {
+      const respostaPorBusca = await faturamentoService.listarFaturasPaginadas({
+        q: numeroProposta,
+        page: 1,
+        pageSize: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+      });
+
+      const faturas = Array.isArray(respostaPorBusca.data) ? respostaPorBusca.data : [];
+      const faturaAssociada =
+        faturas.find((fatura) =>
+          String(fatura?.observacoes || '').toLowerCase().includes(numeroProposta.toLowerCase()),
+        ) || faturas[0];
+
+      if (faturaAssociada?.id) {
+        return Number(faturaAssociada.id);
+      }
+    } catch (error) {
+      console.warn('Falha ao localizar fatura por busca textual da proposta:', error);
+    }
+
+    return null;
+  };
+
+  const abrirFaturamentoParaPagamento = async () => {
+    const faturaId = await localizarFaturaRelacionada();
+    if (faturaId) {
+      abrirFaturamento(faturaId);
+      return;
+    }
+
+    abrirFaturamento();
+    toastService.info(
+      'Nao foi possivel localizar a fatura automaticamente. Use os filtros do financeiro para continuar.',
+    );
+  };
+
+  // Criar fatura automatica
   const handleCriarFatura = async () => {
     if (!podeCriarFatura()) {
       toastService.error('Apenas propostas com contrato assinado podem gerar faturas');
@@ -965,6 +1065,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         observacoes: `Fatura ${fatura.numero || fatura.id} criada a partir da proposta.`,
       });
       toastService.success(`Fatura ${fatura.numero || fatura.id} criada com sucesso.`);
+      abrirFaturamento(fatura.id);
       onPropostaUpdated?.();
     } catch (error) {
       console.error('Erro ao criar fatura automatica:', error);
@@ -974,8 +1075,8 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     }
   };
 
-  // Avançar para próxima etapa do fluxo
-  const handleAvançarFluxo = async () => {
+  // Avancar para proxima etapa do fluxo
+  const handleAvancarFluxo = async () => {
     setAvancandoFluxo(true);
     try {
       const propostaData = getPropostaData();
@@ -988,7 +1089,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         return;
       }
 
-      // Determinar próxima ação baseada no status atual
+      // Determinar proxima acao baseada no status atual
       switch (status) {
         case 'rascunho':
           await handleSendEmail(); // Enviar proposta por email
@@ -1033,9 +1134,27 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           break;
         }
 
-        case 'aprovada':
-          await handleGerarContrato(); // Gerar contrato
+        case 'aprovada': {
+          const desejaGerarContrato = window.confirm(
+            'Deseja gerar contrato para esta venda?\n\nOK: Gerar contrato\nCancelar: Seguir sem contrato',
+          );
+
+          if (desejaGerarContrato) {
+            await handleGerarContrato();
+            break;
+          }
+
+          const confirmarSemContrato = window.confirm(
+            'Confirmar fluxo sem contrato e gerar fatura diretamente?',
+          );
+          if (!confirmarSemContrato) {
+            toastService.info('Fluxo mantido sem alteracoes.');
+            break;
+          }
+
+          await handleCriarFaturaSemContrato();
           break;
+        }
 
         case 'contrato_gerado': {
           const { propostaId } = obterContextoAutomacao();
@@ -1045,17 +1164,28 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
             break;
           }
 
-          if (String(contrato.status || '').toLowerCase() !== 'assinado') {
-            toastService.info(
-              'Aguardando assinatura do contrato. Assim que assinar, o fluxo avanca para faturamento.',
-            );
+          const contratoAssinadoExternamente = window.confirm(
+            'Contrato foi assinado fora do sistema?\n\nOK: confirmar assinatura e seguir\nCancelar: manter aguardando assinatura',
+          );
+
+          if (!contratoAssinadoExternamente) {
+            toastService.info('Proposta mantida em aguardando assinatura de contrato.');
+            abrirContrato(contrato.id);
             break;
           }
 
+          const observacaoAssinatura = window.prompt(
+            'Opcional: informe observacao/evidencia da assinatura externa:',
+            '',
+          );
+
           await sincronizarStatusProposta('contrato_assinado', {
-            source: 'fluxo-avanco',
-            observacoes: `Contrato ${contrato.numero || contrato.id} assinado.`,
+            source: 'assinatura-externa-confirmada',
+            observacoes: observacaoAssinatura?.trim()
+              ? `Contrato ${contrato.numero || contrato.id} confirmado como assinado externamente. Obs: ${observacaoAssinatura.trim()}`
+              : `Contrato ${contrato.numero || contrato.id} confirmado como assinado externamente.`,
           });
+          toastService.success('Assinatura externa confirmada. Prosseguindo para faturamento.');
           await handleCriarFatura();
           break;
         }
@@ -1070,13 +1200,12 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
             observacoes: 'Fatura emitida e aguardando pagamento.',
           });
           toastService.success('Status atualizado para aguardando pagamento.');
+          await abrirFaturamentoParaPagamento();
           onPropostaUpdated?.();
           break;
 
         case 'aguardando_pagamento':
-          toastService.info(
-            'Pagamento deve ser confirmado no módulo de faturamento. A proposta será sincronizada automaticamente após a baixa da fatura.',
-          );
+          await abrirFaturamentoParaPagamento();
           break;
 
         case 'pago':
@@ -1093,10 +1222,46 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           return;
       }
     } catch (error) {
-      console.error('❌ Erro ao avançar fluxo:', error);
-      toastService.error('Erro ao avançar fluxo. Tente novamente.');
+      console.error('Erro ao avancar fluxo:', error);
+      toastService.error('Erro ao avancar fluxo. Tente novamente.');
     } finally {
       setAvancandoFluxo(false);
+    }
+  };
+
+  const handleCriarFaturaSemContrato = async () => {
+    setCriandoFatura(true);
+    try {
+      const { clienteId, usuarioResponsavelId } = obterContextoAutomacao();
+      const propostaData = getPropostaData();
+      const hoje = new Date();
+      const dataVencimento = propostaData.dataValidade
+        ? formatDateOnly(propostaData.dataValidade)
+        : formatDateOnly(addDays(hoje, 30));
+
+      const fatura = await faturamentoService.criarFatura({
+        clienteId,
+        usuarioResponsavelId,
+        tipo: TipoFatura.UNICA,
+        dataVencimento,
+        formaPagamento: mapFormaPagamentoProposta(),
+        observacoes: `Fatura gerada a partir da proposta ${propostaData.numero} sem contrato.`,
+        itens: montarItensFatura(),
+      });
+
+      await sincronizarStatusProposta('fatura_criada', {
+        source: 'automacao-fatura-sem-contrato',
+        observacoes: `Fatura ${fatura.numero || fatura.id} criada sem contrato para a proposta.`,
+      });
+
+      toastService.success(`Fatura ${fatura.numero || fatura.id} criada sem contrato.`);
+      abrirFaturamento(fatura.id);
+      onPropostaUpdated?.();
+    } catch (error) {
+      console.error('Erro ao criar fatura sem contrato:', error);
+      toastService.error(getErrorMessage(error, 'Erro ao criar fatura sem contrato.'));
+    } finally {
+      setCriandoFatura(false);
     }
   };
 
@@ -1108,7 +1273,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     const propostaData = getPropostaData();
     const propostaId = (proposta as any)?.id || propostaData.id;
     if (!propostaId) {
-      toastService.error('Proposta sem identificador para aprovar alçada.');
+      toastService.error('Proposta sem identificador para aprovar alcada.');
       return;
     }
 
@@ -1127,11 +1292,11 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         observacoes: 'Proposta aprovada apos decisao da alcada interna.',
       });
 
-      toastService.success('Alçada aprovada e proposta avançada para aprovada.');
+      toastService.success('Alcada aprovada e proposta avancada para aprovada.');
       onPropostaUpdated?.();
     } catch (error) {
-      console.error('Erro ao aprovar alçada interna:', error);
-      toastService.error(getErrorMessage(error, 'Erro ao aprovar alçada interna.'));
+      console.error('Erro ao aprovar alcada interna:', error);
+      toastService.error(getErrorMessage(error, 'Erro ao aprovar alcada interna.'));
     } finally {
       setDecidindoAlcadaAprovacao(false);
     }
@@ -1143,8 +1308,8 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     }
 
     const motivoReprovacao = window.prompt(
-      'Informe o motivo da reprovação interna (opcional):',
-      'Desconto acima da política comercial',
+      'Informe o motivo da reprovacao interna (opcional):',
+      'Desconto acima da politica comercial',
     );
     if (motivoReprovacao === null) {
       return;
@@ -1153,7 +1318,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     const propostaData = getPropostaData();
     const propostaId = (proposta as any)?.id || propostaData.id;
     if (!propostaId) {
-      toastService.error('Proposta sem identificador para reprovar alçada.');
+      toastService.error('Proposta sem identificador para reprovar alcada.');
       return;
     }
 
@@ -1167,11 +1332,11 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         observacoes: motivoReprovacao || 'Reprovacao interna via tela de propostas.',
       });
 
-      toastService.success('Alçada reprovada. A proposta permanece bloqueada para aprovação.');
+      toastService.success('Alcada reprovada. A proposta permanece bloqueada para aprovacao.');
       onPropostaUpdated?.();
     } catch (error) {
-      console.error('Erro ao reprovar alçada interna:', error);
-      toastService.error(getErrorMessage(error, 'Erro ao reprovar alçada interna.'));
+      console.error('Erro ao reprovar alcada interna:', error);
+      toastService.error(getErrorMessage(error, 'Erro ao reprovar alcada interna.'));
     } finally {
       setDecidindoAlcadaReprovacao(false);
     }
@@ -1181,29 +1346,29 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const handleSendEmail = async () => {
     const clienteData = await getClienteData({ allowLookup: true });
 
-    // Validar se o email é válido
+    // Validar se o email e valido
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     let emailFinal = (clienteData.email || '').trim();
 
     if (!emailFinal) {
       const emailInformado = prompt(
-        `O cliente "${clienteData.nome}" não possui e-mail cadastrado.\n\nDigite o e-mail para envio da proposta:`,
+        `O cliente "${clienteData.nome}" nao possui e-mail cadastrado.\n\nDigite o e-mail para envio da proposta:`,
       );
 
       if (!emailInformado) {
-        toastService.error('Envio cancelado - E-mail é obrigatório');
+        toastService.error('Envio cancelado - E-mail e obrigatorio');
         return;
       }
 
       if (!emailRegex.test(emailInformado)) {
-        toastService.error('E-mail informado é inválido: ' + emailInformado);
+        toastService.error('E-mail informado e invalido: ' + emailInformado);
         return;
       }
 
       emailFinal = emailInformado;
     }
 
-    // 🚨 DETECÇÃO DE EMAIL FICTÍCIO - Solicitar email real
+    // DETECCAO DE EMAIL FICTICIO - Solicitar email real
     const isEmailFicticio =
       emailFinal.includes('@cliente.com') ||
       emailFinal.includes('@cliente.temp') ||
@@ -1214,18 +1379,18 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       emailFinal.includes('@ficticio.');
 
     if (isEmailFicticio) {
-      // Solicitar email real do usuário
+      // Solicitar email real do usuario
       const emailReal = prompt(
-        `O email cadastrado "${clienteData.email}" é fictício.\n\nPor favor, digite o email REAL do cliente "${clienteData.nome}":\n\n(Ex: dhonlenofreitas@hotmail.com)`,
+        `O email cadastrado "${clienteData.email}" e ficticio.\n\nPor favor, digite o email REAL do cliente "${clienteData.nome}":\n\n(Ex: dhonlenofreitas@hotmail.com)`,
       );
 
       if (!emailReal) {
-        toastService.error('Envio cancelado - Email real é obrigatório');
+        toastService.error('Envio cancelado - Email real e obrigatorio');
         return;
       }
 
       if (!emailRegex.test(emailReal)) {
-        toastService.error('Email informado é inválido: ' + emailReal);
+        toastService.error('Email informado e invalido: ' + emailReal);
         return;
       }
 
@@ -1245,7 +1410,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       const emailData = {
         cliente: {
           nome: clienteData.nome,
-          email: emailFinal, // ✅ Usar email real corrigido pelo usuário
+          email: emailFinal, // Usar email real corrigido pelo usuario
         },
         proposta: {
           id: String(propostaId),
@@ -1263,7 +1428,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           nome: 'ConectCRM',
           email: 'conectcrm@gmail.com',
           telefone: '(62) 99668-9991',
-          endereco: 'Goiânia/GO',
+          endereco: 'Goiania/GO',
         },
         portalUrl: `${window.location.origin}/portal`,
       };
@@ -1293,7 +1458,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     const dadosPDF = await montarDadosPdfProposta();
 
     if (!dadosPDF.cliente?.telefone) {
-      toastService.error('Cliente não possui telefone cadastrado');
+      toastService.error('Cliente nao possui telefone cadastrado');
       return;
     }
 
@@ -1358,7 +1523,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         });
         toastService.success('Proposta compartilhada');
       } catch (error) {
-        // Fallback para cópia do link
+        // Fallback para copia do link
         navigator.clipboard.writeText(shareUrl);
         toastService.success('Link da proposta copiado');
       }
@@ -1376,9 +1541,12 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     .trim()
     .toLowerCase();
   const pagamentoControladoNoFinanceiro = statusFluxoAtual === 'aguardando_pagamento';
+  const assinaturaContratoPendente = statusFluxoAtual === 'contrato_gerado';
   const tituloBotaoFluxo = pagamentoControladoNoFinanceiro
-    ? 'Pagamento desta proposta é controlado no módulo de faturamento'
-    : 'Avançar para próxima etapa do fluxo automatizado';
+    ? 'Pagamento desta proposta e controlado no modulo de faturamento'
+    : assinaturaContratoPendente
+      ? 'Confirmar assinatura externa do contrato para seguir'
+      : 'Avancar para proxima etapa do fluxo automatizado';
 
   return (
     <div className={`flex items-center space-x-1 ${className}`}>
@@ -1413,7 +1581,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         title={
           clienteData?.telefone
             ? 'Enviar por WhatsApp'
-            : 'Enviar por WhatsApp (o telefone será validado ao iniciar o envio)'
+            : 'Enviar por WhatsApp (o telefone sera validado ao iniciar o envio)'
         }
       >
         <MessageSquare className="w-4 h-4" />
@@ -1445,7 +1613,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         {showLabels && <span>Compartilhar</span>}
       </button>
 
-      {/* ✨ SEPARADOR VISUAL */}
+      {/* SEPARADOR VISUAL */}
       <div className="h-6 w-px bg-gray-300 mx-2"></div>
       {/* Decisao de alcada */}
       {possuiAprovacaoPendente && (
@@ -1491,7 +1659,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         </>
       )}
 
-      {/* 🚀 NOVOS BOTÕES DE AUTOMAÇÃO */}
+      {/* NOVOS BOTOES DE AUTOMACAO */}
 
       {/* Gerar Contrato */}
       {podeGerarContrato() && (
@@ -1535,9 +1703,9 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         </button>
       )}
 
-      {/* Avançar Fluxo */}
+      {/* Avancar Fluxo */}
       <button
-        onClick={handleAvançarFluxo}
+        onClick={handleAvancarFluxo}
         disabled={avancandoFluxo || bloqueadoPorAlcada}
         className={`${buttonClass} text-orange-600 hover:text-orange-900 hover:bg-orange-50 disabled:opacity-50`}
         title={tituloBotaoFluxo}
@@ -1547,7 +1715,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         ) : (
           <ArrowRight className="w-4 h-4" />
         )}
-        {showLabels && <span>Avançar Fluxo</span>}
+        {showLabels && <span>Avancar Fluxo</span>}
       </button>
 
       {/* Modal WhatsApp */}
@@ -1580,3 +1748,5 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 };
 
 export default PropostaActions;
+
+
