@@ -29,6 +29,7 @@ import { propostasService as propostasApiService } from '../../../services/propo
 import { authService } from '../../../services/authService';
 import { useNavigate } from 'react-router-dom';
 import ModalEnviarWhatsApp from '../../../components/whatsapp/ModalEnviarWhatsApp';
+import { useGlobalConfirmation } from '../../../contexts/GlobalConfirmationContext';
 
 type ClienteContatoData = {
   nome: string;
@@ -226,6 +227,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   hideView = false,
 }) => {
   const navigate = useNavigate();
+  const { confirm } = useGlobalConfirmation();
   const [sendingEmail, setSendingEmail] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [clienteData, setClienteData] = useState<{
@@ -1135,18 +1137,29 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         }
 
         case 'aprovada': {
-          const desejaGerarContrato = window.confirm(
-            'Deseja gerar contrato para esta venda?\n\nOK: Gerar contrato\nCancelar: Seguir sem contrato',
-          );
+          const desejaGerarContrato = await confirm({
+            title: 'Gerar contrato para esta venda?',
+            message:
+              'Se optar por gerar contrato, a proposta segue para assinatura. Se nao, a fatura sera criada diretamente.',
+            confirmText: 'Gerar contrato',
+            cancelText: 'Seguir sem contrato',
+            icon: 'info',
+            confirmButtonClass: 'bg-teal-600 hover:bg-teal-700 focus:ring-teal-500',
+          });
 
           if (desejaGerarContrato) {
             await handleGerarContrato();
             break;
           }
 
-          const confirmarSemContrato = window.confirm(
-            'Confirmar fluxo sem contrato e gerar fatura diretamente?',
-          );
+          const confirmarSemContrato = await confirm({
+            title: 'Confirmar fluxo sem contrato',
+            message: 'A fatura sera criada diretamente para esta proposta. Deseja continuar?',
+            confirmText: 'Sim, criar fatura',
+            cancelText: 'Voltar',
+            icon: 'warning',
+            confirmButtonClass: 'bg-amber-600 hover:bg-amber-700 focus:ring-amber-500',
+          });
           if (!confirmarSemContrato) {
             toastService.info('Fluxo mantido sem alteracoes.');
             break;
