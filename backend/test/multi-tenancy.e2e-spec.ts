@@ -172,7 +172,7 @@ describe('Multi-Tenancy Isolation (E2E)', () => {
             params.email,
             senhaHash,
             params.empresaId,
-            'admin',
+            'superadmin',
             true,
             permissaoOperacionalE2E,
           ],
@@ -192,7 +192,7 @@ describe('Multi-Tenancy Isolation (E2E)', () => {
               role = EXCLUDED.role,
               ativo = EXCLUDED.ativo
         `,
-        [params.id, params.nome, params.email, senhaHash, params.empresaId, 'admin', true],
+        [params.id, params.nome, params.email, senhaHash, params.empresaId, 'superadmin', true],
       );
     };
 
