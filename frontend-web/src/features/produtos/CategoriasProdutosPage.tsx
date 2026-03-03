@@ -1,17 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Plus,
   Search,
   Edit,
   Trash2,
-  ArrowLeft,
   Package,
   Tag,
   Settings,
   Layers,
-  Save,
-  X,
 } from 'lucide-react';
 import { BackToNucleus } from '../../components/navigation/BackToNucleus';
 import ModalCategoria from '../../components/modals/ModalCategoria';
@@ -49,112 +45,16 @@ interface Configuracao {
   ativa: boolean;
 }
 
-// Dados mock iniciais
-const mockCategorias: Categoria[] = [
-  {
-    id: 'cat1',
-    nome: 'Software & Tecnologia',
-    descricao: 'Produtos de software, aplicativos e soluções tecnológicas',
-    cor: 'blue',
-    ativa: true,
-    subcategorias: [
-      {
-        id: 'sub1',
-        nome: 'Sistema de Gestão',
-        descricao: 'Sistemas ERP, CRM e gestão empresarial',
-        categoriaId: 'cat1',
-        ativa: true,
-        configuracoes: [
-          {
-            id: 'conf1',
-            nome: 'Licença Web Básica',
-            descricao: 'Acesso via web, até 5 usuários',
-            subcategoriaId: 'sub1',
-            precoBase: 299.0,
-            multiplicador: 1.0,
-            ativa: true,
-          },
-          {
-            id: 'conf2',
-            nome: 'Licença Web Premium',
-            descricao: 'Acesso via web, usuários ilimitados',
-            subcategoriaId: 'sub1',
-            precoBase: 449.0,
-            multiplicador: 1.5,
-            ativa: true,
-          },
-        ],
-      },
-      {
-        id: 'sub2',
-        nome: 'E-commerce',
-        descricao: 'Soluções para comércio eletrônico',
-        categoriaId: 'cat1',
-        ativa: true,
-        configuracoes: [
-          {
-            id: 'conf3',
-            nome: 'Loja Básica',
-            descricao: 'Até 100 produtos',
-            subcategoriaId: 'sub2',
-            precoBase: 199.0,
-            multiplicador: 1.0,
-            ativa: true,
-          },
-          {
-            id: 'conf4',
-            nome: 'Loja Avançada',
-            descricao: 'Produtos ilimitados',
-            subcategoriaId: 'sub2',
-            precoBase: 399.0,
-            multiplicador: 2.0,
-            ativa: true,
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'cat2',
-    nome: 'Consultoria & Serviços',
-    descricao: 'Serviços de consultoria e assessoria especializada',
-    cor: 'green',
-    ativa: true,
-    subcategorias: [
-      {
-        id: 'sub3',
-        nome: 'Gestão Empresarial',
-        descricao: 'Consultoria em processos e gestão',
-        categoriaId: 'cat2',
-        ativa: true,
-        configuracoes: [
-          {
-            id: 'conf5',
-            nome: 'Consultor Júnior',
-            descricao: '1-3 anos de experiência',
-            subcategoriaId: 'sub3',
-            precoBase: 150.0,
-            multiplicador: 1.0,
-            ativa: true,
-          },
-          {
-            id: 'conf6',
-            nome: 'Consultor Sênior',
-            descricao: '8+ anos de experiência',
-            subcategoriaId: 'sub3',
-            precoBase: 300.0,
-            multiplicador: 2.0,
-            ativa: true,
-          },
-        ],
-      },
-    ],
-  },
-];
+const CATEGORY_COLOR_CLASS_MAP: Record<string, { border: string; dot: string }> = {
+  blue: { border: 'border-blue-500', dot: 'bg-blue-500' },
+  green: { border: 'border-green-500', dot: 'bg-green-500' },
+  purple: { border: 'border-purple-500', dot: 'bg-purple-500' },
+  orange: { border: 'border-orange-500', dot: 'bg-orange-500' },
+  red: { border: 'border-red-500', dot: 'bg-red-500' },
+  yellow: { border: 'border-yellow-500', dot: 'bg-yellow-500' },
+};
 
 const CategoriasProdutosPage: React.FC = () => {
-  const navigate = useNavigate();
-
   // Estados
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
@@ -180,6 +80,8 @@ const CategoriasProdutosPage: React.FC = () => {
     try {
       setLoading(true);
       const categoriasData = await categoriasProdutosService.listarCategorias();
+      const categoriaSelecionadaId = selectedCategoria?.id;
+      const subcategoriaSelecionadaId = selectedSubcategoria?.id;
 
       // Converter para formato da interface local
       const categoriasConvertidas: Categoria[] = categoriasData.map((cat) => ({
@@ -211,6 +113,22 @@ const CategoriasProdutosPage: React.FC = () => {
       }));
 
       setCategorias(categoriasConvertidas);
+
+      if (categoriaSelecionadaId) {
+        const categoriaAtualizada = categoriasConvertidas.find(
+          (categoria) => categoria.id === categoriaSelecionadaId,
+        );
+        setSelectedCategoria(categoriaAtualizada || null);
+
+        if (categoriaAtualizada && subcategoriaSelecionadaId) {
+          const subcategoriaAtualizada = categoriaAtualizada.subcategorias.find(
+            (subcategoria) => subcategoria.id === subcategoriaSelecionadaId,
+          );
+          setSelectedSubcategoria(subcategoriaAtualizada || null);
+        } else if (!categoriaAtualizada) {
+          setSelectedSubcategoria(null);
+        }
+      }
 
       // Se não há categorias, adicionar algumas padrão
       if (categoriasConvertidas.length === 0) {
@@ -252,15 +170,13 @@ const CategoriasProdutosPage: React.FC = () => {
     }).format(value);
   };
 
-  // Cores disponíveis para categorias
-  const coresDisponiveis = [
-    { nome: 'Azul', valor: 'blue', classe: 'bg-blue-500' },
-    { nome: 'Verde', valor: 'green', classe: 'bg-green-500' },
-    { nome: 'Roxo', valor: 'purple', classe: 'bg-purple-500' },
-    { nome: 'Laranja', valor: 'orange', classe: 'bg-orange-500' },
-    { nome: 'Vermelho', valor: 'red', classe: 'bg-red-500' },
-    { nome: 'Amarelo', valor: 'yellow', classe: 'bg-yellow-500' },
-  ];
+  const getCategoryColorClasses = (cor?: string) => {
+    if (!cor) {
+      return CATEGORY_COLOR_CLASS_MAP.blue;
+    }
+
+    return CATEGORY_COLOR_CLASS_MAP[cor] || CATEGORY_COLOR_CLASS_MAP.blue;
+  };
 
   // Funções de manipulação
   const handleNovaCategoria = () => {
@@ -301,46 +217,95 @@ const CategoriasProdutosPage: React.FC = () => {
     setShowModalConfiguracao(true);
   };
 
+  const handleExcluirCategoria = async (categoria: Categoria) => {
+    const confirmado = window.confirm(
+      `Excluir a categoria "${categoria.nome}"? Todas as subcategorias e configurações vinculadas também serão removidas.`,
+    );
+
+    if (!confirmado) {
+      return;
+    }
+
+    try {
+      await categoriasProdutosService.excluirCategoria(categoria.id);
+
+      if (selectedCategoria?.id === categoria.id) {
+        setSelectedCategoria(null);
+        setSelectedSubcategoria(null);
+      }
+
+      toast.success('Categoria excluída com sucesso!');
+      await carregarCategorias();
+    } catch (error) {
+      console.error('Erro ao excluir categoria:', error);
+      toast.error('Erro ao excluir categoria');
+    }
+  };
+
+  const handleExcluirSubcategoria = async (subcategoria: Subcategoria) => {
+    const confirmado = window.confirm(`Excluir a subcategoria "${subcategoria.nome}"?`);
+
+    if (!confirmado) {
+      return;
+    }
+
+    try {
+      await categoriasProdutosService.excluirSubcategoria(subcategoria.id);
+
+      if (selectedSubcategoria?.id === subcategoria.id) {
+        setSelectedSubcategoria(null);
+      }
+
+      toast.success('Subcategoria excluída com sucesso!');
+      await carregarCategorias();
+    } catch (error) {
+      console.error('Erro ao excluir subcategoria:', error);
+      toast.error('Erro ao excluir subcategoria');
+    }
+  };
+
+  const handleExcluirConfiguracao = async (configuracao: Configuracao) => {
+    const confirmado = window.confirm(`Excluir a configuração "${configuracao.nome}"?`);
+
+    if (!confirmado) {
+      return;
+    }
+
+    try {
+      await categoriasProdutosService.excluirConfiguracao(configuracao.id);
+      toast.success('Configuração excluída com sucesso!');
+      await carregarCategorias();
+    } catch (error) {
+      console.error('Erro ao excluir configuração:', error);
+      toast.error('Erro ao excluir configuração');
+    }
+  };
+
   // Funções de salvar
   const handleSalvarCategoria = async (categoriaData: any) => {
     try {
       if (editingItem) {
-        // Editar categoria existente
-        const categoriaAtualizada = await categoriasProdutosService.atualizarCategoria({
+        await categoriasProdutosService.atualizarCategoria({
           id: editingItem.id,
           nome: categoriaData.nome,
           descricao: categoriaData.descricao,
           icone: categoriaData.icone,
           cor: categoriaData.cor,
+          ativo: categoriaData.ativa,
         });
-
-        setCategorias((prev) =>
-          prev.map((cat) => (cat.id === editingItem.id ? { ...cat, ...categoriaData } : cat)),
-        );
-
         toast.success('Categoria atualizada com sucesso!');
       } else {
-        // Criar nova categoria
-        const novaCategoria = await categoriasProdutosService.criarCategoria({
+        await categoriasProdutosService.criarCategoria({
           nome: categoriaData.nome,
           descricao: categoriaData.descricao,
           icone: categoriaData.icone || '📁',
           cor: categoriaData.cor || 'blue',
+          ativo: categoriaData.ativa,
         });
-
-        const categoriaNormalizada: Categoria = {
-          id: novaCategoria.id,
-          nome: novaCategoria.nome,
-          descricao: novaCategoria.descricao,
-          cor: novaCategoria.cor || 'blue',
-          ativa: novaCategoria.ativo,
-          subcategorias: [],
-        };
-
-        setCategorias((prev) => [...prev, categoriaNormalizada]);
         toast.success('Categoria criada com sucesso!');
       }
 
+      await carregarCategorias();
       setShowModalCategoria(false);
       setEditingItem(null);
     } catch (error) {
@@ -351,74 +316,65 @@ const CategoriasProdutosPage: React.FC = () => {
 
   const handleSalvarSubcategoria = async (subcategoriaData: any) => {
     try {
+      const categoriaId = subcategoriaData.categoriaId || subcategoriaData.categoria_id;
+      const payload = {
+        categoria_id: categoriaId,
+        nome: subcategoriaData.nome,
+        descricao: subcategoriaData.descricao,
+        precoBase: Number(subcategoriaData.precoBase || 0),
+        unidade: subcategoriaData.unidade || 'unidade',
+        camposPersonalizados: subcategoriaData.camposPersonalizados,
+        ativo: subcategoriaData.ativa ?? subcategoriaData.ativo,
+      };
+
       if (editingItem) {
-        // Editar subcategoria existente
-        setCategorias((prev) =>
-          prev.map((cat) => ({
-            ...cat,
-            subcategorias: cat.subcategorias.map((sub) =>
-              sub.id === editingItem.id ? { ...sub, ...subcategoriaData } : sub,
-            ),
-          })),
-        );
+        await categoriasProdutosService.atualizarSubcategoria({
+          id: editingItem.id,
+          ...payload,
+        });
+        toast.success('Subcategoria atualizada com sucesso!');
       } else {
-        // Criar nova subcategoria
-        const novaSubcategoria: Subcategoria = {
-          id: Date.now().toString(),
-          ...subcategoriaData,
-          configuracoes: [],
-        };
-        setCategorias((prev) =>
-          prev.map((cat) =>
-            cat.id === subcategoriaData.categoriaId
-              ? { ...cat, subcategorias: [...cat.subcategorias, novaSubcategoria] }
-              : cat,
-          ),
-        );
+        await categoriasProdutosService.criarSubcategoria(payload);
+        toast.success('Subcategoria criada com sucesso!');
       }
+
+      await carregarCategorias();
       setShowModalSubcategoria(false);
       setEditingItem(null);
     } catch (error) {
       console.error('Erro ao salvar subcategoria:', error);
+      toast.error('Erro ao salvar subcategoria');
     }
   };
 
   const handleSalvarConfiguracao = async (configuracaoData: any) => {
     try {
+      const subcategoriaId = configuracaoData.subcategoriaId || configuracaoData.subcategoria_id;
+      const payload = {
+        subcategoria_id: subcategoriaId,
+        nome: configuracaoData.nome,
+        descricao: configuracaoData.descricao,
+        multiplicador: Number(configuracaoData.multiplicador || 1),
+        ativo: configuracaoData.ativa ?? configuracaoData.ativo,
+      };
+
       if (editingItem) {
-        // Editar configuração existente
-        setCategorias((prev) =>
-          prev.map((cat) => ({
-            ...cat,
-            subcategorias: cat.subcategorias.map((sub) => ({
-              ...sub,
-              configuracoes: sub.configuracoes.map((conf) =>
-                conf.id === editingItem.id ? { ...conf, ...configuracaoData } : conf,
-              ),
-            })),
-          })),
-        );
+        await categoriasProdutosService.atualizarConfiguracao({
+          id: editingItem.id,
+          ...payload,
+        });
+        toast.success('Configuração atualizada com sucesso!');
       } else {
-        // Criar nova configuração
-        const novaConfiguracao: Configuracao = {
-          id: Date.now().toString(),
-          ...configuracaoData,
-        };
-        setCategorias((prev) =>
-          prev.map((cat) => ({
-            ...cat,
-            subcategorias: cat.subcategorias.map((sub) =>
-              sub.id === configuracaoData.subcategoriaId
-                ? { ...sub, configuracoes: [...sub.configuracoes, novaConfiguracao] }
-                : sub,
-            ),
-          })),
-        );
+        await categoriasProdutosService.criarConfiguracao(payload);
+        toast.success('Configuração criada com sucesso!');
       }
+
+      await carregarCategorias();
       setShowModalConfiguracao(false);
       setEditingItem(null);
     } catch (error) {
       console.error('Erro ao salvar configuração:', error);
+      toast.error('Erro ao salvar configuração');
     }
   };
 
@@ -430,7 +386,7 @@ const CategoriasProdutosPage: React.FC = () => {
         .map((categoria) => (
           <div
             key={categoria.id}
-            className={`bg-white rounded-lg p-6 border-l-4 border-${categoria.cor}-500 shadow-sm cursor-pointer hover:shadow-md transition-shadow ${
+            className={`bg-white rounded-lg p-6 border-l-4 ${getCategoryColorClasses(categoria.cor).border} shadow-sm cursor-pointer hover:shadow-md transition-shadow ${
               selectedCategoria?.id === categoria.id ? 'ring-2 ring-blue-500' : ''
             }`}
             onClick={() => {
@@ -440,7 +396,7 @@ const CategoriasProdutosPage: React.FC = () => {
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
-                <div className={`w-4 h-4 rounded-full bg-${categoria.cor}-500`}></div>
+                <div className={`w-4 h-4 rounded-full ${getCategoryColorClasses(categoria.cor).dot}`}></div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">{categoria.nome}</h3>
                   <p className="text-gray-600">{categoria.descricao}</p>
@@ -471,7 +427,7 @@ const CategoriasProdutosPage: React.FC = () => {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    // handleExcluirCategoria(categoria);
+                    handleExcluirCategoria(categoria);
                   }}
                   className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                 >
@@ -501,7 +457,9 @@ const CategoriasProdutosPage: React.FC = () => {
       <div className="space-y-4">
         <div className="bg-blue-50 p-4 rounded-lg mb-4">
           <div className="flex items-center space-x-2">
-            <div className={`w-3 h-3 rounded-full bg-${selectedCategoria.cor}-500`}></div>
+            <div
+              className={`w-3 h-3 rounded-full ${getCategoryColorClasses(selectedCategoria.cor).dot}`}
+            ></div>
             <span className="font-medium text-blue-900">
               Subcategorias de: {selectedCategoria.nome}
             </span>
@@ -550,7 +508,7 @@ const CategoriasProdutosPage: React.FC = () => {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      // handleExcluirSubcategoria(subcategoria);
+                      handleExcluirSubcategoria(subcategoria);
                     }}
                     className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                   >
@@ -620,9 +578,7 @@ const CategoriasProdutosPage: React.FC = () => {
                     <Edit className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => {
-                      // handleExcluirConfiguracao(configuracao);
-                    }}
+                    onClick={() => handleExcluirConfiguracao(configuracao)}
                     className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -794,3 +750,4 @@ const CategoriasProdutosPage: React.FC = () => {
 };
 
 export default CategoriasProdutosPage;
+

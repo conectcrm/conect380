@@ -86,6 +86,11 @@ export class ProdutosService {
         vendasTotal: payload.vendasTotal ?? 0,
         tags: payload.tags ?? null,
         variacoes: payload.variacoes ?? null,
+        tipoLicenciamento: payload.tipoLicenciamento ?? null,
+        periodicidadeLicenca: payload.periodicidadeLicenca ?? null,
+        renovacaoAutomatica:
+          payload.renovacaoAutomatica === undefined ? false : Boolean(payload.renovacaoAutomatica),
+        quantidadeLicencas: payload.quantidadeLicencas ?? null,
         ativo: payload.status ? payload.status !== 'inativo' : true,
         empresaId,
       });
@@ -165,6 +170,18 @@ export class ProdutosService {
     }
     if (payload.variacoes !== undefined) {
       produto.variacoes = payload.variacoes;
+    }
+    if (payload.tipoLicenciamento !== undefined) {
+      produto.tipoLicenciamento = payload.tipoLicenciamento;
+    }
+    if (payload.periodicidadeLicenca !== undefined) {
+      produto.periodicidadeLicenca = payload.periodicidadeLicenca;
+    }
+    if (payload.renovacaoAutomatica !== undefined) {
+      produto.renovacaoAutomatica = payload.renovacaoAutomatica;
+    }
+    if (payload.quantidadeLicencas !== undefined) {
+      produto.quantidadeLicencas = payload.quantidadeLicencas;
     }
 
     const updated = await this.produtoRepository.save(produto);

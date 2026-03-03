@@ -81,6 +81,9 @@ import { ItemCotacao } from '../cotacao/entities/item-cotacao.entity';
 import { AnexoCotacao } from '../cotacao/entities/anexo-cotacao.entity';
 import { Notification } from '../notifications/entities/notification.entity';
 import { SystemBranding } from '../modules/system-branding/entities/system-branding.entity';
+import { CategoriaProduto } from '../modules/categorias-produtos/entities/categoria-produto.entity';
+import { SubcategoriaProduto } from '../modules/categorias-produtos/entities/subcategoria-produto.entity';
+import { ConfiguracaoProduto } from '../modules/categorias-produtos/entities/configuracao-produto.entity';
 
 @Injectable()
 export class DatabaseConfig implements TypeOrmOptionsFactory {
@@ -178,6 +181,9 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         Lead, // ✅ Módulo de Leads CRM
         Meta, // ✅ Metas comerciais
         SystemBranding, // ✅ Branding global do sistema
+        CategoriaProduto, // ✅ Catálogo: categorias de produtos
+        SubcategoriaProduto, // ✅ Catálogo: subcategorias de produtos
+        ConfiguracaoProduto, // ✅ Catálogo: configurações de subcategoria
       ],
       autoLoadEntities: true,
       synchronize: false, // ✅ DESABILITADO - usar migrations para segurança

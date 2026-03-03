@@ -103,6 +103,18 @@ export class Produto {
   @Column({ type: 'json', nullable: true })
   variacoes?: string[];
 
+  @Column({ type: 'varchar', name: 'tipoLicenciamento', length: 100, nullable: true })
+  tipoLicenciamento?: string;
+
+  @Column({ type: 'varchar', name: 'periodicidadeLicenca', length: 100, nullable: true })
+  periodicidadeLicenca?: string;
+
+  @Column({ type: 'boolean', name: 'renovacaoAutomatica', default: false, nullable: true })
+  renovacaoAutomatica?: boolean;
+
+  @Column({ type: 'int', name: 'quantidadeLicencas', nullable: true })
+  quantidadeLicencas?: number;
+
   @Column({ type: 'boolean', name: 'ativo', default: true })
   ativo: boolean;
 

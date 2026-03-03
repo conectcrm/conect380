@@ -27,12 +27,12 @@ import { categoriasProdutosService } from '../../services/categoriasProdutosServ
 interface ProdutoFormData {
   nome: string;
   tipo?: 'produto' | 'servico' | 'software'; // Novo campo para detectar software
-  tipoItem: 'produto' | 'servico' | 'licenca' | 'modulo' | 'aplicativo';
+  tipoItem: 'produto' | 'servico' | 'licenca' | 'modulo' | 'plano' | 'aplicativo';
   categoria: string;
   precoUnitario: number;
   frequencia: 'unico' | 'mensal' | 'anual';
   unidadeMedida: 'unidade' | 'saca' | 'hectare' | 'pacote' | 'licenca';
-  status: boolean;
+  status: 'ativo' | 'inativo' | 'descontinuado';
   descricao?: string;
   tags?: string[];
   variacoes?: string[];
@@ -60,7 +60,7 @@ const schema = yup.object().shape({
   tipoItem: yup
     .string()
     .required('Tipo do item é obrigatório')
-    .oneOf(['produto', 'servico', 'licenca', 'modulo', 'aplicativo'], 'Tipo inválido'),
+    .oneOf(['produto', 'servico', 'licenca', 'modulo', 'plano', 'aplicativo'], 'Tipo inválido'),
   categoria: yup.string().required('Categoria é obrigatória'),
   precoUnitario: yup
     .number()
@@ -74,7 +74,10 @@ const schema = yup.object().shape({
     .string()
     .required('Unidade de medida é obrigatória')
     .oneOf(['unidade', 'saca', 'hectare', 'pacote', 'licenca'], 'Unidade inválida'),
-  status: yup.boolean().required('Status é obrigatório'),
+  status: yup
+    .string()
+    .required('Status é obrigatório')
+    .oneOf(['ativo', 'inativo', 'descontinuado'], 'Status inválido'),
   descricao: yup.string().optional(),
   tags: yup.array().of(yup.string()).default([]),
   variacoes: yup.array().of(yup.string()).default([]),
@@ -105,6 +108,7 @@ const tiposItem = [
   { value: 'servico', label: 'Serviço' },
   { value: 'licenca', label: 'Licença' },
   { value: 'modulo', label: 'Módulo' },
+  { value: 'plano', label: 'Plano' },
   { value: 'aplicativo', label: 'Aplicativo' },
 ];
 
@@ -206,7 +210,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
       precoUnitario: 0,
       frequencia: 'unico',
       unidadeMedida: 'unidade',
-      status: true,
+      status: 'ativo',
       descricao: '',
       tags: [],
       variacoes: [],
@@ -302,10 +306,19 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
           precoUnitario: produtoEditando.precoUnitario || 0,
           frequencia: produtoEditando.frequencia || 'unico',
           unidadeMedida: produtoEditando.unidadeMedida || 'unidade',
-          status: produtoEditando.status ?? true,
+          status:
+            (produtoEditando as any).status === true
+              ? 'ativo'
+              : (produtoEditando as any).status === false
+                ? 'inativo'
+                : produtoEditando.status || 'ativo',
           descricao: produtoEditando.descricao || '',
           tags: produtoEditando.tags || [],
           variacoes: produtoEditando.variacoes || [],
+          tipoLicenciamento: produtoEditando.tipoLicenciamento || '',
+          periodicidadeLicenca: produtoEditando.periodicidadeLicenca || '',
+          renovacaoAutomatica: produtoEditando.renovacaoAutomatica ?? false,
+          quantidadeLicencas: produtoEditando.quantidadeLicencas ?? 1,
         });
       } else {
         reset({
@@ -315,10 +328,14 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
           precoUnitario: 0,
           frequencia: 'unico',
           unidadeMedida: 'unidade',
-          status: true,
+          status: 'ativo',
           descricao: '',
           tags: [],
           variacoes: [],
+          tipoLicenciamento: '',
+          periodicidadeLicenca: '',
+          renovacaoAutomatica: false,
+          quantidadeLicencas: 1,
         });
       }
 
@@ -607,26 +624,15 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                       name="status"
                       control={control}
                       render={({ field }) => (
-                        <div className="flex items-center space-x-4">
-                          <label className="flex items-center">
-                            <input
-                              type="radio"
-                              checked={field.value === true}
-                              onChange={() => field.onChange(true)}
-                              className="mr-2 text-green-600 focus:ring-green-500"
-                            />
-                            <span className="text-sm text-gray-700">Ativo</span>
-                          </label>
-                          <label className="flex items-center">
-                            <input
-                              type="radio"
-                              checked={field.value === false}
-                              onChange={() => field.onChange(false)}
-                              className="mr-2 text-red-600 focus:ring-red-500"
-                            />
-                            <span className="text-sm text-gray-700">Inativo</span>
-                          </label>
-                        </div>
+                        <select
+                          value={field.value}
+                          onChange={(event) => field.onChange(event.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="ativo">Ativo</option>
+                          <option value="inativo">Inativo</option>
+                          <option value="descontinuado">Descontinuado</option>
+                        </select>
                       )}
                     />
                     {errors.status && (

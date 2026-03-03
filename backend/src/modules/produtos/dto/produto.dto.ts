@@ -1,4 +1,13 @@
-import { IsNotEmpty, IsString, IsNumber, IsOptional, IsArray, IsEnum, Min } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  IsNumber,
+  IsOptional,
+  IsArray,
+  IsEnum,
+  Min,
+  IsBoolean,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 import { PartialType } from '@nestjs/mapped-types';
 
@@ -79,6 +88,26 @@ export class CreateProdutoDto {
   @IsArray()
   @IsString({ each: true })
   variacoes?: string[];
+
+  @IsOptional()
+  @IsString()
+  tipoLicenciamento?: string;
+
+  @IsOptional()
+  @IsString()
+  periodicidadeLicenca?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  renovacaoAutomatica?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Transform(({ value }) =>
+    value === undefined || value === null || value === '' ? undefined : Number(value),
+  )
+  quantidadeLicencas?: number;
 }
 
 export class UpdateProdutoDto extends PartialType(CreateProdutoDto) {}

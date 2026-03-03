@@ -75,7 +75,7 @@ interface Produto {
   descricao?: string;
   unidade: string; // Mudando para obrigatório para compatibilidade
   // Campos específicos para software
-  tipoItem?: 'produto' | 'servico' | 'licenca' | 'modulo' | 'aplicativo';
+  tipoItem?: 'produto' | 'servico' | 'licenca' | 'modulo' | 'plano' | 'aplicativo';
   tipoLicenciamento?: string;
   periodicidadeLicenca?: string;
   renovacaoAutomatica?: boolean;

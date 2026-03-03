@@ -20,6 +20,10 @@ export interface Produto {
   vendasTotal: number;
   tags?: string[];
   variacoes?: string[];
+  tipoLicenciamento?: string;
+  periodicidadeLicenca?: string;
+  renovacaoAutomatica?: boolean;
+  quantidadeLicencas?: number;
   criadoEm: string;
   atualizadoEm: string;
 }
@@ -41,6 +45,10 @@ export interface CreateProdutoData {
   estoqueMaximo?: number;
   tags?: string[];
   variacoes?: string[];
+  tipoLicenciamento?: string;
+  periodicidadeLicenca?: string;
+  renovacaoAutomatica?: boolean;
+  quantidadeLicencas?: number;
 }
 
 export interface UpdateProdutoData extends Partial<CreateProdutoData> {}
@@ -167,6 +175,16 @@ class ProdutosService {
       estoqueMaximo: formData.estoqueMaximo ? Number(formData.estoqueMaximo) : undefined,
       tags: Array.isArray(formData.tags) ? formData.tags : undefined,
       variacoes: Array.isArray(formData.variacoes) ? formData.variacoes : undefined,
+      tipoLicenciamento: formData.tipoLicenciamento?.trim() || undefined,
+      periodicidadeLicenca: formData.periodicidadeLicenca?.trim() || undefined,
+      renovacaoAutomatica:
+        formData.renovacaoAutomatica === undefined
+          ? undefined
+          : Boolean(formData.renovacaoAutomatica),
+      quantidadeLicencas:
+        formData.quantidadeLicencas === undefined || formData.quantidadeLicencas === null
+          ? undefined
+          : Number(formData.quantidadeLicencas),
     };
 
     return transformed;
@@ -182,6 +200,7 @@ class ProdutosService {
         | 'servico'
         | 'licenca'
         | 'modulo'
+        | 'plano'
         | 'aplicativo',
       categoria: produto.categoria,
       preco: produto.preco,
@@ -206,6 +225,10 @@ class ProdutosService {
       fornecedor: produto.fornecedor,
       sku: produto.sku,
       descricao: produto.descricao,
+      tipoLicenciamento: produto.tipoLicenciamento,
+      periodicidadeLicenca: produto.periodicidadeLicenca,
+      renovacaoAutomatica: produto.renovacaoAutomatica,
+      quantidadeLicencas: produto.quantidadeLicencas,
       criadoEm: produto.criadoEm,
       atualizadoEm: produto.atualizadoEm,
     };

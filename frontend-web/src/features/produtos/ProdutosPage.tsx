@@ -34,22 +34,26 @@ import toast from 'react-hot-toast';
 // Interface para o novo modal
 interface ProdutoFormData {
   nome: string;
-  tipoItem: 'produto' | 'servico' | 'licenca' | 'modulo' | 'aplicativo';
+  tipoItem: 'produto' | 'servico' | 'licenca' | 'modulo' | 'plano' | 'aplicativo';
   categoria: string;
   precoUnitario: number;
   frequencia: 'unico' | 'mensal' | 'anual';
   unidadeMedida: 'unidade' | 'saca' | 'hectare' | 'pacote' | 'licenca';
-  status: boolean;
+  status: 'ativo' | 'inativo' | 'descontinuado';
   descricao?: string;
   tags?: string[];
   variacoes?: string[];
+  tipoLicenciamento?: string;
+  periodicidadeLicenca?: string;
+  renovacaoAutomatica?: boolean;
+  quantidadeLicencas?: number;
 }
 
 // Interface para compatibilidade com o componente atual
 interface ProdutoLegacy {
   id: string;
   nome: string;
-  tipoItem: 'produto' | 'servico' | 'licenca' | 'modulo' | 'aplicativo';
+  tipoItem: 'produto' | 'servico' | 'licenca' | 'modulo' | 'plano' | 'aplicativo';
   categoria: string;
   preco: number;
   custoUnitario: number;
@@ -68,6 +72,10 @@ interface ProdutoLegacy {
   fornecedor: string;
   sku: string;
   descricao: string;
+  tipoLicenciamento?: string;
+  periodicidadeLicenca?: string;
+  renovacaoAutomatica?: boolean;
+  quantidadeLicencas?: number;
   criadoEm: string;
   atualizadoEm: string;
 }
@@ -95,6 +103,7 @@ const tipoItemConfig = {
   servico: 'Serviço',
   licenca: 'Licença',
   modulo: 'Módulo',
+  plano: 'Plano',
   aplicativo: 'Aplicativo',
 };
 
@@ -343,10 +352,14 @@ const ProdutosPage: React.FC = () => {
       precoUnitario: produto.preco,
       frequencia: produto.frequencia,
       unidadeMedida: produto.unidadeMedida,
-      status: produto.status === 'ativo',
+      status: produto.status,
       descricao: produto.descricao,
       tags: [],
       variacoes: [],
+      tipoLicenciamento: produto.tipoLicenciamento,
+      periodicidadeLicenca: produto.periodicidadeLicenca,
+      renovacaoAutomatica: produto.renovacaoAutomatica,
+      quantidadeLicencas: produto.quantidadeLicencas,
     });
     setShowModalAvancado(true);
   };
