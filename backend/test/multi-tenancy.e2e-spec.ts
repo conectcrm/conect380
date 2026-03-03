@@ -5,6 +5,7 @@ import * as request from 'supertest';
 import * as bcrypt from 'bcryptjs';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
+import { ALL_PERMISSIONS } from '../src/common/permissions/permissions.constants';
 
 /**
  * Testes E2E para validar isolamento Multi-Tenancy
@@ -121,6 +122,18 @@ describe('Multi-Tenancy Isolation (E2E)', () => {
     empresa2Id = empresas[1].id;
 
     const senhaHash = await bcrypt.hash(TEST_PASSWORD, 10);
+    const permissaoOperacionalE2E = ALL_PERMISSIONS.join(',');
+    const permissaoColumnRows = await dataSource.query(
+      `
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'users'
+          AND column_name = 'permissoes'
+      `,
+    );
+    const hasPermissoesColumn =
+      Array.isArray(permissaoColumnRows) && permissaoColumnRows.length > 0;
 
     // Evita DELETE em users (quebra por FKs legadas) e garante e-mails livres para upsert.
     await dataSource.query(
@@ -133,51 +146,69 @@ describe('Multi-Tenancy Isolation (E2E)', () => {
       [TEST_EMAIL_EMPRESA_1, TEST_EMAIL_EMPRESA_2, TEST_USER_ID_EMPRESA_1, TEST_USER_ID_EMPRESA_2],
     );
 
-    await dataSource.query(
-      `
-        INSERT INTO users (id, nome, email, senha, empresa_id, role, ativo)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        ON CONFLICT (id) DO UPDATE
-        SET nome = EXCLUDED.nome,
-            email = EXCLUDED.email,
-            senha = EXCLUDED.senha,
-            empresa_id = EXCLUDED.empresa_id,
-            role = EXCLUDED.role,
-            ativo = EXCLUDED.ativo
-      `,
-      [
-        TEST_USER_ID_EMPRESA_1,
-        'Admin E2E Empresa 1',
-        TEST_EMAIL_EMPRESA_1,
-        senhaHash,
-        empresa1Id,
-        'admin',
-        true,
-      ],
-    );
+    const upsertUser = async (params: {
+      id: string;
+      nome: string;
+      email: string;
+      empresaId: string;
+    }) => {
+      if (hasPermissoesColumn) {
+        await dataSource.query(
+          `
+            INSERT INTO users (id, nome, email, senha, empresa_id, role, ativo, permissoes)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            ON CONFLICT (id) DO UPDATE
+            SET nome = EXCLUDED.nome,
+                email = EXCLUDED.email,
+                senha = EXCLUDED.senha,
+                empresa_id = EXCLUDED.empresa_id,
+                role = EXCLUDED.role,
+                ativo = EXCLUDED.ativo,
+                permissoes = EXCLUDED.permissoes
+          `,
+          [
+            params.id,
+            params.nome,
+            params.email,
+            senhaHash,
+            params.empresaId,
+            'admin',
+            true,
+            permissaoOperacionalE2E,
+          ],
+        );
+        return;
+      }
 
-    await dataSource.query(
-      `
-        INSERT INTO users (id, nome, email, senha, empresa_id, role, ativo)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        ON CONFLICT (id) DO UPDATE
-        SET nome = EXCLUDED.nome,
-            email = EXCLUDED.email,
-            senha = EXCLUDED.senha,
-            empresa_id = EXCLUDED.empresa_id,
-            role = EXCLUDED.role,
-            ativo = EXCLUDED.ativo
-      `,
-      [
-        TEST_USER_ID_EMPRESA_2,
-        'Admin E2E Empresa 2',
-        TEST_EMAIL_EMPRESA_2,
-        senhaHash,
-        empresa2Id,
-        'admin',
-        true,
-      ],
-    );
+      await dataSource.query(
+        `
+          INSERT INTO users (id, nome, email, senha, empresa_id, role, ativo)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          ON CONFLICT (id) DO UPDATE
+          SET nome = EXCLUDED.nome,
+              email = EXCLUDED.email,
+              senha = EXCLUDED.senha,
+              empresa_id = EXCLUDED.empresa_id,
+              role = EXCLUDED.role,
+              ativo = EXCLUDED.ativo
+        `,
+        [params.id, params.nome, params.email, senhaHash, params.empresaId, 'admin', true],
+      );
+    };
+
+    await upsertUser({
+      id: TEST_USER_ID_EMPRESA_1,
+      nome: 'Admin E2E Empresa 1',
+      email: TEST_EMAIL_EMPRESA_1,
+      empresaId: empresa1Id,
+    });
+
+    await upsertUser({
+      id: TEST_USER_ID_EMPRESA_2,
+      nome: 'Admin E2E Empresa 2',
+      email: TEST_EMAIL_EMPRESA_2,
+      empresaId: empresa2Id,
+    });
   };
 
   beforeAll(async () => {
