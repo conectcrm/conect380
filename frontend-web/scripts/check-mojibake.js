@@ -4,11 +4,11 @@ const fs = require('fs');
 const path = require('path');
 
 const projectRoot = path.resolve(__dirname, '..');
-const targets = [path.join(projectRoot, 'src')];
+const defaultTargets = [path.join(projectRoot, 'src')];
 const allowedExtensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.json', '.md', '.css', '.scss']);
 
-// Detect common mojibake signatures (UTF-8 interpreted as latin1/cp1252) and replacement chars.
-const suspiciousRegex = /(?:\u00C3|\u00C2|\u00E2)[\u0080-\u00BF]|\uFFFD/g;
+const mojibakeRegex = /(?:\u00c3|\u00c2|\u00e2)[\u0080-\u00bf]|\ufffd/g;
+const questionInsideWordRegex = /[A-Za-z\u00c0-\u017f]\?{1,}[A-Za-z\u00c0-\u017f]/g;
 
 function listFiles(dir) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -30,17 +30,92 @@ function listFiles(dir) {
   return files;
 }
 
-function checkFile(filePath) {
+function isLikelyPathOrQueryToken(value) {
+  if (!value) {
+    return false;
+  }
+
+  const normalized = value
+    .replace(/^[('"`[{<]+/, '')
+    .replace(/[)\]"'`>.,;:]+$/, '');
+
+  if (normalized.includes('://')) {
+    return true;
+  }
+
+  if (
+    normalized.startsWith('/') ||
+    normalized.startsWith('./') ||
+    normalized.startsWith('../') ||
+    normalized.startsWith('#/')
+  ) {
+    return true;
+  }
+
+  if (
+    (normalized.includes('?') || normalized.includes('&')) &&
+    (normalized.includes('=') || normalized.includes('/'))
+  ) {
+    return true;
+  }
+
+  // react-router e query-like fragments often aparecem sem espacos.
+  if (!/\s/.test(normalized) && /[?&][A-Za-z0-9_.-]+=/.test(normalized)) {
+    return true;
+  }
+
+  return false;
+}
+
+function hasSuspiciousQuestionInLine(line) {
+  questionInsideWordRegex.lastIndex = 0;
+  let match = questionInsideWordRegex.exec(line);
+
+  while (match) {
+    const index = match.index;
+    let start = index;
+    let end = index + match[0].length;
+
+    while (start > 0 && !/\s/.test(line[start - 1])) {
+      start -= 1;
+    }
+    while (end < line.length && !/\s/.test(line[end])) {
+      end += 1;
+    }
+
+    const token = line.slice(start, end);
+    if (!isLikelyPathOrQueryToken(token)) {
+      return true;
+    }
+
+    match = questionInsideWordRegex.exec(line);
+  }
+
+  return false;
+}
+
+function checkFile(filePath, strictMode) {
   const content = fs.readFileSync(filePath, 'utf8');
   const lines = content.split(/\r?\n/);
   const findings = [];
 
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
-    suspiciousRegex.lastIndex = 0;
-    if (suspiciousRegex.test(line)) {
+
+    mojibakeRegex.lastIndex = 0;
+    if (mojibakeRegex.test(line)) {
       findings.push({
         line: i + 1,
+        pattern: 'Mojibake UTF-8/Latin1',
+        preview: line.trim().slice(0, 180),
+      });
+      continue;
+    }
+
+    if (strictMode && hasSuspiciousQuestionInLine(line)) {
+      findings.push({
+        line: i + 1,
+        pattern: 'Possivel perda de acentuacao em literal',
         preview: line.trim().slice(0, 180),
       });
     }
@@ -49,7 +124,20 @@ function checkFile(filePath) {
   return findings;
 }
 
+function resolveTargets(rawTargets) {
+  if (!rawTargets || rawTargets.length === 0) {
+    return defaultTargets;
+  }
+
+  return rawTargets.map((target) => path.resolve(projectRoot, target));
+}
+
 function main() {
+  const args = process.argv.slice(2);
+  const strictMode = args.includes('--strict');
+  const rawTargets = args.filter((arg) => !arg.startsWith('--'));
+  const targets = resolveTargets(rawTargets);
+
   const allFindings = [];
 
   for (const target of targets) {
@@ -57,9 +145,9 @@ function main() {
       continue;
     }
 
-    const files = listFiles(target);
+    const files = fs.statSync(target).isDirectory() ? listFiles(target) : [target];
     for (const file of files) {
-      const findings = checkFile(file);
+      const findings = checkFile(file, strictMode);
       if (findings.length > 0) {
         allFindings.push({ file, findings });
       }
@@ -72,14 +160,15 @@ function main() {
       const relative = path.relative(projectRoot, entry.file).replace(/\\/g, '/');
       console.error(`- ${relative}`);
       for (const finding of entry.findings) {
-        console.error(`  L${finding.line}: ${finding.preview}`);
+        console.error(`  L${finding.line} [${finding.pattern}]: ${finding.preview}`);
       }
     }
     console.error('\n[encoding-check] Corrija os textos antes de gerar build.\n');
     process.exit(1);
   }
 
-  console.log('[encoding-check] OK: nenhum texto corrompido detectado em src/.');
+  const strictSuffix = strictMode ? ' (strict)' : '';
+  console.log(`[encoding-check] OK${strictSuffix}: nenhum texto corrompido detectado.`);
 }
 
 main();

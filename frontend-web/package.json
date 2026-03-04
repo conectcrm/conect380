@@ -81,7 +81,8 @@
     "type-check": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.{ts,tsx,json,css,scss,md}\"",
     "quality": "npm run lint && npm run type-check && npm run check:encoding",
-    "check:encoding": "node scripts/check-mojibake.js"
+    "check:encoding": "node scripts/check-mojibake.js",
+    "check:encoding:strict": "node scripts/check-mojibake.js --strict"
   },
   "browserslist": {
     "production": [

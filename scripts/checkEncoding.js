@@ -76,6 +76,52 @@ const PROBLEM_PATTERNS = [
   },
 ];
 
+const QUESTION_INSIDE_WORD_REGEX = /[A-Za-z\u00c0-\u017f]\?+[A-Za-z\u00c0-\u017f]/g;
+
+function normalizeToken(token) {
+  return token
+    .replace(/^[('"`[{<]+/, '')
+    .replace(/[)\]"'`>.,;:]+$/, '');
+}
+
+function isLikelyPathOrQueryToken(token) {
+  if (!token) return false;
+
+  const normalized = normalizeToken(token);
+  if (!normalized) return false;
+
+  if (normalized.includes('://')) {
+    return true;
+  }
+
+  if (
+    normalized.startsWith('/') ||
+    normalized.startsWith('./') ||
+    normalized.startsWith('../') ||
+    normalized.startsWith('#/')
+  ) {
+    return true;
+  }
+
+  if (normalized.includes('${')) {
+    return true;
+  }
+
+  if (!/\s/.test(normalized) && /[?&][A-Za-z0-9_.-]+=/.test(normalized)) {
+    return true;
+  }
+
+  if ((normalized.includes('?') || normalized.includes('&')) && normalized.includes('=')) {
+    return true;
+  }
+
+  if ((normalized.includes('?') || normalized.includes('&')) && normalized.includes('/')) {
+    return true;
+  }
+
+  return false;
+}
+
 function indexToLineCol(content, index) {
   const before = content.slice(0, index);
   const lines = before.split(/\r\n|\n|\r/);
@@ -109,12 +155,10 @@ function scanContent(content) {
 
 function scanFile(filePath) {
   const content = fs.readFileSync(filePath, 'utf8');
-  const findings = scanContent(content);
-  if (findings.length === 0) return [];
-
-  return findings.map((f) => {
+  const findings = scanContent(content).map((f) => {
     const pos = indexToLineCol(content, f.index);
     const lineText = getLine(content, pos.line);
+
     return {
       ...f,
       line: pos.line,
@@ -122,6 +166,42 @@ function scanFile(filePath) {
       lineText,
     };
   });
+
+  const lines = content.split(/\r\n|\n|\r/);
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    QUESTION_INSIDE_WORD_REGEX.lastIndex = 0;
+    let match = QUESTION_INSIDE_WORD_REGEX.exec(line);
+
+    while (match) {
+      let start = match.index;
+      let end = match.index + match[0].length;
+
+      while (start > 0 && !/\s/.test(line[start - 1])) {
+        start -= 1;
+      }
+      while (end < line.length && !/\s/.test(line[end])) {
+        end += 1;
+      }
+
+      const token = line.slice(start, end);
+      if (!isLikelyPathOrQueryToken(token)) {
+        findings.push({
+          pattern: 'Possivel perda de acentuacao em literal (?)',
+          index: match.index,
+          sample: match[0],
+          line: i + 1,
+          col: match.index + 1,
+          lineText: line,
+        });
+        break;
+      }
+
+      match = QUESTION_INSIDE_WORD_REGEX.exec(line);
+    }
+  }
+
+  return findings;
 }
 
 async function readStdinLines() {
