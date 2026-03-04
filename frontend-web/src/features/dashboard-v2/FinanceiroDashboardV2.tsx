@@ -42,10 +42,10 @@ import {
 
 type PeriodoFiltro = '7d' | '30d' | '90d';
 
-const periodButtons: Array<{ key: PeriodoFiltro; label: string }> = [
-  { key: '7d', label: '7D' },
-  { key: '30d', label: '30D' },
-  { key: '90d', label: '90D' },
+const periodOptions: Array<{ value: PeriodoFiltro; label: string }> = [
+  { value: '7d', label: 'Ultimos 7 dias' },
+  { value: '30d', label: 'Ultimos 30 dias' },
+  { value: '90d', label: 'Ultimos 90 dias' },
 ];
 
 const formatCurrency = (value: number): string =>
@@ -61,6 +61,18 @@ const formatNumber = (value: number): string =>
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   });
+
+const formatDateTime = (value: string): string => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'Atualizado agora';
+  return parsed.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
 
 const clampPercent = (value: number): number => Math.max(0, Math.min(100, value));
 
@@ -85,6 +97,7 @@ const FinanceiroDashboardV2: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [warning, setWarning] = useState<string | null>(null);
   const [warningAlertas, setWarningAlertas] = useState<string | null>(null);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
   const [alertaActionById, setAlertaActionById] = useState<
     Record<string, 'ack' | 'resolver' | 'reprocessar' | undefined>
   >({});
@@ -143,6 +156,8 @@ const FinanceiroDashboardV2: React.FC = () => {
     if (falhasCriticas > 0) {
       setWarning('Alguns indicadores nao puderam ser carregados. Exibindo dados parciais.');
     }
+
+    setLastUpdatedAt(new Date().toISOString());
   }, [periodo]);
 
   useEffect(() => {
@@ -204,6 +219,8 @@ const FinanceiroDashboardV2: React.FC = () => {
     () => contarAlertasOperacionais(alertasPriorizados),
     [alertasPriorizados],
   );
+  const hasActiveFilters = periodo !== '30d';
+  const lastUpdatedLabel = lastUpdatedAt ? formatDateTime(lastUpdatedAt) : 'Atualizado agora';
 
   const atualizarAlerta = useCallback(
     async (alerta: AlertaOperacionalFinanceiro, acao: 'ack' | 'resolver' | 'reprocessar') => {
@@ -299,28 +316,45 @@ const FinanceiroDashboardV2: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <section className="rounded-[20px] border border-[#DCE7EB] bg-white px-5 py-4 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)]">
+      <section className="rounded-[20px] border border-[#DCE7EB] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-[20px] font-semibold text-[#18374B]">Dashboard Financeiro</h2>
-          <div className="flex items-center gap-2">
-            <div className="inline-flex rounded-[11px] border border-[#DCE8EC] bg-[#ECF3F0] p-1">
-              {periodButtons.map((button) => (
-                <button
-                  key={button.key}
-                  type="button"
-                  onClick={() => setPeriodo(button.key)}
-                  className={`rounded-[9px] px-3 py-1 text-[13px] font-semibold ${
-                    periodo === button.key ? 'bg-white text-[#213D4B]' : 'text-[#6B8390]'
-                  }`}
-                >
-                  {button.label}
-                </button>
+          <div>
+            <h2 className="text-[20px] font-semibold tracking-[-0.012em] text-[#18374B]">
+              Dashboard Financeiro
+            </h2>
+            <p className="mt-1 text-[13px] text-[#617D89]">
+              Controle de faturamento, recebimentos, caixa e operacoes financeiras.
+            </p>
+            <p className="mt-1 text-[12px] text-[#7A929E]">Ultima sincronizacao: {lastUpdatedLabel}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor="dashboard-financeiro-periodo" className="text-[13px] font-medium text-[#567583]">
+              Periodo
+            </label>
+            <select
+              id="dashboard-financeiro-periodo"
+              value={periodo}
+              onChange={(event) => setPeriodo(event.target.value as PeriodoFiltro)}
+              className="rounded-[10px] border border-[#D5E3E8] bg-white px-3 py-2 text-[13px] text-[#244556] focus:border-[#159A9C] focus:outline-none"
+            >
+              {periodOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
               ))}
-            </div>
+            </select>
+            <button
+              type="button"
+              onClick={() => setPeriodo('30d')}
+              disabled={!hasActiveFilters}
+              className="inline-flex items-center gap-2 rounded-[10px] border border-[#D5E3E8] px-3 py-2 text-[13px] font-semibold text-[#26495C] hover:bg-[#F3F9F8] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Limpar filtros
+            </button>
             <button
               type="button"
               onClick={() => void refresh()}
-              className="inline-flex items-center gap-1.5 rounded-[10px] border border-[#D4E4E8] px-3 py-1.5 text-[13px] font-semibold text-[#23465A]"
+              className="inline-flex items-center gap-2 rounded-[10px] border border-[#D5E3E8] px-3 py-2 text-[13px] font-semibold text-[#26495C] hover:bg-[#F3F9F8]"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
               Atualizar

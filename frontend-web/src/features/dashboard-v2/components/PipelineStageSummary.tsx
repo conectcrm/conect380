@@ -97,7 +97,7 @@ const PipelineStageSummary: React.FC<PipelineStageSummaryProps> = ({ data }) => 
               <p className="mt-2.5 text-[31px] font-semibold leading-none tracking-[-0.02em] text-[#19384C]">{formatCurrency(stage.value)}</p>
               <p className="mt-2.5 inline-flex items-center gap-1 text-[14px] text-[#607B89]">
                 <PackageOpen className="h-3.5 w-3.5 text-[#718A97]" />
-                {stage.quantity} vendas
+                {stage.quantity} oportunidades
               </p>
             </article>
           ))}

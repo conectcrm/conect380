@@ -62,6 +62,18 @@ const formatHours = (value: number) => {
   return `${value.toFixed(1)} h`;
 };
 
+const formatDateTime = (value: string): string => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'Atualizado agora';
+  return parsed.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
 const AtendimentoRoleDashboard: React.FC<AtendimentoRoleDashboardProps> = ({ mode }) => {
   const { user } = useAuth();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
@@ -71,6 +83,7 @@ const AtendimentoRoleDashboard: React.FC<AtendimentoRoleDashboardProps> = ({ mod
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
   const canViewAnalytics = useMemo(() => userHasPermission(user, 'relatorios.read'), [user]);
 
   const loadData = useCallback(async () => {
@@ -96,6 +109,7 @@ const AtendimentoRoleDashboard: React.FC<AtendimentoRoleDashboardProps> = ({ mod
       setMetrics(metricsData);
       setAtendentes(atendentesData);
       setCanais(canaisData);
+      setLastUpdatedAt(new Date().toISOString());
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Erro ao carregar dashboard de atendimento';
       setError(message);
@@ -202,21 +216,34 @@ const AtendimentoRoleDashboard: React.FC<AtendimentoRoleDashboardProps> = ({ mod
       .sort((a, b) => b.ticketsTotal - a.ticketsTotal);
   }, [canais]);
 
+  const hasActiveFilters = periodo !== '7d';
+  const lastUpdatedLabel = lastUpdatedAt ? formatDateTime(lastUpdatedAt) : 'Atualizado agora';
+  const periodoLabel = periodo === '7d' ? 'Ultimos 7 dias' : periodo === '30d' ? 'Ultimos 30 dias' : 'Ultimos 90 dias';
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
-        <div className="bg-white rounded-lg border border-[#DEEFE7] shadow-sm p-6 mb-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <section className="mb-6 rounded-[20px] border border-[#DCE7EB] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-bold text-[#002333]">{roleCopy[mode].title}</h1>
-              <p className="text-[#002333]/70 mt-1">{roleCopy[mode].subtitle}</p>
+              <h1 className="text-[20px] font-semibold tracking-[-0.012em] text-[#18374B]">
+                {roleCopy[mode].title}
+              </h1>
+              <p className="mt-1 text-[13px] text-[#617D89]">{roleCopy[mode].subtitle}</p>
+              <p className="mt-1 text-[12px] text-[#7A929E]">
+                Ultima sincronizacao: {lastUpdatedLabel} (modo {periodoLabel.toLowerCase()})
+              </p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <label htmlFor={`dashboard-atendimento-periodo-${mode}`} className="text-[13px] font-medium text-[#567583]">
+                Periodo
+              </label>
               <select
+                id={`dashboard-atendimento-periodo-${mode}`}
                 value={periodo}
                 onChange={(event) => setPeriodo(event.target.value as '7d' | '30d' | '90d')}
-                className="px-3 py-2 border border-[#B4BEC9] rounded-lg text-sm focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                className="rounded-[10px] border border-[#D5E3E8] bg-white px-3 py-2 text-[13px] text-[#244556] focus:border-[#159A9C] focus:outline-none"
               >
                 <option value="7d">Ultimos 7 dias</option>
                 <option value="30d">Ultimos 30 dias</option>
@@ -224,16 +251,25 @@ const AtendimentoRoleDashboard: React.FC<AtendimentoRoleDashboardProps> = ({ mod
               </select>
 
               <button
+                type="button"
+                onClick={() => setPeriodo('7d')}
+                disabled={!hasActiveFilters}
+                className="inline-flex items-center gap-2 rounded-[10px] border border-[#D5E3E8] px-3 py-2 text-[13px] font-semibold text-[#26495C] hover:bg-[#F3F9F8] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Limpar filtros
+              </button>
+
+              <button
                 onClick={handleRefresh}
                 disabled={refreshing}
-                className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center gap-2"
+                className="inline-flex items-center gap-2 rounded-[10px] border border-[#D5E3E8] px-3 py-2 text-[13px] font-semibold text-[#26495C] hover:bg-[#F3F9F8] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
                 Atualizar
               </button>
             </div>
           </div>
-        </div>
+        </section>
 
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex items-start gap-3">
