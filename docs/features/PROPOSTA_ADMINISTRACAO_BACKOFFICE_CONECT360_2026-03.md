@@ -429,3 +429,30 @@ Entregavel:
   - modal de detalhes de fatura: homologado com cobertura E2E dedicada;
   - catalogo (itens/categorias) e mitigacao de mojibake: entregue;
   - pendencia residual: saneamento de encoding legado para elevar gate estrito sem falso positivo operacional.
+
+## 13. Playbook pre-deploy - aviso de manutencao (atualizado em 2026-03-04)
+
+Objetivo:
+
+1. Informar usuarios logados antes de qualquer deploy com risco de pausa.
+2. Evitar surpresa operacional durante indisponibilidade curta.
+
+Checklist operacional recomendado:
+
+1. Aplicar migration no ambiente alvo antes do deploy:
+  - `cd backend`
+  - `npm run migration:run`
+2. Validar status atual do aviso (publico):
+  - `powershell -ExecutionPolicy Bypass -File scripts/system-maintenance-banner.ps1 -Action status -BaseUrl https://api.conect360.com`
+3. Ativar aviso antes do deploy:
+  - `powershell -ExecutionPolicy Bypass -File scripts/system-maintenance-banner.ps1 -Action enable -BaseUrl https://api.conect360.com -Token "<JWT_ADMIN>" -Title "Deploy em andamento" -Message "O sistema pode apresentar indisponibilidade temporaria entre 22:00 e 22:20." -Severity warning -StartsAt "2026-03-04T22:00:00-03:00" -ExpectedEndAt "2026-03-04T22:20:00-03:00"`
+4. Executar deploy e smoke de validacao.
+5. Desativar aviso ao final:
+  - `powershell -ExecutionPolicy Bypass -File scripts/system-maintenance-banner.ps1 -Action disable -BaseUrl https://api.conect360.com -Token "<JWT_ADMIN>" -ClearContent`
+
+Observacoes:
+
+1. Script aceitando login direto tambem:
+  - `-Email` e `-Senha` podem substituir `-Token` (exceto se MFA bloquear login por API).
+2. Para janelas com alto impacto, usar `-Severity critical`.
+3. Frontend atualiza o banner automaticamente a cada 60 segundos sem reload.

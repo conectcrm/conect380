@@ -56,7 +56,7 @@ const LoginPage: React.FC = () => {
 
     const sessionExpired = localStorage.getItem('sessionExpired');
     if (sessionExpired === 'true') {
-      toastService.error('Sua sessao expirou. Por favor, faca login novamente.');
+      toastService.error('Sua sessão expirou. Por favor, faça login novamente.');
       localStorage.removeItem('sessionExpired');
     }
   }, [location, navigate]);
@@ -83,13 +83,13 @@ const LoginPage: React.FC = () => {
     const newErrors: { email?: string; password?: string } = {};
 
     if (!email) {
-      newErrors.email = 'E-mail e obrigatorio';
+      newErrors.email = 'E-mail é obrigatório';
     } else if (!/\S+@\S+\.\S+/.test(email)) {
-      newErrors.email = 'E-mail invalido';
+      newErrors.email = 'E-mail inválido';
     }
 
     if (!password) {
-      newErrors.password = 'Senha e obrigatoria';
+      newErrors.password = 'Senha é obrigatória';
     } else if (password.length < 6) {
       newErrors.password = 'Senha deve ter pelo menos 6 caracteres';
     }
@@ -146,7 +146,7 @@ const LoginPage: React.FC = () => {
           typeof errorData.senhaTemporaria === 'string' ? errorData.senhaTemporaria : undefined;
 
         if (!userId || !emailFromData || !nome) {
-          toastService.error('Nao foi possivel iniciar a troca de senha. Tente novamente.');
+          toastService.error('Não foi possível iniciar a troca de senha. Tente novamente.');
           return;
         }
 
@@ -174,7 +174,7 @@ const LoginPage: React.FC = () => {
             : 30;
 
         if (!challengeId) {
-          toastService.error('Nao foi possivel iniciar a verificacao em duas etapas.');
+          toastService.error('Não foi possível iniciar a verificação em duas etapas.');
           return;
         }
 
@@ -184,7 +184,7 @@ const LoginPage: React.FC = () => {
           expiresInSeconds,
           canResendAfterSeconds,
         });
-        toastService.info('Codigo MFA enviado para o e-mail corporativo.');
+        toastService.info('Código MFA enviado para o e-mail corporativo.');
         return;
       }
 
@@ -194,7 +194,7 @@ const LoginPage: React.FC = () => {
         return;
       }
 
-      toastService.error('Credenciais invalidas. Tente novamente.');
+      toastService.error('Credenciais inválidas. Tente novamente.');
       setErrors({ email: 'E-mail ou senha incorretos' });
     } finally {
       setIsLoading(false);
@@ -209,7 +209,7 @@ const LoginPage: React.FC = () => {
     }
 
     if (!/^\d{6}$/.test(mfaCode.trim())) {
-      setMfaError('Informe o codigo de 6 digitos enviado por e-mail.');
+      setMfaError('Informe o código de 6 dígitos enviado por e-mail.');
       return;
     }
 
@@ -218,7 +218,7 @@ const LoginPage: React.FC = () => {
 
     try {
       await verifyMfa(mfaState.challengeId, mfaCode.trim());
-      toastService.success('Verificacao concluida com sucesso!');
+      toastService.success('Verificação concluída com sucesso!');
     } catch (error) {
       const message =
         isObject(error) && typeof error.message === 'string'
@@ -228,9 +228,9 @@ const LoginPage: React.FC = () => {
             : '';
 
       if (message === 'MFA_REQUIRED') {
-        setMfaError('Codigo invalido. Verifique e tente novamente.');
+        setMfaError('Código inválido. Verifique e tente novamente.');
       } else {
-        setMfaError('Nao foi possivel validar o codigo. Gere um novo codigo e tente novamente.');
+        setMfaError('Não foi possível validar o código. Gere um novo código e tente novamente.');
       }
     } finally {
       setMfaIsLoading(false);
@@ -248,10 +248,10 @@ const LoginPage: React.FC = () => {
     try {
       const data = await resendMfa(mfaState.challengeId);
       applyMfaState(data);
-      toastService.success('Novo codigo MFA enviado com sucesso.');
+      toastService.success('Novo código MFA enviado com sucesso.');
     } catch (error) {
       const message = error instanceof Error ? error.message : null;
-      setMfaError(message || 'Nao foi possivel reenviar o codigo agora. Tente novamente.');
+      setMfaError(message || 'Não foi possível reenviar o código agora. Tente novamente.');
     } finally {
       setMfaIsResending(false);
     }
@@ -284,7 +284,7 @@ const LoginPage: React.FC = () => {
               <span className="text-[#DEEFE7]">vendas e financeiro</span>
             </h2>
             <p className="text-fluid-lg text-[#DEEFE7] mb-10">
-              Omnichannel, CRM, Financeiro e Automacao com IA no mesmo sistema.
+              Omnichannel, CRM, Financeiro e Automação com IA no mesmo sistema.
             </p>
           </div>
 
@@ -292,9 +292,9 @@ const LoginPage: React.FC = () => {
             {[
               'Atendimento omnichannel (WhatsApp, e-mail, chat e telefone)',
               'CRM e Vendas (leads, oportunidades, propostas e contratos)',
-              'Financeiro integrado (faturas, pagamentos e recorrencia)',
-              'Automacao com IA (triagem, bot e insights)',
-              'Analytics e dashboards com metricas em tempo real',
+              'Financeiro integrado (faturas, pagamentos e recorrência)',
+              'Automação com IA (triagem, bot e insights)',
+              'Analytics e dashboards com métricas em tempo real',
             ].map((feature, index) => (
               <div key={index} className="flex items-start gap-3">
                 <div className="mt-0.5 w-5 h-5 bg-white/15 rounded-full flex items-center justify-center flex-shrink-0">
@@ -308,7 +308,7 @@ const LoginPage: React.FC = () => {
           <div className="mt-12 grid grid-cols-3 gap-3">
             {[
               { title: 'Omnichannel', subtitle: 'Inbox unificada' },
-              { title: 'IA', subtitle: 'Triagem e automacoes' },
+              { title: 'IA', subtitle: 'Triagem e automações' },
               { title: 'Multi-tenant', subtitle: 'Dados isolados' },
             ].map((item) => (
               <div
@@ -333,12 +333,12 @@ const LoginPage: React.FC = () => {
 
           <div className="text-center mb-8">
             <h1 className="text-fluid-2xl font-bold text-[#002333] mb-2">
-              {mfaState ? 'Validacao de seguranca' : 'Bem-vindo de volta!'}
+              {mfaState ? 'Validação de segurança' : 'Bem-vindo de volta!'}
             </h1>
             <p className="text-[#B4BEC9]">
               {mfaState
-                ? 'Informe o codigo enviado para concluir seu acesso administrativo.'
-                : 'Faca login para acessar sua conta'}
+                ? 'Informe o código enviado para concluir seu acesso administrativo.'
+                : 'Faça login para acessar sua conta'}
             </p>
 
             {redirectMessage && !mfaState && (
@@ -355,14 +355,14 @@ const LoginPage: React.FC = () => {
             {mfaState ? (
               <form onSubmit={handleMfaSubmit} className="space-y-5">
                 <div className="rounded-lg border border-[#DEEFE7] bg-[#F8FCFD] px-4 py-3 text-sm text-[#2E4A5A]">
-                  Codigo enviado para <strong>{mfaState.email}</strong>.
+                  Código enviado para <strong>{mfaState.email}</strong>.
                   <br />
                   Expira em <strong>{formatCountdown(mfaExpiresInSeconds)}</strong>.
                 </div>
 
                 <div>
                   <label className="block text-sm font-semibold text-[#002333] mb-2">
-                    Codigo de verificacao
+                    Código de verificação
                   </label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#B4BEC9] w-5 h-5" />
@@ -397,7 +397,7 @@ const LoginPage: React.FC = () => {
                       <span>Validando...</span>
                     </>
                   ) : (
-                    <span>Validar codigo</span>
+                    <span>Validar código</span>
                   )}
                 </button>
 
@@ -408,10 +408,10 @@ const LoginPage: React.FC = () => {
                   className="w-full bg-white border border-[#159A9C] text-[#159A9C] px-4 py-2 rounded-lg hover:bg-[#159A9C]/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                 >
                   {mfaIsResending
-                    ? 'Reenviando codigo...'
+                    ? 'Reenviando código...'
                     : mfaResendInSeconds > 0
                       ? `Reenviar em ${formatCountdown(mfaResendInSeconds)}`
-                      : 'Reenviar codigo'}
+                      : 'Reenviar código'}
                 </button>
 
                 <button
@@ -542,11 +542,11 @@ const LoginPage: React.FC = () => {
                   <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-[#B4BEC9]">
                     <div className="flex items-center space-x-1">
                       <Check className="w-3 h-3 text-green-500" />
-                      <span>30 dias gratis</span>
+                      <span>30 dias grátis</span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <Check className="w-3 h-3 text-green-500" />
-                      <span>Sem cartao</span>
+                      <span>Sem cartão</span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <Check className="w-3 h-3 text-green-500" />
@@ -560,13 +560,13 @@ const LoginPage: React.FC = () => {
 
           <div className="text-center mt-8">
             <p className="text-xs text-[#B4BEC9]">
-              Ao continuar, voce concorda com nossos{' '}
+              Ao continuar, você concorda com nossos{' '}
               <a href="/termos" className="text-[#159A9C] hover:underline">
                 Termos de Uso
               </a>{' '}
               e{' '}
               <a href="/privacidade" className="text-[#159A9C] hover:underline">
-                Politica de Privacidade
+                Política de Privacidade
               </a>
             </p>
           </div>
