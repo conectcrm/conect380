@@ -32,6 +32,7 @@ import ModalEnviarWhatsApp from '../../../components/whatsapp/ModalEnviarWhatsAp
 import { useGlobalConfirmation } from '../../../contexts/GlobalConfirmationContext';
 
 type ClienteContatoData = {
+  id?: string;
   nome: string;
   email: string;
   telefone: string;
@@ -51,6 +52,7 @@ const clienteDetailsPending = new Map<string, Promise<ClienteContatoData | null>
 let lastClienteLookupAt = 0;
 
 const normalizarNomeCliente = (nome: string) => nome.trim().toLowerCase();
+const normalizarDocumento = (value: unknown) => String(value || '').replace(/\D/g, '');
 
 const armazenarNoCache = (nome: string, data: ClienteContatoData | null, ttl: number) => {
   const normalizado = normalizarNomeCliente(nome);
@@ -146,6 +148,10 @@ const buscarClienteComCache = async (nome: string): Promise<ClienteContatoData |
         const clienteEncontrado = clienteExato || clientes[0];
 
         const data: ClienteContatoData = {
+          id:
+            typeof clienteEncontrado.id === 'string' && clienteEncontrado.id.trim()
+              ? clienteEncontrado.id
+              : undefined,
           nome: clienteEncontrado.nome || nome,
           email: clienteEncontrado.email || '',
           telefone: clienteEncontrado.telefone || '',
@@ -244,11 +250,20 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const [avancandoFluxo, setAvancandoFluxo] = useState(false);
   const [decidindoAlcadaAprovacao, setDecidindoAlcadaAprovacao] = useState(false);
   const [decidindoAlcadaReprovacao, setDecidindoAlcadaReprovacao] = useState(false);
+  const propostaCompletaCacheRef = React.useRef<PropostaCompleta | null>(
+    proposta && typeof (proposta as any).cliente === 'object'
+      ? (proposta as PropostaCompleta)
+      : null,
+  );
 
   // Funcao para detectar se e PropostaCompleta ou PropostaUI
   const isPropostaCompleta = (prop: PropostaCompleta | PropostaUI): prop is PropostaCompleta => {
     return 'cliente' in prop && typeof prop.cliente === 'object';
   };
+
+  React.useEffect(() => {
+    propostaCompletaCacheRef.current = isPropostaCompleta(proposta) ? proposta : null;
+  }, [proposta]);
 
   const obterAprovacaoInterna = () => {
     const source = proposta as any;
@@ -337,26 +352,28 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   };
 
   // Funcao para extrair dados da proposta independente do formato
-  const getPropostaData = () => {
-    if (isPropostaCompleta(proposta)) {
+  const getPropostaData = (fonte?: PropostaCompleta | PropostaUI) => {
+    const propostaAtual = fonte || proposta;
+
+    if (isPropostaCompleta(propostaAtual)) {
       return {
-        id: proposta.id || null,
-        numero: proposta.numero || 'N/A',
-        total: proposta.total || 0,
-        dataValidade: proposta.dataValidade
-          ? proposta.dataValidade.toISOString().split('T')[0]
+        id: propostaAtual.id || null,
+        numero: propostaAtual.numero || 'N/A',
+        total: propostaAtual.total || 0,
+        dataValidade: propostaAtual.dataValidade
+          ? propostaAtual.dataValidade.toISOString().split('T')[0]
           : new Date().toISOString().split('T')[0],
-        titulo: proposta.titulo || 'Proposta comercial',
-        status: proposta.status || 'rascunho',
+        titulo: propostaAtual.titulo || 'Proposta comercial',
+        status: propostaAtual.status || 'rascunho',
       };
     } else {
       return {
-        id: proposta.id || null,
-        numero: proposta.numero || 'N/A',
-        total: (proposta as any).valor || 0,
-        dataValidade: proposta.data_vencimento || new Date().toISOString().split('T')[0],
-        titulo: proposta.titulo || 'Proposta comercial',
-        status: proposta.status || 'rascunho',
+        id: propostaAtual.id || null,
+        numero: propostaAtual.numero || 'N/A',
+        total: (propostaAtual as any).valor || 0,
+        dataValidade: propostaAtual.data_vencimento || new Date().toISOString().split('T')[0],
+        titulo: propostaAtual.titulo || 'Proposta comercial',
+        status: propostaAtual.status || 'rascunho',
       };
     }
   };
@@ -755,50 +772,234 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     return message || err?.message || fallback;
   };
 
-  const obterContextoAutomacao = () => {
-    if (!isPropostaCompleta(proposta)) {
+  const carregarPropostaCompletaAutomacao = async (): Promise<PropostaCompleta | null> => {
+    if (propostaCompletaCacheRef.current) {
+      return propostaCompletaCacheRef.current;
+    }
+
+    const propostaId = String((proposta as any)?.id || getPropostaData().id || '').trim();
+    if (!isUuid(propostaId)) {
+      return null;
+    }
+
+    const mergeComPropostaAtual = (payload: any): PropostaCompleta => {
+      const base = (proposta as any) || {};
+      return {
+        ...(base as any),
+        ...(payload as any),
+        cliente: (payload as any)?.cliente ?? base?.cliente,
+        vendedor: (payload as any)?.vendedor ?? base?.vendedor,
+        produtos:
+          Array.isArray((payload as any)?.produtos) && (payload as any).produtos.length > 0
+            ? (payload as any).produtos
+            : Array.isArray(base?.produtos)
+              ? base.produtos
+              : [],
+      } as PropostaCompleta;
+    };
+
+    try {
+      const propostaDetalhada = await propostasApiService.findById(propostaId);
+      if (propostaDetalhada && typeof propostaDetalhada === 'object') {
+        const propostaCompleta = mergeComPropostaAtual(propostaDetalhada);
+        propostaCompletaCacheRef.current = propostaCompleta;
+        return propostaCompleta;
+      }
+    } catch (error) {
+      console.warn('Falha ao carregar proposta detalhada para automacao via findById:', error);
+    }
+
+    try {
+      const propostas = await propostasApiService.findAll();
+      const propostaLista = Array.isArray(propostas)
+        ? propostas.find((item) => String((item as any)?.id || '').trim() === propostaId)
+        : null;
+      if (propostaLista && typeof propostaLista === 'object') {
+        const propostaCompleta = mergeComPropostaAtual(propostaLista);
+        propostaCompletaCacheRef.current = propostaCompleta;
+        return propostaCompleta;
+      }
+    } catch (error) {
+      console.warn('Falha no fallback de automacao via lista de propostas:', error);
+    }
+
+    return null;
+  };
+
+  const resolverClienteIdAutomacao = async (propostaCompleta: PropostaCompleta): Promise<string | null> => {
+    const clientePayload = (propostaCompleta as any)?.cliente;
+    const candidatoDireto = [
+      propostaCompleta.cliente?.id,
+      (propostaCompleta as any)?.clienteId,
+      (propostaCompleta as any)?.cliente_id,
+      clientePayload && typeof clientePayload === 'object' ? (clientePayload as any)?.clienteId : null,
+      clientePayload && typeof clientePayload === 'object' ? (clientePayload as any)?.idCliente : null,
+      (propostaCompleta as any)?.emailDetails?.clienteId,
+    ]
+      .map((value) => String(value || '').trim())
+      .find((value) => isUuid(value));
+
+    if (candidatoDireto) {
+      return candidatoDireto;
+    }
+
+    const emailCliente = String((clientePayload as any)?.email || '').trim().toLowerCase();
+    const documentoCliente = normalizarDocumento((clientePayload as any)?.documento);
+    const nomeCliente =
+      typeof clientePayload === 'string'
+        ? clientePayload.trim()
+        : String((clientePayload as any)?.nome || (proposta as any)?.cliente || '').trim();
+
+    try {
+      const termosBusca = [emailCliente, documentoCliente, nomeCliente]
+        .map((termo) => String(termo || '').trim())
+        .filter((termo, index, source) => termo.length >= 3 && source.indexOf(termo) === index);
+
+      for (const termo of termosBusca) {
+        const pagina = await clientesService.getClientes({ search: termo, limit: 100, page: 1 });
+        const clientes = Array.isArray(pagina?.data) ? pagina.data : [];
+        const clienteExato =
+          clientes.find((cliente) => {
+            const id = String(cliente?.id || '').trim();
+            if (!isUuid(id)) {
+              return false;
+            }
+
+            const emailMatch =
+              emailCliente &&
+              String(cliente.email || '')
+                .trim()
+                .toLowerCase() === emailCliente;
+            const documentoMatch =
+              documentoCliente &&
+              normalizarDocumento(cliente.documento || '') === documentoCliente;
+            const nomeMatch =
+              nomeCliente &&
+              normalizarNomeCliente(cliente.nome || '') === normalizarNomeCliente(nomeCliente);
+
+            return Boolean(emailMatch || documentoMatch || nomeMatch);
+          }) ||
+          clientes.find((cliente) => isUuid(String(cliente?.id || '').trim()));
+
+        if (clienteExato?.id && isUuid(String(clienteExato.id).trim())) {
+          return String(clienteExato.id).trim();
+        }
+      }
+    } catch (error) {
+      console.warn('Falha ao resolver cliente via listagem paginada:', error);
+    }
+
+    if (!nomeCliente) {
+      return null;
+    }
+
+    const clienteComCache = await buscarClienteComCache(nomeCliente);
+    if (isUuid(clienteComCache?.id || null)) {
+      return String(clienteComCache?.id).trim();
+    }
+
+    try {
+      const clientesEncontrados = await clientesService.searchClientes(nomeCliente);
+      const clienteExato =
+        clientesEncontrados.find(
+          (cliente) =>
+            normalizarNomeCliente(cliente.nome || '') === normalizarNomeCliente(nomeCliente),
+        ) || clientesEncontrados[0];
+
+      const clienteId = String(clienteExato?.id || '').trim();
+      return isUuid(clienteId) ? clienteId : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const resolverUsuarioResponsavelIdAutomacao = (propostaCompleta: PropostaCompleta): string | null => {
+    const vendedorPayload = (propostaCompleta as any)?.vendedor;
+    const candidatoDireto = [
+      propostaCompleta.vendedor?.id,
+      (propostaCompleta as any)?.vendedorId,
+      (propostaCompleta as any)?.vendedor_id,
+      (propostaCompleta as any)?.usuarioResponsavelId,
+      vendedorPayload && typeof vendedorPayload === 'object'
+        ? (vendedorPayload as any)?.usuarioResponsavelId
+        : null,
+      (propostaCompleta as any)?.emailDetails?.usuarioResponsavelId,
+    ]
+      .map((value) => String(value || '').trim())
+      .find((value) => isUuid(value));
+
+    if (candidatoDireto) {
+      return candidatoDireto;
+    }
+
+    try {
+      const usuarioAtual = authService.getUser() as any;
+      const usuarioAtualId = String(usuarioAtual?.id || usuarioAtual?.userId || '').trim();
+      return isUuid(usuarioAtualId) ? usuarioAtualId : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const obterContextoAutomacao = async () => {
+    const propostaCompleta =
+      (isPropostaCompleta(proposta) ? proposta : null) || (await carregarPropostaCompletaAutomacao());
+
+    if (!propostaCompleta) {
       throw new Error(
-        'Automacao disponivel apenas para propostas com dados completos de cliente e vendedor.',
+        'Nao foi possivel carregar os dados completos da proposta. Atualize a lista e tente novamente.',
       );
     }
 
-    const propostaId = proposta.id;
-    const clienteId = proposta.cliente?.id;
-    const usuarioResponsavelId = proposta.vendedor?.id;
+    const propostaId = propostaCompleta.id || String((proposta as any)?.id || '').trim();
+    const clienteId = await resolverClienteIdAutomacao(propostaCompleta);
+    const usuarioResponsavelId = resolverUsuarioResponsavelIdAutomacao(propostaCompleta);
 
     if (!isUuid(propostaId)) {
       throw new Error('Proposta sem ID valido para gerar contrato/fatura.');
     }
 
     if (!isUuid(clienteId)) {
-      throw new Error('Cliente da proposta sem ID valido. Atualize a proposta antes de continuar.');
+      throw new Error(
+        'Cliente da proposta sem ID valido. Edite a proposta e selecione um cliente cadastrado antes de continuar.',
+      );
     }
 
     if (!isUuid(usuarioResponsavelId)) {
-      throw new Error('Vendedor/responsavel da proposta sem ID valido.');
+      throw new Error(
+        'Vendedor/responsavel da proposta sem ID valido. Defina o responsavel na proposta para continuar.',
+      );
     }
 
     return {
-      propostaCompleta: proposta,
+      propostaCompleta,
       propostaId,
       clienteId,
       usuarioResponsavelId,
     };
   };
 
-  const mapFormaPagamentoProposta = (): FormaPagamento | undefined => {
-    if (!isPropostaCompleta(proposta)) {
+  const mapFormaPagamentoProposta = (propostaFonte?: PropostaCompleta): FormaPagamento | undefined => {
+    const propostaAtual =
+      propostaFonte || (isPropostaCompleta(proposta) ? proposta : propostaCompletaCacheRef.current);
+    if (!propostaAtual) {
       return undefined;
     }
 
-    switch (proposta.formaPagamento) {
-      case 'boleto':
-        return FormaPagamento.BOLETO;
-      case 'cartao':
-        return FormaPagamento.CARTAO_CREDITO;
-      default:
-        return undefined;
+    const forma = String(propostaAtual.formaPagamento || '')
+      .trim()
+      .toLowerCase();
+    if (forma === 'boleto') {
+      return FormaPagamento.BOLETO;
     }
+    if (forma === 'cartao' || forma === 'cartao_credito') {
+      return FormaPagamento.CARTAO_CREDITO;
+    }
+    if (forma === 'pix') {
+      return FormaPagamento.PIX;
+    }
+
+    return undefined;
   };
 
   const abrirContrato = (contratoId: string | number) => {
@@ -817,34 +1018,124 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     navigate('/financeiro/faturamento');
   };
 
-  const montarItensFatura = () => {
-    const propostaData = getPropostaData();
+  type ItemFaturaAutomacao = {
+    descricao: string;
+    quantidade: number;
+    valorUnitario: number;
+    unidade: string;
+    codigoProduto?: string;
+    percentualDesconto: number;
+    valorDesconto: number;
+  };
 
+  const roundCurrency = (value: unknown) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return 0;
+    }
+    return Math.round((parsed + Number.EPSILON) * 100) / 100;
+  };
+
+  const calcularTotalItensFatura = (itens: ItemFaturaAutomacao[]) =>
+    roundCurrency(
+      itens.reduce((total, item) => {
+        const quantidade = Math.max(Number(item.quantidade || 0), 0.01);
+        const valorUnitario = Math.max(Number(item.valorUnitario || 0), 0.01);
+        const subtotal = quantidade * valorUnitario;
+        const percentualDesconto = Math.min(100, Math.max(Number(item.percentualDesconto || 0), 0));
+        const descontoPercentual = subtotal * (percentualDesconto / 100);
+        const descontoValor = Math.max(Number(item.valorDesconto || 0), 0);
+        return total + Math.max(0, subtotal - descontoPercentual - descontoValor);
+      }, 0),
+    );
+
+  const montarPayloadFatura = (propostaFonte?: PropostaCompleta) => {
+    const propostaAtual = propostaFonte || propostaCompletaCacheRef.current;
+    const propostaData = getPropostaData(propostaAtual || undefined);
+    const valorTotalEsperado = Math.max(roundCurrency(propostaData.total || 0), 0);
+    let valorDescontoGlobal = 0;
+    let possuiAjuste = false;
+
+    let itens: ItemFaturaAutomacao[] = [];
     if (
-      isPropostaCompleta(proposta) &&
-      Array.isArray(proposta.produtos) &&
-      proposta.produtos.length > 0
+      propostaAtual &&
+      Array.isArray(propostaAtual.produtos) &&
+      propostaAtual.produtos.length > 0
     ) {
-      return proposta.produtos.map((item) => ({
-        descricao: item.produto?.nome || 'Item da proposta',
+      itens = propostaAtual.produtos.map((item) => ({
+        descricao: String(item.produto?.nome || 'Item da proposta').trim() || 'Item da proposta',
         quantidade: Math.max(Number(item.quantidade || 1), 0.01),
         valorUnitario: Math.max(Number(item.produto?.preco || 0), 0.01),
         unidade: item.produto?.unidade || 'un',
-        percentualDesconto: Number(item.desconto || 0),
+        codigoProduto: String(item.produto?.id || '').trim() || undefined,
+        percentualDesconto: Math.min(100, Math.max(Number(item.desconto || 0), 0)),
         valorDesconto: 0,
       }));
+    } else {
+      itens = [
+        {
+          descricao: propostaData.titulo || `Proposta ${propostaData.numero}`,
+          quantidade: 1,
+          valorUnitario: Math.max(Number(propostaData.total || 0), 0.01),
+          unidade: 'un',
+          percentualDesconto: 0,
+          valorDesconto: 0,
+        },
+      ];
     }
 
-    return [
-      {
-        descricao: propostaData.titulo || `Proposta ${propostaData.numero}`,
-        quantidade: 1,
-        valorUnitario: Math.max(Number(propostaData.total || 0), 0.01),
-        unidade: 'un',
-        percentualDesconto: 0,
-        valorDesconto: 0,
-      },
-    ];
+    let totalItens = calcularTotalItensFatura(itens);
+    const deltaInicial = roundCurrency(valorTotalEsperado - totalItens);
+
+    if (deltaInicial > 0) {
+      possuiAjuste = true;
+      itens = [
+        ...itens,
+        {
+          descricao: 'Ajuste financeiro (impostos/encargos da proposta)',
+          quantidade: 1,
+          valorUnitario: deltaInicial,
+          unidade: 'un',
+          percentualDesconto: 0,
+          valorDesconto: 0,
+        },
+      ];
+      totalItens = calcularTotalItensFatura(itens);
+    } else if (deltaInicial < 0) {
+      valorDescontoGlobal = Math.max(0, Math.abs(deltaInicial));
+      valorDescontoGlobal = Math.min(valorDescontoGlobal, Math.max(totalItens - 0.01, 0));
+    }
+
+    const totalPosDesconto = roundCurrency(totalItens - valorDescontoGlobal);
+    const deltaFinal = roundCurrency(valorTotalEsperado - totalPosDesconto);
+    if (deltaFinal > 0) {
+      possuiAjuste = true;
+      itens = [
+        ...itens,
+        {
+          descricao: 'Ajuste financeiro complementar',
+          quantidade: 1,
+          valorUnitario: deltaFinal,
+          unidade: 'un',
+          percentualDesconto: 0,
+          valorDesconto: 0,
+        },
+      ];
+      totalItens = calcularTotalItensFatura(itens);
+    } else if (deltaFinal < 0) {
+      valorDescontoGlobal = Math.min(
+        roundCurrency(valorDescontoGlobal + Math.abs(deltaFinal)),
+        Math.max(totalItens - 0.01, 0),
+      );
+    }
+
+    return {
+      itens,
+      valorDescontoGlobal: roundCurrency(valorDescontoGlobal),
+      valorTotalEsperado: roundCurrency(valorTotalEsperado),
+      totalItensAntesDesconto: roundCurrency(totalItens),
+      possuiAjuste,
+    };
   };
 
   const automacaoAvancadaDisponivel = true;
@@ -873,8 +1164,8 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     setGerandoContrato(true);
     try {
       const { propostaCompleta, propostaId, clienteId, usuarioResponsavelId } =
-        obterContextoAutomacao();
-      const propostaData = getPropostaData();
+        await obterContextoAutomacao();
+      const propostaData = getPropostaData(propostaCompleta);
       const valorTotal = Number(propostaData.total || 0);
 
       if (!Number.isFinite(valorTotal) || valorTotal <= 0) {
@@ -945,6 +1236,85 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         (contrato) => contrato.propostaId === propostaId && contrato.status !== 'cancelado',
       ) || null
     );
+  };
+
+  const resolverUsuarioAssinaturaExterna = (fallbackUsuarioId: string) => {
+    try {
+      const usuarioAtual = authService.getUser() as any;
+      const usuarioAtualId = String(usuarioAtual?.id || usuarioAtual?.userId || '').trim();
+      if (isUuid(usuarioAtualId)) {
+        return usuarioAtualId;
+      }
+    } catch {
+      // fallback para o usuario responsavel resolvido no contexto da proposta
+    }
+
+    return fallbackUsuarioId;
+  };
+
+  const confirmarAssinaturaExternaContrato = async (
+    contratoId: string | number,
+    usuarioAssinanteId: string,
+  ) => {
+    const contratoIdNormalizado = String(contratoId || '').trim();
+    if (!isNumericId(contratoIdNormalizado)) {
+      throw new Error('Contrato vinculado com ID invalido para registrar assinatura externa.');
+    }
+
+    if (!isUuid(usuarioAssinanteId)) {
+      throw new Error('Usuario responsavel invalido para registrar assinatura externa.');
+    }
+
+    let tokenValidacao: string | undefined;
+
+    try {
+      const assinaturaCriada = await contratoService.criarAssinatura(contratoIdNormalizado, {
+        usuarioId: usuarioAssinanteId,
+        tipo: 'eletronica',
+        dataExpiracao: addDays(new Date(), 1).toISOString(),
+        metadados: {
+          dispositivo: 'backoffice',
+          navegador: 'fluxo_proposta',
+          versaoApp: 'assinatura_externa_manual',
+        },
+      });
+      tokenValidacao = assinaturaCriada?.tokenValidacao;
+    } catch (error) {
+      const mensagem = getErrorMessage(
+        error,
+        'Nao foi possivel preparar a assinatura externa do contrato.',
+      );
+      const assinaturaPendenteExistente = mensagem.toLowerCase().includes('pendente');
+      if (!assinaturaPendenteExistente) {
+        throw error;
+      }
+
+      const contratoAtualizado = await contratoService.buscarContrato(contratoIdNormalizado);
+      tokenValidacao = contratoAtualizado.assinaturaDigital?.token || undefined;
+    }
+
+    if (!tokenValidacao) {
+      throw new Error('Nao foi possivel obter token de assinatura para confirmar o contrato.');
+    }
+
+    const userAgent =
+      typeof navigator !== 'undefined' && navigator.userAgent
+        ? navigator.userAgent
+        : 'backoffice';
+    const hashAssinatura = `assinatura-externa-${contratoIdNormalizado}-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 10)}`;
+
+    await contratoService.assinarContrato({
+      tokenValidacao,
+      hashAssinatura,
+      userAgent,
+      metadados: {
+        dispositivo: 'backoffice',
+        navegador: 'fluxo_proposta',
+        versaoApp: 'assinatura_externa_manual',
+      },
+    });
   };
 
   const localizarFaturaRelacionada = async (): Promise<number | null> => {
@@ -1019,16 +1389,17 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   };
 
   // Criar fatura automatica
-  const handleCriarFatura = async () => {
-    if (!podeCriarFatura()) {
+  const handleCriarFatura = async (options?: { ignoreStatusGate?: boolean }) => {
+    if (!options?.ignoreStatusGate && !podeCriarFatura()) {
       toastService.error('Apenas propostas com contrato assinado podem gerar faturas');
       return;
     }
 
     setCriandoFatura(true);
     try {
-      const { propostaId, clienteId, usuarioResponsavelId } = obterContextoAutomacao();
-      const propostaData = getPropostaData();
+      const { propostaCompleta, propostaId, clienteId, usuarioResponsavelId } =
+        await obterContextoAutomacao();
+      const propostaData = getPropostaData(propostaCompleta);
       const contrato = await buscarContratoDaProposta(propostaId);
 
       if (!contrato) {
@@ -1047,6 +1418,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         );
       }
 
+      const payloadFatura = montarPayloadFatura(propostaCompleta);
       const fatura = await faturamentoService.criarFatura({
         contratoId: String(contrato.id),
         clienteId,
@@ -1057,9 +1429,10 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
             ? contrato.dataVencimento
             : propostaData.dataValidade,
         ),
-        formaPagamento: mapFormaPagamentoProposta(),
-        observacoes: `Fatura gerada automaticamente a partir da proposta ${propostaData.numero}.`,
-        itens: montarItensFatura(),
+        formaPagamento: mapFormaPagamentoProposta(propostaCompleta),
+        observacoes: `Fatura gerada automaticamente a partir da proposta ${propostaData.numero}.${payloadFatura.possuiAjuste ? ' Valores ajustados para refletir desconto/impostos da proposta.' : ''}`,
+        valorDesconto: payloadFatura.valorDescontoGlobal,
+        itens: payloadFatura.itens,
       });
 
       await sincronizarStatusProposta('fatura_criada', {
@@ -1170,16 +1543,22 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         }
 
         case 'contrato_gerado': {
-          const { propostaId } = obterContextoAutomacao();
+          const { propostaId, usuarioResponsavelId } = await obterContextoAutomacao();
           const contrato = await buscarContratoDaProposta(propostaId);
           if (!contrato) {
             toastService.info('Contrato nao encontrado. Gere o contrato para continuar o fluxo.');
             break;
           }
 
-          const contratoAssinadoExternamente = window.confirm(
-            'Contrato foi assinado fora do sistema?\n\nOK: confirmar assinatura e seguir\nCancelar: manter aguardando assinatura',
-          );
+          const contratoAssinadoExternamente = await confirm({
+            title: 'Confirmar assinatura externa',
+            message:
+              'Este contrato foi assinado fora do sistema? Ao confirmar, o contrato sera marcado como assinado e o fluxo seguira para faturamento.',
+            confirmText: 'Sim, seguir para faturamento',
+            cancelText: 'Nao, manter aguardando',
+            icon: 'warning',
+            confirmButtonClass: 'bg-teal-600 hover:bg-teal-700 focus:ring-teal-500',
+          });
 
           if (!contratoAssinadoExternamente) {
             toastService.info('Proposta mantida em aguardando assinatura de contrato.');
@@ -1187,19 +1566,17 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
             break;
           }
 
-          const observacaoAssinatura = window.prompt(
-            'Opcional: informe observacao/evidencia da assinatura externa:',
-            '',
-          );
+          if (String(contrato.status || '').toLowerCase() !== 'assinado') {
+            const usuarioAssinanteId = resolverUsuarioAssinaturaExterna(usuarioResponsavelId);
+            await confirmarAssinaturaExternaContrato(contrato.id, usuarioAssinanteId);
+          }
 
           await sincronizarStatusProposta('contrato_assinado', {
             source: 'assinatura-externa-confirmada',
-            observacoes: observacaoAssinatura?.trim()
-              ? `Contrato ${contrato.numero || contrato.id} confirmado como assinado externamente. Obs: ${observacaoAssinatura.trim()}`
-              : `Contrato ${contrato.numero || contrato.id} confirmado como assinado externamente.`,
+            observacoes: `Contrato ${contrato.numero || contrato.id} confirmado como assinado externamente.`,
           });
           toastService.success('Assinatura externa confirmada. Prosseguindo para faturamento.');
-          await handleCriarFatura();
+          await handleCriarFatura({ ignoreStatusGate: true });
           break;
         }
 
@@ -1245,21 +1622,23 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const handleCriarFaturaSemContrato = async () => {
     setCriandoFatura(true);
     try {
-      const { clienteId, usuarioResponsavelId } = obterContextoAutomacao();
-      const propostaData = getPropostaData();
+      const { propostaCompleta, clienteId, usuarioResponsavelId } = await obterContextoAutomacao();
+      const propostaData = getPropostaData(propostaCompleta);
       const hoje = new Date();
       const dataVencimento = propostaData.dataValidade
         ? formatDateOnly(propostaData.dataValidade)
         : formatDateOnly(addDays(hoje, 30));
 
+      const payloadFatura = montarPayloadFatura(propostaCompleta);
       const fatura = await faturamentoService.criarFatura({
         clienteId,
         usuarioResponsavelId,
         tipo: TipoFatura.UNICA,
         dataVencimento,
-        formaPagamento: mapFormaPagamentoProposta(),
-        observacoes: `Fatura gerada a partir da proposta ${propostaData.numero} sem contrato.`,
-        itens: montarItensFatura(),
+        formaPagamento: mapFormaPagamentoProposta(propostaCompleta),
+        observacoes: `Fatura gerada a partir da proposta ${propostaData.numero} sem contrato.${payloadFatura.possuiAjuste ? ' Valores ajustados para refletir desconto/impostos da proposta.' : ''}`,
+        valorDesconto: payloadFatura.valorDescontoGlobal,
+        itens: payloadFatura.itens,
       });
 
       await sincronizarStatusProposta('fatura_criada', {
@@ -1698,7 +2077,9 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       {/* Criar Fatura */}
       {podeCriarFatura() && (
         <button
-          onClick={handleCriarFatura}
+          onClick={() => {
+            void handleCriarFatura();
+          }}
           disabled={criandoFatura || !automacaoAvancadaDisponivel}
           className={`${buttonClass} text-green-600 hover:text-green-900 hover:bg-green-50 disabled:opacity-50`}
           title={
