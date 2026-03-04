@@ -181,7 +181,8 @@ const toDateInput = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
-const toDayStart = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+const toDayStart = (date: Date): Date =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
 const shiftDays = (date: Date, days: number): Date => {
   const next = new Date(date);
@@ -212,7 +213,7 @@ const createDateFromInput = (value: string | undefined): Date | null => {
   return parsed;
 };
 
-const resolveRange = (filters: DashboardV2Filters): DashboardV2DateRange => {
+export const resolveDashboardV2Range = (filters: DashboardV2Filters): DashboardV2DateRange => {
   const today = toDayStart(new Date());
   let start = new Date(today);
   let end = new Date(today);
@@ -361,7 +362,7 @@ type UseDashboardV2Result = {
   refresh: () => Promise<void>;
 };
 
-const defaultFilters: DashboardV2Filters = {
+export const defaultDashboardV2Filters: DashboardV2Filters = {
   periodPreset: '30d',
   customStart: undefined,
   customEnd: undefined,
@@ -382,7 +383,7 @@ const validPeriodPresets = new Set<DashboardV2PeriodPreset>([
   'custom',
 ]);
 
-const sanitizeFilters = (input: unknown): DashboardV2Filters => {
+export const sanitizeDashboardV2Filters = (input: unknown): DashboardV2Filters => {
   const raw = (input || {}) as Partial<DashboardV2Filters> & { period?: unknown };
 
   const legacyPeriod =
@@ -393,7 +394,7 @@ const sanitizeFilters = (input: unknown): DashboardV2Filters => {
   const periodPreset =
     typeof raw.periodPreset === 'string' && validPeriodPresets.has(raw.periodPreset)
       ? raw.periodPreset
-      : legacyPeriod || defaultFilters.periodPreset;
+      : legacyPeriod || defaultDashboardV2Filters.periodPreset;
 
   const customStart = isValidDateInput(raw.customStart) ? raw.customStart : undefined;
   const customEnd = isValidDateInput(raw.customEnd) ? raw.customEnd : undefined;
@@ -422,17 +423,17 @@ const sanitizeFilters = (input: unknown): DashboardV2Filters => {
 
 const readStoredFilters = (): DashboardV2Filters => {
   if (typeof window === 'undefined') {
-    return defaultFilters;
+    return defaultDashboardV2Filters;
   }
 
   try {
     const raw = window.localStorage.getItem(DASHBOARD_V2_FILTERS_STORAGE_KEY);
     if (!raw) {
-      return defaultFilters;
+      return defaultDashboardV2Filters;
     }
-    return sanitizeFilters(JSON.parse(raw));
+    return sanitizeDashboardV2Filters(JSON.parse(raw));
   } catch {
-    return defaultFilters;
+    return defaultDashboardV2Filters;
   }
 };
 
@@ -456,12 +457,14 @@ const fetchDashboardPayload = async (
 
   const rejected = settled.filter((result) => result.status === 'rejected');
 
-  const overview = settled[0].status === 'fulfilled' ? settled[0].value.data : createEmptyOverview();
+  const overview =
+    settled[0].status === 'fulfilled' ? settled[0].value.data : createEmptyOverview();
   const trends = settled[1].status === 'fulfilled' ? settled[1].value.data : createEmptyTrends();
   const funnel = settled[2].status === 'fulfilled' ? settled[2].value.data : createEmptyFunnel();
   const pipelineSummary =
     settled[3].status === 'fulfilled' ? settled[3].value.data : createEmptyPipelineSummary();
-  const insights = settled[4].status === 'fulfilled' ? settled[4].value.data : createEmptyInsights();
+  const insights =
+    settled[4].status === 'fulfilled' ? settled[4].value.data : createEmptyInsights();
 
   return {
     payload: {
@@ -497,7 +500,12 @@ export const useDashboardV2 = (autoRefresh = true): UseDashboardV2Result => {
   }, [filters]);
 
   const activeRange = useMemo(
-    () => resolveRange(filters),
+    () =>
+      resolveDashboardV2Range({
+        periodPreset: filters.periodPreset,
+        customStart: filters.customStart,
+        customEnd: filters.customEnd,
+      }),
     [filters.periodPreset, filters.customStart, filters.customEnd],
   );
 
@@ -567,7 +575,7 @@ export const useDashboardV2 = (autoRefresh = true): UseDashboardV2Result => {
   }, [autoRefresh, fetchDashboard]);
 
   const setFilters = useCallback((next: Partial<DashboardV2Filters>) => {
-    setFiltersState((prev) => sanitizeFilters({ ...prev, ...next }));
+    setFiltersState((prev) => sanitizeDashboardV2Filters({ ...prev, ...next }));
   }, []);
 
   const refresh = useCallback(async () => {
