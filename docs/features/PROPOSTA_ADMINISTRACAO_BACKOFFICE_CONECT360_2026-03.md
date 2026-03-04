@@ -400,3 +400,32 @@ Entregavel:
 
 3. Risco: inconsistencias de dados historicos.
   - Mitigacao: migracao incremental com backfill e validacao por amostragem.
+
+## 12. Fechamento de homologacao tecnica (atualizado em 2026-03-04)
+
+1. Publicacao de codigo:
+  - branch `chore/mvp-effective-change-gate-20260218` publicada no remoto;
+  - PR aberto para `main`: <https://github.com/conectcrm/conect380/pull/45>;
+  - ultimos commits de fechamento:
+    - `0eb3e20` fix(propostas): confirma assinatura externa e libera faturamento no avanço;
+    - `1b32dee` feat(propostas): aprimora fluxo comercial e payload de criacao;
+    - `fa20d2e` feat(faturamento): melhora modal de detalhes e adiciona teste e2e;
+    - `8805cc7` feat(catalogo): padroniza categorias e corrige textos com mojibake;
+    - `08efa4b` chore(encoding): reforca detectores e adiciona modo strict.
+
+2. Validacoes executadas em 2026-03-04:
+  - `frontend-web`: `npm run type-check` -> PASS;
+  - `frontend-web`: `npm run check:encoding` -> PASS;
+  - `frontend-web`: `npm run check:encoding:strict` -> FAIL (detecta textos legados fora do escopo da entrega atual);
+  - E2E focal: `npx playwright test e2e/faturamento-modal-detalhes.spec.ts --project=chromium --reporter=list` -> PASS (1/1);
+  - smoke backend: `scripts/verify-backend.ps1` (porta `3001`, usuario `admin@conect360.com.br`) -> PASS.
+
+3. Ponto de atencao para go-live:
+  - o gate `encoding:strict` ainda acusa ocorrencias legadas em arquivos nao alterados neste fechamento (ex.: `src/config/nucleusModulesConfig.ts`, `src/components/calendar/CreateEventModal.tsx`);
+  - recomendacao: abrir tarefa dedicada de saneamento de acentuacao/encoding antes de tornar `encoding:strict` bloqueante no pipeline principal.
+
+4. Status final desta etapa:
+  - fluxo comercial proposta -> contrato -> fatura: homologado;
+  - modal de detalhes de fatura: homologado com cobertura E2E dedicada;
+  - catalogo (itens/categorias) e mitigacao de mojibake: entregue;
+  - pendencia residual: saneamento de encoding legado para elevar gate estrito sem falso positivo operacional.
