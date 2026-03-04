@@ -8,7 +8,7 @@ import {
   MapPin,
   Phone,
   Mail,
-  Eye,
+  Pencil,
   Download,
   Send,
   Link2,
@@ -29,7 +29,6 @@ interface ModalDetalhesFaturaProps {
   onSendEmail?: (id: number) => void;
   onDownloadPDF?: (id: number) => void;
 }
-
 export default function ModalDetalhesFatura({
   isOpen,
   onClose,
@@ -39,7 +38,27 @@ export default function ModalDetalhesFatura({
   onSendEmail,
   onDownloadPDF,
 }: ModalDetalhesFaturaProps) {
+  React.useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen || !fatura) return null;
+
+  const toFiniteNumber = (value: unknown) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
 
   const getStatusIcon = (status: StatusFatura) => {
     switch (status) {
@@ -74,8 +93,46 @@ export default function ModalDetalhesFatura({
   };
 
   const isVencida = faturamentoService.verificarVencimento(fatura.dataVencimento);
-  const valorPago = fatura.pagamentos?.reduce((acc, pag) => acc + pag.valor, 0) || 0;
-  const valorPendente = fatura.valorTotal - valorPago;
+  const statusExibicao =
+    isVencida && fatura.status === StatusFatura.PENDENTE ? StatusFatura.VENCIDA : fatura.status;
+  const valorTotal = toFiniteNumber(fatura.valorTotal);
+  const valorDesconto = toFiniteNumber(fatura.valorDesconto);
+  const valorImpostos = toFiniteNumber(fatura.valorImpostos);
+  const valorBrutoOriginal = toFiniteNumber(fatura.valorBruto);
+  const valorBrutoPorItens = Array.isArray(fatura.itens)
+    ? fatura.itens.reduce((acc, item) => {
+        const totalItem =
+          toFiniteNumber(item.valorTotal) ||
+          Math.max(
+            toFiniteNumber(item.quantidade) * toFiniteNumber(item.valorUnitario) -
+              toFiniteNumber(item.valorDesconto),
+            0,
+          );
+        return acc + totalItem;
+      }, 0)
+    : 0;
+  const valorBrutoExibicao =
+    valorBrutoOriginal > 0
+      ? valorBrutoOriginal
+      : valorBrutoPorItens > 0
+        ? valorBrutoPorItens
+        : Math.max(valorTotal + valorDesconto, 0);
+  const valorPago =
+    fatura.pagamentos?.reduce((acc, pag) => acc + toFiniteNumber(pag.valor), 0) || 0;
+  const valorPendente = Math.max(valorTotal - valorPago, 0);
+  const formaPagamentoAtual = fatura.formaPagamento || fatura.formaPagamentoPreferida;
+  const diasAtraso = (() => {
+    if (!isVencida) {
+      return 0;
+    }
+
+    const vencimento = new Date(fatura.dataVencimento);
+    const hoje = new Date();
+    vencimento.setHours(0, 0, 0, 0);
+    hoje.setHours(0, 0, 0, 0);
+    const diff = Math.floor((hoje.getTime() - vencimento.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.max(diff, 1);
+  })();
 
   return (
     <div
@@ -90,6 +147,7 @@ export default function ModalDetalhesFatura({
         className="max-h-[90vh] w-full max-w-[980px] overflow-y-auto rounded-2xl border border-[#DCE8EC] bg-white shadow-[0_30px_60px_-30px_rgba(7,36,51,0.55)]"
         role="dialog"
         aria-modal="true"
+        aria-labelledby="modal-detalhes-fatura-titulo"
       >
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#E1EAEE] bg-white px-6 py-4">
@@ -98,19 +156,22 @@ export default function ModalDetalhesFatura({
               <FileText className="h-5 w-5 text-[#159A9C]" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-[#173A4D]">
+              <h2
+                id="modal-detalhes-fatura-titulo"
+                className="text-xl font-semibold text-[#173A4D]"
+              >
                 Fatura #{faturamentoService.formatarNumeroFatura(fatura.numero)}
               </h2>
               <div className="flex items-center gap-2 mt-1">
-                {getStatusIcon(fatura.status)}
+                {getStatusIcon(statusExibicao)}
                 <span
-                  className={`px-2 py-1 rounded-md text-xs font-medium border ${getStatusColor(fatura.status)}`}
+                  className={`px-2 py-1 rounded-md text-xs font-medium border ${getStatusColor(statusExibicao)}`}
                 >
-                  {faturamentoService.formatarStatusFatura(fatura.status)}
+                  {faturamentoService.formatarStatusFatura(statusExibicao)}
                 </span>
-                {isVencida && fatura.status === StatusFatura.PENDENTE && (
-                  <span className="px-2 py-1 rounded-md text-xs font-medium bg-red-100 text-red-800 border border-red-200">
-                    VENCIDA
+                {statusExibicao === StatusFatura.VENCIDA && diasAtraso > 0 && (
+                  <span className="text-xs font-medium text-red-700">
+                    Atrasada ha {diasAtraso} dia(s)
                   </span>
                 )}
               </div>
@@ -123,8 +184,9 @@ export default function ModalDetalhesFatura({
                 onClick={onEdit}
                 className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#D4E2E7] text-[#244455] transition hover:bg-[#F6FAFB]"
                 title="Editar Fatura"
+                aria-label="Editar fatura"
               >
-                <Eye className="w-4 h-4" />
+                <Pencil className="w-4 h-4" />
               </button>
             )}
             {onDownloadPDF && (
@@ -132,6 +194,7 @@ export default function ModalDetalhesFatura({
                 onClick={() => onDownloadPDF(fatura.id)}
                 className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#D4E2E7] text-[#244455] transition hover:bg-[#F6FAFB]"
                 title="Baixar PDF"
+                aria-label="Baixar PDF da fatura"
               >
                 <Download className="w-4 h-4" />
               </button>
@@ -141,6 +204,7 @@ export default function ModalDetalhesFatura({
                 onClick={() => onSendEmail(fatura.id)}
                 className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#D4E2E7] text-[#244455] transition hover:bg-[#F6FAFB]"
                 title="Enviar por Email"
+                aria-label="Enviar fatura por email"
               >
                 <Send className="w-4 h-4" />
               </button>
@@ -150,6 +214,7 @@ export default function ModalDetalhesFatura({
                 onClick={() => onGeneratePaymentLink(fatura.id)}
                 className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#D4E2E7] text-[#244455] transition hover:bg-[#F6FAFB]"
                 title="Gerar Link de Pagamento"
+                aria-label="Gerar link de pagamento da fatura"
               >
                 <Link2 className="w-4 h-4" />
               </button>
@@ -157,6 +222,7 @@ export default function ModalDetalhesFatura({
             <button
               onClick={onClose}
               className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[#5E7784] transition hover:bg-[#F4F8FA]"
+              aria-label="Fechar detalhes da fatura"
             >
               <X className="w-5 h-5" />
             </button>
@@ -192,8 +258,8 @@ export default function ModalDetalhesFatura({
                   <div>
                     <span className="text-gray-500">Forma de Pagamento:</span>
                     <p className="font-medium">
-                      {fatura.formaPagamento
-                        ? faturamentoService.formatarFormaPagamento(fatura.formaPagamento)
+                      {formaPagamentoAtual
+                        ? faturamentoService.formatarFormaPagamento(formaPagamentoAtual)
                         : 'Não definida'}
                     </p>
                   </div>
@@ -253,22 +319,22 @@ export default function ModalDetalhesFatura({
                   <div className="flex justify-between">
                     <span className="text-gray-600">Valor Bruto:</span>
                     <span className="font-medium">
-                      R$ {formatarValorMonetario(fatura.valorBruto)}
+                      R$ {formatarValorMonetario(valorBrutoExibicao)}
                     </span>
                   </div>
-                  {fatura.valorDesconto > 0 && (
+                  {valorDesconto > 0 && (
                     <div className="flex justify-between">
                       <span className="text-gray-600">Desconto:</span>
                       <span className="font-medium text-red-600">
-                        - R$ {formatarValorMonetario(fatura.valorDesconto)}
+                        - R$ {formatarValorMonetario(valorDesconto)}
                       </span>
                     </div>
                   )}
-                  {fatura.valorImpostos > 0 && (
+                  {valorImpostos > 0 && (
                     <div className="flex justify-between">
                       <span className="text-gray-600">Impostos:</span>
                       <span className="font-medium">
-                        R$ {formatarValorMonetario(fatura.valorImpostos)}
+                        R$ {formatarValorMonetario(valorImpostos)}
                       </span>
                     </div>
                   )}
@@ -276,7 +342,7 @@ export default function ModalDetalhesFatura({
                   <div className="flex justify-between text-lg">
                     <span className="font-semibold">Total:</span>
                     <span className="font-semibold text-green-600">
-                      R$ {formatarValorMonetario(fatura.valorTotal)}
+                      R$ {formatarValorMonetario(valorTotal)}
                     </span>
                   </div>
 
@@ -444,4 +510,3 @@ export default function ModalDetalhesFatura({
     </div>
   );
 }
-
