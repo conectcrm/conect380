@@ -1,6 +1,6 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { SystemBranding } from './entities/system-branding.entity';
 import { UpdateSystemBrandingDto } from './dto/update-system-branding.dto';
 
@@ -47,6 +47,8 @@ export interface SystemBrandingAdminResponse {
 
 const GLOBAL_BRANDING_KEY = 'global';
 const DEFAULT_MAINTENANCE_SEVERITY: SystemMaintenanceSeverity = 'warning';
+const BRANDING_MIGRATION_HINT =
+  'Execute as migracoes pendentes do backend para habilitar o branding completo.';
 
 const DEFAULT_SYSTEM_BRANDING: SystemBrandingEffectiveConfig = {
   logoFullUrl: '/brand/conect360-logo-horizontal.svg',
@@ -66,10 +68,54 @@ const DEFAULT_SYSTEM_BRANDING: SystemBrandingEffectiveConfig = {
 
 @Injectable()
 export class SystemBrandingService {
+  private readonly logger = new Logger(SystemBrandingService.name);
+
   constructor(
     @InjectRepository(SystemBranding)
     private readonly systemBrandingRepository: Repository<SystemBranding>,
   ) {}
+
+  private isSchemaMismatchError(error: unknown): boolean {
+    const message =
+      (error instanceof QueryFailedError ? error.message : (error as any)?.message || '')
+        .toString()
+        .toLowerCase();
+
+    if (!message.includes('does not exist')) {
+      return false;
+    }
+
+    if (message.includes('system_branding')) {
+      return true;
+    }
+
+    return [
+      'maintenance_enabled',
+      'maintenance_title',
+      'maintenance_message',
+      'maintenance_starts_at',
+      'maintenance_expected_end_at',
+      'maintenance_severity',
+      'loading_logo_url',
+    ].some((columnName) => message.includes(columnName));
+  }
+
+  private async findGlobalRecordSafely(): Promise<SystemBranding | null> {
+    try {
+      return await this.systemBrandingRepository.findOne({
+        where: { chave: GLOBAL_BRANDING_KEY },
+      });
+    } catch (error) {
+      if (this.isSchemaMismatchError(error)) {
+        this.logger.warn(
+          `Tabela system_branding sem colunas esperadas. ${BRANDING_MIGRATION_HINT}`,
+        );
+        return null;
+      }
+
+      throw error;
+    }
+  }
 
   private sanitizeOptionalAsset(value: string | null | undefined): string | null | undefined {
     if (value === undefined) {
@@ -181,32 +227,43 @@ export class SystemBrandingService {
     };
   }
 
-  private async ensureGlobalBrandingRecord(): Promise<SystemBranding> {
-    let record = await this.systemBrandingRepository.findOne({
-      where: { chave: GLOBAL_BRANDING_KEY },
-    });
+  private async ensureGlobalBrandingRecord(): Promise<SystemBranding | null> {
+    let record = await this.findGlobalRecordSafely();
 
     if (!record) {
-      record = this.systemBrandingRepository.create({
-        chave: GLOBAL_BRANDING_KEY,
-      });
-      record = await this.systemBrandingRepository.save(record);
+      try {
+        await this.systemBrandingRepository.query(
+          `
+            INSERT INTO "system_branding" ("chave")
+            SELECT $1
+            WHERE NOT EXISTS (
+              SELECT 1 FROM "system_branding" WHERE "chave" = $1
+            )
+          `,
+          [GLOBAL_BRANDING_KEY],
+        );
+      } catch (error) {
+        if (this.isSchemaMismatchError(error)) {
+          this.logger.warn(`Falha ao garantir registro global de branding. ${BRANDING_MIGRATION_HINT}`);
+          return null;
+        }
+
+        throw error;
+      }
+
+      record = await this.findGlobalRecordSafely();
     }
 
     return record;
   }
 
   async getPublicBranding(): Promise<SystemBrandingEffectiveConfig> {
-    const record = await this.systemBrandingRepository.findOne({
-      where: { chave: GLOBAL_BRANDING_KEY },
-    });
+    const record = await this.findGlobalRecordSafely();
     return this.toEffectiveConfig(record);
   }
 
   async getAdminBranding(): Promise<SystemBrandingAdminResponse> {
-    const record = await this.systemBrandingRepository.findOne({
-      where: { chave: GLOBAL_BRANDING_KEY },
-    });
+    const record = await this.findGlobalRecordSafely();
 
     return {
       data: {
@@ -236,6 +293,11 @@ export class SystemBrandingService {
     updatedBy: string | null,
   ): Promise<SystemBrandingAdminResponse> {
     const record = await this.ensureGlobalBrandingRecord();
+    if (!record) {
+      throw new BadRequestException(
+        `Branding indisponivel por schema desatualizado. ${BRANDING_MIGRATION_HINT}`,
+      );
+    }
 
     const logoFullUrl = this.sanitizeOptionalAsset(dto.logoFullUrl);
     const logoFullLightUrl = this.sanitizeOptionalAsset(dto.logoFullLightUrl);
@@ -287,7 +349,18 @@ export class SystemBrandingService {
 
     record.updatedBy = updatedBy;
 
-    await this.systemBrandingRepository.save(record);
+    try {
+      await this.systemBrandingRepository.save(record);
+    } catch (error) {
+      if (this.isSchemaMismatchError(error)) {
+        throw new BadRequestException(
+          `Nao foi possivel atualizar branding no schema atual. ${BRANDING_MIGRATION_HINT}`,
+        );
+      }
+
+      throw error;
+    }
+
     return this.getAdminBranding();
   }
 }

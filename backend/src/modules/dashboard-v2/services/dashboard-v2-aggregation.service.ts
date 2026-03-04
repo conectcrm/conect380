@@ -32,6 +32,8 @@ export class DashboardV2AggregationService {
   private readonly logger = new Logger(DashboardV2AggregationService.name);
   private readonly approvedStatus = ['aprovada', 'aceita'];
   private readonly finalStatus = ['aprovada', 'aceita', 'rejeitada', 'expirada'];
+  private oportunidadeResponsavelColumnSql: string | null = null;
+  private oportunidadeResponsavelColumnSqlPromise: Promise<string> | null = null;
 
   constructor(
     @InjectRepository(Oportunidade)
@@ -57,8 +59,10 @@ export class DashboardV2AggregationService {
     defaultStart.setDate(defaultStart.getDate() - 29);
     defaultStart.setHours(0, 0, 0, 0);
 
-    const start = input?.periodStart ? new Date(input.periodStart) : defaultStart;
-    const end = input?.periodEnd ? new Date(input.periodEnd) : defaultEnd;
+    const parsedStart = this.parseDateInput(input?.periodStart);
+    const parsedEnd = this.parseDateInput(input?.periodEnd);
+    const start = parsedStart ? new Date(parsedStart) : defaultStart;
+    const end = parsedEnd ? new Date(parsedEnd) : defaultEnd;
 
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
       return { start: defaultStart, end: defaultEnd };
@@ -67,6 +71,37 @@ export class DashboardV2AggregationService {
     start.setHours(0, 0, 0, 0);
     end.setHours(23, 59, 59, 999);
     return start <= end ? { start, end } : { start: end, end: start };
+  }
+
+  private parseDateInput(value?: string): Date | null {
+    if (!value) {
+      return null;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    const localDateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+    if (localDateMatch) {
+      const year = Number(localDateMatch[1]);
+      const month = Number(localDateMatch[2]);
+      const day = Number(localDateMatch[3]);
+      const parsed = new Date(year, month - 1, day);
+
+      if (
+        parsed.getFullYear() === year &&
+        parsed.getMonth() === month - 1 &&
+        parsed.getDate() === day
+      ) {
+        return parsed;
+      }
+      return null;
+    }
+
+    const parsed = new Date(trimmed);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
   periodKey(range: DateRange): string {
@@ -83,7 +118,12 @@ export class DashboardV2AggregationService {
       })
       .getCount();
 
-    if (count > 0) {
+    const expectedDays = Math.max(
+      1,
+      Math.ceil((range.end.getTime() - range.start.getTime()) / 86_400_000) + 1,
+    );
+
+    if (count >= expectedDays) {
       return;
     }
 
@@ -508,12 +548,13 @@ export class DashboardV2AggregationService {
     range: DateRange,
     filters: DashboardV2SourceFilters,
   ): Promise<void> {
+    const responsavelColumn = await this.getOportunidadeResponsavelColumnSql();
     const params: unknown[] = [empresaId, this.toDateKey(range.start), this.toDateKey(range.end)];
     let vendedorClause = '';
 
     if (filters.vendedorId) {
       params.push(filters.vendedorId);
-      vendedorClause = ` AND o.responsavel_id = $${params.length}`;
+      vendedorClause = ` AND ${responsavelColumn}::text = $${params.length}::text`;
     }
 
     const rows = await this.oportunidadeRepository.query(
@@ -553,6 +594,7 @@ export class DashboardV2AggregationService {
     range: DateRange,
     filters: DashboardV2SourceFilters,
   ): Promise<void> {
+    const responsavelColumn = await this.getOportunidadeResponsavelColumnSql();
     const fromStageExpr = this.stageNormalizeSql('e.from_stage');
     const toStageExpr = this.stageNormalizeSql('e.to_stage');
     const params: unknown[] = [empresaId, range.start.toISOString(), range.end.toISOString()];
@@ -560,7 +602,7 @@ export class DashboardV2AggregationService {
 
     if (filters.vendedorId) {
       params.push(filters.vendedorId);
-      vendedorClause = ` AND o.responsavel_id = $${params.length}`;
+      vendedorClause = ` AND ${responsavelColumn}::text = $${params.length}::text`;
     }
 
     const rows = await this.stageEventRepository.query(
@@ -619,6 +661,7 @@ export class DashboardV2AggregationService {
       conversionRate: number;
     }>
   > {
+    const responsavelColumn = await this.getOportunidadeResponsavelColumnSql();
     const fromStageExpr = this.stageNormalizeSql('e.from_stage');
     const toStageExpr = this.stageNormalizeSql('e.to_stage');
     const params: unknown[] = [empresaId, range.start.toISOString(), range.end.toISOString()];
@@ -626,7 +669,7 @@ export class DashboardV2AggregationService {
 
     if (filters.vendedorId) {
       params.push(filters.vendedorId);
-      vendedorClause = ` AND o.responsavel_id = $${params.length}`;
+      vendedorClause = ` AND ${responsavelColumn}::text = $${params.length}::text`;
     }
 
     const rows = await this.stageEventRepository.query(
@@ -686,13 +729,14 @@ export class DashboardV2AggregationService {
       paradas: number;
     }>;
   }> {
+    const responsavelColumn = await this.getOportunidadeResponsavelColumnSql();
     const stageExpr = this.stageNormalizeSql('o.estagio');
     const pipelineParams: unknown[] = [empresaId, range.end.toISOString()];
     let pipelineVendedorClause = '';
 
     if (filters.vendedorId) {
       pipelineParams.push(filters.vendedorId);
-      pipelineVendedorClause = ` AND o.responsavel_id = $${pipelineParams.length}`;
+      pipelineVendedorClause = ` AND ${responsavelColumn}::text = $${pipelineParams.length}::text`;
     }
 
     const pipelineRows = await this.oportunidadeRepository.query(
@@ -715,7 +759,7 @@ export class DashboardV2AggregationService {
     let agingVendedorClause = '';
     if (filters.vendedorId) {
       agingParams.push(filters.vendedorId);
-      agingVendedorClause = ` AND o.responsavel_id = $${agingParams.length}`;
+      agingVendedorClause = ` AND ${responsavelColumn}::text = $${agingParams.length}::text`;
     }
 
     agingParams.push(Number(process.env.DASHBOARD_V2_STALLED_DAYS || 3));
@@ -802,7 +846,7 @@ export class DashboardV2AggregationService {
     await this.pipelineSnapshotRepository.delete({ empresa_id: empresaId, date_key: dateKey });
     if (rows.length === 0) return;
 
-    await this.pipelineSnapshotRepository.insert(
+    await this.pipelineSnapshotRepository.upsert(
       rows.map((row) => ({
         empresa_id: empresaId,
         date_key: dateKey,
@@ -810,6 +854,7 @@ export class DashboardV2AggregationService {
         quantidade: Number(row.quantidade || 0),
         valor_total: Number(row.valor_total || 0),
       })),
+      ['empresa_id', 'date_key', 'stage'],
     );
   }
 
@@ -842,7 +887,7 @@ export class DashboardV2AggregationService {
     await this.funnelMetricsRepository.delete({ empresa_id: empresaId, date_key: dateKey });
     if (rows.length === 0) return;
 
-    await this.funnelMetricsRepository.insert(
+    await this.funnelMetricsRepository.upsert(
       rows.map((row) => {
         const enteredCount = Number(row.entered_count || 0);
         const progressedCount = Number(row.progressed_count || 0);
@@ -858,6 +903,7 @@ export class DashboardV2AggregationService {
           conversion_rate: Number(conversionRate.toFixed(2)),
         };
       }),
+      ['empresa_id', 'date_key', 'from_stage', 'to_stage'],
     );
   }
 
@@ -897,7 +943,7 @@ export class DashboardV2AggregationService {
     await this.agingStageRepository.delete({ empresa_id: empresaId, date_key: dateKey });
     if (rows.length === 0) return;
 
-    await this.agingStageRepository.insert(
+    await this.agingStageRepository.upsert(
       rows.map((row: any) => ({
         empresa_id: empresaId,
         date_key: dateKey,
@@ -905,6 +951,7 @@ export class DashboardV2AggregationService {
         avg_days: Number(row.avg_days || 0),
         stalled_count: Number(row.stalled_count || 0),
       })),
+      ['empresa_id', 'date_key', 'stage'],
     );
   }
 
@@ -953,9 +1000,8 @@ export class DashboardV2AggregationService {
         .getRawOne<{ oportunidades_ativas?: string }>(),
     ]);
 
-    await this.revenueMetricsRepository.delete({ empresa_id: empresaId, date_key: dateKey });
-
-    await this.revenueMetricsRepository.insert({
+    await this.revenueMetricsRepository.upsert(
+      {
       empresa_id: empresaId,
       date_key: dateKey,
       receita_fechada: Number(approvedStats?.receita_fechada || 0),
@@ -963,7 +1009,64 @@ export class DashboardV2AggregationService {
       ticket_medio: Number(approvedStats?.ticket_medio || 0),
       ciclo_medio_dias: Number(cycleStats?.ciclo_medio_dias || 0),
       oportunidades_ativas: Number(ativosStats?.oportunidades_ativas || 0),
-    });
+      },
+      ['empresa_id', 'date_key'],
+    );
+  }
+
+  private async getOportunidadeResponsavelColumnSql(): Promise<string> {
+    if (this.oportunidadeResponsavelColumnSql) {
+      return this.oportunidadeResponsavelColumnSql;
+    }
+
+    if (this.oportunidadeResponsavelColumnSqlPromise) {
+      return this.oportunidadeResponsavelColumnSqlPromise;
+    }
+
+    this.oportunidadeResponsavelColumnSqlPromise = (async () => {
+      try {
+        const rows: Array<{ column_name?: string }> = await this.oportunidadeRepository.query(
+          `
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'oportunidades'
+              AND table_schema NOT IN ('pg_catalog', 'information_schema')
+              AND column_name IN ('responsavel_id', 'responsavelId', 'usuario_id', 'usuarioId')
+            ORDER BY CASE
+              WHEN column_name = 'responsavel_id' THEN 0
+              WHEN column_name = 'responsavelId' THEN 1
+              WHEN column_name = 'usuario_id' THEN 2
+              WHEN column_name = 'usuarioId' THEN 3
+              ELSE 4
+            END
+            LIMIT 1
+          `,
+        );
+
+        const columnName = rows?.[0]?.column_name;
+        if (columnName && typeof columnName === 'string') {
+          return `o."${columnName}"`;
+        }
+
+        this.logger.warn(
+          'Nenhuma coluna de responsavel/usuario encontrada em oportunidades; filtro por vendedor sera vazio.',
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Falha ao detectar coluna de responsavel em oportunidades: ${
+            (error as Error)?.message || 'desconhecido'
+          }`,
+        );
+      }
+
+      return 'NULL::text';
+    })();
+
+    const resolved = await this.oportunidadeResponsavelColumnSqlPromise;
+    this.oportunidadeResponsavelColumnSql = resolved;
+    this.oportunidadeResponsavelColumnSqlPromise = null;
+
+    return resolved;
   }
 
   private stageNormalizeSql(columnRef: string): string {
@@ -990,6 +1093,9 @@ export class DashboardV2AggregationService {
   }
 
   private toDateKey(date: Date): string {
-    return date.toISOString().slice(0, 10);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 }
