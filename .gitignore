@@ -158,6 +158,7 @@ scripts/*.env
 
 # Artefatos gerados/local-only (não versionar)
 .production/pilot-runs/
+.production/configs/deploy-profile.local.psd1
 backend/test/tmp-*
 tmp-*.json
 
