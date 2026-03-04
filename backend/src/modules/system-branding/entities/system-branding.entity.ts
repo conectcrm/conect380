@@ -29,6 +29,24 @@ export class SystemBranding {
   @Column({ name: 'favicon_url', type: 'text', nullable: true })
   faviconUrl: string | null;
 
+  @Column({ name: 'maintenance_enabled', type: 'boolean', default: false })
+  maintenanceEnabled: boolean;
+
+  @Column({ name: 'maintenance_title', type: 'varchar', length: 120, nullable: true })
+  maintenanceTitle: string | null;
+
+  @Column({ name: 'maintenance_message', type: 'text', nullable: true })
+  maintenanceMessage: string | null;
+
+  @Column({ name: 'maintenance_starts_at', type: 'timestamptz', nullable: true })
+  maintenanceStartsAt: Date | null;
+
+  @Column({ name: 'maintenance_expected_end_at', type: 'timestamptz', nullable: true })
+  maintenanceExpectedEndAt: Date | null;
+
+  @Column({ name: 'maintenance_severity', type: 'varchar', length: 20, default: 'warning' })
+  maintenanceSeverity: string;
+
   @Column({ name: 'updated_by', type: 'uuid', nullable: true })
   updatedBy: string | null;
 

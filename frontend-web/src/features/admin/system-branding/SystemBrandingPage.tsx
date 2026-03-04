@@ -1,5 +1,6 @@
 ﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  AlertTriangle,
   CheckCircle2,
   ImagePlus,
   Loader2,
@@ -14,15 +15,21 @@ import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
 import Conect360Logo from '../../../components/ui/Conect360Logo';
 import { systemBrandingUrlResolver, useSystemBranding } from '../../../contexts/SystemBrandingContext';
 import systemBrandingService, {
+  type SystemMaintenanceSeverity,
   type SystemBrandingAdminData,
   type SystemBrandingEffectiveConfig,
 } from '../../../services/systemBrandingService';
 import { getErrorMessage } from '../../../utils/errorHandling';
 
-type BrandingField = keyof SystemBrandingAdminData;
+type BrandingAssetField =
+  | 'logoFullUrl'
+  | 'logoFullLightUrl'
+  | 'logoIconUrl'
+  | 'loadingLogoUrl'
+  | 'faviconUrl';
 
 interface BrandingFieldMeta {
-  field: BrandingField;
+  field: BrandingAssetField;
   label: string;
   helpText: string;
   maxDimension: number;
@@ -69,6 +76,48 @@ const EMPTY_FORM: SystemBrandingAdminData = {
   logoIconUrl: null,
   loadingLogoUrl: null,
   faviconUrl: null,
+  maintenanceEnabled: false,
+  maintenanceTitle: null,
+  maintenanceMessage: null,
+  maintenanceStartsAt: null,
+  maintenanceExpectedEndAt: null,
+  maintenanceSeverity: 'warning',
+};
+
+const MAINTENANCE_SEVERITY_OPTIONS: Array<{
+  value: SystemMaintenanceSeverity;
+  label: string;
+}> = [
+  { value: 'info', label: 'Informativo' },
+  { value: 'warning', label: 'Atencao' },
+  { value: 'critical', label: 'Critico' },
+];
+
+const toDateTimeLocalValue = (isoValue: string | null): string => {
+  if (!isoValue) {
+    return '';
+  }
+
+  const parsed = new Date(isoValue);
+  if (Number.isNaN(parsed.getTime())) {
+    return '';
+  }
+
+  const local = new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+};
+
+const fromDateTimeLocalValue = (localValue: string): string | null => {
+  if (!localValue) {
+    return null;
+  }
+
+  const parsed = new Date(localValue);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed.toISOString();
 };
 
 const readAsDataUrl = (file: File): Promise<string> =>
@@ -130,7 +179,7 @@ const SystemBrandingPage: React.FC = () => {
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
-  const [uploadingField, setUploadingField] = useState<BrandingField | null>(null);
+  const [uploadingField, setUploadingField] = useState<BrandingAssetField | null>(null);
 
   const loadBranding = useCallback(async () => {
     setLoading(true);
@@ -152,7 +201,7 @@ const SystemBrandingPage: React.FC = () => {
 
   const handleUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
-    field: BrandingField,
+    field: BrandingAssetField,
     maxDimension: number,
   ) => {
     const file = event.target.files?.[0];
@@ -186,7 +235,7 @@ const SystemBrandingPage: React.FC = () => {
     }
   };
 
-  const handleRemoveField = (field: BrandingField) => {
+  const handleRemoveField = (field: BrandingAssetField) => {
     setFormData((current) => ({
       ...current,
       [field]: null,
@@ -225,6 +274,12 @@ const SystemBrandingPage: React.FC = () => {
         logoIconUrl: null,
         loadingLogoUrl: null,
         faviconUrl: null,
+        maintenanceEnabled: false,
+        maintenanceTitle: null,
+        maintenanceMessage: null,
+        maintenanceStartsAt: null,
+        maintenanceExpectedEndAt: null,
+        maintenanceSeverity: 'warning',
       });
       setFormData(response.data);
       setEffectiveData(response.effective);
@@ -251,6 +306,33 @@ const SystemBrandingPage: React.FC = () => {
       faviconUrl: formData.faviconUrl || effectiveData.faviconUrl,
     };
   }, [effectiveData, formData]);
+
+  const maintenancePreview = useMemo(() => {
+    const effectiveMaintenance = effectiveData?.maintenanceBanner;
+
+    return {
+      enabled: formData.maintenanceEnabled,
+      title:
+        formData.maintenanceTitle ||
+        effectiveMaintenance?.title ||
+        'Manutencao programada',
+      message:
+        formData.maintenanceMessage ||
+        effectiveMaintenance?.message ||
+        'O sistema pode apresentar instabilidade durante o deploy.',
+      severity: formData.maintenanceSeverity || effectiveMaintenance?.severity || 'warning',
+      startsAt: formData.maintenanceStartsAt,
+      expectedEndAt: formData.maintenanceExpectedEndAt,
+    };
+  }, [
+    effectiveData?.maintenanceBanner,
+    formData.maintenanceEnabled,
+    formData.maintenanceExpectedEndAt,
+    formData.maintenanceMessage,
+    formData.maintenanceSeverity,
+    formData.maintenanceStartsAt,
+    formData.maintenanceTitle,
+  ]);
 
   return (
     <div className="space-y-4 pt-1 sm:pt-2">
@@ -394,6 +476,158 @@ const SystemBrandingPage: React.FC = () => {
           </section>
 
           <section className="rounded-2xl border border-[#D8E4E8] bg-white p-4 sm:p-6">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <h2 className="text-lg font-semibold text-[#0C2F42]">Aviso de manutencao e deploy</h2>
+                <p className="mt-1 text-sm text-[#64808D]">
+                  Ative este aviso para informar usuarios logados sobre pausas planejadas durante deploy.
+                </p>
+              </div>
+              <label className="inline-flex items-center gap-2 rounded-full border border-[#D5E3E8] px-3 py-1.5 text-sm font-semibold text-[#204354]">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-[#B9CDD6] text-[#159A9C] focus:ring-[#159A9C]/30"
+                  checked={formData.maintenanceEnabled}
+                  onChange={(event) =>
+                    setFormData((current) => ({
+                      ...current,
+                      maintenanceEnabled: event.target.checked,
+                    }))
+                  }
+                />
+                Aviso ativo
+              </label>
+            </div>
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6A8795]">
+                  Titulo do aviso
+                </label>
+                <input
+                  type="text"
+                  maxLength={120}
+                  value={formData.maintenanceTitle || ''}
+                  onChange={(event) =>
+                    setFormData((current) => ({
+                      ...current,
+                      maintenanceTitle: event.target.value || null,
+                    }))
+                  }
+                  placeholder="Manutencao programada"
+                  className="w-full rounded-xl border border-[#D5E3E8] px-3 py-2 text-sm text-[#1D3E4F] outline-none transition focus:border-[#159A9C] focus:ring-2 focus:ring-[#159A9C]/20"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6A8795]">
+                  Severidade
+                </label>
+                <select
+                  value={formData.maintenanceSeverity}
+                  onChange={(event) =>
+                    setFormData((current) => ({
+                      ...current,
+                      maintenanceSeverity: event.target.value as SystemMaintenanceSeverity,
+                    }))
+                  }
+                  className="w-full rounded-xl border border-[#D5E3E8] px-3 py-2 text-sm text-[#1D3E4F] outline-none transition focus:border-[#159A9C] focus:ring-2 focus:ring-[#159A9C]/20"
+                >
+                  {MAINTENANCE_SEVERITY_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="lg:col-span-2">
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6A8795]">
+                  Mensagem do aviso
+                </label>
+                <textarea
+                  rows={3}
+                  maxLength={2000}
+                  value={formData.maintenanceMessage || ''}
+                  onChange={(event) =>
+                    setFormData((current) => ({
+                      ...current,
+                      maintenanceMessage: event.target.value || null,
+                    }))
+                  }
+                  placeholder="Durante este deploy o sistema pode ficar indisponivel por alguns minutos."
+                  className="w-full rounded-xl border border-[#D5E3E8] px-3 py-2 text-sm text-[#1D3E4F] outline-none transition focus:border-[#159A9C] focus:ring-2 focus:ring-[#159A9C]/20"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6A8795]">
+                  Inicio previsto
+                </label>
+                <input
+                  type="datetime-local"
+                  value={toDateTimeLocalValue(formData.maintenanceStartsAt)}
+                  onChange={(event) =>
+                    setFormData((current) => ({
+                      ...current,
+                      maintenanceStartsAt: fromDateTimeLocalValue(event.target.value),
+                    }))
+                  }
+                  className="w-full rounded-xl border border-[#D5E3E8] px-3 py-2 text-sm text-[#1D3E4F] outline-none transition focus:border-[#159A9C] focus:ring-2 focus:ring-[#159A9C]/20"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#6A8795]">
+                  Termino previsto
+                </label>
+                <input
+                  type="datetime-local"
+                  value={toDateTimeLocalValue(formData.maintenanceExpectedEndAt)}
+                  onChange={(event) =>
+                    setFormData((current) => ({
+                      ...current,
+                      maintenanceExpectedEndAt: fromDateTimeLocalValue(event.target.value),
+                    }))
+                  }
+                  className="w-full rounded-xl border border-[#D5E3E8] px-3 py-2 text-sm text-[#1D3E4F] outline-none transition focus:border-[#159A9C] focus:ring-2 focus:ring-[#159A9C]/20"
+                />
+              </div>
+            </div>
+
+            <div
+              className={`mt-5 rounded-xl border px-4 py-3 ${
+                maintenancePreview.severity === 'critical'
+                  ? 'border-[#F2B8BE] bg-[#FFF6F7] text-[#8F1D2C]'
+                  : maintenancePreview.severity === 'info'
+                    ? 'border-[#B9DBE7] bg-[#F3FBFF] text-[#1F5C73]'
+                    : 'border-[#F2D7A6] bg-[#FFF9EE] text-[#815A0A]'
+              }`}
+            >
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold">
+                    Preview: {maintenancePreview.title || 'Manutencao programada'}
+                  </p>
+                  <p className="mt-1 text-sm">
+                    {maintenancePreview.message || 'Mensagem nao definida para o aviso.'}
+                  </p>
+                  <p className="mt-2 text-xs font-medium opacity-90">
+                    Status: {maintenancePreview.enabled ? 'ativo' : 'inativo'}
+                    {maintenancePreview.startsAt
+                      ? ` | inicio ${new Date(maintenancePreview.startsAt).toLocaleString('pt-BR')}`
+                      : ''}
+                    {maintenancePreview.expectedEndAt
+                      ? ` | fim previsto ${new Date(maintenancePreview.expectedEndAt).toLocaleString('pt-BR')}`
+                      : ''}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-[#D8E4E8] bg-white p-4 sm:p-6">
             <h2 className="text-lg font-semibold text-[#0C2F42]">Prévia rápida no sistema</h2>
             <p className="mt-1 text-sm text-[#64808D]">
               Esta seção simula os contextos mais comuns onde a marca aparece.
@@ -448,4 +682,3 @@ const SystemBrandingPage: React.FC = () => {
 };
 
 export default SystemBrandingPage;
-

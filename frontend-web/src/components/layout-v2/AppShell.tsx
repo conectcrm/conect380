@@ -11,6 +11,7 @@ import NotificationCenter from '../notifications/NotificationCenter';
 import Conect360Logo from '../ui/Conect360Logo';
 import ActiveEmpresaBadge from '../tenant/ActiveEmpresaBadge';
 import RouteTemplateFrame from './RouteTemplateFrame';
+import SystemMaintenanceBanner from './SystemMaintenanceBanner';
 import { shellSpacing, shellTokens } from './tokens';
 import { resolveAvatarUrl } from '../../utils/avatar';
 
@@ -344,6 +345,7 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
           <div className={shellSpacing.pageOuterX}>
             <div className={`h-px rounded-full ${shellTokens.divider}`} aria-hidden />
+            <SystemMaintenanceBanner />
           </div>
         </header>
 
