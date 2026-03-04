@@ -74,6 +74,100 @@ describe('Multi-Tenancy Isolation (E2E)', () => {
     return Boolean(result?.[0]?.table_name);
   };
 
+  const tableHasColumn = async (tableName: string, columnName: string): Promise<boolean> => {
+    const result = await dataSource.query(
+      `
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = $1
+          AND column_name = $2
+        LIMIT 1
+      `,
+      [tableName, columnName],
+    );
+
+    return Array.isArray(result) && result.length > 0;
+  };
+
+  const ensureGetCurrentTenantFunction = async (): Promise<void> => {
+    await dataSource.query(`
+      CREATE OR REPLACE FUNCTION get_current_tenant()
+      RETURNS uuid
+      LANGUAGE plpgsql
+      STABLE
+      AS $$
+      DECLARE
+        tenant_setting text;
+      BEGIN
+        tenant_setting := current_setting('app.current_tenant_id', true);
+
+        IF tenant_setting IS NULL OR tenant_setting = '' THEN
+          RETURN NULL;
+        END IF;
+
+        RETURN tenant_setting::uuid;
+      EXCEPTION
+        WHEN others THEN
+          RETURN NULL;
+      END;
+      $$;
+    `);
+  };
+
+  const ensureProdutosSoftwareColumns = async (): Promise<void> => {
+    if (!(await tableExists('produtos'))) {
+      return;
+    }
+
+    await dataSource.query(`
+      ALTER TABLE "produtos"
+      ADD COLUMN IF NOT EXISTS "tipoLicenciamento" character varying(100)
+    `);
+    await dataSource.query(`
+      ALTER TABLE "produtos"
+      ADD COLUMN IF NOT EXISTS "periodicidadeLicenca" character varying(100)
+    `);
+    await dataSource.query(`
+      ALTER TABLE "produtos"
+      ADD COLUMN IF NOT EXISTS "renovacaoAutomatica" boolean DEFAULT false
+    `);
+    await dataSource.query(`
+      ALTER TABLE "produtos"
+      ADD COLUMN IF NOT EXISTS "quantidadeLicencas" integer
+    `);
+  };
+
+  const ensurePipelineCoreRlsBaseline = async (): Promise<void> => {
+    await ensureGetCurrentTenantFunction();
+
+    for (const tableName of pipelineCoreTables) {
+      if (!(await tableExists(tableName))) {
+        continue;
+      }
+
+      if (!(await tableHasColumn(tableName, 'empresa_id'))) {
+        continue;
+      }
+
+      const policyName = `tenant_isolation_${tableName}`;
+
+      await dataSource.query(`ALTER TABLE "${tableName}" ENABLE ROW LEVEL SECURITY;`);
+      await dataSource.query(`DROP POLICY IF EXISTS "${policyName}" ON "${tableName}";`);
+      await dataSource.query(`
+        CREATE POLICY "${policyName}" ON "${tableName}"
+        FOR ALL
+        USING (empresa_id::text = get_current_tenant()::text)
+        WITH CHECK (empresa_id::text = get_current_tenant()::text);
+      `);
+    }
+  };
+
+  const ensureMultiTenancyTestBaseline = async (): Promise<void> => {
+    await ensureProdutosSoftwareColumns();
+    await ensurePipelineCoreRlsBaseline();
+  };
+
   const skipIfFeatureUnavailable = (feature: FeatureKey): boolean =>
     !tableFeatureAvailability[feature];
 
@@ -219,6 +313,7 @@ describe('Multi-Tenancy Isolation (E2E)', () => {
     app = await createE2EApp(moduleFixture);
 
     dataSource = app.get(DataSource);
+    await ensureMultiTenancyTestBaseline();
     await prepararUsuariosTeste();
 
     tableFeatureAvailability.contratos = await tableExists('contratos');
