@@ -13,7 +13,7 @@ const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'visualizada', label: 'Visualizada' },
   { value: 'negociacao', label: 'Em negociacao' },
   { value: 'aprovada', label: 'Aprovada' },
-  { value: 'contrato_gerado', label: 'Contrato gerado' },
+  { value: 'contrato_gerado', label: 'Aguardando assinatura do contrato' },
   { value: 'contrato_assinado', label: 'Contrato assinado' },
   { value: 'fatura_criada', label: 'Fatura criada' },
   { value: 'aguardando_pagamento', label: 'Aguardando pagamento' },

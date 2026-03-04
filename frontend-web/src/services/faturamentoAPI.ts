@@ -14,7 +14,7 @@ function unwrapEnvelope<T>(payload: any): T {
 }
 
 export interface FaturaRequest {
-  contratoId: string;
+  contratoId?: string;
   clienteId: string;
   usuarioResponsavelId: string;
   tipo: 'entrada' | 'parcela' | 'recorrente' | 'avulsa';
@@ -32,7 +32,7 @@ export interface FaturaRequest {
 export interface FaturaResponse {
   id: string;
   numero: string;
-  contratoId: string;
+  contratoId?: string;
   clienteId: string;
   usuarioResponsavelId: string;
   tipo: string;

@@ -9,6 +9,25 @@ import {
   Max,
   Min,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
+
+const parseOptionalNumber = ({ value }: { value: unknown }) => {
+  if (value === '' || value === null || value === undefined) {
+    return undefined;
+  }
+
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : value;
+};
+
+const parseOptionalInteger = ({ value }: { value: unknown }) => {
+  if (value === '' || value === null || value === undefined) {
+    return undefined;
+  }
+
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isInteger(parsed) ? parsed : value;
+};
 
 export interface PropostaDto {
   id: string;
@@ -32,6 +51,7 @@ export interface PropostaDto {
         ativo: boolean;
       };
   formaPagamento?: string;
+  parcelas?: number;
   validadeDias?: number;
 }
 
@@ -55,22 +75,27 @@ export class CriarPropostaDto {
   produtos?: Array<Record<string, unknown>>;
 
   @IsOptional()
+  @Transform(parseOptionalNumber)
   @IsNumber()
   subtotal?: number;
 
   @IsOptional()
+  @Transform(parseOptionalNumber)
   @IsNumber()
   descontoGlobal?: number;
 
   @IsOptional()
+  @Transform(parseOptionalNumber)
   @IsNumber()
   impostos?: number;
 
   @IsOptional()
+  @Transform(parseOptionalNumber)
   @IsNumber()
   total?: number;
 
   @IsOptional()
+  @Transform(parseOptionalNumber)
   @IsNumber()
   valor?: number;
 
@@ -79,6 +104,14 @@ export class CriarPropostaDto {
   formaPagamento?: string;
 
   @IsOptional()
+  @Transform(parseOptionalInteger)
+  @IsInt()
+  @Min(1)
+  @Max(24)
+  parcelas?: number;
+
+  @IsOptional()
+  @Transform(parseOptionalInteger)
   @IsInt()
   @Min(1)
   @Max(3650)
@@ -125,22 +158,27 @@ export class AtualizarPropostaDto {
   produtos?: Array<Record<string, unknown>>;
 
   @IsOptional()
+  @Transform(parseOptionalNumber)
   @IsNumber()
   subtotal?: number;
 
   @IsOptional()
+  @Transform(parseOptionalNumber)
   @IsNumber()
   descontoGlobal?: number;
 
   @IsOptional()
+  @Transform(parseOptionalNumber)
   @IsNumber()
   impostos?: number;
 
   @IsOptional()
+  @Transform(parseOptionalNumber)
   @IsNumber()
   total?: number;
 
   @IsOptional()
+  @Transform(parseOptionalNumber)
   @IsNumber()
   valor?: number;
 
@@ -149,6 +187,14 @@ export class AtualizarPropostaDto {
   formaPagamento?: string;
 
   @IsOptional()
+  @Transform(parseOptionalInteger)
+  @IsInt()
+  @Min(1)
+  @Max(24)
+  parcelas?: number;
+
+  @IsOptional()
+  @Transform(parseOptionalInteger)
   @IsInt()
   @Min(1)
   @Max(3650)

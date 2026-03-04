@@ -151,6 +151,30 @@ class PropostasService {
   private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutos em milliseconds
   private isLoadingVendedores = false;
 
+  private toFiniteNumber(value: unknown, fallback: number): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  private toInteger(
+    value: unknown,
+    fallback: number,
+    options?: { min?: number; max?: number },
+  ): number {
+    const parsed = this.toFiniteNumber(value, fallback);
+    const rounded = Math.trunc(parsed);
+    const min = options?.min;
+    const max = options?.max;
+
+    if (typeof min === 'number' && rounded < min) {
+      return min;
+    }
+    if (typeof max === 'number' && rounded > max) {
+      return max;
+    }
+    return rounded;
+  }
+
   private isComboItem(item: unknown): boolean {
     if (!item || typeof item !== 'object') {
       return false;
@@ -614,18 +638,64 @@ class PropostasService {
   // Criar nova proposta usando API real
   async criarProposta(dados: PropostaCompleta): Promise<PropostaCompleta> {
     try {
+      const valorTotal = this.toFiniteNumber(dados.total, 0);
+      const descontoGlobal = this.toFiniteNumber(dados.descontoGlobal, 0);
+      const impostos = this.toFiniteNumber(dados.impostos, 0);
+      const validadeDias = this.toInteger(dados.validadeDias, 30, { min: 1, max: 3650 });
+      const parcelas =
+        dados.formaPagamento === 'parcelado'
+          ? this.toInteger(dados.parcelas, 1, { min: 1, max: 24 })
+          : undefined;
+      const subtotal = this.toFiniteNumber(
+        dados.subtotal,
+        (dados.produtos || []).reduce((acc, produto) => {
+          const quantidade = this.toInteger(produto.quantidade, 1, { min: 1 });
+          const preco = this.toFiniteNumber(produto.produto.preco, 0);
+          const descontoItem = this.toFiniteNumber(produto.desconto, 0);
+          return acc + quantidade * preco * (1 - descontoItem / 100);
+        }, 0),
+      );
+      const clientePayload = dados.cliente
+        ? {
+            id: dados.cliente.id,
+            nome: dados.cliente.nome || 'Cliente não informado',
+            email: dados.cliente.email || '',
+            telefone: dados.cliente.telefone || '',
+            documento: dados.cliente.documento || '',
+            endereco: dados.cliente.endereco || '',
+            cidade: dados.cliente.cidade || '',
+            estado: dados.cliente.estado || '',
+            cep: dados.cliente.cep || '',
+            tipoPessoa: dados.cliente.tipoPessoa || 'fisica',
+          }
+        : undefined;
+      const vendedorPayload = dados.vendedor
+        ? {
+            id: dados.vendedor.id,
+            nome: dados.vendedor.nome || '',
+            email: dados.vendedor.email || '',
+            telefone: dados.vendedor.telefone || '',
+            tipo: dados.vendedor.tipo || 'vendedor',
+            ativo: dados.vendedor.ativo ?? true,
+          }
+        : undefined;
+
       // Preparar dados para o backend
       const dadosParaBackend = {
         titulo: dados.titulo || this.gerarTituloAutomatico(dados.cliente),
-        cliente: dados.cliente?.nome || 'Cliente não informado',
+        cliente: clientePayload || dados.cliente?.nome || 'Cliente nao informado',
         clienteId: dados.cliente?.id,
-        valor: dados.total,
+        subtotal,
+        total: valorTotal,
+        valor: valorTotal,
         observacoes: dados.observacoes || '',
-        vendedor: dados.vendedor?.nome || '',
+        vendedor: vendedorPayload || dados.vendedor?.nome || '',
+        vendedorId: dados.vendedor?.id,
         formaPagamento: dados.formaPagamento || 'avista',
-        validadeDias: dados.validadeDias || 30,
-        descontoGlobal: dados.descontoGlobal ?? 0,
-        impostos: dados.impostos ?? 0,
+        parcelas,
+        validadeDias,
+        descontoGlobal,
+        impostos,
         incluirImpostosPDF: dados.incluirImpostosPDF ?? false,
         produtos:
           dados.produtos?.map((produto) => ({
@@ -638,13 +708,13 @@ class PropostasService {
             descricao: produto.produto.descricao || '',
             unidade: produto.produto.unidade || 'unidade',
             tipoItem: produto.produto.tipoItem || 'produto',
-            quantidade: produto.quantidade,
-            precoUnitario: produto.produto.preco,
-            desconto: produto.desconto || 0,
+            quantidade: this.toInteger(produto.quantidade, 1, { min: 1 }),
+            precoUnitario: this.toFiniteNumber(produto.produto.preco, 0),
+            desconto: this.toFiniteNumber(produto.desconto, 0),
             subtotal:
-              (Number(produto.quantidade || 0) || 0) *
-              (Number(produto.produto.preco || 0) || 0) *
-              (1 - (Number(produto.desconto || 0) || 0) / 100),
+              this.toInteger(produto.quantidade, 1, { min: 1 }) *
+              this.toFiniteNumber(produto.produto.preco, 0) *
+              (1 - this.toFiniteNumber(produto.desconto, 0) / 100),
             produtosCombo:
               produto.produto.tipo === 'combo' && Array.isArray(produto.produto.produtosCombo)
                 ? produto.produto.produtosCombo.map((itemCombo) => ({

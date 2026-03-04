@@ -61,6 +61,7 @@ interface MetricasPropostas {
 
 interface DashboardPropostasProps {
   onRefresh?: () => void;
+  metricasOverride?: MetricasPropostas;
 }
 
 type StatusConfig = {
@@ -83,7 +84,7 @@ const getStatusConfig = (status: string): StatusConfig => {
     case 'negociacao':
       return { icon: AlertCircle, colorClass: 'text-[#92400E]', bgClass: 'bg-[#FBBF24]/20', label: 'Em negociacao' };
     case 'contrato_gerado':
-      return { icon: FileSignature, colorClass: 'text-[#3730A3]', bgClass: 'bg-[#818CF8]/15', label: 'Contrato gerado' };
+      return { icon: FileSignature, colorClass: 'text-[#3730A3]', bgClass: 'bg-[#818CF8]/15', label: 'Aguardando assinatura do contrato' };
     case 'contrato_assinado':
       return { icon: CheckCircle, colorClass: 'text-[#166534]', bgClass: 'bg-[#16A34A]/10', label: 'Contrato assinado' };
     case 'fatura_criada':
@@ -106,7 +107,10 @@ const formatarMoeda = (valor: number): string => {
   }).format(valor || 0);
 };
 
-export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefresh }) => {
+export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({
+  onRefresh,
+  metricasOverride,
+}) => {
   const [metricas, setMetricas] = useState<MetricasPropostas | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -126,41 +130,48 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
   };
 
   useEffect(() => {
+    if (metricasOverride) {
+      return;
+    }
     void carregarMetricas();
-  }, []);
+  }, [metricasOverride]);
+
+  const metricasData = metricasOverride || metricas;
+  const isLoadingDashboard = metricasOverride ? false : isLoading;
+  const errorDashboard = metricasOverride ? null : error;
 
   const valorMedio = useMemo(() => {
-    if (!metricas || metricas.totalPropostas <= 0) {
+    if (!metricasData || metricasData.totalPropostas <= 0) {
       return 0;
     }
-    return metricas.valorTotalPipeline / metricas.totalPropostas;
-  }, [metricas]);
+    return metricasData.valorTotalPipeline / metricasData.totalPropostas;
+  }, [metricasData]);
 
   const statusOrdenados = useMemo(() => {
-    if (!metricas) {
+    if (!metricasData) {
       return [] as Array<[string, number]>;
     }
-    return Object.entries(metricas.estatisticasPorStatus || {}).sort((a, b) => b[1] - a[1]);
-  }, [metricas]);
+    return Object.entries(metricasData.estatisticasPorStatus || {}).sort((a, b) => b[1] - a[1]);
+  }, [metricasData]);
 
   const vendedoresOrdenados = useMemo(() => {
-    if (!metricas) {
+    if (!metricasData) {
       return [] as Array<[string, number]>;
     }
-    return Object.entries(metricas.estatisticasPorVendedor || {})
+    return Object.entries(metricasData.estatisticasPorVendedor || {})
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5);
-  }, [metricas]);
+  }, [metricasData]);
 
   const motivosPerdaTop = useMemo(() => {
-    if (!metricas || !Array.isArray(metricas.motivosPerdaTop)) {
+    if (!metricasData || !Array.isArray(metricasData.motivosPerdaTop)) {
       return [] as Array<{ motivo: string; quantidade: number }>;
     }
-    return metricas.motivosPerdaTop.slice(0, 5);
-  }, [metricas]);
+    return metricasData.motivosPerdaTop.slice(0, 5);
+  }, [metricasData]);
 
   const conversaoPorProduto = useMemo(() => {
-    if (!metricas || !Array.isArray(metricas.conversaoPorProduto)) {
+    if (!metricasData || !Array.isArray(metricasData.conversaoPorProduto)) {
       return [] as Array<{
         produto: string;
         total: number;
@@ -169,11 +180,11 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
         taxaConversao: number;
       }>;
     }
-    return metricas.conversaoPorProduto.slice(0, 5);
-  }, [metricas]);
+    return metricasData.conversaoPorProduto.slice(0, 5);
+  }, [metricasData]);
 
   const usoItensVsCombos = useMemo(() => {
-    if (!metricas?.usoItensVsCombos) {
+    if (!metricasData?.usoItensVsCombos) {
       return {
         itensAvulsos: 0,
         combos: 0,
@@ -185,7 +196,7 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
       };
     }
 
-    const uso = metricas.usoItensVsCombos;
+    const uso = metricasData.usoItensVsCombos;
     return {
       itensAvulsos: Number(uso.itensAvulsos || 0),
       combos: Number(uso.combos || 0),
@@ -195,9 +206,9 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
       percentualItensAvulsos: Number(uso.percentualItensAvulsos || 0),
       percentualCombos: Number(uso.percentualCombos || 0),
     };
-  }, [metricas]);
+  }, [metricasData]);
 
-  if (isLoading) {
+  if (isLoadingDashboard) {
     return (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[...Array(4)].map((_, index) => (
@@ -210,12 +221,12 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
     );
   }
 
-  if (error) {
+  if (errorDashboard) {
     return (
       <SectionCard className="p-4 sm:p-5">
         <div className="flex items-center gap-3">
           <XCircle className="h-5 w-5 text-[#DC2626]" />
-          <p className="text-sm text-[#7A2F2F]">{error}</p>
+          <p className="text-sm text-[#7A2F2F]">{errorDashboard}</p>
           <button
             type="button"
             onClick={() => void carregarMetricas()}
@@ -228,7 +239,7 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
     );
   }
 
-  if (!metricas) return null;
+  if (!metricasData) return null;
 
   return (
     <div className="space-y-4">
@@ -237,7 +248,7 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wide text-[#607B89]">Total de propostas</p>
-              <p className="mt-2 text-2xl font-semibold text-[#19384C]">{metricas.totalPropostas}</p>
+              <p className="mt-2 text-2xl font-semibold text-[#19384C]">{metricasData.totalPropostas}</p>
             </div>
             <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#159A9C]/10">
               <FileText className="h-5 w-5 text-[#0F7B7D]" />
@@ -249,7 +260,9 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wide text-[#607B89]">Pipeline total</p>
-              <p className="mt-2 text-2xl font-semibold text-[#19384C]">{formatarMoeda(metricas.valorTotalPipeline)}</p>
+              <p className="mt-2 text-2xl font-semibold text-[#19384C]">
+                {formatarMoeda(metricasData.valorTotalPipeline)}
+              </p>
             </div>
             <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#16A34A]/10">
               <DollarSign className="h-5 w-5 text-[#166534]" />
@@ -273,10 +286,12 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wide text-[#607B89]">Taxa de conversao</p>
-              <p className="mt-2 text-2xl font-semibold text-[#19384C]">{metricas.taxaConversao.toFixed(1)}%</p>
+              <p className="mt-2 text-2xl font-semibold text-[#19384C]">
+                {metricasData.taxaConversao.toFixed(1)}%
+              </p>
             </div>
             <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#FBBF24]/20">
-              {metricas.taxaConversao >= 50 ? (
+              {metricasData.taxaConversao >= 50 ? (
                 <TrendingUp className="h-5 w-5 text-[#92400E]" />
               ) : (
                 <TrendingDown className="h-5 w-5 text-[#92400E]" />
@@ -297,8 +312,8 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
                 const config = getStatusConfig(status);
                 const Icone = config.icon;
                 const valorEstimado =
-                  metricas.totalPropostas > 0
-                    ? quantidade * (metricas.valorTotalPipeline / metricas.totalPropostas)
+                  metricasData.totalPropostas > 0
+                    ? quantidade * (metricasData.valorTotalPipeline / metricasData.totalPropostas)
                     : 0;
 
                 return (
@@ -315,8 +330,8 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
                     <div className="text-right">
                       <p className="text-sm font-semibold text-[#19384C]">{formatarMoeda(valorEstimado)}</p>
                       <p className="text-xs text-[#607B89]">
-                        {metricas.totalPropostas > 0
-                          ? ((quantidade / metricas.totalPropostas) * 100).toFixed(1)
+                        {metricasData.totalPropostas > 0
+                          ? ((quantidade / metricasData.totalPropostas) * 100).toFixed(1)
                           : '0.0'}
                         %
                       </p>
@@ -336,8 +351,8 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
             ) : (
               vendedoresOrdenados.map(([vendedorNome, quantidade]) => {
                 const valorEstimado =
-                  metricas.totalPropostas > 0
-                    ? quantidade * (metricas.valorTotalPipeline / metricas.totalPropostas)
+                  metricasData.totalPropostas > 0
+                    ? quantidade * (metricasData.valorTotalPipeline / metricasData.totalPropostas)
                     : 0;
                 return (
                   <div key={vendedorNome} className={`${shellTokens.card} flex items-center justify-between gap-3 p-3`}>
@@ -475,15 +490,17 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
             </span>
             <div>
               <p className="text-sm font-medium text-[#244455]">Propostas aprovadas</p>
-              <p className="text-xs text-[#607B89]">{metricas.propostasAprovadas} de {metricas.totalPropostas} no periodo</p>
-              <p className="mt-1 text-xs text-[#607B89]">
-                {metricas.aprovacoesPendentes || 0} aprovacao(oes) pendente(s) e{' '}
-                {metricas.followupsPendentes || 0} follow-up(s) pendente(s)
+              <p className="text-xs text-[#607B89]">
+                {metricasData.propostasAprovadas} de {metricasData.totalPropostas} no periodo
               </p>
               <p className="mt-1 text-xs text-[#607B89]">
-                {metricas.propostasComVersao || 0} proposta(s) com revisao, media de{' '}
-                {Number(metricas.mediaVersoesPorProposta || 0).toFixed(1)} versao(oes) por proposta
-                e {metricas.revisoesUltimos7Dias || 0} revisao(oes) nos ultimos 7 dias
+                {metricasData.aprovacoesPendentes || 0} aprovacao(oes) pendente(s) e{' '}
+                {metricasData.followupsPendentes || 0} follow-up(s) pendente(s)
+              </p>
+              <p className="mt-1 text-xs text-[#607B89]">
+                {metricasData.propostasComVersao || 0} proposta(s) com revisao, media de{' '}
+                {Number(metricasData.mediaVersoesPorProposta || 0).toFixed(1)} versao(oes) por
+                proposta e {metricasData.revisoesUltimos7Dias || 0} revisao(oes) nos ultimos 7 dias
               </p>
             </div>
           </div>
@@ -491,7 +508,9 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({ onRefres
           <button
             type="button"
             onClick={() => {
-              void carregarMetricas();
+              if (!metricasOverride) {
+                void carregarMetricas();
+              }
               onRefresh?.();
             }}
             className="inline-flex h-9 items-center rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB]"

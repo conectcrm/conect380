@@ -32,7 +32,12 @@ const ETAPAS_FLUXO: EtapaFluxo[] = [
   { id: 'visualizada', label: 'Visualizada', icon: Eye, color: 'cyan' },
   { id: 'negociacao', label: 'Negociacao', icon: Clock, color: 'yellow' },
   { id: 'aprovada', label: 'Aprovada', icon: CheckCircle, color: 'green' },
-  { id: 'contrato_gerado', label: 'Contrato gerado', icon: FileSignature, color: 'purple' },
+  {
+    id: 'contrato_gerado',
+    label: 'Aguardando assinatura do contrato',
+    icon: FileSignature,
+    color: 'purple',
+  },
   { id: 'contrato_assinado', label: 'Contrato assinado', icon: CheckCircle, color: 'indigo' },
   { id: 'fatura_criada', label: 'Fatura criada', icon: CreditCard, color: 'pink' },
   {

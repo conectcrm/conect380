@@ -273,9 +273,33 @@ class ContratoService {
   }
 
   // Listar contratos
-  async listarContratos(): Promise<Contrato[]> {
+  async listarContratos(filtros?: {
+    status?: string;
+    clienteId?: string | number;
+    propostaId?: string;
+    dataInicio?: string;
+    dataFim?: string;
+  }): Promise<Contrato[]> {
     try {
-      const response = await api.get('/contratos');
+      const params: Record<string, string> = {};
+
+      if (filtros?.status) {
+        params.status = String(filtros.status);
+      }
+      if (filtros?.clienteId !== undefined && filtros?.clienteId !== null && filtros?.clienteId !== '') {
+        params.clienteId = String(filtros.clienteId);
+      }
+      if (filtros?.propostaId) {
+        params.propostaId = String(filtros.propostaId);
+      }
+      if (filtros?.dataInicio) {
+        params.dataInicio = String(filtros.dataInicio);
+      }
+      if (filtros?.dataFim) {
+        params.dataFim = String(filtros.dataFim);
+      }
+
+      const response = await api.get('/contratos', { params });
       const data = unwrapEnvelope<ContratoBackend[]>(
         response.data,
         'Erro ao listar contratos',
@@ -283,6 +307,27 @@ class ContratoService {
       return Array.isArray(data) ? data.map(mapContrato) : [];
     } catch (error) {
       console.error('Erro ao listar contratos:', error);
+      throw error;
+    }
+  }
+
+  async buscarContratoPorPropostaId(propostaId: string): Promise<Contrato | null> {
+    try {
+      if (!propostaId?.trim()) {
+        return null;
+      }
+
+      const contratos = await this.listarContratos({ propostaId: propostaId.trim() });
+      if (!Array.isArray(contratos) || contratos.length === 0) {
+        return null;
+      }
+
+      return (
+        contratos.find((contrato) => String(contrato.status || '').toLowerCase() !== 'cancelado') ||
+        contratos[0]
+      );
+    } catch (error) {
+      console.error('Erro ao buscar contrato por proposta:', error);
       throw error;
     }
   }

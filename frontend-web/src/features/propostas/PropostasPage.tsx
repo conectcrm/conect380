@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useI18n } from '../../contexts/I18nContext';
 import { ModalProposta } from '../../components/modals/ModalProposta';
@@ -394,6 +394,12 @@ const PropostasPage: React.FC = () => {
   const [previewProposta, setPreviewProposta] = useState<any>(null);
   const [previewPosition, setPreviewPosition] = useState({ x: 0, y: 0 });
   const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (viewMode === 'dashboard' && propostasSelecionadas.length > 0) {
+      setPropostasSelecionadas([]);
+    }
+  }, [viewMode, propostasSelecionadas.length]);
 
   // Função para mostrar notificações
   const showNotification = useCallback((message: string, type: 'success' | 'error') => {
@@ -855,6 +861,14 @@ const PropostasPage: React.FC = () => {
       setIsLoadingCreate(false);
     }
   };
+
+  const vendedoresDisponiveis = useMemo(() => {
+    const nomes = propostas
+      .map((proposta) => safeRender(proposta.vendedor))
+      .filter((nome) => Boolean(nome && nome !== 'Sistema'));
+
+    return Array.from(new Set(nomes)).sort((a, b) => a.localeCompare(b));
+  }, [propostas]);
 
   // Aplicar filtros
   useEffect(() => {
@@ -1431,6 +1445,127 @@ const PropostasPage: React.FC = () => {
 
   const metricas = calcularMetricas();
 
+  const metricasDashboardFiltrado = useMemo(() => {
+    const statusGanhos = new Set([
+      'aprovada',
+      'contrato_gerado',
+      'contrato_assinado',
+      'fatura_criada',
+      'aguardando_pagamento',
+      'pago',
+    ]);
+
+    const totalPropostas = filteredPropostas.length;
+    const valorTotalPipeline: number = filteredPropostas.reduce((sum, proposta) => {
+      return sum + (Number((proposta as any).valor) || 0);
+    }, 0);
+
+    const estatisticasPorStatus: Record<string, number> = filteredPropostas.reduce(
+      (acc: Record<string, number>, proposta: any) => {
+        const status = String(safeRender(proposta?.status) || 'rascunho');
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      },
+      {},
+    );
+
+    const estatisticasPorVendedor: Record<string, number> = filteredPropostas.reduce(
+      (acc: Record<string, number>, proposta: any) => {
+        const vendedor = safeRender(proposta?.vendedor) || 'Sem vendedor';
+        acc[vendedor] = (acc[vendedor] || 0) + 1;
+        return acc;
+      },
+      {},
+    );
+
+    const propostasAprovadas = filteredPropostas.filter((proposta: any) =>
+      statusGanhos.has(String(safeRender(proposta?.status))),
+    ).length;
+
+    const motivosPerdaMap: Record<string, number> = filteredPropostas.reduce(
+      (acc: Record<string, number>, proposta: any) => {
+        if (String(safeRender(proposta?.status)) !== 'rejeitada') {
+          return acc;
+        }
+        const motivo = safeRender((proposta as any)?.motivoPerda) || 'Nao informado';
+        acc[motivo] = (acc[motivo] || 0) + 1;
+        return acc;
+      },
+      {},
+    );
+
+    const motivosPerdaTop = Object.entries(motivosPerdaMap)
+      .map(([motivo, quantidade]) => ({ motivo, quantidade: Number(quantidade) || 0 }))
+      .sort((a, b) => b.quantidade - a.quantidade)
+      .slice(0, 5);
+
+    const conversaoPorProdutoMap: Record<string, { total: number; ganhas: number; perdidas: number }> = {};
+
+    filteredPropostas.forEach((proposta: any) => {
+      const status = String(safeRender(proposta?.status));
+      const ganhou = statusGanhos.has(status);
+      const perdeu = status === 'rejeitada';
+
+      const produtos = Array.isArray((proposta as any)?.produtos) ? (proposta as any).produtos : [];
+      produtos.forEach((item: any) => {
+        const nomeProduto =
+          safeRender(item?.produto?.nome) || safeRender(item?.nome) || 'Produto nao informado';
+
+        if (!conversaoPorProdutoMap[nomeProduto]) {
+          conversaoPorProdutoMap[nomeProduto] = { total: 0, ganhas: 0, perdidas: 0 };
+        }
+
+        conversaoPorProdutoMap[nomeProduto].total += 1;
+        if (ganhou) conversaoPorProdutoMap[nomeProduto].ganhas += 1;
+        if (perdeu) conversaoPorProdutoMap[nomeProduto].perdidas += 1;
+      });
+    });
+
+    const conversaoPorProduto = Object.entries(conversaoPorProdutoMap)
+      .map(([produto, dados]) => ({
+        produto,
+        total: dados.total,
+        ganhas: dados.ganhas,
+        perdidas: dados.perdidas,
+        taxaConversao: dados.total > 0 ? Math.round((dados.ganhas / dados.total) * 10000) / 100 : 0,
+      }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5);
+
+    return {
+      totalPropostas,
+      valorTotalPipeline,
+      taxaConversao: totalPropostas > 0 ? (propostasAprovadas / totalPropostas) * 100 : 0,
+      propostasAprovadas,
+      estatisticasPorStatus,
+      estatisticasPorVendedor,
+      motivosPerdaTop,
+      conversaoPorProduto,
+      aprovacoesPendentes: 0,
+      followupsPendentes: 0,
+      propostasComVersao: filteredPropostas.filter(
+        (proposta) => Number((proposta as any).totalVersoes || 0) > 1,
+      ).length,
+      mediaVersoesPorProposta:
+        totalPropostas > 0
+          ? filteredPropostas.reduce(
+              (sum, proposta) => sum + Math.max(Number((proposta as any).totalVersoes || 0), 1),
+              0,
+            ) / totalPropostas
+          : 0,
+      revisoesUltimos7Dias: 0,
+      usoItensVsCombos: {
+        itensAvulsos: 0,
+        combos: 0,
+        propostasComItensAvulsos: 0,
+        propostasComCombos: 0,
+        propostasMistas: 0,
+        percentualItensAvulsos: 0,
+        percentualCombos: 0,
+      },
+    };
+  }, [filteredPropostas]);
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'aprovada':
@@ -1500,7 +1635,7 @@ const PropostasPage: React.FC = () => {
       case 'enviada':
         return 'Enviada';
       case 'contrato_gerado':
-        return 'Contrato Gerado';
+        return 'Aguardando assinatura do contrato';
       case 'contrato_assinado':
         return 'Contrato Assinado';
       case 'fatura_criada':
@@ -2086,7 +2221,6 @@ const PropostasPage: React.FC = () => {
   return (
     <div className="space-y-4">
       <ModalNovaProposta
-        key={`modal-${showWizardModal ? 'open' : 'closed'}-${Date.now()}`}
         isOpen={showWizardModal}
         onClose={() => {
           setShowWizardModal(false);
@@ -2136,7 +2270,19 @@ const PropostasPage: React.FC = () => {
                 <span className="hidden sm:inline">Atualizar</span>
               </button>
 
-              <button type="button" className={actionSecondaryButtonClass}>
+              <button
+                type="button"
+                onClick={() => {
+                  void handleExportarSelecionadas();
+                }}
+                disabled={propostasSelecionadas.length === 0}
+                className={actionSecondaryButtonClass}
+                title={
+                  propostasSelecionadas.length === 0
+                    ? 'Selecione propostas para exportar'
+                    : 'Exportar propostas selecionadas'
+                }
+              >
                 <Download className="h-4 w-4" />
                 Exportar
               </button>
@@ -2185,7 +2331,10 @@ const PropostasPage: React.FC = () => {
 
         {/* Renderização condicional por modo de visualização */}
         {viewMode === 'dashboard' ? (
-          <DashboardPropostas onRefresh={handleManualRefresh} />
+          <DashboardPropostas
+            onRefresh={handleManualRefresh}
+            metricasOverride={metricasDashboardFiltrado}
+          />
         ) : (
           <>
             {/* Filtros Avançados */}
@@ -2359,7 +2508,7 @@ const PropostasPage: React.FC = () => {
                     <option value="visualizada">Visualizada</option>
                     <option value="negociacao">Em Negociação</option>
                     <option value="aprovada">Aprovada</option>
-                    <option value="contrato_gerado">Contrato Gerado</option>
+                    <option value="contrato_gerado">Aguardando Assinatura do Contrato</option>
                     <option value="contrato_assinado">Contrato Assinado</option>
                     <option value="fatura_criada">Fatura Criada</option>
                     <option value="aguardando_pagamento">Aguardando Pagamento</option>
@@ -2377,9 +2526,11 @@ const PropostasPage: React.FC = () => {
                     className={shellFieldTokens.base}
                   >
                     <option value="todos">Todos os Vendedores</option>
-                    <option value="Maria Santos">Maria Santos</option>
-                    <option value="Pedro Costa">Pedro Costa</option>
-                    <option value="Ana Silva">Ana Silva</option>
+                    {vendedoresDisponiveis.map((vendedor) => (
+                      <option key={vendedor} value={vendedor}>
+                        {vendedor}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -3059,7 +3210,7 @@ const PropostasPage: React.FC = () => {
           onDeselectAll={handleDeselectAll}
           onExportarSelecionadas={handleExportarSelecionadas}
           onAcoesMassa={handleAcoesMassa}
-          visible={propostasSelecionadas.length > 0}
+          visible={propostasSelecionadas.length > 0 && viewMode !== 'dashboard'}
         />
 
         {/* Preview de Proposta - Hover tooltip */}

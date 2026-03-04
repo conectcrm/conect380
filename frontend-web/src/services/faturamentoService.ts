@@ -70,6 +70,7 @@ export interface Fatura {
   valorPago?: number;
   percentualDesconto?: number;
   formaPagamento?: FormaPagamento;
+  formaPagamentoPreferida?: FormaPagamento;
   observacoes?: string;
   linkPagamento?: string;
   arquivoUrl?: string;

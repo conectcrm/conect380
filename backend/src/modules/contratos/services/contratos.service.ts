@@ -176,6 +176,7 @@ export class ContratosService {
     filtros?: {
       status?: StatusContrato;
       clienteId?: number;
+      propostaId?: string;
       dataInicio?: Date;
       dataFim?: Date;
     },
@@ -192,6 +193,10 @@ export class ContratosService {
 
     if (filtros?.clienteId) {
       query.andWhere('contrato.clienteId = :clienteId', { clienteId: filtros.clienteId });
+    }
+
+    if (filtros?.propostaId) {
+      query.andWhere('contrato.propostaId = :propostaId', { propostaId: filtros.propostaId });
     }
 
     if (filtros?.dataInicio) {

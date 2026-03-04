@@ -93,6 +93,7 @@ export class ContratosController {
     @EmpresaId() empresaId: string,
     @Query('status') status?: StatusContrato,
     @Query('clienteId') clienteId?: string,
+    @Query('propostaId') propostaId?: string,
     @Query('dataInicio') dataInicio?: string,
     @Query('dataFim') dataFim?: string,
   ) {
@@ -100,6 +101,7 @@ export class ContratosController {
       const filtros = {
         status,
         clienteId: clienteId ? parseInt(clienteId) : undefined,
+        propostaId: propostaId?.trim() || undefined,
         dataInicio: dataInicio ? new Date(dataInicio) : undefined,
         dataFim: dataFim ? new Date(dataFim) : undefined,
       };

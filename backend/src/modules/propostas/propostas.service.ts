@@ -78,7 +78,7 @@ const FLOW_STATUS_TRANSITIONS: Record<SalesFlowStatus, readonly SalesFlowStatus[
   enviada: ['visualizada', 'negociacao', 'aprovada', 'rejeitada', 'expirada'],
   visualizada: ['negociacao', 'aprovada', 'rejeitada', 'expirada'],
   negociacao: ['aprovada', 'rejeitada', 'expirada', 'visualizada'],
-  aprovada: ['contrato_gerado', 'rejeitada'],
+  aprovada: ['contrato_gerado', 'fatura_criada', 'rejeitada'],
   contrato_gerado: ['contrato_assinado'],
   contrato_assinado: ['fatura_criada'],
   fatura_criada: ['contrato_assinado', 'aguardando_pagamento', 'pago'],
@@ -1573,14 +1573,16 @@ export class PropostasService {
         fluxoStatus,
         motivoPerda,
       });
+      const validadeDias = Number.isFinite(Number(dadosProposta.validadeDias))
+        ? Math.max(1, Number(dadosProposta.validadeDias))
+        : 30;
+      const dataVencimentoCalculada =
+        dadosProposta.dataVencimento ||
+        new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000).toISOString();
 
       if (legacySchema) {
         const titulo = dadosProposta.titulo || `Proposta ${numero}`;
         const valor = Number(dadosProposta.valor || dadosProposta.total || 0);
-        const validadeDias = dadosProposta.validadeDias || 30;
-        const dataVencimento =
-          dadosProposta.dataVencimento ||
-          new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000).toISOString();
         const insertColumns: string[] = ['empresa_id', 'numero', 'titulo', 'valor', 'status'];
         const insertValues: unknown[] = [
           empresaIdProposta,
@@ -1604,7 +1606,7 @@ export class PropostasService {
 
         if (propostaColumns.has('validade')) {
           insertColumns.push('validade');
-          insertValues.push(new Date(dataVencimento));
+          insertValues.push(new Date(dataVencimentoCalculada));
         }
 
         const placeholders = insertValues.map((_, index) => `$${index + 1}`).join(', ');
@@ -1687,13 +1689,13 @@ export class PropostasService {
         total: dadosProposta.total || 0,
         valor: dadosProposta.valor || dadosProposta.total || 0,
         formaPagamento: dadosProposta.formaPagamento || 'avista',
-        validadeDias: dadosProposta.validadeDias || 30,
+        validadeDias,
         observacoes: dadosProposta.observacoes,
         incluirImpostosPDF: dadosProposta.incluirImpostosPDF || false,
         status: this.mapFlowStatusToDatabaseStatus(fluxoStatus, false) as any,
         dataVencimento: dadosProposta.dataVencimento
           ? new Date(dadosProposta.dataVencimento)
-          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          : new Date(dataVencimentoCalculada),
         source: dadosProposta.source || 'api',
         vendedor_id: vendedorId,
         emailDetails: emailDetailsIniciais as any,

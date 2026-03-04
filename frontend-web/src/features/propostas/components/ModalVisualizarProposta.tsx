@@ -131,7 +131,7 @@ const getStatusText = (status?: string) => {
     aprovada: 'Aprovada',
     rejeitada: 'Rejeitada',
     expirada: 'Expirada',
-    contrato_gerado: 'Contrato gerado',
+    contrato_gerado: 'Aguardando assinatura do contrato',
     contrato_assinado: 'Contrato assinado',
     fatura_criada: 'Fatura criada',
     aguardando_pagamento: 'Aguardando pagamento',

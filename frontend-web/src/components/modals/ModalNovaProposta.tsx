@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef, useId } from 'react';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
@@ -19,10 +19,7 @@ import {
   CreditCard,
   Calendar,
   DollarSign,
-  Eye,
   Save,
-  MessageCircle,
-  Mail,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { shellFieldTokens } from '../layout-v2';
@@ -35,8 +32,6 @@ import {
   Vendedor,
 } from '../../features/propostas/services/propostasService';
 import { clientesService, Cliente as ClienteService } from '../../services/clientesService';
-import { emailServiceReal } from '../../services/emailServiceReal';
-import { portalClienteService } from '../../services/portalClienteService';
 import { gerarTokenNumerico } from '../../utils/tokenUtils';
 import { BadgeProdutoSoftware } from '../common/BadgeProdutoSoftware';
 
@@ -107,6 +102,8 @@ interface PropostaFormData {
   incluirImpostosPDF: boolean;
 }
 
+type QuickActionType = 'draft';
+
 // Função auxiliar para detectar se é produto de software
 const isProdutoSoftware = (produto: Produto): boolean => {
   return (
@@ -134,6 +131,18 @@ const etapaSchemas = {
   }),
   condicoes: yup.object().shape({
     formaPagamento: yup.string().required('Forma de pagamento é obrigatória'),
+    parcelas: yup.number().when('formaPagamento', {
+      is: 'parcelado',
+      then: () =>
+        yup
+          .number()
+          .typeError('Informe a quantidade de parcelas')
+          .integer('Parcelas deve ser um número inteiro')
+          .min(1, 'Parcelas deve ser pelo menos 1')
+          .max(24, 'Parcelas deve ser no máximo 24')
+          .required('Quantidade de parcelas é obrigatória para pagamento parcelado'),
+      otherwise: () => yup.number().optional().nullable(),
+    }),
     validadeDias: yup.number().when('produtos', {
       is: (produtos: ProdutoProposta[]) =>
         produtos && produtos.some((produto) => isProdutoSoftware(produto.produto)),
@@ -170,11 +179,11 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
   // Estados principais
   const [etapaAtual, setEtapaAtual] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [quickAction, setQuickAction] = useState<QuickActionType | null>(null);
 
   // Estados para dados
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [isLoadingClientes, setIsLoadingClientes] = useState(false);
-  const [buscarCliente, setBuscarCliente] = useState('');
 
   // Estado para modal de cadastro de cliente
   const [isModalCadastroClienteOpen, setIsModalCadastroClienteOpen] = useState(false);
@@ -182,8 +191,10 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
   // Estados para vendedores
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [isLoadingVendedores, setIsLoadingVendedores] = useState(false);
-  const [vendedorAtual, setVendedorAtual] = useState<Vendedor | null>(null);
   const vendedoresCarregadosRef = useRef(false);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const modalTitleId = useId();
+  const modalDescriptionId = useId();
 
   // Refs para controle de carregamento
   const clientesCarregadosRef = useRef(false);
@@ -231,6 +242,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
       descontoGlobal: 0,
       impostos: 12,
       formaPagamento: 'avista',
+      parcelas: undefined,
       validadeDias: 15, // Valor padrão, será opcional para software
       observacoes: '',
       incluirImpostosPDF: true,
@@ -249,12 +261,12 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
   });
 
   // Watch dos campos com otimização
-  const watchedTitulo = watch('titulo');
   const watchedVendedor = watch('vendedor');
   const watchedCliente = watch('cliente');
   const watchedProdutos = watch('produtos');
   const watchedDescontoGlobal = watch('descontoGlobal');
   const watchedImpostos = watch('impostos');
+  const watchedFormaPagamento = watch('formaPagamento');
 
   // Memoização do vendedor para evitar re-renders
   const vendedorMemoized = useMemo(() => watchedVendedor, [watchedVendedor?.id]);
@@ -263,7 +275,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
   const { totais: totaisCombinados } = useCalculosProposta(
     watchedProdutos || [],
     watchedDescontoGlobal || 0,
-    watchedImpostos || 12,
+    watchedImpostos ?? 12,
   );
 
   // Callbacks memorizados para evitar re-renderizações
@@ -285,7 +297,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
   const handleReloadClientes = useCallback(async () => {
     try {
       setIsLoadingClientes(true);
-      const response = await clientesService.getClientes({ limit: 100 });
+      const response = await clientesService.getClientes({ limit: 500 });
 
       const clientesFormatados: Cliente[] = response.data.map((cliente: ClienteService) => ({
         id: cliente.id || '',
@@ -383,6 +395,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
         descontoGlobal: 0,
         impostos: 12,
         formaPagamento: 'avista',
+        parcelas: undefined,
         validadeDias: 15,
         observacoes: '',
         incluirImpostosPDF: true,
@@ -390,11 +403,11 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
 
       // 2. Reset UI states
       setEtapaAtual(0);
-      setBuscarCliente('');
       setBuscarProduto('');
       setCategoriaSelecionada('');
       setTipoSelecionado('');
       setShowProdutoSearch(false);
+      setQuickAction(null);
 
       // 3. Carregar dados apenas se não carregados
       const carregarDados = async () => {
@@ -410,7 +423,6 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
             ]);
 
             setVendedores(vendedoresList);
-            setVendedorAtual(vendedorAtual);
 
             // Só seta o vendedor se o campo estiver vazio
             const vendedorAtualForm = getValues('vendedor');
@@ -425,7 +437,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
             setIsLoadingClientes(true);
             clientesCarregadosRef.current = true;
 
-            const response = await clientesService.getClientes({ limit: 100 });
+            const response = await clientesService.getClientes({ limit: 500 });
             const clientesFormatados: Cliente[] = response.data.map((cliente: ClienteService) => ({
               id: cliente.id || '',
               nome: cliente.nome,
@@ -476,22 +488,11 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
 
   // Gerar título automático quando cliente for selecionado com controle otimizado
   useEffect(() => {
-    if (watchedCliente && (!watchedTitulo || watchedTitulo === '')) {
+    if (watchedCliente && !getValues('titulo')) {
       const tituloAutomatico = propostasService.gerarTituloAutomatico(watchedCliente);
       setValue('titulo', tituloAutomatico, { shouldValidate: false });
     }
-  }, [watchedCliente?.id, setValue]); // Otimizado com ID do cliente
-
-  // Filtrar clientes
-  const clientesFiltrados = useMemo(() => {
-    if (!buscarCliente) return clientes;
-    return clientes.filter(
-      (cliente) =>
-        cliente.nome.toLowerCase().includes(buscarCliente.toLowerCase()) ||
-        cliente.documento.includes(buscarCliente) ||
-        cliente.email.toLowerCase().includes(buscarCliente.toLowerCase()),
-    );
-  }, [buscarCliente, clientes]);
+  }, [watchedCliente?.id, getValues, setValue]); // Otimizado com ID do cliente
 
   // Filtrar produtos
   const produtosFiltrados = useMemo(() => {
@@ -527,12 +528,6 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
   }, [produtosDisponiveis]);
 
   // Funções auxiliares
-  const handleSelecionarCliente = (cliente: Cliente) => {
-    setValue('cliente', cliente);
-    setBuscarCliente('');
-    toast.success(`Cliente ${cliente.nome} selecionado!`);
-  };
-
   const handleAdicionarProduto = (produto: Produto) => {
     if (produto.tipo !== 'combo' && produto.status === 'descontinuado') {
       toast.error('Item descontinuado não pode ser adicionado em novas propostas.');
@@ -594,52 +589,11 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
     }
   };
 
-  // Handlers para as novas ações da última etapa
-  const handlePreview = async () => {
-    try {
-      const formData = watch();
-
-      // Verificar se há produtos de software
-      const temProdutosSoftware = formData.produtos?.some((produto) =>
-        isProdutoSoftware(produto.produto),
-      );
-      const validadeDias =
-        temProdutosSoftware && !formData.validadeDias ? 30 : formData.validadeDias || 15;
-
-      const propostaData: PropostaCompleta = {
-        ...formData,
-        validadeDias,
-        status: 'rascunho',
-        dataValidade: new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000),
-        subtotal: totaisCombinados.subtotal,
-        total: totaisCombinados.total,
-        vendedor: formData.vendedor || {
-          id: '',
-          nome: 'Vendedor Padrão',
-          email: '',
-          tipo: 'vendedor' as const,
-          ativo: true,
-        },
-      };
-
-      const previewResult = await propostasService.previewProposta(JSON.stringify(propostaData));
-
-      // Abrir preview em nova janela
-      const previewWindow = window.open('', '_blank', 'width=800,height=600,scrollbars=yes');
-      if (previewWindow) {
-        previewWindow.document.write(previewResult.html);
-        previewWindow.document.close();
-      }
-
-      toast.success('Preview gerado com sucesso!');
-    } catch (error) {
-      console.error('Erro ao gerar preview:', error);
-      toast.error('Erro ao gerar preview da proposta');
-    }
-  };
+  // Handler para salvar rascunho na etapa final
 
   const handleSaveAsDraft = async () => {
     try {
+      setQuickAction('draft');
       const formData = watch();
 
       // Verificar se há produtos de software
@@ -652,6 +606,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
       const propostaData: PropostaCompleta = {
         ...formData,
         validadeDias,
+        parcelas: formData.formaPagamento === 'parcelado' ? formData.parcelas : undefined,
         status: 'rascunho',
         dataValidade: new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000),
         subtotal: totaisCombinados.subtotal,
@@ -665,7 +620,10 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
         },
       };
 
-      await propostasService.criarProposta(propostaData);
+      const proposta = await propostasService.criarProposta(propostaData);
+      if (onPropostaCriada) {
+        onPropostaCriada(proposta);
+      }
       toast.success('Proposta salva como rascunho!');
       onClose();
     } catch (error) {
@@ -673,134 +631,8 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
       const friendlyMessage =
         error instanceof Error ? error.message : 'Erro ao salvar proposta como rascunho';
       toast.error(friendlyMessage);
-    }
-  };
-
-  const handleSendWhatsApp = async () => {
-    try {
-      const formData = watch();
-
-      if (!formData.cliente?.telefone) {
-        toast.error('Cliente precisa ter telefone cadastrado para envio via WhatsApp');
-        return;
-      }
-
-      // Verificar se há produtos de software
-      const temProdutosSoftware = formData.produtos?.some((produto) =>
-        isProdutoSoftware(produto.produto),
-      );
-      const validadeDias =
-        temProdutosSoftware && !formData.validadeDias ? 30 : formData.validadeDias || 15;
-
-      const propostaData: PropostaCompleta = {
-        ...formData,
-        validadeDias,
-        status: 'enviada',
-        dataValidade: new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000),
-        subtotal: totaisCombinados.subtotal,
-        total: totaisCombinados.total,
-        vendedor: formData.vendedor || {
-          id: '',
-          nome: 'Vendedor Padrão',
-          email: '',
-          tipo: 'vendedor' as const,
-          ativo: true,
-        },
-      };
-
-      const proposta = await propostasService.criarProposta(propostaData);
-      // await propostasService.enviarPorWhatsApp(proposta.id, formData.cliente.telefone);
-
-      toast.success('Proposta criada! Função de WhatsApp será implementada em breve.');
-      onClose();
-    } catch (error) {
-      console.error('Erro ao enviar via WhatsApp:', error);
-      const friendlyMessage =
-        error instanceof Error ? error.message : 'Erro ao enviar proposta via WhatsApp';
-      toast.error(friendlyMessage);
-    }
-  };
-
-  const handleSendEmail = async () => {
-    try {
-      const formData = watch();
-
-      if (!formData.cliente?.email) {
-        toast.error('Cliente precisa ter e-mail cadastrado para envio');
-        return;
-      }
-
-      // Verificar se há produtos de software
-      const temProdutosSoftware = formData.produtos?.some((produto) =>
-        isProdutoSoftware(produto.produto),
-      );
-      const validadeDias =
-        temProdutosSoftware && !formData.validadeDias ? 30 : formData.validadeDias || 15;
-
-      const propostaData: PropostaCompleta = {
-        ...formData,
-        validadeDias,
-        status: 'enviada',
-        dataValidade: new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000),
-        subtotal: totaisCombinados.subtotal,
-        total: totaisCombinados.total,
-        vendedor: formData.vendedor || {
-          id: '',
-          nome: 'Vendedor Padrão',
-          email: '',
-          tipo: 'vendedor' as const,
-          ativo: true,
-        },
-      };
-
-      const proposta = await propostasService.criarProposta(propostaData);
-      const propostaId = (proposta as any)?.id;
-      if (!propostaId) {
-        throw new Error('Proposta criada sem identificador para envio de e-mail.');
-      }
-
-      const tokenPortal = await portalClienteService.gerarTokenPublico(String(propostaId));
-      const emailData = {
-        cliente: {
-          nome: formData.cliente.nome,
-          email: formData.cliente.email,
-        },
-        proposta: {
-          id: String(propostaId),
-          numero: String((proposta as any)?.numero || propostaData.numero || 'N/A'),
-          valorTotal: propostaData.total || 0,
-          dataValidade:
-            propostaData.dataValidade instanceof Date
-              ? propostaData.dataValidade.toISOString().split('T')[0]
-              : new Date().toISOString().split('T')[0],
-          token: tokenPortal,
-        },
-        vendedor: {
-          nome: formData.vendedor?.nome || 'Vendedor',
-          email: formData.vendedor?.email || 'vendedor@conectcrm.com',
-          telefone: '(62) 99668-9991',
-        },
-        empresa: {
-          nome: 'ConectCRM',
-          email: 'conectcrm@gmail.com',
-          telefone: '(62) 99668-9991',
-          endereco: 'Goiânia/GO',
-        },
-        portalUrl: `${window.location.origin}/portal`,
-      };
-
-      const resultado = await emailServiceReal.enviarPropostaParaCliente(emailData);
-      if (!resultado.success) {
-        throw new Error(resultado.error || 'Falha no envio de e-mail da proposta.');
-      }
-
-      toast.success('Proposta criada e enviada por e-mail com sucesso!');
-      onClose();
-    } catch (error) {
-      console.error('Erro ao enviar por e-mail:', error);
-      const friendlyMessage =
-        error instanceof Error ? error.message : 'Erro ao enviar proposta por e-mail';
-      toast.error(friendlyMessage);
+    } finally {
+      setQuickAction(null);
     }
   };
 
@@ -823,6 +655,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
       const propostaData: PropostaCompleta = {
         ...data,
         validadeDias,
+        parcelas: data.formaPagamento === 'parcelado' ? data.parcelas : undefined,
         subtotal: totaisCombinados.subtotal,
         total: totaisCombinados.total,
         dataValidade: new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000),
@@ -851,21 +684,92 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
     }
   };
 
+  const toStartOfDay = (date: Date) => {
+    const normalized = new Date(date);
+    normalized.setHours(0, 0, 0, 0);
+    return normalized;
+  };
+
+  const getDateFromValidityDays = (validadeDias?: number) => {
+    const today = toStartOfDay(new Date());
+    const safeDays = Math.max(1, Number(validadeDias || 0) || 15);
+    const date = new Date(today.getTime() + safeDays * 24 * 60 * 60 * 1000);
+    return date.toISOString().split('T')[0];
+  };
+
+  const getValidityDaysFromDate = (dateValue: string) => {
+    if (!dateValue) {
+      return 15;
+    }
+
+    const selected = toStartOfDay(new Date(`${dateValue}T00:00:00`));
+    const today = toStartOfDay(new Date());
+    const diffDays = Math.ceil((selected.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+    return Math.max(1, diffDays);
+  };
+
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined;
+    }
+
+    const previousActiveElement = document.activeElement as HTMLElement | null;
+    closeButtonRef.current?.focus();
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      previousActiveElement?.focus();
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) {
     return null;
   }
 
+  const hasPendingAction = isLoading || quickAction !== null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B1F2A]/45 p-2 backdrop-blur-[1px] sm:p-4">
-      <div className="modal-content modal-nova-proposta flex h-[94vh] max-h-[94vh] w-full max-w-[1240px] flex-col overflow-hidden rounded-[20px] border border-[#DCE7EB] bg-white shadow-[0_30px_70px_-36px_rgba(16,57,74,0.45)]">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B1F2A]/45 p-2 backdrop-blur-[1px] sm:p-4"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={modalTitleId}
+        aria-describedby={modalDescriptionId}
+        onMouseDown={(event) => event.stopPropagation()}
+        className="modal-content modal-nova-proposta flex h-[94vh] max-h-[94vh] w-full max-w-[1240px] flex-col overflow-hidden rounded-[20px] border border-[#DCE7EB] bg-white shadow-[0_30px_70px_-36px_rgba(16,57,74,0.45)]"
+      >
+        <p id={modalDescriptionId} className="sr-only">
+          Fluxo em etapas para criar proposta comercial com cliente, itens, condicoes e resumo.
+        </p>
         {/* Header do Modal - Compacto */}
         <div className="flex-shrink-0 border-b border-[#DEE8EC] bg-white px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
-              <h2 className="truncate text-lg font-semibold text-[#19384C]">Nova Proposta</h2>
+              <h2 id={modalTitleId} className="truncate text-lg font-semibold text-[#19384C]">
+                Nova Proposta
+              </h2>
             </div>
             <button
+              ref={closeButtonRef}
+              type="button"
               onClick={onClose}
+              aria-label="Fechar modal de nova proposta"
               className="ml-2 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-[#607B89] transition-colors hover:bg-[#F6FAFB] hover:text-[#244455]"
             >
               <X className="h-4 w-4" />
@@ -931,14 +835,19 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Válida até *
                         </label>
-                        <input
-                          type="date"
-                          defaultValue={
-                            new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-                              .toISOString()
-                              .split('T')[0]
-                          }
-                          className={fieldClass}
+                        <Controller
+                          name="validadeDias"
+                          control={control}
+                          render={({ field }) => (
+                            <input
+                              type="date"
+                              value={getDateFromValidityDays(field.value)}
+                              onChange={(event) =>
+                                field.onChange(getValidityDaysFromDate(event.target.value))
+                              }
+                              className={fieldClass}
+                            />
+                          )}
                         />
                       </div>
 
@@ -1003,10 +912,17 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Observações Iniciais
                         </label>
-                        <textarea
-                          rows={2}
-                          placeholder="Observações sobre esta proposta..."
-                          className={textareaFieldClass}
+                        <Controller
+                          name="observacoes"
+                          control={control}
+                          render={({ field }) => (
+                            <textarea
+                              {...field}
+                              rows={2}
+                              placeholder="Observações sobre esta proposta..."
+                              className={textareaFieldClass}
+                            />
+                          )}
                         />
                       </div>
                     </div>
@@ -1295,13 +1211,17 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {produtos.map((field, index) => (
+                      {produtos.map((field, index) => {
+                        const produtoAtual = watchedProdutos?.[index] || field;
+                        return (
                         <div key={field.id} className="p-4 border border-gray-200 rounded-lg">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
-                                <h5 className="font-medium text-gray-900">{field.produto.nome}</h5>
-                                {field.produto.tipo === 'combo' && (
+                                <h5 className="font-medium text-gray-900">
+                                  {produtoAtual.produto.nome}
+                                </h5>
+                                {produtoAtual.produto.tipo === 'combo' && (
                                   <span className="inline-flex items-center gap-1 px-2 py-1 bg-[#159A9C]/10 text-[#159A9C] text-xs rounded-full font-medium">
                                     <Package className="w-3 h-3" />
                                     COMBO
@@ -1309,15 +1229,15 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                                 )}
                               </div>
                               <p className="text-sm text-gray-600 mb-3">
-                                {field.produto.descricao}
+                                {produtoAtual.produto.descricao}
                               </p>
 
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 <div>
                                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    {field.produto.tipoItem &&
+                                    {produtoAtual.produto.tipoItem &&
                                     ['licenca', 'modulo', 'aplicativo'].includes(
-                                      field.produto.tipoItem,
+                                      produtoAtual.produto.tipoItem,
                                     )
                                       ? 'Quantidade de Licenças'
                                       : 'Quantidade'}
@@ -1332,9 +1252,9 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                                         min="1"
                                         step="1"
                                         placeholder={
-                                          field.produto.tipoItem &&
+                                          produtoAtual.produto.tipoItem &&
                                           ['licenca', 'modulo', 'aplicativo'].includes(
-                                            field.produto.tipoItem,
+                                            produtoAtual.produto.tipoItem,
                                           )
                                             ? 'Ex: 10 licenças'
                                             : 'Ex: 1'
@@ -1399,7 +1319,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                                     {new Intl.NumberFormat('pt-BR', {
                                       style: 'currency',
                                       currency: 'BRL',
-                                    }).format(field.subtotal)}
+                                    }).format(produtoAtual.subtotal || 0)}
                                   </div>
                                 </div>
                               </div>
@@ -1414,7 +1334,8 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                             </button>
                           </div>
                         </div>
-                      ))}
+                      );
+                      })}
                     </div>
                   )}
 
@@ -1500,6 +1421,36 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                         <p className="text-red-500 text-sm mt-1">{errors.formaPagamento.message}</p>
                       )}
                     </div>
+
+                    {watchedFormaPagamento === 'parcelado' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Parcelas *
+                        </label>
+                        <Controller
+                          name="parcelas"
+                          control={control}
+                          render={({ field }) => (
+                            <input
+                              {...field}
+                              type="number"
+                              min="1"
+                              max="24"
+                              step="1"
+                              className={fieldClass}
+                              value={field.value ?? ''}
+                              onChange={(event) => {
+                                const value = event.target.value;
+                                field.onChange(value ? Number(value) : undefined);
+                              }}
+                            />
+                          )}
+                        />
+                        {errors.parcelas && (
+                          <p className="text-red-500 text-sm mt-1">{errors.parcelas.message}</p>
+                        )}
+                      </div>
+                    )}
 
                     {/* Validade - Oculto para produtos Software */}
                     {!watchedProdutos?.some((produto) => isProdutoSoftware(produto.produto)) && (
@@ -1664,24 +1615,32 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                     Produtos ({produtos.length})
                   </h4>
                   <div className="space-y-2">
-                    {produtos.map((produto, index) => (
+                    {produtos.map((produto, index) => {
+                      const produtoAtual = watchedProdutos?.[index] || produto;
+                      const subtotalItem = calcularSubtotalProduto(
+                        produtoAtual.produto,
+                        produtoAtual.quantidade || 1,
+                        produtoAtual.desconto || 0,
+                      );
+                      return (
                       <div key={produto.id} className="flex justify-between text-sm">
                         <span>
-                          {produto.produto.nome} (x{produto.quantidade}{' '}
-                          {produto.produto.tipoItem &&
-                          ['licenca', 'modulo', 'aplicativo'].includes(produto.produto.tipoItem)
+                          {produtoAtual.produto.nome} (x{produtoAtual.quantidade}{' '}
+                          {produtoAtual.produto.tipoItem &&
+                          ['licenca', 'modulo', 'aplicativo'].includes(produtoAtual.produto.tipoItem)
                             ? 'licenças'
-                            : produto.produto.unidade || 'unidades'}
+                            : produtoAtual.produto.unidade || 'unidades'}
                           )
                         </span>
                         <span className="font-medium">
                           {new Intl.NumberFormat('pt-BR', {
                             style: 'currency',
                             currency: 'BRL',
-                          }).format(produto.subtotal)}
+                          }).format(subtotalItem)}
                         </span>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -1742,6 +1701,11 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                     <div>
                       <strong>Forma de Pagamento:</strong> {watch('formaPagamento')}
                     </div>
+                    {watch('formaPagamento') === 'parcelado' && (
+                      <div>
+                        <strong>Parcelas:</strong> {watch('parcelas') || '-'}
+                      </div>
+                    )}
                     {!watchedProdutos?.some((produto) => isProdutoSoftware(produto.produto)) && (
                       <div>
                         <strong>Validade:</strong> {watch('validadeDias')} dias
@@ -1790,49 +1754,36 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                   <ArrowRight className="h-4 w-4 ml-1" />
                 </button>
               ) : (
-                <button
-                  onClick={handleSubmit(onSubmit)}
-                  disabled={isLoading || !isValid}
-                  className={primaryButtonClass}
-                >
-                  {isLoading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1"></div>
-                      Criando...
-                    </>
-                  ) : (
-                    <>
-                      <FileText className="h-4 w-4 mr-2" />
-                      {t('common.generateProposal')}
-                    </>
-                  )}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleSaveAsDraft}
+                    disabled={!isValid || hasPendingAction}
+                    className={secondaryButtonClass}
+                    title="Salvar como rascunho"
+                  >
+                    <Save className="h-4 w-4 mr-1" />
+                    Rascunho
+                  </button>
+                  <button
+                    onClick={handleSubmit(onSubmit)}
+                    disabled={hasPendingAction || !isValid}
+                    className={primaryButtonClass}
+                  >
+                    {hasPendingAction ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1"></div>
+                        Salvando...
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="h-4 w-4 mr-2" />
+                        Salvar Proposta
+                      </>
+                    )}
+                  </button>
+                </div>
               )}
             </div>
-
-            {/* Quick actions - Mobile */}
-            {etapaAtual === etapas.length - 1 && (
-              <div className="flex items-center justify-center space-x-2 pt-2 border-t border-gray-100">
-                <button
-                  onClick={handlePreview}
-                  disabled={!isValid}
-                  className="flex items-center px-3 py-1.5 border border-gray-300 text-gray-700 rounded text-xs disabled:opacity-50"
-                  title="Pré-visualizar"
-                >
-                  <Eye className="h-3 w-3 mr-1" />
-                  Preview
-                </button>
-                <button
-                  onClick={handleSaveAsDraft}
-                  disabled={!isValid}
-                  className="flex items-center px-3 py-1.5 border border-[#159A9C] text-[#159A9C] rounded text-xs hover:bg-[#159A9C]/10 disabled:opacity-50"
-                  title="Salvar rascunho"
-                >
-                  <Save className="h-3 w-3 mr-1" />
-                  Rascunho
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Desktop: Horizontal layout - Compacto */}
@@ -1856,61 +1807,31 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                 </button>
               ) : (
                 <div className="flex items-center gap-2">
-                  {/* Quick actions - Desktop */}
-                  <div className="hidden lg:flex items-center space-x-1">
-                    <button
-                      onClick={handlePreview}
-                      disabled={!isValid}
-                      className={secondaryButtonClass}
-                      title="Pré-visualizar proposta"
-                    >
-                      <Eye className="h-3 w-3 mr-1" />
-                      Preview
-                    </button>
-                    <button
-                      onClick={handleSaveAsDraft}
-                      disabled={!isValid}
-                      className={secondaryButtonClass}
-                      title="Salvar como rascunho"
-                    >
-                      <Save className="h-3 w-3 mr-1" />
-                      Rascunho
-                    </button>
-                    <button
-                      onClick={handleSendWhatsApp}
-                      disabled={!isValid}
-                      className={secondaryButtonClass}
-                      title="Enviar por WhatsApp"
-                    >
-                      <MessageCircle className="h-3 w-3 mr-1" />
-                      WhatsApp
-                    </button>
-                    <button
-                      onClick={handleSendEmail}
-                      disabled={!isValid}
-                      className={secondaryButtonClass}
-                      title="Enviar por e-mail"
-                    >
-                      <Mail className="h-3 w-3 mr-1" />
-                      E-mail
-                    </button>
-                  </div>
-
+                  {/* Secondary action button */}
+                  <button
+                    onClick={handleSaveAsDraft}
+                    disabled={!isValid || hasPendingAction}
+                    className={secondaryButtonClass}
+                    title="Salvar como rascunho"
+                  >
+                    <Save className="h-3 w-3 mr-1" />
+                    Rascunho
+                  </button>
                   {/* Main action button */}
                   <button
                     onClick={handleSubmit(onSubmit)}
-                    disabled={isLoading || !isValid}
+                    disabled={hasPendingAction || !isValid}
                     className={primaryButtonClass}
                   >
-                    {isLoading ? (
+                    {hasPendingAction ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1"></div>
-                        Criando...
+                        Salvando...
                       </>
                     ) : (
                       <>
                         <FileText className="h-4 w-4 mr-1" />
-                        Criar Proposta
+                        Salvar Proposta
                       </>
                     )}
                   </button>
