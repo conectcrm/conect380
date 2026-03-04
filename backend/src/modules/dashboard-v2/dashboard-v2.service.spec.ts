@@ -23,6 +23,10 @@ describe('DashboardV2Service', () => {
     compareOverview: jest.fn(),
   };
 
+  const metasService = {
+    getMetaValorParaRange: jest.fn(),
+  };
+
   let service: DashboardV2Service;
 
   beforeEach(() => {
@@ -52,12 +56,14 @@ describe('DashboardV2Service', () => {
     cacheService.buildKey.mockReturnValue('dashboard-key');
     cacheService.get.mockResolvedValue(null);
     cacheService.set.mockResolvedValue(undefined);
+    metasService.getMetaValorParaRange.mockResolvedValue(2500);
 
     service = new DashboardV2Service(
       featureFlagService as any,
       cacheService as any,
       aggregationService as any,
       validationService as any,
+      metasService as any,
     );
   });
 
@@ -70,6 +76,7 @@ describe('DashboardV2Service', () => {
 
     expect(aggregationService.ensureMetricsForRange).not.toHaveBeenCalled();
     expect(aggregationService.getOverview).not.toHaveBeenCalled();
+    expect(metasService.getMetaValorParaRange).not.toHaveBeenCalled();
   });
 
   it('nao força agregacao diaria quando filtra por vendedor', async () => {
@@ -90,6 +97,13 @@ describe('DashboardV2Service', () => {
         vendedorId: '0f22f2af-8f72-406f-b66b-b5340c17ff07',
       }),
     );
+    expect(metasService.getMetaValorParaRange).toHaveBeenCalledWith(
+      expect.any(Date),
+      expect.any(Date),
+      '0f22f2af-8f72-406f-b66b-b5340c17ff07',
+      undefined,
+      'empresa-1',
+    );
   });
 
   it('mantem agregacao diaria para consulta sem filtros', async () => {
@@ -103,6 +117,21 @@ describe('DashboardV2Service', () => {
       expect.objectContaining({
         start: expect.any(Date),
         end: expect.any(Date),
+      }),
+    );
+  });
+
+  it('retorna metaReceita no overview', async () => {
+    const result = await service.getOverview('empresa-1', {
+      periodStart: '2026-03-01',
+      periodEnd: '2026-03-31',
+    } as any);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        receitaFechada: 1000,
+        receitaPrevista: 2000,
+        metaReceita: 2500,
       }),
     );
   });

@@ -4,6 +4,7 @@ import { DashboardV2CacheService } from './services/dashboard-v2-cache.service';
 import { DashboardV2FeatureFlagService } from './services/dashboard-v2-feature-flag.service';
 import { DashboardV2AggregationService } from './services/dashboard-v2-aggregation.service';
 import { DashboardV2ValidationService } from './services/dashboard-v2-validation.service';
+import { MetasService } from '../metas/metas.service';
 
 type DateRange = {
   start: Date;
@@ -24,6 +25,7 @@ export class DashboardV2Service {
     private readonly cacheService: DashboardV2CacheService,
     private readonly aggregationService: DashboardV2AggregationService,
     private readonly validationService: DashboardV2ValidationService,
+    private readonly metasService: MetasService,
   ) {}
 
   async getFeatureFlag(empresaId: string) {
@@ -46,7 +48,21 @@ export class DashboardV2Service {
           await this.aggregationService.ensureMetricsForRange(empresaId, context.range);
         }
 
-        return this.aggregationService.getOverview(empresaId, context.range, query);
+        const [overview, metaReceita] = await Promise.all([
+          this.aggregationService.getOverview(empresaId, context.range, query),
+          this.metasService.getMetaValorParaRange(
+            context.range.start,
+            context.range.end,
+            query.vendedorId,
+            undefined,
+            empresaId,
+          ),
+        ]);
+
+        return {
+          ...overview,
+          metaReceita: Number(metaReceita || 0),
+        };
       },
     );
 

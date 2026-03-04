@@ -5,6 +5,7 @@ import { Oportunidade } from '../oportunidades/oportunidade.entity';
 import { OportunidadeStageEvent } from '../oportunidades/oportunidade-stage-event.entity';
 import { Proposta } from '../propostas/proposta.entity';
 import { DashboardModule } from '../dashboard/dashboard.module';
+import { MetasModule } from '../metas/metas.module';
 import { Empresa } from '../../empresas/entities/empresa.entity';
 import { DashboardV2Controller } from './dashboard-v2.controller';
 import { DashboardV2Service } from './dashboard-v2.service';
@@ -48,6 +49,7 @@ import { DashboardV2ValidationService } from './services/dashboard-v2-validation
       },
     }),
     DashboardModule,
+    MetasModule,
   ],
   controllers: [DashboardV2Controller],
   providers: [

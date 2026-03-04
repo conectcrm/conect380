@@ -81,7 +81,7 @@ const PipelineStageSummary: React.FC<PipelineStageSummaryProps> = ({ data }) => 
 
   return (
     <section className="rounded-[20px] border border-[#DCE7EB] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(15,57,74,0.28)]">
-      <div className="mb-4 flex items-center justify-between gap-2.5">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2.5">
         <h3 className="text-[20px] font-semibold tracking-[-0.012em] text-[#18374B]">Pipeline de Vendas</h3>
         <span className="inline-flex items-center gap-2 rounded-2xl bg-[#F2F6F8] px-4 py-1.5 text-[14px] text-[#2D4A5A]">
           <strong className="font-semibold text-[#17384B]">{formatCurrency(data.totalValor)}</strong>
@@ -90,11 +90,11 @@ const PipelineStageSummary: React.FC<PipelineStageSummaryProps> = ({ data }) => 
       </div>
 
       <div className="overflow-hidden rounded-[16px] border border-[#DFE8ED] bg-[#FCFDFE]">
-        <div className="grid grid-cols-1 divide-y divide-[#DFE8ED] md:grid-cols-5 md:divide-x md:divide-y-0">
+        <div className="grid grid-cols-1 divide-y divide-[#DFE8ED] lg:grid-cols-5 lg:divide-x lg:divide-y-0">
           {stageCards.map((stage) => (
             <article key={stage.key} className="p-[18px]">
               <p className="text-[15px] font-medium leading-tight text-[#304E5D]">{stage.label}</p>
-              <p className="mt-2.5 text-[31px] font-semibold leading-none tracking-[-0.02em] text-[#19384C]">{formatCurrency(stage.value)}</p>
+              <p className="mt-2.5 text-[24px] font-semibold leading-none tracking-[-0.02em] text-[#19384C] sm:text-[31px]">{formatCurrency(stage.value)}</p>
               <p className="mt-2.5 inline-flex items-center gap-1 text-[14px] text-[#607B89]">
                 <PackageOpen className="h-3.5 w-3.5 text-[#718A97]" />
                 {stage.quantity} oportunidades
@@ -104,7 +104,7 @@ const PipelineStageSummary: React.FC<PipelineStageSummaryProps> = ({ data }) => 
 
           <article className="p-[18px]">
             <p className="text-[15px] font-medium leading-tight text-[#304E5D]">Total</p>
-            <p className="mt-2.5 text-[31px] font-semibold leading-none tracking-[-0.02em] text-[#19384C]">{formatCurrency(data.totalValor)}</p>
+            <p className="mt-2.5 text-[24px] font-semibold leading-none tracking-[-0.02em] text-[#19384C] sm:text-[31px]">{formatCurrency(data.totalValor)}</p>
             <p className="mt-2.5 text-[14px] text-[#607B89]">{totalQuantidade} oportunidades</p>
           </article>
         </div>

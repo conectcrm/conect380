@@ -141,8 +141,14 @@ export class DashboardService {
     const periodoAnterior = this.getPreviousDateRange(periodo, { dataInicio, dataFim });
 
     // Buscar meta atual para o vendedor/região específica
-    const metaAtual = await this.metasService.getMetaAtual(vendedorId, regiao, empresaId);
-    const valorMeta = metaAtual?.valor || 450000; // Meta padrão se não encontrar
+    const metaNoPeriodo = await this.metasService.getMetaValorParaRange(
+      dataInicio,
+      dataFim,
+      vendedorId,
+      regiao,
+      empresaId,
+    );
+    const valorMeta = metaNoPeriodo > 0 ? metaNoPeriodo : 450000;
 
     // Faturamento Total
     const faturamentoAtual = await this.calculateFaturamento(
@@ -1010,8 +1016,18 @@ export class DashboardService {
       select: ['status', 'total', 'criadaEm'],
     });
 
-    const metaAtual = await this.metasService.getMetaAtual(vendedorId, regiao, empresaId);
-    const metaMensal = Number(metaAtual?.valor || this.getMeta('mensal'));
+    const metaNoPeriodo = await this.metasService.getMetaValorParaRange(
+      dataInicio,
+      dataFim,
+      vendedorId,
+      regiao,
+      empresaId,
+    );
+    const mesesNoRange = Math.max(1, this.getMonthKeys(dataInicio, dataFim).length);
+    const metaMensal =
+      metaNoPeriodo > 0
+        ? Number((metaNoPeriodo / mesesNoRange).toFixed(2))
+        : Number(this.getMeta('mensal'));
 
     const vendasMensais = this.buildVendasMensais(propostas, dataInicio, dataFim, metaMensal);
     const propostasPorStatus = this.buildPropostasPorStatus(propostas);
