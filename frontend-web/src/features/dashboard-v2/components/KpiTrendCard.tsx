@@ -16,6 +16,8 @@ type KpiTrendCardProps = {
   footerRight?: string;
   icon?: React.ReactNode;
   rightVisual?: React.ReactNode;
+  onClick?: () => void;
+  ariaLabel?: string;
 };
 
 const clampPercent = (value?: number): number => {
@@ -57,12 +59,30 @@ const KpiTrendCard: React.FC<KpiTrendCardProps> = ({
   footerRight,
   icon,
   rightVisual,
+  onClick,
+  ariaLabel,
 }) => {
   const sparklinePath = useMemo(() => buildSparklinePath(sparkline), [sparkline]);
   const normalizedProgress = clampPercent(progressPercent);
+  const trendSignal = trendPercent >= 0 ? '+' : '-';
+  const Container = onClick ? 'button' : 'article';
+  const baseClass =
+    'min-h-[232px] rounded-[20px] border border-[#DCE7EB] bg-white px-5 py-5 shadow-[0_16px_30px_-24px_rgba(15,57,74,0.28)]';
+  const clickableClass = onClick
+    ? ' text-left transition hover:border-[#C7DCE3] hover:shadow-[0_18px_34px_-24px_rgba(15,57,74,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35'
+    : '';
 
   return (
-    <article className="min-h-[232px] rounded-[20px] border border-[#DCE7EB] bg-white px-5 py-5 shadow-[0_16px_30px_-24px_rgba(15,57,74,0.28)]">
+    <Container
+      {...(onClick
+        ? {
+            type: 'button' as const,
+            onClick,
+            'aria-label': ariaLabel || title,
+          }
+        : {})}
+      className={`${baseClass}${clickableClass}`}
+    >
       <div className="mb-4 flex items-center justify-between gap-2.5">
         <h3 className="text-[17px] font-semibold leading-tight tracking-[-0.01em] text-[#19384C]">{title}</h3>
         <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#EEF6F3] text-[#6B8592]">
@@ -99,7 +119,8 @@ const KpiTrendCard: React.FC<KpiTrendCardProps> = ({
       <div className="mt-3.5 flex items-center gap-1.5 text-[14px]">
         <span className="inline-flex items-center gap-0.5 font-semibold text-[#159B82]">
           <ArrowUpRight className="h-3.5 w-3.5" />
-          {trendPercent >= 0 ? '+' : '-'}{Math.abs(trendPercent).toFixed(0)}%
+          {trendSignal}
+          {Math.abs(trendPercent).toFixed(0)}%
         </span>
         <span className="text-[#607C89]">{trendLabel}</span>
       </div>
@@ -117,7 +138,7 @@ const KpiTrendCard: React.FC<KpiTrendCardProps> = ({
           <span>{footerRight}</span>
         </div>
       ) : null}
-    </article>
+    </Container>
   );
 };
 

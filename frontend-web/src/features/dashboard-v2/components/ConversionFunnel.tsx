@@ -103,7 +103,7 @@ const ConversionFunnel: React.FC<ConversionFunnelProps> = ({ steps }) => {
         </span>
         <span className="inline-flex items-center gap-2">
           <span className="h-2 w-3.5 rounded-full bg-[#3CA895]" />
-          {funnelRows[funnelRows.length - 1]?.progressed || 0} vendas
+          {funnelRows[funnelRows.length - 1]?.progressed || 0} oportunidades
         </span>
       </div>
     </section>
