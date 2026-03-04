@@ -1,4 +1,5 @@
 import { api } from './api';
+import { normalizeOptionalMojibakeText } from '../utils/textEncoding';
 
 export interface Produto {
   id: string;
@@ -192,9 +193,17 @@ class ProdutosService {
 
   // Transformar dados da API para o formato legado do frontend
   transformApiToLegacy(produto: Produto): any {
+    const nome = normalizeOptionalMojibakeText(produto.nome) || '';
+    const categoria = normalizeOptionalMojibakeText(produto.categoria) || '';
+    const fornecedor = normalizeOptionalMojibakeText(produto.fornecedor) || '';
+    const sku = normalizeOptionalMojibakeText(produto.sku) || '';
+    const descricao = normalizeOptionalMojibakeText(produto.descricao) || '';
+    const tipoLicenciamento = normalizeOptionalMojibakeText(produto.tipoLicenciamento);
+    const periodicidadeLicenca = normalizeOptionalMojibakeText(produto.periodicidadeLicenca);
+
     return {
       id: produto.id,
-      nome: produto.nome,
+      nome,
       tipoItem: (produto.tipoItem || 'produto') as
         | 'produto'
         | 'servico'
@@ -202,7 +211,7 @@ class ProdutosService {
         | 'modulo'
         | 'plano'
         | 'aplicativo',
-      categoria: produto.categoria,
+      categoria,
       preco: produto.preco,
       custoUnitario: produto.custoUnitario,
       frequencia: (produto.frequencia || 'unico') as 'unico' | 'mensal' | 'anual',
@@ -222,11 +231,11 @@ class ProdutosService {
         mes: produto.vendasMes,
         total: produto.vendasTotal,
       },
-      fornecedor: produto.fornecedor,
-      sku: produto.sku,
-      descricao: produto.descricao,
-      tipoLicenciamento: produto.tipoLicenciamento,
-      periodicidadeLicenca: produto.periodicidadeLicenca,
+      fornecedor,
+      sku,
+      descricao,
+      tipoLicenciamento,
+      periodicidadeLicenca,
       renovacaoAutomatica: produto.renovacaoAutomatica,
       quantidadeLicencas: produto.quantidadeLicencas,
       criadoEm: produto.criadoEm,

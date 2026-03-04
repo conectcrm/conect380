@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ArrowLeft,
   Plus,
   Search,
   Edit,
@@ -9,11 +10,23 @@ import {
   Settings,
   Layers,
 } from 'lucide-react';
-import { BackToNucleus } from '../../components/navigation/BackToNucleus';
+import {
+  DataTableCard,
+  EmptyState,
+  FiltersBar,
+  LoadingSkeleton,
+  PageHeader,
+  SectionCard,
+} from '../../components/layout-v2';
+import { ConfirmationModal } from '../../components/common/ConfirmationModal';
+import { useConfirmation } from '../../hooks/useConfirmation';
+import { useNavigate } from 'react-router-dom';
 import ModalCategoria from '../../components/modals/ModalCategoria';
 import ModalSubcategoria from '../../components/modals/ModalSubcategoria';
 import ModalConfiguracao from '../../components/modais/ModalConfiguracao';
 import { categoriasProdutosService } from '../../services/categoriasProdutosService';
+import { getCatalogoFeaturesConfig } from '../../config/catalogoFeaturesFlags';
+import { normalizeOptionalMojibakeText } from '../../utils/textEncoding';
 import toast from 'react-hot-toast';
 
 // Interfaces
@@ -62,13 +75,26 @@ const CATEGORY_COLOR_CLASS_MAP: Record<string, { border: string; dot: string }> 
 };
 
 const SUBCATEGORIA_CAMPO_LABELS: Record<string, string> = {
-  duracao: 'Duracao',
-  usuarios: 'Usuarios',
+  duracao: 'Duração',
+  usuarios: 'Usuários',
   modalidade: 'Modalidade',
   recursos: 'Recursos',
 };
 
+const catalogoFeatures = getCatalogoFeaturesConfig();
+
+const actionButtonClass =
+  'inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition hover:bg-[#117C7E]';
+const iconButtonEditClass =
+  'inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#0F7B7D] transition hover:bg-[#ECF7F3]';
+const iconButtonDeleteClass =
+  'inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#B4233A] transition hover:bg-[#FFF2F4]';
+
 const CategoriasProdutosPage: React.FC = () => {
+  const navigate = useNavigate();
+  const categoriasAvancadasEnabled = catalogoFeatures.categoriasAvancadasEnabled;
+  const { confirmationState, showConfirmation } = useConfirmation();
+
   // Estados
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,6 +113,16 @@ const CategoriasProdutosPage: React.FC = () => {
 
   // Carregar categorias do service
   useEffect(() => {
+    if (!categoriasAvancadasEnabled && activeTab !== 'categorias') {
+      setActiveTab('categorias');
+    }
+    if (!categoriasAvancadasEnabled) {
+      setShowModalSubcategoria(false);
+      setShowModalConfiguracao(false);
+    }
+  }, [categoriasAvancadasEnabled, activeTab]);
+
+  useEffect(() => {
     carregarCategorias();
   }, []);
 
@@ -100,15 +136,15 @@ const CategoriasProdutosPage: React.FC = () => {
       // Converter para formato da interface local
       const categoriasConvertidas: Categoria[] = categoriasData.map((cat) => ({
         id: cat.id,
-        nome: cat.nome,
-        descricao: cat.descricao,
+        nome: normalizeOptionalMojibakeText(cat.nome) || '',
+        descricao: normalizeOptionalMojibakeText(cat.descricao) || '',
         cor: cat.cor || 'blue',
         ativa: cat.ativo ?? true,
         subcategorias: cat.subcategorias
           ? cat.subcategorias.map((sub) => ({
               id: sub.id,
-              nome: sub.nome,
-              descricao: sub.descricao || '',
+              nome: normalizeOptionalMojibakeText(sub.nome) || '',
+              descricao: normalizeOptionalMojibakeText(sub.descricao) || '',
               categoriaId: sub.categoria_id || cat.id,
               precoBase: Number(sub.precoBase || 0),
               unidade: sub.unidade || 'unidade',
@@ -117,8 +153,8 @@ const CategoriasProdutosPage: React.FC = () => {
               configuracoes: sub.configuracoes
                 ? sub.configuracoes.map((conf) => ({
                     id: conf.id,
-                    nome: conf.nome,
-                    descricao: conf.descricao || '',
+                    nome: normalizeOptionalMojibakeText(conf.nome) || '',
+                    descricao: normalizeOptionalMojibakeText(conf.descricao) || '',
                     subcategoriaId: sub.id,
                     multiplicador: Number(conf.multiplicador ?? 1),
                     ativa: conf.ativo ?? true,
@@ -146,7 +182,7 @@ const CategoriasProdutosPage: React.FC = () => {
         }
       }
 
-      // Se não há categorias, adicionar algumas padrão
+      // Se nao ha categorias, adicionar algumas padrao
       if (categoriasConvertidas.length === 0) {
         await criarCategoriasIniciais();
       }
@@ -161,10 +197,10 @@ const CategoriasProdutosPage: React.FC = () => {
   const criarCategoriasIniciais = async () => {
     try {
       const categoriasIniciais = [
-        { nome: 'Software', descricao: 'Produtos de software', icone: '💻', cor: 'blue' },
-        { nome: 'Hardware', descricao: 'Equipamentos e hardware', icone: '🖥️', cor: 'green' },
-        { nome: 'Consultoria', descricao: 'Serviços de consultoria', icone: '🎯', cor: 'purple' },
-        { nome: 'Treinamento', descricao: 'Cursos e treinamentos', icone: '📚', cor: 'orange' },
+        { nome: 'Software', descricao: 'Produtos de software', icone: 'software', cor: 'blue' },
+        { nome: 'Hardware', descricao: 'Equipamentos e hardware', icone: 'hardware', cor: 'green' },
+        { nome: 'Consultoria', descricao: 'Serviços de consultoria', icone: 'consultoria', cor: 'purple' },
+        { nome: 'Treinamento', descricao: 'Cursos e treinamentos', icone: 'treinamento', cor: 'orange' },
       ];
 
       for (const categoria of categoriasIniciais) {
@@ -178,7 +214,7 @@ const CategoriasProdutosPage: React.FC = () => {
     }
   };
 
-  // Formatação de moeda
+  // Formatacao de moeda
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -194,7 +230,7 @@ const CategoriasProdutosPage: React.FC = () => {
     return CATEGORY_COLOR_CLASS_MAP[cor] || CATEGORY_COLOR_CLASS_MAP.blue;
   };
 
-  // Funções de manipulação
+  // Funcoes de manipulacao
   const handleNovaCategoria = () => {
     setEditingItem(null);
     setShowModalCategoria(true);
@@ -233,71 +269,87 @@ const CategoriasProdutosPage: React.FC = () => {
     setShowModalConfiguracao(true);
   };
 
-  const handleExcluirCategoria = async (categoria: Categoria) => {
-    const confirmado = window.confirm(
-      `Excluir a categoria "${categoria.nome}"? Todas as subcategorias e configurações vinculadas também serão removidas.`,
-    );
+  const handleExcluirCategoria = (categoria: Categoria) => {
+    showConfirmation({
+      title: 'Excluir categoria',
+      message: `Tem certeza que deseja excluir a categoria "${categoria.nome}"? Todas as subcategorias e configurações vinculadas também serão removidas.`,
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      icon: 'danger',
+      confirmButtonClass: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
+      onConfirm: () => {
+        void (async () => {
+          try {
+            await categoriasProdutosService.excluirCategoria(categoria.id);
 
-    if (!confirmado) {
-      return;
-    }
+            if (selectedCategoria?.id === categoria.id) {
+              setSelectedCategoria(null);
+              setSelectedSubcategoria(null);
+            }
 
-    try {
-      await categoriasProdutosService.excluirCategoria(categoria.id);
-
-      if (selectedCategoria?.id === categoria.id) {
-        setSelectedCategoria(null);
-        setSelectedSubcategoria(null);
-      }
-
-      toast.success('Categoria excluída com sucesso!');
-      await carregarCategorias();
-    } catch (error) {
-      console.error('Erro ao excluir categoria:', error);
-      toast.error('Erro ao excluir categoria');
-    }
+            toast.success('Categoria excluída com sucesso');
+            await carregarCategorias();
+          } catch (error) {
+            console.error('Erro ao excluir categoria:', error);
+            toast.error('Erro ao excluir categoria');
+          }
+        })();
+      },
+    });
   };
 
-  const handleExcluirSubcategoria = async (subcategoria: Subcategoria) => {
-    const confirmado = window.confirm(`Excluir a subcategoria "${subcategoria.nome}"?`);
+  const handleExcluirSubcategoria = (subcategoria: Subcategoria) => {
+    showConfirmation({
+      title: 'Excluir subcategoria',
+      message: `Tem certeza que deseja excluir a subcategoria "${subcategoria.nome}"?`,
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      icon: 'danger',
+      confirmButtonClass: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
+      onConfirm: () => {
+        void (async () => {
+          try {
+            await categoriasProdutosService.excluirSubcategoria(subcategoria.id);
 
-    if (!confirmado) {
-      return;
-    }
+            if (selectedSubcategoria?.id === subcategoria.id) {
+              setSelectedSubcategoria(null);
+            }
 
-    try {
-      await categoriasProdutosService.excluirSubcategoria(subcategoria.id);
-
-      if (selectedSubcategoria?.id === subcategoria.id) {
-        setSelectedSubcategoria(null);
-      }
-
-      toast.success('Subcategoria excluída com sucesso!');
-      await carregarCategorias();
-    } catch (error) {
-      console.error('Erro ao excluir subcategoria:', error);
-      toast.error('Erro ao excluir subcategoria');
-    }
+            toast.success('Subcategoria excluída com sucesso');
+            await carregarCategorias();
+          } catch (error) {
+            console.error('Erro ao excluir subcategoria:', error);
+            toast.error('Erro ao excluir subcategoria');
+          }
+        })();
+      },
+    });
   };
 
-  const handleExcluirConfiguracao = async (configuracao: Configuracao) => {
-    const confirmado = window.confirm(`Excluir a configuração "${configuracao.nome}"?`);
-
-    if (!confirmado) {
-      return;
-    }
-
-    try {
-      await categoriasProdutosService.excluirConfiguracao(configuracao.id);
-      toast.success('Configuração excluída com sucesso!');
-      await carregarCategorias();
-    } catch (error) {
-      console.error('Erro ao excluir configuração:', error);
-      toast.error('Erro ao excluir configuração');
-    }
+  const handleExcluirConfiguracao = (configuracao: Configuracao) => {
+    showConfirmation({
+      title: 'Excluir configuração',
+      message: `Tem certeza que deseja excluir a configuração "${configuracao.nome}"?`,
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      icon: 'danger',
+      confirmButtonClass: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
+      onConfirm: () => {
+        void (async () => {
+          try {
+            await categoriasProdutosService.excluirConfiguracao(configuracao.id);
+            toast.success('Configuração excluída com sucesso');
+            await carregarCategorias();
+          } catch (error) {
+            console.error('Erro ao excluir configuração:', error);
+            toast.error('Erro ao excluir configuração');
+          }
+        })();
+      },
+    });
   };
 
-  // Funções de salvar
+  // Funcoes de salvar
   const handleSalvarCategoria = async (categoriaData: any) => {
     try {
       if (editingItem) {
@@ -314,7 +366,7 @@ const CategoriasProdutosPage: React.FC = () => {
         await categoriasProdutosService.criarCategoria({
           nome: categoriaData.nome,
           descricao: categoriaData.descricao,
-          icone: categoriaData.icone || '📁',
+          icone: categoriaData.icone || 'categoria',
           cor: categoriaData.cor || 'blue',
           ativo: categoriaData.ativa,
         });
@@ -394,78 +446,205 @@ const CategoriasProdutosPage: React.FC = () => {
     }
   };
 
-  // Renderização do conteúdo por aba
-  const renderCategorias = () => {
-    const categoriasFiltradas = categorias.filter((cat) =>
-      cat.nome.toLowerCase().includes(searchTerm.toLowerCase()),
-    );
+  // Renderizacao do conteudo por aba
+    const categoriasFiltradas = useMemo(() => {
+    const termo = searchTerm.trim().toLowerCase();
+    if (!termo) {
+      return categorias;
+    }
 
+    return categorias.filter(
+      (categoria) =>
+        categoria.nome.toLowerCase().includes(termo) ||
+        categoria.descricao.toLowerCase().includes(termo),
+    );
+  }, [categorias, searchTerm]);
+
+  const totalSubcategorias = useMemo(
+    () => categorias.reduce((acc, categoria) => acc + categoria.subcategorias.length, 0),
+    [categorias],
+  );
+
+  const totalConfiguracoes = useMemo(
+    () =>
+      categorias.reduce(
+        (acc, categoria) =>
+          acc +
+          categoria.subcategorias.reduce(
+            (subAcc, subcategoria) => subAcc + subcategoria.configuracoes.length,
+            0,
+          ),
+        0,
+      ),
+    [categorias],
+  );
+
+  const statsCards = useMemo(() => {
+    const cards: Array<{ key: string; label: string; value: number }> = [
+      { key: 'categorias', label: 'Categorias', value: categorias.length },
+    ];
+
+    // Niveis avancados so aparecem quando estao efetivamente em uso.
+    if (categoriasAvancadasEnabled && totalSubcategorias > 0) {
+      cards.push({ key: 'subcategorias', label: 'Subcategorias', value: totalSubcategorias });
+    }
+
+    if (categoriasAvancadasEnabled && totalConfiguracoes > 0) {
+      cards.push({ key: 'configuracoes', label: 'Configurações', value: totalConfiguracoes });
+    }
+
+    return cards;
+  }, [categorias.length, categoriasAvancadasEnabled, totalSubcategorias, totalConfiguracoes]);
+
+  const statsGridClass =
+    statsCards.length === 1
+      ? 'grid grid-cols-1 gap-3'
+      : statsCards.length === 2
+        ? 'grid grid-cols-1 gap-3 md:grid-cols-2'
+        : 'grid grid-cols-1 gap-3 md:grid-cols-3';
+
+  const tabs = useMemo(
+    () => [
+      { id: 'categorias' as const, label: 'Categorias', icon: Package, count: categorias.length },
+      ...(categoriasAvancadasEnabled
+        ? [
+            {
+              id: 'subcategorias' as const,
+              label: 'Subcategorias',
+              icon: Tag,
+              count: totalSubcategorias,
+            },
+            {
+              id: 'configuracoes' as const,
+              label: 'Configurações',
+              icon: Settings,
+              count: totalConfiguracoes,
+            },
+          ]
+        : []),
+    ],
+    [categorias.length, categoriasAvancadasEnabled, totalConfiguracoes, totalSubcategorias],
+  );
+
+  const activeTabMeta = tabs.find((tab) => tab.id === activeTab) ?? tabs[0];
+
+  const primaryActionLabel =
+    activeTab === 'categorias'
+      ? 'Nova categoria'
+      : activeTab === 'subcategorias'
+        ? 'Nova subcategoria'
+        : 'Nova configuração';
+
+  const handlePrimaryAction =
+    activeTab === 'categorias'
+      ? handleNovaCategoria
+      : activeTab === 'subcategorias'
+        ? handleNovaSubcategoria
+        : handleNovaConfiguracao;
+
+  const getStatusBadgeClass = (ativo: boolean) =>
+    ativo
+      ? 'rounded-full border border-[#CDE6DF] bg-[#ECF7F3] px-2.5 py-1 text-xs font-medium text-[#0F7B7D]'
+      : 'rounded-full border border-[#E7C4CB] bg-[#FFF2F4] px-2.5 py-1 text-xs font-medium text-[#B4233A]';
+
+  const renderCategorias = () => {
     if (categoriasFiltradas.length === 0) {
       return (
-        <div className="text-center py-12">
-          <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma categoria encontrada</h3>
-          <p className="text-gray-500">Ajuste o filtro de busca ou cadastre uma nova categoria</p>
-        </div>
+        <EmptyState
+          icon={<Package className="h-5 w-5" />}
+          title="Nenhuma categoria encontrada"
+          description={
+            categorias.length === 0
+              ? 'Comece criando sua primeira categoria para organizar o catálogo.'
+              : 'Ajuste os filtros para localizar a categoria desejada.'
+          }
+          action={
+            <button type="button" onClick={handleNovaCategoria} className={actionButtonClass}>
+              <Plus className="h-4 w-4" />
+              Nova categoria
+            </button>
+          }
+        />
       );
     }
 
     return (
-      <div className="space-y-4">
-        {categoriasFiltradas.map((categoria) => (
-          <div
-            key={categoria.id}
-            className={`bg-white rounded-lg p-6 border-l-4 ${getCategoryColorClasses(categoria.cor).border} shadow-sm cursor-pointer hover:shadow-md transition-shadow ${
-              selectedCategoria?.id === categoria.id ? 'ring-2 ring-blue-500' : ''
-            }`}
-            onClick={() => {
-              setSelectedCategoria(categoria);
-              setSelectedSubcategoria(null);
-            }}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className={`w-4 h-4 rounded-full ${getCategoryColorClasses(categoria.cor).dot}`}></div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{categoria.nome}</h3>
-                  <p className="text-gray-600">{categoria.descricao}</p>
-                  <div className="mt-2 flex items-center space-x-4 text-sm">
-                    <span className="text-gray-500">
+      <div className="space-y-3">
+        {categoriasFiltradas.map((categoria) => {
+          const isSelected = selectedCategoria?.id === categoria.id;
+          const categoryColors = getCategoryColorClasses(categoria.cor);
+
+          return (
+            <article
+              key={categoria.id}
+              role="button"
+              tabIndex={0}
+              aria-pressed={isSelected}
+              aria-label={`Selecionar categoria ${categoria.nome}`}
+              onClick={() => {
+                setSelectedCategoria(categoria);
+                setSelectedSubcategoria(null);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  setSelectedCategoria(categoria);
+                  setSelectedSubcategoria(null);
+                }
+              }}
+              className={`rounded-xl border px-4 py-4 transition sm:px-5 ${
+                isSelected
+                  ? 'border-[#159A9C] bg-[#F2FBF8] shadow-[0_12px_24px_-24px_rgba(21,154,156,0.8)] focus-visible:ring-2 focus-visible:ring-[#1A9E87]/35'
+                  : 'border-[#E1EAEE] bg-white hover:border-[#CDE0E8] hover:bg-[#FAFCFD] focus-visible:ring-2 focus-visible:ring-[#1A9E87]/35'
+              }`}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`h-2.5 w-2.5 rounded-full ${categoryColors.dot}`} />
+                    <h3 className="truncate text-sm font-semibold text-[#1B3B4E]">{categoria.nome}</h3>
+                  </div>
+                  <p className="mt-1 text-sm text-[#607B89]">{categoria.descricao || 'Sem descrição'}</p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border border-[#DCE8EC] bg-[#F7FBFC] px-2.5 py-1 text-xs font-medium text-[#486978]">
                       {categoria.subcategorias.length} subcategorias
                     </span>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        categoria.ativa ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                      }`}
-                    >
+                    <span className={getStatusBadgeClass(categoria.ativa)}>
                       {categoria.ativa ? 'Ativa' : 'Inativa'}
                     </span>
                   </div>
                 </div>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleEditarCategoria(categoria);
+                    }}
+                    className={iconButtonEditClass}
+                    title="Editar categoria"
+                    aria-label={`Editar categoria ${categoria.nome}`}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleExcluirCategoria(categoria);
+                    }}
+                    className={iconButtonDeleteClass}
+                    title="Excluir categoria"
+                    aria-label={`Excluir categoria ${categoria.nome}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleEditarCategoria(categoria);
-                  }}
-                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                >
-                  <Edit className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleExcluirCategoria(categoria);
-                  }}
-                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
+            </article>
+          );
+        })}
       </div>
     );
   };
@@ -473,103 +652,144 @@ const CategoriasProdutosPage: React.FC = () => {
   const renderSubcategorias = () => {
     if (!selectedCategoria) {
       return (
-        <div className="text-center py-12">
-          <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Selecione uma categoria</h3>
-          <p className="text-gray-500">
-            Escolha uma categoria na aba anterior para ver suas subcategorias
-          </p>
+        <EmptyState
+          icon={<Tag className="h-5 w-5" />}
+          title="Selecione uma categoria"
+          description="Escolha uma categoria para listar e editar as subcategorias vinculadas."
+          action={
+            <button
+              type="button"
+              onClick={() => setActiveTab('categorias')}
+              className={actionButtonClass}
+            >
+              Ver categorias
+            </button>
+          }
+        />
+      );
+    }
+
+    const termo = searchTerm.trim().toLowerCase();
+    const subcategoriasFiltradas = selectedCategoria.subcategorias.filter(
+      (subcategoria) =>
+        !termo ||
+        subcategoria.nome.toLowerCase().includes(termo) ||
+        subcategoria.descricao.toLowerCase().includes(termo),
+    );
+
+    if (subcategoriasFiltradas.length === 0) {
+      return (
+        <div className="space-y-3">
+          <div className="rounded-xl border border-[#DCE8EC] bg-[#F8FBFC] px-4 py-3">
+            <p className="text-sm font-medium text-[#1E3A4B]">Categoria selecionada: {selectedCategoria.nome}</p>
+            <p className="mt-1 text-xs text-[#607B89]">Nenhuma subcategoria encontrada para o filtro atual.</p>
+          </div>
+
+          <EmptyState
+            icon={<Tag className="h-5 w-5" />}
+            title="Nenhuma subcategoria encontrada"
+            description="Crie a primeira subcategoria para detalhar os tipos de item desta categoria."
+            action={
+              <button type="button" onClick={handleNovaSubcategoria} className={actionButtonClass}>
+                <Plus className="h-4 w-4" />
+                Nova subcategoria
+              </button>
+            }
+          />
         </div>
       );
     }
 
-    const subcategoriasFiltradas = selectedCategoria.subcategorias.filter((sub) =>
-      sub.nome.toLowerCase().includes(searchTerm.toLowerCase()),
-    );
-
     return (
-      <div className="space-y-4">
-        <div className="bg-blue-50 p-4 rounded-lg mb-4">
-          <div className="flex items-center space-x-2">
-            <div
-              className={`w-3 h-3 rounded-full ${getCategoryColorClasses(selectedCategoria.cor).dot}`}
-            ></div>
-            <span className="font-medium text-blue-900">
-              Subcategorias de: {selectedCategoria.nome}
-            </span>
+      <div className="space-y-3">
+        <div className="rounded-xl border border-[#DCE8EC] bg-[#F8FBFC] px-4 py-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-[#1E3A4B]">
+            <span
+              className={`h-2.5 w-2.5 rounded-full ${getCategoryColorClasses(selectedCategoria.cor).dot}`}
+            />
+            Categoria selecionada: {selectedCategoria.nome}
           </div>
+          <p className="mt-1 text-xs text-[#607B89]">
+            {selectedCategoria.subcategorias.length} subcategorias cadastradas.
+          </p>
         </div>
 
-        {subcategoriasFiltradas.length === 0 && (
-          <div className="text-center py-8 border border-dashed border-gray-300 rounded-lg">
-            <Tag className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-            <p className="text-gray-600">Nenhuma subcategoria encontrada para o filtro aplicado</p>
-          </div>
-        )}
-
         {subcategoriasFiltradas.map((subcategoria) => {
+          const isSelected = selectedSubcategoria?.id === subcategoria.id;
           const camposAtivos = Object.entries(subcategoria.camposPersonalizados || {})
             .filter(([, enabled]) => Boolean(enabled))
             .map(([campo]) => SUBCATEGORIA_CAMPO_LABELS[campo] || campo);
 
           return (
-            <div
+            <article
               key={subcategoria.id}
-              className={`bg-white rounded-lg p-4 border shadow-sm cursor-pointer hover:shadow-md transition-shadow ${
-                selectedSubcategoria?.id === subcategoria.id ? 'ring-2 ring-green-500' : ''
-              }`}
+              role="button"
+              tabIndex={0}
+              aria-pressed={isSelected}
+              aria-label={`Selecionar subcategoria ${subcategoria.nome}`}
               onClick={() => setSelectedSubcategoria(subcategoria)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  setSelectedSubcategoria(subcategoria);
+                }
+              }}
+              className={`rounded-xl border px-4 py-4 transition sm:px-5 ${
+                isSelected
+                  ? 'border-[#159A9C] bg-[#F2FBF8] shadow-[0_12px_24px_-24px_rgba(21,154,156,0.8)] focus-visible:ring-2 focus-visible:ring-[#1A9E87]/35'
+                  : 'border-[#E1EAEE] bg-white hover:border-[#CDE0E8] hover:bg-[#FAFCFD] focus-visible:ring-2 focus-visible:ring-[#1A9E87]/35'
+              }`}
             >
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-md font-semibold text-gray-900">{subcategoria.nome}</h4>
-                  <p className="text-gray-600 text-sm">{subcategoria.descricao}</p>
-                  <div className="mt-2 flex items-center space-x-4 text-sm">
-                    <span className="text-gray-500">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <h4 className="truncate text-sm font-semibold text-[#1B3B4E]">{subcategoria.nome}</h4>
+                  <p className="mt-1 text-sm text-[#607B89]">{subcategoria.descricao || 'Sem descrição'}</p>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[#486978]">
+                    <span className="rounded-full border border-[#DCE8EC] bg-[#F7FBFC] px-2.5 py-1 font-medium">
                       {subcategoria.configuracoes.length} configurações
                     </span>
-                    <span className="text-gray-700">
-                      <strong>Base:</strong> {formatCurrency(subcategoria.precoBase)} /{' '}
-                      {subcategoria.unidade}
+                    <span className="rounded-full border border-[#DCE8EC] bg-[#F7FBFC] px-2.5 py-1 font-medium">
+                      Base {formatCurrency(subcategoria.precoBase)} / {subcategoria.unidade}
                     </span>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        subcategoria.ativa
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}
-                    >
+                    <span className={getStatusBadgeClass(subcategoria.ativa)}>
                       {subcategoria.ativa ? 'Ativa' : 'Inativa'}
                     </span>
                   </div>
+
                   {camposAtivos.length > 0 && (
-                    <p className="mt-2 text-xs text-gray-500">
-                      Campos customizáveis: {camposAtivos.join(', ')}
-                    </p>
+                    <p className="mt-2 text-xs text-[#607B89]">Campos dinâmicos: {camposAtivos.join(', ')}</p>
                   )}
                 </div>
-                <div className="flex items-center space-x-2">
+
+                <div className="flex items-center gap-1">
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
                       handleEditarSubcategoria(subcategoria);
                     }}
-                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    className={iconButtonEditClass}
+                    title="Editar subcategoria"
+                    aria-label={`Editar subcategoria ${subcategoria.nome}`}
                   >
-                    <Edit className="w-4 h-4" />
+                    <Edit className="h-4 w-4" />
                   </button>
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
                       handleExcluirSubcategoria(subcategoria);
                     }}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    className={iconButtonDeleteClass}
+                    title="Excluir subcategoria"
+                    aria-label={`Excluir subcategoria ${subcategoria.nome}`}
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               </div>
-            </div>
+            </article>
           );
         })}
       </div>
@@ -579,201 +799,267 @@ const CategoriasProdutosPage: React.FC = () => {
   const renderConfiguracoes = () => {
     if (!selectedSubcategoria) {
       return (
-        <div className="text-center py-12">
-          <Settings className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Selecione uma subcategoria</h3>
-          <p className="text-gray-500">Escolha uma subcategoria para ver suas configurações</p>
+        <EmptyState
+          icon={<Layers className="h-5 w-5" />}
+          title="Selecione uma subcategoria"
+          description="Escolha uma subcategoria para visualizar as configurações e os multiplicadores."
+          action={
+            <button
+              type="button"
+              onClick={() => setActiveTab('subcategorias')}
+              className={actionButtonClass}
+            >
+              Ver subcategorias
+            </button>
+          }
+        />
+      );
+    }
+
+    const termo = searchTerm.trim().toLowerCase();
+    const configuracoesFiltradas = selectedSubcategoria.configuracoes.filter(
+      (configuracao) =>
+        !termo ||
+        configuracao.nome.toLowerCase().includes(termo) ||
+        configuracao.descricao.toLowerCase().includes(termo),
+    );
+
+    if (configuracoesFiltradas.length === 0) {
+      return (
+        <div className="space-y-3">
+          <div className="rounded-xl border border-[#DCE8EC] bg-[#F8FBFC] px-4 py-3">
+            <p className="text-sm font-medium text-[#1E3A4B]">
+              Subcategoria selecionada: {selectedSubcategoria.nome}
+            </p>
+            <p className="mt-1 text-xs text-[#607B89]">Nenhuma configuração encontrada para o filtro atual.</p>
+          </div>
+
+          <EmptyState
+            icon={<Settings className="h-5 w-5" />}
+            title="Nenhuma configuração encontrada"
+            description="Crie configurações para variações comerciais e cálculo de preço final."
+            action={
+              <button type="button" onClick={handleNovaConfiguracao} className={actionButtonClass}>
+                <Plus className="h-4 w-4" />
+                Nova configuração
+              </button>
+            }
+          />
         </div>
       );
     }
 
-    const configuracoesFiltradas = selectedSubcategoria.configuracoes.filter((conf) =>
-      conf.nome.toLowerCase().includes(searchTerm.toLowerCase()),
-    );
-
     return (
-      <div className="space-y-4">
-        <div className="bg-green-50 p-4 rounded-lg mb-4">
-          <div className="flex items-center space-x-2">
-            <Layers className="w-4 h-4 text-green-700" />
-            <span className="font-medium text-green-900">
-              Configurações de: {selectedSubcategoria.nome}
-            </span>
-          </div>
+      <div className="space-y-3">
+        <div className="rounded-xl border border-[#DCE8EC] bg-[#F8FBFC] px-4 py-3">
+          <p className="text-sm font-medium text-[#1E3A4B]">
+            Subcategoria selecionada: {selectedSubcategoria.nome}
+          </p>
+          <p className="mt-1 text-xs text-[#607B89]">
+            Preço base de referência: {formatCurrency(selectedSubcategoria.precoBase)}
+          </p>
         </div>
 
-        {configuracoesFiltradas.length === 0 && (
-          <div className="text-center py-8 border border-dashed border-gray-300 rounded-lg">
-            <Settings className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-            <p className="text-gray-600">Nenhuma configuração encontrada para o filtro aplicado</p>
-          </div>
-        )}
+        {configuracoesFiltradas.map((configuracao) => {
+          const precoFinal = selectedSubcategoria.precoBase * configuracao.multiplicador;
 
-        {configuracoesFiltradas.map((configuracao) => (
-            <div key={configuracao.id} className="bg-white rounded-lg p-4 border shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <h5 className="text-md font-semibold text-gray-900">{configuracao.nome}</h5>
-                  <p className="text-gray-600 text-sm">{configuracao.descricao}</p>
-                  <div className="mt-2 flex items-center space-x-4 text-sm">
-                    <span className="text-gray-700">
-                      <strong>Preço Base:</strong> {formatCurrency(selectedSubcategoria.precoBase)}
+          return (
+            <article
+              key={configuracao.id}
+              className="rounded-xl border border-[#E1EAEE] bg-white px-4 py-4 transition hover:border-[#CDE0E8] hover:bg-[#FAFCFD] sm:px-5"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <h5 className="truncate text-sm font-semibold text-[#1B3B4E]">{configuracao.nome}</h5>
+                  <p className="mt-1 text-sm text-[#607B89]">{configuracao.descricao || 'Sem descrição'}</p>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[#486978]">
+                    <span className="rounded-full border border-[#DCE8EC] bg-[#F7FBFC] px-2.5 py-1 font-medium">
+                      Multiplicador {configuracao.multiplicador}x
                     </span>
-                    <span className="text-gray-700">
-                      <strong>Multiplicador:</strong> {configuracao.multiplicador}x
+                    <span className="rounded-full border border-[#DCE8EC] bg-[#F7FBFC] px-2.5 py-1 font-medium">
+                      Preço final {formatCurrency(precoFinal)}
                     </span>
-                    <span className="text-gray-700">
-                      <strong>Preço Final:</strong>{' '}
-                      {formatCurrency(selectedSubcategoria.precoBase * configuracao.multiplicador)}
-                    </span>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        configuracao.ativa
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}
-                    >
+                    <span className={getStatusBadgeClass(configuracao.ativa)}>
                       {configuracao.ativa ? 'Ativa' : 'Inativa'}
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
+
+                <div className="flex items-center gap-1">
                   <button
+                    type="button"
                     onClick={() => handleEditarConfiguracao(configuracao)}
-                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    className={iconButtonEditClass}
+                    title="Editar configuração"
+                    aria-label={`Editar configuração ${configuracao.nome}`}
                   >
-                    <Edit className="w-4 h-4" />
+                    <Edit className="h-4 w-4" />
                   </button>
                   <button
+                    type="button"
                     onClick={() => handleExcluirConfiguracao(configuracao)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    className={iconButtonDeleteClass}
+                    title="Excluir configuração"
+                    aria-label={`Excluir configuração ${configuracao.nome}`}
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               </div>
-            </div>
-          ))}
+            </article>
+          );
+        })}
       </div>
     );
   };
 
-  return (
-    <div className="min-h-screen bg-[#DEEFE7]">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b border-[#DEEFE7]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <BackToNucleus
-                nucleusName="Produtos"
-                nucleusPath="/produtos"
-                currentModuleName="Gestão de Categorias"
-              />
-              <div>
-                <p className="text-[#B4BEC9]">
-                  Configure categorias, subcategorias e tipos de produtos
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+  if (loading) {
+    return (
+      <div className="space-y-4 pt-1 sm:pt-2">
+        <LoadingSkeleton lines={7} />
       </div>
+    );
+  }
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Tabs de Navegação */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+  return (
+    <div className="space-y-4 pt-1 sm:pt-2">
+      <SectionCard className="space-y-4 p-4 sm:p-5">
+        <PageHeader
+          title={
+            <span className="inline-flex items-center gap-2">
+              <Package className="h-6 w-6 text-[#159A9C]" />
+              Gestão de categorias do catálogo
+            </span>
+          }
+          description="Estruture categorias, níveis de subcategoria e configurações de composição conforme o perfil de cada operação."
+          actions={
+            <>
               <button
-                onClick={() => setActiveTab('categorias')}
-                className={`flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  activeTab === 'categorias'
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-800'
-                }`}
+                type="button"
+                onClick={() => navigate('/produtos')}
+                aria-label="Voltar para o catálogo de itens"
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1A9E87]/35"
               >
-                <Package className="h-4 w-4 mr-2" />
-                Categorias
+                <ArrowLeft className="h-4 w-4" />
+                Voltar
               </button>
               <button
-                onClick={() => setActiveTab('subcategorias')}
-                className={`flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  activeTab === 'subcategorias'
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-800'
-                }`}
+                type="button"
+                className={`${actionButtonClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1A9E87]/35`}
+                onClick={handlePrimaryAction}
               >
-                <Tag className="h-4 w-4 mr-2" />
-                Subcategorias
+                <Plus className="h-4 w-4" />
+                {primaryActionLabel}
               </button>
-              <button
-                onClick={() => setActiveTab('configuracoes')}
-                className={`flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  activeTab === 'configuracoes'
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-800'
-                }`}
-              >
-                <Settings className="h-4 w-4 mr-2" />
-                Configurações
-              </button>
+            </>
+          }
+        />
+
+        <div className={statsGridClass}>
+          {statsCards.map((card) => (
+            <div key={card.key} className="rounded-xl border border-[#DCE8EC] bg-white px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-[#6B8693]">{card.label}</p>
+              <p className="mt-1 text-xl font-semibold text-[#1E3A4B]">{card.value}</p>
             </div>
+          ))}
+        </div>
 
-            {/* Botão de adicionar */}
-            <div className="flex items-center space-x-3">
-              {activeTab === 'categorias' && (
-                <button
-                  onClick={handleNovaCategoria}
-                  className="flex items-center px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nova Categoria
-                </button>
-              )}
-              {activeTab === 'subcategorias' && (
-                <button
-                  onClick={handleNovaSubcategoria}
-                  className="flex items-center px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nova Subcategoria
-                </button>
-              )}
-              {activeTab === 'configuracoes' && (
-                <button
-                  onClick={handleNovaConfiguracao}
-                  className="flex items-center px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nova Configuração
-                </button>
-              )}
-            </div>
-          </div>
+      </SectionCard>
 
-          {/* Busca */}
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+      <FiltersBar className="p-4">
+        <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-2">
+          <div className="relative">
+            <label htmlFor="filtro-busca-categorias" className="sr-only">
+              Buscar categorias, subcategorias e configurações
+            </label>
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8FA6B2]" />
             <input
+              id="filtro-busca-categorias"
               type="text"
-              placeholder="Buscar..."
+              placeholder="Buscar por nome ou descrição..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onChange={(event) => setSearchTerm(event.target.value)}
+              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
             />
           </div>
+
+          <div
+            role="tablist"
+            aria-label="Níveis do catálogo"
+            className="inline-flex w-full flex-wrap items-center gap-2 rounded-xl border border-[#DCE8EC] bg-[#F7FBFC] p-1.5 sm:w-auto sm:justify-end sm:justify-self-end"
+          >
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = tab.id === activeTab;
+
+              return (
+                <button
+                  key={tab.id}
+                  id={`tab-${tab.id}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  aria-controls={`tabpanel-${tab.id}`}
+                  tabIndex={isActive ? 0 : -1}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium transition ${
+                    isActive
+                      ? 'bg-white text-[#0F7B7D] shadow-sm'
+                      : 'text-[#5D7887] hover:bg-white hover:text-[#244455]'
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {tab.label}
+                  <span className="rounded-full border border-[#DCE8EC] bg-[#F7FBFC] px-2 py-0.5 text-xs text-[#607B89]">
+                    {tab.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </FiltersBar>
+
+      <DataTableCard>
+        <div className="border-b border-[#E1EAEE] bg-[#F8FBFC] px-4 py-3 sm:px-5">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-[#516F7D]">
+            <h3 className="text-sm font-semibold text-[#1B3B4E]">
+              {activeTabMeta?.label} ({activeTabMeta?.count ?? 0})
+            </h3>
+
+            {searchTerm.trim() && (
+              <span className="rounded-full border border-[#CDE6DF] bg-[#ECF7F3] px-2 py-0.5 text-xs font-medium text-[#0F7B7D]">
+                filtro ativo
+              </span>
+            )}
+
+            {activeTab === 'subcategorias' && selectedCategoria && (
+              <span className="rounded-full border border-[#DCE8EC] bg-white px-2 py-0.5 text-xs text-[#486978]">
+                Categoria: {selectedCategoria.nome}
+              </span>
+            )}
+
+            {activeTab === 'configuracoes' && selectedSubcategoria && (
+              <span className="rounded-full border border-[#DCE8EC] bg-white px-2 py-0.5 text-xs text-[#486978]">
+                Subcategoria: {selectedSubcategoria.nome}
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* Conteúdo por Aba */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
+        <div
+          id={`tabpanel-${activeTab}`}
+          role="tabpanel"
+          aria-labelledby={`tab-${activeTab}`}
+          className="p-4 sm:p-5"
+        >
           {activeTab === 'categorias' && renderCategorias()}
-          {activeTab === 'subcategorias' && renderSubcategorias()}
-          {activeTab === 'configuracoes' && renderConfiguracoes()}
+          {categoriasAvancadasEnabled && activeTab === 'subcategorias' && renderSubcategorias()}
+          {categoriasAvancadasEnabled && activeTab === 'configuracoes' && renderConfiguracoes()}
         </div>
-      </div>
+      </DataTableCard>
 
-      {/* Modais */}
       <ModalCategoria
         isOpen={showModalCategoria}
         onClose={() => {
@@ -784,46 +1070,50 @@ const CategoriasProdutosPage: React.FC = () => {
         categoria={editingItem}
       />
 
-      <ModalSubcategoria
-        isOpen={showModalSubcategoria}
-        onClose={() => {
-          setShowModalSubcategoria(false);
-          setEditingItem(null);
-        }}
-        onSave={handleSalvarSubcategoria}
-        subcategoria={editingItem}
-        categoriaAtual={selectedCategoria}
-        categorias={categorias}
-      />
+      {categoriasAvancadasEnabled && (
+        <ModalSubcategoria
+          isOpen={showModalSubcategoria}
+          onClose={() => {
+            setShowModalSubcategoria(false);
+            setEditingItem(null);
+          }}
+          onSave={handleSalvarSubcategoria}
+          subcategoria={editingItem}
+          categoriaAtual={selectedCategoria}
+          categorias={categorias}
+        />
+      )}
 
-      <ModalConfiguracao
-        isOpen={showModalConfiguracao}
-        onClose={() => {
-          setShowModalConfiguracao(false);
-          setEditingItem(null);
-        }}
-        onSave={handleSalvarConfiguracao}
-        configuracao={editingItem}
-        subcategoriaAtual={
-          selectedSubcategoria
-            ? {
-                ...selectedSubcategoria,
-                categoria: selectedCategoria
-                  ? { nome: selectedCategoria.nome, cor: selectedCategoria.cor }
-                  : undefined,
-              }
-            : null
-        }
-        subcategorias={categorias.flatMap((cat) =>
-          cat.subcategorias.map((sub) => ({
-            ...sub,
-            categoria: { nome: cat.nome, cor: cat.cor },
-          })),
-        )}
-      />
+      {categoriasAvancadasEnabled && (
+        <ModalConfiguracao
+          isOpen={showModalConfiguracao}
+          onClose={() => {
+            setShowModalConfiguracao(false);
+            setEditingItem(null);
+          }}
+          onSave={handleSalvarConfiguracao}
+          configuracao={editingItem}
+          subcategoriaAtual={
+            selectedSubcategoria
+              ? {
+                  ...selectedSubcategoria,
+                  categoria: selectedCategoria
+                    ? { nome: selectedCategoria.nome, cor: selectedCategoria.cor }
+                    : undefined,
+                }
+              : null
+          }
+          subcategorias={categorias.flatMap((cat) =>
+            cat.subcategorias.map((sub) => ({
+              ...sub,
+              categoria: { nome: cat.nome, cor: cat.cor },
+            })),
+          )}
+        />
+      )}
+
+      <ConfirmationModal confirmationState={confirmationState} />
     </div>
   );
 };
-
 export default CategoriasProdutosPage;
-

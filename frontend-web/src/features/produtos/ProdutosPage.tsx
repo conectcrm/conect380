@@ -521,10 +521,10 @@ const ProdutosPage: React.FC = () => {
             <Lightbulb className="h-4 w-4 text-[#0F7B7D]" />
           </span>
           <div>
-            <h2 className="text-sm font-semibold text-[#244455]">Guia rapido: quando usar item ou combo</h2>
+            <h2 className="text-sm font-semibold text-[#244455]">Guia rápido: quando usar item ou combo</h2>
             <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-[#607B89]">
-              <li>Use item avulso quando o preco e a negociacao forem independentes.</li>
-              <li>Use combo quando dois ou mais itens sempre saem juntos com condicao comercial unica.</li>
+              <li>Use item avulso quando o preço e a negociação forem independentes.</li>
+              <li>Use combo quando dois ou mais itens sempre saem juntos com condição comercial única.</li>
               <li>Prefira combo para padronizar proposta recorrente e reduzir erro de montagem.</li>
             </ul>
           </div>
