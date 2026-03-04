@@ -1,10 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../../services/api';
 
-export type DashboardV2Period = '30d' | '90d' | '365d';
+export type DashboardV2PeriodPreset =
+  | 'today'
+  | 'yesterday'
+  | '7d'
+  | '30d'
+  | '90d'
+  | 'month'
+  | 'lastMonth'
+  | 'ytd'
+  | '365d'
+  | 'custom';
+
+export type DashboardV2DateRange = {
+  periodStart: string;
+  periodEnd: string;
+};
 
 export type DashboardV2Filters = {
-  period: DashboardV2Period;
+  periodPreset: DashboardV2PeriodPreset;
+  customStart?: string;
+  customEnd?: string;
   vendedorId?: string;
   pipelineId?: string;
 };
@@ -18,6 +35,7 @@ type CacheMeta = {
 export type DashboardV2Overview = {
   receitaFechada: number;
   receitaPrevista: number;
+  metaReceita: number;
   ticketMedio: number;
   cicloMedioDias: number;
   oportunidadesAtivas: number;
@@ -92,6 +110,43 @@ export type DashboardV2Payload = {
   insights: DashboardV2Insights;
 };
 
+const defaultCacheMeta: CacheMeta = {
+  hit: false,
+  key: '',
+  generatedAt: '',
+};
+
+const createEmptyOverview = (): DashboardV2Overview => ({
+  receitaFechada: 0,
+  receitaPrevista: 0,
+  metaReceita: 0,
+  ticketMedio: 0,
+  cicloMedioDias: 0,
+  oportunidadesAtivas: 0,
+  cache: defaultCacheMeta,
+});
+
+const createEmptyTrends = (): DashboardV2Trends => ({
+  points: [],
+  cache: defaultCacheMeta,
+});
+
+const createEmptyFunnel = (): DashboardV2Funnel => ({
+  steps: [],
+  cache: defaultCacheMeta,
+});
+
+const createEmptyPipelineSummary = (): DashboardV2PipelineSummary => ({
+  totalValor: 0,
+  stages: [],
+  cache: defaultCacheMeta,
+});
+
+const createEmptyInsights = (): DashboardV2Insights => ({
+  insights: [],
+  cache: defaultCacheMeta,
+});
+
 type UseDashboardV2FlagResult = {
   loading: boolean;
   error: string | null;
@@ -116,25 +171,109 @@ type ApiErrorShape = {
   message?: string;
 };
 
-const toDateInput = (date: Date): string => date.toISOString().slice(0, 10);
+const DASHBOARD_V2_FILTERS_STORAGE_KEY = 'conect360:dashboard-v2:filters:v2';
+const dateInputPattern = /^\d{4}-\d{2}-\d{2}$/;
 
-const resolveRange = (period: DashboardV2Period): { periodStart: string; periodEnd: string } => {
-  const end = new Date();
-  const start = new Date(end);
+const toDateInput = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
-  switch (period) {
+const toDayStart = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+const shiftDays = (date: Date, days: number): Date => {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+};
+
+const isValidDateInput = (value: string | undefined): value is string =>
+  Boolean(value && dateInputPattern.test(value));
+
+const createDateFromInput = (value: string | undefined): Date | null => {
+  if (!isValidDateInput(value)) return null;
+  const [yearRaw, monthRaw, dayRaw] = value.split('-');
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  const day = Number(dayRaw);
+  const parsed = new Date(year, month - 1, day);
+
+  if (
+    Number.isNaN(parsed.getTime()) ||
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return parsed;
+};
+
+const resolveRange = (filters: DashboardV2Filters): DashboardV2DateRange => {
+  const today = toDayStart(new Date());
+  let start = new Date(today);
+  let end = new Date(today);
+
+  switch (filters.periodPreset) {
+    case 'today':
+      break;
+    case 'yesterday':
+      start = shiftDays(today, -1);
+      end = shiftDays(today, -1);
+      break;
+    case '7d':
+      start = shiftDays(today, -6);
+      break;
     case '30d':
-      start.setDate(start.getDate() - 29);
+      start = shiftDays(today, -29);
       break;
     case '90d':
-      start.setDate(start.getDate() - 89);
+      start = shiftDays(today, -89);
+      break;
+    case 'month':
+      start = new Date(today.getFullYear(), today.getMonth(), 1);
+      break;
+    case 'lastMonth':
+      start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      end = new Date(today.getFullYear(), today.getMonth(), 0);
+      break;
+    case 'ytd':
+      start = new Date(today.getFullYear(), 0, 1);
       break;
     case '365d':
-      start.setDate(start.getDate() - 364);
+      start = shiftDays(today, -364);
       break;
+    case 'custom': {
+      const customStart = createDateFromInput(filters.customStart);
+      const customEnd = createDateFromInput(filters.customEnd);
+
+      if (customStart && customEnd) {
+        start = customStart;
+        end = customEnd;
+      } else if (customStart && !customEnd) {
+        start = customStart;
+        end = customStart;
+      } else if (!customStart && customEnd) {
+        start = customEnd;
+        end = customEnd;
+      } else {
+        start = shiftDays(today, -29);
+        end = today;
+      }
+      break;
+    }
     default:
-      start.setDate(start.getDate() - 29);
+      start = shiftDays(today, -29);
       break;
+  }
+
+  if (start.getTime() > end.getTime()) {
+    const temp = start;
+    start = end;
+    end = temp;
   }
 
   return {
@@ -216,33 +355,160 @@ type UseDashboardV2Result = {
   refreshing: boolean;
   error: string | null;
   data: DashboardV2Payload | null;
+  activeRange: DashboardV2DateRange;
   filters: DashboardV2Filters;
   setFilters: (next: Partial<DashboardV2Filters>) => void;
   refresh: () => Promise<void>;
 };
 
 const defaultFilters: DashboardV2Filters = {
-  period: '30d',
+  periodPreset: '30d',
+  customStart: undefined,
+  customEnd: undefined,
   vendedorId: undefined,
   pipelineId: undefined,
 };
 
+const validPeriodPresets = new Set<DashboardV2PeriodPreset>([
+  'today',
+  'yesterday',
+  '7d',
+  '30d',
+  '90d',
+  'month',
+  'lastMonth',
+  'ytd',
+  '365d',
+  'custom',
+]);
+
+const sanitizeFilters = (input: unknown): DashboardV2Filters => {
+  const raw = (input || {}) as Partial<DashboardV2Filters> & { period?: unknown };
+
+  const legacyPeriod =
+    typeof raw.period === 'string' && validPeriodPresets.has(raw.period as DashboardV2PeriodPreset)
+      ? (raw.period as DashboardV2PeriodPreset)
+      : undefined;
+
+  const periodPreset =
+    typeof raw.periodPreset === 'string' && validPeriodPresets.has(raw.periodPreset)
+      ? raw.periodPreset
+      : legacyPeriod || defaultFilters.periodPreset;
+
+  const customStart = isValidDateInput(raw.customStart) ? raw.customStart : undefined;
+  const customEnd = isValidDateInput(raw.customEnd) ? raw.customEnd : undefined;
+
+  let normalizedCustomStart = customStart;
+  let normalizedCustomEnd = customEnd;
+
+  if (periodPreset === 'custom' && customStart && customEnd && customStart > customEnd) {
+    normalizedCustomStart = customEnd;
+    normalizedCustomEnd = customStart;
+  }
+
+  if (periodPreset !== 'custom') {
+    normalizedCustomStart = undefined;
+    normalizedCustomEnd = undefined;
+  }
+
+  return {
+    periodPreset,
+    customStart: normalizedCustomStart,
+    customEnd: normalizedCustomEnd,
+    vendedorId: raw.vendedorId || undefined,
+    pipelineId: raw.pipelineId || undefined,
+  };
+};
+
+const readStoredFilters = (): DashboardV2Filters => {
+  if (typeof window === 'undefined') {
+    return defaultFilters;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(DASHBOARD_V2_FILTERS_STORAGE_KEY);
+    if (!raw) {
+      return defaultFilters;
+    }
+    return sanitizeFilters(JSON.parse(raw));
+  } catch {
+    return defaultFilters;
+  }
+};
+
+type DashboardFetchResult = {
+  payload: DashboardV2Payload;
+  rejectedCount: number;
+  allRejected: boolean;
+  firstError: unknown;
+};
+
+const fetchDashboardPayload = async (
+  params: Record<string, string | undefined>,
+): Promise<DashboardFetchResult> => {
+  const settled = await Promise.allSettled([
+    api.get<DashboardV2Overview>('/dashboard/v2/overview', { params }),
+    api.get<DashboardV2Trends>('/dashboard/v2/trends', { params }),
+    api.get<DashboardV2Funnel>('/dashboard/v2/funnel', { params }),
+    api.get<DashboardV2PipelineSummary>('/dashboard/v2/pipeline-summary', { params }),
+    api.get<DashboardV2Insights>('/dashboard/v2/insights', { params }),
+  ]);
+
+  const rejected = settled.filter((result) => result.status === 'rejected');
+
+  const overview = settled[0].status === 'fulfilled' ? settled[0].value.data : createEmptyOverview();
+  const trends = settled[1].status === 'fulfilled' ? settled[1].value.data : createEmptyTrends();
+  const funnel = settled[2].status === 'fulfilled' ? settled[2].value.data : createEmptyFunnel();
+  const pipelineSummary =
+    settled[3].status === 'fulfilled' ? settled[3].value.data : createEmptyPipelineSummary();
+  const insights = settled[4].status === 'fulfilled' ? settled[4].value.data : createEmptyInsights();
+
+  return {
+    payload: {
+      overview,
+      trends,
+      funnel,
+      pipelineSummary,
+      insights,
+    },
+    rejectedCount: rejected.length,
+    allRejected: rejected.length === settled.length,
+    firstError: rejected[0]?.status === 'rejected' ? rejected[0].reason : null,
+  };
+};
+
 export const useDashboardV2 = (autoRefresh = true): UseDashboardV2Result => {
-  const [filters, setFiltersState] = useState<DashboardV2Filters>(defaultFilters);
+  const [filters, setFiltersState] = useState<DashboardV2Filters>(() => readStoredFilters());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<DashboardV2Payload | null>(null);
 
-  const queryParams = useMemo(() => {
-    const range = resolveRange(filters.period);
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
 
-    return {
-      ...range,
+    try {
+      window.localStorage.setItem(DASHBOARD_V2_FILTERS_STORAGE_KEY, JSON.stringify(filters));
+    } catch {
+      // Ignore storage failures and keep runtime state.
+    }
+  }, [filters]);
+
+  const activeRange = useMemo(
+    () => resolveRange(filters),
+    [filters.periodPreset, filters.customStart, filters.customEnd],
+  );
+
+  const queryParams = useMemo(
+    () => ({
+      ...activeRange,
       vendedorId: filters.vendedorId || undefined,
       pipelineId: filters.pipelineId || undefined,
-    };
-  }, [filters.period, filters.vendedorId, filters.pipelineId]);
+    }),
+    [activeRange, filters.vendedorId, filters.pipelineId],
+  );
 
   const fetchDashboard = useCallback(
     async (mode: 'initial' | 'refresh' = 'initial') => {
@@ -253,24 +519,19 @@ export const useDashboardV2 = (autoRefresh = true): UseDashboardV2Result => {
       }
 
       try {
-        const [overview, trends, funnel, pipelineSummary, insights] = await Promise.all([
-          api.get<DashboardV2Overview>('/dashboard/v2/overview', { params: queryParams }),
-          api.get<DashboardV2Trends>('/dashboard/v2/trends', { params: queryParams }),
-          api.get<DashboardV2Funnel>('/dashboard/v2/funnel', { params: queryParams }),
-          api.get<DashboardV2PipelineSummary>('/dashboard/v2/pipeline-summary', {
-            params: queryParams,
-          }),
-          api.get<DashboardV2Insights>('/dashboard/v2/insights', { params: queryParams }),
-        ]);
+        const currentResult = await fetchDashboardPayload(queryParams);
+        if (currentResult.allRejected && currentResult.firstError) {
+          throw currentResult.firstError;
+        }
 
-        setData({
-          overview: overview.data,
-          trends: trends.data,
-          funnel: funnel.data,
-          pipelineSummary: pipelineSummary.data,
-          insights: insights.data,
-        });
-        setError(null);
+        setData(currentResult.payload);
+
+        const notices: string[] = [];
+        if (currentResult.rejectedCount > 0) {
+          notices.push('Alguns indicadores nao puderam ser carregados. Exibindo dados parciais.');
+        }
+
+        setError(notices.length > 0 ? notices.join(' ') : null);
       } catch (err: unknown) {
         setError(normalizeError(err));
       } finally {
@@ -306,7 +567,7 @@ export const useDashboardV2 = (autoRefresh = true): UseDashboardV2Result => {
   }, [autoRefresh, fetchDashboard]);
 
   const setFilters = useCallback((next: Partial<DashboardV2Filters>) => {
-    setFiltersState((prev) => ({ ...prev, ...next }));
+    setFiltersState((prev) => sanitizeFilters({ ...prev, ...next }));
   }, []);
 
   const refresh = useCallback(async () => {
@@ -318,6 +579,7 @@ export const useDashboardV2 = (autoRefresh = true): UseDashboardV2Result => {
     refreshing,
     error,
     data,
+    activeRange,
     filters,
     setFilters,
     refresh,

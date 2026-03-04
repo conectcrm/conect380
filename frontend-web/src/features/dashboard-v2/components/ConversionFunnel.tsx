@@ -69,7 +69,7 @@ const ConversionFunnel: React.FC<ConversionFunnelProps> = ({ steps }) => {
                   className="flex h-[70px] items-center rounded-[16px] bg-[#EAF3EF] px-4"
                   style={{ clipPath: 'polygon(2% 0%, 100% 0%, 97% 100%, 0% 100%)' }}
                 >
-                  <p className="text-[42px] font-semibold leading-none tracking-[-0.02em] text-[#1E4151]">{row.entered}</p>
+                  <p className="text-[30px] font-semibold leading-none tracking-[-0.02em] text-[#1E4151] sm:text-[42px]">{row.entered}</p>
                   <p className="ml-2.5 text-[15px] text-[#2F5260]">{row.title}</p>
                 </div>
               </div>
@@ -83,11 +83,11 @@ const ConversionFunnel: React.FC<ConversionFunnelProps> = ({ steps }) => {
                 style={{ clipPath: 'polygon(2% 0%, 100% 0%, 97% 100%, 0% 100%)' }}
               >
                 <div className="flex min-w-0 flex-1 items-center bg-[#CCE3D9] px-4">
-                  <p className="text-[42px] font-semibold leading-none tracking-[-0.02em] text-[#1E4151]">{row.progressed}</p>
+                  <p className="text-[30px] font-semibold leading-none tracking-[-0.02em] text-[#1E4151] sm:text-[42px]">{row.progressed}</p>
                 </div>
 
                 <div className="flex w-[48%] items-center justify-center gap-1.5 bg-gradient-to-r from-[#7DD8CD] via-[#6FD3C5] to-[#60C8B8] px-3 text-white">
-                  <span className="text-[45px] font-semibold leading-none tracking-[-0.02em]">{Math.max(0, row.rate).toFixed(0)}%</span>
+                  <span className="text-[32px] font-semibold leading-none tracking-[-0.02em] sm:text-[45px]">{Math.max(0, row.rate).toFixed(0)}%</span>
                   <ChevronRight className="h-[18px] w-[18px]" />
                 </div>
               </div>

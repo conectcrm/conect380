@@ -1,9 +1,10 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { DashboardV2QueryDto } from './dto/dashboard-v2-query.dto';
 import { DashboardV2CacheService } from './services/dashboard-v2-cache.service';
 import { DashboardV2FeatureFlagService } from './services/dashboard-v2-feature-flag.service';
 import { DashboardV2AggregationService } from './services/dashboard-v2-aggregation.service';
 import { DashboardV2ValidationService } from './services/dashboard-v2-validation.service';
+import { MetasService } from '../metas/metas.service';
 
 type DateRange = {
   start: Date;
@@ -24,6 +25,7 @@ export class DashboardV2Service {
     private readonly cacheService: DashboardV2CacheService,
     private readonly aggregationService: DashboardV2AggregationService,
     private readonly validationService: DashboardV2ValidationService,
+    private readonly metasService: MetasService,
   ) {}
 
   async getFeatureFlag(empresaId: string) {
@@ -32,16 +34,35 @@ export class DashboardV2Service {
 
   async getOverview(empresaId: string, query: DashboardV2QueryDto) {
     await this.ensureEnabled(empresaId);
+    this.validateFilters(query);
 
     const context = this.resolveContext(query);
+    const requiresSourceQuery = this.requiresSourceQuery(query);
     const response = await this.withCache(
       empresaId,
       context.periodKey,
       'overview',
       this.toFilterHash(query),
       async () => {
-        await this.aggregationService.ensureMetricsForRange(empresaId, context.range);
-        return this.aggregationService.getOverview(empresaId, context.range);
+        if (!requiresSourceQuery) {
+          await this.aggregationService.ensureMetricsForRange(empresaId, context.range);
+        }
+
+        const [overview, metaReceita] = await Promise.all([
+          this.aggregationService.getOverview(empresaId, context.range, query),
+          this.metasService.getMetaValorParaRange(
+            context.range.start,
+            context.range.end,
+            query.vendedorId,
+            undefined,
+            empresaId,
+          ),
+        ]);
+
+        return {
+          ...overview,
+          metaReceita: Number(metaReceita || 0),
+        };
       },
     );
 
@@ -65,16 +86,21 @@ export class DashboardV2Service {
 
   async getTrends(empresaId: string, query: DashboardV2QueryDto) {
     await this.ensureEnabled(empresaId);
+    this.validateFilters(query);
 
     const context = this.resolveContext(query);
+    const requiresSourceQuery = this.requiresSourceQuery(query);
     const response = await this.withCache(
       empresaId,
       context.periodKey,
       'trends',
       this.toFilterHash(query),
       async () => {
-        await this.aggregationService.ensureMetricsForRange(empresaId, context.range);
-        return this.aggregationService.getTrends(empresaId, context.range);
+        if (!requiresSourceQuery) {
+          await this.aggregationService.ensureMetricsForRange(empresaId, context.range);
+        }
+
+        return this.aggregationService.getTrends(empresaId, context.range, query);
       },
     );
 
@@ -90,16 +116,21 @@ export class DashboardV2Service {
 
   async getFunnel(empresaId: string, query: DashboardV2QueryDto) {
     await this.ensureEnabled(empresaId);
+    this.validateFilters(query);
 
     const context = this.resolveContext(query);
+    const requiresSourceQuery = this.requiresSourceQuery(query);
     const response = await this.withCache(
       empresaId,
       context.periodKey,
       'funnel',
       this.toFilterHash(query),
       async () => {
-        await this.aggregationService.ensureMetricsForRange(empresaId, context.range);
-        return this.aggregationService.getFunnel(empresaId, context.range);
+        if (!requiresSourceQuery) {
+          await this.aggregationService.ensureMetricsForRange(empresaId, context.range);
+        }
+
+        return this.aggregationService.getFunnel(empresaId, context.range, query);
       },
     );
 
@@ -115,16 +146,21 @@ export class DashboardV2Service {
 
   async getPipelineSummary(empresaId: string, query: DashboardV2QueryDto) {
     await this.ensureEnabled(empresaId);
+    this.validateFilters(query);
 
     const context = this.resolveContext(query);
+    const requiresSourceQuery = this.requiresSourceQuery(query);
     const response = await this.withCache(
       empresaId,
       context.periodKey,
       'pipeline-summary',
       this.toFilterHash(query),
       async () => {
-        await this.aggregationService.ensureMetricsForRange(empresaId, context.range);
-        return this.aggregationService.getPipelineSummary(empresaId, context.range);
+        if (!requiresSourceQuery) {
+          await this.aggregationService.ensureMetricsForRange(empresaId, context.range);
+        }
+
+        return this.aggregationService.getPipelineSummary(empresaId, context.range, query);
       },
     );
 
@@ -140,16 +176,21 @@ export class DashboardV2Service {
 
   async getInsights(empresaId: string, query: DashboardV2QueryDto) {
     await this.ensureEnabled(empresaId);
+    this.validateFilters(query);
 
     const context = this.resolveContext(query);
+    const requiresSourceQuery = this.requiresSourceQuery(query);
     const response = await this.withCache(
       empresaId,
       context.periodKey,
       'insights',
       this.toFilterHash(query),
       async () => {
-        await this.aggregationService.ensureMetricsForRange(empresaId, context.range);
-        return this.aggregationService.getInsights(empresaId, context.range);
+        if (!requiresSourceQuery) {
+          await this.aggregationService.ensureMetricsForRange(empresaId, context.range);
+        }
+
+        return this.aggregationService.getInsights(empresaId, context.range, query);
       },
     );
 
@@ -191,6 +232,18 @@ export class DashboardV2Service {
       periodStart: query.periodStart || null,
       periodEnd: query.periodEnd || null,
     };
+  }
+
+  private validateFilters(query: DashboardV2QueryDto): void {
+    if (query.pipelineId) {
+      throw new BadRequestException(
+        'Filtro pipelineId ainda nao esta disponivel neste tenant. Utilize o filtro por vendedor.',
+      );
+    }
+  }
+
+  private requiresSourceQuery(query: DashboardV2QueryDto): boolean {
+    return Boolean(query.vendedorId || query.pipelineId);
   }
 
   private async withCache<T>(
