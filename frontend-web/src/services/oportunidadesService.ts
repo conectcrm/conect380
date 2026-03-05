@@ -9,6 +9,8 @@ import {
   EstatisticasOportunidades,
   DadosKanban,
   EstagioOportunidade,
+  OportunidadeHistoricoEstagioItem,
+  OportunidadeAtividadeResumo,
 } from '../types/oportunidades/index';
 
 class OportunidadesService {
@@ -135,6 +137,28 @@ class OportunidadesService {
   // Atividades
   async listarAtividades(oportunidadeId: number): Promise<Atividade[]> {
     const response = await api.get(this.getUrl(`/${oportunidadeId}/atividades`));
+    return response.data;
+  }
+
+  async listarHistoricoEstagios(
+    oportunidadeId: number,
+    limit = 50,
+  ): Promise<OportunidadeHistoricoEstagioItem[]> {
+    const response = await api.get(this.getUrl(`/${oportunidadeId}/historico-estagios`), {
+      params: { limit },
+    });
+    return response.data;
+  }
+
+  async obterResumoAtividadesComerciais(params?: {
+    periodStart?: string;
+    periodEnd?: string;
+    vendedorId?: string;
+    limit?: number;
+  }): Promise<OportunidadeAtividadeResumo> {
+    const response = await api.get(this.getUrl('/atividades/resumo-gerencial'), {
+      params,
+    });
     return response.data;
   }
 

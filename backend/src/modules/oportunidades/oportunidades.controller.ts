@@ -73,6 +73,23 @@ export class OportunidadesController {
     return this.oportunidadesService.getMetricas(empresaId, queryDto);
   }
 
+  @Get('atividades/resumo-gerencial')
+  getResumoAtividadesComerciais(
+    @EmpresaId() empresaId: string,
+    @Query('periodStart') periodStart?: string,
+    @Query('periodEnd') periodEnd?: string,
+    @Query('vendedorId') vendedorId?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = limit ? Number(limit) : undefined;
+    return this.oportunidadesService.obterResumoAtividadesComerciais(empresaId, {
+      periodStart,
+      periodEnd,
+      vendedorId,
+      limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
+    });
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string, @EmpresaId() empresaId: string) {
     return this.oportunidadesService.findOne(id, empresaId);
@@ -109,6 +126,20 @@ export class OportunidadesController {
   @Get(':id/atividades')
   listarAtividades(@Param('id') id: string, @EmpresaId() empresaId: string) {
     return this.oportunidadesService.listarAtividades(id, empresaId);
+  }
+
+  @Get(':id/historico-estagios')
+  listarHistoricoEstagios(
+    @Param('id') id: string,
+    @EmpresaId() empresaId: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = limit ? Number(limit) : undefined;
+    return this.oportunidadesService.listarHistoricoEstagios(
+      id,
+      empresaId,
+      Number.isFinite(parsedLimit) ? parsedLimit : undefined,
+    );
   }
 
   @Post(':id/atividades')

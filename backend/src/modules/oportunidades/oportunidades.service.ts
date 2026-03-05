@@ -113,6 +113,57 @@ export function isOportunidadeStageTransitionAllowed(
   return getAllowedNextOportunidadeStages(current).includes(next);
 }
 
+type OportunidadeActivitiesRange = {
+  start: Date;
+  end: Date;
+};
+
+type OportunidadeAtividadeResumo = {
+  range: {
+    periodStart: string;
+    periodEnd: string;
+  };
+  totalAtividades: number;
+  porTipo: Array<{
+    tipo: TipoAtividade;
+    quantidade: number;
+  }>;
+  porVendedor: Array<{
+    vendedorId: string;
+    nome: string;
+    avatarUrl?: string | null;
+    quantidade: number;
+    oportunidadesAtivas: number;
+    ultimaAtividadeEm: string | null;
+  }>;
+  recentes: Array<{
+    id: number;
+    tipo: TipoAtividade;
+    descricao: string;
+    dataAtividade: string | null;
+    oportunidadeId: number;
+    oportunidadeTitulo?: string;
+    vendedor?: {
+      id: string;
+      nome: string;
+      avatarUrl?: string | null;
+    };
+  }>;
+};
+
+type OportunidadeHistoricoEstagioItem = {
+  id: string;
+  fromStage: EstagioOportunidade | null;
+  toStage: EstagioOportunidade;
+  changedAt: string;
+  source: string;
+  changedBy?: {
+    id: string;
+    nome: string;
+    avatarUrl?: string | null;
+  };
+};
+
 @Injectable()
 export class OportunidadesService {
   private readonly logger = new Logger(OportunidadesService.name);
@@ -161,6 +212,77 @@ export class OportunidadesService {
     }
 
     return [];
+  }
+
+  private parseDateInput(value?: string | null): Date | null {
+    if (!value) {
+      return null;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    const localDateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+    if (localDateMatch) {
+      const year = Number(localDateMatch[1]);
+      const month = Number(localDateMatch[2]);
+      const day = Number(localDateMatch[3]);
+      const parsed = new Date(year, month - 1, day);
+
+      if (
+        parsed.getFullYear() === year &&
+        parsed.getMonth() === month - 1 &&
+        parsed.getDate() === day
+      ) {
+        return parsed;
+      }
+
+      return null;
+    }
+
+    const parsed = new Date(trimmed);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  private resolveActivitiesRange(periodStart?: string, periodEnd?: string): OportunidadeActivitiesRange {
+    const defaultEnd = new Date();
+    defaultEnd.setHours(23, 59, 59, 999);
+
+    const defaultStart = new Date(defaultEnd);
+    defaultStart.setDate(defaultStart.getDate() - 29);
+    defaultStart.setHours(0, 0, 0, 0);
+
+    const parsedStart = this.parseDateInput(periodStart);
+    const parsedEnd = this.parseDateInput(periodEnd);
+
+    let start = parsedStart ? new Date(parsedStart) : defaultStart;
+    let end = parsedEnd ? new Date(parsedEnd) : defaultEnd;
+
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+
+    if (start.getTime() > end.getTime()) {
+      const tmp = start;
+      start = end;
+      end = tmp;
+    }
+
+    return { start, end };
+  }
+
+  private toIsoStringOrNull(value: unknown): string | null {
+    if (!value) {
+      return null;
+    }
+
+    const parsed = value instanceof Date ? value : new Date(String(value));
+    if (Number.isNaN(parsed.getTime())) {
+      return null;
+    }
+
+    return parsed.toISOString();
   }
 
   private async getTableColumns(tableName: string): Promise<Set<string>> {
@@ -1118,6 +1240,220 @@ export class OportunidadesService {
           }
         : undefined,
     })) as Atividade[];
+  }
+
+  async obterResumoAtividadesComerciais(
+    empresaId: string,
+    options?: {
+      periodStart?: string;
+      periodEnd?: string;
+      vendedorId?: string;
+      limit?: number;
+    },
+  ): Promise<OportunidadeAtividadeResumo> {
+    const atividadeSchema = await this.resolveAtividadesSchema();
+    const usersColumns = await this.getTableColumns('users');
+    const range = this.resolveActivitiesRange(options?.periodStart, options?.periodEnd);
+    const vendedorId = options?.vendedorId?.trim() || undefined;
+    const parsedLimit = Number(options?.limit ?? 12);
+    const limit = Number.isFinite(parsedLimit)
+      ? Math.min(Math.max(Math.floor(parsedLimit), 1), 100)
+      : 12;
+
+    const userRef = `atividade.${this.quoteIdentifier(atividadeSchema.userColumn)}`;
+    const dateRef = `atividade.${this.quoteIdentifier(atividadeSchema.dateColumn)}`;
+    const avatarExpr = usersColumns.has('avatar_url') ? 'usuario.avatar_url' : 'NULL';
+    const queryParams = {
+      empresaId,
+      start: range.start.toISOString(),
+      end: range.end.toISOString(),
+    };
+
+    const totalQuery = this.atividadeRepository
+      .createQueryBuilder('atividade')
+      .select('COUNT(*)::int', 'total')
+      .where('atividade.empresa_id = :empresaId', { empresaId })
+      .andWhere(`${dateRef} BETWEEN :start AND :end`, queryParams);
+
+    const byTypeQuery = this.atividadeRepository
+      .createQueryBuilder('atividade')
+      .select('atividade.tipo', 'tipo')
+      .addSelect('COUNT(*)::int', 'quantidade')
+      .where('atividade.empresa_id = :empresaId', { empresaId })
+      .andWhere(`${dateRef} BETWEEN :start AND :end`, queryParams)
+      .groupBy('atividade.tipo')
+      .orderBy('quantidade', 'DESC');
+
+    const bySellerQuery = this.atividadeRepository
+      .createQueryBuilder('atividade')
+      .leftJoin('users', 'usuario', `usuario.id = ${userRef}`)
+      .select(`${userRef}`, 'vendedor_id')
+      .addSelect(`COALESCE(usuario.nome, 'Usuario removido')`, 'vendedor_nome')
+      .addSelect(avatarExpr, 'vendedor_avatar_url')
+      .addSelect('COUNT(*)::int', 'quantidade')
+      .addSelect('COUNT(DISTINCT atividade.oportunidade_id)::int', 'oportunidades_ativas')
+      .addSelect(`MAX(${dateRef})`, 'ultima_atividade_em')
+      .where('atividade.empresa_id = :empresaId', { empresaId })
+      .andWhere(`${dateRef} BETWEEN :start AND :end`, queryParams)
+      .groupBy(`${userRef}`)
+      .addGroupBy('usuario.nome')
+      .orderBy('quantidade', 'DESC')
+      .addOrderBy('vendedor_nome', 'ASC');
+
+    if (usersColumns.has('avatar_url')) {
+      bySellerQuery.addGroupBy('usuario.avatar_url');
+    }
+
+    const recentQuery = this.atividadeRepository
+      .createQueryBuilder('atividade')
+      .leftJoin(
+        'oportunidades',
+        'oportunidade',
+        'oportunidade.id::text = atividade.oportunidade_id::text AND oportunidade.empresa_id = atividade.empresa_id',
+      )
+      .leftJoin('users', 'usuario', `usuario.id = ${userRef}`)
+      .select('atividade.id', 'id')
+      .addSelect('atividade.tipo', 'tipo')
+      .addSelect('atividade.descricao', 'descricao')
+      .addSelect('atividade.oportunidade_id', 'oportunidade_id')
+      .addSelect(dateRef, 'data_atividade')
+      .addSelect('oportunidade.titulo', 'oportunidade_titulo')
+      .addSelect('usuario.id', 'usuario_id')
+      .addSelect('usuario.nome', 'usuario_nome')
+      .addSelect(avatarExpr, 'usuario_avatar_url')
+      .where('atividade.empresa_id = :empresaId', { empresaId })
+      .andWhere(`${dateRef} BETWEEN :start AND :end`, queryParams)
+      .orderBy(dateRef, 'DESC')
+      .addOrderBy('atividade.id', 'DESC')
+      .limit(limit);
+
+    if (vendedorId) {
+      totalQuery.andWhere(`${userRef}::text = :vendedorId`, { vendedorId });
+      byTypeQuery.andWhere(`${userRef}::text = :vendedorId`, { vendedorId });
+      bySellerQuery.andWhere(`${userRef}::text = :vendedorId`, { vendedorId });
+      recentQuery.andWhere(`${userRef}::text = :vendedorId`, { vendedorId });
+    }
+
+    const [totalRow, byTypeRows, bySellerRows, recentRows] = await Promise.all([
+      totalQuery.getRawOne<{ total?: string }>(),
+      byTypeQuery.getRawMany<{ tipo?: string; quantidade?: string }>(),
+      bySellerQuery.getRawMany<{
+        vendedor_id?: string;
+        vendedor_nome?: string;
+        vendedor_avatar_url?: string | null;
+        quantidade?: string;
+        oportunidades_ativas?: string;
+        ultima_atividade_em?: string | Date | null;
+      }>(),
+      recentQuery.getRawMany<{
+        id?: string;
+        tipo?: string;
+        descricao?: string;
+        oportunidade_id?: string;
+        data_atividade?: string | Date | null;
+        oportunidade_titulo?: string | null;
+        usuario_id?: string | null;
+        usuario_nome?: string | null;
+        usuario_avatar_url?: string | null;
+      }>(),
+    ]);
+
+    return {
+      range: {
+        periodStart: range.start.toISOString(),
+        periodEnd: range.end.toISOString(),
+      },
+      totalAtividades: Number(totalRow?.total || 0),
+      porTipo: byTypeRows.map((row) => ({
+        tipo: (row.tipo || TipoAtividade.NOTA) as TipoAtividade,
+        quantidade: Number(row.quantidade || 0),
+      })),
+      porVendedor: bySellerRows
+        .filter((row) => Boolean(row.vendedor_id))
+        .map((row) => ({
+          vendedorId: String(row.vendedor_id),
+          nome: row.vendedor_nome || 'Usuario removido',
+          avatarUrl: row.vendedor_avatar_url || null,
+          quantidade: Number(row.quantidade || 0),
+          oportunidadesAtivas: Number(row.oportunidades_ativas || 0),
+          ultimaAtividadeEm: this.toIsoStringOrNull(row.ultima_atividade_em),
+        })),
+      recentes: recentRows.map((row) => ({
+        id: Number(row.id || 0),
+        tipo: (row.tipo || TipoAtividade.NOTA) as TipoAtividade,
+        descricao: row.descricao || '',
+        dataAtividade: this.toIsoStringOrNull(row.data_atividade),
+        oportunidadeId: Number(row.oportunidade_id || 0),
+        oportunidadeTitulo: row.oportunidade_titulo || undefined,
+        vendedor: row.usuario_id
+          ? {
+              id: row.usuario_id,
+              nome: row.usuario_nome || 'Usuario removido',
+              avatarUrl: row.usuario_avatar_url || null,
+            }
+          : undefined,
+      })),
+    };
+  }
+
+  async listarHistoricoEstagios(
+    oportunidadeId: string,
+    empresaId: string,
+    limit = 50,
+  ): Promise<OportunidadeHistoricoEstagioItem[]> {
+    const oportunidade = await this.findOne(oportunidadeId, empresaId);
+    const usersColumns = await this.getTableColumns('users');
+    const avatarExpr = usersColumns.has('avatar_url') ? 'usuario.avatar_url' : 'NULL';
+    const parsedLimit = Number(limit);
+    const safeLimit = Number.isFinite(parsedLimit)
+      ? Math.min(Math.max(Math.floor(parsedLimit), 1), 200)
+      : 50;
+
+    const rows = await this.stageEventRepository
+      .createQueryBuilder('evento')
+      .leftJoin('users', 'usuario', 'usuario.id = evento.changed_by')
+      .select('evento.id', 'id')
+      .addSelect('evento.from_stage', 'from_stage')
+      .addSelect('evento.to_stage', 'to_stage')
+      .addSelect('evento.changed_at', 'changed_at')
+      .addSelect('evento.source', 'source')
+      .addSelect('usuario.id', 'usuario_id')
+      .addSelect('usuario.nome', 'usuario_nome')
+      .addSelect(avatarExpr, 'usuario_avatar_url')
+      .where('evento.empresa_id = :empresaId', { empresaId })
+      .andWhere('evento.oportunidade_id::text = :oportunidadeId', {
+        oportunidadeId: String(oportunidade.id),
+      })
+      .orderBy('evento.changed_at', 'DESC')
+      .addOrderBy('evento.created_at', 'DESC')
+      .limit(safeLimit)
+      .getRawMany<{
+        id?: string;
+        from_stage?: string | null;
+        to_stage?: string;
+        changed_at?: string | Date;
+        source?: string;
+        usuario_id?: string | null;
+        usuario_nome?: string | null;
+        usuario_avatar_url?: string | null;
+      }>();
+
+    return rows
+      .filter((row) => Boolean(row.id && row.to_stage))
+      .map((row) => ({
+        id: String(row.id),
+        fromStage: row.from_stage ? this.fromDatabaseEstagio(row.from_stage) : null,
+        toStage: this.fromDatabaseEstagio(row.to_stage as string),
+        changedAt: this.toIsoStringOrNull(row.changed_at) || new Date().toISOString(),
+        source: row.source || 'system',
+        changedBy: row.usuario_id
+          ? {
+              id: row.usuario_id,
+              nome: row.usuario_nome || 'Usuario removido',
+              avatarUrl: row.usuario_avatar_url || null,
+            }
+          : undefined,
+      }));
   }
 
   async getMetricas(empresaId: string, filtros?: { dataInicio?: string; dataFim?: string }) {

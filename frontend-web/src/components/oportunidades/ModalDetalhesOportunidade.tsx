@@ -19,12 +19,16 @@ import {
   Send,
   User,
   Copy,
+  Plus,
+  GitBranch,
 } from 'lucide-react';
 import {
   Oportunidade,
   Atividade,
   EstagioOportunidade,
   PrioridadeOportunidade,
+  TipoAtividade,
+  OportunidadeHistoricoEstagioItem,
 } from '../../types/oportunidades';
 import { oportunidadesService } from '../../services/oportunidadesService';
 import { toastService } from '../../services/toastService';
@@ -44,12 +48,21 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
   onClonar,
 }) => {
   const [atividades, setAtividades] = useState<Atividade[]>([]);
+  const [historicoEstagios, setHistoricoEstagios] = useState<OportunidadeHistoricoEstagioItem[]>([]);
   const [loadingAtividades, setLoadingAtividades] = useState(false);
+  const [loadingHistoricoEstagios, setLoadingHistoricoEstagios] = useState(false);
+  const [salvandoAtividade, setSalvandoAtividade] = useState(false);
+  const [novoTipoAtividade, setNovoTipoAtividade] = useState<TipoAtividade>(TipoAtividade.NOTA);
+  const [novaDescricaoAtividade, setNovaDescricaoAtividade] = useState('');
+  const [novaDataAtividade, setNovaDataAtividade] = useState('');
   const [abaSelecionada, setAbaSelecionada] = useState<'detalhes' | 'atividades'>('detalhes');
 
   useEffect(() => {
     if (oportunidade?.id) {
-      carregarAtividades();
+      void Promise.all([carregarAtividades(), carregarHistoricoEstagios()]);
+      setNovoTipoAtividade(TipoAtividade.NOTA);
+      setNovaDescricaoAtividade('');
+      setNovaDataAtividade('');
     }
   }, [oportunidade?.id]);
 
@@ -83,6 +96,62 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
       toastService.error('Não foi possível carregar as atividades desta oportunidade.');
     } finally {
       setLoadingAtividades(false);
+    }
+  };
+
+  const carregarHistoricoEstagios = async () => {
+    if (!oportunidade) return;
+
+    try {
+      setLoadingHistoricoEstagios(true);
+      const dados = await oportunidadesService.listarHistoricoEstagios(oportunidade.id, 30);
+      setHistoricoEstagios(dados);
+    } catch (err) {
+      console.error('Erro ao carregar historico de estagios:', err);
+      toastService.error('Nao foi possivel carregar o historico de estagios.');
+    } finally {
+      setLoadingHistoricoEstagios(false);
+    }
+  };
+
+  const converterDataInputParaDate = (value: string): Date | undefined => {
+    if (!value) return undefined;
+
+    const [ano, mes, dia] = value.split('-').map(Number);
+    if (!ano || !mes || !dia) return undefined;
+
+    const parsed = new Date(ano, mes - 1, dia, 12, 0, 0, 0);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+  };
+
+  const criarAtividade = async () => {
+    if (!oportunidade) return;
+
+    const descricaoLimpa = novaDescricaoAtividade.trim();
+    if (!descricaoLimpa) {
+      toastService.error('Informe a descricao da atividade.');
+      return;
+    }
+
+    try {
+      setSalvandoAtividade(true);
+
+      await oportunidadesService.criarAtividade({
+        oportunidadeId: oportunidade.id,
+        tipo: novoTipoAtividade,
+        descricao: descricaoLimpa,
+        dataAtividade: converterDataInputParaDate(novaDataAtividade),
+      });
+
+      setNovaDescricaoAtividade('');
+      setNovaDataAtividade('');
+      await carregarAtividades();
+      toastService.success('Atividade registrada com sucesso.');
+    } catch (err) {
+      console.error('Erro ao criar atividade:', err);
+      toastService.error('Nao foi possivel registrar a atividade.');
+    } finally {
+      setSalvandoAtividade(false);
     }
   };
 
@@ -127,7 +196,8 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
   };
 
   // Nome do estágio em português
-  const getNomeEstagio = (estagio: EstagioOportunidade) => {
+  const getNomeEstagio = (estagio?: EstagioOportunidade | string | null) => {
+    if (!estagio) return 'Nao informado';
     const estagios = {
       [EstagioOportunidade.LEADS]: 'Leads',
       [EstagioOportunidade.QUALIFICACAO]: 'Qualificação',
@@ -137,7 +207,19 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
       [EstagioOportunidade.GANHO]: 'Ganho',
       [EstagioOportunidade.PERDIDO]: 'Perdido',
     };
-    return estagios[estagio] || estagio;
+    return estagios[estagio as EstagioOportunidade] || String(estagio);
+  };
+
+  const getLabelTipoAtividade = (tipo: TipoAtividade | string): string => {
+    const labels: Record<string, string> = {
+      [TipoAtividade.LIGACAO]: 'Ligacao',
+      [TipoAtividade.EMAIL]: 'Email',
+      [TipoAtividade.REUNIAO]: 'Reuniao',
+      [TipoAtividade.NOTA]: 'Nota',
+      [TipoAtividade.TAREFA]: 'Tarefa',
+    };
+
+    return labels[String(tipo)] || String(tipo);
   };
 
   const formatarMoeda = (valor: number) => {
@@ -477,71 +559,157 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
               )}
             </div>
           ) : (
-            // Aba de Atividades
-            <div>
-              <h3 className="text-lg font-bold text-[#002333] mb-4 flex items-center gap-2">
-                <MessageSquare className="h-5 w-5 text-[#159A9C]" />
-                Timeline de Atividades
-              </h3>
-
-              {loadingAtividades ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#159A9C] mx-auto"></div>
-                  <p className="text-[#002333]/60 mt-2 text-sm">Carregando atividades...</p>
+            <div className="space-y-6">
+              <div className="rounded-xl border border-[#B4BEC9]/35 bg-[#DEEFE7]/35 p-4">
+                <h3 className="text-base font-bold text-[#002333] mb-3 flex items-center gap-2">
+                  <Plus className="h-4 w-4 text-[#159A9C]" />
+                  Registrar nova atividade
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <select
+                    value={novoTipoAtividade}
+                    onChange={(event) => setNovoTipoAtividade(event.target.value as TipoAtividade)}
+                    className="rounded-lg border border-[#B4BEC9]/70 bg-white px-3 py-2 text-sm text-[#002333] focus:border-[#159A9C] focus:outline-none"
+                  >
+                    <option value={TipoAtividade.LIGACAO}>Ligacao</option>
+                    <option value={TipoAtividade.EMAIL}>Email</option>
+                    <option value={TipoAtividade.REUNIAO}>Reuniao</option>
+                    <option value={TipoAtividade.NOTA}>Nota</option>
+                    <option value={TipoAtividade.TAREFA}>Tarefa</option>
+                  </select>
+                  <input
+                    type="date"
+                    value={novaDataAtividade}
+                    onChange={(event) => setNovaDataAtividade(event.target.value)}
+                    className="rounded-lg border border-[#B4BEC9]/70 bg-white px-3 py-2 text-sm text-[#002333] focus:border-[#159A9C] focus:outline-none"
+                  />
+                  <div className="md:col-span-2">
+                    <textarea
+                      value={novaDescricaoAtividade}
+                      onChange={(event) => setNovaDescricaoAtividade(event.target.value)}
+                      rows={2}
+                      placeholder="Descreva a interacao, follow-up ou proximo passo..."
+                      className="w-full rounded-lg border border-[#B4BEC9]/70 bg-white px-3 py-2 text-sm text-[#002333] focus:border-[#159A9C] focus:outline-none"
+                    />
+                  </div>
                 </div>
-              ) : atividades.length === 0 ? (
-                <div className="text-center py-12 bg-[#DEEFE7]/35 rounded-xl border border-[#B4BEC9]/25">
-                  <MessageSquare className="h-12 w-12 text-[#B4BEC9] mx-auto mb-3" />
-                  <p className="text-[#002333]/70 font-medium">Nenhuma atividade registrada</p>
-                  <p className="text-[#002333]/55 text-sm mt-1">
-                    As atividades aparecerão aqui conforme forem criadas
-                  </p>
+                <div className="mt-3 flex justify-end">
                   <button
                     type="button"
-                    onClick={carregarAtividades}
-                    className="mt-4 px-4 py-2 border border-[#B4BEC9]/70 rounded-lg text-sm font-medium text-[#002333] hover:bg-[#DEEFE7]/55 transition-colors"
+                    disabled={salvandoAtividade}
+                    onClick={() => {
+                      void criarAtividade();
+                    }}
+                    className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    Recarregar
+                    <Plus className="h-4 w-4" />
+                    {salvandoAtividade ? 'Salvando...' : 'Adicionar atividade'}
                   </button>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {atividades.map((atividade, index) => (
-                    <div key={atividade.id} className="flex gap-4">
-                      {/* Linha vertical */}
-                      <div className="flex flex-col items-center">
-                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] flex items-center justify-center shadow-sm">
-                          {getIconeAtividade(atividade.tipo)}
-                        </div>
-                        {index < atividades.length - 1 && (
-                          <div className="w-0.5 flex-1 bg-[#B4BEC9]/60 my-2 min-h-[30px]" />
-                        )}
-                      </div>
+              </div>
 
-                      {/* Conteúdo da atividade */}
-                      <div className="flex-1 pb-6">
-                        <div className="bg-white border border-[#B4BEC9]/35 rounded-xl p-4 hover:border-[#159A9C]/30 transition-colors">
-                          <div className="flex items-start justify-between mb-2">
-                            <div>
-                              <p className="font-semibold text-[#002333] capitalize">
-                                {atividade.tipo.replace('_', ' ')}
-                              </p>
-                              <p className="text-xs text-[#002333]/55 flex items-center gap-1 mt-1">
-                                <User className="h-3 w-3" />
-                                {atividade.criadoPor?.nome || 'Sistema'} •{' '}
-                                {formatarData(atividade.createdAt)}
-                              </p>
-                            </div>
+              <div>
+                <h3 className="text-lg font-bold text-[#002333] mb-4 flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5 text-[#159A9C]" />
+                  Timeline de Atividades
+                </h3>
+
+                {loadingAtividades ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#159A9C] mx-auto"></div>
+                    <p className="text-[#002333]/60 mt-2 text-sm">Carregando atividades...</p>
+                  </div>
+                ) : atividades.length === 0 ? (
+                  <div className="text-center py-12 bg-[#DEEFE7]/35 rounded-xl border border-[#B4BEC9]/25">
+                    <MessageSquare className="h-12 w-12 text-[#B4BEC9] mx-auto mb-3" />
+                    <p className="text-[#002333]/70 font-medium">Nenhuma atividade registrada</p>
+                    <p className="text-[#002333]/55 text-sm mt-1">
+                      As atividades aparecerão aqui conforme forem criadas.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void carregarAtividades();
+                      }}
+                      className="mt-4 px-4 py-2 border border-[#B4BEC9]/70 rounded-lg text-sm font-medium text-[#002333] hover:bg-[#DEEFE7]/55 transition-colors"
+                    >
+                      Recarregar
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {atividades.map((atividade, index) => (
+                      <div key={atividade.id} className="flex gap-4">
+                        <div className="flex flex-col items-center">
+                          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] flex items-center justify-center shadow-sm">
+                            {getIconeAtividade(atividade.tipo)}
                           </div>
-                          <p className="text-[#002333]/80 text-sm whitespace-pre-wrap">
-                            {atividade.descricao}
-                          </p>
+                          {index < atividades.length - 1 && (
+                            <div className="w-0.5 flex-1 bg-[#B4BEC9]/60 my-2 min-h-[30px]" />
+                          )}
+                        </div>
+
+                        <div className="flex-1 pb-6">
+                          <div className="bg-white border border-[#B4BEC9]/35 rounded-xl p-4 hover:border-[#159A9C]/30 transition-colors">
+                            <div className="flex items-start justify-between mb-2">
+                              <div>
+                                <p className="font-semibold text-[#002333] capitalize">
+                                  {getLabelTipoAtividade(atividade.tipo)}
+                                </p>
+                                <p className="text-xs text-[#002333]/55 flex items-center gap-1 mt-1">
+                                  <User className="h-3 w-3" />
+                                  {atividade.criadoPor?.nome || 'Sistema'} •{' '}
+                                  {formatarData(atividade.createdAt)}
+                                </p>
+                              </div>
+                            </div>
+                            <p className="text-[#002333]/80 text-sm whitespace-pre-wrap">
+                              {atividade.descricao}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <h3 className="text-lg font-bold text-[#002333] mb-4 flex items-center gap-2">
+                  <GitBranch className="h-5 w-5 text-[#159A9C]" />
+                  Historico de estagios
+                </h3>
+
+                {loadingHistoricoEstagios ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#159A9C] mx-auto"></div>
+                    <p className="text-[#002333]/60 mt-2 text-sm">Carregando historico...</p>
+                  </div>
+                ) : historicoEstagios.length === 0 ? (
+                  <div className="rounded-xl border border-[#B4BEC9]/25 bg-[#DEEFE7]/25 px-4 py-5 text-sm text-[#002333]/65">
+                    Nenhuma movimentacao de estagio registrada para esta oportunidade.
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {historicoEstagios.map((evento) => (
+                      <div
+                        key={evento.id}
+                        className="rounded-xl border border-[#B4BEC9]/35 bg-white px-4 py-3"
+                      >
+                        <p className="text-sm font-semibold text-[#002333]">
+                          {evento.fromStage
+                            ? `${getNomeEstagio(evento.fromStage)} -> ${getNomeEstagio(evento.toStage)}`
+                            : `Entrada em ${getNomeEstagio(evento.toStage)}`}
+                        </p>
+                        <p className="mt-1 text-xs text-[#002333]/60">
+                          {evento.changedBy?.nome || 'Sistema'} • {formatarData(evento.changedAt)} •{' '}
+                          Origem: {evento.source}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

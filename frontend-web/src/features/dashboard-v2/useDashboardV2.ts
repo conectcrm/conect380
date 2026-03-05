@@ -96,6 +96,45 @@ export type DashboardV2Insights = {
   cache: CacheMeta;
 };
 
+export type DashboardV2SalesActivityType = {
+  tipo: string;
+  quantidade: number;
+};
+
+export type DashboardV2SalesActivitySeller = {
+  vendedorId: string;
+  nome: string;
+  avatarUrl?: string | null;
+  quantidade: number;
+  oportunidadesAtivas: number;
+  ultimaAtividadeEm: string | null;
+};
+
+export type DashboardV2SalesActivityRecent = {
+  id: number;
+  tipo: string;
+  descricao: string;
+  dataAtividade: string | null;
+  oportunidadeId: number;
+  oportunidadeTitulo?: string;
+  vendedor?: {
+    id: string;
+    nome: string;
+    avatarUrl?: string | null;
+  };
+};
+
+export type DashboardV2SalesActivities = {
+  range: {
+    periodStart: string;
+    periodEnd: string;
+  };
+  totalAtividades: number;
+  porTipo: DashboardV2SalesActivityType[];
+  porVendedor: DashboardV2SalesActivitySeller[];
+  recentes: DashboardV2SalesActivityRecent[];
+};
+
 export type DashboardV2Flag = {
   enabled: boolean;
   source: 'disabled' | 'enabled' | 'rollout';
@@ -108,6 +147,7 @@ export type DashboardV2Payload = {
   funnel: DashboardV2Funnel;
   pipelineSummary: DashboardV2PipelineSummary;
   insights: DashboardV2Insights;
+  salesActivities: DashboardV2SalesActivities;
 };
 
 const defaultCacheMeta: CacheMeta = {
@@ -147,6 +187,19 @@ const createEmptyInsights = (): DashboardV2Insights => ({
   cache: defaultCacheMeta,
 });
 
+const createEmptySalesActivities = (
+  range: DashboardV2DateRange,
+): DashboardV2SalesActivities => ({
+  range: {
+    periodStart: range.periodStart,
+    periodEnd: range.periodEnd,
+  },
+  totalAtividades: 0,
+  porTipo: [],
+  porVendedor: [],
+  recentes: [],
+});
+
 type UseDashboardV2FlagResult = {
   loading: boolean;
   error: string | null;
@@ -172,6 +225,7 @@ type ApiErrorShape = {
 };
 
 const DASHBOARD_V2_FILTERS_STORAGE_KEY = 'conect360:dashboard-v2:filters:v2';
+const DASHBOARD_V2_AUTO_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const dateInputPattern = /^\d{4}-\d{2}-\d{2}$/;
 
 const toDateInput = (date: Date): string => {
@@ -444,15 +498,50 @@ type DashboardFetchResult = {
   firstError: unknown;
 };
 
+type DashboardV2SnapshotApiPayload = Omit<DashboardV2Payload, 'salesActivities'>;
+
 const fetchDashboardPayload = async (
   params: Record<string, string | undefined>,
+  range: DashboardV2DateRange,
 ): Promise<DashboardFetchResult> => {
+  const salesActivitiesParams = {
+    periodStart: params.periodStart,
+    periodEnd: params.periodEnd,
+    vendedorId: params.vendedorId,
+    limit: '12',
+  };
+
+  const [snapshotResult, salesActivitiesResult] = await Promise.allSettled([
+    api.get<DashboardV2SnapshotApiPayload>('/dashboard/v2/snapshot', { params }),
+    api.get<DashboardV2SalesActivities>('/oportunidades/atividades/resumo-gerencial', {
+      params: salesActivitiesParams,
+    }),
+  ]);
+
+  if (snapshotResult.status === 'fulfilled') {
+    return {
+      payload: {
+        ...snapshotResult.value.data,
+        salesActivities:
+          salesActivitiesResult.status === 'fulfilled'
+            ? salesActivitiesResult.value.data
+            : createEmptySalesActivities(range),
+      },
+      rejectedCount: salesActivitiesResult.status === 'rejected' ? 1 : 0,
+      allRejected: false,
+      firstError: salesActivitiesResult.status === 'rejected' ? salesActivitiesResult.reason : null,
+    };
+  }
+
   const settled = await Promise.allSettled([
     api.get<DashboardV2Overview>('/dashboard/v2/overview', { params }),
     api.get<DashboardV2Trends>('/dashboard/v2/trends', { params }),
     api.get<DashboardV2Funnel>('/dashboard/v2/funnel', { params }),
     api.get<DashboardV2PipelineSummary>('/dashboard/v2/pipeline-summary', { params }),
     api.get<DashboardV2Insights>('/dashboard/v2/insights', { params }),
+    api.get<DashboardV2SalesActivities>('/oportunidades/atividades/resumo-gerencial', {
+      params: salesActivitiesParams,
+    }),
   ]);
 
   const rejected = settled.filter((result) => result.status === 'rejected');
@@ -465,6 +554,8 @@ const fetchDashboardPayload = async (
     settled[3].status === 'fulfilled' ? settled[3].value.data : createEmptyPipelineSummary();
   const insights =
     settled[4].status === 'fulfilled' ? settled[4].value.data : createEmptyInsights();
+  const salesActivities =
+    settled[5].status === 'fulfilled' ? settled[5].value.data : createEmptySalesActivities(range);
 
   return {
     payload: {
@@ -473,6 +564,7 @@ const fetchDashboardPayload = async (
       funnel,
       pipelineSummary,
       insights,
+      salesActivities,
     },
     rejectedCount: rejected.length,
     allRejected: rejected.length === settled.length,
@@ -527,7 +619,7 @@ export const useDashboardV2 = (autoRefresh = true): UseDashboardV2Result => {
       }
 
       try {
-        const currentResult = await fetchDashboardPayload(queryParams);
+        const currentResult = await fetchDashboardPayload(queryParams, activeRange);
         if (currentResult.allRejected && currentResult.firstError) {
           throw currentResult.firstError;
         }
@@ -550,7 +642,7 @@ export const useDashboardV2 = (autoRefresh = true): UseDashboardV2Result => {
         }
       }
     },
-    [queryParams],
+    [queryParams, activeRange],
   );
 
   useEffect(() => {
@@ -562,15 +654,26 @@ export const useDashboardV2 = (autoRefresh = true): UseDashboardV2Result => {
       return;
     }
 
-    const interval = window.setInterval(
-      () => {
+    const refreshIfVisible = () => {
+      if (document.visibilityState !== 'visible') {
+        return;
+      }
+
+      void fetchDashboard('refresh');
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
         void fetchDashboard('refresh');
-      },
-      2 * 60 * 1000,
-    );
+      }
+    };
+
+    const interval = window.setInterval(refreshIfVisible, DASHBOARD_V2_AUTO_REFRESH_INTERVAL_MS);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [autoRefresh, fetchDashboard]);
 

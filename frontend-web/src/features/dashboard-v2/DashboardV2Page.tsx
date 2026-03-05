@@ -1,6 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, BadgeCheck, Clock3, DollarSign, RefreshCw, Target } from 'lucide-react';
+import {
+  Activity,
+  BadgeCheck,
+  CheckCircle2,
+  Clock3,
+  DollarSign,
+  Mail,
+  MessageSquare,
+  PhoneCall,
+  RefreshCw,
+  Target,
+  Users,
+} from 'lucide-react';
 import {
   useDashboardV2,
   type DashboardV2PeriodPreset,
@@ -121,6 +133,52 @@ const formatDateLabel = (value: string): string => {
 
 const formatRangeLabel = (start: string, end: string): string =>
   `${formatDateLabel(start)} a ${formatDateLabel(end)}`;
+
+const activityTypeLabelMap: Record<string, string> = {
+  call: 'Ligacao',
+  email: 'Email',
+  meeting: 'Reuniao',
+  note: 'Nota',
+  task: 'Tarefa',
+};
+
+const activityTypeStyleMap: Record<string, string> = {
+  call: 'bg-[#E7F4FF] text-[#276A91]',
+  email: 'bg-[#F5ECFF] text-[#6A46A0]',
+  meeting: 'bg-[#E8F6F4] text-[#196A6B]',
+  note: 'bg-[#FFF2DF] text-[#996512]',
+  task: 'bg-[#E9F7EA] text-[#2C7A43]',
+};
+
+const getActivityTypeLabel = (tipo: string): string => activityTypeLabelMap[tipo] || tipo;
+
+const getActivityTypeIcon = (tipo: string) => {
+  switch (tipo) {
+    case 'call':
+      return <PhoneCall className="h-3.5 w-3.5" />;
+    case 'email':
+      return <Mail className="h-3.5 w-3.5" />;
+    case 'meeting':
+      return <Users className="h-3.5 w-3.5" />;
+    case 'task':
+      return <CheckCircle2 className="h-3.5 w-3.5" />;
+    case 'note':
+    default:
+      return <MessageSquare className="h-3.5 w-3.5" />;
+  }
+};
+
+const formatActivityTimestamp = (value: string | null | undefined): string => {
+  if (!value) return 'Sem data';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'Sem data';
+  return parsed.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
 
 const average = (values: number[]): number => {
   if (!values.length) return 0;
@@ -393,6 +451,10 @@ const DashboardV2Page: React.FC = () => {
   const latestGeneratedAtLabel = latestGeneratedAt
     ? formatDateTime(latestGeneratedAt)
     : 'Atualizado agora';
+  const salesActivities = data.salesActivities;
+  const topActivityTypes = salesActivities.porTipo.slice(0, 5);
+  const topSellers = salesActivities.porVendedor.slice(0, 6);
+  const recentSalesActivities = salesActivities.recentes.slice(0, 6);
 
   if (loading) {
     return (
@@ -688,6 +750,114 @@ const DashboardV2Page: React.FC = () => {
           projectionLabel={`Projecao: ${formatCurrency(data.overview.receitaPrevista)}`}
           icon={<Activity className="h-5 w-5" />}
         />
+      </section>
+
+      <section className="grid grid-cols-1 gap-3.5 xl:grid-cols-12">
+        <article className="rounded-[20px] border border-[#DCE7EB] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)] xl:col-span-8">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h3 className="text-[20px] font-semibold tracking-[-0.012em] text-[#18374B]">
+                Atividades Comerciais
+              </h3>
+              <p className="mt-1 text-[13px] text-[#617D89]">
+                {salesActivities.totalAtividades} atividades registradas no periodo selecionado.
+              </p>
+            </div>
+            <span className="inline-flex items-center rounded-full border border-[#D6E4E9] bg-[#F5FAFB] px-2.5 py-1 text-[12px] font-medium text-[#4C6977]">
+              {formatRangeLabel(
+                salesActivities.range.periodStart,
+                salesActivities.range.periodEnd,
+              )}
+            </span>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-3.5 lg:grid-cols-2">
+            <div className="rounded-[14px] border border-[#E1EBEE] bg-[#FBFEFF] p-4">
+              <p className="text-[13px] font-semibold text-[#20465A]">Distribuicao por tipo</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {topActivityTypes.length ? (
+                  topActivityTypes.map((item) => (
+                    <span
+                      key={item.tipo}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold ${activityTypeStyleMap[item.tipo] || 'bg-[#EEF3F5] text-[#516A77]'}`}
+                    >
+                      {getActivityTypeIcon(item.tipo)}
+                      {getActivityTypeLabel(item.tipo)}: {item.quantidade}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-[13px] text-[#718A97]">
+                    Sem atividades no periodo.
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-[14px] border border-[#E1EBEE] bg-[#FBFEFF] p-4">
+              <p className="text-[13px] font-semibold text-[#20465A]">Interacoes recentes</p>
+              <div className="mt-3 space-y-2.5">
+                {recentSalesActivities.length ? (
+                  recentSalesActivities.map((item) => (
+                    <div
+                      key={item.id}
+                      className="rounded-[11px] border border-[#E8EFF2] bg-white px-3 py-2.5"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#2A4B5B]">
+                          {getActivityTypeIcon(item.tipo)}
+                          {getActivityTypeLabel(item.tipo)}
+                        </span>
+                        <span className="text-[11px] text-[#79909B]">
+                          {formatActivityTimestamp(item.dataAtividade)}
+                        </span>
+                      </div>
+                      <p className="mt-1.5 line-clamp-2 text-[12px] text-[#4D6876]">
+                        {item.descricao}
+                      </p>
+                      <p className="mt-1 text-[11px] text-[#7F95A0]">
+                        {item.vendedor?.nome || 'Sistema'}
+                        {item.oportunidadeTitulo ? ` • ${item.oportunidadeTitulo}` : ''}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-[13px] text-[#718A97]">Nenhuma interacao recente.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article className="rounded-[20px] border border-[#DCE7EB] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)] xl:col-span-4">
+          <h3 className="text-[18px] font-semibold tracking-[-0.012em] text-[#18374B]">
+            Produtividade por vendedor
+          </h3>
+          <div className="mt-3 space-y-2.5">
+            {topSellers.length ? (
+              topSellers.map((seller) => (
+                <div
+                  key={seller.vendedorId}
+                  className="rounded-[12px] border border-[#E2EBEF] bg-[#FBFEFF] px-3.5 py-2.5"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="truncate text-[13px] font-semibold text-[#20485B]">{seller.nome}</p>
+                    <span className="rounded-full bg-[#E8F6F4] px-2 py-0.5 text-[11px] font-semibold text-[#1C6C6E]">
+                      {seller.quantidade} atividades
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-[#728A96]">
+                    {seller.oportunidadesAtivas} oportunidades com interacao
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-[#879CA7]">
+                    Ultima atividade: {formatActivityTimestamp(seller.ultimaAtividadeEm)}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <p className="text-[13px] text-[#718A97]">Sem produtividade registrada no periodo.</p>
+            )}
+          </div>
+        </article>
       </section>
 
       <section className="grid grid-cols-1 gap-3.5 xl:grid-cols-12">

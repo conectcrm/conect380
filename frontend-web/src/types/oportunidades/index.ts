@@ -145,6 +145,52 @@ export interface NovaAtividade {
   oportunidadeId: number;
 }
 
+export interface OportunidadeHistoricoEstagioItem {
+  id: string;
+  fromStage: EstagioOportunidade | null;
+  toStage: EstagioOportunidade;
+  changedAt: string;
+  source: string;
+  changedBy?: {
+    id: string;
+    nome: string;
+    avatarUrl?: string | null;
+  };
+}
+
+export interface OportunidadeAtividadeResumo {
+  range: {
+    periodStart: string;
+    periodEnd: string;
+  };
+  totalAtividades: number;
+  porTipo: Array<{
+    tipo: TipoAtividade;
+    quantidade: number;
+  }>;
+  porVendedor: Array<{
+    vendedorId: string;
+    nome: string;
+    avatarUrl?: string | null;
+    quantidade: number;
+    oportunidadesAtivas: number;
+    ultimaAtividadeEm: string | null;
+  }>;
+  recentes: Array<{
+    id: number;
+    tipo: TipoAtividade;
+    descricao: string;
+    dataAtividade: string | null;
+    oportunidadeId: number;
+    oportunidadeTitulo?: string;
+    vendedor?: {
+      id: string;
+      nome: string;
+      avatarUrl?: string | null;
+    };
+  }>;
+}
+
 // Configurações do Pipeline
 export interface ConfiguracaoPipeline {
   estagios: EstagioConfig[];
