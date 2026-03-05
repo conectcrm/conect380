@@ -56,8 +56,23 @@ const LoginPage: React.FC = () => {
 
     const sessionExpired = localStorage.getItem('sessionExpired');
     if (sessionExpired === 'true') {
-      toastService.error('Sua sessão expirou. Por favor, faça login novamente.');
+      const sessionExpiredReason = localStorage.getItem('sessionExpiredReason');
+      const sessionExpiredMessage = localStorage.getItem('sessionExpiredMessage');
+
+      if (sessionExpiredReason === 'concurrent_login') {
+        toastService.error(
+          sessionExpiredMessage ||
+            'Sua sessao foi encerrada porque sua conta foi acessada em outro dispositivo.',
+        );
+      } else {
+        toastService.error(
+          sessionExpiredMessage || 'Sua sessao expirou. Por favor, faca login novamente.',
+        );
+      }
+
       localStorage.removeItem('sessionExpired');
+      localStorage.removeItem('sessionExpiredReason');
+      localStorage.removeItem('sessionExpiredMessage');
     }
   }, [location, navigate]);
 
@@ -577,3 +592,4 @@ const LoginPage: React.FC = () => {
 };
 
 export default LoginPage;
+

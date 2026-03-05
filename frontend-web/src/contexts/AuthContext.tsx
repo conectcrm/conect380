@@ -72,6 +72,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       typeof data === 'object' &&
       data !== null &&
       typeof (data as LoginSuccessData).access_token === 'string' &&
+      typeof (data as LoginSuccessData).refresh_token === 'string' &&
       typeof (data as LoginSuccessData).user === 'object'
     );
   };
@@ -86,9 +87,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const applyAuthenticatedSession = (loginData: LoginSuccessData) => {
-    const { access_token, user: userData } = loginData;
+    const { access_token, refresh_token, user: userData } = loginData;
 
-    authService.setToken(access_token);
+    authService.setSessionTokens(access_token, refresh_token);
     dispatchAuthTokenChanged();
 
     authService.setUser(userData);

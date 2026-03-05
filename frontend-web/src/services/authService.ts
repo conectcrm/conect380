@@ -1,6 +1,10 @@
 import api, { apiPublic } from './api';
 import { LoginRequest, LoginResponse, User, ApiResponse } from '../types';
 
+const ACCESS_TOKEN_STORAGE_KEY = 'authToken';
+const REFRESH_TOKEN_STORAGE_KEY = 'refreshToken';
+const USER_STORAGE_KEY = 'user_data';
+
 export const authService = {
   async login(credentials: LoginRequest): Promise<LoginResponse> {
     const response = await api.post<LoginResponse>('/auth/login', credentials);
@@ -40,8 +44,11 @@ export const authService = {
     return response.data;
   },
 
-  async refreshToken(): Promise<ApiResponse<{ access_token: string }>> {
-    const response = await api.post<ApiResponse<{ access_token: string }>>('/auth/refresh');
+  async refreshToken(refreshToken: string): Promise<ApiResponse<{ access_token: string; refresh_token: string }>> {
+    const response = await apiPublic.post<ApiResponse<{ access_token: string; refresh_token: string }>>(
+      '/auth/refresh',
+      { refreshToken },
+    );
     return response.data;
   },
 
@@ -61,14 +68,20 @@ export const authService = {
   },
 
   async logoutSession(payload?: { reason?: string }): Promise<ApiResponse> {
-    const token = localStorage.getItem('authToken');
+    const token = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+    const refreshToken = localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY);
+    const requestBody = {
+      ...(payload || {}),
+      ...(refreshToken ? { refreshToken } : {}),
+    };
+
     if (!token) {
       return { success: true, message: 'Sessao local encerrada sem token ativo.' };
     }
 
     const response = await apiPublic.post<ApiResponse>(
       '/auth/logout',
-      payload || {},
+      requestBody,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -80,26 +93,43 @@ export const authService = {
   },
 
   logout() {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user_data');
+    localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
+    localStorage.removeItem(USER_STORAGE_KEY);
     localStorage.removeItem('empresaAtiva');
     localStorage.removeItem('selectedProfileId');
+    localStorage.removeItem('sessionExpired');
+    localStorage.removeItem('sessionExpiredReason');
+    localStorage.removeItem('sessionExpiredMessage');
+  },
+
+  setSessionTokens(accessToken: string, refreshToken: string) {
+    localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, accessToken);
+    localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, refreshToken);
   },
 
   setToken(token: string) {
-    localStorage.setItem('authToken', token);
+    localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, token);
   },
 
   getToken(): string | null {
-    return localStorage.getItem('authToken');
+    return localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+  },
+
+  setRefreshToken(token: string) {
+    localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, token);
+  },
+
+  getRefreshToken(): string | null {
+    return localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY);
   },
 
   setUser(user: User) {
-    localStorage.setItem('user_data', JSON.stringify(user));
+    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
   },
 
   getUser(): User | null {
-    const userData = localStorage.getItem('user_data');
+    const userData = localStorage.getItem(USER_STORAGE_KEY);
     return userData ? JSON.parse(userData) : null;
   },
 

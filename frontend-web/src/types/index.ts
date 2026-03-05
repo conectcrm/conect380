@@ -87,6 +87,7 @@ export interface LoginRequest {
 
 export interface LoginSuccessData {
   access_token: string;
+  refresh_token: string;
   user: User;
 }
 

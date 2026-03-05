@@ -162,6 +162,29 @@ class LogoutDto {
   @IsString({ message: 'Motivo deve ser uma string' })
   @MaxLength(120, { message: 'Motivo muito longo (maximo 120 caracteres)' })
   reason?: string;
+
+  @ApiProperty({
+    description: 'Refresh token da sessao atual para revogacao',
+    required: false,
+    example: 'a7d2f4c5...',
+  })
+  @IsOptional()
+  @IsString({ message: 'Refresh token deve ser uma string' })
+  @MinLength(32, { message: 'Refresh token invalido' })
+  @MaxLength(512, { message: 'Refresh token muito longo' })
+  refreshToken?: string;
+}
+
+class RefreshTokenDto {
+  @ApiProperty({
+    description: 'Refresh token valido da sessao',
+    example: 'a7d2f4c5...',
+  })
+  @IsString({ message: 'Refresh token deve ser uma string' })
+  @IsNotEmpty({ message: 'Refresh token e obrigatorio' })
+  @MinLength(32, { message: 'Refresh token invalido' })
+  @MaxLength(512, { message: 'Refresh token muito longo' })
+  refreshToken: string;
 }
 
 class UnlockLoginDto {
@@ -238,12 +261,13 @@ export class AuthController {
     });
   }
 
-  @UseGuards(AuthGuard('jwt'))
   @Post('refresh')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @ApiOperation({ summary: 'Renovar token' })
+  @ApiBody({ type: RefreshTokenDto })
   @ApiResponse({ status: 200, description: 'Token renovado com sucesso' })
-  async refresh(@Request() req) {
-    return this.authService.refreshToken(req.user, {
+  async refresh(@Body() refreshTokenDto: RefreshTokenDto, @Req() req) {
+    return this.authService.refreshToken(refreshTokenDto.refreshToken, {
       ip: req?.ip || req?.connection?.remoteAddress,
       userAgent: req?.headers?.['user-agent'],
     });
@@ -262,6 +286,7 @@ export class AuthController {
         userAgent: req?.headers?.['user-agent'],
       },
       logoutDto?.reason,
+      logoutDto?.refreshToken,
     );
   }
 

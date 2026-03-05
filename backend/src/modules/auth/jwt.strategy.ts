@@ -2,10 +2,13 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { UsersService } from '../users/users.service';
 import { resolveJwtSecret } from '../../config/jwt.config';
 import { AdminBreakGlassAccessService } from '../users/services/admin-break-glass-access.service';
 import { User } from '../users/user.entity';
+import { AuthRefreshToken } from './entities/auth-refresh-token.entity';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -13,6 +16,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private configService: ConfigService,
     private usersService: UsersService,
     private adminBreakGlassAccessService: AdminBreakGlassAccessService,
+    @InjectRepository(AuthRefreshToken)
+    private authRefreshTokenRepository: Repository<AuthRefreshToken>,
   ) {
     const jwtSecret = resolveJwtSecret(configService);
 
@@ -24,7 +29,26 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
-    const user = await this.usersService.findById(payload.sub);
+    const sessionId = typeof payload?.sid === 'string' ? payload.sid.trim() : '';
+    const userId = typeof payload?.sub === 'string' ? payload.sub.trim() : '';
+
+    if (!sessionId || !userId) {
+      return null;
+    }
+
+    const session = await this.authRefreshTokenRepository.findOne({
+      where: {
+        id: sessionId,
+        userId,
+        revokedAt: IsNull(),
+      },
+    });
+
+    if (!session || session.expiresAt.getTime() < Date.now()) {
+      return null;
+    }
+
+    const user = await this.usersService.findById(userId);
     if (!user || !user.ativo) {
       return null;
     }

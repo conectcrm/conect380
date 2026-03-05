@@ -9,6 +9,7 @@ import { User, UserRole } from '../users/user.entity';
 import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { MfaLoginChallenge } from './entities/mfa-login-challenge.entity';
 import { AuthLoginAttempt } from './entities/auth-login-attempt.entity';
+import { AuthRefreshToken } from './entities/auth-refresh-token.entity';
 import { EmpresaConfig } from '../empresas/entities/empresa-config.entity';
 import { MailService } from '../../mail/mail.service';
 import { securityLogger } from '../../config/logger.config';
@@ -19,6 +20,9 @@ const MFA_LOGIN_MAX_ATTEMPTS = 5;
 const MFA_LOGIN_RESEND_COOLDOWN_SECONDS = 30;
 const MFA_INVALID_MESSAGE = 'Codigo MFA invalido ou expirado';
 const DEFAULT_ACCESS_TOKEN_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
+const REFRESH_TOKEN_EXPIRES_DAYS_DEFAULT = 30;
+const REFRESH_TOKEN_EXPIRES_DAYS_MIN = 1;
+const REFRESH_TOKEN_EXPIRES_DAYS_MAX = 180;
 const ADMIN_SESSION_MINUTES_DEFAULT = 30;
 const ADMIN_SESSION_MINUTES_MIN = 5;
 const ADMIN_SESSION_MINUTES_MAX = 480;
@@ -27,6 +31,10 @@ const AUTH_LOCKOUT_WINDOW_MINUTES_DEFAULT = 15;
 const AUTH_LOCKOUT_BASE_MINUTES_DEFAULT = 15;
 const AUTH_LOCKOUT_MAX_MULTIPLIER = 8;
 const ADMIN_ROLES_FOR_MFA = new Set<UserRole>([UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE]);
+const REVOKE_REASON_SINGLE_SESSION = 'single_session_enforced';
+const AUTH_ERROR_CODE_CONCURRENT_LOGIN = 'CONCURRENT_LOGIN';
+const AUTH_ERROR_MESSAGE_CONCURRENT_LOGIN =
+  'Sua sessao foi encerrada porque sua conta foi acessada em outro dispositivo.';
 
 type AuthRequestMetadata = {
   ip?: string;
@@ -64,6 +72,8 @@ export class AuthService {
     private mfaLoginChallengeRepository: Repository<MfaLoginChallenge>,
     @InjectRepository(AuthLoginAttempt)
     private authLoginAttemptRepository: Repository<AuthLoginAttempt>,
+    @InjectRepository(AuthRefreshToken)
+    private authRefreshTokenRepository: Repository<AuthRefreshToken>,
     @InjectRepository(EmpresaConfig)
     private empresaConfigRepository: Repository<EmpresaConfig>,
   ) {}
@@ -78,8 +88,24 @@ export class AuthService {
     return randomInt(100000, 1000000).toString();
   }
 
+  private gerarRefreshToken(): string {
+    return randomBytes(48).toString('hex');
+  }
+
   private hashValor(value: string): string {
     return createHash('sha256').update(value).digest('hex');
+  }
+
+  private getRefreshTokenExpiresInDays(): number {
+    const envValue = this.parseInteger(process.env.AUTH_REFRESH_TOKEN_DAYS);
+    if (!envValue) {
+      return REFRESH_TOKEN_EXPIRES_DAYS_DEFAULT;
+    }
+
+    return Math.min(
+      REFRESH_TOKEN_EXPIRES_DAYS_MAX,
+      Math.max(REFRESH_TOKEN_EXPIRES_DAYS_MIN, envValue),
+    );
   }
 
   private parseInteger(value: string | undefined): number | null {
@@ -115,6 +141,10 @@ export class AuthService {
 
   private isLoginLockoutEnabled(): boolean {
     return this.parseBooleanFlag(process.env.AUTH_LOGIN_LOCKOUT_ENABLED, true);
+  }
+
+  private isSingleSessionEnabled(): boolean {
+    return this.parseBooleanFlag(process.env.AUTH_SINGLE_SESSION_ENABLED, true);
   }
 
   private isDevMfaFallbackEnabled(): boolean {
@@ -395,6 +425,7 @@ export class AuthService {
   private async issueAccessToken(
     user: Pick<User, 'id' | 'email' | 'role' | 'empresa_id'>,
     context: TokenIssueContext,
+    sessionId: string,
     metadata?: AuthRequestMetadata,
   ): Promise<string> {
     const payload = {
@@ -402,6 +433,7 @@ export class AuthService {
       sub: user.id,
       empresa_id: user.empresa_id,
       role: user.role,
+      sid: sessionId,
     };
 
     const expiresIn = await this.resolveAccessTokenExpiresIn(user);
@@ -416,6 +448,118 @@ export class AuthService {
     }
 
     return token;
+  }
+
+  private async issueRefreshToken(
+    user: Pick<User, 'id' | 'empresa_id'>,
+    metadata?: AuthRequestMetadata,
+  ): Promise<{ sessionId: string; token: string; tokenHash: string; expiresAt: Date }> {
+    const token = this.gerarRefreshToken();
+    const tokenHash = this.hashValor(token);
+    const expiresInDays = this.getRefreshTokenExpiresInDays();
+    const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
+
+    const entity = this.authRefreshTokenRepository.create({
+      tokenHash,
+      userId: user.id,
+      empresaId: user.empresa_id ?? null,
+      expiresAt,
+      revokedAt: null,
+      revokeReason: null,
+      replacedByTokenHash: null,
+      requestedIp: metadata?.ip?.slice(0, 45) ?? null,
+      userAgent: metadata?.userAgent ?? null,
+    });
+
+    await this.authRefreshTokenRepository.save(entity);
+
+    return {
+      sessionId: entity.id,
+      token,
+      tokenHash,
+      expiresAt,
+    };
+  }
+
+  private async issueSessionTokens(
+    user: Pick<User, 'id' | 'email' | 'role' | 'empresa_id'>,
+    context: TokenIssueContext,
+    metadata?: AuthRequestMetadata,
+  ): Promise<{ sessionId: string; accessToken: string; refreshToken: string }> {
+    const { sessionId, token: refreshToken } = await this.issueRefreshToken(user, metadata);
+    const accessToken = await this.issueAccessToken(user, context, sessionId, metadata);
+
+    return {
+      sessionId,
+      accessToken,
+      refreshToken,
+    };
+  }
+
+  private async revokeRefreshToken(
+    rawRefreshToken: string,
+    reason: string,
+    options?: {
+      replacedByTokenHash?: string | null;
+      userId?: string;
+    },
+  ): Promise<boolean> {
+    const normalizedToken = rawRefreshToken?.trim();
+    if (!normalizedToken) {
+      return false;
+    }
+
+    const tokenHash = this.hashValor(normalizedToken);
+    const whereClause: {
+      tokenHash: string;
+      revokedAt: ReturnType<typeof IsNull>;
+      userId?: string;
+    } = {
+      tokenHash,
+      revokedAt: IsNull(),
+    };
+
+    if (options?.userId) {
+      whereClause.userId = options.userId;
+    }
+
+    const result = await this.authRefreshTokenRepository.update(whereClause, {
+      revokedAt: new Date(),
+      revokeReason: reason,
+      replacedByTokenHash: options?.replacedByTokenHash ?? null,
+    });
+
+    return Boolean(result.affected && result.affected > 0);
+  }
+
+  private async revokeAllUserRefreshTokens(userId: string, reason: string): Promise<void> {
+    await this.authRefreshTokenRepository.update(
+      { userId, revokedAt: IsNull() },
+      {
+        revokedAt: new Date(),
+        revokeReason: reason,
+        replacedByTokenHash: null,
+      },
+    );
+  }
+
+  private async revokeOtherUserRefreshTokens(
+    userId: string,
+    currentSessionId: string,
+    reason: string,
+  ): Promise<void> {
+    await this.authRefreshTokenRepository
+      .createQueryBuilder()
+      .update(AuthRefreshToken)
+      .set({
+        revokedAt: new Date(),
+        revokeReason: reason,
+        replacedByTokenHash: null,
+      })
+      .where('user_id = :userId', { userId })
+      .andWhere('revoked_at IS NULL')
+      .andWhere('id <> :currentSessionId', { currentSessionId })
+      .execute();
   }
 
   private async shouldRequireAdminMfa(user: Pick<User, 'role' | 'empresa_id'>): Promise<boolean> {
@@ -455,12 +599,21 @@ export class AuthService {
     await this.usersService.updateLastLogin(user.id);
 
     const normalizedPermissions = Array.isArray(user.permissoes) ? user.permissoes : [];
-    const accessToken = await this.issueAccessToken(user, context, metadata);
+    const { sessionId, accessToken, refreshToken } = await this.issueSessionTokens(
+      user,
+      context,
+      metadata,
+    );
+
+    if (this.isSingleSessionEnabled()) {
+      await this.revokeOtherUserRefreshTokens(user.id, sessionId, REVOKE_REASON_SINGLE_SESSION);
+    }
 
     return {
       success: true,
       data: {
         access_token: accessToken,
+        refresh_token: refreshToken,
         user: {
           id: user.id,
           nome: user.nome,
@@ -749,18 +902,103 @@ export class AuthService {
     };
   }
 
-  async refreshToken(user: User, metadata?: AuthRequestMetadata) {
-    const accessToken = await this.issueAccessToken(user, 'refresh', metadata);
+  async refreshToken(refreshToken: string, metadata?: AuthRequestMetadata) {
+    const normalizedRefreshToken = refreshToken?.trim();
+    if (!normalizedRefreshToken) {
+      throw new UnauthorizedException('Refresh token invalido ou expirado');
+    }
+
+    const tokenHash = this.hashValor(normalizedRefreshToken);
+    const currentSession = await this.authRefreshTokenRepository.findOne({
+      where: { tokenHash },
+      relations: ['user', 'user.empresa'],
+    });
+
+    if (!currentSession) {
+      throw new UnauthorizedException('Refresh token invalido ou expirado');
+    }
+
+    if (currentSession.revokedAt) {
+      const revokeReason = String(currentSession.revokeReason || '')
+        .trim()
+        .toLowerCase();
+
+      if (revokeReason === REVOKE_REASON_SINGLE_SESSION) {
+        throw new UnauthorizedException({
+          code: AUTH_ERROR_CODE_CONCURRENT_LOGIN,
+          message: AUTH_ERROR_MESSAGE_CONCURRENT_LOGIN,
+        });
+      }
+
+      throw new UnauthorizedException('Refresh token invalido ou expirado');
+    }
+
+    if (currentSession.expiresAt.getTime() < Date.now()) {
+      await this.authRefreshTokenRepository.update(
+        { id: currentSession.id, revokedAt: IsNull() },
+        {
+          revokedAt: new Date(),
+          revokeReason: 'expired',
+        },
+      );
+      throw new UnauthorizedException('Refresh token invalido ou expirado');
+    }
+
+    const user = currentSession.user ?? (await this.usersService.findById(currentSession.userId));
+
+    if (!user || !user.ativo || user.deve_trocar_senha) {
+      await this.authRefreshTokenRepository.update(
+        { id: currentSession.id, revokedAt: IsNull() },
+        {
+          revokedAt: new Date(),
+          revokeReason: 'invalid_user',
+        },
+      );
+      throw new UnauthorizedException('Sessao de autenticacao invalida. Refaca o login.');
+    }
+
+    const {
+      sessionId: nextSessionId,
+      token: nextRefreshToken,
+      tokenHash: nextRefreshTokenHash,
+    } = await this.issueRefreshToken(
+      user,
+      metadata,
+    );
+
+    const revoked = await this.revokeRefreshToken(normalizedRefreshToken, 'rotated', {
+      replacedByTokenHash: nextRefreshTokenHash,
+      userId: user.id,
+    });
+
+    if (!revoked) {
+      await this.revokeRefreshToken(nextRefreshToken, 'rotation_conflict', {
+        userId: user.id,
+      });
+      throw new UnauthorizedException('Refresh token invalido ou expirado');
+    }
+
+    const accessToken = await this.issueAccessToken(user, 'refresh', nextSessionId, metadata);
 
     return {
       success: true,
       data: {
         access_token: accessToken,
+        refresh_token: nextRefreshToken,
       },
     };
   }
 
-  async logout(user: User, metadata?: AuthRequestMetadata, reason?: string) {
+  async logout(
+    user: User,
+    metadata?: AuthRequestMetadata,
+    reason?: string,
+    refreshToken?: string,
+  ) {
+    if (refreshToken) {
+      await this.revokeRefreshToken(refreshToken, 'logout', { userId: user.id });
+    }
+
     if (this.isAdminRoleForMfa(user.role)) {
       securityLogger.adminSessionLogout(
         user.id,
@@ -850,6 +1088,7 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(senhaNovaNormalizada, 10);
     await this.usersService.updatePassword(userId, hashedPassword, true);
+    await this.revokeAllUserRefreshTokens(userId, 'password_changed');
 
     return {
       success: true,
@@ -934,6 +1173,7 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(senhaNormalizada, 10);
 
     await this.usersService.updatePassword(registro.user_id, hashedPassword, true);
+    await this.revokeAllUserRefreshTokens(registro.user_id, 'password_reset');
 
     registro.used_at = new Date();
     await this.passwordResetTokenRepository.save(registro);

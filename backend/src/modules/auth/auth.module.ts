@@ -11,6 +11,7 @@ import { LocalStrategy } from './local.strategy';
 import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { MfaLoginChallenge } from './entities/mfa-login-challenge.entity';
 import { AuthLoginAttempt } from './entities/auth-login-attempt.entity';
+import { AuthRefreshToken } from './entities/auth-refresh-token.entity';
 import { MailModule } from '../../mail/mail.module';
 import { resolveJwtSecret } from '../../config/jwt.config';
 import { EmpresaConfig } from '../empresas/entities/empresa-config.entity';
@@ -23,6 +24,7 @@ import { EmpresaConfig } from '../empresas/entities/empresa-config.entity';
       PasswordResetToken,
       MfaLoginChallenge,
       AuthLoginAttempt,
+      AuthRefreshToken,
       EmpresaConfig,
     ]),
     PassportModule,
