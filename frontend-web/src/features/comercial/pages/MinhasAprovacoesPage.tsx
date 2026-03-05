@@ -506,7 +506,7 @@ function MinhasAprovacoesPage() {
           title="Nenhuma aprovacao pendente"
           description="Voce nao possui cotacoes aguardando sua aprovacao no momento."
           action={
-            <button type="button" onClick={() => navigate('/vendas/cotacoes')} className={btnPrimary}>
+            <button type="button" onClick={() => navigate('/financeiro/cotacoes')} className={btnPrimary}>
               <FileText className="h-4 w-4" />
               Ver todas as cotacoes
             </button>

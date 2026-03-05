@@ -34,6 +34,7 @@ import { AtendimentoModule } from './modules/atendimento/atendimento.module';
 import { IAModule } from './modules/ia/ia.module';
 import { TriagemModule } from './modules/triagem/triagem.module';
 import { LeadsModule } from './modules/leads/leads.module';
+import { InteracoesModule } from './modules/interacoes/interacoes.module';
 import { CategoriasProdutosModule } from './modules/categorias-produtos/categorias-produtos.module';
 import { SearchModule } from './search/search.module';
 import { AssinaturaMiddleware } from './modules/common/assinatura.middleware';
@@ -114,6 +115,7 @@ const throttlerShortLimit = isProduction ? 10 : 200;
     IAModule,
     TriagemModule,
     LeadsModule,
+    InteracoesModule,
     CategoriasProdutosModule,
     SearchModule,
     PagamentosModule,

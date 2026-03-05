@@ -4,13 +4,13 @@ import { PERMISSIONS_KEY } from '../common/decorators/permissions.decorator';
 import { Permission } from '../common/permissions/permissions.constants';
 
 describe('CotacaoController (permissions)', () => {
-  it('deve exigir permissao comercial para converter em pedido', () => {
+  it('deve exigir permissao financeira para converter em pedido', () => {
     const permissions = Reflect.getMetadata(
       PERMISSIONS_KEY,
       CotacaoController.prototype.converterEmPedido,
     );
 
-    expect(permissions).toEqual([Permission.COMERCIAL_PROPOSTAS_UPDATE]);
+    expect(permissions).toEqual([Permission.FINANCEIRO_PAGAMENTOS_MANAGE]);
   });
 
   it('deve exigir permissao financeiro para marcar adquirido', () => {

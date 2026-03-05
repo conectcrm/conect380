@@ -40,14 +40,14 @@ import { StatusCotacao } from './entities/cotacao.entity';
 @ApiTags('Cotações')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
-@Permissions(Permission.COMERCIAL_PROPOSTAS_READ)
+@Permissions(Permission.FINANCEIRO_PAGAMENTOS_READ)
 @Controller('cotacao')
 export class CotacaoController {
   private readonly logger = new Logger(CotacaoController.name);
   constructor(private readonly cotacaoService: CotacaoService) {}
 
   @Post()
-  @Permissions(Permission.COMERCIAL_PROPOSTAS_CREATE)
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   @ApiOperation({ summary: 'Criar nova cotação' })
   @ApiResponse({
     status: 201,
@@ -179,7 +179,7 @@ export class CotacaoController {
   }
 
   @Put(':id')
-  @Permissions(Permission.COMERCIAL_PROPOSTAS_UPDATE)
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   @ApiOperation({ summary: 'Atualizar cotação' })
   @ApiResponse({
     status: 200,
@@ -209,7 +209,7 @@ export class CotacaoController {
   }
 
   @Delete(':id')
-  @Permissions(Permission.COMERCIAL_PROPOSTAS_DELETE)
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   @ApiOperation({ summary: 'Deletar cotação' })
   @ApiResponse({ status: 200, description: 'Cotação deletada com sucesso' })
   @ApiResponse({ status: 404, description: 'Cotação não encontrada' })
@@ -229,7 +229,7 @@ export class CotacaoController {
   }
 
   @Post(':id/enviar-para-aprovacao')
-  @Permissions(Permission.COMERCIAL_PROPOSTAS_SEND)
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   @ApiOperation({ summary: 'Enviar cotação em rascunho para aprovação' })
   @ApiResponse({ status: 200, description: 'Cotação enviada para aprovação com sucesso' })
   @ApiResponse({ status: 404, description: 'Cotação não encontrada' })
@@ -273,7 +273,7 @@ export class CotacaoController {
   }
 
   @Post(':id/aprovar')
-  @Permissions(Permission.COMERCIAL_PROPOSTAS_UPDATE)
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   @ApiOperation({ summary: 'Aprovar cotação' })
   @ApiResponse({ status: 200, description: 'Cotação aprovada com sucesso' })
   @ApiResponse({ status: 404, description: 'Cotação não encontrada' })
@@ -316,7 +316,7 @@ export class CotacaoController {
   }
 
   @Post(':id/reprovar')
-  @Permissions(Permission.COMERCIAL_PROPOSTAS_UPDATE)
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   @ApiOperation({ summary: 'Reprovar cotação' })
   @ApiResponse({ status: 200, description: 'Cotação reprovada com sucesso' })
   @ApiResponse({ status: 404, description: 'Cotação não encontrada' })
@@ -355,7 +355,7 @@ export class CotacaoController {
   }
 
   @Post('aprovar-lote')
-  @Permissions(Permission.COMERCIAL_PROPOSTAS_UPDATE)
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   @ApiOperation({ summary: 'Aprovar múltiplas cotações de uma vez' })
   @ApiResponse({
     status: 200,
@@ -396,7 +396,7 @@ export class CotacaoController {
   }
 
   @Post('reprovar-lote')
-  @Permissions(Permission.COMERCIAL_PROPOSTAS_UPDATE)
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   @ApiOperation({ summary: 'Reprovar múltiplas cotações de uma vez' })
   @ApiResponse({
     status: 200,
@@ -445,7 +445,7 @@ export class CotacaoController {
   }
   @Put(':id/status')
   @Patch(':id/status')
-  @Permissions(Permission.COMERCIAL_PROPOSTAS_UPDATE)
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   @ApiOperation({ summary: 'Alterar status da cotação' })
   @ApiResponse({
     status: 200,
@@ -475,7 +475,7 @@ export class CotacaoController {
   }
 
   @Post(':id/duplicar')
-  @Permissions(Permission.COMERCIAL_PROPOSTAS_CREATE)
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   @ApiOperation({ summary: 'Duplicar cotação' })
   @ApiResponse({
     status: 201,
@@ -525,7 +525,7 @@ export class CotacaoController {
   }
 
   @Post(':id/enviar-email')
-  @Permissions(Permission.COMERCIAL_PROPOSTAS_SEND)
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   @ApiOperation({ summary: 'Enviar cotação por email' })
   @ApiResponse({ status: 200, description: 'Email enviado com sucesso' })
   async enviarEmail(
@@ -564,7 +564,7 @@ export class CotacaoController {
 
   @Post(':id/converter-pedido')
   @UseGuards(PermissionsGuard)
-  @Permissions(Permission.COMERCIAL_PROPOSTAS_UPDATE)
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   @ApiOperation({ summary: 'Converter cotação em pedido' })
   @ApiResponse({ status: 201, description: 'Pedido criado com sucesso' })
   async converterEmPedido(
@@ -659,7 +659,7 @@ export class CotacaoController {
   }
 
   @Post('templates')
-  @Permissions(Permission.COMERCIAL_PROPOSTAS_CREATE)
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   @ApiOperation({ summary: 'Salvar template de cotação' })
   @ApiResponse({ status: 201, description: 'Template salvo com sucesso' })
   async salvarTemplate(
@@ -678,7 +678,7 @@ export class CotacaoController {
   }
 
   @Get('exportar')
-  @Permissions(Permission.COMERCIAL_PROPOSTAS_READ)
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_READ)
   @ApiOperation({ summary: 'Exportar cotações' })
   @ApiResponse({ status: 200, description: 'Arquivo exportado com sucesso' })
   async exportar(@Query() query: any, @Res() res: Response, @Req() req: any) {
@@ -707,7 +707,7 @@ export class CotacaoController {
   }
 
   @Post('importar')
-  @Permissions(Permission.COMERCIAL_PROPOSTAS_CREATE)
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   @ApiOperation({ summary: 'Importar cotações' })
   @ApiResponse({ status: 201, description: 'Cotações importadas com sucesso' })
   async importar(@Body() body: { dados: any[]; validarApenas?: boolean }, @Req() req: any) {
@@ -743,7 +743,7 @@ export class CotacaoController {
   }
 
   @Post(':id/anexos')
-  @Permissions(Permission.COMERCIAL_PROPOSTAS_UPDATE)
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   @ApiOperation({ summary: 'Adicionar anexo à cotação' })
   @ApiResponse({ status: 201, description: 'Anexo adicionado com sucesso' })
   async adicionarAnexo(
@@ -763,7 +763,7 @@ export class CotacaoController {
   }
 
   @Delete(':id/anexos/:anexoId')
-  @Permissions(Permission.COMERCIAL_PROPOSTAS_UPDATE)
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   @ApiOperation({ summary: 'Remover anexo da cotação' })
   @ApiResponse({ status: 200, description: 'Anexo removido com sucesso' })
   async removerAnexo(

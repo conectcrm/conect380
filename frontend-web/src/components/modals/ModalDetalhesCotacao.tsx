@@ -119,10 +119,10 @@ export const ModalDetalhesCotacao: React.FC<ModalDetalhesCotacaoProps> = ({
 
   const compraStatus = cotacao.metadados?.compra?.status;
   const compraMeta = cotacao.metadados?.compra;
-  const canUpdateCotacao = userHasPermission(user as any, 'comercial.propostas.update');
-  const canDeleteCotacao = userHasPermission(user as any, 'comercial.propostas.delete');
-  const canSendCotacao = userHasPermission(user as any, 'comercial.propostas.send');
-  const canConverterPedido = userHasPermission(user as any, 'comercial.propostas.update');
+  const canUpdateCotacao = userHasPermission(user as any, 'financeiro.pagamentos.manage');
+  const canDeleteCotacao = userHasPermission(user as any, 'financeiro.pagamentos.manage');
+  const canSendCotacao = userHasPermission(user as any, 'financeiro.pagamentos.manage');
+  const canConverterPedido = userHasPermission(user as any, 'financeiro.pagamentos.manage');
   const canMarcarAdquirido = userHasPermission(user as any, 'financeiro.pagamentos.manage');
   const statusBadgeClass =
     (cotacao.status === StatusCotacao.CONVERTIDA || cotacao.status === StatusCotacao.ADQUIRIDO) &&

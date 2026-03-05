@@ -282,7 +282,14 @@ const AppRoutes: React.FC = () => {
                   {/* Página de Notificações */}
                   <Route path="/notifications" element={<NotificationsPage />} />
                   {/* Página de Contratos */}
-                  <Route path="/contratos/:id" element={<ContratosPage />} />
+                  <Route
+                    path="/contratos"
+                    element={protegerRota(ModuloEnum.VENDAS, <ContratosPage />)}
+                  />
+                  <Route
+                    path="/contratos/:id"
+                    element={protegerRota(ModuloEnum.VENDAS, <ContratosPage />)}
+                  />
                   {/* Rotas das páginas de núcleos - Protegidas por licença */}
                   <Route
                     path="/nuclei/crm"
@@ -681,24 +688,32 @@ const AppRoutes: React.FC = () => {
                     element={protegerRota(ModuloEnum.VENDAS, <PropostasPage />)}
                   />
                   <Route
+                    path="/financeiro/cotacoes"
+                    element={protegerRota(ModuloEnum.FINANCEIRO, <CotacaoPage />)}
+                  />
+                  <Route
+                    path="/financeiro/compras/aprovacoes"
+                    element={protegerRota(ModuloEnum.FINANCEIRO, <MinhasAprovacoesPage />)}
+                  />
+                  <Route
                     path="/cotacoes"
-                    element={protegerRota(ModuloEnum.VENDAS, <CotacaoPage />)}
+                    element={<Navigate to="/financeiro/cotacoes" replace />}
                   />
                   <Route
                     path="/vendas/cotacoes"
-                    element={protegerRota(ModuloEnum.VENDAS, <CotacaoPage />)}
+                    element={<Navigate to="/financeiro/cotacoes" replace />}
                   />
                   <Route
                     path="/orcamentos"
-                    element={protegerRota(ModuloEnum.VENDAS, <CotacaoPage />)}
+                    element={<Navigate to="/financeiro/cotacoes" replace />}
                   />
                   <Route
                     path="/aprovacoes/pendentes"
-                    element={protegerRota(ModuloEnum.VENDAS, <MinhasAprovacoesPage />)}
+                    element={<Navigate to="/financeiro/compras/aprovacoes" replace />}
                   />
                   <Route
                     path="/vendas/aprovacoes"
-                    element={protegerRota(ModuloEnum.VENDAS, <MinhasAprovacoesPage />)}
+                    element={<Navigate to="/financeiro/compras/aprovacoes" replace />}
                   />
                   <Route
                     path="/produtos"

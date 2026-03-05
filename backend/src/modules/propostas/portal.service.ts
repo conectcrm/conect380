@@ -75,6 +75,22 @@ export class PortalService {
     return clone;
   }
 
+  private resolveErrorMessage(error: unknown, fallbackMessage: string): string {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'message' in error &&
+      typeof (error as { message?: unknown }).message === 'string'
+    ) {
+      const message = (error as { message: string }).message.trim();
+      if (message) {
+        return message;
+      }
+    }
+
+    return fallbackMessage;
+  }
+
   private buildTokenData(rawToken: string, entity: PropostaPortalToken): TokenData {
     return {
       token: rawToken,
@@ -445,9 +461,7 @@ export class PortalService {
       );
     } catch (error) {
       this.logger.warn(
-        `Portal: falha ao persistir acao "${acao}" para ${this.maskToken(token)} - ${String(
-          error?.message || error,
-        )}`,
+        `Portal: falha ao persistir acao "${acao}" para ${this.maskToken(token)} - ${this.resolveErrorMessage(error, 'erro desconhecido')}`,
       );
     }
   }
@@ -542,7 +556,7 @@ export class PortalService {
       this.logger.error('Portal: erro ao registrar acao do cliente', error);
       return {
         sucesso: false,
-        mensagem: `Erro ao registrar acao: ${error.message}`,
+        mensagem: `Erro ao registrar acao: ${this.resolveErrorMessage(error, 'erro desconhecido')}`,
       };
     }
   }

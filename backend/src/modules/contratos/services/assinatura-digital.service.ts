@@ -44,14 +44,14 @@ export class AssinaturaDigitalService {
       });
 
       if (!contrato) {
-        throw new NotFoundException('Contrato no encontrado');
+        throw new NotFoundException('Contrato nao encontrado');
       }
 
       if (contrato.status !== StatusContrato.AGUARDANDO_ASSINATURA) {
-        throw new BadRequestException('Contrato no est aguardando assinatura');
+        throw new BadRequestException('Contrato nao esta aguardando assinatura');
       }
 
-      // Verificar se j existe assinatura pendente para este usurio
+      // Verificar se ja existe assinatura pendente para este usuario
       const assinaturaExistente = await this.assinaturaRepository.findOne({
         where: {
           contratoId: createAssinaturaDto.contratoId,
@@ -62,7 +62,7 @@ export class AssinaturaDigitalService {
 
       if (assinaturaExistente) {
         throw new BadRequestException(
-          'J existe uma solicitao de assinatura pendente para este usurio',
+          'Ja existe uma solicitacao de assinatura pendente para este usuario',
         );
       }
 
@@ -84,11 +84,11 @@ export class AssinaturaDigitalService {
 
       const assinaturaSalva = await this.assinaturaRepository.save(assinatura);
 
-      // Enviar email de solicitao de assinatura
+      // Enviar email de solicitacao de assinatura
       await this.enviarEmailSolicitacaoAssinatura(assinaturaSalva, contrato);
 
       this.logger.log(
-        `Assinatura criada para contrato ${contrato.numero}, usurio ${createAssinaturaDto.usuarioId}`,
+        `Assinatura criada para contrato ${contrato.numero}, usuario ${createAssinaturaDto.usuarioId}`,
       );
 
       return assinaturaSalva;
@@ -109,11 +109,11 @@ export class AssinaturaDigitalService {
       });
 
       if (!assinatura) {
-        throw new NotFoundException('Token de assinatura invlido');
+        throw new NotFoundException('Token de assinatura invalido');
       }
 
       if (assinatura.status !== StatusAssinatura.PENDENTE) {
-        throw new BadRequestException('Esta assinatura j foi processada');
+        throw new BadRequestException('Esta assinatura ja foi processada');
       }
 
       if (assinatura.isExpirado()) {
@@ -135,8 +135,21 @@ export class AssinaturaDigitalService {
 
       const assinaturaAtualizada = await this.assinaturaRepository.save(assinatura);
 
-      // Verificar se todas as assinaturas necessrias foram realizadas
-      await this.verificarAssinaturasCompletas(assinatura.contratoId);
+      try {
+        // Verificar se todas as assinaturas necessarias foram realizadas
+        await this.verificarAssinaturasCompletas(assinatura.contratoId);
+      } catch (error) {
+        // Rollback da assinatura processada para permitir nova tentativa quando
+        // houver falha em sincronizacoes obrigatorias (ex.: proposta vinculada).
+        await this.assinaturaRepository.update(assinatura.id, {
+          status: StatusAssinatura.PENDENTE,
+          dataAssinatura: null,
+          hashAssinatura: null,
+          ipAssinatura: null,
+          userAgent: null,
+        });
+        throw error;
+      }
 
       this.logger.log(`Assinatura processada para contrato ${assinatura.contrato.numero}`);
 
@@ -157,11 +170,11 @@ export class AssinaturaDigitalService {
       });
 
       if (!assinatura) {
-        throw new NotFoundException('Token de assinatura invlido');
+        throw new NotFoundException('Token de assinatura invalido');
       }
 
       if (assinatura.status !== StatusAssinatura.PENDENTE) {
-        throw new BadRequestException('Esta assinatura j foi processada');
+        throw new BadRequestException('Esta assinatura ja foi processada');
       }
 
       assinatura.status = StatusAssinatura.REJEITADO;
@@ -243,11 +256,12 @@ export class AssinaturaDigitalService {
     // Para este exemplo, consideramos que o contrato est pronto quando h pelo menos uma assinatura
     // Em cenrios reais, voc pode ter regras mais complexas
     if (assinaturasAssinadas.length > 0 && assinaturasPendentes.length === 0) {
+      const statusAnterior = contrato.status;
+      const dataAssinaturaAnterior = contrato.dataAssinatura;
+
       contrato.status = StatusContrato.ASSINADO;
       contrato.dataAssinatura = new Date();
       await this.contratoRepository.save(contrato);
-
-      this.logger.log(`Contrato ${contrato.numero} marcado como assinado`);
 
       if (contrato.propostaId) {
         try {
@@ -260,11 +274,21 @@ export class AssinaturaDigitalService {
             contrato.empresa_id,
           );
         } catch (error) {
-          this.logger.warn(
+          await this.contratoRepository.update(contrato.id, {
+            status: statusAnterior,
+            dataAssinatura: dataAssinaturaAnterior ?? null,
+          });
+
+          this.logger.error(
             `Falha ao sincronizar proposta ${contrato.propostaId} apos assinatura digital: ${error.message}`,
+          );
+          throw new BadRequestException(
+            'Nao foi possivel sincronizar o status da proposta apos assinatura digital',
           );
         }
       }
+
+      this.logger.log(`Contrato ${contrato.numero} marcado como assinado`);
     }
   }
 
@@ -297,7 +321,7 @@ export class AssinaturaDigitalService {
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
         <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
           <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #2c3e50; margin: 0;">S Solicitao de Assinatura</h1>
+            <h1 style="color: #2c3e50; margin: 0;">Solicitacao de Assinatura</h1>
           </div>
           
           <p style="color: #555; font-size: 16px; line-height: 1.6;">
@@ -305,7 +329,7 @@ export class AssinaturaDigitalService {
           </p>
           
           <p style="color: #555; font-size: 16px; line-height: 1.6;">
-            Voc foi solicitado para assinar o seguinte contrato:
+            Voce foi solicitado a assinar o seguinte contrato:
           </p>
           
           <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
@@ -325,7 +349,7 @@ export class AssinaturaDigitalService {
           
           <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0;">
             <p style="margin: 0; color: #856404; font-size: 14px;">
-              a <strong>Importante:</strong> Este link  vlido at ${dados.dataVencimento}. Aps esta data, uma nova solicitao ser necessria.
+              <strong>Importante:</strong> Este link e valido ate ${dados.dataVencimento}. Apos esta data, uma nova solicitacao sera necessaria.
             </p>
           </div>
           
@@ -342,7 +366,7 @@ export class AssinaturaDigitalService {
     contrato: Contrato,
   ): Promise<void> {
     try {
-      // Buscar dados do usurio para obter o email
+      // Buscar dados do usuario para obter o email
       const usuario = await this.assinaturaRepository
         .createQueryBuilder('assinatura')
         .leftJoinAndSelect('assinatura.usuario', 'usuario')
@@ -371,13 +395,13 @@ export class AssinaturaDigitalService {
 
       await this.emailService.enviarEmailGenerico({
         to: usuario.usuario.email,
-        subject: `Solicitao de Assinatura - Contrato ${contrato.numero}`,
+        subject: `Solicitacao de Assinatura - Contrato ${contrato.numero}`,
         html: this.gerarTemplateEmailAssinatura(templateData),
       });
 
-      this.logger.log(`Email de solicitao de assinatura enviado para ${usuario.usuario.email}`);
+      this.logger.log(`Email de solicitacao de assinatura enviado para ${usuario.usuario.email}`);
     } catch (error) {
-      this.logger.error(`Erro ao enviar email de solicitao de assinatura: ${error.message}`);
+      this.logger.error(`Erro ao enviar email de solicitacao de assinatura: ${error.message}`);
     }
   }
 }

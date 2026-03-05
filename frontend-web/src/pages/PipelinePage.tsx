@@ -329,6 +329,7 @@ const PipelinePage: React.FC = () => {
         // Redirecionar para login após 2 segundos
         setTimeout(() => {
           localStorage.removeItem('authToken'); // ✅ Corrigido para 'authToken'
+          localStorage.removeItem('refreshToken');
           navigate('/login');
         }, 2000);
       } else {
@@ -805,10 +806,8 @@ const PipelinePage: React.FC = () => {
       const { oportunidade, novoEstagio } = mudancaEstagioData;
 
       // Atualizar estágio no backend
-      await oportunidadesService.atualizarOportunidade({
-        id: oportunidade.id,
+      await oportunidadesService.atualizarEstagio(oportunidade.id, {
         estagio: novoEstagio,
-        responsavel_id: oportunidade.responsavel?.id || '',
       });
 
       // Criar atividade de histórico
@@ -1584,6 +1583,7 @@ const PipelinePage: React.FC = () => {
                   <button
                     onClick={() => {
                       localStorage.removeItem('authToken'); // ✅ Corrigido para 'authToken'
+                      localStorage.removeItem('refreshToken');
                       navigate('/login');
                     }}
                     className="px-4 py-2 bg-white text-red-600 border border-red-600 rounded-lg hover:bg-red-50 transition-colors text-sm font-medium"

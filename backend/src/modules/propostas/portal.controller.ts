@@ -17,26 +17,68 @@ export class PortalController {
 
   constructor(private readonly portalService: PortalService) {}
 
+  private resolveErrorMessage(error: unknown, fallbackMessage: string): string {
+    if (error instanceof HttpException) {
+      const response = error.getResponse();
+
+      if (typeof response === 'string' && response.trim()) {
+        return response;
+      }
+
+      if (response && typeof response === 'object') {
+        const responseRecord = response as Record<string, unknown>;
+        const responseMessage = responseRecord.message;
+
+        if (Array.isArray(responseMessage)) {
+          const joined = responseMessage
+            .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+            .join('. ');
+
+          if (joined) {
+            return joined;
+          }
+        }
+
+        if (typeof responseMessage === 'string' && responseMessage.trim()) {
+          return responseMessage;
+        }
+      }
+    }
+
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'message' in error &&
+      typeof (error as { message?: unknown }).message === 'string'
+    ) {
+      const message = (error as { message: string }).message.trim();
+      if (message) {
+        return message;
+      }
+    }
+
+    return fallbackMessage;
+  }
+
   private maskToken(token?: string): string {
     if (!token) return '[token]';
     return token.length <= 8 ? `${token.slice(0, 2)}***` : `${token.slice(0, 4)}...${token.slice(-4)}`;
   }
 
   private resolvePortalErrorStatus(error: unknown): HttpStatus {
-    const message = String((error as any)?.message || '').toLowerCase();
+    const message = this.resolveErrorMessage(error, '').toLowerCase();
     if (
       message.includes('transicao de status invalida') ||
       message.includes('exige aprovacao interna')
     ) {
       return HttpStatus.BAD_REQUEST;
     }
+
     if (
       message.includes('token invalido') ||
-      message.includes('token inválido') ||
       message.includes('token expirado') ||
       message.includes('expirado') ||
-      message.includes('proposta nao encontrada') ||
-      message.includes('proposta não encontrada')
+      message.includes('proposta nao encontrada')
     ) {
       return HttpStatus.NOT_FOUND;
     }
@@ -80,7 +122,7 @@ export class PortalController {
         {
           success: false,
           message: 'Erro ao atualizar status via portal',
-          error: error.message,
+          error: this.resolveErrorMessage(error, 'Falha ao atualizar status via portal'),
         },
         statusCode,
       );
@@ -110,13 +152,14 @@ export class PortalController {
       if (error instanceof HttpException) {
         throw error;
       }
+
       const statusCode = this.resolvePortalErrorStatus(error);
 
       throw new HttpException(
         {
           success: false,
           message: 'Erro ao buscar proposta via portal',
-          error: error.message,
+          error: this.resolveErrorMessage(error, 'Falha ao buscar proposta via portal'),
         },
         statusCode,
       );
@@ -145,7 +188,7 @@ export class PortalController {
       return {
         success: false,
         message: 'Erro ao registrar visualizacao',
-        error: error.message,
+        error: this.resolveErrorMessage(error, 'Falha ao registrar visualizacao'),
       };
     }
   }
@@ -188,7 +231,7 @@ export class PortalController {
         {
           success: false,
           message: 'Erro ao registrar acao',
-          error: error.message,
+          error: this.resolveErrorMessage(error, 'Falha ao registrar acao'),
         },
         statusCode,
       );

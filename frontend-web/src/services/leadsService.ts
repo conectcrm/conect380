@@ -72,6 +72,11 @@ export interface UpdateLeadDto {
 }
 
 export interface ConvertLeadDto {
+  estagio?: string;
+  valor?: number;
+  descricao?: string;
+  titulo?: string;
+  dataFechamentoEsperado?: string;
   titulo_oportunidade?: string;
   valor_estimado?: number;
   data_fechamento_prevista?: string;
@@ -84,6 +89,9 @@ export interface CaptureLeadDto {
   telefone?: string;
   empresa_nome?: string;
   mensagem?: string;
+  empresa_id?: string;
+  empresa_slug?: string;
+  empresa_subdominio?: string;
 }
 
 export interface LeadEstatisticas {

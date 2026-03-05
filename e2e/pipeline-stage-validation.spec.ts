@@ -67,7 +67,7 @@ test.describe('Pipeline - validacao de estagio (UI)', () => {
   test('exibe erro contextual no modal de mudanca de estagio quando backend retorna 400', async ({ page }) => {
     await bootstrapPipelineUiAuthenticatedSession(page);
     await mockPipelineStageApis(page, async ({ method, pathname, route }) => {
-      if (method === 'PATCH' && /\/oportunidades\/1$/.test(pathname)) {
+      if (method === 'PATCH' && /\/oportunidades\/1\/estagio$/.test(pathname)) {
         await json(route, 400, {
           statusCode: 400,
           message: 'Transicao invalida: leads nao pode ir direto para qualification neste cenario',
@@ -98,7 +98,7 @@ test.describe('Pipeline - validacao de estagio (UI)', () => {
     await bootstrapPipelineUiAuthenticatedSession(page);
     await mockPipelineStageApis(page);
 
-    await page.route('**/oportunidades/1', async (route) => {
+    await page.route('**/oportunidades/1/estagio', async (route) => {
       if (route.request().method() !== 'PATCH') {
         return route.continue();
       }

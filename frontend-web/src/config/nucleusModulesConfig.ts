@@ -165,10 +165,9 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
         badgeColor: 'blue',
       },
       {
-        menuId: 'comercial-cotacoes',
-        description:
-          'Sistema completo de cota??es com gera??o de PDF, envio por e-mail e controle de status.',
-        badge: 'Novo',
+        menuId: 'comercial-contratos',
+        description: 'Acompanhamento dos contratos gerados a partir de propostas aprovadas.',
+        badge: 'Ativo',
         badgeColor: 'green',
       },
       {
@@ -236,6 +235,18 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
         menuId: 'financeiro-contas-pagar',
         description: 'Controle de despesas, agendamento de pagamentos e an?lise de gastos.',
         notifications: 2,
+      },
+      {
+        menuId: 'comercial-cotacoes',
+        description:
+          'Gestao de cotacoes de compras com geracao de PDF, envio por email e controle de status.',
+        badge: 'Novo',
+        badgeColor: 'green',
+      },
+      {
+        menuId: 'comercial-aprovacoes',
+        description: 'Fila de aprovacoes das cotacoes de compras pendentes por responsavel.',
+        icon: ListChecks,
       },
       {
         id: 'financeiro-fluxo-caixa',

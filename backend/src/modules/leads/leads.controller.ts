@@ -11,6 +11,7 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  Req,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { LeadsService } from './leads.service';
@@ -42,8 +43,12 @@ export class LeadsController {
   @Post('capture')
   @Public()
   @SkipEmpresaValidation()
-  capturePublic(@Body() dto: CaptureLeadDto) {
-    return this.leadsService.captureFromPublic(dto);
+  capturePublic(@Body() dto: CaptureLeadDto, @Req() req: any) {
+    const hostHeader = req?.headers?.['x-forwarded-host'] || req?.headers?.host;
+    return this.leadsService.captureFromPublic(dto, {
+      host: Array.isArray(hostHeader) ? hostHeader[0] : hostHeader,
+      query: (req?.query || {}) as Record<string, unknown>,
+    });
   }
 
   /**

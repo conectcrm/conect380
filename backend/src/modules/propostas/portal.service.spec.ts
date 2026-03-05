@@ -159,7 +159,7 @@ describe('PortalService', () => {
     expect(proposta.status).toBe('visualizada');
     expect(proposta.portalAccess.token).toBe('ff***');
 
-    // touchToken atualiza ultimo acesso do token válido
+    // touchToken atualiza ultimo acesso do token valido
     expect(mockPortalTokenRepository.update).toHaveBeenCalledWith(
       'token-row-active',
       expect.objectContaining({
@@ -168,3 +168,4 @@ describe('PortalService', () => {
     );
   });
 });
+

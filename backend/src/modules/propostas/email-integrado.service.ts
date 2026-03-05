@@ -55,8 +55,24 @@ export class EmailIntegradoService {
     console.error(...args);
   }
 
+  private resolveErrorMessage(error: unknown, fallbackMessage: string): string {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'message' in error &&
+      typeof (error as { message?: unknown }).message === 'string'
+    ) {
+      const message = (error as { message: string }).message.trim();
+      if (message) {
+        return message;
+      }
+    }
+
+    return fallbackMessage;
+  }
+
   private setupTransporter() {
-    // Configuração Gmail SMTP
+    // Configuracao Gmail SMTP
     this.transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -65,7 +81,7 @@ export class EmailIntegradoService {
       },
     });
 
-    this.log('📧 Serviço de email integrado configurado');
+    this.log('Servico de email integrado configurado');
   }
 
   private isProductionEnv(): boolean {
@@ -138,13 +154,11 @@ export class EmailIntegradoService {
         }
 
         this.warn(
-          `⚠️ SMTP da empresa ${empresaId} incompleto. Fallback para configuração global do ambiente.`,
+          `SMTP da empresa ${empresaId} incompleto. Fallback para configuracao global do ambiente.`,
         );
       } catch (error: any) {
         this.warn(
-          `⚠️ Falha ao ler SMTP da empresa ${empresaId}. Fallback para ambiente: ${
-            error?.message || error
-          }`,
+          `Falha ao ler SMTP da empresa ${empresaId}. Fallback para ambiente: ${this.resolveErrorMessage(error, 'erro desconhecido')}`,
         );
       }
     }
@@ -183,19 +197,21 @@ export class EmailIntegradoService {
 
     try {
       await this.propostasService.marcarComoEnviada(propostaId, emailCliente, linkPortal);
-      this.log(`✅ Status automaticamente atualizado para "enviada"`);
+      this.log('Status automaticamente atualizado para "enviada"');
     } catch (statusError: any) {
-      this.warn(`⚠️ Erro ao atualizar status automaticamente:`, statusError?.message || statusError);
-      // Não falhar o envio por causa do status.
+      this.warn(
+        `Erro ao atualizar status automaticamente: ${this.resolveErrorMessage(statusError, 'erro desconhecido')}`,
+      );
+      // Nao falhar o envio por causa do status.
     }
   }
 
   /**
-   * Envia email de notificação de proposta aceita
+   * Envia email de notificacao de proposta aceita
    */
   async notificarPropostaAceita(dadosProposta: any): Promise<boolean> {
     try {
-      this.log(`📤 Enviando notificação de proposta aceita: ${dadosProposta.numero}`);
+      this.log(`Enviando notificacao de proposta aceita: ${dadosProposta.numero}`);
 
       const mailOptions = {
         from: {
@@ -203,25 +219,27 @@ export class EmailIntegradoService {
           address: process.env.EMAIL_FROM || process.env.GMAIL_USER,
         },
         to: 'vendas@conectcrm.com', // Email da equipe
-        subject: `✅ Proposta ${dadosProposta.numero} foi ACEITA!`,
+        subject: `Proposta ${dadosProposta.numero} foi ACEITA`,
         html: this.gerarTemplateAceitacao(dadosProposta),
       };
 
       const result = await this.transporter.sendMail(mailOptions);
-      this.log('✅ Email de aceitação enviado:', result.messageId);
+      this.log('Email de aceitacao enviado:', result.messageId);
       return true;
     } catch (error) {
-      this.error('❌ Erro ao enviar email de aceitação:', error);
+      this.error(
+        `Erro ao enviar email de aceitacao: ${this.resolveErrorMessage(error, 'erro desconhecido')}`,
+      );
       return false;
     }
   }
 
   /**
-   * Envia email de notificação de proposta rejeitada
+   * Envia email de notificacao de proposta rejeitada
    */
   async notificarPropostaRejeitada(dadosProposta: any): Promise<boolean> {
     try {
-      this.log(`📤 Enviando notificação de proposta rejeitada: ${dadosProposta.numero}`);
+      this.log(`Enviando notificacao de proposta rejeitada: ${dadosProposta.numero}`);
 
       const mailOptions = {
         from: {
@@ -229,15 +247,17 @@ export class EmailIntegradoService {
           address: process.env.EMAIL_FROM || process.env.GMAIL_USER,
         },
         to: 'vendas@conectcrm.com', // Email da equipe
-        subject: `❌ Proposta ${dadosProposta.numero} foi REJEITADA`,
+        subject: `Proposta ${dadosProposta.numero} foi REJEITADA`,
         html: this.gerarTemplateRejeicao(dadosProposta),
       };
 
       const result = await this.transporter.sendMail(mailOptions);
-      this.log('✅ Email de rejeição enviado:', result.messageId);
+      this.log('Email de rejeicao enviado:', result.messageId);
       return true;
     } catch (error) {
-      this.error('❌ Erro ao enviar email de rejeição:', error);
+      this.error(
+        `Erro ao enviar email de rejeicao: ${this.resolveErrorMessage(error, 'erro desconhecido')}`,
+      );
       return false;
     }
   }
@@ -253,30 +273,30 @@ export class EmailIntegradoService {
     empresaId?: string,
   ): Promise<boolean> {
     try {
-      this.log(`📤 Enviando proposta para cliente: ${emailCliente}`);
+      this.log(`Enviando proposta para cliente: ${emailCliente}`);
 
       const fakeEmail = this.isFakeEmail(emailCliente);
       const transportContext = await this.resolveEmailTransportContext(empresaId);
 
       if (fakeEmail) {
-        this.warn(`⚠️ [EMAIL FICTÍCIO] Envio simulado para: ${emailCliente}`);
+        this.warn(`[EMAIL FICTICIO] Envio simulado para: ${emailCliente}`);
         await this.syncStatusAfterSend(propostaId, emailCliente, linkPortal);
         return true;
       }
 
       if (!transportContext.emailsEnabled) {
-        this.warn(`⚠️ E-mails desabilitados na configuração da empresa ${empresaId || '[sem-id]'}.`);
+        this.warn(`E-mails desabilitados na configuracao da empresa ${empresaId || '[sem-id]'}.`);
         return false;
       }
 
       if (!transportContext.smtpConfigured && !this.isProductionEnv()) {
-        this.warn('⚠️ SMTP não configurado no ambiente local. Envio de proposta será simulado.');
+        this.warn('SMTP nao configurado no ambiente local. Envio de proposta sera simulado.');
         await this.syncStatusAfterSend(propostaId, emailCliente, linkPortal);
         return true;
       }
 
       if (!transportContext.smtpConfigured) {
-        this.error('❌ SMTP não configurado. Defina GMAIL_USER/GMAIL_PASSWORD ou SMTP_USER/SMTP_PASS.');
+        this.error('SMTP nao configurado. Defina GMAIL_USER/GMAIL_PASSWORD ou SMTP_USER/SMTP_PASS.');
         return false;
       }
 
@@ -286,47 +306,52 @@ export class EmailIntegradoService {
           address: transportContext.fromAddress,
         },
         to: emailCliente,
-        subject: `📋 Proposta ${dadosProposta.numero} - ${dadosProposta.titulo || 'Proposta Comercial'}`,
+        subject: `Proposta ${dadosProposta.numero} - ${dadosProposta.titulo || 'Proposta Comercial'}`,
         html: this.gerarTemplateProposta(dadosProposta, linkPortal),
       };
 
       const result = await transportContext.transporter.sendMail(mailOptions);
-      this.log('✅ Proposta enviada por email:', result.messageId);
+      this.log('Proposta enviada por email:', result.messageId);
 
-      // 🔄 SINCRONIZAÇÃO AUTOMÁTICA: Marcar como enviada após sucesso no envio
+      // Sincronizacao automatica: marcar como enviada apos sucesso no envio.
       await this.syncStatusAfterSend(propostaId, emailCliente, linkPortal);
 
       return true;
     } catch (error) {
-      this.error('❌ Erro ao enviar proposta:', error);
+      this.error(`Erro ao enviar proposta: ${this.resolveErrorMessage(error, 'erro desconhecido')}`);
       return false;
     }
   }
 
   /**
-   * Testa configuração de email
+   * Testa configuracao de email
    */
   async testarConfiguracao(): Promise<boolean> {
     try {
       await this.transporter.verify();
-      this.log('✅ Configuração de email válida');
+      this.log('Configuracao de email valida');
       return true;
     } catch (error) {
-      this.error('❌ Erro na configuração de email:', error);
+      this.error(
+        `Erro na configuracao de email: ${this.resolveErrorMessage(error, 'erro desconhecido')}`,
+      );
       return false;
     }
   }
 
   /**
-   * Envia email genérico
+   * Envia email generico
    */
-  async enviarEmailGenerico(emailData: {
-    to: string;
-    cc?: string;
-    subject: string;
-    html: string;
-    text?: string;
-  }, empresaId?: string): Promise<boolean> {
+  async enviarEmailGenerico(
+    emailData: {
+      to: string;
+      cc?: string;
+      subject: string;
+      html: string;
+      text?: string;
+    },
+    empresaId?: string,
+  ): Promise<boolean> {
     const resultado = await this.enviarEmailGenericoDetalhado(emailData, empresaId);
     return resultado.sucesso;
   }
@@ -450,29 +475,29 @@ export class EmailIntegradoService {
     return `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background: #10b981; color: white; padding: 20px; text-align: center;">
-          <h1>🎉 Proposta Aceita!</h1>
+          <h1>Proposta Aceita</h1>
         </div>
-        
+
         <div style="padding: 20px; background: #f9fafb;">
-          <h2>Ótimas notícias!</h2>
+          <h2>Otimas noticias!</h2>
           <p>A proposta <strong>${proposta.numero}</strong> foi aceita pelo cliente.</p>
-          
+
           <div style="background: white; padding: 15px; border-radius: 8px; margin: 20px 0;">
             <h3>Detalhes da Proposta:</h3>
             <ul>
               <li><strong>Cliente:</strong> ${proposta.cliente}</li>
-              <li><strong>Título:</strong> ${proposta.titulo}</li>
+              <li><strong>Titulo:</strong> ${proposta.titulo}</li>
               <li><strong>Valor:</strong> R$ ${proposta.valor?.toLocaleString('pt-BR')}</li>
               <li><strong>Data de Aceite:</strong> ${new Date().toLocaleString('pt-BR')}</li>
             </ul>
           </div>
-          
+
           <div style="background: #eff6ff; padding: 15px; border-radius: 8px;">
-            <h4>📋 Próximos Passos:</h4>
+            <h4>Proximos Passos:</h4>
             <ol>
-              <li>Entrar em contato com o cliente em até 2 horas</li>
+              <li>Entrar em contato com o cliente em ate 2 horas</li>
               <li>Preparar e enviar o contrato</li>
-              <li>Agendar reunião de kickoff</li>
+              <li>Agendar reuniao de kickoff</li>
               <li>Atualizar status no CRM</li>
             </ol>
           </div>
@@ -485,35 +510,35 @@ export class EmailIntegradoService {
     return `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background: #dc2626; color: white; padding: 20px; text-align: center;">
-          <h1>❌ Proposta Rejeitada</h1>
+          <h1>Proposta Rejeitada</h1>
         </div>
-        
+
         <div style="padding: 20px; background: #f9fafb;">
           <h2>Infelizmente...</h2>
           <p>A proposta <strong>${proposta.numero}</strong> foi rejeitada pelo cliente.</p>
-          
+
           <div style="background: white; padding: 15px; border-radius: 8px; margin: 20px 0;">
             <h3>Detalhes da Proposta:</h3>
             <ul>
               <li><strong>Cliente:</strong> ${proposta.cliente}</li>
-              <li><strong>Título:</strong> ${proposta.titulo}</li>
+              <li><strong>Titulo:</strong> ${proposta.titulo}</li>
               <li><strong>Valor:</strong> R$ ${proposta.valor?.toLocaleString('pt-BR')}</li>
-              <li><strong>Data de Rejeição:</strong> ${new Date().toLocaleString('pt-BR')}</li>
+              <li><strong>Data de Rejeicao:</strong> ${new Date().toLocaleString('pt-BR')}</li>
             </ul>
           </div>
-          
+
           <div style="background: #fef2f2; padding: 15px; border-radius: 8px; border: 1px solid #fecaca;">
-            <h4>🔄 Próximos Passos:</h4>
+            <h4>Proximos Passos:</h4>
             <ol>
               <li>Entrar em contato com o cliente para entender os motivos</li>
               <li>Solicitar feedback sobre a proposta</li>
               <li>Avaliar possibilidade de nova proposta</li>
-              <li>Atualizar CRM com observações</li>
+              <li>Atualizar CRM com observacoes</li>
             </ol>
           </div>
 
           <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; margin-top: 20px;">
-            <p><strong>💡 Dica:</strong> Use este feedback para melhorar futuras propostas!</p>
+            <p><strong>Dica:</strong> Use este feedback para melhorar futuras propostas!</p>
           </div>
         </div>
       </div>
@@ -524,38 +549,37 @@ export class EmailIntegradoService {
     return `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background: #2563eb; color: white; padding: 20px; text-align: center;">
-          <h1>📋 Nova Proposta</h1>
+          <h1>Nova Proposta</h1>
         </div>
-        
+
         <div style="padding: 20px; background: #f9fafb;">
-          <h2>Olá!</h2>
-          <p>Recebemos sua solicitação e preparamos uma proposta personalizada para você.</p>
-          
+          <h2>Ola!</h2>
+          <p>Recebemos sua solicitacao e preparamos uma proposta personalizada para voce.</p>
+
           <div style="background: white; padding: 15px; border-radius: 8px; margin: 20px 0;">
             <h3>Detalhes da Proposta:</h3>
             <ul>
-              <li><strong>Número:</strong> ${proposta.numero}</li>
-              <li><strong>Título:</strong> ${proposta.titulo}</li>
+              <li><strong>Numero:</strong> ${proposta.numero}</li>
+              <li><strong>Titulo:</strong> ${proposta.titulo}</li>
               <li><strong>Valor:</strong> R$ ${proposta.valor?.toLocaleString('pt-BR')}</li>
             </ul>
           </div>
-          
+
           <div style="text-align: center; margin: 30px 0;">
-            <a href="${linkPortal}" 
-               style="background: #10b981; color: white; padding: 15px 30px; 
+            <a href="${linkPortal}"
+               style="background: #10b981; color: white; padding: 15px 30px;
                       text-decoration: none; border-radius: 8px; display: inline-block;
                       font-weight: bold;">
-              🔍 Visualizar Proposta Completa
+              Visualizar Proposta Completa
             </a>
           </div>
-          
+
           <div style="background: #fef3c7; padding: 15px; border-radius: 8px; text-align: center;">
-            <p><strong>⏰ Esta proposta é válida por 30 dias</strong></p>
-            <p>Clique no botão acima para aceitar ou rejeitar a proposta.</p>
+            <p><strong>Esta proposta e valida por 30 dias</strong></p>
+            <p>Clique no botao acima para aceitar ou rejeitar a proposta.</p>
           </div>
         </div>
       </div>
     `;
   }
 }
-

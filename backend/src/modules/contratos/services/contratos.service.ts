@@ -5,13 +5,22 @@ import {
   ForbiddenException,
   Logger,
 } from '@nestjs/common';
+import { isUUID } from 'class-validator';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Contrato, StatusContrato } from '../entities/contrato.entity';
-import { AssinaturaContrato, StatusAssinatura } from '../entities/assinatura-contrato.entity';
+import {
+  AssinaturaContrato,
+  StatusAssinatura,
+  TipoAssinatura,
+} from '../entities/assinatura-contrato.entity';
 import { Proposta } from '../../propostas/proposta.entity';
 import { PropostasService } from '../../propostas/propostas.service';
-import { CreateContratoDto, UpdateContratoDto } from '../dto/contrato.dto';
+import {
+  ConfirmarAssinaturaExternaDto,
+  CreateContratoDto,
+  UpdateContratoDto,
+} from '../dto/contrato.dto';
 import { PdfContratoService } from './pdf-contrato.service';
 import { AssinaturaDigitalService } from './assinatura-digital.service';
 
@@ -167,7 +176,7 @@ export class ContratosService {
         throw error;
       }
 
-      throw new BadRequestException('Erro ao criar contrato');
+      throw new BadRequestException('Nao foi possivel criar o contrato');
     }
   }
 
@@ -257,7 +266,7 @@ export class ContratosService {
     const contrato = await this.buscarContratoPorId(id, empresaId);
 
     if (contrato.status === StatusContrato.ASSINADO) {
-      throw new BadRequestException('Não é possível alterar contrato já assinado');
+      throw new BadRequestException('Nao e possivel alterar contrato ja assinado');
     }
 
     Object.assign(contrato, updateContratoDto);
@@ -295,33 +304,44 @@ export class ContratosService {
   async marcarComoAssinado(id: number, empresaId: string): Promise<Contrato> {
     // 🔒 MULTI-TENANCY: Validar empresa_id
     const contrato = await this.buscarContratoPorId(id, empresaId);
+    const statusAnterior = contrato.status;
+    const dataAssinaturaAnterior = contrato.dataAssinatura;
 
     if (contrato.status === StatusContrato.ASSINADO) {
-      throw new BadRequestException('Contrato já está assinado');
+      throw new BadRequestException('Contrato ja esta assinado');
     }
 
     // Verificar se todas as assinaturas obrigatórias foram realizadas
     const assinaturasAssinadas = contrato.assinaturas.filter((a) => a.isAssinado());
 
     if (assinaturasAssinadas.length === 0) {
-      throw new BadRequestException('Nenhuma assinatura válida encontrada');
+      throw new BadRequestException('Nenhuma assinatura valida encontrada');
     }
 
     contrato.status = StatusContrato.ASSINADO;
     contrato.dataAssinatura = new Date();
 
-    const contratoAtualizado = await this.contratoRepository.save(contrato);
-    this.logger.log(`Contrato assinado: ${contratoAtualizado.numero}`);
+    try {
+      const contratoAtualizado = await this.contratoRepository.save(contrato);
+      this.logger.log(`Contrato assinado: ${contratoAtualizado.numero}`);
 
-    await this.sincronizarStatusProposta(
-      contratoAtualizado.propostaId,
-      'contrato_assinado',
-      empresaId,
-      `Contrato ${contratoAtualizado.numero} assinado.`,
-      'contratos-assinatura',
-    );
+      await this.sincronizarStatusProposta(
+        contratoAtualizado.propostaId,
+        'contrato_assinado',
+        empresaId,
+        `Contrato ${contratoAtualizado.numero} assinado.`,
+        'contratos-assinatura',
+        true,
+      );
 
-    return contratoAtualizado;
+      return contratoAtualizado;
+    } catch (error) {
+      await this.contratoRepository.update(contrato.id, {
+        status: statusAnterior,
+        dataAssinatura: dataAssinaturaAnterior ?? null,
+      });
+      throw error;
+    }
   }
 
   async cancelarContrato(id: number, empresaId: string, motivo?: string): Promise<Contrato> {
@@ -329,7 +349,7 @@ export class ContratosService {
     const contrato = await this.buscarContratoPorId(id, empresaId);
 
     if (contrato.status === StatusContrato.ASSINADO) {
-      throw new BadRequestException('Não é possível cancelar contrato já assinado');
+      throw new BadRequestException('Nao e possivel cancelar contrato ja assinado');
     }
 
     contrato.status = StatusContrato.CANCELADO;
@@ -341,6 +361,107 @@ export class ContratosService {
     this.logger.log(`Contrato cancelado: ${contratoAtualizado.numero}`);
 
     return contratoAtualizado;
+  }
+
+  async confirmarAssinaturaExterna(
+    id: number,
+    empresaId: string,
+    usuarioConfirmacaoId?: string,
+    payload?: ConfirmarAssinaturaExternaDto,
+  ): Promise<Contrato> {
+    const contrato = await this.buscarContratoPorId(id, empresaId);
+
+    if (contrato.status === StatusContrato.CANCELADO) {
+      throw new BadRequestException(
+        'Nao e possivel confirmar assinatura externa em contrato cancelado',
+      );
+    }
+
+    if (contrato.status === StatusContrato.EXPIRADO) {
+      throw new BadRequestException(
+        'Nao e possivel confirmar assinatura externa em contrato expirado',
+      );
+    }
+
+    if (contrato.status === StatusContrato.ASSINADO) {
+      throw new BadRequestException('Contrato ja esta assinado');
+    }
+
+    const dataAssinatura = payload?.dataAssinatura ? new Date(payload.dataAssinatura) : new Date();
+    if (Number.isNaN(dataAssinatura.getTime())) {
+      throw new BadRequestException('Data de assinatura invalida');
+    }
+
+    if (dataAssinatura.getTime() > Date.now()) {
+      throw new BadRequestException('Data de assinatura nao pode ser futura');
+    }
+
+    const assinanteId = isUUID(String(usuarioConfirmacaoId || ''))
+      ? String(usuarioConfirmacaoId)
+      : contrato.usuarioResponsavelId;
+
+    if (!isUUID(String(assinanteId || ''))) {
+      throw new BadRequestException('Nao foi possivel identificar o usuario para registrar assinatura externa');
+    }
+
+    const assinatura = this.assinaturaRepository.create({
+      contratoId: contrato.id,
+      usuarioId: assinanteId,
+      tipo: TipoAssinatura.PRESENCIAL,
+      status: StatusAssinatura.ASSINADO,
+      dataAssinatura,
+      dataEnvio: new Date(),
+      metadados: {
+        dispositivo: 'backoffice',
+        navegador: 'contratos',
+        versaoApp: 'assinatura_externa_manual',
+      },
+    });
+
+    const assinaturaSalva = await this.assinaturaRepository.save(assinatura);
+
+    const observacoesAdicionais = payload?.observacoes?.trim();
+    const registroAssinaturaExterna =
+      `Assinatura externa confirmada em ${dataAssinatura.toISOString()}` +
+      (observacoesAdicionais ? `. Obs: ${observacoesAdicionais}` : '.');
+
+    const observacoesAtualizadas = [contrato.observacoes, registroAssinaturaExterna]
+      .filter((item) => Boolean(item && String(item).trim().length > 0))
+      .join('\n\n');
+
+    try {
+      // Atualiza campos escalares sem re-sincronizar a relacao `assinaturas`.
+      // Isso evita que o TypeORM tente desvincular assinatura criada no mesmo fluxo.
+      await this.contratoRepository.update(contrato.id, {
+        status: StatusContrato.ASSINADO,
+        dataAssinatura,
+        observacoes: observacoesAtualizadas,
+      });
+
+      const contratoAtualizado = await this.buscarContratoPorId(contrato.id, empresaId);
+
+      await this.sincronizarStatusProposta(
+        contratoAtualizado.propostaId,
+        'contrato_assinado',
+        empresaId,
+        `Contrato ${contratoAtualizado.numero} confirmado como assinado externamente.`,
+        'contratos-assinatura-externa',
+        true,
+      );
+
+      this.logger.log(`Assinatura externa confirmada para contrato: ${contratoAtualizado.numero}`);
+
+      return contratoAtualizado;
+    } catch (error) {
+      // Rollback para evitar contrato/assinatura assinados sem atualizar proposta.
+      await this.assinaturaRepository.delete(assinaturaSalva.id);
+      await this.contratoRepository.update(contrato.id, {
+        status: contrato.status,
+        dataAssinatura: contrato.dataAssinatura ?? null,
+        observacoes: contrato.observacoes ?? null,
+      });
+      throw error;
+    }
   }
 
   async verificarContratosExpirados(): Promise<void> {
@@ -449,6 +570,7 @@ export class ContratosService {
     empresaId: string,
     observacoes: string,
     source: string,
+    obrigatoria = false,
   ): Promise<void> {
     if (!propostaId) {
       return;
@@ -463,11 +585,18 @@ export class ContratosService {
         undefined,
         empresaId,
       );
-    } catch (error) {
-      this.logger.warn(
-        `Falha ao sincronizar status da proposta ${propostaId} para ${status}: ${error.message}`,
-      );
+    } catch (error: any) {
+      const mensagemErro =
+        `Falha ao sincronizar status da proposta ${propostaId} para ${status}: ${error.message}`;
+
+      if (obrigatoria) {
+        this.logger.error(mensagemErro);
+        throw new BadRequestException(
+          'Nao foi possivel sincronizar o status da proposta vinculada ao contrato',
+        );
+      }
+
+      this.logger.warn(mensagemErro);
     }
   }
 }
-

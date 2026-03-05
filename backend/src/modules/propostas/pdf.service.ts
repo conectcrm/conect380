@@ -37,7 +37,7 @@ export class PdfService {
   }
 
   private registerHandlebarsHelpers() {
-    // Helper para formatação de moeda
+    // Helper para formatacao de moeda
     handlebars.registerHelper('formatarMoeda', (value: number) => {
       if (typeof value !== 'number') return 'R$ 0,00';
       return new Intl.NumberFormat('pt-BR', {
@@ -46,7 +46,7 @@ export class PdfService {
       }).format(value);
     });
 
-    // Helper para formatação de moeda (alias)
+    // Helper para formatacao de moeda (alias)
     handlebars.registerHelper('currency', (value: number) => {
       if (typeof value !== 'number') return 'R$ 0,00';
       return new Intl.NumberFormat('pt-BR', {
@@ -55,19 +55,19 @@ export class PdfService {
       }).format(value);
     });
 
-    // Helper para adição (usado em índices)
+    // Helper para adicao (usado em indices)
     handlebars.registerHelper('add', (a: number, b: number) => {
       return a + b;
     });
 
-    // Helper para formatação de data
+    // Helper para formatacao de data
     handlebars.registerHelper('formatDate', (date: string | Date) => {
       if (!date) return '';
       const d = new Date(date);
       return d.toLocaleDateString('pt-BR');
     });
 
-    // Helper para formatação de telefone
+    // Helper para formatacao de telefone
     handlebars.registerHelper('formatPhone', (phone: string) => {
       if (!phone) return '';
       const cleaned = phone.replace(/\D/g, '');
@@ -104,7 +104,7 @@ export class PdfService {
       const fallback = fallbackCandidates.find((candidate) => fs.existsSync(candidate));
       if (!fallback) {
         throw new Error(
-          `Template ${tipo} não encontrado. Caminhos verificados: ${[templatePath, ...fallbackCandidates].join(' | ')}`,
+          `Template ${tipo} nao encontrado. Caminhos verificados: ${[templatePath, ...fallbackCandidates].join(' | ')}`,
         );
       }
       const templateSourceFallback = fs.readFileSync(fallback, 'utf8');
@@ -185,7 +185,7 @@ export class PdfService {
     const prazoEntrega = this.toNonEmptyString(dados?.prazoEntrega);
     const garantia = this.toNonEmptyString(dados?.garantia);
     const validadeProposta =
-      this.toNonEmptyString(dados?.validadeProposta) || `Até ${dataValidade}`;
+      this.toNonEmptyString(dados?.validadeProposta) || `Ate ${dataValidade}`;
     const condicoesGerais = Array.isArray(dados?.condicoesGerais)
       ? dados.condicoesGerais
           .map((item: unknown) => this.toNonEmptyString(item))
@@ -213,7 +213,7 @@ export class PdfService {
 
     const clienteRaw = dados?.cliente || {};
     const cliente = {
-      nome: this.toNonEmptyString(clienteRaw?.nome) || 'Cliente não informado',
+      nome: this.toNonEmptyString(clienteRaw?.nome) || 'Cliente nao informado',
       empresa: this.toNonEmptyString(clienteRaw?.empresa),
       email: this.toNonEmptyString(clienteRaw?.email),
       telefone: this.toNonEmptyString(clienteRaw?.telefone),
@@ -374,18 +374,18 @@ export class PdfService {
       .toLowerCase();
 
     const map: Record<string, string> = {
-      avista: 'À vista',
-      'a-vista': 'À vista',
-      a_vista: 'À vista',
-      boleto: 'Boleto bancário',
-      cartao: 'Cartão de crédito',
-      cartao_credito: 'Cartão de crédito',
+      avista: 'A vista',
+      'a-vista': 'A vista',
+      a_vista: 'A vista',
+      boleto: 'Boleto bancario',
+      cartao: 'Cartao de credito',
+      cartao_credito: 'Cartao de credito',
       pix: 'PIX',
       recorrente: 'Recorrente',
       parcelado: 'Parcelado',
     };
 
-    return map[normalized] || this.toNonEmptyString(value) || 'Conforme negociação comercial';
+    return map[normalized] || this.toNonEmptyString(value) || 'Conforme negociacao comercial';
   }
 
   private formatarMoeda(valor: number): string {
@@ -405,7 +405,7 @@ export class PdfService {
       enviada: 'Enviada',
       viewed: 'Visualizada',
       visualizada: 'Visualizada',
-      negociacao: 'Em negociação',
+      negociacao: 'Em negociacao',
       approved: 'Aprovada',
       aprovada: 'Aprovada',
       contrato_gerado: 'Contrato gerado',
@@ -446,3 +446,4 @@ export class PdfService {
     return 'status-muted';
   }
 }
+

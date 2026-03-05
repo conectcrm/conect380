@@ -772,8 +772,24 @@ export class OportunidadesService {
     }
 
     if (updateOportunidadeDto.estagio !== undefined) {
+      const nextStage = updateOportunidadeDto.estagio;
+      if (nextStage !== estagioAnterior) {
+        if (!isOportunidadeStageTransitionAllowed(estagioAnterior, nextStage)) {
+          const allowed = getAllowedNextOportunidadeStages(estagioAnterior);
+          throw new BadRequestException(
+            `Transicao de estagio invalida: ${estagioAnterior} -> ${nextStage}. Permitidos: ${allowed.join(', ') || 'nenhum'}`,
+          );
+        }
+
+        if (nextStage === EstagioOportunidade.PERDIDO) {
+          throw new BadRequestException(
+            'Para marcar como perdido, use PATCH /oportunidades/:id/estagio com motivoPerda.',
+          );
+        }
+      }
+
       updateData.estagio = this.toDatabaseEstagio(
-        updateOportunidadeDto.estagio,
+        nextStage,
         schema.estagioMode,
       );
     }

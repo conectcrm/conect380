@@ -11,6 +11,18 @@ type ContratoBackend = {
   numero: string;
   propostaId?: string | null;
   clienteId?: string | null;
+  proposta?: {
+    id?: string | null;
+    numero?: string | null;
+  } | null;
+  cliente?: {
+    id?: string | number | null;
+    nome?: string | null;
+    email?: string | null;
+    telefone?: string | null;
+    documento?: string | null;
+    endereco?: string | null;
+  } | null;
   status?: string;
   objeto?: string;
   descricao?: string;
@@ -36,9 +48,17 @@ type ContratoBackend = {
   } | null;
   assinaturas?: Array<{
     id: number | string;
+    tipo?: 'digital' | 'eletronica' | 'presencial';
     status?: string;
     tokenValidacao?: string;
     dataAssinatura?: string | null;
+    createdAt?: string;
+    dataEnvio?: string | null;
+    usuario?: {
+      id: string;
+      nome: string;
+      email: string;
+    } | null;
   }>;
 };
 
@@ -59,6 +79,7 @@ export interface Contrato {
   id: string;
   numero: string;
   propostaId: string;
+  propostaNumero?: string;
   cliente: {
     id: string;
     nome: string;
@@ -88,6 +109,18 @@ export interface Contrato {
   criadoEm?: Date;
   atualizadoEm?: Date;
   caminhoArquivoPDF?: string;
+  assinaturas?: Array<{
+    id: string;
+    tipo?: 'digital' | 'eletronica' | 'presencial';
+    status: 'pendente' | 'assinado' | 'rejeitado' | 'expirado';
+    dataAssinatura?: Date;
+    criadoEm?: Date;
+    usuario?: {
+      id: string;
+      nome: string;
+      email: string;
+    };
+  }>;
 }
 
 export interface CriarContratoDTO {
@@ -158,6 +191,11 @@ export interface RejeitarAssinaturaContratoDTO {
   motivoRejeicao: string;
 }
 
+export interface ConfirmarAssinaturaExternaDTO {
+  dataAssinatura?: string;
+  observacoes?: string;
+}
+
 function toDate(value?: string | null): Date | undefined {
   if (!value) return undefined;
   const parsed = new Date(value);
@@ -206,17 +244,58 @@ function mapContrato(raw: ContratoBackend): Contrato {
     assinaturas.find((a) => a?.tokenValidacao)?.tokenValidacao ||
     '';
 
+  const historicoAssinaturas = assinaturas
+    .map((assinatura) => {
+      const statusNormalizado = String(assinatura?.status || '').toLowerCase().trim();
+      const status = (['pendente', 'assinado', 'rejeitado', 'expirado'].includes(statusNormalizado)
+        ? statusNormalizado
+        : 'pendente') as 'pendente' | 'assinado' | 'rejeitado' | 'expirado';
+
+      return {
+        id: String(assinatura?.id || ''),
+        tipo: assinatura?.tipo,
+        status,
+        dataAssinatura: toDate(assinatura?.dataAssinatura || undefined),
+        criadoEm: toDate(assinatura?.createdAt || assinatura?.dataEnvio || undefined),
+        usuario: assinatura?.usuario
+          ? {
+              id: String(assinatura.usuario.id),
+              nome: assinatura.usuario.nome,
+              email: assinatura.usuario.email,
+            }
+          : undefined,
+      };
+    })
+    .filter((assinatura) => assinatura.id);
+
   const vendedor = raw.usuarioResponsavel || raw.vendedor || undefined;
-  const clienteId = raw.clienteId ? String(raw.clienteId) : '';
+  const clienteRaw = raw.cliente || undefined;
+  const clienteId = raw.clienteId
+    ? String(raw.clienteId)
+    : clienteRaw?.id !== undefined && clienteRaw?.id !== null
+      ? String(clienteRaw.id)
+      : '';
+  const clienteNome = String(clienteRaw?.nome || '').trim() || 'Cliente nao identificado';
+  const clienteEmail = String(clienteRaw?.email || '').trim();
+  const propostaId = raw.propostaId
+    ? String(raw.propostaId)
+    : raw.proposta?.id
+      ? String(raw.proposta.id)
+      : '';
+  const propostaNumero = String(raw.proposta?.numero || '').trim() || undefined;
 
   return {
     id: String(raw.id),
     numero: raw.numero || '',
-    propostaId: raw.propostaId ? String(raw.propostaId) : '',
+    propostaId,
+    propostaNumero,
     cliente: {
       id: clienteId,
-      nome: clienteId ? `Cliente ${clienteId}` : 'Cliente nao identificado',
-      email: '',
+      nome: clienteNome,
+      email: clienteEmail,
+      telefone: String(clienteRaw?.telefone || '').trim() || undefined,
+      documento: String(clienteRaw?.documento || '').trim() || undefined,
+      endereco: String(clienteRaw?.endereco || '').trim() || undefined,
     },
     valor: toNumber(raw.valorTotal ?? raw.valor),
     status: normalizeContratoStatus(raw.status),
@@ -244,6 +323,7 @@ function mapContrato(raw: ContratoBackend): Contrato {
     criadoEm: toDate(raw.createdAt),
     atualizadoEm: toDate(raw.updatedAt),
     caminhoArquivoPDF: raw.caminhoArquivoPDF || undefined,
+    assinaturas: historicoAssinaturas.length > 0 ? historicoAssinaturas : undefined,
   };
 }
 
@@ -412,6 +492,25 @@ class ContratoService {
       return this.parseAssinaturaResponse(response.data, 'Erro ao rejeitar assinatura');
     } catch (error) {
       console.error('Erro ao rejeitar assinatura:', error);
+      throw error;
+    }
+  }
+
+  async confirmarAssinaturaExterna(
+    contratoId: string | number,
+    dados?: ConfirmarAssinaturaExternaDTO,
+  ): Promise<Contrato> {
+    try {
+      const response = await api.post(
+        `/contratos/${contratoId}/confirmar-assinatura-externa`,
+        dados ?? {},
+      );
+      return this.parseContratoResponse(
+        response.data,
+        'Erro ao confirmar assinatura externa do contrato',
+      );
+    } catch (error) {
+      console.error('Erro ao confirmar assinatura externa do contrato:', error);
       throw error;
     }
   }

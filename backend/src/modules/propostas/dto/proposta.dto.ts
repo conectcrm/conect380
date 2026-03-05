@@ -57,7 +57,7 @@ export interface PropostaDto {
 
 // DTO permissivo para preservar compatibilidade com payloads legados do frontend.
 // Valida apenas campos conhecidos no topo, sem bloquear estruturas extras enquanto
-// o contrato do modulo ainda está sendo normalizado.
+// o contrato do modulo ainda esta sendo normalizado.
 export class CriarPropostaDto {
   @IsOptional()
   @IsString()
@@ -252,3 +252,4 @@ export interface PropostaResponseDto {
   timestamp?: string;
   error?: string;
 }
+

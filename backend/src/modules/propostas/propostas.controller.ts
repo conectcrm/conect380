@@ -37,6 +37,49 @@ export class PropostasController {
     private readonly portalService: PortalService,
   ) {}
 
+  private resolveErrorMessage(error: unknown, fallbackMessage: string): string {
+    if (error instanceof HttpException) {
+      const response = error.getResponse();
+
+      if (typeof response === 'string' && response.trim()) {
+        return response;
+      }
+
+      if (response && typeof response === 'object') {
+        const responseRecord = response as Record<string, unknown>;
+        const responseMessage = responseRecord.message;
+
+        if (Array.isArray(responseMessage)) {
+          const joined = responseMessage
+            .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+            .join('. ');
+
+          if (joined) {
+            return joined;
+          }
+        }
+
+        if (typeof responseMessage === 'string' && responseMessage.trim()) {
+          return responseMessage;
+        }
+      }
+    }
+
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'message' in error &&
+      typeof (error as { message?: unknown }).message === 'string'
+    ) {
+      const message = (error as { message: string }).message.trim();
+      if (message) {
+        return message;
+      }
+    }
+
+    return fallbackMessage;
+  }
+
   // Helper para converter Proposta para PropostaDto
   private toPropostaDto(proposta: Proposta): PropostaDto {
     return {
@@ -80,7 +123,7 @@ export class PropostasController {
         {
           success: false,
           message: 'Erro ao listar propostas',
-          error: error.message,
+          error: this.resolveErrorMessage(error, 'Falha ao listar propostas'),
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -101,7 +144,7 @@ export class PropostasController {
         {
           success: false,
           message: 'Erro ao carregar estatisticas do dashboard',
-          error: error.message,
+          error: this.resolveErrorMessage(error, 'Falha ao carregar estatisticas do dashboard'),
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -122,7 +165,7 @@ export class PropostasController {
         {
           success: false,
           message: 'Erro ao listar propostas expiradas',
-          error: error.message,
+          error: this.resolveErrorMessage(error, 'Falha ao listar propostas expiradas'),
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -143,7 +186,7 @@ export class PropostasController {
         {
           success: false,
           message: 'Erro ao obter estatisticas da proposta',
-          error: error.message,
+          error: this.resolveErrorMessage(error, 'Falha ao obter estatisticas da proposta'),
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -174,7 +217,7 @@ export class PropostasController {
         {
           success: false,
           message: 'Erro ao agendar lembrete',
-          error: error.message,
+          error: this.resolveErrorMessage(error, 'Falha ao agendar lembrete'),
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -213,7 +256,7 @@ export class PropostasController {
         {
           success: false,
           message: 'Erro ao reativar proposta',
-          error: error.message,
+          error: this.resolveErrorMessage(error, 'Falha ao reativar proposta'),
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -234,7 +277,7 @@ export class PropostasController {
         {
           success: false,
           message: 'Erro ao obter historico da proposta',
-          error: error.message,
+          error: this.resolveErrorMessage(error, 'Falha ao obter historico da proposta'),
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -258,7 +301,7 @@ export class PropostasController {
         {
           success: false,
           message: 'Erro ao obter aprovacao interna',
-          error: error.message,
+          error: this.resolveErrorMessage(error, 'Falha ao obter aprovacao interna'),
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -297,7 +340,7 @@ export class PropostasController {
         {
           success: false,
           message: 'Erro ao solicitar aprovacao interna',
-          error: error.message,
+          error: this.resolveErrorMessage(error, 'Falha ao solicitar aprovacao interna'),
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -339,7 +382,7 @@ export class PropostasController {
         {
           success: false,
           message: 'Erro ao decidir aprovacao interna',
-          error: error.message,
+          error: this.resolveErrorMessage(error, 'Falha ao decidir aprovacao interna'),
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -373,7 +416,7 @@ export class PropostasController {
       };
     } catch (error) {
       this.logger.error('[PROPOSTAS] Erro ao atualizar proposta:', error);
-      const message = String(error?.message || '');
+      const message = this.resolveErrorMessage(error, 'Falha ao atualizar proposta');
       const statusCode = message.includes('nao encontrada')
         ? HttpStatus.NOT_FOUND
         : HttpStatus.INTERNAL_SERVER_ERROR;
@@ -430,7 +473,7 @@ export class PropostasController {
         {
           success: false,
           message: 'Erro ao atualizar status da proposta',
-          error: error.message,
+          error: this.resolveErrorMessage(error, 'Falha ao atualizar status da proposta'),
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -471,7 +514,7 @@ export class PropostasController {
         {
           success: false,
           message: 'Erro ao buscar proposta',
-          error: error.message,
+          error: this.resolveErrorMessage(error, 'Falha ao buscar proposta'),
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -534,7 +577,7 @@ export class PropostasController {
         {
           success: false,
           message: 'Erro ao criar proposta',
-          error: error.message,
+          error: this.resolveErrorMessage(error, 'Falha ao criar proposta'),
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
@@ -575,7 +618,7 @@ export class PropostasController {
       };
     } catch (error) {
       this.logger.error('[PROPOSTAS] Erro ao gerar token de portal:', error);
-      const message = String(error?.message || '');
+      const message = this.resolveErrorMessage(error, 'Falha ao gerar token de portal');
       const statusCode = message.includes('nao encontrada')
         ? HttpStatus.NOT_FOUND
         : HttpStatus.INTERNAL_SERVER_ERROR;
@@ -615,7 +658,7 @@ export class PropostasController {
         {
           success: false,
           message: 'Erro ao remover proposta',
-          error: error.message,
+          error: this.resolveErrorMessage(error, 'Falha ao remover proposta'),
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );

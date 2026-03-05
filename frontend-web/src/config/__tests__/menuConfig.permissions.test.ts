@@ -33,7 +33,7 @@ describe('menuConfig permission filtering', () => {
     const menu = getMenuParaEmpresa(ALL_MODULES, {
       email: 'scoped-user@empresa.com',
       role: 'user',
-      permissions: ['atendimento.tickets.read', 'comercial.propostas.read'],
+      permissions: ['atendimento.tickets.read', 'comercial.propostas.read', 'financeiro.pagamentos.read'],
     } as any);
 
     const ids = collectIds(menu);
@@ -43,6 +43,7 @@ describe('menuConfig permission filtering', () => {
     expect(ids).not.toContain('atendimento-analytics');
     expect(ids).toContain('comercial');
     expect(ids).toContain('comercial-propostas');
+    expect(ids).toContain('comercial-contratos');
     expect(ids).toContain('comercial-cotacoes');
     expect(ids).not.toContain('comercial-aprovacoes');
     expect(ids).not.toContain('comercial-leads');
@@ -72,6 +73,7 @@ describe('menuConfig permission filtering', () => {
     const ids = collectIds(menu);
     expect(ids).toContain('comercial');
     expect(ids).toContain('comercial-propostas');
+    expect(ids).toContain('comercial-contratos');
     expect(ids).not.toContain('comercial-pipeline');
   });
 
@@ -176,6 +178,28 @@ describe('menuConfig permission filtering', () => {
     expect(withCrm).toBe(true);
   });
 
+  it('requires comercial.propostas.read for contratos list and detail routes', () => {
+    const withoutPermissionList = canUserAccessPath('/contratos', ALL_MODULES, {
+      email: 'viewer@empresa.com',
+      role: 'custom',
+      permissions: ['crm.clientes.read'],
+    } as any);
+    const withPermissionList = canUserAccessPath('/contratos', ALL_MODULES, {
+      email: 'sales@empresa.com',
+      role: 'custom',
+      permissions: ['comercial.propostas.read'],
+    } as any);
+    const withPermissionDetail = canUserAccessPath('/contratos/123', ALL_MODULES, {
+      email: 'sales@empresa.com',
+      role: 'custom',
+      permissions: ['comercial.propostas.read'],
+    } as any);
+
+    expect(withoutPermissionList).toBe(false);
+    expect(withPermissionList).toBe(true);
+    expect(withPermissionDetail).toBe(true);
+  });
+
   it('requires atendimento.filas.manage for distribuicao route', () => {
     const withoutManage = canUserAccessPath('/atendimento/distribuicao', ALL_MODULES, {
       email: 'agent@empresa.com',
@@ -192,26 +216,48 @@ describe('menuConfig permission filtering', () => {
     expect(withManage).toBe(true);
   });
 
-  it('allows cotacoes route with comercial read or financeiro pagamentos manage', () => {
-    const comercialRead = canUserAccessPath('/vendas/cotacoes', ALL_MODULES, {
+  it('requires financeiro.pagamentos.read for cotacoes routes and keeps legacy alias', () => {
+    const financeiroRead = canUserAccessPath('/financeiro/cotacoes', ALL_MODULES, {
+      email: 'finance.read@empresa.com',
+      role: 'custom',
+      permissions: ['financeiro.pagamentos.read'],
+    } as any);
+    const legacyAlias = canUserAccessPath('/vendas/cotacoes', ALL_MODULES, {
+      email: 'finance.alias@empresa.com',
+      role: 'custom',
+      permissions: ['financeiro.pagamentos.read'],
+    } as any);
+    const comercialReadOnly = canUserAccessPath('/financeiro/cotacoes', ALL_MODULES, {
       email: 'seller.read@empresa.com',
       role: 'custom',
       permissions: ['comercial.propostas.read'],
     } as any);
-    const financeiroManage = canUserAccessPath('/vendas/cotacoes', ALL_MODULES, {
-      email: 'finance.buy@empresa.com',
+
+    expect(financeiroRead).toBe(true);
+    expect(legacyAlias).toBe(true);
+    expect(comercialReadOnly).toBe(false);
+  });
+
+  it('requires financeiro.pagamentos.manage for aprovacoes de compras routes', () => {
+    const readOnly = canUserAccessPath('/financeiro/compras/aprovacoes', ALL_MODULES, {
+      email: 'finance.read@empresa.com',
+      role: 'custom',
+      permissions: ['financeiro.pagamentos.read'],
+    } as any);
+    const manage = canUserAccessPath('/financeiro/compras/aprovacoes', ALL_MODULES, {
+      email: 'finance.manage@empresa.com',
       role: 'custom',
       permissions: ['financeiro.pagamentos.manage'],
     } as any);
-    const creatorOnly = canUserAccessPath('/vendas/cotacoes', ALL_MODULES, {
-      email: 'seller.create@empresa.com',
+    const legacyAlias = canUserAccessPath('/vendas/aprovacoes', ALL_MODULES, {
+      email: 'finance.alias@empresa.com',
       role: 'custom',
-      permissions: ['comercial.propostas.create'],
+      permissions: ['financeiro.pagamentos.manage'],
     } as any);
 
-    expect(comercialRead).toBe(true);
-    expect(financeiroManage).toBe(true);
-    expect(creatorOnly).toBe(false);
+    expect(readOnly).toBe(false);
+    expect(manage).toBe(true);
+    expect(legacyAlias).toBe(true);
   });
 
   it('requires financeiro.pagamentos.read for contas-pagar and fornecedores routes', () => {

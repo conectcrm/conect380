@@ -314,18 +314,23 @@ const LeadsPage: React.FC = () => {
 
       const convertData: any = {
         titulo_oportunidade: data.titulo_oportunidade,
+        titulo: data.titulo_oportunidade,
       };
 
       if (data.valor_estimado) {
-        convertData.valor_estimado = parseFloat(data.valor_estimado);
+        const valor = parseFloat(data.valor_estimado);
+        convertData.valor_estimado = valor;
+        convertData.valor = valor;
       }
 
       if (data.data_fechamento_prevista) {
         convertData.data_fechamento_prevista = data.data_fechamento_prevista;
+        convertData.dataFechamentoEsperado = data.data_fechamento_prevista;
       }
 
       if (data.observacoes) {
         convertData.observacoes = data.observacoes;
+        convertData.descricao = data.observacoes;
       }
 
       await leadsService.converter(leadToConvert.id, convertData);

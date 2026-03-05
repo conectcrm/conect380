@@ -16,6 +16,7 @@ const MVP_ALLOWED_TOP_LEVEL_MENU_IDS = new Set<string>([
   'dashboard',
   'atendimento',
   'comercial',
+  'financeiro',
   'configuracoes',
   'administracao',
 ]);
@@ -29,8 +30,11 @@ const MVP_ALLOWED_CHILD_MENU_IDS = new Set<string>([
   'comercial-leads',
   'comercial-pipeline',
   'comercial-propostas',
+  'comercial-contratos',
   'comercial-analytics',
   'comercial-produtos',
+  'comercial-cotacoes',
+  'comercial-aprovacoes',
   'configuracoes-empresa',
   'configuracoes-usuarios',
   'admin-empresas',
@@ -67,10 +71,10 @@ const BLOCKED_RELATIONSHIP_INFO: MvpBlockedRouteInfo = {
 const BLOCKED_FINANCE_INFO: MvpBlockedRouteInfo = {
   moduleName: 'Financeiro e Billing',
   description:
-    'Financeiro, cobrancas e faturamento estao fora do MVP comercial desta release.',
+    'Somente o fluxo de compras (cotacoes/aprovacoes) esta liberado no MVP. Billing e financeiro avancado seguem pos-MVP.',
   estimatedCompletion: 'Pos-MVP',
   features: [
-    'Fluxo financeiro completo',
+    'Fluxo financeiro completo fora de compras',
     'Assinaturas e billing',
     'Faturamento e cobrancas',
     'Relatorios financeiros avancados',
@@ -99,6 +103,17 @@ const BLOCKED_ROUTE_RULES: MvpBlockedRouteRule[] = [
   { prefix: '/vendas/aprovacoes', info: BLOCKED_COMMERCIAL_INFO },
   { prefix: '/combos', info: BLOCKED_COMMERCIAL_INFO },
   { prefix: '/vendas/combos', info: BLOCKED_COMMERCIAL_INFO },
+];
+
+const MVP_ALLOWED_ROUTE_PREFIXES: string[] = [
+  '/financeiro/cotacoes',
+  '/financeiro/compras/aprovacoes',
+  '/cotacoes',
+  '/vendas/cotacoes',
+  '/orcamentos',
+  '/aprovacoes/pendentes',
+  '/vendas/aprovacoes',
+  '/contratos',
 ];
 
 const normalizePath = (pathname: string): string => {
@@ -137,6 +152,14 @@ export const getMvpBlockedRouteInfo = (pathname: string): MvpBlockedRouteInfo | 
   }
 
   const normalizedPath = normalizePath(pathname);
+  const isAllowedInMvp = MVP_ALLOWED_ROUTE_PREFIXES.some((prefix) =>
+    matchesPrefix(normalizedPath, prefix),
+  );
+
+  if (isAllowedInMvp) {
+    return null;
+  }
+
   const matchedRule = BLOCKED_ROUTE_RULES.find((rule) => matchesPrefix(normalizedPath, rule.prefix));
   return matchedRule?.info ?? null;
 };

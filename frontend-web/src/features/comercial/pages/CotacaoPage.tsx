@@ -206,10 +206,10 @@ function CotacaoPage() {
   const [cotacoesSelecionadas, setCotacoesSelecionadas] = useState<string[]>([]);
   const selectAllRef = useRef<HTMLInputElement | null>(null);
 
-  const canCreateCotacao = userHasPermission(user as any, 'comercial.propostas.create');
-  const canUpdateCotacao = userHasPermission(user as any, 'comercial.propostas.update');
-  const canDeleteCotacao = userHasPermission(user as any, 'comercial.propostas.delete');
-  const canSendCotacao = userHasPermission(user as any, 'comercial.propostas.send');
+  const canCreateCotacao = userHasPermission(user as any, 'financeiro.pagamentos.manage');
+  const canUpdateCotacao = userHasPermission(user as any, 'financeiro.pagamentos.manage');
+  const canDeleteCotacao = userHasPermission(user as any, 'financeiro.pagamentos.manage');
+  const canSendCotacao = userHasPermission(user as any, 'financeiro.pagamentos.manage');
 
   const resumo = useMemo(() => {
     const pendentes = cotacoes.filter((c) =>

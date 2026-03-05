@@ -78,7 +78,7 @@ const FLOW_STATUS_TRANSITIONS: Record<SalesFlowStatus, readonly SalesFlowStatus[
   enviada: ['visualizada', 'negociacao', 'aprovada', 'rejeitada', 'expirada'],
   visualizada: ['negociacao', 'aprovada', 'rejeitada', 'expirada'],
   negociacao: ['aprovada', 'rejeitada', 'expirada', 'visualizada'],
-  aprovada: ['contrato_gerado', 'fatura_criada', 'rejeitada'],
+  aprovada: ['contrato_gerado', 'contrato_assinado', 'fatura_criada', 'rejeitada'],
   contrato_gerado: ['contrato_assinado'],
   contrato_assinado: ['fatura_criada'],
   fatura_criada: ['contrato_assinado', 'aguardando_pagamento', 'pago'],
@@ -242,6 +242,30 @@ export class PropostasService {
   ) {
     // Inicializar contador baseado nas propostas existentes
     this.inicializarContador();
+  }
+
+  private resolveErrorMessage(error: unknown, fallbackMessage: string): string {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'message' in error &&
+      typeof (error as { message?: unknown }).message === 'string'
+    ) {
+      const message = (error as { message: string }).message.trim();
+      if (message) {
+        return message;
+      }
+    }
+
+    return fallbackMessage;
+  }
+
+  private buildPropostaNotFoundMessage(propostaId: string): string {
+    return `Proposta com ID ${propostaId} nao encontrada`;
+  }
+
+  private buildPropostaNotFoundByIdentifierMessage(identifier: string): string {
+    return `Proposta com ID/Numero ${identifier} nao encontrada`;
   }
 
   private async enrichSnapshotProdutos(produtos: unknown[], empresaId?: string): Promise<unknown[]> {
@@ -416,7 +440,9 @@ export class PropostasService {
 
       this.contadorId = 1;
     } catch (error) {
-      this.logger.warn(`Erro ao inicializar contador de propostas: ${error.message}`);
+      this.logger.warn(
+        `Erro ao inicializar contador de propostas: ${this.resolveErrorMessage(error, 'falha desconhecida')}`,
+      );
     }
   }
 
@@ -1310,6 +1336,97 @@ export class PropostasService {
     };
   }
 
+  private async buscarPropostasComContratoAssinado(
+    propostaIds: string[],
+    empresaId?: string,
+  ): Promise<Set<string>> {
+    const ids = Array.from(
+      new Set(
+        propostaIds
+          .map((id) => String(id || '').trim())
+          .filter(Boolean),
+      ),
+    );
+
+    if (ids.length === 0) {
+      return new Set<string>();
+    }
+
+    const params: unknown[] = [ids];
+    const filtroEmpresa = empresaId ? 'AND c.empresa_id::text = $2::text' : '';
+    if (empresaId) {
+      params.push(String(empresaId));
+    }
+
+    try {
+      const rows: Array<{ proposta_id?: string }> = await this.propostaRepository.query(
+        `
+          SELECT c."propostaId"::text AS proposta_id
+          FROM contratos c
+          WHERE c."propostaId" IS NOT NULL
+            AND c."propostaId"::text = ANY($1::text[])
+            AND c.status = 'assinado'
+            AND c.ativo = true
+            ${filtroEmpresa}
+          GROUP BY c."propostaId"
+        `,
+        params,
+      );
+
+      return new Set(
+        rows
+          .map((row) => String(row?.proposta_id || '').trim())
+          .filter(Boolean),
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Nao foi possivel consultar contratos assinados para reconciliar status das propostas: ${this.resolveErrorMessage(error, 'falha desconhecida')}`,
+      );
+      return new Set<string>();
+    }
+  }
+
+  private isStatusAntesDoContratoAssinado(status: SalesFlowStatus): boolean {
+    return [
+      'rascunho',
+      'enviada',
+      'visualizada',
+      'negociacao',
+      'aprovada',
+      'contrato_gerado',
+    ].includes(status);
+  }
+
+  private aplicarStatusContratoAssinadoSeNecessario(
+    proposta: Proposta,
+    possuiContratoAssinado: boolean,
+  ): Proposta {
+    if (!possuiContratoAssinado) {
+      return proposta;
+    }
+
+    const statusAtual = this.normalizeStatusInput(proposta.status);
+    if (!this.isStatusAntesDoContratoAssinado(statusAtual)) {
+      return proposta;
+    }
+
+    const emailDetails =
+      proposta.emailDetails && typeof proposta.emailDetails === 'object'
+        ? {
+            ...proposta.emailDetails,
+            fluxoStatus: 'contrato_assinado' as SalesFlowStatus,
+          }
+        : {
+            fluxoStatus: 'contrato_assinado' as SalesFlowStatus,
+          };
+
+    return {
+      ...proposta,
+      status: 'contrato_assinado',
+      emailDetails,
+    };
+  }
+
   private gerarId(): string {
     const timestamp = Date.now();
     const random = Math.floor(Math.random() * 100000);
@@ -1371,7 +1488,18 @@ export class PropostasService {
           params,
         );
 
-        return rows.map((row) => this.buildLegacyInterface(row));
+        const propostas = rows.map((row) => this.buildLegacyInterface(row));
+        const propostasComContratoAssinado = await this.buscarPropostasComContratoAssinado(
+          propostas.map((proposta) => String(proposta.id || '')),
+          empresaId,
+        );
+
+        return propostas.map((proposta) =>
+          this.aplicarStatusContratoAssinadoSeNecessario(
+            proposta,
+            propostasComContratoAssinado.has(String(proposta.id || '')),
+          ),
+        );
       }
 
       const entities = await this.propostaRepository.find({
@@ -1381,7 +1509,18 @@ export class PropostasService {
       });
 
       this.logger.debug(`${entities.length} propostas encontradas no banco`);
-      return entities.map((entity) => this.entityToInterface(entity));
+      const propostas = entities.map((entity) => this.entityToInterface(entity));
+      const propostasComContratoAssinado = await this.buscarPropostasComContratoAssinado(
+        propostas.map((proposta) => String(proposta.id || '')),
+        empresaId,
+      );
+
+      return propostas.map((proposta) =>
+        this.aplicarStatusContratoAssinadoSeNecessario(
+          proposta,
+          propostasComContratoAssinado.has(String(proposta.id || '')),
+        ),
+      );
     } catch (error) {
       this.logger.error('Erro ao listar propostas', error?.stack || String(error));
       return [];
@@ -1389,7 +1528,7 @@ export class PropostasService {
   }
 
   /**
-   * Obtém uma proposta específica
+   * Obtem uma proposta especifica
    */
   async obterProposta(id: string, empresaId?: string): Promise<Proposta | null> {
     try {
@@ -1443,7 +1582,16 @@ export class PropostasService {
           return null;
         }
 
-        return this.buildLegacyInterface(rows[0]);
+        const proposta = this.buildLegacyInterface(rows[0]);
+        const propostasComContratoAssinado = await this.buscarPropostasComContratoAssinado(
+          [String(proposta.id || '')],
+          empresaId,
+        );
+
+        return this.aplicarStatusContratoAssinadoSeNecessario(
+          proposta,
+          propostasComContratoAssinado.has(String(proposta.id || '')),
+        );
       }
 
       const entity = await this.propostaRepository.findOne({
@@ -1451,7 +1599,20 @@ export class PropostasService {
         relations: columns.has('vendedor_id') ? ['vendedor'] : [],
       });
 
-      return entity ? this.entityToInterface(entity) : null;
+      if (!entity) {
+        return null;
+      }
+
+      const proposta = this.entityToInterface(entity);
+      const propostasComContratoAssinado = await this.buscarPropostasComContratoAssinado(
+        [String(proposta.id || '')],
+        empresaId,
+      );
+
+      return this.aplicarStatusContratoAssinadoSeNecessario(
+        proposta,
+        propostasComContratoAssinado.has(String(proposta.id || '')),
+      );
     } catch (error) {
       this.logger.error('Erro ao obter proposta', error?.stack || String(error));
       return null;
@@ -1500,12 +1661,12 @@ export class PropostasService {
       // Processar cliente baseado no tipo de dados recebido
       let clienteProcessado;
       if (typeof dadosProposta.cliente === 'string') {
-        // 🔍 BUSCAR CLIENTE REAL NO BANCO ao invés de gerar email fictício
+        // Buscar cliente real no banco ao inves de gerar email ficticio
         const nomeCliente = dadosProposta.cliente as string;
         this.logger.debug(`Buscando cliente real por nome: ${this.summarizeText(nomeCliente, 50)}`);
 
         try {
-          // Buscar cliente real pelo nome (busca flexível)
+          // Buscar cliente real pelo nome (busca flexivel)
           const clienteReal = await this.clienteRepository.findOne({
             where: empresaIdProposta
               ? [
@@ -1520,18 +1681,18 @@ export class PropostasService {
             clienteProcessado = {
               id: clienteReal.id,
               nome: clienteReal.nome,
-              email: clienteReal.email, // ✅ USAR EMAIL REAL
-              telefone: clienteReal.telefone, // ✅ USAR TELEFONE REAL
+              email: clienteReal.email, // Usar email real
+              telefone: clienteReal.telefone, // Usar telefone real
               documento: clienteReal.documento || '',
               status: clienteReal.status || 'lead',
             };
           } else {
             this.logger.warn(`Cliente nao encontrado no cadastro: ${this.summarizeText(nomeCliente, 50)}`);
-            // ✅ NÃO gerar email fictício - deixar vazio para busca posterior
+            // Nao gerar email ficticio - deixar vazio para busca posterior
             clienteProcessado = {
               id: 'cliente-temp',
               nome: nomeCliente,
-              email: '', // ← DEIXAR VAZIO ao invés de gerar fictício
+              email: '', // Deixar vazio ao inves de gerar ficticio
               telefone: '',
               documento: '',
               status: 'lead',
@@ -1539,25 +1700,25 @@ export class PropostasService {
           }
         } catch (error) {
           this.logger.error('Erro ao buscar cliente no banco', error?.stack || String(error));
-          // Fallback sem email fictício
+          // Fallback sem email ficticio
           clienteProcessado = {
             id: 'cliente-temp',
             nome: nomeCliente,
-            email: '', // ← NÃO gerar email fictício
+            email: '', // Nao gerar email ficticio
             telefone: '',
             documento: '',
             status: 'lead',
           };
         }
       } else if (dadosProposta.cliente && typeof dadosProposta.cliente === 'object') {
-        // Se é objeto, usar como está
+        // Se e objeto, usar como esta
         clienteProcessado = dadosProposta.cliente;
       } else {
-        // Fallback para cliente padrão SEM EMAIL FICTÍCIO
+        // Fallback para cliente padrao sem email ficticio
         clienteProcessado = {
           id: 'cliente-default',
-          nome: 'Cliente Temporário',
-          email: '', // ✅ NÃO gerar email fictício
+          nome: 'Cliente Temporario',
+          email: '', // Nao gerar email ficticio
           telefone: '',
           documento: '',
           status: 'lead',
@@ -1718,7 +1879,7 @@ export class PropostasService {
       ) as any;
 
       const propostaSalva = await this.propostaRepository.save(novaProposta);
-      this.logger.log(`✅ Proposta criada no banco: ${propostaSalva.id} - ${propostaSalva.numero}`);
+      this.logger.log(`Proposta criada no banco: ${propostaSalva.id} - ${propostaSalva.numero}`);
 
       return this.entityToInterface(propostaSalva);
     } catch (error) {
@@ -1728,7 +1889,7 @@ export class PropostasService {
   }
 
   /**
-   * Atualiza dados de uma proposta (além de status)
+   * Atualiza dados de uma proposta (alem de status)
    */
   async atualizarProposta(
     id: string,
@@ -1803,7 +1964,7 @@ export class PropostasService {
 
         if (setClauses.length === 0) {
           const existente = await this.obterProposta(id, empresaId);
-          if (!existente) throw new Error(`Proposta com ID ${id} nao encontrada`);
+          if (!existente) throw new Error(this.buildPropostaNotFoundMessage(id));
           return existente;
         }
 
@@ -1828,12 +1989,12 @@ export class PropostasService {
         const updateResult = this.extractQueryRows<{ id: string }>(updateResultRaw);
 
         if (!updateResult?.[0]?.id) {
-          throw new Error(`Proposta com ID ${id} nao encontrada`);
+          throw new Error(this.buildPropostaNotFoundMessage(id));
         }
 
         const propostaAtualizada = await this.obterProposta(id, empresaId);
         if (!propostaAtualizada) {
-          throw new Error(`Proposta com ID ${id} nao encontrada`);
+          throw new Error(this.buildPropostaNotFoundMessage(id));
         }
         return propostaAtualizada;
       }
@@ -1843,7 +2004,7 @@ export class PropostasService {
       });
 
       if (!proposta) {
-        throw new Error(`Proposta com ID ${id} nao encontrada`);
+        throw new Error(this.buildPropostaNotFoundMessage(id));
       }
 
       if (dadosProposta.titulo !== undefined) {
@@ -1976,7 +2137,7 @@ export class PropostasService {
       ) as any;
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);
-      this.logger.log(`✅ Proposta atualizada: ${propostaAtualizada.id}`);
+      this.logger.log(`Proposta atualizada: ${propostaAtualizada.id}`);
       return this.entityToInterface(propostaAtualizada);
     } catch (error) {
       this.logger.error('Erro ao atualizar proposta', error?.stack || String(error));
@@ -2031,7 +2192,7 @@ export class PropostasService {
       if (legacySchema) {
         const propostaAtual = await this.obterProposta(propostaId, empresaId);
         if (!propostaAtual) {
-          throw new Error(`Proposta com ID ${propostaId} nao encontrada`);
+          throw new Error(this.buildPropostaNotFoundMessage(propostaId));
         }
 
         if (!this.isStatusTransitionAllowed(propostaAtual.status, fluxoStatus)) {
@@ -2069,7 +2230,7 @@ export class PropostasService {
       });
 
       if (!proposta) {
-        throw new Error(`Proposta com ID ${propostaId} não encontrada`);
+        throw new Error(this.buildPropostaNotFoundMessage(propostaId));
       }
 
       const statusAnterior =
@@ -2160,7 +2321,7 @@ export class PropostasService {
   }
 
   /**
-   * Atualiza o status de uma proposta com validação automática
+   * Atualiza o status de uma proposta com validacao automatica
    */
   async atualizarStatusComValidacao(
     propostaId: string,
@@ -2173,7 +2334,7 @@ export class PropostasService {
       const fluxoStatus = this.normalizeStatusInput(status);
       const propostaAtual = await this.obterProposta(propostaId, empresaId);
       if (!propostaAtual) {
-        throw new Error(`Proposta com ID ${propostaId} nao encontrada`);
+        throw new Error(this.buildPropostaNotFoundMessage(propostaId));
       }
 
       if (fluxoStatus === 'aprovada' || fluxoStatus === 'rejeitada') {
@@ -2207,7 +2368,7 @@ export class PropostasService {
       if (legacySchema) {
         const proposta = await this.obterProposta(propostaId, empresaId);
         if (!proposta) {
-          throw new Error(`Proposta com ID ${propostaId} nao encontrada`);
+          throw new Error(this.buildPropostaNotFoundMessage(propostaId));
         }
 
         const propostaAtualizada = await this.atualizarStatus(
@@ -2227,7 +2388,7 @@ export class PropostasService {
       });
 
       if (!proposta) {
-        throw new Error(`Proposta com ID ${propostaId} não encontrada`);
+        throw new Error(this.buildPropostaNotFoundMessage(propostaId));
       }
 
       proposta.status = this.mapFlowStatusToDatabaseStatus('visualizada', false) as any;
@@ -2252,7 +2413,7 @@ export class PropostasService {
       ) as any;
 
       const propostaAtualizada = await this.savePropostaWithStatusFallback(proposta, 'visualizada');
-      this.logger.log(`👁️ Proposta ${propostaId} marcada como visualizada`);
+      this.logger.log(`Proposta ${propostaId} marcada como visualizada`);
 
       return this.entityToInterface(propostaAtualizada);
     } catch (error) {
@@ -2276,7 +2437,7 @@ export class PropostasService {
       });
 
       if (!proposta) {
-        throw new Error(`Proposta com ID ${propostaId} não encontrada`);
+        throw new Error(this.buildPropostaNotFoundMessage(propostaId));
       }
 
       proposta.status = this.mapFlowStatusToDatabaseStatus('enviada', false) as any;
@@ -2317,7 +2478,7 @@ export class PropostasService {
   }
 
   /**
-   * Marca proposta como enviada (usado pela sincronização automática)
+   * Marca proposta como enviada (usado pela sincronizacao automatica)
    */
   async marcarComoEnviada(
     propostaIdOuNumero: string,
@@ -2328,16 +2489,16 @@ export class PropostasService {
     try {
       this.logger.debug(`Marcando proposta ${propostaIdOuNumero} como enviada automaticamente`);
 
-      // Tentar encontrar por ID (UUID) primeiro, depois por número
+      // Tentar encontrar por ID (UUID) primeiro, depois por numero
       let proposta = await this.propostaRepository
         .findOne({
           where: empresaId
             ? { id: propostaIdOuNumero, empresaId }
             : { id: propostaIdOuNumero },
         })
-        .catch(() => null); // Capturar erro de UUID inválido
+        .catch(() => null); // Capturar erro de UUID invalido
 
-      // Se não encontrou por ID, tentar por número
+      // Se nao encontrou por ID, tentar por numero
       if (!proposta) {
         proposta = await this.propostaRepository.findOne({
           where: empresaId
@@ -2347,7 +2508,7 @@ export class PropostasService {
       }
 
       if (!proposta) {
-        throw new Error(`Proposta com ID/Número ${propostaIdOuNumero} não encontrada`);
+        throw new Error(this.buildPropostaNotFoundByIdentifierMessage(propostaIdOuNumero));
       }
 
       // Atualizar status para enviada
@@ -2367,7 +2528,7 @@ export class PropostasService {
       proposta.emailDetails = emailDetails as any;
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);
-      this.logger.log(`✅ Proposta ${proposta.numero} marcada como enviada automaticamente`);
+      this.logger.log(`Proposta ${proposta.numero} marcada como enviada automaticamente`);
 
       return this.entityToInterface(propostaAtualizada);
     } catch (error) {
@@ -2425,7 +2586,7 @@ export class PropostasService {
   }> {
     const proposta = await this.obterProposta(propostaId, empresaId);
     if (!proposta) {
-      throw new Error(`Proposta com ID ${propostaId} nao encontrada`);
+      throw new Error(this.buildPropostaNotFoundMessage(propostaId));
     }
 
     const portalEventos = [
@@ -2512,7 +2673,7 @@ export class PropostasService {
     });
 
     if (!proposta) {
-      throw new Error(`Proposta com ID ${propostaId} nao encontrada`);
+      throw new Error(this.buildPropostaNotFoundMessage(propostaId));
     }
 
     const dias = Math.max(1, Math.floor(this.toFiniteNumber(diasApos, 7)));
@@ -2610,7 +2771,7 @@ export class PropostasService {
     });
 
     if (!proposta) {
-      throw new Error(`Proposta com ID ${propostaId} nao encontrada`);
+      throw new Error(this.buildPropostaNotFoundMessage(propostaId));
     }
 
     const novaData = new Date(novaDataValidade);
@@ -2661,7 +2822,7 @@ export class PropostasService {
   }> {
     const proposta = await this.obterProposta(propostaId, empresaId);
     if (!proposta) {
-      throw new Error(`Proposta com ID ${propostaId} nao encontrada`);
+      throw new Error(this.buildPropostaNotFoundMessage(propostaId));
     }
 
     const historico = (proposta.historicoEventos || proposta.emailDetails?.historicoEventos || [])
@@ -2719,7 +2880,7 @@ export class PropostasService {
   ): Promise<PropostaAprovacaoInterna> {
     const proposta = await this.obterProposta(propostaId, empresaId);
     if (!proposta) {
-      throw new Error(`Proposta com ID ${propostaId} nao encontrada`);
+      throw new Error(this.buildPropostaNotFoundMessage(propostaId));
     }
 
     if (proposta.aprovacaoInterna) {
@@ -2743,7 +2904,7 @@ export class PropostasService {
     });
 
     if (!proposta) {
-      throw new Error(`Proposta com ID ${propostaId} nao encontrada`);
+      throw new Error(this.buildPropostaNotFoundMessage(propostaId));
     }
 
     const aprovacaoBase = this.calcularAprovacaoInterna(
@@ -2812,7 +2973,7 @@ export class PropostasService {
     });
 
     if (!proposta) {
-      throw new Error(`Proposta com ID ${propostaId} nao encontrada`);
+      throw new Error(this.buildPropostaNotFoundMessage(propostaId));
     }
 
     const aprovacaoBase = this.calcularAprovacaoInterna(
@@ -3091,4 +3252,3 @@ export class PropostasService {
     };
   }
 }
-

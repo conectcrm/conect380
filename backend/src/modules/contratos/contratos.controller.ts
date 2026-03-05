@@ -20,7 +20,11 @@ import * as path from 'path';
 import { ContratosService } from './services/contratos.service';
 import { AssinaturaDigitalService } from './services/assinatura-digital.service';
 import { PdfContratoService } from './services/pdf-contrato.service';
-import { CreateContratoDto, UpdateContratoDto } from './dto/contrato.dto';
+import {
+  ConfirmarAssinaturaExternaDto,
+  CreateContratoDto,
+  UpdateContratoDto,
+} from './dto/contrato.dto';
 import {
   CreateAssinaturaDto,
   ProcessarAssinaturaDto,
@@ -31,6 +35,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Public } from '../auth/decorators/public.decorator';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
 import { EmpresaId, SkipEmpresaValidation } from '../../common/decorators/empresa.decorator';
+import { CurrentUser } from '../../common/decorators/user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permission } from '../../common/permissions/permissions.constants';
@@ -45,6 +50,49 @@ export class ContratosController {
     private readonly assinaturaService: AssinaturaDigitalService,
     private readonly pdfService: PdfContratoService,
   ) {}
+
+  private resolveErrorMessage(error: unknown, fallbackMessage: string): string {
+    if (error instanceof HttpException) {
+      const response = error.getResponse();
+
+      if (typeof response === 'string' && response.trim()) {
+        return response;
+      }
+
+      if (response && typeof response === 'object') {
+        const responseRecord = response as Record<string, unknown>;
+        const responseMessage = responseRecord.message;
+
+        if (Array.isArray(responseMessage)) {
+          const joined = responseMessage
+            .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+            .join('. ');
+
+          if (joined) {
+            return joined;
+          }
+        }
+
+        if (typeof responseMessage === 'string' && responseMessage.trim()) {
+          return responseMessage;
+        }
+      }
+    }
+
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'message' in error &&
+      typeof (error as { message?: unknown }).message === 'string'
+    ) {
+      const message = (error as { message: string }).message.trim();
+      if (message) {
+        return message;
+      }
+    }
+
+    return fallbackMessage;
+  }
 
   private rethrowPublicSignatureError(error: any, contexto: string): never {
     this.logger.error(`Erro em ${contexto}: ${error?.message || error}`);
@@ -75,8 +123,10 @@ export class ContratosController {
         message: 'Contrato criado com sucesso',
         data: contrato,
       };
-    } catch (error) {
-      this.logger.error(`Erro ao criar contrato: ${error.message}`);
+    } catch (error: unknown) {
+      this.logger.error(
+        `Erro ao criar contrato: ${this.resolveErrorMessage(error, 'Falha ao criar contrato')}`,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -100,7 +150,7 @@ export class ContratosController {
     try {
       const filtros = {
         status,
-        clienteId: clienteId ? parseInt(clienteId) : undefined,
+        clienteId: clienteId ? parseInt(clienteId, 10) : undefined,
         propostaId: propostaId?.trim() || undefined,
         dataInicio: dataInicio ? new Date(dataInicio) : undefined,
         dataFim: dataFim ? new Date(dataFim) : undefined,
@@ -113,11 +163,13 @@ export class ContratosController {
         message: 'Contratos listados com sucesso',
         data: contratos,
       };
-    } catch (error) {
-      this.logger.error(`Erro ao listar contratos: ${error.message}`);
+    } catch (error: unknown) {
+      this.logger.error(
+        `Erro ao listar contratos: ${this.resolveErrorMessage(error, 'Falha ao listar contratos')}`,
+      );
       return {
         success: false,
-        message: error.message,
+        message: this.resolveErrorMessage(error, 'Falha ao listar contratos'),
         data: [],
       };
     }
@@ -181,11 +233,13 @@ export class ContratosController {
         message: 'Contrato atualizado com sucesso',
         data: contrato,
       };
-    } catch (error) {
-      this.logger.error(`Erro ao atualizar contrato: ${error.message}`);
+    } catch (error: unknown) {
+      this.logger.error(
+        `Erro ao atualizar contrato: ${this.resolveErrorMessage(error, 'Falha ao atualizar contrato')}`,
+      );
       return {
         success: false,
-        message: error.message,
+        message: this.resolveErrorMessage(error, 'Falha ao atualizar contrato'),
         data: null,
       };
     }
@@ -212,13 +266,52 @@ export class ContratosController {
         message: 'Contrato cancelado com sucesso',
         data: contrato,
       };
-    } catch (error) {
-      this.logger.error(`Erro ao cancelar contrato: ${error.message}`);
+    } catch (error: unknown) {
+      this.logger.error(
+        `Erro ao cancelar contrato: ${this.resolveErrorMessage(error, 'Falha ao cancelar contrato')}`,
+      );
       return {
         success: false,
-        message: error.message,
+        message: this.resolveErrorMessage(error, 'Falha ao cancelar contrato'),
         data: null,
       };
+    }
+  }
+
+  /**
+   * Confirmar assinatura externa do contrato
+   */
+  @Post(':id/confirmar-assinatura-externa')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_UPDATE)
+  async confirmarAssinaturaExterna(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() confirmarAssinaturaExternaDto: ConfirmarAssinaturaExternaDto,
+    @EmpresaId() empresaId: string,
+    @CurrentUser() user: { id?: string; sub?: string },
+  ) {
+    try {
+      const usuarioConfirmacaoId = String(user?.id || user?.sub || '').trim() || undefined;
+
+      const contrato = await this.contratosService.confirmarAssinaturaExterna(
+        id,
+        empresaId,
+        usuarioConfirmacaoId,
+        confirmarAssinaturaExternaDto,
+      );
+
+      return {
+        success: true,
+        message: 'Assinatura externa registrada com sucesso',
+        data: contrato,
+      };
+    } catch (error: unknown) {
+      this.logger.error(
+        `Erro ao confirmar assinatura externa: ${this.resolveErrorMessage(error, 'Falha ao confirmar assinatura externa')}`,
+      );
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Erro interno ao confirmar assinatura externa');
     }
   }
 
@@ -239,7 +332,7 @@ export class ContratosController {
       if (!contrato.caminhoArquivoPDF) {
         return res.status(HttpStatus.NOT_FOUND).json({
           success: false,
-          message: 'PDF do contrato não encontrado',
+          message: 'PDF do contrato nao encontrado',
         });
       }
 
@@ -253,11 +346,13 @@ export class ContratosController {
       res.setHeader('Content-Disposition', `attachment; filename=\"${nomeArquivo}\"`);
 
       return res.send(arquivo);
-    } catch (error) {
-      this.logger.error(`Erro ao baixar PDF: ${error.message}`);
+    } catch (error: unknown) {
+      this.logger.error(
+        `Erro ao baixar PDF: ${this.resolveErrorMessage(error, 'Falha ao baixar PDF do contrato')}`,
+      );
       return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         success: false,
-        message: error.message,
+        message: this.resolveErrorMessage(error, 'Falha ao baixar PDF do contrato'),
       });
     }
   }
@@ -282,14 +377,16 @@ export class ContratosController {
 
       return {
         success: true,
-        message: 'Solicitação de assinatura criada com sucesso',
+        message: 'Solicitacao de assinatura criada com sucesso',
         data: assinatura,
       };
-    } catch (error) {
-      this.logger.error(`Erro ao criar assinatura: ${error.message}`);
+    } catch (error: unknown) {
+      this.logger.error(
+        `Erro ao criar assinatura: ${this.resolveErrorMessage(error, 'Falha ao criar assinatura')}`,
+      );
       return {
         success: false,
-        message: error.message,
+        message: this.resolveErrorMessage(error, 'Falha ao criar assinatura'),
         data: null,
       };
     }
@@ -309,11 +406,13 @@ export class ContratosController {
         message: 'Assinaturas listadas com sucesso',
         data: assinaturas,
       };
-    } catch (error) {
-      this.logger.error(`Erro ao listar assinaturas: ${error.message}`);
+    } catch (error: unknown) {
+      this.logger.error(
+        `Erro ao listar assinaturas: ${this.resolveErrorMessage(error, 'Falha ao listar assinaturas')}`,
+      );
       return {
         success: false,
-        message: error.message,
+        message: this.resolveErrorMessage(error, 'Falha ao listar assinaturas'),
         data: [],
       };
     }

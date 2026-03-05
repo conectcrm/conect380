@@ -26,6 +26,7 @@ import {
   PrioridadeOportunidade,
 } from '../oportunidades/oportunidade.entity';
 import { OportunidadesService } from '../oportunidades/oportunidades.service';
+import { Empresa } from '../../empresas/entities/empresa.entity';
 import * as Papa from 'papaparse';
 
 @Injectable()
@@ -35,6 +36,8 @@ export class LeadsService {
   constructor(
     @InjectRepository(Lead)
     private readonly leadsRepository: Repository<Lead>,
+    @InjectRepository(Empresa)
+    private readonly empresaRepository: Repository<Empresa>,
     private readonly oportunidadesService: OportunidadesService,
   ) {}
 
@@ -200,6 +203,140 @@ export class LeadsService {
     }
   }
 
+  private normalizeIdentifier(value?: string | null): string | undefined {
+    if (!value || typeof value !== 'string') {
+      return undefined;
+    }
+    const normalized = value.trim();
+    return normalized === '' ? undefined : normalized;
+  }
+
+  private extractSubdominioFromHost(host?: string): string | undefined {
+    const hostRaw = this.normalizeIdentifier(host);
+    if (!hostRaw) {
+      return undefined;
+    }
+
+    const firstHost = hostRaw.split(',')[0]?.trim().toLowerCase();
+    if (!firstHost) {
+      return undefined;
+    }
+
+    const withoutPort = firstHost.split(':')[0];
+    if (!withoutPort || withoutPort === 'localhost' || withoutPort === '127.0.0.1') {
+      return undefined;
+    }
+
+    const parts = withoutPort.split('.').filter(Boolean);
+    if (parts.length < 3) {
+      return undefined;
+    }
+
+    const subdominio = parts[0];
+    if (!subdominio || subdominio === 'www') {
+      return undefined;
+    }
+
+    return subdominio;
+  }
+
+  private async resolveEmpresaIdForPublicCapture(
+    dto: CaptureLeadDto,
+    context?: {
+      host?: string;
+      query?: Record<string, unknown>;
+    },
+  ): Promise<string> {
+    const query = context?.query || {};
+    const queryValue = (keys: string[]): string | undefined => {
+      for (const key of keys) {
+        const raw = query[key];
+        if (typeof raw === 'string' && raw.trim() !== '') {
+          return raw.trim();
+        }
+      }
+      return undefined;
+    };
+
+    const empresaId = this.normalizeIdentifier(
+      dto.empresa_id ||
+        queryValue(['empresa_id', 'empresaId', 'tenant', 'tenant_id', 'tenantId']),
+    );
+    if (empresaId) {
+      const empresa = await this.empresaRepository.findOne({
+        where: { id: empresaId, ativo: true },
+        select: ['id'],
+      });
+      if (empresa?.id) {
+        return empresa.id;
+      }
+    }
+
+    const empresaSlug = this.normalizeIdentifier(
+      dto.empresa_slug || queryValue(['empresa_slug', 'empresaSlug', 'slug', 'empresa']),
+    );
+    if (empresaSlug) {
+      const empresa = await this.empresaRepository.findOne({
+        where: { slug: empresaSlug, ativo: true },
+        select: ['id'],
+      });
+      if (empresa?.id) {
+        return empresa.id;
+      }
+    }
+
+    const empresaSubdominio = this.normalizeIdentifier(
+      dto.empresa_subdominio ||
+        queryValue(['empresa_subdominio', 'empresaSubdominio', 'subdominio']) ||
+        this.extractSubdominioFromHost(context?.host),
+    );
+    if (empresaSubdominio) {
+      const empresa = await this.empresaRepository.findOne({
+        where: { subdominio: empresaSubdominio, ativo: true },
+        select: ['id'],
+      });
+      if (empresa?.id) {
+        return empresa.id;
+      }
+    }
+
+    throw new BadRequestException(
+      'Captura publica de lead requer identificacao da empresa (empresa_id, slug ou subdominio).',
+    );
+  }
+
+  /**
+   * Capturar lead de formulario publico (sem autenticacao)
+   */
+  async captureFromPublic(
+    dto: CaptureLeadDto,
+    context?: {
+      host?: string;
+      query?: Record<string, unknown>;
+    },
+  ): Promise<Lead> {
+    try {
+      const empresaId = await this.resolveEmpresaIdForPublicCapture(dto, context);
+      return await this.create(
+        {
+          nome: dto.nome,
+          email: dto.email,
+          telefone: dto.telefone,
+          empresa_nome: dto.empresa_nome,
+          observacoes: dto.mensagem,
+          origem: OrigemLead.FORMULARIO,
+        },
+        empresaId,
+      );
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      this.logError('[LeadsService.captureFromPublic] erro ao capturar lead publico', error);
+      throw new InternalServerErrorException('Erro ao capturar lead', error.message);
+    }
+  }
+
   /**
    * Criar novo lead
    */
@@ -238,22 +375,6 @@ export class LeadsService {
       throw new InternalServerErrorException(
         detail ? `Erro ao criar lead: ${detail}` : 'Erro ao criar lead',
       );
-    }
-  }
-
-  /**
-   * Capturar lead de formulário público (sem autenticação)
-   */
-  async captureFromPublic(dto: CaptureLeadDto): Promise<Lead> {
-    try {
-      throw new BadRequestException(
-        'Captura pública de lead requer identificação da empresa (roteamento por subdomínio/parâmetro).',
-      );
-    } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
-      }      this.logError('[LeadsService.captureFromPublic] erro ao capturar lead p?blico', error);
-      throw new InternalServerErrorException('Erro ao capturar lead', error.message);
     }
   }
 
@@ -418,12 +539,34 @@ export class LeadsService {
         throw new BadRequestException('Lead já foi convertido anteriormente');
       }
 
-      // Criar oportunidade usando OportunidadesService (schema-aware e compatível com bancos legados)
+      const tituloOportunidade =
+        this.normalizeIdentifier(dto.titulo) ||
+        this.normalizeIdentifier(dto.titulo_oportunidade) ||
+        `${lead.nome}${lead.empresa_nome ? ` - ${lead.empresa_nome}` : ''}`;
+
+      const descricaoOportunidade =
+        this.normalizeIdentifier(dto.descricao) ||
+        this.normalizeIdentifier(dto.observacoes) ||
+        this.normalizeIdentifier(lead.observacoes) ||
+        `Lead convertido: ${lead.nome}`;
+
+      const dataFechamentoEsperado =
+        this.normalizeIdentifier(dto.dataFechamentoEsperado) ||
+        this.normalizeIdentifier(dto.data_fechamento_prevista);
+
+      const valorOportunidade =
+        dto.valor !== undefined && dto.valor !== null
+          ? dto.valor
+          : dto.valor_estimado !== undefined && dto.valor_estimado !== null
+            ? dto.valor_estimado
+            : 0;
+
+      // Criar oportunidade usando OportunidadesService (schema-aware e compativel com bancos legados)
       const savedOportunidade = await this.oportunidadesService.create(
         {
-          titulo: `${lead.nome}${lead.empresa_nome ? ` - ${lead.empresa_nome}` : ''}`,
-          descricao: dto.descricao || lead.observacoes || `Lead convertido: ${lead.nome}`,
-          valor: dto.valor || 0,
+          titulo: tituloOportunidade,
+          descricao: descricaoOportunidade,
+          valor: valorOportunidade,
           probabilidade: 20,
           estagio: this.mapearEstagioParaBanco(
             (dto.estagio as EstagioOportunidade) || EstagioOportunidade.LEADS,
@@ -435,6 +578,7 @@ export class LeadsService {
           emailContato: lead.email,
           telefoneContato: lead.telefone,
           empresaContato: lead.empresa_nome,
+          dataFechamentoEsperado,
         } as any,
         empresaId,
       );
