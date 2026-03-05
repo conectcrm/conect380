@@ -11,6 +11,7 @@ Validar ponta a ponta o fluxo integrado entre Vendas e Financeiro, com foco em s
 3. Sincronizacao de status em pagamento/fatura.
 4. Trilhas de auditoria (webhook e logs operacionais).
 5. Regressao das rotas financeiras relacionadas (contas a pagar, conciliacao e alertas).
+6. Fluxo MVP de compras/fechamento: cotacoes, aprovacoes de compras e contratos.
 
 ## 3. Pre-condicoes
 
@@ -20,7 +21,10 @@ Validar ponta a ponta o fluxo integrado entre Vendas e Financeiro, com foco em s
    - `contas_pagar_exportacoes`
    - `alertas_operacionais_financeiro`
 3. Ambiente com gateway sandbox configurado para empresa de teste.
-4. Usuario com perfil financeiro e usuario com perfil de vendas disponiveis.
+4. Usuarios de teste disponiveis:
+   - financeiro leitura (`financeiro.pagamentos.read`);
+   - financeiro aprovador (`financeiro.pagamentos.manage`);
+   - vendas (`comercial.propostas.read`) para validar nao-acesso em rotas de compras.
 
 ## 4. Cenarios obrigatorios
 
@@ -33,6 +37,8 @@ Validar ponta a ponta o fluxo integrado entre Vendas e Financeiro, com foco em s
 | VF-005 | Webhook com assinatura invalida | `401` sem atualizar pagamento/fatura |
 | VF-006 | Falha controlada de processamento de webhook | Evento em `webhooks_gateway_eventos.status=falha` com mensagem de erro |
 | VF-007 | Regressao financeira (contas a pagar/exportacao/conciliacao/alertas) | Suites automatizadas sem regressao |
+| VF-008 | MVP mode ativo com rotas de compras/fechamento | `/financeiro/cotacoes`, `/financeiro/compras/aprovacoes`, `/contratos` e `/contratos/:id` acessiveis; demais rotas financeiras seguem bloqueadas |
+| VF-009 | Permissoes de compras no frontend/backend | `pagamentos.read` acessa cotacoes; `pagamentos.manage` aprova/edita; perfil apenas comercial nao acessa rotas de compras |
 
 ## 5. Evidencias obrigatorias
 
@@ -62,3 +68,4 @@ Validar ponta a ponta o fluxo integrado entre Vendas e Financeiro, com foco em s
 2. Nenhuma duplicidade de baixa no VF-003.
 3. Suites de regressao integradas sem falha.
 4. Sem bug critico/alto aberto para o fluxo integrado.
+5. VF-008 e VF-009 em PASS sem bypass manual de permissao.

@@ -24,6 +24,7 @@ Para ambiente remoto (recomendado em producao):
 powershell -ExecutionPolicy Bypass -File scripts/monitor-pos-go-live-vendas-financeiro.ps1 `
   -BaseUrl "https://api.seu-ambiente.com" `
   -IntervalSeconds 300 `
+  -MonitorExpectedIntervalSeconds 300 `
   -DurationHours 48 `
   -EmpresaId "<empresa-id>" `
   -BearerToken "<jwt-operacional>"
@@ -56,3 +57,12 @@ powershell -ExecutionPolicy Bypass -File scripts/monitor-pos-go-live-vendas-fina
 - Resultado GO negocio:
 - Link das evidencias:
 
+### Registro local em andamento (2026-03-05)
+
+- Data/hora inicio: `2026-03-05 08:56:10`
+- Responsavel: Codex (execucao assistida local)
+- RunId do monitor: `20260305-085611`
+- PID: `30800`
+- Evidencias:
+  - `docs/features/evidencias/MONITORAMENTO_48H_BACKGROUND_START_20260305-085610.md`
+  - `docs/features/evidencias/MONITORAMENTO_48H_BACKGROUND_20260305-085610.log`

@@ -6,6 +6,9 @@ param(
   [int]$IntervalSeconds = 300,
 
   [Parameter(Mandatory = $false)]
+  [int]$MonitorExpectedIntervalSeconds = 0,
+
+  [Parameter(Mandatory = $false)]
   [int]$DurationHours = 48,
 
   [Parameter(Mandatory = $false)]
@@ -36,6 +39,12 @@ if (-not [System.IO.Path]::IsPathRooted($OutputDir)) {
 
 if (-not (Test-Path $OutputDir)) {
   New-Item -Path $OutputDir -ItemType Directory -Force | Out-Null
+}
+
+$effectiveMonitorIntervalSeconds = if ($MonitorExpectedIntervalSeconds -gt 0) {
+  $MonitorExpectedIntervalSeconds
+} else {
+  $IntervalSeconds
 }
 
 function Parse-Labels {
@@ -327,7 +336,7 @@ while ($true) {
   $monitorAgeSec = $null
   if ($null -ne $parsedMetrics.ultimo_ciclo_timestamp_seconds) {
     $monitorAgeSec = [Math]::Round(([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() - [double]$parsedMetrics.ultimo_ciclo_timestamp_seconds), 2)
-    $staleLimit = ($IntervalSeconds * 2) + 60
+    $staleLimit = ($effectiveMonitorIntervalSeconds * 2) + 60
     if ($monitorAgeSec -gt $staleLimit) {
       $anomalies.Add([PSCustomObject]@{
         timestampUtc = $now.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
@@ -432,6 +441,7 @@ $md += "- Inicio: $($startedAt.ToString('yyyy-MM-dd HH:mm:ss'))"
 $md += "- Fim: $($finishedAt.ToString('yyyy-MM-dd HH:mm:ss'))"
 $md += "- BaseUrl: $BaseUrl"
 $md += "- Intervalo (s): $IntervalSeconds"
+$md += "- Intervalo esperado do monitor (s): $effectiveMonitorIntervalSeconds"
 $md += "- Duracao alvo (h): $DurationHours"
 $md += "- Ciclos executados: $($snapshots.Count)"
 $md += "- Coleta metricas: $(if ($SkipMetrics) { 'nao' } else { 'sim' })"

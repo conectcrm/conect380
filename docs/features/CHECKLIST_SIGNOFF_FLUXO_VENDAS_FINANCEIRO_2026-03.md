@@ -11,6 +11,10 @@ Registrar aprovacao formal de QA, Produto e Financeiro para encerramento do cicl
 - [x] Evidencia regressao integrada: `docs/features/evidencias/REGRESSAO_FLUXO_VENDAS_FINANCEIRO_20260228-133245.md`
 - [x] Relatorio formal para aprovacao: `docs/features/RELATORIO_HOMOLOGACAO_FLUXO_VENDAS_FINANCEIRO_20260228-133245.md`
 - [x] Backlog AP304 atualizado: `docs/features/AP304_FECHAMENTO_FLUXO_VENDAS_FINANCEIRO_BACKLOG_2026-03.md`
+- [x] Rodada complementar local (2026-03-05) de AP-301 + regressao:
+  - `docs/features/evidencias/AP301_HOMOLOGACAO_ASSISTIDA_20260305-085018.md`
+  - `docs/features/evidencias/REGRESSAO_FLUXO_VENDAS_FINANCEIRO_20260305-085018.md`
+  - `docs/features/evidencias/HOMOLOGACAO_FLUXO_VENDAS_FINANCEIRO_20260305-085018.md`
 
 ## 3. Validacao funcional (QA)
 
@@ -43,6 +47,16 @@ Registrar aprovacao formal de QA, Produto e Financeiro para encerramento do cicl
 
 - [x] Dry-run tecnico do monitoramento executado (`RunId 20260228-144233`) com artefatos em `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260228-144233.md` e `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260228-144233.csv`.
 - [x] Dry-run tecnico complementar executado (`RunId 20260301-232945`) com artefatos em `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260301-232945.md` e `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260301-232945.csv` (health e metrics OK; anomalias `MONITOR_STALE_CYCLE` para triagem no go-live real).
+- [x] Dry-run tecnico recalibrado executado (`RunId 20260305-083633`) com artefatos em `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260305-083633.md` e `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260305-083633.csv` (sem anomalias).
+- [x] Rodada de monitoramento com token e coleta de alertas executada (`RunId 20260305-085356`) com triagem AP304 aplicada e validacao limpa em seguida (`RunId 20260305-085454`):
+  - `docs/features/evidencias/AP304_TRIAGEM_ALERTAS_CRITICOS_LOCAL_20260305-085454.md`
+  - `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260305-085454.md`
+- [x] Janela de monitoramento 48h iniciada em background no ambiente local (`RunId 20260305-085611`, inicio em 2026-03-05 08:56:10):
+  - `docs/features/evidencias/MONITORAMENTO_48H_BACKGROUND_START_20260305-085610.md`
+- [x] Validacao dedicada de contratos MVP no ambiente local (API + escopo de rota):
+  - `docs/features/evidencias/CONTRATOS_MVP_VALIDACAO_LOCAL_20260305-092356.md`
 - [x] Migration de consistencia multi-tenant para fornecedores aplicada no banco local (`AlignFornecedorUniqueByEmpresa1802861000000`).
+- [x] Preflight tecnico GO Full executado com PASS (`docs/features/evidencias/PREFLIGHT_GO_LIVE_FULL_20260305-084855.md`).
+- [x] Smoke MVP UI complementar (desktop + mobile) executado com PASS (`docs/features/evidencias/SMOKE_MVP_UI_20260305-084855.md`).
 - [ ] Janela real de 48h no ambiente de go-live.
 - [ ] Atualizacao final de GO tecnico/negocio apos janela real.

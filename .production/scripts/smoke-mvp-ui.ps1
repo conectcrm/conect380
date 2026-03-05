@@ -1,7 +1,7 @@
 param(
   [string]$FrontendUrl = "http://localhost:3000",
   [string]$BackendHealthUrl = "http://localhost:3001/health",
-  [string]$AdminEmail = "admin@conectsuite.com.br",
+  [string]$AdminEmail = "admin@conect360.com.br",
   [string]$AdminPassword = "admin123",
   [switch]$SkipMobileGuard
 )

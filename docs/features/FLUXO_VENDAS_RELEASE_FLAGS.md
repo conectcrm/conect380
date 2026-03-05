@@ -17,11 +17,11 @@ Escopo:
 
 ## Decisao operacional atual
 
-- Modo alvo atual desta linha: **GO Core Vendas**
-- Motivo: liberar fluxo comercial principal com menor risco operacional, mantendo contratos/faturamento/gateways fora do escopo inicial.
+- Modo alvo atual desta linha: **GO Core Vendas + Compras**
+- Motivo: liberar fluxo comercial ponta a ponta do MVP (incluindo fechamento via contratos e compras basicas) com menor risco operacional, mantendo faturamento/gateways fora do escopo inicial.
 - Criterio para migrar para GO Full: guardrails de flags em full + E2E vendas full + janela de deploy dedicada com providers definidos.
 
-### GO Core Vendas (recomendado)
+### GO Core Vendas + Compras (recomendado)
 
 Inclui:
 
@@ -29,10 +29,12 @@ Inclui:
 - Pipeline/Oportunidades
 - Propostas
 - Portal de propostas (token persistido)
+- Cotacoes de compras (`/financeiro/cotacoes`)
+- Aprovacoes de compras (`/financeiro/compras/aprovacoes`)
+- Contratos (`/contratos` e `/contratos/:id`)
 
 Fora do escopo:
 
-- Contratos (UI bloqueada por MVP mode, se aplicavel)
 - Faturamento/Billing
 - Gateways de pagamento
 
@@ -57,8 +59,13 @@ Flag:
 
 Comportamento atual relevante:
 
-- Rotas de `financeiro`, `faturamento`, `billing` e `contratos` ficam bloqueadas por `ModuleUnderConstruction` quando MVP mode esta ativo.
+- Rotas de `billing`, `faturamento` e financeiro avancado ficam bloqueadas por `ModuleUnderConstruction` quando MVP mode esta ativo.
 - Rotas comerciais core (ex.: `leads`, `pipeline`, `propostas`) permanecem habilitadas no MVP.
+- Excecoes liberadas no MVP para fechamento/compras:
+  - `/financeiro/cotacoes`
+  - `/financeiro/compras/aprovacoes`
+  - `/contratos`
+  - `/contratos/:id`
 
 Rotas bloqueadas no MVP (exemplos):
 
@@ -66,7 +73,8 @@ Rotas bloqueadas no MVP (exemplos):
 - `/assinaturas`
 - `/faturamento`
 - `/financeiro`
-- `/contratos`
+- `/financeiro/contas-pagar`
+- `/financeiro/faturamento`
 
 ### Gate visual de gateway no faturamento (frontend)
 
@@ -122,13 +130,13 @@ PAGAMENTOS_GATEWAY_ALLOW_UNIMPLEMENTED=false
 
 ## Matriz de habilitacao por ambiente
 
-| Ambiente | `REACT_APP_MVP_MODE` | Contratos/Faturamento UI | Gateways frontend | Gateways backend | Uso recomendado |
+| Ambiente | `REACT_APP_MVP_MODE` | Contratos/Compras MVP UI | Gateways frontend | Gateways backend | Uso recomendado |
 |---|---:|---|---|---|---|
-| Local dev (core) | `true` | Bloqueados | Bloqueado | Bypass opcional | Desenvolvimento GO Core |
+| Local dev (core) | `true` | Habilitados (`/contratos` e `/contratos/:id`, cotacoes/aprovacoes compras) | Bloqueado | Bypass opcional | Desenvolvimento GO Core |
 | Local dev (full) | `false` | Habilitados | `ALLOW_UNIMPLEMENTED=true` ou lista | `ALLOW_UNIMPLEMENTED=true` ou lista | Desenvolvimento GO Full |
-| Homolog (core) | `true` | Bloqueados | Bloqueado | Lista vazia (bloqueado) | Validacao GO Core |
+| Homolog (core) | `true` | Habilitados (`/contratos` e `/contratos/:id`, cotacoes/aprovacoes compras) | Bloqueado | Lista vazia (bloqueado) | Validacao GO Core |
 | Homolog (full) | `false` | Habilitados | Lista explicita | Lista explicita | Validacao GO Full |
-| Producao (core) | `true` | Bloqueados | Bloqueado | Lista vazia (bloqueado) | Release GO Core |
+| Producao (core) | `true` | Habilitados (`/contratos` e `/contratos/:id`, cotacoes/aprovacoes compras) | Bloqueado | Lista vazia (bloqueado) | Release GO Core |
 | Producao (full) | `false` | Habilitados | Lista explicita | Lista explicita | Release GO Full |
 
 ## Checklist de rollout (resumo)

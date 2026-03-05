@@ -483,7 +483,7 @@ Observacao de status (2026-03-02): os gaps do baseline acima foram tratados dura
   - Responsavel sugerido: QA + Backend
   - Prazo: 2026-03-06
   - Evidencia de conclusao: relatorio consolidado com PASS/FAIL por cenario e anexos de log/SQL.
-  - Status atual: concluido em 2026-02-28 com `HOMO-001` PASS + `HOMO-002` PASS (`RUN 20260228-133245`) e autoaprovacao formal do responsavel unico; evidencias em `docs/features/evidencias/HOMOLOGACAO_FLUXO_VENDAS_FINANCEIRO_20260228-133245.md`, `docs/features/evidencias/REGRESSAO_FLUXO_VENDAS_FINANCEIRO_20260228-133245.md`, `docs/features/evidencias/AP301_HOMOLOGACAO_ASSISTIDA_20260228-133245.md`, `docs/features/RELATORIO_HOMOLOGACAO_FLUXO_VENDAS_FINANCEIRO_20260228-133245.md` e `docs/features/CHECKLIST_SIGNOFF_FLUXO_VENDAS_FINANCEIRO_2026-03.md`.
+  - Status atual: concluido com rodada inicial em 2026-02-28 (`RUN 20260228-133245`) e rodada complementar em 2026-03-05 (`RUN 20260305-085018`), ambas com `HOMO-001` PASS + `HOMO-002` PASS; evidencias em `docs/features/evidencias/HOMOLOGACAO_FLUXO_VENDAS_FINANCEIRO_20260305-085018.md`, `docs/features/evidencias/REGRESSAO_FLUXO_VENDAS_FINANCEIRO_20260305-085018.md`, `docs/features/evidencias/AP301_HOMOLOGACAO_ASSISTIDA_20260305-085018.md` e `docs/features/CHECKLIST_SIGNOFF_FLUXO_VENDAS_FINANCEIRO_2026-03.md`.
 - [x] Consolidar backlog de melhorias finais do fluxo integrado (cancelamento/estorno, sincronizacao bidirecional de status e governanca operacional).
   - Responsavel sugerido: Produto + Tech Lead + Financeiro
   - Prazo: 2026-03-07
@@ -501,7 +501,7 @@ Observacao de status (2026-03-02): os gaps do baseline acima foram tratados dura
   - Responsavel sugerido: Operacoes + Tech Lead
   - Prazo: primeiro ciclo apos publicacao em producao
   - Evidencia de conclusao: relatorio de monitoramento gerado em `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_<runId>.md`.
-  - Status atual: dry-run tecnico concluido em 2026-02-28 (`RunId 20260228-144233`) e dry-run complementar concluido em 2026-03-01 (`RunId 20260301-232945`) com evidencias em `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260228-144233.md`, `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260228-144233.csv`, `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260301-232945.md` e `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260301-232945.csv`; aguardando execucao da janela real de 48h em ambiente de go-live.
+  - Status atual: dry-runs concluidos em 2026-02-28 (`RunId 20260228-144233`), 2026-03-01 (`RunId 20260301-232945`) e 2026-03-05 (`RunId 20260305-083633`, sem anomalias apos calibracao de limiar). Rodada com token em 2026-03-05 (`RunId 20260305-085356`) detectou `ALERTAS_CRITICAL_OPEN`, com triagem AP304 aplicada e validacao limpa em seguida (`RunId 20260305-085454`, evidencia em `docs/features/evidencias/AP304_TRIAGEM_ALERTAS_CRITICOS_LOCAL_20260305-085454.md`). Aguardando apenas execucao da janela real de 48h em ambiente de go-live.
 - [ ] Registrar decisao final de operacao (GO tecnico/negocio) apos janela de 48h.
   - Responsavel sugerido: Responsavel unico do projeto
   - Prazo: D+2 do go-live monitorado

@@ -18,6 +18,7 @@ Padronizar a janela de monitoramento de 48h apos go-live para os fluxos Sprint 1
 
 - `-BaseUrl`: URL do backend monitorado.
 - `-IntervalSeconds`: intervalo de coleta (recomendado: `300`).
+- `-MonitorExpectedIntervalSeconds`: intervalo esperado do job de monitor de alertas (default: usa `IntervalSeconds`).
 - `-DurationHours`: duracao alvo (padrao: `48`).
 - `-EmpresaId` + `-BearerToken`: habilita coleta da fila de alertas operacionais.
 - `-MaxCycles`: util para dry-run tecnico sem esperar 48h.
@@ -29,6 +30,8 @@ Padronizar a janela de monitoramento de 48h apos go-live para os fluxos Sprint 1
 ```powershell
 npm run monitor:go-live:vendas-financeiro
 ```
+
+Nota: no dry-run local (coleta a cada 10s), manter `MonitorExpectedIntervalSeconds=300` para evitar falso positivo de `MONITOR_STALE_CYCLE` quando o job roda em janela maior.
 
 ### 4.2 Janela real de 48h (com fila de excecoes)
 
@@ -42,6 +45,7 @@ Para ambiente remoto e coleta completa da fila de alertas, usar execucao direta 
 powershell -ExecutionPolicy Bypass -File scripts/monitor-pos-go-live-vendas-financeiro.ps1 `
   -BaseUrl "https://api.seu-ambiente.com" `
   -IntervalSeconds 300 `
+  -MonitorExpectedIntervalSeconds 300 `
   -DurationHours 48 `
   -EmpresaId "<empresa-id>" `
   -BearerToken "<jwt-operacional>"
@@ -73,4 +77,7 @@ powershell -ExecutionPolicy Bypass -File scripts/monitor-pos-go-live-vendas-fina
 - Guia e automacao publicados em 2026-02-28.
 - Dry-run tecnico executado em 2026-02-28 (`RunId 20260228-144233`) com coleta concluida e evidencias em `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260228-144233.md` e `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260228-144233.csv`.
 - Dry-run tecnico complementar executado em 2026-03-01 (`RunId 20260301-232945`) com health/metrics sem falhas e 2 anomalias `MONITOR_STALE_CYCLE` (idade do ciclo acima do limite), registradas para triagem no go-live real.
+- Dry-run tecnico recalibrado executado em 2026-03-05 (`RunId 20260305-083633`) com `MonitorExpectedIntervalSeconds=300`, sem anomalias detectadas:
+  - `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260305-083633.md`
+  - `docs/features/evidencias/MONITORAMENTO_POS_GO_LIVE_48H_20260305-083633.csv`
 - Janela real de 48h: pendente da data efetiva de go-live no ambiente alvo.
