@@ -17,7 +17,6 @@ import {
   Globe,
   PackageOpen,
   Target,
-  MessageSquare,
   Home,
   ListChecks,
 } from 'lucide-react';
@@ -126,16 +125,6 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
         description: 'Visualiza??o Kanban do funil de oportunidades com drag-and-drop entre etapas.',
         badge: 'Novo',
         badgeColor: 'blue',
-      },
-      {
-        id: 'interacoes',
-        name: 'Intera??es',
-        description: 'Hist?rico completo de intera??es, chamadas, e-mails e reuni?es.',
-        href: '/interacoes',
-        icon: MessageSquare,
-        status: 'coming_soon',
-        badge: 'Em Breve',
-        badgeColor: 'yellow',
       },
       {
         id: 'agenda',

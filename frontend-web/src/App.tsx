@@ -59,7 +59,6 @@ const ClientesPage = React.lazy(() => import('./features/clientes/ClientesPage')
 const ClienteDetailPage = React.lazy(() => import('./features/clientes/ClienteDetailPage'));
 const ContatosPage = React.lazy(() => import('./features/contatos/ContatosPage'));
 const LeadsPage = React.lazy(() => import('./pages/LeadsPage'));
-const InteracoesPage = React.lazy(() => import('./pages/InteracoesPage'));
 
 const DashboardRouter = React.lazy(() => import('./features/dashboard/DashboardRouter'));
 const DashboardHomeRoute = React.lazy(() => import('./features/dashboard/DashboardHomeRoute'));
@@ -670,7 +669,7 @@ const AppRoutes: React.FC = () => {
                   />
                   <Route
                     path="/interacoes"
-                    element={protegerRota(ModuloEnum.CRM, <InteracoesPage />)}
+                    element={<Navigate to="/pipeline" replace />}
                   />
                   <Route
                     path="/pipeline"
@@ -784,7 +783,7 @@ const AppRoutes: React.FC = () => {
                   <Route path="/crm/leads" element={protegerRota(ModuloEnum.CRM, <LeadsPage />)} />
                   <Route
                     path="/crm/interacoes"
-                    element={protegerRota(ModuloEnum.CRM, <InteracoesPage />)}
+                    element={<Navigate to="/crm/pipeline" replace />}
                   />
                   <Route
                     path="/crm/pipeline"
