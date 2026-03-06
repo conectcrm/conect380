@@ -6,7 +6,6 @@ import { join, extname, resolve, relative, normalize, isAbsolute, basename } fro
 import { randomUUID } from 'crypto';
 import type { Express } from 'express';
 import axios from 'axios';
-import { parseBuffer } from 'music-metadata';
 import ffmpeg = require('fluent-ffmpeg');
 import ffmpegStatic = require('ffmpeg-static');
 import {
@@ -26,6 +25,10 @@ const resolvedFfmpegPath =
   typeof ffmpegStatic === 'string' ? ffmpegStatic : (ffmpegStatic as { path?: string })?.path;
 
 const logger = new Logger('MensagemService');
+const importMusicMetadata = new Function(
+  'specifier',
+  'return import(specifier);',
+) as (specifier: string) => Promise<typeof import('music-metadata')>;
 
 if (resolvedFfmpegPath) {
   ffmpeg.setFfmpegPath(resolvedFfmpegPath);
@@ -70,6 +73,17 @@ export interface AtualizarStatusMensagemDto {
 export class MensagemService {
   private readonly logger = new Logger(MensagemService.name);
   private readonly uploadsDir = join(process.cwd(), 'uploads', 'atendimento');
+
+  private async parseMediaMetadata(
+    buffer: Buffer,
+    mimeType: string,
+  ): Promise<Awaited<ReturnType<typeof import('music-metadata')['parseBuffer']>>> {
+    const { parseBuffer } = await importMusicMetadata('music-metadata');
+    return parseBuffer(buffer, {
+      mimeType,
+      size: buffer.length,
+    });
+  }
 
   constructor(
     @InjectRepository(Mensagem)
@@ -261,11 +275,7 @@ export class MensagemService {
 
       let duracaoExtraida: number | undefined;
       try {
-        const metadata = await parseBuffer(responseBuffer, {
-          mimeType,
-          size: responseBuffer.length,
-        });
-
+        const metadata = await this.parseMediaMetadata(responseBuffer, mimeType);
         const duracao = metadata?.format?.duration;
 
         if (typeof duracao === 'number' && Number.isFinite(duracao) && duracao > 0) {
