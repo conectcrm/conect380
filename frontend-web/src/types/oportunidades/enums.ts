@@ -48,3 +48,20 @@ export enum MotivoPerda {
   SEM_RESPOSTA = 'SEM_RESPOSTA',
   OUTRO = 'OUTRO',
 }
+
+export enum LifecycleStatusOportunidade {
+  OPEN = 'open',
+  WON = 'won',
+  LOST = 'lost',
+  ARCHIVED = 'archived',
+  DELETED = 'deleted',
+}
+
+export enum LifecycleViewOportunidade {
+  OPEN = 'open',
+  CLOSED = 'closed',
+  ARCHIVED = 'archived',
+  DELETED = 'deleted',
+  ALL_ACTIVE = 'all_active',
+  ALL = 'all',
+}
