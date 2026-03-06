@@ -66,18 +66,27 @@ npm run sync:apply
 Gerar status de saude local/remoto:
 ```bash
 npm run branch:health:prune
+npm run branch:remote-health:prune
 ```
 
 Criticos comuns:
 - `UPSTREAM_GONE`: branch local aponta para remoto removido.
 - `BehindMain` muito alto: branch defasada com risco de conflito massivo.
 - `AgeDays` alto: branch stale com alto risco de regressao na reconciliacao.
+- `DELETE_SAFE`: branch remota sem branch local e sem diferenca util contra a `main`.
+- `REVIEW`: branch remota com commits proprios ainda fora da `main`.
 
 Acao recomendada para branch critica:
 1. Nao fazer merge direto.
 2. Criar branch limpa de `origin/main`.
 3. Reaplicar somente commits necessarios.
 4. Validar router/menu/telas antes de push.
+
+## Higiene remota (rotina semanal)
+1. Rodar `npm run branch:remote-health:prune`.
+2. Remover primeiro tudo que vier como `DELETE_SAFE`.
+3. Revisar itens `REVIEW` olhando PR, branch local associada e utilidade funcional.
+4. Nao deletar `dependabot/*` sem checar se o PR correspondente esta aberto ou fechado.
 
 ## Checklist rapido antes de push
 1. Router principal sem rotas de exemplo/legado reintroduzidas.
