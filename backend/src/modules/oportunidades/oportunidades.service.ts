@@ -1,16 +1,26 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Oportunidade, EstagioOportunidade } from './oportunidade.entity';
+import {
+  Oportunidade,
+  EstagioOportunidade,
+  LifecycleStatusOportunidade,
+} from './oportunidade.entity';
 import { Atividade, TipoAtividade } from './atividade.entity';
 import { OportunidadeStageEvent } from './oportunidade-stage-event.entity';
 import { DashboardV2JobsService } from '../dashboard-v2/dashboard-v2.jobs.service';
 import {
   CreateOportunidadeDto,
+  LifecycleTransitionDto,
+  LifecycleViewOportunidade,
+  MetricasQueryDto,
+  OportunidadesListQueryDto,
   UpdateOportunidadeDto,
   UpdateEstagioDto,
 } from './dto/oportunidade.dto';
 import { CreateAtividadeDto } from './dto/atividade.dto';
+import { FeatureFlagTenant } from '../dashboard-v2/entities/feature-flag-tenant.entity';
+import { createHash } from 'crypto';
 
 const ALL_OPORTUNIDADE_STAGES = new Set<string>([
   EstagioOportunidade.LEADS,
@@ -21,6 +31,154 @@ const ALL_OPORTUNIDADE_STAGES = new Set<string>([
   EstagioOportunidade.GANHO,
   EstagioOportunidade.PERDIDO,
 ]);
+
+const MODERN_DB_STAGE_VALUES = new Set<string>([
+  'leads',
+  'qualification',
+  'proposal',
+  'negotiation',
+  'closing',
+  'won',
+  'lost',
+]);
+
+const LEGACY_DB_STAGE_VALUES = new Set<string>([
+  'lead',
+  'qualificado',
+  'proposta',
+  'negociacao',
+  'ganho',
+  'perdido',
+]);
+
+const OPORTUNIDADES_LIFECYCLE_FLAG_KEY = 'crm_oportunidades_lifecycle_v1';
+const OPORTUNIDADES_STALE_POLICY_FLAG_KEY = 'crm_oportunidades_stale_policy_v1';
+const OPORTUNIDADES_STALE_AUTO_ARCHIVE_FLAG_KEY = 'crm_oportunidades_stale_auto_archive_v1';
+const STALE_DEFAULT_THRESHOLD_DAYS = 30;
+const STALE_DEFAULT_AUTO_ARCHIVE_DAYS = 60;
+const STALE_MIN_DAYS = 7;
+const STALE_MAX_DAYS = 365;
+const STALE_DEFAULT_SCAN_LIMIT = 300;
+const ALL_OPORTUNIDADE_LIFECYCLE_STATUSES = new Set<string>([
+  LifecycleStatusOportunidade.OPEN,
+  LifecycleStatusOportunidade.WON,
+  LifecycleStatusOportunidade.LOST,
+  LifecycleStatusOportunidade.ARCHIVED,
+  LifecycleStatusOportunidade.DELETED,
+]);
+
+export const OPORTUNIDADE_LIFECYCLE_TRANSITIONS: Record<
+  LifecycleStatusOportunidade,
+  readonly LifecycleStatusOportunidade[]
+> = {
+  [LifecycleStatusOportunidade.OPEN]: [
+    LifecycleStatusOportunidade.WON,
+    LifecycleStatusOportunidade.LOST,
+    LifecycleStatusOportunidade.ARCHIVED,
+    LifecycleStatusOportunidade.DELETED,
+  ],
+  [LifecycleStatusOportunidade.WON]: [
+    LifecycleStatusOportunidade.OPEN,
+    LifecycleStatusOportunidade.ARCHIVED,
+    LifecycleStatusOportunidade.DELETED,
+  ],
+  [LifecycleStatusOportunidade.LOST]: [
+    LifecycleStatusOportunidade.OPEN,
+    LifecycleStatusOportunidade.ARCHIVED,
+    LifecycleStatusOportunidade.DELETED,
+  ],
+  [LifecycleStatusOportunidade.ARCHIVED]: [
+    LifecycleStatusOportunidade.OPEN,
+    LifecycleStatusOportunidade.WON,
+    LifecycleStatusOportunidade.LOST,
+    LifecycleStatusOportunidade.DELETED,
+  ],
+  [LifecycleStatusOportunidade.DELETED]: [
+    LifecycleStatusOportunidade.OPEN,
+    LifecycleStatusOportunidade.WON,
+    LifecycleStatusOportunidade.LOST,
+    LifecycleStatusOportunidade.ARCHIVED,
+  ],
+};
+
+type LifecycleFlagDecision = {
+  enabled: boolean;
+  source: 'disabled' | 'enabled' | 'rollout';
+  rolloutPercentage: number;
+};
+
+type TenantFlagSource = 'tenant' | 'default';
+
+type StalePolicyDecision = {
+  enabled: boolean;
+  thresholdDays: number;
+  source: TenantFlagSource;
+  autoArchiveEnabled: boolean;
+  autoArchiveAfterDays: number;
+  autoArchiveSource: TenantFlagSource;
+};
+
+type StaleOpportunitySnapshot = {
+  id: string;
+  oportunidade: Oportunidade;
+  isStale: boolean;
+  staleDays: number;
+  lastInteractionAt: string | null;
+  staleSince: string | null;
+};
+
+type StaleCheckResult = {
+  enabled: boolean;
+  thresholdDays: number;
+  totalCandidates: number;
+  totalStale: number;
+  generatedAt: string;
+  stale: Oportunidade[];
+};
+
+type AutoArchiveResult = {
+  enabled: boolean;
+  autoArchiveEnabled: boolean;
+  thresholdDays: number;
+  totalCandidates: number;
+  archivedCount: number;
+  dryRun: boolean;
+  trigger: 'manual' | 'scheduler';
+  archivedIds: string[];
+  failed: Array<{ id: string; reason: string }>;
+  generatedAt: string;
+};
+
+function normalizeLifecycleRuleInput(
+  lifecycleStatus?: LifecycleStatusOportunidade | string | null,
+): LifecycleStatusOportunidade | null {
+  const normalized = (lifecycleStatus || '').toString().trim().toLowerCase();
+  if (!normalized) return null;
+
+  switch (normalized) {
+    case 'open':
+    case 'aberta':
+    case 'aberto':
+      return LifecycleStatusOportunidade.OPEN;
+    case 'won':
+    case 'ganho':
+      return LifecycleStatusOportunidade.WON;
+    case 'lost':
+    case 'perdido':
+      return LifecycleStatusOportunidade.LOST;
+    case 'archived':
+    case 'arquivado':
+      return LifecycleStatusOportunidade.ARCHIVED;
+    case 'deleted':
+    case 'deletado':
+    case 'excluido':
+      return LifecycleStatusOportunidade.DELETED;
+    default:
+      return ALL_OPORTUNIDADE_LIFECYCLE_STATUSES.has(normalized)
+        ? (normalized as LifecycleStatusOportunidade)
+        : null;
+  }
+}
 
 function normalizeStageRuleInput(
   stage?: EstagioOportunidade | string | null,
@@ -113,6 +271,68 @@ export function isOportunidadeStageTransitionAllowed(
   return getAllowedNextOportunidadeStages(current).includes(next);
 }
 
+export function getAllowedNextOportunidadeLifecycleStatuses(
+  currentLifecycleStatus?: LifecycleStatusOportunidade | string | null,
+): readonly LifecycleStatusOportunidade[] {
+  const normalized = normalizeLifecycleRuleInput(currentLifecycleStatus);
+  if (!normalized) return [];
+  return OPORTUNIDADE_LIFECYCLE_TRANSITIONS[normalized] || [];
+}
+
+export function isOportunidadeLifecycleTransitionAllowed(
+  currentLifecycleStatus?: LifecycleStatusOportunidade | string | null,
+  nextLifecycleStatus?: LifecycleStatusOportunidade | string | null,
+): boolean {
+  const current = normalizeLifecycleRuleInput(currentLifecycleStatus);
+  const next = normalizeLifecycleRuleInput(nextLifecycleStatus);
+  if (!current || !next) return false;
+  if (current === next) return true;
+  return getAllowedNextOportunidadeLifecycleStatuses(current).includes(next);
+}
+
+export function normalizeStaleThresholdDays(
+  value: unknown,
+  fallback = STALE_DEFAULT_THRESHOLD_DAYS,
+): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return Math.min(Math.max(Math.floor(fallback), STALE_MIN_DAYS), STALE_MAX_DAYS);
+  }
+
+  return Math.min(Math.max(Math.floor(numeric), STALE_MIN_DAYS), STALE_MAX_DAYS);
+}
+
+export function calculateStaleDays(
+  lastInteractionAt?: Date | string | null,
+  referenceDate: Date = new Date(),
+): number {
+  if (!lastInteractionAt) {
+    return 0;
+  }
+
+  const resolved =
+    lastInteractionAt instanceof Date ? lastInteractionAt : new Date(lastInteractionAt);
+  if (Number.isNaN(resolved.getTime())) {
+    return 0;
+  }
+
+  const diffMs = referenceDate.getTime() - resolved.getTime();
+  if (diffMs <= 0) {
+    return 0;
+  }
+
+  return Math.floor(diffMs / (24 * 60 * 60 * 1000));
+}
+
+export function isOportunidadeStale(
+  lastInteractionAt: Date | string | null | undefined,
+  thresholdDays: number,
+  referenceDate: Date = new Date(),
+): boolean {
+  const safeThreshold = normalizeStaleThresholdDays(thresholdDays);
+  return calculateStaleDays(lastInteractionAt, referenceDate) >= safeThreshold;
+}
+
 type OportunidadeActivitiesRange = {
   start: Date;
   end: Date;
@@ -164,11 +384,35 @@ type OportunidadeHistoricoEstagioItem = {
   };
 };
 
+type TableColumnMetadata = {
+  columnName: string;
+  dataType: string;
+  udtName: string;
+};
+
+type OportunidadeLifecycleFilters = {
+  lifecycle_status?: LifecycleStatusOportunidade;
+  lifecycle_view?: LifecycleViewOportunidade;
+  include_deleted?: boolean | string;
+};
+
+type OportunidadeFindFilters = {
+  id?: string;
+  estagio?: EstagioOportunidade;
+  responsavel_id?: string;
+  cliente_id?: string;
+  dataInicio?: string;
+  dataFim?: string;
+} & OportunidadeLifecycleFilters;
+
 @Injectable()
 export class OportunidadesService {
   private readonly logger = new Logger(OportunidadesService.name);
   private tableColumnsCache = new Map<string, Set<string>>();
+  private tableColumnMetadataCache = new Map<string, Map<string, TableColumnMetadata>>();
+  private enumValuesCache = new Map<string, Set<string>>();
   private stageEventsTableAvailable?: boolean;
+  private featureFlagsTableAvailable?: boolean;
 
   private readonly canonicalStageOrder: EstagioOportunidade[] = [
     EstagioOportunidade.LEADS,
@@ -191,6 +435,8 @@ export class OportunidadesService {
     private atividadeRepository: Repository<Atividade>,
     @InjectRepository(OportunidadeStageEvent)
     private stageEventRepository: Repository<OportunidadeStageEvent>,
+    @InjectRepository(FeatureFlagTenant)
+    private readonly featureFlagRepository: Repository<FeatureFlagTenant>,
     @Optional()
     private readonly dashboardV2JobsService?: DashboardV2JobsService,
   ) {}
@@ -212,6 +458,23 @@ export class OportunidadesService {
     }
 
     return [];
+  }
+
+  private parseBooleanFlag(value: unknown): boolean {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+
+    if (typeof value === 'number') {
+      return value === 1;
+    }
+
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'sim';
+    }
+
+    return false;
   }
 
   private parseDateInput(value?: string | null): Date | null {
@@ -244,6 +507,31 @@ export class OportunidadesService {
 
     const parsed = new Date(trimmed);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  private parseDateValue(value: unknown): Date | null {
+    if (!value) {
+      return null;
+    }
+
+    const resolved = value instanceof Date ? value : new Date(value as any);
+    return Number.isNaN(resolved.getTime()) ? null : resolved;
+  }
+
+  private getMostRecentDate(values: Array<Date | null | undefined>): Date | null {
+    let latest: Date | null = null;
+
+    for (const value of values) {
+      if (!value) {
+        continue;
+      }
+
+      if (!latest || value.getTime() > latest.getTime()) {
+        latest = value;
+      }
+    }
+
+    return latest;
   }
 
   private resolveActivitiesRange(periodStart?: string, periodEnd?: string): OportunidadeActivitiesRange {
@@ -310,10 +598,108 @@ export class OportunidadesService {
     return columns;
   }
 
+  private async getTableColumnMetadata(
+    tableName: string,
+    columnName: string,
+  ): Promise<TableColumnMetadata | null> {
+    if (!this.tableColumnMetadataCache.has(tableName)) {
+      const rows = await this.oportunidadeRepository.query(
+        `
+          SELECT column_name, data_type, udt_name
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = $1
+        `,
+        [tableName],
+      );
+
+      const metadataMap = new Map<string, TableColumnMetadata>();
+      rows.forEach((row: { column_name?: string; data_type?: string; udt_name?: string }) => {
+        const currentColumn = row.column_name?.toString();
+        if (!currentColumn) return;
+        metadataMap.set(currentColumn, {
+          columnName: currentColumn,
+          dataType: (row.data_type || '').toString(),
+          udtName: (row.udt_name || '').toString(),
+        });
+      });
+
+      this.tableColumnMetadataCache.set(tableName, metadataMap);
+    }
+
+    return this.tableColumnMetadataCache.get(tableName)?.get(columnName) ?? null;
+  }
+
+  private async getEnumValues(enumTypeName: string): Promise<Set<string>> {
+    if (this.enumValuesCache.has(enumTypeName)) {
+      return this.enumValuesCache.get(enumTypeName)!;
+    }
+
+    const rows = await this.oportunidadeRepository.query(
+      `
+        SELECT e.enumlabel
+        FROM pg_type t
+        INNER JOIN pg_namespace n ON n.oid = t.typnamespace
+        INNER JOIN pg_enum e ON e.enumtypid = t.oid
+        WHERE n.nspname = 'public'
+          AND t.typname = $1
+        ORDER BY e.enumsortorder
+      `,
+      [enumTypeName],
+    );
+
+    const values = new Set<string>(
+      rows
+        .map((row: { enumlabel?: string }) => row.enumlabel?.toString().toLowerCase())
+        .filter((value: string | undefined): value is string => Boolean(value)),
+    );
+
+    this.enumValuesCache.set(enumTypeName, values);
+    return values;
+  }
+
+  private async resolveDatabaseEstagioMode(columns: Set<string>): Promise<'legacy' | 'modern'> {
+    if (!columns.has('estagio')) {
+      return columns.has('responsavel_id') && !columns.has('usuario_id') ? 'modern' : 'legacy';
+    }
+
+    const estagioMetadata = await this.getTableColumnMetadata('oportunidades', 'estagio');
+    const isUserDefined =
+      estagioMetadata?.dataType?.toLowerCase() === 'user-defined' &&
+      Boolean(estagioMetadata?.udtName);
+
+    if (isUserDefined) {
+      const enumValues = await this.getEnumValues(estagioMetadata!.udtName);
+      const hasModernValues = Array.from(MODERN_DB_STAGE_VALUES).some((value) =>
+        enumValues.has(value),
+      );
+      if (hasModernValues) {
+        return 'modern';
+      }
+
+      const hasLegacyValues = Array.from(LEGACY_DB_STAGE_VALUES).some((value) =>
+        enumValues.has(value),
+      );
+      return hasLegacyValues ? 'legacy' : 'modern';
+    }
+
+    return columns.has('responsavel_id') && !columns.has('usuario_id') ? 'modern' : 'legacy';
+  }
+
   private async resolveOportunidadesSchema() {
     const columns = await this.getTableColumns('oportunidades');
 
-    const responsavelColumn = columns.has('usuario_id') ? 'usuario_id' : 'responsavel_id';
+    const responsavelColumn = columns.has('responsavel_id')
+      ? 'responsavel_id'
+      : columns.has('usuario_id')
+        ? 'usuario_id'
+        : 'responsavel_id';
+    const responsavelMirrorColumn =
+      responsavelColumn === 'responsavel_id' && columns.has('usuario_id')
+        ? 'usuario_id'
+        : responsavelColumn === 'usuario_id' && columns.has('responsavel_id')
+          ? 'responsavel_id'
+          : null;
     const dataFechamentoEsperadoColumn = columns.has('data_fechamento_prevista')
       ? 'data_fechamento_prevista'
       : columns.has('dataFechamentoEsperado')
@@ -326,16 +712,58 @@ export class OportunidadesService {
         : null;
     const createdAtColumn = columns.has('createdAt') ? 'createdAt' : 'criado_em';
     const updatedAtColumn = columns.has('updatedAt') ? 'updatedAt' : 'atualizado_em';
-    const estagioMode: 'legacy' | 'modern' =
-      responsavelColumn === 'responsavel_id' ? 'modern' : 'legacy';
+    const lifecycleStatusColumn = columns.has('lifecycle_status')
+      ? 'lifecycle_status'
+      : columns.has('lifecycleStatus')
+        ? 'lifecycleStatus'
+        : null;
+    const archivedAtColumn = columns.has('archived_at')
+      ? 'archived_at'
+      : columns.has('archivedAt')
+        ? 'archivedAt'
+        : null;
+    const archivedByColumn = columns.has('archived_by')
+      ? 'archived_by'
+      : columns.has('archivedBy')
+        ? 'archivedBy'
+        : null;
+    const deletedAtColumn = columns.has('deleted_at')
+      ? 'deleted_at'
+      : columns.has('deletedAt')
+        ? 'deletedAt'
+        : null;
+    const deletedByColumn = columns.has('deleted_by')
+      ? 'deleted_by'
+      : columns.has('deletedBy')
+        ? 'deletedBy'
+        : null;
+    const reopenedAtColumn = columns.has('reopened_at')
+      ? 'reopened_at'
+      : columns.has('reopenedAt')
+        ? 'reopenedAt'
+        : null;
+    const reopenedByColumn = columns.has('reopened_by')
+      ? 'reopened_by'
+      : columns.has('reopenedBy')
+        ? 'reopenedBy'
+        : null;
+    const estagioMode = await this.resolveDatabaseEstagioMode(columns);
 
     return {
       columns,
       responsavelColumn,
+      responsavelMirrorColumn,
       dataFechamentoEsperadoColumn,
       dataFechamentoRealColumn,
       createdAtColumn,
       updatedAtColumn,
+      lifecycleStatusColumn,
+      archivedAtColumn,
+      archivedByColumn,
+      deletedAtColumn,
+      deletedByColumn,
+      reopenedAtColumn,
+      reopenedByColumn,
       estagioMode,
     };
   }
@@ -442,6 +870,206 @@ export class OportunidadesService {
       default:
         return EstagioOportunidade.LEADS;
     }
+  }
+
+  private resolveLifecycleFromStage(
+    estagio?: EstagioOportunidade | string | null,
+  ): LifecycleStatusOportunidade {
+    const normalizedStage = this.fromDatabaseEstagio(estagio || undefined);
+
+    if (normalizedStage === EstagioOportunidade.GANHO) {
+      return LifecycleStatusOportunidade.WON;
+    }
+
+    if (normalizedStage === EstagioOportunidade.PERDIDO) {
+      return LifecycleStatusOportunidade.LOST;
+    }
+
+    return LifecycleStatusOportunidade.OPEN;
+  }
+
+  private fromDatabaseLifecycleStatus(
+    lifecycleStatus?: LifecycleStatusOportunidade | string | null,
+    estagioFallback?: EstagioOportunidade | string | null,
+  ): LifecycleStatusOportunidade {
+    const normalized = normalizeLifecycleRuleInput(lifecycleStatus);
+    if (normalized) {
+      return normalized;
+    }
+
+    return this.resolveLifecycleFromStage(estagioFallback);
+  }
+
+  private getLifecycleStatusesByView(
+    lifecycleView?: LifecycleViewOportunidade | string | null,
+  ): LifecycleStatusOportunidade[] | null {
+    const normalized = (lifecycleView || '').toString().trim().toLowerCase();
+    switch (normalized) {
+      case LifecycleViewOportunidade.OPEN:
+        return [LifecycleStatusOportunidade.OPEN];
+      case LifecycleViewOportunidade.CLOSED:
+        return [LifecycleStatusOportunidade.WON, LifecycleStatusOportunidade.LOST];
+      case LifecycleViewOportunidade.ARCHIVED:
+        return [LifecycleStatusOportunidade.ARCHIVED];
+      case LifecycleViewOportunidade.DELETED:
+        return [LifecycleStatusOportunidade.DELETED];
+      case LifecycleViewOportunidade.ALL_ACTIVE:
+        return [
+          LifecycleStatusOportunidade.OPEN,
+          LifecycleStatusOportunidade.WON,
+          LifecycleStatusOportunidade.LOST,
+          LifecycleStatusOportunidade.ARCHIVED,
+        ];
+      case LifecycleViewOportunidade.ALL:
+        return [
+          LifecycleStatusOportunidade.OPEN,
+          LifecycleStatusOportunidade.WON,
+          LifecycleStatusOportunidade.LOST,
+          LifecycleStatusOportunidade.ARCHIVED,
+          LifecycleStatusOportunidade.DELETED,
+        ];
+      default:
+        return null;
+    }
+  }
+
+  private resolveLifecycleStatusFilterValues(
+    filters?: OportunidadeLifecycleFilters,
+  ): LifecycleStatusOportunidade[] {
+    const normalizedStatus = normalizeLifecycleRuleInput(filters?.lifecycle_status);
+    if (normalizedStatus) {
+      return [normalizedStatus];
+    }
+
+    const byView = this.getLifecycleStatusesByView(filters?.lifecycle_view);
+    if (byView?.length) {
+      return byView;
+    }
+
+    if (this.parseBooleanFlag(filters?.include_deleted)) {
+      return [
+        LifecycleStatusOportunidade.OPEN,
+        LifecycleStatusOportunidade.WON,
+        LifecycleStatusOportunidade.LOST,
+        LifecycleStatusOportunidade.ARCHIVED,
+        LifecycleStatusOportunidade.DELETED,
+      ];
+    }
+
+    return [
+      LifecycleStatusOportunidade.OPEN,
+      LifecycleStatusOportunidade.WON,
+      LifecycleStatusOportunidade.LOST,
+      LifecycleStatusOportunidade.ARCHIVED,
+    ];
+  }
+
+  private buildLifecycleFromStageExpression(estagioExpression: string): string {
+    return `
+      CASE lower(coalesce(${estagioExpression}::text, ''))
+        WHEN 'ganho' THEN 'won'
+        WHEN 'won' THEN 'won'
+        WHEN 'perdido' THEN 'lost'
+        WHEN 'lost' THEN 'lost'
+        ELSE 'open'
+      END
+    `;
+  }
+
+  private getBucketByTenantId(empresaId: string): number {
+    const digest = createHash('md5').update(empresaId).digest('hex');
+    const intValue = Number.parseInt(digest.slice(0, 8), 16);
+    return intValue % 100;
+  }
+
+  private async isFeatureFlagsTableAvailable(): Promise<boolean> {
+    if (this.featureFlagsTableAvailable !== undefined) {
+      return this.featureFlagsTableAvailable;
+    }
+
+    const columns = await this.getTableColumns('feature_flags_tenant');
+    this.featureFlagsTableAvailable =
+      columns.has('empresa_id') &&
+      columns.has('flag_key') &&
+      columns.has('enabled') &&
+      columns.has('rollout_percentage');
+
+    return this.featureFlagsTableAvailable;
+  }
+
+  private async resolveLifecycleFeatureFlagDecision(
+    empresaId: string,
+  ): Promise<LifecycleFlagDecision> {
+    if (!(await this.isFeatureFlagsTableAvailable())) {
+      return {
+        enabled: false,
+        source: 'disabled',
+        rolloutPercentage: 0,
+      };
+    }
+
+    try {
+      const flag = await this.featureFlagRepository.findOne({
+        where: {
+          empresa_id: empresaId,
+          flag_key: OPORTUNIDADES_LIFECYCLE_FLAG_KEY,
+        },
+      });
+
+      if (!flag) {
+        return {
+          enabled: false,
+          source: 'disabled',
+          rolloutPercentage: 0,
+        };
+      }
+
+      if (flag.enabled) {
+        return {
+          enabled: true,
+          source: 'enabled',
+          rolloutPercentage: Number(flag.rollout_percentage || 0),
+        };
+      }
+
+      const rolloutPercentage = Math.max(0, Math.min(100, Number(flag.rollout_percentage || 0)));
+      if (rolloutPercentage <= 0) {
+        return {
+          enabled: false,
+          source: 'disabled',
+          rolloutPercentage,
+        };
+      }
+
+      const enabled = this.getBucketByTenantId(empresaId) < rolloutPercentage;
+      return {
+        enabled,
+        source: enabled ? 'rollout' : 'disabled',
+        rolloutPercentage,
+      };
+    } catch (error: any) {
+      this.logger.warn(
+        `Falha ao resolver feature flag ${OPORTUNIDADES_LIFECYCLE_FLAG_KEY}: ${error?.message || error}`,
+      );
+
+      return {
+        enabled: false,
+        source: 'disabled',
+        rolloutPercentage: 0,
+      };
+    }
+  }
+
+  private async isLifecycleEnabledForTenant(params: {
+    empresaId: string;
+    schema: Awaited<ReturnType<OportunidadesService['resolveOportunidadesSchema']>>;
+  }): Promise<boolean> {
+    if (!params.schema.lifecycleStatusColumn) {
+      return false;
+    }
+
+    const featureFlag = await this.resolveLifecycleFeatureFlagDecision(params.empresaId);
+    return featureFlag.enabled;
   }
 
   private normalizeOportunidade(oportunidade: Oportunidade): Oportunidade {
@@ -598,6 +1226,14 @@ export class OportunidadesService {
     empresaId: string,
   ): Promise<Oportunidade> {
     const schema = await this.resolveOportunidadesSchema();
+    const lifecycleEnabled = await this.isLifecycleEnabledForTenant({ empresaId, schema });
+
+    if (lifecycleEnabled && this.isTerminalStage(createOportunidadeDto.estagio)) {
+      throw new BadRequestException(
+        'Nao e permitido criar oportunidade diretamente em estagio terminal (ganho/perdido) com ciclo de vida habilitado.',
+      );
+    }
+
     const columns: string[] = [
       'titulo',
       'descricao',
@@ -618,6 +1254,17 @@ export class OportunidadesService {
       createOportunidadeDto.responsavel_id,
       createOportunidadeDto.cliente_id ?? null,
     ];
+
+    // Compatibilidade com schemas hibridos que mantem usuario_id e responsavel_id.
+    if (schema.responsavelMirrorColumn) {
+      columns.push(schema.responsavelMirrorColumn);
+      values.push(createOportunidadeDto.responsavel_id);
+    }
+
+    if (schema.lifecycleStatusColumn) {
+      columns.push(schema.lifecycleStatusColumn);
+      values.push(this.resolveLifecycleFromStage(createOportunidadeDto.estagio));
+    }
 
     if (schema.dataFechamentoEsperadoColumn) {
       columns.push(schema.dataFechamentoEsperadoColumn);
@@ -697,19 +1344,10 @@ export class OportunidadesService {
     return this.findOne(savedOportunidadeId, empresaId);
   }
 
-  async findAll(
-    empresaId: string,
-    filters?: {
-      id?: string;
-      estagio?: EstagioOportunidade;
-      responsavel_id?: string;
-      cliente_id?: string;
-      dataInicio?: string;
-      dataFim?: string;
-    },
-  ): Promise<Oportunidade[]> {
+  async findAll(empresaId: string, filters?: OportunidadeFindFilters): Promise<Oportunidade[]> {
     const schema = await this.resolveOportunidadesSchema();
     const usersColumns = await this.getTableColumns('users');
+    const lifecycleEnabled = await this.isLifecycleEnabledForTenant({ empresaId, schema });
     const responsavelRef = `oportunidade.${this.quoteIdentifier(schema.responsavelColumn)}`;
     const createdAtRef = `oportunidade.${this.quoteIdentifier(schema.createdAtColumn)}`;
     const updatedAtRef = `oportunidade.${this.quoteIdentifier(schema.updatedAtColumn)}`;
@@ -743,6 +1381,27 @@ export class OportunidadesService {
     const empresaContatoExpr = schema.columns.has('empresaContato')
       ? `oportunidade.${this.quoteIdentifier('empresaContato')}`
       : 'NULL';
+    const lifecycleStatusExpr = schema.lifecycleStatusColumn
+      ? `oportunidade.${this.quoteIdentifier(schema.lifecycleStatusColumn)}`
+      : this.buildLifecycleFromStageExpression('oportunidade.estagio');
+    const archivedAtExpr = schema.archivedAtColumn
+      ? `oportunidade.${this.quoteIdentifier(schema.archivedAtColumn)}`
+      : 'NULL';
+    const archivedByExpr = schema.archivedByColumn
+      ? `oportunidade.${this.quoteIdentifier(schema.archivedByColumn)}`
+      : 'NULL';
+    const deletedAtExpr = schema.deletedAtColumn
+      ? `oportunidade.${this.quoteIdentifier(schema.deletedAtColumn)}`
+      : 'NULL';
+    const deletedByExpr = schema.deletedByColumn
+      ? `oportunidade.${this.quoteIdentifier(schema.deletedByColumn)}`
+      : 'NULL';
+    const reopenedAtExpr = schema.reopenedAtColumn
+      ? `oportunidade.${this.quoteIdentifier(schema.reopenedAtColumn)}`
+      : 'NULL';
+    const reopenedByExpr = schema.reopenedByColumn
+      ? `oportunidade.${this.quoteIdentifier(schema.reopenedByColumn)}`
+      : 'NULL';
 
     const queryBuilder = this.oportunidadeRepository
       .createQueryBuilder('oportunidade')
@@ -768,6 +1427,13 @@ export class OportunidadesService {
       .addSelect(emailContatoExpr, 'emailContato')
       .addSelect(telefoneContatoExpr, 'telefoneContato')
       .addSelect(empresaContatoExpr, 'empresaContato')
+      .addSelect(lifecycleStatusExpr, 'lifecycle_status')
+      .addSelect(archivedAtExpr, 'archived_at')
+      .addSelect(archivedByExpr, 'archived_by')
+      .addSelect(deletedAtExpr, 'deleted_at')
+      .addSelect(deletedByExpr, 'deleted_by')
+      .addSelect(reopenedAtExpr, 'reopened_at')
+      .addSelect(reopenedByExpr, 'reopened_by')
       .addSelect('responsavel.id', 'responsavel__id')
       .addSelect('responsavel.nome', 'responsavel__nome')
       .addSelect('responsavel.email', 'responsavel__email')
@@ -808,6 +1474,19 @@ export class OportunidadesService {
       });
     }
 
+    if (lifecycleEnabled && schema.lifecycleStatusColumn) {
+      const lifecycleStatuses = this.resolveLifecycleStatusFilterValues(filters);
+      if (lifecycleStatuses.length > 0) {
+        queryBuilder.andWhere(`${lifecycleStatusExpr}::text IN (:...lifecycleStatuses)`, {
+          lifecycleStatuses,
+        });
+      }
+    } else if (schema.lifecycleStatusColumn && !this.parseBooleanFlag(filters?.include_deleted)) {
+      queryBuilder.andWhere(`${lifecycleStatusExpr}::text <> :deletedLifecycle`, {
+        deletedLifecycle: LifecycleStatusOportunidade.DELETED,
+      });
+    }
+
     const oportunidades = await queryBuilder.getRawMany();
 
     return oportunidades.map((item) => ({
@@ -823,6 +1502,13 @@ export class OportunidadesService {
       tags: this.parseSimpleArray(item.tags),
       dataFechamentoEsperado: item.dataFechamentoEsperado ?? null,
       dataFechamentoReal: item.dataFechamentoReal ?? null,
+      lifecycle_status: this.fromDatabaseLifecycleStatus(item.lifecycle_status, item.estagio),
+      archived_at: item.archived_at ?? null,
+      archived_by: item.archived_by ?? null,
+      deleted_at: item.deleted_at ?? null,
+      deleted_by: item.deleted_by ?? null,
+      reopened_at: item.reopened_at ?? null,
+      reopened_by: item.reopened_by ?? null,
       responsavel_id: item.responsavel_id?.toString?.() ?? item.responsavel_id,
       cliente_id: item.cliente_id,
       responsavel: item.responsavel__id
@@ -851,12 +1537,22 @@ export class OportunidadesService {
     })) as Oportunidade[];
   }
 
-  async findOne(id: string, empresaId?: string): Promise<Oportunidade> {
+  async findOne(
+    id: string,
+    empresaId?: string,
+    options?: { include_deleted?: boolean },
+  ): Promise<Oportunidade> {
     if (!empresaId) {
       throw new NotFoundException('Oportunidade nao encontrada');
     }
 
-    const [oportunidade] = await this.findAll(empresaId, { id });
+    const [oportunidade] = await this.findAll(empresaId, {
+      id,
+      lifecycle_view: options?.include_deleted
+        ? LifecycleViewOportunidade.ALL
+        : LifecycleViewOportunidade.ALL_ACTIVE,
+      include_deleted: Boolean(options?.include_deleted),
+    });
 
     if (!oportunidade) {
       throw new NotFoundException('Oportunidade nao encontrada');
@@ -872,8 +1568,31 @@ export class OportunidadesService {
     actorUserId?: string,
   ): Promise<Oportunidade> {
     const schema = await this.resolveOportunidadesSchema();
+    const lifecycleEnabled = await this.isLifecycleEnabledForTenant({ empresaId, schema });
     const oportunidade = await this.findOne(id, empresaId);
     const estagioAnterior = oportunidade.estagio;
+    const currentLifecycle = this.fromDatabaseLifecycleStatus(
+      (oportunidade as any).lifecycle_status,
+      oportunidade.estagio,
+    );
+
+    if (
+      lifecycleEnabled &&
+      updateOportunidadeDto.estagio !== undefined &&
+      updateOportunidadeDto.estagio !== estagioAnterior
+    ) {
+      if (currentLifecycle === LifecycleStatusOportunidade.DELETED) {
+        throw new BadRequestException(
+          'Oportunidade excluida logicamente. Restaure antes de alterar o estagio.',
+        );
+      }
+
+      if (currentLifecycle === LifecycleStatusOportunidade.ARCHIVED) {
+        throw new BadRequestException(
+          'Oportunidade arquivada. Restaure antes de alterar o estagio.',
+        );
+      }
+    }
 
     const updateData: Record<string, unknown> = {};
 
@@ -914,10 +1633,23 @@ export class OportunidadesService {
         nextStage,
         schema.estagioMode,
       );
+
+      if (schema.lifecycleStatusColumn) {
+        if (nextStage === EstagioOportunidade.GANHO) {
+          updateData[schema.lifecycleStatusColumn] = LifecycleStatusOportunidade.WON;
+        } else if (nextStage === EstagioOportunidade.PERDIDO) {
+          updateData[schema.lifecycleStatusColumn] = LifecycleStatusOportunidade.LOST;
+        } else {
+          updateData[schema.lifecycleStatusColumn] = LifecycleStatusOportunidade.OPEN;
+        }
+      }
     }
 
     if (updateOportunidadeDto.responsavel_id !== undefined) {
       updateData[schema.responsavelColumn] = updateOportunidadeDto.responsavel_id;
+      if (schema.responsavelMirrorColumn) {
+        updateData[schema.responsavelMirrorColumn] = updateOportunidadeDto.responsavel_id;
+      }
     }
 
     if (updateOportunidadeDto.cliente_id !== undefined) {
@@ -1013,9 +1745,26 @@ export class OportunidadesService {
     actorUserId?: string,
   ): Promise<Oportunidade> {
     const schema = await this.resolveOportunidadesSchema();
+    const lifecycleEnabled = await this.isLifecycleEnabledForTenant({ empresaId, schema });
     const oportunidade = await this.findOne(id, empresaId);
     const currentStage = oportunidade.estagio;
     const nextStage = updateEstagioDto.estagio;
+    const currentLifecycle = this.fromDatabaseLifecycleStatus(
+      (oportunidade as any).lifecycle_status,
+      oportunidade.estagio,
+    );
+
+    if (lifecycleEnabled && currentLifecycle === LifecycleStatusOportunidade.DELETED) {
+      throw new BadRequestException(
+        'Oportunidade excluida logicamente. Restaure antes de alterar o estagio.',
+      );
+    }
+
+    if (lifecycleEnabled && currentLifecycle === LifecycleStatusOportunidade.ARCHIVED) {
+      throw new BadRequestException(
+        'Oportunidade arquivada. Restaure antes de alterar o estagio.',
+      );
+    }
 
     if (currentStage === nextStage) {
       return oportunidade;
@@ -1037,6 +1786,16 @@ export class OportunidadesService {
     const updatePayload: Record<string, unknown> = {
       estagio: this.toDatabaseEstagio(nextStage, schema.estagioMode),
     };
+
+    if (schema.lifecycleStatusColumn) {
+      if (nextStage === EstagioOportunidade.GANHO) {
+        updatePayload[schema.lifecycleStatusColumn] = LifecycleStatusOportunidade.WON;
+      } else if (nextStage === EstagioOportunidade.PERDIDO) {
+        updatePayload[schema.lifecycleStatusColumn] = LifecycleStatusOportunidade.LOST;
+      } else if (currentLifecycle !== LifecycleStatusOportunidade.OPEN) {
+        updatePayload[schema.lifecycleStatusColumn] = LifecycleStatusOportunidade.OPEN;
+      }
+    }
 
     if (schema.dataFechamentoRealColumn) {
       if (updateEstagioDto.dataFechamentoReal) {
@@ -1110,7 +1869,589 @@ export class OportunidadesService {
     return this.findOne(id, empresaId);
   }
 
-  async remove(id: string, empresaId: string): Promise<void> {
+  async getLifecycleFeatureFlag(empresaId: string): Promise<LifecycleFlagDecision> {
+    return this.resolveLifecycleFeatureFlagDecision(empresaId);
+  }
+
+  async setLifecycleFeatureFlag(input: {
+    empresaId: string;
+    enabled: boolean;
+    rolloutPercentage?: number;
+    updatedBy?: string | null;
+  }): Promise<LifecycleFlagDecision> {
+    if (!(await this.isFeatureFlagsTableAvailable())) {
+      throw new BadRequestException(
+        'Tabela de feature flags indisponivel. Execute as migrations antes de configurar a flag.',
+      );
+    }
+
+    const rolloutPercentage = Math.max(0, Math.min(100, Number(input.rolloutPercentage || 0)));
+
+    await this.featureFlagRepository
+      .createQueryBuilder()
+      .insert()
+      .into(FeatureFlagTenant)
+      .values({
+        empresa_id: input.empresaId,
+        flag_key: OPORTUNIDADES_LIFECYCLE_FLAG_KEY,
+        enabled: input.enabled,
+        rollout_percentage: rolloutPercentage,
+        updated_by: input.updatedBy || null,
+        updated_at: new Date(),
+      })
+      .orUpdate(
+        ['enabled', 'rollout_percentage', 'updated_by', 'updated_at'],
+        ['empresa_id', 'flag_key'],
+      )
+      .execute();
+
+    return this.resolveLifecycleFeatureFlagDecision(input.empresaId);
+  }
+
+  private getDefaultStalePolicyEnabled(): boolean {
+    return this.parseBooleanFlag(process.env.OPORTUNIDADES_STALE_POLICY_ENABLED);
+  }
+
+  private getDefaultAutoArchiveEnabled(): boolean {
+    return this.parseBooleanFlag(process.env.OPORTUNIDADES_STALE_AUTO_ARCHIVE_ENABLED);
+  }
+
+  private getDefaultStaleThresholdDays(): number {
+    return normalizeStaleThresholdDays(
+      process.env.OPORTUNIDADES_STALE_DEFAULT_DAYS,
+      STALE_DEFAULT_THRESHOLD_DAYS,
+    );
+  }
+
+  private getDefaultAutoArchiveAfterDays(minimumThresholdDays: number): number {
+    const resolved = normalizeStaleThresholdDays(
+      process.env.OPORTUNIDADES_STALE_AUTO_ARCHIVE_AFTER_DAYS,
+      STALE_DEFAULT_AUTO_ARCHIVE_DAYS,
+    );
+    return Math.max(resolved, minimumThresholdDays);
+  }
+
+  private normalizeStaleQueryLimit(limit?: number): number {
+    const parsed = Number(limit ?? STALE_DEFAULT_SCAN_LIMIT);
+    if (!Number.isFinite(parsed)) {
+      return STALE_DEFAULT_SCAN_LIMIT;
+    }
+
+    return Math.min(Math.max(Math.floor(parsed), 1), 2000);
+  }
+
+  private getAutoArchiveBatchLimit(limit?: number): number {
+    const envBatchLimit = Number(
+      process.env.OPORTUNIDADES_STALE_AUTO_ARCHIVE_BATCH_SIZE || STALE_DEFAULT_SCAN_LIMIT,
+    );
+    const fallback = Number.isFinite(envBatchLimit) ? envBatchLimit : STALE_DEFAULT_SCAN_LIMIT;
+    return this.normalizeStaleQueryLimit(limit ?? fallback);
+  }
+
+  private async resolveTenantFlagConfig(empresaId: string, flagKey: string): Promise<{
+    source: TenantFlagSource;
+    enabled: boolean;
+    numericValue: number | null;
+  }> {
+    if (!(await this.isFeatureFlagsTableAvailable())) {
+      return {
+        source: 'default',
+        enabled: false,
+        numericValue: null,
+      };
+    }
+
+    try {
+      const flag = await this.featureFlagRepository.findOne({
+        where: {
+          empresa_id: empresaId,
+          flag_key: flagKey,
+        },
+      });
+
+      if (!flag) {
+        return {
+          source: 'default',
+          enabled: false,
+          numericValue: null,
+        };
+      }
+
+      return {
+        source: 'tenant',
+        enabled: Boolean(flag.enabled),
+        numericValue: Number.isFinite(Number(flag.rollout_percentage))
+          ? Number(flag.rollout_percentage)
+          : null,
+      };
+    } catch (error: any) {
+      this.logger.warn(
+        `Falha ao resolver configuracao de flag ${flagKey}: ${error?.message || error}`,
+      );
+      return {
+        source: 'default',
+        enabled: false,
+        numericValue: null,
+      };
+    }
+  }
+
+  private async upsertTenantFlagConfig(input: {
+    empresaId: string;
+    flagKey: string;
+    enabled: boolean;
+    numericValue: number;
+    updatedBy?: string | null;
+  }): Promise<void> {
+    await this.featureFlagRepository
+      .createQueryBuilder()
+      .insert()
+      .into(FeatureFlagTenant)
+      .values({
+        empresa_id: input.empresaId,
+        flag_key: input.flagKey,
+        enabled: input.enabled,
+        rollout_percentage: Math.max(0, Math.floor(Number(input.numericValue) || 0)),
+        updated_by: input.updatedBy || null,
+        updated_at: new Date(),
+      })
+      .orUpdate(
+        ['enabled', 'rollout_percentage', 'updated_by', 'updated_at'],
+        ['empresa_id', 'flag_key'],
+      )
+      .execute();
+  }
+
+  async getStalePolicy(empresaId: string): Promise<StalePolicyDecision> {
+    const defaultThresholdDays = this.getDefaultStaleThresholdDays();
+    const defaultEnabled = this.getDefaultStalePolicyEnabled();
+    const defaultAutoArchiveEnabled = this.getDefaultAutoArchiveEnabled();
+    const defaultAutoArchiveAfterDays = this.getDefaultAutoArchiveAfterDays(defaultThresholdDays);
+
+    const [staleFlag, autoArchiveFlag] = await Promise.all([
+      this.resolveTenantFlagConfig(empresaId, OPORTUNIDADES_STALE_POLICY_FLAG_KEY),
+      this.resolveTenantFlagConfig(empresaId, OPORTUNIDADES_STALE_AUTO_ARCHIVE_FLAG_KEY),
+    ]);
+
+    const thresholdDays =
+      staleFlag.source === 'tenant'
+        ? normalizeStaleThresholdDays(staleFlag.numericValue, defaultThresholdDays)
+        : defaultThresholdDays;
+
+    const autoArchiveAfterDaysRaw =
+      autoArchiveFlag.source === 'tenant'
+        ? normalizeStaleThresholdDays(autoArchiveFlag.numericValue, defaultAutoArchiveAfterDays)
+        : defaultAutoArchiveAfterDays;
+
+    return {
+      enabled: staleFlag.source === 'tenant' ? staleFlag.enabled : defaultEnabled,
+      thresholdDays,
+      source: staleFlag.source,
+      autoArchiveEnabled:
+        autoArchiveFlag.source === 'tenant' ? autoArchiveFlag.enabled : defaultAutoArchiveEnabled,
+      autoArchiveAfterDays: Math.max(autoArchiveAfterDaysRaw, thresholdDays),
+      autoArchiveSource: autoArchiveFlag.source,
+    };
+  }
+
+  async setStalePolicy(input: {
+    empresaId: string;
+    enabled?: boolean;
+    thresholdDays?: number;
+    autoArchiveEnabled?: boolean;
+    autoArchiveAfterDays?: number;
+    updatedBy?: string | null;
+  }): Promise<StalePolicyDecision> {
+    if (!(await this.isFeatureFlagsTableAvailable())) {
+      throw new BadRequestException(
+        'Tabela de feature flags indisponivel. Execute as migrations antes de configurar a politica stale.',
+      );
+    }
+
+    const currentPolicy = await this.getStalePolicy(input.empresaId);
+    const enabled = input.enabled ?? currentPolicy.enabled;
+    const thresholdDays = normalizeStaleThresholdDays(
+      input.thresholdDays,
+      currentPolicy.thresholdDays,
+    );
+    const autoArchiveEnabled = input.autoArchiveEnabled ?? currentPolicy.autoArchiveEnabled;
+    const autoArchiveAfterDays = Math.max(
+      normalizeStaleThresholdDays(input.autoArchiveAfterDays, currentPolicy.autoArchiveAfterDays),
+      thresholdDays,
+    );
+
+    await Promise.all([
+      this.upsertTenantFlagConfig({
+        empresaId: input.empresaId,
+        flagKey: OPORTUNIDADES_STALE_POLICY_FLAG_KEY,
+        enabled,
+        numericValue: thresholdDays,
+        updatedBy: input.updatedBy || null,
+      }),
+      this.upsertTenantFlagConfig({
+        empresaId: input.empresaId,
+        flagKey: OPORTUNIDADES_STALE_AUTO_ARCHIVE_FLAG_KEY,
+        enabled: autoArchiveEnabled,
+        numericValue: autoArchiveAfterDays,
+        updatedBy: input.updatedBy || null,
+      }),
+    ]);
+
+    return this.getStalePolicy(input.empresaId);
+  }
+
+  private async resolveOpenCandidatesForStale(input: {
+    empresaId: string;
+    lifecycleEnabled: boolean;
+  }): Promise<Oportunidade[]> {
+    const lifecycleFilters: OportunidadeFindFilters | undefined = input.lifecycleEnabled
+      ? {
+          lifecycle_view: LifecycleViewOportunidade.OPEN,
+        }
+      : undefined;
+
+    const oportunidades = await this.findAll(input.empresaId, lifecycleFilters);
+    if (input.lifecycleEnabled) {
+      return oportunidades.filter((oportunidade) => {
+        const lifecycleStatus = this.fromDatabaseLifecycleStatus(
+          (oportunidade as any).lifecycle_status,
+          oportunidade.estagio,
+        );
+        return lifecycleStatus === LifecycleStatusOportunidade.OPEN;
+      });
+    }
+
+    return oportunidades.filter((oportunidade) => !this.isTerminalStage(oportunidade.estagio));
+  }
+
+  private async loadLatestActivityByOportunidade(
+    empresaId: string,
+    oportunidadeIds: string[],
+  ): Promise<Map<string, Date>> {
+    const results = new Map<string, Date>();
+    if (!oportunidadeIds.length) {
+      return results;
+    }
+
+    const atividadeSchema = await this.resolveAtividadesSchema();
+    const dateExpression = `MAX(atividade.${this.quoteIdentifier(atividadeSchema.dateColumn)})`;
+
+    const rows = await this.atividadeRepository
+      .createQueryBuilder('atividade')
+      .select('atividade.oportunidade_id::text', 'oportunidade_id')
+      .addSelect(dateExpression, 'last_activity_at')
+      .where('atividade.empresa_id = :empresaId', { empresaId })
+      .andWhere('atividade.oportunidade_id::text IN (:...oportunidadeIds)', { oportunidadeIds })
+      .groupBy('atividade.oportunidade_id')
+      .getRawMany<{ oportunidade_id?: string; last_activity_at?: string | Date | null }>();
+
+    rows.forEach((row) => {
+      if (!row.oportunidade_id) {
+        return;
+      }
+
+      const parsed = this.parseDateValue(row.last_activity_at);
+      if (parsed) {
+        results.set(row.oportunidade_id, parsed);
+      }
+    });
+
+    return results;
+  }
+
+  private async loadLatestStageEventByOportunidade(
+    empresaId: string,
+    oportunidadeIds: string[],
+  ): Promise<Map<string, Date>> {
+    const results = new Map<string, Date>();
+    if (!oportunidadeIds.length) {
+      return results;
+    }
+
+    if (!(await this.isStageEventsTableAvailable())) {
+      return results;
+    }
+
+    const stageEventColumns = await this.getTableColumns('oportunidade_stage_events');
+    const changedAtColumn = stageEventColumns.has('changed_at')
+      ? 'changed_at'
+      : stageEventColumns.has('created_at')
+        ? 'created_at'
+        : null;
+
+    if (!changedAtColumn) {
+      return results;
+    }
+
+    const rows = await this.stageEventRepository
+      .createQueryBuilder('evento')
+      .select('evento.oportunidade_id::text', 'oportunidade_id')
+      .addSelect(`MAX(evento.${this.quoteIdentifier(changedAtColumn)})`, 'last_stage_event_at')
+      .where('evento.empresa_id = :empresaId', { empresaId })
+      .andWhere('evento.oportunidade_id::text IN (:...oportunidadeIds)', { oportunidadeIds })
+      .groupBy('evento.oportunidade_id')
+      .getRawMany<{ oportunidade_id?: string; last_stage_event_at?: string | Date | null }>();
+
+    rows.forEach((row) => {
+      if (!row.oportunidade_id) {
+        return;
+      }
+
+      const parsed = this.parseDateValue(row.last_stage_event_at);
+      if (parsed) {
+        results.set(row.oportunidade_id, parsed);
+      }
+    });
+
+    return results;
+  }
+
+  private applyStaleSnapshot(snapshot: StaleOpportunitySnapshot): Oportunidade {
+    return {
+      ...snapshot.oportunidade,
+      is_stale: snapshot.isStale,
+      stale_days: snapshot.staleDays,
+      last_interaction_at: snapshot.lastInteractionAt,
+      stale_since: snapshot.staleSince,
+    } as Oportunidade;
+  }
+
+  private async buildStaleSnapshots(
+    empresaId: string,
+    oportunidades: Oportunidade[],
+    thresholdDays: number,
+    referenceDate: Date = new Date(),
+  ): Promise<StaleOpportunitySnapshot[]> {
+    if (!oportunidades.length) {
+      return [];
+    }
+
+    const oportunidadeIds = oportunidades.map((oportunidade) => String(oportunidade.id));
+    const [activityMap, stageEventMap] = await Promise.all([
+      this.loadLatestActivityByOportunidade(empresaId, oportunidadeIds),
+      this.loadLatestStageEventByOportunidade(empresaId, oportunidadeIds),
+    ]);
+
+    return oportunidades.map((oportunidade) => {
+      const oportunidadeId = String(oportunidade.id);
+      const interactionDate = this.getMostRecentDate([
+        this.parseDateValue((oportunidade as any).updatedAt || oportunidade.updatedAt),
+        this.parseDateValue((oportunidade as any).createdAt || oportunidade.createdAt),
+        activityMap.get(oportunidadeId),
+        stageEventMap.get(oportunidadeId),
+      ]);
+      const staleDays = calculateStaleDays(interactionDate, referenceDate);
+      const isStaleDeal = staleDays >= thresholdDays;
+      const staleSince =
+        isStaleDeal && interactionDate
+          ? new Date(interactionDate.getTime() + thresholdDays * 24 * 60 * 60 * 1000)
+          : null;
+
+      return {
+        id: oportunidadeId,
+        oportunidade,
+        isStale: isStaleDeal,
+        staleDays,
+        lastInteractionAt: interactionDate ? interactionDate.toISOString() : null,
+        staleSince: staleSince ? staleSince.toISOString() : null,
+      };
+    });
+  }
+
+  async listarOportunidadesParadas(
+    empresaId: string,
+    options?: {
+      thresholdDays?: number;
+      limit?: number;
+    },
+  ): Promise<StaleCheckResult> {
+    const schema = await this.resolveOportunidadesSchema();
+    const lifecycleEnabled = await this.isLifecycleEnabledForTenant({ empresaId, schema });
+    const policy = await this.getStalePolicy(empresaId);
+    const thresholdDays = normalizeStaleThresholdDays(options?.thresholdDays, policy.thresholdDays);
+    const limit = this.normalizeStaleQueryLimit(options?.limit);
+    const candidates = await this.resolveOpenCandidatesForStale({
+      empresaId,
+      lifecycleEnabled,
+    });
+    const snapshots = await this.buildStaleSnapshots(empresaId, candidates, thresholdDays);
+    const staleSnapshots = snapshots
+      .filter((snapshot) => snapshot.isStale)
+      .sort((left, right) => {
+        if (right.staleDays !== left.staleDays) {
+          return right.staleDays - left.staleDays;
+        }
+        return right.id.localeCompare(left.id);
+      });
+
+    return {
+      enabled: policy.enabled,
+      thresholdDays,
+      totalCandidates: candidates.length,
+      totalStale: staleSnapshots.length,
+      generatedAt: new Date().toISOString(),
+      stale: staleSnapshots.slice(0, limit).map((snapshot) => this.applyStaleSnapshot(snapshot)),
+    };
+  }
+
+  async processarAutoArquivamentoStale(
+    empresaId: string,
+    options?: {
+      dryRun?: boolean;
+      trigger?: 'manual' | 'scheduler';
+      limit?: number;
+    },
+  ): Promise<AutoArchiveResult> {
+    const trigger = options?.trigger === 'manual' ? 'manual' : 'scheduler';
+    const dryRun = Boolean(options?.dryRun);
+    const policy = await this.getStalePolicy(empresaId);
+    const schema = await this.resolveOportunidadesSchema();
+    const lifecycleEnabled = await this.isLifecycleEnabledForTenant({ empresaId, schema });
+    const featureEnabled = lifecycleEnabled && policy.enabled;
+    const autoArchiveEnabled = featureEnabled && policy.autoArchiveEnabled;
+
+    if (!autoArchiveEnabled) {
+      return {
+        enabled: featureEnabled,
+        autoArchiveEnabled,
+        thresholdDays: policy.autoArchiveAfterDays,
+        totalCandidates: 0,
+        archivedCount: 0,
+        dryRun,
+        trigger,
+        archivedIds: [],
+        failed: [],
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const batchLimit = this.getAutoArchiveBatchLimit(options?.limit);
+    const staleResult = await this.listarOportunidadesParadas(empresaId, {
+      thresholdDays: policy.autoArchiveAfterDays,
+      limit: batchLimit,
+    });
+    const candidates = staleResult.stale.slice(0, batchLimit);
+    const archivedIds: string[] = [];
+    const failed: Array<{ id: string; reason: string }> = [];
+
+    if (dryRun) {
+      return {
+        enabled: featureEnabled,
+        autoArchiveEnabled,
+        thresholdDays: policy.autoArchiveAfterDays,
+        totalCandidates: candidates.length,
+        archivedCount: 0,
+        dryRun,
+        trigger,
+        archivedIds: candidates.map((oportunidade) => String(oportunidade.id)),
+        failed,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    for (const oportunidade of candidates) {
+      const oportunidadeId = String(oportunidade.id);
+      try {
+        await this.arquivar(oportunidadeId, empresaId, undefined, {
+          motivo: 'Auto-arquivamento por inatividade',
+          comentario: `Arquivada automaticamente (${trigger}) apos ${policy.autoArchiveAfterDays} dias sem interacao relevante.`,
+        });
+        archivedIds.push(oportunidadeId);
+      } catch (error: any) {
+        failed.push({
+          id: oportunidadeId,
+          reason: error?.message || 'Falha ao arquivar oportunidade automaticamente.',
+        });
+      }
+    }
+
+    return {
+      enabled: featureEnabled,
+      autoArchiveEnabled,
+      thresholdDays: policy.autoArchiveAfterDays,
+      totalCandidates: candidates.length,
+      archivedCount: archivedIds.length,
+      dryRun,
+      trigger,
+      archivedIds,
+      failed,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  async remove(id: string, empresaId: string, actorUserId?: string): Promise<void> {
+    const schema = await this.resolveOportunidadesSchema();
+    const lifecycleEnabled = await this.isLifecycleEnabledForTenant({ empresaId, schema });
+
+    if (!lifecycleEnabled || !schema.lifecycleStatusColumn) {
+      await this.oportunidadeRepository
+        .createQueryBuilder()
+        .delete()
+        .from('oportunidades')
+        .where('id::text = :id', { id })
+        .andWhere('empresa_id = :empresaId', { empresaId })
+        .execute();
+      return;
+    }
+
+    const oportunidade = await this.findOne(id, empresaId, { include_deleted: true });
+    const currentLifecycle = this.fromDatabaseLifecycleStatus(
+      (oportunidade as any).lifecycle_status,
+      oportunidade.estagio,
+    );
+
+    if (currentLifecycle === LifecycleStatusOportunidade.DELETED) {
+      return;
+    }
+
+    if (
+      !isOportunidadeLifecycleTransitionAllowed(
+        currentLifecycle,
+        LifecycleStatusOportunidade.DELETED,
+      )
+    ) {
+      const allowed = getAllowedNextOportunidadeLifecycleStatuses(currentLifecycle);
+      throw new BadRequestException(
+        `Transicao de lifecycle invalida: ${currentLifecycle} -> deleted. Permitidos: ${allowed.join(', ') || 'nenhum'}`,
+      );
+    }
+
+    const now = new Date();
+    const updatePayload: Record<string, unknown> = {
+      [schema.lifecycleStatusColumn]: LifecycleStatusOportunidade.DELETED,
+    };
+
+    if (schema.deletedAtColumn) {
+      updatePayload[schema.deletedAtColumn] = now;
+    }
+    if (schema.deletedByColumn) {
+      updatePayload[schema.deletedByColumn] = actorUserId || null;
+    }
+
+    await this.createAtividade(
+      {
+        tipo: TipoAtividade.NOTA,
+        descricao: 'Oportunidade movida para lixeira',
+        oportunidade_id: id,
+      },
+      {
+        userId: actorUserId ?? oportunidade.responsavel_id,
+        empresaId,
+      },
+    );
+
+    await this.oportunidadeRepository
+      .createQueryBuilder()
+      .update('oportunidades')
+      .set(updatePayload as any)
+      .where('id::text = :id', { id })
+      .andWhere('empresa_id = :empresaId', { empresaId })
+      .execute();
+  }
+
+  async removePermanente(id: string, empresaId: string, _actorUserId?: string): Promise<void> {
+    await this.findOne(id, empresaId, { include_deleted: true });
+
     await this.oportunidadeRepository
       .createQueryBuilder()
       .delete()
@@ -1118,6 +2459,268 @@ export class OportunidadesService {
       .where('id::text = :id', { id })
       .andWhere('empresa_id = :empresaId', { empresaId })
       .execute();
+  }
+
+  async arquivar(
+    id: string,
+    empresaId: string,
+    actorUserId?: string,
+    payload?: LifecycleTransitionDto,
+  ): Promise<Oportunidade> {
+    const schema = await this.resolveOportunidadesSchema();
+    const lifecycleEnabled = await this.isLifecycleEnabledForTenant({ empresaId, schema });
+    if (!lifecycleEnabled || !schema.lifecycleStatusColumn) {
+      throw new BadRequestException(
+        'Ciclo de vida desabilitado para esta empresa. Acao de arquivamento indisponivel.',
+      );
+    }
+
+    const oportunidade = await this.findOne(id, empresaId, { include_deleted: true });
+    const currentLifecycle = this.fromDatabaseLifecycleStatus(
+      (oportunidade as any).lifecycle_status,
+      oportunidade.estagio,
+    );
+
+    if (currentLifecycle === LifecycleStatusOportunidade.DELETED) {
+      throw new BadRequestException('Oportunidade na lixeira. Restaure antes de arquivar.');
+    }
+
+    if (currentLifecycle === LifecycleStatusOportunidade.ARCHIVED) {
+      return oportunidade;
+    }
+
+    if (
+      !isOportunidadeLifecycleTransitionAllowed(
+        currentLifecycle,
+        LifecycleStatusOportunidade.ARCHIVED,
+      )
+    ) {
+      const allowed = getAllowedNextOportunidadeLifecycleStatuses(currentLifecycle);
+      throw new BadRequestException(
+        `Transicao de lifecycle invalida: ${currentLifecycle} -> archived. Permitidos: ${allowed.join(', ') || 'nenhum'}`,
+      );
+    }
+
+    const now = new Date();
+    const updatePayload: Record<string, unknown> = {
+      [schema.lifecycleStatusColumn]: LifecycleStatusOportunidade.ARCHIVED,
+    };
+
+    if (schema.archivedAtColumn) {
+      updatePayload[schema.archivedAtColumn] = now;
+    }
+    if (schema.archivedByColumn) {
+      updatePayload[schema.archivedByColumn] = actorUserId || null;
+    }
+
+    await this.oportunidadeRepository
+      .createQueryBuilder()
+      .update('oportunidades')
+      .set(updatePayload as any)
+      .where('id::text = :id', { id })
+      .andWhere('empresa_id = :empresaId', { empresaId })
+      .execute();
+
+    const notaPartes = ['Oportunidade arquivada'];
+    if (payload?.motivo?.trim()) {
+      notaPartes.push(`Motivo: ${payload.motivo.trim()}`);
+    }
+    if (payload?.comentario?.trim()) {
+      notaPartes.push(`Detalhes: ${payload.comentario.trim()}`);
+    }
+
+    await this.createAtividade(
+      {
+        tipo: TipoAtividade.NOTA,
+        descricao: notaPartes.join('\n'),
+        oportunidade_id: id,
+      },
+      {
+        userId: actorUserId ?? oportunidade.responsavel_id,
+        empresaId,
+      },
+    );
+
+    return this.findOne(id, empresaId, { include_deleted: true });
+  }
+
+  async restaurar(
+    id: string,
+    empresaId: string,
+    actorUserId?: string,
+    payload?: LifecycleTransitionDto,
+  ): Promise<Oportunidade> {
+    const schema = await this.resolveOportunidadesSchema();
+    const lifecycleEnabled = await this.isLifecycleEnabledForTenant({ empresaId, schema });
+    if (!lifecycleEnabled || !schema.lifecycleStatusColumn) {
+      throw new BadRequestException(
+        'Ciclo de vida desabilitado para esta empresa. Acao de restauracao indisponivel.',
+      );
+    }
+
+    const oportunidade = await this.findOne(id, empresaId, { include_deleted: true });
+    const currentLifecycle = this.fromDatabaseLifecycleStatus(
+      (oportunidade as any).lifecycle_status,
+      oportunidade.estagio,
+    );
+
+    if (
+      currentLifecycle !== LifecycleStatusOportunidade.ARCHIVED &&
+      currentLifecycle !== LifecycleStatusOportunidade.DELETED
+    ) {
+      return oportunidade;
+    }
+
+    const restoredLifecycle = this.resolveLifecycleFromStage(oportunidade.estagio);
+    const updatePayload: Record<string, unknown> = {
+      [schema.lifecycleStatusColumn]: restoredLifecycle,
+    };
+
+    if (schema.archivedAtColumn) {
+      updatePayload[schema.archivedAtColumn] = null;
+    }
+    if (schema.archivedByColumn) {
+      updatePayload[schema.archivedByColumn] = null;
+    }
+    if (schema.deletedAtColumn) {
+      updatePayload[schema.deletedAtColumn] = null;
+    }
+    if (schema.deletedByColumn) {
+      updatePayload[schema.deletedByColumn] = null;
+    }
+
+    await this.oportunidadeRepository
+      .createQueryBuilder()
+      .update('oportunidades')
+      .set(updatePayload as any)
+      .where('id::text = :id', { id })
+      .andWhere('empresa_id = :empresaId', { empresaId })
+      .execute();
+
+    const notaPartes = ['Oportunidade restaurada para fluxo ativo'];
+    if (payload?.motivo?.trim()) {
+      notaPartes.push(`Motivo: ${payload.motivo.trim()}`);
+    }
+    if (payload?.comentario?.trim()) {
+      notaPartes.push(`Detalhes: ${payload.comentario.trim()}`);
+    }
+
+    await this.createAtividade(
+      {
+        tipo: TipoAtividade.NOTA,
+        descricao: notaPartes.join('\n'),
+        oportunidade_id: id,
+      },
+      {
+        userId: actorUserId ?? oportunidade.responsavel_id,
+        empresaId,
+      },
+    );
+
+    return this.findOne(id, empresaId, { include_deleted: true });
+  }
+
+  async reabrir(
+    id: string,
+    empresaId: string,
+    actorUserId?: string,
+    payload?: LifecycleTransitionDto,
+  ): Promise<Oportunidade> {
+    const schema = await this.resolveOportunidadesSchema();
+    const lifecycleEnabled = await this.isLifecycleEnabledForTenant({ empresaId, schema });
+    const oportunidade = await this.findOne(id, empresaId, { include_deleted: true });
+    const currentLifecycle = this.fromDatabaseLifecycleStatus(
+      (oportunidade as any).lifecycle_status,
+      oportunidade.estagio,
+    );
+
+    if (currentLifecycle === LifecycleStatusOportunidade.DELETED) {
+      throw new BadRequestException('Oportunidade na lixeira. Restaure antes de reabrir.');
+    }
+
+    if (currentLifecycle === LifecycleStatusOportunidade.ARCHIVED) {
+      throw new BadRequestException('Oportunidade arquivada. Restaure antes de reabrir.');
+    }
+
+    if (
+      oportunidade.estagio !== EstagioOportunidade.GANHO &&
+      oportunidade.estagio !== EstagioOportunidade.PERDIDO
+    ) {
+      throw new BadRequestException('Apenas oportunidades ganhas ou perdidas podem ser reabertas.');
+    }
+
+    const reopenedStage = EstagioOportunidade.FECHAMENTO;
+    const updatePayload: Record<string, unknown> = {
+      estagio: this.toDatabaseEstagio(reopenedStage, schema.estagioMode),
+    };
+
+    if (schema.lifecycleStatusColumn && lifecycleEnabled) {
+      updatePayload[schema.lifecycleStatusColumn] = LifecycleStatusOportunidade.OPEN;
+    }
+
+    if (schema.dataFechamentoRealColumn) {
+      updatePayload[schema.dataFechamentoRealColumn] = null;
+    }
+
+    if (schema.reopenedAtColumn) {
+      updatePayload[schema.reopenedAtColumn] = new Date();
+    }
+
+    if (schema.reopenedByColumn) {
+      updatePayload[schema.reopenedByColumn] = actorUserId || null;
+    }
+
+    if (schema.columns.has('motivo_perda')) {
+      updatePayload.motivoPerda = null;
+    }
+    if (schema.columns.has('motivo_perda_detalhes')) {
+      updatePayload.motivoPerdaDetalhes = null;
+    }
+    if (schema.columns.has('concorrente_nome')) {
+      updatePayload.concorrenteNome = null;
+    }
+    if (schema.columns.has('data_revisao')) {
+      updatePayload.dataRevisao = null;
+    }
+
+    await this.oportunidadeRepository
+      .createQueryBuilder()
+      .update('oportunidades')
+      .set(updatePayload as any)
+      .where('id::text = :id', { id })
+      .andWhere('empresa_id = :empresaId', { empresaId })
+      .execute();
+
+    await this.createStageEvent({
+      empresaId,
+      oportunidadeId: oportunidade.id,
+      fromStage: oportunidade.estagio,
+      toStage: reopenedStage,
+      changedBy: actorUserId ?? oportunidade.responsavel_id,
+      source: 'reopen',
+    });
+
+    const notaPartes = ['Oportunidade reaberta para o estagio Fechamento'];
+    if (payload?.motivo?.trim()) {
+      notaPartes.push(`Motivo: ${payload.motivo.trim()}`);
+    }
+    if (payload?.comentario?.trim()) {
+      notaPartes.push(`Detalhes: ${payload.comentario.trim()}`);
+    }
+
+    await this.createAtividade(
+      {
+        tipo: TipoAtividade.NOTA,
+        descricao: notaPartes.join('\n'),
+        oportunidade_id: id,
+      },
+      {
+        userId: actorUserId ?? oportunidade.responsavel_id,
+        empresaId,
+      },
+    );
+
+    return this.findOne(id, empresaId, { include_deleted: true });
   }
 
   async createAtividade(
@@ -1130,10 +2733,22 @@ export class OportunidadesService {
       throw new NotFoundException('Oportunidade nao encontrada para esta empresa');
     }
 
-    const oportunidade = await this.findOne(oportunidadeId, context.empresaId);
+    const oportunidade = await this.findOne(oportunidadeId, context.empresaId, {
+      include_deleted: true,
+    });
 
     if (!oportunidade) {
       throw new NotFoundException('Oportunidade nao encontrada para esta empresa');
+    }
+
+    const lifecycleStatus = this.fromDatabaseLifecycleStatus(
+      (oportunidade as any).lifecycle_status,
+      oportunidade.estagio,
+    );
+    if (lifecycleStatus === LifecycleStatusOportunidade.DELETED) {
+      throw new BadRequestException(
+        'Nao e permitido registrar atividade em oportunidade na lixeira. Restaure antes.',
+      );
     }
 
     const columns: string[] = [
@@ -1193,7 +2808,7 @@ export class OportunidadesService {
   async listarAtividades(oportunidadeId: string, empresaId: string): Promise<Atividade[]> {
     const atividadeSchema = await this.resolveAtividadesSchema();
     const usersColumns = await this.getTableColumns('users');
-    const oportunidade = await this.findOne(oportunidadeId, empresaId);
+    const oportunidade = await this.findOne(oportunidadeId, empresaId, { include_deleted: true });
 
     if (!oportunidade) {
       throw new NotFoundException('Oportunidade nao encontrada para esta empresa');
@@ -1401,7 +3016,7 @@ export class OportunidadesService {
     empresaId: string,
     limit = 50,
   ): Promise<OportunidadeHistoricoEstagioItem[]> {
-    const oportunidade = await this.findOne(oportunidadeId, empresaId);
+    const oportunidade = await this.findOne(oportunidadeId, empresaId, { include_deleted: true });
     const usersColumns = await this.getTableColumns('users');
     const avatarExpr = usersColumns.has('avatar_url') ? 'usuario.avatar_url' : 'NULL';
     const parsedLimit = Number(limit);
@@ -1456,7 +3071,14 @@ export class OportunidadesService {
       }));
   }
 
-  async getMetricas(empresaId: string, filtros?: { dataInicio?: string; dataFim?: string }) {
+  async getMetricas(empresaId: string, filtros?: MetricasQueryDto) {
+    const schema = await this.resolveOportunidadesSchema();
+    const lifecycleEnabled = await this.isLifecycleEnabledForTenant({ empresaId, schema });
+    const createdAtRef = `oportunidade.${this.quoteIdentifier(schema.createdAtColumn)}`;
+    const lifecycleStatusExpr = schema.lifecycleStatusColumn
+      ? `oportunidade.${this.quoteIdentifier(schema.lifecycleStatusColumn)}`
+      : this.buildLifecycleFromStageExpression('oportunidade.estagio');
+
     let queryBuilder = this.oportunidadeRepository
       .createQueryBuilder('oportunidade')
       .select('oportunidade.estagio', 'estagio')
@@ -1464,13 +3086,23 @@ export class OportunidadesService {
       .where('oportunidade.empresa_id = :empresaId', { empresaId });
 
     if (filtros?.dataInicio && filtros?.dataFim) {
-      queryBuilder = queryBuilder.andWhere(
-        'oportunidade.createdAt BETWEEN :dataInicio AND :dataFim',
-        {
-          dataInicio: filtros.dataInicio,
-          dataFim: filtros.dataFim,
-        },
-      );
+      queryBuilder = queryBuilder.andWhere(`${createdAtRef} BETWEEN :dataInicio AND :dataFim`, {
+        dataInicio: filtros.dataInicio,
+        dataFim: filtros.dataFim,
+      });
+    }
+
+    if (lifecycleEnabled && schema.lifecycleStatusColumn) {
+      const lifecycleStatuses = this.resolveLifecycleStatusFilterValues(filtros);
+      if (lifecycleStatuses.length > 0) {
+        queryBuilder = queryBuilder.andWhere(`${lifecycleStatusExpr}::text IN (:...lifecycleStatuses)`, {
+          lifecycleStatuses,
+        });
+      }
+    } else if (schema.lifecycleStatusColumn && !this.parseBooleanFlag(filtros?.include_deleted)) {
+      queryBuilder = queryBuilder.andWhere(`${lifecycleStatusExpr}::text <> :deletedLifecycle`, {
+        deletedLifecycle: LifecycleStatusOportunidade.DELETED,
+      });
     }
 
     const todasOportunidades = (await queryBuilder.getRawMany()).map((opp) => ({
@@ -1512,8 +3144,21 @@ export class OportunidadesService {
     };
   }
 
-  async getPipelineData(empresaId: string) {
-    const oportunidades = await this.findAll(empresaId);
+  async getPipelineData(empresaId: string, filters?: OportunidadeLifecycleFilters) {
+    const schema = await this.resolveOportunidadesSchema();
+    const lifecycleEnabled = await this.isLifecycleEnabledForTenant({ empresaId, schema });
+    const normalizedFilters: OportunidadeFindFilters = { ...(filters || {}) };
+
+    if (
+      lifecycleEnabled &&
+      !normalizedFilters.lifecycle_status &&
+      !normalizedFilters.lifecycle_view &&
+      !this.parseBooleanFlag(normalizedFilters.include_deleted)
+    ) {
+      normalizedFilters.lifecycle_view = LifecycleViewOportunidade.OPEN;
+    }
+
+    const oportunidades = await this.findAll(empresaId, normalizedFilters);
 
     const pipeline = {};
     this.canonicalStageOrder.forEach((estagio) => {

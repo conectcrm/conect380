@@ -43,6 +43,7 @@ interface ModalOportunidadeProps {
   onSave: (data: NovaOportunidade) => Promise<void>;
   oportunidade?: Oportunidade | null;
   estagioInicial?: EstagioOportunidade;
+  estagiosPermitidos?: EstagioOportunidade[];
   usuarios?: Usuario[];
   loadingUsuarios?: boolean;
 }
@@ -101,6 +102,7 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
   onSave,
   oportunidade,
   estagioInicial = EstagioOportunidade.LEADS,
+  estagiosPermitidos,
   usuarios = [],
   loadingUsuarios = false,
 }) => {
@@ -234,6 +236,42 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
       }));
     }
   }, [isOpen, oportunidade, user]);
+
+  const estagiosDisponiveis = useMemo(() => {
+    const todosEstagios = Object.entries(ESTAGIOS_LABELS) as Array<
+      [EstagioOportunidade, string]
+    >;
+
+    if (oportunidade || !estagiosPermitidos?.length) {
+      return todosEstagios;
+    }
+
+    return todosEstagios.filter(([estagio]) => estagiosPermitidos.includes(estagio));
+  }, [oportunidade, estagiosPermitidos]);
+
+  useEffect(() => {
+    if (!isOpen || oportunidade || !estagiosPermitidos?.length) {
+      return;
+    }
+
+    const estagioAtualPermitido = estagiosPermitidos.includes(formData.estagio);
+    if (estagioAtualPermitido) {
+      return;
+    }
+
+    const fallback = estagiosPermitidos.includes(estagioInicial)
+      ? estagioInicial
+      : estagiosPermitidos[0];
+
+    if (!fallback) {
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      estagio: fallback,
+    }));
+  }, [isOpen, oportunidade, estagiosPermitidos, formData.estagio, estagioInicial]);
 
   // ========================================
   // VALIDAÇÕES
@@ -837,7 +875,7 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
                         required
                         disabled={loading}
                       >
-                        {Object.entries(ESTAGIOS_LABELS).map(([value, label]) => (
+                        {estagiosDisponiveis.map(([value, label]) => (
                           <option key={value} value={value}>
                             {label}
                           </option>

@@ -9,8 +9,13 @@ import {
   EstatisticasOportunidades,
   DadosKanban,
   EstagioOportunidade,
+  LifecycleFeatureFlagDecision,
+  LifecycleStatusOportunidade,
+  LifecycleViewOportunidade,
   OportunidadeHistoricoEstagioItem,
   OportunidadeAtividadeResumo,
+  StaleDealsResult,
+  StalePolicyDecision,
 } from '../types/oportunidades/index';
 
 class OportunidadesService {
@@ -27,6 +32,38 @@ class OportunidadesService {
 
     const trimmed = value.trim();
     return trimmed.length > 0 ? trimmed : undefined;
+  }
+
+  private normalizeListParams(
+    filtros?: Partial<FiltrosOportunidade> & {
+      lifecycle_status?: LifecycleStatusOportunidade | '';
+      lifecycle_view?: LifecycleViewOportunidade | '';
+      include_deleted?: boolean;
+    },
+  ): Record<string, unknown> | undefined {
+    if (!filtros) return undefined;
+
+    const params: Record<string, unknown> = { ...filtros };
+
+    if (filtros.dataInicio instanceof Date) {
+      params.dataInicio = filtros.dataInicio.toISOString();
+    }
+
+    if (filtros.dataFim instanceof Date) {
+      params.dataFim = filtros.dataFim.toISOString();
+    }
+
+    if (typeof filtros.include_deleted === 'boolean') {
+      params.include_deleted = filtros.include_deleted;
+    }
+
+    Object.keys(params).forEach((key) => {
+      if (params[key] === '' || params[key] === null || params[key] === undefined) {
+        delete params[key];
+      }
+    });
+
+    return params;
   }
 
   private preparePayload(
@@ -64,7 +101,9 @@ class OportunidadesService {
 
   // CRUD Oportunidades
   async listarOportunidades(filtros?: Partial<FiltrosOportunidade>): Promise<Oportunidade[]> {
-    const response = await api.get(this.getUrl(), { params: filtros });
+    const response = await api.get(this.getUrl(), {
+      params: this.normalizeListParams(filtros),
+    });
     return response.data.map((oportunidade: any) => this.formatarOportunidade(oportunidade));
   }
 
@@ -105,6 +144,95 @@ class OportunidadesService {
 
   async excluirOportunidade(id: number): Promise<void> {
     await api.delete(this.getUrl(`/${id}`));
+  }
+
+  async excluirOportunidadePermanente(id: number): Promise<void> {
+    await api.delete(this.getUrl(`/${id}/permanente`));
+  }
+
+  async arquivarOportunidade(
+    id: number,
+    payload?: { motivo?: string; comentario?: string },
+  ): Promise<Oportunidade> {
+    const response = await api.post(this.getUrl(`/${id}/arquivar`), payload || {});
+    return this.formatarOportunidade(response.data);
+  }
+
+  async restaurarOportunidade(
+    id: number,
+    payload?: { motivo?: string; comentario?: string },
+  ): Promise<Oportunidade> {
+    const response = await api.post(this.getUrl(`/${id}/restaurar`), payload || {});
+    return this.formatarOportunidade(response.data);
+  }
+
+  async reabrirOportunidade(
+    id: number,
+    payload?: { motivo?: string; comentario?: string },
+  ): Promise<Oportunidade> {
+    const response = await api.post(this.getUrl(`/${id}/reabrir`), payload || {});
+    return this.formatarOportunidade(response.data);
+  }
+
+  async obterLifecycleFeatureFlag(): Promise<LifecycleFeatureFlagDecision> {
+    const response = await api.get(this.getUrl('/lifecycle/feature-flag'));
+    return response.data;
+  }
+
+  async obterStalePolicy(): Promise<StalePolicyDecision> {
+    const response = await api.get(this.getUrl('/lifecycle/stale-policy'));
+    return response.data;
+  }
+
+  async atualizarStalePolicy(payload: {
+    enabled?: boolean;
+    thresholdDays?: number;
+    autoArchiveEnabled?: boolean;
+    autoArchiveAfterDays?: number;
+  }): Promise<StalePolicyDecision> {
+    const response = await api.patch(this.getUrl('/lifecycle/stale-policy'), payload);
+    return response.data;
+  }
+
+  async listarOportunidadesParadas(params?: {
+    thresholdDays?: number;
+    limit?: number;
+  }): Promise<StaleDealsResult> {
+    const response = await api.get(this.getUrl('/stale'), {
+      params: {
+        threshold_days: params?.thresholdDays,
+        limit: params?.limit,
+      },
+    });
+
+    return {
+      ...response.data,
+      stale: (response.data?.stale || []).map((oportunidade: any) =>
+        this.formatarOportunidade(oportunidade),
+      ),
+    };
+  }
+
+  async executarAutoArquivamentoStale(params?: {
+    dryRun?: boolean;
+  }): Promise<{
+    enabled: boolean;
+    autoArchiveEnabled: boolean;
+    thresholdDays: number;
+    totalCandidates: number;
+    archivedCount: number;
+    dryRun: boolean;
+    trigger: 'manual' | 'scheduler';
+    archivedIds: string[];
+    failed: Array<{ id: string; reason: string }>;
+    generatedAt: string;
+  }> {
+    const response = await api.post(this.getUrl('/stale/auto-archive/run'), null, {
+      params: {
+        dry_run: params?.dryRun ? 'true' : undefined,
+      },
+    });
+    return response.data;
   }
 
   async moverOportunidade(id: number, novoEstagio: EstagioOportunidade): Promise<Oportunidade> {
@@ -178,12 +306,16 @@ class OportunidadesService {
   async obterEstatisticas(
     filtros?: Partial<FiltrosOportunidade>,
   ): Promise<EstatisticasOportunidades> {
-    const response = await api.get(this.getUrl('/metricas'), { params: filtros });
+    const response = await api.get(this.getUrl('/metricas'), {
+      params: this.normalizeListParams(filtros),
+    });
     return response.data;
   }
 
   async obterDadosKanban(filtros?: Partial<FiltrosOportunidade>): Promise<DadosKanban> {
-    const response = await api.get(this.getUrl('/pipeline'), { params: filtros });
+    const response = await api.get(this.getUrl('/pipeline'), {
+      params: this.normalizeListParams(filtros),
+    });
 
     // Converter formato do backend para o formato esperado pelo frontend
     const stages = response.data.stages || {};
@@ -237,6 +369,13 @@ class OportunidadesService {
   private formatarOportunidade(oportunidade: any): Oportunidade {
     const createdAt = oportunidade.createdAt ? new Date(oportunidade.createdAt) : new Date();
     const updatedAt = oportunidade.updatedAt ? new Date(oportunidade.updatedAt) : createdAt;
+    const lifecycleStatus: LifecycleStatusOportunidade =
+      oportunidade.lifecycle_status ||
+      (oportunidade.estagio === EstagioOportunidade.GANHO
+        ? LifecycleStatusOportunidade.WON
+        : oportunidade.estagio === EstagioOportunidade.PERDIDO
+          ? LifecycleStatusOportunidade.LOST
+          : LifecycleStatusOportunidade.OPEN);
 
     return {
       id: oportunidade.id,
@@ -305,6 +444,22 @@ class OportunidadesService {
         : undefined,
       tempoNoEstagio: this.formatarTempoNoEstagio(oportunidade.updatedAt),
       probabilidadeVisual: this.classificarProbabilidade(oportunidade.probabilidade),
+      lifecycle_status: lifecycleStatus,
+      archived_at: oportunidade.archived_at ? new Date(oportunidade.archived_at) : null,
+      archived_by: oportunidade.archived_by ?? null,
+      deleted_at: oportunidade.deleted_at ? new Date(oportunidade.deleted_at) : null,
+      deleted_by: oportunidade.deleted_by ?? null,
+      reopened_at: oportunidade.reopened_at ? new Date(oportunidade.reopened_at) : null,
+      reopened_by: oportunidade.reopened_by ?? null,
+      is_stale: Boolean(oportunidade.is_stale),
+      stale_days:
+        Number.isFinite(Number(oportunidade.stale_days)) && Number(oportunidade.stale_days) >= 0
+          ? Number(oportunidade.stale_days)
+          : undefined,
+      last_interaction_at: oportunidade.last_interaction_at
+        ? new Date(oportunidade.last_interaction_at)
+        : null,
+      stale_since: oportunidade.stale_since ? new Date(oportunidade.stale_since) : null,
     };
   }
 

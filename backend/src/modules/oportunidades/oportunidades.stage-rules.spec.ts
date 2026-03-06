@@ -1,6 +1,8 @@
-import { EstagioOportunidade } from './oportunidade.entity';
+import { EstagioOportunidade, LifecycleStatusOportunidade } from './oportunidade.entity';
 import {
+  getAllowedNextOportunidadeLifecycleStatuses,
   getAllowedNextOportunidadeStages,
+  isOportunidadeLifecycleTransitionAllowed,
   isOportunidadeStageTransitionAllowed,
   isOportunidadeTerminalStage,
 } from './oportunidades.service';
@@ -101,5 +103,52 @@ describe('Oportunidades stage rules', () => {
     expect(isOportunidadeTerminalStage('won')).toBe(true);
     expect(isOportunidadeTerminalStage('perdido')).toBe(true);
     expect(isOportunidadeTerminalStage(EstagioOportunidade.PROPOSTA)).toBe(false);
+  });
+
+  it('permite transicoes validas de lifecycle', () => {
+    expect(
+      isOportunidadeLifecycleTransitionAllowed(
+        LifecycleStatusOportunidade.OPEN,
+        LifecycleStatusOportunidade.ARCHIVED,
+      ),
+    ).toBe(true);
+
+    expect(
+      isOportunidadeLifecycleTransitionAllowed(
+        LifecycleStatusOportunidade.ARCHIVED,
+        LifecycleStatusOportunidade.OPEN,
+      ),
+    ).toBe(true);
+
+    expect(
+      isOportunidadeLifecycleTransitionAllowed(
+        LifecycleStatusOportunidade.WON,
+        LifecycleStatusOportunidade.DELETED,
+      ),
+    ).toBe(true);
+  });
+
+  it('bloqueia transicoes invalidas de lifecycle', () => {
+    expect(
+      isOportunidadeLifecycleTransitionAllowed(
+        LifecycleStatusOportunidade.OPEN,
+        'inexistente',
+      ),
+    ).toBe(false);
+    expect(
+      isOportunidadeLifecycleTransitionAllowed(
+        'inexistente',
+        LifecycleStatusOportunidade.OPEN,
+      ),
+    ).toBe(false);
+  });
+
+  it('expoe lista de proximos status de lifecycle permitidos', () => {
+    expect(getAllowedNextOportunidadeLifecycleStatuses(LifecycleStatusOportunidade.OPEN)).toEqual([
+      LifecycleStatusOportunidade.WON,
+      LifecycleStatusOportunidade.LOST,
+      LifecycleStatusOportunidade.ARCHIVED,
+      LifecycleStatusOportunidade.DELETED,
+    ]);
   });
 });

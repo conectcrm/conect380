@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  X,
   Edit2,
   Calendar,
   DollarSign,
@@ -21,11 +20,15 @@ import {
   Copy,
   Plus,
   GitBranch,
+  Archive,
+  RotateCcw,
+  Trash2,
 } from 'lucide-react';
 import {
   Oportunidade,
   Atividade,
   EstagioOportunidade,
+  LifecycleStatusOportunidade,
   PrioridadeOportunidade,
   TipoAtividade,
   OportunidadeHistoricoEstagioItem,
@@ -33,12 +36,19 @@ import {
 import { oportunidadesService } from '../../services/oportunidadesService';
 import { toastService } from '../../services/toastService';
 import { differenceInDays } from 'date-fns';
+import { BaseModal } from '../base/BaseModal';
 
 interface ModalDetalhesOportunidadeProps {
   oportunidade: Oportunidade | null;
   onClose: () => void;
   onEditar: (oportunidade: Oportunidade) => void;
   onClonar?: (oportunidade: Oportunidade) => void;
+  exclusaoDireta?: boolean;
+  onArquivar?: (oportunidade: Oportunidade) => Promise<void> | void;
+  onRestaurar?: (oportunidade: Oportunidade) => Promise<void> | void;
+  onReabrir?: (oportunidade: Oportunidade) => Promise<void> | void;
+  onExcluir?: (oportunidade: Oportunidade) => Promise<void> | void;
+  onExcluirPermanente?: (oportunidade: Oportunidade) => Promise<void> | void;
 }
 
 const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
@@ -46,43 +56,68 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
   onClose,
   onEditar,
   onClonar,
+  exclusaoDireta = false,
+  onArquivar,
+  onRestaurar,
+  onReabrir,
+  onExcluir,
+  onExcluirPermanente,
 }) => {
   const [atividades, setAtividades] = useState<Atividade[]>([]);
-  const [historicoEstagios, setHistoricoEstagios] = useState<OportunidadeHistoricoEstagioItem[]>([]);
+  const [historicoEstagios, setHistoricoEstagios] = useState<OportunidadeHistoricoEstagioItem[]>(
+    [],
+  );
   const [loadingAtividades, setLoadingAtividades] = useState(false);
   const [loadingHistoricoEstagios, setLoadingHistoricoEstagios] = useState(false);
   const [salvandoAtividade, setSalvandoAtividade] = useState(false);
+  const [tentouSalvarAtividade, setTentouSalvarAtividade] = useState(false);
   const [novoTipoAtividade, setNovoTipoAtividade] = useState<TipoAtividade>(TipoAtividade.NOTA);
   const [novaDescricaoAtividade, setNovaDescricaoAtividade] = useState('');
   const [novaDataAtividade, setNovaDataAtividade] = useState('');
   const [abaSelecionada, setAbaSelecionada] = useState<'detalhes' | 'atividades'>('detalhes');
+  const [limiteHistoricoEstagios, setLimiteHistoricoEstagios] = useState(30);
+  const [acaoLifecycleLoading, setAcaoLifecycleLoading] = useState<
+    'arquivar' | 'restaurar' | 'reabrir' | 'excluir' | 'excluir_permanente' | null
+  >(null);
+
+  const descricaoAtividadeLimpa = novaDescricaoAtividade.trim();
+  const descricaoAtividadeInvalida = tentouSalvarAtividade && !descricaoAtividadeLimpa;
+  const hasDraftAtividade =
+    Boolean(descricaoAtividadeLimpa) ||
+    Boolean(novaDataAtividade) ||
+    novoTipoAtividade !== TipoAtividade.NOTA;
 
   useEffect(() => {
     if (oportunidade?.id) {
-      void Promise.all([carregarAtividades(), carregarHistoricoEstagios()]);
+      setLimiteHistoricoEstagios(30);
+      void Promise.all([carregarAtividades(), carregarHistoricoEstagios(30)]);
       setNovoTipoAtividade(TipoAtividade.NOTA);
       setNovaDescricaoAtividade('');
       setNovaDataAtividade('');
+      setTentouSalvarAtividade(false);
     }
   }, [oportunidade?.id]);
 
-  useEffect(() => {
-    if (!oportunidade) return;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [oportunidade]);
+  const podeFecharModal = useCallback(() => {
+    if (abaSelecionada !== 'atividades' || salvandoAtividade || !hasDraftAtividade) {
+      return true;
+    }
 
-  useEffect(() => {
-    if (!oportunidade) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [oportunidade, onClose]);
+    return window.confirm(
+      'Existe uma atividade em rascunho. Deseja fechar e descartar esse rascunho?',
+    );
+  }, [abaSelecionada, hasDraftAtividade, salvandoAtividade]);
+
+  const handleClose = useCallback(() => {
+    if (!podeFecharModal()) return;
+    onClose();
+  }, [onClose, podeFecharModal]);
+
+  const handleTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    setAbaSelecionada((current) => (current === 'detalhes' ? 'atividades' : 'detalhes'));
+  };
 
   const carregarAtividades = async () => {
     if (!oportunidade) return;
@@ -99,12 +134,12 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
     }
   };
 
-  const carregarHistoricoEstagios = async () => {
+  const carregarHistoricoEstagios = async (limit = limiteHistoricoEstagios) => {
     if (!oportunidade) return;
 
     try {
       setLoadingHistoricoEstagios(true);
-      const dados = await oportunidadesService.listarHistoricoEstagios(oportunidade.id, 30);
+      const dados = await oportunidadesService.listarHistoricoEstagios(oportunidade.id, limit);
       setHistoricoEstagios(dados);
     } catch (err) {
       console.error('Erro ao carregar historico de estagios:', err);
@@ -127,8 +162,9 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
   const criarAtividade = async () => {
     if (!oportunidade) return;
 
-    const descricaoLimpa = novaDescricaoAtividade.trim();
-    if (!descricaoLimpa) {
+    setTentouSalvarAtividade(true);
+
+    if (!descricaoAtividadeLimpa) {
       toastService.error('Informe a descricao da atividade.');
       return;
     }
@@ -139,12 +175,14 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
       await oportunidadesService.criarAtividade({
         oportunidadeId: oportunidade.id,
         tipo: novoTipoAtividade,
-        descricao: descricaoLimpa,
+        descricao: descricaoAtividadeLimpa,
         dataAtividade: converterDataInputParaDate(novaDataAtividade),
       });
 
+      setNovoTipoAtividade(TipoAtividade.NOTA);
       setNovaDescricaoAtividade('');
       setNovaDataAtividade('');
+      setTentouSalvarAtividade(false);
       await carregarAtividades();
       toastService.success('Atividade registrada com sucesso.');
     } catch (err) {
@@ -161,6 +199,59 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
   const diasAteVencimento = oportunidade.dataFechamentoEsperado
     ? differenceInDays(new Date(oportunidade.dataFechamentoEsperado), new Date())
     : null;
+  const lifecycleStatus = oportunidade.lifecycle_status
+    ? oportunidade.lifecycle_status
+    : oportunidade.estagio === EstagioOportunidade.GANHO
+      ? LifecycleStatusOportunidade.WON
+      : oportunidade.estagio === EstagioOportunidade.PERDIDO
+        ? LifecycleStatusOportunidade.LOST
+        : LifecycleStatusOportunidade.OPEN;
+  const staleDays = Number(oportunidade.stale_days || 0);
+  const isStaleOpen =
+    Boolean(oportunidade.is_stale) &&
+    staleDays > 0 &&
+    lifecycleStatus === LifecycleStatusOportunidade.OPEN;
+  const lastInteractionDate = oportunidade.last_interaction_at
+    ? new Date(oportunidade.last_interaction_at)
+    : null;
+  const lastInteractionLabel =
+    lastInteractionDate && !Number.isNaN(lastInteractionDate.getTime())
+      ? lastInteractionDate.toLocaleDateString('pt-BR')
+      : null;
+
+  const podeArquivar =
+    lifecycleStatus !== LifecycleStatusOportunidade.ARCHIVED &&
+    lifecycleStatus !== LifecycleStatusOportunidade.DELETED;
+  const podeRestaurar =
+    lifecycleStatus === LifecycleStatusOportunidade.ARCHIVED ||
+    lifecycleStatus === LifecycleStatusOportunidade.DELETED;
+  const podeReabrir =
+    lifecycleStatus !== LifecycleStatusOportunidade.ARCHIVED &&
+    lifecycleStatus !== LifecycleStatusOportunidade.DELETED &&
+    (oportunidade.estagio === EstagioOportunidade.GANHO ||
+      oportunidade.estagio === EstagioOportunidade.PERDIDO);
+  const podeExcluir = lifecycleStatus !== LifecycleStatusOportunidade.DELETED;
+  const podeExcluirPermanente = lifecycleStatus === LifecycleStatusOportunidade.DELETED;
+
+  const executarAcaoLifecycle = async (
+    acao: 'arquivar' | 'restaurar' | 'reabrir' | 'excluir' | 'excluir_permanente',
+    callback: ((item: Oportunidade) => Promise<void> | void) | undefined,
+    confirmacao: string,
+  ) => {
+    if (!callback) return;
+    if (!window.confirm(confirmacao)) return;
+
+    try {
+      setAcaoLifecycleLoading(acao);
+      await callback(oportunidade);
+      onClose();
+    } catch (err) {
+      console.error(`Erro ao executar acao ${acao}:`, err);
+      toastService.error('Nao foi possivel concluir a acao solicitada.');
+    } finally {
+      setAcaoLifecycleLoading(null);
+    }
+  };
 
   // Cor da probabilidade
   const prob = oportunidade.probabilidade || 0;
@@ -239,337 +330,365 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
     });
   };
 
+  const tabDetalhesId = `modal-detalhes-oportunidade-tab-detalhes-${oportunidade.id}`;
+  const tabAtividadesId = `modal-detalhes-oportunidade-tab-atividades-${oportunidade.id}`;
+  const panelDetalhesId = `modal-detalhes-oportunidade-panel-detalhes-${oportunidade.id}`;
+  const panelAtividadesId = `modal-detalhes-oportunidade-panel-atividades-${oportunidade.id}`;
+  const podeCarregarMaisHistorico =
+    historicoEstagios.length >= limiteHistoricoEstagios && limiteHistoricoEstagios < 200;
+
+  const handleEditarOportunidade = () => {
+    if (!podeFecharModal()) return;
+    onEditar(oportunidade);
+    onClose();
+  };
+
+  const handleClonarOportunidade = () => {
+    if (!onClonar || !podeFecharModal()) return;
+    onClonar(oportunidade);
+    onClose();
+  };
+
+  const handleCarregarMaisHistorico = () => {
+    const novoLimite = Math.min(limiteHistoricoEstagios + 30, 200);
+    setLimiteHistoricoEstagios(novoLimite);
+    void carregarHistoricoEstagios(novoLimite);
+  };
+
   return (
-    <div
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="modal-detalhes-oportunidade-title"
-      onClick={onClose}
+    <BaseModal
+      isOpen={Boolean(oportunidade)}
+      onClose={handleClose}
+      title={oportunidade.titulo}
+      subtitle="Detalhes da oportunidade e acompanhamento comercial"
+      maxWidth="5xl"
+      modalClassName="max-h-[90vh] overflow-hidden rounded-2xl"
     >
-      <div
-        className="bg-white rounded-2xl shadow-2xl w-[calc(100%-2rem)] sm:w-[600px] md:w-[700px] lg:w-[900px] xl:w-[1000px] max-w-[1100px] max-h-[90vh] overflow-hidden flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header com gradiente */}
-        <div className="bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] px-6 py-6 flex items-start justify-between">
-          <div className="flex-1">
-            <h2
-              id="modal-detalhes-oportunidade-title"
-              className="text-2xl font-bold text-white mb-2 flex items-center gap-3"
-            >
-              <TrendingUp className="h-7 w-7" />
-              {oportunidade.titulo}
-            </h2>
-            <div className="flex items-center gap-4 text-white/90 text-sm">
-              <span className="flex items-center gap-1">
-                <User className="h-4 w-4" />
-                {oportunidade.responsavel?.nome || 'Sem responsável'}
+      <div className="border-b border-[#B4BEC9]/25 bg-[#DEEFE7]/20 px-6 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-4 text-sm text-[#002333]/70">
+            <span className="inline-flex items-center gap-1">
+              <User className="h-4 w-4 text-[#159A9C]" />
+              {oportunidade.responsavel?.nome || 'Sem responsável'}
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Clock className="h-4 w-4 text-[#159A9C]" />
+              Criado em {new Date(oportunidade.createdAt).toLocaleDateString('pt-BR')}
+            </span>
+            {isStaleOpen && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-orange-300 bg-orange-50 px-2.5 py-0.5 text-xs font-semibold text-orange-700">
+                <AlertCircle className="h-3.5 w-3.5" />
+                Parada {staleDays}d
               </span>
-              <span className="flex items-center gap-1">
-                <Clock className="h-4 w-4" />
-                Criado em {new Date(oportunidade.createdAt).toLocaleDateString('pt-BR')}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                onEditar(oportunidade);
-                onClose();
-              }}
-              type="button"
-              className="p-2 hover:bg-white/20 rounded-lg transition-colors text-white"
-              title="Editar"
-              aria-label="Editar oportunidade"
-            >
-              <Edit2 className="h-5 w-5" />
-            </button>
-            {onClonar && (
-              <button
-                onClick={() => {
-                  onClonar(oportunidade);
-                  onClose();
-                }}
-                type="button"
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors text-white"
-                title="Duplicar"
-                aria-label="Duplicar oportunidade"
-              >
-                <Copy className="h-5 w-5" />
-              </button>
             )}
-            <button
-              onClick={onClose}
-              type="button"
-              className="p-2 hover:bg-white/20 rounded-lg transition-colors text-white"
-              aria-label="Fechar"
-            >
-              <X className="h-5 w-5" />
-            </button>
           </div>
-        </div>
-
-        {/* Abas */}
-        <div className="border-b border-[#B4BEC9]/35 bg-[#DEEFE7]/35">
-          <div className="flex">
+          {onClonar && (
             <button
-              onClick={() => setAbaSelecionada('detalhes')}
+              onClick={handleClonarOportunidade}
               type="button"
-              aria-pressed={abaSelecionada === 'detalhes'}
-              className={`px-6 py-3 font-medium transition-colors border-b-2 ${
-                abaSelecionada === 'detalhes'
-                  ? 'border-[#159A9C] text-[#159A9C] bg-white'
-                  : 'border-transparent text-[#002333]/60 hover:text-[#002333]'
-              }`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#B4BEC9]/70 bg-white px-3 py-1.5 text-sm font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/50"
             >
-              Detalhes
+              <Copy className="h-4 w-4 text-[#159A9C]" />
+              Duplicar
             </button>
-            <button
-              onClick={() => setAbaSelecionada('atividades')}
-              type="button"
-              aria-pressed={abaSelecionada === 'atividades'}
-              className={`px-6 py-3 font-medium transition-colors border-b-2 flex items-center gap-2 ${
-                abaSelecionada === 'atividades'
-                  ? 'border-[#159A9C] text-[#159A9C] bg-white'
-                  : 'border-transparent text-[#002333]/60 hover:text-[#002333]'
-              }`}
-            >
-              Atividades
-              {atividades.length > 0 && (
-                <span className="px-2 py-0.5 bg-[#159A9C] text-white text-xs rounded-full font-semibold">
-                  {atividades.length}
-                </span>
-              )}
-            </button>
-          </div>
+          )}
         </div>
+      </div>
+      {/* Abas */}
+      <div className="border-b border-[#B4BEC9]/35 bg-[#DEEFE7]/35">
+        <div className="flex" role="tablist" aria-label="Navegacao de detalhes da oportunidade">
+          <button
+            id={tabDetalhesId}
+            role="tab"
+            onClick={() => setAbaSelecionada('detalhes')}
+            onKeyDown={handleTabKeyDown}
+            type="button"
+            aria-selected={abaSelecionada === 'detalhes'}
+            aria-controls={panelDetalhesId}
+            tabIndex={abaSelecionada === 'detalhes' ? 0 : -1}
+            className={`px-6 py-3 font-medium transition-colors border-b-2 ${
+              abaSelecionada === 'detalhes'
+                ? 'border-[#159A9C] text-[#159A9C] bg-white'
+                : 'border-transparent text-[#002333]/60 hover:text-[#002333]'
+            }`}
+          >
+            Detalhes
+          </button>
+          <button
+            id={tabAtividadesId}
+            role="tab"
+            onClick={() => setAbaSelecionada('atividades')}
+            onKeyDown={handleTabKeyDown}
+            type="button"
+            aria-selected={abaSelecionada === 'atividades'}
+            aria-controls={panelAtividadesId}
+            tabIndex={abaSelecionada === 'atividades' ? 0 : -1}
+            className={`px-6 py-3 font-medium transition-colors border-b-2 flex items-center gap-2 ${
+              abaSelecionada === 'atividades'
+                ? 'border-[#159A9C] text-[#159A9C] bg-white'
+                : 'border-transparent text-[#002333]/60 hover:text-[#002333]'
+            }`}
+          >
+            Atividades
+            {atividades.length > 0 && (
+              <span className="px-2 py-0.5 bg-[#159A9C] text-white text-xs rounded-full font-semibold">
+                {atividades.length}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
 
-        {/* Conteúdo com scroll */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {abaSelecionada === 'detalhes' ? (
-            <div className="space-y-6">
-              {/* Métricas Principais */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Valor */}
-                <div className="bg-[#159A9C]/10 border border-[#159A9C]/20 rounded-xl p-4">
-                  <div className="flex items-center gap-2 text-[#159A9C] mb-1">
-                    <DollarSign className="h-5 w-5" />
-                    <span className="text-sm font-medium">Valor</span>
-                  </div>
-                  <p className="text-2xl font-bold text-[#0F7B7D]">
-                    {formatarMoeda(Number(oportunidade.valor || 0))}
-                  </p>
+      {/* Conteúdo com scroll */}
+      <div className="p-6">
+        {abaSelecionada === 'detalhes' ? (
+          <div
+            id={panelDetalhesId}
+            role="tabpanel"
+            aria-labelledby={tabDetalhesId}
+            className="space-y-6"
+          >
+            {/* Métricas Principais */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Valor */}
+              <div className="bg-[#159A9C]/10 border border-[#159A9C]/20 rounded-xl p-4">
+                <div className="flex items-center gap-2 text-[#159A9C] mb-1">
+                  <DollarSign className="h-5 w-5" />
+                  <span className="text-sm font-medium">Valor</span>
                 </div>
-
-                {/* Probabilidade */}
-                <div className={`border rounded-xl p-4 ${probColor}`}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <TrendingUp className="h-5 w-5" />
-                    <span className="text-sm font-medium">Probabilidade</span>
-                  </div>
-                  <p className="text-2xl font-bold flex items-center gap-2">
-                    <span>{probEmoji}</span>
-                    <span>{oportunidade.probabilidade}%</span>
-                  </p>
-                </div>
-
-                {/* Estágio */}
-                <div className="bg-[#DEEFE7]/55 border border-[#B4BEC9]/35 rounded-xl p-4">
-                  <div className="flex items-center gap-2 text-[#159A9C] mb-1">
-                    <CheckCircle className="h-5 w-5" />
-                    <span className="text-sm font-medium">Estágio</span>
-                  </div>
-                  <p className="text-xl font-bold text-[#002333]">
-                    {getNomeEstagio(oportunidade.estagio)}
-                  </p>
-                </div>
+                <p className="text-2xl font-bold text-[#0F7B7D]">
+                  {formatarMoeda(Number(oportunidade.valor || 0))}
+                </p>
               </div>
 
-              {/* Alerta de SLA */}
-              {diasAteVencimento !== null && (
-                <>
-                  {diasAteVencimento < 0 && (
-                    <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 flex items-start gap-3">
-                      <AlertCircle className="h-6 w-6 text-red-600 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <h4 className="font-semibold text-red-900">Oportunidade Atrasada</h4>
-                        <p className="text-red-700 text-sm">
-                          Esta oportunidade está atrasada há {Math.abs(diasAteVencimento)} dias
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                  {diasAteVencimento >= 0 && diasAteVencimento < 7 && (
-                    <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-4 flex items-start gap-3">
-                      <AlertCircle className="h-6 w-6 text-yellow-600 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <h4 className="font-semibold text-yellow-900">
-                          Atenção: Vencimento Próximo
-                        </h4>
-                        <p className="text-yellow-700 text-sm">
-                          Esta oportunidade vence em {diasAteVencimento}{' '}
-                          {diasAteVencimento === 1 ? 'dia' : 'dias'}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* Informações de Contato */}
-              <div className="bg-[#DEEFE7]/35 rounded-xl p-5 space-y-4 border border-[#B4BEC9]/25">
-                <h3 className="text-lg font-bold text-[#002333] flex items-center gap-2 mb-4">
-                  <Users className="h-5 w-5 text-[#159A9C]" />
-                  Informações de Contato
-                </h3>
-
-                {oportunidade.nomeContato && (
-                  <div className="flex items-start gap-3">
-                    <User className="h-5 w-5 text-[#159A9C] mt-0.5" />
-                    <div>
-                      <p className="text-sm text-[#002333]/60">Nome do Contato</p>
-                      <p className="font-semibold text-[#002333]">{oportunidade.nomeContato}</p>
-                    </div>
-                  </div>
-                )}
-
-                {oportunidade.empresaContato && (
-                  <div className="flex items-start gap-3">
-                    <Building className="h-5 w-5 text-[#159A9C] mt-0.5" />
-                      <div>
-                      <p className="text-sm text-[#002333]/60">Empresa</p>
-                      <p className="font-semibold text-[#002333]">{oportunidade.empresaContato}</p>
-                    </div>
-                  </div>
-                )}
-
-                {oportunidade.emailContato && (
-                  <div className="flex items-start gap-3">
-                      <Mail className="h-5 w-5 text-[#159A9C] mt-0.5" />
-                      <div>
-                      <p className="text-sm text-[#002333]/60">Email</p>
-                      <a
-                        href={`mailto:${oportunidade.emailContato}`}
-                        className="font-semibold text-[#159A9C] hover:underline"
-                      >
-                        {oportunidade.emailContato}
-                      </a>
-                    </div>
-                  </div>
-                )}
-
-                {oportunidade.telefoneContato && (
-                  <div className="flex items-start gap-3">
-                      <Phone className="h-5 w-5 text-[#159A9C] mt-0.5" />
-                      <div>
-                      <p className="text-sm text-[#002333]/60">Telefone</p>
-                      <a
-                        href={`tel:${oportunidade.telefoneContato}`}
-                        className="font-semibold text-[#159A9C] hover:underline"
-                      >
-                        {oportunidade.telefoneContato}
-                      </a>
-                    </div>
-                  </div>
-                )}
+              {/* Probabilidade */}
+              <div className={`border rounded-xl p-4 ${probColor}`}>
+                <div className="flex items-center gap-2 mb-1">
+                  <TrendingUp className="h-5 w-5" />
+                  <span className="text-sm font-medium">Probabilidade</span>
+                </div>
+                <p className="text-2xl font-bold flex items-center gap-2">
+                  <span>{probEmoji}</span>
+                  <span>{oportunidade.probabilidade}%</span>
+                </p>
               </div>
 
-              {/* Detalhes Adicionais */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {oportunidade.prioridade && (
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-[#159A9C] mt-0.5" />
+              {/* Estágio */}
+              <div className="bg-[#DEEFE7]/55 border border-[#B4BEC9]/35 rounded-xl p-4">
+                <div className="flex items-center gap-2 text-[#159A9C] mb-1">
+                  <CheckCircle className="h-5 w-5" />
+                  <span className="text-sm font-medium">Estágio</span>
+                </div>
+                <p className="text-xl font-bold text-[#002333]">
+                  {getNomeEstagio(oportunidade.estagio)}
+                </p>
+              </div>
+            </div>
+
+            {isStaleOpen && (
+              <div className="rounded-xl border-2 border-orange-200 bg-orange-50 p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="mt-0.5 h-6 w-6 flex-shrink-0 text-orange-600" />
+                  <div>
+                    <h4 className="font-semibold text-orange-900">
+                      Oportunidade sem interacao recente
+                    </h4>
+                    <p className="text-sm text-orange-700">
+                      Esta oportunidade esta parada ha {staleDays}{' '}
+                      {staleDays === 1 ? 'dia' : 'dias'}.
+                      {lastInteractionLabel ? ` Ultima interacao em ${lastInteractionLabel}.` : ''}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Alerta de SLA */}
+            {diasAteVencimento !== null && (
+              <>
+                {diasAteVencimento < 0 && (
+                  <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 flex items-start gap-3">
+                    <AlertCircle className="h-6 w-6 text-red-600 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-sm text-[#002333]/60">Prioridade</p>
-                      <span
-                        className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${
-                          oportunidade.prioridade === PrioridadeOportunidade.ALTA
-                            ? 'bg-red-100 text-red-700'
+                      <h4 className="font-semibold text-red-900">Oportunidade Atrasada</h4>
+                      <p className="text-red-700 text-sm">
+                        Esta oportunidade está atrasada há {Math.abs(diasAteVencimento)} dias
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {diasAteVencimento >= 0 && diasAteVencimento < 7 && (
+                  <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-4 flex items-start gap-3">
+                    <AlertCircle className="h-6 w-6 text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-semibold text-yellow-900">Atenção: Vencimento Próximo</h4>
+                      <p className="text-yellow-700 text-sm">
+                        Esta oportunidade vence em {diasAteVencimento}{' '}
+                        {diasAteVencimento === 1 ? 'dia' : 'dias'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Informações de Contato */}
+            <div className="bg-[#DEEFE7]/35 rounded-xl p-5 space-y-4 border border-[#B4BEC9]/25">
+              <h3 className="text-lg font-bold text-[#002333] flex items-center gap-2 mb-4">
+                <Users className="h-5 w-5 text-[#159A9C]" />
+                Informações de Contato
+              </h3>
+
+              {oportunidade.nomeContato && (
+                <div className="flex items-start gap-3">
+                  <User className="h-5 w-5 text-[#159A9C] mt-0.5" />
+                  <div>
+                    <p className="text-sm text-[#002333]/60">Nome do Contato</p>
+                    <p className="font-semibold text-[#002333]">{oportunidade.nomeContato}</p>
+                  </div>
+                </div>
+              )}
+
+              {oportunidade.empresaContato && (
+                <div className="flex items-start gap-3">
+                  <Building className="h-5 w-5 text-[#159A9C] mt-0.5" />
+                  <div>
+                    <p className="text-sm text-[#002333]/60">Empresa</p>
+                    <p className="font-semibold text-[#002333]">{oportunidade.empresaContato}</p>
+                  </div>
+                </div>
+              )}
+
+              {oportunidade.emailContato && (
+                <div className="flex items-start gap-3">
+                  <Mail className="h-5 w-5 text-[#159A9C] mt-0.5" />
+                  <div>
+                    <p className="text-sm text-[#002333]/60">Email</p>
+                    <a
+                      href={`mailto:${oportunidade.emailContato}`}
+                      className="font-semibold text-[#159A9C] hover:underline"
+                    >
+                      {oportunidade.emailContato}
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {oportunidade.telefoneContato && (
+                <div className="flex items-start gap-3">
+                  <Phone className="h-5 w-5 text-[#159A9C] mt-0.5" />
+                  <div>
+                    <p className="text-sm text-[#002333]/60">Telefone</p>
+                    <a
+                      href={`tel:${oportunidade.telefoneContato}`}
+                      className="font-semibold text-[#159A9C] hover:underline"
+                    >
+                      {oportunidade.telefoneContato}
+                    </a>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Detalhes Adicionais */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {oportunidade.prioridade && (
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-[#159A9C] mt-0.5" />
+                  <div>
+                    <p className="text-sm text-[#002333]/60">Prioridade</p>
+                    <span
+                      className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${
+                        oportunidade.prioridade === PrioridadeOportunidade.ALTA
+                          ? 'bg-red-100 text-red-700'
                           : oportunidade.prioridade === PrioridadeOportunidade.MEDIA
                             ? 'bg-yellow-100 text-yellow-700'
                             : 'bg-green-100 text-green-700'
-                        }`}
-                      >
-                        {oportunidade.prioridade === PrioridadeOportunidade.ALTA
-                          ? 'Alta'
-                          : oportunidade.prioridade === PrioridadeOportunidade.MEDIA
-                            ? 'Média'
-                            : 'Baixa'}
-                      </span>
-                    </div>
+                      }`}
+                    >
+                      {oportunidade.prioridade === PrioridadeOportunidade.ALTA
+                        ? 'Alta'
+                        : oportunidade.prioridade === PrioridadeOportunidade.MEDIA
+                          ? 'Média'
+                          : 'Baixa'}
+                    </span>
                   </div>
-                )}
+                </div>
+              )}
 
-                {oportunidade.origem && (
-                  <div className="flex items-start gap-3">
-                    <Tag className="h-5 w-5 text-[#159A9C] mt-0.5" />
-                    <div>
-                      <p className="text-sm text-[#002333]/60">Origem</p>
-                      <p className="font-semibold text-[#002333] capitalize">
-                        {oportunidade.origem}
-                      </p>
-                    </div>
+              {oportunidade.origem && (
+                <div className="flex items-start gap-3">
+                  <Tag className="h-5 w-5 text-[#159A9C] mt-0.5" />
+                  <div>
+                    <p className="text-sm text-[#002333]/60">Origem</p>
+                    <p className="font-semibold text-[#002333] capitalize">{oportunidade.origem}</p>
                   </div>
-                )}
+                </div>
+              )}
 
-                {oportunidade.dataFechamentoEsperado && (
-                  <div className="flex items-start gap-3">
-                    <Calendar className="h-5 w-5 text-[#159A9C] mt-0.5" />
-                    <div>
-                      <p className="text-sm text-[#002333]/60">Data Esperada</p>
-                      <p className="font-semibold text-[#002333]">
-                        {new Date(oportunidade.dataFechamentoEsperado).toLocaleDateString('pt-BR')}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Descrição */}
-              {oportunidade.descricao && (
-                <div>
-                  <h3 className="text-lg font-bold text-[#002333] mb-3">Descrição</h3>
-                  <div className="bg-[#DEEFE7]/35 rounded-xl p-4 border border-[#B4BEC9]/25">
-                    <p className="text-[#002333]/80 whitespace-pre-wrap">
-                      {oportunidade.descricao}
+              {oportunidade.dataFechamentoEsperado && (
+                <div className="flex items-start gap-3">
+                  <Calendar className="h-5 w-5 text-[#159A9C] mt-0.5" />
+                  <div>
+                    <p className="text-sm text-[#002333]/60">Data Esperada</p>
+                    <p className="font-semibold text-[#002333]">
+                      {new Date(oportunidade.dataFechamentoEsperado).toLocaleDateString('pt-BR')}
                     </p>
                   </div>
                 </div>
               )}
-
-              {/* Tags */}
-              {oportunidade.tags && oportunidade.tags.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-bold text-[#002333] mb-3 flex items-center gap-2">
-                    <Tag className="h-5 w-5 text-[#159A9C]" />
-                    Tags
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {oportunidade.tags.map((tag, idx) => (
-                      <span
-                        key={idx}
-                        className="px-3 py-1 bg-[#159A9C]/10 text-[#159A9C] rounded-lg text-sm font-semibold"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="rounded-xl border border-[#B4BEC9]/35 bg-[#DEEFE7]/35 p-4">
-                <h3 className="text-base font-bold text-[#002333] mb-3 flex items-center gap-2">
-                  <Plus className="h-4 w-4 text-[#159A9C]" />
-                  Registrar nova atividade
+
+            {/* Descrição */}
+            {oportunidade.descricao && (
+              <div>
+                <h3 className="text-lg font-bold text-[#002333] mb-3">Descrição</h3>
+                <div className="bg-[#DEEFE7]/35 rounded-xl p-4 border border-[#B4BEC9]/25">
+                  <p className="text-[#002333]/80 whitespace-pre-wrap">{oportunidade.descricao}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Tags */}
+            {oportunidade.tags && oportunidade.tags.length > 0 && (
+              <div>
+                <h3 className="text-lg font-bold text-[#002333] mb-3 flex items-center gap-2">
+                  <Tag className="h-5 w-5 text-[#159A9C]" />
+                  Tags
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div className="flex flex-wrap gap-2">
+                  {oportunidade.tags.map((tag, idx) => (
+                    <span
+                      key={idx}
+                      className="px-3 py-1 bg-[#159A9C]/10 text-[#159A9C] rounded-lg text-sm font-semibold"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div
+            id={panelAtividadesId}
+            role="tabpanel"
+            aria-labelledby={tabAtividadesId}
+            className="space-y-6"
+          >
+            <div className="rounded-xl border border-[#B4BEC9]/35 bg-[#DEEFE7]/35 p-4">
+              <h3 className="text-base font-bold text-[#002333] mb-3 flex items-center gap-2">
+                <Plus className="h-4 w-4 text-[#159A9C]" />
+                Registrar nova atividade
+              </h3>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[#002333]/70">Tipo</label>
                   <select
                     value={novoTipoAtividade}
                     onChange={(event) => setNovoTipoAtividade(event.target.value as TipoAtividade)}
-                    className="rounded-lg border border-[#B4BEC9]/70 bg-white px-3 py-2 text-sm text-[#002333] focus:border-[#159A9C] focus:outline-none"
+                    disabled={salvandoAtividade}
+                    className="w-full rounded-lg border border-[#B4BEC9]/70 bg-white px-3 py-2 text-sm text-[#002333] focus:border-[#159A9C] focus:outline-none disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     <option value={TipoAtividade.LIGACAO}>Ligacao</option>
                     <option value={TipoAtividade.EMAIL}>Email</option>
@@ -577,166 +696,309 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
                     <option value={TipoAtividade.NOTA}>Nota</option>
                     <option value={TipoAtividade.TAREFA}>Tarefa</option>
                   </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[#002333]/70">
+                    Data da atividade
+                  </label>
                   <input
                     type="date"
                     value={novaDataAtividade}
                     onChange={(event) => setNovaDataAtividade(event.target.value)}
-                    className="rounded-lg border border-[#B4BEC9]/70 bg-white px-3 py-2 text-sm text-[#002333] focus:border-[#159A9C] focus:outline-none"
-                  />
-                  <div className="md:col-span-2">
-                    <textarea
-                      value={novaDescricaoAtividade}
-                      onChange={(event) => setNovaDescricaoAtividade(event.target.value)}
-                      rows={2}
-                      placeholder="Descreva a interacao, follow-up ou proximo passo..."
-                      className="w-full rounded-lg border border-[#B4BEC9]/70 bg-white px-3 py-2 text-sm text-[#002333] focus:border-[#159A9C] focus:outline-none"
-                    />
-                  </div>
-                </div>
-                <div className="mt-3 flex justify-end">
-                  <button
-                    type="button"
                     disabled={salvandoAtividade}
-                    onClick={() => {
-                      void criarAtividade();
-                    }}
-                    className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    <Plus className="h-4 w-4" />
-                    {salvandoAtividade ? 'Salvando...' : 'Adicionar atividade'}
-                  </button>
+                    className="w-full rounded-lg border border-[#B4BEC9]/70 bg-white px-3 py-2 text-sm text-[#002333] focus:border-[#159A9C] focus:outline-none disabled:cursor-not-allowed disabled:opacity-70"
+                  />
+                </div>
+
+                <div className="md:col-span-4">
+                  <div className="mb-1 flex items-center justify-between">
+                    <label
+                      htmlFor={`descricao-atividade-${oportunidade.id}`}
+                      className="block text-xs font-medium text-[#002333]/70"
+                    >
+                      Descricao da atividade
+                    </label>
+                    <span className="text-xs text-[#002333]/50">
+                      {novaDescricaoAtividade.length} caracteres
+                    </span>
+                  </div>
+                  <textarea
+                    id={`descricao-atividade-${oportunidade.id}`}
+                    value={novaDescricaoAtividade}
+                    onChange={(event) => setNovaDescricaoAtividade(event.target.value)}
+                    rows={5}
+                    disabled={salvandoAtividade}
+                    placeholder="Descreva a interacao, follow-up ou proximo passo..."
+                    aria-invalid={descricaoAtividadeInvalida}
+                    className={`min-h-[140px] w-full resize-y rounded-lg border bg-white px-3 py-2 text-sm text-[#002333] focus:outline-none disabled:cursor-not-allowed disabled:opacity-70 ${
+                      descricaoAtividadeInvalida
+                        ? 'border-red-300 focus:border-red-500'
+                        : 'border-[#B4BEC9]/70 focus:border-[#159A9C]'
+                    }`}
+                  />
+                  {descricaoAtividadeInvalida && (
+                    <p className="mt-1 text-xs text-red-600">
+                      A descricao da atividade e obrigatoria.
+                    </p>
+                  )}
                 </div>
               </div>
-
-              <div>
-                <h3 className="text-lg font-bold text-[#002333] mb-4 flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5 text-[#159A9C]" />
-                  Timeline de Atividades
-                </h3>
-
-                {loadingAtividades ? (
-                  <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#159A9C] mx-auto"></div>
-                    <p className="text-[#002333]/60 mt-2 text-sm">Carregando atividades...</p>
-                  </div>
-                ) : atividades.length === 0 ? (
-                  <div className="text-center py-12 bg-[#DEEFE7]/35 rounded-xl border border-[#B4BEC9]/25">
-                    <MessageSquare className="h-12 w-12 text-[#B4BEC9] mx-auto mb-3" />
-                    <p className="text-[#002333]/70 font-medium">Nenhuma atividade registrada</p>
-                    <p className="text-[#002333]/55 text-sm mt-1">
-                      As atividades aparecerão aqui conforme forem criadas.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void carregarAtividades();
-                      }}
-                      className="mt-4 px-4 py-2 border border-[#B4BEC9]/70 rounded-lg text-sm font-medium text-[#002333] hover:bg-[#DEEFE7]/55 transition-colors"
-                    >
-                      Recarregar
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {atividades.map((atividade, index) => (
-                      <div key={atividade.id} className="flex gap-4">
-                        <div className="flex flex-col items-center">
-                          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] flex items-center justify-center shadow-sm">
-                            {getIconeAtividade(atividade.tipo)}
-                          </div>
-                          {index < atividades.length - 1 && (
-                            <div className="w-0.5 flex-1 bg-[#B4BEC9]/60 my-2 min-h-[30px]" />
-                          )}
-                        </div>
-
-                        <div className="flex-1 pb-6">
-                          <div className="bg-white border border-[#B4BEC9]/35 rounded-xl p-4 hover:border-[#159A9C]/30 transition-colors">
-                            <div className="flex items-start justify-between mb-2">
-                              <div>
-                                <p className="font-semibold text-[#002333] capitalize">
-                                  {getLabelTipoAtividade(atividade.tipo)}
-                                </p>
-                                <p className="text-xs text-[#002333]/55 flex items-center gap-1 mt-1">
-                                  <User className="h-3 w-3" />
-                                  {atividade.criadoPor?.nome || 'Sistema'} •{' '}
-                                  {formatarData(atividade.createdAt)}
-                                </p>
-                              </div>
-                            </div>
-                            <p className="text-[#002333]/80 text-sm whitespace-pre-wrap">
-                              {atividade.descricao}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <h3 className="text-lg font-bold text-[#002333] mb-4 flex items-center gap-2">
-                  <GitBranch className="h-5 w-5 text-[#159A9C]" />
-                  Historico de estagios
-                </h3>
-
-                {loadingHistoricoEstagios ? (
-                  <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#159A9C] mx-auto"></div>
-                    <p className="text-[#002333]/60 mt-2 text-sm">Carregando historico...</p>
-                  </div>
-                ) : historicoEstagios.length === 0 ? (
-                  <div className="rounded-xl border border-[#B4BEC9]/25 bg-[#DEEFE7]/25 px-4 py-5 text-sm text-[#002333]/65">
-                    Nenhuma movimentacao de estagio registrada para esta oportunidade.
-                  </div>
-                ) : (
-                  <div className="space-y-2.5">
-                    {historicoEstagios.map((evento) => (
-                      <div
-                        key={evento.id}
-                        className="rounded-xl border border-[#B4BEC9]/35 bg-white px-4 py-3"
-                      >
-                        <p className="text-sm font-semibold text-[#002333]">
-                          {evento.fromStage
-                            ? `${getNomeEstagio(evento.fromStage)} -> ${getNomeEstagio(evento.toStage)}`
-                            : `Entrada em ${getNomeEstagio(evento.toStage)}`}
-                        </p>
-                        <p className="mt-1 text-xs text-[#002333]/60">
-                          {evento.changedBy?.nome || 'Sistema'} • {formatarData(evento.changedAt)} •{' '}
-                          Origem: {evento.source}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  disabled={salvandoAtividade}
+                  onClick={() => {
+                    void criarAtividade();
+                  }}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  <Plus className="h-4 w-4" />
+                  {salvandoAtividade ? 'Salvando...' : 'Adicionar atividade'}
+                </button>
               </div>
             </div>
+
+            <div>
+              <h3 className="text-lg font-bold text-[#002333] mb-4 flex items-center gap-2">
+                <MessageSquare className="h-5 w-5 text-[#159A9C]" />
+                Timeline de Atividades
+              </h3>
+
+              {loadingAtividades ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#159A9C] mx-auto"></div>
+                  <p className="text-[#002333]/60 mt-2 text-sm">Carregando atividades...</p>
+                </div>
+              ) : atividades.length === 0 ? (
+                <div className="text-center py-12 bg-[#DEEFE7]/35 rounded-xl border border-[#B4BEC9]/25">
+                  <MessageSquare className="h-12 w-12 text-[#B4BEC9] mx-auto mb-3" />
+                  <p className="text-[#002333]/70 font-medium">Nenhuma atividade registrada</p>
+                  <p className="text-[#002333]/55 text-sm mt-1">
+                    As atividades aparecerão aqui conforme forem criadas.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void carregarAtividades();
+                    }}
+                    className="mt-4 px-4 py-2 border border-[#B4BEC9]/70 rounded-lg text-sm font-medium text-[#002333] hover:bg-[#DEEFE7]/55 transition-colors"
+                  >
+                    Recarregar
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {atividades.map((atividade, index) => (
+                    <div key={atividade.id} className="flex gap-4">
+                      <div className="flex flex-col items-center">
+                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] flex items-center justify-center shadow-sm">
+                          {getIconeAtividade(atividade.tipo)}
+                        </div>
+                        {index < atividades.length - 1 && (
+                          <div className="w-0.5 flex-1 bg-[#B4BEC9]/60 my-2 min-h-[30px]" />
+                        )}
+                      </div>
+
+                      <div className="flex-1 pb-6">
+                        <div className="bg-white border border-[#B4BEC9]/35 rounded-xl p-4 hover:border-[#159A9C]/30 transition-colors">
+                          <div className="flex items-start justify-between mb-2">
+                            <div>
+                              <p className="font-semibold text-[#002333] capitalize">
+                                {getLabelTipoAtividade(atividade.tipo)}
+                              </p>
+                              <p className="text-xs text-[#002333]/55 flex items-center gap-1 mt-1">
+                                <User className="h-3 w-3" />
+                                {atividade.criadoPor?.nome || 'Sistema'} •{' '}
+                                {formatarData(atividade.dataAtividade || atividade.createdAt)}
+                              </p>
+                            </div>
+                          </div>
+                          <p className="text-[#002333]/80 text-sm whitespace-pre-wrap">
+                            {atividade.descricao}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <h3 className="text-lg font-bold text-[#002333] mb-4 flex items-center gap-2">
+                <GitBranch className="h-5 w-5 text-[#159A9C]" />
+                Historico de estagios
+              </h3>
+
+              {loadingHistoricoEstagios ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#159A9C] mx-auto"></div>
+                  <p className="text-[#002333]/60 mt-2 text-sm">Carregando historico...</p>
+                </div>
+              ) : historicoEstagios.length === 0 ? (
+                <div className="rounded-xl border border-[#B4BEC9]/25 bg-[#DEEFE7]/25 px-4 py-5 text-sm text-[#002333]/65">
+                  Nenhuma movimentacao de estagio registrada para esta oportunidade.
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {historicoEstagios.map((evento) => (
+                    <div
+                      key={evento.id}
+                      className="rounded-xl border border-[#B4BEC9]/35 bg-white px-4 py-3"
+                    >
+                      <p className="text-sm font-semibold text-[#002333]">
+                        {evento.fromStage
+                          ? `${getNomeEstagio(evento.fromStage)} -> ${getNomeEstagio(evento.toStage)}`
+                          : `Entrada em ${getNomeEstagio(evento.toStage)}`}
+                      </p>
+                      <p className="mt-1 text-xs text-[#002333]/60">
+                        {evento.changedBy?.nome || 'Sistema'} • {formatarData(evento.changedAt)} •{' '}
+                        Origem: {evento.source}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {podeCarregarMaisHistorico && (
+                <div className="mt-3 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={handleCarregarMaisHistorico}
+                    disabled={loadingHistoricoEstagios}
+                    className="rounded-lg border border-[#B4BEC9]/70 px-4 py-2 text-sm font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/55 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {loadingHistoricoEstagios ? 'Carregando...' : 'Carregar mais historico'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="border-t border-[#B4BEC9]/35 px-6 py-4 bg-[#DEEFE7]/35 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {podeArquivar && onArquivar && (
+            <button
+              onClick={() =>
+                void executarAcaoLifecycle(
+                  'arquivar',
+                  onArquivar,
+                  'Deseja arquivar esta oportunidade?',
+                )
+              }
+              type="button"
+              disabled={acaoLifecycleLoading !== null}
+              className="px-3 py-2 rounded-lg border border-[#B4BEC9]/70 bg-white text-[#002333] hover:bg-[#DEEFE7]/55 transition-colors text-sm font-medium inline-flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <Archive className="h-4 w-4 text-[#159A9C]" />
+              {acaoLifecycleLoading === 'arquivar' ? 'Arquivando...' : 'Arquivar'}
+            </button>
+          )}
+
+          {podeRestaurar && onRestaurar && (
+            <button
+              onClick={() =>
+                void executarAcaoLifecycle(
+                  'restaurar',
+                  onRestaurar,
+                  'Deseja restaurar esta oportunidade para o fluxo ativo?',
+                )
+              }
+              type="button"
+              disabled={acaoLifecycleLoading !== null}
+              className="px-3 py-2 rounded-lg border border-[#B4BEC9]/70 bg-white text-[#002333] hover:bg-[#DEEFE7]/55 transition-colors text-sm font-medium inline-flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <RotateCcw className="h-4 w-4 text-[#159A9C]" />
+              {acaoLifecycleLoading === 'restaurar' ? 'Restaurando...' : 'Restaurar'}
+            </button>
+          )}
+
+          {podeReabrir && onReabrir && (
+            <button
+              onClick={() =>
+                void executarAcaoLifecycle(
+                  'reabrir',
+                  onReabrir,
+                  'Deseja reabrir esta oportunidade?',
+                )
+              }
+              type="button"
+              disabled={acaoLifecycleLoading !== null}
+              className="px-3 py-2 rounded-lg border border-[#B4BEC9]/70 bg-white text-[#002333] hover:bg-[#DEEFE7]/55 transition-colors text-sm font-medium inline-flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <RotateCcw className="h-4 w-4 text-[#159A9C]" />
+              {acaoLifecycleLoading === 'reabrir' ? 'Reabrindo...' : 'Reabrir'}
+            </button>
+          )}
+
+          {podeExcluir && onExcluir && (
+            <button
+              onClick={() =>
+                void executarAcaoLifecycle(
+                  'excluir',
+                  onExcluir,
+                  exclusaoDireta
+                    ? 'Deseja excluir esta oportunidade permanentemente? Esta acao nao pode ser desfeita.'
+                    : 'Deseja mover esta oportunidade para a lixeira?',
+                )
+              }
+              type="button"
+              disabled={acaoLifecycleLoading !== null}
+              className="px-3 py-2 rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-colors text-sm font-medium inline-flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <Trash2 className="h-4 w-4" />
+              {acaoLifecycleLoading === 'excluir'
+                ? exclusaoDireta
+                  ? 'Excluindo...'
+                  : 'Enviando...'
+                : 'Excluir'}
+            </button>
+          )}
+
+          {podeExcluirPermanente && onExcluirPermanente && (
+            <button
+              onClick={() =>
+                void executarAcaoLifecycle(
+                  'excluir_permanente',
+                  onExcluirPermanente,
+                  'Deseja excluir permanentemente esta oportunidade? Esta acao nao pode ser desfeita.',
+                )
+              }
+              type="button"
+              disabled={acaoLifecycleLoading !== null}
+              className="px-3 py-2 rounded-lg border border-red-600 bg-red-600 text-white hover:bg-red-700 transition-colors text-sm font-medium inline-flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <Trash2 className="h-4 w-4" />
+              {acaoLifecycleLoading === 'excluir_permanente'
+                ? 'Excluindo...'
+                : 'Excluir permanente'}
+            </button>
           )}
         </div>
 
-        {/* Footer */}
-        <div className="border-t border-[#B4BEC9]/35 px-6 py-4 bg-[#DEEFE7]/35 flex justify-end gap-3">
+        <div className="flex items-center gap-3">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             type="button"
             className="px-4 py-2 border border-[#B4BEC9]/70 text-[#002333] rounded-lg hover:bg-[#DEEFE7]/55 transition-colors text-sm font-medium"
           >
             Fechar
           </button>
           <button
-            onClick={() => {
-              onEditar(oportunidade);
-              onClose();
-            }}
+            onClick={handleEditarOportunidade}
             type="button"
             className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors flex items-center gap-2 text-sm font-medium"
           >
             <Edit2 className="h-4 w-4" />
-            Editar Oportunidade
+            Editar oportunidade
           </button>
         </div>
       </div>
-    </div>
+    </BaseModal>
   );
 };
 
