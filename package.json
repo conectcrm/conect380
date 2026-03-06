@@ -47,7 +47,9 @@
     "sync:audit": "powershell -ExecutionPolicy Bypass -File scripts/git/sync-safe.ps1",
     "sync:apply": "powershell -ExecutionPolicy Bypass -File scripts/git/sync-safe.ps1 -Apply",
     "sync:apply:force": "powershell -ExecutionPolicy Bypass -File scripts/git/sync-safe.ps1 -Apply -AllowHighRisk",
-    "sync:harden": "powershell -ExecutionPolicy Bypass -File scripts/git/harden-git-sync.ps1"
+    "sync:harden": "powershell -ExecutionPolicy Bypass -File scripts/git/harden-git-sync.ps1",
+    "branch:health": "powershell -ExecutionPolicy Bypass -File scripts/git/branch-health.ps1",
+    "branch:health:prune": "powershell -ExecutionPolicy Bypass -File scripts/git/branch-health.ps1 -PruneFetch"
   },
   "keywords": [
     "crm",

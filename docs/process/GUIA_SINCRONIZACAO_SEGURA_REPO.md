@@ -62,6 +62,23 @@ npm run sync:audit
 npm run sync:apply
 ```
 
+## Saude das branches (rotina semanal)
+Gerar status de saude local/remoto:
+```bash
+npm run branch:health:prune
+```
+
+Criticos comuns:
+- `UPSTREAM_GONE`: branch local aponta para remoto removido.
+- `BehindMain` muito alto: branch defasada com risco de conflito massivo.
+- `AgeDays` alto: branch stale com alto risco de regressao na reconciliacao.
+
+Acao recomendada para branch critica:
+1. Nao fazer merge direto.
+2. Criar branch limpa de `origin/main`.
+3. Reaplicar somente commits necessarios.
+4. Validar router/menu/telas antes de push.
+
 ## Checklist rapido antes de push
 1. Router principal sem rotas de exemplo/legado reintroduzidas.
 2. Sidebar/menu sem links para telas antigas.
