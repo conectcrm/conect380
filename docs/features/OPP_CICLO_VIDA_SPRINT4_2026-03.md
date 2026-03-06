@@ -72,7 +72,7 @@ Regra:
 1. OPP-304-T2 parcialmente concluida:
    - runbook publicado em `docs/features/OPP304_ROLLOUT_RUNBOOK_CICLO_VIDA_2026-03.md`.
 2. Automacao de pre-piloto entregue:
-   - script `scripts/test-opp304-piloto-lifecycle.ps1`;
+   - script `scripts/qa-opp304-piloto-lifecycle.ps1`;
    - dry-run executado com sucesso (`docs/features/evidencias/OPP304_PILOTO_API_SMOKE_20260306-094312.md`);
    - execucao real local registrada (`docs/features/evidencias/OPP304_PILOTO_API_SMOKE_20260306-094306.md`).
 3. Monitoramento automatizado de piloto publicado:

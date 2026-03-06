@@ -33,11 +33,11 @@
   - `docs/features/evidencias/OPP304_PILOTO_MONITOR_48H_20260306-095244.md`
   - Resultado: ciclos `PARTIAL` por `401` em endpoints protegidos sem autenticacao valida.
 - [x] Smoke real autenticado com transicoes lifecycle:
-  - `powershell -ExecutionPolicy Bypass -File scripts/test-opp304-piloto-lifecycle.ps1 -BaseUrl http://localhost:3001 -Email <usuario> -Senha <senha> -ApplyFlagPatch -FlagEnabled $true -RolloutPercentage 0 -RestoreAfterPatch $false -RunLifecycleActions -OportunidadeId <id_aberta> -ClosedOportunidadeId <id_fechada>`
+  - `powershell -ExecutionPolicy Bypass -File scripts/qa-opp304-piloto-lifecycle.ps1 -BaseUrl http://localhost:3001 -Email <usuario> -Senha <senha> -ApplyFlagPatch -FlagEnabled $true -RolloutPercentage 0 -RestoreAfterPatch $false -RunLifecycleActions -OportunidadeId <id_aberta> -ClosedOportunidadeId <id_fechada>`
   - `docs/features/evidencias/OPP304_PILOTO_API_SMOKE_20260306-100852.md`
   - Resultado: PASS completo (11/11 etapas).
 - [x] Smoke real autenticado (rodada complementar local):
-  - `powershell -ExecutionPolicy Bypass -File scripts/test-opp304-piloto-lifecycle.ps1 -BaseUrl http://localhost:3001 -Email <usuario> -Senha <senha> -RunLifecycleActions -OportunidadeId <id_aberta>`
+  - `powershell -ExecutionPolicy Bypass -File scripts/qa-opp304-piloto-lifecycle.ps1 -BaseUrl http://localhost:3001 -Email <usuario> -Senha <senha> -RunLifecycleActions -OportunidadeId <id_aberta>`
   - `docs/features/evidencias/OPP304_PILOTO_API_SMOKE_20260306-110310.md`
   - Resultado: PASS sem falhas (8 PASS / 1 SKIPPED por `ClosedOportunidadeId` nao informado).
 - [x] Monitor OPP-304 quick autenticado sem falhas:

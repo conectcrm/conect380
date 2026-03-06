@@ -92,6 +92,6 @@ Regra:
    - dry-run executado com sucesso via `npm run test:opp305:homolog:dryrun`;
    - evidencia: `docs/features/evidencias/OPP305_HOMOLOG_API_SMOKE_20260306-092704.md`.
 7. Smoke real da API stale executado em ambiente local:
-   - comando: `powershell -ExecutionPolicy Bypass -File scripts/test-opp305-stale-homologacao.ps1 -BaseUrl http://localhost:3001 -Email <usuario> -Senha <senha>`;
+   - comando: `powershell -ExecutionPolicy Bypass -File scripts/qa-opp305-stale-homologacao.ps1 -BaseUrl http://localhost:3001 -Email <usuario> -Senha <senha>`;
    - tentativa inicial registrou falha de autenticacao/intermitencia (`docs/features/evidencias/OPP305_HOMOLOG_API_SMOKE_20260306-110142.md`);
    - rerun autenticado concluiu com `PASS=5` e `FAIL=0` (`docs/features/evidencias/OPP305_HOMOLOG_API_SMOKE_20260306-110229.md`).

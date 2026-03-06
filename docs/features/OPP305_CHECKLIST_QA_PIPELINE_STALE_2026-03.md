@@ -21,10 +21,10 @@ Validar o comportamento funcional e visual da deteccao de oportunidades paradas 
 - [x] Relatorio consolidado: `docs/features/evidencias/OPP305_RELATORIO_QA_STALE_20260306-100919.md`
 - [x] Smoke homologacao (dry-run): `npm run test:opp305:homolog:dryrun` -> `docs/features/evidencias/OPP305_HOMOLOG_API_SMOKE_20260306-092704.md`
 - [x] Smoke homologacao (real/local) - tentativa inicial com falha de autenticacao/intermitencia:
-  - `powershell -ExecutionPolicy Bypass -File scripts/test-opp305-stale-homologacao.ps1 -BaseUrl http://localhost:3001 -Email <usuario> -Senha <senha>`
+  - `powershell -ExecutionPolicy Bypass -File scripts/qa-opp305-stale-homologacao.ps1 -BaseUrl http://localhost:3001 -Email <usuario> -Senha <senha>`
   - `docs/features/evidencias/OPP305_HOMOLOG_API_SMOKE_20260306-110142.md`
 - [x] Smoke homologacao (real/local) - rerun autenticado em PASS:
-  - `powershell -ExecutionPolicy Bypass -File scripts/test-opp305-stale-homologacao.ps1 -BaseUrl http://localhost:3001 -Email <usuario> -Senha <senha>`
+  - `powershell -ExecutionPolicy Bypass -File scripts/qa-opp305-stale-homologacao.ps1 -BaseUrl http://localhost:3001 -Email <usuario> -Senha <senha>`
   - `docs/features/evidencias/OPP305_HOMOLOG_API_SMOKE_20260306-110229.md`
   - Resultado: 5/5 PASS, sem `401`.
 

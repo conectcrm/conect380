@@ -43,8 +43,8 @@ DO UPDATE SET
    - `GET /oportunidades/lifecycle/feature-flag`
 4. Executar smoke funcional:
    - baseline tecnico (sem chamadas reais): `npm run test:opp304:piloto:dryrun`;
-   - smoke real autenticado: `powershell -ExecutionPolicy Bypass -File scripts/test-opp304-piloto-lifecycle.ps1 -BaseUrl <url_homolog> -Token <jwt_valido>`;
-   - smoke com transicoes lifecycle: `powershell -ExecutionPolicy Bypass -File scripts/test-opp304-piloto-lifecycle.ps1 -BaseUrl <url_homolog> -Token <jwt_valido> -RunLifecycleActions -OportunidadeId <id_aberta> -ClosedOportunidadeId <id_fechada>`;
+   - smoke real autenticado: `powershell -ExecutionPolicy Bypass -File scripts/qa-opp304-piloto-lifecycle.ps1 -BaseUrl <url_homolog> -Token <jwt_valido>`;
+   - smoke com transicoes lifecycle: `powershell -ExecutionPolicy Bypass -File scripts/qa-opp304-piloto-lifecycle.ps1 -BaseUrl <url_homolog> -Token <jwt_valido> -RunLifecycleActions -OportunidadeId <id_aberta> -ClosedOportunidadeId <id_fechada>`;
    - validar relatorio em `docs/features/evidencias/OPP304_PILOTO_API_SMOKE_<timestamp>.md`.
 
 ## 5. Monitoramento nas primeiras 48h

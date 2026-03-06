@@ -35,11 +35,11 @@
     "monitor:opp304:piloto": "powershell -ExecutionPolicy Bypass -File scripts/monitor-opp304-piloto-48h.ps1",
     "monitor:opp304:piloto:dryrun": "powershell -ExecutionPolicy Bypass -File scripts/monitor-opp304-piloto-48h.ps1 -DryRun -MaxCycles 1",
     "monitor:opp304:piloto:quick": "powershell -ExecutionPolicy Bypass -File scripts/monitor-opp304-piloto-48h.ps1 -IntervalSeconds 10 -MaxCycles 2",
-    "test:opp304:piloto": "powershell -ExecutionPolicy Bypass -File scripts/test-opp304-piloto-lifecycle.ps1",
-    "test:opp304:piloto:dryrun": "powershell -ExecutionPolicy Bypass -File scripts/test-opp304-piloto-lifecycle.ps1 -DryRun",
-    "test:opp305:stale": "powershell -ExecutionPolicy Bypass -File scripts/test-opp305-stale-quality.ps1",
-    "test:opp305:homolog": "powershell -ExecutionPolicy Bypass -File scripts/test-opp305-stale-homologacao.ps1",
-    "test:opp305:homolog:dryrun": "powershell -ExecutionPolicy Bypass -File scripts/test-opp305-stale-homologacao.ps1 -DryRun"
+    "test:opp304:piloto": "powershell -ExecutionPolicy Bypass -File scripts/qa-opp304-piloto-lifecycle.ps1",
+    "test:opp304:piloto:dryrun": "powershell -ExecutionPolicy Bypass -File scripts/qa-opp304-piloto-lifecycle.ps1 -DryRun",
+    "test:opp305:stale": "powershell -ExecutionPolicy Bypass -File scripts/qa-opp305-stale-quality.ps1",
+    "test:opp305:homolog": "powershell -ExecutionPolicy Bypass -File scripts/qa-opp305-stale-homologacao.ps1",
+    "test:opp305:homolog:dryrun": "powershell -ExecutionPolicy Bypass -File scripts/qa-opp305-stale-homologacao.ps1 -DryRun"
   },
   "keywords": [
     "crm",

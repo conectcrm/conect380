@@ -11,16 +11,16 @@ Executar as pendencias operacionais finais do ciclo de vida de oportunidades e f
 3. Credencial valida do tenant piloto (`-Token` ou `-Email/-Senha`).
 4. Canal de incidente definido para a janela de 48h.
 5. Scripts disponiveis:
-   - `scripts/test-opp304-piloto-lifecycle.ps1`
+   - `scripts/qa-opp304-piloto-lifecycle.ps1`
    - `scripts/monitor-opp304-piloto-48h.ps1`
-   - `scripts/test-opp305-stale-homologacao.ps1`
+   - `scripts/qa-opp305-stale-homologacao.ps1`
 
 ## 3. Sequencia obrigatoria de execucao
 
 1. OPP-304 - Validacao inicial autenticada do tenant piloto:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/test-opp304-piloto-lifecycle.ps1 `
+powershell -ExecutionPolicy Bypass -File scripts/qa-opp304-piloto-lifecycle.ps1 `
   -BaseUrl "https://api.seu-ambiente.com" `
   -Token "<jwt-valido>" `
   -RunLifecycleActions `
@@ -41,7 +41,7 @@ powershell -ExecutionPolicy Bypass -File scripts/monitor-opp304-piloto-48h.ps1 `
 3. OPP-305 - Smoke autenticado da API stale:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/test-opp305-stale-homologacao.ps1 `
+powershell -ExecutionPolicy Bypass -File scripts/qa-opp305-stale-homologacao.ps1 `
   -BaseUrl "https://api.seu-ambiente.com" `
   -Token "<jwt-valido>"
 ```
