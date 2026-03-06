@@ -134,10 +134,6 @@ const PortalRoutes = React.lazy(() => import('./routes/PortalRoutes'));
 
 const CaptureLeadPage = React.lazy(() => import('./pages/CaptureLeadPage'));
 
-const ExemploModalProduto = React.lazy(() =>
-  import('./examples/ExemploModalProduto').then((m) => ({ default: m.ExemploModalProduto })),
-);
-
 const DepartamentosPage = React.lazy(() => import('./features/gestao/pages/DepartamentosPage'));
 
 const ConfigurarCanalEmail = React.lazy(() => import('./pages/ConfigurarCanalEmail'));
@@ -731,7 +727,6 @@ const AppRoutes: React.FC = () => {
                     element={protegerRota(ModuloEnum.BILLING, <FaturamentoPage />)}
                   />
                   {/* Exemplo Modal Produto */}
-                  <Route path="/exemplo-produto" element={<ExemploModalProduto />} />
                   {/* Rotas dos módulos existentes - Protegidas */}
                   <Route path="/leads" element={protegerRota(ModuloEnum.CRM, <LeadsPage />)} />
                   <Route
