@@ -1,0 +1,7 @@
+Issue ID,Parent ID,Issue Type,Summary,Description,Priority,Story Points,Epic Name,Labels,Components
+OPP-EPIC-04,,Epic,OPP-04 Dashboard Analytics integracoes e rollout lifecycle,Alinhar metricas e integracoes internas ao lifecycle preservando compatibilidade legada,High,,OPP-04 Dashboard Analytics integracoes e rollout,conect360 oportunidades lifecycle sprint4 fase4 rollout,Backend
+OPP-304,OPP-EPIC-04,Story,OPP-304 Rollout assistido e runbook operacional,Executar piloto por tenant com monitoramento de 48h e publicar runbook de operacao/rollback,High,5,,conect360 oportunidades lifecycle sprint4 story-opp-304,Backend
+OPP-304-T1,OPP-304,Sub-task,OPP-304-T1 Executar piloto controlado por tenant,Ativar flag por tenant piloto e validar estabilidade operacional durante 48h,High,2,,conect360 oportunidades lifecycle sprint4 task-opp-304,Backend
+OPP-304-T2,OPP-304,Sub-task,OPP-304-T2 Publicar runbook e checklist de rollback,Documentar procedimentos de suporte monitoramento triagem e rollback da flag,Medium,2,,conect360 oportunidades lifecycle sprint4 task-opp-304,QA
+OPP-304-T3,OPP-304,Sub-task,OPP-304-T3 Comunicar e treinar operacao/comercial,Executar comunicacao de mudancas e treinamento rapido para equipe operacional e comercial,Medium,1,,conect360 oportunidades lifecycle sprint4 task-opp-304,Produto
+
