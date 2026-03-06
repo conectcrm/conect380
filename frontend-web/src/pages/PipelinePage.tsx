@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toastService } from '../services/toastService';
 import * as XLSX from 'xlsx';
@@ -35,19 +35,22 @@ import {
   Calendar,
   Search,
   X,
-  Edit2,
+  Maximize2,
+  Minimize2,
   Trash2,
   Grid3X3,
   List,
   BarChart3,
   Download,
   FileSpreadsheet,
-  FileText,
   AlertCircle,
   RefreshCw,
-  Copy,
   Save,
   Bookmark,
+  Archive,
+  RotateCcw,
+  SlidersHorizontal,
+  MoreHorizontal,
 } from 'lucide-react';
 import { oportunidadesService } from '../services/oportunidadesService';
 import usuariosService from '../services/usuariosService';
@@ -57,9 +60,13 @@ import {
   NovaOportunidade,
   FiltrosOportunidade,
   EstatisticasOportunidades,
+  StaleDealsResult,
+  StalePolicyDecision,
 } from '../types/oportunidades';
 import {
   EstagioOportunidade,
+  LifecycleStatusOportunidade,
+  LifecycleViewOportunidade,
   PrioridadeOportunidade,
   OrigemOportunidade,
   TipoAtividade,
@@ -70,9 +77,9 @@ import ModalDetalhesOportunidade from '../components/oportunidades/ModalDetalhes
 import ModalExport from '../components/oportunidades/ModalExport';
 import ModalMotivoPerda from '../components/oportunidades/ModalMotivoPerda';
 import { useAuth } from '../contexts/AuthContext';
+import { userHasPermission } from '../config/menuConfig';
 import { useGlobalConfirmation } from '../contexts/GlobalConfirmationContext';
-import { FiltersBar, PageHeader, SectionCard } from '../components/layout-v2';
-import ActiveEmpresaBadge from '../components/tenant/ActiveEmpresaBadge';
+import { DataTableCard, InlineStats, PageHeader, SectionCard } from '../components/layout-v2';
 
 // Configuração do localizador do calendário (date-fns)
 const locales = {
@@ -89,6 +96,7 @@ const localizer = dateFnsLocalizer({
 
 // Tipos de visualização
 type VisualizacaoPipeline = 'kanban' | 'lista' | 'calendario' | 'grafico';
+type WorkspaceTab = 'pipeline' | 'parametros';
 
 type EstagioConfig = {
   id: EstagioOportunidade;
@@ -105,7 +113,8 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.LEADS,
     nome: 'Leads',
-    headerClass: 'bg-[#002333]',
+    headerClass:
+      'bg-white border border-[#B4BEC9]/40 border-b-0 border-t-4 border-t-[#002333]',
     legendClass: 'bg-[#002333]',
     badgeTextClass: 'text-[#002333]',
     badgeBgClass: 'bg-[#DEEFE7]',
@@ -114,7 +123,8 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.QUALIFICACAO,
     nome: 'Qualificação',
-    headerClass: 'bg-[#0F7B7D]',
+    headerClass:
+      'bg-white border border-[#B4BEC9]/40 border-b-0 border-t-4 border-t-[#0F7B7D]',
     legendClass: 'bg-[#0F7B7D]',
     badgeTextClass: 'text-[#0F7B7D]',
     badgeBgClass: 'bg-[#DEEFE7]',
@@ -123,7 +133,8 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.PROPOSTA,
     nome: 'Proposta',
-    headerClass: 'bg-[#159A9C]',
+    headerClass:
+      'bg-white border border-[#B4BEC9]/40 border-b-0 border-t-4 border-t-[#159A9C]',
     legendClass: 'bg-[#159A9C]',
     badgeTextClass: 'text-[#0F7B7D]',
     badgeBgClass: 'bg-[#DEEFE7]',
@@ -132,7 +143,8 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.NEGOCIACAO,
     nome: 'Negociação',
-    headerClass: 'bg-[#0F7B7D]',
+    headerClass:
+      'bg-white border border-[#B4BEC9]/40 border-b-0 border-t-4 border-t-[#0F7B7D]',
     legendClass: 'bg-[#0F7B7D]',
     badgeTextClass: 'text-[#0F7B7D]',
     badgeBgClass: 'bg-[#DEEFE7]',
@@ -141,7 +153,8 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.FECHAMENTO,
     nome: 'Fechamento',
-    headerClass: 'bg-[#159A9C]',
+    headerClass:
+      'bg-white border border-[#B4BEC9]/40 border-b-0 border-t-4 border-t-[#159A9C]',
     legendClass: 'bg-[#159A9C]',
     badgeTextClass: 'text-[#0F7B7D]',
     badgeBgClass: 'bg-[#DEEFE7]',
@@ -150,7 +163,8 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.GANHO,
     nome: 'Ganho',
-    headerClass: 'bg-green-600',
+    headerClass:
+      'bg-white border border-[#B4BEC9]/40 border-b-0 border-t-4 border-t-green-600',
     legendClass: 'bg-green-600',
     badgeTextClass: 'text-green-700',
     badgeBgClass: 'bg-green-50',
@@ -159,7 +173,7 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
   {
     id: EstagioOportunidade.PERDIDO,
     nome: 'Perdido',
-    headerClass: 'bg-red-600',
+    headerClass: 'bg-white border border-[#B4BEC9]/40 border-b-0 border-t-4 border-t-red-600',
     legendClass: 'bg-red-600',
     badgeTextClass: 'text-red-700',
     badgeBgClass: 'bg-red-50',
@@ -168,6 +182,56 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
 ];
 
 // Paleta de apoio para gráficos (seguindo tema Crevasse + cores contextuais)
+const ALLOWED_STAGE_TRANSITIONS: Record<EstagioOportunidade, readonly EstagioOportunidade[]> = {
+  [EstagioOportunidade.LEADS]: [EstagioOportunidade.QUALIFICACAO, EstagioOportunidade.PERDIDO],
+  [EstagioOportunidade.QUALIFICACAO]: [
+    EstagioOportunidade.LEADS,
+    EstagioOportunidade.PROPOSTA,
+    EstagioOportunidade.PERDIDO,
+  ],
+  [EstagioOportunidade.PROPOSTA]: [
+    EstagioOportunidade.QUALIFICACAO,
+    EstagioOportunidade.NEGOCIACAO,
+    EstagioOportunidade.PERDIDO,
+  ],
+  [EstagioOportunidade.NEGOCIACAO]: [
+    EstagioOportunidade.PROPOSTA,
+    EstagioOportunidade.FECHAMENTO,
+    EstagioOportunidade.PERDIDO,
+  ],
+  [EstagioOportunidade.FECHAMENTO]: [
+    EstagioOportunidade.NEGOCIACAO,
+    EstagioOportunidade.GANHO,
+    EstagioOportunidade.PERDIDO,
+  ],
+  [EstagioOportunidade.GANHO]: [],
+  [EstagioOportunidade.PERDIDO]: [],
+};
+
+const LIFECYCLE_VIEW_OPTIONS: Array<{
+  id: LifecycleViewOportunidade;
+  label: string;
+}> = [
+  { id: LifecycleViewOportunidade.OPEN, label: 'Abertas' },
+  { id: LifecycleViewOportunidade.CLOSED, label: 'Fechadas' },
+  { id: LifecycleViewOportunidade.ARCHIVED, label: 'Arquivadas' },
+  { id: LifecycleViewOportunidade.DELETED, label: 'Lixeira' },
+];
+
+const LIFECYCLE_VIEW_DESCRIPTIONS: Record<LifecycleViewOportunidade, string> = {
+  [LifecycleViewOportunidade.OPEN]: 'Apenas oportunidades ativas no funil comercial.',
+  [LifecycleViewOportunidade.CLOSED]: 'Negocios encerrados como ganho ou perdido.',
+  [LifecycleViewOportunidade.ARCHIVED]: 'Registros arquivados para referencia.',
+  [LifecycleViewOportunidade.DELETED]: 'Itens enviados para a lixeira (exclusao logica).',
+  [LifecycleViewOportunidade.ALL_ACTIVE]: 'Todos os registros ativos.',
+  [LifecycleViewOportunidade.ALL]: 'Todos os registros, incluindo lixeira.',
+};
+
+const STALE_THRESHOLD_MIN = 7;
+const STALE_THRESHOLD_MAX = 120;
+const STALE_AUTO_ARCHIVE_MIN = 7;
+const STALE_AUTO_ARCHIVE_MAX = 365;
+
 const CORES_GRAFICOS = [
   '#002333',
   '#0F7B7D',
@@ -182,15 +246,30 @@ const CORES_GRAFICOS = [
 const PipelinePage: React.FC = () => {
   const { confirm } = useGlobalConfirmation();
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [oportunidades, setOportunidades] = useState<Oportunidade[]>([]);
   const [estatisticas, setEstatisticas] = useState<EstatisticasOportunidades | null>(null);
+  const [lifecycleFeatureEnabled, setLifecycleFeatureEnabled] = useState(false);
+  const [lifecycleView, setLifecycleView] = useState<LifecycleViewOportunidade>(
+    LifecycleViewOportunidade.OPEN,
+  );
+  const [stalePolicy, setStalePolicy] = useState<StalePolicyDecision | null>(null);
+  const [stalePolicyDraft, setStalePolicyDraft] = useState({
+    enabled: false,
+    thresholdDays: 30,
+    autoArchiveEnabled: false,
+    autoArchiveAfterDays: 60,
+  });
+  const [stalePolicyLoading, setStalePolicyLoading] = useState(false);
+  const [stalePolicySaving, setStalePolicySaving] = useState(false);
+  const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>('pipeline');
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loadingUsuarios, setLoadingUsuarios] = useState(false);
   const [visualizacao, setVisualizacao] = useState<VisualizacaoPipeline>('kanban');
+  const [kanbanExpanded, setKanbanExpanded] = useState(false);
   const [filtros, setFiltros] = useState({
     busca: '',
     estagio: '',
@@ -218,6 +297,7 @@ const PipelinePage: React.FC = () => {
   const [erroMotivoPerda, setErroMotivoPerda] = useState<string | null>(null);
   const [showModalDeletar, setShowModalDeletar] = useState(false);
   const [oportunidadeDeletar, setOportunidadeDeletar] = useState<Oportunidade | null>(null);
+  const [deleteMode, setDeleteMode] = useState<'soft' | 'permanente'>('soft');
   const [loadingDeletar, setLoadingDeletar] = useState(false);
   const [oportunidadeDetalhes, setOportunidadeDetalhes] = useState<Oportunidade | null>(null);
   const [oportunidadeEditando, setOportunidadeEditando] = useState<Oportunidade | null>(null);
@@ -226,6 +306,54 @@ const PipelinePage: React.FC = () => {
   );
   const [calendarView, setCalendarView] = useState<View>('month');
   const [calendarDate, setCalendarDate] = useState(new Date());
+  const [openCardActionsMenuId, setOpenCardActionsMenuId] = useState<string | null>(null);
+  const [openListActionsMenuId, setOpenListActionsMenuId] = useState<string | null>(null);
+  const canManageStalePolicy = userHasPermission(user as any, 'config.automacoes.manage');
+  const showPipelineWorkspace = !lifecycleFeatureEnabled || workspaceTab === 'pipeline';
+
+  useEffect(() => {
+    if (visualizacao !== 'kanban' && kanbanExpanded) {
+      setKanbanExpanded(false);
+    }
+  }, [visualizacao, kanbanExpanded]);
+
+  useEffect(() => {
+    if (!kanbanExpanded) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [kanbanExpanded]);
+
+  useEffect(() => {
+    if (!openCardActionsMenuId && !openListActionsMenuId) return;
+
+    const closeMenu = () => {
+      setOpenCardActionsMenuId(null);
+      setOpenListActionsMenuId(null);
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeMenu();
+    };
+
+    window.addEventListener('click', closeMenu);
+    window.addEventListener('keydown', handleEscape);
+
+    return () => {
+      window.removeEventListener('click', closeMenu);
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [openCardActionsMenuId, openListActionsMenuId]);
+
+  useEffect(() => {
+    if (!kanbanExpanded) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setKanbanExpanded(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [kanbanExpanded]);
 
   // Estados para ordenação e paginação
   const [ordenacao, setOrdenacao] = useState<{
@@ -259,6 +387,43 @@ const PipelinePage: React.FC = () => {
     }
   }, []);
 
+  const normalizeIntegerWithinRange = (value: number, min: number, max: number) => {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+      return min;
+    }
+    return Math.min(max, Math.max(min, Math.round(numericValue)));
+  };
+
+  const stalePolicyHasChanges = useMemo(() => {
+    if (!stalePolicy) return false;
+    return (
+      stalePolicy.enabled !== stalePolicyDraft.enabled ||
+      stalePolicy.thresholdDays !==
+        normalizeIntegerWithinRange(
+          stalePolicyDraft.thresholdDays,
+          STALE_THRESHOLD_MIN,
+          STALE_THRESHOLD_MAX,
+        ) ||
+      stalePolicy.autoArchiveEnabled !== stalePolicyDraft.autoArchiveEnabled ||
+      stalePolicy.autoArchiveAfterDays !==
+        normalizeIntegerWithinRange(
+          stalePolicyDraft.autoArchiveAfterDays,
+          STALE_AUTO_ARCHIVE_MIN,
+          STALE_AUTO_ARCHIVE_MAX,
+        )
+    );
+  }, [stalePolicy, stalePolicyDraft]);
+
+  const syncStalePolicyDraft = useCallback((policy: StalePolicyDecision) => {
+    setStalePolicyDraft({
+      enabled: Boolean(policy.enabled),
+      thresholdDays: policy.thresholdDays,
+      autoArchiveEnabled: Boolean(policy.autoArchiveEnabled),
+      autoArchiveAfterDays: policy.autoArchiveAfterDays,
+    });
+  }, []);
+
   // Verificar autenticação ao carregar
   useEffect(() => {
     if (!isAuthenticated) {
@@ -269,24 +434,83 @@ const PipelinePage: React.FC = () => {
       setLoading(false);
       return;
     }
-    carregarDados();
-  }, [isAuthenticated, navigate]);
+    void carregarDados();
+  }, [isAuthenticated, navigate, lifecycleView]);
 
   const carregarDados = async () => {
     try {
       setLoading(true);
       setError(null);
 
+      const lifecycleDecision = await oportunidadesService
+        .obterLifecycleFeatureFlag()
+        .catch(() => ({ enabled: false, source: 'disabled', rolloutPercentage: 0 }));
+      const lifecycleEnabled = Boolean(lifecycleDecision.enabled);
+      setLifecycleFeatureEnabled(lifecycleEnabled);
+
+      if (!lifecycleEnabled && lifecycleView !== LifecycleViewOportunidade.OPEN) {
+        setLifecycleView(LifecycleViewOportunidade.OPEN);
+      }
+
+      const lifecycleFilters: Partial<FiltrosOportunidade> = lifecycleEnabled
+        ? {
+            lifecycle_view: lifecycleView,
+            include_deleted: lifecycleView === LifecycleViewOportunidade.DELETED,
+          }
+        : {};
+
+      const staleDealsPromise: Promise<StaleDealsResult | null> =
+        lifecycleEnabled && lifecycleView === LifecycleViewOportunidade.OPEN
+          ? oportunidadesService.listarOportunidadesParadas({ limit: 2000 }).catch(() => null)
+          : Promise.resolve(null);
+
+      let stalePolicyPromise: Promise<StalePolicyDecision | null> = Promise.resolve(null);
+      if (lifecycleEnabled) {
+        setStalePolicyLoading(true);
+        stalePolicyPromise = oportunidadesService.obterStalePolicy().catch(() => null);
+      } else {
+        setStalePolicy(null);
+      }
+
       // Carregar oportunidades e usuários em paralelo
-      const [dados, stats, usuariosData] = await Promise.all([
-        oportunidadesService.listarOportunidades(),
-        oportunidadesService.obterEstatisticas(),
+      const [dados, stats, usuariosData, staleDealsResult, stalePolicyData] = await Promise.all([
+        oportunidadesService.listarOportunidades(lifecycleFilters),
+        oportunidadesService.obterEstatisticas(lifecycleFilters),
         carregarUsuarios(),
+        staleDealsPromise,
+        stalePolicyPromise,
       ]);
 
-      setOportunidades(dados);
+      const staleById = new Map(
+        (staleDealsResult?.stale || []).map((oportunidade: Oportunidade) => [
+          String(oportunidade.id),
+          oportunidade,
+        ]),
+      );
+      const dadosComStale =
+        staleById.size > 0
+          ? dados.map((oportunidade) => {
+              const stale = staleById.get(String(oportunidade.id));
+              if (!stale) return oportunidade;
+              return {
+                ...oportunidade,
+                is_stale: stale.is_stale,
+                stale_days: stale.stale_days,
+                stale_since: stale.stale_since,
+                last_interaction_at: stale.last_interaction_at,
+              };
+            })
+          : dados;
+
+      setOportunidades(dadosComStale);
       setEstatisticas(stats);
       setUsuarios(usuariosData);
+      if (stalePolicyData) {
+        setStalePolicy(stalePolicyData);
+        syncStalePolicyDraft(stalePolicyData);
+      } else if (lifecycleEnabled) {
+        setStalePolicy(null);
+      }
     } catch (err: any) {
       console.error('Erro ao carregar dados:', err);
 
@@ -296,6 +520,7 @@ const PipelinePage: React.FC = () => {
         // Redirecionar para login após 2 segundos
         setTimeout(() => {
           localStorage.removeItem('authToken'); // ✅ Corrigido para 'authToken'
+          localStorage.removeItem('refreshToken');
           navigate('/login');
         }, 2000);
       } else {
@@ -305,10 +530,55 @@ const PipelinePage: React.FC = () => {
       }
     } finally {
       setLoading(false);
+      setStalePolicyLoading(false);
     }
   };
 
   // Carregar lista de usuários para os selects
+  const handleSalvarStalePolicy = async () => {
+    if (!canManageStalePolicy) {
+      toastService.warning('Você não possui permissão para alterar essa configuração.');
+      return;
+    }
+
+    const payload = {
+      enabled: stalePolicyDraft.enabled,
+      thresholdDays: normalizeIntegerWithinRange(
+        stalePolicyDraft.thresholdDays,
+        STALE_THRESHOLD_MIN,
+        STALE_THRESHOLD_MAX,
+      ),
+      autoArchiveEnabled: stalePolicyDraft.enabled ? stalePolicyDraft.autoArchiveEnabled : false,
+      autoArchiveAfterDays: normalizeIntegerWithinRange(
+        stalePolicyDraft.autoArchiveAfterDays,
+        STALE_AUTO_ARCHIVE_MIN,
+        STALE_AUTO_ARCHIVE_MAX,
+      ),
+    };
+
+    try {
+      setStalePolicySaving(true);
+      const updatedPolicy = await oportunidadesService.atualizarStalePolicy(payload);
+      setStalePolicy(updatedPolicy);
+      syncStalePolicyDraft(updatedPolicy);
+      toastService.success('Política de oportunidades paradas atualizada.');
+      await carregarDados();
+    } catch (err: any) {
+      if (err?.response?.status === 403) {
+        toastService.error('Sem permissão para atualizar a política stale.');
+      } else {
+        toastService.error('Não foi possível atualizar a política stale.');
+      }
+    } finally {
+      setStalePolicySaving(false);
+    }
+  };
+
+  const handleResetStalePolicyDraft = () => {
+    if (!stalePolicy) return;
+    syncStalePolicyDraft(stalePolicy);
+  };
+
   const carregarUsuarios = async (): Promise<Usuario[]> => {
     try {
       setLoadingUsuarios(true);
@@ -324,10 +594,26 @@ const PipelinePage: React.FC = () => {
 
   // Abrir modal para criar nova oportunidade
   const handleNovaOportunidade = (estagio: EstagioOportunidade = EstagioOportunidade.LEADS) => {
+    if (lifecycleFeatureEnabled && lifecycleView !== LifecycleViewOportunidade.OPEN) {
+      toastService.warning('Para criar oportunidade, altere para a visão "Abertas".');
+      return;
+    }
+
     setOportunidadeEditando(null);
     setEstagioNovaOportunidade(estagio);
     setShowModal(true);
   };
+
+  const getLifecycleStatus = (oportunidade: Oportunidade): LifecycleStatusOportunidade => {
+    if (oportunidade.lifecycle_status) return oportunidade.lifecycle_status;
+    if (oportunidade.estagio === EstagioOportunidade.GANHO) return LifecycleStatusOportunidade.WON;
+    if (oportunidade.estagio === EstagioOportunidade.PERDIDO)
+      return LifecycleStatusOportunidade.LOST;
+    return LifecycleStatusOportunidade.OPEN;
+  };
+
+  const canManipulateKanban =
+    !lifecycleFeatureEnabled || lifecycleView === LifecycleViewOportunidade.OPEN;
 
   // Abrir modal para editar oportunidade existente
   const handleEditarOportunidade = (oportunidade: Oportunidade) => {
@@ -340,26 +626,32 @@ const PipelinePage: React.FC = () => {
     setOportunidadeDetalhes(oportunidade);
   };
 
-  // Abrir modal para confirmar exclusão
+  // Abrir modal para confirmar exclusao
   const handleDeletarOportunidade = (oportunidade: Oportunidade) => {
+    setDeleteMode(getDeleteModeForOpportunity(oportunidade));
     setOportunidadeDeletar(oportunidade);
     setShowModalDeletar(true);
   };
 
-  // Confirmar exclusão
+  // Confirmar exclusao
   const handleConfirmarDelecao = async () => {
     if (!oportunidadeDeletar) return;
 
     try {
       setLoadingDeletar(true);
-      await oportunidadesService.excluirOportunidade(oportunidadeDeletar.id);
-      setOportunidades((prev) => prev.filter((o) => o.id !== oportunidadeDeletar.id));
+      if (deleteMode === 'permanente') {
+        await oportunidadesService.excluirOportunidadePermanente(oportunidadeDeletar.id);
+        toastService.success('Oportunidade excluida permanentemente.');
+      } else {
+        await oportunidadesService.excluirOportunidade(oportunidadeDeletar.id);
+        toastService.success('Oportunidade enviada para a lixeira.');
+      }
+      if (oportunidadeDetalhes?.id === oportunidadeDeletar.id) {
+        setOportunidadeDetalhes(null);
+      }
 
       // Recarregar estatísticas
-      const stats = await oportunidadesService.obterEstatisticas();
-      setEstatisticas(stats);
-
-      toastService.success('Oportunidade deletada com sucesso!');
+      await carregarDados();
     } catch (err) {
       console.error('Erro ao deletar oportunidade:', err);
       toastService.error('Erro ao deletar oportunidade');
@@ -367,6 +659,70 @@ const PipelinePage: React.FC = () => {
       setLoadingDeletar(false);
       setShowModalDeletar(false);
       setOportunidadeDeletar(null);
+      setDeleteMode('soft');
+    }
+  };
+
+  const handleArquivarOportunidade = async (oportunidade: Oportunidade) => {
+    await oportunidadesService.arquivarOportunidade(oportunidade.id);
+    toastService.success('Oportunidade arquivada com sucesso.');
+    await carregarDados();
+  };
+
+  const handleRestaurarOportunidade = async (oportunidade: Oportunidade) => {
+    await oportunidadesService.restaurarOportunidade(oportunidade.id);
+    toastService.success('Oportunidade restaurada com sucesso.');
+    await carregarDados();
+  };
+
+  const handleReabrirOportunidade = async (oportunidade: Oportunidade) => {
+    await oportunidadesService.reabrirOportunidade(oportunidade.id);
+    toastService.success('Oportunidade reaberta com sucesso.');
+    await carregarDados();
+  };
+
+  const handleExcluirPermanenteOportunidade = async (oportunidade: Oportunidade) => {
+    await oportunidadesService.excluirOportunidadePermanente(oportunidade.id);
+    toastService.success('Oportunidade excluida permanentemente.');
+    await carregarDados();
+  };
+
+  const getDeleteModeForOpportunity = (oportunidade: Oportunidade): 'soft' | 'permanente' => {
+    const lifecycleStatus = getLifecycleStatus(oportunidade);
+    const shouldDeletePermanently =
+      lifecycleFeatureEnabled &&
+      (lifecycleView === LifecycleViewOportunidade.DELETED ||
+        lifecycleStatus === LifecycleStatusOportunidade.DELETED);
+
+    return shouldDeletePermanently ? 'permanente' : 'soft';
+  };
+
+  const handleLifecyclePrimaryAction = async (oportunidade: Oportunidade) => {
+    if (!lifecycleFeatureEnabled) return;
+
+    const lifecycleStatus = getLifecycleStatus(oportunidade);
+
+    try {
+      if (
+        lifecycleStatus === LifecycleStatusOportunidade.ARCHIVED ||
+        lifecycleStatus === LifecycleStatusOportunidade.DELETED
+      ) {
+        await handleRestaurarOportunidade(oportunidade);
+        return;
+      }
+
+      if (
+        oportunidade.estagio === EstagioOportunidade.GANHO ||
+        oportunidade.estagio === EstagioOportunidade.PERDIDO
+      ) {
+        await handleReabrirOportunidade(oportunidade);
+        return;
+      }
+
+      await handleArquivarOportunidade(oportunidade);
+    } catch (err) {
+      console.error('Erro ao executar acao de ciclo de vida:', err);
+      toastService.error('Não foi possível concluir a ação de ciclo de vida.');
     }
   };
 
@@ -715,6 +1071,13 @@ const PipelinePage: React.FC = () => {
 
   // Drag and Drop handlers
   const handleDragStart = (oportunidade: Oportunidade) => {
+    if (!canManipulateKanban) return;
+
+    const lifecycleStatus = getLifecycleStatus(oportunidade);
+    if (lifecycleFeatureEnabled && lifecycleStatus !== LifecycleStatusOportunidade.OPEN) {
+      return;
+    }
+
     setDraggedItem(oportunidade);
   };
 
@@ -722,16 +1085,44 @@ const PipelinePage: React.FC = () => {
     e.preventDefault();
   };
 
+  const getNomeEstagio = (estagio: EstagioOportunidade): string =>
+    ESTAGIOS_CONFIG.find((item) => item.id === estagio)?.nome || estagio;
+
   const handleDrop = async (novoEstagio: EstagioOportunidade) => {
     if (!draggedItem) return;
 
+    if (!canManipulateKanban) {
+      toastService.warning('Movimentação no Kanban está disponível apenas na visão "Abertas".');
+      setDraggedItem(null);
+      return;
+    }
+
+    const lifecycleStatus = getLifecycleStatus(draggedItem);
+    if (lifecycleFeatureEnabled && lifecycleStatus !== LifecycleStatusOportunidade.OPEN) {
+      toastService.warning('Somente oportunidades abertas podem ser movimentadas no Kanban.');
+      setDraggedItem(null);
+      return;
+    }
+
+    const estagioAtual = draggedItem.estagio;
+
     // Não faz nada se soltar no mesmo estágio
-    if (draggedItem.estagio === novoEstagio) {
+    if (estagioAtual === novoEstagio) {
       setDraggedItem(null);
       return;
     }
 
     // ✅ Se for movido para PERDIDO, abrir modal de motivo de perda
+    const permitidos = ALLOWED_STAGE_TRANSITIONS[estagioAtual] || [];
+    if (!permitidos.includes(novoEstagio)) {
+      const listaPermitidos = permitidos.map((stage) => getNomeEstagio(stage)).join(', ');
+      toastService.warning(
+        `Transicao invalida: ${getNomeEstagio(estagioAtual)} -> ${getNomeEstagio(novoEstagio)}. Permitidos: ${listaPermitidos || 'nenhum'}.`,
+      );
+      setDraggedItem(null);
+      return;
+    }
+
     if (novoEstagio === EstagioOportunidade.PERDIDO) {
       setOportunidadeParaPerder(draggedItem);
       setErroMotivoPerda(null);
@@ -772,10 +1163,8 @@ const PipelinePage: React.FC = () => {
       const { oportunidade, novoEstagio } = mudancaEstagioData;
 
       // Atualizar estágio no backend
-      await oportunidadesService.atualizarOportunidade({
-        id: oportunidade.id,
+      await oportunidadesService.atualizarEstagio(oportunidade.id, {
         estagio: novoEstagio,
-        responsavel_id: oportunidade.responsavel?.id || '',
       });
 
       // Criar atividade de histórico
@@ -803,13 +1192,9 @@ const PipelinePage: React.FC = () => {
       }
 
       // Atualizar estado local
-      setOportunidades((prev) =>
-        prev.map((op) => (op.id === oportunidade.id ? { ...op, estagio: novoEstagio } : op)),
-      );
+      await carregarDados();
 
       // Recarregar estatísticas
-      const stats = await oportunidadesService.obterEstatisticas();
-      setEstatisticas(stats);
 
       // Fechar modal
       setShowModalMudancaEstagio(false);
@@ -852,17 +1237,9 @@ const PipelinePage: React.FC = () => {
       });
 
       // Atualizar estado local
-      setOportunidades((prev) =>
-        prev.map((op) =>
-          op.id === oportunidadeParaPerder.id
-            ? { ...op, estagio: EstagioOportunidade.PERDIDO }
-            : op,
-        ),
-      );
+      await carregarDados();
 
       // Recarregar estatísticas
-      const stats = await oportunidadesService.obterEstatisticas();
-      setEstatisticas(stats);
 
       // Fechar modal
       setShowModalMotivoPerda(false);
@@ -1066,12 +1443,45 @@ const PipelinePage: React.FC = () => {
   }, [oportunidadesFiltradas]);
 
   // Agrupar por estágio
+  const estagiosKanbanVisiveis = useMemo(() => {
+    if (!lifecycleFeatureEnabled) return ESTAGIOS_CONFIG;
+
+    if (lifecycleView === LifecycleViewOportunidade.OPEN) {
+      return ESTAGIOS_CONFIG.filter(
+        (estagio) =>
+          estagio.id !== EstagioOportunidade.GANHO && estagio.id !== EstagioOportunidade.PERDIDO,
+      );
+    }
+
+    if (lifecycleView === LifecycleViewOportunidade.CLOSED) {
+      return ESTAGIOS_CONFIG.filter(
+        (estagio) =>
+          estagio.id === EstagioOportunidade.GANHO || estagio.id === EstagioOportunidade.PERDIDO,
+      );
+    }
+
+    return ESTAGIOS_CONFIG;
+  }, [lifecycleFeatureEnabled, lifecycleView]);
+
+  useEffect(() => {
+    if (!filtros.estagio) {
+      return;
+    }
+
+    const estagioSelecionado = filtros.estagio as EstagioOportunidade;
+    const estagioPermitido = estagiosKanbanVisiveis.some((estagio) => estagio.id === estagioSelecionado);
+
+    if (!estagioPermitido) {
+      setFiltros((prev) => ({ ...prev, estagio: '' }));
+    }
+  }, [filtros.estagio, estagiosKanbanVisiveis]);
+
   const agrupadoPorEstagio = useMemo(() => {
-    return ESTAGIOS_CONFIG.map((estagio) => ({
+    return estagiosKanbanVisiveis.map((estagio) => ({
       ...estagio,
       oportunidades: oportunidadesFiltradas.filter((op) => op.estagio === estagio.id),
     }));
-  }, [oportunidadesFiltradas]);
+  }, [estagiosKanbanVisiveis, oportunidadesFiltradas]);
 
   // Calcular métricas
   const calcularValorTotal = (oportunidades: Oportunidade[]) => {
@@ -1095,6 +1505,77 @@ const PipelinePage: React.FC = () => {
       filtros.valorMax,
   );
 
+  const activeKanbanFilterChips = useMemo(() => {
+    const chips: Array<{ label: string; value: string }> = [];
+
+    const busca = filtros.busca?.trim();
+    if (busca) chips.push({ label: 'Busca', value: busca });
+
+    if (lifecycleFeatureEnabled) {
+      const lifecycleLabel =
+        LIFECYCLE_VIEW_OPTIONS.find((option) => option.id === lifecycleView)?.label || 'Abertas';
+      chips.push({ label: 'Carteira', value: lifecycleLabel });
+    }
+
+    if (filtros.estagio) {
+      const estagioNome = ESTAGIOS_CONFIG.find((e) => e.id === filtros.estagio)?.nome || filtros.estagio;
+      chips.push({ label: 'Estágio', value: estagioNome });
+    }
+
+    if (filtros.prioridade) {
+      const prioridadeLabelMap: Record<string, string> = {
+        [PrioridadeOportunidade.BAIXA]: 'Baixa',
+        [PrioridadeOportunidade.MEDIA]: 'Média',
+        [PrioridadeOportunidade.ALTA]: 'Alta',
+      };
+      chips.push({
+        label: 'Prioridade',
+        value: prioridadeLabelMap[filtros.prioridade] || filtros.prioridade,
+      });
+    }
+
+    if (filtros.origem) {
+      const origemLabelMap: Record<string, string> = {
+        [OrigemOportunidade.WEBSITE]: 'Website',
+        [OrigemOportunidade.INDICACAO]: 'Indicação',
+        [OrigemOportunidade.REDES_SOCIAIS]: 'Redes Sociais',
+        [OrigemOportunidade.EVENTO]: 'Evento',
+        [OrigemOportunidade.CAMPANHA]: 'Campanha',
+        [OrigemOportunidade.TELEFONE]: 'Telefone',
+        [OrigemOportunidade.EMAIL]: 'Email',
+        [OrigemOportunidade.PARCEIRO]: 'Parceiro',
+      };
+      chips.push({ label: 'Origem', value: origemLabelMap[filtros.origem] || filtros.origem });
+    }
+
+    const valorMin = filtros.valorMin?.trim();
+    const valorMax = filtros.valorMax?.trim();
+    if (valorMin || valorMax) {
+      const minNumber = valorMin ? Number(valorMin) : null;
+      const maxNumber = valorMax ? Number(valorMax) : null;
+      const formatOrRaw = (value: number | null, raw: string | undefined) => {
+        if (value === null) return raw || '';
+        if (Number.isFinite(value)) return formatarMoeda(value);
+        return raw || '';
+      };
+
+      const minLabel = formatOrRaw(minNumber, valorMin);
+      const maxLabel = formatOrRaw(maxNumber, valorMax);
+
+      if (minLabel && maxLabel) chips.push({ label: 'Valor', value: `${minLabel}–${maxLabel}` });
+      else if (minLabel) chips.push({ label: 'Valor ≥', value: minLabel });
+      else if (maxLabel) chips.push({ label: 'Valor ≤', value: maxLabel });
+    }
+
+    if (filtros.responsavel) {
+      const responsavelNome =
+        usuarios.find((u) => u.id === filtros.responsavel)?.nome || filtros.responsavel;
+      chips.push({ label: 'Responsável', value: responsavelNome });
+    }
+
+    return chips;
+  }, [filtros, lifecycleFeatureEnabled, lifecycleView, usuarios]);
+
   if (loading) {
     return (
       <div className="space-y-4 pt-1 sm:pt-2">
@@ -1111,8 +1592,8 @@ const PipelinePage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-4 pt-1 sm:pt-2">
-      <SectionCard className="space-y-4 p-4 sm:p-5">
+    <div className="space-y-3 pt-1 sm:pt-2">
+      <SectionCard className="space-y-3 p-3 sm:p-4">
         <PageHeader
           title={
             <span className="inline-flex items-center gap-2">
@@ -1121,11 +1602,16 @@ const PipelinePage: React.FC = () => {
             </span>
           }
           description="Gerencie suas oportunidades de venda atraves de um funil visual"
-          filters={<ActiveEmpresaBadge variant="page" />}
           actions={
             <button
               onClick={() => handleNovaOportunidade()}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#0F7B7D]"
+              disabled={lifecycleFeatureEnabled && lifecycleView !== LifecycleViewOportunidade.OPEN}
+              title={
+                lifecycleFeatureEnabled && lifecycleView !== LifecycleViewOportunidade.OPEN
+                  ? 'Troque para "Abertas" para criar oportunidades'
+                  : 'Nova Oportunidade'
+              }
+              className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Plus className="h-4 w-4" />
               Nova Oportunidade
@@ -1133,88 +1619,281 @@ const PipelinePage: React.FC = () => {
           }
         />
 
-        {/* Métricas do Pipeline */}
         {estatisticas && (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {/* Total de Oportunidades */}
-            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                    Total de Oportunidades
-                  </p>
-                  <p className="mt-2 text-3xl font-bold text-[#002333]">
-                    {estatisticas.totalOportunidades}
-                  </p>
-                </div>
-                <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
-                  <Target className="h-6 w-6 text-[#159A9C]" />
-                </div>
-              </div>
+          <InlineStats
+            stats={[
+              { label: 'Oportunidades', value: String(estatisticas.totalOportunidades), tone: 'neutral' },
+              { label: 'Pipeline', value: formatarMoeda(estatisticas.valorTotalPipeline), tone: 'accent' },
+              { label: 'Ticket médio', value: formatarMoeda(estatisticas.valorMedio), tone: 'neutral' },
+              { label: 'Conversão', value: `${estatisticas.taxaConversao.toFixed(1)}%`, tone: 'accent' },
+            ]}
+          />
+        )}
+
+        {lifecycleFeatureEnabled && (
+          <div className="space-y-2 rounded-lg border border-[#B4BEC9]/40 bg-[#DEEFE7]/30 px-3 py-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-[#002333]">
+              <Archive className="h-4 w-4 text-[#159A9C]" />
+              <span>Carteira do Pipeline</span>
+            </div>
+            <div className="inline-flex rounded-lg border border-[#B4BEC9]/60 bg-white p-1">
+              <button
+                type="button"
+                onClick={() => setWorkspaceTab('pipeline')}
+                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  workspaceTab === 'pipeline'
+                    ? 'bg-[#159A9C] text-white'
+                    : 'text-[#002333] hover:bg-[#DEEFE7]/60'
+                }`}
+              >
+                <Grid3X3 className="h-4 w-4" />
+                Pipeline
+              </button>
+              <button
+                type="button"
+                onClick={() => setWorkspaceTab('parametros')}
+                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  workspaceTab === 'parametros'
+                    ? 'bg-[#159A9C] text-white'
+                    : 'text-[#002333] hover:bg-[#DEEFE7]/60'
+                }`}
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+                Parâmetros
+              </button>
             </div>
 
-            {/* Valor Total */}
-            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                    Valor Total
-                  </p>
-                  <p className="mt-2 text-2xl sm:text-3xl font-bold text-[#002333] leading-tight break-words">
-                    {formatarMoeda(estatisticas.valorTotalPipeline)}
-                  </p>
+            {workspaceTab === 'parametros' ? (
+              <div className="space-y-3 rounded-lg border border-[#B4BEC9]/35 bg-white/80 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-[#002333]">
+                      Política de oportunidades paradas
+                    </p>
+                    <p className="text-xs text-[#002333]/65">
+                      Define quando mostrar o alerta "Parada Xd" e quando arquivar automaticamente.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border border-[#B4BEC9]/45 bg-[#DEEFE7]/50 px-2 py-0.5 text-xs font-medium text-[#0F7B7D]">
+                      {stalePolicyLoading
+                        ? 'Carregando...'
+                        : stalePolicy
+                          ? `Política: ${stalePolicy.source === 'tenant' ? 'tenant' : 'default'}`
+                          : 'Política indisponível'}
+                    </span>
+                    {stalePolicy && (
+                      <span className="rounded-full border border-[#B4BEC9]/45 bg-white px-2 py-0.5 text-xs font-medium text-[#002333]/70">
+                        Auto: {stalePolicy.autoArchiveSource === 'tenant' ? 'tenant' : 'default'}
+                      </span>
+                    )}
+                    {stalePolicyHasChanges && (
+                      <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                        Alterações não salvas
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="h-12 w-12 rounded-2xl bg-[#0F7B7D]/10 flex items-center justify-center shadow-sm">
-                  <DollarSign className="h-6 w-6 text-[#0F7B7D]" />
-                </div>
-              </div>
-            </div>
 
-            {/* Ticket Médio */}
-            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                    Ticket Médio
-                  </p>
-                  <p className="mt-2 text-2xl sm:text-3xl font-bold text-[#002333] leading-tight break-words">
-                    {formatarMoeda(estatisticas.valorMedio)}
-                  </p>
-                </div>
-                <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
-                  <TrendingUp className="h-6 w-6 text-[#159A9C]" />
-                </div>
-              </div>
-            </div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <label className="inline-flex items-center gap-2 rounded-lg border border-[#B4BEC9]/50 bg-white px-3 py-2 text-sm text-[#002333]">
+                    <input
+                      type="checkbox"
+                      checked={stalePolicyDraft.enabled}
+                      onChange={(event) =>
+                        setStalePolicyDraft((prev) => ({
+                          ...prev,
+                          enabled: event.target.checked,
+                        }))
+                      }
+                      disabled={!canManageStalePolicy || stalePolicyLoading || stalePolicySaving}
+                      className="h-4 w-4 rounded border-[#B4BEC9] text-[#159A9C] focus:ring-[#159A9C]"
+                    />
+                    Ativar detecção de oportunidades paradas
+                  </label>
 
-            {/* Taxa de Conversão */}
-            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                    Taxa de Conversão
-                  </p>
-                  <p className="mt-2 text-3xl font-bold text-[#002333]">
-                    {estatisticas.taxaConversao.toFixed(1)}%
-                  </p>
+                  <div className="rounded-lg border border-[#B4BEC9]/50 bg-white px-3 py-2">
+                    <label className="mb-1 block text-xs font-medium text-[#002333]/70">
+                      Limite para marcar parada (dias)
+                    </label>
+                    <input
+                      type="number"
+                      min={STALE_THRESHOLD_MIN}
+                      max={STALE_THRESHOLD_MAX}
+                      value={stalePolicyDraft.thresholdDays}
+                      onChange={(event) => {
+                        const parsed = Number(event.target.value);
+                        if (!Number.isFinite(parsed)) return;
+                        setStalePolicyDraft((prev) => ({ ...prev, thresholdDays: parsed }));
+                      }}
+                      onBlur={(event) => {
+                        const normalized = normalizeIntegerWithinRange(
+                          Number(event.target.value),
+                          STALE_THRESHOLD_MIN,
+                          STALE_THRESHOLD_MAX,
+                        );
+                        setStalePolicyDraft((prev) => ({ ...prev, thresholdDays: normalized }));
+                      }}
+                      disabled={
+                        !canManageStalePolicy ||
+                        stalePolicyLoading ||
+                        stalePolicySaving ||
+                        !stalePolicyDraft.enabled
+                      }
+                      className="w-full rounded-lg border border-[#B4BEC9]/70 px-3 py-1.5 text-sm text-[#002333] focus:border-[#159A9C] focus:outline-none disabled:cursor-not-allowed disabled:bg-[#F8FAFB] disabled:opacity-70"
+                    />
+                    <p className="mt-1 text-[11px] text-[#002333]/55">
+                      Faixa permitida: {STALE_THRESHOLD_MIN} a {STALE_THRESHOLD_MAX} dias.
+                    </p>
+                  </div>
+
+                  <label className="inline-flex items-center gap-2 rounded-lg border border-[#B4BEC9]/50 bg-white px-3 py-2 text-sm text-[#002333]">
+                    <input
+                      type="checkbox"
+                      checked={stalePolicyDraft.autoArchiveEnabled}
+                      onChange={(event) =>
+                        setStalePolicyDraft((prev) => ({
+                          ...prev,
+                          autoArchiveEnabled: event.target.checked,
+                        }))
+                      }
+                      disabled={
+                        !canManageStalePolicy ||
+                        stalePolicyLoading ||
+                        stalePolicySaving ||
+                        !stalePolicyDraft.enabled
+                      }
+                      className="h-4 w-4 rounded border-[#B4BEC9] text-[#159A9C] focus:ring-[#159A9C]"
+                    />
+                    Autoarquivar oportunidades paradas
+                  </label>
+
+                  <div className="rounded-lg border border-[#B4BEC9]/50 bg-white px-3 py-2">
+                    <label className="mb-1 block text-xs font-medium text-[#002333]/70">
+                      Dias para autoarquivar
+                    </label>
+                    <input
+                      type="number"
+                      min={STALE_AUTO_ARCHIVE_MIN}
+                      max={STALE_AUTO_ARCHIVE_MAX}
+                      value={stalePolicyDraft.autoArchiveAfterDays}
+                      onChange={(event) => {
+                        const parsed = Number(event.target.value);
+                        if (!Number.isFinite(parsed)) return;
+                        setStalePolicyDraft((prev) => ({
+                          ...prev,
+                          autoArchiveAfterDays: parsed,
+                        }));
+                      }}
+                      onBlur={(event) => {
+                        const normalized = normalizeIntegerWithinRange(
+                          Number(event.target.value),
+                          STALE_AUTO_ARCHIVE_MIN,
+                          STALE_AUTO_ARCHIVE_MAX,
+                        );
+                        setStalePolicyDraft((prev) => ({
+                          ...prev,
+                          autoArchiveAfterDays: normalized,
+                        }));
+                      }}
+                      disabled={
+                        !canManageStalePolicy ||
+                        stalePolicyLoading ||
+                        stalePolicySaving ||
+                        !stalePolicyDraft.enabled ||
+                        !stalePolicyDraft.autoArchiveEnabled
+                      }
+                      className="w-full rounded-lg border border-[#B4BEC9]/70 px-3 py-1.5 text-sm text-[#002333] focus:border-[#159A9C] focus:outline-none disabled:cursor-not-allowed disabled:bg-[#F8FAFB] disabled:opacity-70"
+                    />
+                    <p className="mt-1 text-[11px] text-[#002333]/55">
+                      Faixa permitida: {STALE_AUTO_ARCHIVE_MIN} a {STALE_AUTO_ARCHIVE_MAX} dias.
+                    </p>
+                  </div>
                 </div>
-                <div className="h-12 w-12 rounded-2xl bg-[#002333]/10 flex items-center justify-center shadow-sm">
-                  <Target className="h-6 w-6 text-[#002333]" />
+
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-[#002333]/60">
+                    {canManageStalePolicy
+                      ? 'Apenas usuários com permissão de automações conseguem salvar alterações.'
+                      : 'Somente leitura: sem permissão para alterar esta política.'}
+                  </p>
+                  {canManageStalePolicy && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleResetStalePolicyDraft}
+                        disabled={!stalePolicy || stalePolicySaving || !stalePolicyHasChanges}
+                        className="inline-flex items-center gap-2 rounded-lg border border-[#B4BEC9]/70 bg-white px-3 py-1.5 text-sm font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Reverter
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void handleSalvarStalePolicy();
+                        }}
+                        disabled={
+                          !stalePolicy ||
+                          stalePolicyLoading ||
+                          stalePolicySaving ||
+                          !stalePolicyHasChanges
+                        }
+                        className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <Save className="h-4 w-4" />
+                        {stalePolicySaving ? 'Salvando...' : 'Salvar política'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
+            ) : (
+              <p className="text-xs text-[#002333]/65">
+                Os controles de carteira foram movidos para a barra fixa do Pipeline.
+              </p>
+            )}
           </div>
         )}
       </SectionCard>
-      {/* Seletor de Visualização */}
-      <div className="bg-white rounded-lg shadow-sm border p-4 mb-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      {showPipelineWorkspace && (
+        <>
+      {/* Barra de trabalho sticky */}
+            <SectionCard className="sticky top-2 z-20 border border-[#B4BEC9]/40 bg-white/95 p-3 backdrop-blur supports-[backdrop-filter]:bg-white/85 sm:p-4">
+        <div className="flex flex-col gap-3">
+          {lifecycleFeatureEnabled && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-[#607B89]">
+                Carteira
+              </span>
+              {LIFECYCLE_VIEW_OPTIONS.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setLifecycleView(option.id)}
+                  className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${
+                    lifecycleView === option.id
+                      ? 'border-[#159A9C] bg-[#159A9C] text-white'
+                      : 'border-[#B4BEC9]/70 bg-white text-[#002333] hover:bg-[#DEEFE7]/60'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+              <span className="text-xs text-[#002333]/60">
+                {LIFECYCLE_VIEW_DESCRIPTIONS[lifecycleView]}
+              </span>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="w-full flex flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
             <span className="text-sm font-medium text-[#002333]">Visualização:</span>
             <div className="grid grid-cols-2 gap-1 bg-gray-100 rounded-lg p-1 sm:flex sm:flex-wrap sm:items-center sm:gap-1">
               <button
                 data-testid="pipeline-view-kanban"
                 onClick={() => setVisualizacao('kanban')}
+                type="button"
+                aria-pressed={visualizacao === 'kanban'}
                 className={`px-3 py-1.5 rounded-md transition-colors flex items-center justify-center gap-2 text-sm font-medium ${
                   visualizacao === 'kanban'
                     ? 'bg-white text-[#159A9C] shadow-sm'
@@ -1227,6 +1906,8 @@ const PipelinePage: React.FC = () => {
               <button
                 data-testid="pipeline-view-lista"
                 onClick={() => setVisualizacao('lista')}
+                type="button"
+                aria-pressed={visualizacao === 'lista'}
                 className={`px-3 py-1.5 rounded-md transition-colors flex items-center justify-center gap-2 text-sm font-medium ${
                   visualizacao === 'lista'
                     ? 'bg-white text-[#159A9C] shadow-sm'
@@ -1239,6 +1920,8 @@ const PipelinePage: React.FC = () => {
               <button
                 data-testid="pipeline-view-calendario"
                 onClick={() => setVisualizacao('calendario')}
+                type="button"
+                aria-pressed={visualizacao === 'calendario'}
                 className={`px-3 py-1.5 rounded-md transition-colors flex items-center justify-center gap-2 text-sm font-medium ${
                   visualizacao === 'calendario'
                     ? 'bg-white text-[#159A9C] shadow-sm'
@@ -1251,6 +1934,8 @@ const PipelinePage: React.FC = () => {
               <button
                 data-testid="pipeline-view-grafico"
                 onClick={() => setVisualizacao('grafico')}
+                type="button"
+                aria-pressed={visualizacao === 'grafico'}
                 className={`px-3 py-1.5 rounded-md transition-colors flex items-center justify-center gap-2 text-sm font-medium ${
                   visualizacao === 'grafico'
                     ? 'bg-white text-[#159A9C] shadow-sm'
@@ -1264,29 +1949,44 @@ const PipelinePage: React.FC = () => {
           </div>
 
           <div className="w-full sm:w-auto flex items-center justify-end gap-2">
+            {visualizacao === 'kanban' && (
+              <button
+                type="button"
+                onClick={() => setKanbanExpanded((prev) => !prev)}
+                className="p-2 text-[#002333]/60 hover:text-[#002333] hover:bg-[#DEEFE7]/60 rounded-lg transition-colors"
+                title={kanbanExpanded ? 'Sair da visualização ampliada' : 'Ampliar Kanban'}
+                aria-label={kanbanExpanded ? 'Sair da visualização ampliada' : 'Ampliar Kanban'}
+              >
+                {kanbanExpanded ? (
+                  <Minimize2 className="h-4 w-4" />
+                ) : (
+                  <Maximize2 className="h-4 w-4" />
+                )}
+              </button>
+            )}
             <button
               data-testid="pipeline-refresh"
               onClick={() => carregarDados()}
               disabled={loading}
+              type="button"
               className="p-2 text-[#002333]/60 hover:text-[#002333] hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
               title="Atualizar"
+              aria-label="Atualizar dados do pipeline"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
             <button
               data-testid="pipeline-export"
               onClick={() => setShowModalExport(true)}
+              type="button"
               className="p-2 text-[#002333]/60 hover:text-[#002333] hover:bg-gray-100 rounded-lg transition-colors"
               title="Exportar"
+              aria-label="Exportar oportunidades"
             >
               <Download className="h-4 w-4" />
             </button>
           </div>
         </div>
-      </div>
-
-      {/* Barra de Filtros */}
-      <FiltersBar className="p-4">
         <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
           <div className="w-full sm:flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#002333]/40" />
@@ -1388,6 +2088,8 @@ const PipelinePage: React.FC = () => {
           </div>
         </div>
 
+        </div>
+
         {/* Painel de Filtros Expandido */}
         {showFiltros && (
           <div className="mt-4 w-full border-t pt-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -1400,7 +2102,7 @@ const PipelinePage: React.FC = () => {
                 className="w-full px-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
               >
                 <option value="">Todos os estágios</option>
-                {ESTAGIOS_CONFIG.map((estagio) => (
+                {estagiosKanbanVisiveis.map((estagio) => (
                   <option key={estagio.id} value={estagio.id}>
                     {estagio.nome}
                   </option>
@@ -1496,7 +2198,7 @@ const PipelinePage: React.FC = () => {
             </div>
           </div>
         )}
-      </FiltersBar>
+      </SectionCard>
 
       {/* Error State */}
       {error && (
@@ -1521,6 +2223,7 @@ const PipelinePage: React.FC = () => {
                   <button
                     onClick={() => {
                       localStorage.removeItem('authToken'); // ✅ Corrigido para 'authToken'
+                      localStorage.removeItem('refreshToken');
                       navigate('/login');
                     }}
                     className="px-4 py-2 bg-white text-red-600 border border-red-600 rounded-lg hover:bg-red-50 transition-colors text-sm font-medium"
@@ -1536,20 +2239,71 @@ const PipelinePage: React.FC = () => {
 
       {/* Visualização Kanban */}
       {visualizacao === 'kanban' && (
-        <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 -mx-1 px-1 sm:mx-0 sm:px-0">
+        <div className={kanbanExpanded ? 'fixed inset-0 z-50 bg-[#F3F6F7] text-[#1E3A4B]' : undefined}>
+          {kanbanExpanded && (
+            <div className="min-h-14 px-4 sm:px-5 py-2 flex flex-col gap-2 border-b border-[#D6E2E6] bg-white/95 backdrop-blur-[2px]">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-[#19384C]">
+                  <Grid3X3 className="h-4 w-4 text-[#159A9C]" />
+                  <span className="text-sm font-semibold">Pipeline • Kanban</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setKanbanExpanded(false)}
+                  className="p-2 rounded-lg text-[#002333]/70 hover:text-[#002333] hover:bg-[#DEEFE7]/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/25"
+                  aria-label="Fechar visualização ampliada do Kanban"
+                  title="Fechar"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {activeKanbanFilterChips.length > 0 && (
+                <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                  <span className="text-xs font-medium text-[#607B89] whitespace-nowrap">Filtros:</span>
+                  <div className="flex items-center gap-2">
+                    {activeKanbanFilterChips.map((chip) => (
+                      <span
+                        key={`${chip.label}-${chip.value}`}
+                        className="inline-flex items-center gap-1 rounded-full border border-[#B4BEC9]/55 bg-white px-2.5 py-1 text-[12px] text-[#244455] whitespace-nowrap"
+                        title={`${chip.label}: ${chip.value}`}
+                      >
+                        <span className="text-[#6C8794]">{chip.label}:</span>
+                        <strong className="text-[#1E3A4B] font-semibold">{chip.value}</strong>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <div className={kanbanExpanded ? 'h-[calc(100vh-3.5rem)] px-4 sm:px-5 pt-3 pb-4' : undefined}>
+            {!canManipulateKanban && (
+              <div className="mb-3 rounded-lg border border-[#B4BEC9]/50 bg-white px-3 py-2 text-sm text-[#002333]/80">
+                A movimentação de cards e a criação direta por coluna ficam disponíveis apenas na
+                visão "Abertas".
+              </div>
+            )}
+            <div
+              className={
+                kanbanExpanded
+                  ? 'flex gap-3 sm:gap-4 overflow-x-auto pb-3 h-full'
+                  : 'flex gap-3 sm:gap-4 overflow-x-auto pb-3 -mx-1 px-1 sm:mx-0 sm:px-0 h-[min(72vh,calc(100vh-22rem))]'
+              }
+            >
           {agrupadoPorEstagio.map((estagio) => (
             <div
               key={estagio.id}
               data-testid={`pipeline-column-${estagio.id}`}
-              className="flex-shrink-0 w-[min(20rem,calc(100vw-6rem))] sm:w-80"
-              onDragOver={handleDragOver}
-              onDrop={() => handleDrop(estagio.id)}
+              className="flex-shrink-0 w-[min(18rem,calc(100vw-5rem))] sm:w-72 flex flex-col h-full"
+              role="region"
+              aria-labelledby={`pipeline-column-title-${estagio.id}`}
             >
               {/* Header da Coluna */}
-              <div className={`${estagio.headerClass} rounded-t-lg p-3 sm:p-4`}>
-                <div className="flex items-center justify-between mb-2">
+              <div className={`${estagio.headerClass} rounded-t-lg p-2.5 sm:p-3`}>
+                <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
-                    <span className="text-2xl">
+                    <span className="text-xl" aria-hidden="true">
                       {estagio.id === EstagioOportunidade.LEADS
                         ? '🎯'
                         : estagio.id === EstagioOportunidade.QUALIFICACAO
@@ -1560,28 +2314,50 @@ const PipelinePage: React.FC = () => {
                               ? '🤝'
                               : '🎉'}
                     </span>
-                    <h3 className="font-bold text-white">{estagio.nome}</h3>
+                    <h3
+                      id={`pipeline-column-title-${estagio.id}`}
+                      className="text-xs sm:text-sm font-semibold text-[#002333]"
+                    >
+                      {estagio.nome}
+                    </h3>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-white/25 backdrop-blur-sm text-white border border-white/30">
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#DEEFE7] text-[#002333] border border-[#B4BEC9]/55">
                       {estagio.oportunidades.length}
                     </span>
                     <button
                       onClick={() => handleNovaOportunidade(estagio.id)}
-                      className="p-1.5 hover:bg-white/20 rounded-lg transition-colors text-white"
-                      title="Adicionar oportunidade"
+                      type="button"
+                      disabled={!canManipulateKanban}
+                      className="p-1.5 hover:bg-[#DEEFE7]/70 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/25 disabled:cursor-not-allowed disabled:opacity-50"
+                      aria-label={
+                        canManipulateKanban
+                          ? `Adicionar oportunidade em ${estagio.nome}`
+                          : 'Criação por coluna disponível apenas na visão Abertas'
+                      }
+                      title={
+                        canManipulateKanban
+                          ? `Adicionar oportunidade em ${estagio.nome}`
+                          : 'Disponível apenas na visão Abertas'
+                      }
+                      style={{ color: estagio.accentColor }}
                     >
                       <Plus className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
-                <p className="text-sm text-white font-semibold">
+                <p className="text-xs sm:text-sm text-[#002333]/70 font-semibold">
                   {formatarMoeda(calcularValorTotal(estagio.oportunidades))}
                 </p>
               </div>
 
               {/* Cards das Oportunidades */}
-              <div className="bg-gray-100 rounded-b-lg p-2 min-h-[420px] sm:min-h-[500px] space-y-2">
+              <div
+                data-testid={`pipeline-column-dropzone-${estagio.id}`}
+                className="bg-[#DEEFE7]/35 rounded-b-lg p-2 space-y-2 border border-[#B4BEC9]/40 border-t-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]"
+                onDragOver={canManipulateKanban ? handleDragOver : undefined}
+                onDrop={canManipulateKanban ? () => handleDrop(estagio.id) : undefined}
+              >
                 {estagio.oportunidades.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-center">
                     <div className="text-6xl mb-4 opacity-20">
@@ -1627,23 +2403,70 @@ const PipelinePage: React.FC = () => {
                     const diasAteVencimento = oportunidade.dataFechamentoEsperado
                       ? differenceInDays(new Date(oportunidade.dataFechamentoEsperado), new Date())
                       : null;
+                    const lifecycleStatusCard = getLifecycleStatus(oportunidade);
+                    const deleteModeCard = getDeleteModeForOpportunity(oportunidade);
+                    const staleDaysCard = Number(oportunidade.stale_days || 0);
+                    const showStaleBadge =
+                      Boolean(oportunidade.is_stale) &&
+                      staleDaysCard > 0 &&
+                      lifecycleStatusCard === LifecycleStatusOportunidade.OPEN;
+                    const isDragEnabled =
+                      canManipulateKanban &&
+                      (!lifecycleFeatureEnabled ||
+                        lifecycleStatusCard === LifecycleStatusOportunidade.OPEN) &&
+                      oportunidade.estagio !== EstagioOportunidade.GANHO &&
+                      oportunidade.estagio !== EstagioOportunidade.PERDIDO;
+                    const cardId = String(oportunidade.id);
+                    const cardActionsMenuOpen = openCardActionsMenuId === cardId;
+                    const lifecyclePrimaryLabel =
+                      lifecycleStatusCard === LifecycleStatusOportunidade.ARCHIVED ||
+                      lifecycleStatusCard === LifecycleStatusOportunidade.DELETED
+                        ? 'Restaurar'
+                        : oportunidade.estagio === EstagioOportunidade.GANHO ||
+                            oportunidade.estagio === EstagioOportunidade.PERDIDO
+                          ? 'Reabrir'
+                          : 'Arquivar';
 
                     return (
                       <div
                         key={oportunidade.id}
                         data-testid={`pipeline-card-${oportunidade.id}`}
-                        draggable
-                        onDragStart={() => handleDragStart(oportunidade)}
+                        draggable={isDragEnabled}
+                        onDragStart={(event) => {
+                          if (!isDragEnabled) {
+                            event.preventDefault();
+                            return;
+                          }
+                          event.dataTransfer?.setData('text/plain', String(oportunidade.id));
+                          if (event.dataTransfer) {
+                            event.dataTransfer.effectAllowed = 'move';
+                          }
+                          handleDragStart(oportunidade);
+                        }}
                         onClick={() => handleVerDetalhes(oportunidade)}
-                        className="bg-white rounded-xl p-4 shadow-sm border hover:shadow-xl hover:-translate-y-1 transition-all duration-200 cursor-pointer relative group"
+                        onDragEnd={() => setDraggedItem(null)}
+                        onKeyDown={(e) => {
+                          if (e.currentTarget !== e.target) return;
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleVerDetalhes(oportunidade);
+                          }
+                        }}
+                        tabIndex={0}
+                        role="button"
+                        aria-label={`Abrir oportunidade: ${oportunidade.titulo}`}
+                        aria-grabbed={draggedItem?.id === oportunidade.id}
+                        className={`bg-white rounded-lg p-3 shadow-sm border border-[#B4BEC9]/35 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer relative group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/30 ${
+                          cardActionsMenuOpen ? 'z-40' : 'z-0'
+                        }`}
                       >
-                        {/* Header com avatar e ações */}
-                        <div className="flex items-center justify-between mb-3">
+                        {/* Header com avatar e badges */}
+                        <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
                             {/* Avatar do responsável */}
                             {oportunidade.responsavel && (
                               <div
-                                className="h-8 w-8 rounded-full bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] flex items-center justify-center text-white text-xs font-bold shadow-sm"
+                                className="h-7 w-7 rounded-full bg-gradient-to-br from-[#159A9C] to-[#0F7B7D] flex items-center justify-center text-white text-[11px] font-bold shadow-sm"
                                 title={oportunidade.responsavel.nome}
                               >
                                 {oportunidade.responsavel.nome?.charAt(0).toUpperCase() || 'U'}
@@ -1660,38 +2483,11 @@ const PipelinePage: React.FC = () => {
                                 Urgente
                               </span>
                             )}
-                          </div>
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditarOportunidade(oportunidade);
-                              }}
-                              className="text-[#159A9C] hover:bg-[#159A9C]/10 p-1.5 rounded-lg transition-colors"
-                              title="Editar"
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleClonarOportunidade(oportunidade);
-                              }}
-                              className="text-[#0F7B7D] hover:bg-[#159A9C]/10 p-1.5 rounded-lg transition-colors"
-                              title="Duplicar"
-                            >
-                              <Copy className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeletarOportunidade(oportunidade);
-                              }}
-                              className="text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
-                              title="Excluir"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                            {showStaleBadge && (
+                              <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-semibold">
+                                Parada {staleDaysCard}d
+                              </span>
+                            )}
                           </div>
                         </div>
 
@@ -1699,7 +2495,7 @@ const PipelinePage: React.FC = () => {
                         {diasAteVencimento !== null && (
                           <>
                             {diasAteVencimento < 0 && (
-                              <div className="mb-3 px-2 py-1 bg-red-100 border border-red-200 rounded-lg flex items-center gap-2">
+                              <div className="mb-2 px-2 py-1 bg-red-100 border border-red-200 rounded-lg flex items-center gap-2">
                                 <AlertCircle className="h-4 w-4 text-red-600" />
                                 <span className="text-xs font-semibold text-red-700">
                                   Atrasado {Math.abs(diasAteVencimento)}d
@@ -1707,7 +2503,7 @@ const PipelinePage: React.FC = () => {
                               </div>
                             )}
                             {diasAteVencimento >= 0 && diasAteVencimento < 7 && (
-                              <div className="mb-3 px-2 py-1 bg-yellow-100 border border-yellow-200 rounded-lg flex items-center gap-2">
+                              <div className="mb-2 px-2 py-1 bg-yellow-100 border border-yellow-200 rounded-lg flex items-center gap-2">
                                 <AlertCircle className="h-4 w-4 text-yellow-600" />
                                 <span className="text-xs font-semibold text-yellow-700">
                                   Vence em {diasAteVencimento}d
@@ -1718,24 +2514,25 @@ const PipelinePage: React.FC = () => {
                         )}
 
                         {/* Título */}
-                        <h4 className="font-bold text-[#002333] text-base mb-3 line-clamp-2 leading-tight">
+                        <h4
+                          className="font-semibold text-[#002333] text-sm mb-2 line-clamp-2 leading-snug"
+                          title={oportunidade.titulo}
+                        >
                           {oportunidade.titulo}
                         </h4>
 
                         {/* Valor em destaque */}
-                        <div className="mb-3 pb-3 border-b border-gray-100">
-                          <p className="text-2xl font-extrabold text-emerald-600">
+                        <div className="mb-2 pb-2 border-b border-gray-100">
+                          <p className="text-lg font-bold text-[#0F7B7D]">
                             {formatarMoeda(Number(oportunidade.valor || 0))}
                           </p>
                         </div>
 
                         {/* Badge de Probabilidade com Heat Map */}
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-xs text-[#002333]/60 font-medium">
-                            Probabilidade
-                          </span>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-[#002333]/60 font-medium">Probabilidade</span>
                           <span
-                            className={`px-3 py-1 rounded-full text-xs font-bold ${probColor} flex items-center gap-1`}
+                            className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${probColor} flex items-center gap-1`}
                           >
                             <span>{probEmoji}</span>
                             <span>{oportunidade.probabilidade}%</span>
@@ -1750,25 +2547,27 @@ const PipelinePage: React.FC = () => {
                               e.stopPropagation();
                               navigate(`/clientes/${oportunidade.cliente.id}`);
                             }}
-                            className="flex items-center gap-2 text-sm text-[#0F7B7D] hover:text-[#159A9C] hover:underline mb-2 transition-colors"
+                            type="button"
+                            className="flex items-center gap-2 text-xs text-[#0F7B7D] hover:text-[#159A9C] hover:underline mb-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/25 rounded"
+                            aria-label={`Abrir cliente ${oportunidade.cliente.nome}`}
                           >
-                            <Users className="h-4 w-4" />
+                            <Users className="h-3.5 w-3.5" />
                             <span className="truncate font-medium">
                               {oportunidade.cliente.nome}
                             </span>
                           </button>
                         ) : oportunidade.nomeContato ? (
                           // Se não tem cliente, mas tem nome de contato, mostra o contato
-                          <div className="flex items-center gap-2 text-sm text-[#002333]/70 mb-2">
-                            <Users className="h-4 w-4 text-[#159A9C]" />
+                          <div className="flex items-center gap-2 text-xs text-[#002333]/70 mb-2">
+                            <Users className="h-3.5 w-3.5 text-[#159A9C]" />
                             <span className="truncate font-medium">{oportunidade.nomeContato}</span>
                           </div>
                         ) : null}
 
                         {/* Data */}
                         {oportunidade.dataFechamentoEsperado && (
-                          <div className="flex items-center gap-2 text-sm text-[#002333]/70">
-                            <Calendar className="h-4 w-4 text-[#159A9C]" />
+                          <div className="flex items-center gap-2 text-xs text-[#002333]/70">
+                            <Calendar className="h-3.5 w-3.5 text-[#159A9C]" />
                             <span className="font-medium">
                               {new Date(oportunidade.dataFechamentoEsperado).toLocaleDateString(
                                 'pt-BR',
@@ -1777,37 +2576,106 @@ const PipelinePage: React.FC = () => {
                           </div>
                         )}
 
-                        {/* Botões de ação */}
-                        <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEditarOportunidade(oportunidade);
-                            }}
-                            className="flex-1 px-3 py-2 text-sm font-medium text-[#159A9C] hover:bg-[#159A9C]/10 rounded-lg transition-colors flex items-center justify-center gap-2"
-                            title="Editar"
-                          >
-                            <Edit2 className="h-4 w-4" />
-                            Editar
-                          </button>
-                          <button
-                            onClick={(e) => handleGerarProposta(oportunidade, e)}
-                            className="flex-1 px-3 py-2 text-sm font-medium text-white bg-[#159A9C] hover:bg-[#0F7B7D] rounded-lg transition-colors flex items-center justify-center gap-2"
-                            title="Gerar Proposta"
-                          >
-                            <FileText className="h-4 w-4" />
-                            Proposta
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeletarOportunidade(oportunidade);
-                            }}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Deletar"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                        {/* Ações */}
+                        <div className="flex items-center justify-between gap-2 border-t border-gray-100 pt-2">
+                          {lifecycleFeatureEnabled ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenCardActionsMenuId(null);
+                                void handleLifecyclePrimaryAction(oportunidade);
+                              }}
+                              type="button"
+                              className="inline-flex items-center gap-1 rounded-lg border border-[#B4BEC9]/70 bg-white px-2 py-1 text-xs font-semibold text-[#0F7B7D] transition-colors hover:bg-[#DEEFE7]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/25"
+                              title={`${lifecyclePrimaryLabel} oportunidade`}
+                            >
+                              {lifecyclePrimaryLabel === 'Arquivar' ? (
+                                <Archive className="h-3.5 w-3.5" />
+                              ) : (
+                                <RotateCcw className="h-3.5 w-3.5" />
+                              )}
+                              {lifecyclePrimaryLabel}
+                            </button>
+                          ) : (
+                            <span className="text-xs text-[#002333]/55">Ações rápidas</span>
+                          )}
+
+                          <div className="relative ml-auto" onClick={(event) => event.stopPropagation()}>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setOpenCardActionsMenuId((prev) => (prev === cardId ? null : cardId));
+                              }}
+                              className="inline-flex items-center gap-1 rounded-lg border border-[#B4BEC9]/70 bg-white px-2 py-1 text-xs font-semibold text-[#002333] transition-colors hover:bg-[#DEEFE7]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/25"
+                              aria-expanded={cardActionsMenuOpen}
+                              aria-label="Abrir menu de ações"
+                            >
+                              Ações
+                              <MoreHorizontal className="h-3.5 w-3.5" />
+                            </button>
+
+                            {cardActionsMenuOpen && (
+                              <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded-lg border border-[#B4BEC9]/60 bg-white p-1 shadow-lg">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenCardActionsMenuId(null);
+                                    handleVerDetalhes(oportunidade);
+                                  }}
+                                  className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                >
+                                  Ver detalhes
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenCardActionsMenuId(null);
+                                    handleEditarOportunidade(oportunidade);
+                                  }}
+                                  className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                >
+                                  Editar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenCardActionsMenuId(null);
+                                    handleClonarOportunidade(oportunidade);
+                                  }}
+                                  className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                >
+                                  Duplicar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenCardActionsMenuId(null);
+                                    void handleGerarProposta(oportunidade);
+                                  }}
+                                  className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                >
+                                  Gerar proposta
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenCardActionsMenuId(null);
+                                    handleDeletarOportunidade(oportunidade);
+                                  }}
+                                  className={`block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium transition-colors ${
+                                    deleteModeCard === 'permanente'
+                                      ? 'text-red-700 hover:bg-red-100'
+                                      : 'text-red-600 hover:bg-red-50'
+                                  }`}
+                                >
+                                  {deleteModeCard === 'permanente'
+                                    ? 'Excluir permanente'
+                                    : 'Mover para lixeira'}
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
@@ -1816,19 +2684,21 @@ const PipelinePage: React.FC = () => {
               </div>
             </div>
           ))}
+            </div>
+          </div>
         </div>
       )}
 
       {/* Visualização Lista */}
       {visualizacao === 'lista' && (
-        <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+        <DataTableCard>
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b">
+              <thead className="bg-[#DEEFE7]/35 border-b border-[#B4BEC9]/40">
                 <tr>
                   <th
                     onClick={() => handleOrdenar('titulo')}
-                    className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-[#DEEFE7]/55 transition-colors"
                   >
                     <div className="flex items-center gap-2">
                       Título
@@ -1837,7 +2707,7 @@ const PipelinePage: React.FC = () => {
                   </th>
                   <th
                     onClick={() => handleOrdenar('estagio')}
-                    className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-[#DEEFE7]/55 transition-colors"
                   >
                     <div className="flex items-center gap-2">
                       Estágio
@@ -1846,7 +2716,7 @@ const PipelinePage: React.FC = () => {
                   </th>
                   <th
                     onClick={() => handleOrdenar('valor')}
-                    className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-[#DEEFE7]/55 transition-colors"
                   >
                     <div className="flex items-center gap-2">
                       Valor
@@ -1855,7 +2725,7 @@ const PipelinePage: React.FC = () => {
                   </th>
                   <th
                     onClick={() => handleOrdenar('probabilidade')}
-                    className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-[#DEEFE7]/55 transition-colors"
                   >
                     <div className="flex items-center gap-2">
                       Probabilidade
@@ -1867,7 +2737,7 @@ const PipelinePage: React.FC = () => {
                   </th>
                   <th
                     onClick={() => handleOrdenar('dataFechamentoEsperado')}
-                    className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    className="px-6 py-3 text-left text-xs font-medium text-[#002333] uppercase tracking-wider cursor-pointer hover:bg-[#DEEFE7]/55 transition-colors"
                   >
                     <div className="flex items-center gap-2">
                       Data Esperada
@@ -1881,7 +2751,7 @@ const PipelinePage: React.FC = () => {
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-[#B4BEC9]/25">
                 {oportunidadesPaginadas.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-6 py-8 text-center text-[#002333]/60">
@@ -1891,6 +2761,23 @@ const PipelinePage: React.FC = () => {
                 ) : (
                   oportunidadesPaginadas.map((oportunidade) => {
                     const estagioInfo = ESTAGIOS_CONFIG.find((e) => e.id === oportunidade.estagio);
+                    const lifecycleStatus = getLifecycleStatus(oportunidade);
+                    const deleteModeList = getDeleteModeForOpportunity(oportunidade);
+                    const staleDaysList = Number(oportunidade.stale_days || 0);
+                    const showStaleBadgeList =
+                      Boolean(oportunidade.is_stale) &&
+                      staleDaysList > 0 &&
+                      lifecycleStatus === LifecycleStatusOportunidade.OPEN;
+                    const listRowId = String(oportunidade.id);
+                    const listActionsMenuOpen = openListActionsMenuId === listRowId;
+                    const lifecyclePrimaryLabelList =
+                      lifecycleStatus === LifecycleStatusOportunidade.ARCHIVED ||
+                      lifecycleStatus === LifecycleStatusOportunidade.DELETED
+                        ? 'Restaurar'
+                        : oportunidade.estagio === EstagioOportunidade.GANHO ||
+                            oportunidade.estagio === EstagioOportunidade.PERDIDO
+                          ? 'Reabrir'
+                          : 'Arquivar';
                     return (
                       <tr
                         key={oportunidade.id}
@@ -1904,6 +2791,13 @@ const PipelinePage: React.FC = () => {
                           {oportunidade.descricao && (
                             <div className="text-sm text-[#002333]/60 line-clamp-1">
                               {oportunidade.descricao}
+                            </div>
+                          )}
+                          {showStaleBadgeList && (
+                            <div className="mt-1">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+                                Parada {staleDaysList}d
+                              </span>
                             </div>
                           )}
                         </td>
@@ -1931,34 +2825,98 @@ const PipelinePage: React.FC = () => {
                             : '-'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex items-center justify-end gap-2">
+                          <div
+                            className="relative inline-block text-left"
+                            onClick={(event) => event.stopPropagation()}
+                          >
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditarOportunidade(oportunidade);
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setOpenListActionsMenuId((prev) =>
+                                  prev === listRowId ? null : listRowId,
+                                );
                               }}
-                              className="text-[#159A9C] hover:text-[#0F7B7D] transition-colors p-1"
-                              title="Editar"
+                              className="inline-flex items-center gap-1 rounded-lg border border-[#B4BEC9]/70 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                              aria-expanded={listActionsMenuOpen}
+                              aria-label="Abrir menu de ações da linha"
                             >
-                              <Edit2 className="h-4 w-4" />
+                              Ações
+                              <MoreHorizontal className="h-3.5 w-3.5" />
                             </button>
-                            <button
-                              onClick={(e) => handleGerarProposta(oportunidade, e)}
-                              className="text-[#159A9C] hover:text-[#0F7B7D] transition-colors p-1"
-                              title="Gerar Proposta"
-                            >
-                              <FileText className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeletarOportunidade(oportunidade);
-                              }}
-                              className="text-red-600 hover:text-red-700 transition-colors p-1"
-                              title="Deletar"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+
+                            {listActionsMenuOpen && (
+                              <div className="absolute right-0 top-full z-30 mt-1 w-44 rounded-lg border border-[#B4BEC9]/60 bg-white p-1 shadow-lg">
+                                {lifecycleFeatureEnabled && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenListActionsMenuId(null);
+                                      void handleLifecyclePrimaryAction(oportunidade);
+                                    }}
+                                    className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#0F7B7D] transition-colors hover:bg-[#DEEFE7]/60"
+                                  >
+                                    {lifecyclePrimaryLabelList}
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenListActionsMenuId(null);
+                                    handleVerDetalhes(oportunidade);
+                                  }}
+                                  className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                >
+                                  Ver detalhes
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenListActionsMenuId(null);
+                                    handleEditarOportunidade(oportunidade);
+                                  }}
+                                  className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                >
+                                  Editar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenListActionsMenuId(null);
+                                    handleClonarOportunidade(oportunidade);
+                                  }}
+                                  className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                >
+                                  Duplicar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenListActionsMenuId(null);
+                                    void handleGerarProposta(oportunidade);
+                                  }}
+                                  className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                >
+                                  Gerar proposta
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenListActionsMenuId(null);
+                                    handleDeletarOportunidade(oportunidade);
+                                  }}
+                                  className={`block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium transition-colors ${
+                                    deleteModeList === 'permanente'
+                                      ? 'text-red-700 hover:bg-red-100'
+                                      : 'text-red-600 hover:bg-red-50'
+                                  }`}
+                                >
+                                  {deleteModeList === 'permanente'
+                                    ? 'Excluir permanente'
+                                    : 'Mover para lixeira'}
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1971,7 +2929,7 @@ const PipelinePage: React.FC = () => {
 
           {/* Paginação */}
           {totalPaginas > 1 && (
-            <div className="border-t px-4 sm:px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-gray-50">
+            <div className="border-t border-[#B4BEC9]/35 px-4 sm:px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-[#DEEFE7]/35">
               <div className="text-xs sm:text-sm text-[#002333]/60">
                 Mostrando {indexInicio + 1} a {Math.min(indexFim, oportunidadesOrdenadas.length)} de{' '}
                 {oportunidadesOrdenadas.length} oportunidades
@@ -1980,7 +2938,7 @@ const PipelinePage: React.FC = () => {
                 <button
                   onClick={() => setPaginaAtual((prev) => Math.max(1, prev - 1))}
                   disabled={paginaAtual === 1}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium text-[#002333] hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                  className="px-3 py-1.5 border border-[#B4BEC9]/70 rounded-lg text-sm font-medium text-[#002333] hover:bg-[#DEEFE7]/55 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
                 >
                   Anterior
                 </button>
@@ -2005,7 +2963,7 @@ const PipelinePage: React.FC = () => {
                             className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
                               paginaAtual === page
                                 ? 'bg-[#159A9C] text-white'
-                                : 'text-[#002333] hover:bg-gray-100'
+                                : 'text-[#002333] hover:bg-[#DEEFE7]/55'
                             }`}
                           >
                             {page}
@@ -2018,19 +2976,19 @@ const PipelinePage: React.FC = () => {
                 <button
                   onClick={() => setPaginaAtual((prev) => Math.min(totalPaginas, prev + 1))}
                   disabled={paginaAtual === totalPaginas}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium text-[#002333] hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                  className="px-3 py-1.5 border border-[#B4BEC9]/70 rounded-lg text-sm font-medium text-[#002333] hover:bg-[#DEEFE7]/55 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
                 >
                   Próxima
                 </button>
               </div>
             </div>
           )}
-        </div>
+        </DataTableCard>
       )}
 
       {/* Visualização Calendário */}
       {visualizacao === 'calendario' && (
-        <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+        <SectionCard className="overflow-hidden">
           <style>{`
                 .rbc-calendar {
                   font-family: inherit;
@@ -2041,15 +2999,15 @@ const PipelinePage: React.FC = () => {
                   font-weight: 600;
                   font-size: 14px;
                   color: #002333;
-                  background-color: #F9FAFB;
-                  border-bottom: 2px solid #E5E7EB;
+                  background-color: #DEEFE7;
+                  border-bottom: 1px solid #B4BEC9;
                 }
                 .rbc-toolbar {
                   padding: 16px 24px;
                   display: flex;
                   justify-content: space-between;
                   align-items: center;
-                  border-bottom: 1px solid #E5E7EB;
+                  border-bottom: 1px solid #B4BEC9;
                   background-color: #FFFFFF;
                 }
                 .rbc-toolbar button {
@@ -2064,7 +3022,7 @@ const PipelinePage: React.FC = () => {
                   transition: all 0.2s;
                 }
                 .rbc-toolbar button:hover {
-                  background-color: #F3F4F6;
+                  background-color: #DEEFE7;
                   border-color: #159A9C;
                 }
                 .rbc-toolbar button.rbc-active {
@@ -2080,10 +3038,10 @@ const PipelinePage: React.FC = () => {
                   overflow: visible;
                 }
                 .rbc-day-bg {
-                  border: 1px solid #E5E7EB;
+                  border: 1px solid #B4BEC9;
                 }
                 .rbc-off-range-bg {
-                  background-color: #F9FAFB;
+                  background-color: #DEEFE7;
                 }
                 .rbc-today {
                   background-color: #DEEFE7 !important;
@@ -2104,7 +3062,7 @@ const PipelinePage: React.FC = () => {
                   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
                 }
                 .rbc-event.rbc-selected {
-                  outline: 2px solid #002333;
+                  outline: 2px solid #159A9C;
                   outline-offset: 2px;
                 }
                 .rbc-event-label {
@@ -2230,7 +3188,7 @@ const PipelinePage: React.FC = () => {
               ))}
             </div>
           </div>
-        </div>
+        </SectionCard>
       )}
 
       {/* Visualização Gráficos */}
@@ -2239,14 +3197,14 @@ const PipelinePage: React.FC = () => {
           {/* Grid 2x3 de gráficos */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* 1. Funil de Conversão */}
-            <div className="bg-white rounded-lg shadow-sm border p-6">
+            <SectionCard className="p-6">
               <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
                 <TrendingUp className="h-5 w-5 text-[#159A9C]" />
                 Funil de Conversão
               </h3>
               <ResponsiveContainer width="100%" height={300}>
                 <RechartsBarChart data={dadosGraficos.funil}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#B4BEC9" />
                   <XAxis
                     dataKey="nome"
                     tick={{ fontSize: 12, fill: '#002333' }}
@@ -2258,7 +3216,7 @@ const PipelinePage: React.FC = () => {
                   <Tooltip
                     contentStyle={{
                       backgroundColor: '#fff',
-                      border: '1px solid #E5E7EB',
+                      border: '1px solid #B4BEC9',
                       borderRadius: '8px',
                       fontSize: '12px',
                     }}
@@ -2267,17 +3225,17 @@ const PipelinePage: React.FC = () => {
                   <Bar dataKey="quantidade" fill="#159A9C" radius={[8, 8, 0, 0]} />
                 </RechartsBarChart>
               </ResponsiveContainer>
-            </div>
+            </SectionCard>
 
             {/* 2. Valor por Estágio */}
-            <div className="bg-white rounded-lg shadow-sm border p-6">
+            <SectionCard className="p-6">
               <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
                 <DollarSign className="h-5 w-5 text-[#159A9C]" />
                 Valor por Estágio
               </h3>
               <ResponsiveContainer width="100%" height={300}>
                 <RechartsBarChart data={dadosGraficos.valorPorEstagio} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#B4BEC9" />
                   <XAxis
                     type="number"
                     tick={{ fontSize: 12, fill: '#002333' }}
@@ -2292,7 +3250,7 @@ const PipelinePage: React.FC = () => {
                   <Tooltip
                     contentStyle={{
                       backgroundColor: '#fff',
-                      border: '1px solid #E5E7EB',
+                      border: '1px solid #B4BEC9',
                       borderRadius: '8px',
                       fontSize: '12px',
                     }}
@@ -2307,17 +3265,17 @@ const PipelinePage: React.FC = () => {
                   <Bar dataKey="valor" fill="#0F7B7D" radius={[0, 8, 8, 0]} />
                 </RechartsBarChart>
               </ResponsiveContainer>
-            </div>
+            </SectionCard>
 
             {/* 3. Taxa de Conversão */}
-            <div className="bg-white rounded-lg shadow-sm border p-6">
+            <SectionCard className="p-6">
               <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
                 <Target className="h-5 w-5 text-[#159A9C]" />
                 Taxa de Conversão
               </h3>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={dadosGraficos.taxaConversao}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#B4BEC9" />
                   <XAxis
                     dataKey="nome"
                     tick={{ fontSize: 12, fill: '#002333' }}
@@ -2332,7 +3290,7 @@ const PipelinePage: React.FC = () => {
                   <Tooltip
                     contentStyle={{
                       backgroundColor: '#fff',
-                      border: '1px solid #E5E7EB',
+                      border: '1px solid #B4BEC9',
                       borderRadius: '8px',
                       fontSize: '12px',
                     }}
@@ -2348,10 +3306,10 @@ const PipelinePage: React.FC = () => {
                   />
                 </LineChart>
               </ResponsiveContainer>
-            </div>
+            </SectionCard>
 
             {/* 4. Origem das Oportunidades */}
-            <div className="bg-white rounded-lg shadow-sm border p-6">
+            <SectionCard className="p-6">
               <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
                 <Users className="h-5 w-5 text-[#159A9C]" />
                 Origem das Oportunidades
@@ -2378,24 +3336,24 @@ const PipelinePage: React.FC = () => {
                   <Tooltip
                     contentStyle={{
                       backgroundColor: '#fff',
-                      border: '1px solid #E5E7EB',
+                      border: '1px solid #B4BEC9',
                       borderRadius: '8px',
                       fontSize: '12px',
                     }}
                   />
                 </PieChart>
               </ResponsiveContainer>
-            </div>
+            </SectionCard>
 
             {/* 5. Performance por Responsável */}
-            <div className="bg-white rounded-lg shadow-sm border p-6 lg:col-span-2">
+            <SectionCard className="p-6 lg:col-span-2">
               <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
                 <Users className="h-5 w-5 text-[#159A9C]" />
                 Top 5 - Performance por Responsável
               </h3>
               <ResponsiveContainer width="100%" height={300}>
                 <RechartsBarChart data={dadosGraficos.performance}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#B4BEC9" />
                   <XAxis dataKey="nome" tick={{ fontSize: 12, fill: '#002333' }} />
                   <YAxis
                     yAxisId="left"
@@ -2411,7 +3369,7 @@ const PipelinePage: React.FC = () => {
                   <Tooltip
                     contentStyle={{
                       backgroundColor: '#fff',
-                      border: '1px solid #E5E7EB',
+                      border: '1px solid #B4BEC9',
                       borderRadius: '8px',
                       fontSize: '12px',
                     }}
@@ -2432,20 +3390,20 @@ const PipelinePage: React.FC = () => {
                   <Bar
                     yAxisId="left"
                     dataKey="valor"
-                    fill="#6366f1"
+                    fill="#159A9C"
                     name="Valor"
                     radius={[8, 8, 0, 0]}
                   />
                   <Bar
                     yAxisId="right"
                     dataKey="quantidade"
-                    fill="#f59e0b"
+                    fill="#FBBF24"
                     name="Quantidade"
                     radius={[8, 8, 0, 0]}
                   />
                 </RechartsBarChart>
               </ResponsiveContainer>
-            </div>
+            </SectionCard>
           </div>
 
           {/* Resumo Estatístico */}
@@ -2491,6 +3449,8 @@ const PipelinePage: React.FC = () => {
           </div>
         </div>
       )}
+        </>
+      )}
 
       {/* Modal Oportunidade Refatorado */}
       <ModalOportunidadeRefatorado
@@ -2502,6 +3462,7 @@ const PipelinePage: React.FC = () => {
         onSave={handleSalvarOportunidade}
         oportunidade={oportunidadeEditando}
         estagioInicial={estagioNovaOportunidade}
+        estagiosPermitidos={estagiosKanbanVisiveis.map((estagio) => estagio.id)}
         usuarios={usuarios}
         loadingUsuarios={false}
       />
@@ -2560,6 +3521,20 @@ const PipelinePage: React.FC = () => {
           setShowModal(true);
         }}
         onClonar={handleClonarOportunidade}
+        exclusaoDireta={!lifecycleFeatureEnabled}
+        onArquivar={lifecycleFeatureEnabled ? handleArquivarOportunidade : undefined}
+        onRestaurar={lifecycleFeatureEnabled ? handleRestaurarOportunidade : undefined}
+        onReabrir={lifecycleFeatureEnabled ? handleReabrirOportunidade : undefined}
+        onExcluir={async (oportunidade) => {
+          await oportunidadesService.excluirOportunidade(oportunidade.id);
+          toastService.success(
+            lifecycleFeatureEnabled
+              ? 'Oportunidade enviada para a lixeira.'
+              : 'Oportunidade excluida com sucesso.',
+          );
+          await carregarDados();
+        }}
+        onExcluirPermanente={lifecycleFeatureEnabled ? handleExcluirPermanenteOportunidade : undefined}
       />
 
       {/* Modal de Confirmação de Exclusão */}
@@ -2571,13 +3546,19 @@ const PipelinePage: React.FC = () => {
                 <AlertCircle className="h-6 w-6 text-red-600" />
               </div>
               <h3 className="text-xl font-bold text-center text-[#002333] mb-2">
-                Confirmar Exclusão
+                {deleteMode === 'permanente' ? 'Confirmar Exclusao Permanente' : 'Confirmar Exclusao'}
               </h3>
               <p className="text-center text-gray-600 mb-6">
-                Tem certeza que deseja deletar a oportunidade{' '}
+                Tem certeza que deseja{' '}
+                {deleteMode === 'permanente'
+                  ? 'excluir permanentemente'
+                  : 'enviar para a lixeira'}{' '}
+                a oportunidade{' '}
                 <strong>"{oportunidadeDeletar.titulo}"</strong>?
                 <br />
-                Esta ação não pode ser desfeita.
+                {deleteMode === 'permanente'
+                  ? 'Esta ação não pode ser desfeita.'
+                  : 'Você poderá restaurar depois pela visão Lixeira.'}
               </p>
               <div className="flex gap-3">
                 <button
@@ -2593,17 +3574,21 @@ const PipelinePage: React.FC = () => {
                 <button
                   onClick={handleConfirmarDelecao}
                   disabled={loadingDeletar}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                  className={`flex-1 px-4 py-2 text-white rounded-lg transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2 ${
+                    deleteMode === 'permanente'
+                      ? 'bg-red-600 hover:bg-red-700'
+                      : 'bg-[#159A9C] hover:bg-[#0F7B7D]'
+                  }`}
                 >
                   {loadingDeletar ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      Deletando...
+                      {deleteMode === 'permanente' ? 'Excluindo...' : 'Movendo...'}
                     </>
                   ) : (
                     <>
                       <Trash2 className="h-4 w-4" />
-                      Deletar
+                      {deleteMode === 'permanente' ? 'Excluir permanente' : 'Mover para lixeira'}
                     </>
                   )}
                 </button>
@@ -2666,3 +3651,6 @@ const PipelinePage: React.FC = () => {
 };
 
 export default PipelinePage;
+
+
+
