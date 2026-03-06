@@ -451,7 +451,16 @@ const DashboardV2Page: React.FC = () => {
   const latestGeneratedAtLabel = latestGeneratedAt
     ? formatDateTime(latestGeneratedAt)
     : 'Atualizado agora';
-  const salesActivities = data.salesActivities;
+  const salesActivities = data?.salesActivities ?? {
+    range: {
+      periodStart: activeRange.periodStart,
+      periodEnd: activeRange.periodEnd,
+    },
+    totalAtividades: 0,
+    porTipo: [],
+    porVendedor: [],
+    recentes: [],
+  };
   const topActivityTypes = salesActivities.porTipo.slice(0, 5);
   const topSellers = salesActivities.porVendedor.slice(0, 6);
   const recentSalesActivities = salesActivities.recentes.slice(0, 6);
@@ -618,8 +627,8 @@ const DashboardV2Page: React.FC = () => {
               className="min-w-[240px] rounded-[10px] border border-[#D5E3E8] bg-white px-3 py-2 text-[13px] text-[#244556] focus:border-[#159A9C] focus:outline-none"
             >
               <option value="">Todos</option>
-              {vendedorOptions.map((vendedor) => (
-                <option key={vendedor.id} value={vendedor.id}>
+              {vendedorOptions.map((vendedor, index) => (
+                <option key={`${vendedor.id}-${index}`} value={vendedor.id}>
                   {vendedor.nome}
                 </option>
               ))}
@@ -776,15 +785,19 @@ const DashboardV2Page: React.FC = () => {
               <p className="text-[13px] font-semibold text-[#20465A]">Distribuicao por tipo</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {topActivityTypes.length ? (
-                  topActivityTypes.map((item) => (
-                    <span
-                      key={item.tipo}
-                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold ${activityTypeStyleMap[item.tipo] || 'bg-[#EEF3F5] text-[#516A77]'}`}
-                    >
-                      {getActivityTypeIcon(item.tipo)}
-                      {getActivityTypeLabel(item.tipo)}: {item.quantidade}
-                    </span>
-                  ))
+                  topActivityTypes.map((item, index) => {
+                    const activityType = item.tipo || 'note';
+
+                    return (
+                      <span
+                        key={`${activityType}-${index}`}
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold ${activityTypeStyleMap[activityType] || 'bg-[#EEF3F5] text-[#516A77]'}`}
+                      >
+                        {getActivityTypeIcon(activityType)}
+                        {getActivityTypeLabel(activityType)}: {item.quantidade}
+                      </span>
+                    );
+                  })
                 ) : (
                   <span className="text-[13px] text-[#718A97]">
                     Sem atividades no periodo.
@@ -797,15 +810,15 @@ const DashboardV2Page: React.FC = () => {
               <p className="text-[13px] font-semibold text-[#20465A]">Interacoes recentes</p>
               <div className="mt-3 space-y-2.5">
                 {recentSalesActivities.length ? (
-                  recentSalesActivities.map((item) => (
+                  recentSalesActivities.map((item, index) => (
                     <div
-                      key={item.id}
+                      key={`${item.id || 'activity'}-${index}`}
                       className="rounded-[11px] border border-[#E8EFF2] bg-white px-3 py-2.5"
                     >
                       <div className="flex items-center justify-between gap-3">
                         <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#2A4B5B]">
-                          {getActivityTypeIcon(item.tipo)}
-                          {getActivityTypeLabel(item.tipo)}
+                          {getActivityTypeIcon(item.tipo || 'note')}
+                          {getActivityTypeLabel(item.tipo || 'note')}
                         </span>
                         <span className="text-[11px] text-[#79909B]">
                           {formatActivityTimestamp(item.dataAtividade)}
@@ -834,9 +847,9 @@ const DashboardV2Page: React.FC = () => {
           </h3>
           <div className="mt-3 space-y-2.5">
             {topSellers.length ? (
-              topSellers.map((seller) => (
+              topSellers.map((seller, index) => (
                 <div
-                  key={seller.vendedorId}
+                  key={`${seller.vendedorId || 'seller'}-${index}`}
                   className="rounded-[12px] border border-[#E2EBEF] bg-[#FBFEFF] px-3.5 py-2.5"
                 >
                   <div className="flex items-center justify-between gap-3">

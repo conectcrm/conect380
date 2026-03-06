@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, Repository } from 'typeorm';
-import { Oportunidade } from '../../oportunidades/oportunidade.entity';
+import { LifecycleStatusOportunidade, Oportunidade } from '../../oportunidades/oportunidade.entity';
 import { OportunidadeStageEvent } from '../../oportunidades/oportunidade-stage-event.entity';
 import { Proposta } from '../../propostas/proposta.entity';
 import { DashboardV2QueryDto } from '../dto/dashboard-v2-query.dto';
@@ -34,6 +34,8 @@ export class DashboardV2AggregationService {
   private readonly finalStatus = ['aprovada', 'aceita', 'rejeitada', 'expirada'];
   private oportunidadeResponsavelColumnSql: string | null = null;
   private oportunidadeResponsavelColumnSqlPromise: Promise<string> | null = null;
+  private oportunidadeLifecycleColumnSql: string | null = null;
+  private oportunidadeLifecycleColumnSqlPromise: Promise<string> | null = null;
 
   constructor(
     @InjectRepository(Oportunidade)
@@ -330,6 +332,27 @@ export class DashboardV2AggregationService {
       this.getPipelineSummary(empresaId, range, filters),
     ]);
 
+    return this.buildInsights({
+      overview,
+      trends,
+      pipelineSummary,
+    });
+  }
+
+  buildInsights(params: {
+    overview: { receitaPrevista: number; receitaFechada: number };
+    trends: Array<{ receitaFechada: number }>;
+    pipelineSummary: { stages: Array<{ paradas: number }> };
+  }): Array<{
+    id: string;
+    type: 'warning' | 'opportunity' | 'info';
+    title: string;
+    description: string;
+    impact: 'alto' | 'medio' | 'baixo';
+    action?: string;
+  }> {
+    const { overview, trends, pipelineSummary } = params;
+
     const insights: Array<{
       id: string;
       type: 'warning' | 'opportunity' | 'info';
@@ -549,6 +572,9 @@ export class DashboardV2AggregationService {
     filters: DashboardV2SourceFilters,
   ): Promise<void> {
     const responsavelColumn = await this.getOportunidadeResponsavelColumnSql();
+    const openLifecycleClause = await this.getOportunidadeLifecycleFilterSql('o', [
+      LifecycleStatusOportunidade.OPEN,
+    ]);
     const params: unknown[] = [empresaId, this.toDateKey(range.start), this.toDateKey(range.end)];
     let vendedorClause = '';
 
@@ -570,7 +596,7 @@ export class DashboardV2AggregationService {
         LEFT JOIN oportunidades o
           ON o.empresa_id = $1
           AND o."createdAt" <= (d.date_key + interval '1 day' - interval '1 millisecond')
-          AND ${this.stageNormalizeSql('o.estagio')} NOT IN ('won', 'lost')
+          AND ${openLifecycleClause}
           ${vendedorClause}
         GROUP BY d.date_key
         ORDER BY d.date_key ASC
@@ -595,6 +621,11 @@ export class DashboardV2AggregationService {
     filters: DashboardV2SourceFilters,
   ): Promise<void> {
     const responsavelColumn = await this.getOportunidadeResponsavelColumnSql();
+    const activeLifecycleClause = await this.getOportunidadeLifecycleFilterSql('o', [
+      LifecycleStatusOportunidade.OPEN,
+      LifecycleStatusOportunidade.WON,
+      LifecycleStatusOportunidade.LOST,
+    ]);
     const fromStageExpr = this.stageNormalizeSql('e.from_stage');
     const toStageExpr = this.stageNormalizeSql('e.to_stage');
     const params: unknown[] = [empresaId, range.start.toISOString(), range.end.toISOString()];
@@ -620,6 +651,7 @@ export class DashboardV2AggregationService {
           INNER JOIN oportunidades o
             ON o.id::text = e.oportunidade_id::text
             AND o.empresa_id = e.empresa_id
+            AND ${activeLifecycleClause}
           WHERE e.empresa_id = $1
             AND e.from_stage IS NOT NULL
             AND e.changed_at BETWEEN $2::timestamptz AND $3::timestamptz
@@ -662,6 +694,11 @@ export class DashboardV2AggregationService {
     }>
   > {
     const responsavelColumn = await this.getOportunidadeResponsavelColumnSql();
+    const activeLifecycleClause = await this.getOportunidadeLifecycleFilterSql('o', [
+      LifecycleStatusOportunidade.OPEN,
+      LifecycleStatusOportunidade.WON,
+      LifecycleStatusOportunidade.LOST,
+    ]);
     const fromStageExpr = this.stageNormalizeSql('e.from_stage');
     const toStageExpr = this.stageNormalizeSql('e.to_stage');
     const params: unknown[] = [empresaId, range.start.toISOString(), range.end.toISOString()];
@@ -684,6 +721,7 @@ export class DashboardV2AggregationService {
           INNER JOIN oportunidades o
             ON o.id::text = e.oportunidade_id::text
             AND o.empresa_id = e.empresa_id
+            AND ${activeLifecycleClause}
           WHERE e.empresa_id = $1
             AND e.from_stage IS NOT NULL
             AND e.changed_at BETWEEN $2::timestamptz AND $3::timestamptz
@@ -730,6 +768,11 @@ export class DashboardV2AggregationService {
     }>;
   }> {
     const responsavelColumn = await this.getOportunidadeResponsavelColumnSql();
+    const activeLifecycleClause = await this.getOportunidadeLifecycleFilterSql('o', [
+      LifecycleStatusOportunidade.OPEN,
+      LifecycleStatusOportunidade.WON,
+      LifecycleStatusOportunidade.LOST,
+    ]);
     const stageExpr = this.stageNormalizeSql('o.estagio');
     const pipelineParams: unknown[] = [empresaId, range.end.toISOString()];
     let pipelineVendedorClause = '';
@@ -748,6 +791,7 @@ export class DashboardV2AggregationService {
         FROM oportunidades o
         WHERE o.empresa_id = $1
           AND o."createdAt" <= $2::timestamptz
+          AND ${activeLifecycleClause}
           ${pipelineVendedorClause}
         GROUP BY ${stageExpr}
         ORDER BY ${stageExpr} ASC
@@ -772,6 +816,7 @@ export class DashboardV2AggregationService {
           FROM oportunidades o
           WHERE o.empresa_id = $1
             AND o."createdAt" <= $2::timestamptz
+            AND ${activeLifecycleClause}
             ${agingVendedorClause}
         ),
         latest_stage AS (
@@ -833,6 +878,11 @@ export class DashboardV2AggregationService {
     dayEnd: Date,
   ): Promise<void> {
     const stageExpr = this.stageNormalizeSql('o.estagio');
+    const activeLifecycleClause = await this.getOportunidadeLifecycleFilterSql('o', [
+      LifecycleStatusOportunidade.OPEN,
+      LifecycleStatusOportunidade.WON,
+      LifecycleStatusOportunidade.LOST,
+    ]);
     const rows = await this.oportunidadeRepository
       .createQueryBuilder('o')
       .select(stageExpr, 'stage')
@@ -840,6 +890,7 @@ export class DashboardV2AggregationService {
       .addSelect('COALESCE(SUM(o.valor), 0)::numeric', 'valor_total')
       .where('o.empresa_id = :empresaId', { empresaId })
       .andWhere('o.createdAt <= :dayEnd', { dayEnd })
+      .andWhere(activeLifecycleClause)
       .groupBy(stageExpr)
       .getRawMany<{ stage: string; quantidade: string; valor_total: string }>();
 
@@ -912,16 +963,30 @@ export class DashboardV2AggregationService {
     dateKey: string,
     dayEnd: Date,
   ): Promise<void> {
+    const activeLifecycleClause = await this.getOportunidadeLifecycleFilterSql('o', [
+      LifecycleStatusOportunidade.OPEN,
+      LifecycleStatusOportunidade.WON,
+      LifecycleStatusOportunidade.LOST,
+    ]);
     const rows = await this.stageEventRepository.query(
       `
-        WITH latest_stage AS (
+        WITH scoped_oportunidades AS (
+          SELECT o.id
+          FROM oportunidades o
+          WHERE o.empresa_id = $1
+            AND o."createdAt" <= $2::timestamptz
+            AND ${activeLifecycleClause}
+        ),
+        latest_stage AS (
           SELECT DISTINCT ON (e.oportunidade_id)
             e.oportunidade_id,
             ${this.stageNormalizeSql('e.to_stage')} AS stage,
             e.changed_at
           FROM oportunidade_stage_events e
+          INNER JOIN scoped_oportunidades so
+            ON so.id::text = e.oportunidade_id::text
           WHERE e.empresa_id = $1
-            AND e.changed_at <= $2
+            AND e.changed_at <= $2::timestamptz
           ORDER BY e.oportunidade_id, e.changed_at DESC
         )
         SELECT
@@ -961,6 +1026,9 @@ export class DashboardV2AggregationService {
     dayStart: Date,
     dayEnd: Date,
   ): Promise<void> {
+    const openLifecycleClause = await this.getOportunidadeLifecycleFilterSql('o', [
+      LifecycleStatusOportunidade.OPEN,
+    ]);
     const [approvedStats, cycleStats, previstoStats, ativosStats] = await Promise.all([
       this.propostaRepository
         .createQueryBuilder('p')
@@ -985,18 +1053,14 @@ export class DashboardV2AggregationService {
         .select('COALESCE(SUM((o.valor * o.probabilidade) / 100.0), 0)', 'receita_prevista')
         .where('o.empresa_id = :empresaId', { empresaId })
         .andWhere('o.createdAt <= :dayEnd', { dayEnd })
-        .andWhere(`${this.stageNormalizeSql('o.estagio')} NOT IN (:...stages)`, {
-          stages: ['won', 'lost'],
-        })
+        .andWhere(openLifecycleClause)
         .getRawOne<{ receita_prevista?: string }>(),
       this.oportunidadeRepository
         .createQueryBuilder('o')
         .select('COUNT(*)::int', 'oportunidades_ativas')
         .where('o.empresa_id = :empresaId', { empresaId })
         .andWhere('o.createdAt <= :dayEnd', { dayEnd })
-        .andWhere(`${this.stageNormalizeSql('o.estagio')} NOT IN (:...stages)`, {
-          stages: ['won', 'lost'],
-        })
+        .andWhere(openLifecycleClause)
         .getRawOne<{ oportunidades_ativas?: string }>(),
     ]);
 
@@ -1067,6 +1131,99 @@ export class DashboardV2AggregationService {
     this.oportunidadeResponsavelColumnSqlPromise = null;
 
     return resolved;
+  }
+
+  private async getOportunidadeLifecycleColumnSql(): Promise<string> {
+    if (this.oportunidadeLifecycleColumnSql) {
+      return this.oportunidadeLifecycleColumnSql;
+    }
+
+    if (this.oportunidadeLifecycleColumnSqlPromise) {
+      return this.oportunidadeLifecycleColumnSqlPromise;
+    }
+
+    this.oportunidadeLifecycleColumnSqlPromise = (async () => {
+      try {
+        const rows: Array<{ column_name?: string }> = await this.oportunidadeRepository.query(
+          `
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'oportunidades'
+              AND table_schema NOT IN ('pg_catalog', 'information_schema')
+              AND column_name IN ('lifecycle_status', 'lifecycleStatus')
+            ORDER BY CASE
+              WHEN column_name = 'lifecycle_status' THEN 0
+              WHEN column_name = 'lifecycleStatus' THEN 1
+              ELSE 2
+            END
+            LIMIT 1
+          `,
+        );
+
+        const columnName = rows?.[0]?.column_name;
+        if (columnName && typeof columnName === 'string') {
+          return columnName;
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Falha ao detectar coluna de lifecycle em oportunidades: ${
+            (error as Error)?.message || 'desconhecido'
+          }`,
+        );
+      }
+
+      return '';
+    })();
+
+    const resolved = await this.oportunidadeLifecycleColumnSqlPromise;
+    this.oportunidadeLifecycleColumnSql = resolved;
+    this.oportunidadeLifecycleColumnSqlPromise = null;
+
+    return resolved;
+  }
+
+  private lifecycleNormalizeSql(columnRef: string): string {
+    return `
+      CASE LOWER(COALESCE(${columnRef}::text, ''))
+        WHEN 'open' THEN 'open'
+        WHEN 'won' THEN 'won'
+        WHEN 'ganho' THEN 'won'
+        WHEN 'lost' THEN 'lost'
+        WHEN 'perdido' THEN 'lost'
+        WHEN 'archived' THEN 'archived'
+        WHEN 'deleted' THEN 'deleted'
+        ELSE 'open'
+      END
+    `;
+  }
+
+  private lifecycleFromStageSql(stageColumnRef: string): string {
+    const normalizedStageExpr = this.stageNormalizeSql(stageColumnRef);
+    return `
+      CASE
+        WHEN ${normalizedStageExpr} = 'won' THEN 'won'
+        WHEN ${normalizedStageExpr} = 'lost' THEN 'lost'
+        ELSE 'open'
+      END
+    `;
+  }
+
+  private async getOportunidadeLifecycleStatusExpr(alias = 'o'): Promise<string> {
+    const lifecycleColumn = await this.getOportunidadeLifecycleColumnSql();
+    if (lifecycleColumn) {
+      return this.lifecycleNormalizeSql(`${alias}."${lifecycleColumn}"`);
+    }
+
+    return this.lifecycleFromStageSql(`${alias}.estagio`);
+  }
+
+  private async getOportunidadeLifecycleFilterSql(
+    alias: string,
+    statuses: LifecycleStatusOportunidade[],
+  ): Promise<string> {
+    const lifecycleExpr = await this.getOportunidadeLifecycleStatusExpr(alias);
+    const statusesSql = statuses.map((status) => `'${status}'`).join(', ');
+    return `${lifecycleExpr} IN (${statusesSql})`;
   }
 
   private stageNormalizeSql(columnRef: string): string {

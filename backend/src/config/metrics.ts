@@ -406,6 +406,29 @@ export const dashboardV2CacheHitsTotal = new promClient.Counter({
   labelNames: ['empresaId', 'status'],
   registers: [register],
 });
+
+/**
+ * Counter: Requisicoes do endpoint Dashboard V2 snapshot
+ * Labels: empresaId, status (hit, miss, error)
+ */
+export const dashboardV2SnapshotRequestsTotal = new promClient.Counter({
+  name: 'conectcrm_dashboard_v2_snapshot_requests_total',
+  help: 'Total de requisicoes ao endpoint agregado Dashboard V2 snapshot por status',
+  labelNames: ['empresaId', 'status'],
+  registers: [register],
+});
+
+/**
+ * Histogram: Duracao de etapas do snapshot Dashboard V2
+ * Labels: empresaId, stage, status
+ */
+export const dashboardV2SnapshotStageDurationHistogram = new promClient.Histogram({
+  name: 'conectcrm_dashboard_v2_snapshot_stage_duration_seconds',
+  help: 'Duracao das etapas do endpoint Dashboard V2 snapshot',
+  labelNames: ['empresaId', 'stage', 'status'],
+  buckets: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10],
+  registers: [register],
+});
 /**
  * Counter: Total de ciclos do monitor automatico de alertas financeiros
  * Labels: status (success, partial, skipped_concurrent, fatal_error)
@@ -544,4 +567,3 @@ export function initializeMetrics(): void {
   console.log('✅ Prometheus metrics initialized');
   console.log(`📊 Metrics configured: counters, histograms, gauges`);
 }
-

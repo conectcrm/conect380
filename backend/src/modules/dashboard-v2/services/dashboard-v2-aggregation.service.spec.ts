@@ -98,4 +98,23 @@ describe('DashboardV2AggregationService', () => {
 
     expect(column).toBe('NULL::text');
   });
+
+  it('usa coluna lifecycle_status quando disponivel', async () => {
+    oportunidadeQueryMock.mockResolvedValue([{ column_name: 'lifecycle_status' }]);
+
+    const expr = await (service as any).getOportunidadeLifecycleStatusExpr('o');
+
+    expect(expr).toContain('lifecycle_status');
+    expect(expr).toContain("'archived'");
+  });
+
+  it('faz fallback de lifecycle a partir do estagio quando coluna nao existe', async () => {
+    oportunidadeQueryMock.mockResolvedValue([]);
+
+    const expr = await (service as any).getOportunidadeLifecycleStatusExpr('o');
+
+    expect(expr).toContain('o.estagio');
+    expect(expr).toContain("'won'");
+    expect(expr).toContain("'lost'");
+  });
 });

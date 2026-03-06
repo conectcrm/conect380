@@ -12,6 +12,7 @@ interface SystemBrandingContextValue {
 }
 
 const STORAGE_KEY = 'conect_system_branding_cache_v1';
+const BRANDING_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 const resolveAssetUrl = (url: string): string => {
   if (!url) {
@@ -114,12 +115,26 @@ export const SystemBrandingProvider: React.FC<SystemBrandingProviderProps> = ({ 
   }, [refreshBranding]);
 
   useEffect(() => {
-    const interval = window.setInterval(() => {
+    const refreshIfVisible = () => {
+      if (document.visibilityState !== 'visible') {
+        return;
+      }
+
       void refreshBranding({ silent: true });
-    }, 60000);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshBranding({ silent: true });
+      }
+    };
+
+    const interval = window.setInterval(refreshIfVisible, BRANDING_REFRESH_INTERVAL_MS);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [refreshBranding]);
 

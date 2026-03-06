@@ -21,6 +21,7 @@ interface NotificationCenterProps {
 }
 
 type NotificationFilter = 'all' | 'unread' | 'success' | 'error' | 'warning' | 'info' | 'reminder';
+const NOTIFICATION_POLL_INTERVAL_MS = 60_000;
 
 export const NotificationCenter: React.FC<NotificationCenterProps> = ({ className = '' }) => {
   const navigate = useNavigate();
@@ -90,9 +91,13 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Polling: Buscar notificações da API a cada 30 segundos
+  // Polling: Buscar notificações da API em intervalo moderado e apenas com aba visível.
   useEffect(() => {
-    const fetchNotifications = async () => {
+    const fetchNotifications = async (force = false) => {
+      if (!force && document.visibilityState !== 'visible') {
+        return;
+      }
+
       try {
         const apiNotifications = await notificationService.listar();
         const count = await notificationService.contarNaoLidas();
@@ -134,12 +139,22 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
       }
     };
 
-    void fetchNotifications();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void fetchNotifications(true);
+      }
+    };
+
+    void fetchNotifications(true);
     const interval = setInterval(() => {
       void fetchNotifications();
-    }, 30000);
+    }, NOTIFICATION_POLL_INTERVAL_MS);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const notificationCounts = useMemo(

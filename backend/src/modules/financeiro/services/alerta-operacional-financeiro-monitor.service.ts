@@ -22,9 +22,12 @@ export class AlertaOperacionalFinanceiroMonitorService implements OnModuleInit, 
   private intervalId: NodeJS.Timeout | null = null;
   private isRunning = false;
   private readonly usuarioSistema = 'sistema:auto_recalculo_alertas_financeiro';
+  private readonly nodeEnv = (process.env.NODE_ENV || '').toLowerCase();
   private readonly enabled =
-    process.env.FINANCEIRO_ALERTAS_AUTO_RECALCULO_ENABLED !== 'false' &&
-    process.env.NODE_ENV !== 'test';
+    this.nodeEnv !== 'test' &&
+    (process.env.FINANCEIRO_ALERTAS_AUTO_RECALCULO_ENABLED === 'true' ||
+      (process.env.FINANCEIRO_ALERTAS_AUTO_RECALCULO_ENABLED !== 'false' &&
+        this.nodeEnv !== 'development'));
   private readonly intervalMs = Number(
     process.env.FINANCEIRO_ALERTAS_AUTO_RECALCULO_INTERVAL_MS ?? 5 * 60_000,
   );
@@ -38,7 +41,7 @@ export class AlertaOperacionalFinanceiroMonitorService implements OnModuleInit, 
   onModuleInit() {
     if (!this.enabled) {
       this.logger.log(
-        'Financeiro alertas monitor desabilitado (FINANCEIRO_ALERTAS_AUTO_RECALCULO_ENABLED=false ou ambiente de teste)',
+        'Financeiro alertas monitor desabilitado (defina FINANCEIRO_ALERTAS_AUTO_RECALCULO_ENABLED=true para habilitar em desenvolvimento)',
       );
       return;
     }
