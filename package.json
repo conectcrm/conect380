@@ -29,7 +29,17 @@
     "validate:release:vendas:core": "node scripts/ci/validate-sales-release-mode.mjs --mode core --frontend-env frontend-web/.env.example --backend-env backend/.env.production.example",
     "validate:release:vendas:full": "node scripts/ci/validate-sales-release-mode.mjs --mode full --frontend-env frontend-web/.env.full.example --backend-env backend/.env.production.full.example",
     "preflight:go-live:vendas:core": "node scripts/ci/preflight-sales-go-core.mjs",
-    "preflight:go-live:vendas:full": "node scripts/ci/preflight-sales-go-full.mjs"
+    "preflight:go-live:vendas:full": "node scripts/ci/preflight-sales-go-full.mjs",
+    "monitor:go-live:vendas-financeiro": "powershell -ExecutionPolicy Bypass -File scripts/monitor-pos-go-live-vendas-financeiro.ps1 -BaseUrl http://localhost:3001 -IntervalSeconds 10 -MonitorExpectedIntervalSeconds 300 -MaxCycles 2 -SkipAlertas",
+    "monitor:go-live:vendas-financeiro:48h": "powershell -ExecutionPolicy Bypass -File scripts/monitor-pos-go-live-vendas-financeiro.ps1 -BaseUrl http://localhost:3001 -IntervalSeconds 300 -MonitorExpectedIntervalSeconds 300 -DurationHours 48 -SkipAlertas",
+    "monitor:opp304:piloto": "powershell -ExecutionPolicy Bypass -File scripts/monitor-opp304-piloto-48h.ps1",
+    "monitor:opp304:piloto:dryrun": "powershell -ExecutionPolicy Bypass -File scripts/monitor-opp304-piloto-48h.ps1 -DryRun -MaxCycles 1",
+    "monitor:opp304:piloto:quick": "powershell -ExecutionPolicy Bypass -File scripts/monitor-opp304-piloto-48h.ps1 -IntervalSeconds 10 -MaxCycles 2",
+    "test:opp304:piloto": "powershell -ExecutionPolicy Bypass -File scripts/qa-opp304-piloto-lifecycle.ps1",
+    "test:opp304:piloto:dryrun": "powershell -ExecutionPolicy Bypass -File scripts/qa-opp304-piloto-lifecycle.ps1 -DryRun",
+    "test:opp305:stale": "powershell -ExecutionPolicy Bypass -File scripts/qa-opp305-stale-quality.ps1",
+    "test:opp305:homolog": "powershell -ExecutionPolicy Bypass -File scripts/qa-opp305-stale-homologacao.ps1",
+    "test:opp305:homolog:dryrun": "powershell -ExecutionPolicy Bypass -File scripts/qa-opp305-stale-homologacao.ps1 -DryRun"
   },
   "keywords": [
     "crm",

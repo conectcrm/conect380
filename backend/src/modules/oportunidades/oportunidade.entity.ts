@@ -52,6 +52,14 @@ export enum MotivoPerdaOportunidade {
   OUTRO = 'outro',
 }
 
+export enum LifecycleStatusOportunidade {
+  OPEN = 'open',
+  WON = 'won',
+  LOST = 'lost',
+  ARCHIVED = 'archived',
+  DELETED = 'deleted',
+}
+
 @Entity('oportunidades')
 export class Oportunidade {
   @PrimaryGeneratedColumn()
@@ -149,6 +157,32 @@ export class Oportunidade {
   @Column({ type: 'timestamp', name: 'data_revisao', nullable: true })
   dataRevisao?: Date;
 
+  @Column({
+    name: 'lifecycle_status',
+    type: 'varchar',
+    length: 20,
+    default: LifecycleStatusOportunidade.OPEN,
+  })
+  lifecycle_status?: LifecycleStatusOportunidade;
+
+  @Column({ name: 'archived_at', type: 'timestamptz', nullable: true })
+  archived_at?: Date | null;
+
+  @Column({ name: 'archived_by', type: 'uuid', nullable: true })
+  archived_by?: string | null;
+
+  @Column({ name: 'deleted_at', type: 'timestamptz', nullable: true })
+  deleted_at?: Date | null;
+
+  @Column({ name: 'deleted_by', type: 'uuid', nullable: true })
+  deleted_by?: string | null;
+
+  @Column({ name: 'reopened_at', type: 'timestamptz', nullable: true })
+  reopened_at?: Date | null;
+
+  @Column({ name: 'reopened_by', type: 'uuid', nullable: true })
+  reopened_by?: string | null;
+
   @OneToMany(() => Atividade, (atividade) => atividade.oportunidade)
   atividades: Atividade[];
 
@@ -162,4 +196,8 @@ export class Oportunidade {
   updatedAt: Date;
 
   valorFormatado?: string;
+  is_stale?: boolean;
+  stale_days?: number;
+  last_interaction_at?: Date | string | null;
+  stale_since?: Date | string | null;
 }

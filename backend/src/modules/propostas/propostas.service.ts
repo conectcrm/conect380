@@ -246,10 +246,10 @@ export class PropostasService {
     vendedorId: string | null,
   ): Promise<string> {
     const oportunidadeColumns = await this.getTableColumns('oportunidades');
-    const userColumn = oportunidadeColumns.has('usuario_id')
-      ? 'usuario_id'
-      : oportunidadeColumns.has('responsavel_id')
-        ? 'responsavel_id'
+    const userColumn = oportunidadeColumns.has('responsavel_id')
+      ? 'responsavel_id'
+      : oportunidadeColumns.has('usuario_id')
+        ? 'usuario_id'
         : null;
 
     const insertColumns: string[] = ['empresa_id', 'titulo', 'valor'];
@@ -268,6 +268,11 @@ export class PropostasService {
     if (oportunidadeColumns.has('probabilidade')) {
       insertColumns.push('probabilidade');
       insertValues.push(0);
+    }
+
+    if (oportunidadeColumns.has('lifecycle_status')) {
+      insertColumns.push('lifecycle_status');
+      insertValues.push('open');
     }
 
     const placeholders = insertValues.map((_, index) => `$${index + 1}`).join(', ');

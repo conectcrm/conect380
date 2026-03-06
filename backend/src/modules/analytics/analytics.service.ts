@@ -6,7 +6,11 @@ import { Proposta } from '../propostas/proposta.entity';
 import { Contrato, StatusContrato } from '../contratos/entities/contrato.entity';
 import { Fatura, StatusFatura } from '../faturamento/entities/fatura.entity';
 import { User, UserRole } from '../users/user.entity';
-import { EstagioOportunidade, Oportunidade } from '../oportunidades/oportunidade.entity';
+import {
+  EstagioOportunidade,
+  LifecycleStatusOportunidade,
+  Oportunidade,
+} from '../oportunidades/oportunidade.entity';
 import { Lead, StatusLead } from '../leads/lead.entity';
 
 type Periodo = '7d' | '30d' | '90d' | '1y';
@@ -97,6 +101,8 @@ interface VendorAccumulator {
 @Injectable()
 export class AnalyticsService {
   private readonly logger = new Logger(AnalyticsService.name);
+  private oportunidadeLifecycleColumnExists: boolean | null = null;
+  private oportunidadeLifecycleColumnExistsPromise: Promise<boolean> | null = null;
 
   constructor(
     @InjectRepository(Proposta) private readonly propostaRepo: Repository<Proposta>,
@@ -373,6 +379,7 @@ export class AnalyticsService {
 
   async getPrevisaoFechamento(params: AnalyticsQueryParams) {
     const vendedorId = this.normalizeVendedor(params.vendedor);
+    const hasLifecycleColumn = await this.hasOportunidadeLifecycleColumn();
     const oportunidadesQuery = this.oportunidadeRepo
       .createQueryBuilder('o')
       .leftJoin('o.responsavel', 'responsavel')
@@ -395,6 +402,18 @@ export class AnalyticsService {
           EstagioOportunidade.GANHO,
         ],
       });
+
+    if (hasLifecycleColumn) {
+      oportunidadesQuery.andWhere(
+        "LOWER(COALESCE(o.lifecycle_status::text, 'open')) NOT IN (:...excludedLifecycle)",
+        {
+          excludedLifecycle: [
+            LifecycleStatusOportunidade.ARCHIVED,
+            LifecycleStatusOportunidade.DELETED,
+          ],
+        },
+      );
+    }
 
     if (vendedorId) oportunidadesQuery.andWhere('o.responsavel_id = :vendedorId', { vendedorId });
     const oportunidades = await oportunidadesQuery.getRawMany<{
@@ -542,6 +561,7 @@ export class AnalyticsService {
     const inicioHoje = new Date(agora);
     inicioHoje.setHours(0, 0, 0, 0);
     const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1);
+    const hasLifecycleColumn = await this.hasOportunidadeLifecycleColumn();
 
     const [propostasHoje, propostas24h, faturasHoje, faturasMes, vendedoresAtivos, pipeline] =
       await Promise.all([
@@ -550,20 +570,29 @@ export class AnalyticsService {
         this.queryFaturasPagas(empresaId, inicioHoje, agora),
         this.queryFaturasPagas(empresaId, inicioMes, agora),
         this.queryVendedoresAtivos(empresaId),
-        this.oportunidadeRepo
-          .createQueryBuilder('o')
-          .select(['o.id AS id', 'o.valor AS valor'])
-          .where('o.empresa_id = :empresaId', { empresaId })
-          .andWhere('o.estagio IN (:...estagios)', {
-            estagios: [
-              EstagioOportunidade.LEADS,
-              EstagioOportunidade.QUALIFICACAO,
-              EstagioOportunidade.PROPOSTA,
-              EstagioOportunidade.NEGOCIACAO,
-              EstagioOportunidade.FECHAMENTO,
-            ],
-          })
-          .getRawMany<{ id: number; valor: number | string }>(),
+        (async () => {
+          const pipelineQuery = this.oportunidadeRepo
+            .createQueryBuilder('o')
+            .select(['o.id AS id', 'o.valor AS valor'])
+            .where('o.empresa_id = :empresaId', { empresaId })
+            .andWhere('o.estagio IN (:...estagios)', {
+              estagios: [
+                EstagioOportunidade.LEADS,
+                EstagioOportunidade.QUALIFICACAO,
+                EstagioOportunidade.PROPOSTA,
+                EstagioOportunidade.NEGOCIACAO,
+                EstagioOportunidade.FECHAMENTO,
+              ],
+            });
+
+          if (hasLifecycleColumn) {
+            pipelineQuery.andWhere("LOWER(COALESCE(o.lifecycle_status::text, 'open')) = :openLifecycle", {
+              openLifecycle: LifecycleStatusOportunidade.OPEN,
+            });
+          }
+
+          return pipelineQuery.getRawMany<{ id: number; valor: number | string }>();
+        })(),
       ]);
 
     const propostasRespondidas24h = propostas24h.filter((p) =>
@@ -704,6 +733,45 @@ export class AnalyticsService {
         role: In([UserRole.ADMIN, UserRole.MANAGER, UserRole.VENDEDOR]),
       },
     });
+  }
+
+  private async hasOportunidadeLifecycleColumn(): Promise<boolean> {
+    if (this.oportunidadeLifecycleColumnExists !== null) {
+      return this.oportunidadeLifecycleColumnExists;
+    }
+
+    if (this.oportunidadeLifecycleColumnExistsPromise) {
+      return this.oportunidadeLifecycleColumnExistsPromise;
+    }
+
+    this.oportunidadeLifecycleColumnExistsPromise = (async () => {
+      try {
+        const rows: Array<{ column_name?: string }> = await this.oportunidadeRepo.query(
+          `
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'oportunidades'
+              AND table_schema NOT IN ('pg_catalog', 'information_schema')
+              AND column_name = 'lifecycle_status'
+            LIMIT 1
+          `,
+        );
+
+        return rows.length > 0;
+      } catch (error) {
+        this.logger.warn(
+          `Nao foi possivel verificar coluna lifecycle_status em oportunidades: ${
+            (error as Error)?.message || 'desconhecido'
+          }`,
+        );
+        return false;
+      }
+    })();
+
+    const resolved = await this.oportunidadeLifecycleColumnExistsPromise;
+    this.oportunidadeLifecycleColumnExists = resolved;
+    this.oportunidadeLifecycleColumnExistsPromise = null;
+    return resolved;
   }
 
   private buildVendedores(propostas: Proposta[], usuarios: User[], vendedorSelecionado?: string) {

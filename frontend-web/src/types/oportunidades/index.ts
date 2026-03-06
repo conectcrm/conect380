@@ -1,6 +1,8 @@
 // Importar e re-exportar enums do arquivo enums.ts
 import {
   EstagioOportunidade,
+  LifecycleStatusOportunidade,
+  LifecycleViewOportunidade,
   PrioridadeOportunidade,
   OrigemOportunidade,
   TipoAtividade,
@@ -8,6 +10,8 @@ import {
 } from './enums';
 export {
   EstagioOportunidade,
+  LifecycleStatusOportunidade,
+  LifecycleViewOportunidade,
   PrioridadeOportunidade,
   OrigemOportunidade,
   TipoAtividade,
@@ -75,6 +79,17 @@ export interface Oportunidade {
   dataUltimaMudancaEstagio?: Date | string;
   diasNoEstagioAtual?: number;
   precisaAtencao?: boolean;
+  lifecycle_status?: LifecycleStatusOportunidade;
+  archived_at?: Date | string | null;
+  archived_by?: string | null;
+  deleted_at?: Date | string | null;
+  deleted_by?: string | null;
+  reopened_at?: Date | string | null;
+  reopened_by?: string | null;
+  is_stale?: boolean;
+  stale_days?: number;
+  last_interaction_at?: Date | string | null;
+  stale_since?: Date | string | null;
 }
 
 export interface Atividade {
@@ -104,6 +119,9 @@ export interface FiltrosOportunidade {
   tags: string[];
   ordenacao: 'titulo' | 'valor' | 'probabilidade' | 'createdAt' | 'updatedAt';
   direcao: 'asc' | 'desc';
+  lifecycle_status?: LifecycleStatusOportunidade | '';
+  lifecycle_view?: LifecycleViewOportunidade | '';
+  include_deleted?: boolean;
 }
 
 export interface EstatisticasOportunidades {
@@ -143,6 +161,76 @@ export interface NovaAtividade {
   descricao: string;
   dataAtividade?: Date;
   oportunidadeId: number;
+}
+
+export interface OportunidadeHistoricoEstagioItem {
+  id: string;
+  fromStage: EstagioOportunidade | null;
+  toStage: EstagioOportunidade;
+  changedAt: string;
+  source: string;
+  changedBy?: {
+    id: string;
+    nome: string;
+    avatarUrl?: string | null;
+  };
+}
+
+export interface OportunidadeAtividadeResumo {
+  range: {
+    periodStart: string;
+    periodEnd: string;
+  };
+  totalAtividades: number;
+  porTipo: Array<{
+    tipo: TipoAtividade;
+    quantidade: number;
+  }>;
+  porVendedor: Array<{
+    vendedorId: string;
+    nome: string;
+    avatarUrl?: string | null;
+    quantidade: number;
+    oportunidadesAtivas: number;
+    ultimaAtividadeEm: string | null;
+  }>;
+  recentes: Array<{
+    id: number;
+    tipo: TipoAtividade;
+    descricao: string;
+    dataAtividade: string | null;
+    oportunidadeId: number;
+    oportunidadeTitulo?: string;
+    vendedor?: {
+      id: string;
+      nome: string;
+      avatarUrl?: string | null;
+    };
+  }>;
+}
+
+export interface LifecycleFeatureFlagDecision {
+  enabled: boolean;
+  source: 'disabled' | 'enabled' | 'rollout';
+  rolloutPercentage: number;
+}
+
+export interface StalePolicyDecision {
+  enabled: boolean;
+  thresholdDays: number;
+  source: 'tenant' | 'default';
+  autoArchiveEnabled: boolean;
+  autoArchiveAfterDays: number;
+  autoArchiveSource: 'tenant' | 'default';
+}
+
+export interface StaleDealsResult {
+  enabled: boolean;
+  thresholdDays: number;
+  totalCandidates: number;
+  totalStale: number;
+  generatedAt: string;
+  stale: Oportunidade[];
 }
 
 // Configurações do Pipeline
