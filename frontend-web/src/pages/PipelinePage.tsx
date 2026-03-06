@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toastService } from '../services/toastService';
 import * as XLSX from 'xlsx';
@@ -37,19 +37,20 @@ import {
   X,
   Maximize2,
   Minimize2,
-  Edit2,
   Trash2,
   Grid3X3,
   List,
   BarChart3,
   Download,
   FileSpreadsheet,
-  FileText,
   AlertCircle,
   RefreshCw,
-  Copy,
   Save,
   Bookmark,
+  Archive,
+  RotateCcw,
+  SlidersHorizontal,
+  MoreHorizontal,
 } from 'lucide-react';
 import { oportunidadesService } from '../services/oportunidadesService';
 import usuariosService from '../services/usuariosService';
@@ -59,9 +60,13 @@ import {
   NovaOportunidade,
   FiltrosOportunidade,
   EstatisticasOportunidades,
+  StaleDealsResult,
+  StalePolicyDecision,
 } from '../types/oportunidades';
 import {
   EstagioOportunidade,
+  LifecycleStatusOportunidade,
+  LifecycleViewOportunidade,
   PrioridadeOportunidade,
   OrigemOportunidade,
   TipoAtividade,
@@ -72,9 +77,9 @@ import ModalDetalhesOportunidade from '../components/oportunidades/ModalDetalhes
 import ModalExport from '../components/oportunidades/ModalExport';
 import ModalMotivoPerda from '../components/oportunidades/ModalMotivoPerda';
 import { useAuth } from '../contexts/AuthContext';
+import { userHasPermission } from '../config/menuConfig';
 import { useGlobalConfirmation } from '../contexts/GlobalConfirmationContext';
-import { DataTableCard, FiltersBar, InlineStats, PageHeader, SectionCard } from '../components/layout-v2';
-import ActiveEmpresaBadge from '../components/tenant/ActiveEmpresaBadge';
+import { DataTableCard, InlineStats, PageHeader, SectionCard } from '../components/layout-v2';
 
 // Configuração do localizador do calendário (date-fns)
 const locales = {
@@ -91,6 +96,7 @@ const localizer = dateFnsLocalizer({
 
 // Tipos de visualização
 type VisualizacaoPipeline = 'kanban' | 'lista' | 'calendario' | 'grafico';
+type WorkspaceTab = 'pipeline' | 'parametros';
 
 type EstagioConfig = {
   id: EstagioOportunidade;
@@ -176,6 +182,56 @@ const ESTAGIOS_CONFIG: EstagioConfig[] = [
 ];
 
 // Paleta de apoio para gráficos (seguindo tema Crevasse + cores contextuais)
+const ALLOWED_STAGE_TRANSITIONS: Record<EstagioOportunidade, readonly EstagioOportunidade[]> = {
+  [EstagioOportunidade.LEADS]: [EstagioOportunidade.QUALIFICACAO, EstagioOportunidade.PERDIDO],
+  [EstagioOportunidade.QUALIFICACAO]: [
+    EstagioOportunidade.LEADS,
+    EstagioOportunidade.PROPOSTA,
+    EstagioOportunidade.PERDIDO,
+  ],
+  [EstagioOportunidade.PROPOSTA]: [
+    EstagioOportunidade.QUALIFICACAO,
+    EstagioOportunidade.NEGOCIACAO,
+    EstagioOportunidade.PERDIDO,
+  ],
+  [EstagioOportunidade.NEGOCIACAO]: [
+    EstagioOportunidade.PROPOSTA,
+    EstagioOportunidade.FECHAMENTO,
+    EstagioOportunidade.PERDIDO,
+  ],
+  [EstagioOportunidade.FECHAMENTO]: [
+    EstagioOportunidade.NEGOCIACAO,
+    EstagioOportunidade.GANHO,
+    EstagioOportunidade.PERDIDO,
+  ],
+  [EstagioOportunidade.GANHO]: [],
+  [EstagioOportunidade.PERDIDO]: [],
+};
+
+const LIFECYCLE_VIEW_OPTIONS: Array<{
+  id: LifecycleViewOportunidade;
+  label: string;
+}> = [
+  { id: LifecycleViewOportunidade.OPEN, label: 'Abertas' },
+  { id: LifecycleViewOportunidade.CLOSED, label: 'Fechadas' },
+  { id: LifecycleViewOportunidade.ARCHIVED, label: 'Arquivadas' },
+  { id: LifecycleViewOportunidade.DELETED, label: 'Lixeira' },
+];
+
+const LIFECYCLE_VIEW_DESCRIPTIONS: Record<LifecycleViewOportunidade, string> = {
+  [LifecycleViewOportunidade.OPEN]: 'Apenas oportunidades ativas no funil comercial.',
+  [LifecycleViewOportunidade.CLOSED]: 'Negocios encerrados como ganho ou perdido.',
+  [LifecycleViewOportunidade.ARCHIVED]: 'Registros arquivados para referencia.',
+  [LifecycleViewOportunidade.DELETED]: 'Itens enviados para a lixeira (exclusao logica).',
+  [LifecycleViewOportunidade.ALL_ACTIVE]: 'Todos os registros ativos.',
+  [LifecycleViewOportunidade.ALL]: 'Todos os registros, incluindo lixeira.',
+};
+
+const STALE_THRESHOLD_MIN = 7;
+const STALE_THRESHOLD_MAX = 120;
+const STALE_AUTO_ARCHIVE_MIN = 7;
+const STALE_AUTO_ARCHIVE_MAX = 365;
+
 const CORES_GRAFICOS = [
   '#002333',
   '#0F7B7D',
@@ -190,12 +246,26 @@ const CORES_GRAFICOS = [
 const PipelinePage: React.FC = () => {
   const { confirm } = useGlobalConfirmation();
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [oportunidades, setOportunidades] = useState<Oportunidade[]>([]);
   const [estatisticas, setEstatisticas] = useState<EstatisticasOportunidades | null>(null);
+  const [lifecycleFeatureEnabled, setLifecycleFeatureEnabled] = useState(false);
+  const [lifecycleView, setLifecycleView] = useState<LifecycleViewOportunidade>(
+    LifecycleViewOportunidade.OPEN,
+  );
+  const [stalePolicy, setStalePolicy] = useState<StalePolicyDecision | null>(null);
+  const [stalePolicyDraft, setStalePolicyDraft] = useState({
+    enabled: false,
+    thresholdDays: 30,
+    autoArchiveEnabled: false,
+    autoArchiveAfterDays: 60,
+  });
+  const [stalePolicyLoading, setStalePolicyLoading] = useState(false);
+  const [stalePolicySaving, setStalePolicySaving] = useState(false);
+  const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>('pipeline');
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loadingUsuarios, setLoadingUsuarios] = useState(false);
   const [visualizacao, setVisualizacao] = useState<VisualizacaoPipeline>('kanban');
@@ -227,6 +297,7 @@ const PipelinePage: React.FC = () => {
   const [erroMotivoPerda, setErroMotivoPerda] = useState<string | null>(null);
   const [showModalDeletar, setShowModalDeletar] = useState(false);
   const [oportunidadeDeletar, setOportunidadeDeletar] = useState<Oportunidade | null>(null);
+  const [deleteMode, setDeleteMode] = useState<'soft' | 'permanente'>('soft');
   const [loadingDeletar, setLoadingDeletar] = useState(false);
   const [oportunidadeDetalhes, setOportunidadeDetalhes] = useState<Oportunidade | null>(null);
   const [oportunidadeEditando, setOportunidadeEditando] = useState<Oportunidade | null>(null);
@@ -235,6 +306,10 @@ const PipelinePage: React.FC = () => {
   );
   const [calendarView, setCalendarView] = useState<View>('month');
   const [calendarDate, setCalendarDate] = useState(new Date());
+  const [openCardActionsMenuId, setOpenCardActionsMenuId] = useState<string | null>(null);
+  const [openListActionsMenuId, setOpenListActionsMenuId] = useState<string | null>(null);
+  const canManageStalePolicy = userHasPermission(user as any, 'config.automacoes.manage');
+  const showPipelineWorkspace = !lifecycleFeatureEnabled || workspaceTab === 'pipeline';
 
   useEffect(() => {
     if (visualizacao !== 'kanban' && kanbanExpanded) {
@@ -250,6 +325,26 @@ const PipelinePage: React.FC = () => {
       document.body.style.overflow = prevOverflow;
     };
   }, [kanbanExpanded]);
+
+  useEffect(() => {
+    if (!openCardActionsMenuId && !openListActionsMenuId) return;
+
+    const closeMenu = () => {
+      setOpenCardActionsMenuId(null);
+      setOpenListActionsMenuId(null);
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeMenu();
+    };
+
+    window.addEventListener('click', closeMenu);
+    window.addEventListener('keydown', handleEscape);
+
+    return () => {
+      window.removeEventListener('click', closeMenu);
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [openCardActionsMenuId, openListActionsMenuId]);
 
   useEffect(() => {
     if (!kanbanExpanded) return;
@@ -292,6 +387,43 @@ const PipelinePage: React.FC = () => {
     }
   }, []);
 
+  const normalizeIntegerWithinRange = (value: number, min: number, max: number) => {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+      return min;
+    }
+    return Math.min(max, Math.max(min, Math.round(numericValue)));
+  };
+
+  const stalePolicyHasChanges = useMemo(() => {
+    if (!stalePolicy) return false;
+    return (
+      stalePolicy.enabled !== stalePolicyDraft.enabled ||
+      stalePolicy.thresholdDays !==
+        normalizeIntegerWithinRange(
+          stalePolicyDraft.thresholdDays,
+          STALE_THRESHOLD_MIN,
+          STALE_THRESHOLD_MAX,
+        ) ||
+      stalePolicy.autoArchiveEnabled !== stalePolicyDraft.autoArchiveEnabled ||
+      stalePolicy.autoArchiveAfterDays !==
+        normalizeIntegerWithinRange(
+          stalePolicyDraft.autoArchiveAfterDays,
+          STALE_AUTO_ARCHIVE_MIN,
+          STALE_AUTO_ARCHIVE_MAX,
+        )
+    );
+  }, [stalePolicy, stalePolicyDraft]);
+
+  const syncStalePolicyDraft = useCallback((policy: StalePolicyDecision) => {
+    setStalePolicyDraft({
+      enabled: Boolean(policy.enabled),
+      thresholdDays: policy.thresholdDays,
+      autoArchiveEnabled: Boolean(policy.autoArchiveEnabled),
+      autoArchiveAfterDays: policy.autoArchiveAfterDays,
+    });
+  }, []);
+
   // Verificar autenticação ao carregar
   useEffect(() => {
     if (!isAuthenticated) {
@@ -302,24 +434,83 @@ const PipelinePage: React.FC = () => {
       setLoading(false);
       return;
     }
-    carregarDados();
-  }, [isAuthenticated, navigate]);
+    void carregarDados();
+  }, [isAuthenticated, navigate, lifecycleView]);
 
   const carregarDados = async () => {
     try {
       setLoading(true);
       setError(null);
 
+      const lifecycleDecision = await oportunidadesService
+        .obterLifecycleFeatureFlag()
+        .catch(() => ({ enabled: false, source: 'disabled', rolloutPercentage: 0 }));
+      const lifecycleEnabled = Boolean(lifecycleDecision.enabled);
+      setLifecycleFeatureEnabled(lifecycleEnabled);
+
+      if (!lifecycleEnabled && lifecycleView !== LifecycleViewOportunidade.OPEN) {
+        setLifecycleView(LifecycleViewOportunidade.OPEN);
+      }
+
+      const lifecycleFilters: Partial<FiltrosOportunidade> = lifecycleEnabled
+        ? {
+            lifecycle_view: lifecycleView,
+            include_deleted: lifecycleView === LifecycleViewOportunidade.DELETED,
+          }
+        : {};
+
+      const staleDealsPromise: Promise<StaleDealsResult | null> =
+        lifecycleEnabled && lifecycleView === LifecycleViewOportunidade.OPEN
+          ? oportunidadesService.listarOportunidadesParadas({ limit: 2000 }).catch(() => null)
+          : Promise.resolve(null);
+
+      let stalePolicyPromise: Promise<StalePolicyDecision | null> = Promise.resolve(null);
+      if (lifecycleEnabled) {
+        setStalePolicyLoading(true);
+        stalePolicyPromise = oportunidadesService.obterStalePolicy().catch(() => null);
+      } else {
+        setStalePolicy(null);
+      }
+
       // Carregar oportunidades e usuários em paralelo
-      const [dados, stats, usuariosData] = await Promise.all([
-        oportunidadesService.listarOportunidades(),
-        oportunidadesService.obterEstatisticas(),
+      const [dados, stats, usuariosData, staleDealsResult, stalePolicyData] = await Promise.all([
+        oportunidadesService.listarOportunidades(lifecycleFilters),
+        oportunidadesService.obterEstatisticas(lifecycleFilters),
         carregarUsuarios(),
+        staleDealsPromise,
+        stalePolicyPromise,
       ]);
 
-      setOportunidades(dados);
+      const staleById = new Map(
+        (staleDealsResult?.stale || []).map((oportunidade: Oportunidade) => [
+          String(oportunidade.id),
+          oportunidade,
+        ]),
+      );
+      const dadosComStale =
+        staleById.size > 0
+          ? dados.map((oportunidade) => {
+              const stale = staleById.get(String(oportunidade.id));
+              if (!stale) return oportunidade;
+              return {
+                ...oportunidade,
+                is_stale: stale.is_stale,
+                stale_days: stale.stale_days,
+                stale_since: stale.stale_since,
+                last_interaction_at: stale.last_interaction_at,
+              };
+            })
+          : dados;
+
+      setOportunidades(dadosComStale);
       setEstatisticas(stats);
       setUsuarios(usuariosData);
+      if (stalePolicyData) {
+        setStalePolicy(stalePolicyData);
+        syncStalePolicyDraft(stalePolicyData);
+      } else if (lifecycleEnabled) {
+        setStalePolicy(null);
+      }
     } catch (err: any) {
       console.error('Erro ao carregar dados:', err);
 
@@ -339,10 +530,55 @@ const PipelinePage: React.FC = () => {
       }
     } finally {
       setLoading(false);
+      setStalePolicyLoading(false);
     }
   };
 
   // Carregar lista de usuários para os selects
+  const handleSalvarStalePolicy = async () => {
+    if (!canManageStalePolicy) {
+      toastService.warning('Você não possui permissão para alterar essa configuração.');
+      return;
+    }
+
+    const payload = {
+      enabled: stalePolicyDraft.enabled,
+      thresholdDays: normalizeIntegerWithinRange(
+        stalePolicyDraft.thresholdDays,
+        STALE_THRESHOLD_MIN,
+        STALE_THRESHOLD_MAX,
+      ),
+      autoArchiveEnabled: stalePolicyDraft.enabled ? stalePolicyDraft.autoArchiveEnabled : false,
+      autoArchiveAfterDays: normalizeIntegerWithinRange(
+        stalePolicyDraft.autoArchiveAfterDays,
+        STALE_AUTO_ARCHIVE_MIN,
+        STALE_AUTO_ARCHIVE_MAX,
+      ),
+    };
+
+    try {
+      setStalePolicySaving(true);
+      const updatedPolicy = await oportunidadesService.atualizarStalePolicy(payload);
+      setStalePolicy(updatedPolicy);
+      syncStalePolicyDraft(updatedPolicy);
+      toastService.success('Política de oportunidades paradas atualizada.');
+      await carregarDados();
+    } catch (err: any) {
+      if (err?.response?.status === 403) {
+        toastService.error('Sem permissão para atualizar a política stale.');
+      } else {
+        toastService.error('Não foi possível atualizar a política stale.');
+      }
+    } finally {
+      setStalePolicySaving(false);
+    }
+  };
+
+  const handleResetStalePolicyDraft = () => {
+    if (!stalePolicy) return;
+    syncStalePolicyDraft(stalePolicy);
+  };
+
   const carregarUsuarios = async (): Promise<Usuario[]> => {
     try {
       setLoadingUsuarios(true);
@@ -358,10 +594,26 @@ const PipelinePage: React.FC = () => {
 
   // Abrir modal para criar nova oportunidade
   const handleNovaOportunidade = (estagio: EstagioOportunidade = EstagioOportunidade.LEADS) => {
+    if (lifecycleFeatureEnabled && lifecycleView !== LifecycleViewOportunidade.OPEN) {
+      toastService.warning('Para criar oportunidade, altere para a visão "Abertas".');
+      return;
+    }
+
     setOportunidadeEditando(null);
     setEstagioNovaOportunidade(estagio);
     setShowModal(true);
   };
+
+  const getLifecycleStatus = (oportunidade: Oportunidade): LifecycleStatusOportunidade => {
+    if (oportunidade.lifecycle_status) return oportunidade.lifecycle_status;
+    if (oportunidade.estagio === EstagioOportunidade.GANHO) return LifecycleStatusOportunidade.WON;
+    if (oportunidade.estagio === EstagioOportunidade.PERDIDO)
+      return LifecycleStatusOportunidade.LOST;
+    return LifecycleStatusOportunidade.OPEN;
+  };
+
+  const canManipulateKanban =
+    !lifecycleFeatureEnabled || lifecycleView === LifecycleViewOportunidade.OPEN;
 
   // Abrir modal para editar oportunidade existente
   const handleEditarOportunidade = (oportunidade: Oportunidade) => {
@@ -374,26 +626,32 @@ const PipelinePage: React.FC = () => {
     setOportunidadeDetalhes(oportunidade);
   };
 
-  // Abrir modal para confirmar exclusão
+  // Abrir modal para confirmar exclusao
   const handleDeletarOportunidade = (oportunidade: Oportunidade) => {
+    setDeleteMode(getDeleteModeForOpportunity(oportunidade));
     setOportunidadeDeletar(oportunidade);
     setShowModalDeletar(true);
   };
 
-  // Confirmar exclusão
+  // Confirmar exclusao
   const handleConfirmarDelecao = async () => {
     if (!oportunidadeDeletar) return;
 
     try {
       setLoadingDeletar(true);
-      await oportunidadesService.excluirOportunidade(oportunidadeDeletar.id);
-      setOportunidades((prev) => prev.filter((o) => o.id !== oportunidadeDeletar.id));
+      if (deleteMode === 'permanente') {
+        await oportunidadesService.excluirOportunidadePermanente(oportunidadeDeletar.id);
+        toastService.success('Oportunidade excluida permanentemente.');
+      } else {
+        await oportunidadesService.excluirOportunidade(oportunidadeDeletar.id);
+        toastService.success('Oportunidade enviada para a lixeira.');
+      }
+      if (oportunidadeDetalhes?.id === oportunidadeDeletar.id) {
+        setOportunidadeDetalhes(null);
+      }
 
       // Recarregar estatísticas
-      const stats = await oportunidadesService.obterEstatisticas();
-      setEstatisticas(stats);
-
-      toastService.success('Oportunidade deletada com sucesso!');
+      await carregarDados();
     } catch (err) {
       console.error('Erro ao deletar oportunidade:', err);
       toastService.error('Erro ao deletar oportunidade');
@@ -401,6 +659,70 @@ const PipelinePage: React.FC = () => {
       setLoadingDeletar(false);
       setShowModalDeletar(false);
       setOportunidadeDeletar(null);
+      setDeleteMode('soft');
+    }
+  };
+
+  const handleArquivarOportunidade = async (oportunidade: Oportunidade) => {
+    await oportunidadesService.arquivarOportunidade(oportunidade.id);
+    toastService.success('Oportunidade arquivada com sucesso.');
+    await carregarDados();
+  };
+
+  const handleRestaurarOportunidade = async (oportunidade: Oportunidade) => {
+    await oportunidadesService.restaurarOportunidade(oportunidade.id);
+    toastService.success('Oportunidade restaurada com sucesso.');
+    await carregarDados();
+  };
+
+  const handleReabrirOportunidade = async (oportunidade: Oportunidade) => {
+    await oportunidadesService.reabrirOportunidade(oportunidade.id);
+    toastService.success('Oportunidade reaberta com sucesso.');
+    await carregarDados();
+  };
+
+  const handleExcluirPermanenteOportunidade = async (oportunidade: Oportunidade) => {
+    await oportunidadesService.excluirOportunidadePermanente(oportunidade.id);
+    toastService.success('Oportunidade excluida permanentemente.');
+    await carregarDados();
+  };
+
+  const getDeleteModeForOpportunity = (oportunidade: Oportunidade): 'soft' | 'permanente' => {
+    const lifecycleStatus = getLifecycleStatus(oportunidade);
+    const shouldDeletePermanently =
+      lifecycleFeatureEnabled &&
+      (lifecycleView === LifecycleViewOportunidade.DELETED ||
+        lifecycleStatus === LifecycleStatusOportunidade.DELETED);
+
+    return shouldDeletePermanently ? 'permanente' : 'soft';
+  };
+
+  const handleLifecyclePrimaryAction = async (oportunidade: Oportunidade) => {
+    if (!lifecycleFeatureEnabled) return;
+
+    const lifecycleStatus = getLifecycleStatus(oportunidade);
+
+    try {
+      if (
+        lifecycleStatus === LifecycleStatusOportunidade.ARCHIVED ||
+        lifecycleStatus === LifecycleStatusOportunidade.DELETED
+      ) {
+        await handleRestaurarOportunidade(oportunidade);
+        return;
+      }
+
+      if (
+        oportunidade.estagio === EstagioOportunidade.GANHO ||
+        oportunidade.estagio === EstagioOportunidade.PERDIDO
+      ) {
+        await handleReabrirOportunidade(oportunidade);
+        return;
+      }
+
+      await handleArquivarOportunidade(oportunidade);
+    } catch (err) {
+      console.error('Erro ao executar acao de ciclo de vida:', err);
+      toastService.error('Não foi possível concluir a ação de ciclo de vida.');
     }
   };
 
@@ -749,6 +1071,13 @@ const PipelinePage: React.FC = () => {
 
   // Drag and Drop handlers
   const handleDragStart = (oportunidade: Oportunidade) => {
+    if (!canManipulateKanban) return;
+
+    const lifecycleStatus = getLifecycleStatus(oportunidade);
+    if (lifecycleFeatureEnabled && lifecycleStatus !== LifecycleStatusOportunidade.OPEN) {
+      return;
+    }
+
     setDraggedItem(oportunidade);
   };
 
@@ -756,16 +1085,44 @@ const PipelinePage: React.FC = () => {
     e.preventDefault();
   };
 
+  const getNomeEstagio = (estagio: EstagioOportunidade): string =>
+    ESTAGIOS_CONFIG.find((item) => item.id === estagio)?.nome || estagio;
+
   const handleDrop = async (novoEstagio: EstagioOportunidade) => {
     if (!draggedItem) return;
 
+    if (!canManipulateKanban) {
+      toastService.warning('Movimentação no Kanban está disponível apenas na visão "Abertas".');
+      setDraggedItem(null);
+      return;
+    }
+
+    const lifecycleStatus = getLifecycleStatus(draggedItem);
+    if (lifecycleFeatureEnabled && lifecycleStatus !== LifecycleStatusOportunidade.OPEN) {
+      toastService.warning('Somente oportunidades abertas podem ser movimentadas no Kanban.');
+      setDraggedItem(null);
+      return;
+    }
+
+    const estagioAtual = draggedItem.estagio;
+
     // Não faz nada se soltar no mesmo estágio
-    if (draggedItem.estagio === novoEstagio) {
+    if (estagioAtual === novoEstagio) {
       setDraggedItem(null);
       return;
     }
 
     // ✅ Se for movido para PERDIDO, abrir modal de motivo de perda
+    const permitidos = ALLOWED_STAGE_TRANSITIONS[estagioAtual] || [];
+    if (!permitidos.includes(novoEstagio)) {
+      const listaPermitidos = permitidos.map((stage) => getNomeEstagio(stage)).join(', ');
+      toastService.warning(
+        `Transicao invalida: ${getNomeEstagio(estagioAtual)} -> ${getNomeEstagio(novoEstagio)}. Permitidos: ${listaPermitidos || 'nenhum'}.`,
+      );
+      setDraggedItem(null);
+      return;
+    }
+
     if (novoEstagio === EstagioOportunidade.PERDIDO) {
       setOportunidadeParaPerder(draggedItem);
       setErroMotivoPerda(null);
@@ -835,13 +1192,9 @@ const PipelinePage: React.FC = () => {
       }
 
       // Atualizar estado local
-      setOportunidades((prev) =>
-        prev.map((op) => (op.id === oportunidade.id ? { ...op, estagio: novoEstagio } : op)),
-      );
+      await carregarDados();
 
       // Recarregar estatísticas
-      const stats = await oportunidadesService.obterEstatisticas();
-      setEstatisticas(stats);
 
       // Fechar modal
       setShowModalMudancaEstagio(false);
@@ -884,17 +1237,9 @@ const PipelinePage: React.FC = () => {
       });
 
       // Atualizar estado local
-      setOportunidades((prev) =>
-        prev.map((op) =>
-          op.id === oportunidadeParaPerder.id
-            ? { ...op, estagio: EstagioOportunidade.PERDIDO }
-            : op,
-        ),
-      );
+      await carregarDados();
 
       // Recarregar estatísticas
-      const stats = await oportunidadesService.obterEstatisticas();
-      setEstatisticas(stats);
 
       // Fechar modal
       setShowModalMotivoPerda(false);
@@ -1098,12 +1443,45 @@ const PipelinePage: React.FC = () => {
   }, [oportunidadesFiltradas]);
 
   // Agrupar por estágio
+  const estagiosKanbanVisiveis = useMemo(() => {
+    if (!lifecycleFeatureEnabled) return ESTAGIOS_CONFIG;
+
+    if (lifecycleView === LifecycleViewOportunidade.OPEN) {
+      return ESTAGIOS_CONFIG.filter(
+        (estagio) =>
+          estagio.id !== EstagioOportunidade.GANHO && estagio.id !== EstagioOportunidade.PERDIDO,
+      );
+    }
+
+    if (lifecycleView === LifecycleViewOportunidade.CLOSED) {
+      return ESTAGIOS_CONFIG.filter(
+        (estagio) =>
+          estagio.id === EstagioOportunidade.GANHO || estagio.id === EstagioOportunidade.PERDIDO,
+      );
+    }
+
+    return ESTAGIOS_CONFIG;
+  }, [lifecycleFeatureEnabled, lifecycleView]);
+
+  useEffect(() => {
+    if (!filtros.estagio) {
+      return;
+    }
+
+    const estagioSelecionado = filtros.estagio as EstagioOportunidade;
+    const estagioPermitido = estagiosKanbanVisiveis.some((estagio) => estagio.id === estagioSelecionado);
+
+    if (!estagioPermitido) {
+      setFiltros((prev) => ({ ...prev, estagio: '' }));
+    }
+  }, [filtros.estagio, estagiosKanbanVisiveis]);
+
   const agrupadoPorEstagio = useMemo(() => {
-    return ESTAGIOS_CONFIG.map((estagio) => ({
+    return estagiosKanbanVisiveis.map((estagio) => ({
       ...estagio,
       oportunidades: oportunidadesFiltradas.filter((op) => op.estagio === estagio.id),
     }));
-  }, [oportunidadesFiltradas]);
+  }, [estagiosKanbanVisiveis, oportunidadesFiltradas]);
 
   // Calcular métricas
   const calcularValorTotal = (oportunidades: Oportunidade[]) => {
@@ -1132,6 +1510,12 @@ const PipelinePage: React.FC = () => {
 
     const busca = filtros.busca?.trim();
     if (busca) chips.push({ label: 'Busca', value: busca });
+
+    if (lifecycleFeatureEnabled) {
+      const lifecycleLabel =
+        LIFECYCLE_VIEW_OPTIONS.find((option) => option.id === lifecycleView)?.label || 'Abertas';
+      chips.push({ label: 'Carteira', value: lifecycleLabel });
+    }
 
     if (filtros.estagio) {
       const estagioNome = ESTAGIOS_CONFIG.find((e) => e.id === filtros.estagio)?.nome || filtros.estagio;
@@ -1190,7 +1574,7 @@ const PipelinePage: React.FC = () => {
     }
 
     return chips;
-  }, [filtros, usuarios]);
+  }, [filtros, lifecycleFeatureEnabled, lifecycleView, usuarios]);
 
   if (loading) {
     return (
@@ -1208,8 +1592,8 @@ const PipelinePage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-4 pt-1 sm:pt-2">
-      <SectionCard className="space-y-4 p-4 sm:p-5">
+    <div className="space-y-3 pt-1 sm:pt-2">
+      <SectionCard className="space-y-3 p-3 sm:p-4">
         <PageHeader
           title={
             <span className="inline-flex items-center gap-2">
@@ -1218,11 +1602,16 @@ const PipelinePage: React.FC = () => {
             </span>
           }
           description="Gerencie suas oportunidades de venda atraves de um funil visual"
-          filters={<ActiveEmpresaBadge variant="page" />}
           actions={
             <button
               onClick={() => handleNovaOportunidade()}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#0F7B7D]"
+              disabled={lifecycleFeatureEnabled && lifecycleView !== LifecycleViewOportunidade.OPEN}
+              title={
+                lifecycleFeatureEnabled && lifecycleView !== LifecycleViewOportunidade.OPEN
+                  ? 'Troque para "Abertas" para criar oportunidades'
+                  : 'Nova Oportunidade'
+              }
+              className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Plus className="h-4 w-4" />
               Nova Oportunidade
@@ -1240,10 +1629,263 @@ const PipelinePage: React.FC = () => {
             ]}
           />
         )}
+
+        {lifecycleFeatureEnabled && (
+          <div className="space-y-2 rounded-lg border border-[#B4BEC9]/40 bg-[#DEEFE7]/30 px-3 py-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-[#002333]">
+              <Archive className="h-4 w-4 text-[#159A9C]" />
+              <span>Carteira do Pipeline</span>
+            </div>
+            <div className="inline-flex rounded-lg border border-[#B4BEC9]/60 bg-white p-1">
+              <button
+                type="button"
+                onClick={() => setWorkspaceTab('pipeline')}
+                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  workspaceTab === 'pipeline'
+                    ? 'bg-[#159A9C] text-white'
+                    : 'text-[#002333] hover:bg-[#DEEFE7]/60'
+                }`}
+              >
+                <Grid3X3 className="h-4 w-4" />
+                Pipeline
+              </button>
+              <button
+                type="button"
+                onClick={() => setWorkspaceTab('parametros')}
+                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  workspaceTab === 'parametros'
+                    ? 'bg-[#159A9C] text-white'
+                    : 'text-[#002333] hover:bg-[#DEEFE7]/60'
+                }`}
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+                Parâmetros
+              </button>
+            </div>
+
+            {workspaceTab === 'parametros' ? (
+              <div className="space-y-3 rounded-lg border border-[#B4BEC9]/35 bg-white/80 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-[#002333]">
+                      Política de oportunidades paradas
+                    </p>
+                    <p className="text-xs text-[#002333]/65">
+                      Define quando mostrar o alerta "Parada Xd" e quando arquivar automaticamente.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border border-[#B4BEC9]/45 bg-[#DEEFE7]/50 px-2 py-0.5 text-xs font-medium text-[#0F7B7D]">
+                      {stalePolicyLoading
+                        ? 'Carregando...'
+                        : stalePolicy
+                          ? `Política: ${stalePolicy.source === 'tenant' ? 'tenant' : 'default'}`
+                          : 'Política indisponível'}
+                    </span>
+                    {stalePolicy && (
+                      <span className="rounded-full border border-[#B4BEC9]/45 bg-white px-2 py-0.5 text-xs font-medium text-[#002333]/70">
+                        Auto: {stalePolicy.autoArchiveSource === 'tenant' ? 'tenant' : 'default'}
+                      </span>
+                    )}
+                    {stalePolicyHasChanges && (
+                      <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                        Alterações não salvas
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <label className="inline-flex items-center gap-2 rounded-lg border border-[#B4BEC9]/50 bg-white px-3 py-2 text-sm text-[#002333]">
+                    <input
+                      type="checkbox"
+                      checked={stalePolicyDraft.enabled}
+                      onChange={(event) =>
+                        setStalePolicyDraft((prev) => ({
+                          ...prev,
+                          enabled: event.target.checked,
+                        }))
+                      }
+                      disabled={!canManageStalePolicy || stalePolicyLoading || stalePolicySaving}
+                      className="h-4 w-4 rounded border-[#B4BEC9] text-[#159A9C] focus:ring-[#159A9C]"
+                    />
+                    Ativar detecção de oportunidades paradas
+                  </label>
+
+                  <div className="rounded-lg border border-[#B4BEC9]/50 bg-white px-3 py-2">
+                    <label className="mb-1 block text-xs font-medium text-[#002333]/70">
+                      Limite para marcar parada (dias)
+                    </label>
+                    <input
+                      type="number"
+                      min={STALE_THRESHOLD_MIN}
+                      max={STALE_THRESHOLD_MAX}
+                      value={stalePolicyDraft.thresholdDays}
+                      onChange={(event) => {
+                        const parsed = Number(event.target.value);
+                        if (!Number.isFinite(parsed)) return;
+                        setStalePolicyDraft((prev) => ({ ...prev, thresholdDays: parsed }));
+                      }}
+                      onBlur={(event) => {
+                        const normalized = normalizeIntegerWithinRange(
+                          Number(event.target.value),
+                          STALE_THRESHOLD_MIN,
+                          STALE_THRESHOLD_MAX,
+                        );
+                        setStalePolicyDraft((prev) => ({ ...prev, thresholdDays: normalized }));
+                      }}
+                      disabled={
+                        !canManageStalePolicy ||
+                        stalePolicyLoading ||
+                        stalePolicySaving ||
+                        !stalePolicyDraft.enabled
+                      }
+                      className="w-full rounded-lg border border-[#B4BEC9]/70 px-3 py-1.5 text-sm text-[#002333] focus:border-[#159A9C] focus:outline-none disabled:cursor-not-allowed disabled:bg-[#F8FAFB] disabled:opacity-70"
+                    />
+                    <p className="mt-1 text-[11px] text-[#002333]/55">
+                      Faixa permitida: {STALE_THRESHOLD_MIN} a {STALE_THRESHOLD_MAX} dias.
+                    </p>
+                  </div>
+
+                  <label className="inline-flex items-center gap-2 rounded-lg border border-[#B4BEC9]/50 bg-white px-3 py-2 text-sm text-[#002333]">
+                    <input
+                      type="checkbox"
+                      checked={stalePolicyDraft.autoArchiveEnabled}
+                      onChange={(event) =>
+                        setStalePolicyDraft((prev) => ({
+                          ...prev,
+                          autoArchiveEnabled: event.target.checked,
+                        }))
+                      }
+                      disabled={
+                        !canManageStalePolicy ||
+                        stalePolicyLoading ||
+                        stalePolicySaving ||
+                        !stalePolicyDraft.enabled
+                      }
+                      className="h-4 w-4 rounded border-[#B4BEC9] text-[#159A9C] focus:ring-[#159A9C]"
+                    />
+                    Autoarquivar oportunidades paradas
+                  </label>
+
+                  <div className="rounded-lg border border-[#B4BEC9]/50 bg-white px-3 py-2">
+                    <label className="mb-1 block text-xs font-medium text-[#002333]/70">
+                      Dias para autoarquivar
+                    </label>
+                    <input
+                      type="number"
+                      min={STALE_AUTO_ARCHIVE_MIN}
+                      max={STALE_AUTO_ARCHIVE_MAX}
+                      value={stalePolicyDraft.autoArchiveAfterDays}
+                      onChange={(event) => {
+                        const parsed = Number(event.target.value);
+                        if (!Number.isFinite(parsed)) return;
+                        setStalePolicyDraft((prev) => ({
+                          ...prev,
+                          autoArchiveAfterDays: parsed,
+                        }));
+                      }}
+                      onBlur={(event) => {
+                        const normalized = normalizeIntegerWithinRange(
+                          Number(event.target.value),
+                          STALE_AUTO_ARCHIVE_MIN,
+                          STALE_AUTO_ARCHIVE_MAX,
+                        );
+                        setStalePolicyDraft((prev) => ({
+                          ...prev,
+                          autoArchiveAfterDays: normalized,
+                        }));
+                      }}
+                      disabled={
+                        !canManageStalePolicy ||
+                        stalePolicyLoading ||
+                        stalePolicySaving ||
+                        !stalePolicyDraft.enabled ||
+                        !stalePolicyDraft.autoArchiveEnabled
+                      }
+                      className="w-full rounded-lg border border-[#B4BEC9]/70 px-3 py-1.5 text-sm text-[#002333] focus:border-[#159A9C] focus:outline-none disabled:cursor-not-allowed disabled:bg-[#F8FAFB] disabled:opacity-70"
+                    />
+                    <p className="mt-1 text-[11px] text-[#002333]/55">
+                      Faixa permitida: {STALE_AUTO_ARCHIVE_MIN} a {STALE_AUTO_ARCHIVE_MAX} dias.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-[#002333]/60">
+                    {canManageStalePolicy
+                      ? 'Apenas usuários com permissão de automações conseguem salvar alterações.'
+                      : 'Somente leitura: sem permissão para alterar esta política.'}
+                  </p>
+                  {canManageStalePolicy && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleResetStalePolicyDraft}
+                        disabled={!stalePolicy || stalePolicySaving || !stalePolicyHasChanges}
+                        className="inline-flex items-center gap-2 rounded-lg border border-[#B4BEC9]/70 bg-white px-3 py-1.5 text-sm font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Reverter
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void handleSalvarStalePolicy();
+                        }}
+                        disabled={
+                          !stalePolicy ||
+                          stalePolicyLoading ||
+                          stalePolicySaving ||
+                          !stalePolicyHasChanges
+                        }
+                        className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <Save className="h-4 w-4" />
+                        {stalePolicySaving ? 'Salvando...' : 'Salvar política'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-[#002333]/65">
+                Os controles de carteira foram movidos para a barra fixa do Pipeline.
+              </p>
+            )}
+          </div>
+        )}
       </SectionCard>
-      {/* Seletor de Visualização */}
-      <SectionCard className="p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      {showPipelineWorkspace && (
+        <>
+      {/* Barra de trabalho sticky */}
+            <SectionCard className="sticky top-2 z-20 border border-[#B4BEC9]/40 bg-white/95 p-3 backdrop-blur supports-[backdrop-filter]:bg-white/85 sm:p-4">
+        <div className="flex flex-col gap-3">
+          {lifecycleFeatureEnabled && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-[#607B89]">
+                Carteira
+              </span>
+              {LIFECYCLE_VIEW_OPTIONS.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setLifecycleView(option.id)}
+                  className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${
+                    lifecycleView === option.id
+                      ? 'border-[#159A9C] bg-[#159A9C] text-white'
+                      : 'border-[#B4BEC9]/70 bg-white text-[#002333] hover:bg-[#DEEFE7]/60'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+              <span className="text-xs text-[#002333]/60">
+                {LIFECYCLE_VIEW_DESCRIPTIONS[lifecycleView]}
+              </span>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="w-full flex flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
             <span className="text-sm font-medium text-[#002333]">Visualização:</span>
             <div className="grid grid-cols-2 gap-1 bg-gray-100 rounded-lg p-1 sm:flex sm:flex-wrap sm:items-center sm:gap-1">
@@ -1345,10 +1987,6 @@ const PipelinePage: React.FC = () => {
             </button>
           </div>
         </div>
-      </SectionCard>
-
-      {/* Barra de Filtros */}
-      <FiltersBar className="p-4">
         <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
           <div className="w-full sm:flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#002333]/40" />
@@ -1450,6 +2088,8 @@ const PipelinePage: React.FC = () => {
           </div>
         </div>
 
+        </div>
+
         {/* Painel de Filtros Expandido */}
         {showFiltros && (
           <div className="mt-4 w-full border-t pt-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -1462,7 +2102,7 @@ const PipelinePage: React.FC = () => {
                 className="w-full px-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
               >
                 <option value="">Todos os estágios</option>
-                {ESTAGIOS_CONFIG.map((estagio) => (
+                {estagiosKanbanVisiveis.map((estagio) => (
                   <option key={estagio.id} value={estagio.id}>
                     {estagio.nome}
                   </option>
@@ -1558,7 +2198,7 @@ const PipelinePage: React.FC = () => {
             </div>
           </div>
         )}
-      </FiltersBar>
+      </SectionCard>
 
       {/* Error State */}
       {error && (
@@ -1638,6 +2278,12 @@ const PipelinePage: React.FC = () => {
             </div>
           )}
           <div className={kanbanExpanded ? 'h-[calc(100vh-3.5rem)] px-4 sm:px-5 pt-3 pb-4' : undefined}>
+            {!canManipulateKanban && (
+              <div className="mb-3 rounded-lg border border-[#B4BEC9]/50 bg-white px-3 py-2 text-sm text-[#002333]/80">
+                A movimentação de cards e a criação direta por coluna ficam disponíveis apenas na
+                visão "Abertas".
+              </div>
+            )}
             <div
               className={
                 kanbanExpanded
@@ -1682,9 +2328,18 @@ const PipelinePage: React.FC = () => {
                     <button
                       onClick={() => handleNovaOportunidade(estagio.id)}
                       type="button"
-                      className="p-1.5 hover:bg-[#DEEFE7]/70 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/25"
-                      aria-label={`Adicionar oportunidade em ${estagio.nome}`}
-                      title={`Adicionar oportunidade em ${estagio.nome}`}
+                      disabled={!canManipulateKanban}
+                      className="p-1.5 hover:bg-[#DEEFE7]/70 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/25 disabled:cursor-not-allowed disabled:opacity-50"
+                      aria-label={
+                        canManipulateKanban
+                          ? `Adicionar oportunidade em ${estagio.nome}`
+                          : 'Criação por coluna disponível apenas na visão Abertas'
+                      }
+                      title={
+                        canManipulateKanban
+                          ? `Adicionar oportunidade em ${estagio.nome}`
+                          : 'Disponível apenas na visão Abertas'
+                      }
                       style={{ color: estagio.accentColor }}
                     >
                       <Plus className="h-4 w-4" />
@@ -1700,8 +2355,8 @@ const PipelinePage: React.FC = () => {
               <div
                 data-testid={`pipeline-column-dropzone-${estagio.id}`}
                 className="bg-[#DEEFE7]/35 rounded-b-lg p-2 space-y-2 border border-[#B4BEC9]/40 border-t-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]"
-                onDragOver={handleDragOver}
-                onDrop={() => handleDrop(estagio.id)}
+                onDragOver={canManipulateKanban ? handleDragOver : undefined}
+                onDrop={canManipulateKanban ? () => handleDrop(estagio.id) : undefined}
               >
                 {estagio.oportunidades.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -1748,13 +2403,40 @@ const PipelinePage: React.FC = () => {
                     const diasAteVencimento = oportunidade.dataFechamentoEsperado
                       ? differenceInDays(new Date(oportunidade.dataFechamentoEsperado), new Date())
                       : null;
+                    const lifecycleStatusCard = getLifecycleStatus(oportunidade);
+                    const deleteModeCard = getDeleteModeForOpportunity(oportunidade);
+                    const staleDaysCard = Number(oportunidade.stale_days || 0);
+                    const showStaleBadge =
+                      Boolean(oportunidade.is_stale) &&
+                      staleDaysCard > 0 &&
+                      lifecycleStatusCard === LifecycleStatusOportunidade.OPEN;
+                    const isDragEnabled =
+                      canManipulateKanban &&
+                      (!lifecycleFeatureEnabled ||
+                        lifecycleStatusCard === LifecycleStatusOportunidade.OPEN) &&
+                      oportunidade.estagio !== EstagioOportunidade.GANHO &&
+                      oportunidade.estagio !== EstagioOportunidade.PERDIDO;
+                    const cardId = String(oportunidade.id);
+                    const cardActionsMenuOpen = openCardActionsMenuId === cardId;
+                    const lifecyclePrimaryLabel =
+                      lifecycleStatusCard === LifecycleStatusOportunidade.ARCHIVED ||
+                      lifecycleStatusCard === LifecycleStatusOportunidade.DELETED
+                        ? 'Restaurar'
+                        : oportunidade.estagio === EstagioOportunidade.GANHO ||
+                            oportunidade.estagio === EstagioOportunidade.PERDIDO
+                          ? 'Reabrir'
+                          : 'Arquivar';
 
                     return (
                       <div
                         key={oportunidade.id}
                         data-testid={`pipeline-card-${oportunidade.id}`}
-                        draggable
+                        draggable={isDragEnabled}
                         onDragStart={(event) => {
+                          if (!isDragEnabled) {
+                            event.preventDefault();
+                            return;
+                          }
                           event.dataTransfer?.setData('text/plain', String(oportunidade.id));
                           if (event.dataTransfer) {
                             event.dataTransfer.effectAllowed = 'move';
@@ -1774,7 +2456,9 @@ const PipelinePage: React.FC = () => {
                         role="button"
                         aria-label={`Abrir oportunidade: ${oportunidade.titulo}`}
                         aria-grabbed={draggedItem?.id === oportunidade.id}
-                        className="bg-white rounded-lg p-3 shadow-sm border border-[#B4BEC9]/35 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer relative group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/30"
+                        className={`bg-white rounded-lg p-3 shadow-sm border border-[#B4BEC9]/35 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer relative group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/30 ${
+                          cardActionsMenuOpen ? 'z-40' : 'z-0'
+                        }`}
                       >
                         {/* Header com avatar e badges */}
                         <div className="flex items-center justify-between mb-2">
@@ -1797,6 +2481,11 @@ const PipelinePage: React.FC = () => {
                             {(oportunidade as any).prioridade === 'urgente' && (
                               <span className="px-2 py-0.5 bg-red-600 text-white rounded-full text-xs font-semibold">
                                 Urgente
+                              </span>
+                            )}
+                            {showStaleBadge && (
+                              <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-semibold">
+                                Parada {staleDaysCard}d
                               </span>
                             )}
                           </div>
@@ -1887,56 +2576,105 @@ const PipelinePage: React.FC = () => {
                           </div>
                         )}
 
-                        {/* Botões de ação */}
-                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100">
-                          <div className="flex items-center gap-1">
+                        {/* Ações */}
+                        <div className="flex items-center justify-between gap-2 border-t border-gray-100 pt-2">
+                          {lifecycleFeatureEnabled ? (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleEditarOportunidade(oportunidade);
+                                setOpenCardActionsMenuId(null);
+                                void handleLifecyclePrimaryAction(oportunidade);
                               }}
                               type="button"
-                              className="text-[#159A9C] hover:bg-[#159A9C]/10 p-1.5 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/25"
-                              aria-label="Editar oportunidade"
-                              title="Editar"
+                              className="inline-flex items-center gap-1 rounded-lg border border-[#B4BEC9]/70 bg-white px-2 py-1 text-xs font-semibold text-[#0F7B7D] transition-colors hover:bg-[#DEEFE7]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/25"
+                              title={`${lifecyclePrimaryLabel} oportunidade`}
                             >
-                              <Edit2 className="h-4 w-4" />
+                              {lifecyclePrimaryLabel === 'Arquivar' ? (
+                                <Archive className="h-3.5 w-3.5" />
+                              ) : (
+                                <RotateCcw className="h-3.5 w-3.5" />
+                              )}
+                              {lifecyclePrimaryLabel}
                             </button>
+                          ) : (
+                            <span className="text-xs text-[#002333]/55">Ações rápidas</span>
+                          )}
+
+                          <div className="relative ml-auto" onClick={(event) => event.stopPropagation()}>
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleClonarOportunidade(oportunidade);
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setOpenCardActionsMenuId((prev) => (prev === cardId ? null : cardId));
                               }}
-                              type="button"
-                              className="text-[#0F7B7D] hover:bg-[#159A9C]/10 p-1.5 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/25"
-                              aria-label="Duplicar oportunidade"
-                              title="Duplicar"
+                              className="inline-flex items-center gap-1 rounded-lg border border-[#B4BEC9]/70 bg-white px-2 py-1 text-xs font-semibold text-[#002333] transition-colors hover:bg-[#DEEFE7]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/25"
+                              aria-expanded={cardActionsMenuOpen}
+                              aria-label="Abrir menu de ações"
                             >
-                              <Copy className="h-4 w-4" />
+                              Ações
+                              <MoreHorizontal className="h-3.5 w-3.5" />
                             </button>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={(e) => handleGerarProposta(oportunidade, e)}
-                              type="button"
-                              className="text-white bg-[#159A9C] hover:bg-[#0F7B7D] p-1.5 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/25"
-                              aria-label="Gerar proposta"
-                              title="Gerar proposta"
-                            >
-                              <FileText className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeletarOportunidade(oportunidade);
-                              }}
-                              type="button"
-                              className="text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-200"
-                              aria-label="Excluir oportunidade"
-                              title="Excluir"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+
+                            {cardActionsMenuOpen && (
+                              <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded-lg border border-[#B4BEC9]/60 bg-white p-1 shadow-lg">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenCardActionsMenuId(null);
+                                    handleVerDetalhes(oportunidade);
+                                  }}
+                                  className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                >
+                                  Ver detalhes
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenCardActionsMenuId(null);
+                                    handleEditarOportunidade(oportunidade);
+                                  }}
+                                  className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                >
+                                  Editar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenCardActionsMenuId(null);
+                                    handleClonarOportunidade(oportunidade);
+                                  }}
+                                  className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                >
+                                  Duplicar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenCardActionsMenuId(null);
+                                    void handleGerarProposta(oportunidade);
+                                  }}
+                                  className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                >
+                                  Gerar proposta
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenCardActionsMenuId(null);
+                                    handleDeletarOportunidade(oportunidade);
+                                  }}
+                                  className={`block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium transition-colors ${
+                                    deleteModeCard === 'permanente'
+                                      ? 'text-red-700 hover:bg-red-100'
+                                      : 'text-red-600 hover:bg-red-50'
+                                  }`}
+                                >
+                                  {deleteModeCard === 'permanente'
+                                    ? 'Excluir permanente'
+                                    : 'Mover para lixeira'}
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -2023,6 +2761,23 @@ const PipelinePage: React.FC = () => {
                 ) : (
                   oportunidadesPaginadas.map((oportunidade) => {
                     const estagioInfo = ESTAGIOS_CONFIG.find((e) => e.id === oportunidade.estagio);
+                    const lifecycleStatus = getLifecycleStatus(oportunidade);
+                    const deleteModeList = getDeleteModeForOpportunity(oportunidade);
+                    const staleDaysList = Number(oportunidade.stale_days || 0);
+                    const showStaleBadgeList =
+                      Boolean(oportunidade.is_stale) &&
+                      staleDaysList > 0 &&
+                      lifecycleStatus === LifecycleStatusOportunidade.OPEN;
+                    const listRowId = String(oportunidade.id);
+                    const listActionsMenuOpen = openListActionsMenuId === listRowId;
+                    const lifecyclePrimaryLabelList =
+                      lifecycleStatus === LifecycleStatusOportunidade.ARCHIVED ||
+                      lifecycleStatus === LifecycleStatusOportunidade.DELETED
+                        ? 'Restaurar'
+                        : oportunidade.estagio === EstagioOportunidade.GANHO ||
+                            oportunidade.estagio === EstagioOportunidade.PERDIDO
+                          ? 'Reabrir'
+                          : 'Arquivar';
                     return (
                       <tr
                         key={oportunidade.id}
@@ -2036,6 +2791,13 @@ const PipelinePage: React.FC = () => {
                           {oportunidade.descricao && (
                             <div className="text-sm text-[#002333]/60 line-clamp-1">
                               {oportunidade.descricao}
+                            </div>
+                          )}
+                          {showStaleBadgeList && (
+                            <div className="mt-1">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+                                Parada {staleDaysList}d
+                              </span>
                             </div>
                           )}
                         </td>
@@ -2063,34 +2825,98 @@ const PipelinePage: React.FC = () => {
                             : '-'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex items-center justify-end gap-2">
+                          <div
+                            className="relative inline-block text-left"
+                            onClick={(event) => event.stopPropagation()}
+                          >
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditarOportunidade(oportunidade);
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setOpenListActionsMenuId((prev) =>
+                                  prev === listRowId ? null : listRowId,
+                                );
                               }}
-                              className="text-[#159A9C] hover:text-[#0F7B7D] transition-colors p-1"
-                              title="Editar"
+                              className="inline-flex items-center gap-1 rounded-lg border border-[#B4BEC9]/70 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                              aria-expanded={listActionsMenuOpen}
+                              aria-label="Abrir menu de ações da linha"
                             >
-                              <Edit2 className="h-4 w-4" />
+                              Ações
+                              <MoreHorizontal className="h-3.5 w-3.5" />
                             </button>
-                            <button
-                              onClick={(e) => handleGerarProposta(oportunidade, e)}
-                              className="text-[#159A9C] hover:text-[#0F7B7D] transition-colors p-1"
-                              title="Gerar Proposta"
-                            >
-                              <FileText className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeletarOportunidade(oportunidade);
-                              }}
-                              className="text-red-600 hover:text-red-700 transition-colors p-1"
-                              title="Deletar"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+
+                            {listActionsMenuOpen && (
+                              <div className="absolute right-0 top-full z-30 mt-1 w-44 rounded-lg border border-[#B4BEC9]/60 bg-white p-1 shadow-lg">
+                                {lifecycleFeatureEnabled && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenListActionsMenuId(null);
+                                      void handleLifecyclePrimaryAction(oportunidade);
+                                    }}
+                                    className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#0F7B7D] transition-colors hover:bg-[#DEEFE7]/60"
+                                  >
+                                    {lifecyclePrimaryLabelList}
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenListActionsMenuId(null);
+                                    handleVerDetalhes(oportunidade);
+                                  }}
+                                  className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                >
+                                  Ver detalhes
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenListActionsMenuId(null);
+                                    handleEditarOportunidade(oportunidade);
+                                  }}
+                                  className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                >
+                                  Editar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenListActionsMenuId(null);
+                                    handleClonarOportunidade(oportunidade);
+                                  }}
+                                  className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                >
+                                  Duplicar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenListActionsMenuId(null);
+                                    void handleGerarProposta(oportunidade);
+                                  }}
+                                  className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                >
+                                  Gerar proposta
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenListActionsMenuId(null);
+                                    handleDeletarOportunidade(oportunidade);
+                                  }}
+                                  className={`block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium transition-colors ${
+                                    deleteModeList === 'permanente'
+                                      ? 'text-red-700 hover:bg-red-100'
+                                      : 'text-red-600 hover:bg-red-50'
+                                  }`}
+                                >
+                                  {deleteModeList === 'permanente'
+                                    ? 'Excluir permanente'
+                                    : 'Mover para lixeira'}
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -2623,6 +3449,8 @@ const PipelinePage: React.FC = () => {
           </div>
         </div>
       )}
+        </>
+      )}
 
       {/* Modal Oportunidade Refatorado */}
       <ModalOportunidadeRefatorado
@@ -2634,6 +3462,7 @@ const PipelinePage: React.FC = () => {
         onSave={handleSalvarOportunidade}
         oportunidade={oportunidadeEditando}
         estagioInicial={estagioNovaOportunidade}
+        estagiosPermitidos={estagiosKanbanVisiveis.map((estagio) => estagio.id)}
         usuarios={usuarios}
         loadingUsuarios={false}
       />
@@ -2692,6 +3521,20 @@ const PipelinePage: React.FC = () => {
           setShowModal(true);
         }}
         onClonar={handleClonarOportunidade}
+        exclusaoDireta={!lifecycleFeatureEnabled}
+        onArquivar={lifecycleFeatureEnabled ? handleArquivarOportunidade : undefined}
+        onRestaurar={lifecycleFeatureEnabled ? handleRestaurarOportunidade : undefined}
+        onReabrir={lifecycleFeatureEnabled ? handleReabrirOportunidade : undefined}
+        onExcluir={async (oportunidade) => {
+          await oportunidadesService.excluirOportunidade(oportunidade.id);
+          toastService.success(
+            lifecycleFeatureEnabled
+              ? 'Oportunidade enviada para a lixeira.'
+              : 'Oportunidade excluida com sucesso.',
+          );
+          await carregarDados();
+        }}
+        onExcluirPermanente={lifecycleFeatureEnabled ? handleExcluirPermanenteOportunidade : undefined}
       />
 
       {/* Modal de Confirmação de Exclusão */}
@@ -2703,13 +3546,19 @@ const PipelinePage: React.FC = () => {
                 <AlertCircle className="h-6 w-6 text-red-600" />
               </div>
               <h3 className="text-xl font-bold text-center text-[#002333] mb-2">
-                Confirmar Exclusão
+                {deleteMode === 'permanente' ? 'Confirmar Exclusao Permanente' : 'Confirmar Exclusao'}
               </h3>
               <p className="text-center text-gray-600 mb-6">
-                Tem certeza que deseja deletar a oportunidade{' '}
+                Tem certeza que deseja{' '}
+                {deleteMode === 'permanente'
+                  ? 'excluir permanentemente'
+                  : 'enviar para a lixeira'}{' '}
+                a oportunidade{' '}
                 <strong>"{oportunidadeDeletar.titulo}"</strong>?
                 <br />
-                Esta ação não pode ser desfeita.
+                {deleteMode === 'permanente'
+                  ? 'Esta ação não pode ser desfeita.'
+                  : 'Você poderá restaurar depois pela visão Lixeira.'}
               </p>
               <div className="flex gap-3">
                 <button
@@ -2725,17 +3574,21 @@ const PipelinePage: React.FC = () => {
                 <button
                   onClick={handleConfirmarDelecao}
                   disabled={loadingDeletar}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                  className={`flex-1 px-4 py-2 text-white rounded-lg transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2 ${
+                    deleteMode === 'permanente'
+                      ? 'bg-red-600 hover:bg-red-700'
+                      : 'bg-[#159A9C] hover:bg-[#0F7B7D]'
+                  }`}
                 >
                   {loadingDeletar ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      Deletando...
+                      {deleteMode === 'permanente' ? 'Excluindo...' : 'Movendo...'}
                     </>
                   ) : (
                     <>
                       <Trash2 className="h-4 w-4" />
-                      Deletar
+                      {deleteMode === 'permanente' ? 'Excluir permanente' : 'Mover para lixeira'}
                     </>
                   )}
                 </button>
@@ -2798,3 +3651,6 @@ const PipelinePage: React.FC = () => {
 };
 
 export default PipelinePage;
+
+
+
