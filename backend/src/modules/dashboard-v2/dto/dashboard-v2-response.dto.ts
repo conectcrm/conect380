@@ -1,6 +1,7 @@
 export class DashboardV2OverviewDto {
   receitaFechada: number;
   receitaPrevista: number;
+  metaReceita: number;
   ticketMedio: number;
   cicloMedioDias: number;
   oportunidadesAtivas: number;
