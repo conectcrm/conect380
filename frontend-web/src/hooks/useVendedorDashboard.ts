@@ -5,6 +5,13 @@ import { API_BASE_URL } from '../services/api';
 const DASHBOARD_FETCH_TIMEOUT_MS = 20_000;
 const STATUS_PROPOSTA_ATIVA = new Set(['enviada', 'visualizada']);
 
+export type VendedorDashboardPeriodo =
+  | 'semanal'
+  | 'mensal'
+  | 'trimestral'
+  | 'semestral'
+  | 'anual';
+
 const fetchJsonWithTimeout = async <T,>(
   url: string,
   options: RequestInit,
@@ -148,6 +155,67 @@ const getProximaAcaoByStatus = (status: string): string => {
 const getDiasAte = (from: Date, targetDate: Date): number => {
   const oneDay = 1000 * 60 * 60 * 24;
   return Math.ceil((targetDate.getTime() - from.getTime()) / oneDay);
+};
+
+const startOfDay = (value: Date): Date => {
+  const normalized = new Date(value);
+  normalized.setHours(0, 0, 0, 0);
+  return normalized;
+};
+
+const endOfDay = (value: Date): Date => {
+  const normalized = new Date(value);
+  normalized.setHours(23, 59, 59, 999);
+  return normalized;
+};
+
+const getPeriodoBounds = (
+  periodo: VendedorDashboardPeriodo,
+  reference: Date,
+): { inicio: Date; fim: Date; totalDias: number; diasDecorridos: number } => {
+  const oneDayMs = 1000 * 60 * 60 * 24;
+  const today = startOfDay(reference);
+
+  let inicio: Date;
+  let fim: Date;
+
+  if (periodo === 'semanal') {
+    const weekDay = today.getDay();
+    const distanceToMonday = (weekDay + 6) % 7;
+    inicio = new Date(today);
+    inicio.setDate(today.getDate() - distanceToMonday);
+    fim = new Date(inicio);
+    fim.setDate(inicio.getDate() + 6);
+  } else if (periodo === 'trimestral') {
+    const quarterStartMonth = Math.floor(today.getMonth() / 3) * 3;
+    inicio = new Date(today.getFullYear(), quarterStartMonth, 1);
+    fim = new Date(today.getFullYear(), quarterStartMonth + 3, 0);
+  } else if (periodo === 'semestral') {
+    const semesterStartMonth = today.getMonth() < 6 ? 0 : 6;
+    inicio = new Date(today.getFullYear(), semesterStartMonth, 1);
+    fim = new Date(today.getFullYear(), semesterStartMonth + 6, 0);
+  } else if (periodo === 'anual') {
+    inicio = new Date(today.getFullYear(), 0, 1);
+    fim = new Date(today.getFullYear(), 11, 31);
+  } else {
+    inicio = new Date(today.getFullYear(), today.getMonth(), 1);
+    fim = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  }
+
+  const inicioDia = startOfDay(inicio);
+  const fimDia = endOfDay(fim);
+  const totalDias = Math.max(1, Math.round((fimDia.getTime() - inicioDia.getTime()) / oneDayMs));
+  const diasDecorridos = Math.max(
+    1,
+    Math.min(totalDias, Math.floor((today.getTime() - inicioDia.getTime()) / oneDayMs) + 1),
+  );
+
+  return {
+    inicio: inicioDia,
+    fim: fimDia,
+    totalDias,
+    diasDecorridos,
+  };
 };
 
 interface DashboardResumoResponse {
@@ -306,6 +374,7 @@ export interface LeadQualificar {
 interface UseVendedorDashboardOptions {
   autoRefresh?: boolean;
   refreshInterval?: number;
+  periodo?: VendedorDashboardPeriodo;
 }
 
 interface VendedorDashboardData {
@@ -336,9 +405,11 @@ const emptyData: VendedorDashboardData = {
 
 export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) => {
   const { user } = useAuth();
+  const periodoSelecionado: VendedorDashboardPeriodo = options.periodo || 'mensal';
   const [data, setData] = useState<VendedorDashboardData>(emptyData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
 
   const loadVendedorData = useCallback(async () => {
     try {
@@ -356,7 +427,7 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
       };
 
       const params = new URLSearchParams();
-      params.append('periodo', 'mensal');
+      params.append('periodo', periodoSelecionado);
       if (user?.id) {
         params.append('vendedor', user.id);
       }
@@ -442,10 +513,10 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
       const percentualMeta =
         metaMensal > 0 ? Math.max(0, Math.round((metaAtual / metaMensal) * 100)) : 0;
 
-      const daysNow = new Date();
-      const diasNoMes = new Date(daysNow.getFullYear(), daysNow.getMonth() + 1, 0).getDate();
-      const diasDecorridos = Math.max(1, daysNow.getDate());
-      const diasRestantes = Math.max(0, diasNoMes - daysNow.getDate());
+      const periodInfo = getPeriodoBounds(periodoSelecionado, now);
+      const diasNoPeriodo = periodInfo.totalDias;
+      const diasDecorridos = periodInfo.diasDecorridos;
+      const diasRestantes = Math.max(0, diasNoPeriodo - diasDecorridos);
 
       const agendaResumo = kpisResumo?.agenda ?? {};
       const estatisticasPorTipo = agendaResumo?.estatisticasPorTipo ?? {};
@@ -652,7 +723,7 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
             percentual: percentualMeta,
             diasRestantes,
             mediaVendasDiarias: Number((metaAtual / diasDecorridos).toFixed(2)),
-            metaDiaria: diasNoMes > 0 ? Number((metaMensal / diasNoMes).toFixed(2)) : 0,
+            metaDiaria: diasNoPeriodo > 0 ? Number((metaMensal / diasNoPeriodo).toFixed(2)) : 0,
           },
           ranking: {
             posicao: toNumber(rankingAtual?.posicao),
@@ -709,12 +780,13 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
         leads,
         alertas,
       });
+      setLastUpdatedAt(new Date().toISOString());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar dados do vendedor');
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [periodoSelecionado, user?.id]);
 
   const refresh = useCallback(() => {
     void loadVendedorData();
@@ -764,5 +836,7 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
     error,
     refresh,
     insights,
+    period: periodoSelecionado,
+    lastUpdatedAt,
   };
 };

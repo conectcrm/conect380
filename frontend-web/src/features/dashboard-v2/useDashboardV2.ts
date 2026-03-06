@@ -92,6 +92,42 @@ export type DashboardV2Payload = {
   insights: DashboardV2Insights;
 };
 
+const defaultCacheMeta: CacheMeta = {
+  hit: false,
+  key: '',
+  generatedAt: '',
+};
+
+const createEmptyOverview = (): DashboardV2Overview => ({
+  receitaFechada: 0,
+  receitaPrevista: 0,
+  ticketMedio: 0,
+  cicloMedioDias: 0,
+  oportunidadesAtivas: 0,
+  cache: defaultCacheMeta,
+});
+
+const createEmptyTrends = (): DashboardV2Trends => ({
+  points: [],
+  cache: defaultCacheMeta,
+});
+
+const createEmptyFunnel = (): DashboardV2Funnel => ({
+  steps: [],
+  cache: defaultCacheMeta,
+});
+
+const createEmptyPipelineSummary = (): DashboardV2PipelineSummary => ({
+  totalValor: 0,
+  stages: [],
+  cache: defaultCacheMeta,
+});
+
+const createEmptyInsights = (): DashboardV2Insights => ({
+  insights: [],
+  cache: defaultCacheMeta,
+});
+
 type UseDashboardV2FlagResult = {
   loading: boolean;
   error: string | null;
@@ -253,24 +289,43 @@ export const useDashboardV2 = (autoRefresh = true): UseDashboardV2Result => {
       }
 
       try {
-        const [overview, trends, funnel, pipelineSummary, insights] = await Promise.all([
+        const settled = await Promise.allSettled([
           api.get<DashboardV2Overview>('/dashboard/v2/overview', { params: queryParams }),
           api.get<DashboardV2Trends>('/dashboard/v2/trends', { params: queryParams }),
           api.get<DashboardV2Funnel>('/dashboard/v2/funnel', { params: queryParams }),
-          api.get<DashboardV2PipelineSummary>('/dashboard/v2/pipeline-summary', {
-            params: queryParams,
-          }),
+          api.get<DashboardV2PipelineSummary>('/dashboard/v2/pipeline-summary', { params: queryParams }),
           api.get<DashboardV2Insights>('/dashboard/v2/insights', { params: queryParams }),
         ]);
 
+        const rejected = settled.filter((result) => result.status === 'rejected');
+        if (rejected.length === settled.length && rejected.length > 0) {
+          throw rejected[0].reason;
+        }
+
+        const overview =
+          settled[0].status === 'fulfilled' ? settled[0].value.data : createEmptyOverview();
+        const trends = settled[1].status === 'fulfilled' ? settled[1].value.data : createEmptyTrends();
+        const funnel = settled[2].status === 'fulfilled' ? settled[2].value.data : createEmptyFunnel();
+        const pipelineSummary =
+          settled[3].status === 'fulfilled'
+            ? settled[3].value.data
+            : createEmptyPipelineSummary();
+        const insights =
+          settled[4].status === 'fulfilled' ? settled[4].value.data : createEmptyInsights();
+
         setData({
-          overview: overview.data,
-          trends: trends.data,
-          funnel: funnel.data,
-          pipelineSummary: pipelineSummary.data,
-          insights: insights.data,
+          overview,
+          trends,
+          funnel,
+          pipelineSummary,
+          insights,
         });
-        setError(null);
+
+        if (rejected.length > 0) {
+          setError('Alguns indicadores nao puderam ser carregados. Exibindo dados parciais.');
+        } else {
+          setError(null);
+        }
       } catch (err: unknown) {
         setError(normalizeError(err));
       } finally {

@@ -17,6 +17,12 @@ import faturamentoService, {
 
 type PeriodoFiltro = '7d' | '30d' | '90d';
 
+const periodOptions: Array<{ value: PeriodoFiltro; label: string }> = [
+  { value: '7d', label: 'Ultimos 7 dias' },
+  { value: '30d', label: 'Ultimos 30 dias' },
+  { value: '90d', label: 'Ultimos 90 dias' },
+];
+
 const formatCurrency = (value: number): string =>
   value.toLocaleString('pt-BR', {
     style: 'currency',
@@ -28,6 +34,18 @@ const formatDate = (value: string): string => {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
   return parsed.toLocaleDateString('pt-BR');
+};
+
+const formatDateTime = (value: string): string => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'Atualizado agora';
+  return parsed.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 };
 
 const getPeriodoDates = (periodo: PeriodoFiltro): { dataInicio: string; dataFim: string } => {
@@ -73,6 +91,7 @@ const FinanceiroDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
 
   const carregarDados = useCallback(async () => {
     try {
@@ -98,6 +117,7 @@ const FinanceiroDashboard: React.FC = () => {
 
       setFaturasData(faturasResponse);
       setPagamentosStats(pagamentosResponse);
+      setLastUpdatedAt(new Date().toISOString());
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Erro ao carregar dashboard financeiro';
       setError(message);
@@ -118,6 +138,8 @@ const FinanceiroDashboard: React.FC = () => {
 
   const faturas = faturasData?.data || [];
   const aggregates = faturasData?.aggregates || {};
+  const hasActiveFilters = periodo !== '30d';
+  const lastUpdatedLabel = lastUpdatedAt ? formatDateTime(lastUpdatedAt) : 'Atualizado agora';
 
   const {
     totalFaturas,
@@ -174,31 +196,52 @@ const FinanceiroDashboard: React.FC = () => {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         <div className="bg-white rounded-lg border border-[#DEEFE7] shadow-sm p-6 mb-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-bold text-[#002333]">Dashboard Financeiro</h1>
-              <p className="text-[#002333]/70 mt-1">
+              <h1 className="text-[20px] font-semibold tracking-[-0.012em] text-[#18374B]">
+                Dashboard Financeiro
+              </h1>
+              <p className="mt-1 text-[13px] text-[#617D89]">
                 Visao de faturamento, recebimento e exposicao de inadimplencia.
+              </p>
+              <p className="mt-1 text-[12px] text-[#7A929E]">
+                Ultima sincronizacao: {lastUpdatedLabel}
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <label htmlFor="dashboard-financeiro-periodo" className="text-[13px] font-medium text-[#567583]">
+                Periodo
+              </label>
               <select
+                id="dashboard-financeiro-periodo"
                 value={periodo}
                 onChange={(event) => setPeriodo(event.target.value as PeriodoFiltro)}
-                className="px-3 py-2 border border-[#B4BEC9] rounded-lg text-sm focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
+                className="rounded-[10px] border border-[#D5E3E8] bg-white px-3 py-2 text-[13px] text-[#244556] focus:border-[#159A9C] focus:outline-none"
               >
-                <option value="7d">Ultimos 7 dias</option>
-                <option value="30d">Ultimos 30 dias</option>
-                <option value="90d">Ultimos 90 dias</option>
+                {periodOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
 
               <button
+                type="button"
+                onClick={() => setPeriodo('30d')}
+                disabled={!hasActiveFilters}
+                className="inline-flex items-center gap-2 rounded-[10px] border border-[#D5E3E8] px-3 py-2 text-[13px] font-semibold text-[#26495C] hover:bg-[#F3F9F8] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Limpar filtros
+              </button>
+
+              <button
+                type="button"
                 onClick={handleRefresh}
                 disabled={refreshing}
-                className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center gap-2"
+                className="inline-flex items-center gap-2 rounded-[10px] border border-[#D5E3E8] px-3 py-2 text-[13px] font-semibold text-[#26495C] hover:bg-[#F3F9F8] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
                 Atualizar
               </button>
             </div>

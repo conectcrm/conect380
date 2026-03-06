@@ -19,6 +19,14 @@ Variaveis minimas:
 - `DATABASE_USERNAME`
 - `FRONTEND_URL`
 
+### Perfil local de deploy (AWS scripts)
+Para usar os scripts `.production/scripts/deploy-*.ps1` sem credenciais hardcoded:
+```powershell
+cp .\configs\deploy-profile.local.example.psd1 .\configs\deploy-profile.local.psd1
+# editar ServerIp, SshUser, PemPath e RemoteRoot
+```
+O arquivo `deploy-profile.local.psd1` eh local e nao deve ser versionado.
+
 ## 2) Build
 ```powershell
 .\scripts\build-all.ps1
@@ -165,4 +173,3 @@ docker compose up -d
 
 ## Nota
 Fluxo AWS permanece desativado por escopo atual.
-
