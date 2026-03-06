@@ -44,7 +44,7 @@ jobs:
         run: npm run build
       
       - name: 📦 Upload Backend Build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-dist
           path: backend/dist
@@ -61,7 +61,7 @@ jobs:
           REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL }}
       
       - name: 📦 Upload Frontend Build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-build
           path: frontend-web/build
@@ -107,7 +107,7 @@ jobs:
       # Opção 2: Deploy para Azure App Service
       - name: 🚀 Deploy para Azure App Service
         if: ${{ secrets.AZURE_WEBAPP_NAME }}
-        uses: azure/webapps-deploy@v2
+        uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
@@ -156,7 +156,7 @@ jobs:
       # Opção 2: Deploy para Netlify
       - name: 🚀 Deploy para Netlify
         if: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-        uses: nwtgck/actions-netlify@v2.0
+        uses: nwtgck/actions-netlify@v3.0
         with:
           publish-dir: frontend-web/build
           production-branch: main
