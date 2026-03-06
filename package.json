@@ -43,7 +43,11 @@
     "test:opp304:piloto:dryrun": "powershell -ExecutionPolicy Bypass -File scripts/test-opp304-piloto-lifecycle.ps1 -DryRun",
     "test:opp305:stale": "powershell -ExecutionPolicy Bypass -File scripts/test-opp305-stale-quality.ps1",
     "test:opp305:homolog": "powershell -ExecutionPolicy Bypass -File scripts/test-opp305-stale-homologacao.ps1",
-    "test:opp305:homolog:dryrun": "powershell -ExecutionPolicy Bypass -File scripts/test-opp305-stale-homologacao.ps1 -DryRun"
+    "test:opp305:homolog:dryrun": "powershell -ExecutionPolicy Bypass -File scripts/test-opp305-stale-homologacao.ps1 -DryRun",
+    "sync:audit": "powershell -ExecutionPolicy Bypass -File scripts/git/sync-safe.ps1",
+    "sync:apply": "powershell -ExecutionPolicy Bypass -File scripts/git/sync-safe.ps1 -Apply",
+    "sync:apply:force": "powershell -ExecutionPolicy Bypass -File scripts/git/sync-safe.ps1 -Apply -AllowHighRisk",
+    "sync:harden": "powershell -ExecutionPolicy Bypass -File scripts/git/harden-git-sync.ps1"
   },
   "keywords": [
     "crm",
