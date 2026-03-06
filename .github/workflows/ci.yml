@@ -1,4 +1,4 @@
-﻿name: CI - Testes e Build
+name: CI - Testes e Build
 
 on:
   push:
@@ -444,7 +444,7 @@ jobs:
 
       - name: Upload artefatos Playwright (Pipeline UI)
         if: ${{ !cancelled() && steps.pipeline_ui_changes.outputs.pipeline_ui == 'true' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-pipeline-ui-artifacts
           path: |
