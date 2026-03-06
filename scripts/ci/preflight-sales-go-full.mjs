@@ -5,9 +5,9 @@ import process from 'node:process';
 
 const steps = [
   {
-    name: 'Release flags (GO Core)',
+    name: 'Release flags (GO Full)',
     cmd: 'npm',
-    args: ['run', 'validate:release:vendas:core'],
+    args: ['run', 'validate:release:vendas:full'],
   },
   {
     name: 'Backend build',
@@ -30,6 +30,11 @@ const steps = [
     args: ['--prefix', 'backend', 'run', 'test:e2e:vendas'],
   },
   {
+    name: 'Backend E2E vendas permissoes',
+    cmd: 'npm',
+    args: ['--prefix', 'backend', 'run', 'test:e2e:vendas:permissoes'],
+  },
+  {
     name: 'Frontend E2E pipeline UI',
     cmd: 'npm',
     args: ['run', 'test:e2e:pipeline-ui'],
@@ -40,9 +45,9 @@ const steps = [
 function runStep(step) {
   return new Promise((resolve, reject) => {
     // eslint-disable-next-line no-console
-    console.log(`\n[preflight-sales-go-core] STEP: ${step.name}`);
+    console.log(`\n[preflight-sales-go-full] STEP: ${step.name}`);
     // eslint-disable-next-line no-console
-    console.log(`[preflight-sales-go-core] CMD: ${step.cmd} ${step.args.join(' ')}`);
+    console.log(`[preflight-sales-go-full] CMD: ${step.cmd} ${step.args.join(' ')}`);
 
     const child = spawn(step.cmd, step.args, {
       stdio: 'inherit',
@@ -82,12 +87,12 @@ async function isFrontendAvailable() {
 async function ensureFrontendServer() {
   if (await isFrontendAvailable()) {
     // eslint-disable-next-line no-console
-    console.log('[preflight-sales-go-core] Frontend ja disponivel em http://localhost:3000');
+    console.log('[preflight-sales-go-full] Frontend ja disponivel em http://localhost:3000');
     return { child: null, startedByScript: false };
   }
 
   // eslint-disable-next-line no-console
-  console.log('[preflight-sales-go-core] Subindo frontend local para os testes de UI...');
+  console.log('[preflight-sales-go-full] Subindo frontend local para os testes de UI...');
   const child = spawn('npm', ['--prefix', 'frontend-web', 'run', 'start:docker'], {
     stdio: 'ignore',
     shell: process.platform === 'win32',
@@ -110,7 +115,7 @@ async function ensureFrontendServer() {
     // eslint-disable-next-line no-await-in-loop
     if (await isFrontendAvailable()) {
       // eslint-disable-next-line no-console
-      console.log('[preflight-sales-go-core] Frontend pronto em http://localhost:3000');
+      console.log('[preflight-sales-go-full] Frontend pronto em http://localhost:3000');
       return { child, startedByScript: true };
     }
 
@@ -174,11 +179,11 @@ async function main() {
 
   const durationMs = Date.now() - startedAt;
   // eslint-disable-next-line no-console
-  console.log(`\n[preflight-sales-go-core] PASS em ${(durationMs / 1000).toFixed(1)}s`);
+  console.log(`\n[preflight-sales-go-full] PASS em ${(durationMs / 1000).toFixed(1)}s`);
 }
 
 main().catch((error) => {
   // eslint-disable-next-line no-console
-  console.error(`\n[preflight-sales-go-core] FAIL: ${error.message}`);
+  console.error(`\n[preflight-sales-go-full] FAIL: ${error.message}`);
   process.exit(1);
 });

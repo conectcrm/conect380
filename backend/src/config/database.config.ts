@@ -180,7 +180,6 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         host: config.host,
         port: config.port,
         username: config.username,
-        password: config.password?.substr(0, 3) + '***',
         database: config.database,
         entitiesCount: config.entities.length, // ✅ Quantas entities carregadas
         synchronize: config.synchronize, // ✅ Confirmar se está true
