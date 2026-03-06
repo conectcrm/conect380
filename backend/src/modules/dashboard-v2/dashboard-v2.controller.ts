@@ -43,11 +43,6 @@ export class DashboardV2Controller {
     return this.dashboardV2Service.getFeatureFlag(empresaId);
   }
 
-  @Get('snapshot')
-  async getSnapshot(@EmpresaId() empresaId: string, @Query() query: DashboardV2QueryDto) {
-    return this.dashboardV2Service.getSnapshot(empresaId, query);
-  }
-
   @Get('overview')
   async getOverview(@EmpresaId() empresaId: string, @Query() query: DashboardV2QueryDto) {
     return this.dashboardV2Service.getOverview(empresaId, query);

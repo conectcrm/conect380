@@ -1,10 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, Repository } from 'typeorm';
-import { LifecycleStatusOportunidade, Oportunidade } from '../../oportunidades/oportunidade.entity';
+import { Oportunidade } from '../../oportunidades/oportunidade.entity';
 import { OportunidadeStageEvent } from '../../oportunidades/oportunidade-stage-event.entity';
 import { Proposta } from '../../propostas/proposta.entity';
-import { DashboardV2QueryDto } from '../dto/dashboard-v2-query.dto';
 import { DashboardAgingStageDaily } from '../entities/dashboard-aging-stage-daily.entity';
 import { DashboardFunnelMetricsDaily } from '../entities/dashboard-funnel-metrics-daily.entity';
 import { DashboardPipelineSnapshotDaily } from '../entities/dashboard-pipeline-snapshot-daily.entity';
@@ -15,27 +14,11 @@ type DateRange = {
   end: Date;
 };
 
-type DashboardV2SourceFilters = Pick<DashboardV2QueryDto, 'vendedorId' | 'pipelineId'>;
-
-type DashboardV2TrendPoint = {
-  date: string;
-  receitaFechada: number;
-  receitaPrevista: number;
-  ticketMedio: number;
-  cicloMedioDias: number;
-  oportunidadesAtivas: number;
-  conversao: number;
-};
-
 @Injectable()
 export class DashboardV2AggregationService {
   private readonly logger = new Logger(DashboardV2AggregationService.name);
   private readonly approvedStatus = ['aprovada', 'aceita'];
   private readonly finalStatus = ['aprovada', 'aceita', 'rejeitada', 'expirada'];
-  private oportunidadeResponsavelColumnSql: string | null = null;
-  private oportunidadeResponsavelColumnSqlPromise: Promise<string> | null = null;
-  private oportunidadeLifecycleColumnSql: string | null = null;
-  private oportunidadeLifecycleColumnSqlPromise: Promise<string> | null = null;
 
   constructor(
     @InjectRepository(Oportunidade)
@@ -61,10 +44,8 @@ export class DashboardV2AggregationService {
     defaultStart.setDate(defaultStart.getDate() - 29);
     defaultStart.setHours(0, 0, 0, 0);
 
-    const parsedStart = this.parseDateInput(input?.periodStart);
-    const parsedEnd = this.parseDateInput(input?.periodEnd);
-    const start = parsedStart ? new Date(parsedStart) : defaultStart;
-    const end = parsedEnd ? new Date(parsedEnd) : defaultEnd;
+    const start = input?.periodStart ? new Date(input.periodStart) : defaultStart;
+    const end = input?.periodEnd ? new Date(input.periodEnd) : defaultEnd;
 
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
       return { start: defaultStart, end: defaultEnd };
@@ -73,37 +54,6 @@ export class DashboardV2AggregationService {
     start.setHours(0, 0, 0, 0);
     end.setHours(23, 59, 59, 999);
     return start <= end ? { start, end } : { start: end, end: start };
-  }
-
-  private parseDateInput(value?: string): Date | null {
-    if (!value) {
-      return null;
-    }
-
-    const trimmed = value.trim();
-    if (!trimmed) {
-      return null;
-    }
-
-    const localDateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
-    if (localDateMatch) {
-      const year = Number(localDateMatch[1]);
-      const month = Number(localDateMatch[2]);
-      const day = Number(localDateMatch[3]);
-      const parsed = new Date(year, month - 1, day);
-
-      if (
-        parsed.getFullYear() === year &&
-        parsed.getMonth() === month - 1 &&
-        parsed.getDate() === day
-      ) {
-        return parsed;
-      }
-      return null;
-    }
-
-    const parsed = new Date(trimmed);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
   periodKey(range: DateRange): string {
@@ -120,12 +70,7 @@ export class DashboardV2AggregationService {
       })
       .getCount();
 
-    const expectedDays = Math.max(
-      1,
-      Math.ceil((range.end.getTime() - range.start.getTime()) / 86_400_000) + 1,
-    );
-
-    if (count >= expectedDays) {
+    if (count > 0) {
       return;
     }
 
@@ -167,12 +112,7 @@ export class DashboardV2AggregationService {
     ]);
   }
 
-  async getOverview(empresaId: string, range: DateRange, filters: DashboardV2SourceFilters = {}) {
-    if (this.useSourceFilters(filters)) {
-      const trendPoints = await this.getTrendPointsFromSource(empresaId, range, filters);
-      return this.toOverview(trendPoints);
-    }
-
+  async getOverview(empresaId: string, range: DateRange) {
     const rows = await this.revenueMetricsRepository.find({
       where: {
         empresa_id: empresaId,
@@ -181,24 +121,28 @@ export class DashboardV2AggregationService {
       order: { date_key: 'ASC' },
     });
 
-    return this.toOverview(
-      rows.map((row) => ({
-        date: row.date_key,
-        receitaFechada: Number(row.receita_fechada || 0),
-        receitaPrevista: Number(row.receita_prevista || 0),
-        ticketMedio: Number(row.ticket_medio || 0),
-        cicloMedioDias: Number(row.ciclo_medio_dias || 0),
-        oportunidadesAtivas: Number(row.oportunidades_ativas || 0),
-        conversao: 0,
-      })),
-    );
+    const receitaFechada = rows.reduce((acc, row) => acc + Number(row.receita_fechada || 0), 0);
+    const receitaPrevista = rows.reduce((acc, row) => acc + Number(row.receita_prevista || 0), 0);
+    const ticketMedio =
+      rows.length > 0
+        ? rows.reduce((acc, row) => acc + Number(row.ticket_medio || 0), 0) / rows.length
+        : 0;
+    const cicloMedioDias =
+      rows.length > 0
+        ? rows.reduce((acc, row) => acc + Number(row.ciclo_medio_dias || 0), 0) / rows.length
+        : 0;
+
+    const lastDay = rows[rows.length - 1];
+    return {
+      receitaFechada: Number(receitaFechada.toFixed(2)),
+      receitaPrevista: Number(receitaPrevista.toFixed(2)),
+      ticketMedio: Number(ticketMedio.toFixed(2)),
+      cicloMedioDias: Number(cicloMedioDias.toFixed(2)),
+      oportunidadesAtivas: Number(lastDay?.oportunidades_ativas || 0),
+    };
   }
 
-  async getTrends(empresaId: string, range: DateRange, filters: DashboardV2SourceFilters = {}) {
-    if (this.useSourceFilters(filters)) {
-      return this.getTrendPointsFromSource(empresaId, range, filters);
-    }
-
+  async getTrends(empresaId: string, range: DateRange) {
     const [revenueRows, funnelRows] = await Promise.all([
       this.revenueMetricsRepository.find({
         where: {
@@ -239,11 +183,7 @@ export class DashboardV2AggregationService {
     });
   }
 
-  async getFunnel(empresaId: string, range: DateRange, filters: DashboardV2SourceFilters = {}) {
-    if (this.useSourceFilters(filters)) {
-      return this.getFunnelFromSource(empresaId, range, filters);
-    }
-
+  async getFunnel(empresaId: string, range: DateRange) {
     const rows = await this.funnelMetricsRepository
       .createQueryBuilder('f')
       .select('f.from_stage', 'fromStage')
@@ -274,15 +214,7 @@ export class DashboardV2AggregationService {
     });
   }
 
-  async getPipelineSummary(
-    empresaId: string,
-    range: DateRange,
-    filters: DashboardV2SourceFilters = {},
-  ) {
-    if (this.useSourceFilters(filters)) {
-      return this.getPipelineSummaryFromSource(empresaId, range, filters);
-    }
-
+  async getPipelineSummary(empresaId: string, range: DateRange) {
     const lastDate = await this.pipelineSnapshotRepository
       .createQueryBuilder('p')
       .select('MAX(p.date_key)', 'maxDate')
@@ -325,33 +257,12 @@ export class DashboardV2AggregationService {
     };
   }
 
-  async getInsights(empresaId: string, range: DateRange, filters: DashboardV2SourceFilters = {}) {
+  async getInsights(empresaId: string, range: DateRange) {
     const [overview, trends, pipelineSummary] = await Promise.all([
-      this.getOverview(empresaId, range, filters),
-      this.getTrends(empresaId, range, filters),
-      this.getPipelineSummary(empresaId, range, filters),
+      this.getOverview(empresaId, range),
+      this.getTrends(empresaId, range),
+      this.getPipelineSummary(empresaId, range),
     ]);
-
-    return this.buildInsights({
-      overview,
-      trends,
-      pipelineSummary,
-    });
-  }
-
-  buildInsights(params: {
-    overview: { receitaPrevista: number; receitaFechada: number };
-    trends: Array<{ receitaFechada: number }>;
-    pipelineSummary: { stages: Array<{ paradas: number }> };
-  }): Array<{
-    id: string;
-    type: 'warning' | 'opportunity' | 'info';
-    title: string;
-    description: string;
-    impact: 'alto' | 'medio' | 'baixo';
-    action?: string;
-  }> {
-    const { overview, trends, pipelineSummary } = params;
 
     const insights: Array<{
       id: string;
@@ -413,476 +324,12 @@ export class DashboardV2AggregationService {
     return insights;
   }
 
-  private useSourceFilters(filters: DashboardV2SourceFilters): boolean {
-    return Boolean(filters.vendedorId || filters.pipelineId);
-  }
-
-  private toOverview(points: DashboardV2TrendPoint[]) {
-    const receitaFechada = points.reduce((acc, row) => acc + Number(row.receitaFechada || 0), 0);
-    const receitaPrevista = points.reduce((acc, row) => acc + Number(row.receitaPrevista || 0), 0);
-    const ticketMedio =
-      points.length > 0
-        ? points.reduce((acc, row) => acc + Number(row.ticketMedio || 0), 0) / points.length
-        : 0;
-    const cicloMedioDias =
-      points.length > 0
-        ? points.reduce((acc, row) => acc + Number(row.cicloMedioDias || 0), 0) / points.length
-        : 0;
-
-    const lastDay = points[points.length - 1];
-    return {
-      receitaFechada: Number(receitaFechada.toFixed(2)),
-      receitaPrevista: Number(receitaPrevista.toFixed(2)),
-      ticketMedio: Number(ticketMedio.toFixed(2)),
-      cicloMedioDias: Number(cicloMedioDias.toFixed(2)),
-      oportunidadesAtivas: Number(lastDay?.oportunidadesAtivas || 0),
-    };
-  }
-
-  private buildDateSeries(range: DateRange): string[] {
-    const keys: string[] = [];
-    const cursor = new Date(range.start);
-    cursor.setHours(0, 0, 0, 0);
-    const end = new Date(range.end);
-    end.setHours(0, 0, 0, 0);
-
-    while (cursor <= end) {
-      keys.push(this.toDateKey(cursor));
-      cursor.setDate(cursor.getDate() + 1);
-    }
-
-    return keys;
-  }
-
-  private createEmptyTrendPoints(range: DateRange): DashboardV2TrendPoint[] {
-    return this.buildDateSeries(range).map((date) => ({
-      date,
-      receitaFechada: 0,
-      receitaPrevista: 0,
-      ticketMedio: 0,
-      cicloMedioDias: 0,
-      oportunidadesAtivas: 0,
-      conversao: 0,
-    }));
-  }
-
-  private async getTrendPointsFromSource(
-    empresaId: string,
-    range: DateRange,
-    filters: DashboardV2SourceFilters,
-  ): Promise<DashboardV2TrendPoint[]> {
-    const points = this.createEmptyTrendPoints(range);
-    const pointsMap = new Map(points.map((point) => [point.date, point]));
-
-    await Promise.all([
-      this.mergeRevenueFromSource(pointsMap, empresaId, range, filters),
-      this.mergePipelineProjectionFromSource(pointsMap, empresaId, range, filters),
-      this.mergeConversionFromSource(pointsMap, empresaId, range, filters),
-    ]);
-
-    return points;
-  }
-
-  private async mergeRevenueFromSource(
-    pointsMap: Map<string, DashboardV2TrendPoint>,
-    empresaId: string,
-    range: DateRange,
-    filters: DashboardV2SourceFilters,
-  ): Promise<void> {
-    const approvedParams: unknown[] = [
-      empresaId,
-      range.start.toISOString(),
-      range.end.toISOString(),
-      this.approvedStatus,
-    ];
-    const finalParams: unknown[] = [
-      empresaId,
-      range.start.toISOString(),
-      range.end.toISOString(),
-      this.finalStatus,
-    ];
-
-    let approvedVendedorClause = '';
-    let finalVendedorClause = '';
-    if (filters.vendedorId) {
-      approvedParams.push(filters.vendedorId);
-      approvedVendedorClause = ` AND p."vendedor_id" = $${approvedParams.length}`;
-
-      finalParams.push(filters.vendedorId);
-      finalVendedorClause = ` AND p."vendedor_id" = $${finalParams.length}`;
-    }
-
-    const [approvedRows, cycleRows] = await Promise.all([
-      this.propostaRepository.query(
-        `
-          SELECT
-            TO_CHAR(DATE(p."criadaEm"), 'YYYY-MM-DD') AS date_key,
-            COALESCE(SUM(p.total), 0)::numeric AS receita_fechada,
-            COALESCE(AVG(p.total), 0)::numeric AS ticket_medio
-          FROM propostas p
-          WHERE p."empresa_id" = $1
-            AND p."criadaEm" BETWEEN $2::timestamptz AND $3::timestamptz
-            AND LOWER(p.status::text) = ANY($4::text[])
-            ${approvedVendedorClause}
-          GROUP BY DATE(p."criadaEm")
-        `,
-        approvedParams,
-      ),
-      this.propostaRepository.query(
-        `
-          SELECT
-            TO_CHAR(DATE(p."criadaEm"), 'YYYY-MM-DD') AS date_key,
-            COALESCE(
-              AVG(EXTRACT(EPOCH FROM (COALESCE(p."atualizadaEm", p."criadaEm") - p."criadaEm")) / 86400.0),
-              0
-            )::numeric AS ciclo_medio_dias
-          FROM propostas p
-          WHERE p."empresa_id" = $1
-            AND p."criadaEm" BETWEEN $2::timestamptz AND $3::timestamptz
-            AND LOWER(p.status::text) = ANY($4::text[])
-            ${finalVendedorClause}
-          GROUP BY DATE(p."criadaEm")
-        `,
-        finalParams,
-      ),
-    ]);
-
-    approvedRows.forEach((row: { date_key?: string; receita_fechada?: string; ticket_medio?: string }) => {
-      if (!row.date_key) return;
-      const current = pointsMap.get(row.date_key);
-      if (!current) return;
-
-      current.receitaFechada = Number(row.receita_fechada || 0);
-      current.ticketMedio = Number(row.ticket_medio || 0);
-    });
-
-    cycleRows.forEach((row: { date_key?: string; ciclo_medio_dias?: string }) => {
-      if (!row.date_key) return;
-      const current = pointsMap.get(row.date_key);
-      if (!current) return;
-
-      current.cicloMedioDias = Number(row.ciclo_medio_dias || 0);
-    });
-  }
-
-  private async mergePipelineProjectionFromSource(
-    pointsMap: Map<string, DashboardV2TrendPoint>,
-    empresaId: string,
-    range: DateRange,
-    filters: DashboardV2SourceFilters,
-  ): Promise<void> {
-    const responsavelColumn = await this.getOportunidadeResponsavelColumnSql();
-    const openLifecycleClause = await this.getOportunidadeLifecycleFilterSql('o', [
-      LifecycleStatusOportunidade.OPEN,
-    ]);
-    const params: unknown[] = [empresaId, this.toDateKey(range.start), this.toDateKey(range.end)];
-    let vendedorClause = '';
-
-    if (filters.vendedorId) {
-      params.push(filters.vendedorId);
-      vendedorClause = ` AND ${responsavelColumn}::text = $${params.length}::text`;
-    }
-
-    const rows = await this.oportunidadeRepository.query(
-      `
-        WITH dias AS (
-          SELECT generate_series($2::date, $3::date, interval '1 day')::date AS date_key
-        )
-        SELECT
-          TO_CHAR(d.date_key, 'YYYY-MM-DD') AS date_key,
-          COALESCE(SUM((o.valor * o.probabilidade) / 100.0), 0)::numeric AS receita_prevista,
-          COUNT(o.id)::int AS oportunidades_ativas
-        FROM dias d
-        LEFT JOIN oportunidades o
-          ON o.empresa_id = $1
-          AND o."createdAt" <= (d.date_key + interval '1 day' - interval '1 millisecond')
-          AND ${openLifecycleClause}
-          ${vendedorClause}
-        GROUP BY d.date_key
-        ORDER BY d.date_key ASC
-      `,
-      params,
-    );
-
-    rows.forEach((row: { date_key?: string; receita_prevista?: string; oportunidades_ativas?: string }) => {
-      if (!row.date_key) return;
-      const current = pointsMap.get(row.date_key);
-      if (!current) return;
-
-      current.receitaPrevista = Number(row.receita_prevista || 0);
-      current.oportunidadesAtivas = Number(row.oportunidades_ativas || 0);
-    });
-  }
-
-  private async mergeConversionFromSource(
-    pointsMap: Map<string, DashboardV2TrendPoint>,
-    empresaId: string,
-    range: DateRange,
-    filters: DashboardV2SourceFilters,
-  ): Promise<void> {
-    const responsavelColumn = await this.getOportunidadeResponsavelColumnSql();
-    const activeLifecycleClause = await this.getOportunidadeLifecycleFilterSql('o', [
-      LifecycleStatusOportunidade.OPEN,
-      LifecycleStatusOportunidade.WON,
-      LifecycleStatusOportunidade.LOST,
-    ]);
-    const fromStageExpr = this.stageNormalizeSql('e.from_stage');
-    const toStageExpr = this.stageNormalizeSql('e.to_stage');
-    const params: unknown[] = [empresaId, range.start.toISOString(), range.end.toISOString()];
-    let vendedorClause = '';
-
-    if (filters.vendedorId) {
-      params.push(filters.vendedorId);
-      vendedorClause = ` AND ${responsavelColumn}::text = $${params.length}::text`;
-    }
-
-    const rows = await this.stageEventRepository.query(
-      `
-        WITH movements AS (
-          SELECT
-            TO_CHAR(DATE(e.changed_at), 'YYYY-MM-DD') AS date_key,
-            ${fromStageExpr} AS from_stage,
-            ${toStageExpr} AS to_stage,
-            COUNT(*)::int AS progressed_count,
-            SUM(COUNT(*)) OVER (
-              PARTITION BY DATE(e.changed_at), ${fromStageExpr}
-            )::int AS entered_count
-          FROM oportunidade_stage_events e
-          INNER JOIN oportunidades o
-            ON o.id::text = e.oportunidade_id::text
-            AND o.empresa_id = e.empresa_id
-            AND ${activeLifecycleClause}
-          WHERE e.empresa_id = $1
-            AND e.from_stage IS NOT NULL
-            AND e.changed_at BETWEEN $2::timestamptz AND $3::timestamptz
-            ${vendedorClause}
-          GROUP BY DATE(e.changed_at), ${fromStageExpr}, ${toStageExpr}
-        )
-        SELECT
-          date_key,
-          COALESCE(SUM(progressed_count), 0)::int AS progressed,
-          COALESCE(SUM(entered_count), 0)::int AS entered
-        FROM movements
-        GROUP BY date_key
-        ORDER BY date_key ASC
-      `,
-      params,
-    );
-
-    rows.forEach((row: { date_key?: string; entered?: string; progressed?: string }) => {
-      if (!row.date_key) return;
-      const current = pointsMap.get(row.date_key);
-      if (!current) return;
-
-      const entered = Number(row.entered || 0);
-      const progressed = Number(row.progressed || 0);
-      current.conversao = entered > 0 ? Number(((progressed / entered) * 100).toFixed(2)) : 0;
-    });
-  }
-
-  private async getFunnelFromSource(
-    empresaId: string,
-    range: DateRange,
-    filters: DashboardV2SourceFilters,
-  ): Promise<
-    Array<{
-      fromStage: string;
-      toStage: string;
-      entered: number;
-      progressed: number;
-      conversionRate: number;
-    }>
-  > {
-    const responsavelColumn = await this.getOportunidadeResponsavelColumnSql();
-    const activeLifecycleClause = await this.getOportunidadeLifecycleFilterSql('o', [
-      LifecycleStatusOportunidade.OPEN,
-      LifecycleStatusOportunidade.WON,
-      LifecycleStatusOportunidade.LOST,
-    ]);
-    const fromStageExpr = this.stageNormalizeSql('e.from_stage');
-    const toStageExpr = this.stageNormalizeSql('e.to_stage');
-    const params: unknown[] = [empresaId, range.start.toISOString(), range.end.toISOString()];
-    let vendedorClause = '';
-
-    if (filters.vendedorId) {
-      params.push(filters.vendedorId);
-      vendedorClause = ` AND ${responsavelColumn}::text = $${params.length}::text`;
-    }
-
-    const rows = await this.stageEventRepository.query(
-      `
-        WITH movements AS (
-          SELECT
-            ${fromStageExpr} AS from_stage,
-            ${toStageExpr} AS to_stage,
-            COUNT(*)::int AS progressed_count,
-            SUM(COUNT(*)) OVER (PARTITION BY ${fromStageExpr})::int AS entered_count
-          FROM oportunidade_stage_events e
-          INNER JOIN oportunidades o
-            ON o.id::text = e.oportunidade_id::text
-            AND o.empresa_id = e.empresa_id
-            AND ${activeLifecycleClause}
-          WHERE e.empresa_id = $1
-            AND e.from_stage IS NOT NULL
-            AND e.changed_at BETWEEN $2::timestamptz AND $3::timestamptz
-            ${vendedorClause}
-          GROUP BY ${fromStageExpr}, ${toStageExpr}
-        )
-        SELECT
-          from_stage AS "fromStage",
-          to_stage AS "toStage",
-          entered_count::int AS entered,
-          progressed_count::int AS progressed
-        FROM movements
-        ORDER BY from_stage ASC, to_stage ASC
-      `,
-      params,
-    );
-
-    return rows.map((row: { fromStage: string; toStage: string; entered: string; progressed: string }) => {
-      const entered = Number(row.entered || 0);
-      const progressed = Number(row.progressed || 0);
-
-      return {
-        fromStage: row.fromStage,
-        toStage: row.toStage,
-        entered,
-        progressed,
-        conversionRate: entered > 0 ? Number(((progressed / entered) * 100).toFixed(2)) : 0,
-      };
-    });
-  }
-
-  private async getPipelineSummaryFromSource(
-    empresaId: string,
-    range: DateRange,
-    filters: DashboardV2SourceFilters,
-  ): Promise<{
-    totalValor: number;
-    stages: Array<{
-      stage: string;
-      quantidade: number;
-      valor: number;
-      agingMedioDias: number;
-      paradas: number;
-    }>;
-  }> {
-    const responsavelColumn = await this.getOportunidadeResponsavelColumnSql();
-    const activeLifecycleClause = await this.getOportunidadeLifecycleFilterSql('o', [
-      LifecycleStatusOportunidade.OPEN,
-      LifecycleStatusOportunidade.WON,
-      LifecycleStatusOportunidade.LOST,
-    ]);
-    const stageExpr = this.stageNormalizeSql('o.estagio');
-    const pipelineParams: unknown[] = [empresaId, range.end.toISOString()];
-    let pipelineVendedorClause = '';
-
-    if (filters.vendedorId) {
-      pipelineParams.push(filters.vendedorId);
-      pipelineVendedorClause = ` AND ${responsavelColumn}::text = $${pipelineParams.length}::text`;
-    }
-
-    const pipelineRows = await this.oportunidadeRepository.query(
-      `
-        SELECT
-          ${stageExpr} AS stage,
-          COUNT(*)::int AS quantidade,
-          COALESCE(SUM(o.valor), 0)::numeric AS valor_total
-        FROM oportunidades o
-        WHERE o.empresa_id = $1
-          AND o."createdAt" <= $2::timestamptz
-          AND ${activeLifecycleClause}
-          ${pipelineVendedorClause}
-        GROUP BY ${stageExpr}
-        ORDER BY ${stageExpr} ASC
-      `,
-      pipelineParams,
-    );
-
-    const agingParams: unknown[] = [empresaId, range.end.toISOString()];
-    let agingVendedorClause = '';
-    if (filters.vendedorId) {
-      agingParams.push(filters.vendedorId);
-      agingVendedorClause = ` AND ${responsavelColumn}::text = $${agingParams.length}::text`;
-    }
-
-    agingParams.push(Number(process.env.DASHBOARD_V2_STALLED_DAYS || 3));
-    const stalledLimitParam = agingParams.length;
-
-    const agingRows = await this.stageEventRepository.query(
-      `
-        WITH scoped_oportunidades AS (
-          SELECT o.id
-          FROM oportunidades o
-          WHERE o.empresa_id = $1
-            AND o."createdAt" <= $2::timestamptz
-            AND ${activeLifecycleClause}
-            ${agingVendedorClause}
-        ),
-        latest_stage AS (
-          SELECT DISTINCT ON (e.oportunidade_id)
-            e.oportunidade_id,
-            ${this.stageNormalizeSql('e.to_stage')} AS stage,
-            e.changed_at
-          FROM oportunidade_stage_events e
-          INNER JOIN scoped_oportunidades so
-            ON so.id::text = e.oportunidade_id::text
-          WHERE e.empresa_id = $1
-            AND e.changed_at <= $2::timestamptz
-          ORDER BY e.oportunidade_id, e.changed_at DESC
-        )
-        SELECT
-          ls.stage AS stage,
-          AVG(EXTRACT(EPOCH FROM ($2::timestamptz - ls.changed_at)) / 86400.0)::numeric(8,2) AS avg_days,
-          SUM(
-            CASE
-              WHEN EXTRACT(EPOCH FROM ($2::timestamptz - ls.changed_at)) / 86400.0 > $${stalledLimitParam}
-              THEN 1
-              ELSE 0
-            END
-          )::int AS stalled_count
-        FROM latest_stage ls
-        GROUP BY ls.stage
-      `,
-      agingParams,
-    );
-
-    const agingMap = new Map<string, { avg_days?: string; stalled_count?: string }>();
-    agingRows.forEach((row: { stage?: string; avg_days?: string; stalled_count?: string }) => {
-      if (!row.stage) return;
-      agingMap.set(row.stage, row);
-    });
-
-    const stages = pipelineRows.map((row: { stage?: string; quantidade?: string; valor_total?: string }) => {
-      const stage = String(row.stage || 'leads');
-      const aging = agingMap.get(stage);
-
-      return {
-        stage,
-        quantidade: Number(row.quantidade || 0),
-        valor: Number(row.valor_total || 0),
-        agingMedioDias: Number(aging?.avg_days || 0),
-        paradas: Number(aging?.stalled_count || 0),
-      };
-    });
-
-    return {
-      totalValor: Number(stages.reduce((acc, item) => acc + item.valor, 0).toFixed(2)),
-      stages,
-    };
-  }
-
   private async recomputePipelineSnapshot(
     empresaId: string,
     dateKey: string,
     dayEnd: Date,
   ): Promise<void> {
     const stageExpr = this.stageNormalizeSql('o.estagio');
-    const activeLifecycleClause = await this.getOportunidadeLifecycleFilterSql('o', [
-      LifecycleStatusOportunidade.OPEN,
-      LifecycleStatusOportunidade.WON,
-      LifecycleStatusOportunidade.LOST,
-    ]);
     const rows = await this.oportunidadeRepository
       .createQueryBuilder('o')
       .select(stageExpr, 'stage')
@@ -890,14 +337,13 @@ export class DashboardV2AggregationService {
       .addSelect('COALESCE(SUM(o.valor), 0)::numeric', 'valor_total')
       .where('o.empresa_id = :empresaId', { empresaId })
       .andWhere('o.createdAt <= :dayEnd', { dayEnd })
-      .andWhere(activeLifecycleClause)
       .groupBy(stageExpr)
       .getRawMany<{ stage: string; quantidade: string; valor_total: string }>();
 
     await this.pipelineSnapshotRepository.delete({ empresa_id: empresaId, date_key: dateKey });
     if (rows.length === 0) return;
 
-    await this.pipelineSnapshotRepository.upsert(
+    await this.pipelineSnapshotRepository.insert(
       rows.map((row) => ({
         empresa_id: empresaId,
         date_key: dateKey,
@@ -905,7 +351,6 @@ export class DashboardV2AggregationService {
         quantidade: Number(row.quantidade || 0),
         valor_total: Number(row.valor_total || 0),
       })),
-      ['empresa_id', 'date_key', 'stage'],
     );
   }
 
@@ -938,7 +383,7 @@ export class DashboardV2AggregationService {
     await this.funnelMetricsRepository.delete({ empresa_id: empresaId, date_key: dateKey });
     if (rows.length === 0) return;
 
-    await this.funnelMetricsRepository.upsert(
+    await this.funnelMetricsRepository.insert(
       rows.map((row) => {
         const enteredCount = Number(row.entered_count || 0);
         const progressedCount = Number(row.progressed_count || 0);
@@ -954,7 +399,6 @@ export class DashboardV2AggregationService {
           conversion_rate: Number(conversionRate.toFixed(2)),
         };
       }),
-      ['empresa_id', 'date_key', 'from_stage', 'to_stage'],
     );
   }
 
@@ -963,30 +407,16 @@ export class DashboardV2AggregationService {
     dateKey: string,
     dayEnd: Date,
   ): Promise<void> {
-    const activeLifecycleClause = await this.getOportunidadeLifecycleFilterSql('o', [
-      LifecycleStatusOportunidade.OPEN,
-      LifecycleStatusOportunidade.WON,
-      LifecycleStatusOportunidade.LOST,
-    ]);
     const rows = await this.stageEventRepository.query(
       `
-        WITH scoped_oportunidades AS (
-          SELECT o.id
-          FROM oportunidades o
-          WHERE o.empresa_id = $1
-            AND o."createdAt" <= $2::timestamptz
-            AND ${activeLifecycleClause}
-        ),
-        latest_stage AS (
+        WITH latest_stage AS (
           SELECT DISTINCT ON (e.oportunidade_id)
             e.oportunidade_id,
             ${this.stageNormalizeSql('e.to_stage')} AS stage,
             e.changed_at
           FROM oportunidade_stage_events e
-          INNER JOIN scoped_oportunidades so
-            ON so.id::text = e.oportunidade_id::text
           WHERE e.empresa_id = $1
-            AND e.changed_at <= $2::timestamptz
+            AND e.changed_at <= $2
           ORDER BY e.oportunidade_id, e.changed_at DESC
         )
         SELECT
@@ -1008,7 +438,7 @@ export class DashboardV2AggregationService {
     await this.agingStageRepository.delete({ empresa_id: empresaId, date_key: dateKey });
     if (rows.length === 0) return;
 
-    await this.agingStageRepository.upsert(
+    await this.agingStageRepository.insert(
       rows.map((row: any) => ({
         empresa_id: empresaId,
         date_key: dateKey,
@@ -1016,7 +446,6 @@ export class DashboardV2AggregationService {
         avg_days: Number(row.avg_days || 0),
         stalled_count: Number(row.stalled_count || 0),
       })),
-      ['empresa_id', 'date_key', 'stage'],
     );
   }
 
@@ -1026,9 +455,6 @@ export class DashboardV2AggregationService {
     dayStart: Date,
     dayEnd: Date,
   ): Promise<void> {
-    const openLifecycleClause = await this.getOportunidadeLifecycleFilterSql('o', [
-      LifecycleStatusOportunidade.OPEN,
-    ]);
     const [approvedStats, cycleStats, previstoStats, ativosStats] = await Promise.all([
       this.propostaRepository
         .createQueryBuilder('p')
@@ -1053,19 +479,24 @@ export class DashboardV2AggregationService {
         .select('COALESCE(SUM((o.valor * o.probabilidade) / 100.0), 0)', 'receita_prevista')
         .where('o.empresa_id = :empresaId', { empresaId })
         .andWhere('o.createdAt <= :dayEnd', { dayEnd })
-        .andWhere(openLifecycleClause)
+        .andWhere(`${this.stageNormalizeSql('o.estagio')} NOT IN (:...stages)`, {
+          stages: ['won', 'lost'],
+        })
         .getRawOne<{ receita_prevista?: string }>(),
       this.oportunidadeRepository
         .createQueryBuilder('o')
         .select('COUNT(*)::int', 'oportunidades_ativas')
         .where('o.empresa_id = :empresaId', { empresaId })
         .andWhere('o.createdAt <= :dayEnd', { dayEnd })
-        .andWhere(openLifecycleClause)
+        .andWhere(`${this.stageNormalizeSql('o.estagio')} NOT IN (:...stages)`, {
+          stages: ['won', 'lost'],
+        })
         .getRawOne<{ oportunidades_ativas?: string }>(),
     ]);
 
-    await this.revenueMetricsRepository.upsert(
-      {
+    await this.revenueMetricsRepository.delete({ empresa_id: empresaId, date_key: dateKey });
+
+    await this.revenueMetricsRepository.insert({
       empresa_id: empresaId,
       date_key: dateKey,
       receita_fechada: Number(approvedStats?.receita_fechada || 0),
@@ -1073,157 +504,7 @@ export class DashboardV2AggregationService {
       ticket_medio: Number(approvedStats?.ticket_medio || 0),
       ciclo_medio_dias: Number(cycleStats?.ciclo_medio_dias || 0),
       oportunidades_ativas: Number(ativosStats?.oportunidades_ativas || 0),
-      },
-      ['empresa_id', 'date_key'],
-    );
-  }
-
-  private async getOportunidadeResponsavelColumnSql(): Promise<string> {
-    if (this.oportunidadeResponsavelColumnSql) {
-      return this.oportunidadeResponsavelColumnSql;
-    }
-
-    if (this.oportunidadeResponsavelColumnSqlPromise) {
-      return this.oportunidadeResponsavelColumnSqlPromise;
-    }
-
-    this.oportunidadeResponsavelColumnSqlPromise = (async () => {
-      try {
-        const rows: Array<{ column_name?: string }> = await this.oportunidadeRepository.query(
-          `
-            SELECT column_name
-            FROM information_schema.columns
-            WHERE table_name = 'oportunidades'
-              AND table_schema NOT IN ('pg_catalog', 'information_schema')
-              AND column_name IN ('responsavel_id', 'responsavelId', 'usuario_id', 'usuarioId')
-            ORDER BY CASE
-              WHEN column_name = 'responsavel_id' THEN 0
-              WHEN column_name = 'responsavelId' THEN 1
-              WHEN column_name = 'usuario_id' THEN 2
-              WHEN column_name = 'usuarioId' THEN 3
-              ELSE 4
-            END
-            LIMIT 1
-          `,
-        );
-
-        const columnName = rows?.[0]?.column_name;
-        if (columnName && typeof columnName === 'string') {
-          return `o."${columnName}"`;
-        }
-
-        this.logger.warn(
-          'Nenhuma coluna de responsavel/usuario encontrada em oportunidades; filtro por vendedor sera vazio.',
-        );
-      } catch (error) {
-        this.logger.warn(
-          `Falha ao detectar coluna de responsavel em oportunidades: ${
-            (error as Error)?.message || 'desconhecido'
-          }`,
-        );
-      }
-
-      return 'NULL::text';
-    })();
-
-    const resolved = await this.oportunidadeResponsavelColumnSqlPromise;
-    this.oportunidadeResponsavelColumnSql = resolved;
-    this.oportunidadeResponsavelColumnSqlPromise = null;
-
-    return resolved;
-  }
-
-  private async getOportunidadeLifecycleColumnSql(): Promise<string> {
-    if (this.oportunidadeLifecycleColumnSql) {
-      return this.oportunidadeLifecycleColumnSql;
-    }
-
-    if (this.oportunidadeLifecycleColumnSqlPromise) {
-      return this.oportunidadeLifecycleColumnSqlPromise;
-    }
-
-    this.oportunidadeLifecycleColumnSqlPromise = (async () => {
-      try {
-        const rows: Array<{ column_name?: string }> = await this.oportunidadeRepository.query(
-          `
-            SELECT column_name
-            FROM information_schema.columns
-            WHERE table_name = 'oportunidades'
-              AND table_schema NOT IN ('pg_catalog', 'information_schema')
-              AND column_name IN ('lifecycle_status', 'lifecycleStatus')
-            ORDER BY CASE
-              WHEN column_name = 'lifecycle_status' THEN 0
-              WHEN column_name = 'lifecycleStatus' THEN 1
-              ELSE 2
-            END
-            LIMIT 1
-          `,
-        );
-
-        const columnName = rows?.[0]?.column_name;
-        if (columnName && typeof columnName === 'string') {
-          return columnName;
-        }
-      } catch (error) {
-        this.logger.warn(
-          `Falha ao detectar coluna de lifecycle em oportunidades: ${
-            (error as Error)?.message || 'desconhecido'
-          }`,
-        );
-      }
-
-      return '';
-    })();
-
-    const resolved = await this.oportunidadeLifecycleColumnSqlPromise;
-    this.oportunidadeLifecycleColumnSql = resolved;
-    this.oportunidadeLifecycleColumnSqlPromise = null;
-
-    return resolved;
-  }
-
-  private lifecycleNormalizeSql(columnRef: string): string {
-    return `
-      CASE LOWER(COALESCE(${columnRef}::text, ''))
-        WHEN 'open' THEN 'open'
-        WHEN 'won' THEN 'won'
-        WHEN 'ganho' THEN 'won'
-        WHEN 'lost' THEN 'lost'
-        WHEN 'perdido' THEN 'lost'
-        WHEN 'archived' THEN 'archived'
-        WHEN 'deleted' THEN 'deleted'
-        ELSE 'open'
-      END
-    `;
-  }
-
-  private lifecycleFromStageSql(stageColumnRef: string): string {
-    const normalizedStageExpr = this.stageNormalizeSql(stageColumnRef);
-    return `
-      CASE
-        WHEN ${normalizedStageExpr} = 'won' THEN 'won'
-        WHEN ${normalizedStageExpr} = 'lost' THEN 'lost'
-        ELSE 'open'
-      END
-    `;
-  }
-
-  private async getOportunidadeLifecycleStatusExpr(alias = 'o'): Promise<string> {
-    const lifecycleColumn = await this.getOportunidadeLifecycleColumnSql();
-    if (lifecycleColumn) {
-      return this.lifecycleNormalizeSql(`${alias}."${lifecycleColumn}"`);
-    }
-
-    return this.lifecycleFromStageSql(`${alias}.estagio`);
-  }
-
-  private async getOportunidadeLifecycleFilterSql(
-    alias: string,
-    statuses: LifecycleStatusOportunidade[],
-  ): Promise<string> {
-    const lifecycleExpr = await this.getOportunidadeLifecycleStatusExpr(alias);
-    const statusesSql = statuses.map((status) => `'${status}'`).join(', ');
-    return `${lifecycleExpr} IN (${statusesSql})`;
+    });
   }
 
   private stageNormalizeSql(columnRef: string): string {
@@ -1250,9 +531,6 @@ export class DashboardV2AggregationService {
   }
 
   private toDateKey(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return date.toISOString().slice(0, 10);
   }
 }

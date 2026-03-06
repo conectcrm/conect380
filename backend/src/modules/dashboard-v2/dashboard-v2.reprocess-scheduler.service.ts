@@ -4,12 +4,8 @@ import { DashboardV2JobsService } from './dashboard-v2.jobs.service';
 @Injectable()
 export class DashboardV2ReprocessSchedulerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DashboardV2ReprocessSchedulerService.name);
-  private readonly nodeEnv = (process.env.NODE_ENV || '').toLowerCase();
   private readonly enabled =
-    this.nodeEnv !== 'test' &&
-    (process.env.DASHBOARD_V2_DAILY_REPROCESS_ENABLED === 'true' ||
-      (process.env.DASHBOARD_V2_DAILY_REPROCESS_ENABLED !== 'false' &&
-        this.nodeEnv !== 'development'));
+    process.env.DASHBOARD_V2_DAILY_REPROCESS_ENABLED !== 'false' && process.env.NODE_ENV !== 'test';
   private readonly intervalMs = Number(
     process.env.DASHBOARD_V2_DAILY_REPROCESS_INTERVAL_MS || 15 * 60 * 1000,
   );
@@ -20,9 +16,7 @@ export class DashboardV2ReprocessSchedulerService implements OnModuleInit, OnMod
 
   onModuleInit() {
     if (!this.enabled) {
-      this.logger.log(
-        'Reprocessamento diario Dashboard V2 desabilitado (defina DASHBOARD_V2_DAILY_REPROCESS_ENABLED=true para habilitar em desenvolvimento).',
-      );
+      this.logger.log('Reprocessamento diario Dashboard V2 desabilitado por configuracao.');
       return;
     }
 

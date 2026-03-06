@@ -8,12 +8,9 @@ import { DashboardV2ValidationService } from './services/dashboard-v2-validation
 @Injectable()
 export class DashboardV2ValidationSchedulerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DashboardV2ValidationSchedulerService.name);
-  private readonly nodeEnv = (process.env.NODE_ENV || '').toLowerCase();
   private readonly enabled =
-    this.nodeEnv !== 'test' &&
-    (process.env.DASHBOARD_V2_VALIDATION_SCHEDULER_ENABLED === 'true' ||
-      (process.env.DASHBOARD_V2_VALIDATION_SCHEDULER_ENABLED !== 'false' &&
-        this.nodeEnv !== 'development'));
+    process.env.DASHBOARD_V2_VALIDATION_SCHEDULER_ENABLED !== 'false' &&
+    process.env.NODE_ENV !== 'test';
   private readonly intervalMs = Number(
     process.env.DASHBOARD_V2_VALIDATION_SCHEDULER_INTERVAL_MS || 15 * 60 * 1000,
   );
@@ -38,9 +35,7 @@ export class DashboardV2ValidationSchedulerService implements OnModuleInit, OnMo
 
   onModuleInit() {
     if (!this.enabled) {
-      this.logger.log(
-        'Scheduler de validacao V1 vs V2 desabilitado (defina DASHBOARD_V2_VALIDATION_SCHEDULER_ENABLED=true para habilitar em desenvolvimento).',
-      );
+      this.logger.log('Scheduler de validacao V1 vs V2 desabilitado por configuracao.');
       return;
     }
 
