@@ -27,7 +27,9 @@
     "build:frontend": "cd frontend-web && npm run build",
     "check:encoding": "node scripts/checkEncoding.js",
     "validate:release:vendas:core": "node scripts/ci/validate-sales-release-mode.mjs --mode core --frontend-env frontend-web/.env.example --backend-env backend/.env.production.example",
-    "preflight:go-live:vendas:core": "node scripts/ci/preflight-sales-go-core.mjs"
+    "validate:release:vendas:full": "node scripts/ci/validate-sales-release-mode.mjs --mode full --frontend-env frontend-web/.env.full.example --backend-env backend/.env.production.full.example",
+    "preflight:go-live:vendas:core": "node scripts/ci/preflight-sales-go-core.mjs",
+    "preflight:go-live:vendas:full": "node scripts/ci/preflight-sales-go-full.mjs"
   },
   "keywords": [
     "crm",

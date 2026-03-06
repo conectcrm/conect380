@@ -203,3 +203,20 @@ export interface AprovarCotacaoRequest {
 export interface ReprovarCotacaoRequest {
   justificativa: string;
 }
+
+export interface CotacaoMetadataFornecedor {
+  id: string;
+  nome: string;
+}
+
+export interface CotacaoMetadataAprovador {
+  id: string;
+  nome: string;
+  email: string;
+  role: string;
+}
+
+export interface CotacaoMetadataCriacao {
+  fornecedores: CotacaoMetadataFornecedor[];
+  aprovadores: CotacaoMetadataAprovador[];
+}
