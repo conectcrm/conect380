@@ -8,10 +8,11 @@ interface SystemBrandingContextValue {
   branding: SystemBrandingEffectiveConfig;
   isLoading: boolean;
   isReady: boolean;
-  refreshBranding: () => Promise<void>;
+  refreshBranding: (options?: { silent?: boolean }) => Promise<void>;
 }
 
 const STORAGE_KEY = 'conect_system_branding_cache_v1';
+const BRANDING_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 const resolveAssetUrl = (url: string): string => {
   if (!url) {
@@ -78,17 +79,23 @@ export const SystemBrandingProvider: React.FC<SystemBrandingProviderProps> = ({ 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isReady, setIsReady] = useState<boolean>(false);
 
-  const refreshBranding = useCallback(async () => {
-    setIsLoading(true);
+  const refreshBranding = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = options?.silent === true;
+    if (!silent) {
+      setIsLoading(true);
+    }
+
     try {
       const data = await systemBrandingService.getPublicBranding();
-      const normalized = { ...DEFAULT_SYSTEM_BRANDING, ...data };
+      const normalized = systemBrandingService.normalizeBranding(data);
       setBranding(normalized);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
     } catch (error) {
       console.warn('[SystemBranding] Nao foi possivel atualizar branding publico.', error);
     } finally {
-      setIsLoading(false);
+      if (!silent) {
+        setIsLoading(false);
+      }
       setIsReady(true);
     }
   }, []);
@@ -98,13 +105,37 @@ export const SystemBrandingProvider: React.FC<SystemBrandingProviderProps> = ({ 
     if (cached) {
       try {
         const parsed = JSON.parse(cached) as Partial<SystemBrandingEffectiveConfig>;
-        setBranding({ ...DEFAULT_SYSTEM_BRANDING, ...parsed });
+        setBranding(systemBrandingService.normalizeBranding(parsed));
       } catch (error) {
         console.warn('[SystemBranding] Cache invalido, usando branding padrao.', error);
       }
     }
 
     void refreshBranding();
+  }, [refreshBranding]);
+
+  useEffect(() => {
+    const refreshIfVisible = () => {
+      if (document.visibilityState !== 'visible') {
+        return;
+      }
+
+      void refreshBranding({ silent: true });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshBranding({ silent: true });
+      }
+    };
+
+    const interval = window.setInterval(refreshIfVisible, BRANDING_REFRESH_INTERVAL_MS);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [refreshBranding]);
 
   useEffect(() => {
