@@ -32,9 +32,16 @@ const AUTH_LOCKOUT_BASE_MINUTES_DEFAULT = 15;
 const AUTH_LOCKOUT_MAX_MULTIPLIER = 8;
 const ADMIN_ROLES_FOR_MFA = new Set<UserRole>([UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE]);
 const REVOKE_REASON_SINGLE_SESSION = 'single_session_enforced';
+const REVOKE_REASON_IDLE_TIMEOUT = 'idle_timeout';
 const AUTH_ERROR_CODE_CONCURRENT_LOGIN = 'CONCURRENT_LOGIN';
 const AUTH_ERROR_MESSAGE_CONCURRENT_LOGIN =
   'Sua sessao foi encerrada porque sua conta foi acessada em outro dispositivo.';
+const AUTH_ERROR_CODE_IDLE_TIMEOUT = 'SESSION_IDLE_TIMEOUT';
+const AUTH_ERROR_MESSAGE_IDLE_TIMEOUT =
+  'Sua sessao expirou por inatividade. Faca login novamente.';
+const ADMIN_IDLE_TIMEOUT_MINUTES_DEFAULT = 30;
+const ADMIN_IDLE_TIMEOUT_MINUTES_MIN = 5;
+const ADMIN_IDLE_TIMEOUT_MINUTES_MAX = 480;
 
 type AuthRequestMetadata = {
   ip?: string;
@@ -205,6 +212,33 @@ export class AuthService {
       ADMIN_SESSION_MINUTES_MAX,
       Math.max(ADMIN_SESSION_MINUTES_MIN, envMinutes),
     );
+  }
+
+  private getAdminIdleTimeoutMinutes(): number {
+    const envMinutes = this.parseInteger(process.env.AUTH_ADMIN_IDLE_TIMEOUT_MINUTES);
+    if (!envMinutes) {
+      return ADMIN_IDLE_TIMEOUT_MINUTES_DEFAULT;
+    }
+
+    return Math.min(
+      ADMIN_IDLE_TIMEOUT_MINUTES_MAX,
+      Math.max(ADMIN_IDLE_TIMEOUT_MINUTES_MIN, envMinutes),
+    );
+  }
+
+  private resolveDateToEpochMs(value: unknown): number | null {
+    if (value instanceof Date) {
+      const ms = value.getTime();
+      return Number.isFinite(ms) ? ms : null;
+    }
+
+    if (typeof value === 'string' || typeof value === 'number') {
+      const parsed = new Date(value);
+      const ms = parsed.getTime();
+      return Number.isFinite(ms) ? ms : null;
+    }
+
+    return null;
   }
 
   private async resolveAdminSessionMinutes(user: Pick<User, 'empresa_id'>): Promise<number> {
@@ -426,6 +460,7 @@ export class AuthService {
     user: Pick<User, 'id' | 'email' | 'role' | 'empresa_id'>,
     context: TokenIssueContext,
     sessionId: string,
+    mfaVerified: boolean,
     metadata?: AuthRequestMetadata,
   ): Promise<string> {
     const payload = {
@@ -434,6 +469,7 @@ export class AuthService {
       empresa_id: user.empresa_id,
       role: user.role,
       sid: sessionId,
+      mfa_verified: mfaVerified,
     };
 
     const expiresIn = await this.resolveAccessTokenExpiresIn(user);
@@ -452,6 +488,7 @@ export class AuthService {
 
   private async issueRefreshToken(
     user: Pick<User, 'id' | 'empresa_id'>,
+    options?: { mfaVerified?: boolean },
     metadata?: AuthRequestMetadata,
   ): Promise<{ sessionId: string; token: string; tokenHash: string; expiresAt: Date }> {
     const token = this.gerarRefreshToken();
@@ -469,6 +506,8 @@ export class AuthService {
       replacedByTokenHash: null,
       requestedIp: metadata?.ip?.slice(0, 45) ?? null,
       userAgent: metadata?.userAgent ?? null,
+      mfaVerified: Boolean(options?.mfaVerified),
+      lastActivityAt: new Date(),
     });
 
     await this.authRefreshTokenRepository.save(entity);
@@ -486,8 +525,13 @@ export class AuthService {
     context: TokenIssueContext,
     metadata?: AuthRequestMetadata,
   ): Promise<{ sessionId: string; accessToken: string; refreshToken: string }> {
-    const { sessionId, token: refreshToken } = await this.issueRefreshToken(user, metadata);
-    const accessToken = await this.issueAccessToken(user, context, sessionId, metadata);
+    const mfaVerified = context === 'mfa_verify';
+    const { sessionId, token: refreshToken } = await this.issueRefreshToken(
+      user,
+      { mfaVerified },
+      metadata,
+    );
+    const accessToken = await this.issueAccessToken(user, context, sessionId, mfaVerified, metadata);
 
     return {
       sessionId,
@@ -565,6 +609,10 @@ export class AuthService {
   private async shouldRequireAdminMfa(user: Pick<User, 'role' | 'empresa_id'>): Promise<boolean> {
     if (!this.isAdminRoleForMfa(user.role)) {
       return false;
+    }
+
+    if (String(user.role || '').trim().toLowerCase() === UserRole.SUPERADMIN) {
+      return true;
     }
 
     const globalAdminMfaRequired = this.parseBooleanFlag(
@@ -957,12 +1005,41 @@ export class AuthService {
       throw new UnauthorizedException('Sessao de autenticacao invalida. Refaca o login.');
     }
 
+    if (this.isAdminRoleForMfa(user.role)) {
+      const idleTimeoutMs = this.getAdminIdleTimeoutMinutes() * 60 * 1000;
+      const lastActivityTime =
+        this.resolveDateToEpochMs(currentSession.lastActivityAt) ??
+        this.resolveDateToEpochMs(currentSession.updatedAt) ??
+        this.resolveDateToEpochMs(currentSession.createdAt);
+
+      if (lastActivityTime !== null && Date.now() - lastActivityTime > idleTimeoutMs) {
+        await this.authRefreshTokenRepository.update(
+          { id: currentSession.id, revokedAt: IsNull() },
+          {
+            revokedAt: new Date(),
+            revokeReason: REVOKE_REASON_IDLE_TIMEOUT,
+          },
+        );
+        securityLogger.adminSessionLogout(
+          user.id,
+          String(user.role || ''),
+          this.normalizarIp(metadata?.ip ?? currentSession.requestedIp ?? undefined),
+          REVOKE_REASON_IDLE_TIMEOUT,
+        );
+        throw new UnauthorizedException({
+          code: AUTH_ERROR_CODE_IDLE_TIMEOUT,
+          message: AUTH_ERROR_MESSAGE_IDLE_TIMEOUT,
+        });
+      }
+    }
+
     const {
       sessionId: nextSessionId,
       token: nextRefreshToken,
       tokenHash: nextRefreshTokenHash,
     } = await this.issueRefreshToken(
       user,
+      { mfaVerified: Boolean(currentSession.mfaVerified) },
       metadata,
     );
 
@@ -978,7 +1055,13 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token invalido ou expirado');
     }
 
-    const accessToken = await this.issueAccessToken(user, 'refresh', nextSessionId, metadata);
+    const accessToken = await this.issueAccessToken(
+      user,
+      'refresh',
+      nextSessionId,
+      Boolean(currentSession.mfaVerified),
+      metadata,
+    );
 
     return {
       success: true,

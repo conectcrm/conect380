@@ -50,6 +50,12 @@ export class AuthRefreshToken {
   @Column({ name: 'user_agent', type: 'text', nullable: true })
   userAgent: string | null;
 
+  @Column({ name: 'mfa_verified', type: 'boolean', default: false })
+  mfaVerified: boolean;
+
+  @Column({ name: 'last_activity_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  lastActivityAt: Date;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

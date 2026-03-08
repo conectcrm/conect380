@@ -12,6 +12,10 @@ import { UpdateModuloEmpresaDto } from '../dto/update-modulo-empresa.dto';
 import { MudarPlanoDto } from '../dto/mudar-plano.dto';
 import { ModuloEmpresa } from '../entities/modulo-empresa.entity';
 import { HistoricoPlano } from '../entities/historico-plano.entity';
+import { PlanosService } from '../../planos/planos.service';
+import { AssinaturasService } from '../../planos/assinaturas.service';
+import { Plano } from '../../planos/entities/plano.entity';
+import { toCanonicalAssinaturaStatus } from '../../planos/entities/assinatura-empresa.entity';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -28,6 +32,8 @@ export class AdminEmpresasService {
     @InjectRepository(HistoricoPlano)
     private historicoPlanoRepository: Repository<HistoricoPlano>,
     private empresaModuloService: EmpresaModuloService,
+    private planosService: PlanosService,
+    private assinaturasService: AssinaturasService,
   ) {}
 
   /**
@@ -132,36 +138,44 @@ export class AdminEmpresasService {
    * Criar nova empresa (onboarding completo)
    */
   async criar(dto: CreateEmpresaAdminDto) {
-    this.logger.log(`🏢 Criando nova empresa: ${dto.nome}`);
+    this.logger.log(`Criando nova empresa: ${dto.nome}`);
 
-    // Verificar se CNPJ já existe
     const empresaExistente = await this.empresaRepository.findOne({
       where: { cnpj: dto.cnpj },
     });
 
     if (empresaExistente) {
-      throw new BadRequestException('CNPJ já cadastrado no sistema');
+      throw new BadRequestException('CNPJ ja cadastrado no sistema');
     }
 
-    // Verificar se email da empresa já existe
     const emailExistente = await this.empresaRepository.findOne({
       where: { email: dto.email },
     });
 
     if (emailExistente) {
-      throw new BadRequestException('Email da empresa já cadastrado');
+      throw new BadRequestException('Email da empresa ja cadastrado');
     }
 
-    // Gerar slug e subdomínio
     const slug = this.gerarSlug(dto.nome);
     const subdominio = slug;
 
-    // Calcular data de expiração do trial
-    const trialDays = dto.trial_days || 7;
+    const trialDays = Number.parseInt(String(dto.trial_days || '7'), 10) || 7;
     const trialEndDate = new Date();
     trialEndDate.setDate(trialEndDate.getDate() + trialDays);
 
-    // Criar empresa
+    const planoCatalogo = await this.resolvePlanoFromInput(dto.plano || 'starter');
+    const planoCode = planoCatalogo.codigo;
+    const valorMensalCatalogo = this.toMoney(planoCatalogo.preco);
+
+    const assinaturaStatusMap: Record<string, 'trial' | 'active' | 'past_due' | 'suspended' | 'canceled'> = {
+      trial: 'trial',
+      active: 'active',
+      past_due: 'past_due',
+      suspended: 'suspended',
+      cancelled: 'canceled',
+    };
+    const assinaturaInicialStatus = assinaturaStatusMap[String(dto.status || 'trial')] || 'trial';
+
     const empresa = this.empresaRepository.create({
       nome: dto.nome,
       slug,
@@ -173,11 +187,11 @@ export class AdminEmpresasService {
       estado: dto.estado || '',
       cep: dto.cep || '',
       subdominio,
-      plano: dto.plano || 'starter',
+      plano: planoCode,
       status: dto.status || 'trial',
       trial_end_date: trialEndDate,
-      valor_mensal: dto.valor_mensal || 0,
-      limites: dto.limites || this.getLimitesPadrao(dto.plano),
+      valor_mensal: valorMensalCatalogo,
+      limites: dto.limites || this.getLimitesPadrao(planoCode),
       account_manager_id: dto.account_manager_id,
       notas_internas: dto.notas_internas,
       ativo: true,
@@ -186,7 +200,6 @@ export class AdminEmpresasService {
 
     const empresaSalva = await this.empresaRepository.save(empresa);
 
-    // Criar usuário admin da empresa
     const hashedPassword = await bcrypt.hash(dto.admin_senha, 10);
     const adminUser = this.userRepository.create({
       nome: dto.admin_nome,
@@ -199,10 +212,27 @@ export class AdminEmpresasService {
 
     await this.userRepository.save(adminUser);
 
-    // Ativar módulos do plano
-    await this.empresaModuloService.ativarPlano(empresaSalva.id, dto.plano.toUpperCase() as any);
+    const hoje = new Date();
+    const proximoVencimento = new Date(hoje);
+    proximoVencimento.setMonth(proximoVencimento.getMonth() + 1);
 
-    this.logger.log(`✅ Empresa criada com sucesso: ${empresaSalva.id}`);
+    await this.assinaturasService.criar({
+      empresaId: empresaSalva.id,
+      planoId: planoCatalogo.id,
+      status: assinaturaInicialStatus,
+      dataInicio: hoje.toISOString(),
+      proximoVencimento: proximoVencimento.toISOString(),
+      valorMensal: valorMensalCatalogo,
+      renovacaoAutomatica: true,
+      observacoes: `Assinatura criada via admin.criar em ${hoje.toISOString()}`,
+    });
+
+    await this.empresaModuloService.ativarPlano(
+      empresaSalva.id,
+      this.toEmpresaModuloPlanoCode(planoCode) as any,
+    );
+
+    this.logger.log(`Empresa criada com sucesso: ${empresaSalva.id}`);
 
     return this.buscarPorId(empresaSalva.id);
   }
@@ -214,17 +244,27 @@ export class AdminEmpresasService {
     const empresa = await this.empresaRepository.findOne({ where: { id } });
 
     if (!empresa) {
-      throw new NotFoundException(`Empresa com ID ${id} não encontrada`);
+      throw new NotFoundException(`Empresa com ID ${id} nao encontrada`);
     }
 
-    // Se mudar o plano, atualizar módulos
-    if (dto.plano && dto.plano !== empresa.plano) {
-      await this.empresaModuloService.ativarPlano(id, dto.plano.toUpperCase() as any);
-      this.logger.log(`📦 Plano alterado de ${empresa.plano} para ${dto.plano}`);
+    const updatePayload: UpdateEmpresaAdminDto = { ...dto };
+    const requestedPlan = typeof updatePayload.plano === 'string' ? updatePayload.plano.trim() : '';
+
+    if (requestedPlan) {
+      await this.mudarPlano(id, {
+        plano: requestedPlan,
+        motivo: 'Alteracao via admin.atualizar',
+        valor_mensal: updatePayload.valor_mensal,
+      });
+      delete updatePayload.plano;
+      delete updatePayload.valor_mensal;
     }
 
-    // Atualizar empresa
-    Object.assign(empresa, dto);
+    if (Object.keys(updatePayload).length === 0) {
+      return this.buscarPorId(id);
+    }
+
+    Object.assign(empresa, updatePayload);
     const empresaAtualizada = await this.empresaRepository.save(empresa);
 
     return this.buscarPorId(empresaAtualizada.id);
@@ -373,6 +413,11 @@ export class AdminEmpresasService {
         clientes: 1000,
         armazenamento: '5GB',
       },
+      professional: {
+        usuarios: 50,
+        clientes: 10000,
+        armazenamento: '50GB',
+      },
       business: {
         usuarios: 50,
         clientes: 10000,
@@ -383,9 +428,15 @@ export class AdminEmpresasService {
         clientes: 999999,
         armazenamento: '500GB',
       },
+      custom: {
+        usuarios: 999,
+        clientes: 999999,
+        armazenamento: '500GB',
+      },
     };
 
-    return limites[plano] || limites.starter;
+    const normalized = this.resolvePlanCode(plano);
+    return limites[normalized] || limites.starter;
   }
 
   /**
@@ -561,6 +612,75 @@ export class AdminEmpresasService {
     return historico;
   }
 
+  private normalizePlanInput(value: string): string {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+  }
+
+  private toMoney(value: unknown): number {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return 0;
+    }
+
+    return Number(parsed.toFixed(2));
+  }
+
+  private resolvePlanCode(rawInput: string): string {
+    const normalized = this.normalizePlanInput(rawInput);
+    const aliases: Record<string, string> = {
+      starter: 'starter',
+      start: 'starter',
+      basico: 'starter',
+      basic: 'starter',
+      professional: 'professional',
+      profissonal: 'professional',
+      profissional: 'professional',
+      pro: 'professional',
+      business: 'professional',
+      enterprise: 'enterprise',
+      custom: 'custom',
+      personalizado: 'custom',
+    };
+
+    return aliases[normalized] || normalized;
+  }
+
+  private toEmpresaModuloPlanoCode(planCode: string): 'STARTER' | 'BUSINESS' | 'ENTERPRISE' {
+    if (planCode === 'enterprise') {
+      return 'ENTERPRISE';
+    }
+
+    if (planCode === 'professional' || planCode === 'custom') {
+      return 'BUSINESS';
+    }
+
+    return 'STARTER';
+  }
+
+  private async resolvePlanoFromInput(planoInput: string): Promise<Plano> {
+    const resolvedCode = this.resolvePlanCode(planoInput);
+
+    try {
+      return await this.planosService.buscarPorCodigo(resolvedCode);
+    } catch {
+      const normalizedName = this.normalizePlanInput(planoInput);
+      const planosAtivos = await this.planosService.listarTodos();
+      const byName = planosAtivos.find(
+        (item) => this.normalizePlanInput(item.nome) === normalizedName,
+      );
+
+      if (byName) {
+        return byName;
+      }
+
+      throw new BadRequestException(`Plano "${planoInput}" nao encontrado no catalogo`);
+    }
+  }
+
   /**
    * Mudar plano de uma empresa
    */
@@ -570,35 +690,70 @@ export class AdminEmpresasService {
     });
 
     if (!empresa) {
-      throw new NotFoundException(`Empresa ${empresaId} não encontrada`);
+      throw new NotFoundException(`Empresa ${empresaId} nao encontrada`);
     }
 
-    const planoAnterior = empresa.plano;
-    const valorAnterior = empresa.valor_mensal || 0;
+    const planoDestino = await this.resolvePlanoFromInput(dto.plano);
+    const assinaturaAtual = await this.assinaturasService.buscarPorEmpresa(empresaId);
+    const statusAtual = assinaturaAtual
+      ? toCanonicalAssinaturaStatus(assinaturaAtual.status)
+      : null;
 
-    // Registrar no histórico
+    const planoAnterior = assinaturaAtual?.plano?.codigo || empresa.plano || 'trial';
+    const valorAnterior = this.toMoney(assinaturaAtual?.valorMensal ?? empresa.valor_mensal ?? 0);
+
+    if (
+      dto.valor_mensal !== undefined &&
+      this.toMoney(dto.valor_mensal) !== this.toMoney(planoDestino.preco)
+    ) {
+      this.logger.warn(
+        `valor_mensal manual ignorado para empresa ${empresaId}; usando preco do catalogo (${planoDestino.codigo})`,
+      );
+    }
+
+    let assinaturaAtualizada = assinaturaAtual;
+
+    if (!assinaturaAtual || statusAtual === 'canceled') {
+      const hoje = new Date();
+      const proximoVencimento = new Date(hoje);
+      proximoVencimento.setMonth(proximoVencimento.getMonth() + 1);
+
+      assinaturaAtualizada = await this.assinaturasService.criar({
+        empresaId,
+        planoId: planoDestino.id,
+        status: 'active',
+        dataInicio: hoje.toISOString(),
+        proximoVencimento: proximoVencimento.toISOString(),
+        valorMensal: this.toMoney(planoDestino.preco),
+        renovacaoAutomatica: true,
+        observacoes: `Assinatura criada via admin.mudarPlano em ${hoje.toISOString()}`,
+      });
+    } else if (assinaturaAtual.plano?.id !== planoDestino.id) {
+      assinaturaAtualizada = await this.assinaturasService.alterarPlano(empresaId, planoDestino.id);
+    }
+
+    const valorNovo = this.toMoney(assinaturaAtualizada?.valorMensal ?? planoDestino.preco);
+
     const historico = this.historicoPlanoRepository.create({
       empresaId,
-      planoAnterior: planoAnterior || 'Trial',
-      planoNovo: dto.plano,
-      valorAnterior: parseFloat(valorAnterior.toString()),
-      valorNovo: dto.valor_mensal || 0,
-      motivo: dto.motivo || 'Alteração manual pelo admin',
+      planoAnterior: planoAnterior || 'trial',
+      planoNovo: planoDestino.codigo,
+      valorAnterior,
+      valorNovo,
+      motivo: dto.motivo || 'Alteracao manual pelo admin',
       alteradoPor: dto.alterado_por,
     });
 
     await this.historicoPlanoRepository.save(historico);
 
-    // Atualizar empresa
-    empresa.plano = dto.plano;
-    if (dto.valor_mensal !== undefined) {
-      empresa.valor_mensal = dto.valor_mensal;
-    }
+    // Legacy fields remain synchronized, but assinatura is the source of truth.
+    empresa.plano = planoDestino.codigo;
+    empresa.valor_mensal = valorNovo;
 
     const empresaAtualizada = await this.empresaRepository.save(empresa);
 
     this.logger.log(
-      `Plano da empresa ${empresa.nome} alterado de ${planoAnterior} para ${dto.plano}`,
+      `Plano da empresa ${empresa.nome} alterado via assinatura de ${planoAnterior} para ${planoDestino.codigo}`,
     );
 
     return empresaAtualizada;

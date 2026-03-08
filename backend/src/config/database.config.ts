@@ -39,6 +39,7 @@ import { Fatura } from '../modules/faturamento/entities/fatura.entity';
 import { ItemFatura } from '../modules/faturamento/entities/item-fatura.entity';
 import { Pagamento } from '../modules/faturamento/entities/pagamento.entity';
 import { PlanoCobranca } from '../modules/faturamento/entities/plano-cobranca.entity';
+import { BillingEvent } from '../modules/faturamento/entities/billing-event.entity';
 import { Contrato } from '../modules/contratos/entities/contrato.entity';
 import { AssinaturaContrato } from '../modules/contratos/entities/assinatura-contrato.entity';
 import { Canal } from '../modules/atendimento/entities/canal.entity';
@@ -72,6 +73,7 @@ import { PasswordResetToken } from '../modules/auth/entities/password-reset-toke
 import { AuthLoginAttempt } from '../modules/auth/entities/auth-login-attempt.entity';
 import { MfaLoginChallenge } from '../modules/auth/entities/mfa-login-challenge.entity';
 import { AuthRefreshToken } from '../modules/auth/entities/auth-refresh-token.entity';
+import { GuardianCriticalAudit } from '../modules/guardian/entities/guardian-critical-audit.entity';
 import { Lead } from '../modules/leads/lead.entity'; // ✅ Módulo de Leads CRM
 import { Meta } from '../modules/metas/entities/meta.entity';
 import { ConfiguracaoGateway } from '../modules/pagamentos/entities/configuracao-gateway.entity';
@@ -139,6 +141,7 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         ItemFatura,
         Pagamento,
         PlanoCobranca,
+        BillingEvent,
         Contrato,
         AssinaturaContrato,
         Canal, // Módulo omnichannel
@@ -180,6 +183,7 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         AuthLoginAttempt,
         MfaLoginChallenge,
         AuthRefreshToken,
+        GuardianCriticalAudit,
         Lead, // ✅ Módulo de Leads CRM
         Meta, // ✅ Metas comerciais
         SystemBranding, // ✅ Branding global do sistema

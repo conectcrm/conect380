@@ -20,6 +20,63 @@ import * as Sentry from '@sentry/node';
 import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import { resolveJwtSecret } from './config/jwt.config';
 
+const HTTP_METHOD_KEYS = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head'];
+
+const isGuardianOpenApiPath = (path: string): boolean => {
+  const normalized = String(path || '').toLowerCase();
+  return (
+    normalized === '/guardian' ||
+    normalized.startsWith('/guardian/') ||
+    normalized === 'guardian' ||
+    normalized.startsWith('guardian/')
+  );
+};
+
+const filterOpenApiByGuardianScope = (
+  document: Record<string, any>,
+  mode: 'exclude_guardian' | 'only_guardian',
+): Record<string, any> => {
+  const sourcePaths = document?.paths || {};
+  const filteredEntries = Object.entries(sourcePaths).filter(([routePath]) => {
+    const isGuardianPath = isGuardianOpenApiPath(routePath);
+    return mode === 'exclude_guardian' ? !isGuardianPath : isGuardianPath;
+  });
+
+  const filteredPaths = Object.fromEntries(filteredEntries);
+  const usedTags = new Set<string>();
+
+  Object.values(filteredPaths).forEach((pathItem: any) => {
+    if (!pathItem || typeof pathItem !== 'object') {
+      return;
+    }
+
+    HTTP_METHOD_KEYS.forEach((method) => {
+      const operation = pathItem[method];
+      if (!operation || typeof operation !== 'object') {
+        return;
+      }
+
+      const tags = Array.isArray(operation.tags) ? operation.tags : [];
+      tags.forEach((tag: unknown) => {
+        if (typeof tag === 'string' && tag.trim()) {
+          usedTags.add(tag);
+        }
+      });
+    });
+  });
+
+  const sourceTags = Array.isArray(document?.tags) ? document.tags : [];
+  const filteredTags = sourceTags.filter(
+    (tag: any) => tag && typeof tag.name === 'string' && usedTags.has(tag.name),
+  );
+
+  return {
+    ...document,
+    paths: filteredPaths,
+    tags: filteredTags,
+  };
+};
+
 async function bootstrap() {
   // ============================================================================
   // OPENTELEMETRY (Tracing Distribuído) - TEMPORARIAMENTE DESABILITADO PARA TESTE DE CACHE
@@ -406,8 +463,65 @@ async function bootstrap() {
       .addBearerAuth()
       .build();
 
-    const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('api-docs', app, document);
+    const fullDocument = SwaggerModule.createDocument(app, config);
+    const publicDocument = filterOpenApiByGuardianScope(fullDocument, 'exclude_guardian');
+    SwaggerModule.setup('api-docs', app, publicDocument as any);
+
+    const guardianDocsEnabled = process.env.GUARDIAN_DOCS_ENABLED === 'true';
+    const guardianDocsUser = process.env.GUARDIAN_DOCS_USER?.trim() || '';
+    const guardianDocsPassword = process.env.GUARDIAN_DOCS_PASSWORD?.trim() || '';
+    const guardianDocsPath = (process.env.GUARDIAN_DOCS_PATH || 'guardian-docs').replace(
+      /^\/+|\/+$/g,
+      '',
+    );
+
+    if (guardianDocsEnabled) {
+      if (!guardianDocsUser || !guardianDocsPassword) {
+        console.warn(
+          '⚠️ [Swagger] Guardian docs habilitado sem credenciais (GUARDIAN_DOCS_USER/GUARDIAN_DOCS_PASSWORD). Endpoint nao sera publicado.',
+        );
+      } else {
+        const guardianDocument = filterOpenApiByGuardianScope(fullDocument, 'only_guardian');
+
+        app.use(
+          [`/${guardianDocsPath}`, `/${guardianDocsPath}-json`],
+          (req: any, res: any, next: any) => {
+            const authHeader = String(req.headers?.authorization || '');
+            if (!authHeader.startsWith('Basic ')) {
+              res.setHeader('WWW-Authenticate', 'Basic realm="Guardian Docs"');
+              return res.status(401).send('Unauthorized');
+            }
+
+            const encoded = authHeader.slice('Basic '.length).trim();
+            let decoded = '';
+            try {
+              decoded = Buffer.from(encoded, 'base64').toString('utf8');
+            } catch {
+              res.setHeader('WWW-Authenticate', 'Basic realm="Guardian Docs"');
+              return res.status(401).send('Unauthorized');
+            }
+
+            const separatorIndex = decoded.indexOf(':');
+            const username = separatorIndex >= 0 ? decoded.slice(0, separatorIndex) : '';
+            const password = separatorIndex >= 0 ? decoded.slice(separatorIndex + 1) : '';
+
+            if (username !== guardianDocsUser || password !== guardianDocsPassword) {
+              res.setHeader('WWW-Authenticate', 'Basic realm="Guardian Docs"');
+              return res.status(401).send('Unauthorized');
+            }
+
+            return next();
+          },
+        );
+
+        SwaggerModule.setup(guardianDocsPath, app, guardianDocument as any, {
+          customSiteTitle: 'Conect Guardian API Docs',
+          swaggerOptions: {
+            persistAuthorization: true,
+          },
+        });
+      }
+    }
 
     // Porta padrão ajustada para 3001 para alinhar com frontend e documentação
     const port = process.env.APP_PORT || 3001;
@@ -415,7 +529,12 @@ async function bootstrap() {
 
     const protocol = sslEnabled && httpsOptions ? 'https' : 'http';
     console.log(`🚀 Conect CRM Backend rodando na porta ${port} (${protocol.toUpperCase()})`);
-    console.log(`📖 Documentação disponível em: ${protocol}://localhost:${port}/api-docs`);
+    console.log(`📖 Documentação pública disponível em: ${protocol}://localhost:${port}/api-docs`);
+    if (guardianDocsEnabled && guardianDocsUser && guardianDocsPassword) {
+      console.log(
+        `🔐 Documentação Guardian disponível em: ${protocol}://localhost:${port}/${guardianDocsPath}`,
+      );
+    }
 
     if (sslEnabled && httpsOptions) {
       console.log(`🔐 Conexão segura HTTPS ativada`);

@@ -47,6 +47,7 @@ import { NotificationModule } from './notifications/notification.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
 import { SystemBrandingModule } from './modules/system-branding/system-branding.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { GuardianModule } from './modules/guardian/guardian.module';
 
 const nodeEnv = (process.env.NODE_ENV || '').toLowerCase();
 const isProduction = nodeEnv === 'production';
@@ -123,6 +124,7 @@ const throttlerShortLimit = isProduction ? 10 : 200;
     MetricsModule, // 📊 Prometheus metrics endpoint
     SystemBrandingModule,
     AdminModule,
+    GuardianModule,
   ],
   controllers: [HealthController, RateLimitController], // 📊 Health + Rate Limit monitoring
   providers: [
@@ -156,7 +158,17 @@ export class AppModule implements NestModule {
     // Middleware de verificação de assinatura
     consumer
       .apply(AssinaturaMiddleware)
-      .exclude('/auth/(.*)', '/planos/(.*)', '/assinaturas/(.*)', '/health', '/docs')
+      .exclude(
+        '/auth/(.*)',
+        '/planos/(.*)',
+        '/assinaturas/(.*)',
+        '/guardian/(.*)',
+        '/health',
+        '/api-docs',
+        '/guardian-docs',
+        '/guardian-docs-json',
+        '/docs',
+      )
       .forRoutes('*');
   }
 }

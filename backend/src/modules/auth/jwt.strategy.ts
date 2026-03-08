@@ -60,6 +60,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         break_glass?: { active: boolean; grants: Array<{ id: string; expires_at: string; permissions: string[] }> };
       }
     ).break_glass = effective.breakGlass;
+    (user as User & { mfa_verified?: boolean }).mfa_verified = Boolean(session.mfaVerified);
+    (user as User & { session_id?: string }).session_id = session.id;
 
     return user;
   }

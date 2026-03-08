@@ -13,15 +13,24 @@ import { UsersModule } from '../users/users.module';
 import { NotificationModule } from '../../notifications/notification.module';
 import { AdminBffService } from './services/admin-bff.service';
 import { AdminBffAuditInterceptor } from './interceptors/admin-bff-audit.interceptor';
+import { LegacyAdminTransitionGuard } from './guards/legacy-admin-transition.guard';
+import { PlanosModule } from '../planos/planos.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Empresa, User, EmpresaModulo, ModuloEmpresa, HistoricoPlano]),
     UsersModule,
     NotificationModule,
+    PlanosModule,
   ],
   controllers: [AdminEmpresasController, AdminBffController],
-  providers: [AdminEmpresasService, EmpresaModuloService, AdminBffService, AdminBffAuditInterceptor],
+  providers: [
+    AdminEmpresasService,
+    EmpresaModuloService,
+    AdminBffService,
+    AdminBffAuditInterceptor,
+    LegacyAdminTransitionGuard,
+  ],
   exports: [AdminEmpresasService, AdminBffService],
 })
 export class AdminModule {}

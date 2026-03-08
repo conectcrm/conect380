@@ -1,4 +1,4 @@
-import {
+﻿import {
   Controller,
   Get,
   Post,
@@ -9,35 +9,38 @@ import {
   Param,
   Query,
   UseGuards,
+  UseInterceptors,
   HttpStatus,
   HttpCode,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
-import { RolesGuard } from '../../../common/guards/roles.guard';
-import { PermissionsGuard } from '../../../common/guards/permissions.guard';
-import { AdminEmpresasService } from '../services/admin-empresas.service';
-import { CreateEmpresaAdminDto } from '../dto/create-empresa-admin.dto';
-import { UpdateEmpresaAdminDto } from '../dto/update-empresa-admin.dto';
-import { FilterEmpresasAdminDto } from '../dto/filter-empresas-admin.dto';
-import { CreateModuloEmpresaDto } from '../dto/create-modulo-empresa.dto';
-import { UpdateModuloEmpresaDto } from '../dto/update-modulo-empresa.dto';
-import { MudarPlanoDto } from '../dto/mudar-plano.dto';
-import { Roles } from '../../../common/decorators/roles.decorator';
-import { Permissions } from '../../../common/decorators/permissions.decorator';
-import { Permission } from '../../../common/permissions/permissions.constants';
-import { UserRole } from '../../users/user.entity';
-import { LegacyAdminTransitionGuard } from '../guards/legacy-admin-transition.guard';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { AdminEmpresasService } from '../admin/services/admin-empresas.service';
+import { CreateEmpresaAdminDto } from '../admin/dto/create-empresa-admin.dto';
+import { UpdateEmpresaAdminDto } from '../admin/dto/update-empresa-admin.dto';
+import { FilterEmpresasAdminDto } from '../admin/dto/filter-empresas-admin.dto';
+import { CreateModuloEmpresaDto } from '../admin/dto/create-modulo-empresa.dto';
+import { UpdateModuloEmpresaDto } from '../admin/dto/update-modulo-empresa.dto';
+import { MudarPlanoDto } from '../admin/dto/mudar-plano.dto';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { Permission } from '../../common/permissions/permissions.constants';
+import { UserRole } from '../users/user.entity';
+import { GuardianMfaGuard } from './guardian-mfa.guard';
+import { GuardianCriticalAuditInterceptor } from './interceptors/guardian-critical-audit.interceptor';
 
-@Controller('admin/empresas')
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, LegacyAdminTransitionGuard)
-@Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
+@Controller('guardian/empresas')
+@UseGuards(JwtAuthGuard, GuardianMfaGuard, RolesGuard, PermissionsGuard)
+@UseInterceptors(GuardianCriticalAuditInterceptor)
+@Roles(UserRole.SUPERADMIN)
 @Permissions(Permission.ADMIN_EMPRESAS_MANAGE)
-export class AdminEmpresasController {
+export class GuardianEmpresasController {
   constructor(private readonly adminEmpresasService: AdminEmpresasService) {}
 
   /**
-   * GET /api/admin/empresas
-   * Listar todas as empresas com filtros e paginação
+   * GET /api/guardian/empresas
+   * Listar todas as empresas com filtros e paginaÃ§Ã£o
    */
   @Get()
   async listarTodas(@Query() filters: FilterEmpresasAdminDto) {
@@ -45,7 +48,7 @@ export class AdminEmpresasController {
   }
 
   /**
-   * GET /api/admin/empresas/:id
+   * GET /api/guardian/empresas/:id
    * Buscar detalhes completos de uma empresa
    */
   @Get(':id')
@@ -54,7 +57,7 @@ export class AdminEmpresasController {
   }
 
   /**
-   * POST /api/admin/empresas
+   * POST /api/guardian/empresas
    * Criar nova empresa (onboarding completo)
    */
   @Post()
@@ -64,7 +67,7 @@ export class AdminEmpresasController {
   }
 
   /**
-   * PUT /api/admin/empresas/:id
+   * PUT /api/guardian/empresas/:id
    * Atualizar dados da empresa
    */
   @Put(':id')
@@ -73,7 +76,7 @@ export class AdminEmpresasController {
   }
 
   /**
-   * PATCH /api/admin/empresas/:id/suspender
+   * PATCH /api/guardian/empresas/:id/suspender
    * Suspender empresa (bloquear acesso)
    */
   @Patch(':id/suspender')
@@ -82,7 +85,7 @@ export class AdminEmpresasController {
   }
 
   /**
-   * PATCH /api/admin/empresas/:id/reativar
+   * PATCH /api/guardian/empresas/:id/reativar
    * Reativar empresa (restaurar acesso)
    */
   @Patch(':id/reativar')
@@ -91,8 +94,8 @@ export class AdminEmpresasController {
   }
 
   /**
-   * GET /api/admin/empresas/:id/usuarios
-   * Listar usuários da empresa
+   * GET /api/guardian/empresas/:id/usuarios
+   * Listar usuÃ¡rios da empresa
    */
   @Get(':id/usuarios')
   async listarUsuarios(@Param('id') empresaId: string) {
@@ -100,7 +103,7 @@ export class AdminEmpresasController {
   }
 
   /**
-   * POST /api/admin/empresas/:id/health-score
+   * POST /api/guardian/empresas/:id/health-score
    * Recalcular health score da empresa
    */
   @Post(':id/health-score')
@@ -111,13 +114,13 @@ export class AdminEmpresasController {
 
   /**
    * ========================================
-   * GESTÃO DE MÓDULOS
+   * GESTÃƒO DE MÃ“DULOS
    * ========================================
    */
 
   /**
-   * GET /api/admin/empresas/:id/modulos
-   * Listar módulos da empresa
+   * GET /api/guardian/empresas/:id/modulos
+   * Listar mÃ³dulos da empresa
    */
   @Get(':id/modulos')
   async listarModulos(@Param('id') id: string) {
@@ -125,8 +128,8 @@ export class AdminEmpresasController {
   }
 
   /**
-   * POST /api/admin/empresas/:id/modulos
-   * Ativar módulo para a empresa
+   * POST /api/guardian/empresas/:id/modulos
+   * Ativar mÃ³dulo para a empresa
    */
   @Post(':id/modulos')
   @HttpCode(HttpStatus.CREATED)
@@ -135,8 +138,8 @@ export class AdminEmpresasController {
   }
 
   /**
-   * PATCH /api/admin/empresas/:id/modulos/:modulo
-   * Atualizar configurações/limites do módulo
+   * PATCH /api/guardian/empresas/:id/modulos/:modulo
+   * Atualizar configuraÃ§Ãµes/limites do mÃ³dulo
    */
   @Patch(':id/modulos/:modulo')
   async atualizarModulo(
@@ -148,8 +151,8 @@ export class AdminEmpresasController {
   }
 
   /**
-   * DELETE /api/admin/empresas/:id/modulos/:modulo
-   * Desativar módulo da empresa
+   * DELETE /api/guardian/empresas/:id/modulos/:modulo
+   * Desativar mÃ³dulo da empresa
    */
   @Delete(':id/modulos/:modulo')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -159,25 +162,30 @@ export class AdminEmpresasController {
 
   /**
    * ========================================
-   * GESTÃO DE PLANOS
+   * GESTÃƒO DE PLANOS
    * ========================================
    */
 
   /**
-   * GET /api/admin/empresas/:id/historico-planos
-   * Listar histórico de mudanças de plano
+   * GET /api/guardian/empresas/:id/historico-planos
+   * Listar histÃ³rico de mudanÃ§as de plano
    */
   @Get(':id/historico-planos')
+  @Permissions(Permission.PLANOS_MANAGE)
   async historicoPlanos(@Param('id') id: string) {
     return await this.adminEmpresasService.historicoPlanos(id);
   }
 
   /**
-   * PATCH /api/admin/empresas/:id/plano
+   * PATCH /api/guardian/empresas/:id/plano
    * Mudar plano da empresa
    */
   @Patch(':id/plano')
+  @Permissions(Permission.PLANOS_MANAGE)
   async mudarPlano(@Param('id') id: string, @Body() dto: MudarPlanoDto) {
     return await this.adminEmpresasService.mudarPlano(id, dto);
   }
 }
+
+
+
