@@ -92,19 +92,26 @@ test.describe('Pipeline - validacao de perda (UI)', () => {
 
   test('fecha modal e move card quando backend aceita registrar perda', async ({ page }) => {
     await bootstrapPipelineUiAuthenticatedSession(page);
-    await mockPipelineLossApis(page);
+    const oportunidadesState = [{ ...OPORTUNIDADE_LOSS_BASE }];
 
-    await page.route('**/oportunidades/1/estagio', async (route) => {
-      if (route.request().method() !== 'PATCH') {
-        return route.continue();
+    await mockPipelineLossApis(page, async ({ method, pathname, route }) => {
+      if (method === 'GET' && pathname.endsWith('/oportunidades')) {
+        await json(route, 200, oportunidadesState);
+        return true;
       }
 
-      return json(route, 200, {
-        ...OPORTUNIDADE_LOSS_BASE,
-        estagio: 'lost',
-        motivoPerda: 'preco',
-        updatedAt: new Date().toISOString(),
-      });
+      if (method === 'PATCH' && /\/oportunidades\/1\/estagio$/.test(pathname)) {
+        oportunidadesState[0] = {
+          ...oportunidadesState[0],
+          estagio: 'lost',
+          motivoPerda: 'preco',
+          updatedAt: new Date().toISOString(),
+        };
+        await json(route, 200, oportunidadesState[0]);
+        return true;
+      }
+
+      return false;
     });
 
     await page.goto('/pipeline');

@@ -7,6 +7,7 @@ import { DataSource } from 'typeorm';
 import { AppModule } from '../../src/app.module';
 import { CreatePropostasPortalTokens1802869000000 } from '../../src/migrations/1802869000000-CreatePropostasPortalTokens';
 import { EmailIntegradoService } from '../../src/modules/propostas/email-integrado.service';
+import { MailService } from '../../src/mail/mail.service';
 import { createE2EApp, withE2EBootstrapLock } from './e2e-app.helper';
 
 export class SalesFlowE2EHarness {
@@ -21,6 +22,7 @@ export class SalesFlowE2EHarness {
 
   app!: INestApplication;
   dataSource!: DataSource;
+  private readonly tableColumnsCache = new Map<string, Set<string>>();
 
   empresaAId!: string;
   empresaBId!: string;
@@ -51,6 +53,10 @@ export class SalesFlowE2EHarness {
       success: true,
       messageId: `e2e-${this.runId}`,
     } as any);
+    const mailService = this.app.get(MailService);
+    jest
+      .spyOn(mailService, 'enviarEmailCodigoMfa')
+      .mockRejectedValue(new Error('Forcando fallback de MFA no ambiente E2E'));
 
     this.dataSource = this.app.get(DataSource);
     await this.ensurePortalTokensInfra();
@@ -74,6 +80,49 @@ export class SalesFlowE2EHarness {
 
   get httpServer() {
     return this.app.getHttpServer();
+  }
+
+  private async getTableColumns(tableName: string): Promise<Set<string>> {
+    if (this.tableColumnsCache.has(tableName)) {
+      return this.tableColumnsCache.get(tableName)!;
+    }
+
+    try {
+      const rows: Array<{ column_name?: string }> = await this.dataSource.query(
+        `
+          SELECT column_name
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = $1
+        `,
+        [tableName],
+      );
+
+      const columns = new Set(
+        rows
+          .map((row) => String(row.column_name || '').trim())
+          .filter((columnName) => columnName.length > 0),
+      );
+      this.tableColumnsCache.set(tableName, columns);
+      return columns;
+    } catch {
+      const empty = new Set<string>();
+      this.tableColumnsCache.set(tableName, empty);
+      return empty;
+    }
+  }
+
+  private async hasTableColumn(tableName: string, columnName: string): Promise<boolean> {
+    const columns = await this.getTableColumns(tableName);
+    return columns.has(columnName);
+  }
+
+  private extrairAccessToken(response: request.Response): string | null {
+    return (
+      response.body?.data?.access_token ??
+      response.body?.access_token ??
+      null
+    );
   }
 
   async criarEmpresa(label: 'A' | 'B'): Promise<string> {
@@ -182,18 +231,67 @@ export class SalesFlowE2EHarness {
   }
 
   async fazerLogin(email: string, senha: string): Promise<string> {
-    const response = await request(this.httpServer).post('/auth/login').send({ email, senha });
+    const response = await request(this.httpServer)
+      .post('/auth/login')
+      .send({ email, senha });
 
     if (![200, 201].includes(response.status)) {
       throw new Error(`Falha no login para ${email}: status ${response.status}`);
     }
 
-    const token = response.body?.data?.access_token ?? response.body?.access_token;
-    if (!token) {
+    const tokenDireto = this.extrairAccessToken(response);
+    if (tokenDireto) {
+      return tokenDireto;
+    }
+
+    if (response.body?.action !== 'MFA_REQUIRED') {
       throw new Error(`Token nao retornado no login para ${email}`);
     }
 
-    return token as string;
+    const challengeId = String(response.body?.data?.challengeId || '').trim();
+    if (!challengeId) {
+      throw new Error(`Challenge MFA nao retornado no login para ${email}`);
+    }
+
+    let codigoMfa = String(response.body?.data?.devCode || '').trim();
+
+    if (!codigoMfa) {
+      const resendResponse = await request(this.httpServer)
+        .post('/auth/mfa/resend')
+        .send({ challengeId });
+
+      if (![200, 201].includes(resendResponse.status)) {
+        throw new Error(
+          `MFA requerido para ${email}, mas nao foi possivel reenviar codigo (status ${resendResponse.status})`,
+        );
+      }
+
+      codigoMfa = String(resendResponse.body?.data?.devCode || '').trim();
+    }
+
+    if (!codigoMfa) {
+      throw new Error(
+        `MFA requerido para ${email}, mas devCode nao foi retornado no ambiente de teste`,
+      );
+    }
+
+    const verifyResponse = await request(this.httpServer)
+      .post('/auth/mfa/verify')
+      .send({
+        challengeId,
+        codigo: codigoMfa,
+      });
+
+    if (![200, 201].includes(verifyResponse.status)) {
+      throw new Error(`Falha ao validar MFA para ${email}: status ${verifyResponse.status}`);
+    }
+
+    const tokenMfa = this.extrairAccessToken(verifyResponse);
+    if (!tokenMfa) {
+      throw new Error(`Token nao retornado apos validacao MFA para ${email}`);
+    }
+
+    return tokenMfa;
   }
 
   async criarPropostaViaApi(token: string, titulo: string): Promise<string> {
@@ -202,7 +300,6 @@ export class SalesFlowE2EHarness {
       cliente: `Cliente Portal ${this.runId}`,
       valor: 2500,
       total: 2500,
-      source: `e2e-portal-${this.runId}`,
       produtos: [],
     };
 
@@ -293,13 +390,15 @@ export class SalesFlowE2EHarness {
     await this.dataSource
       .query(`DELETE FROM oportunidades WHERE empresa_id IN ($1, $2)`, [empresaA, empresaB])
       .catch(() => undefined);
-    await this.dataSource
-      .query(`DELETE FROM propostas WHERE empresa_id IN ($1, $2) OR source = $3`, [
-        empresaA,
-        empresaB,
-        sourceTag,
-      ])
-      .catch(() => undefined);
+    const propostasHasSourceColumn = await this.hasTableColumn('propostas', 'source');
+    const propostasDeleteSql = propostasHasSourceColumn
+      ? `DELETE FROM propostas WHERE empresa_id IN ($1, $2) OR source = $3`
+      : `DELETE FROM propostas WHERE empresa_id IN ($1, $2)`;
+    const propostasDeleteParams = propostasHasSourceColumn
+      ? [empresaA, empresaB, sourceTag]
+      : [empresaA, empresaB];
+
+    await this.dataSource.query(propostasDeleteSql, propostasDeleteParams).catch(() => undefined);
     await this.dataSource
       .query(`DELETE FROM users WHERE email IN ($1, $2)`, [this.emailAdminEmpresaA, this.emailAdminEmpresaB])
       .catch(() => undefined);
@@ -425,4 +524,3 @@ export class SalesFlowE2EHarness {
     return contrato;
   }
 }
-

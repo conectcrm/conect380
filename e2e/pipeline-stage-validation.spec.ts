@@ -96,18 +96,25 @@ test.describe('Pipeline - validacao de estagio (UI)', () => {
 
   test('fecha modal e move card quando backend aceita a mudanca de estagio', async ({ page }) => {
     await bootstrapPipelineUiAuthenticatedSession(page);
-    await mockPipelineStageApis(page);
+    const oportunidadesState = [{ ...OPORTUNIDADE_STAGE_BASE }];
 
-    await page.route('**/oportunidades/1/estagio', async (route) => {
-      if (route.request().method() !== 'PATCH') {
-        return route.continue();
+    await mockPipelineStageApis(page, async ({ method, pathname, route }) => {
+      if (method === 'GET' && pathname.endsWith('/oportunidades')) {
+        await json(route, 200, oportunidadesState);
+        return true;
       }
 
-      return json(route, 200, {
-        ...OPORTUNIDADE_STAGE_BASE,
-        estagio: 'qualification',
-        updatedAt: new Date().toISOString(),
-      });
+      if (method === 'PATCH' && /\/oportunidades\/1\/estagio$/.test(pathname)) {
+        oportunidadesState[0] = {
+          ...oportunidadesState[0],
+          estagio: 'qualification',
+          updatedAt: new Date().toISOString(),
+        };
+        await json(route, 200, oportunidadesState[0]);
+        return true;
+      }
+
+      return false;
     });
 
     await page.goto('/pipeline');

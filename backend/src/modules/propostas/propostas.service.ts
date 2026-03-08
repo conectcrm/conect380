@@ -1127,18 +1127,26 @@ export class PropostasService {
     vendedorId: string | null,
   ): Promise<string> {
     const oportunidadeColumns = await this.getTableColumns('oportunidades');
-    const userColumn = oportunidadeColumns.has('responsavel_id')
-      ? 'responsavel_id'
-      : oportunidadeColumns.has('usuario_id')
-        ? 'usuario_id'
-        : null;
+    const hasResponsavelId = oportunidadeColumns.has('responsavel_id');
+    const hasUsuarioId = oportunidadeColumns.has('usuario_id');
 
     const insertColumns: string[] = ['empresa_id', 'titulo', 'valor'];
     const insertValues: unknown[] = [empresaId, titulo, valor];
 
-    if (userColumn) {
-      insertColumns.push(userColumn);
-      insertValues.push(vendedorId || (await this.resolveFallbackUserId(empresaId)));
+    const fallbackUserId =
+      hasResponsavelId || hasUsuarioId
+        ? vendedorId || (await this.resolveFallbackUserId(empresaId))
+        : null;
+
+    // Compatibilidade com schemas hibridos: pode existir responsavel_id e usuario_id ao mesmo tempo.
+    if (hasResponsavelId) {
+      insertColumns.push('responsavel_id');
+      insertValues.push(fallbackUserId);
+    }
+
+    if (hasUsuarioId) {
+      insertColumns.push('usuario_id');
+      insertValues.push(fallbackUserId);
     }
 
     if (oportunidadeColumns.has('estagio')) {

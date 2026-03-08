@@ -7,6 +7,10 @@ on:
   pull_request:
     branches: [main, develop]
 
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
   encoding-guardrails:
     name: Guardrails - Encoding
@@ -820,6 +824,7 @@ jobs:
         uses: github/codeql-action/init@v2
         with:
           languages: javascript, typescript
+          config-file: ./.github/codeql/codeql-config.yml
 
       - name: Executar analise CodeQL
         uses: github/codeql-action/analyze@v2
