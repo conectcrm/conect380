@@ -77,7 +77,7 @@ describe('menuConfig permission filtering', () => {
     expect(ids).not.toContain('comercial-pipeline');
   });
 
-  it('allows admin-only branch for manager alias role', () => {
+  it('does not expose removed administracao branch for manager alias role', () => {
     const menu = getMenuParaEmpresa(ALL_MODULES, {
       email: 'gestor@empresa.com',
       role: 'manager',
@@ -85,8 +85,8 @@ describe('menuConfig permission filtering', () => {
     } as any);
 
     const ids = collectIds(menu);
-    expect(ids).toContain('administracao');
-    expect(ids).toContain('admin-usuarios');
+    expect(ids).not.toContain('administracao');
+    expect(ids).not.toContain('admin-usuarios');
   });
 
   it('keeps compatibility without user context (no permission pruning)', () => {
@@ -292,20 +292,48 @@ describe('menuConfig permission filtering', () => {
     expect(pagamentosReadFornecedorPerfil).toBe(true);
   });
 
-  it('does not grant admin subroute via generic configuracoes parent prefix', () => {
-    const configReader = canUserAccessPath('/nuclei/configuracoes/empresas', ALL_MODULES, {
+  it('keeps legacy gestao/empresas alias with empresas/minhas permission model', () => {
+    const withoutManage = canUserAccessPath('/gestao/empresas', ALL_MODULES, {
       email: 'config@empresa.com',
       role: 'custom',
       permissions: ['config.empresa.read'],
     } as any);
-    const adminManager = canUserAccessPath('/nuclei/configuracoes/empresas', ALL_MODULES, {
+    const withManage = canUserAccessPath('/gestao/empresas', ALL_MODULES, {
       email: 'admin.manager@empresa.com',
       role: 'admin',
       permissions: ['admin.empresas.manage'],
     } as any);
 
-    expect(configReader).toBe(false);
-    expect(adminManager).toBe(true);
+    expect(withoutManage).toBe(false);
+    expect(withManage).toBe(true);
+  });
+
+  it('blocks legacy admin aliases in cliente app regardless of permission set', () => {
+    const withoutManage = canUserAccessPath('/admin/empresas', ALL_MODULES, {
+      email: 'viewer@empresa.com',
+      role: 'custom',
+      permissions: ['config.empresa.read'],
+    } as any);
+    const withManage = canUserAccessPath('/admin/empresas', ALL_MODULES, {
+      email: 'owner@empresa.com',
+      role: 'admin',
+      permissions: ['admin.empresas.manage'],
+    } as any);
+    const withManageOnDetail = canUserAccessPath('/admin/empresas/emp-1', ALL_MODULES, {
+      email: 'owner@empresa.com',
+      role: 'admin',
+      permissions: ['admin.empresas.manage'],
+    } as any);
+    const withoutManageOnNucleo = canUserAccessPath('/nuclei/administracao', ALL_MODULES, {
+      email: 'analyst@empresa.com',
+      role: 'custom',
+      permissions: ['relatorios.read'],
+    } as any);
+
+    expect(withoutManage).toBe(false);
+    expect(withManage).toBe(false);
+    expect(withManageOnDetail).toBe(false);
+    expect(withoutManageOnNucleo).toBe(false);
   });
 
   it('allows empresas minhas route only for admin.empresas.manage', () => {
@@ -354,22 +382,6 @@ describe('menuConfig permission filtering', () => {
 
     expect(withoutPermission).toBe(false);
     expect(withPermission).toBe(true);
-  });
-
-  it('requires admin permission for admin governance routes', () => {
-    const relatoriosOnly = canUserAccessPath('/admin/sistema', ALL_MODULES, {
-      email: 'analyst@empresa.com',
-      role: 'custom',
-      permissions: ['relatorios.read'],
-    } as any);
-    const adminPermission = canUserAccessPath('/admin/sistema', ALL_MODULES, {
-      email: 'admin@empresa.com',
-      role: 'custom',
-      permissions: ['admin.empresas.manage'],
-    } as any);
-
-    expect(relatoriosOnly).toBe(false);
-    expect(adminPermission).toBe(true);
   });
 
   it('requires users.read + admin.empresas.manage for legacy permission routes', () => {
@@ -478,5 +490,64 @@ describe('menuConfig permission filtering', () => {
     expect(financeiroOnly).toBe(false);
     expect(relatoriosOnly).toBe(false);
     expect(combined).toBe(true);
+  });
+
+  it('shows billing self-service menu without legacy faturas/pagamentos duplication', () => {
+    const menu = getMenuParaEmpresa(ALL_MODULES, {
+      email: 'owner@empresa.com',
+      role: 'custom',
+      permissions: ['planos.manage'],
+    } as any);
+
+    const ids = collectIds(menu);
+    expect(ids).toContain('billing');
+    expect(ids).not.toContain('billing-assinaturas');
+    expect(ids).not.toContain('billing-planos');
+    expect(ids).not.toContain('billing-faturas');
+    expect(ids).not.toContain('billing-pagamentos');
+  });
+
+  it('allows billing self-service routes only with planos.manage permission', () => {
+    const withPermissionAssinatura = canUserAccessPath('/billing/assinaturas', ALL_MODULES, {
+      email: 'owner@empresa.com',
+      role: 'custom',
+      permissions: ['planos.manage'],
+    } as any);
+    const withPermissionPlanos = canUserAccessPath('/billing/planos', ALL_MODULES, {
+      email: 'owner@empresa.com',
+      role: 'custom',
+      permissions: ['planos.manage'],
+    } as any);
+    const withoutPermission = canUserAccessPath('/billing/assinaturas', ALL_MODULES, {
+      email: 'usuario@empresa.com',
+      role: 'custom',
+      permissions: ['crm.clientes.read'],
+    } as any);
+
+    expect(withPermissionAssinatura).toBe(true);
+    expect(withPermissionPlanos).toBe(true);
+    expect(withoutPermission).toBe(false);
+  });
+
+  it('maps legacy billing faturas/pagamentos aliases to financeiro.faturamento.read', () => {
+    const faturamentoRead = canUserAccessPath('/billing/faturas', ALL_MODULES, {
+      email: 'finance.reader@empresa.com',
+      role: 'custom',
+      permissions: ['financeiro.faturamento.read'],
+    } as any);
+    const pagamentoReadOnly = canUserAccessPath('/billing/pagamentos', ALL_MODULES, {
+      email: 'payables.reader@empresa.com',
+      role: 'custom',
+      permissions: ['financeiro.pagamentos.read'],
+    } as any);
+    const withoutFinance = canUserAccessPath('/billing/faturas', ALL_MODULES, {
+      email: 'user@empresa.com',
+      role: 'custom',
+      permissions: ['crm.clientes.read'],
+    } as any);
+
+    expect(faturamentoRead).toBe(true);
+    expect(pagamentoReadOnly).toBe(true);
+    expect(withoutFinance).toBe(false);
   });
 });

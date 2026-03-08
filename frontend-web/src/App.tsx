@@ -1,7 +1,14 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import React, { Suspense } from 'react';
+﻿import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React, { Suspense, useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
-import { Navigate, Route, BrowserRouter as Router, Routes, useLocation } from 'react-router-dom';
+import {
+  Navigate,
+  Route,
+  BrowserRouter as Router,
+  Routes,
+  useLocation,
+  useParams,
+} from 'react-router-dom';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import PermissionPathGuard from './components/licensing/PermissionPathGuard';
 import { AuthProvider } from './contexts/AuthContext';
@@ -16,7 +23,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { GlobalConfirmationProvider } from './contexts/GlobalConfirmationContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';
 import { ModuloEnum } from './services/modulosService';
-import { protegerRota, protegerRotaSuperadmin } from './utils/routeGuardHelper';
+import { protegerRota } from './utils/routeGuardHelper';
 // Importar páginas de núcleos
 import ModuleUnderConstruction from './components/common/ModuleUnderConstruction';
 import Conect360Logo from './components/ui/Conect360Logo';
@@ -25,14 +32,15 @@ import Conect360Logo from './components/ui/Conect360Logo';
 // Sistema de Templates de Mensagens - Núcleo Atendimento
 // Sistema de SLA Tracking - Núcleo Atendimento
 // Sistema de Fechamento Automático - Núcleo Atendimento
-// Chat Omnichannel - ETAPA 2 (Evolução Chat → Omnichannel)
+// Chat Omnichannel - ETAPA 2 (Evolucao Chat para Omnichannel)
 // ETAPA 3: Páginas Consolidadas com Abas
 // Importar novas páginas do sistema de empresas
 import ScrollToTop from './components/common/ScrollToTop';
 import { useAuth } from './hooks/useAuth';
 import { getMvpBlockedRouteInfo } from './config/mvpScope';
 import { getCatalogoFeaturesConfig } from './config/catalogoFeaturesFlags';
-// ⚠️ Demandas agora são Tickets - imports removidos (apenas redirects mantidos)
+import { buildGuardianUrl } from './utils/guardianPortal';
+// Demandas agora sao Tickets - imports removidos (apenas redirects mantidos)
 // Sprint 2 - Fase 3e: Admin Console Tickets Configuráveis
 // (code splitting) imports estáticos removidos
 
@@ -65,19 +73,12 @@ const DashboardHomeRoute = React.lazy(() => import('./features/dashboard/Dashboa
 const NotificationsPage = React.lazy(() => import('./pages/NotificationsPage'));
 const ContratosPage = React.lazy(() => import('./features/contratos/ContratosPage'));
 
-const AdministracaoNucleusPage = React.lazy(
-  () => import('./pages/nuclei/AdministracaoNucleusPage'),
-);
 const CrmNucleusPage = React.lazy(() => import('./pages/nuclei/CrmNucleusPage'));
 const VendasNucleusPage = React.lazy(() => import('./pages/nuclei/VendasNucleusPage'));
 const FinanceiroNucleusPage = React.lazy(() => import('./pages/nuclei/FinanceiroNucleusPage'));
 
 const ConfiguracoesWrapper = React.lazy(() => import('./pages/ConfiguracoesWrapper'));
-const GestaoModulosPage = React.lazy(() => import('./pages/GestaoModulosPage'));
 const GestaoUsuariosPage = React.lazy(() => import('./features/gestao/pages/GestaoUsuariosPage'));
-const SystemBrandingPage = React.lazy(
-  () => import('./features/admin/system-branding/SystemBrandingPage'),
-);
 
 const AtendimentoDashboard = React.lazy(
   () => import('./features/atendimento/pages/AtendimentoDashboard'),
@@ -163,20 +164,6 @@ const AgendaEventDetailsPage = React.lazy(() =>
   })),
 );
 
-const EmpresasListPage = React.lazy(() =>
-  import('./features/admin/empresas/EmpresasListPage').then((m) => ({
-    default: m.EmpresasListPage,
-  })),
-);
-const EmpresaDetailPage = React.lazy(() =>
-  import('./features/admin/empresas/EmpresaDetailPage').then((m) => ({
-    default: m.EmpresaDetailPage,
-  })),
-);
-const MinhasEmpresasPage = React.lazy(() =>
-  import('./features/empresas/MinhasEmpresasPage').then((m) => ({ default: m.MinhasEmpresasPage })),
-);
-
 const BillingPage = React.lazy(() =>
   import('./pages/billing').then((m) => ({ default: m.BillingPage })),
 );
@@ -187,18 +174,85 @@ const MetasConfiguracao = React.lazy(() => import('./pages/configuracoes/MetasCo
 const ConfiguracaoEmpresaPage = React.lazy(
   () => import('./pages/empresas/ConfiguracaoEmpresaPage'),
 );
-const RelatoriosAnalyticsPage = React.lazy(() =>
-  import('./pages/empresas/RelatoriosAnalyticsPage').then((m) => ({
-    default: m.RelatoriosAnalyticsPage,
-  })),
-);
-const BackupSincronizacaoPage = React.lazy(() =>
-  import('./pages/empresas/BackupSincronizacaoPage').then((m) => ({
-    default: m.BackupSincronizacaoPage,
-  })),
-);
 
 const catalogoFeatures = getCatalogoFeaturesConfig();
+
+type GuardianLegacyRedirectProps = {
+  path: string;
+  query?: Record<string, string | undefined>;
+};
+
+const GuardianLegacyRedirect: React.FC<GuardianLegacyRedirectProps> = ({ path, query }) => {
+  const targetUrl = buildGuardianUrl(path, query);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.location.replace(targetUrl);
+    }
+  }, [targetUrl]);
+
+  return (
+    <div className="min-h-[200px] w-full rounded-xl border border-[#D8E4E8] bg-white p-6 text-sm text-[#456270]">
+      Redirecionando para o painel Guardian...
+    </div>
+  );
+};
+
+const LegacyEmpresasMinhasRedirect: React.FC = () => {
+  return <GuardianLegacyRedirect path="/governance/companies" />;
+};
+
+const LegacyAdminEmpresasRedirect: React.FC = () => {
+  return <GuardianLegacyRedirect path="/governance/companies" />;
+};
+
+const LegacyAdminEmpresaDetailRedirect: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  return (
+    <GuardianLegacyRedirect
+      path="/governance/companies"
+      query={id ? { empresaId: id } : undefined}
+    />
+  );
+};
+
+const LegacyAdminUsersRedirect: React.FC = () => {
+  return <GuardianLegacyRedirect path="/governance/users" />;
+};
+
+const LegacyAdminSystemRedirect: React.FC = () => {
+  return <GuardianLegacyRedirect path="/governance/system" />;
+};
+
+const LegacyEmpresaConfiguracaoRedirect: React.FC = () => {
+  const { empresaId } = useParams<{ empresaId: string }>();
+  return (
+    <GuardianLegacyRedirect
+      path="/governance/companies"
+      query={empresaId ? { empresaId } : undefined}
+    />
+  );
+};
+
+const LegacyEmpresaPermissoesRedirect: React.FC = () => {
+  const { empresaId } = useParams<{ empresaId: string }>();
+  return (
+    <GuardianLegacyRedirect
+      path="/governance/users"
+      query={empresaId ? { empresaId } : undefined}
+    />
+  );
+};
+
+const EmpresaBackupLegacyRedirect: React.FC = () => {
+  const { empresaId } = useParams<{ empresaId: string }>();
+  return (
+    <GuardianLegacyRedirect
+      path="/governance/system"
+      query={empresaId ? { empresaId } : undefined}
+    />
+  );
+};
 
 // Componente principal de rotas
 const AppRoutes: React.FC = () => {
@@ -266,7 +320,7 @@ const AppRoutes: React.FC = () => {
             }
           />
 
-          {/* Redirect: Chat antigo → Nova Inbox */}
+          {/* Redirect: Chat antigo para Nova Inbox */}
           <Route path="/atendimento/chat" element={<Navigate to="/atendimento/inbox" replace />} />
 
           {/* Todas as outras rotas renderizam dentro do DashboardLayout */}
@@ -308,41 +362,12 @@ const AppRoutes: React.FC = () => {
                     element={<Navigate to="/configuracoes/empresa" replace />}
                   />{' '}
                   {/* Configurações: base platform */}
-                  <Route
-                    path="/nuclei/administracao"
-                    element={protegerRotaSuperadmin(<AdministracaoNucleusPage />)}
-                  />
-                  {/* Rotas administrativas do sistema - Protegidas */}
-                  <Route
-                    path="/admin/empresas"
-                    element={protegerRotaSuperadmin(<EmpresasListPage />)}
-                  />
-                  <Route
-                    path="/admin/empresas/:id"
-                    element={protegerRotaSuperadmin(<EmpresaDetailPage />)}
-                  />
-                  <Route
-                    path="/admin/empresas/:empresaId/modulos"
-                    element={protegerRotaSuperadmin(<GestaoModulosPage />)}
-                  />
-                  <Route
-                    path="/admin/usuarios"
-                    element={<Navigate to="/configuracoes/usuarios" replace />}
-                  />
-                  <Route
-                    path="/admin/sistema"
-                    element={protegerRotaSuperadmin(<SystemBrandingPage />)}
-                  />
-                  <Route
-                    path="/admin/branding"
-                    element={<Navigate to="/admin/sistema" replace />}
-                  />
                   {/* ⭐ NOVA ROTA: Configurações de Atendimento com Abas (com redirects automáticos) */}
                   <Route
                     path="/atendimento/configuracoes"
                     element={protegerRota(ModuloEnum.ATENDIMENTO, <ConfiguracoesWrapper />)}
                   />
-                  {/* 🔄 REDIRECTS: Rotas antigas redirecionam para abas específicas */}
+                  {/* Redirects: rotas antigas redirecionam para abas especificas */}
                   <Route
                     path="/gestao/nucleos"
                     element={<Navigate to="/atendimento/configuracoes?tab=nucleos" replace />}
@@ -359,17 +384,17 @@ const AppRoutes: React.FC = () => {
                     path="/gestao/tags"
                     element={<Navigate to="/atendimento/configuracoes?tab=tags" replace />}
                   />
-                  {/* ❌ REMOVIDO: Apenas Atribuições descontinuadas (absorvidas por Distribuição) */}
+                  {/* Removido: apenas atribuicoes descontinuadas (absorvidas por distribuicao) */}
                   <Route
                     path="/gestao/atribuicoes"
                     element={<Navigate to="/atendimento/distribuicao" replace />}
                   />
-                  {/* ⚠️ REDIRECT ANTIGO: Departamentos permanecem ativos em /nuclei/configuracoes/departamentos */}
+                  {/* Redirect antigo: departamentos permanecem ativos em /nuclei/configuracoes/departamentos */}
                   <Route
                     path="/gestao/departamentos"
                     element={<Navigate to="/configuracoes/departamentos" replace />}
                   />
-                  {/* ✅ Fluxos consolidados em Automações > Bot (mantém rotas builder separadas) */}
+                  {/* Fluxos consolidados em Automacoes > Bot (mantem rotas builder separadas) */}
                   <Route
                     path="/gestao/fluxos"
                     element={<Navigate to="/atendimento/automacoes?tab=bot" replace />}
@@ -383,20 +408,23 @@ const AppRoutes: React.FC = () => {
                     element={protegerRota(ModuloEnum.ATENDIMENTO, <FluxoBuilderPage />)}
                   />
                   {/* Gerenciamento de Empresas do Usuário */}
-                  <Route path="/empresas/minhas" element={<MinhasEmpresasPage />} />
+                  <Route path="/empresas/minhas" element={<LegacyEmpresasMinhasRedirect />} />
                   <Route
                     path="/empresas/:empresaId/configuracoes"
-                    element={<ConfiguracaoEmpresaPage />}
+                    element={<LegacyEmpresaConfiguracaoRedirect />}
                   />
                   <Route
                     path="/empresas/:empresaId/relatorios"
-                    element={<RelatoriosAnalyticsPage />}
+                    element={<LegacyEmpresaConfiguracaoRedirect />}
                   />
                   <Route
                     path="/empresas/:empresaId/permissoes"
-                    element={<Navigate to="/configuracoes/usuarios" replace />}
+                    element={<LegacyEmpresaPermissoesRedirect />}
                   />
-                  <Route path="/empresas/:empresaId/backup" element={<BackupSincronizacaoPage />} />
+                  <Route
+                    path="/empresas/:empresaId/backup"
+                    element={<EmpresaBackupLegacyRedirect />}
+                  />
                   {/* Configurações globais da empresa ativa - Padrão consolidado */}
                   <Route path="/configuracoes/usuarios" element={<GestaoUsuariosPage />} />
                   <Route path="/configuracoes/empresa" element={<ConfiguracaoEmpresaPage />} />
@@ -415,7 +443,7 @@ const AppRoutes: React.FC = () => {
                     path="/configuracoes/seguranca"
                     element={<Navigate to="/configuracoes/empresa" replace />}
                   />
-                  {/* ROTAS DO NÚCLEO ATENDIMENTO */}
+                  {/* Rotas do nucleo atendimento */}
                   <Route
                     path="/nuclei/atendimento/canais/email"
                     element={<ConfigurarCanalEmail />}
@@ -448,7 +476,7 @@ const AppRoutes: React.FC = () => {
                     path="/atendimento/tickets/:id"
                     element={protegerRota(ModuloEnum.ATENDIMENTO, <TicketDetailPage />)}
                   />
-                  {/* ⚠️ DEPRECATED: Demandas agora são Tickets (tipo='suporte') - Redirects para compatibilidade */}
+                  {/* Deprecated: demandas agora sao tickets (tipo='suporte') - redirects para compatibilidade */}
                   <Route
                     path="/nuclei/atendimento/demandas"
                     element={<Navigate to="/atendimento/tickets?tipo=suporte" replace />}
@@ -497,9 +525,9 @@ const AppRoutes: React.FC = () => {
                   {/* Rotas legadas - Redirects para compatibilidade */}
                   <Route
                     path="/gestao/empresas"
-                    element={<Navigate to="/admin/empresas" replace />}
+                    element={<Navigate to="/empresas/minhas" replace />}
                   />{' '}
-                  {/* Redirect para gestão admin */}
+                  {/* Redirect legado para rota operacional */}
                   <Route
                     path="/nuclei/configuracoes/empresas"
                     element={<Navigate to="/configuracoes/empresa" replace />}
@@ -549,7 +577,10 @@ const AppRoutes: React.FC = () => {
                     path="/gestao/permissoes"
                     element={<Navigate to="/configuracoes/usuarios" replace />}
                   />
-                  <Route path="/sistema/backup" element={<BackupSincronizacaoPage />} />
+                  <Route
+                    path="/sistema/backup"
+                    element={<GuardianLegacyRedirect path="/governance/system" />}
+                  />
                   {/* Atendimento Omnichannel - Protegido */}
                   <Route
                     path="/atendimento"
@@ -624,7 +655,12 @@ const AppRoutes: React.FC = () => {
                   {/* Sistema de Billing e Assinaturas - Protegido */}
                   <Route
                     path="/billing"
-                    element={protegerRota(ModuloEnum.BILLING, <BillingPage />)}
+                    element={
+                      protegerRota(
+                        ModuloEnum.BILLING,
+                        <Navigate to="/billing/assinaturas" replace />,
+                      )
+                    }
                   />
                   <Route
                     path="/billing/assinaturas"
@@ -636,15 +672,15 @@ const AppRoutes: React.FC = () => {
                   />
                   <Route
                     path="/billing/faturas"
-                    element={protegerRota(ModuloEnum.BILLING, <BillingPage />)}
+                    element={<Navigate to="/financeiro/faturamento" replace />}
                   />
                   <Route
                     path="/billing/pagamentos"
-                    element={protegerRota(ModuloEnum.BILLING, <BillingPage />)}
+                    element={<Navigate to="/financeiro/faturamento" replace />}
                   />
                   <Route
                     path="/assinaturas"
-                    element={protegerRota(ModuloEnum.BILLING, <BillingPage />)}
+                    element={<Navigate to="/billing/assinaturas" replace />}
                   />
                   {/* Sistema de Faturamento - Protegido */}
                   <Route
@@ -945,7 +981,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/esqueci-minha-senha" element={<ForgotPasswordPage />} />
       <Route path="/recuperar-senha" element={<ResetPasswordPage />} />
       <Route path="/trocar-senha" element={<TrocarSenhaPage />} />{' '}
-      {/* ✅ Troca de senha (primeiro acesso) */}
+      {/* Troca de senha (primeiro acesso) */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
@@ -1038,3 +1074,5 @@ const App: React.FC = () => {
 };
 
 export default App;
+
+

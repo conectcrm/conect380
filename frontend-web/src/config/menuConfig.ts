@@ -758,7 +758,7 @@ export const menuConfig: MenuConfig[] = [
       },
       {
         id: 'comercial-produtos',
-        title: 'Catálogo de Itens',
+        title: 'Catalogo de Itens',
         shortTitle: 'Itens',
         icon: ShoppingBag,
         href: '/vendas/produtos',
@@ -771,7 +771,8 @@ export const menuConfig: MenuConfig[] = [
         ? [
             {
               id: 'comercial-combos',
-              title: 'Combos',
+              title: 'Combos (legado)',
+              shortTitle: 'Legado',
               icon: Archive,
               href: '/vendas/combos',
               color: 'blue',
@@ -879,52 +880,14 @@ export const menuConfig: MenuConfig[] = [
   },
   {
     id: 'billing',
-    title: 'Cobran\u00e7as',
-    shortTitle: 'Cob.',
+    title: 'Assinatura',
+    shortTitle: 'Assin.',
     icon: CreditCard,
-    href: '/billing',
+    href: '/billing/assinaturas',
     color: 'green',
-    permissions: ['financeiro.pagamentos.read', 'planos.manage'],
+    permissions: ['planos.manage'],
     requiredModule: 'BILLING', //  Requer licenca de Billing
     section: 'Opera\u00e7\u00f5es',
-    children: [
-      {
-        id: 'billing-assinaturas',
-        title: 'Assinaturas',
-        icon: Zap,
-        href: '/billing/assinaturas',
-        color: 'green',
-        permissions: ['planos.manage'],
-        group: 'Gest\u00e3o',
-      },
-      {
-        id: 'billing-planos',
-        title: 'Planos',
-        icon: Archive,
-        href: '/billing/planos',
-        color: 'green',
-        permissions: ['planos.manage'],
-        group: 'Gest\u00e3o',
-      },
-      {
-        id: 'billing-faturas',
-        title: 'Faturas',
-        icon: Receipt,
-        href: '/billing/faturas',
-        color: 'green',
-        permissions: ['financeiro.pagamentos.read', 'financeiro.faturamento.read'],
-        group: 'Cobran\u00e7a',
-      },
-      {
-        id: 'billing-pagamentos',
-        title: 'Pagamentos',
-        icon: Wallet,
-        href: '/billing/pagamentos',
-        color: 'green',
-        permissions: ['financeiro.pagamentos.read', 'financeiro.pagamentos.manage'],
-        group: 'Cobran\u00e7a',
-      },
-    ],
   },
   {
     id: 'configuracoes',
@@ -975,10 +938,10 @@ export const menuConfig: MenuConfig[] = [
       },
       {
         id: 'configuracoes-backup',
-        title: 'Backup & Sincroniza\u00e7\u00e3o',
+        title: 'Backup e Dados',
         shortTitle: 'Backup',
         icon: Database,
-        href: '/sistema/backup',
+        href: '/configuracoes/empresa?tab=backup',
         color: 'purple',
         permissions: ['admin.empresas.manage'],
         group: 'Governan\u00e7a',
@@ -1019,50 +982,6 @@ export const menuConfig: MenuConfig[] = [
             permissions: ['atendimento.filas.manage'],
           },
         ],
-      },
-    ],
-  },
-  {
-    id: 'administracao',
-    title: 'Administra\u00e7\u00e3o',
-    shortTitle: 'Admin',
-    icon: Building2,
-    href: '/nuclei/administracao',
-    color: 'blue',
-    adminOnly: true,
-    permissions: ['users.read', 'admin.empresas.manage', 'planos.manage'],
-    //  SEM requiredModule - Sempre disponivel para admins
-    section: 'Administra\u00e7\u00e3o',
-    children: [
-      {
-        id: 'admin-empresas',
-        title: 'Gest\u00e3o de Empresas',
-        shortTitle: 'Empresas',
-        icon: Users,
-        href: '/admin/empresas',
-        color: 'blue',
-        permissions: ['admin.empresas.manage'],
-        group: 'Opera\u00e7\u00e3o',
-      },
-      {
-        id: 'admin-usuarios',
-        title: 'Usu\u00e1rios do Sistema',
-        shortTitle: 'Usu\u00e1rios',
-        icon: Users,
-        href: '/admin/usuarios',
-        color: 'blue',
-        permissions: ['users.read'],
-        group: 'Opera\u00e7\u00e3o',
-      },
-      {
-        id: 'admin-sistema',
-        title: 'Branding Global',
-        shortTitle: 'Branding',
-        icon: Settings,
-        href: '/admin/sistema',
-        color: 'blue',
-        permissions: ['planos.manage'],
-        group: 'Governan\u00e7a',
       },
     ],
   },
@@ -1179,6 +1098,7 @@ const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
     permissions: ['users.read', 'admin.empresas.manage'],
     match: 'all',
   },
+  { pattern: '/gestao/empresas', permissions: ['admin.empresas.manage'] },
   { pattern: '/gestao/nucleos', permissions: ['admin.empresas.manage'] },
   { pattern: '/gestao/equipes', permissions: ['users.read'] },
   { pattern: '/gestao/atendentes', permissions: ['atendimento.filas.manage'] },
@@ -1190,9 +1110,6 @@ const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
   { pattern: '/gestao/fluxos/novo/builder', permissions: ['config.automacoes.manage'] },
   { pattern: '/agenda/eventos/:id', permissions: ['crm.agenda.read'] },
   { pattern: '/crm/agenda/eventos/:id', permissions: ['crm.agenda.read'] },
-  { pattern: '/admin/sistema', permissions: ['admin.empresas.manage'] },
-  { pattern: '/admin/branding', permissions: ['admin.empresas.manage'] },
-  { pattern: '/nuclei/configuracoes/empresas', permissions: ['admin.empresas.manage'] },
   { pattern: '/empresas/minhas', permissions: ['admin.empresas.manage'] },
   { pattern: '/sistema/backup', permissions: ['admin.empresas.manage'] },
   { pattern: '/empresas/:empresaId/configuracoes', permissions: ['admin.empresas.manage'] },
@@ -1220,15 +1137,17 @@ const ROUTE_PATH_ALIASES: Record<string, string[]> = {
   '/produtos/categorias': ['/vendas/produtos'],
   ...(catalogoFeatures.combosEnabled ? { '/combos': ['/vendas/combos'] } : {}),
   '/agenda': ['/crm/agenda'],
+  '/billing': ['/billing/assinaturas'],
   '/assinaturas': ['/billing/assinaturas'],
+  '/billing/faturas': ['/financeiro/faturamento'],
+  '/billing/pagamentos': ['/financeiro/faturamento'],
   '/faturamento': ['/financeiro/faturamento'],
   '/financeiro': ['/nuclei/financeiro', '/financeiro/faturamento'],
   '/demandas': ['/atendimento/tickets'],
   '/nuclei/atendimento/demandas': ['/atendimento/tickets'],
   '/nuclei/atendimento/tickets': ['/atendimento/tickets'],
   '/nuclei/atendimento/tickets/novo': ['/atendimento/tickets/novo'],
-  '/gestao/empresas': ['/admin/empresas', '/nuclei/configuracoes/empresas'],
-  '/admin/sistema': ['/admin/branding'],
+  '/gestao/empresas': ['/empresas/minhas'],
   '/gestao/usuarios': ['/configuracoes/usuarios', '/nuclei/configuracoes/usuarios'],
   '/gestao/fluxos': ['/atendimento/automacoes'],
   '/configuracoes/email': ['/nuclei/configuracoes/email', '/configuracoes/empresa'],
@@ -1431,6 +1350,7 @@ const ALL_PROTECTED_ROUTE_PREFIXES: string[] = (() => {
 })();
 
 const COMBOS_ROUTE_PREFIXES = ['/combos', '/vendas/combos'];
+const BLOCKED_LEGACY_ROUTE_PREFIXES = ['/admin'];
 
 export const canUserAccessPath = (
   pathname: string,
@@ -1438,6 +1358,16 @@ export const canUserAccessPath = (
   user?: PermissionAwareUser | null,
 ): boolean => {
   const normalizedPath = normalizePathname(pathname);
+
+  const isBlockedLegacyNucleusAdministrationPath =
+    normalizedPath.startsWith('/nuclei/') && normalizedPath.includes('administracao');
+
+  if (
+    BLOCKED_LEGACY_ROUTE_PREFIXES.some((prefix) => isPathMatch(normalizedPath, prefix)) ||
+    isBlockedLegacyNucleusAdministrationPath
+  ) {
+    return false;
+  }
 
   if (
     !catalogoFeatures.combosEnabled &&

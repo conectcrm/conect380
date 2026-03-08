@@ -14,11 +14,12 @@ import toast from 'react-hot-toast';
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
 import Conect360Logo from '../../../components/ui/Conect360Logo';
 import { systemBrandingUrlResolver, useSystemBranding } from '../../../contexts/SystemBrandingContext';
-import systemBrandingService, {
+import {
   type SystemMaintenanceSeverity,
   type SystemBrandingAdminData,
   type SystemBrandingEffectiveConfig,
 } from '../../../services/systemBrandingService';
+import systemBrandingAdminService from '../../../services/systemBrandingAdminService';
 import { getErrorMessage } from '../../../utils/errorHandling';
 
 type BrandingAssetField =
@@ -184,7 +185,7 @@ const SystemBrandingPage: React.FC = () => {
   const loadBranding = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await systemBrandingService.getAdminBranding();
+      const response = await systemBrandingAdminService.getAdminBranding();
       setFormData(response.data);
       setEffectiveData(response.effective);
       setUpdatedAt(response.updatedAt);
@@ -245,7 +246,7 @@ const SystemBrandingPage: React.FC = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const response = await systemBrandingService.updateBranding(formData);
+      const response = await systemBrandingAdminService.updateBranding(formData);
       setFormData(response.data);
       setEffectiveData(response.effective);
       setUpdatedAt(response.updatedAt);
@@ -268,7 +269,7 @@ const SystemBrandingPage: React.FC = () => {
 
     setSaving(true);
     try {
-      const response = await systemBrandingService.updateBranding({
+      const response = await systemBrandingAdminService.updateBranding({
         logoFullUrl: null,
         logoFullLightUrl: null,
         logoIconUrl: null,
@@ -336,7 +337,7 @@ const SystemBrandingPage: React.FC = () => {
 
   return (
     <div className="space-y-4 pt-1 sm:pt-2">
-      <BackToNucleus nucleusName="Administração" nucleusPath="/nuclei/administracao" />
+      <BackToNucleus nucleusName="Administracao" nucleusPath="/configuracoes/empresa" />
 
       <section className="rounded-2xl border border-[#D6E3E8] bg-white p-4 shadow-[0_24px_48px_-42px_rgba(6,35,52,0.55)] sm:p-5">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">

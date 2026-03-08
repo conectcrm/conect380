@@ -1,6 +1,7 @@
 ﻿name: CI - Testes e Build
 
 on:
+  workflow_dispatch:
   push:
     branches: [main, develop, consolidacao-*]
   pull_request:
@@ -329,6 +330,145 @@ jobs:
       - name: Rodar E2E de vendas
         run: npm --prefix backend run test:e2e:vendas
 
+  backend-e2e-guardian-hardening:
+    name: Backend - E2E Guardian Hardening
+    runs-on: ubuntu-latest
+    needs: backend
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detectar mudancas relevantes (Guardian Hardening)
+        id: guardian_hardening_changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            guardian_hardening:
+              - '.github/workflows/ci.yml'
+              - 'backend/test/guardian/**'
+              - 'backend/test/_support/e2e-app.helper.ts'
+              - 'backend/src/modules/guardian/**'
+              - 'backend/src/modules/admin/guards/legacy-admin-transition.guard.ts'
+              - 'backend/src/modules/planos/assinatura-due-date-scheduler.service.ts'
+              - 'backend/src/modules/planos/assinaturas.controller.ts'
+              - 'backend/src/modules/planos/planos.controller.ts'
+              - 'backend/package.json'
+              - 'backend/package-lock.json'
+
+      - name: Pular E2E Guardian Hardening (sem mudancas relevantes)
+        if: steps.guardian_hardening_changes.outputs.guardian_hardening != 'true'
+        run: echo "Sem alteracoes no escopo de guardian hardening; job finalizado sem executar testes."
+
+      - name: Setup Node.js
+        if: steps.guardian_hardening_changes.outputs.guardian_hardening == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias backend
+        if: steps.guardian_hardening_changes.outputs.guardian_hardening == 'true'
+        run: npm --prefix backend ci
+
+      - name: Rodar E2E Guardian Hardening
+        if: steps.guardian_hardening_changes.outputs.guardian_hardening == 'true'
+        run: npm --prefix backend run test:e2e:guardian:hardening
+
+  backend-e2e-guardian-security:
+    name: Backend - E2E Guardian Security (DB)
+    runs-on: ubuntu-latest
+    needs: backend
+    env:
+      NODE_ENV: test
+      JWT_SECRET: test-jwt-secret
+      DATABASE_HOST: localhost
+      DATABASE_PORT: '5434'
+      DATABASE_USERNAME: conectcrm
+      DATABASE_PASSWORD: conectcrm123
+      DATABASE_NAME: conectcrm_test
+      TYPEORM_USE_TS: 'true'
+      REDIS_HOST: localhost
+      REDIS_PORT: '6379'
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: conectcrm
+          POSTGRES_PASSWORD: conectcrm123
+          POSTGRES_DB: conectcrm_test
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U conectcrm -d conectcrm_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detectar mudancas relevantes (Guardian Security)
+        id: guardian_security_changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            guardian_security:
+              - '.github/workflows/ci.yml'
+              - 'backend/test/guardian/guardian-mfa-session.e2e-spec.ts'
+              - 'backend/test/guardian/guardian-backend-bypass.e2e-spec.ts'
+              - 'backend/test/_support/e2e-app.helper.ts'
+              - 'backend/src/modules/guardian/**'
+              - 'backend/src/modules/auth/**'
+              - 'backend/src/modules/admin/**'
+              - 'backend/src/modules/users/**'
+              - 'backend/src/modules/planos/**'
+              - 'backend/src/main.ts'
+              - 'backend/src/app.module.ts'
+              - 'backend/src/config/**'
+              - 'backend/package.json'
+              - 'backend/package-lock.json'
+
+      - name: Pular E2E Guardian Security (sem mudancas relevantes)
+        if: steps.guardian_security_changes.outputs.guardian_security != 'true'
+        run: echo "Sem alteracoes no escopo de guardian security; job finalizado sem executar testes."
+
+      - name: Setup Node.js
+        if: steps.guardian_security_changes.outputs.guardian_security == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias backend
+        if: steps.guardian_security_changes.outputs.guardian_security == 'true'
+        run: npm --prefix backend ci
+
+      - name: Aplicar migrations na base de teste e2e
+        if: steps.guardian_security_changes.outputs.guardian_security == 'true'
+        run: npm --prefix backend run migration:run
+
+      - name: Rodar E2E Guardian Security
+        if: steps.guardian_security_changes.outputs.guardian_security == 'true'
+        run: npm --prefix backend run test:e2e:guardian:security
+
   frontend:
     name: Frontend - Testes e Build
     runs-on: ubuntu-latest
@@ -461,6 +601,213 @@ jobs:
             kill "$(cat frontend.pid)" || true
           fi
 
+  frontend-e2e-billing-critical:
+    name: Frontend - E2E Billing Critical (Playwright)
+    runs-on: ubuntu-latest
+    needs: frontend
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detectar mudancas relevantes (Billing Critical)
+        id: billing_critical_changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            billing_critical:
+              - '.github/workflows/ci.yml'
+              - 'e2e/billing-*.spec.ts'
+              - 'e2e/fixtures.ts'
+              - 'playwright.config.ts'
+              - 'frontend-web/src/pages/billing/**'
+              - 'frontend-web/src/components/Billing/**'
+              - 'frontend-web/src/hooks/useSubscription.ts'
+              - 'frontend-web/src/config/menuConfig.ts'
+              - 'frontend-web/src/config/__tests__/menuConfig.permissions.test.ts'
+              - 'frontend-web/src/contexts/AuthContext.tsx'
+              - 'frontend-web/src/components/licensing/PermissionPathGuard.tsx'
+              - 'frontend-web/src/App.tsx'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'frontend-web/package.json'
+              - 'frontend-web/package-lock.json'
+
+      - name: Pular E2E Billing Critical (sem mudancas relevantes)
+        if: steps.billing_critical_changes.outputs.billing_critical != 'true'
+        run: echo "Sem alteracoes no escopo de billing critical; job finalizado sem executar Playwright."
+
+      - name: Setup Node.js
+        if: steps.billing_critical_changes.outputs.billing_critical == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend-web/package-lock.json
+
+      - name: Instalar dependencias root (Playwright)
+        if: steps.billing_critical_changes.outputs.billing_critical == 'true'
+        run: npm ci
+
+      - name: Instalar dependencias frontend
+        if: steps.billing_critical_changes.outputs.billing_critical == 'true'
+        run: npm --prefix frontend-web ci
+
+      - name: Instalar browser Chromium (Playwright)
+        if: steps.billing_critical_changes.outputs.billing_critical == 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Subir frontend (modo CI)
+        if: steps.billing_critical_changes.outputs.billing_critical == 'true'
+        env:
+          PORT: '3000'
+          BROWSER: 'none'
+          CI: 'true'
+        run: |
+          nohup npm --prefix frontend-web run start:docker > frontend.log 2>&1 &
+          echo $! > frontend.pid
+
+          for i in $(seq 1 90); do
+            if curl -fsS http://localhost:3000 > /dev/null; then
+              echo "Frontend disponivel em http://localhost:3000"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Frontend nao iniciou a tempo."
+          tail -n 200 frontend.log || true
+          exit 1
+
+      - name: Rodar E2E Billing Critical (Playwright)
+        if: steps.billing_critical_changes.outputs.billing_critical == 'true'
+        env:
+          TEST_E2E_AUTH_MODE: mock
+        run: npm run test:e2e:billing:critical
+
+      - name: Upload artefatos Playwright (Billing Critical)
+        if: ${{ !cancelled() && steps.billing_critical_changes.outputs.billing_critical == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-billing-critical-artifacts
+          path: |
+            playwright-report/
+            test-results/
+            frontend.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Encerrar frontend
+        if: ${{ always() && steps.billing_critical_changes.outputs.billing_critical == 'true' }}
+        run: |
+          if [ -f frontend.pid ]; then
+            kill "$(cat frontend.pid)" || true
+          fi
+
+  frontend-e2e-guardian-billing-governance:
+    name: Frontend - E2E Guardian Billing Governance (Playwright)
+    runs-on: ubuntu-latest
+    needs: frontend
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detectar mudancas relevantes (Guardian Billing Governance)
+        id: guardian_billing_governance_changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            guardian_billing_governance:
+              - '.github/workflows/ci.yml'
+              - 'e2e/guardian-billing-governance.spec.ts'
+              - 'e2e/guardian-responsive-visual.spec.ts'
+              - 'playwright.config.ts'
+              - 'guardian-web/src/**'
+              - 'backend/src/modules/guardian/**'
+              - 'backend/src/modules/planos/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'guardian-web/package.json'
+              - 'guardian-web/package-lock.json'
+
+      - name: Pular E2E Guardian Billing Governance (sem mudancas relevantes)
+        if: steps.guardian_billing_governance_changes.outputs.guardian_billing_governance != 'true'
+        run: echo "Sem alteracoes no escopo guardian billing governance; job finalizado sem executar Playwright."
+
+      - name: Setup Node.js
+        if: steps.guardian_billing_governance_changes.outputs.guardian_billing_governance == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            guardian-web/package-lock.json
+
+      - name: Instalar dependencias root (Playwright)
+        if: steps.guardian_billing_governance_changes.outputs.guardian_billing_governance == 'true'
+        run: npm ci
+
+      - name: Instalar dependencias guardian-web
+        if: steps.guardian_billing_governance_changes.outputs.guardian_billing_governance == 'true'
+        run: npm --prefix guardian-web ci
+
+      - name: Instalar browser Chromium (Playwright)
+        if: steps.guardian_billing_governance_changes.outputs.guardian_billing_governance == 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Subir guardian-web (modo CI)
+        if: steps.guardian_billing_governance_changes.outputs.guardian_billing_governance == 'true'
+        env:
+          CI: 'true'
+        run: |
+          nohup npm --prefix guardian-web run dev > guardian.log 2>&1 &
+          echo $! > guardian.pid
+
+          for i in $(seq 1 90); do
+            if curl -fsS http://localhost:3020 > /dev/null; then
+              echo "Guardian web disponivel em http://localhost:3020"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Guardian web nao iniciou a tempo."
+          tail -n 200 guardian.log || true
+          exit 1
+
+      - name: Rodar E2E Guardian Billing Governance (Playwright)
+        if: steps.guardian_billing_governance_changes.outputs.guardian_billing_governance == 'true'
+        env:
+          GUARDIAN_FRONTEND_URL: http://localhost:3020
+        run: npm run test:e2e:guardian:billing:governance
+
+      - name: Upload artefatos Playwright (Guardian Billing Governance)
+        if: ${{ !cancelled() && steps.guardian_billing_governance_changes.outputs.guardian_billing_governance == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-guardian-billing-governance-artifacts
+          path: |
+            playwright-report/
+            test-results/
+            guardian.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Encerrar guardian-web
+        if: ${{ always() && steps.guardian_billing_governance_changes.outputs.guardian_billing_governance == 'true' }}
+        run: |
+          if [ -f guardian.pid ]; then
+            kill "$(cat guardian.pid)" || true
+          fi
+
   security:
     name: Analise de Seguranca
     runs-on: ubuntu-latest
@@ -510,7 +857,7 @@ jobs:
   final-status:
     name: Status Final do CI
     runs-on: ubuntu-latest
-    needs: [encoding-guardrails, release-flags-guardrails, backend, backend-e2e-cotacao, backend-e2e-contas-pagar, backend-e2e-multi-tenancy, backend-e2e-vendas, frontend, frontend-e2e-pipeline-ui, security, check-temp-files]
+    needs: [encoding-guardrails, release-flags-guardrails, backend, backend-e2e-cotacao, backend-e2e-contas-pagar, backend-e2e-multi-tenancy, backend-e2e-vendas, backend-e2e-guardian-hardening, backend-e2e-guardian-security, frontend, frontend-e2e-pipeline-ui, frontend-e2e-billing-critical, frontend-e2e-guardian-billing-governance, security, check-temp-files]
     if: always()
 
     steps:
@@ -523,8 +870,12 @@ jobs:
           echo "Backend E2E Contas Pagar: ${{ needs.backend-e2e-contas-pagar.result }}"
           echo "Backend E2E Multi-Tenancy: ${{ needs.backend-e2e-multi-tenancy.result }}"
           echo "Backend E2E Vendas: ${{ needs.backend-e2e-vendas.result }}"
+          echo "Backend E2E Guardian Hardening: ${{ needs.backend-e2e-guardian-hardening.result }}"
+          echo "Backend E2E Guardian Security: ${{ needs.backend-e2e-guardian-security.result }}"
           echo "Frontend: ${{ needs.frontend.result }}"
           echo "Frontend E2E Pipeline UI: ${{ needs.frontend-e2e-pipeline-ui.result }}"
+          echo "Frontend E2E Billing Critical: ${{ needs.frontend-e2e-billing-critical.result }}"
+          echo "Frontend E2E Guardian Billing Governance: ${{ needs.frontend-e2e-guardian-billing-governance.result }}"
           echo "Security: ${{ needs.security.result }}"
           echo "Temp Files Check: ${{ needs.check-temp-files.result }}"
 
@@ -535,8 +886,12 @@ jobs:
              [ "${{ needs.backend-e2e-contas-pagar.result }}" != "success" ] || \
              [ "${{ needs.backend-e2e-multi-tenancy.result }}" != "success" ] || \
              [ "${{ needs.backend-e2e-vendas.result }}" != "success" ] || \
+             [ "${{ needs.backend-e2e-guardian-hardening.result }}" != "success" ] || \
+             [ "${{ needs.backend-e2e-guardian-security.result }}" != "success" ] || \
              [ "${{ needs.frontend.result }}" != "success" ] || \
              [ "${{ needs.frontend-e2e-pipeline-ui.result }}" != "success" ] || \
+             [ "${{ needs.frontend-e2e-billing-critical.result }}" != "success" ] || \
+             [ "${{ needs.frontend-e2e-guardian-billing-governance.result }}" != "success" ] || \
              [ "${{ needs.security.result }}" != "success" ] || \
              [ "${{ needs.check-temp-files.result }}" != "success" ]; then
             echo "CI falhou em um ou mais jobs"
