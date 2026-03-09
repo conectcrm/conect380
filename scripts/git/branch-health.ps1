@@ -176,7 +176,9 @@ try {
   if ($critical.Count -gt 0 -or $warning.Count -gt 0) {
     Write-Host "Acoes recomendadas:" -ForegroundColor Yellow
     if ($critical.Count -gt 0) {
-      Write-Host " - CRITICAL: criar branch limpa a partir de $mainRef e reaplicar commits necessarios."
+      Write-Host " - CRITICAL: nao tente limpar a branch no workspace principal."
+      Write-Host " - CRITICAL: abra um worktree isolado com npm run branch:worktree:new -- -BranchName <nova-branch>."
+      Write-Host " - CRITICAL: reaplique commits somente no worktree isolado baseado em $mainRef."
       Write-Host " - CRITICAL: remover/arrumar branches com upstream gone."
     }
     if ($warning.Count -gt 0) {
@@ -200,7 +202,9 @@ try {
     if ($critical.Count -gt 0 -or $warning.Count -gt 0) {
       $output += "Acoes recomendadas:"
       if ($critical.Count -gt 0) {
-        $output += " - CRITICAL: criar branch limpa a partir de $mainRef e reaplicar commits necessarios."
+        $output += " - CRITICAL: nao tente limpar a branch no workspace principal."
+        $output += " - CRITICAL: abra um worktree isolado com npm run branch:worktree:new -- -BranchName <nova-branch>."
+        $output += " - CRITICAL: reaplique commits somente no worktree isolado baseado em $mainRef."
         $output += " - CRITICAL: remover/arrumar branches com upstream gone."
       }
       if ($warning.Count -gt 0) {

@@ -150,8 +150,9 @@ Sincronizacao bloqueada para evitar regressao visual/funcional.
 
 Opcoes seguras:
 1) Revisar relatorio e reduzir escopo da branch.
-2) Reaplicar commits em branch limpa baseada em $baseRef.
-3) Se for intencional, execute com -AllowHighRisk.
+2) Criar worktree isolado: npm run branch:worktree:new -- -BranchName <nova-branch>.
+3) Reaplicar commits em branch limpa baseada em $baseRef somente no worktree isolado.
+4) Se for intencional, execute com -AllowHighRisk.
 "@
   }
 

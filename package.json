@@ -53,6 +53,7 @@
     "sync:harden": "powershell -ExecutionPolicy Bypass -File scripts/git/harden-git-sync.ps1",
     "branch:health": "powershell -ExecutionPolicy Bypass -File scripts/git/branch-health.ps1",
     "branch:health:prune": "powershell -ExecutionPolicy Bypass -File scripts/git/branch-health.ps1 -PruneFetch",
+    "branch:worktree:new": "powershell -ExecutionPolicy Bypass -File scripts/git/new-isolated-worktree.ps1",
     "branch:remote-health": "powershell -ExecutionPolicy Bypass -File scripts/git/remote-branch-health.ps1",
     "branch:remote-health:prune": "powershell -ExecutionPolicy Bypass -File scripts/git/remote-branch-health.ps1 -PruneFetch"
   },
