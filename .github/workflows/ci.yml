@@ -754,7 +754,7 @@ jobs:
 
       - name: Rodar Guardian exposure scan
         if: steps.guardian_exposure_changes.outputs.guardian_exposure == 'true'
-        run: pwsh -NoLogo -NoProfile -File scripts/ci/guardian-exposure-scan.ps1
+        run: pwsh -NoLogo -NoProfile -File ./scripts/ci/guardian-exposure-scan.ps1
 
   frontend-e2e-guardian-billing-governance:
     name: Frontend - E2E Guardian Billing Governance (Playwright)
