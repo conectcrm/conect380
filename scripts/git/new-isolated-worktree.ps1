@@ -56,7 +56,8 @@ if (-not $NoFetch) {
   Invoke-Git -Arguments @('fetch', 'origin', '--prune')
 }
 
-$localExists = (& git show-ref --verify --quiet ("refs/heads/{0}" -f $BranchName); $LASTEXITCODE) -eq 0
+$null = & git show-ref --verify --quiet ("refs/heads/{0}" -f $BranchName)
+$localExists = $LASTEXITCODE -eq 0
 if ($localExists) {
   throw "A branch local '$BranchName' ja existe. Escolha outro nome."
 }
