@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Settings,
   Save,
@@ -29,10 +30,25 @@ import { useGlobalConfirmation } from '../../contexts/GlobalConfirmationContext'
 import { userHasPermission } from '../../config/menuConfig';
 import { toastService } from '../../services/toastService';
 
+const EMPRESA_CONFIG_TABS = [
+  { id: 'geral', label: 'Geral', icon: Settings },
+  { id: 'seguranca', label: 'Segurança', icon: Shield },
+  { id: 'usuarios', label: 'Usuários e Permissões', icon: Users },
+  { id: 'email', label: 'Email/SMTP', icon: Mail },
+  { id: 'comunicacao', label: 'Comunicação', icon: MessageSquare },
+  { id: 'backup', label: 'Backup e Dados', icon: Database },
+] as const;
+
+type EmpresaConfigTabId = (typeof EMPRESA_CONFIG_TABS)[number]['id'];
+
+const isValidEmpresaConfigTab = (tab: string | null): tab is EmpresaConfigTabId =>
+  Boolean(tab && EMPRESA_CONFIG_TABS.some((item) => item.id === tab));
+
 const ConfiguracaoEmpresaPage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { confirm } = useGlobalConfirmation();
   const { user, isLoading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState('geral');
+  const [activeTab, setActiveTab] = useState<EmpresaConfigTabId>('geral');
   const [config, setConfig] = useState<ConfiguracoesEmpresa | null>(null);
   const [empresa, setEmpresa] = useState<EmpresaResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -57,16 +73,25 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canUpdateConfig = userHasPermission(user, 'config.empresa.update');
 
+  const handleTabChange = (tabId: EmpresaConfigTabId) => {
+    setActiveTab(tabId);
+    const nextParams = new URLSearchParams(searchParams);
+    if (tabId === 'geral') {
+      nextParams.delete('tab');
+    } else {
+      nextParams.set('tab', tabId);
+    }
+    setSearchParams(nextParams, { replace: true });
+  };
+
   // 🔐 empresaId removido - backend pega do JWT automaticamente
 
-  const tabs = [
-    { id: 'geral', label: 'Geral', icon: Settings },
-    { id: 'seguranca', label: 'Segurança', icon: Shield },
-    { id: 'usuarios', label: 'Usuários e Permissões', icon: Users },
-    { id: 'email', label: 'Email/SMTP', icon: Mail },
-    { id: 'comunicacao', label: 'Comunicação', icon: MessageSquare },
-    { id: 'backup', label: 'Backup e Dados', icon: Database },
-  ];
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab');
+    if (isValidEmpresaConfigTab(tabFromUrl) && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [activeTab, searchParams]);
 
   useEffect(() => {
     if (authLoading) {
@@ -455,12 +480,12 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
       <SectionCard className="overflow-hidden">
         <div className="border-b px-6 py-3">
           <div className="flex gap-4 overflow-x-auto">
-            {tabs.map((tab) => {
+            {EMPRESA_CONFIG_TABS.map((tab) => {
               const IconComponent = tab.icon;
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => handleTabChange(tab.id)}
                   className={`flex items-center gap-2 px-4 py-2 font-medium text-sm whitespace-nowrap transition-colors ${activeTab === tab.id ? 'text-[#159A9C] border-b-2 border-[#159A9C]' : 'text-gray-500 hover:text-gray-700'}`}
                 >
                   <IconComponent className="h-4 w-4" />
@@ -1643,7 +1668,10 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                 activeTab !== 'backup' && (
                   <div className="text-center py-12 text-gray-500">
                     <Info className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                    <p>Aba "{tabs.find((t) => t.id === activeTab)?.label}" em desenvolvimento</p>
+                    <p>
+                      Aba "{EMPRESA_CONFIG_TABS.find((t) => t.id === activeTab)?.label}" em
+                      desenvolvimento
+                    </p>
                   </div>
                 )}
             </div>
@@ -1676,4 +1704,3 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
 };
 
 export default ConfiguracaoEmpresaPage;
-

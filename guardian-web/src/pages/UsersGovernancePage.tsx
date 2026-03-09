@@ -1,6 +1,9 @@
 ﻿import { AxiosError } from 'axios';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ConfirmActionModal } from '../components/ConfirmActionModal';
+import {
+  ConfirmActionModal,
+  type ConfirmActionModalStatus,
+} from '../components/ConfirmActionModal';
 import { api } from '../lib/api';
 
 type UserItem = {
@@ -32,17 +35,34 @@ type ActionDialogState =
       confirmLabel: string;
       successMessage: string;
       requestId: string;
-    }
-  | {
-      mode: 'recertify_revoke';
-      actionKey: string;
-      title: string;
-      subtitle: string;
-      reasonRequired: boolean;
-      confirmLabel: string;
-      successMessage: string;
-      user: UserItem;
     };
+
+type ActionExecutionResult = { ok: true } | { ok: false; message: string };
+
+type DialogStatusState = {
+  status: ConfirmActionModalStatus;
+  message: string | null;
+};
+
+const createIdleDialogStatus = (): DialogStatusState => ({
+  status: 'idle',
+  message: null,
+});
+
+const createLoadingDialogStatus = (): DialogStatusState => ({
+  status: 'loading',
+  message: 'Processando acao e registrando auditoria guardian...',
+});
+
+const createErrorDialogStatus = (message: string): DialogStatusState => ({
+  status: 'error',
+  message,
+});
+
+const createSuccessDialogStatus = (message: string): DialogStatusState => ({
+  status: 'success',
+  message,
+});
 
 const formatDate = (value?: string) => {
   if (!value) return '-';
@@ -78,6 +98,7 @@ export const UsersGovernancePage = () => {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [runningActionKey, setRunningActionKey] = useState<string | null>(null);
   const [dialog, setDialog] = useState<ActionDialogState | null>(null);
+  const [dialogStatus, setDialogStatus] = useState<DialogStatusState>(() => createIdleDialogStatus());
   const [error, setError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
@@ -134,9 +155,13 @@ export const UsersGovernancePage = () => {
   const hasActionInProgress = runningActionKey !== null;
 
   const runAction = useCallback(
-    async (actionKey: string, operation: () => Promise<void>, successMessage: string) => {
+    async (
+      actionKey: string,
+      operation: () => Promise<void>,
+      successMessage: string,
+    ): Promise<ActionExecutionResult> => {
       if (hasActionInProgress) {
-        return false;
+        return { ok: false, message: 'Ja existe uma acao guardian em andamento.' };
       }
 
       setRunningActionKey(actionKey);
@@ -146,10 +171,11 @@ export const UsersGovernancePage = () => {
         await operation();
         setFeedback(successMessage);
         await loadData();
-        return true;
+        return { ok: true };
       } catch (actionError) {
-        setError(parseErrorMessage(actionError, 'Falha ao executar acao no guardian.'));
-        return false;
+        const message = parseErrorMessage(actionError, 'Falha ao executar acao no guardian.');
+        setError(message);
+        return { ok: false, message };
       } finally {
         setRunningActionKey(null);
       }
@@ -161,12 +187,14 @@ export const UsersGovernancePage = () => {
     if (hasActionInProgress) {
       return;
     }
+    setDialogStatus(createIdleDialogStatus());
     setDialog(null);
   }, [hasActionInProgress]);
 
   const openRejectRequestDialog = useCallback((request: AccessRequestItem) => {
     setError(null);
     setFeedback(null);
+    setDialogStatus(createIdleDialogStatus());
     setDialog({
       mode: 'reject_request',
       actionKey: `reject:${request.id}`,
@@ -179,21 +207,6 @@ export const UsersGovernancePage = () => {
     });
   }, []);
 
-  const openRecertifyRevokeDialog = useCallback((user: UserItem) => {
-    setError(null);
-    setFeedback(null);
-    setDialog({
-      mode: 'recertify_revoke',
-      actionKey: `recertify:${user.id}:reject`,
-      title: 'Revogar acesso do usuario',
-      subtitle: `${user.nome} (${user.email})`,
-      reasonRequired: true,
-      confirmLabel: 'Revogar acesso',
-      successMessage: `Recertificacao reprovada para ${user.nome}.`,
-      user,
-    });
-  }, []);
-
   const confirmDialog = useCallback(
     async (reasonInput: string) => {
       if (!dialog) {
@@ -202,12 +215,14 @@ export const UsersGovernancePage = () => {
 
       const reason = reasonInput.trim();
       if (dialog.reasonRequired && !reason) {
-        setError('Motivo obrigatorio para esta acao.');
+        setDialogStatus(createErrorDialogStatus('Motivo obrigatorio para esta acao.'));
         return;
       }
 
+      setDialogStatus(createLoadingDialogStatus());
+
       if (dialog.mode === 'reject_request') {
-        const success = await runAction(
+        const result = await runAction(
           dialog.actionKey,
           async () => {
             await api.post(`/guardian/bff/access-change-requests/${dialog.requestId}/reject`, {
@@ -217,28 +232,16 @@ export const UsersGovernancePage = () => {
           dialog.successMessage,
         );
 
-        if (success) {
-          closeDialog();
+        if (result.ok) {
+          setDialogStatus(createSuccessDialogStatus(dialog.successMessage));
+          return;
         }
+
+        setDialogStatus(createErrorDialogStatus(result.message));
 
         return;
       }
 
-      const success = await runAction(
-        dialog.actionKey,
-        async () => {
-          await api.post('/guardian/bff/access-review/recertify', {
-            target_user_id: dialog.user.id,
-            approved: false,
-            reason,
-          });
-        },
-        dialog.successMessage,
-      );
-
-      if (success) {
-        closeDialog();
-      }
     },
     [closeDialog, dialog, runAction],
   );
@@ -251,22 +254,6 @@ export const UsersGovernancePage = () => {
           await api.post(`/guardian/bff/access-change-requests/${requestId}/approve`, {});
         },
         'Solicitacao aprovada com sucesso.',
-      );
-    },
-    [runAction],
-  );
-
-  const handleRecertifyApprove = useCallback(
-    async (user: UserItem) => {
-      await runAction(
-        `recertify:${user.id}:approve`,
-        async () => {
-          await api.post('/guardian/bff/access-review/recertify', {
-            target_user_id: user.id,
-            approved: true,
-          });
-        },
-        `Recertificacao aprovada para ${user.nome}.`,
       );
     },
     [runAction],
@@ -288,13 +275,22 @@ export const UsersGovernancePage = () => {
             </button>
           </header>
           <p className="subtle">
-            Operacoes de governanca consumindo o gateway guardian `/guardian/bff`.
+            Visibilidade cross-tenant de usuarios e decisao formal sobre mudancas sensiveis. O
+            Guardian nao expoe aprovacao ou revogacao direta fora do workflow.
           </p>
 
           <div className="kpi-inline">
             <span>Total listados: {users.length}</span>
             <span>Ativos: {activeUsers}</span>
             <span>Pendencias: {pendingRequests.length}</span>
+          </div>
+
+          <div className="plan-editor-shell">
+            <h3>Escopo do Guardian</h3>
+            <p className="subtle">
+              A lista global de usuarios fica disponivel para inspecao. Mudancas de acesso devem
+              passar pela fila formal de aprovacao ou pelo contexto operacional do tenant.
+            </p>
           </div>
 
           {loading ? <p>Carregando usuarios...</p> : null}
@@ -310,7 +306,6 @@ export const UsersGovernancePage = () => {
                     <th>Email</th>
                     <th>Papel</th>
                     <th>Status</th>
-                    <th>Acoes</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -320,31 +315,11 @@ export const UsersGovernancePage = () => {
                       <td>{user.email}</td>
                       <td>{user.role}</td>
                       <td>{user.ativo ? 'Ativo' : 'Inativo'}</td>
-                      <td>
-                        <div className="table-actions">
-                          <button
-                            type="button"
-                            className="button secondary tiny"
-                            disabled={hasActionInProgress}
-                            onClick={() => void handleRecertifyApprove(user)}
-                          >
-                            Aprovar acesso
-                          </button>
-                          <button
-                            type="button"
-                            className="button ghost tiny"
-                            disabled={hasActionInProgress}
-                            onClick={() => openRecertifyRevokeDialog(user)}
-                          >
-                            Revogar acesso
-                          </button>
-                        </div>
-                      </td>
                     </tr>
                   ))}
                   {users.length === 0 ? (
                     <tr>
-                      <td colSpan={5}>Nenhum usuario encontrado.</td>
+                      <td colSpan={4}>Nenhum usuario encontrado.</td>
                     </tr>
                   ) : null}
                 </tbody>
@@ -400,7 +375,8 @@ export const UsersGovernancePage = () => {
         subtitle={dialog?.subtitle}
         reasonRequired={dialog?.reasonRequired}
         confirmLabel={dialog?.confirmLabel}
-        loading={hasActionInProgress}
+        status={dialogStatus.status}
+        statusMessage={dialogStatus.message}
         onCancel={closeDialog}
         onConfirm={(reason) => {
           void confirmDialog(reason);

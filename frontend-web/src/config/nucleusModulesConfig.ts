@@ -176,10 +176,10 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
       },
       {
         menuId: 'comercial-combos',
-        description: 'Cria??o e gest?o de combos e pacotes de produtos com descontos especiais.',
+        description: 'Fluxo legado de combos e pacotes, mantido apenas para compatibilidade controlada.',
         icon: PackageOpen,
-        badge: 'Novo',
-        badgeColor: 'green',
+        badge: 'Legado',
+        badgeColor: 'yellow',
       },
       {
         menuId: 'comercial-leads',

@@ -1,5 +1,9 @@
 import { AxiosError } from 'axios';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ConfirmActionModal,
+  type ConfirmActionModalStatus,
+} from '../components/ConfirmActionModal';
 import { api } from '../lib/api';
 
 type BillingCompany = {
@@ -69,6 +73,57 @@ type PlanFormState = {
   ordem: string;
   modulosInclusos: string[];
 };
+
+type ActionDialogState =
+  | {
+      mode: 'suspend_subscription';
+      item: BillingItem;
+      actionKey: string;
+      title: string;
+      subtitle: string;
+      confirmLabel: string;
+      reasonRequired: boolean;
+      reasonPlaceholder?: string;
+      successMessage: string;
+    }
+  | {
+      mode: 'reactivate_subscription';
+      item: BillingItem;
+      actionKey: string;
+      title: string;
+      subtitle: string;
+      confirmLabel: string;
+      reasonRequired: boolean;
+      reasonPlaceholder?: string;
+      successMessage: string;
+    };
+
+type ActionExecutionResult = { ok: true } | { ok: false; message: string };
+
+type DialogStatusState = {
+  status: ConfirmActionModalStatus;
+  message: string | null;
+};
+
+const createIdleDialogStatus = (): DialogStatusState => ({
+  status: 'idle',
+  message: null,
+});
+
+const createLoadingDialogStatus = (): DialogStatusState => ({
+  status: 'loading',
+  message: 'Processando acao e registrando auditoria guardian...',
+});
+
+const createErrorDialogStatus = (message: string): DialogStatusState => ({
+  status: 'error',
+  message,
+});
+
+const createSuccessDialogStatus = (message: string): DialogStatusState => ({
+  status: 'success',
+  message,
+});
 
 const STATUS_OPTIONS = [
   { value: 'ALL', label: 'Todos' },
@@ -327,7 +382,6 @@ export const BillingGovernancePage = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [loadingSubscriptions, setLoadingSubscriptions] = useState(true);
-  const [runningDueDateCycle, setRunningDueDateCycle] = useState(false);
   const [runningCompanyId, setRunningCompanyId] = useState<string | null>(null);
   const [subscriptionFeedback, setSubscriptionFeedback] = useState<string | null>(null);
   const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
@@ -341,6 +395,8 @@ export const BillingGovernancePage = () => {
   const [catalogFeedback, setCatalogFeedback] = useState<string | null>(null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [planForm, setPlanForm] = useState<PlanFormState>(() => createEmptyPlanForm());
+  const [dialog, setDialog] = useState<ActionDialogState | null>(null);
+  const [dialogStatus, setDialogStatus] = useState<DialogStatusState>(() => createIdleDialogStatus());
 
   const loadSubscriptions = useCallback(async () => {
     setLoadingSubscriptions(true);
@@ -471,7 +527,11 @@ export const BillingGovernancePage = () => {
   }, [loadCatalog]);
 
   const runSubscriptionAction = useCallback(
-    async (companyId: string, successMessage: string, operation: () => Promise<void>) => {
+    async (
+      companyId: string,
+      successMessage: string,
+      operation: () => Promise<void>,
+    ): Promise<ActionExecutionResult> => {
       setRunningCompanyId(companyId);
       setSubscriptionError(null);
       setSubscriptionFeedback(null);
@@ -480,103 +540,19 @@ export const BillingGovernancePage = () => {
         await operation();
         setSubscriptionFeedback(successMessage);
         await loadSubscriptions();
+        return { ok: true };
       } catch (actionError) {
-        setSubscriptionError(parseErrorMessage(actionError, 'Falha ao executar operacao de cobranca.'));
+        const message = parseErrorMessage(
+          actionError,
+          'Falha ao executar operacao de cobranca.',
+        );
+        setSubscriptionError(message);
+        return { ok: false, message };
       } finally {
         setRunningCompanyId(null);
       }
     },
     [loadSubscriptions],
-  );
-
-  const runDueDateCycle = useCallback(async () => {
-    setRunningDueDateCycle(true);
-    setSubscriptionError(null);
-    setSubscriptionFeedback(null);
-
-    try {
-      const response = await api.post('/guardian/bff/billing/subscriptions/jobs/due-date-cycle');
-      const summary = response.data?.data;
-      const checked = typeof summary?.checked === 'number' ? summary.checked : null;
-      const markedPastDue =
-        typeof summary?.markedPastDue === 'number' ? summary.markedPastDue : null;
-      const suspended = typeof summary?.suspended === 'number' ? summary.suspended : null;
-
-      const details = [
-        checked !== null ? `checadas: ${checked}` : null,
-        markedPastDue !== null ? `past_due: ${markedPastDue}` : null,
-        suspended !== null ? `suspensas: ${suspended}` : null,
-      ]
-        .filter(Boolean)
-        .join(' | ');
-
-      setSubscriptionFeedback(
-        details
-          ? `Ciclo de vencimento executado com sucesso (${details}).`
-          : 'Ciclo de vencimento executado com sucesso.',
-      );
-      await loadSubscriptions();
-    } catch (cycleError) {
-      setSubscriptionError(parseErrorMessage(cycleError, 'Falha ao executar ciclo de vencimento.'));
-    } finally {
-      setRunningDueDateCycle(false);
-    }
-  }, [loadSubscriptions]);
-
-  const handleSuspend = useCallback(
-    async (item: BillingItem) => {
-      const reasonInput = window.prompt(
-        `Informe o motivo para suspender a assinatura da empresa ${item.empresa.nome}.`,
-      );
-      if (reasonInput === null) {
-        return;
-      }
-
-      const reason = reasonInput.trim();
-      if (!reason) {
-        setSubscriptionError('Motivo obrigatorio para suspender assinatura.');
-        return;
-      }
-
-      await runSubscriptionAction(
-        item.empresa.id,
-        `Assinatura da empresa ${item.empresa.nome} suspensa com sucesso.`,
-        async () => {
-          await api.patch(`/guardian/bff/billing/subscriptions/${item.empresa.id}/suspend`, {
-            reason,
-          });
-        },
-      );
-    },
-    [runSubscriptionAction],
-  );
-
-  const handleReactivate = useCallback(
-    async (item: BillingItem) => {
-      const reasonInput = window.prompt(
-        `Informe o motivo para reativar a assinatura da empresa ${item.empresa.nome}.`,
-      );
-      if (reasonInput === null) {
-        return;
-      }
-
-      const reason = reasonInput.trim();
-      if (!reason) {
-        setSubscriptionError('Motivo obrigatorio para reativar assinatura.');
-        return;
-      }
-
-      await runSubscriptionAction(
-        item.empresa.id,
-        `Assinatura da empresa ${item.empresa.nome} reativada com sucesso.`,
-        async () => {
-          await api.patch(`/guardian/bff/billing/subscriptions/${item.empresa.id}/reactivate`, {
-            reason,
-          });
-        },
-      );
-    },
-    [runSubscriptionAction],
   );
 
   const clearPlanEditor = useCallback(() => {
@@ -585,7 +561,11 @@ export const BillingGovernancePage = () => {
   }, []);
 
   const runPlanAction = useCallback(
-    async (planId: string, successMessage: string, operation: () => Promise<void>) => {
+    async (
+      planId: string,
+      successMessage: string,
+      operation: () => Promise<void>,
+    ): Promise<ActionExecutionResult> => {
       setRunningPlanId(planId);
       setCatalogError(null);
       setCatalogFeedback(null);
@@ -597,8 +577,11 @@ export const BillingGovernancePage = () => {
         if (editingPlanId === planId) {
           clearPlanEditor();
         }
+        return { ok: true };
       } catch (actionError) {
-        setCatalogError(parseErrorMessage(actionError, 'Falha ao executar acao no catalogo.'));
+        const message = parseErrorMessage(actionError, 'Falha ao executar acao no catalogo.');
+        setCatalogError(message);
+        return { ok: false, message };
       } finally {
         setRunningPlanId(null);
       }
@@ -724,7 +707,7 @@ export const BillingGovernancePage = () => {
 
   const handleTogglePlanStatus = useCallback(
     async (plan: PlanCatalogItem) => {
-      const actionLabel = plan.ativo ? 'desativado' : 'ativado';
+      const actionLabel = plan.ativo ? 'arquivado' : 'reativado';
       await runPlanAction(plan.id, `Plano ${plan.nome} ${actionLabel} com sucesso.`, async () => {
         await api.put(`/guardian/planos/${plan.id}/toggle-status`);
       });
@@ -732,20 +715,110 @@ export const BillingGovernancePage = () => {
     [runPlanAction],
   );
 
-  const handleDeletePlan = useCallback(
-    async (plan: PlanCatalogItem) => {
-      const confirmed = window.confirm(
-        `Tem certeza que deseja remover o plano ${plan.nome}? Esta acao nao pode ser desfeita.`,
-      );
-      if (!confirmed) {
+  const hasDialogActionInProgress =
+    runningCompanyId !== null || runningPlanId !== null || savingPlan;
+
+  const closeDialog = useCallback(() => {
+    if (hasDialogActionInProgress) {
+      return;
+    }
+
+    setDialogStatus(createIdleDialogStatus());
+    setDialog(null);
+  }, [hasDialogActionInProgress]);
+
+  const openSuspendDialog = useCallback((item: BillingItem) => {
+    setSubscriptionError(null);
+    setSubscriptionFeedback(null);
+    setDialogStatus(createIdleDialogStatus());
+    setDialog({
+      mode: 'suspend_subscription',
+      item,
+      actionKey: `billing:suspend:${item.empresa.id}`,
+      title: 'Suspender assinatura',
+      subtitle: `${item.empresa.nome} | a cobranca sera interrompida no billing guardian`,
+      confirmLabel: 'Suspender assinatura',
+      reasonRequired: true,
+      reasonPlaceholder: 'Explique o motivo operacional da suspensao.',
+      successMessage: `Assinatura da empresa ${item.empresa.nome} suspensa com sucesso.`,
+    });
+  }, []);
+
+  const openReactivateDialog = useCallback((item: BillingItem) => {
+    setSubscriptionError(null);
+    setSubscriptionFeedback(null);
+    setDialogStatus(createIdleDialogStatus());
+    setDialog({
+      mode: 'reactivate_subscription',
+      item,
+      actionKey: `billing:reactivate:${item.empresa.id}`,
+      title: 'Reativar assinatura',
+      subtitle: `${item.empresa.nome} | a empresa voltara a cobrar normalmente`,
+      confirmLabel: 'Reativar assinatura',
+      reasonRequired: true,
+      reasonPlaceholder: 'Explique o motivo da reativacao da assinatura.',
+      successMessage: `Assinatura da empresa ${item.empresa.nome} reativada com sucesso.`,
+    });
+  }, []);
+
+  const confirmDialog = useCallback(
+    async (reasonInput: string) => {
+      if (!dialog) {
         return;
       }
 
-      await runPlanAction(plan.id, `Plano ${plan.nome} removido com sucesso.`, async () => {
-        await api.delete(`/guardian/planos/${plan.id}`);
-      });
+      const reason = reasonInput.trim();
+      if (dialog.reasonRequired && !reason) {
+        setDialogStatus(createErrorDialogStatus('Motivo obrigatorio para esta acao.'));
+        return;
+      }
+
+      setDialogStatus(createLoadingDialogStatus());
+
+      if (dialog.mode === 'suspend_subscription') {
+        const result = await runSubscriptionAction(
+          dialog.item.empresa.id,
+          dialog.successMessage,
+          async () => {
+            await api.patch(`/guardian/bff/billing/subscriptions/${dialog.item.empresa.id}/suspend`, {
+              reason,
+            });
+          },
+        );
+
+        if (result.ok) {
+          setDialogStatus(createSuccessDialogStatus(dialog.successMessage));
+          return;
+        }
+
+        setDialogStatus(createErrorDialogStatus(result.message));
+
+        return;
+      }
+
+      if (dialog.mode === 'reactivate_subscription') {
+        const result = await runSubscriptionAction(
+          dialog.item.empresa.id,
+          dialog.successMessage,
+          async () => {
+            await api.patch(`/guardian/bff/billing/subscriptions/${dialog.item.empresa.id}/reactivate`, {
+              reason,
+            });
+          },
+        );
+
+        if (result.ok) {
+          setDialogStatus(createSuccessDialogStatus(dialog.successMessage));
+          return;
+        }
+
+        setDialogStatus(createErrorDialogStatus(result.message));
+
+        return;
+      }
+
     },
-    [runPlanAction],
+    [closeDialog, dialog, runPlanAction, runSubscriptionAction],
   );
 
   const subscriptionSummary = useMemo(() => {
@@ -814,22 +887,16 @@ export const BillingGovernancePage = () => {
               type="button"
               className="button secondary"
               onClick={() => void loadSubscriptions()}
-              disabled={loadingSubscriptions || runningDueDateCycle}
+              disabled={loadingSubscriptions}
             >
               Recarregar
-            </button>
-            <button
-              type="button"
-              className="button ghost"
-              onClick={() => void runDueDateCycle()}
-              disabled={loadingSubscriptions || runningDueDateCycle}
-            >
-              {runningDueDateCycle ? 'Executando ciclo...' : 'Executar ciclo de vencimento'}
             </button>
           </div>
         </header>
         <p className="subtle">
-          Governanca de status de assinatura por empresa com operacoes de suspensao e reativacao.
+          Governanca de status de assinatura por empresa. Ciclos de vencimento e conciliacao devem
+          ocorrer de forma automatica fora do Guardian; aqui ficam apenas excecoes e decisoes
+          sensiveis.
         </p>
 
         <div className="kpi-inline">
@@ -907,7 +974,7 @@ export const BillingGovernancePage = () => {
                             type="button"
                             className="button ghost tiny"
                             disabled={!allowSuspend || busy || !item.assinatura}
-                            onClick={() => void handleSuspend(item)}
+                            onClick={() => openSuspendDialog(item)}
                           >
                             Suspender
                           </button>
@@ -915,7 +982,7 @@ export const BillingGovernancePage = () => {
                             type="button"
                             className="button secondary tiny"
                             disabled={!allowReactivate || busy || !item.assinatura}
-                            onClick={() => void handleReactivate(item)}
+                            onClick={() => openReactivateDialog(item)}
                           >
                             Reativar
                           </button>
@@ -959,8 +1026,8 @@ export const BillingGovernancePage = () => {
         </header>
 
         <p className="subtle">
-          Catalogo central do Guardian para criar, editar, ativar, desativar e remover planos com
-          modulos vinculados.
+          Catalogo central do Guardian para criar, editar, reativar e arquivar planos com modulos
+          vinculados. Exclusao fisica foi removida para preservar historico comercial e auditoria.
         </p>
 
         <div className="kpi-inline">
@@ -1226,15 +1293,7 @@ export const BillingGovernancePage = () => {
                             onClick={() => void handleTogglePlanStatus(plan)}
                             disabled={isPlanActionRunning || busy}
                           >
-                            {plan.ativo ? 'Desativar' : 'Ativar'}
-                          </button>
-                          <button
-                            type="button"
-                            className="button ghost tiny"
-                            onClick={() => void handleDeletePlan(plan)}
-                            disabled={isPlanActionRunning || busy}
-                          >
-                            Excluir
+                            {plan.ativo ? 'Arquivar' : 'Reativar'}
                           </button>
                         </div>
                       </td>
@@ -1251,6 +1310,21 @@ export const BillingGovernancePage = () => {
           </div>
         ) : null}
       </section>
+
+      <ConfirmActionModal
+        open={!!dialog}
+        title={dialog?.title || ''}
+        subtitle={dialog?.subtitle}
+        reasonRequired={dialog?.reasonRequired}
+        reasonPlaceholder={dialog?.reasonPlaceholder}
+        confirmLabel={dialog?.confirmLabel}
+        status={dialogStatus.status}
+        statusMessage={dialogStatus.message}
+        onCancel={closeDialog}
+        onConfirm={(reason) => {
+          void confirmDialog(reason);
+        }}
+      />
     </>
   );
 };

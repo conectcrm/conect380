@@ -1,15 +1,10 @@
 ﻿import { AxiosError } from 'axios';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ConfirmActionModal } from '../components/ConfirmActionModal';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  ConfirmActionModal,
+  type ConfirmActionModalStatus,
+} from '../components/ConfirmActionModal';
 import { api } from '../lib/api';
-
-type GovernanceUser = {
-  id: string;
-  nome: string;
-  email: string;
-  role: string;
-  ativo: boolean;
-};
 
 type BreakGlassRequest = {
   id: string;
@@ -37,6 +32,32 @@ type BreakGlassRequest = {
     nome?: string;
     email?: string;
   } | null;
+};
+
+type RuntimeContext = {
+  environment: string;
+  policySource: string;
+  releaseVersion?: string | null;
+  adminMfaRequired: boolean;
+  legacyTransitionMode: string;
+  capabilities: {
+    allowBreakGlassRequestCreation: boolean;
+    allowManualBillingDueDateCycle: boolean;
+    allowPlanDeletion: boolean;
+    allowDirectAccessRecertification: boolean;
+    allowCompanyModuleManagement: boolean;
+  };
+};
+
+type RuntimeSnapshot = {
+  id: number;
+  environment: string;
+  policySource: string;
+  releaseVersion?: string | null;
+  adminMfaRequired: boolean;
+  legacyTransitionMode: string;
+  enabledCapabilities: string[];
+  createdAt: string;
 };
 
 type ActionDialogState =
@@ -71,6 +92,33 @@ type ActionDialogState =
       successMessage: string;
     };
 
+type ActionExecutionResult = { ok: true } | { ok: false; message: string };
+
+type DialogStatusState = {
+  status: ConfirmActionModalStatus;
+  message: string | null;
+};
+
+const createIdleDialogStatus = (): DialogStatusState => ({
+  status: 'idle',
+  message: null,
+});
+
+const createLoadingDialogStatus = (): DialogStatusState => ({
+  status: 'loading',
+  message: 'Processando acao e registrando auditoria guardian...',
+});
+
+const createErrorDialogStatus = (message: string): DialogStatusState => ({
+  status: 'error',
+  message,
+});
+
+const createSuccessDialogStatus = (message: string): DialogStatusState => ({
+  status: 'success',
+  message,
+});
+
 const formatDate = (value?: string | null) => {
   if (!value) return '-';
   const date = new Date(value);
@@ -99,68 +147,46 @@ const parseErrorMessage = (error: unknown, fallback: string): string => {
   return fallback;
 };
 
-const parsePermissionsText = (input: string): string[] =>
-  input
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean);
-
 export const SystemGovernancePage = () => {
-  const [users, setUsers] = useState<GovernanceUser[]>([]);
   const [pendingRequests, setPendingRequests] = useState<BreakGlassRequest[]>([]);
   const [activeAccesses, setActiveAccesses] = useState<BreakGlassRequest[]>([]);
+  const [runtimeContext, setRuntimeContext] = useState<RuntimeContext | null>(null);
+  const [runtimeHistory, setRuntimeHistory] = useState<RuntimeSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [runningActionKey, setRunningActionKey] = useState<string | null>(null);
   const [dialog, setDialog] = useState<ActionDialogState | null>(null);
-
-  const [requestForm, setRequestForm] = useState({
-    targetUserId: '',
-    permissions: 'admin.empresas.manage',
-    durationMinutes: '30',
-    reason: '',
-  });
+  const [dialogStatus, setDialogStatus] = useState<DialogStatusState>(() => createIdleDialogStatus());
 
   const hasActionInProgress = runningActionKey !== null;
-
-  const activeUsers = useMemo(() => users.filter((user) => user.ativo), [users]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
-    try {
-      const [usersResponse, pendingResponse, activeResponse] = await Promise.all([
-        api.get('/guardian/bff/users', {
-          params: { limite: 120, pagina: 1, ativo: true, ordenacao: 'nome', direcao: 'asc' },
-        }),
+      try {
+      const [pendingResponse, activeResponse, runtimeResponse, runtimeHistoryResponse] = await Promise.all([
         api.get('/guardian/bff/break-glass/requests', {
           params: { status: 'REQUESTED', limit: 50 },
         }),
         api.get('/guardian/bff/break-glass/active', {
           params: { limit: 50 },
         }),
+        api.get('/guardian/bff/runtime-context'),
+        api.get('/guardian/bff/runtime-history', {
+          params: { limit: 8 },
+        }),
       ]);
 
-      const userItems = usersResponse.data?.data?.items ?? usersResponse.data?.items ?? [];
       const pendingItems = pendingResponse.data?.data ?? [];
       const activeItems = activeResponse.data?.data ?? [];
 
-      setUsers(
-        Array.isArray(userItems)
-          ? userItems.map((item: Record<string, unknown>) => ({
-              id: String(item.id ?? ''),
-              nome: String(item.nome ?? ''),
-              email: String(item.email ?? ''),
-              role: String(item.role ?? ''),
-              ativo: Boolean(item.ativo),
-            }))
-          : [],
-      );
-
       setPendingRequests(Array.isArray(pendingItems) ? (pendingItems as BreakGlassRequest[]) : []);
       setActiveAccesses(Array.isArray(activeItems) ? (activeItems as BreakGlassRequest[]) : []);
+      setRuntimeContext((runtimeResponse.data?.data as RuntimeContext | undefined) ?? null);
+      const historyItems = runtimeHistoryResponse.data?.data ?? [];
+      setRuntimeHistory(Array.isArray(historyItems) ? (historyItems as RuntimeSnapshot[]) : []);
     } catch (loadError) {
       setError(parseErrorMessage(loadError, 'Falha ao carregar governanca de acesso emergencial.'));
     } finally {
@@ -173,9 +199,13 @@ export const SystemGovernancePage = () => {
   }, [loadData]);
 
   const runAction = useCallback(
-    async (actionKey: string, operation: () => Promise<void>, successMessage: string) => {
+    async (
+      actionKey: string,
+      operation: () => Promise<void>,
+      successMessage: string,
+    ): Promise<ActionExecutionResult> => {
       if (hasActionInProgress) {
-        return false;
+        return { ok: false, message: 'Ja existe uma acao guardian em andamento.' };
       }
 
       setRunningActionKey(actionKey);
@@ -185,10 +215,11 @@ export const SystemGovernancePage = () => {
         await operation();
         setFeedback(successMessage);
         await loadData();
-        return true;
+        return { ok: true };
       } catch (actionError) {
-        setError(parseErrorMessage(actionError, 'Falha ao executar acao de governanca.'));
-        return false;
+        const message = parseErrorMessage(actionError, 'Falha ao executar acao de governanca.');
+        setError(message);
+        return { ok: false, message };
       } finally {
         setRunningActionKey(null);
       }
@@ -196,54 +227,14 @@ export const SystemGovernancePage = () => {
     [hasActionInProgress, loadData],
   );
 
-  const handleCreateRequest = useCallback(async () => {
-    const targetUserId = requestForm.targetUserId.trim();
-    const reason = requestForm.reason.trim();
-    const permissions = parsePermissionsText(requestForm.permissions);
-    const durationMinutes = Number.parseInt(requestForm.durationMinutes, 10);
-
-    if (!targetUserId) {
-      setError('Selecione o usuario alvo para solicitar o acesso emergencial.');
-      return;
-    }
-    if (permissions.length === 0) {
-      setError('Informe ao menos uma permissao canonica para o break-glass.');
-      return;
-    }
-    if (!reason) {
-      setError('Justificativa obrigatoria para solicitar break-glass.');
-      return;
-    }
-    if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) {
-      setError('Duracao invalida. Informe um valor em minutos.');
-      return;
-    }
-
-    await runAction(
-      `request:${targetUserId}`,
-      async () => {
-        await api.post('/guardian/bff/break-glass/requests', {
-          target_user_id: targetUserId,
-          permissions,
-          duration_minutes: durationMinutes,
-          reason,
-        });
-      },
-      'Solicitacao de acesso emergencial registrada com sucesso.',
-    );
-
-    setRequestForm((current) => ({
-      ...current,
-      reason: '',
-    }));
-  }, [requestForm, runAction]);
-
   const closeDialog = useCallback(() => {
     if (hasActionInProgress) return;
+    setDialogStatus(createIdleDialogStatus());
     setDialog(null);
   }, [hasActionInProgress]);
 
   const openApproveDialog = useCallback((item: BreakGlassRequest) => {
+    setDialogStatus(createIdleDialogStatus());
     setDialog({
       mode: 'approve_request',
       requestId: item.id,
@@ -257,6 +248,7 @@ export const SystemGovernancePage = () => {
   }, []);
 
   const openRejectDialog = useCallback((item: BreakGlassRequest) => {
+    setDialogStatus(createIdleDialogStatus());
     setDialog({
       mode: 'reject_request',
       requestId: item.id,
@@ -270,6 +262,7 @@ export const SystemGovernancePage = () => {
   }, []);
 
   const openRevokeDialog = useCallback((item: BreakGlassRequest) => {
+    setDialogStatus(createIdleDialogStatus());
     setDialog({
       mode: 'revoke_active',
       requestId: item.id,
@@ -288,12 +281,14 @@ export const SystemGovernancePage = () => {
 
       const reason = reasonInput.trim();
       if (dialog.reasonRequired && !reason) {
-        setError('Motivo obrigatorio para esta acao.');
+        setDialogStatus(createErrorDialogStatus('Motivo obrigatorio para esta acao.'));
         return;
       }
 
+      setDialogStatus(createLoadingDialogStatus());
+
       if (dialog.mode === 'approve_request') {
-        const success = await runAction(
+        const result = await runAction(
           dialog.actionKey,
           async () => {
             await api.post(`/guardian/bff/break-glass/requests/${dialog.requestId}/approve`, {
@@ -302,12 +297,16 @@ export const SystemGovernancePage = () => {
           },
           dialog.successMessage,
         );
-        if (success) closeDialog();
+        if (result.ok) {
+          setDialogStatus(createSuccessDialogStatus(dialog.successMessage));
+          return;
+        }
+        setDialogStatus(createErrorDialogStatus(result.message));
         return;
       }
 
       if (dialog.mode === 'reject_request') {
-        const success = await runAction(
+        const result = await runAction(
           dialog.actionKey,
           async () => {
             await api.post(`/guardian/bff/break-glass/requests/${dialog.requestId}/reject`, {
@@ -316,11 +315,15 @@ export const SystemGovernancePage = () => {
           },
           dialog.successMessage,
         );
-        if (success) closeDialog();
+        if (result.ok) {
+          setDialogStatus(createSuccessDialogStatus(dialog.successMessage));
+          return;
+        }
+        setDialogStatus(createErrorDialogStatus(result.message));
         return;
       }
 
-      const success = await runAction(
+      const result = await runAction(
         dialog.actionKey,
         async () => {
           await api.post(`/guardian/bff/break-glass/${dialog.requestId}/revoke`, {
@@ -329,17 +332,25 @@ export const SystemGovernancePage = () => {
         },
         dialog.successMessage,
       );
-      if (success) closeDialog();
+      if (result.ok) {
+        setDialogStatus(createSuccessDialogStatus(dialog.successMessage));
+        return;
+      }
+      setDialogStatus(createErrorDialogStatus(result.message));
     },
     [closeDialog, dialog, runAction],
   );
+
+  const activeRuntimeExceptions = runtimeContext
+    ? Object.values(runtimeContext.capabilities).filter((enabled) => enabled).length
+    : 0;
 
   return (
     <>
       <div className="page-grid">
         <section className="card">
           <header className="card-headline">
-            <h2>Break-glass: solicitacao emergencial</h2>
+            <h2>Governanca de break-glass</h2>
             <button
               type="button"
               className="button secondary"
@@ -350,91 +361,57 @@ export const SystemGovernancePage = () => {
             </button>
           </header>
           <p className="subtle">
-            Fluxo emergencial com justificativa obrigatoria, aprovacao de segundo responsavel e expiracao automatica.
+            O Guardian aprova, audita e revoga acessos emergenciais. A solicitacao precisa nascer
+            no fluxo operacional controlado fora deste painel.
           </p>
 
           <div className="kpi-inline">
-            <span>Usuarios elegiveis: {activeUsers.length}</span>
             <span>Pendentes: {pendingRequests.length}</span>
             <span>Ativos: {activeAccesses.length}</span>
+            <span>Solicitacao fora do Guardian</span>
+            {runtimeContext ? <span>Excecoes runtime: {activeRuntimeExceptions}</span> : null}
           </div>
 
           {loading ? <p>Carregando governanca break-glass...</p> : null}
           {!loading && error ? <p className="error-text">{error}</p> : null}
           {feedback ? <p className="success-text">{feedback}</p> : null}
 
-          <div className="form-grid form-grid-compact">
-            <label>
-              Usuario alvo
-              <select
-                value={requestForm.targetUserId}
-                onChange={(event) =>
-                  setRequestForm((current) => ({ ...current, targetUserId: event.target.value }))
-                }
-                disabled={hasActionInProgress}
-              >
-                <option value="">Selecione...</option>
-                {activeUsers.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.nome} ({user.email}) - {user.role}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Permissoes temporarias (separadas por virgula)
-              <input
-                value={requestForm.permissions}
-                onChange={(event) =>
-                  setRequestForm((current) => ({ ...current, permissions: event.target.value }))
-                }
-                placeholder="admin.empresas.manage, users.update"
-                disabled={hasActionInProgress}
-              />
-            </label>
-
-            <label>
-              Duracao (minutos)
-              <input
-                type="number"
-                min={5}
-                max={240}
-                value={requestForm.durationMinutes}
-                onChange={(event) =>
-                  setRequestForm((current) => ({
-                    ...current,
-                    durationMinutes: event.target.value,
-                  }))
-                }
-                disabled={hasActionInProgress}
-              />
-            </label>
-
-            <label>
-              Justificativa
-              <textarea
-                rows={3}
-                value={requestForm.reason}
-                onChange={(event) =>
-                  setRequestForm((current) => ({ ...current, reason: event.target.value }))
-                }
-                placeholder="Contexto do incidente e porque o acesso emergencial e necessario."
-                disabled={hasActionInProgress}
-              />
-            </label>
-
-            <div className="inline-actions">
-              <button
-                type="button"
-                className="button primary"
-                onClick={() => void handleCreateRequest()}
-                disabled={hasActionInProgress || loading}
-              >
-                Solicitar break-glass
-              </button>
-            </div>
+          <div className="plan-editor-shell">
+            <h3>Escopo do Guardian</h3>
+            <p className="subtle">
+              O painel do proprietario nao deve ser usado para autoelevacao. Solicite o
+              break-glass no fluxo operacional previsto e use esta area apenas para aprovacao,
+              acompanhamento e revogacao.
+            </p>
           </div>
+
+          {runtimeContext ? (
+            <div className="system-runtime-grid">
+              <article className="system-runtime-card">
+                <span>Ambiente</span>
+                <strong>{runtimeContext.environment}</strong>
+                <small>
+                  Origem: {runtimeContext.policySource}
+                  {runtimeContext.releaseVersion ? ` | Release: ${runtimeContext.releaseVersion}` : ''}
+                </small>
+              </article>
+              <article className="system-runtime-card">
+                <span>MFA administrativo</span>
+                <strong>{runtimeContext.adminMfaRequired ? 'Obrigatorio' : 'Flexivel'}</strong>
+                <small>Politica aplicada no runtime do backend</small>
+              </article>
+              <article className="system-runtime-card">
+                <span>Transicao legado</span>
+                <strong>{runtimeContext.legacyTransitionMode}</strong>
+                <small>Backoffice legado versus Guardian</small>
+              </article>
+              <article className="system-runtime-card">
+                <span>Excecoes sensiveis</span>
+                <strong>{activeRuntimeExceptions}</strong>
+                <small>Flags liberadas fora do baseline seguro</small>
+              </article>
+            </div>
+          ) : null}
         </section>
 
         <section className="card">
@@ -482,6 +459,47 @@ export const SystemGovernancePage = () => {
           ) : null}
         </section>
       </div>
+
+      <section className="card">
+        <header className="card-headline">
+          <h2>Historico de politica Guardian</h2>
+          <span className="subtle-inline">Snapshots imutaveis por mudanca de politica/release</span>
+        </header>
+        {loading ? <p>Carregando historico runtime...</p> : null}
+        {!loading ? (
+          <ul className="clean-list runtime-history-list">
+            {runtimeHistory.map((item) => (
+              <li key={item.id} className="runtime-history-item">
+                <div>
+                  <strong>
+                    {item.environment}
+                    {item.releaseVersion ? ` | ${item.releaseVersion}` : ''}
+                  </strong>
+                  <div className="subtle-inline">
+                    {formatDate(item.createdAt)} | origem {item.policySource} | transicao{' '}
+                    {item.legacyTransitionMode}
+                  </div>
+                  <div className="subtle-inline">
+                    MFA admin: {item.adminMfaRequired ? 'obrigatorio' : 'flexivel'}
+                  </div>
+                </div>
+                <div className="runtime-history-tags">
+                  {item.enabledCapabilities.length > 0 ? (
+                    item.enabledCapabilities.map((capability) => (
+                      <span key={`${item.id}-${capability}`} className="runtime-history-tag enabled">
+                        {capability}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="runtime-history-tag">baseline seguro</span>
+                  )}
+                </div>
+              </li>
+            ))}
+            {runtimeHistory.length === 0 ? <li>Nenhum snapshot registrado ainda.</li> : null}
+          </ul>
+        ) : null}
+      </section>
 
       <section className="card">
         <h2>Acessos emergenciais ativos</h2>
@@ -538,7 +556,8 @@ export const SystemGovernancePage = () => {
         subtitle={dialog?.subtitle}
         reasonRequired={dialog?.reasonRequired}
         confirmLabel={dialog?.confirmLabel}
-        loading={hasActionInProgress}
+        status={dialogStatus.status}
+        statusMessage={dialogStatus.message}
         onCancel={closeDialog}
         onConfirm={(reason) => {
           void confirmDialog(reason);
