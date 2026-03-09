@@ -45,23 +45,23 @@ const applyProfilePermissions = async (page: any, permissions: string[]) => {
   await page.waitForURL('**/dashboard', { timeout: 10000 });
 };
 
-test.describe('Billing relay para Financeiro (legado)', () => {
-  test('permite redirect legado com financeiro.faturamento.read', async ({ page, adminUser }) => {
+test.describe('Billing legacy aliases para self-service', () => {
+  test('permite aliases legados com planos.manage', async ({ page, adminUser }) => {
     await login(page, adminUser.email, adminUser.senha);
-    await applyProfilePermissions(page, ['financeiro.faturamento.read']);
+    await applyProfilePermissions(page, ['planos.manage']);
 
     await page.goto('/billing/faturas');
-    await page.waitForURL('**/financeiro/faturamento', { timeout: 10000 });
+    await page.waitForURL('**/billing/assinaturas', { timeout: 10000 });
     await expect(page.getByText(/Acesso negado/i)).toHaveCount(0);
 
     await page.goto('/billing/pagamentos');
-    await page.waitForURL('**/financeiro/faturamento', { timeout: 10000 });
+    await page.waitForURL('**/billing/assinaturas', { timeout: 10000 });
     await expect(page.getByText(/Acesso negado/i)).toHaveCount(0);
   });
 
-  test('bloqueia relay legado sem permissao financeira', async ({ page, adminUser }) => {
+  test('bloqueia aliases legados sem planos.manage', async ({ page, adminUser }) => {
     await login(page, adminUser.email, adminUser.senha);
-    await applyProfilePermissions(page, ['crm.clientes.read']);
+    await applyProfilePermissions(page, ['financeiro.faturamento.read']);
 
     await page.goto('/billing/faturas');
     await expect(page.getByText(/Acesso negado/i)).toBeVisible({ timeout: 10000 });

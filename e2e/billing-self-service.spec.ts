@@ -1,7 +1,7 @@
 ﻿import { test, expect } from './fixtures';
 
 test.describe('Billing self-service', () => {
-  test('mantem navegacao por tab/query e aplica redirects legados', async ({ authenticatedPage }) => {
+  test('mantem navegacao por tab/query e aplica aliases legados para assinatura', async ({ authenticatedPage }) => {
     await authenticatedPage.goto('/billing/assinaturas?tab=usage');
     await authenticatedPage.waitForURL('**/billing/assinaturas?tab=usage', { timeout: 15000 });
 
@@ -26,9 +26,9 @@ test.describe('Billing self-service', () => {
     await authenticatedPage.waitForURL('**/billing/assinaturas', { timeout: 10000 });
 
     await authenticatedPage.goto('/billing/faturas');
-    await authenticatedPage.waitForURL('**/financeiro/faturamento', { timeout: 10000 });
+    await authenticatedPage.waitForURL('**/billing/assinaturas', { timeout: 10000 });
 
     await authenticatedPage.goto('/billing/pagamentos');
-    await authenticatedPage.waitForURL('**/financeiro/faturamento', { timeout: 10000 });
+    await authenticatedPage.waitForURL('**/billing/assinaturas', { timeout: 10000 });
   });
 });
