@@ -2,6 +2,7 @@ import { INestApplication, ValidationPipe, ValidationPipeOptions } from '@nestjs
 import { TestingModule } from '@nestjs/testing';
 import * as fs from 'fs';
 import * as path from 'path';
+import { DataSource } from 'typeorm';
 
 type CreateE2EAppOptions = {
   validationPipe?: boolean;
@@ -91,7 +92,25 @@ export async function createE2EApp(
 
   await withE2EBootstrapLock(async () => {
     await app.init();
+    await ensureE2EDatabaseCompatibility(app);
   });
 
   return app;
+}
+
+async function ensureE2EDatabaseCompatibility(app: INestApplication): Promise<void> {
+  if (!isTestEnv()) return;
+
+  try {
+    const dataSource = app.get(DataSource, { strict: false });
+    if (!dataSource?.isInitialized) return;
+
+    // Compatibilidade com schema legado para fluxo MFA em suites E2E.
+    await dataSource.query(`
+      ALTER TABLE "empresas"
+      ADD COLUMN IF NOT EXISTS "data_expiracao" TIMESTAMP
+    `);
+  } catch {
+    // Best effort: nao bloquear bootstrap de testes por ajuste de compatibilidade.
+  }
 }

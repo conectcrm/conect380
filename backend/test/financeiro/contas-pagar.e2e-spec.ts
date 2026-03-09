@@ -104,7 +104,7 @@ describe('ContasPagar (E2E)', () => {
       ) {
         return;
       }
-      // Preserva logs n?o-SQL relevantes do teste/aplica??o.
+      // Preserva logs nao-SQL relevantes do teste/aplicacao.
       // eslint-disable-next-line no-console
       console.info(...args);
     });
@@ -570,5 +570,4 @@ describe('ContasPagar (E2E)', () => {
     return value;
   }
 });
-
 
