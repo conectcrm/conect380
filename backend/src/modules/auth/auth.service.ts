@@ -889,7 +889,6 @@ export class AuthService {
 
     const challenge = await this.mfaLoginChallengeRepository.findOne({
       where: { id: challengeIdNormalizado },
-      relations: ['user', 'user.empresa'],
     });
 
     if (!challenge || challenge.usedAt) {
@@ -958,7 +957,6 @@ export class AuthService {
     const tokenHash = this.hashValor(normalizedRefreshToken);
     const currentSession = await this.authRefreshTokenRepository.findOne({
       where: { tokenHash },
-      relations: ['user', 'user.empresa'],
     });
 
     if (!currentSession) {
