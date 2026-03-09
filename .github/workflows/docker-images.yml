@@ -37,7 +37,7 @@ jobs:
 
       - name: 🏷️ Gerar metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: |
             ${{ env.IMAGE_PREFIX }}-backend
@@ -80,7 +80,7 @@ jobs:
 
       - name: 🏷️ Gerar metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: |
             ${{ env.IMAGE_PREFIX }}-frontend
