@@ -626,14 +626,7 @@ jobs:
               - 'e2e/billing-*.spec.ts'
               - 'e2e/fixtures.ts'
               - 'playwright.config.ts'
-              - 'frontend-web/src/pages/billing/**'
-              - 'frontend-web/src/components/Billing/**'
-              - 'frontend-web/src/hooks/useSubscription.ts'
-              - 'frontend-web/src/config/menuConfig.ts'
-              - 'frontend-web/src/config/__tests__/menuConfig.permissions.test.ts'
-              - 'frontend-web/src/contexts/AuthContext.tsx'
-              - 'frontend-web/src/components/licensing/PermissionPathGuard.tsx'
-              - 'frontend-web/src/App.tsx'
+              - 'frontend-web/src/**'
               - 'package.json'
               - 'package-lock.json'
               - 'frontend-web/package.json'
@@ -711,6 +704,57 @@ jobs:
           if [ -f frontend.pid ]; then
             kill "$(cat frontend.pid)" || true
           fi
+
+  frontend-guardian-exposure-scan:
+    name: Frontend - Guardian Exposure Scan
+    runs-on: ubuntu-latest
+    needs: frontend
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detectar mudancas relevantes (Guardian Exposure Scan)
+        id: guardian_exposure_changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            guardian_exposure:
+              - '.github/workflows/ci.yml'
+              - 'scripts/ci/guardian-exposure-scan.ps1'
+              - 'frontend-web/src/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'frontend-web/package.json'
+              - 'frontend-web/package-lock.json'
+
+      - name: Pular Guardian Exposure Scan (sem mudancas relevantes)
+        if: steps.guardian_exposure_changes.outputs.guardian_exposure != 'true'
+        run: echo "Sem alteracoes no escopo de guardian exposure scan; job finalizado."
+
+      - name: Setup Node.js
+        if: steps.guardian_exposure_changes.outputs.guardian_exposure == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend-web/package-lock.json
+
+      - name: Instalar dependencias root
+        if: steps.guardian_exposure_changes.outputs.guardian_exposure == 'true'
+        run: npm ci
+
+      - name: Instalar dependencias frontend
+        if: steps.guardian_exposure_changes.outputs.guardian_exposure == 'true'
+        run: npm --prefix frontend-web ci
+
+      - name: Rodar Guardian exposure scan
+        if: steps.guardian_exposure_changes.outputs.guardian_exposure == 'true'
+        run: pwsh -NoLogo -NoProfile -File scripts/ci/guardian-exposure-scan.ps1
 
   frontend-e2e-guardian-billing-governance:
     name: Frontend - E2E Guardian Billing Governance (Playwright)
@@ -862,7 +906,7 @@ jobs:
   final-status:
     name: Status Final do CI
     runs-on: ubuntu-latest
-    needs: [encoding-guardrails, release-flags-guardrails, backend, backend-e2e-cotacao, backend-e2e-contas-pagar, backend-e2e-multi-tenancy, backend-e2e-vendas, backend-e2e-guardian-hardening, backend-e2e-guardian-security, frontend, frontend-e2e-pipeline-ui, frontend-e2e-billing-critical, frontend-e2e-guardian-billing-governance, security, check-temp-files]
+    needs: [encoding-guardrails, release-flags-guardrails, backend, backend-e2e-cotacao, backend-e2e-contas-pagar, backend-e2e-multi-tenancy, backend-e2e-vendas, backend-e2e-guardian-hardening, backend-e2e-guardian-security, frontend, frontend-e2e-pipeline-ui, frontend-e2e-billing-critical, frontend-guardian-exposure-scan, frontend-e2e-guardian-billing-governance, security, check-temp-files]
     if: always()
 
     steps:
@@ -880,6 +924,7 @@ jobs:
           echo "Frontend: ${{ needs.frontend.result }}"
           echo "Frontend E2E Pipeline UI: ${{ needs.frontend-e2e-pipeline-ui.result }}"
           echo "Frontend E2E Billing Critical: ${{ needs.frontend-e2e-billing-critical.result }}"
+          echo "Frontend Guardian Exposure Scan: ${{ needs.frontend-guardian-exposure-scan.result }}"
           echo "Frontend E2E Guardian Billing Governance: ${{ needs.frontend-e2e-guardian-billing-governance.result }}"
           echo "Security: ${{ needs.security.result }}"
           echo "Temp Files Check: ${{ needs.check-temp-files.result }}"
@@ -896,6 +941,7 @@ jobs:
              [ "${{ needs.frontend.result }}" != "success" ] || \
              [ "${{ needs.frontend-e2e-pipeline-ui.result }}" != "success" ] || \
              [ "${{ needs.frontend-e2e-billing-critical.result }}" != "success" ] || \
+             [ "${{ needs.frontend-guardian-exposure-scan.result }}" != "success" ] || \
              [ "${{ needs.frontend-e2e-guardian-billing-governance.result }}" != "success" ] || \
              [ "${{ needs.security.result }}" != "success" ] || \
              [ "${{ needs.check-temp-files.result }}" != "success" ]; then
