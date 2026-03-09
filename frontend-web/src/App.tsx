@@ -672,11 +672,11 @@ const AppRoutes: React.FC = () => {
                   />
                   <Route
                     path="/billing/faturas"
-                    element={<Navigate to="/financeiro/faturamento" replace />}
+                    element={<Navigate to="/billing/assinaturas" replace />}
                   />
                   <Route
                     path="/billing/pagamentos"
-                    element={<Navigate to="/financeiro/faturamento" replace />}
+                    element={<Navigate to="/billing/assinaturas" replace />}
                   />
                   <Route
                     path="/assinaturas"

@@ -114,7 +114,6 @@ const renderBillingRoute = (initialEntry: string) => {
       <Routes>
         <Route path="/billing/assinaturas" element={<BillingPage />} />
         <Route path="/billing/planos" element={<BillingPage />} />
-        <Route path="/financeiro/faturamento" element={<span>financeiro-faturamento-view</span>} />
       </Routes>
       <LocationProbe />
     </MemoryRouter>,
@@ -170,15 +169,15 @@ describe('BillingPage routing tabs', () => {
     expect(screen.getByTestId('location-probe')).toHaveTextContent('/billing/assinaturas');
   });
 
-  it('redireciona gestao de cobranca para financeiro quando acionado pelo dashboard', async () => {
+  it('abre fluxo de planos quando gestao de cobranca e acionada no dashboard', async () => {
     renderBillingRoute('/billing/assinaturas');
 
     fireEvent.click(screen.getByText('dashboard-manage'));
 
     await waitFor(() => {
-      expect(screen.getByText('financeiro-faturamento-view')).toBeInTheDocument();
+      expect(screen.getByText('plan-selection-view')).toBeInTheDocument();
     });
 
-    expect(screen.getByTestId('location-probe')).toHaveTextContent('/financeiro/faturamento');
+    expect(screen.getByTestId('location-probe')).toHaveTextContent('/billing/planos');
   });
 });

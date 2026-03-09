@@ -132,7 +132,7 @@ export const BillingPage: React.FC = () => {
   };
 
   const handleManageBilling = () => {
-    navigate('/financeiro/faturamento');
+    navigateToTab('plans');
   };
 
   const renderContent = () => {

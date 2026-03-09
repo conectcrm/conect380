@@ -529,25 +529,25 @@ describe('menuConfig permission filtering', () => {
     expect(withoutPermission).toBe(false);
   });
 
-  it('maps legacy billing faturas/pagamentos aliases to financeiro.faturamento.read', () => {
-    const faturamentoRead = canUserAccessPath('/billing/faturas', ALL_MODULES, {
+  it('maps legacy billing faturas/pagamentos aliases to billing self-service permission', () => {
+    const planosManageFaturas = canUserAccessPath('/billing/faturas', ALL_MODULES, {
+      email: 'owner@empresa.com',
+      role: 'custom',
+      permissions: ['planos.manage'],
+    } as any);
+    const planosManagePagamentos = canUserAccessPath('/billing/pagamentos', ALL_MODULES, {
+      email: 'owner@empresa.com',
+      role: 'custom',
+      permissions: ['planos.manage'],
+    } as any);
+    const financeiroOnly = canUserAccessPath('/billing/faturas', ALL_MODULES, {
       email: 'finance.reader@empresa.com',
       role: 'custom',
       permissions: ['financeiro.faturamento.read'],
     } as any);
-    const pagamentoReadOnly = canUserAccessPath('/billing/pagamentos', ALL_MODULES, {
-      email: 'payables.reader@empresa.com',
-      role: 'custom',
-      permissions: ['financeiro.pagamentos.read'],
-    } as any);
-    const withoutFinance = canUserAccessPath('/billing/faturas', ALL_MODULES, {
-      email: 'user@empresa.com',
-      role: 'custom',
-      permissions: ['crm.clientes.read'],
-    } as any);
 
-    expect(faturamentoRead).toBe(true);
-    expect(pagamentoReadOnly).toBe(true);
-    expect(withoutFinance).toBe(false);
+    expect(planosManageFaturas).toBe(true);
+    expect(planosManagePagamentos).toBe(true);
+    expect(financeiroOnly).toBe(false);
   });
 });
