@@ -33,6 +33,11 @@ interface Produto {
   nome: string;
   preco: number;
   categoria: string;
+  categoriaId?: string;
+  subcategoria?: string;
+  subcategoriaId?: string;
+  configuracao?: string;
+  configuracaoId?: string;
   descricao?: string;
   unidade: string;
   tipo?: 'produto' | 'combo' | 'software';
@@ -310,17 +315,23 @@ class PropostasService {
               nome: produto.nome || 'Item sem nome',
               preco: Number(produto.preco || 0),
               categoria: produto.categoria || 'Geral',
+              categoriaId: produto.categoriaId,
+              subcategoria: produto.subcategoriaNome || undefined,
+              subcategoriaId: produto.subcategoriaId || undefined,
+              configuracao: produto.configuracaoNome || undefined,
+              configuracaoId: produto.configuracaoId || undefined,
               descricao: produto.descricao || '',
               unidade: produto.unidade || produto.unidadeMedida || 'unidade',
-              tipo: 'produto',
+              tipo: produto.configuracaoNome || produto.tipoItem || 'produto',
               tipoItem: produto.tipoItem,
               status: produto.status || 'ativo',
-              tipoLicenciamento: produto.frequencia,
-              periodicidadeLicenca: produto.frequencia,
+              tipoLicenciamento: produto.tipoLicenciamento,
+              periodicidadeLicenca: produto.periodicidadeLicenca,
             }))
         : [];
 
       let itensCombo: Produto[] = [];
+      // Compatibilidade legada: combos ficam desligados por padrão e não devem mais orientar a evolução do catálogo.
       if (catalogoFeatures.combosEnabled) {
         try {
           const { combosService } = await import('../../../services/combosService');
@@ -344,9 +355,11 @@ class PropostasService {
                 nome: item.produto.nome,
                 preco: Number(item.produto.preco || 0),
                 categoria: item.produto.categoria || 'Geral',
+                subcategoria: (item.produto as any).subcategoria,
+                configuracao: (item.produto as any).configuracao,
                 descricao: item.produto.descricao,
                 unidade: item.produto.unidade || 'unidade',
-                tipo: 'produto',
+                tipo: (item.produto as any).configuracao || item.produto.tipo || 'produto',
                 tipoItem: item.produto.tipo as Produto['tipoItem'],
                 status: item.produto.status || 'ativo',
               })),

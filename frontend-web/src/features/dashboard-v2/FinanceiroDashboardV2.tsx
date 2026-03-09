@@ -43,9 +43,9 @@ import {
 type PeriodoFiltro = '7d' | '30d' | '90d';
 
 const periodOptions: Array<{ value: PeriodoFiltro; label: string }> = [
-  { value: '7d', label: 'Ultimos 7 dias' },
-  { value: '30d', label: 'Ultimos 30 dias' },
-  { value: '90d', label: 'Ultimos 90 dias' },
+  { value: '7d', label: 'Últimos 7 dias' },
+  { value: '30d', label: 'Últimos 30 dias' },
+  { value: '90d', label: 'Últimos 90 dias' },
 ];
 
 const formatCurrency = (value: number): string =>
@@ -74,7 +74,31 @@ const formatDateTime = (value: string): string => {
   });
 };
 
+const alertSeverityLabelMap = {
+  critical: 'Crítico',
+  warning: 'Atenção',
+  info: 'Informativo',
+} as const;
+
+const alertStatusLabelMap = {
+  ativo: 'Ativo',
+  acknowledged: 'Reconhecido',
+  resolvido: 'Resolvido',
+} as const;
+
 const clampPercent = (value: number): number => Math.max(0, Math.min(100, value));
+
+const formatCompactCurrency = (value: number): string => {
+  if (Math.abs(value) >= 1_000_000) {
+    return `R$${(value / 1_000_000).toFixed(1)}M`;
+  }
+
+  if (Math.abs(value) >= 1_000) {
+    return `R$${(value / 1_000).toFixed(0)}K`;
+  }
+
+  return formatCurrency(value);
+};
 
 const periodRange = (periodo: PeriodoFiltro): { dataInicioIso: string; dataFimIso: string } => {
   const dataFim = new Date();
@@ -150,11 +174,11 @@ const FinanceiroDashboardV2: React.FC = () => {
     if (resultados[6].status === 'fulfilled') {
       setAlertasOperacionais(resultados[6].value);
     } else {
-      setWarningAlertas('Nao foi possivel carregar alertas operacionais agora.');
+      setWarningAlertas('Não foi possível carregar alertas operacionais agora.');
     }
 
     if (falhasCriticas > 0) {
-      setWarning('Alguns indicadores nao puderam ser carregados. Exibindo dados parciais.');
+      setWarning('Alguns indicadores não puderam ser carregados. Exibindo dados parciais.');
     }
 
     setLastUpdatedAt(new Date().toISOString());
@@ -187,12 +211,22 @@ const FinanceiroDashboardV2: React.FC = () => {
   const valorEmAberto = Number(faturasData?.aggregates?.valorEmAberto || 0);
   const totalAtrasado = Number(resumoContasPagar?.totalAtrasado || 0);
   const totalMes = Number(resumoContasPagar?.totalMes || 0);
+  const totalQuantidadeFaturas = Number(faturasData?.total || faturas.length || 0);
   const pendenciasValor = pendenciasAprovacao.reduce(
     (acc, conta) => acc + Number(conta.valorRestante || conta.valorTotal || 0),
     0,
   );
   const taxaRecebimento = valorFaturado > 0 ? (valorRecebido / valorFaturado) * 100 : 0;
   const caixaPercent = clampPercent(totalMes > 0 ? (saldoBancarioTotal / totalMes) * 100 : 100);
+  const faturadoMedioPorFatura = totalQuantidadeFaturas > 0 ? valorFaturado / totalQuantidadeFaturas : 0;
+  const recebidasCount = faturas.filter((item) => item.status === StatusFatura.PAGA).length;
+  const vencidasCount = faturas.filter((item) => item.status === StatusFatura.VENCIDA).length;
+  const importacoesRecentesCount = importacoesConciliacao.length;
+  const coberturaCaixaMeses = totalMes > 0 ? saldoBancarioTotal / totalMes : 0;
+  const caixaCoverageLabel =
+    totalMes > 0
+      ? `${coberturaCaixaMeses.toFixed(1)}x do desembolso mensal`
+      : 'Sem desembolso mensal de referência';
 
   const sparkFaturado = useMemo(() => faturas.slice(-12).map((item) => Number(item.valorTotal || 0)), [faturas]);
   const sparkRecebido = useMemo(
@@ -217,6 +251,18 @@ const FinanceiroDashboardV2: React.FC = () => {
 
   const contadoresAlertas = useMemo(
     () => contarAlertasOperacionais(alertasPriorizados),
+    [alertasPriorizados],
+  );
+  const alertasAtivosCount = useMemo(
+    () => alertasPriorizados.filter((alerta) => alerta.status === 'ativo').length,
+    [alertasPriorizados],
+  );
+  const alertasReconhecidosCount = useMemo(
+    () => alertasPriorizados.filter((alerta) => alerta.status === 'acknowledged').length,
+    [alertasPriorizados],
+  );
+  const alertasReprocessaveisCount = useMemo(
+    () => alertasPriorizados.filter((alerta) => isAlertaReprocessavel(alerta.tipo)).length,
     [alertasPriorizados],
   );
   const hasActiveFilters = periodo !== '30d';
@@ -248,7 +294,7 @@ const FinanceiroDashboardV2: React.FC = () => {
           atualizado = resultado.alerta;
           if (!resultado.sucesso) {
             limparWarning = false;
-            setWarningAlertas(resultado.mensagem || 'Nao foi possivel reprocessar o alerta.');
+            setWarningAlertas(resultado.mensagem || 'Não foi possível reprocessar o alerta.');
           }
         }
 
@@ -263,7 +309,7 @@ const FinanceiroDashboardV2: React.FC = () => {
         if (acao === 'reprocessar' && error instanceof Error && error.message) {
           setWarningAlertas(error.message);
         } else {
-          setWarningAlertas('Nao foi possivel atualizar o alerta selecionado.');
+          setWarningAlertas('Não foi possível atualizar o alerta selecionado.');
         }
       } finally {
         setAlertaActionById((prev) => ({ ...prev, [id]: undefined }));
@@ -293,18 +339,18 @@ const FinanceiroDashboardV2: React.FC = () => {
       {
         id: 'aprovacoes',
         type: pendenciasAprovacao.length > 0 ? 'info' : 'opportunity',
-        title: 'Fila de aprovacao financeira',
+        title: 'Fila de aprovação financeira',
         description: `${formatNumber(pendenciasAprovacao.length)} itens somando ${formatCurrency(pendenciasValor)}.`,
         impact: pendenciasAprovacao.length > 0 ? 'medio' : 'baixo',
-        action: 'Liberar aprovacoes pendentes conforme alcada.',
+        action: 'Liberar aprovações pendentes conforme alçada.',
       },
       {
         id: 'conciliacao',
         type: importacoesConciliacao.length > 0 ? 'opportunity' : 'info',
-        title: 'Conciliacao bancaria',
-        description: `${formatNumber(importacoesConciliacao.length)} importacoes recentes.`,
+        title: 'Conciliação bancária',
+        description: `${formatNumber(importacoesConciliacao.length)} importações recentes.`,
         impact: 'medio',
-        action: 'Executar matching automatico para reduzir pendencias.',
+        action: 'Executar matching automático para reduzir pendências.',
       },
     ],
     [importacoesConciliacao.length, pendenciasAprovacao.length, pendenciasValor, taxaRecebimento, totalAtrasado],
@@ -323,19 +369,19 @@ const FinanceiroDashboardV2: React.FC = () => {
               Dashboard Financeiro
             </h2>
             <p className="mt-1 text-[13px] text-[#617D89]">
-              Controle de faturamento, recebimentos, caixa e operacoes financeiras.
+              Controle de faturamento, recebimentos, caixa e operações financeiras.
             </p>
-            <p className="mt-1 text-[12px] text-[#7A929E]">Ultima sincronizacao: {lastUpdatedLabel}</p>
+            <p className="mt-1 text-[12px] text-[#7A929E]">Última sincronização: {lastUpdatedLabel}</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto">
             <label htmlFor="dashboard-financeiro-periodo" className="text-[13px] font-medium text-[#567583]">
-              Periodo
+              Período
             </label>
             <select
               id="dashboard-financeiro-periodo"
               value={periodo}
               onChange={(event) => setPeriodo(event.target.value as PeriodoFiltro)}
-              className="rounded-[10px] border border-[#D5E3E8] bg-white px-3 py-2 text-[13px] text-[#244556] focus:border-[#159A9C] focus:outline-none"
+              className="w-full min-w-0 rounded-[10px] border border-[#D5E3E8] bg-white px-3 py-2 text-[13px] text-[#244556] focus:border-[#159A9C] focus:outline-none sm:w-auto sm:min-w-[180px]"
             >
               {periodOptions.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -365,20 +411,76 @@ const FinanceiroDashboardV2: React.FC = () => {
       </section>
 
       <section className="grid grid-cols-1 gap-3.5 lg:grid-cols-2 xl:grid-cols-5">
-        <KpiTrendCard title="Faturado" value={formatCurrency(valorFaturado)} sparkline={sparkFaturado} icon={<Wallet className="h-5 w-5" />} />
-        <KpiTrendCard title="Recebido" value={formatCurrency(valorRecebido)} progressPercent={taxaRecebimento} sparkline={sparkRecebido} icon={<Wallet className="h-5 w-5" />} />
-        <KpiTrendCard title="Em aberto" value={formatCurrency(valorEmAberto)} progressPercent={clampPercent(100 - taxaRecebimento)} progressTone="amber" sparkline={sparkAtrasado} icon={<Wallet className="h-5 w-5" />} />
-        <KpiTrendCard title="Aprovacoes" value={formatNumber(pendenciasAprovacao.length)} valueSuffix="itens" progressPercent={clampPercent(pendenciasAprovacao.length * 12)} progressTone="amber" icon={<ShieldCheck className="h-5 w-5" />} />
-        <GoalProgressCard title="Posicao de caixa" primaryValue={formatCurrency(saldoBancarioTotal)} secondaryValue={formatCurrency(totalMes)} progressPercent={caixaPercent} icon={<Landmark className="h-5 w-5" />} />
+        <KpiTrendCard
+          title="Faturado"
+          value={formatCurrency(valorFaturado)}
+          sparkline={sparkFaturado}
+          progressPercent={clampPercent(totalQuantidadeFaturas > 0 ? (recebidasCount / totalQuantidadeFaturas) * 100 : 0)}
+          footerLeft={`${formatNumber(totalQuantidadeFaturas)} faturas no período`}
+          footerRight={
+            faturadoMedioPorFatura > 0
+              ? `Ticket médio: ${formatCompactCurrency(faturadoMedioPorFatura)}`
+              : 'Sem ticket calculado'
+          }
+          icon={<Wallet className="h-5 w-5" />}
+        />
+        <KpiTrendCard
+          title="Recebido"
+          value={formatCurrency(valorRecebido)}
+          progressPercent={taxaRecebimento}
+          sparkline={sparkRecebido}
+          footerLeft={`${taxaRecebimento.toFixed(0)}% de conversão financeira`}
+          footerRight={`${formatNumber(recebidasCount)} faturas pagas`}
+          icon={<Wallet className="h-5 w-5" />}
+        />
+        <KpiTrendCard
+          title="Em aberto"
+          value={formatCurrency(valorEmAberto)}
+          progressPercent={clampPercent(100 - taxaRecebimento)}
+          progressTone="amber"
+          sparkline={sparkAtrasado}
+          footerLeft={`${formatNumber(vencidasCount)} faturas vencidas`}
+          footerRight={
+            totalAtrasado > 0 ? `Atrasado: ${formatCompactCurrency(totalAtrasado)}` : 'Sem atraso relevante'
+          }
+          icon={<Wallet className="h-5 w-5" />}
+        />
+        <KpiTrendCard
+          title="Fila de aprovações"
+          value={formatNumber(pendenciasAprovacao.length)}
+          valueSuffix="itens"
+          progressPercent={clampPercent(pendenciasAprovacao.length * 12)}
+          progressTone="amber"
+          footerLeft={
+            pendenciasValor > 0 ? `Fila: ${formatCompactCurrency(pendenciasValor)}` : 'Sem valor pendente'
+          }
+          footerRight={`${formatNumber(importacoesRecentesCount)} importações recentes`}
+          icon={<ShieldCheck className="h-5 w-5" />}
+        />
+        <GoalProgressCard
+          title="Posicao de caixa"
+          primaryValue={formatCurrency(saldoBancarioTotal)}
+          primaryLabel="Saldo bancário"
+          secondaryValue={formatCurrency(totalMes)}
+          secondaryLabel="Desembolso mensal"
+          progressPercent={caixaPercent}
+          projectionLabel={caixaCoverageLabel}
+          icon={<Landmark className="h-5 w-5" />}
+        />
       </section>
 
-      <section className="grid grid-cols-1 gap-3.5 xl:grid-cols-12">
-        <article className="space-y-3.5 xl:col-span-9">
+      <section className="grid grid-cols-1 gap-3.5 2xl:grid-cols-12">
+        <article className="space-y-3.5 2xl:col-span-9">
           <div className="rounded-[20px] border border-[#DCE7EB] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)]">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <BellRing className="h-4.5 w-4.5 text-[#2A5C70]" />
-                <h3 className="text-[18px] font-semibold text-[#18374B]">Alertas operacionais</h3>
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <BellRing className="h-4.5 w-4.5 text-[#2A5C70]" />
+                  <h3 className="text-[18px] font-semibold text-[#18374B]">Alertas operacionais</h3>
+                </div>
+                <p className="mt-1 text-[13px] text-[#617D89]">
+                  Priorização de risco e ações imediatas para o time financeiro.
+                </p>
               </div>
               <button
                 type="button"
@@ -390,18 +492,28 @@ const FinanceiroDashboardV2: React.FC = () => {
               </button>
             </div>
 
-            <div className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-4">
-              <div className="rounded-[12px] border border-[#F2D4D4] bg-[#FFF5F5] px-3 py-2 text-[13px] text-[#8A3030]">
-                Criticos: {formatNumber(contadoresAlertas.critical)}
+            <div className="mb-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2 2xl:grid-cols-4">
+              <div className="rounded-[14px] border border-[#F2D4D4] bg-[#FFF5F5] px-3.5 py-3 text-[#8A3030]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em]">Críticos</p>
+                <p className="mt-1 text-[22px] font-semibold leading-none">{formatNumber(contadoresAlertas.critical)}</p>
+                <p className="mt-2 text-[12px] text-[#9C5454]">Itens que exigem resposta imediata.</p>
               </div>
-              <div className="rounded-[12px] border border-[#F4E1BF] bg-[#FFF8EB] px-3 py-2 text-[13px] text-[#8A5D11]">
-                Warning: {formatNumber(contadoresAlertas.warning)}
+              <div className="rounded-[14px] border border-[#F4E1BF] bg-[#FFF8EB] px-3.5 py-3 text-[#8A5D11]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em]">Em atenção</p>
+                <p className="mt-1 text-[22px] font-semibold leading-none">{formatNumber(contadoresAlertas.warning)}</p>
+                <p className="mt-2 text-[12px] text-[#9A7A34]">Demandas com potencial de escalada.</p>
               </div>
-              <div className="rounded-[12px] border border-[#DDEAF0] bg-[#F4FAFD] px-3 py-2 text-[13px] text-[#2F5C72]">
-                Informativos: {formatNumber(contadoresAlertas.info)}
+              <div className="rounded-[14px] border border-[#DDEAF0] bg-[#F4FAFD] px-3.5 py-3 text-[#2F5C72]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em]">Ativos</p>
+                <p className="mt-1 text-[22px] font-semibold leading-none">{formatNumber(alertasAtivosCount)}</p>
+                <p className="mt-2 text-[12px] text-[#5E8397]">Alertas ainda sem resolução final.</p>
               </div>
-              <div className="rounded-[12px] border border-[#DDE7EC] bg-[#F8FBFD] px-3 py-2 text-[13px] text-[#436273]">
-                Ativos: {formatNumber(contadoresAlertas.total)}
+              <div className="rounded-[14px] border border-[#DDE7EC] bg-[#F8FBFD] px-3.5 py-3 text-[#436273]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em]">Cobertura</p>
+                <p className="mt-1 text-[22px] font-semibold leading-none">{formatNumber(alertasReprocessaveisCount)}</p>
+                <p className="mt-2 text-[12px] text-[#69808C]">
+                  reprocessáveis • {formatNumber(alertasReconhecidosCount)} reconhecidos
+                </p>
               </div>
             </div>
 
@@ -412,49 +524,61 @@ const FinanceiroDashboardV2: React.FC = () => {
                 Sem alertas operacionais ativos no momento.
               </p>
             ) : (
-              <div className="space-y-2.5">
+              <div className="space-y-3">
                 {alertasPriorizados.slice(0, 6).map((alerta) => {
                   const currentAction = alertaActionById[alerta.id];
                   const isProcessing = Boolean(currentAction);
                   return (
                     <div
                       key={alerta.id}
-                      className="rounded-[14px] border border-[#E2ECEF] bg-[#FBFDFD] px-3 py-3"
+                      className="rounded-[16px] border border-[#E2ECEF] bg-[#FBFDFD] px-3.5 py-3.5"
                     >
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-2 flex flex-wrap items-center gap-2">
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold ${
+                                alerta.severidade === 'critical'
+                                  ? 'bg-[#FFE9E9] text-[#A93B3B]'
+                                  : alerta.severidade === 'warning'
+                                    ? 'bg-[#FFF2DD] text-[#A16A16]'
+                                    : 'bg-[#EAF4F8] text-[#436B80]'
+                              }`}
+                            >
+                              {alerta.severidade === 'critical' ? (
+                                <AlertTriangle className="h-3 w-3" />
+                              ) : (
+                                <CheckCircle2 className="h-3 w-3" />
+                              )}
+                              {alertSeverityLabelMap[alerta.severidade]}
+                            </span>
+                            <span className="inline-flex items-center rounded-full border border-[#D8E5EA] bg-white px-2 py-1 text-[11px] font-semibold text-[#5D7885]">
+                              {alertStatusLabelMap[alerta.status]}
+                            </span>
+                            <span className="text-[11px] text-[#7E96A2]">
+                              Criado em {formatDateTime(alerta.createdAt)}
+                            </span>
+                          </div>
+
                           <p className="text-[14px] font-semibold text-[#1C3B4E]">{alerta.titulo}</p>
                           {alerta.descricao ? (
                             <p className="mt-1 text-[13px] text-[#5F7C89]">{alerta.descricao}</p>
                           ) : null}
-                          {alerta.referencia ? (
-                            <p className="mt-1 text-[12px] text-[#7E96A2]">Ref: {alerta.referencia}</p>
-                          ) : null}
+
+                          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[#7E96A2]">
+                            {alerta.referencia ? <span>Ref.: {alerta.referencia}</span> : null}
+                            <span>Atualizado: {formatDateTime(alerta.updatedAt)}</span>
+                          </div>
                         </div>
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold ${
-                            alerta.severidade === 'critical'
-                              ? 'bg-[#FFE9E9] text-[#A93B3B]'
-                              : alerta.severidade === 'warning'
-                                ? 'bg-[#FFF2DD] text-[#A16A16]'
-                                : 'bg-[#EAF4F8] text-[#436B80]'
-                          }`}
-                        >
-                          {alerta.severidade === 'critical' ? (
-                            <AlertTriangle className="h-3 w-3" />
-                          ) : (
-                            <CheckCircle2 className="h-3 w-3" />
-                          )}
-                          {alerta.severidade}
-                        </span>
                       </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
                         {alerta.status === 'ativo' ? (
                           <button
                             type="button"
                             onClick={() => void atualizarAlerta(alerta, 'ack')}
                             disabled={isProcessing}
-                            className="rounded-[10px] border border-[#D9E7EB] px-2.5 py-1 text-[12px] font-semibold text-[#305C70] disabled:opacity-60"
+                            className="rounded-[10px] border border-[#D9E7EB] bg-white px-2.5 py-1.5 text-[12px] font-semibold text-[#305C70] disabled:opacity-60"
                           >
                             {currentAction === 'ack' ? 'Processando...' : 'Reconhecer'}
                           </button>
@@ -464,7 +588,7 @@ const FinanceiroDashboardV2: React.FC = () => {
                             type="button"
                             onClick={() => void atualizarAlerta(alerta, 'reprocessar')}
                             disabled={isProcessing}
-                            className="rounded-[10px] border border-[#D9E7EB] px-2.5 py-1 text-[12px] font-semibold text-[#305C70] disabled:opacity-60"
+                            className="rounded-[10px] border border-[#D9E7EB] bg-white px-2.5 py-1.5 text-[12px] font-semibold text-[#305C70] disabled:opacity-60"
                           >
                             {currentAction === 'reprocessar' ? 'Reprocessando...' : 'Reprocessar'}
                           </button>
@@ -473,7 +597,7 @@ const FinanceiroDashboardV2: React.FC = () => {
                           type="button"
                           onClick={() => void atualizarAlerta(alerta, 'resolver')}
                           disabled={isProcessing}
-                          className="rounded-[10px] border border-[#D9E7EB] px-2.5 py-1 text-[12px] font-semibold text-[#305C70] disabled:opacity-60"
+                          className="rounded-[10px] border border-[#159A9C] bg-[#159A9C] px-2.5 py-1.5 text-[12px] font-semibold text-white disabled:opacity-60"
                         >
                           {currentAction === 'resolver' ? 'Processando...' : 'Resolver'}
                         </button>
@@ -486,37 +610,101 @@ const FinanceiroDashboardV2: React.FC = () => {
           </div>
 
           <div className="rounded-[20px] border border-[#DCE7EB] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)]">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-[18px] font-semibold text-[#18374B]">Resumo operacional</h3>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-[18px] font-semibold text-[#18374B]">Resumo operacional</h3>
+                <p className="mt-1 text-[13px] text-[#617D89]">
+                  Itens que merecem acompanhamento diário do financeiro.
+                </p>
+              </div>
               <button type="button" onClick={() => navigate('/financeiro/contas-pagar')} className="inline-flex items-center gap-1 text-[13px] font-semibold text-[#2A5C70]">
                 Contas a pagar
                 <ArrowRight className="h-3.5 w-3.5" />
               </button>
             </div>
             <div className="grid grid-cols-1 gap-2.5 md:grid-cols-3">
-              <div className="rounded-[14px] border border-[#E2ECEF] bg-[#FBFDFD] px-3 py-2.5 text-[14px] text-[#1C3B4E]">Atrasado: {formatCurrency(totalAtrasado)}</div>
-              <div className="rounded-[14px] border border-[#E2ECEF] bg-[#FBFDFD] px-3 py-2.5 text-[14px] text-[#1C3B4E]">Pendencias: {formatCurrency(pendenciasValor)}</div>
-              <div className="rounded-[14px] border border-[#E2ECEF] bg-[#FBFDFD] px-3 py-2.5 text-[14px] text-[#1C3B4E]">Importacoes: {formatNumber(importacoesConciliacao.length)}</div>
+              <div className="rounded-[14px] border border-[#E2ECEF] bg-[#FBFDFD] px-3.5 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6D8793]">Atrasado</p>
+                <p className="mt-1 text-[22px] font-semibold leading-none text-[#1C3B4E]">{formatCurrency(totalAtrasado)}</p>
+                <p className="mt-2 text-[12px] text-[#738B97]">Montante vencido aguardando tratamento.</p>
+              </div>
+              <div className="rounded-[14px] border border-[#E2ECEF] bg-[#FBFDFD] px-3.5 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6D8793]">Pendencias</p>
+                <p className="mt-1 text-[22px] font-semibold leading-none text-[#1C3B4E]">{formatCurrency(pendenciasValor)}</p>
+                <p className="mt-2 text-[12px] text-[#738B97]">Fila financeira aguardando aprovação.</p>
+              </div>
+              <div className="rounded-[14px] border border-[#E2ECEF] bg-[#FBFDFD] px-3.5 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6D8793]">Importações</p>
+                <p className="mt-1 text-[22px] font-semibold leading-none text-[#1C3B4E]">{formatNumber(importacoesConciliacao.length)}</p>
+                <p className="mt-2 text-[12px] text-[#738B97]">Arquivos recentes para conciliação bancária.</p>
+              </div>
             </div>
           </div>
 
           <div className="rounded-[20px] border border-[#DCE7EB] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)]">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-[18px] font-semibold text-[#18374B]">Acoes rapidas</h3>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-[18px] font-semibold text-[#18374B]">Ações rápidas</h3>
+                <p className="mt-1 text-[13px] text-[#617D89]">
+                  Atalhos com contexto para reduzir clique e decisão desnecessária.
+                </p>
+              </div>
               <button type="button" onClick={() => navigate('/financeiro/conciliacao')} className="inline-flex items-center gap-1 text-[13px] font-semibold text-[#2A5C70]">
-                Conciliacao
+                Conciliação
                 <ArrowRight className="h-3.5 w-3.5" />
               </button>
             </div>
             <div className="grid grid-cols-1 gap-2.5 md:grid-cols-3">
-              <button type="button" onClick={() => navigate('/financeiro/aprovacoes')} className="rounded-[14px] border border-[#E2ECEF] bg-[#FBFDFD] px-3 py-2.5 text-left text-[14px] font-semibold text-[#1C3B4E]">Fila de aprovacoes</button>
-              <button type="button" onClick={() => navigate('/financeiro/contas-bancarias')} className="rounded-[14px] border border-[#E2ECEF] bg-[#FBFDFD] px-3 py-2.5 text-left text-[14px] font-semibold text-[#1C3B4E]">Contas bancarias</button>
-              <button type="button" onClick={() => navigate('/financeiro/contas-receber')} className="rounded-[14px] border border-[#E2ECEF] bg-[#FBFDFD] px-3 py-2.5 text-left text-[14px] font-semibold text-[#1C3B4E]">Contas a receber</button>
+              <button
+                type="button"
+                onClick={() => navigate('/financeiro/aprovacoes')}
+                className="rounded-[16px] border border-[#E2ECEF] bg-[#FBFDFD] px-3.5 py-3 text-left transition hover:border-[#D0E0E6] hover:bg-white"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[14px] font-semibold text-[#1C3B4E]">Fila de aprovações</p>
+                    <p className="mt-1 text-[12px] text-[#708894]">
+                      {formatNumber(pendenciasAprovacao.length)} itens somando {formatCompactCurrency(pendenciasValor)}.
+                    </p>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-[#6F8894]" />
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/financeiro/contas-bancarias')}
+                className="rounded-[16px] border border-[#E2ECEF] bg-[#FBFDFD] px-3.5 py-3 text-left transition hover:border-[#D0E0E6] hover:bg-white"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[14px] font-semibold text-[#1C3B4E]">Contas bancárias</p>
+                    <p className="mt-1 text-[12px] text-[#708894]">
+                      Saldo consolidado de {formatCompactCurrency(saldoBancarioTotal)}.
+                    </p>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-[#6F8894]" />
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/financeiro/contas-receber')}
+                className="rounded-[16px] border border-[#E2ECEF] bg-[#FBFDFD] px-3.5 py-3 text-left transition hover:border-[#D0E0E6] hover:bg-white"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[14px] font-semibold text-[#1C3B4E]">Contas a receber</p>
+                    <p className="mt-1 text-[12px] text-[#708894]">
+                      {formatNumber(totalQuantidadeFaturas)} faturas e {formatCompactCurrency(valorEmAberto)} em aberto.
+                    </p>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-[#6F8894]" />
+                </div>
+              </button>
             </div>
           </div>
         </article>
 
-        <div className="xl:col-span-3">
+        <div className="2xl:col-span-3">
           <InsightsPanel insights={insights} />
         </div>
       </section>

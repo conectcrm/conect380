@@ -1,97 +1,167 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { BillingDashboard } from '../../components/Billing/BillingDashboard';
 import { PlanSelection } from '../../components/Billing/PlanSelection';
 import { UsageMeter } from '../../components/Billing/UsageMeter';
 import { PaymentForm } from '../../components/Billing/PaymentForm';
-import { ArrowLeft, CreditCard, FileText, HelpCircle, LayoutDashboard, Settings } from 'lucide-react';
+import { useSubscription, type Plano } from '../../hooks/useSubscription';
+import { ArrowLeft, CreditCard, FileText, HelpCircle, LayoutDashboard } from 'lucide-react';
 import { FiltersBar, PageHeader, SectionCard } from '../../components/layout-v2';
 
-type BillingView = 'dashboard' | 'plans' | 'usage' | 'settings' | 'payment';
+type BillingTab = 'overview' | 'plans' | 'usage' | 'payment';
+
+type BillingPrimaryTab = Exclude<BillingTab, 'payment'>;
+
+const resolveTabFromLocation = (pathname: string, search: string): BillingTab => {
+  const params = new URLSearchParams(search);
+  const queryTab = String(params.get('tab') || '').toLowerCase();
+
+  if (queryTab === 'payment') {
+    return 'payment';
+  }
+
+  if (queryTab === 'usage') {
+    return 'usage';
+  }
+
+  if (queryTab === 'plans') {
+    return 'plans';
+  }
+
+  if (pathname.startsWith('/billing/planos')) {
+    return 'plans';
+  }
+
+  return 'overview';
+};
+
+const resolvePathForTab = (tab: BillingTab): string => {
+  if (tab === 'plans' || tab === 'payment') {
+    return '/billing/planos';
+  }
+
+  return '/billing/assinaturas';
+};
+
+const mapPlanoToCheckout = (plano: Plano) => {
+  return {
+    id: plano.id,
+    nome: plano.nome,
+    preco: plano.preco,
+    periodo: 'Cobranca mensal',
+    features: (plano.modulosInclusos || []).map((modulo) => modulo.nome),
+  };
+};
 
 export const BillingPage: React.FC = () => {
-  const [currentView, setCurrentView] = useState<BillingView>('dashboard');
-  const [selectedPlan, setSelectedPlan] = useState<any>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { planos } = useSubscription();
 
-  const abaAtiva = currentView === 'payment' ? 'plans' : currentView;
+  const activeTab = useMemo(
+    () => resolveTabFromLocation(location.pathname, location.search),
+    [location.pathname, location.search],
+  );
 
-  const handlePlanSelect = (plano: any) => {
-    setSelectedPlan(plano);
-    setCurrentView('payment');
+  const selectedPlanId = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('planId');
+  }, [location.search]);
+
+  const selectedPlan = useMemo(() => {
+    if (!selectedPlanId) {
+      return null;
+    }
+
+    return planos.find((plano) => plano.id === selectedPlanId) || null;
+  }, [planos, selectedPlanId]);
+
+  const navigateToTab = useCallback(
+    (tab: BillingTab, planId?: string): void => {
+      const targetPath = resolvePathForTab(tab);
+      const params = new URLSearchParams(location.search);
+      params.delete('tab');
+      params.delete('planId');
+
+      if (tab === 'usage') {
+        params.set('tab', 'usage');
+      } else if (tab === 'payment') {
+        params.set('tab', 'payment');
+        if (planId) {
+          params.set('planId', planId);
+        }
+      }
+
+      const targetSearch = params.toString();
+      const currentSearch = location.search.startsWith('?')
+        ? location.search.slice(1)
+        : location.search;
+
+      if (location.pathname === targetPath && currentSearch === targetSearch) {
+        return;
+      }
+
+      navigate({
+        pathname: targetPath,
+        search: targetSearch ? `?${targetSearch}` : '',
+      });
+    },
+    [location.pathname, location.search, navigate],
+  );
+
+  useEffect(() => {
+    if (activeTab === 'payment' && !selectedPlanId) {
+      navigateToTab('plans');
+    }
+  }, [activeTab, navigateToTab, selectedPlanId]);
+
+  const currentPrimaryTab: BillingPrimaryTab = activeTab === 'payment' ? 'plans' : activeTab;
+
+  const handlePlanSelect = (plano: Plano, context: { requiresPayment: boolean }) => {
+    if (context.requiresPayment) {
+      navigateToTab('payment', plano.id);
+      return;
+    }
+
+    navigateToTab('overview');
   };
 
   const handlePaymentSuccess = (paymentData: any) => {
     console.log('Pagamento realizado com sucesso:', paymentData);
-    setSelectedPlan(null);
-    setCurrentView('dashboard');
+    navigateToTab('overview');
+  };
+
+  const handleManageBilling = () => {
+    navigate('/financeiro/faturamento');
   };
 
   const renderContent = () => {
-    switch (currentView) {
+    switch (activeTab) {
       case 'plans':
         return (
           <PlanSelection
             onPlanSelect={handlePlanSelect}
-            onClose={() => setCurrentView('dashboard')}
+            onClose={() => navigateToTab('overview')}
           />
         );
 
       case 'payment':
         return (
           <PaymentForm
-            planoSelecionado={selectedPlan}
+            planoSelecionado={selectedPlan ? mapPlanoToCheckout(selectedPlan) : undefined}
             onPaymentSuccess={handlePaymentSuccess}
-            onCancel={() => setCurrentView('plans')}
+            onCancel={() => navigateToTab('plans')}
           />
         );
 
       case 'usage':
-        return <UsageMeter showDetails={true} onUpgrade={() => setCurrentView('plans')} />;
-
-      case 'settings':
-        return (
-          <SectionCard className="p-4 sm:p-5">
-            <div className="space-y-6">
-              <div className="py-6 text-center sm:py-10">
-                <Settings className="mx-auto mb-4 h-14 w-14 text-[#B4BEC9]" />
-                <h3 className="mb-2 text-lg font-semibold text-[#002333]">
-                  Configurações de Billing
-                </h3>
-                <p className="mx-auto mb-6 max-w-2xl text-sm text-[#385A6A]">
-                  Esta seção permitirá gerenciar métodos de pagamento, histórico de faturas e
-                  configurações de cobrança.
-                </p>
-                <div className="mx-auto grid max-w-3xl grid-cols-1 gap-3 md:grid-cols-3">
-                  <div className="rounded-xl border border-[#DEEFE7] bg-white p-4 text-left">
-                    <div className="flex items-center gap-3">
-                      <CreditCard className="h-5 w-5 text-[#159A9C]" />
-                      <span className="text-sm font-medium text-[#244455]">Métodos de Pagamento</span>
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-[#DEEFE7] bg-white p-4 text-left">
-                    <div className="flex items-center gap-3">
-                      <FileText className="h-5 w-5 text-[#159A9C]" />
-                      <span className="text-sm font-medium text-[#244455]">Histórico de Faturas</span>
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-[#DEEFE7] bg-white p-4 text-left">
-                    <div className="flex items-center gap-3">
-                      <Settings className="h-5 w-5 text-[#159A9C]" />
-                      <span className="text-sm font-medium text-[#244455]">
-                        Configurações de Cobrança
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </SectionCard>
-        );
+        return <UsageMeter showDetails={true} onUpgrade={() => navigateToTab('plans')} />;
 
       default:
         return (
           <BillingDashboard
-            onUpgrade={() => setCurrentView('plans')}
-            onManageBilling={() => setCurrentView('settings')}
+            onUpgrade={() => navigateToTab('plans')}
+            onManageBilling={handleManageBilling}
           />
         );
     }
@@ -104,19 +174,19 @@ export const BillingPage: React.FC = () => {
           title={
             <span className="inline-flex items-center gap-2">
               <CreditCard className="h-5 w-5 text-[#159A9C]" />
-              <span>Billing</span>
+              <span>Assinatura</span>
             </span>
           }
-          description="Gerencie assinatura, uso, planos e configurações de cobrança em um fluxo único."
+          description="Gerencie assinatura, uso e planos em um fluxo unico para o cliente."
           actions={
-            currentView !== 'dashboard' ? (
+            activeTab !== 'overview' ? (
               <button
                 type="button"
-                onClick={() => setCurrentView('dashboard')}
+                onClick={() => navigateToTab('overview')}
                 className="inline-flex items-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
               >
                 <ArrowLeft className="h-4 w-4" />
-                Voltar ao Dashboard
+                Voltar para Assinaturas
               </button>
             ) : undefined
           }
@@ -127,49 +197,37 @@ export const BillingPage: React.FC = () => {
         <div className="flex w-full flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => setCurrentView('dashboard')}
+            onClick={() => navigateToTab('overview')}
             className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              abaAtiva === 'dashboard'
+              currentPrimaryTab === 'overview'
                 ? 'bg-[#159A9C] text-white'
                 : 'border border-[#D4E2E7] bg-white text-[#244455] hover:bg-[#F6FAF9]'
             }`}
           >
             <LayoutDashboard className="h-4 w-4" />
-            Dashboard
+            Assinatura
           </button>
           <button
             type="button"
-            onClick={() => setCurrentView('usage')}
+            onClick={() => navigateToTab('usage')}
             className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              abaAtiva === 'usage'
+              currentPrimaryTab === 'usage'
                 ? 'bg-[#159A9C] text-white'
                 : 'border border-[#D4E2E7] bg-white text-[#244455] hover:bg-[#F6FAF9]'
             }`}
           >
-            Uso Detalhado
+            Uso
           </button>
           <button
             type="button"
-            onClick={() => setCurrentView('plans')}
+            onClick={() => navigateToTab('plans')}
             className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              abaAtiva === 'plans'
+              currentPrimaryTab === 'plans'
                 ? 'bg-[#159A9C] text-white'
                 : 'border border-[#D4E2E7] bg-white text-[#244455] hover:bg-[#F6FAF9]'
             }`}
           >
-            Planos
-          </button>
-          <button
-            type="button"
-            onClick={() => setCurrentView('settings')}
-            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              abaAtiva === 'settings'
-                ? 'bg-[#159A9C] text-white'
-                : 'border border-[#D4E2E7] bg-white text-[#244455] hover:bg-[#F6FAF9]'
-            }`}
-          >
-            <Settings className="h-4 w-4" />
-            Configurações
+            Planos e Upgrade
           </button>
         </div>
       </FiltersBar>
@@ -181,7 +239,7 @@ export const BillingPage: React.FC = () => {
           <HelpCircle className="mx-auto mb-3 h-8 w-8 text-[#159A9C]" />
           <h3 className="mb-2 text-lg font-semibold text-[#002333]">Precisa de Ajuda?</h3>
           <p className="mx-auto mb-4 max-w-2xl text-sm text-[#385A6A]">
-            Nossa equipe está pronta para ajudar você a escolher o melhor plano e configurar sua
+            Nossa equipe esta pronta para ajudar voce a escolher o melhor plano e configurar sua
             assinatura.
           </p>
           <div className="flex flex-col justify-center gap-3 sm:flex-row">
@@ -190,7 +248,7 @@ export const BillingPage: React.FC = () => {
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
             >
               <FileText className="h-4 w-4" />
-              Documentação
+              Documentacao
             </button>
             <button
               type="button"

@@ -51,7 +51,7 @@ const KpiTrendCard: React.FC<KpiTrendCardProps> = ({
   value,
   valueSuffix,
   trendPercent = 0,
-  trendLabel = 'no periodo selecionado',
+  trendLabel = 'no período selecionado',
   sparkline = [],
   progressPercent = 0,
   progressTone = 'teal',
@@ -67,6 +67,7 @@ const KpiTrendCard: React.FC<KpiTrendCardProps> = ({
   const safeTrendPercent = Number.isFinite(trendPercent) ? trendPercent : 0;
   const isPositiveTrend = safeTrendPercent > 0;
   const isNegativeTrend = safeTrendPercent < 0;
+  const hasTrendContent = Boolean(trendLabel) || safeTrendPercent !== 0;
   const trendSignal = isPositiveTrend ? '+' : isNegativeTrend ? '-' : '';
   const TrendIcon = isNegativeTrend ? ArrowDownRight : ArrowUpRight;
   const trendToneClass = isNegativeTrend
@@ -133,14 +134,16 @@ const KpiTrendCard: React.FC<KpiTrendCardProps> = ({
         ) : null}
       </div>
 
-      <div className="mt-3.5 flex flex-wrap items-center gap-1.5 text-[14px]">
-        <span className={`inline-flex items-center gap-0.5 font-semibold ${trendToneClass}`}>
-          <TrendIcon className="h-3.5 w-3.5" />
-          {trendSignal}
-          {Math.abs(safeTrendPercent).toFixed(0)}%
-        </span>
-        <span className="text-[#607C89]">{trendLabel}</span>
-      </div>
+      {hasTrendContent ? (
+        <div className="mt-3.5 flex flex-wrap items-center gap-1.5 text-[13px]">
+          <span className={`inline-flex items-center gap-0.5 font-semibold ${trendToneClass}`}>
+            <TrendIcon className="h-3.5 w-3.5" />
+            {trendSignal}
+            {Math.abs(safeTrendPercent).toFixed(0)}%
+          </span>
+          <span className="text-[#6C8692]">{trendLabel}</span>
+        </div>
+      ) : null}
 
       <div className="mt-3.5 h-[7px] rounded-full bg-[#E6EEF0]">
         <div
@@ -150,7 +153,7 @@ const KpiTrendCard: React.FC<KpiTrendCardProps> = ({
       </div>
 
       {footerLeft || footerRight ? (
-        <div className="mt-3.5 flex flex-col items-start justify-between gap-2 text-[14px] text-[#617C89] sm:flex-row sm:items-center">
+        <div className="mt-3.5 flex flex-col items-start justify-between gap-2 text-[12px] text-[#708894] sm:flex-row sm:items-center">
           <span className="break-words">{footerLeft}</span>
           <span className="break-words">{footerRight}</span>
         </div>

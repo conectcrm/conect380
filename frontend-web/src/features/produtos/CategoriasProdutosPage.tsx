@@ -20,7 +20,7 @@ import {
 } from '../../components/layout-v2';
 import { ConfirmationModal } from '../../components/common/ConfirmationModal';
 import { useConfirmation } from '../../hooks/useConfirmation';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import ModalCategoria from '../../components/modals/ModalCategoria';
 import ModalSubcategoria from '../../components/modals/ModalSubcategoria';
 import ModalConfiguracao from '../../components/modais/ModalConfiguracao';
@@ -92,6 +92,7 @@ const iconButtonDeleteClass =
 
 const CategoriasProdutosPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const categoriasAvancadasEnabled = catalogoFeatures.categoriasAvancadasEnabled;
   const { confirmationState, showConfirmation } = useConfirmation();
 
@@ -110,6 +111,10 @@ const CategoriasProdutosPage: React.FC = () => {
   const [showModalSubcategoria, setShowModalSubcategoria] = useState(false);
   const [showModalConfiguracao, setShowModalConfiguracao] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
+
+  const requestedTab = searchParams.get('tab');
+  const requestedCategoriaId = searchParams.get('categoriaId');
+  const requestedSubcategoriaId = searchParams.get('subcategoriaId');
 
   // Carregar categorias do service
   useEffect(() => {
@@ -166,17 +171,45 @@ const CategoriasProdutosPage: React.FC = () => {
 
       setCategorias(categoriasConvertidas);
 
+      const categoriaFromQuery = requestedCategoriaId
+        ? categoriasConvertidas.find((categoria) => categoria.id === requestedCategoriaId) || null
+        : null;
+      const categoriaPreferencial = categoriaFromQuery || null;
+
+      const subcategoriaFromQuery = requestedSubcategoriaId
+        ? categoriaPreferencial?.subcategorias.find(
+            (subcategoria) => subcategoria.id === requestedSubcategoriaId,
+          ) || null
+        : null;
+
+      if (categoriaPreferencial) {
+        setSelectedCategoria(categoriaPreferencial);
+        setSelectedSubcategoria(subcategoriaFromQuery || null);
+
+        if (categoriasAvancadasEnabled) {
+          if (requestedTab === 'configuracoes' && subcategoriaFromQuery) {
+            setActiveTab('configuracoes');
+          } else if (requestedTab === 'subcategorias' || requestedTab === 'configuracoes') {
+            setActiveTab('subcategorias');
+          }
+        }
+      }
+
       if (categoriaSelecionadaId) {
         const categoriaAtualizada = categoriasConvertidas.find(
           (categoria) => categoria.id === categoriaSelecionadaId,
         );
-        setSelectedCategoria(categoriaAtualizada || null);
+        if (!categoriaPreferencial) {
+          setSelectedCategoria(categoriaAtualizada || null);
+        }
 
         if (categoriaAtualizada && subcategoriaSelecionadaId) {
           const subcategoriaAtualizada = categoriaAtualizada.subcategorias.find(
             (subcategoria) => subcategoria.id === subcategoriaSelecionadaId,
           );
-          setSelectedSubcategoria(subcategoriaAtualizada || null);
+          if (!subcategoriaFromQuery) {
+            setSelectedSubcategoria(subcategoriaAtualizada || null);
+          }
         } else if (!categoriaAtualizada) {
           setSelectedSubcategoria(null);
         }
@@ -197,7 +230,7 @@ const CategoriasProdutosPage: React.FC = () => {
   const criarCategoriasIniciais = async () => {
     try {
       const categoriasIniciais = [
-        { nome: 'Software', descricao: 'Produtos de software', icone: 'software', cor: 'blue' },
+        { nome: 'Software', descricao: 'Itens de software', icone: 'software', cor: 'blue' },
         { nome: 'Hardware', descricao: 'Equipamentos e hardware', icone: 'hardware', cor: 'green' },
         { nome: 'Consultoria', descricao: 'Serviços de consultoria', icone: 'consultoria', cor: 'purple' },
         { nome: 'Treinamento', descricao: 'Cursos e treinamentos', icone: 'treinamento', cor: 'orange' },
@@ -932,7 +965,7 @@ const CategoriasProdutosPage: React.FC = () => {
               Gestão de categorias do catálogo
             </span>
           }
-          description="Estruture categorias, níveis de subcategoria e configurações de composição conforme o perfil de cada operação."
+          description="Crie e organize categorias, subcategorias e configurações de composição conforme o perfil de cada operação."
           actions={
             <>
               <button

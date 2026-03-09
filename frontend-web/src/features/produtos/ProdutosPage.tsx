@@ -29,6 +29,8 @@ import { ConfirmationModal } from '../../components/common/ConfirmationModal';
 import { useConfirmation } from '../../hooks/useConfirmation';
 import { ModalCadastroProduto } from '../../components/modals/ModalCadastroProdutoLandscape';
 import { produtosService, Produto, ProdutoEstatisticas } from '../../services/produtosService';
+import { categoriasProdutosService } from '../../services/categoriasProdutosService';
+import { CategoriaProduto } from '../../types/produtos';
 import toast from 'react-hot-toast';
 
 // Interface para o novo modal
@@ -36,11 +38,20 @@ interface ProdutoFormData {
   nome: string;
   tipoItem: 'produto' | 'servico' | 'licenca' | 'modulo' | 'plano' | 'aplicativo';
   categoria: string;
+  categoriaId?: string;
+  subcategoriaId?: string;
+  configuracaoId?: string;
   precoUnitario: number;
+  custoUnitario?: number;
   frequencia: 'unico' | 'mensal' | 'anual';
   unidadeMedida: 'unidade' | 'saca' | 'hectare' | 'pacote' | 'licenca';
   status: 'ativo' | 'inativo' | 'descontinuado';
   descricao?: string;
+  sku?: string;
+  fornecedor?: string;
+  estoqueAtual?: number;
+  estoqueMinimo?: number;
+  estoqueMaximo?: number;
   tags?: string[];
   variacoes?: string[];
   tipoLicenciamento?: string;
@@ -55,6 +66,11 @@ interface ProdutoLegacy {
   nome: string;
   tipoItem: 'produto' | 'servico' | 'licenca' | 'modulo' | 'plano' | 'aplicativo';
   categoria: string;
+  categoriaId?: string;
+  subcategoriaId?: string;
+  configuracaoId?: string;
+  subcategoriaNome?: string;
+  configuracaoNome?: string;
   preco: number;
   custoUnitario: number;
   frequencia: 'unico' | 'mensal' | 'anual';
@@ -72,6 +88,8 @@ interface ProdutoLegacy {
   fornecedor: string;
   sku: string;
   descricao: string;
+  tags?: string[];
+  variacoes?: string[];
   tipoLicenciamento?: string;
   periodicidadeLicenca?: string;
   renovacaoAutomatica?: boolean;
@@ -107,6 +125,13 @@ const tipoItemConfig = {
   aplicativo: 'Aplicativo',
 };
 
+const normalizeCatalogName = (value?: string | null) =>
+  (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+
 const ProdutosPage: React.FC = () => {
   const navigate = useNavigate();
   const { confirmationState, showConfirmation } = useConfirmation();
@@ -123,11 +148,18 @@ const ProdutosPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [tipoFilter, setTipoFilter] = useState<string>('todos');
   const [categoriaFilter, setCategoriaFilter] = useState<string>('todas');
+  const [subcategoriaFilter, setSubcategoriaFilter] = useState<string>('todas');
+  const [configuracaoFilter, setConfiguracaoFilter] = useState<string>('todas');
+  const [sortOption, setSortOption] = useState<string>('nome-asc');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [categoriasCatalogo, setCategoriasCatalogo] = useState<CategoriaProduto[]>([]);
   const [selectedProduto, setSelectedProduto] = useState<ProdutoLegacy | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -139,153 +171,256 @@ const ProdutosPage: React.FC = () => {
   const [isLoadingSave, setIsLoadingSave] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm.trim());
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
+
+  const resolveSortParams = useCallback(() => {
+    switch (sortOption) {
+      case 'nome-desc':
+        return { sortBy: 'nome' as const, sortOrder: 'DESC' as const };
+      case 'preco-desc':
+        return { sortBy: 'preco' as const, sortOrder: 'DESC' as const };
+      case 'preco-asc':
+        return { sortBy: 'preco' as const, sortOrder: 'ASC' as const };
+      case 'recentes':
+        return { sortBy: 'atualizadoEm' as const, sortOrder: 'DESC' as const };
+      default:
+        return { sortBy: 'nome' as const, sortOrder: 'ASC' as const };
+    }
+  }, [sortOption]);
+
+  const carregarCategorias = useCallback(async () => {
+    try {
+      const categorias = await categoriasProdutosService.listarCategorias({
+        ativo: true,
+        ordenacao: 'nome',
+        direcao: 'asc',
+      });
+      setCategoriasCatalogo(categorias);
+    } catch (error) {
+      console.error('Erro ao carregar categorias do catálogo:', error);
+    }
+  }, []);
+
   // Função para carregar produtos do backend
-  const carregarProdutos = async () => {
+  const carregarProdutos = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
-      const produtosAPI = await produtosService.findAll();
-      const produtosFormatados = produtosAPI.map(produtosService.transformApiToLegacy);
+
+      const { sortBy, sortOrder } = resolveSortParams();
+      const resposta = await produtosService.listPaginated({
+        categoria: categoriaFilter !== 'todas' ? categoriaFilter : undefined,
+        subcategoriaId: subcategoriaFilter !== 'todas' ? subcategoriaFilter : undefined,
+        configuracaoId: configuracaoFilter !== 'todas' ? configuracaoFilter : undefined,
+        status: statusFilter !== 'todos' ? statusFilter : undefined,
+        tipoItem: tipoFilter !== 'todos' ? tipoFilter : undefined,
+        search: debouncedSearchTerm || undefined,
+        page: currentPage,
+        limit: itemsPerPage,
+        sortBy,
+        sortOrder,
+      });
+
+      const produtosFormatados = resposta.data.map(produtosService.transformApiToLegacy);
       setProdutos(produtosFormatados);
+      setTotalItems(resposta.meta.total);
+      setTotalPages(resposta.meta.totalPages);
 
       // Carregar estatísticas
       const estatisticasAPI = await produtosService.getEstatisticas();
       setEstatisticas(estatisticasAPI);
     } catch (error) {
-      console.error('Erro ao carregar produtos:', error);
-      setError('Erro ao carregar produtos. Tente novamente.');
-      toast.error('Erro ao carregar produtos. Verifique se o backend está funcionando.');
+      console.error('Erro ao carregar itens do catálogo:', error);
+      setError('Erro ao carregar itens do catálogo. Tente novamente.');
+      toast.error('Erro ao carregar itens do catálogo. Verifique se o backend está funcionando.');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [categoriaFilter, configuracaoFilter, currentPage, debouncedSearchTerm, itemsPerPage, resolveSortParams, statusFilter, subcategoriaFilter, tipoFilter]);
 
-  // Carregar dados ao montar o componente
   useEffect(() => {
-    carregarProdutos();
-  }, []);
+    void carregarCategorias();
+  }, [carregarCategorias]);
 
-  // Filtrar produtos
-  const produtosFiltrados = useMemo(() => {
-    return produtos.filter((produto) => {
-      const matchesSearch =
-        produto.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        produto.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        produto.fornecedor.toLowerCase().includes(searchTerm.toLowerCase());
+  useEffect(() => {
+    void carregarProdutos();
+  }, [carregarProdutos]);
 
-      const matchesStatus = statusFilter === 'todos' || produto.status === statusFilter;
-      const matchesTipo = tipoFilter === 'todos' || produto.tipoItem === tipoFilter;
-      const matchesCategoria = categoriaFilter === 'todas' || produto.categoria === categoriaFilter;
+  const categorias = useMemo(() => {
+    if (categoriasCatalogo.length > 0) {
+      return Array.from(
+        new Set(
+          categoriasCatalogo
+            .map((categoria) => categoria.nome?.trim())
+            .filter((categoria): categoria is string => Boolean(categoria)),
+        ),
+      );
+    }
 
-      return matchesSearch && matchesStatus && matchesTipo && matchesCategoria;
-    });
-  }, [produtos, searchTerm, statusFilter, tipoFilter, categoriaFilter]);
+    return Array.from(new Set(produtos.map((produto) => produto.categoria)));
+  }, [categoriasCatalogo, produtos]);
 
-  const categorias = useMemo(
-    () => Array.from(new Set(produtos.map((produto) => produto.categoria))),
-    [produtos],
+  const categoriaSelecionada = useMemo(() => {
+    if (categoriaFilter === 'todas') {
+      return null;
+    }
+
+    const categoriaNormalizada = normalizeCatalogName(categoriaFilter);
+    return (
+      categoriasCatalogo.find(
+        (categoria) => normalizeCatalogName(categoria.nome) === categoriaNormalizada,
+      ) || null
+    );
+  }, [categoriaFilter, categoriasCatalogo]);
+
+  const subcategoriasDisponiveis = useMemo(
+    () => categoriaSelecionada?.subcategorias?.filter((subcategoria) => subcategoria.ativo !== false) || [],
+    [categoriaSelecionada],
   );
 
-  const tipos = useMemo(() => Array.from(new Set(produtos.map((produto) => produto.tipoItem))), [produtos]);
+  const categoriaTemSubcategorias = subcategoriasDisponiveis.length > 0;
+
+  const subcategoriaSelecionada = useMemo(() => {
+    if (subcategoriaFilter === 'todas') {
+      return null;
+    }
+
+    return (
+      subcategoriasDisponiveis.find((subcategoria) => subcategoria.id === subcategoriaFilter) || null
+    );
+  }, [subcategoriaFilter, subcategoriasDisponiveis]);
+
+  const configuracoesDisponiveis = useMemo(
+    () => subcategoriaSelecionada?.configuracoes?.filter((configuracao) => configuracao.ativo !== false) || [],
+    [subcategoriaSelecionada],
+  );
+
+  const subcategoriaTemConfiguracoes = configuracoesDisponiveis.length > 0;
+
+  const categoriaDoProdutoSelecionado = useMemo(() => {
+    if (!selectedProduto) {
+      return null;
+    }
+
+    if (selectedProduto.categoriaId) {
+      return categoriasCatalogo.find((categoria) => categoria.id === selectedProduto.categoriaId) || null;
+    }
+
+    const categoriaNormalizada = normalizeCatalogName(selectedProduto.categoria);
+    return (
+      categoriasCatalogo.find(
+        (categoria) => normalizeCatalogName(categoria.nome) === categoriaNormalizada,
+      ) || null
+    );
+  }, [categoriasCatalogo, selectedProduto]);
+
+  const resumoCategoriaSelecionada = useMemo(() => {
+    if (!categoriaSelecionada) {
+      return null;
+    }
+
+    const totalConfiguracoes = categoriaSelecionada.subcategorias.reduce(
+      (total, subcategoria) => total + (subcategoria.configuracoes?.length || 0),
+      0,
+    );
+
+    return {
+      totalSubcategorias: categoriaSelecionada.subcategorias.length,
+      totalConfiguracoes,
+    };
+  }, [categoriaSelecionada]);
+
+  const tipos = useMemo(
+    () => Object.keys(tipoItemConfig) as Array<keyof typeof tipoItemConfig>,
+    [],
+  );
+
+  useEffect(() => {
+    if (categoriaFilter === 'todas') {
+      if (subcategoriaFilter !== 'todas') {
+        setSubcategoriaFilter('todas');
+      }
+      if (configuracaoFilter !== 'todas') {
+        setConfiguracaoFilter('todas');
+      }
+      return;
+    }
+
+    if (
+      subcategoriaFilter !== 'todas' &&
+      !subcategoriasDisponiveis.some((subcategoria) => subcategoria.id === subcategoriaFilter)
+    ) {
+      setSubcategoriaFilter('todas');
+      setConfiguracaoFilter('todas');
+    }
+  }, [categoriaFilter, configuracaoFilter, subcategoriaFilter, subcategoriasDisponiveis]);
+
+  useEffect(() => {
+    if (subcategoriaFilter === 'todas') {
+      if (configuracaoFilter !== 'todas') {
+        setConfiguracaoFilter('todas');
+      }
+      return;
+    }
+
+    if (
+      configuracaoFilter !== 'todas' &&
+      !configuracoesDisponiveis.some((configuracao) => configuracao.id === configuracaoFilter)
+    ) {
+      setConfiguracaoFilter('todas');
+    }
+  }, [configuracaoFilter, configuracoesDisponiveis, subcategoriaFilter]);
 
   const hasFilters =
     searchTerm.trim().length > 0 ||
     statusFilter !== 'todos' ||
     tipoFilter !== 'todos' ||
-    categoriaFilter !== 'todas';
-
-  const totalPages = Math.max(1, Math.ceil(produtosFiltrados.length / itemsPerPage));
-
-  const produtosPagina = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return produtosFiltrados.slice(startIndex, startIndex + itemsPerPage);
-  }, [produtosFiltrados, currentPage, itemsPerPage]);
+    categoriaFilter !== 'todas' ||
+    subcategoriaFilter !== 'todas' ||
+    configuracaoFilter !== 'todas';
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, tipoFilter, categoriaFilter, itemsPerPage]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
+  }, [searchTerm, statusFilter, tipoFilter, categoriaFilter, subcategoriaFilter, configuracaoFilter, itemsPerPage, sortOption]);
 
   const handleClearFilters = () => {
     setSearchTerm('');
     setStatusFilter('todos');
     setTipoFilter('todos');
     setCategoriaFilter('todas');
+    setSubcategoriaFilter('todas');
+    setConfiguracaoFilter('todas');
     setCurrentPage(1);
   };
 
   const handleExport = useCallback(async () => {
-    if (produtosFiltrados.length === 0) {
-      toast.error('Nenhum produto disponível para exportação.');
+    if (totalItems === 0) {
+      toast.error('Nenhum item disponível para exportação.');
       return;
     }
 
     try {
       setIsExporting(true);
 
-      const headers = [
-        'Nome',
-        'SKU',
-        'Categoria',
-        'Status',
-        'Preço',
-        'Custo',
-        'Estoque Atual',
-        'Estoque Mínimo',
-        'Estoque Máximo',
-        'Fornecedor',
-        'Vendas (Mês)',
-        'Vendas (Total)',
-        'Criado em',
-        'Atualizado em',
-      ];
+      const { sortBy, sortOrder } = resolveSortParams();
+      const csvBlob = await produtosService.exportCsv({
+        categoria: categoriaFilter !== 'todas' ? categoriaFilter : undefined,
+        subcategoriaId: subcategoriaFilter !== 'todas' ? subcategoriaFilter : undefined,
+        configuracaoId: configuracaoFilter !== 'todas' ? configuracaoFilter : undefined,
+        status: statusFilter !== 'todos' ? statusFilter : undefined,
+        tipoItem: tipoFilter !== 'todos' ? tipoFilter : undefined,
+        search: debouncedSearchTerm || undefined,
+        sortBy,
+        sortOrder,
+      });
 
-      const sanitize = (value: unknown) => {
-        if (value === null || value === undefined) {
-          return '';
-        }
-
-        if (value instanceof Date) {
-          return value.toISOString();
-        }
-
-        const text = String(value);
-        return text.includes('"') ? text.split('"').join('""') : text;
-      };
-
-      const formatNumber = (value: number | null | undefined) =>
-        typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : '';
-
-      const rows = produtosFiltrados.map((produto) =>
-        [
-          produto.nome,
-          produto.sku,
-          produto.categoria,
-          statusConfig[produto.status]?.label ?? produto.status,
-          formatNumber(produto.preco),
-          formatNumber(produto.custoUnitario),
-          produto.estoque.atual,
-          produto.estoque.minimo,
-          produto.estoque.maximo,
-          produto.fornecedor,
-          produto.vendas.mes,
-          produto.vendas.total,
-          produto.criadoEm,
-          produto.atualizadoEm,
-        ].map(sanitize),
-      );
-
-      const csvContent = [headers, ...rows]
-        .map((row) => row.map((cell) => `"${cell}"`).join(';'))
-        .join('\n');
-
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
+      const url = URL.createObjectURL(csvBlob);
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `produtos_${new Date().toISOString().slice(0, 10)}.csv`);
@@ -296,12 +431,12 @@ const ProdutosPage: React.FC = () => {
 
       toast.success('Exportação concluída com sucesso!');
     } catch (error) {
-      console.error('Erro ao exportar produtos:', error);
-      toast.error('Não foi possível exportar os produtos.');
+      console.error('Erro ao exportar itens do catálogo:', error);
+      toast.error('Não foi possível exportar os itens do catálogo.');
     } finally {
       setIsExporting(false);
     }
-  }, [produtosFiltrados]);
+  }, [categoriaFilter, configuracaoFilter, debouncedSearchTerm, resolveSortParams, statusFilter, subcategoriaFilter, tipoFilter, totalItems]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -349,13 +484,22 @@ const ProdutosPage: React.FC = () => {
       nome: produto.nome,
       tipoItem: produto.tipoItem,
       categoria: produto.categoria,
+      categoriaId: produto.categoriaId,
+      subcategoriaId: produto.subcategoriaId,
+      configuracaoId: produto.configuracaoId,
       precoUnitario: produto.preco,
+      custoUnitario: produto.custoUnitario,
       frequencia: produto.frequencia,
       unidadeMedida: produto.unidadeMedida,
       status: produto.status,
       descricao: produto.descricao,
-      tags: [],
-      variacoes: [],
+      sku: produto.sku,
+      fornecedor: produto.fornecedor,
+      estoqueAtual: produto.estoque.atual,
+      estoqueMinimo: produto.estoque.minimo,
+      estoqueMaximo: produto.estoque.maximo,
+      tags: produto.tags || [],
+      variacoes: produto.variacoes || [],
       tipoLicenciamento: produto.tipoLicenciamento,
       periodicidadeLicenca: produto.periodicidadeLicenca,
       renovacaoAutomatica: produto.renovacaoAutomatica,
@@ -366,8 +510,8 @@ const ProdutosPage: React.FC = () => {
 
   const handleExcluirProduto = (produto: ProdutoLegacy) => {
     showConfirmation({
-      title: 'Confirmar Exclusão',
-      message: `Tem certeza que deseja excluir o produto "${produto.nome}"?\n\nEsta ação não pode ser desfeita.`,
+      title: 'Confirmar exclusão',
+      message: `Tem certeza que deseja excluir o item "${produto.nome}"?\n\nEsta ação não pode ser desfeita.`,
       confirmText: 'Excluir',
       cancelText: 'Cancelar',
       icon: 'danger',
@@ -376,10 +520,10 @@ const ProdutosPage: React.FC = () => {
         try {
           await produtosService.delete(produto.id);
           await carregarProdutos();
-          toast.success(`Produto "${produto.nome}" excluído com sucesso!`);
+          toast.success(`Item "${produto.nome}" excluído com sucesso!`);
         } catch (error) {
-          console.error('Erro ao excluir produto:', error);
-          toast.error('Erro ao excluir produto');
+          console.error('Erro ao excluir item:', error);
+          toast.error('Erro ao excluir item');
         }
       },
     });
@@ -395,11 +539,11 @@ const ProdutosPage: React.FC = () => {
       if (produtoParaEditar && produtoParaEditar.produtoId) {
         // Atualizar produto existente
         await produtosService.update(produtoParaEditar.produtoId, produtoData);
-        toast.success('Produto atualizado com sucesso!');
+        toast.success('Item atualizado com sucesso!');
       } else {
         // Criar novo produto
         await produtosService.create(produtoData);
-        toast.success('Produto criado com sucesso!');
+        toast.success('Item criado com sucesso!');
       }
 
       // Recarregar lista
@@ -408,8 +552,8 @@ const ProdutosPage: React.FC = () => {
       setShowModalAvancado(false);
       setProdutoParaEditar(null);
     } catch (error) {
-      console.error('Erro ao salvar produto:', error);
-      toast.error('Erro ao salvar produto');
+      console.error('Erro ao salvar item:', error);
+      toast.error('Erro ao salvar item');
       throw error; // Modal tratará o erro
     } finally {
       setIsLoadingSave(false);
@@ -420,7 +564,7 @@ const ProdutosPage: React.FC = () => {
     () => [
       {
         key: 'total-produtos',
-        label: 'Total de Produtos',
+        label: 'Total de Itens',
         value: estatisticas.totalProdutos,
         description: 'Itens cadastrados no catálogo',
         iconWrapper: 'bg-[#159A9C]',
@@ -429,7 +573,7 @@ const ProdutosPage: React.FC = () => {
       },
       {
         key: 'produtos-ativos',
-        label: 'Produtos Ativos',
+        label: 'Itens Ativos',
         value: estatisticas.produtosAtivos,
         description: 'Disponíveis para venda',
         iconWrapper: 'bg-[#0F7B7D]',
@@ -484,12 +628,12 @@ const ProdutosPage: React.FC = () => {
                 className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
               >
                 <Settings className="h-4 w-4" />
-                Categorias
+                Estrutura do catálogo
               </button>
               <button
                 type="button"
                 onClick={handleExport}
-                disabled={isExporting || produtosFiltrados.length === 0}
+                disabled={isExporting || totalItems === 0}
                 className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Download className="h-4 w-4" />
@@ -521,11 +665,11 @@ const ProdutosPage: React.FC = () => {
             <Lightbulb className="h-4 w-4 text-[#0F7B7D]" />
           </span>
           <div>
-            <h2 className="text-sm font-semibold text-[#244455]">Guia rápido: quando usar item ou combo</h2>
+            <h2 className="text-sm font-semibold text-[#244455]">Guia rápido do catálogo</h2>
             <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-[#607B89]">
-              <li>Use item avulso quando o preço e a negociação forem independentes.</li>
-              <li>Use combo quando dois ou mais itens sempre saem juntos com condição comercial única.</li>
-              <li>Prefira combo para padronizar proposta recorrente e reduzir erro de montagem.</li>
+              <li>Use categorias para organizar o catálogo por contexto comercial e operacional.</li>
+              <li>Use subcategorias e configurações apenas nas categorias que exigem esse detalhamento.</li>
+              <li>Mantenha SKU, fornecedor e estoque atualizados para facilitar proposta, venda e reposição.</li>
             </ul>
           </div>
         </div>
@@ -546,7 +690,7 @@ const ProdutosPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row lg:col-span-2 xl:col-span-2">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:col-span-2 xl:col-span-2">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -584,6 +728,48 @@ const ProdutosPage: React.FC = () => {
               ))}
             </select>
 
+            {categoriaSelecionada && categoriaTemSubcategorias ? (
+              <select
+                value={subcategoriaFilter}
+                onChange={(e) => setSubcategoriaFilter(e.target.value)}
+                className="h-10 rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+              >
+                <option value="todas">Todas as Subcategorias</option>
+                {subcategoriasDisponiveis.map((subcategoria) => (
+                  <option key={subcategoria.id} value={subcategoria.id}>
+                    {subcategoria.nome}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+
+            {subcategoriaSelecionada && subcategoriaTemConfiguracoes ? (
+              <select
+                value={configuracaoFilter}
+                onChange={(e) => setConfiguracaoFilter(e.target.value)}
+                className="h-10 rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+              >
+                <option value="todas">Todas as Configurações</option>
+                {configuracoesDisponiveis.map((configuracao) => (
+                  <option key={configuracao.id} value={configuracao.id}>
+                    {configuracao.nome}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+
+            <select
+              value={sortOption}
+              onChange={(e) => setSortOption(e.target.value)}
+              className="h-10 rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+            >
+              <option value="nome-asc">Ordenar: Nome A-Z</option>
+              <option value="nome-desc">Ordenar: Nome Z-A</option>
+              <option value="preco-desc">Ordenar: Maior preço</option>
+              <option value="preco-asc">Ordenar: Menor preço</option>
+              <option value="recentes">Ordenar: Mais recentes</option>
+            </select>
+
             {hasFilters && (
               <button
                 type="button"
@@ -595,13 +781,102 @@ const ProdutosPage: React.FC = () => {
             )}
           </div>
         </div>
+
+        {categoriaSelecionada && !categoriaTemSubcategorias ? (
+          <p className="mt-3 text-xs text-[#607B89]">
+            A categoria selecionada usa apenas classificação principal. Não há subcategorias ou configurações para refinar nesta etapa.
+          </p>
+        ) : null}
+
+        {subcategoriaSelecionada && !subcategoriaTemConfiguracoes ? (
+          <p className="mt-2 text-xs text-[#607B89]">
+            A subcategoria selecionada não possui configurações adicionais. O filtro atual já está no nível mais detalhado.
+          </p>
+        ) : null}
       </FiltersBar>
+
+      {categoriaSelecionada && resumoCategoriaSelecionada && (
+        <SectionCard className="space-y-4 p-4 sm:p-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#CFE7E8] bg-[#EFF8F8] px-3 py-1 text-xs font-medium text-[#0F7B7D]">
+                <Settings className="h-3.5 w-3.5" />
+                Estrutura oficial da categoria
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-[#19384C]">{categoriaSelecionada.nome}</h3>
+                <p className="mt-1 text-sm text-[#607B89]">
+                  {categoriaSelecionada.descricao || 'Categoria sem descrição cadastrada.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2 text-xs">
+              <span className="rounded-full border border-[#D4E2E7] bg-white px-3 py-1 font-medium text-[#244455]">
+                {resumoCategoriaSelecionada.totalSubcategorias} subcategorias
+              </span>
+              <span className="rounded-full border border-[#D4E2E7] bg-white px-3 py-1 font-medium text-[#244455]">
+                {resumoCategoriaSelecionada.totalConfiguracoes} configurações
+              </span>
+            </div>
+          </div>
+
+          {resumoCategoriaSelecionada.totalSubcategorias === 0 ? (
+            <div className="rounded-2xl border border-[#DEEFE7] bg-[#FCFEFE] p-4 text-sm text-[#607B89]">
+              Essa categoria não possui subcategorias cadastradas. Para esse tipo de item, a categoria principal já é suficiente.
+            </div>
+          ) : (
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+            {categoriaSelecionada.subcategorias.map((subcategoria) => (
+              <div
+                key={subcategoria.id}
+                className="rounded-2xl border border-[#DEEFE7] bg-[#FCFEFE] p-4"
+              >
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h4 className="text-sm font-semibold text-[#19384C]">{subcategoria.nome}</h4>
+                    <p className="mt-1 text-xs text-[#607B89]">
+                      {subcategoria.descricao || 'Subcategoria sem descrição cadastrada.'}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-[11px]">
+                    <span className="rounded-full bg-[#DEEFE7] px-2.5 py-1 font-medium text-[#0F7B7D]">
+                      {subcategoria.configuracoes?.length || 0} configurações
+                    </span>
+                    <span className="rounded-full bg-[#F3F8FA] px-2.5 py-1 font-medium text-[#516F7D]">
+                      Unidade: {subcategoria.unidade}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {subcategoria.configuracoes && subcategoria.configuracoes.length > 0 ? (
+                    subcategoria.configuracoes.map((configuracao) => (
+                      <span
+                        key={configuracao.id}
+                        className="rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-[11px] font-medium text-[#244455]"
+                      >
+                        {configuracao.nome}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-xs text-[#7A95A3]">
+                      Nenhuma configuração cadastrada para esta subcategoria.
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          )}
+        </SectionCard>
+      )}
 
       <DataTableCard>
         <div className="border-b border-[#E1EAEE] bg-[#F8FBFC] px-4 py-3 sm:px-5">
           <div className="flex flex-wrap items-center gap-3 text-sm text-[#516F7D]">
             <h3 className="text-sm font-semibold text-[#1B3B4E]">
-              Lista de Itens ({produtosFiltrados.length})
+              Lista de Itens ({totalItems})
             </h3>
             {hasFilters && (
               <span className="rounded-full border border-[#CDE6DF] bg-[#ECF7F3] px-2 py-0.5 text-xs font-medium text-[#0F7B7D]">
@@ -609,6 +884,27 @@ const ProdutosPage: React.FC = () => {
               </span>
             )}
           </div>
+          {hasFilters && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {categoriaFilter !== 'todas' && (
+                <span className="rounded-full border border-[#D4E2E7] bg-white px-3 py-1 text-xs font-medium text-[#244455]">
+                  Categoria: {categoriaFilter}
+                </span>
+              )}
+              {subcategoriaSelecionada && (
+                <span className="rounded-full border border-[#CFE7E8] bg-[#EFF8F8] px-3 py-1 text-xs font-medium text-[#0F7B7D]">
+                  Subcategoria: {subcategoriaSelecionada.nome}
+                </span>
+              )}
+              {configuracaoFilter !== 'todas' && (
+                <span className="rounded-full border border-[#DCE6F8] bg-[#F4F8FF] px-3 py-1 text-xs font-medium text-[#35538A]">
+                  Configuração:{' '}
+                  {configuracoesDisponiveis.find((configuracao) => configuracao.id === configuracaoFilter)?.nome ||
+                    'Selecionada'}
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {error && (
@@ -625,13 +921,13 @@ const ProdutosPage: React.FC = () => {
           </div>
         )}
 
-        {produtosFiltrados.length === 0 ? (
+        {produtos.length === 0 ? (
           <div className="p-4 sm:p-5">
             <EmptyState
               icon={<Package className="h-5 w-5" />}
               title="Nenhum item encontrado"
               description={
-                produtos.length === 0
+                totalItems === 0 && !hasFilters
                   ? 'Comece criando seu primeiro item.'
                   : 'Tente ajustar os filtros ou termos de busca.'
               }
@@ -640,7 +936,7 @@ const ProdutosPage: React.FC = () => {
         ) : (
           <>
             <div className="divide-y divide-[#EAF0F2] lg:hidden">
-              {produtosPagina.map((produto) => {
+              {produtos.map((produto) => {
                 const statusInfo = statusConfig[produto.status];
                 const StatusIcon = statusInfo.icon;
 
@@ -669,6 +965,14 @@ const ProdutosPage: React.FC = () => {
                       <div>
                         <p className="text-[#6B8693]">Categoria</p>
                         <p className="font-medium text-[#1E3A4B]">{produto.categoria}</p>
+                        {produto.subcategoriaNome && (
+                          <p className="mt-0.5 text-[11px] text-[#6B8693]">{produto.subcategoriaNome}</p>
+                        )}
+                        {produto.configuracaoNome && (
+                          <p className="mt-1 inline-flex rounded-full border border-[#DCE6F8] bg-[#F4F8FF] px-2 py-0.5 text-[11px] font-medium text-[#35538A]">
+                            {produto.configuracaoNome}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <p className="text-[#6B8693]">Preço</p>
@@ -745,7 +1049,7 @@ const ProdutosPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-[#DEEFE7]">
-                  {produtosPagina.map((produto) => {
+                  {produtos.map((produto) => {
                     const statusInfo = statusConfig[produto.status];
                     const estoqueStatus = getEstoqueStatus(produto);
                     const StatusIcon = statusInfo.icon;
@@ -766,9 +1070,17 @@ const ProdutosPage: React.FC = () => {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm text-[#002333] font-medium">
-                            {produto.categoria}
-                          </span>
+                          <div>
+                            <span className="text-sm text-[#002333] font-medium">{produto.categoria}</span>
+                            {produto.subcategoriaNome && (
+                              <div className="mt-1 text-xs text-[#002333]/70">{produto.subcategoriaNome}</div>
+                            )}
+                            {produto.configuracaoNome && (
+                              <div className="mt-1 inline-flex rounded-full border border-[#DCE6F8] bg-[#F4F8FF] px-2 py-0.5 text-[11px] font-medium text-[#35538A]">
+                                {produto.configuracaoNome}
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-[#002333] font-semibold">
@@ -840,11 +1152,11 @@ const ProdutosPage: React.FC = () => {
           </>
         )}
 
-        {produtosFiltrados.length > 0 && (
+        {totalItems > 0 && (
           <div className="flex flex-col gap-3 border-t border-[#E1EAEE] bg-[#F8FBFC] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <div className="flex flex-wrap items-center gap-3 text-xs text-[#5F7B89] sm:text-sm">
               <span>
-                {produtosPagina.length} de {produtosFiltrados.length} registros
+                {produtos.length} de {totalItems} registros
               </span>
               <select
                 value={itemsPerPage}
@@ -887,7 +1199,7 @@ const ProdutosPage: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-[1px]">
           <div className="max-h-[90vh] w-full max-w-[980px] overflow-y-auto rounded-2xl border border-[#DCE7EB] bg-white shadow-[0_30px_60px_-30px_rgba(7,36,51,0.55)]">
             <div className="flex items-center justify-between border-b border-[#E1EAEE] px-6 py-4">
-              <h3 className="text-lg font-semibold text-[#19384C]">Detalhes do Produto</h3>
+              <h3 className="text-lg font-semibold text-[#19384C]">Detalhes do item</h3>
               <button
                 onClick={closeModal}
                 className="rounded-lg p-1 text-[#7A95A3] transition-colors hover:bg-[#F3F8FA] hover:text-[#19384C]"
@@ -918,7 +1230,51 @@ const ProdutosPage: React.FC = () => {
                     <h4 className="text-sm font-semibold text-[#002333]">Categoria</h4>
                     <p className="text-sm text-[#002333]/70">{selectedProduto.categoria}</p>
                   </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-[#002333]">Subcategoria</h4>
+                    <p className="text-sm text-[#002333]/70">
+                      {selectedProduto.subcategoriaNome || 'Não informada'}
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-[#002333]">Configuração</h4>
+                    <p className="text-sm text-[#002333]/70">
+                      {selectedProduto.configuracaoNome || 'Não informada'}
+                    </p>
+                  </div>
                 </div>
+
+                {categoriaDoProdutoSelecionado && (
+                  <div className="rounded-2xl border border-[#DEEFE7] bg-[#FCFEFE] p-4">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <h4 className="text-sm font-semibold text-[#002333]">
+                          Estrutura relacionada da categoria
+                        </h4>
+                        <p className="mt-1 text-sm text-[#002333]/70">
+                          {categoriaDoProdutoSelecionado.descricao || 'Categoria sem descrição cadastrada.'}
+                        </p>
+                      </div>
+                      <span className="rounded-full border border-[#D4E2E7] bg-white px-3 py-1 text-xs font-medium text-[#244455]">
+                        {categoriaDoProdutoSelecionado.subcategorias.length} subcategorias oficiais
+                      </span>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {categoriaDoProdutoSelecionado.subcategorias.map((subcategoria) => (
+                        <span
+                          key={subcategoria.id}
+                          className="rounded-full border border-[#CFE7E8] bg-[#EFF8F8] px-3 py-1 text-xs text-[#0F7B7D]"
+                        >
+                          {subcategoria.nome}
+                          {subcategoria.configuracoes?.length
+                            ? ` • ${subcategoria.configuracoes.length} config.`
+                            : ''}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
@@ -951,6 +1307,62 @@ const ProdutosPage: React.FC = () => {
                     {selectedProduto.descricao || 'Sem descrição'}
                   </p>
                 </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <h4 className="text-sm font-semibold text-[#002333]">Fornecedor</h4>
+                    <p className="text-sm text-[#002333]/70">
+                      {selectedProduto.fornecedor || 'Não informado'}
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-[#002333]">Status</h4>
+                    <p className="text-sm text-[#002333]/70">
+                      {statusConfig[selectedProduto.status]?.label || selectedProduto.status}
+                    </p>
+                  </div>
+                </div>
+
+                {selectedProduto.tags && selectedProduto.tags.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-[#002333]">Tags</h4>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {selectedProduto.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="inline-flex items-center rounded-full border border-[#CFE7E8] bg-[#EFF8F8] px-3 py-1 text-xs text-[#0F7B7D]"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(selectedProduto.tipoLicenciamento ||
+                  selectedProduto.periodicidadeLicenca ||
+                  selectedProduto.quantidadeLicencas) && (
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div>
+                      <h4 className="text-sm font-semibold text-[#002333]">Licenciamento</h4>
+                      <p className="text-sm text-[#002333]/70">
+                        {selectedProduto.tipoLicenciamento || 'Não informado'}
+                      </p>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-semibold text-[#002333]">Periodicidade</h4>
+                      <p className="text-sm text-[#002333]/70">
+                        {selectedProduto.periodicidadeLicenca || 'Não informada'}
+                      </p>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-semibold text-[#002333]">Licenças</h4>
+                      <p className="text-sm text-[#002333]/70">
+                        {selectedProduto.quantidadeLicencas ?? 'Não informada'}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>

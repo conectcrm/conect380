@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, In } from 'typeorm';
 import { Plano } from './entities/plano.entity';
 import { ModuloSistema } from './entities/modulo-sistema.entity';
 import { PlanoModulo } from './entities/plano-modulo.entity';
@@ -27,9 +27,11 @@ export class PlanosService {
     private dataSource: DataSource,
   ) {}
 
-  async listarTodos(): Promise<Plano[]> {
+  async listarTodos(includeInactive = false): Promise<Plano[]> {
+    const where = includeInactive ? undefined : { ativo: true };
+
     return this.planoRepository.find({
-      where: { ativo: true },
+      where,
       relations: ['modulosInclusos', 'modulosInclusos.modulo'],
       order: { ordem: 'ASC', preco: 'ASC' },
     });
@@ -42,7 +44,7 @@ export class PlanosService {
     });
 
     if (!plano) {
-      throw new NotFoundException(`Plano com ID ${id} não encontrado`);
+      throw new NotFoundException(`Plano com ID ${id} nao encontrado`);
     }
 
     return plano;
@@ -55,21 +57,22 @@ export class PlanosService {
     });
 
     if (!plano) {
-      throw new NotFoundException(`Plano com código ${codigo} não encontrado`);
+      throw new NotFoundException(`Plano com codigo ${codigo} nao encontrado`);
     }
 
     return plano;
   }
 
   async criar(dados: CriarPlanoDto): Promise<Plano> {
-    // Verificar se código já existe
     const planoExistente = await this.planoRepository.findOne({
       where: { codigo: dados.codigo },
     });
 
     if (planoExistente) {
-      throw new ConflictException(`Plano com código ${dados.codigo} já existe`);
+      throw new ConflictException(`Plano com codigo ${dados.codigo} ja existe`);
     }
+
+    const modulosInclusos = await this.validarModulosInclusos(dados.modulosInclusos);
 
     const plano = this.planoRepository.create({
       nome: dados.nome,
@@ -87,11 +90,7 @@ export class PlanosService {
     });
 
     const planoSalvo = await this.planoRepository.save(plano);
-
-    // Associar módulos se fornecidos
-    if (dados.modulosInclusos && dados.modulosInclusos.length > 0) {
-      await this.associarModulos(planoSalvo.id, dados.modulosInclusos);
-    }
+    await this.associarModulos(planoSalvo.id, modulosInclusos);
 
     return this.buscarPorId(planoSalvo.id);
   }
@@ -99,31 +98,24 @@ export class PlanosService {
   async atualizar(id: string, dados: AtualizarPlanoDto): Promise<Plano> {
     const plano = await this.buscarPorId(id);
 
-    // Verificar conflito de código se estiver sendo alterado
     if (dados.codigo && dados.codigo !== plano.codigo) {
       const planoExistente = await this.planoRepository.findOne({
         where: { codigo: dados.codigo },
       });
 
       if (planoExistente) {
-        throw new ConflictException(`Plano com código ${dados.codigo} já existe`);
+        throw new ConflictException(`Plano com codigo ${dados.codigo} ja existe`);
       }
     }
 
-    // Atualizar campos
-    Object.assign(plano, dados);
+    const modulosInclusos = await this.validarModulosInclusos(dados.modulosInclusos);
+    const { modulosInclusos: _ignored, ...dadosPlano } = dados;
+
+    Object.assign(plano, dadosPlano);
     const planoAtualizado = await this.planoRepository.save(plano);
 
-    // Atualizar módulos se fornecidos
-    if (dados.modulosInclusos !== undefined) {
-      // Remover associações existentes
-      await this.planoModuloRepository.delete({ plano: { id } });
-
-      // Adicionar novas associações
-      if (dados.modulosInclusos.length > 0) {
-        await this.associarModulos(id, dados.modulosInclusos);
-      }
-    }
+    await this.planoModuloRepository.delete({ plano: { id } });
+    await this.associarModulos(id, modulosInclusos);
 
     return this.buscarPorId(planoAtualizado.id);
   }
@@ -131,11 +123,10 @@ export class PlanosService {
   async remover(id: string): Promise<void> {
     const plano = await this.buscarPorId(id);
 
-    // Verificar se há assinaturas ativas vinculadas a este plano
     const assinaturasAtivas = await this.dataSource.query(
       `
-      SELECT COUNT(*) as total 
-      FROM assinaturas_empresas 
+      SELECT COUNT(*) as total
+      FROM assinaturas_empresas
       WHERE plano_id = $1 AND status = 'ativa'
     `,
       [id],
@@ -143,7 +134,7 @@ export class PlanosService {
 
     if (assinaturasAtivas[0]?.total > 0) {
       throw new BadRequestException(
-        `Não é possível excluir este plano pois existem ${assinaturasAtivas[0].total} empresa(s) com assinatura ativa. Desative o plano ao invés de excluí-lo.`,
+        `Nao e possivel excluir este plano pois existem ${assinaturasAtivas[0].total} empresa(s) com assinatura ativa. Desative o plano ao inves de exclui-lo.`,
       );
     }
 
@@ -162,25 +153,47 @@ export class PlanosService {
     return this.planoRepository.save(plano);
   }
 
-  private async associarModulos(planoId: string, modulosIds: string[]): Promise<void> {
-    for (const moduloId of modulosIds) {
-      // Verificar se módulo existe
-      const modulo = await this.moduloSistemaRepository.findOne({
-        where: { id: moduloId },
-      });
+  private async validarModulosInclusos(modulosIds: string[]): Promise<string[]> {
+    const moduloIdsNormalizados = Array.from(
+      new Set((modulosIds || []).map((id) => String(id).trim()).filter(Boolean)),
+    );
 
-      if (modulo) {
-        const planoModulo = this.planoModuloRepository.create({
-          plano: { id: planoId },
-          modulo: { id: moduloId },
-        });
-
-        await this.planoModuloRepository.save(planoModulo);
-      }
+    if (moduloIdsNormalizados.length === 0) {
+      throw new BadRequestException('Plano deve possuir ao menos um modulo vinculado');
     }
+
+    const modulosExistentes = await this.moduloSistemaRepository.find({
+      where: { id: In(moduloIdsNormalizados) },
+      select: ['id'],
+    });
+
+    const existentes = new Set(modulosExistentes.map((modulo) => modulo.id));
+    const modulosInvalidos = moduloIdsNormalizados.filter((id) => !existentes.has(id));
+
+    if (modulosInvalidos.length > 0) {
+      throw new BadRequestException(
+        `Modulos informados nao existem no catalogo: ${modulosInvalidos.join(', ')}`,
+      );
+    }
+
+    return moduloIdsNormalizados;
   }
 
-  // Métodos para gerenciar módulos do sistema
+  private async associarModulos(planoId: string, modulosIds: string[]): Promise<void> {
+    if (modulosIds.length === 0) {
+      return;
+    }
+
+    const vinculos = modulosIds.map((moduloId) =>
+      this.planoModuloRepository.create({
+        plano: { id: planoId },
+        modulo: { id: moduloId },
+      }),
+    );
+
+    await this.planoModuloRepository.save(vinculos);
+  }
+
   async listarModulosDisponiveis(): Promise<ModuloSistema[]> {
     return this.moduloSistemaRepository.find({
       where: { ativo: true },

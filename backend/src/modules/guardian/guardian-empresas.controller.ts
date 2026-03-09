@@ -40,7 +40,7 @@ export class GuardianEmpresasController {
 
   /**
    * GET /api/guardian/empresas
-   * Listar todas as empresas com filtros e paginaÃ§Ã£o
+   * Listar todas as empresas com filtros e paginacao
    */
   @Get()
   async listarTodas(@Query() filters: FilterEmpresasAdminDto) {
@@ -95,7 +95,7 @@ export class GuardianEmpresasController {
 
   /**
    * GET /api/guardian/empresas/:id/usuarios
-   * Listar usuÃ¡rios da empresa
+   * Listar usuarios da empresa
    */
   @Get(':id/usuarios')
   async listarUsuarios(@Param('id') empresaId: string) {
@@ -114,13 +114,13 @@ export class GuardianEmpresasController {
 
   /**
    * ========================================
-   * GESTÃƒO DE MÃ“DULOS
+   * GESTAO DE MODULOS
    * ========================================
    */
 
   /**
    * GET /api/guardian/empresas/:id/modulos
-   * Listar mÃ³dulos da empresa
+   * Listar modulos da empresa
    */
   @Get(':id/modulos')
   async listarModulos(@Param('id') id: string) {
@@ -129,7 +129,7 @@ export class GuardianEmpresasController {
 
   /**
    * POST /api/guardian/empresas/:id/modulos
-   * Ativar mÃ³dulo para a empresa
+   * Ativar modulo para a empresa
    */
   @Post(':id/modulos')
   @HttpCode(HttpStatus.CREATED)
@@ -139,7 +139,7 @@ export class GuardianEmpresasController {
 
   /**
    * PATCH /api/guardian/empresas/:id/modulos/:modulo
-   * Atualizar configuraÃ§Ãµes/limites do mÃ³dulo
+   * Atualizar configuracoes/limites do modulo
    */
   @Patch(':id/modulos/:modulo')
   async atualizarModulo(
@@ -152,7 +152,7 @@ export class GuardianEmpresasController {
 
   /**
    * DELETE /api/guardian/empresas/:id/modulos/:modulo
-   * Desativar mÃ³dulo da empresa
+   * Desativar modulo da empresa
    */
   @Delete(':id/modulos/:modulo')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -162,13 +162,13 @@ export class GuardianEmpresasController {
 
   /**
    * ========================================
-   * GESTÃƒO DE PLANOS
+   * GESTAO DE PLANOS
    * ========================================
    */
 
   /**
    * GET /api/guardian/empresas/:id/historico-planos
-   * Listar histÃ³rico de mudanÃ§as de plano
+   * Listar historico de mudancas de plano
    */
   @Get(':id/historico-planos')
   @Permissions(Permission.PLANOS_MANAGE)

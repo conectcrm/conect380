@@ -114,6 +114,11 @@ export interface CreateCardPaymentDto {
   notification_url: string;
 }
 
+export interface ReconcilePaymentsDto {
+  lookbackHours?: number;
+  limit?: number;
+}
+
 @Controller('mercadopago')
 @UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
 export class MercadoPagoController {
@@ -218,6 +223,41 @@ export class MercadoPagoController {
     }
   }
 
+  @Post('reconciliation/payments/:id')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  async reconcilePaymentById(@Param('id') paymentId: string) {
+    try {
+      return await this.mercadoPagoService.reconcilePaymentById(paymentId, 'manual');
+    } catch (error) {
+      this.logger.error(`Erro ao reconciliar pagamento ${paymentId}:`, error);
+      throw new HttpException(
+        error.message || 'Erro interno do servidor',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('reconciliation/payments')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  async reconcileRecentPayments(@Body() body: ReconcilePaymentsDto = {}) {
+    try {
+      const lookbackHours =
+        body.lookbackHours !== undefined ? Number(body.lookbackHours) : undefined;
+      const limit = body.limit !== undefined ? Number(body.limit) : undefined;
+
+      return await this.mercadoPagoService.reconcileRecentPayments({
+        lookbackHours,
+        limit,
+      });
+    } catch (error) {
+      this.logger.error('Erro ao reconciliar pagamentos recentes:', error);
+      throw new HttpException(
+        error.message || 'Erro interno do servidor',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
   @Post('webhooks')
   @Public()
   @SkipEmpresaValidation()
@@ -227,7 +267,8 @@ export class MercadoPagoController {
     @Headers('x-request-id') requestId: string,
   ) {
     try {
-      this.logger.log(`Webhook recebido: ${body.type} - ID: ${requestId}`);
+      const webhookType = body?.type || body?.topic || 'unknown';
+      this.logger.log(`Webhook recebido: ${webhookType} - ID: ${requestId || 'n/a'}`);
 
       // Validar assinatura do webhook
       const isValid = await this.mercadoPagoService.validateWebhookSignature(
@@ -246,6 +287,10 @@ export class MercadoPagoController {
 
       return { status: 'success' };
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
       this.logger.error('Erro ao processar webhook:', error);
       throw new HttpException(
         error.message || 'Erro interno do servidor',

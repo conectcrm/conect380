@@ -8,6 +8,7 @@ import { PlanosService } from './planos.service';
 import { PlanosController } from './planos.controller';
 import { AssinaturasService } from './assinaturas.service';
 import { AssinaturasController } from './assinaturas.controller';
+import { AssinaturaDueDateSchedulerService } from './assinatura-due-date-scheduler.service';
 import { MercadoPagoModule } from '../mercado-pago/mercado-pago.module';
 
 @Module({
@@ -16,7 +17,7 @@ import { MercadoPagoModule } from '../mercado-pago/mercado-pago.module';
     MercadoPagoModule,
   ],
   controllers: [PlanosController, AssinaturasController],
-  providers: [PlanosService, AssinaturasService],
-  exports: [PlanosService, AssinaturasService],
+  providers: [PlanosService, AssinaturasService, AssinaturaDueDateSchedulerService],
+  exports: [PlanosService, AssinaturasService, AssinaturaDueDateSchedulerService],
 })
 export class PlanosModule {}

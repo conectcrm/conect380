@@ -54,13 +54,13 @@ export const MODULOS_INFO: Record<ModuloEnum, ModuloInfo> = {
     id: ModuloEnum.VENDAS,
     nome: 'Vendas',
     descricao:
-      'Gestão completa do ciclo de vendas. Propostas, cotações, produtos, combos, funil de vendas e acompanhamento de oportunidades.',
+      'Gestão completa do ciclo de vendas. Propostas, cotações, catálogo de itens, funil de vendas e acompanhamento de oportunidades.',
     preco: 'R$ 349',
     recursos: [
       'Gestão de propostas comerciais',
       'Sistema de cotações',
       'Catálogo de produtos e serviços',
-      'Criação de combos e pacotes',
+      'Catálogo hierárquico de itens',
       'Funil de vendas visual',
       'Acompanhamento de oportunidades',
       'Previsão de receita',

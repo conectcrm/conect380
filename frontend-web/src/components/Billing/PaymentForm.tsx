@@ -29,8 +29,8 @@ interface PaymentFormProps {
     id: string;
     nome: string;
     preco: number | string;
-    periodo: string;
-    features: string[];
+    periodo?: string;
+    features?: string[];
   };
   onPaymentSuccess: (paymentData: any) => void;
   onCancel: () => void;
@@ -355,10 +355,10 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
         {planoSelecionado && (
             <div className="mt-4 rounded-lg bg-[#DEEFE7] p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="font-semibold text-[#002333]">{planoSelecionado.nome}</div>
-                <div className="text-sm text-[#385A6A]">{planoSelecionado.periodo}</div>
-              </div>
+                <div>
+                  <div className="font-semibold text-[#002333]">{planoSelecionado.nome}</div>
+                  <div className="text-sm text-[#385A6A]">{planoSelecionado.periodo || 'Cobranca mensal'}</div>
+                </div>
               <div className="text-left sm:text-right">
                 <div className="text-2xl font-bold text-[#002333]">
                   R$ {formatPrice(planoSelecionado.preco)}

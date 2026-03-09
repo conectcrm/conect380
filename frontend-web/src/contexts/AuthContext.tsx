@@ -191,8 +191,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } else {
         throw new Error('Authentication failed');
       }
-    } catch (error) {
-      console.error('Login error:', error);
+    } catch (error: unknown) {
+      const isExpectedActionError =
+        error instanceof Error && (error.message === 'MFA_REQUIRED' || error.message === 'TROCAR_SENHA');
+
+      if (!isExpectedActionError) {
+        console.error('Login error:', error);
+      }
       throw error;
     }
   };

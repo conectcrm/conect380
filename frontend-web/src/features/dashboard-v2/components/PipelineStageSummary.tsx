@@ -11,13 +11,14 @@ type StageCard = {
   label: string;
   value: number;
   quantity: number;
+  agingDays: number;
 };
 
 const stageLabelMap: Record<string, string> = {
-  leads: 'Prospeccao',
+  leads: 'Prospecção',
   qualification: 'Contato Realizado',
   proposal: 'Proposta Enviada',
-  negotiation: 'Negociacao',
+  negotiation: 'Negociação',
   closing: 'Fechamento',
   won: 'Ganho',
 };
@@ -46,6 +47,7 @@ const PipelineStageSummary: React.FC<PipelineStageSummaryProps> = ({ data }) => 
           label: stageLabelMap[stageKey] || stageKey,
           value: Number(stage.valor || 0),
           quantity: Number(stage.quantidade || 0),
+          agingDays: Number(stage.agingMedioDias || 0),
         };
       })
       .filter((stage): stage is StageCard => Boolean(stage));
@@ -60,6 +62,7 @@ const PipelineStageSummary: React.FC<PipelineStageSummaryProps> = ({ data }) => 
         label: stageLabelMap[stage.stage] || stage.stage,
         value: Number(stage.valor || 0),
         quantity: Number(stage.quantidade || 0),
+        agingDays: Number(stage.agingMedioDias || 0),
       }));
 
     return [...ordered, ...fallback].slice(0, 4);
@@ -74,7 +77,7 @@ const PipelineStageSummary: React.FC<PipelineStageSummaryProps> = ({ data }) => 
     return (
       <section className="rounded-[20px] border border-[#DCE7EB] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(15,57,74,0.28)]">
         <h3 className="text-[20px] font-semibold tracking-[-0.012em] text-[#18374B]">Pipeline de Vendas</h3>
-        <p className="mt-3 text-[14px] text-[#607C89]">Sem dados de pipeline para o periodo selecionado.</p>
+        <p className="mt-3 text-[14px] text-[#607C89]">Sem dados de pipeline para o período selecionado.</p>
       </section>
     );
   }
@@ -82,11 +85,21 @@ const PipelineStageSummary: React.FC<PipelineStageSummaryProps> = ({ data }) => 
   return (
     <section className="rounded-[20px] border border-[#DCE7EB] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(15,57,74,0.28)]">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2.5">
-        <h3 className="text-[20px] font-semibold tracking-[-0.012em] text-[#18374B]">Pipeline de Vendas</h3>
-        <span className="inline-flex items-center gap-2 rounded-2xl bg-[#F2F6F8] px-4 py-1.5 text-[14px] text-[#2D4A5A]">
-          <strong className="font-semibold text-[#17384B]">{formatCurrency(data.totalValor)}</strong>
-          Total do Pipeline
-        </span>
+        <div>
+          <h3 className="text-[20px] font-semibold tracking-[-0.012em] text-[#18374B]">Pipeline de Vendas</h3>
+          <p className="mt-1 text-[13px] text-[#617D89]">
+            Leitura rápida de valor, peso e maturidade por etapa.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-2 rounded-2xl bg-[#F2F6F8] px-4 py-1.5 text-[14px] text-[#2D4A5A]">
+            <strong className="font-semibold text-[#17384B]">{formatCurrency(data.totalValor)}</strong>
+            Total do Pipeline
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-2xl bg-[#F7FBFC] px-4 py-1.5 text-[14px] text-[#607B89]">
+            {totalQuantidade} oportunidades
+          </span>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-[16px] border border-[#DFE8ED] bg-[#FCFDFE]">
@@ -98,6 +111,10 @@ const PipelineStageSummary: React.FC<PipelineStageSummaryProps> = ({ data }) => 
               <p className="mt-2.5 inline-flex items-center gap-1 text-[14px] text-[#607B89]">
                 <PackageOpen className="h-3.5 w-3.5 text-[#718A97]" />
                 {stage.quantity} oportunidades
+              </p>
+              <p className="mt-1 text-[12px] text-[#7B919D]">
+                {totalQuantidade > 0 ? `${((stage.quantity / totalQuantidade) * 100).toFixed(0)}%` : '0%'} do volume
+                {stage.agingDays > 0 ? ` • aging médio ${stage.agingDays.toFixed(0)}d` : ''}
               </p>
             </article>
           ))}

@@ -57,7 +57,7 @@ export const montarPayloadReprocessamento = (
     }
 
     if (!pagamentoId) {
-      throw new Error('Informe um pagamentoId numerico valido para reprocessar o estorno.');
+      throw new Error('Informe um pagamentoId numérico válido para reprocessar o estorno.');
     }
 
     return { observacao, pagamentoId };
@@ -72,7 +72,7 @@ export const montarPayloadReprocessamento = (
 
     if (!gatewayTransacaoId) {
       const input = solicitarEntrada(
-        'Informe o gatewayTransacaoId para reprocessar a referencia de integracao:',
+        'Informe o gatewayTransacaoId para reprocessar a referência de integração:',
       );
       if (input === null) return null;
       gatewayTransacaoId = toOptionalString(input);
@@ -80,7 +80,7 @@ export const montarPayloadReprocessamento = (
 
     if (!gatewayTransacaoId) {
       throw new Error(
-        'gatewayTransacaoId obrigatorio para reprocessar alerta de referencia de integracao.',
+        'gatewayTransacaoId obrigatório para reprocessar alerta de referência de integração.',
       );
     }
 
@@ -93,5 +93,5 @@ export const montarPayloadReprocessamento = (
     };
   }
 
-  throw new Error(`Tipo de alerta ${alerta.tipo} nao suporta reprocessamento manual.`);
+  throw new Error(`Tipo de alerta ${alerta.tipo} não suporta reprocessamento manual.`);
 };

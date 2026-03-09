@@ -21,13 +21,24 @@ export const authService = {
 
   async resendMfaCode(payload: {
     challengeId: string;
-  }): Promise<ApiResponse<{ challengeId: string; email: string; expiresInSeconds: number; canResendAfterSeconds: number }>> {
+  }): Promise<
+    ApiResponse<{
+      challengeId: string;
+      email: string;
+      expiresInSeconds: number;
+      canResendAfterSeconds: number;
+      deliveryChannel?: 'email' | 'dev_fallback';
+      devCode?: string;
+    }>
+  > {
     const response = await api.post<
       ApiResponse<{
         challengeId: string;
         email: string;
         expiresInSeconds: number;
         canResendAfterSeconds: number;
+        deliveryChannel?: 'email' | 'dev_fallback';
+        devCode?: string;
       }>
     >('/auth/mfa/resend', payload);
     return response.data;

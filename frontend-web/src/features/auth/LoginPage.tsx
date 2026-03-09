@@ -6,6 +6,8 @@ import Conect360Logo from '../../components/ui/Conect360Logo';
 import { toastService } from '../../services/toastService';
 import { MfaRequiredActionData } from '../../types';
 
+const IS_DEV_ENV = process.env.NODE_ENV !== 'production';
+
 interface MfaFlowState extends MfaRequiredActionData {
   expiresAt: number;
   resendAvailableAt: number;
@@ -187,6 +189,11 @@ const LoginPage: React.FC = () => {
           typeof errorData.canResendAfterSeconds === 'number'
             ? errorData.canResendAfterSeconds
             : 30;
+        const deliveryChannel =
+          errorData.deliveryChannel === 'dev_fallback' || errorData.deliveryChannel === 'email'
+            ? errorData.deliveryChannel
+            : undefined;
+        const devCode = typeof errorData.devCode === 'string' ? errorData.devCode : undefined;
 
         if (!challengeId) {
           toastService.error('Não foi possível iniciar a verificação em duas etapas.');
@@ -198,8 +205,14 @@ const LoginPage: React.FC = () => {
           email: emailMask,
           expiresInSeconds,
           canResendAfterSeconds,
+          deliveryChannel,
+          devCode,
         });
-        toastService.info('Código MFA enviado para o e-mail corporativo.');
+        toastService.info(
+          deliveryChannel === 'dev_fallback' && devCode && IS_DEV_ENV
+            ? 'MFA em modo desenvolvimento: use o codigo exibido na tela.'
+            : 'Código MFA enviado para o e-mail corporativo.',
+        );
         return;
       }
 
@@ -263,7 +276,11 @@ const LoginPage: React.FC = () => {
     try {
       const data = await resendMfa(mfaState.challengeId);
       applyMfaState(data);
-      toastService.success('Novo código MFA enviado com sucesso.');
+      toastService.success(
+        data.deliveryChannel === 'dev_fallback' && data.devCode && IS_DEV_ENV
+          ? 'MFA em modo desenvolvimento: use o codigo exibido na tela.'
+          : 'Novo código MFA enviado com sucesso.',
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : null;
       setMfaError(message || 'Não foi possível reenviar o código agora. Tente novamente.');
@@ -374,6 +391,15 @@ const LoginPage: React.FC = () => {
                   <br />
                   Expira em <strong>{formatCountdown(mfaExpiresInSeconds)}</strong>.
                 </div>
+
+                {mfaState.deliveryChannel === 'dev_fallback' && mfaState.devCode && IS_DEV_ENV && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    <p className="font-semibold">Ambiente de desenvolvimento</p>
+                    <p>
+                      Código MFA: <strong>{mfaState.devCode}</strong>
+                    </p>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-semibold text-[#002333] mb-2">
@@ -592,4 +618,3 @@ const LoginPage: React.FC = () => {
 };
 
 export default LoginPage;
-

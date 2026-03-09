@@ -330,10 +330,10 @@ const PortalClientePage: React.FC = () => {
           actions={
             <div className="flex items-center gap-2">
               <Link
-                to="/nuclei/administracao"
+                to="/dashboard"
                 className="inline-flex h-9 items-center rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
               >
-                Voltar ao nucleo
+                Voltar ao painel
               </Link>
               <button
                 type="button"

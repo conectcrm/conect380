@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Progress } from '../ui/progress';
 import { Badge } from '../ui/badge';
@@ -13,11 +13,9 @@ import {
   CheckCircle,
   Crown,
   Calendar,
-  Settings,
 } from 'lucide-react';
 import { useSubscription } from '../../hooks/useSubscription';
 import { formatCurrency } from '../../utils/formatters';
-import { AdminDashboard } from './Admin/AdminDashboard';
 
 interface BillingDashboardProps {
   onUpgrade?: () => void;
@@ -28,17 +26,9 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
   onUpgrade,
   onManageBilling,
 }) => {
-  const [showAdmin, setShowAdmin] = useState(false);
-  const { assinatura, limites, loading, error, calcularProgresso, getStatusInfo, assinaturaAtiva } =
+  const { assinatura, loading, error, calcularProgresso, getStatusInfo } =
     useSubscription();
 
-  // TODO: Implementar verificação de permissão de administrador
-  // Por enquanto, vamos mostrar para todos os usuários para teste
-  const isAdmin = true; // Substituir pela lógica real de verificação
-
-  if (showAdmin) {
-    return <AdminDashboard onBack={() => setShowAdmin(false)} />;
-  }
 
   if (loading) {
     return (
@@ -76,7 +66,7 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
             <Crown className="h-16 w-16 text-yellow-500 mx-auto mb-4" />
             <h3 className="mb-2 text-xl font-semibold text-[#002333]">Bem-vindo ao ConectCRM!</h3>
             <p className="mb-6 text-[#385A6A]">
-              Para começar a usar todas as funcionalidades, escolha um plano que se adeque às suas
+              Para comecar a usar todas as funcionalidades, escolha um plano que se adeque as suas
               necessidades.
             </p>
             <Button onClick={onUpgrade} size="lg" className="bg-[#159A9C] hover:bg-[#0F7B7D]">
@@ -107,23 +97,11 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
 
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:gap-3">
           <Badge
-            variant={statusInfo.status === 'ativa' ? 'default' : 'destructive'}
+            variant={statusInfo.status === 'active' ? 'default' : 'destructive'}
             className="text-sm"
           >
             {statusInfo.texto}
           </Badge>
-
-          {isAdmin && (
-            <Button
-              onClick={() => setShowAdmin(true)}
-              variant="outline"
-              size="sm"
-              className="border-[#B4BEC9] text-[#159A9C] hover:bg-[#159A9C]/10"
-            >
-              <Settings className="h-4 w-4 mr-2" />
-              Administração
-            </Button>
-          )}
 
           <Button
             onClick={onManageBilling}
@@ -137,7 +115,7 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
         </div>
       </div>
 
-      {/* Informações da Assinatura Atual */}
+      {/* Informacoes da Assinatura Atual */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -155,7 +133,7 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
             </div>
 
             <div>
-              <p className="text-sm text-[#385A6A]">Próximo Vencimento</p>
+              <p className="text-sm text-[#385A6A]">Proximo Vencimento</p>
               <p className="text-lg font-semibold">
                 {proximoVencimento.toLocaleDateString('pt-BR')}
               </p>
@@ -167,12 +145,12 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
             </div>
 
             <div>
-              <p className="text-sm text-[#385A6A]">Renovação</p>
+              <p className="text-sm text-[#385A6A]">Renovacao</p>
               <div className="flex items-center gap-2">
                 {assinatura.renovacaoAutomatica ? (
                   <>
                     <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">Automática</span>
+                    <span className="text-sm">Automatica</span>
                   </>
                 ) : (
                   <>
@@ -195,12 +173,12 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
       {/* Uso de Recursos */}
       {progresso && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Usuários */}
+          {/* Usuarios */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <Users className="h-4 w-4" />
-                Usuários
+                Usuarios
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -290,7 +268,7 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
                 />
                 <p className="text-xs text-gray-600">
                   {((assinatura.apiCallsHoje / assinatura.plano.limiteApiCalls) * 100).toFixed(1)}%
-                  do limite diário
+                  do limite diario
                 </p>
               </div>
             </CardContent>
@@ -298,7 +276,7 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
         </div>
       )}
 
-      {/* Alertas e Ações */}
+      {/* Alertas e Acoes */}
       {progresso && (
         <div className="space-y-4">
           {/* Alerta de Limite */}
@@ -310,9 +288,9 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <h4 className="font-medium text-yellow-800">Limite Próximo</h4>
+                    <h4 className="font-medium text-yellow-800">Limite Proximo</h4>
                     <p className="text-sm text-yellow-700 mt-1">
-                      Você está próximo do limite de alguns recursos. Considere fazer upgrade do seu
+                      Voce esta proximo do limite de alguns recursos. Considere fazer upgrade do seu
                       plano.
                     </p>
                     <Button
@@ -328,18 +306,18 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
             </Card>
           )}
 
-          {/* Vencimento Próximo */}
+          {/* Vencimento Proximo */}
           {diasParaVencimento <= 7 && diasParaVencimento > 0 && (
             <Card className="border-red-200 bg-red-50">
               <CardContent className="pt-6">
                 <div className="flex items-start gap-3">
                   <Calendar className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <h4 className="font-medium text-red-800">Renovação Próxima</h4>
+                    <h4 className="font-medium text-red-800">Renovacao Proxima</h4>
                     <p className="text-sm text-red-700 mt-1">
                       Sua assinatura vence em {diasParaVencimento} dias.
                       {!assinatura.renovacaoAutomatica &&
-                        ' Configure a renovação automática para evitar interrupções.'}
+                        ' Configure a renovacao automatica para evitar interrupcoes.'}
                     </p>
                     <Button
                       onClick={onManageBilling}
@@ -358,3 +336,4 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
     </div>
   );
 };
+

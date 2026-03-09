@@ -43,34 +43,34 @@ type VendedorOption = {
 const dashboardPeriodOptions: Array<{ value: DashboardV2PeriodPreset; label: string }> = [
   { value: 'today', label: 'Hoje' },
   { value: 'yesterday', label: 'Ontem' },
-  { value: '7d', label: 'Ultimos 7 dias' },
-  { value: '30d', label: 'Ultimos 30 dias' },
-  { value: '90d', label: 'Ultimos 90 dias' },
-  { value: 'month', label: 'Mes atual' },
-  { value: 'lastMonth', label: 'Mes anterior' },
+  { value: '7d', label: 'Últimos 7 dias' },
+  { value: '30d', label: 'Últimos 30 dias' },
+  { value: '90d', label: 'Últimos 90 dias' },
+  { value: 'month', label: 'Mês atual' },
+  { value: 'lastMonth', label: 'Mês anterior' },
   { value: 'ytd', label: 'Ano atual' },
-  { value: '365d', label: 'Ultimos 12 meses' },
+  { value: '365d', label: 'Últimos 12 meses' },
   { value: 'custom', label: 'Personalizado' },
 ];
 
 const dashboardQuickPeriodChips: Array<{ value: DashboardV2PeriodPreset; label: string }> = [
   { value: 'today', label: 'Hoje' },
   { value: '7d', label: '7 dias' },
-  { value: 'month', label: 'Mes atual' },
+  { value: 'month', label: 'Mês atual' },
   { value: '30d', label: '30 dias' },
   { value: '90d', label: '90 dias' },
 ];
 
 const dashboardTrendLabelByPreset: Record<Exclude<DashboardV2PeriodPreset, 'custom'>, string> = {
-  today: 'vs inicio de hoje',
-  yesterday: 'vs inicio de ontem',
-  '7d': 'vs inicio dos ultimos 7 dias',
-  '30d': 'vs inicio dos ultimos 30 dias',
-  '90d': 'vs inicio dos ultimos 90 dias',
-  month: 'vs inicio do mes atual',
-  lastMonth: 'vs inicio do mes anterior',
-  ytd: 'vs inicio do ano atual',
-  '365d': 'vs inicio dos ultimos 12 meses',
+  today: 'vs. início de hoje',
+  yesterday: 'vs. início de ontem',
+  '7d': 'vs. início dos últimos 7 dias',
+  '30d': 'vs. início dos últimos 30 dias',
+  '90d': 'vs. início dos últimos 90 dias',
+  month: 'vs. início do mês atual',
+  lastMonth: 'vs. início do mês anterior',
+  ytd: 'vs. início do ano atual',
+  '365d': 'vs. início dos últimos 12 meses',
 };
 
 const periodButtons: Array<{ key: ChartWindow; label: string }> = [
@@ -125,19 +125,69 @@ const formatDateTime = (value: string): string => {
   });
 };
 
+const parseDateValue = (value: string): Date | null => {
+  if (!value) return null;
+
+  const normalized = value.includes('T') ? value.slice(0, 10) : value;
+  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+  if (match) {
+    const [, yearRaw, monthRaw, dayRaw] = match;
+    const year = Number(yearRaw);
+    const month = Number(monthRaw);
+    const day = Number(dayRaw);
+    const parsed = new Date(year, month - 1, day);
+
+    if (
+      !Number.isNaN(parsed.getTime()) &&
+      parsed.getFullYear() === year &&
+      parsed.getMonth() === month - 1 &&
+      parsed.getDate() === day
+    ) {
+      return parsed;
+    }
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+};
+
 const formatDateLabel = (value: string): string => {
-  const [year, month, day] = value.split('-');
-  if (!year || !month || !day) return value;
-  return `${day}/${month}/${year}`;
+  const parsed = parseDateValue(value);
+  if (!parsed) return value;
+
+  return parsed.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
 };
 
 const formatRangeLabel = (start: string, end: string): string =>
   `${formatDateLabel(start)} a ${formatDateLabel(end)}`;
 
+const getInclusiveDayCount = (start: string, end: string): number => {
+  const startDate = parseDateValue(start);
+  const endDate = parseDateValue(end);
+
+  if (!startDate || !endDate) return 0;
+
+  const startTime = new Date(
+    startDate.getFullYear(),
+    startDate.getMonth(),
+    startDate.getDate(),
+  ).getTime();
+  const endTime = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()).getTime();
+
+  const diff = Math.abs(endTime - startTime);
+  return Math.floor(diff / 86400000) + 1;
+};
+
 const activityTypeLabelMap: Record<string, string> = {
-  call: 'Ligacao',
+  call: 'Ligação',
   email: 'Email',
-  meeting: 'Reuniao',
+  meeting: 'Reunião',
   note: 'Nota',
   task: 'Tarefa',
 };
@@ -355,7 +405,7 @@ const DashboardV2Page: React.FC = () => {
   const conversaoDeltaFallback = useMemo(() => trendDelta(trendPoints, 'conversao'), [trendPoints]);
   const trendPeriodLabel =
     filters.periodPreset === 'custom'
-      ? 'vs inicio do periodo personalizado'
+      ? 'vs. início do período personalizado'
       : dashboardTrendLabelByPreset[filters.periodPreset];
 
   const goalProgress = useMemo(() => {
@@ -464,6 +514,27 @@ const DashboardV2Page: React.FC = () => {
   const topActivityTypes = salesActivities.porTipo.slice(0, 5);
   const topSellers = salesActivities.porVendedor.slice(0, 6);
   const recentSalesActivities = salesActivities.recentes.slice(0, 6);
+  const salesActivityRangeDays = getInclusiveDayCount(
+    salesActivities.range.periodStart,
+    salesActivities.range.periodEnd,
+  );
+  const averageActivitiesPerDay =
+    salesActivityRangeDays > 0 ? salesActivities.totalAtividades / salesActivityRangeDays : 0;
+  const dominantActivityType = topActivityTypes[0] ?? null;
+  const dominantActivityShare =
+    salesActivities.totalAtividades > 0 && dominantActivityType
+      ? (dominantActivityType.quantidade / salesActivities.totalAtividades) * 100
+      : 0;
+  const topSellerActivityCount = topSellers[0]?.quantidade || 0;
+  const topSellerSharePercent =
+    salesActivities.totalAtividades > 0 && topSellerActivityCount > 0
+      ? (topSellerActivityCount / salesActivities.totalAtividades) * 100
+      : 0;
+  const activityMixMessage = dominantActivityType
+    ? dominantActivityShare >= 70
+      ? `${getActivityTypeLabel(dominantActivityType.tipo)} concentra ${dominantActivityShare.toFixed(0)}% do volume; vale revisar equilíbrio entre registro e contato ativo.`
+      : `${getActivityTypeLabel(dominantActivityType.tipo)} lidera o mix, mas o período segue distribuído entre mais frentes comerciais.`
+    : 'Sem movimentação registrada no período selecionado.';
 
   if (loading) {
     return (
@@ -510,7 +581,7 @@ const DashboardV2Page: React.FC = () => {
       <section className="rounded-[20px] border border-[#DCE6EA] bg-white p-5 shadow-[0_10px_28px_-22px_rgba(15,55,71,0.45)]">
         <h2 className="text-xl font-semibold text-[#173548]">Sem dados no Dashboard V2</h2>
         <p className="mt-2 text-sm text-[#5E7A88]">
-          Sincronize os dados para gerar os indicadores analiticos.
+          Sincronize os dados para gerar os indicadores analíticos.
         </p>
       </section>
     );
@@ -526,11 +597,11 @@ const DashboardV2Page: React.FC = () => {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-[22px] font-semibold tracking-[-0.014em] text-[#143548]">
-              Painel Comercial
+              Dashboard Comercial
             </h2>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
               <span className="inline-flex items-center rounded-full border border-[#D6E4E9] bg-[#F5FAFB] px-2.5 py-1 text-[12px] font-medium text-[#4C6977]">
-                Periodo: {formatRangeLabel(activeRange.periodStart, activeRange.periodEnd)}
+                Período: {formatRangeLabel(activeRange.periodStart, activeRange.periodEnd)}
               </span>
               <span className="inline-flex items-center rounded-full border border-[#D6E4E9] bg-[#F5FAFB] px-2.5 py-1 text-[12px] font-medium text-[#4C6977]">
                 Atualizado: {latestGeneratedAtLabel}
@@ -540,7 +611,7 @@ const DashboardV2Page: React.FC = () => {
 
           <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:justify-end">
             <label htmlFor="dashboard-v2-period" className="text-[13px] font-medium text-[#567583]">
-              Periodo
+              Período
             </label>
             <select
               id="dashboard-v2-period"
@@ -548,7 +619,7 @@ const DashboardV2Page: React.FC = () => {
               onChange={(event) =>
                 handlePeriodPresetChange(event.target.value as DashboardV2PeriodPreset)
               }
-              className="min-w-[180px] rounded-[10px] border border-[#D5E3E8] bg-white px-3 py-2 text-[13px] text-[#244556] focus:border-[#159A9C] focus:outline-none"
+              className="w-full min-w-0 rounded-[10px] border border-[#D5E3E8] bg-white px-3 py-2 text-[13px] text-[#244556] focus:border-[#159A9C] focus:outline-none sm:w-auto sm:min-w-[180px]"
             >
               {dashboardPeriodOptions.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -560,7 +631,7 @@ const DashboardV2Page: React.FC = () => {
             <div
               className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto"
               role="group"
-              aria-label="Atalhos de periodo"
+              aria-label="Atalhos de período"
             >
               {dashboardQuickPeriodChips.map((chip) => {
                 const isActive = filters.periodPreset === chip.value;
@@ -594,7 +665,7 @@ const DashboardV2Page: React.FC = () => {
                       customStart: event.target.value || undefined,
                     })
                   }
-                  className="rounded-[10px] border border-[#D5E3E8] bg-white px-3 py-2 text-[13px] text-[#244556] focus:border-[#159A9C] focus:outline-none"
+                  className="w-full rounded-[10px] border border-[#D5E3E8] bg-white px-3 py-2 text-[13px] text-[#244556] focus:border-[#159A9C] focus:outline-none sm:w-auto"
                 />
                 <input
                   type="date"
@@ -605,7 +676,7 @@ const DashboardV2Page: React.FC = () => {
                       customEnd: event.target.value || undefined,
                     })
                   }
-                  className="rounded-[10px] border border-[#D5E3E8] bg-white px-3 py-2 text-[13px] text-[#244556] focus:border-[#159A9C] focus:outline-none"
+                  className="w-full rounded-[10px] border border-[#D5E3E8] bg-white px-3 py-2 text-[13px] text-[#244556] focus:border-[#159A9C] focus:outline-none sm:w-auto"
                 />
               </>
             ) : null}
@@ -624,7 +695,7 @@ const DashboardV2Page: React.FC = () => {
                   vendedorId: event.target.value || undefined,
                 })
               }
-              className="min-w-[240px] rounded-[10px] border border-[#D5E3E8] bg-white px-3 py-2 text-[13px] text-[#244556] focus:border-[#159A9C] focus:outline-none"
+              className="w-full min-w-0 rounded-[10px] border border-[#D5E3E8] bg-white px-3 py-2 text-[13px] text-[#244556] focus:border-[#159A9C] focus:outline-none sm:w-auto sm:min-w-[240px]"
             >
               <option value="">Todos</option>
               {vendedorOptions.map((vendedor, index) => (
@@ -674,8 +745,8 @@ const DashboardV2Page: React.FC = () => {
           sparkline={receitaSparkline}
           progressPercent={goalProgress}
           progressTone="amber"
-          footerLeft={`Meta: ${formatCurrency(metaTotal)}`}
-          footerRight={`${Math.max(0, goalProgress).toFixed(0)}%`}
+          footerLeft={`Meta do recorte: ${formatCurrency(metaTotal)}`}
+          footerRight={`${Math.max(0, goalProgress).toFixed(0)}% da meta atingida`}
           icon={<DollarSign className="h-5 w-5" />}
           onClick={() => navigate('/financeiro/contas-receber')}
           ariaLabel="Abrir contas a receber"
@@ -691,40 +762,42 @@ const DashboardV2Page: React.FC = () => {
           progressTone="teal"
           footerLeft={
             ticketBenchmark > 0
-              ? `Referencia historica: ${formatCurrency(ticketBenchmark)}`
-              : 'Referencia historica indisponivel'
+              ? `Base histórica: ${formatCurrency(ticketBenchmark)}`
+              : 'Histórico insuficiente para comparação'
           }
-          footerRight=""
+          footerRight={
+            ticketProgress > 0 ? `${ticketProgress.toFixed(0)}% do benchmark recente` : ''
+          }
           icon={<Target className="h-5 w-5" />}
           onClick={() => navigate('/propostas')}
-          ariaLabel="Abrir propostas para analise de ticket medio"
+          ariaLabel="Abrir propostas para análise de ticket médio"
         />
 
         <KpiTrendCard
-          title="Vendas Fechadas"
+          title="Ganhos no período"
           value={formatNumber(Number(wonStage?.quantidade || 0))}
           valueSuffix="vendas"
           trendPercent={vendasFechadasTrendPercent}
-          trendLabel={`taxa de conversao ${trendPeriodLabel}`}
+          trendLabel={`taxa de conversão ${trendPeriodLabel}`}
           sparkline={conversaoSparkline}
           progressPercent={Math.max(0, Math.min(100, wonConversionPercent))}
           progressTone="teal"
-          footerLeft={`Ate negociacao: ${Math.max(0, Number(funnelStepToNegotiation?.conversionRate || 0)).toFixed(0)}%`}
-          footerRight={`Fechamento: ${Math.max(0, wonConversionPercent).toFixed(0)}%`}
+          footerLeft={`Chegada até negociação: ${Math.max(0, Number(funnelStepToNegotiation?.conversionRate || 0)).toFixed(0)}%`}
+          footerRight={`Taxa final de ganho: ${Math.max(0, wonConversionPercent).toFixed(0)}%`}
           icon={<BadgeCheck className="h-5 w-5" />}
           onClick={() => navigate('/propostas')}
           ariaLabel="Abrir propostas fechadas"
         />
 
         <KpiTrendCard
-          title="Em Negociacao"
+          title="Pipeline em negociação"
           value={formatCurrency(Number(negotiationStage?.valor || 0))}
           trendPercent={negociacaoTrendPercent}
-          trendLabel={`valor em negociacao ${trendPeriodLabel}`}
+          trendLabel={`estoque em negociação ${trendPeriodLabel}`}
           progressPercent={Math.max(0, Math.min(100, negotiationSharePercent))}
           progressTone="amber"
-          footerLeft={`Conv. para fechamento: ${Math.max(0, wonConversionPercent).toFixed(0)}%`}
-          footerRight={`${negotiationCount}/${activeOpportunityCount} em negociacao`}
+          footerLeft={`Chance de ganho: ${Math.max(0, wonConversionPercent).toFixed(0)}%`}
+          footerRight={`${negotiationCount} de ${activeOpportunityCount} oportunidades ativas`}
           icon={<Clock3 className="h-5 w-5" />}
           onClick={() => navigate('/pipeline')}
           ariaLabel="Abrir pipeline comercial"
@@ -751,25 +824,27 @@ const DashboardV2Page: React.FC = () => {
         />
 
         <GoalProgressCard
-          title="Progresso ativas"
+          title="Meta e carteira ativa"
           primaryValue={formatCurrency(metaTotal)}
+          primaryLabel="Meta"
           secondaryValue={formatNumber(data.overview.oportunidadesAtivas)}
+          secondaryLabel="Oportunidades ativas"
           trendPercent={progressoAtivoTrendPercent}
           progressPercent={goalProgress}
-          projectionLabel={`Projecao: ${formatCurrency(data.overview.receitaPrevista)}`}
+          projectionLabel={`Projeção do pipeline: ${formatCurrency(data.overview.receitaPrevista)}`}
           icon={<Activity className="h-5 w-5" />}
         />
       </section>
 
-      <section className="grid grid-cols-1 gap-3.5 xl:grid-cols-12">
-        <article className="rounded-[20px] border border-[#DCE7EB] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)] xl:col-span-8">
+      <section className="grid grid-cols-1 gap-3.5 2xl:grid-cols-12">
+        <article className="rounded-[20px] border border-[#DCE7EB] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)] 2xl:col-span-8">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
               <h3 className="text-[20px] font-semibold tracking-[-0.012em] text-[#18374B]">
                 Atividades Comerciais
               </h3>
               <p className="mt-1 text-[13px] text-[#617D89]">
-                {salesActivities.totalAtividades} atividades registradas no periodo selecionado.
+                {salesActivities.totalAtividades} atividades registradas no período selecionado.
               </p>
             </div>
             <span className="inline-flex items-center rounded-full border border-[#D6E4E9] bg-[#F5FAFB] px-2.5 py-1 text-[12px] font-medium text-[#4C6977]">
@@ -780,107 +855,224 @@ const DashboardV2Page: React.FC = () => {
             </span>
           </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-3.5 lg:grid-cols-2">
+          <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
             <div className="rounded-[14px] border border-[#E1EBEE] bg-[#FBFEFF] p-4">
-              <p className="text-[13px] font-semibold text-[#20465A]">Distribuicao por tipo</p>
-              <div className="mt-3 flex flex-wrap gap-2">
+              <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[#6D8793]">
+                Total no período
+              </p>
+              <p className="mt-2 text-[28px] font-semibold leading-none text-[#16384B]">
+                {formatNumber(salesActivities.totalAtividades)}
+              </p>
+              <p className="mt-3 text-[12px] text-[#6C8591]">
+                {salesActivityRangeDays > 0 ? `${salesActivityRangeDays} dias no recorte.` : 'Período indisponível.'}
+              </p>
+            </div>
+
+            <div className="rounded-[14px] border border-[#E1EBEE] bg-[#FBFEFF] p-4">
+              <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[#6D8793]">
+                Cadência média
+              </p>
+              <p className="mt-2 text-[28px] font-semibold leading-none text-[#16384B]">
+                {averageActivitiesPerDay.toFixed(1)}
+              </p>
+              <p className="mt-3 text-[12px] text-[#6C8591]">média diária de atividade no período</p>
+            </div>
+
+            <div className="rounded-[14px] border border-[#E1EBEE] bg-[#FBFEFF] p-4">
+              <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[#6D8793]">
+                Sinal do mix
+              </p>
+              <p className="mt-2 text-[18px] font-semibold leading-tight text-[#16384B]">
+                {dominantActivityType
+                  ? getActivityTypeLabel(dominantActivityType.tipo)
+                  : 'Sem atividade dominante'}
+              </p>
+              <p className="mt-3 text-[12px] text-[#6C8591]">{activityMixMessage}</p>
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 gap-3.5 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+            <div className="rounded-[14px] border border-[#E1EBEE] bg-[#FBFEFF] p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[13px] font-semibold text-[#20465A]">Distribuição por tipo</p>
+                  <p className="mt-1 text-[12px] text-[#718A97]">
+                    Volume e participação de cada tipo no período.
+                  </p>
+                </div>
+                {dominantActivityType ? (
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${activityTypeStyleMap[dominantActivityType.tipo] || 'bg-[#EEF3F5] text-[#516A77]'}`}
+                  >
+                    {getActivityTypeIcon(dominantActivityType.tipo)}
+                    Líder: {getActivityTypeLabel(dominantActivityType.tipo)}
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="mt-4 space-y-3">
                 {topActivityTypes.length ? (
                   topActivityTypes.map((item, index) => {
                     const activityType = item.tipo || 'note';
+                    const percent =
+                      salesActivities.totalAtividades > 0
+                        ? (item.quantidade / salesActivities.totalAtividades) * 100
+                        : 0;
 
                     return (
-                      <span
-                        key={`${activityType}-${index}`}
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold ${activityTypeStyleMap[activityType] || 'bg-[#EEF3F5] text-[#516A77]'}`}
-                      >
-                        {getActivityTypeIcon(activityType)}
-                        {getActivityTypeLabel(activityType)}: {item.quantidade}
-                      </span>
+                      <div key={`${activityType}-${index}`} className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#264A5E]">
+                              {getActivityTypeIcon(activityType)}
+                              {getActivityTypeLabel(activityType)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 text-[12px] text-[#5F7987]">
+                            <span className="font-semibold text-[#16384B]">{formatNumber(item.quantidade)}</span>
+                            <span>{percent.toFixed(0)}%</span>
+                          </div>
+                        </div>
+
+                        <div className="h-2 overflow-hidden rounded-full bg-[#E6EEF1]">
+                          <div
+                            className={`h-full rounded-full ${activityTypeStyleMap[activityType]?.includes('bg-[#E7F4FF]') ? 'bg-[#276A91]' : activityTypeStyleMap[activityType]?.includes('bg-[#F5ECFF]') ? 'bg-[#6A46A0]' : activityTypeStyleMap[activityType]?.includes('bg-[#E8F6F4]') ? 'bg-[#196A6B]' : activityTypeStyleMap[activityType]?.includes('bg-[#FFF2DF]') ? 'bg-[#996512]' : activityTypeStyleMap[activityType]?.includes('bg-[#E9F7EA]') ? 'bg-[#2C7A43]' : 'bg-[#7A909B]'}`}
+                            style={{ width: `${Math.max(percent, percent > 0 ? 8 : 0)}%` }}
+                          />
+                        </div>
+                      </div>
                     );
                   })
                 ) : (
                   <span className="text-[13px] text-[#718A97]">
-                    Sem atividades no periodo.
+                    Sem atividades no período.
                   </span>
                 )}
               </div>
             </div>
 
             <div className="rounded-[14px] border border-[#E1EBEE] bg-[#FBFEFF] p-4">
-              <p className="text-[13px] font-semibold text-[#20465A]">Interacoes recentes</p>
-              <div className="mt-3 space-y-2.5">
+              <p className="text-[13px] font-semibold text-[#20465A]">Interações recentes</p>
+              <p className="mt-1 text-[12px] text-[#718A97]">
+                Últimos registros para leitura rápida do contexto comercial.
+              </p>
+              <div className="mt-4 space-y-2.5">
                 {recentSalesActivities.length ? (
                   recentSalesActivities.map((item, index) => (
                     <div
                       key={`${item.id || 'activity'}-${index}`}
-                      className="rounded-[11px] border border-[#E8EFF2] bg-white px-3 py-2.5"
+                      className="rounded-[12px] border border-[#E8EFF2] bg-white px-3 py-2.5"
                     >
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#2A4B5B]">
-                          {getActivityTypeIcon(item.tipo || 'note')}
-                          {getActivityTypeLabel(item.tipo || 'note')}
-                        </span>
-                        <span className="text-[11px] text-[#79909B]">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#2A4B5B]">
+                            {getActivityTypeIcon(item.tipo || 'note')}
+                            {getActivityTypeLabel(item.tipo || 'note')}
+                          </span>
+                          <p className="mt-1.5 line-clamp-2 text-[12px] leading-5 text-[#4D6876]">
+                            {item.descricao}
+                          </p>
+                        </div>
+
+                        <span className="whitespace-nowrap text-[11px] text-[#79909B]">
                           {formatActivityTimestamp(item.dataAtividade)}
                         </span>
                       </div>
-                      <p className="mt-1.5 line-clamp-2 text-[12px] text-[#4D6876]">
-                        {item.descricao}
-                      </p>
-                      <p className="mt-1 text-[11px] text-[#7F95A0]">
+                      <p className="mt-1.5 text-[11px] text-[#7F95A0]">
                         {item.vendedor?.nome || 'Sistema'}
                         {item.oportunidadeTitulo ? ` • ${item.oportunidadeTitulo}` : ''}
                       </p>
                     </div>
                   ))
                 ) : (
-                  <p className="text-[13px] text-[#718A97]">Nenhuma interacao recente.</p>
+                  <p className="text-[13px] text-[#718A97]">Nenhuma interação recente.</p>
                 )}
               </div>
             </div>
           </div>
         </article>
 
-        <article className="rounded-[20px] border border-[#DCE7EB] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)] xl:col-span-4">
-          <h3 className="text-[18px] font-semibold tracking-[-0.012em] text-[#18374B]">
-            Produtividade por vendedor
-          </h3>
+        <article className="rounded-[20px] border border-[#DCE7EB] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)] 2xl:col-span-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-[18px] font-semibold tracking-[-0.012em] text-[#18374B]">
+                Produtividade por vendedor
+              </h3>
+              <p className="mt-1 text-[12px] text-[#718A97]">
+                Ranking por volume com leitura de concentração e cobertura.
+              </p>
+            </div>
+            <div className="rounded-[12px] border border-[#DCE7EB] bg-[#F8FBFC] px-3 py-2 text-right">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6E8894]">
+                Líder do período
+              </p>
+              <p className="mt-1 text-[18px] font-semibold text-[#17394C]">
+                {topSellerSharePercent.toFixed(0)}%
+              </p>
+              <p className="text-[11px] text-[#7B919D]">do total de atividades</p>
+            </div>
+          </div>
+
           <div className="mt-3 space-y-2.5">
             {topSellers.length ? (
               topSellers.map((seller, index) => (
                 <div
                   key={`${seller.vendedorId || 'seller'}-${index}`}
-                  className="rounded-[12px] border border-[#E2EBEF] bg-[#FBFEFF] px-3.5 py-2.5"
+                  className="rounded-[12px] border border-[#E2EBEF] bg-[#FBFEFF] px-3.5 py-3"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <p className="truncate text-[13px] font-semibold text-[#20485B]">{seller.nome}</p>
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#E8F6F4] text-[11px] font-semibold text-[#196A6B]">
+                        {index + 1}
+                      </span>
+                      <p className="truncate text-[13px] font-semibold text-[#20485B]">{seller.nome}</p>
+                    </div>
                     <span className="rounded-full bg-[#E8F6F4] px-2 py-0.5 text-[11px] font-semibold text-[#1C6C6E]">
                       {seller.quantidade} atividades
                     </span>
                   </div>
-                  <p className="mt-1 text-[11px] text-[#728A96]">
-                    {seller.oportunidadesAtivas} oportunidades com interacao
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#E4ECEF]">
+                    <div
+                      className="h-full rounded-full bg-[#159A9C]"
+                      style={{
+                        width: `${Math.max(
+                          topSellerActivityCount > 0
+                            ? (seller.quantidade / topSellerActivityCount) * 100
+                            : 0,
+                          seller.quantidade > 0 ? 10 : 0,
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                  <p className="mt-2 text-[11px] text-[#728A96]">
+                    {seller.oportunidadesAtivas} oportunidades com interação
                   </p>
                   <p className="mt-0.5 text-[11px] text-[#879CA7]">
-                    Ultima atividade: {formatActivityTimestamp(seller.ultimaAtividadeEm)}
+                    Participação no período: {' '}
+                    {salesActivities.totalAtividades > 0
+                      ? ((seller.quantidade / salesActivities.totalAtividades) * 100).toFixed(0)
+                      : '0'}%
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-[#879CA7]">
+                    Última atividade: {formatActivityTimestamp(seller.ultimaAtividadeEm)}
                   </p>
                 </div>
               ))
             ) : (
-              <p className="text-[13px] text-[#718A97]">Sem produtividade registrada no periodo.</p>
+              <p className="text-[13px] text-[#718A97]">Sem produtividade registrada no período.</p>
             )}
           </div>
         </article>
       </section>
 
-      <section className="grid grid-cols-1 gap-3.5 xl:grid-cols-12">
-        <div className="space-y-3.5 xl:col-span-9">
-          <div className="grid grid-cols-1 gap-3.5 xl:grid-cols-12">
-            <article className="rounded-[20px] border border-[#DCE7EB] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)] xl:col-span-7">
+      <section className="grid grid-cols-1 gap-3.5 2xl:grid-cols-12">
+        <div className="space-y-3.5 2xl:col-span-9">
+          <div className="grid grid-cols-1 gap-3.5 2xl:grid-cols-12">
+            <article className="rounded-[20px] border border-[#DCE7EB] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)] 2xl:col-span-7">
               <div className="flex flex-wrap items-start justify-between gap-2.5">
                 <div>
                   <h3 className="text-[20px] font-semibold tracking-[-0.012em] text-[#18374B]">
-                    Vendas vs Meta do periodo
+                    Vendas vs. meta do período
                   </h3>
                   <p className="mt-1.5 inline-flex items-center gap-1 text-[14px] text-[#617D89]">
                     <span className={`font-semibold ${vendasVsPeriodoAnteriorClass}`}>
@@ -971,7 +1163,7 @@ const DashboardV2Page: React.FC = () => {
               </div>
             </article>
 
-            <div className="xl:col-span-5">
+            <div className="2xl:col-span-5">
               <ConversionFunnel steps={data.funnel.steps} />
             </div>
           </div>
@@ -979,7 +1171,7 @@ const DashboardV2Page: React.FC = () => {
           <PipelineStageSummary data={data.pipelineSummary} />
         </div>
 
-        <div className="xl:col-span-3">
+        <div className="2xl:col-span-3">
           <InsightsPanel insights={data.insights.insights} />
         </div>
       </section>

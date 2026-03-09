@@ -50,7 +50,7 @@ const BLOCKED_COMMERCIAL_INFO: MvpBlockedRouteInfo = {
   features: [
     'Cotacoes avancadas',
     'Aprovacoes comerciais',
-    'Gestao de combos',
+    'Fluxo legado de combos',
     'Agenda comercial expandida',
   ],
 };

@@ -4,7 +4,9 @@ import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
 type GoalProgressCardProps = {
   title: string;
   primaryValue: string;
+  primaryLabel?: string;
   secondaryValue: string;
+  secondaryLabel?: string;
   trendPercent?: number;
   progressPercent: number;
   projectionLabel?: string;
@@ -16,7 +18,9 @@ const clampPercent = (value: number): number => Math.max(0, Math.min(100, value)
 const GoalProgressCard: React.FC<GoalProgressCardProps> = ({
   title,
   primaryValue,
+  primaryLabel = 'Principal',
   secondaryValue,
+  secondaryLabel = 'Secundário',
   trendPercent = 0,
   progressPercent,
   projectionLabel,
@@ -49,10 +53,16 @@ const GoalProgressCard: React.FC<GoalProgressCardProps> = ({
 
       <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
         <div>
+          <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[#6D8793]">
+            {primaryLabel}
+          </p>
           <p className="break-words text-[25px] font-semibold leading-none tracking-[-0.02em] text-[#19384C] sm:text-[29px] lg:text-[31px]">
             {primaryValue}
           </p>
-          <p className="mt-2 break-words text-[25px] font-semibold leading-none tracking-[-0.02em] text-[#19384C] sm:text-[29px] lg:text-[31px]">
+          <p className="mt-3 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#6D8793]">
+            {secondaryLabel}
+          </p>
+          <p className="mt-1 break-words text-[25px] font-semibold leading-none tracking-[-0.02em] text-[#19384C] sm:text-[29px] lg:text-[31px]">
             {secondaryValue}
           </p>
         </div>
@@ -86,7 +96,7 @@ const GoalProgressCard: React.FC<GoalProgressCardProps> = ({
         </svg>
       </div>
 
-      <div className="mt-3.5 flex items-center gap-1.5 text-[14px]">
+      <div className="mt-3.5 flex items-center gap-1.5 text-[13px]">
         <span className={`inline-flex items-center gap-1 font-semibold ${trendToneClass}`}>
           <TrendIcon className="h-3.5 w-3.5" />
           {trendSignal}
@@ -99,7 +109,7 @@ const GoalProgressCard: React.FC<GoalProgressCardProps> = ({
       </div>
 
       {projectionLabel ? (
-        <p className="mt-3.5 text-[14px] text-[#617C89]">{projectionLabel}</p>
+        <p className="mt-3.5 text-[12px] text-[#708894]">{projectionLabel}</p>
       ) : null}
     </article>
   );

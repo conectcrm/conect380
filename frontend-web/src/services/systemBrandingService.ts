@@ -1,4 +1,4 @@
-import { api, apiPublic } from './api';
+import { apiPublic } from './api';
 
 export type SystemMaintenanceSeverity = 'info' | 'warning' | 'critical';
 
@@ -80,16 +80,6 @@ export const systemBrandingService = {
   async getPublicBranding(): Promise<SystemBrandingEffectiveConfig> {
     const response = await apiPublic.get<SystemBrandingEffectiveConfig>('/system-branding/public');
     return normalizeBranding(response.data);
-  },
-
-  async getAdminBranding(): Promise<SystemBrandingAdminResponse> {
-    const response = await api.get<SystemBrandingAdminResponse>('/admin/system-branding');
-    return response.data;
-  },
-
-  async updateBranding(payload: Partial<SystemBrandingAdminData>): Promise<SystemBrandingAdminResponse> {
-    const response = await api.put<SystemBrandingAdminResponse>('/admin/system-branding', payload);
-    return response.data;
   },
 
   normalizeBranding,

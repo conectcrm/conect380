@@ -5,6 +5,11 @@ export interface Produto {
   id: string;
   nome: string;
   categoria: string;
+  categoriaId?: string | null;
+  subcategoriaId?: string | null;
+  configuracaoId?: string | null;
+  subcategoriaNome?: string | null;
+  configuracaoNome?: string | null;
   preco: number;
   custoUnitario: number;
   tipoItem: string;
@@ -32,6 +37,9 @@ export interface Produto {
 export interface CreateProdutoData {
   nome: string;
   categoria: string;
+  categoriaId?: string;
+  subcategoriaId?: string;
+  configuracaoId?: string;
   preco: number;
   custoUnitario?: number;
   tipoItem?: string;
@@ -62,18 +70,93 @@ export interface ProdutoEstatisticas {
   estoquesBaixos: number;
 }
 
+export interface ProdutoListFilters {
+  categoria?: string;
+  subcategoriaId?: string;
+  configuracaoId?: string;
+  status?: string;
+  search?: string;
+  tipoItem?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: 'nome' | 'categoria' | 'preco' | 'status' | 'criadoEm' | 'atualizadoEm';
+  sortOrder?: 'ASC' | 'DESC';
+}
+
+export interface ProdutoListResponse {
+  data: Produto[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+type ProdutoCsvExportFilters = Omit<ProdutoListFilters, 'page' | 'limit'>;
+
 class ProdutosService {
   // Buscar todos os produtos
   async findAll(filters?: { categoria?: string; status?: string }): Promise<Produto[]> {
     try {
       const params = new URLSearchParams();
       if (filters?.categoria) params.append('categoria', filters.categoria);
+      if ((filters as ProdutoListFilters)?.subcategoriaId) {
+        params.append('subcategoriaId', (filters as ProdutoListFilters).subcategoriaId as string);
+      }
+      if ((filters as ProdutoListFilters)?.configuracaoId) {
+        params.append('configuracaoId', (filters as ProdutoListFilters).configuracaoId as string);
+      }
       if (filters?.status) params.append('status', filters.status);
 
       const response = await api.get(`/produtos?${params.toString()}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar produtos:', error);
+      throw error;
+    }
+  }
+
+  async listPaginated(filters: ProdutoListFilters = {}): Promise<ProdutoListResponse> {
+    try {
+      const params = new URLSearchParams();
+      if (filters.categoria) params.append('categoria', filters.categoria);
+      if (filters.subcategoriaId) params.append('subcategoriaId', filters.subcategoriaId);
+      if (filters.configuracaoId) params.append('configuracaoId', filters.configuracaoId);
+      if (filters.status) params.append('status', filters.status);
+      if (filters.search) params.append('search', filters.search);
+      if (filters.tipoItem) params.append('tipoItem', filters.tipoItem);
+      if (filters.page) params.append('page', String(filters.page));
+      if (filters.limit) params.append('limit', String(filters.limit));
+      if (filters.sortBy) params.append('sortBy', filters.sortBy);
+      if (filters.sortOrder) params.append('sortOrder', filters.sortOrder);
+
+      const response = await api.get(`/produtos?${params.toString()}`);
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao buscar produtos paginados:', error);
+      throw error;
+    }
+  }
+
+  async exportCsv(filters: ProdutoCsvExportFilters = {}): Promise<Blob> {
+    try {
+      const params = new URLSearchParams();
+      if (filters.categoria) params.append('categoria', filters.categoria);
+      if (filters.subcategoriaId) params.append('subcategoriaId', filters.subcategoriaId);
+      if (filters.configuracaoId) params.append('configuracaoId', filters.configuracaoId);
+      if (filters.status) params.append('status', filters.status);
+      if (filters.search) params.append('search', filters.search);
+      if (filters.tipoItem) params.append('tipoItem', filters.tipoItem);
+      if (filters.sortBy) params.append('sortBy', filters.sortBy);
+      if (filters.sortOrder) params.append('sortOrder', filters.sortOrder);
+
+      const response = await api.get(`/produtos/exportar?${params.toString()}`, {
+        responseType: 'blob',
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao exportar CSV de produtos:', error);
       throw error;
     }
   }
@@ -153,6 +236,9 @@ class ProdutosService {
     const transformed = {
       nome: formData.nome.trim(),
       categoria: formData.categoria.trim(),
+      categoriaId: formData.categoriaId || undefined,
+      subcategoriaId: formData.subcategoriaId || undefined,
+      configuracaoId: formData.configuracaoId || undefined,
       preco: Number(preco),
       custoUnitario: formData.custoUnitario ? Number(formData.custoUnitario) : undefined,
       tipoItem: formData.tipoItem || 'produto',
@@ -212,6 +298,11 @@ class ProdutosService {
         | 'plano'
         | 'aplicativo',
       categoria,
+      categoriaId: produto.categoriaId || undefined,
+      subcategoriaId: produto.subcategoriaId || undefined,
+      configuracaoId: produto.configuracaoId || undefined,
+      subcategoriaNome: normalizeOptionalMojibakeText(produto.subcategoriaNome) || undefined,
+      configuracaoNome: normalizeOptionalMojibakeText(produto.configuracaoNome) || undefined,
       preco: produto.preco,
       custoUnitario: produto.custoUnitario,
       frequencia: (produto.frequencia || 'unico') as 'unico' | 'mensal' | 'anual',
@@ -234,6 +325,8 @@ class ProdutosService {
       fornecedor,
       sku,
       descricao,
+      tags: produto.tags || [],
+      variacoes: produto.variacoes || [],
       tipoLicenciamento,
       periodicidadeLicenca,
       renovacaoAutomatica: produto.renovacaoAutomatica,

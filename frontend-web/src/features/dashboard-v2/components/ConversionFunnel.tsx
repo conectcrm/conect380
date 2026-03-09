@@ -9,9 +9,9 @@ type ConversionFunnelProps = {
 const stageLabel = (value: string): string => {
   const labels: Record<string, string> = {
     leads: 'Propostas enviadas',
-    qualification: 'Qualificacao',
+    qualification: 'Qualificação',
     proposal: 'Proposta',
-    negotiation: 'Negociacao',
+    negotiation: 'Negociação',
     closing: 'Fechamento',
     won: 'Ganho',
   };
@@ -35,16 +35,26 @@ const ConversionFunnel: React.FC<ConversionFunnelProps> = ({ steps }) => {
     return normalized;
   }, [steps]);
 
+  const bestRate = useMemo(
+    () => funnelRows.reduce((best, row) => (row.rate > best.rate ? row : best), funnelRows[0]),
+    [funnelRows],
+  );
+
+  const totalProgressed = useMemo(
+    () => funnelRows.reduce((acc, row) => acc + row.progressed, 0),
+    [funnelRows],
+  );
+
   if (!funnelRows.length) {
     return (
       <section className="rounded-[20px] border border-[#DCE7EB] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(15,57,74,0.28)]">
         <div className="flex items-center justify-between gap-3">
-          <h3 className="text-[20px] font-semibold tracking-[-0.012em] text-[#18374B]">Taxa de Conversao</h3>
+          <h3 className="text-[20px] font-semibold tracking-[-0.012em] text-[#18374B]">Taxa de Conversão</h3>
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#EDF6F3] text-[#2AA397]">
             <Shuffle className="h-[18px] w-[18px]" />
           </span>
         </div>
-        <p className="mt-4 text-[14px] text-[#607C89]">Sem dados para o periodo selecionado.</p>
+        <p className="mt-4 text-[14px] text-[#607C89]">Sem dados para o período selecionado.</p>
       </section>
     );
   }
@@ -52,10 +62,38 @@ const ConversionFunnel: React.FC<ConversionFunnelProps> = ({ steps }) => {
   return (
     <section className="rounded-[20px] border border-[#DCE7EB] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(15,57,74,0.28)]">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-[20px] font-semibold tracking-[-0.012em] text-[#18374B]">Taxa de Conversao</h3>
+        <h3 className="text-[20px] font-semibold tracking-[-0.012em] text-[#18374B]">Taxa de Conversão</h3>
         <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#EDF6F3] text-[#2AA397]">
           <Shuffle className="h-[18px] w-[18px]" />
         </span>
+      </div>
+
+      <p className="mt-1 text-[13px] text-[#617D89]">
+        Etapas com maior sinal de avanço no período selecionado.
+      </p>
+
+      <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+        <div className="rounded-[14px] border border-[#E1EBEE] bg-[#FBFEFF] px-4 py-3">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[#6D8793]">
+            Melhor conversão
+          </p>
+          <p className="mt-1 text-[24px] font-semibold leading-none text-[#17384B]">
+            {bestRate ? `${Math.max(0, bestRate.rate).toFixed(0)}%` : '0%'}
+          </p>
+          <p className="mt-2 text-[12px] text-[#6D8793]">
+            {bestRate ? bestRate.title : 'Sem etapa destacada'}
+          </p>
+        </div>
+
+        <div className="rounded-[14px] border border-[#E1EBEE] bg-[#FBFEFF] px-4 py-3">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[#6D8793]">
+            Avanços mapeados
+          </p>
+          <p className="mt-1 text-[24px] font-semibold leading-none text-[#17384B]">
+            {totalProgressed}
+          </p>
+          <p className="mt-2 text-[12px] text-[#6D8793]">movimentos nas etapas exibidas</p>
+        </div>
       </div>
 
       <div className="mt-4 space-y-2.5">
@@ -90,6 +128,11 @@ const ConversionFunnel: React.FC<ConversionFunnelProps> = ({ steps }) => {
                   <span className="text-[32px] font-semibold leading-none tracking-[-0.02em] sm:text-[45px]">{Math.max(0, row.rate).toFixed(0)}%</span>
                   <ChevronRight className="h-[18px] w-[18px]" />
                 </div>
+              </div>
+
+              <div className="mt-2 flex items-center justify-between px-1 text-[12px] text-[#66808D]">
+                <span>{row.entered} entradas</span>
+                <span>{row.progressed} avanços</span>
               </div>
             </div>
           );

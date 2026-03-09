@@ -1,10 +1,10 @@
 /**
- * Modal de Cadastro de Produto - Layout Paisagem
+ * Modal de Cadastro de Item - Layout Paisagem
  * Otimizado para caber todos os campos na mesma tela
  * Versão com modal customizado para alterações não salvas
  */
 
-import React, { useState, useEffect, useId } from 'react';
+import React, { useState, useEffect, useId, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
@@ -22,6 +22,14 @@ import {
   validarDadosSoftware,
 } from '../../config/camposSoftware';
 import { categoriasProdutosService } from '../../services/categoriasProdutosService';
+import { CategoriaProduto } from '../../types/produtos';
+
+const normalizeCatalogName = (value?: string | null) =>
+  (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
 
 // Tipos de dados
 interface ProdutoFormData {
@@ -29,11 +37,20 @@ interface ProdutoFormData {
   tipo?: 'produto' | 'servico' | 'software'; // Novo campo para detectar software
   tipoItem: 'produto' | 'servico' | 'licenca' | 'modulo' | 'plano' | 'aplicativo';
   categoria: string;
+  categoriaId?: string;
+  subcategoriaId?: string;
+  configuracaoId?: string;
   precoUnitario: number;
+  custoUnitario?: number;
   frequencia: 'unico' | 'mensal' | 'anual';
   unidadeMedida: 'unidade' | 'saca' | 'hectare' | 'pacote' | 'licenca';
   status: 'ativo' | 'inativo' | 'descontinuado';
   descricao?: string;
+  sku?: string;
+  fornecedor?: string;
+  estoqueAtual?: number;
+  estoqueMinimo?: number;
+  estoqueMaximo?: number;
   tags?: string[];
   variacoes?: string[];
   // Campos específicos para software
@@ -55,17 +72,25 @@ interface ModalCadastroProdutoProps {
 const schema = yup.object().shape({
   nome: yup
     .string()
-    .required('Nome do produto é obrigatório')
+    .required('Nome do item é obrigatório')
     .min(3, 'Nome deve ter pelo menos 3 caracteres'),
   tipoItem: yup
     .string()
     .required('Tipo do item é obrigatório')
     .oneOf(['produto', 'servico', 'licenca', 'modulo', 'plano', 'aplicativo'], 'Tipo inválido'),
   categoria: yup.string().required('Categoria é obrigatória'),
+  categoriaId: yup.string().optional(),
+  subcategoriaId: yup.string().optional(),
+  configuracaoId: yup.string().optional(),
   precoUnitario: yup
     .number()
     .required('Preço unitário é obrigatório')
     .min(0, 'Preço deve ser maior que zero'),
+  custoUnitario: yup
+    .number()
+    .transform((value, originalValue) => (originalValue === '' ? undefined : value))
+    .optional()
+    .min(0, 'Custo deve ser maior ou igual a zero'),
   frequencia: yup
     .string()
     .required('Frequência é obrigatória')
@@ -79,19 +104,36 @@ const schema = yup.object().shape({
     .required('Status é obrigatório')
     .oneOf(['ativo', 'inativo', 'descontinuado'], 'Status inválido'),
   descricao: yup.string().optional(),
+  sku: yup.string().optional(),
+  fornecedor: yup.string().optional(),
+  estoqueAtual: yup
+    .number()
+    .transform((value, originalValue) => (originalValue === '' ? undefined : value))
+    .optional()
+    .min(0, 'Estoque atual deve ser maior ou igual a zero'),
+  estoqueMinimo: yup
+    .number()
+    .transform((value, originalValue) => (originalValue === '' ? undefined : value))
+    .optional()
+    .min(0, 'Estoque mínimo deve ser maior ou igual a zero'),
+  estoqueMaximo: yup
+    .number()
+    .transform((value, originalValue) => (originalValue === '' ? undefined : value))
+    .optional()
+    .min(0, 'Estoque máximo deve ser maior ou igual a zero'),
   tags: yup.array().of(yup.string()).default([]),
   variacoes: yup.array().of(yup.string()).default([]),
   // Validação condicional para campos de software
   tipoLicenciamento: yup.string().when('tipoItem', {
     is: (tipoItem: string) => ['licenca', 'modulo', 'aplicativo'].includes(tipoItem),
     then: (schema) =>
-      schema.required('Tipo de licenciamento é obrigatório para produtos de software'),
+      schema.required('Tipo de licenciamento é obrigatório para itens de software'),
     otherwise: (schema) => schema.optional(),
   }),
   periodicidadeLicenca: yup.string().when('tipoItem', {
     is: (tipoItem: string) => ['licenca', 'modulo', 'aplicativo'].includes(tipoItem),
     then: (schema) =>
-      schema.required('Periodicidade da licença é obrigatória para produtos de software'),
+      schema.required('Periodicidade da licença é obrigatória para itens de software'),
     otherwise: (schema) => schema.optional(),
   }),
   renovacaoAutomatica: yup.boolean().optional(),
@@ -142,7 +184,8 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
   const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
 
   // Estado para categorias carregadas do backend
-  const [categorias, setCategorias] = useState<string[]>([]);
+  const [categoriasCatalogo, setCategoriasCatalogo] = useState<CategoriaProduto[]>([]);
+  const [categoriasFallback, setCategoriasFallback] = useState<string[]>([]);
   const [loadingCategorias, setLoadingCategorias] = useState(false);
 
   // Carregar categorias do backend quando o modal abrir
@@ -157,10 +200,12 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
         // Se há categorias cadastradas, usa elas
         if (categoriasNomes.length > 0) {
-          setCategorias(categoriasNomes);
+          setCategoriasCatalogo(categoriasData);
+          setCategoriasFallback([]);
         } else {
           // Senão, usa categorias padrão como fallback
-          setCategorias([
+          setCategoriasCatalogo([]);
+          setCategoriasFallback([
             'Software',
             'Hardware',
             'Consultoria',
@@ -174,7 +219,8 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
       } catch (error) {
         console.error('Erro ao carregar categorias:', error);
         // Em caso de erro, usa categorias padrão
-        setCategorias([
+        setCategoriasCatalogo([]);
+        setCategoriasFallback([
           'Software',
           'Hardware',
           'Consultoria',
@@ -207,11 +253,20 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
       nome: '',
       tipoItem: 'produto',
       categoria: '',
+      categoriaId: undefined,
+      subcategoriaId: undefined,
+      configuracaoId: undefined,
       precoUnitario: 0,
+      custoUnitario: undefined,
       frequencia: 'unico',
       unidadeMedida: 'unidade',
       status: 'ativo',
       descricao: '',
+      sku: '',
+      fornecedor: '',
+      estoqueAtual: undefined,
+      estoqueMinimo: undefined,
+      estoqueMaximo: undefined,
       tags: [],
       variacoes: [],
       // Valores padrão para campos de software
@@ -234,6 +289,51 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
   const dialogTitleId = useId();
   const dialogDescriptionId = useId();
   const isItemRecorrente = ['plano', 'licenca', 'modulo', 'aplicativo'].includes(tipoAtual);
+  const categoriaSelecionada = useMemo(() => {
+    const categoriaPorId = categoriasCatalogo.find((categoria) => categoria.id === watchedFields.categoriaId);
+    if (categoriaPorId) {
+      return categoriaPorId;
+    }
+
+    const categoriaNormalizada = normalizeCatalogName(watchedFields.categoria);
+    return (
+      categoriasCatalogo.find(
+        (categoria) => normalizeCatalogName(categoria.nome) === categoriaNormalizada,
+      ) || null
+    );
+  }, [categoriasCatalogo, watchedFields.categoria, watchedFields.categoriaId]);
+
+  const subcategoriasDisponiveis = useMemo(
+    () => categoriaSelecionada?.subcategorias?.filter((subcategoria) => subcategoria.ativo !== false) || [],
+    [categoriaSelecionada],
+  );
+
+  const categoriaTemSubcategorias = subcategoriasDisponiveis.length > 0;
+
+  const subcategoriaSelecionada = useMemo(
+    () =>
+      subcategoriasDisponiveis.find(
+        (subcategoria) => subcategoria.id === watchedFields.subcategoriaId,
+      ) || null,
+    [subcategoriasDisponiveis, watchedFields.subcategoriaId],
+  );
+
+  const configuracoesDisponiveis = useMemo(
+    () => subcategoriaSelecionada?.configuracoes?.filter((configuracao) => configuracao.ativo !== false) || [],
+    [subcategoriaSelecionada],
+  );
+
+  const subcategoriaTemConfiguracoes = configuracoesDisponiveis.length > 0;
+
+  const categorias = useMemo(() => {
+    const nomes = new Set<string>([
+      ...categoriasCatalogo.map((categoria) => categoria.nome),
+      ...categoriasFallback,
+      ...(watchedFields.categoria ? [watchedFields.categoria] : []),
+    ]);
+
+    return Array.from(nomes).sort((left, right) => left.localeCompare(right, 'pt-BR'));
+  }, [categoriasCatalogo, categoriasFallback, watchedFields.categoria]);
 
   const labelClass = 'mb-1 block text-sm font-medium text-[#244455]';
   const inputClass =
@@ -245,6 +345,23 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
     'inline-flex items-center rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#117C7E] disabled:cursor-not-allowed disabled:opacity-60';
   const secondaryButtonClass =
     'inline-flex items-center rounded-lg border border-[#D4E2E7] bg-white px-4 py-2 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-60';
+  const helperLinkButtonClass =
+    'mt-3 inline-flex items-center rounded-lg border border-[#D4E2E7] bg-white px-3 py-2 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB]';
+
+  const handleOpenCatalogStructure = (targetTab: 'categorias' | 'subcategorias' | 'configuracoes') => {
+    const params = new URLSearchParams();
+    params.set('tab', targetTab);
+
+    if (categoriaSelecionada?.id) {
+      params.set('categoriaId', categoriaSelecionada.id);
+    }
+
+    if (subcategoriaSelecionada?.id) {
+      params.set('subcategoriaId', subcategoriaSelecionada.id);
+    }
+
+    window.open(`/produtos/categorias?${params.toString()}`, '_blank', 'noopener,noreferrer');
+  };
 
   // Primeiro vou declarar as funções que serão usadas nos hooks
   const onFormSubmit = async (data: ProdutoFormData) => {
@@ -255,7 +372,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
       setHasUnsavedChanges(false);
       setIsFormInitialized(false);
     } catch (error) {
-      console.error('Erro ao salvar produto:', error);
+      console.error('Erro ao salvar item:', error);
     }
   };
 
@@ -306,6 +423,58 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
     }
   }, [watch, isFormInitialized, isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const categoriaNormalizada = normalizeCatalogName(watchedFields.categoria);
+    const categoriaRelacionada =
+      categoriasCatalogo.find(
+        (categoria) => normalizeCatalogName(categoria.nome) === categoriaNormalizada,
+      ) || null;
+
+    const nextCategoriaId = categoriaRelacionada?.id;
+    if ((watchedFields.categoriaId || undefined) !== nextCategoriaId) {
+      setValue('categoriaId', nextCategoriaId, {
+        shouldValidate: true,
+        shouldDirty: false,
+      });
+    }
+
+    if (
+      watchedFields.subcategoriaId &&
+      !categoriaRelacionada?.subcategorias?.some(
+        (subcategoria) => subcategoria.id === watchedFields.subcategoriaId,
+      )
+    ) {
+      setValue('subcategoriaId', undefined, { shouldValidate: true, shouldDirty: false });
+      setValue('configuracaoId', undefined, { shouldValidate: true, shouldDirty: false });
+    }
+  }, [
+    categoriasCatalogo,
+    isOpen,
+    setValue,
+    watchedFields.categoria,
+    watchedFields.categoriaId,
+    watchedFields.subcategoriaId,
+  ]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    if (
+      watchedFields.configuracaoId &&
+      !configuracoesDisponiveis.some(
+        (configuracao) => configuracao.id === watchedFields.configuracaoId,
+      )
+    ) {
+      setValue('configuracaoId', undefined, { shouldValidate: true, shouldDirty: false });
+    }
+  }, [configuracoesDisponiveis, isOpen, setValue, watchedFields.configuracaoId]);
+
   // Efeito para preencher dados na edição
   useEffect(() => {
     if (isOpen) {
@@ -317,7 +486,11 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
           nome: produtoEditando.nome || '',
           tipoItem: produtoEditando.tipoItem || 'produto',
           categoria: produtoEditando.categoria || '',
+          categoriaId: produtoEditando.categoriaId,
+          subcategoriaId: produtoEditando.subcategoriaId,
+          configuracaoId: produtoEditando.configuracaoId,
           precoUnitario: produtoEditando.precoUnitario || 0,
+          custoUnitario: produtoEditando.custoUnitario,
           frequencia: produtoEditando.frequencia || 'unico',
           unidadeMedida: produtoEditando.unidadeMedida || 'unidade',
           status:
@@ -327,6 +500,11 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                 ? 'inativo'
                 : produtoEditando.status || 'ativo',
           descricao: produtoEditando.descricao || '',
+          sku: produtoEditando.sku || '',
+          fornecedor: produtoEditando.fornecedor || '',
+          estoqueAtual: produtoEditando.estoqueAtual,
+          estoqueMinimo: produtoEditando.estoqueMinimo,
+          estoqueMaximo: produtoEditando.estoqueMaximo,
           tags: produtoEditando.tags || [],
           variacoes: produtoEditando.variacoes || [],
           tipoLicenciamento: produtoEditando.tipoLicenciamento || '',
@@ -339,11 +517,20 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
           nome: '',
           tipoItem: 'produto',
           categoria: '',
+          categoriaId: undefined,
+          subcategoriaId: undefined,
+          configuracaoId: undefined,
           precoUnitario: 0,
+          custoUnitario: undefined,
           frequencia: 'unico',
           unidadeMedida: 'unidade',
           status: 'ativo',
           descricao: '',
+          sku: '',
+          fornecedor: '',
+          estoqueAtual: undefined,
+          estoqueMinimo: undefined,
+          estoqueMaximo: undefined,
           tags: [],
           variacoes: [],
           tipoLicenciamento: '',
@@ -403,7 +590,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                 </h3>
               </div>
               <p className="mb-6 text-sm text-[#4F6470]">
-                Você tem alterações não salvas no produto. Deseja realmente sair sem salvar?
+                Você tem alterações não salvas no item. Deseja realmente sair sem salvar?
               </p>
               <div className="flex justify-end space-x-3">
                 <button onClick={handleCancelClose} className={secondaryButtonClass}>
@@ -446,7 +633,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                 </div>
                 <div>
                   <h2 id={dialogTitleId} className="text-xl font-semibold text-[#19384C]">
-                    {produtoEditando ? 'Editar Produto' : 'Novo Produto'}
+                    {produtoEditando ? 'Editar Item' : 'Novo Item'}
                   </h2>
                   <p id={dialogDescriptionId} className="text-sm text-[#5F7380]">
                     Preencha as informações do item do catálogo
@@ -492,14 +679,14 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                   {/* Nome */}
                   <div>
                     <label htmlFor="nome" className={labelClass}>
-                      Nome do Produto *
+                      Nome do Item *
                     </label>
                     <input
                       {...register('nome')}
                       type="text"
                       id="nome"
                       className={errors.nome ? inputErrorClass : inputClass}
-                      placeholder="Digite o nome do produto"
+                      placeholder="Digite o nome do item"
                     />
                     {errors.nome && (
                       <p className="mt-1 text-sm text-red-600">{errors.nome.message}</p>
@@ -537,23 +724,149 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                         Carregando categorias...
                       </div>
                     ) : (
-                      <select
-                        {...register('categoria')}
-                        id="categoria"
-                        className={errors.categoria ? inputErrorClass : inputClass}
-                      >
-                        <option value="">Selecione uma categoria</option>
-                        {categorias.map((categoria, index) => (
-                          <option key={`${categoria}-${index}`} value={categoria}>
-                            {categoria}
-                          </option>
-                        ))}
-                      </select>
+                      <Controller
+                        name="categoria"
+                        control={control}
+                        render={({ field }) => (
+                          <select
+                            id="categoria"
+                            value={field.value || ''}
+                            onChange={(event) => {
+                              const categoria = event.target.value;
+                              field.onChange(categoria);
+                              const categoriaRelacionada =
+                                categoriasCatalogo.find(
+                                  (item) => normalizeCatalogName(item.nome) === normalizeCatalogName(categoria),
+                                ) || null;
+                              setValue('categoriaId', categoriaRelacionada?.id, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+                              setValue('subcategoriaId', undefined, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+                              setValue('configuracaoId', undefined, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+                            }}
+                            className={errors.categoria ? inputErrorClass : inputClass}
+                          >
+                            <option value="">Selecione uma categoria</option>
+                            {categorias.map((categoria, index) => (
+                              <option key={`${categoria}-${index}`} value={categoria}>
+                                {categoria}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      />
                     )}
                     {errors.categoria && (
                       <p className="mt-1 text-sm text-red-600">{errors.categoria.message}</p>
                     )}
                   </div>
+
+                  {categoriaSelecionada && categoriaTemSubcategorias ? (
+                    <div>
+                      <label htmlFor="subcategoriaId" className={labelClass}>
+                        Subcategoria
+                      </label>
+                      <Controller
+                        name="subcategoriaId"
+                        control={control}
+                        render={({ field }) => (
+                          <select
+                            id="subcategoriaId"
+                            value={field.value || ''}
+                            onChange={(event) => {
+                              const subcategoriaId = event.target.value || undefined;
+                              field.onChange(subcategoriaId);
+                              setValue('configuracaoId', undefined, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                              });
+
+                              const subcategoria =
+                                subcategoriasDisponiveis.find((item) => item.id === subcategoriaId) || null;
+                              if (subcategoria?.unidade) {
+                                setValue('unidadeMedida', subcategoria.unidade as ProdutoFormData['unidadeMedida'], {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+                              }
+                            }}
+                            className={errors.subcategoriaId ? inputErrorClass : inputClass}
+                          >
+                            <option value="">Selecione uma subcategoria</option>
+                            {subcategoriasDisponiveis.map((subcategoria) => (
+                              <option key={subcategoria.id} value={subcategoria.id}>
+                                {subcategoria.nome}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      />
+                      {errors.subcategoriaId && (
+                        <p className="mt-1 text-sm text-red-600">{errors.subcategoriaId.message}</p>
+                      )}
+                    </div>
+                  ) : categoriaSelecionada ? (
+                    <div className="rounded-lg border border-[#D4E2E7] bg-[#F9FCFD] px-3 py-2 text-sm text-[#607B89]">
+                      <p>
+                        Esta categoria não exige subcategoria. Você pode seguir com o cadastro usando apenas a classificação principal.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenCatalogStructure('subcategorias')}
+                        className={helperLinkButtonClass}
+                      >
+                        Gerenciar estrutura do catálogo
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {subcategoriaSelecionada && subcategoriaTemConfiguracoes ? (
+                    <div>
+                      <label htmlFor="configuracaoId" className={labelClass}>
+                        Configuração
+                      </label>
+                      <Controller
+                        name="configuracaoId"
+                        control={control}
+                        render={({ field }) => (
+                          <select
+                            id="configuracaoId"
+                            value={field.value || ''}
+                            onChange={(event) => field.onChange(event.target.value || undefined)}
+                            className={errors.configuracaoId ? inputErrorClass : inputClass}
+                          >
+                            <option value="">Selecione uma configuração</option>
+                            {configuracoesDisponiveis.map((configuracao) => (
+                              <option key={configuracao.id} value={configuracao.id}>
+                                {configuracao.nome}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      />
+                      {errors.configuracaoId && (
+                        <p className="mt-1 text-sm text-red-600">{errors.configuracaoId.message}</p>
+                      )}
+                    </div>
+                  ) : subcategoriaSelecionada ? (
+                    <div className="rounded-lg border border-[#D4E2E7] bg-[#F9FCFD] px-3 py-2 text-sm text-[#607B89]">
+                      <p>Esta subcategoria não possui configurações adicionais. O item já está no nível mais detalhado.</p>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenCatalogStructure('configuracoes')}
+                        className={helperLinkButtonClass}
+                      >
+                        Criar configuração nesta estrutura
+                      </button>
+                    </div>
+                  ) : null}
 
                   {/* Preço */}
                   <div>
@@ -574,6 +887,57 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                     />
                     {errors.precoUnitario && (
                       <p className="mt-1 text-sm text-red-600">{errors.precoUnitario.message}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="custoUnitario" className={labelClass}>
+                      Custo Unitário
+                    </label>
+                    <Controller
+                      name="custoUnitario"
+                      control={control}
+                      render={({ field }) => (
+                        <MoneyInput
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder="R$ 0,00"
+                          className={errors.custoUnitario ? inputErrorClass : inputClass}
+                        />
+                      )}
+                    />
+                    {errors.custoUnitario && (
+                      <p className="mt-1 text-sm text-red-600">{errors.custoUnitario.message}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="sku" className={labelClass}>
+                      SKU
+                    </label>
+                    <input
+                      {...register('sku')}
+                      type="text"
+                      id="sku"
+                      className={errors.sku ? inputErrorClass : inputClass}
+                      placeholder="Código interno do item"
+                    />
+                    {errors.sku && <p className="mt-1 text-sm text-red-600">{errors.sku.message}</p>}
+                  </div>
+
+                  <div>
+                    <label htmlFor="fornecedor" className={labelClass}>
+                      Fornecedor
+                    </label>
+                    <input
+                      {...register('fornecedor')}
+                      type="text"
+                      id="fornecedor"
+                      className={errors.fornecedor ? inputErrorClass : inputClass}
+                      placeholder="Nome do fornecedor"
+                    />
+                    {errors.fornecedor && (
+                      <p className="mt-1 text-sm text-red-600">{errors.fornecedor.message}</p>
                     )}
                   </div>
                 </div>
@@ -666,12 +1030,79 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                       id="descricao"
                       rows={4}
                       className={errors.descricao ? inputErrorClass : inputClass}
-                      placeholder="Descrição detalhada do produto..."
+                      placeholder="Descrição detalhada do item..."
                     />
                     {errors.descricao && (
                       <p className="mt-1 text-sm text-red-600">{errors.descricao.message}</p>
                     )}
                   </div>
+
+                  {tipoAtual === 'produto' && (
+                    <div className="space-y-3 rounded-lg border border-[#DEEFE7] bg-[#F7FCFA] p-3">
+                      <p className="text-sm font-medium text-[#244455]">Controle de estoque</p>
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                        <div>
+                          <label htmlFor="estoqueAtual" className={labelClass}>
+                            Estoque atual
+                          </label>
+                          <input
+                            {...register('estoqueAtual', {
+                              valueAsNumber: true,
+                              setValueAs: (value) => (value === '' ? undefined : Number(value)),
+                            })}
+                            type="number"
+                            min="0"
+                            id="estoqueAtual"
+                            className={errors.estoqueAtual ? inputErrorClass : inputClass}
+                            placeholder="0"
+                          />
+                          {errors.estoqueAtual && (
+                            <p className="mt-1 text-sm text-red-600">{errors.estoqueAtual.message}</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label htmlFor="estoqueMinimo" className={labelClass}>
+                            Estoque mínimo
+                          </label>
+                          <input
+                            {...register('estoqueMinimo', {
+                              valueAsNumber: true,
+                              setValueAs: (value) => (value === '' ? undefined : Number(value)),
+                            })}
+                            type="number"
+                            min="0"
+                            id="estoqueMinimo"
+                            className={errors.estoqueMinimo ? inputErrorClass : inputClass}
+                            placeholder="0"
+                          />
+                          {errors.estoqueMinimo && (
+                            <p className="mt-1 text-sm text-red-600">{errors.estoqueMinimo.message}</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label htmlFor="estoqueMaximo" className={labelClass}>
+                            Estoque máximo
+                          </label>
+                          <input
+                            {...register('estoqueMaximo', {
+                              valueAsNumber: true,
+                              setValueAs: (value) => (value === '' ? undefined : Number(value)),
+                            })}
+                            type="number"
+                            min="0"
+                            id="estoqueMaximo"
+                            className={errors.estoqueMaximo ? inputErrorClass : inputClass}
+                            placeholder="0"
+                          />
+                          {errors.estoqueMaximo && (
+                            <p className="mt-1 text-sm text-red-600">{errors.estoqueMaximo.message}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Coluna 2.5: Campos Específicos para Software (Condicional) */}
@@ -877,7 +1308,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                       Salvando...
                     </>
                   ) : (
-                    <>{produtoEditando ? t('common.update') : t('common.saveProduct')}</>
+                    <>{produtoEditando ? t('common.update') : 'Salvar item'}</>
                   )}
                 </button>
               </div>

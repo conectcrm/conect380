@@ -11,7 +11,7 @@ type RouteTemplateRule = {
 const routeRules: RouteTemplateRule[] = [
   {
     pattern:
-      /^\/(dashboard|atendimento\/analytics|atendimento\/distribuicao\/dashboard|nuclei\/administracao|nuclei\/crm|nuclei\/financeiro|nuclei\/vendas|relatorios\/analytics)$/,
+      /^\/(dashboard|atendimento\/analytics|atendimento\/distribuicao\/dashboard|nuclei\/crm|nuclei\/financeiro|nuclei\/vendas|relatorios\/analytics)$/,
     type: 'DASHBOARD',
   },
   {
@@ -20,7 +20,7 @@ const routeRules: RouteTemplateRule[] = [
   },
   {
     pattern:
-      /^\/(atendimento\/tickets\/[^/]+|admin\/empresas\/[^/]+|admin\/empresas\/[^/]+\/modulos|empresas\/[^/]+\/(configuracoes|relatorios|permissoes|backup)|contratos\/[^/]+|clientes\/[^/]+|crm\/clientes\/[^/]+)$/,
+      /^\/(atendimento\/tickets\/[^/]+|empresas\/[^/]+\/(configuracoes|relatorios|permissoes|backup)|contratos\/[^/]+|clientes\/[^/]+|crm\/clientes\/[^/]+)$/,
     type: 'DETAIL',
   },
   {
@@ -57,7 +57,7 @@ const routeRules: RouteTemplateRule[] = [
   },
   {
     pattern:
-      /^\/(clientes|contatos|pipeline|propostas|vendas\/propostas|produtos(\/categorias)?|vendas\/produtos|atendimento\/tickets|financeiro(\/.*)?|agenda|crm\/agenda|crm\/clientes|crm\/contatos|crm\/leads|crm\/interacoes|crm\/pipeline|leads|interacoes|cotacoes|vendas\/cotacoes|orcamentos|combos|vendas\/combos|aprovacoes\/pendentes|vendas\/aprovacoes|portal|billing(\/.*)?|assinaturas|faturamento|notifications|atendimento|atendimento\/automacoes|admin\/sistema|admin\/branding)$/,
+      /^\/(clientes|contatos|pipeline|propostas|vendas\/propostas|produtos(\/categorias)?|vendas\/produtos|atendimento\/tickets|financeiro(\/.*)?|agenda|crm\/agenda|crm\/clientes|crm\/contatos|crm\/leads|crm\/interacoes|crm\/pipeline|leads|interacoes|cotacoes|vendas\/cotacoes|orcamentos|combos|vendas\/combos|aprovacoes\/pendentes|vendas\/aprovacoes|portal|billing(\/.*)?|assinaturas|faturamento|notifications|atendimento|atendimento\/automacoes)$/,
     type: 'LIST',
   },
   {

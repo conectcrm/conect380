@@ -102,6 +102,8 @@ export interface MfaRequiredActionData {
   email: string;
   expiresInSeconds: number;
   canResendAfterSeconds: number;
+  deliveryChannel?: 'email' | 'dev_fallback';
+  devCode?: string;
 }
 
 export interface LoginResponse {

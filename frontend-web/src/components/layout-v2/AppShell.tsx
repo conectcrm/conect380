@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ChevronDown, LogOut, Menu, Settings, User, Users, X } from 'lucide-react';
+import { ChevronDown, LogOut, Menu, Settings, Shield, User, Users, X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useProfile, type PerfilUsuario } from '../../contexts/ProfileContext';
 import { useSidebar } from '../../contexts/SidebarContext';
@@ -14,6 +14,7 @@ import RouteTemplateFrame from './RouteTemplateFrame';
 import SystemMaintenanceBanner from './SystemMaintenanceBanner';
 import { shellSpacing, shellTokens } from './tokens';
 import { resolveAvatarUrl } from '../../utils/avatar';
+import { openGuardianPortal } from '../../utils/guardianPortal';
 
 type AppShellProps = {
   children: React.ReactNode;
@@ -102,6 +103,7 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
     roleKey === 'manager' ||
     roleKey === 'gerente';
   const isSuperAdmin = roleKey === 'superadmin';
+  const canAccessGuardian = isSuperAdmin;
 
   const initials = useMemo(() => resolveInitials(user?.nome), [user?.nome]);
   const avatarUrl = useMemo(() => resolveAvatarUrl(user?.avatar_url || null), [user?.avatar_url]);
@@ -112,6 +114,10 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const handleProfileSelect = (profileId: PerfilUsuario) => {
     setPerfilSelecionado(profileId);
     setShowProfileSelector(false);
+  };
+
+  const handleOpenGuardianCompanies = () => {
+    openGuardianPortal('/governance/companies');
   };
 
   return (
@@ -197,19 +203,19 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
                 <>
                   <button
                     type="button"
-                    onClick={() => navigate('/empresas/minhas')}
+                    onClick={handleOpenGuardianCompanies}
                     className="rounded-full outline-none transition-transform hover:-translate-y-[1px] focus-visible:ring-2 focus-visible:ring-[#159A9C]/30 sm:hidden"
-                    title="Abrir gerenciamento de empresas"
-                    aria-label="Abrir gerenciamento de empresas"
+                    title="Abrir painel Guardian"
+                    aria-label="Abrir painel Guardian"
                   >
                     <ActiveEmpresaBadge variant="header" compact />
                   </button>
                   <button
                     type="button"
-                    onClick={() => navigate('/empresas/minhas')}
+                    onClick={handleOpenGuardianCompanies}
                     className="hidden rounded-full outline-none transition-transform hover:-translate-y-[1px] focus-visible:ring-2 focus-visible:ring-[#159A9C]/30 sm:inline-flex"
-                    title="Abrir gerenciamento de empresas"
-                    aria-label="Abrir gerenciamento de empresas"
+                    title="Abrir painel Guardian"
+                    aria-label="Abrir painel Guardian"
                   >
                     <ActiveEmpresaBadge variant="header" />
                   </button>
@@ -277,6 +283,20 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
                       <Settings className="h-4 w-4 text-[#5F7B88]" />
                       Configuracoes
                     </button>
+
+                    {canAccessGuardian ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          openGuardianPortal('/governance/companies');
+                        }}
+                        className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-[#214251] hover:bg-[#EEF5F8]"
+                      >
+                        <Shield className="h-4 w-4 text-[#5F7B88]" />
+                        Painel Guardian
+                      </button>
+                    ) : null}
 
                     {isAdmin ? (
                       <div className="relative mt-1" data-profile-selector>

@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { combosService, ComboFormData, Combo } from '../../services/combosService';
-import { ProdutoPropostaBase } from '../../shared/produtosAdapter';
+import { ProdutoPropostaBase, adaptProdutoToPropostaBase } from '../../shared/produtosAdapter';
 import { produtosService } from '../../services/produtosService';
 
 // Schema de validação
@@ -80,19 +80,7 @@ const NovoComboPage: React.FC = () => {
 
       const itensCatalogo = (produtos || [])
         .filter((produto) => (produto.status || 'ativo') !== 'descontinuado')
-        .map<ProdutoPropostaBase>((produto) => ({
-          id: produto.id,
-          nome: produto.nome,
-          preco: Number(produto.preco || 0),
-          categoria: produto.categoria || 'Geral',
-          subcategoria: undefined,
-          tipo: produto.tipoItem || 'produto',
-          descricao: produto.descricao || '',
-          unidade: produto.unidadeMedida || 'unidade',
-          status: (produto.status || 'ativo') as 'ativo' | 'inativo' | 'descontinuado',
-          sku: produto.sku,
-          fornecedor: produto.fornecedor,
-        }));
+        .map<ProdutoPropostaBase>((produto) => adaptProdutoToPropostaBase(produto));
 
       setProdutosDisponiveis(itensCatalogo);
     } catch (error) {

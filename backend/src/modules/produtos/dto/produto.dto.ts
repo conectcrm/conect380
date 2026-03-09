@@ -7,6 +7,7 @@ import {
   IsEnum,
   Min,
   IsBoolean,
+  IsUUID,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { PartialType } from '@nestjs/mapped-types';
@@ -19,6 +20,18 @@ export class CreateProdutoDto {
   @IsNotEmpty()
   @IsString()
   categoria: string;
+
+  @IsOptional()
+  @IsUUID()
+  categoriaId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  subcategoriaId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  configuracaoId?: string;
 
   @IsNotEmpty()
   @IsNumber()

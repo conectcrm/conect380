@@ -33,12 +33,20 @@ const toneMap: Record<DashboardV2Insight['type'], InsightCardTone> = {
 
 const impactLabel: Record<DashboardV2Insight['impact'], string> = {
   alto: 'Alta prioridade',
-  medio: 'Media prioridade',
+  medio: 'Média prioridade',
   baixo: 'Baixa prioridade',
 };
 
 const InsightsPanel: React.FC<InsightsPanelProps> = ({ insights, headerAction }) => {
   const primaryInsights = insights.slice(0, 3);
+  const summary = useMemo(
+    () => ({
+      warning: insights.filter((insight) => insight.type === 'warning').length,
+      opportunity: insights.filter((insight) => insight.type === 'opportunity').length,
+      highImpact: insights.filter((insight) => insight.impact === 'alto').length,
+    }),
+    [insights],
+  );
 
   const reportInsights = useMemo(() => {
     const source = insights.slice(3, 5);
@@ -49,8 +57,8 @@ const InsightsPanel: React.FC<InsightsPanelProps> = ({ insights, headerAction })
         {
           id: 'fallback-report-1',
           type: 'info' as const,
-          title: 'Conversao media',
-          description: 'Sem variacao registrada no periodo atual.',
+          title: 'Conversão média',
+          description: 'Sem variação registrada no período atual.',
           impact: 'medio' as const,
           action: 'Aguardando novos dados',
         },
@@ -58,9 +66,9 @@ const InsightsPanel: React.FC<InsightsPanelProps> = ({ insights, headerAction })
           id: 'fallback-report-2',
           type: 'info' as const,
           title: 'Follow-ups pendentes',
-          description: 'Nao ha pendencias criticas neste momento.',
+          description: 'Não há pendências críticas neste momento.',
           impact: 'baixo' as const,
-          action: 'Sem acoes urgentes',
+          action: 'Sem ações urgentes',
         },
       ];
     }
@@ -76,7 +84,10 @@ const InsightsPanel: React.FC<InsightsPanelProps> = ({ insights, headerAction })
   return (
     <section className="rounded-[20px] border border-[#DCE7EB] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(15,57,74,0.28)]">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-[20px] font-semibold tracking-[-0.012em] text-[#18374B]">Insights</h3>
+        <div>
+          <h3 className="text-[20px] font-semibold tracking-[-0.012em] text-[#18374B]">Insights</h3>
+          <p className="mt-1 text-[13px] text-[#6B8591]">Leituras prioritárias e sinais de decisão do período.</p>
+        </div>
         <div className="flex items-center gap-2">
           {headerAction}
           <button
@@ -86,6 +97,27 @@ const InsightsPanel: React.FC<InsightsPanelProps> = ({ insights, headerAction })
           >
             <ExternalLink className="h-4 w-4" />
           </button>
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="rounded-[14px] border border-[#E1EBEE] bg-[#FBFEFF] px-3.5 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6D8793]">
+            Oportunidades
+          </p>
+          <p className="mt-1 text-[22px] font-semibold leading-none text-[#17384B]">{summary.opportunity}</p>
+        </div>
+        <div className="rounded-[14px] border border-[#E1EBEE] bg-[#FBFEFF] px-3.5 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6D8793]">
+            Alertas
+          </p>
+          <p className="mt-1 text-[22px] font-semibold leading-none text-[#17384B]">{summary.warning}</p>
+        </div>
+        <div className="rounded-[14px] border border-[#E1EBEE] bg-[#FBFEFF] px-3.5 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6D8793]">
+            Alta prioridade
+          </p>
+          <p className="mt-1 text-[22px] font-semibold leading-none text-[#17384B]">{summary.highImpact}</p>
         </div>
       </div>
 
@@ -121,14 +153,17 @@ const InsightsPanel: React.FC<InsightsPanelProps> = ({ insights, headerAction })
           })
         ) : (
           <div className="rounded-2xl border border-dashed border-[#CFE0E6] bg-[#F7FBFC] px-3 py-3.5 text-[11px] text-[#5E7A88]">
-            Sem insights para o periodo selecionado.
+            Sem insights para o período selecionado.
           </div>
         )}
       </div>
 
       <div className="mt-4 border-t border-[#E3ECEF] pt-4">
         <div className="mb-3.5 flex items-center justify-between gap-2">
-          <h4 className="text-[20px] font-semibold tracking-[-0.012em] text-[#18374B]">Informe</h4>
+          <div>
+            <h4 className="text-[20px] font-semibold tracking-[-0.012em] text-[#18374B]">Leituras adicionais</h4>
+            <p className="mt-1 text-[13px] text-[#6B8591]">Contextos complementares para validar a leitura principal.</p>
+          </div>
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-[#6E8996]">
             <Gauge className="h-[19px] w-[19px]" />
           </span>

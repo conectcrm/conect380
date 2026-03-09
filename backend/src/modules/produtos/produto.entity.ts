@@ -8,6 +8,9 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { Empresa } from '../../empresas/entities/empresa.entity';
+import { CategoriaProduto } from '../categorias-produtos/entities/categoria-produto.entity';
+import { SubcategoriaProduto } from '../categorias-produtos/entities/subcategoria-produto.entity';
+import { ConfiguracaoProduto } from '../categorias-produtos/entities/configuracao-produto.entity';
 
 @Entity('produtos')
 export class Produto {
@@ -26,6 +29,27 @@ export class Produto {
 
   @Column({ type: 'varchar', length: 50, nullable: true })
   categoria: string;
+
+  @Column({ type: 'uuid', name: 'categoria_id', nullable: true })
+  categoriaId?: string | null;
+
+  @ManyToOne(() => CategoriaProduto, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'categoria_id' })
+  categoriaRelacionada?: CategoriaProduto | null;
+
+  @Column({ type: 'uuid', name: 'subcategoria_id', nullable: true })
+  subcategoriaId?: string | null;
+
+  @ManyToOne(() => SubcategoriaProduto, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'subcategoria_id' })
+  subcategoria?: SubcategoriaProduto | null;
+
+  @Column({ type: 'uuid', name: 'configuracao_id', nullable: true })
+  configuracaoId?: string | null;
+
+  @ManyToOne(() => ConfiguracaoProduto, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'configuracao_id' })
+  configuracao?: ConfiguracaoProduto | null;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   preco: number;
