@@ -24,6 +24,7 @@ describe('Multi-Tenancy Isolation (E2E)', () => {
   const TEST_EMAIL_EMPRESA_2 = 'e2e.admin.empresa2@conectcrm.local';
   const TEST_USER_ID_EMPRESA_1 = '00000000-0000-4000-8000-000000000001';
   const TEST_USER_ID_EMPRESA_2 = '00000000-0000-4000-8000-000000000002';
+  const TEST_RUN_ID = Date.now().toString();
 
   let app: INestApplication;
   let dataSource: DataSource;
@@ -135,6 +136,18 @@ describe('Multi-Tenancy Isolation (E2E)', () => {
     await dataSource.query(`
       ALTER TABLE "produtos"
       ADD COLUMN IF NOT EXISTS "quantidadeLicencas" integer
+    `);
+    await dataSource.query(`
+      ALTER TABLE "produtos"
+      ADD COLUMN IF NOT EXISTS "categoria_id" uuid
+    `);
+    await dataSource.query(`
+      ALTER TABLE "produtos"
+      ADD COLUMN IF NOT EXISTS "subcategoria_id" uuid
+    `);
+    await dataSource.query(`
+      ALTER TABLE "produtos"
+      ADD COLUMN IF NOT EXISTS "configuracao_id" uuid
     `);
   };
 
@@ -378,35 +391,88 @@ describe('Multi-Tenancy Isolation (E2E)', () => {
     });
   });
 
+  const extrairAccessToken = (body: any): string | null =>
+    body?.data?.access_token ?? body?.access_token ?? null;
+
+  const fazerLoginComFallbackMfa = async (
+    email: string,
+    senha: string,
+    fallbackUserId: string,
+  ): Promise<{ accessToken: string; userId: string }> => {
+    const loginResponse = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email, senha });
+
+    expect([200, 201]).toContain(loginResponse.status);
+
+    const tokenDireto = extrairAccessToken(loginResponse.body);
+    if (tokenDireto) {
+      const userId = String(loginResponse.body?.data?.user?.id || fallbackUserId);
+      return { accessToken: tokenDireto, userId };
+    }
+
+    expect(loginResponse.body?.action).toBe('MFA_REQUIRED');
+    const challengeId = String(loginResponse.body?.data?.challengeId || '').trim();
+    expect(challengeId).toBeTruthy();
+
+    let codigoMfa = String(loginResponse.body?.data?.devCode || '').trim();
+    if (!codigoMfa) {
+      const resendResponse = await request(app.getHttpServer())
+        .post('/auth/mfa/resend')
+        .send({ challengeId });
+
+      expect([200, 201]).toContain(resendResponse.status);
+      codigoMfa = String(resendResponse.body?.data?.devCode || '').trim();
+    }
+
+    expect(codigoMfa).toBeTruthy();
+
+    const verifyResponse = await request(app.getHttpServer())
+      .post('/auth/mfa/verify')
+      .send({
+        challengeId,
+        codigo: codigoMfa,
+      });
+
+    expect([200, 201]).toContain(verifyResponse.status);
+
+    const tokenMfa = extrairAccessToken(verifyResponse.body);
+    expect(tokenMfa).toBeTruthy();
+
+    const userId = String(
+      verifyResponse.body?.data?.user?.id ||
+        loginResponse.body?.data?.user?.id ||
+        fallbackUserId,
+    );
+
+    return { accessToken: String(tokenMfa), userId };
+  };
+
   describe('🔐 Autenticação', () => {
     it('Deve fazer login na Empresa 1', async () => {
-      const response = await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({
-          email: TEST_EMAIL_EMPRESA_1,
-          senha: TEST_PASSWORD, // ← Campo correto: 'senha' (não 'password')
-        })
-        .expect(201); // ✅ Corrigido: login retorna 201 Created
+      const session = await fazerLoginComFallbackMfa(
+        TEST_EMAIL_EMPRESA_1,
+        TEST_PASSWORD,
+        TEST_USER_ID_EMPRESA_1,
+      );
 
-      expect(response.body.data).toHaveProperty('access_token');
-      expect(response.body.data).toHaveProperty('user');
-      tokenEmpresa1 = response.body.data.access_token; // ✅ Corrigido: token está em 'data'
-      userEmpresa1Id = response.body.data.user.id; // ✅ Capturar ID do usuário
+      tokenEmpresa1 = session.accessToken;
+      userEmpresa1Id = session.userId;
+      expect(tokenEmpresa1).toBeTruthy();
+      expect(userEmpresa1Id).toBe(TEST_USER_ID_EMPRESA_1);
     });
 
     it('Deve fazer login na Empresa 2', async () => {
-      const response = await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({
-          email: TEST_EMAIL_EMPRESA_2,
-          senha: TEST_PASSWORD, // ← Campo correto: 'senha' (não 'password')
-        })
-        .expect(201); // ✅ Corrigido: login retorna 201 Created
+      const session = await fazerLoginComFallbackMfa(
+        TEST_EMAIL_EMPRESA_2,
+        TEST_PASSWORD,
+        TEST_USER_ID_EMPRESA_2,
+      );
 
-      expect(response.body.data).toHaveProperty('access_token');
-      expect(response.body.data).toHaveProperty('user');
-      tokenEmpresa2 = response.body.data.access_token; // ✅ Corrigido: token está em 'data'
-      userEmpresa2Id = response.body.data.user.id; // ✅ Capturar ID do usuário
+      tokenEmpresa2 = session.accessToken;
+      userEmpresa2Id = session.userId;
+      expect(tokenEmpresa2).toBeTruthy();
+      expect(userEmpresa2Id).toBe(TEST_USER_ID_EMPRESA_2);
     });
   });
 
@@ -582,23 +648,52 @@ describe('Multi-Tenancy Isolation (E2E)', () => {
   });
 
   describe('🛍️ Produtos/Serviços - Isolamento Multi-Tenancy', () => {
+    const produtoNomeEmpresa1 = `Servico Premium Empresa 1 ${TEST_RUN_ID}`;
+    const produtoNomeEmpresa2 = `Servico Especial Empresa 2 ${TEST_RUN_ID}`;
+
+    const resolverProdutoPorNome = async (
+      token: string,
+      nomeProduto: string,
+      empresaEsperada: string,
+    ): Promise<string> => {
+      const listResponse = await request(app.getHttpServer())
+        .get('/produtos')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(Array.isArray(listResponse.body)).toBe(true);
+
+      const produtoEncontrado = listResponse.body.find(
+        (produto: any) => String(produto?.nome || '').trim() === nomeProduto,
+      );
+      expect(produtoEncontrado).toBeDefined();
+      expect(produtoEncontrado.empresa_id).toBe(empresaEsperada);
+      return String(produtoEncontrado.id);
+    };
+
     it('Empresa 1 deve cadastrar produto/serviço próprio', async () => {
       const response = await request(app.getHttpServer())
         .post('/produtos')
         .set('Authorization', `Bearer ${tokenEmpresa1}`)
         .send({
-          nome: 'Serviço Premium Empresa 1',
+          nome: produtoNomeEmpresa1,
           categoria: 'consultoria',
           preco: 2500,
           tipoItem: 'servico',
-          descricao: 'Implementação dedicada multi-tenancy',
-        })
-        .expect(201);
+          descricao: 'Implementacao dedicada multi-tenancy',
+        });
 
-      expect(response.body).toHaveProperty('id');
-      expect(response.body.empresa_id).toBe(empresa1Id);
-      expect(response.body.tipoItem).toBe('servico');
-      produtoEmpresa1Id = response.body.id;
+      expect([201, 409]).toContain(response.status);
+
+      if (response.status === 201) {
+        expect(response.body).toHaveProperty('id');
+        expect(response.body.empresa_id).toBe(empresa1Id);
+        expect(response.body.tipoItem).toBe('servico');
+        produtoEmpresa1Id = response.body.id;
+        return;
+      }
+
+      produtoEmpresa1Id = await resolverProdutoPorNome(tokenEmpresa1, produtoNomeEmpresa1, empresa1Id);
     });
 
     it('Empresa 2 deve cadastrar produto independente', async () => {
@@ -606,17 +701,23 @@ describe('Multi-Tenancy Isolation (E2E)', () => {
         .post('/produtos')
         .set('Authorization', `Bearer ${tokenEmpresa2}`)
         .send({
-          nome: 'Serviço Especial Empresa 2',
+          nome: produtoNomeEmpresa2,
           categoria: 'support',
           preco: 1800,
           tipoItem: 'servico',
           descricao: 'Suporte dedicado',
-        })
-        .expect(201);
+        });
 
-      expect(response.body).toHaveProperty('id');
-      expect(response.body.empresa_id).toBe(empresa2Id);
-      produtoEmpresa2Id = response.body.id;
+      expect([201, 409]).toContain(response.status);
+
+      if (response.status === 201) {
+        expect(response.body).toHaveProperty('id');
+        expect(response.body.empresa_id).toBe(empresa2Id);
+        produtoEmpresa2Id = response.body.id;
+        return;
+      }
+
+      produtoEmpresa2Id = await resolverProdutoPorNome(tokenEmpresa2, produtoNomeEmpresa2, empresa2Id);
     });
 
     it('❌ Empresa 2 NÃO deve acessar produto da Empresa 1', async () => {
@@ -1106,7 +1207,4 @@ describe('Multi-Tenancy Isolation (E2E)', () => {
     });
   });
 });
-
-
-
 

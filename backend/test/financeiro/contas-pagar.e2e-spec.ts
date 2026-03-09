@@ -489,11 +489,57 @@ describe('ContasPagar (E2E)', () => {
     if (![200, 201].includes(response.status)) {
       throw new Error(`Falha no login para ${email}: status ${response.status}`);
     }
-    const token = response.body?.data?.access_token ?? response.body?.access_token;
-    if (!token) {
+
+    const tokenDireto = response.body?.data?.access_token ?? response.body?.access_token;
+    if (tokenDireto) {
+      return tokenDireto as string;
+    }
+
+    if (response.body?.action !== 'MFA_REQUIRED') {
       throw new Error(`Token nao retornado no login para ${email}`);
     }
-    return token as string;
+
+    const challengeId = String(response.body?.data?.challengeId || '').trim();
+    if (!challengeId) {
+      throw new Error(`Challenge MFA nao retornado no login para ${email}`);
+    }
+
+    let codigoMfa = String(response.body?.data?.devCode || '').trim();
+    if (!codigoMfa) {
+      const resendResponse = await request(app.getHttpServer())
+        .post('/auth/mfa/resend')
+        .send({ challengeId });
+
+      if (![200, 201].includes(resendResponse.status)) {
+        throw new Error(
+          `MFA requerido para ${email}, mas nao foi possivel reenviar codigo (status ${resendResponse.status})`,
+        );
+      }
+
+      codigoMfa = String(resendResponse.body?.data?.devCode || '').trim();
+    }
+
+    if (!codigoMfa) {
+      throw new Error(`MFA requerido para ${email}, mas devCode nao foi retornado no ambiente de teste`);
+    }
+
+    const verifyResponse = await request(app.getHttpServer())
+      .post('/auth/mfa/verify')
+      .send({
+        challengeId,
+        codigo: codigoMfa,
+      });
+
+    if (![200, 201].includes(verifyResponse.status)) {
+      throw new Error(`Falha ao validar MFA para ${email}: status ${verifyResponse.status}`);
+    }
+
+    const tokenMfa = verifyResponse.body?.data?.access_token ?? verifyResponse.body?.access_token;
+    if (!tokenMfa) {
+      throw new Error(`Token nao retornado apos validacao MFA para ${email}`);
+    }
+
+    return tokenMfa as string;
   }
 
   async function limparDadosTeste() {
@@ -524,6 +570,5 @@ describe('ContasPagar (E2E)', () => {
     return value;
   }
 });
-
 
 
