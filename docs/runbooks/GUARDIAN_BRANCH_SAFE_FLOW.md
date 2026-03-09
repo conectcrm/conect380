@@ -58,3 +58,4 @@ entao a operacao deve ser feita no worktree isolado, nunca no workspace principa
 1. `c:\Projetos\conect360` e o checkout usado para subir e validar o sistema.
 2. Nao executar `git switch`, `git checkout`, `git rebase origin/main` ou extracao de PR limpa nesse diretorio.
 3. Se a branch atual estiver distante de `origin/main`, usar `npm run branch:health` para confirmar o risco e abrir um worktree isolado.
+4. Se precisar manter o sistema em execucao enquanto trabalha em Git, use o clone runtime dedicado documentado em `docs/runbooks/RUNTIME_WORKSPACE_FLOW.md`.
