@@ -22,24 +22,19 @@ Preparar o clone runtime:
 npm run runtime:prepare
 ```
 
+Instalar dependencias do clone runtime:
+
+```powershell
+npm run runtime:deps:install
+```
+
 Sincronizar o clone runtime com o `HEAD` atual do workspace principal:
 
 ```powershell
 npm run runtime:sync
 ```
 
-Instalar dependencias no clone runtime sem sujar arquivos rastreados:
-
-```powershell
-cd c:\Projetos\conect360-runtime
-npm ci
-cd backend
-npm ci
-cd ..\frontend-web
-npm ci
-cd ..\admin-web
-npm ci
-```
+Esse comando usa `npm ci` na raiz, `backend`, `frontend-web`, `admin-web` e `guardian-web`.
 
 Subir o sistema a partir do clone runtime:
 
@@ -59,13 +54,20 @@ Subir apenas frontend:
 npm run runtime:start:frontend
 ```
 
+Subir o Guardian:
+
+```powershell
+npm run runtime:start:guardian-web
+```
+
 ## Regra operacional
 
 1. Git e mudancas de branch ficam em `c:\Projetos\conect360`.
 2. Execucao do sistema para validacao fica em `c:\Projetos\conect360-runtime`.
 3. Antes de subir o sistema, rode `npm run runtime:sync`.
-4. Instale dependencias com `npm ci`, nao com `npm install`.
-5. Nao fazer desenvolvimento direto no clone runtime.
+4. Se ainda nao houver dependencias, rode `npm run runtime:deps:install`.
+5. Instale dependencias com `npm ci`, nao com `npm install`.
+6. Nao fazer desenvolvimento direto no clone runtime.
 
 ## Observacoes
 
