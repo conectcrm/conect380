@@ -23,7 +23,7 @@ function Invoke-Git {
   }
 }
 
-$repoRoot = (& git rev-parse --show-toplevel).Trim()
+$repoRoot = ((& git rev-parse --show-toplevel) -join '').Trim()
 if (-not $repoRoot) {
   throw 'Nao foi possivel identificar a raiz do repositorio.'
 }
@@ -47,7 +47,7 @@ $worktreePath = Join-Path $WorktreeRoot $sanitizedBranch
 
 Set-Location $repoRoot
 
-$status = (& git status --porcelain=v1).Trim()
+$status = ((@(& git status --porcelain=v1)) -join "`n").Trim()
 if ($status) {
   throw 'Workspace principal com alteracoes pendentes. Limpe antes de criar um worktree isolado.'
 }
@@ -76,6 +76,6 @@ Write-Host "  Branch         : $BranchName"
 Write-Host "  Worktree       : $worktreePath"
 Write-Host ''
 Write-Host 'Uso recomendado:'
-Write-Host "  1. Abra o worktree em outra janela de terminal/editor."
-Write-Host "  2. Faça cherry-pick ou commits de PR somente nele."
-Write-Host "  3. Nao troque a branch do workspace principal que executa o sistema."
+Write-Host '  1. Abra o worktree em outra janela de terminal/editor.'
+Write-Host '  2. Faca cherry-pick ou commits de PR somente nele.'
+Write-Host '  3. Nao troque a branch do workspace principal que executa o sistema.'
