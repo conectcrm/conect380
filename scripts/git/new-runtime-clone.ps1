@@ -122,6 +122,6 @@ Write-Host "  Branch origem : $sourceBranch"
 Write-Host "  Commit atual  : $sourceCommit"
 Write-Host ''
 Write-Host 'Uso recomendado:'
-Write-Host '  1. Instale dependencias no clone runtime se necessario.'
+Write-Host '  1. Instale dependencias no clone runtime com npm ci se necessario.'
 Write-Host '  2. Rode npm run runtime:sync antes de subir o sistema.'
 Write-Host '  3. Use o clone runtime para executar o sistema e o workspace principal para Git.'
