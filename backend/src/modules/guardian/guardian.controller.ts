@@ -8,12 +8,15 @@ import { Permission } from '../../common/permissions/permissions.constants';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UserRole } from '../users/user.entity';
 import { GuardianMfaGuard } from './guardian-mfa.guard';
+import { GuardianRuntimeAlertService } from './services/guardian-runtime-alert.service';
 
 @Controller('guardian')
 @UseGuards(JwtAuthGuard, GuardianMfaGuard, RolesGuard, PermissionsGuard)
 @Roles(UserRole.SUPERADMIN)
 @Permissions(Permission.ADMIN_EMPRESAS_MANAGE)
 export class GuardianController {
+  constructor(private readonly guardianRuntimeAlertService: GuardianRuntimeAlertService) {}
+
   @Get('health')
   health(@Req() req: Request) {
     const user = (req as any)?.user;

@@ -16,6 +16,7 @@ import { PlanosService } from '../../planos/planos.service';
 import { AssinaturasService } from '../../planos/assinaturas.service';
 import { Plano } from '../../planos/entities/plano.entity';
 import { toCanonicalAssinaturaStatus } from '../../planos/entities/assinatura-empresa.entity';
+import { UsersService } from '../../users/users.service';
 import { MailService } from '../../../mail/mail.service';
 import * as bcrypt from 'bcryptjs';
 
@@ -35,6 +36,7 @@ export class AdminEmpresasService {
     private empresaModuloService: EmpresaModuloService,
     private planosService: PlanosService,
     private assinaturasService: AssinaturasService,
+    private usersService: UsersService,
     private mailService: MailService,
   ) {}
 
@@ -394,6 +396,38 @@ export class AdminEmpresasService {
     });
   }
 
+  async resetarSenhaUsuario(
+    empresaId: string,
+    usuarioId: string,
+    actor: Pick<User, 'id' | 'nome' | 'email'>,
+    reason?: string,
+  ): Promise<{ usuarioId: string; novaSenha: string }> {
+    const empresa = await this.empresaRepository.findOne({ where: { id: empresaId } });
+    if (!empresa) {
+      throw new NotFoundException(`Empresa com ID ${empresaId} nao encontrada`);
+    }
+
+    const usuario = await this.userRepository.findOne({
+      where: { id: usuarioId, empresa_id: empresaId },
+      select: ['id', 'email', 'nome'],
+    });
+    if (!usuario) {
+      throw new NotFoundException('Usuario nao encontrado para a empresa informada');
+    }
+
+    const normalizedReason = this.normalizeOptionalReason(reason);
+    const novaSenha = await this.usersService.resetarSenha(usuarioId, empresaId, {
+      actor,
+      source: 'guardian.empresas.resetarSenhaUsuario',
+      reason: normalizedReason || undefined,
+    });
+
+    return {
+      usuarioId: usuario.id,
+      novaSenha,
+    };
+  }
+
   private async notificarStatusEmpresa(
     empresa: Empresa,
     status: 'suspended' | 'active',
@@ -467,6 +501,19 @@ export class AdminEmpresasService {
     }
 
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(candidate) ? candidate : null;
+  }
+
+  private normalizeOptionalReason(input?: string): string | null {
+    if (!input) {
+      return null;
+    }
+
+    const normalized = input.trim();
+    if (!normalized) {
+      return null;
+    }
+
+    return normalized.slice(0, 2000);
   }
 
   /**

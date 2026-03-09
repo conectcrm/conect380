@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { ForbiddenException } from '@nestjs/common';
 import { GUARDS_METADATA, INTERCEPTORS_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { PERMISSIONS_KEY } from '../../common/decorators/permissions.decorator';
 import { Permission } from '../../common/permissions/permissions.constants';
@@ -29,5 +30,25 @@ describe('GuardianPlanosController (metadata)', () => {
     const interceptors = Reflect.getMetadata(INTERCEPTORS_METADATA, GuardianPlanosController);
     expect(Array.isArray(interceptors)).toBe(true);
     expect(interceptors.length).toBe(1);
+  });
+});
+
+describe('GuardianPlanosController (capabilities)', () => {
+  it('bloqueia exclusao fisica de plano quando a capacidade esta desabilitada', async () => {
+    const planosService = {
+      remover: jest.fn(),
+    };
+    const guardianCapabilitiesService = {
+      assertPlanDeletionAllowed: jest.fn(() => {
+        throw new ForbiddenException('exclusao de plano desabilitada');
+      }),
+    };
+    const controller = new GuardianPlanosController(
+      planosService as never,
+      guardianCapabilitiesService as never,
+    );
+
+    await expect(controller.remover('plan-id')).rejects.toThrow('exclusao de plano desabilitada');
+    expect(planosService.remover).not.toHaveBeenCalled();
   });
 });

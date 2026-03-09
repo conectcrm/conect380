@@ -35,7 +35,10 @@ import {
 import { GuardianMfaGuard } from './guardian-mfa.guard';
 import { GuardianCriticalAuditInterceptor } from './interceptors/guardian-critical-audit.interceptor';
 import { GuardianCriticalAudit } from './entities/guardian-critical-audit.entity';
+import { GuardianCapabilitiesService } from './services/guardian-capabilities.service';
 import { GuardianCriticalAuditService } from './services/guardian-critical-audit.service';
+import { GuardianPolicySnapshotService } from './services/guardian-policy-snapshot.service';
+import { GuardianRuntimeAlertService } from './services/guardian-runtime-alert.service';
 
 @Controller('guardian/bff')
 @UseGuards(JwtAuthGuard, GuardianMfaGuard, EmpresaGuard, RolesGuard, PermissionsGuard)
@@ -47,8 +50,42 @@ export class GuardianBffController {
     private readonly adminBffService: AdminBffService,
     private readonly assinaturasService: AssinaturasService,
     private readonly assinaturaDueDateSchedulerService: AssinaturaDueDateSchedulerService,
+    private readonly guardianCapabilitiesService: GuardianCapabilitiesService,
     private readonly guardianCriticalAuditService: GuardianCriticalAuditService,
+    private readonly guardianPolicySnapshotService: GuardianPolicySnapshotService,
+    private readonly guardianRuntimeAlertService: GuardianRuntimeAlertService,
   ) {}
+
+  @Get('capabilities')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  getCapabilities() {
+    return {
+      success: true,
+      data: this.guardianCapabilitiesService.getCapabilities(),
+    };
+  }
+
+  @Get('runtime-context')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  async getRuntimeContext() {
+    await this.guardianRuntimeAlertService.syncRuntimePolicy();
+    return {
+      success: true,
+      data: this.guardianCapabilitiesService.getRuntimeContext(),
+    };
+  }
+
+  @Get('runtime-history')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  async getRuntimeHistory(@Query('limit') limit?: string) {
+    await this.guardianRuntimeAlertService.syncRuntimePolicy();
+    return {
+      success: true,
+      data: await this.guardianPolicySnapshotService.list(
+        this.parseOptionalPositiveInt(limit, 'limit') ?? 20,
+      ),
+    };
+  }
 
   @Get('overview')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
@@ -166,6 +203,8 @@ export class GuardianBffController {
       reason?: string;
     },
   ) {
+    this.guardianCapabilitiesService.assertBreakGlassRequestCreationAllowed();
+
     const targetUserId =
       typeof body?.target_user_id === 'string' ? body.target_user_id.trim() : '';
     if (!targetUserId) {
@@ -294,6 +333,8 @@ export class GuardianBffController {
       reason?: string;
     },
   ) {
+    this.guardianCapabilitiesService.assertDirectAccessRecertificationAllowed();
+
     const targetUserId =
       typeof body?.target_user_id === 'string' ? body.target_user_id.trim() : '';
     if (!targetUserId) {
@@ -477,6 +518,8 @@ export class GuardianBffController {
   @Permissions(Permission.PLANOS_MANAGE)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   async runBillingDueDateCycle() {
+    this.guardianCapabilitiesService.assertManualBillingDueDateCycleAllowed();
+
     return {
       success: true,
       data: await this.assinaturaDueDateSchedulerService.runDueDateStatusCycle(),

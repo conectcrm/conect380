@@ -1,4 +1,5 @@
 ﻿import {
+  BadRequestException,
   Controller,
   Get,
   Post,
@@ -25,10 +26,12 @@ import { UpdateModuloEmpresaDto } from '../admin/dto/update-modulo-empresa.dto';
 import { MudarPlanoDto } from '../admin/dto/mudar-plano.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
+import { CurrentUser } from '../../common/decorators/user.decorator';
 import { Permission } from '../../common/permissions/permissions.constants';
-import { UserRole } from '../users/user.entity';
+import { User, UserRole } from '../users/user.entity';
 import { GuardianMfaGuard } from './guardian-mfa.guard';
 import { GuardianCriticalAuditInterceptor } from './interceptors/guardian-critical-audit.interceptor';
+import { GuardianCapabilitiesService } from './services/guardian-capabilities.service';
 
 @Controller('guardian/empresas')
 @UseGuards(JwtAuthGuard, GuardianMfaGuard, RolesGuard, PermissionsGuard)
@@ -36,7 +39,10 @@ import { GuardianCriticalAuditInterceptor } from './interceptors/guardian-critic
 @Roles(UserRole.SUPERADMIN)
 @Permissions(Permission.ADMIN_EMPRESAS_MANAGE)
 export class GuardianEmpresasController {
-  constructor(private readonly adminEmpresasService: AdminEmpresasService) {}
+  constructor(
+    private readonly adminEmpresasService: AdminEmpresasService,
+    private readonly guardianCapabilitiesService: GuardianCapabilitiesService,
+  ) {}
 
   /**
    * GET /api/guardian/empresas
@@ -103,6 +109,39 @@ export class GuardianEmpresasController {
   }
 
   /**
+   * PUT /api/guardian/empresas/:empresaId/usuarios/:usuarioId/reset-senha
+   * Resetar senha de um usuario da empresa (operacao superadmin cross-tenant)
+   */
+  @Put(':empresaId/usuarios/:usuarioId/reset-senha')
+  @Permissions(Permission.ADMIN_EMPRESAS_MANAGE, Permission.USERS_RESET_PASSWORD)
+  async resetarSenhaUsuario(
+    @Param('empresaId') empresaId: string,
+    @Param('usuarioId') usuarioId: string,
+    @CurrentUser() currentUser: User,
+    @Body('motivo') motivo?: string,
+  ) {
+    if (!currentUser?.id) {
+      throw new BadRequestException('Usuario autenticado invalido');
+    }
+
+    const result = await this.adminEmpresasService.resetarSenhaUsuario(
+      empresaId,
+      usuarioId,
+      {
+        id: currentUser.id,
+        nome: currentUser.nome,
+        email: currentUser.email,
+      },
+      motivo,
+    );
+
+    return {
+      message: 'Senha resetada com sucesso',
+      ...result,
+    };
+  }
+
+  /**
    * POST /api/guardian/empresas/:id/health-score
    * Recalcular health score da empresa
    */
@@ -134,6 +173,7 @@ export class GuardianEmpresasController {
   @Post(':id/modulos')
   @HttpCode(HttpStatus.CREATED)
   async ativarModulo(@Param('id') id: string, @Body() dto: CreateModuloEmpresaDto) {
+    this.guardianCapabilitiesService.assertCompanyModuleManagementAllowed();
     return await this.adminEmpresasService.ativarModulo(id, dto);
   }
 
@@ -147,6 +187,7 @@ export class GuardianEmpresasController {
     @Param('modulo') modulo: string,
     @Body() dto: UpdateModuloEmpresaDto,
   ) {
+    this.guardianCapabilitiesService.assertCompanyModuleManagementAllowed();
     return await this.adminEmpresasService.atualizarModulo(id, modulo, dto);
   }
 
@@ -157,6 +198,7 @@ export class GuardianEmpresasController {
   @Delete(':id/modulos/:modulo')
   @HttpCode(HttpStatus.NO_CONTENT)
   async desativarModulo(@Param('id') id: string, @Param('modulo') modulo: string) {
+    this.guardianCapabilitiesService.assertCompanyModuleManagementAllowed();
     await this.adminEmpresasService.desativarModulo(id, modulo);
   }
 
@@ -186,6 +228,4 @@ export class GuardianEmpresasController {
     return await this.adminEmpresasService.mudarPlano(id, dto);
   }
 }
-
-
 

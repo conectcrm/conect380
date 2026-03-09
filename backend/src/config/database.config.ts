@@ -74,6 +74,7 @@ import { AuthLoginAttempt } from '../modules/auth/entities/auth-login-attempt.en
 import { MfaLoginChallenge } from '../modules/auth/entities/mfa-login-challenge.entity';
 import { AuthRefreshToken } from '../modules/auth/entities/auth-refresh-token.entity';
 import { GuardianCriticalAudit } from '../modules/guardian/entities/guardian-critical-audit.entity';
+import { GuardianPolicySnapshot } from '../modules/guardian/entities/guardian-policy-snapshot.entity';
 import { Lead } from '../modules/leads/lead.entity'; // ✅ Módulo de Leads CRM
 import { Meta } from '../modules/metas/entities/meta.entity';
 import { ConfiguracaoGateway } from '../modules/pagamentos/entities/configuracao-gateway.entity';
@@ -184,6 +185,7 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         MfaLoginChallenge,
         AuthRefreshToken,
         GuardianCriticalAudit,
+        GuardianPolicySnapshot,
         Lead, // ✅ Módulo de Leads CRM
         Meta, // ✅ Metas comerciais
         SystemBranding, // ✅ Branding global do sistema

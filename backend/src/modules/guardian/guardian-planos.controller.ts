@@ -23,6 +23,7 @@ import { Permission } from '../../common/permissions/permissions.constants';
 import { UserRole } from '../users/user.entity';
 import { GuardianMfaGuard } from './guardian-mfa.guard';
 import { GuardianCriticalAuditInterceptor } from './interceptors/guardian-critical-audit.interceptor';
+import { GuardianCapabilitiesService } from './services/guardian-capabilities.service';
 import { PlanosService } from '../planos/planos.service';
 import { CriarPlanoDto } from '../planos/dto/criar-plano.dto';
 import { AtualizarPlanoDto } from '../planos/dto/atualizar-plano.dto';
@@ -33,7 +34,10 @@ import { AtualizarPlanoDto } from '../planos/dto/atualizar-plano.dto';
 @Roles(UserRole.SUPERADMIN)
 @Permissions(Permission.PLANOS_MANAGE)
 export class GuardianPlanosController {
-  constructor(private readonly planosService: PlanosService) {}
+  constructor(
+    private readonly planosService: PlanosService,
+    private readonly guardianCapabilitiesService: GuardianCapabilitiesService,
+  ) {}
 
   @Get()
   async listarTodos(@Query('include_inactive') includeInactive?: string) {
@@ -68,6 +72,7 @@ export class GuardianPlanosController {
 
   @Delete(':id')
   async remover(@Param('id') id: string) {
+    this.guardianCapabilitiesService.assertPlanDeletionAllowed();
     await this.planosService.remover(id);
     return { message: 'Plano removido com sucesso' };
   }

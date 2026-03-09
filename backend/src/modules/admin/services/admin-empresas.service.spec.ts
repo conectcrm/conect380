@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { Empresa } from '../../../empresas/entities/empresa.entity';
 import { UserRole } from '../../users/user.entity';
 import { AdminEmpresasService } from './admin-empresas.service';
@@ -12,6 +13,7 @@ describe('AdminEmpresasService - notificacoes de status', () => {
 
   const userRepository = {
     find: jest.fn(),
+    findOne: jest.fn(),
   };
 
   const moduloEmpresaRepository = {
@@ -29,6 +31,10 @@ describe('AdminEmpresasService - notificacoes de status', () => {
 
   const mailService = {
     enviarEmailStatusEmpresa: jest.fn(),
+  };
+
+  const usersService = {
+    resetarSenha: jest.fn(),
   };
 
   const buildEmpresa = (): Empresa =>
@@ -52,6 +58,7 @@ describe('AdminEmpresasService - notificacoes de status', () => {
       {} as any,
       {} as any,
       {} as any,
+      usersService as any,
       mailService as any,
     );
   });
@@ -130,5 +137,55 @@ describe('AdminEmpresasService - notificacoes de status', () => {
     expect(empresaRepository.save).toHaveBeenCalledTimes(1);
     expect(mailService.enviarEmailStatusEmpresa).toHaveBeenCalledTimes(1);
   });
-});
 
+  it('reseta senha cross-tenant via usersService quando usuario pertence a empresa', async () => {
+    const empresa = buildEmpresa();
+    const actor = {
+      id: 'superadmin-1',
+      nome: 'Guardian Root',
+      email: 'root@conect360.com.br',
+    };
+
+    empresaRepository.findOne.mockResolvedValue(empresa);
+    userRepository.findOne.mockResolvedValue({
+      id: 'user-1',
+      nome: 'Ana Cliente',
+      email: 'ana@acme.com',
+      empresa_id: empresa.id,
+    });
+    usersService.resetarSenha.mockResolvedValue('Temp@1234');
+
+    const result = await service.resetarSenhaUsuario(empresa.id, 'user-1', actor, 'suporte tecnico');
+
+    expect(result).toEqual({
+      usuarioId: 'user-1',
+      novaSenha: 'Temp@1234',
+    });
+    expect(usersService.resetarSenha).toHaveBeenCalledWith(
+      'user-1',
+      empresa.id,
+      expect.objectContaining({
+        actor,
+        source: 'guardian.empresas.resetarSenhaUsuario',
+        reason: 'suporte tecnico',
+      }),
+    );
+  });
+
+  it('falha quando usuario nao pertence a empresa informada', async () => {
+    const empresa = buildEmpresa();
+    const actor = {
+      id: 'superadmin-1',
+      nome: 'Guardian Root',
+      email: 'root@conect360.com.br',
+    };
+
+    empresaRepository.findOne.mockResolvedValue(empresa);
+    userRepository.findOne.mockResolvedValue(null);
+
+    await expect(service.resetarSenhaUsuario(empresa.id, 'user-404', actor)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(usersService.resetarSenha).not.toHaveBeenCalled();
+  });
+});
