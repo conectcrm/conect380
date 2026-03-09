@@ -821,7 +821,6 @@ export class AuthService {
 
     const challenge = await this.mfaLoginChallengeRepository.findOne({
       where: { id: challengeIdNormalizado },
-      relations: ['user', 'user.empresa'],
     });
 
     if (!challenge) {
@@ -865,7 +864,7 @@ export class AuthService {
     challenge.usedAt = new Date();
     await this.mfaLoginChallengeRepository.save(challenge);
 
-    const user = challenge.user ?? (await this.usersService.findById(challenge.userId));
+    const user = await this.usersService.findById(challenge.userId);
 
     if (!user) {
       throw new UnauthorizedException('Usuario nao encontrado para validacao MFA');
