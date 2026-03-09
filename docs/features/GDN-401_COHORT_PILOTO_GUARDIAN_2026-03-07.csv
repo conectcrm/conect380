@@ -1,0 +1,4 @@
+empresa_id,nome_empresa,owner_operacional,owner_comercial,janela_inicio_utc,janela_fim_utc,status,observacoes
+<preencher>,<preencher>,<preencher>,<preencher>,<preencher>,<preencher>,pending_selection,Selecionar conta real de baixo risco para lote 1
+<preencher>,<preencher>,<preencher>,<preencher>,<preencher>,<preencher>,pending_selection,Selecionar conta real com owner operacional dedicado
+<preencher>,<preencher>,<preencher>,<preencher>,<preencher>,<preencher>,pending_selection,Opcional para lote 2 apos estabilidade inicial

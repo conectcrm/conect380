@@ -433,8 +433,8 @@ if ($DryRun) {
         }
         $notes += 'Fluxo suspend/reactivate nao executado por ausencia de empresa elegivel. Informe -TargetEmpresaId para validar mutacao.'
       } else {
-        $suspend = Invoke-EndpointWithFallback -Method 'PATCH' -BaseCandidates $baseCandidates -Path "/guardian/bff/billing/subscriptions/$empresaId/suspend" -Headers $headers
-        $reactivate = Invoke-EndpointWithFallback -Method 'PATCH' -BaseCandidates $baseCandidates -Path "/guardian/bff/billing/subscriptions/$empresaId/reactivate" -Headers $headers
+        $suspend = Invoke-EndpointWithFallback -Method 'PATCH' -BaseCandidates $baseCandidates -Path "/guardian/bff/billing/subscriptions/$empresaId/suspend" -Headers $headers -Body @{ reason = 'daily-smoke-guardian-suspend-validation' }
+        $reactivate = Invoke-EndpointWithFallback -Method 'PATCH' -BaseCandidates $baseCandidates -Path "/guardian/bff/billing/subscriptions/$empresaId/reactivate" -Headers $headers -Body @{ reason = 'daily-smoke-guardian-reactivate-validation' }
 
         if ($suspend.success -and $reactivate.success) {
           $steps += [PSCustomObject]@{
