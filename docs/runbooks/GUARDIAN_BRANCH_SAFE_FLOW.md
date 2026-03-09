@@ -27,6 +27,12 @@ Use:
 powershell -File .\scripts\git\new-isolated-worktree.ps1 -BranchName feat\guardian-ajuste-x
 ```
 
+Atalho via `npm`:
+
+```powershell
+npm run branch:worktree:new -- -BranchName feat/guardian-ajuste-x
+```
+
 Exemplo com nome valido para Git:
 
 ```powershell
@@ -46,3 +52,9 @@ Se o objetivo for:
 3. comparar escopo contra `main`
 
 entao a operacao deve ser feita no worktree isolado, nunca no workspace principal.
+
+## Regra adicional para o workspace principal
+
+1. `c:\Projetos\conect360` e o checkout usado para subir e validar o sistema.
+2. Nao executar `git switch`, `git checkout`, `git rebase origin/main` ou extracao de PR limpa nesse diretorio.
+3. Se a branch atual estiver distante de `origin/main`, usar `npm run branch:health` para confirmar o risco e abrir um worktree isolado.
