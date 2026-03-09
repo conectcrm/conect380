@@ -368,4 +368,84 @@ export class MailService {
       throw error;
     }
   }
+
+  async enviarEmailStatusEmpresa(dados: {
+    to: string | string[];
+    empresa: string;
+    status: 'suspended' | 'active';
+    reason?: string;
+  }): Promise<void> {
+    const recipients = (Array.isArray(dados.to) ? dados.to : [dados.to])
+      .map((email) => String(email || '').trim())
+      .filter(Boolean);
+
+    if (recipients.length === 0) {
+      this.logger.warn('Notificacao de status ignorada: nenhum destinatario informado.');
+      return;
+    }
+
+    const isSuspended = dados.status === 'suspended';
+    const statusLabel = isSuspended ? 'suspensa' : 'reativada';
+    const subject = isSuspended
+      ? `[Conect CRM] Empresa ${dados.empresa} suspensa`
+      : `[Conect CRM] Empresa ${dados.empresa} reativada`;
+    const reasonBlock =
+      isSuspended && dados.reason
+        ? `<p><strong>Motivo:</strong> ${dados.reason}</p>`
+        : '';
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Status da empresa atualizado</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #002333; background: #f4f7fb; }
+          .container { max-width: 640px; margin: 0 auto; padding: 24px; }
+          .card { background: #ffffff; border-radius: 12px; box-shadow: 0 12px 40px rgba(21, 154, 156, 0.12); overflow: hidden; }
+          .header { background: linear-gradient(135deg, #159A9C, #0F7B7D); color: #ffffff; padding: 24px; text-align: center; }
+          .content { padding: 24px; }
+          .footer { padding: 16px 24px 24px 24px; background: #DEEFE7; color: #002333; font-size: 13px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="card">
+            <div class="header">
+              <h1>Status da empresa atualizado</h1>
+            </div>
+            <div class="content">
+              <p>O status da empresa <strong>${dados.empresa}</strong> foi alterado para <strong>${statusLabel}</strong>.</p>
+              ${reasonBlock}
+              <p>Data da alteracao: <strong>${new Date().toISOString()}</strong></p>
+            </div>
+            <div class="footer">
+              Conect CRM - Notificacao automatica de governanca guardian.
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const mailOptions = {
+      from: `"Conect CRM" <${process.env.SMTP_USER || 'no-reply@conectcrm.com'}>`,
+      to: recipients.join(', '),
+      subject,
+      html: htmlContent,
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+      const masked = recipients.map((email) => this.maskEmail(email)).join(', ');
+      this.logger.log(`Email de status da empresa enviado para ${masked}`);
+    } catch (error) {
+      this.logger.error(
+        `Erro ao enviar email de status da empresa para ${recipients.map((email) => this.maskEmail(email)).join(', ')}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw error;
+    }
+  }
 }

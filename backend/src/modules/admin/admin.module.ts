@@ -15,6 +15,7 @@ import { AdminBffService } from './services/admin-bff.service';
 import { AdminBffAuditInterceptor } from './interceptors/admin-bff-audit.interceptor';
 import { LegacyAdminTransitionGuard } from './guards/legacy-admin-transition.guard';
 import { PlanosModule } from '../planos/planos.module';
+import { MailModule } from '../../mail/mail.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { PlanosModule } from '../planos/planos.module';
     UsersModule,
     NotificationModule,
     PlanosModule,
+    MailModule,
   ],
   controllers: [AdminEmpresasController, AdminBffController],
   providers: [

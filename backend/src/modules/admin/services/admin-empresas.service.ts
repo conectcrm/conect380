@@ -16,6 +16,7 @@ import { PlanosService } from '../../planos/planos.service';
 import { AssinaturasService } from '../../planos/assinaturas.service';
 import { Plano } from '../../planos/entities/plano.entity';
 import { toCanonicalAssinaturaStatus } from '../../planos/entities/assinatura-empresa.entity';
+import { MailService } from '../../../mail/mail.service';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -34,6 +35,7 @@ export class AdminEmpresasService {
     private empresaModuloService: EmpresaModuloService,
     private planosService: PlanosService,
     private assinaturasService: AssinaturasService,
+    private mailService: MailService,
   ) {}
 
   /**
@@ -288,7 +290,7 @@ export class AdminEmpresasService {
 
     this.logger.warn(`⚠️ Empresa ${empresa.nome} foi suspensa. Motivo: ${motivo}`);
 
-    // TODO: Enviar email notificando suspensão
+    await this.notificarStatusEmpresa(empresa, 'suspended', motivo);
 
     return { message: 'Empresa suspensa com sucesso', empresa };
   }
@@ -311,7 +313,7 @@ export class AdminEmpresasService {
 
     this.logger.log(`✅ Empresa ${empresa.nome} foi reativada`);
 
-    // TODO: Enviar email notificando reativação
+    await this.notificarStatusEmpresa(empresa, 'active');
 
     return { message: 'Empresa reativada com sucesso', empresa };
   }
@@ -390,6 +392,81 @@ export class AdminEmpresasService {
       select: ['id', 'nome', 'email', 'role', 'ativo', 'created_at'],
       order: { created_at: 'DESC' },
     });
+  }
+
+  private async notificarStatusEmpresa(
+    empresa: Empresa,
+    status: 'suspended' | 'active',
+    reason?: string,
+  ): Promise<void> {
+    const recipients = await this.resolverDestinatariosNotificacao(empresa.id, empresa.email);
+    if (recipients.length === 0) {
+      this.logger.warn(
+        `Nenhum destinatario valido para notificacao de status da empresa ${empresa.id}`,
+      );
+      return;
+    }
+
+    try {
+      await this.mailService.enviarEmailStatusEmpresa({
+        to: recipients,
+        empresa: empresa.nome,
+        status,
+        reason,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Falha ao enviar notificacao de status da empresa ${empresa.id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
+  }
+
+  private async resolverDestinatariosNotificacao(
+    empresaId: string,
+    companyEmail?: string | null,
+  ): Promise<string[]> {
+    const allowedRoles = new Set<UserRole>([
+      UserRole.SUPERADMIN,
+      UserRole.ADMIN,
+      UserRole.GERENTE,
+    ]);
+
+    const users = await this.userRepository.find({
+      where: { empresa_id: empresaId, ativo: true },
+      select: ['email', 'role'],
+    });
+
+    const emails = new Set<string>();
+
+    for (const user of users) {
+      if (!allowedRoles.has(user.role)) {
+        continue;
+      }
+
+      const normalized = this.normalizeEmail(user.email);
+      if (normalized) {
+        emails.add(normalized);
+      }
+    }
+
+    const normalizedCompanyEmail = this.normalizeEmail(companyEmail);
+    if (normalizedCompanyEmail) {
+      emails.add(normalizedCompanyEmail);
+    }
+
+    return Array.from(emails);
+  }
+
+  private normalizeEmail(email?: string | null): string | null {
+    const candidate = String(email || '')
+      .trim()
+      .toLowerCase();
+    if (!candidate) {
+      return null;
+    }
+
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(candidate) ? candidate : null;
   }
 
   /**
