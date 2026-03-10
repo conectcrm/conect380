@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { toast } from 'react-hot-toast';
 import { PropostaCompleta } from '../services/propostasService';
 import PropostaActions from './PropostaActions';
 import { propostasService as propostasApiService } from '../../../services/propostasService';
 import { BaseModal, ModalButton } from '../../../components/modals/BaseModal';
 import { produtosService } from '../../../services/produtosService';
+import { toastService } from '../../../services/toastService';
 import {
   User,
   Calendar,
@@ -88,6 +88,37 @@ type EstatisticasResposta = {
   }>;
 };
 
+type PlanoComponente = {
+  childItemId: string;
+  componentRole: 'included' | 'required' | 'optional' | 'recommended' | 'addon';
+  quantity?: number;
+  nome?: string;
+  preco?: number;
+  tipoItem?: string;
+  affectsPrice?: boolean;
+  isDefault?: boolean;
+};
+
+type ItemNegociado = {
+  produtoId: string;
+  nome: string;
+  descricao: string;
+  quantidade: number;
+  precoUnitario: number;
+  desconto: number;
+  subtotal: number;
+  tipoItem?: string;
+  componentesPlano?: PlanoComponente[];
+};
+
+const componentRoleLabels: Record<PlanoComponente['componentRole'], string> = {
+  included: 'Incluido',
+  required: 'Obrigatorio',
+  optional: 'Opcional',
+  recommended: 'Recomendado',
+  addon: 'Add-on',
+};
+
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
@@ -111,15 +142,15 @@ const formatDateTime = (date: Date | string | undefined | null) => {
 
 const getStatusColor = (status?: string) => {
   const statusColors = {
-    rascunho: 'bg-gray-100 text-gray-800',
-    enviada: 'bg-blue-100 text-blue-800',
-    visualizada: 'bg-sky-100 text-sky-800',
-    negociacao: 'bg-amber-100 text-amber-800',
-    aprovada: 'bg-green-100 text-green-800',
-    rejeitada: 'bg-red-100 text-red-800',
-    expirada: 'bg-orange-100 text-orange-800',
+    rascunho: 'bg-[#B4BEC9]/20 text-[#244455]',
+    enviada: 'bg-[#38BDF8]/10 text-[#0369A1]',
+    visualizada: 'bg-[#159A9C]/10 text-[#0F7B7D]',
+    negociacao: 'bg-[#FBBF24]/20 text-[#92400E]',
+    aprovada: 'bg-[#16A34A]/10 text-[#166534]',
+    rejeitada: 'bg-[#DC2626]/10 text-[#B91C1C]',
+    expirada: 'bg-[#F97316]/15 text-[#9A3412]',
   };
-  return statusColors[status as keyof typeof statusColors] || 'bg-gray-100 text-gray-800';
+  return statusColors[status as keyof typeof statusColors] || 'bg-[#B4BEC9]/20 text-[#244455]';
 };
 
 const getStatusText = (status?: string) => {
@@ -145,25 +176,25 @@ const getAprovacaoBadge = (status?: string) => {
     case 'aprovada':
       return {
         label: 'Aprovacao interna aprovada',
-        className: 'bg-green-100 text-green-800',
+        className: 'bg-[#16A34A]/10 text-[#166534]',
         icon: ShieldCheck,
       };
     case 'rejeitada':
       return {
         label: 'Aprovacao interna rejeitada',
-        className: 'bg-red-100 text-red-800',
+        className: 'bg-[#DC2626]/10 text-[#B91C1C]',
         icon: ShieldX,
       };
     case 'pendente':
       return {
         label: 'Aprovacao interna pendente',
-        className: 'bg-amber-100 text-amber-800',
+        className: 'bg-[#FBBF24]/20 text-[#92400E]',
         icon: ShieldAlert,
       };
     default:
       return {
         label: 'Sem necessidade de alçada',
-        className: 'bg-slate-100 text-slate-700',
+        className: 'bg-[#DEE8EC] text-[#355166]',
         icon: ShieldCheck,
       };
   }
@@ -175,6 +206,107 @@ const parseNumber = (value: unknown, fallback = 0) => {
 };
 
 const normalizeText = (value: unknown) => String(value || '').trim().toLowerCase();
+
+const normalizePlanoComponentes = (value: unknown): PlanoComponente[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((raw) => {
+      if (!raw || typeof raw !== 'object') {
+        return null;
+      }
+
+      const record = raw as Record<string, unknown>;
+      const childItemId = String(record.childItemId || record.child_item_id || '').trim();
+      if (!childItemId) {
+        return null;
+      }
+
+      const componentRoleRaw = String(record.componentRole || record.component_role || 'included');
+      const componentRole = (
+        ['included', 'required', 'optional', 'recommended', 'addon'].includes(componentRoleRaw)
+          ? componentRoleRaw
+          : 'included'
+      ) as PlanoComponente['componentRole'];
+
+      const quantity = Number(record.quantity);
+      const preco = Number(record.preco);
+
+      return {
+        childItemId,
+        componentRole,
+        quantity: Number.isFinite(quantity) ? quantity : undefined,
+        nome: typeof record.nome === 'string' ? record.nome : undefined,
+        preco: Number.isFinite(preco) ? preco : undefined,
+        tipoItem: typeof record.tipoItem === 'string' ? record.tipoItem : undefined,
+        affectsPrice: Boolean(record.affectsPrice),
+        isDefault: record.isDefault === undefined ? undefined : Boolean(record.isDefault),
+      } as PlanoComponente;
+    })
+    .filter((item): item is PlanoComponente => Boolean(item));
+};
+
+const getComposicaoDetalhes = (item: ItemNegociado, limit = 3): string[] => {
+  const componentes = Array.isArray(item.componentesPlano) ? item.componentesPlano : [];
+  return componentes.slice(0, limit).map((componente) => {
+    const nome = componente.nome?.trim() || 'Item da composicao';
+    const qtd =
+      typeof componente.quantity === 'number' && componente.quantity > 1
+        ? ` x${componente.quantity}`
+        : '';
+    const papel = componentRoleLabels[componente.componentRole || 'included'] || 'Incluido';
+    return `${nome}${qtd} (${papel})`;
+  });
+};
+
+const getComposicaoDetalhesPlano = (componentes: PlanoComponente[], limit = 3): string[] => {
+  return componentes.slice(0, limit).map((componente) => {
+    const nome = componente.nome?.trim() || 'Item da composicao';
+    const qtd =
+      typeof componente.quantity === 'number' && componente.quantity > 1
+        ? ` x${componente.quantity}`
+        : '';
+    const papel = componentRoleLabels[componente.componentRole || 'included'] || 'Incluido';
+    return `${nome}${qtd} (${papel})`;
+  });
+};
+
+const buildComposicaoPlanoSignature = (componentes: PlanoComponente[]): string => {
+  if (!Array.isArray(componentes) || componentes.length === 0) {
+    return '';
+  }
+
+  return componentes
+    .map((componente) => {
+      const nomeBase = componente.nome?.trim() || componente.childItemId || '';
+      const nome = normalizeText(nomeBase);
+      const papel = normalizeText(componente.componentRole || 'included');
+      const quantidade = parseNumber(componente.quantity, 1);
+      return `${nome}|${papel}|${quantidade}`;
+    })
+    .filter((item) => Boolean(item))
+    .sort()
+    .join('||');
+};
+
+const buildResumoComposicaoPlano = (componentes: PlanoComponente[], limit = 3): string => {
+  if (!Array.isArray(componentes) || componentes.length === 0) {
+    return '';
+  }
+
+  const detalhes = getComposicaoDetalhesPlano(componentes, limit);
+  if (detalhes.length === 0) {
+    return '';
+  }
+
+  if (componentes.length > limit) {
+    return `${detalhes.join(', ')} +${componentes.length - limit}`;
+  }
+
+  return detalhes.join(', ');
+};
 
 const extractProductNames = (produtos?: unknown[]): string[] => {
   if (!Array.isArray(produtos)) {
@@ -220,6 +352,9 @@ type SnapshotItemNormalizado = {
   precoUnitario: number;
   desconto: number;
   subtotal: number;
+  tipoItem: string;
+  composicaoPlanoAssinatura: string;
+  resumoComposicaoPlano: string;
 };
 
 const normalizeSnapshotItems = (produtos?: unknown[]): SnapshotItemNormalizado[] => {
@@ -252,6 +387,17 @@ const normalizeSnapshotItems = (produtos?: unknown[]): SnapshotItemNormalizado[]
       const desconto = Math.max(parseNumber(raw.desconto, 0), 0);
       const subtotalCalculado = quantidade * precoUnitario * (1 - desconto / 100);
       const subtotal = Math.max(parseNumber(raw.subtotal, subtotalCalculado), 0);
+      const tipoItemRaw = raw.tipoItem ?? nestedProduto?.tipoItem ?? '';
+      const tipoItem = normalizeText(tipoItemRaw);
+      const componentesCandidatos = normalizePlanoComponentes(
+        raw.componentesPlano ?? raw.componentes ?? nestedProduto?.componentes,
+      );
+      const isPlano = tipoItem === 'plano' || componentesCandidatos.length > 0;
+      const componentesPlano = isPlano ? componentesCandidatos : [];
+      const composicaoPlanoAssinatura =
+        isPlano ? buildComposicaoPlanoSignature(componentesPlano) : '';
+      const resumoComposicaoPlano =
+        isPlano ? buildResumoComposicaoPlano(componentesPlano) : '';
 
       return {
         key: normalizeText(nome),
@@ -260,6 +406,9 @@ const normalizeSnapshotItems = (produtos?: unknown[]): SnapshotItemNormalizado[]
         precoUnitario,
         desconto,
         subtotal,
+        tipoItem,
+        composicaoPlanoAssinatura,
+        resumoComposicaoPlano,
       };
     })
     .filter((item): item is SnapshotItemNormalizado => Boolean(item));
@@ -277,12 +426,30 @@ const buildSnapshotItemMap = (items: SnapshotItemNormalizado[]) => {
 
     const quantidade = existente.quantidade + item.quantidade;
     const subtotal = existente.subtotal + item.subtotal;
+    const composicoes = Array.from(
+      new Set(
+        [existente.composicaoPlanoAssinatura, item.composicaoPlanoAssinatura]
+          .map((value) => value.trim())
+          .filter((value) => value.length > 0),
+      ),
+    ).sort();
+    const resumos = Array.from(
+      new Set(
+        [existente.resumoComposicaoPlano, item.resumoComposicaoPlano]
+          .map((value) => value.trim())
+          .filter((value) => value.length > 0),
+      ),
+    );
+
     map.set(item.key, {
       ...existente,
       quantidade,
       subtotal,
       desconto: Math.max(existente.desconto, item.desconto),
       precoUnitario: quantidade > 0 ? subtotal / quantidade : existente.precoUnitario,
+      tipoItem: existente.tipoItem || item.tipoItem,
+      composicaoPlanoAssinatura: composicoes.join('&&'),
+      resumoComposicaoPlano: resumos.join(' | '),
     });
   });
 
@@ -366,20 +533,20 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
 
   const handleAgendarFollowup = async (dias: number) => {
     if (!propostaId) {
-      toast.error('Proposta sem identificador para agendar follow-up.');
+      toastService.error('Proposta sem identificador para agendar follow-up.');
       return;
     }
 
     setAgendandoFollowup(true);
     try {
       await propostasApiService.agendarLembrete(propostaId, dias);
-      toast.success(`Follow-up agendado para ${dias} dia(s).`);
+      toastService.success(`Follow-up agendado para ${dias} dia(s).`);
       await carregarDadosCiclo();
       onPropostaUpdated?.();
       setShowFollowupForm(false);
     } catch (error) {
       console.error('Erro ao agendar follow-up:', error);
-      toast.error('Nao foi possivel agendar o follow-up.');
+      toastService.error('Nao foi possivel agendar o follow-up.');
     } finally {
       setAgendandoFollowup(false);
     }
@@ -479,6 +646,9 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
         const descontoBaseItem = parseNumber(itemBase?.desconto, 0);
         const subtotalAtual = parseNumber(itemAtual?.subtotal, 0);
         const subtotalBase = parseNumber(itemBase?.subtotal, 0);
+        const composicaoAtual = String(itemAtual?.composicaoPlanoAssinatura || '').trim();
+        const composicaoBase = String(itemBase?.composicaoPlanoAssinatura || '').trim();
+        const composicaoAlterada = composicaoAtual !== composicaoBase;
 
         const adicionado = Boolean(itemAtual) && !itemBase;
         const removido = Boolean(itemBase) && !itemAtual;
@@ -488,7 +658,8 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
           Math.abs(quantidadeAtual - quantidadeBase) > 0.0001 ||
           Math.abs(precoAtual - precoBase) > 0.01 ||
           Math.abs(descontoAtualItem - descontoBaseItem) > 0.01 ||
-          Math.abs(subtotalAtual - subtotalBase) > 0.01;
+          Math.abs(subtotalAtual - subtotalBase) > 0.01 ||
+          composicaoAlterada;
 
         if (!alterado) {
           return null;
@@ -510,10 +681,17 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
           subtotalBase,
           subtotalAtual,
           deltaSubtotal: subtotalAtual - subtotalBase,
+          composicaoAlterada,
+          composicaoResumoBase: String(itemBase?.resumoComposicaoPlano || ''),
+          composicaoResumoAtual: String(itemAtual?.resumoComposicaoPlano || ''),
         };
       })
       .filter((item): item is NonNullable<typeof item> => Boolean(item))
-      .sort((a, b) => Math.abs(b.deltaSubtotal) - Math.abs(a.deltaSubtotal))
+      .sort(
+        (a, b) =>
+          Number(b.composicaoAlterada) - Number(a.composicaoAlterada) ||
+          Math.abs(b.deltaSubtotal) - Math.abs(a.deltaSubtotal),
+      )
       .slice(0, 8);
 
     return {
@@ -566,20 +744,38 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
     return ordenadas[0]?.snapshot || null;
   })();
 
-  const itensNegociados = (() => {
+  const itensNegociados: ItemNegociado[] = (() => {
     const itensDaProposta = Array.isArray(proposta.produtos) ? proposta.produtos : [];
 
     if (itensDaProposta.length > 0) {
       return itensDaProposta
-        .map((item) => ({
-          produtoId: String(item?.produto?.id || ''),
-          nome: item?.produto?.nome || '',
-          descricao: item?.produto?.descricao || '',
-          quantidade: Number(item?.quantidade || 0),
-          precoUnitario: Number(item?.produto?.preco || 0),
-          desconto: Number(item?.desconto || 0),
-          subtotal: Number(item?.subtotal || 0),
-        }))
+        .map((item) => {
+          const produto = item?.produto ?? null;
+
+          const componentesPlano = normalizePlanoComponentes(
+            (item as unknown as Record<string, unknown>)?.componentesPlano ??
+              (item as unknown as Record<string, unknown>)?.componentes ??
+              (produto as any)?.componentes,
+          );
+
+          return {
+            produtoId: String((produto as any)?.id || ''),
+            nome: typeof (produto as any)?.nome === 'string' ? String((produto as any).nome) : '',
+            descricao:
+              typeof (produto as any)?.descricao === 'string'
+                ? String((produto as any).descricao)
+                : '',
+            quantidade: Number(item?.quantidade || 0),
+            precoUnitario: Number((produto as any)?.preco || 0),
+            desconto: Number(item?.desconto || 0),
+            subtotal: Number(item?.subtotal || 0),
+            tipoItem:
+              typeof (produto as any)?.tipoItem === 'string'
+                ? String((produto as any).tipoItem)
+                : undefined,
+            componentesPlano,
+          };
+        })
         .map((item, index) => ({
           ...item,
           nome: item.nome.trim() ? item.nome : `Item ${index + 1}`,
@@ -616,6 +812,10 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
         const desconto = Number(raw?.desconto ?? 0);
         const subtotalCalculado = quantidade * precoUnitario;
         const subtotal = Number(raw?.subtotal ?? subtotalCalculado);
+        const tipoItemRaw = raw?.tipoItem ?? nestedProduto?.tipoItem ?? '';
+        const componentesPlano = normalizePlanoComponentes(
+          raw?.componentesPlano ?? raw?.componentes ?? nestedProduto?.componentes,
+        );
 
         return {
           produtoId: String(produtoIdRaw || ''),
@@ -625,6 +825,8 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
           precoUnitario: Number.isFinite(precoUnitario) ? precoUnitario : 0,
           desconto: Number.isFinite(desconto) ? desconto : 0,
           subtotal: Number.isFinite(subtotal) ? subtotal : 0,
+          tipoItem: typeof tipoItemRaw === 'string' ? tipoItemRaw : undefined,
+          componentesPlano,
         };
       })
       .filter((item) => item.nome.trim().length > 0);
@@ -719,8 +921,8 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
         </span>
       </div>
 
-      <div className="mb-4 rounded-lg bg-gray-50 p-3 sm:p-4">
-        <h4 className="mb-3 text-sm font-medium text-gray-900">Compartilhar proposta</h4>
+      <div className="mb-4 rounded-xl border border-[#E2ECF0] bg-[#F7FBFC] p-3 sm:p-4">
+        <h4 className="mb-3 text-sm font-medium text-[#19384C]">Compartilhar proposta</h4>
         <PropostaActions
           proposta={proposta}
           onViewProposta={() => {}}
@@ -1047,6 +1249,16 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
                                       {' -> '}
                                       {formatCurrency(item.subtotalAtual)}
                                     </p>
+                                    {(item.composicaoAlterada ||
+                                      item.composicaoResumoBase ||
+                                      item.composicaoResumoAtual) && (
+                                      <p className="text-[11px] text-[#546E7A]">
+                                        Composicao:{' '}
+                                        {item.composicaoResumoBase || '-'}
+                                        {' -> '}
+                                        {item.composicaoResumoAtual || '-'}
+                                      </p>
+                                    )}
                                   </div>
                                 ))}
                               </div>
@@ -1090,14 +1302,14 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div className="space-y-4">
-            <h4 className="border-b pb-2 text-lg font-semibold text-gray-900">Informacoes do cliente</h4>
+            <h4 className="border-b border-[#E2ECF0] pb-2 text-lg font-semibold text-[#19384C]">Informacoes do cliente</h4>
 
             <div className="space-y-3">
               <div className="flex items-center">
-                <User className="mr-3 h-4 w-4 text-gray-400" />
+                <User className="mr-3 h-4 w-4 text-[#8BA0AA]" />
                 <div>
-                  <p className="text-sm font-medium text-gray-900">{proposta.cliente?.nome || 'Nome nao informado'}</p>
-                  <p className="text-xs text-gray-600">
+                  <p className="text-sm font-medium text-[#19384C]">{proposta.cliente?.nome || 'Nome nao informado'}</p>
+                  <p className="text-xs text-[#607B89]">
                     {proposta.cliente?.tipoPessoa === 'juridica' ? 'Pessoa Juridica' : 'Pessoa Fisica'}
                   </p>
                 </div>
@@ -1105,22 +1317,22 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
 
               {proposta.cliente?.email && (
                 <div className="flex items-center">
-                  <Mail className="mr-3 h-4 w-4 text-gray-400" />
-                  <span className="text-sm text-gray-700">{proposta.cliente.email}</span>
+                  <Mail className="mr-3 h-4 w-4 text-[#8BA0AA]" />
+                  <span className="text-sm text-[#355166]">{proposta.cliente.email}</span>
                 </div>
               )}
 
               {proposta.cliente?.telefone && (
                 <div className="flex items-center">
-                  <Phone className="mr-3 h-4 w-4 text-gray-400" />
-                  <span className="text-sm text-gray-700">{proposta.cliente.telefone}</span>
+                  <Phone className="mr-3 h-4 w-4 text-[#8BA0AA]" />
+                  <span className="text-sm text-[#355166]">{proposta.cliente.telefone}</span>
                 </div>
               )}
 
               {proposta.cliente?.endereco && (
                 <div className="flex items-center">
-                  <MapPin className="mr-3 h-4 w-4 text-gray-400" />
-                  <span className="text-sm text-gray-700">
+                  <MapPin className="mr-3 h-4 w-4 text-[#8BA0AA]" />
+                  <span className="text-sm text-[#355166]">
                     {proposta.cliente.endereco}
                     {proposta.cliente.cidade && `, ${proposta.cliente.cidade}`}
                     {proposta.cliente.estado && ` - ${proposta.cliente.estado}`}
@@ -1131,11 +1343,11 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
           </div>
 
           <div className="space-y-4">
-            <h4 className="border-b pb-2 text-lg font-semibold text-gray-900">Detalhes da proposta</h4>
+            <h4 className="border-b border-[#E2ECF0] pb-2 text-lg font-semibold text-[#19384C]">Detalhes da proposta</h4>
 
             <div className="space-y-3">
-              <div className="rounded-md border border-gray-200 bg-white p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+              <div className="rounded-md border border-[#E2ECF0] bg-white p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#607B89]">
                   O que esta sendo negociado
                 </p>
                 {itensNegociados.length > 0 ? (
@@ -1154,52 +1366,62 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
                             key={`${item.produtoId || item.nome}-${item.quantidade}-${index}`}
                             className="flex items-start justify-between gap-3 text-sm"
                           >
-                            <span className="text-gray-900">{nomeResolvido}</span>
-                          <span className="text-gray-500">x{Math.max(1, item.quantidade || 1)}</span>
+                            <span className="text-[#19384C]">
+                              {nomeResolvido}
+                              {getComposicaoDetalhes(item).length > 0 && (
+                                  <span className="mt-0.5 block text-xs text-[#35538A]">
+                                    {getComposicaoDetalhes(item)[0]}
+                                    {(item.componentesPlano?.length || 0) > 1
+                                      ? ` +${(item.componentesPlano?.length || 0) - 1}`
+                                      : ''}
+                                  </span>
+                                )}
+                            </span>
+                            <span className="text-[#607B89]">x{Math.max(1, item.quantidade || 1)}</span>
                           </li>
                         );
                       })}
                     </ul>
                     {itensNegociados.length > 3 && (
-                      <p className="mt-2 text-xs text-gray-500">
+                      <p className="mt-2 text-xs text-[#607B89]">
                         + {itensNegociados.length - 3} item(ns)
                       </p>
                     )}
                   </>
                 ) : loadingCiclo ? (
-                  <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
+                  <div className="mt-2 flex items-center gap-2 text-sm text-[#607B89]">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Carregando itens...
                   </div>
                 ) : (
-                  <p className="mt-2 text-sm text-gray-700">{proposta.titulo || 'Proposta comercial'}</p>
+                  <p className="mt-2 text-sm text-[#355166]">{proposta.titulo || 'Proposta comercial'}</p>
                 )}
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Subtotal:</span>
+                <span className="text-sm text-[#607B89]">Subtotal:</span>
                 <span className="text-sm font-medium">{formatCurrency(proposta.subtotal)}</span>
               </div>
 
               <div className="flex items-center justify-between border-t pt-2">
-                <span className="text-base font-semibold text-gray-900">Total:</span>
+                <span className="text-base font-semibold text-[#19384C]">Total:</span>
                 <span className="text-lg font-bold text-[#159A9C]">{formatCurrency(proposta.total)}</span>
               </div>
 
               <div className="flex items-center">
-                <Calendar className="mr-3 h-4 w-4 text-gray-400" />
+                <Calendar className="mr-3 h-4 w-4 text-[#8BA0AA]" />
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Valida ate: {formatDate(proposta.dataValidade)}</p>
-                  <p className="text-xs text-gray-600">Criada em: {proposta.criadaEm ? formatDate(proposta.criadaEm) : 'N/A'}</p>
+                  <p className="text-sm font-medium text-[#19384C]">Valida ate: {formatDate(proposta.dataValidade)}</p>
+                  <p className="text-xs text-[#607B89]">Criada em: {proposta.criadaEm ? formatDate(proposta.criadaEm) : 'N/A'}</p>
                 </div>
               </div>
 
               {typeof proposta.vendedor === 'object' && (
                 <div className="flex items-center">
-                  <Building className="mr-3 h-4 w-4 text-gray-400" />
+                  <Building className="mr-3 h-4 w-4 text-[#8BA0AA]" />
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{proposta.vendedor.nome}</p>
-                    <p className="text-xs text-gray-600">Vendedor responsavel</p>
+                    <p className="text-sm font-medium text-[#19384C]">{proposta.vendedor.nome}</p>
+                    <p className="text-xs text-[#607B89]">Vendedor responsavel</p>
                   </div>
                 </div>
               )}
@@ -1208,30 +1430,30 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
         </div>
 
         <div className="mt-6">
-          <h4 className="mb-3 border-b pb-2 text-lg font-semibold text-gray-900">Produtos / Servicos</h4>
+          <h4 className="mb-3 border-b border-[#E2ECF0] pb-2 text-lg font-semibold text-[#19384C]">Produtos / Servicos</h4>
 
           {itensNegociados.length === 0 ? (
             loadingCiclo ? (
-              <div className="flex items-center gap-2 text-sm text-gray-600">
+              <div className="flex items-center gap-2 text-sm text-[#607B89]">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Carregando itens negociados...
               </div>
             ) : (
-            <p className="text-sm text-gray-600">Nenhum item informado nesta proposta.</p>
+            <p className="text-sm text-[#607B89]">Nenhum item informado nesta proposta.</p>
             )
           ) : (
-            <div className="overflow-x-auto rounded-md border border-gray-200 bg-white">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+            <div className="overflow-x-auto rounded-md border border-[#E2ECF0] bg-white">
+              <table className="min-w-full divide-y divide-[#E4EDF0]">
+                <thead className="bg-[#F7FBFC]">
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Produto</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Qtd</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Preco Unit.</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Desconto</th>
-                    <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Subtotal</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[#607B89]">Produto</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[#607B89]">Qtd</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[#607B89]">Preco Unit.</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[#607B89]">Desconto</th>
+                    <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-[#607B89]">Subtotal</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
+                <tbody className="divide-y divide-[#E4EDF0] bg-white">
                   {itensNegociados.map((item, index) => {
                     const nomeProdutoRaw = item?.nome || 'Produto/Servico';
                     const nomeProduto =
@@ -1250,18 +1472,35 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
                       <tr key={`${item.produtoId || nomeProduto}-${index}`}>
                         <td className="px-4 py-2 align-top">
                           <div>
-                            <div className="text-sm font-medium text-gray-900">{nomeProduto}</div>
+                            <div className="text-sm font-medium text-[#19384C]">{nomeProduto}</div>
                             {descricaoProduto ? (
-                              <div className="text-xs text-gray-500">{descricaoProduto}</div>
+                              <div className="text-xs text-[#607B89]">{descricaoProduto}</div>
                             ) : null}
+                            {getComposicaoDetalhes(item).length > 0 && (
+                              <div className="mt-1 space-y-1 rounded-md border border-[#D4E2E7] bg-[#F8FBFC] px-2 py-1.5">
+                                {getComposicaoDetalhes(item).map((detalhe, detalheIndex) => (
+                                  <p
+                                    key={`${item.produtoId || nomeProduto}-comp-${detalheIndex}`}
+                                    className="text-xs text-[#35538A]"
+                                  >
+                                    {detalhe}
+                                  </p>
+                                ))}
+                                {(item.componentesPlano?.length || 0) > 3 && (
+                                  <p className="text-xs font-medium text-[#607B89]">
+                                    +{(item.componentesPlano?.length || 0) - 3} componente(s)
+                                  </p>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </td>
-                        <td className="whitespace-nowrap px-4 py-2 text-sm text-gray-900">{quantidade}</td>
-                        <td className="whitespace-nowrap px-4 py-2 text-sm text-gray-900">
+                        <td className="whitespace-nowrap px-4 py-2 text-sm text-[#19384C]">{quantidade}</td>
+                        <td className="whitespace-nowrap px-4 py-2 text-sm text-[#19384C]">
                           {formatCurrency(precoUnit)}
                         </td>
-                        <td className="whitespace-nowrap px-4 py-2 text-sm text-gray-900">{desconto}%</td>
-                        <td className="whitespace-nowrap px-4 py-2 text-right text-sm text-gray-900">
+                        <td className="whitespace-nowrap px-4 py-2 text-sm text-[#19384C]">{desconto}%</td>
+                        <td className="whitespace-nowrap px-4 py-2 text-right text-sm text-[#19384C]">
                           {formatCurrency(subtotal)}
                         </td>
                       </tr>
@@ -1275,8 +1514,8 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
 
         {proposta.observacoes && (
           <div className="mt-6">
-            <h4 className="mb-4 border-b pb-2 text-lg font-semibold text-gray-900">Observacoes</h4>
-            <p className="whitespace-pre-wrap text-sm text-gray-700">{proposta.observacoes}</p>
+            <h4 className="mb-4 border-b border-[#E2ECF0] pb-2 text-lg font-semibold text-[#19384C]">Observacoes</h4>
+            <p className="whitespace-pre-wrap text-sm text-[#355166]">{proposta.observacoes}</p>
           </div>
         )}
 

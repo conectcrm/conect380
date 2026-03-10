@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { BaseModal, ModalButton } from '../../../components/modals/BaseModal';
 import { propostasService } from '../services/propostasService';
 import { Check, X, Trash2, Mail, CheckCircle, AlertTriangle, Loader } from 'lucide-react';
 
@@ -112,22 +113,22 @@ export const BulkActions: React.FC<BulkActionsProps> = ({
   return (
     <>
       <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 transform">
-        <div className="flex items-center space-x-3 rounded-lg border bg-white p-4 shadow-lg">
+        <div className="flex items-center space-x-3 rounded-2xl border border-[#D4E2E7] bg-white p-4 shadow-[0_20px_50px_-24px_rgba(15,57,74,0.45)]">
           <div className="flex items-center space-x-2">
-            <CheckCircle className="h-5 w-5 text-blue-600" />
-            <span className="font-medium text-gray-900">
+            <CheckCircle className="h-5 w-5 text-[#159A9C]" />
+            <span className="font-medium text-[#19384C]">
               {selectedIds.length} proposta(s) selecionada(s)
             </span>
           </div>
 
-          <div className="h-6 w-px bg-gray-300" />
+          <div className="h-6 w-px bg-[#D4E2E7]" />
 
           <div className="flex items-center space-x-2">
             <select
               value={bulkStatus}
               onChange={(e) => setBulkStatus(e.target.value)}
               disabled={isLoading}
-              className="h-9 rounded-md border border-gray-300 px-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+              className="h-9 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm text-[#355166] focus:border-[#159A9C] focus:outline-none focus:ring-2 focus:ring-[#159A9C]/20 disabled:bg-[#EEF3F5]"
               title="Selecionar novo status"
             >
               {STATUS_OPTIONS.map((option) => (
@@ -137,39 +138,43 @@ export const BulkActions: React.FC<BulkActionsProps> = ({
               ))}
             </select>
             <button
+              type="button"
               onClick={() => handleStatusUpdate(bulkStatus)}
               disabled={isLoading}
-              className="inline-flex items-center rounded-md border border-transparent bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors duration-200 hover:bg-blue-700 disabled:bg-gray-400"
+              className="inline-flex items-center rounded-lg border border-transparent bg-[#159A9C] px-3 py-1.5 text-sm font-medium text-white transition-colors duration-200 hover:bg-[#0F7B7D] disabled:bg-[#9FCFD0]"
               title="Aplicar status em lote"
             >
               {isLoading ? <Loader className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
             </button>
 
             <button
+              type="button"
               onClick={confirmSendEmail}
               disabled={isLoading}
-              className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors duration-200 hover:bg-gray-50 disabled:bg-gray-100"
+              className="inline-flex items-center rounded-lg border border-[#D4E2E7] bg-white px-3 py-1.5 text-sm font-medium text-[#355166] transition-colors duration-200 hover:bg-[#F6FAFB] disabled:bg-[#EEF3F5]"
               title="Enviar por email"
             >
               {isLoading ? <Loader className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
             </button>
 
             <button
+              type="button"
               onClick={confirmDelete}
               disabled={isLoading}
-              className="inline-flex items-center rounded-md border border-transparent bg-red-600 px-3 py-1.5 text-sm font-medium text-white transition-colors duration-200 hover:bg-red-700 disabled:bg-gray-400"
+              className="inline-flex items-center rounded-lg border border-transparent bg-red-600 px-3 py-1.5 text-sm font-medium text-white transition-colors duration-200 hover:bg-red-700 disabled:bg-red-300"
               title="Excluir selecionadas"
             >
               {isLoading ? <Loader className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
             </button>
           </div>
 
-          <div className="h-6 w-px bg-gray-300" />
+          <div className="h-6 w-px bg-[#D4E2E7]" />
 
           <button
+            type="button"
             onClick={onClearSelection}
             disabled={isLoading}
-            className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors duration-200 hover:bg-gray-50 disabled:bg-gray-100"
+            className="inline-flex items-center rounded-lg border border-[#D4E2E7] bg-white px-3 py-1.5 text-sm font-medium text-[#355166] transition-colors duration-200 hover:bg-[#F6FAFB] disabled:bg-[#EEF3F5]"
             title="Limpar selecao"
           >
             <X className="h-4 w-4" />
@@ -178,48 +183,45 @@ export const BulkActions: React.FC<BulkActionsProps> = ({
       </div>
 
       {showConfirmDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="mx-4 w-full max-w-md rounded-lg bg-white p-6">
-            <div className="mb-4 flex items-center">
-              {showConfirmDialog.action === 'delete' ? (
-                <AlertTriangle className="mr-3 h-6 w-6 text-red-500" />
-              ) : (
-                <Mail className="mr-3 h-6 w-6 text-blue-500" />
-              )}
-              <h3 className="text-lg font-medium text-gray-900">{showConfirmDialog.title}</h3>
-            </div>
-
-            <p className="mb-6 text-gray-600">{showConfirmDialog.message}</p>
-
-            <div className="flex justify-end space-x-3">
-              <button
+        <BaseModal
+          isOpen={Boolean(showConfirmDialog)}
+          onClose={() => setShowConfirmDialog(null)}
+          title={showConfirmDialog.title}
+          subtitle={showConfirmDialog.message}
+          size="medium"
+          footer={
+            <div className="flex items-center justify-end gap-3">
+              <ModalButton
+                type="button"
+                variant="secondary"
                 onClick={() => setShowConfirmDialog(null)}
                 disabled={isLoading}
-                className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 transition-colors duration-200 hover:bg-gray-50 disabled:bg-gray-100"
               >
                 Cancelar
-              </button>
-              <button
+              </ModalButton>
+              <ModalButton
+                type="button"
+                variant={showConfirmDialog.action === 'delete' ? 'danger' : 'primary'}
                 onClick={showConfirmDialog.onConfirm}
-                disabled={isLoading}
-                className={`rounded-md px-4 py-2 text-white transition-colors duration-200 ${
-                  showConfirmDialog.action === 'delete'
-                    ? 'bg-red-600 hover:bg-red-700 disabled:bg-red-400'
-                    : 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400'
-                }`}
+                loading={isLoading}
               >
-                {isLoading ? (
-                  <div className="flex items-center">
-                    <Loader className="mr-2 h-4 w-4 animate-spin" />
-                    Processando...
-                  </div>
-                ) : (
-                  'Confirmar'
-                )}
-              </button>
+                Confirmar
+              </ModalButton>
+            </div>
+          }
+        >
+          <div className="flex items-start gap-3 rounded-xl border border-[#E2ECF0] bg-[#F7FBFC] p-4">
+            {showConfirmDialog.action === 'delete' ? (
+              <AlertTriangle className="mt-0.5 h-5 w-5 text-[#DC2626]" />
+            ) : (
+              <Mail className="mt-0.5 h-5 w-5 text-[#159A9C]" />
+            )}
+            <div>
+              <p className="text-sm font-medium text-[#19384C]">Revise a ação antes de prosseguir.</p>
+              <p className="mt-1 text-sm text-[#607B89]">Essa operação será aplicada a todas as propostas selecionadas.</p>
             </div>
           </div>
-        </div>
+        </BaseModal>
       )}
     </>
   );

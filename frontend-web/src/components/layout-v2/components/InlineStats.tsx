@@ -9,6 +9,7 @@ type InlineStat = {
 type InlineStatsProps = {
   stats: InlineStat[];
   className?: string;
+  compact?: boolean;
 };
 
 const toneClassMap: Record<NonNullable<InlineStat['tone']>, string> = {
@@ -17,7 +18,7 @@ const toneClassMap: Record<NonNullable<InlineStat['tone']>, string> = {
   warning: 'text-[#C98A19]',
 };
 
-const InlineStats: React.FC<InlineStatsProps> = ({ stats, className }) => {
+const InlineStats: React.FC<InlineStatsProps> = ({ stats, className, compact = false }) => {
   if (!stats.length) return null;
 
   return (
@@ -25,7 +26,7 @@ const InlineStats: React.FC<InlineStatsProps> = ({ stats, className }) => {
       {stats.map((stat) => (
         <div
           key={`${stat.label}-${stat.value}`}
-          className="inline-flex items-center gap-2 rounded-[999px] border border-[#DCE8EC] bg-white px-3 py-1.5 text-[13px]"
+          className={`inline-flex items-center rounded-[999px] border border-[#DCE8EC] bg-white ${compact ? 'gap-1.5 px-2.5 py-1 text-[12px]' : 'gap-2 px-3 py-1.5 text-[13px]'}`}
         >
           <span className="text-[#6E8997]">{stat.label}</span>
           <strong className={toneClassMap[stat.tone || 'neutral']}>{stat.value}</strong>

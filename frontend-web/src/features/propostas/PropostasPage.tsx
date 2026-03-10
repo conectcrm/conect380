@@ -1,19 +1,20 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useI18n } from '../../contexts/I18nContext';
-import { ModalProposta } from '../../components/modals/ModalProposta';
 import { ModalNovaProposta } from '../../components/modals/ModalNovaProposta';
 import {
   DataTableCard,
-  PageHeader,
+  EmptyState,
+  InlineStats,
+  LoadingSkeleton,
   SectionCard,
   shellFieldTokens,
   shellTokens,
 } from '../../components/layout-v2';
+import { BaseModal, ModalButton } from '../../components/modals/BaseModal';
 import { propostasService, Proposta as PropostaCompleta } from '../../services/propostasService';
 import { pdfPropostasService, DadosProposta } from '../../services/pdfPropostasService';
-import { emailServiceReal } from '../../services/emailServiceReal';
-import { portalClienteService } from '../../services/portalClienteService';
+import { toastService } from '../../services/toastService';
 import { useGlobalConfirmation } from '../../contexts/GlobalConfirmationContext';
 import DashboardPropostas from './components/DashboardPropostas';
 import FiltrosAvancados from './components/FiltrosAvancados';
@@ -25,8 +26,6 @@ import {
   type PropostaCompleta as PropostaCompletaFeature,
 } from './services/propostasService';
 import SelecaoMultipla from './components/SelecaoMultipla';
-import PreviewProposta from './components/PreviewProposta';
-import { createSafeMouseHandler } from '../../utils/dom-helper';
 import { safeRender } from '../../utils/safeRender';
 import {
   Plus,
@@ -46,7 +45,6 @@ import {
   List,
   ArrowUp,
   ArrowDown,
-  X,
   BarChart3,
   RefreshCw,
   Target,
@@ -296,16 +294,6 @@ const actionSecondaryButtonClass =
 const viewToggleBaseClass =
   'inline-flex h-8 items-center justify-center rounded-md px-3 text-sm font-medium transition-colors';
 const MOTIVOS_PERDA_STORAGE_KEY = 'conect360:propostas:motivos-perda';
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const DOMINIOS_EMAIL_FICTICIO = [
-  '@cliente.com',
-  '@cliente.temp',
-  '@email.com',
-  '@exemplo.com',
-  '@cliente.',
-  '@temp.',
-  '@ficticio.',
-];
 
 type MotivoPerdaMap = Record<
   string,
@@ -328,12 +316,11 @@ const PropostasPage: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState('todos');
   const [selectedVendedor, setSelectedVendedor] = useState('todos');
   const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingCreate, setIsLoadingCreate] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [showWizardModal, setShowWizardModal] = useState(false);
 
   // Sistema de Controle de Atualizações v2
   const [isLoadingPropostas, setIsLoadingPropostas] = useState(false);
+  const isLoadingPropostasRef = React.useRef(false);
   const updateControl = React.useRef({
     lastUpdate: 0,
     pendingUpdate: false,
@@ -357,14 +344,9 @@ const PropostasPage: React.FC = () => {
     'data_criacao',
   );
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [dateRange, setDateRange] = useState({ start: '', end: '' });
-  const [valueRange, setValueRange] = useState({ min: '', max: '' });
   const [viewMode, setViewMode] = useState<'table' | 'cards' | 'dashboard'>('dashboard'); // Novo modo dashboard
   const [filtrosAvancados, setFiltrosAvancados] = useState<any>({});
-  const [notification, setNotification] = useState<{
-    message: string;
-    type: 'success' | 'error';
-  } | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [motivosPerda, setMotivosPerda] = useState<MotivoPerdaMap>(() => {
     try {
       const raw = localStorage.getItem(MOTIVOS_PERDA_STORAGE_KEY);
@@ -390,10 +372,6 @@ const PropostasPage: React.FC = () => {
 
   // 🆕 Estados para UX Melhorada - Fase 2
   const [propostasSelecionadas, setPropostasSelecionadas] = useState<string[]>([]);
-  const [showPreview, setShowPreview] = useState(false);
-  const [previewProposta, setPreviewProposta] = useState<any>(null);
-  const [previewPosition, setPreviewPosition] = useState({ x: 0, y: 0 });
-  const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (viewMode === 'dashboard' && propostasSelecionadas.length > 0) {
@@ -403,8 +381,12 @@ const PropostasPage: React.FC = () => {
 
   // Função para mostrar notificações
   const showNotification = useCallback((message: string, type: 'success' | 'error') => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 5000);
+    if (type === 'success') {
+      toastService.success(message);
+      return;
+    }
+
+    toastService.error(message);
   }, []);
 
   useEffect(() => {
@@ -575,11 +557,12 @@ const PropostasPage: React.FC = () => {
       const { force = false, source = 'manual', immediate = false } = options;
       const now = Date.now();
       const requestId = `req_${now}_${Math.random().toString(36).substr(2, 9)}`;
+      const shouldShowBlockingLoader = force || propostas.length === 0;
 
       // Função para verificar se devemos prosseguir com a atualização
       const shouldUpdate = () => {
         if (force) return true;
-        if (isLoadingPropostas) return false;
+        if (isLoadingPropostasRef.current) return false;
 
         const timeSinceLastUpdate = now - updateControl.current.lastUpdate;
         if (timeSinceLastUpdate < REFRESH_CONFIG.minInterval) {
@@ -594,17 +577,21 @@ const PropostasPage: React.FC = () => {
         return true;
       };
 
-      // Se já houver uma atualização pendente e não for forçada, apenas registre
-      if (!force && updateControl.current.pendingUpdate) {
-        logUpdate('UPDATE_QUEUED', { source, requestId });
+      if (!shouldUpdate()) {
         return;
       }
 
       try {
+        isLoadingPropostasRef.current = true;
         setIsLoadingPropostas(true);
-        setIsLoading(true);
+        if (shouldShowBlockingLoader) {
+          setIsLoading(true);
+        }
+        setLoadError(null);
         updateControl.current.lastUpdate = now;
         updateControl.current.requestId = requestId;
+        updateControl.current.pendingUpdate = false;
+        updateControl.current.updateSource = source;
 
         const propostasReais = await propostasService.findAll();
 
@@ -663,31 +650,54 @@ const PropostasPage: React.FC = () => {
 
           setPropostas(propostasValidadas);
           setFilteredPropostas(propostasValidadas);
+          setLoadError(null);
         } else {
           setPropostas([]);
           setFilteredPropostas([]);
+          setLoadError(null);
         }
       } catch (error) {
         console.error(`❌ [OTIMIZADO] Erro ao carregar propostas (${requestId}):`, error);
-        setPropostas([]);
-        setFilteredPropostas([]);
         const friendlyMessage =
           error instanceof Error ? error.message : 'Erro ao carregar propostas do banco de dados';
+        setLoadError(friendlyMessage);
         showNotification(friendlyMessage, 'error');
       } finally {
+        isLoadingPropostasRef.current = false;
         // Só resetar se ainda é a requisição atual
         if (updateControl.current.requestId === requestId) {
-          setIsLoading(false);
+          if (shouldShowBlockingLoader) {
+            setIsLoading(false);
+          }
           setIsLoadingPropostas(false);
           updateControl.current.requestId = null;
         } else {
-          setIsLoading(false);
+          if (shouldShowBlockingLoader) {
+            setIsLoading(false);
+          }
           setIsLoadingPropostas(false);
         }
       }
     },
-    [isLoadingPropostas],
+    [propostas.length],
   ); // ✅ Dependências limpas
+
+  const scheduleBackgroundRefresh = useCallback(
+    ({ source = 'manual', delay = REFRESH_CONFIG.batchWindow }: { source?: string; delay?: number }) => {
+      if (updateControl.current.batchTimeout) {
+        clearTimeout(updateControl.current.batchTimeout);
+      }
+
+      updateControl.current.pendingUpdate = true;
+      updateControl.current.updateSource = source;
+      updateControl.current.batchTimeout = setTimeout(() => {
+        updateControl.current.pendingUpdate = false;
+        updateControl.current.batchTimeout = null;
+        void carregarPropostas({ force: false, source });
+      }, delay);
+    },
+    [carregarPropostas],
+  );
 
   // ✅ CARREGAMENTO INICIAL SIMPLIFICADO - Sem dependência circular
   useEffect(() => {
@@ -747,11 +757,20 @@ const PropostasPage: React.FC = () => {
     let focusTimeout: NodeJS.Timeout;
 
     const handleFocus = () => {
-      // Usar debounce de 3 segundos para focus
+      const timeSinceLastUpdate = Date.now() - updateControl.current.lastUpdate;
+
+      if (document.visibilityState !== 'visible') {
+        return;
+      }
+
+      if (timeSinceLastUpdate < REFRESH_CONFIG.forceInterval) {
+        return;
+      }
+
       if (focusTimeout) clearTimeout(focusTimeout);
       focusTimeout = setTimeout(() => {
-        carregarPropostas({ force: false }); // Não forçar reload
-      }, 3000);
+        scheduleBackgroundRefresh({ source: 'focus', delay: 600 });
+      }, 800);
     };
 
     window.addEventListener('focus', handleFocus);
@@ -759,13 +778,10 @@ const PropostasPage: React.FC = () => {
       window.removeEventListener('focus', handleFocus);
       if (focusTimeout) clearTimeout(focusTimeout);
     };
-  }, [carregarPropostas]);
+  }, [scheduleBackgroundRefresh]);
 
   // Sistema de Eventos Simplificado
   useEffect(() => {
-    let refreshTimeout: NodeJS.Timeout | null = null;
-    const refreshDelay = 5000; // 5 segundos de espera
-
     const handlePropostaAtualizada = (e: Event) => {
       const event = e as CustomEvent;
       const detail = event.detail || {};
@@ -807,11 +823,7 @@ const PropostasPage: React.FC = () => {
         }
       }
 
-      // Agendar atualização do servidor
-      if (refreshTimeout) clearTimeout(refreshTimeout);
-      refreshTimeout = setTimeout(() => {
-        carregarPropostas({ force: false, source: 'event' });
-      }, refreshDelay);
+      scheduleBackgroundRefresh({ source: 'event' });
     };
 
     const handleRefreshRequest = (e: Event) => {
@@ -823,11 +835,7 @@ const PropostasPage: React.FC = () => {
         return;
       }
 
-      // Agendar atualização
-      if (refreshTimeout) clearTimeout(refreshTimeout);
-      refreshTimeout = setTimeout(() => {
-        carregarPropostas({ force: false, source: fonte || 'manual' });
-      }, refreshDelay);
+      scheduleBackgroundRefresh({ source: fonte || 'manual' });
     };
 
     window.addEventListener('propostaAtualizada', handlePropostaAtualizada);
@@ -836,31 +844,8 @@ const PropostasPage: React.FC = () => {
     return () => {
       window.removeEventListener('propostaAtualizada', handlePropostaAtualizada);
       window.removeEventListener('atualizarPropostas', handleRefreshRequest);
-      if (refreshTimeout) clearTimeout(refreshTimeout);
     };
-  }, [carregarPropostas]);
-
-  // Função para salvar proposta usando serviço real
-  const handleSaveProposta = async (data: any) => {
-    try {
-      setIsLoadingCreate(true);
-
-      // Usar o serviço real para criar a proposta
-      // const novaProposta = await propostasService.criarProposta(data);
-
-      // Recarregar a lista de propostas para incluir a nova
-      await carregarPropostas({ force: true }); // Forçar reload após criar nova proposta
-
-      showNotification('Proposta criada com sucesso!', 'success');
-    } catch (error) {
-      console.error('❌ Erro ao criar proposta:', error);
-      const friendlyMessage =
-        error instanceof Error ? error.message : 'Erro ao criar proposta. Tente novamente.';
-      showNotification(friendlyMessage, 'error');
-    } finally {
-      setIsLoadingCreate(false);
-    }
-  };
+  }, [scheduleBackgroundRefresh]);
 
   const vendedoresDisponiveis = useMemo(() => {
     const nomes = propostas
@@ -893,26 +878,6 @@ const PropostasPage: React.FC = () => {
     // Filtro por vendedor
     if (selectedVendedor !== 'todos') {
       filtered = filtered.filter((proposta) => proposta.vendedor === selectedVendedor);
-    }
-
-    // Filtros avançados - range de datas
-    if (dateRange.start && dateRange.end) {
-      filtered = filtered.filter((proposta) => {
-        const dataCreated = new Date(proposta.data_criacao);
-        const startDate = new Date(dateRange.start);
-        const endDate = new Date(dateRange.end);
-        return dataCreated >= startDate && dataCreated <= endDate;
-      });
-    }
-
-    // Filtros avançados - range de valores
-    if (valueRange.min || valueRange.max) {
-      filtered = filtered.filter((proposta) => {
-        const valor = (proposta as any).valor;
-        const min = valueRange.min ? parseFloat(valueRange.min) : 0;
-        const max = valueRange.max ? parseFloat(valueRange.max) : Infinity;
-        return valor >= min && valor <= max;
-      });
     }
 
     // Filtros avançados do componente FiltrosAvancados
@@ -991,8 +956,6 @@ const PropostasPage: React.FC = () => {
     searchTerm,
     selectedStatus,
     selectedVendedor,
-    dateRange,
-    valueRange,
     sortBy,
     sortOrder,
     filtrosAvancados,
@@ -1002,6 +965,14 @@ const PropostasPage: React.FC = () => {
   const handleAdvancedFilters = (filtros: any) => {
     setFiltrosAvancados(filtros);
   };
+
+  const limparTodosOsFiltros = useCallback(() => {
+    setSearchTerm('');
+    setSelectedStatus('todos');
+    setSelectedVendedor('todos');
+    setFiltrosAvancados({});
+    setShowAdvancedFilters(false);
+  }, []);
 
   // 🆕 FASE 2: Funções para Seleção Múltipla e UX Melhorada
 
@@ -1025,48 +996,6 @@ const PropostasPage: React.FC = () => {
   // Deselecionar todas
   const handleDeselectAll = () => {
     setPropostasSelecionadas([]);
-  };
-
-  // Preview de proposta no hover
-  const handleMouseEnterProposta = (proposta: any, event: React.MouseEvent) => {
-    if (hoverTimeout) {
-      clearTimeout(hoverTimeout);
-    }
-
-    const safeHandler = createSafeMouseHandler((rect) => {
-      setPreviewPosition({
-        x: rect.right + 10,
-        y: rect.top + rect.height / 2,
-      });
-      setPreviewProposta(proposta);
-      setShowPreview(true);
-    }, 800);
-
-    const timeout = setTimeout(() => {
-      safeHandler(event);
-    }, 0);
-
-    setHoverTimeout(timeout);
-  };
-
-  const handleMouseLeaveProposta = () => {
-    if (hoverTimeout) {
-      clearTimeout(hoverTimeout);
-      setHoverTimeout(null);
-    }
-
-    // Dar um pequeno delay para permitir hover no preview
-    const leaveTimeout = setTimeout(() => {
-      setShowPreview(false);
-      setPreviewProposta(null);
-    }, 200);
-
-    // Cleanup do timeout se necessário
-    return () => {
-      if (leaveTimeout) {
-        clearTimeout(leaveTimeout);
-      }
-    };
   };
 
   // Exportar propostas selecionadas
@@ -1110,111 +1039,6 @@ const PropostasPage: React.FC = () => {
     [propostas, propostasSelecionadas],
   );
 
-  const isEmailFicticio = useCallback((email: string) => {
-    const normalized = String(email || '').toLowerCase();
-    return DOMINIOS_EMAIL_FICTICIO.some((dominio) => normalized.includes(dominio));
-  }, []);
-
-  const enviarPropostaPorEmail = useCallback(
-    async (proposta: any) => {
-      const propostaId = safeRender(proposta?.id) || safeRender(proposta?.numero);
-      if (!propostaId) {
-        throw new Error('Proposta sem identificador para envio de email.');
-      }
-
-      const emailCliente = String(safeRender(proposta?.cliente_contato) || '').trim();
-      if (!emailCliente || !EMAIL_REGEX.test(emailCliente)) {
-        throw new Error(
-          `Cliente da proposta ${safeRender(proposta?.numero) || propostaId} sem email valido.`,
-        );
-      }
-
-      if (isEmailFicticio(emailCliente)) {
-        throw new Error(
-          `Email ficticio detectado em ${safeRender(proposta?.numero) || propostaId}. Atualize o cadastro do cliente.`,
-        );
-      }
-
-      const token = await portalClienteService.gerarTokenPublico(String(propostaId));
-      const numeroProposta = safeRender(proposta?.numero) || String(propostaId);
-      const valorTotal = Number((proposta as any)?.valor || 0);
-
-      const resultado = await emailServiceReal.enviarPropostaParaCliente({
-        cliente: {
-          nome: safeRender(proposta?.cliente) || 'Cliente',
-          email: emailCliente,
-        },
-        proposta: {
-          id: String(propostaId),
-          numero: numeroProposta,
-          valorTotal,
-          dataValidade:
-            safeRender(proposta?.data_vencimento) || new Date().toISOString().split('T')[0],
-          token,
-        },
-        vendedor: {
-          nome: safeRender(proposta?.vendedor) || 'Vendedor',
-          email: 'vendedor@conectcrm.com',
-          telefone: '',
-        },
-        empresa: {
-          nome: 'ConectCRM',
-          email: 'conectcrm@gmail.com',
-          telefone: '',
-          endereco: '',
-        },
-        portalUrl: `${window.location.origin}/portal`,
-      });
-
-      if (!resultado.success) {
-        throw new Error(resultado.error || 'Falha ao enviar email.');
-      }
-
-      await propostasService.updateStatus(String(propostaId), 'enviada' as any, {
-        source: 'bulk-email',
-        observacoes: `Proposta enviada por email em lote para ${emailCliente}.`,
-      });
-    },
-    [isEmailFicticio],
-  );
-
-  const atualizarStatusEmLote = useCallback(
-    async (propostasAlvo: any[], novoStatus: string, source: string, observacoes: string) => {
-      let atualizadas = 0;
-      for (const proposta of propostasAlvo) {
-        const propostaId = safeRender(proposta?.id) || safeRender(proposta?.numero);
-        if (!propostaId) continue;
-
-        const updated = await propostasService.updateStatus(String(propostaId), novoStatus as any, {
-          source,
-          observacoes,
-        });
-        if (updated) {
-          atualizadas += 1;
-        }
-      }
-
-      return atualizadas;
-    },
-    [],
-  );
-
-  const proximoStatusFluxo = useCallback((statusAtual: string) => {
-    const status = String(statusAtual || '').toLowerCase();
-    const mapa: Record<string, string> = {
-      rascunho: 'enviada',
-      enviada: 'negociacao',
-      visualizada: 'negociacao',
-      negociacao: 'aprovada',
-      aprovada: 'contrato_gerado',
-      contrato_gerado: 'contrato_assinado',
-      contrato_assinado: 'fatura_criada',
-      fatura_criada: 'aguardando_pagamento',
-    };
-
-    return mapa[status] || '';
-  }, []);
-
   // Executar acoes em massa
   const handleAcoesMassa = async (acao: string) => {
     if (propostasSelecionadas.length === 0) {
@@ -1230,113 +1054,6 @@ const PropostasPage: React.FC = () => {
 
     try {
       switch (acao) {
-        case 'enviar-email': {
-          let sucesso = 0;
-          let falhas = 0;
-
-          for (const proposta of propostasAlvo) {
-            try {
-              await enviarPropostaPorEmail(proposta);
-              sucesso += 1;
-            } catch (error) {
-              falhas += 1;
-              console.error('Falha ao enviar proposta por email:', error);
-            }
-          }
-
-          if (sucesso === 0) {
-            showNotification('Nenhuma proposta foi enviada por email.', 'error');
-            break;
-          }
-
-          showNotification(
-            falhas > 0
-              ? `${sucesso} proposta(s) enviada(s); ${falhas} falharam.`
-              : `${sucesso} proposta(s) enviada(s) por email.`,
-            falhas > 0 ? 'error' : 'success',
-          );
-          break;
-        }
-
-        case 'gerar-contratos': {
-          const elegiveis = propostasAlvo.filter(
-            (proposta) => String(safeRender(proposta?.status)) === 'aprovada',
-          );
-          const atualizadas = await atualizarStatusEmLote(
-            elegiveis,
-            'contrato_gerado',
-            'bulk-gerar-contratos',
-            'Status atualizado em lote para contrato gerado.',
-          );
-          showNotification(
-            atualizadas > 0
-              ? `${atualizadas} proposta(s) avancada(s) para contrato gerado.`
-              : 'Nenhuma proposta elegivel para gerar contrato.',
-            atualizadas > 0 ? 'success' : 'error',
-          );
-          break;
-        }
-
-        case 'criar-faturas': {
-          const elegiveis = propostasAlvo.filter((proposta) =>
-            ['contrato_assinado', 'fatura_criada'].includes(String(safeRender(proposta?.status))),
-          );
-          const atualizadas = await atualizarStatusEmLote(
-            elegiveis,
-            'fatura_criada',
-            'bulk-criar-faturas',
-            'Status atualizado em lote para fatura criada.',
-          );
-          showNotification(
-            atualizadas > 0
-              ? `${atualizadas} proposta(s) marcada(s) com fatura criada.`
-              : 'Nenhuma proposta elegivel para criar fatura.',
-            atualizadas > 0 ? 'success' : 'error',
-          );
-          break;
-        }
-
-        case 'avancar-fluxo': {
-          let avancadas = 0;
-          let bloqueadasNoFinanceiro = 0;
-
-          for (const proposta of propostasAlvo) {
-            const propostaId = safeRender(proposta?.id) || safeRender(proposta?.numero);
-            if (!propostaId) continue;
-
-            const statusAtual = String(safeRender(proposta?.status) || '').toLowerCase();
-            if (statusAtual === 'aguardando_pagamento') {
-              bloqueadasNoFinanceiro += 1;
-              continue;
-            }
-
-            const novoStatus = proximoStatusFluxo(statusAtual);
-            if (!novoStatus) continue;
-
-            const updated = await propostasService.updateStatus(String(propostaId), novoStatus as any, {
-              source: 'bulk-avancar-fluxo',
-              observacoes: `Status avancado em lote de ${safeRender(proposta?.status)} para ${novoStatus}.`,
-            });
-
-            if (updated) {
-              avancadas += 1;
-            }
-          }
-
-          const detalheFinanceiro =
-            bloqueadasNoFinanceiro > 0
-              ? ` ${bloqueadasNoFinanceiro} proposta(s) aguardando pagamento dependem da baixa da fatura no financeiro.`
-              : '';
-
-          showNotification(
-            avancadas > 0
-              ? `${avancadas} proposta(s) avancada(s) no fluxo.${detalheFinanceiro}`
-              : `Nenhuma proposta elegivel para avancar no fluxo.${detalheFinanceiro}`,
-            avancadas > 0 ? 'success' : 'error',
-          );
-          break;
-        }
-
         case 'exportar-pdf':
           await handleExportarSelecionadas();
           break;
@@ -1365,7 +1082,7 @@ const PropostasPage: React.FC = () => {
           break;
 
         default:
-          showNotification(`Acao "${acao}" executada.`, 'success');
+          showNotification('Esta acao em massa nao esta disponivel nesta etapa do sistema.', 'error');
       }
 
       setPropostasSelecionadas([]);
@@ -1376,22 +1093,6 @@ const PropostasPage: React.FC = () => {
     }
   };
 
-  // Funcao auxiliar para o preview
-  const handleGeneratePDF = async (proposta: any) => {
-    try {
-      const numero = safeRender(proposta?.numero) || safeRender(proposta?.id) || 'sem-numero';
-      showNotification(`Gerando PDF da proposta ${numero}...`, 'success');
-
-      const dadosPdf = await converterPropostaParaPDF(proposta);
-      await pdfPropostasService.downloadPdf('comercial', dadosPdf);
-
-      showNotification(`PDF da proposta ${numero} gerado com sucesso.`, 'success');
-    } catch (error) {
-      console.error('Erro ao gerar PDF:', error);
-      const message = error instanceof Error ? error.message : 'Erro ao gerar PDF';
-      showNotification(message, 'error');
-    }
-  };
   // Calcular metricas do dashboard
   // 🎯 Função específica para refresh manual do dashboard
   const handleManualRefresh = () => {
@@ -1418,6 +1119,7 @@ const PropostasPage: React.FC = () => {
     const valorAprovado = filteredPropostas
       .filter((p) => statusGanhos.has(String(p.status)))
       .reduce((sum, p) => sum + p.valor, 0);
+    const rejeitadas = filteredPropostas.filter((p) => String(p.status) === 'rejeitada').length;
     const propostasRevisadas = filteredPropostas.filter(
       (p) => Number((p as any).totalVersoes || 0) > 1,
     ).length;
@@ -1430,14 +1132,17 @@ const PropostasPage: React.FC = () => {
         : 0;
 
     const taxaConversao = total > 0 ? (aprovadas / total) * 100 : 0;
+    const taxaPerda = total > 0 ? (rejeitadas / total) * 100 : 0;
 
     return {
       total,
       aprovadas,
       emNegociacao,
+      rejeitadas,
       valorTotal,
       valorAprovado,
       taxaConversao,
+      taxaPerda,
       propostasRevisadas,
       mediaVersoesPorProposta,
     };
@@ -1717,15 +1422,163 @@ const PropostasPage: React.FC = () => {
     return 'Conforme acordo comercial';
   };
 
+  type PlanoComponentePdf = {
+    childItemId: string;
+    componentRole: 'included' | 'required' | 'optional' | 'recommended' | 'addon';
+    quantity?: number;
+    nome?: string;
+  };
+
+  const componentRoleLabelsPdf: Record<PlanoComponentePdf['componentRole'], string> = {
+    included: 'Incluido',
+    required: 'Obrigatorio',
+    optional: 'Opcional',
+    recommended: 'Recomendado',
+    addon: 'Add-on',
+  };
+
+  const normalizarComponentesPlanoPdf = (value: unknown): PlanoComponentePdf[] => {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value
+      .map((raw) => {
+        if (!raw || typeof raw !== 'object') {
+          return null;
+        }
+
+        const record = raw as Record<string, unknown>;
+        const childItemId = safeRender(record.childItemId || record.child_item_id);
+        if (!childItemId) {
+          return null;
+        }
+
+        const componentRoleRaw = String(record.componentRole || record.component_role || 'included');
+        const componentRole = (
+          ['included', 'required', 'optional', 'recommended', 'addon'].includes(componentRoleRaw)
+            ? componentRoleRaw
+            : 'included'
+        ) as PlanoComponentePdf['componentRole'];
+        const quantity = Number(record.quantity);
+
+        return {
+          childItemId,
+          componentRole,
+          quantity: Number.isFinite(quantity) ? quantity : undefined,
+          nome: safeRender(record.nome) || undefined,
+        } as PlanoComponentePdf;
+      })
+      .filter((item): item is PlanoComponentePdf => Boolean(item));
+  };
+
+  const montarDescricaoComposicaoPlanoPdf = (
+    componentesPlano: PlanoComponentePdf[],
+    limit = 6,
+  ): string | undefined => {
+    if (!Array.isArray(componentesPlano) || componentesPlano.length === 0) {
+      return undefined;
+    }
+
+    const linhas = componentesPlano.slice(0, limit).map((componente) => {
+      const nome = (componente.nome || '').trim() || 'Item da composicao';
+      const quantidade =
+        typeof componente.quantity === 'number' && componente.quantity > 1
+          ? ` x${componente.quantity}`
+          : '';
+      const papel = componentRoleLabelsPdf[componente.componentRole || 'included'] || 'Incluido';
+      return `- ${nome}${quantidade} (${papel})`;
+    });
+
+    if (componentesPlano.length > limit) {
+      linhas.push(`- +${componentesPlano.length - limit} componente(s) adicional(is)`);
+    }
+
+    return `Composicao do plano:\n${linhas.join('\n')}`;
+  };
+
+  const montarDescricaoItemPdf = (
+    descricaoBase: string,
+    tipoItem: unknown,
+    componentesPlano: PlanoComponentePdf[],
+  ): string | undefined => {
+    const partes: string[] = [];
+    if (descricaoBase) {
+      partes.push(descricaoBase);
+    }
+
+    const tipoItemNormalizado = String(tipoItem || '')
+      .trim()
+      .toLowerCase();
+    const temComposicao = Array.isArray(componentesPlano) && componentesPlano.length > 0;
+    const descricaoJaTemComposicao = descricaoBase.toLowerCase().includes('composicao do plano');
+    if ((tipoItemNormalizado === 'plano' || temComposicao) && !descricaoJaTemComposicao) {
+      const descricaoComposicao = montarDescricaoComposicaoPlanoPdf(componentesPlano);
+      if (descricaoComposicao) {
+        partes.push(descricaoComposicao);
+      }
+    }
+
+    const descricaoFinal = partes.join('\n\n').trim();
+    return descricaoFinal || undefined;
+  };
+
   const converterPropostaParaPDF = async (proposta: any): Promise<DadosProposta> => {
     if (!proposta || !proposta.id) {
       throw new Error('Proposta nao encontrada ou dados incompletos.');
     }
 
-    const propostaCompleta = proposta;
-    const itensOriginais = Array.isArray(propostaCompleta.produtos)
-      ? propostaCompleta.produtos
-      : [];
+    const extrairItensDaProposta = (fonte: any): any[] => {
+      if (!fonte) {
+        return [];
+      }
+
+      const listasDiretas = [
+        fonte.produtos,
+        fonte.itens,
+        fonte.items,
+        fonte.produtosSelecionados,
+        fonte.snapshot?.produtos,
+      ];
+
+      for (const lista of listasDiretas) {
+        if (Array.isArray(lista) && lista.length > 0) {
+          return lista;
+        }
+      }
+
+      const versoes = Array.isArray(fonte.versoes)
+        ? fonte.versoes
+        : Array.isArray(fonte.emailDetails?.versoes)
+          ? fonte.emailDetails.versoes
+          : [];
+      if (versoes.length > 0) {
+        const versoesOrdenadas = [...versoes].sort(
+          (a: any, b: any) => Number(a?.versao || 0) - Number(b?.versao || 0),
+        );
+        const ultimaVersao = versoesOrdenadas[versoesOrdenadas.length - 1];
+        const itensVersao = ultimaVersao?.snapshot?.produtos;
+        if (Array.isArray(itensVersao) && itensVersao.length > 0) {
+          return itensVersao;
+        }
+      }
+
+      return [];
+    };
+
+    let propostaCompleta = proposta;
+    let itensOriginais = extrairItensDaProposta(propostaCompleta);
+    if (itensOriginais.length === 0 && proposta?.id) {
+      try {
+        const propostaDetalhada = await propostasFeatureService.obterProposta(String(proposta.id));
+        if (propostaDetalhada) {
+          propostaCompleta = propostaDetalhada;
+          itensOriginais = extrairItensDaProposta(propostaDetalhada);
+        }
+      } catch (error) {
+        console.warn('Nao foi possivel carregar itens detalhados para exportacao PDF:', error);
+      }
+    }
 
     const itens = (
       itensOriginais.length > 0
@@ -1743,22 +1596,38 @@ const PropostasPage: React.FC = () => {
 
       const nome =
         safeRender(produto?.nome || produto?.titulo || item?.nome) || `Item ${index + 1}`;
-      const quantidade = Math.max(1, Number(item?.quantidade ?? produto?.quantidade ?? 1));
-      const valorUnitario = Number(
-        item?.precoUnitario ?? item?.valorUnitario ?? produto?.precoUnitario ?? produto?.preco ?? 0,
+      const quantidade = Math.max(0.01, Number(item?.quantidade ?? produto?.quantidade ?? 1));
+      const valorUnitario = Math.max(
+        0,
+        Number(
+          item?.precoUnitario ??
+            item?.valorUnitario ??
+            produto?.precoUnitario ??
+            produto?.valorUnitario ??
+            produto?.preco ??
+            0,
+        ),
       );
-      const desconto = Number(item?.desconto ?? produto?.desconto ?? 0);
+      const desconto = Math.max(0, Number(item?.desconto ?? produto?.desconto ?? 0));
       const valorTotalCalculado = valorUnitario * quantidade * (1 - desconto / 100);
       const valorTotal = Number(item?.subtotal ?? item?.valorTotal ?? valorTotalCalculado);
+      const tipoItem = item?.tipoItem ?? produto?.tipoItem;
+      const componentesPlano = normalizarComponentesPlanoPdf(
+        item?.componentesPlano ??
+          item?.componentes ??
+          produto?.componentesPlano ??
+          produto?.componentes,
+      );
 
       const descricaoPartes = [
-        safeRender(produto?.descricao),
+        safeRender(produto?.descricao || item?.descricao || item?.detalhes || item?.observacoes),
         produto?.categoria ? `Categoria: ${safeRender(produto.categoria)}` : null,
       ].filter(Boolean);
+      const descricaoBase = descricaoPartes.join(' | ');
 
       return {
         nome,
-        descricao: descricaoPartes.join(' | '),
+        descricao: montarDescricaoItemPdf(descricaoBase, tipoItem, componentesPlano),
         quantidade,
         valorUnitario,
         desconto,
@@ -1767,11 +1636,13 @@ const PropostasPage: React.FC = () => {
     });
 
     const subtotalCalculado = itens.reduce((sum, item) => sum + Number(item.valorTotal || 0), 0);
-    const subtotal = Number(propostaCompleta.subtotal ?? subtotalCalculado);
-    const descontoGeral = Number(propostaCompleta.descontoGlobal ?? 0);
-    const impostos = Number(propostaCompleta.impostos ?? 0);
+    const subtotal = Number((propostaCompleta as any).subtotal ?? subtotalCalculado);
+    const descontoGeral = Number((propostaCompleta as any).descontoGlobal ?? 0);
+    const impostos = Number((propostaCompleta as any).impostos ?? 0);
     const valorTotal = Number(
-      propostaCompleta.total ?? propostaCompleta.valor ?? subtotal - descontoGeral + impostos,
+      (propostaCompleta as any).total ??
+        (propostaCompleta as any).valor ??
+        subtotal - descontoGeral + impostos,
     );
     const prazoEntrega =
       safeRender((propostaCompleta as any).prazoEntrega) ||
@@ -1782,31 +1653,31 @@ const PropostasPage: React.FC = () => {
       safeRender((propostaCompleta as any)?.condicoes?.garantia) ||
       undefined;
     const observacoesNormalizadas =
-      safeRender(propostaCompleta.observacoes) ||
+      safeRender((propostaCompleta as any).observacoes) ||
       'Proposta gerada pelo módulo comercial do ConectCRM.';
 
     const clienteObj =
-      propostaCompleta.cliente && typeof propostaCompleta.cliente === 'object'
-        ? propostaCompleta.cliente
+      (propostaCompleta as any).cliente && typeof (propostaCompleta as any).cliente === 'object'
+        ? (propostaCompleta as any).cliente
         : null;
     const vendedorObj =
-      propostaCompleta.vendedor && typeof propostaCompleta.vendedor === 'object'
-        ? propostaCompleta.vendedor
+      (propostaCompleta as any).vendedor && typeof (propostaCompleta as any).vendedor === 'object'
+        ? (propostaCompleta as any).vendedor
         : null;
 
     return {
-      numeroProposta: safeRender(propostaCompleta.numero) || `PROP-${Date.now()}`,
-      titulo: safeRender(propostaCompleta.titulo) || 'Proposta comercial',
+      numeroProposta: safeRender((propostaCompleta as any).numero) || `PROP-${Date.now()}`,
+      titulo: safeRender((propostaCompleta as any).titulo) || 'Proposta comercial',
       descricao:
-        safeRender(propostaCompleta.observacoes) ||
+        safeRender((propostaCompleta as any).observacoes) ||
         'Proposta comercial com produtos/servicos selecionados para o cliente.',
-      status: normalizarStatusParaPdf(propostaCompleta.status),
+      status: normalizarStatusParaPdf((propostaCompleta as any).status),
       dataEmissao: formatarDataPdf(
-        propostaCompleta.criadaEm || propostaCompleta.data_criacao,
+        (propostaCompleta as any).criadaEm || (propostaCompleta as any).data_criacao,
         new Date(),
       ),
       dataValidade: formatarDataPdf(
-        propostaCompleta.dataValidade || propostaCompleta.data_vencimento,
+        (propostaCompleta as any).dataValidade || (propostaCompleta as any).data_vencimento,
         new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       ),
       empresa: {
@@ -1822,7 +1693,7 @@ const PropostasPage: React.FC = () => {
       cliente: {
         nome:
           safeRender(clienteObj?.nome) ||
-          safeRender(propostaCompleta.cliente) ||
+          safeRender((propostaCompleta as any).cliente) ||
           'Cliente nao informado',
         empresa: safeRender(clienteObj?.empresa),
         email: safeRender(clienteObj?.email) || 'nao-informado@cliente.local',
@@ -1833,7 +1704,10 @@ const PropostasPage: React.FC = () => {
         endereco: safeRender(clienteObj?.endereco) || 'Endereco nao informado',
       },
       vendedor: {
-        nome: safeRender(vendedorObj?.nome) || safeRender(propostaCompleta.vendedor) || 'Vendedor',
+        nome:
+          safeRender(vendedorObj?.nome) ||
+          safeRender((propostaCompleta as any).vendedor) ||
+          'Vendedor',
         email: safeRender(vendedorObj?.email) || 'vendedor@conectcrm.com',
         telefone: safeRender(vendedorObj?.telefone) || '(11) 99999-9999',
         cargo: safeRender(vendedorObj?.cargo) || 'Consultor de vendas',
@@ -1845,12 +1719,12 @@ const PropostasPage: React.FC = () => {
       impostos,
       valorTotal,
       formaPagamento: descreverFormaPagamento(
-        propostaCompleta.formaPagamento,
-        propostaCompleta.parcelas,
+        (propostaCompleta as any).formaPagamento,
+        (propostaCompleta as any).parcelas,
       ),
       prazoEntrega,
       garantia,
-      validadeProposta: `${Number(propostaCompleta.validadeDias || 30)} dias corridos`,
+      validadeProposta: `${Number((propostaCompleta as any).validadeDias || 30)} dias corridos`,
       condicoesGerais: observacoesNormalizadas ? [observacoesNormalizadas] : [],
       observacoes: observacoesNormalizadas,
     };
@@ -2054,18 +1928,28 @@ const PropostasPage: React.FC = () => {
                     ${dados.itens
                       .map((item, index) => {
                         // Separar descrição dos detalhes técnicos
-                        const descricaoLinhas = (item.descricao || '').split('\n');
+                        const descricaoCompleta = String(item.descricao || '').trim();
+                        const descricaoLinhas = descricaoCompleta.split('\n');
                         const descricaoPrincipal =
                           descricaoLinhas.find((linha) => !linha.startsWith('•')) || '';
                         const detalhes = descricaoLinhas.filter((linha) => linha.startsWith('•'));
+
+                        const detalhesComposicao =
+                          detalhes.length > 0
+                            ? detalhes
+                            : descricaoLinhas.filter((linha) => linha.trim().startsWith('-'));
+                        const descricaoPrincipalComposicao =
+                          descricaoPrincipal ||
+                          descricaoLinhas.find((linha) => !linha.trim().startsWith('-')) ||
+                          '';
 
                         return `
                     <tr>
                         <td class="text-center">${index + 1}</td>
                         <td>
                             <div class="product-name">${item.nome}</div>
-                            ${descricaoPrincipal ? `<div class="product-desc">${descricaoPrincipal}</div>` : ''}
-                            ${detalhes.length > 0 ? `<div class="product-features">${detalhes.join('\n')}</div>` : ''}
+                            ${descricaoPrincipalComposicao ? `<div class="product-desc">${descricaoPrincipalComposicao}</div>` : ''}
+                            ${detalhesComposicao.length > 0 ? `<div class="product-features">${detalhesComposicao.join('\n')}</div>` : ''}
                         </td>
                         <td class="text-center">${item.quantidade}</td>
                         <td class="text-right currency">R$ ${item.valorUnitario.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
@@ -2161,11 +2045,6 @@ const PropostasPage: React.FC = () => {
 </html>`;
   };
 
-  const handleEditProposta = async (proposta: any) => {
-    if (!proposta) return;
-    await handleViewProposta(proposta);
-  };
-
   const handleDeleteProposta = async (proposta: any) => {
     if (await confirm(`Tem certeza que deseja excluir a proposta ${proposta.numero}?`)) {
       try {
@@ -2189,12 +2068,12 @@ const PropostasPage: React.FC = () => {
     }
   };
 
-  const formatCurrency = (value: number) => {
+  function formatCurrency(value: number) {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
     }).format(value);
-  };
+  }
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('pt-BR');
@@ -2215,8 +2094,81 @@ const PropostasPage: React.FC = () => {
   const valorNegociacao = filteredPropostas
     .filter((p) => ['enviada', 'visualizada', 'negociacao'].includes(String(p.status)))
     .reduce((sum, p) => sum + p.valor, 0);
-  const propostasRejeitadas = filteredPropostas.filter((p) => p.status === 'rejeitada').length;
-  const taxaPerda = metricas.total > 0 ? (propostasRejeitadas / metricas.total) * 100 : 0;
+  const propostasRejeitadas = metricas.rejeitadas;
+  const activeAdvancedFiltersCount = Object.values(filtrosAvancados).filter(
+    (value) => value !== undefined && value !== null && value !== '' && value !== 'todas',
+  ).length;
+  const hasActiveFilters =
+    Boolean(searchTerm) ||
+    selectedStatus !== 'todos' ||
+    selectedVendedor !== 'todos' ||
+    activeAdvancedFiltersCount > 0;
+  const showInlineErrorBanner = Boolean(loadError && propostas.length > 0 && !isLoading);
+
+  const renderEstadoCarregando = () =>
+    viewMode === 'cards' ? (
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <LoadingSkeleton key={`propostas-loading-${index}`} lines={5} />
+        ))}
+      </div>
+    ) : (
+      <LoadingSkeleton lines={8} />
+    );
+
+  const renderEstadoErro = () => (
+    <SectionCard className="p-4 sm:p-5">
+      <EmptyState
+        title="Nao foi possivel carregar as propostas"
+        description={loadError || 'Tente novamente em instantes.'}
+        icon={<AlertCircle className="h-5 w-5" />}
+        action={
+          <button
+            type="button"
+            onClick={() => carregarPropostas({ force: true, source: 'retry-empty-error' })}
+            className={actionPrimaryButtonClass}
+          >
+            <RefreshCw className="h-4 w-4" />
+            Tentar novamente
+          </button>
+        }
+      />
+    </SectionCard>
+  );
+
+  const renderEstadoVazio = () => (
+    <SectionCard className="p-4 sm:p-5">
+      <EmptyState
+        title={hasActiveFilters ? 'Nenhuma proposta encontrada' : 'Nenhuma proposta cadastrada'}
+        description={
+          hasActiveFilters
+            ? 'Ajuste ou limpe os filtros para ampliar os resultados.'
+            : 'Crie a primeira proposta comercial para iniciar o pipeline.'
+        }
+        icon={hasActiveFilters ? <Search className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
+        action={
+          hasActiveFilters ? (
+            <button
+              type="button"
+              onClick={limparTodosOsFiltros}
+              className={actionSecondaryButtonClass}
+            >
+              Limpar filtros
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowWizardModal(true)}
+              className={actionPrimaryButtonClass}
+            >
+              <Plus className="h-4 w-4" />
+              Nova Proposta
+            </button>
+          )
+        }
+      />
+    </SectionCard>
+  );
 
   return (
     <div className="space-y-4">
@@ -2234,257 +2186,146 @@ const PropostasPage: React.FC = () => {
 
       <div className="space-y-4">
         {/* Header da Página */}
-        <SectionCard className="p-4 sm:p-5">
-          <PageHeader
-            title="Propostas"
-            description={
-              isLoading
-                ? 'Carregando propostas...'
-                : `Acompanhe suas ${propostas.length} propostas comerciais`
-            }
-            actions={
-              <button
-                type="button"
-                onClick={() => setShowWizardModal(true)}
-                className={actionPrimaryButtonClass}
-              >
-                <Plus className="h-4 w-4" />
-                Nova Proposta
-              </button>
-            }
-          />
-        </SectionCard>
+        <SectionCard className="overflow-hidden border border-[#D7E3E8] bg-white p-0 shadow-[0_14px_28px_-24px_rgba(16,57,74,0.2)]">
+          <div className="border-b border-[#E3ECEF] bg-[#FBFDFC] px-4 py-4 sm:px-5">
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                <div className="min-w-0">
+                  <h1 className="text-[clamp(1.875rem,2.4vw,2.5rem)] font-semibold leading-tight tracking-[-0.025em] text-[#19384C]">
+                    Propostas
+                  </h1>
+                  <p className="mt-2 max-w-xl text-sm leading-6 text-[#647D89]">
+                    Gerencie propostas comerciais e acompanhe seu andamento.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowWizardModal(true)}
+                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#159A9C] px-4 text-sm font-medium text-white transition hover:bg-[#117C7E] self-start shadow-[0_10px_20px_-16px_rgba(17,124,126,0.5)] sm:flex-shrink-0"
+                >
+                  <Plus className="h-4 w-4" />
+                  Nova Proposta
+                </button>
+              </div>
 
-        {/* Controles de Visualização e Ações */}
-        <SectionCard className="p-4 sm:p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => carregarPropostas({ force: true })}
-                disabled={isLoading}
-                className={actionSecondaryButtonClass}
-                title="Atualizar lista de propostas"
-              >
-                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                <span className="hidden sm:inline">Atualizar</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  void handleExportarSelecionadas();
-                }}
-                disabled={propostasSelecionadas.length === 0}
-                className={actionSecondaryButtonClass}
-                title={
-                  propostasSelecionadas.length === 0
-                    ? 'Selecione propostas para exportar'
-                    : 'Exportar propostas selecionadas'
-                }
-              >
-                <Download className="h-4 w-4" />
-                Exportar
-              </button>
-            </div>
-
-            <div className="flex rounded-lg border border-[#D4E2E7] bg-[#F6FAFB] p-1">
-              <button
-                type="button"
-                onClick={() => setViewMode('dashboard')}
-                className={`${viewToggleBaseClass} ${
-                  viewMode === 'dashboard'
-                    ? 'border border-[#DEE8EC] bg-white text-[#0F7B7D]'
-                    : 'text-[#607B89] hover:text-[#244455]'
-                }`}
-                title="Visualizacao Dashboard"
-              >
-                <BarChart3 className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('table')}
-                className={`${viewToggleBaseClass} ${
-                  viewMode === 'table'
-                    ? 'border border-[#DEE8EC] bg-white text-[#0F7B7D]'
-                    : 'text-[#607B89] hover:text-[#244455]'
-                }`}
-                title="Visualizacao Lista"
-              >
-                <List className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('cards')}
-                className={`${viewToggleBaseClass} ${
-                  viewMode === 'cards'
-                    ? 'border border-[#DEE8EC] bg-white text-[#0F7B7D]'
-                    : 'text-[#607B89] hover:text-[#244455]'
-                }`}
-                title="Visualizacao Cards"
-              >
-                <Grid className="h-4 w-4" />
-              </button>
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                <p className="text-sm text-[#607B89]">
+                  {isLoading
+                    ? 'Carregando propostas...'
+                    : `${propostas.length} proposta(s) em acompanhamento`}
+                </p>
+                {viewMode === 'dashboard' && (
+                  <InlineStats
+                    stats={[
+                      {
+                        label: 'Pipeline',
+                        value: formatCurrency(metricas.valorTotal),
+                        tone: 'accent',
+                      },
+                      {
+                        label: 'Conversao',
+                        value: `${metricas.taxaConversao.toFixed(1)}%`,
+                        tone: metricas.taxaConversao >= 40 ? 'accent' : 'warning',
+                      },
+                      {
+                        label: 'Em curso',
+                        value: `${metricas.emNegociacao}`,
+                        tone: metricas.emNegociacao > 0 ? 'accent' : 'neutral',
+                      },
+                      {
+                        label: 'Ticket medio',
+                        value: formatCurrency(metricas.total > 0 ? metricas.valorTotal / metricas.total : 0),
+                        tone: 'neutral',
+                      },
+                    ]}
+                    className="lg:justify-end"
+                    compact
+                  />
+                )}
+              </div>
             </div>
           </div>
         </SectionCard>
 
-        {/* Renderização condicional por modo de visualização */}
-        {viewMode === 'dashboard' ? (
-          <DashboardPropostas
-            onRefresh={handleManualRefresh}
-            metricasOverride={metricasDashboardFiltrado}
-          />
-        ) : (
-          <>
-            {/* Filtros Avançados */}
-            <div className="mb-6">
-              <FiltrosAvancados
-                onFiltersChange={handleAdvancedFilters}
-                isOpen={showAdvancedFilters}
-                onToggle={() => setShowAdvancedFilters(!showAdvancedFilters)}
-              />
-            </div>
+        {/* Controles de Visualização, Ações e Filtros */}
+        <SectionCard className="p-4 sm:p-5">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => carregarPropostas({ force: true })}
+                  disabled={isLoadingPropostas}
+                  className={actionSecondaryButtonClass}
+                  title="Atualizar lista de propostas"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isLoadingPropostas ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline">Atualizar</span>
+                </button>
 
-            {/* Cards de Dashboard */}
-            <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-7">
-              <div className={`${shellTokens.cardSoft} p-4`}>
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                      Total no filtro
-                    </p>
-                    <p className="mt-2 text-2xl font-bold text-[#002333] sm:text-3xl">
-                      {metricas.total}
-                    </p>
-                    <p className="mt-3 truncate text-sm text-[#002333]/70">Pipeline atual</p>
-                  </div>
-                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-[#159A9C]/10 shadow-sm">
-                    <Users className="h-6 w-6 text-[#159A9C]" />
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleExportarSelecionadas();
+                  }}
+                  disabled={propostasSelecionadas.length === 0}
+                  className={actionSecondaryButtonClass}
+                  title={
+                    propostasSelecionadas.length === 0
+                      ? 'Selecione propostas para exportar'
+                      : 'Exportar propostas selecionadas'
+                  }
+                >
+                  <Download className="h-4 w-4" />
+                  Exportar
+                </button>
               </div>
 
-              <div className={`${shellTokens.cardSoft} p-4`}>
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                      Aprovadas
-                    </p>
-                    <p className="mt-2 text-2xl font-bold text-[#002333] sm:text-3xl">
-                      {metricas.aprovadas}
-                    </p>
-                    <p className="mt-3 truncate text-sm text-[#002333]/70">
-                      {formatCurrency(valorAprovadas)}
-                    </p>
-                  </div>
-                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-[#16A34A]/10 shadow-sm">
-                    <CheckCircle className="h-6 w-6 text-[#16A34A]" />
-                  </div>
-                </div>
-              </div>
-
-              <div className={`${shellTokens.cardSoft} p-4`}>
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                      Em negociacao
-                    </p>
-                    <p className="mt-2 text-2xl font-bold text-[#002333] sm:text-3xl">
-                      {metricas.emNegociacao}
-                    </p>
-                    <p className="mt-3 truncate text-sm text-[#002333]/70">
-                      {formatCurrency(valorNegociacao)}
-                    </p>
-                  </div>
-                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-[#159A9C]/10 shadow-sm">
-                    <TrendingUp className="h-6 w-6 text-[#0F7B7D]" />
-                  </div>
-                </div>
-              </div>
-
-              <div className={`${shellTokens.cardSoft} p-4`}>
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                      Rejeitadas
-                    </p>
-                    <p className="mt-2 text-2xl font-bold text-[#002333] sm:text-3xl">
-                      {propostasRejeitadas}
-                    </p>
-                    <p className="mt-3 truncate text-sm text-[#002333]/70">
-                      {taxaPerda.toFixed(1)}% de perda
-                    </p>
-                  </div>
-                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-[#DC2626]/10 shadow-sm">
-                    <TrendingDown className="h-6 w-6 text-[#DC2626]" />
-                  </div>
-                </div>
-              </div>
-
-              <div className={`${shellTokens.cardSoft} p-4`}>
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                      Conversao
-                    </p>
-                    <p className="mt-2 text-2xl font-bold text-[#002333] sm:text-3xl">
-                      {metricas.taxaConversao.toFixed(1)}%
-                    </p>
-                    <p className="mt-3 truncate text-sm text-[#002333]/70">Aprovadas / Total</p>
-                  </div>
-                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-[#0F7B7D]/10 shadow-sm">
-                    <Target className="h-6 w-6 text-[#0F7B7D]" />
-                  </div>
-                </div>
-              </div>
-
-              <div className={`${shellTokens.cardSoft} p-4`}>
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                      Revisadas
-                    </p>
-                    <p className="mt-2 text-2xl font-bold text-[#002333] sm:text-3xl">
-                      {metricas.propostasRevisadas}
-                    </p>
-                    <p className="mt-3 truncate text-sm text-[#002333]/70">
-                      {metricas.mediaVersoesPorProposta.toFixed(1)} versao(oes) / proposta
-                    </p>
-                  </div>
-                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-[#0369A1]/10 shadow-sm">
-                    <RefreshCw className="h-6 w-6 text-[#0369A1]" />
-                  </div>
-                </div>
-              </div>
-
-              <div className={`${shellTokens.cardSoft} p-4`}>
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                      Valor total
-                    </p>
-                    <div className="mt-2">
-                      <p className="break-words text-lg font-bold leading-tight text-[#002333] sm:text-xl lg:text-2xl">
-                        {formatCurrency(metricas.valorTotal)}
-                      </p>
-                    </div>
-                    <p className="mt-3 truncate text-sm text-[#002333]/70">Receita potencial</p>
-                  </div>
-                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-[#159A9C]/10 shadow-sm">
-                    <DollarSign className="h-6 w-6 text-[#159A9C]" />
-                  </div>
-                </div>
+              <div className="flex rounded-lg border border-[#D4E2E7] bg-[#F6FAFB] p-1">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('dashboard')}
+                  className={`${viewToggleBaseClass} ${
+                    viewMode === 'dashboard'
+                      ? 'border border-[#DEE8EC] bg-white text-[#0F7B7D]'
+                      : 'text-[#607B89] hover:text-[#244455]'
+                  }`}
+                  title="Visualizacao Dashboard"
+                >
+                  <BarChart3 className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('table')}
+                  className={`${viewToggleBaseClass} ${
+                    viewMode === 'table'
+                      ? 'border border-[#DEE8EC] bg-white text-[#0F7B7D]'
+                      : 'text-[#607B89] hover:text-[#244455]'
+                  }`}
+                  title="Visualizacao Lista"
+                >
+                  <List className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('cards')}
+                  className={`${viewToggleBaseClass} ${
+                    viewMode === 'cards'
+                      ? 'border border-[#DEE8EC] bg-white text-[#0F7B7D]'
+                      : 'text-[#607B89] hover:text-[#244455]'
+                  }`}
+                  title="Visualizacao Cards"
+                >
+                  <Grid className="h-4 w-4" />
+                </button>
               </div>
             </div>
 
-            {/* Filtros básicos */}
-            <div className={`${shellTokens.card} p-4 sm:p-5`}>
-              <div className="flex flex-col lg:flex-row gap-3 sm:gap-4">
-                {/* Busca */}
-                <div className="flex-1 min-w-0">
+            {viewMode !== 'dashboard' && (
+              <div className="flex flex-col gap-3 border-t border-[#E4EDF0] pt-4 lg:flex-row lg:items-center">
+                <div className="min-w-0 flex-1">
                   <div className="relative">
-                    <Search className="w-4 h-4 sm:w-5 sm:h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 sm:h-5 sm:w-5" />
                     <input
                       type="text"
                       placeholder="Buscar por número, cliente ou título..."
@@ -2495,7 +2336,6 @@ const PropostasPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Filtro Status */}
                 <div className="w-full sm:w-auto sm:min-w-[160px] lg:w-48">
                   <select
                     value={selectedStatus}
@@ -2518,7 +2358,6 @@ const PropostasPage: React.FC = () => {
                   </select>
                 </div>
 
-                {/* Filtro Vendedor */}
                 <div className="w-full sm:w-auto sm:min-w-[160px] lg:w-48">
                   <select
                     value={selectedVendedor}
@@ -2534,7 +2373,6 @@ const PropostasPage: React.FC = () => {
                   </select>
                 </div>
 
-                {/* Filtro por Urgência */}
                 <div className="w-full sm:w-auto sm:min-w-[160px] lg:w-48">
                   <select
                     value={filtrosAvancados.urgencia || 'todas'}
@@ -2551,8 +2389,8 @@ const PropostasPage: React.FC = () => {
                   </select>
                 </div>
 
-                {/* Botão Filtros Avançados */}
                 <button
+                  type="button"
                   onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
                   className={`px-3 sm:px-4 py-2 border rounded-lg flex items-center justify-center gap-2 text-sm transition-colors flex-shrink-0 ${
                     showAdvancedFilters
@@ -2562,29 +2400,70 @@ const PropostasPage: React.FC = () => {
                 >
                   <Filter className="w-4 h-4" />
                   Filtros
-                  {Object.keys(filtrosAvancados).length > 0 && (
+                  {activeAdvancedFiltersCount > 0 && (
                     <span className="bg-[#159A9C] text-white text-xs rounded-full px-2 py-0.5 ml-1">
-                      {Object.keys(filtrosAvancados).length}
+                      {activeAdvancedFiltersCount}
                     </span>
                   )}
                 </button>
               </div>
+            )}
+          </div>
+        </SectionCard>
+
+        {/* Renderização condicional por modo de visualização */}
+        {viewMode === 'dashboard' ? (
+          <DashboardPropostas
+            onRefresh={handleManualRefresh}
+            metricasOverride={metricasDashboardFiltrado}
+          />
+        ) : (
+          <>
+            {/* Filtros Avançados */}
+            <div className="mb-6">
+              <FiltrosAvancados
+                onFiltersChange={handleAdvancedFilters}
+                isOpen={showAdvancedFilters}
+                onToggle={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              />
             </div>
 
-            {/* Lista de Propostas com Seleção */}
-            {viewMode === 'cards' ? (
-              <section className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
-                {filteredPropostas.length === 0 ? (
-                  <div className="col-span-full rounded-[18px] border border-dashed border-[#D4E2E7] bg-[#F8FBFC] p-10 text-center">
-                    <p className="text-sm font-medium text-[#244455]">
-                      Nenhuma proposta encontrada para os filtros atuais.
-                    </p>
-                    <p className="mt-2 text-sm text-[#607B89]">
-                      Ajuste os filtros ou crie uma nova proposta.
-                    </p>
+            {showInlineErrorBanner && (
+              <SectionCard className="border border-[#F8D7DA] bg-[#FFF7F8] p-4 sm:p-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#DC2626]/10 text-[#DC2626]">
+                      <AlertCircle className="h-5 w-5" />
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-[#7A2230]">
+                        A lista exibida pode estar desatualizada
+                      </p>
+                      <p className="mt-1 text-sm text-[#8C4A56]">{loadError}</p>
+                    </div>
                   </div>
-                ) : (
-                  filteredPropostas.map((proposta) => {
+                  <button
+                    type="button"
+                    onClick={() => carregarPropostas({ force: true, source: 'retry-inline-error' })}
+                    className={actionSecondaryButtonClass}
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Tentar novamente
+                  </button>
+                </div>
+              </SectionCard>
+            )}
+
+            {/* Lista de Propostas com Seleção */}
+            {isLoading ? (
+              renderEstadoCarregando()
+            ) : loadError && propostas.length === 0 ? (
+              renderEstadoErro()
+            ) : filteredPropostas.length === 0 ? (
+              renderEstadoVazio()
+            ) : viewMode === 'cards' ? (
+              <section className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+                {filteredPropostas.map((proposta) => {
                     const propostaId = proposta.id?.toString() || proposta.numero;
                     const propostaSelecionada = propostasSelecionadas.includes(propostaId);
                     const motivoPerda = getMotivoPerda(proposta);
@@ -2598,8 +2477,6 @@ const PropostasPage: React.FC = () => {
                       <article
                         key={propostaId}
                         className={`${shellTokens.card} p-4 transition-colors ${propostaSelecionada ? 'border-[#159A9C]/50 bg-[#F2FBFA]' : ''}`}
-                        onMouseEnter={(e) => handleMouseEnterProposta(proposta, e)}
-                        onMouseLeave={handleMouseLeaveProposta}
                       >
                         <div className="mb-3 flex items-start justify-between gap-3">
                           <div>
@@ -2715,16 +2592,15 @@ const PropostasPage: React.FC = () => {
                         </div>
                       </article>
                     );
-                  })
-                )}
+                  })}
               </section>
             ) : (
               <DataTableCard className="propostas-page overflow-hidden">
                 {/* Header da tabela com informações de filtros */}
-                <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                <div className="border-b border-[#DEE8EC] bg-[#F7FBFC] px-6 py-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
-                      <h3 className="text-lg font-medium text-gray-900">
+                      <h3 className="text-lg font-medium text-[#19384C]">
                         Lista de Propostas ({filteredPropostas.length})
                       </h3>
                       {/* Indicadores de filtros ativos */}
@@ -2751,7 +2627,7 @@ const PropostasPage: React.FC = () => {
                     </div>
                     <div className="flex items-center space-x-2">
                       {propostasSelecionadas.length > 0 && (
-                        <span className="text-sm text-gray-600">
+                        <span className="text-sm text-[#607B89]">
                           {propostasSelecionadas.length} selecionada(s)
                         </span>
                       )}
@@ -2761,8 +2637,8 @@ const PropostasPage: React.FC = () => {
 
                 <div className="overflow-hidden border-t border-[#DEE8EC]">
                   <div className="overflow-x-auto">
-                    <table className="table-propostas min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
+                    <table className="table-propostas min-w-full divide-y divide-[#E4EDF0]">
+                      <thead className="bg-[#F7FBFC]">
                         <tr>
                           {/* Checkbox para selecionar todas */}
                           <th className="px-6 py-3 text-left">
@@ -2777,11 +2653,11 @@ const PropostasPage: React.FC = () => {
                                   ? handleDeselectAll
                                   : handleSelectAll
                               }
-                              className="rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]"
+                              className="rounded border-[#C7D7DE] text-[#159A9C] focus:ring-[#159A9C]"
                             />
                           </th>
                           <th
-                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                            className="cursor-pointer px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[#607B89] hover:bg-[#EEF5F7]"
                             onClick={() => {
                               if (sortBy === 'data_criacao') {
                                 setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -2802,7 +2678,7 @@ const PropostasPage: React.FC = () => {
                             </div>
                           </th>
                           <th
-                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                            className="cursor-pointer px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[#607B89] hover:bg-[#EEF5F7]"
                             onClick={() => {
                               if (sortBy === 'cliente') {
                                 setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -2823,7 +2699,7 @@ const PropostasPage: React.FC = () => {
                             </div>
                           </th>
                           <th
-                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-hide-mobile cursor-pointer hover:bg-gray-100"
+                            className="col-hide-mobile cursor-pointer px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[#607B89] hover:bg-[#EEF5F7]"
                             onClick={() => {
                               if (sortBy === 'status') {
                                 setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -2843,11 +2719,11 @@ const PropostasPage: React.FC = () => {
                                 ))}
                             </div>
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-hide-mobile">
+                          <th className="col-hide-mobile px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[#607B89]">
                             Motivo perda
                           </th>
                           <th
-                            className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                            className="cursor-pointer px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[#607B89] hover:bg-[#EEF5F7]"
                             onClick={() => {
                               if (sortBy === 'valor') {
                                 setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -2867,31 +2743,19 @@ const PropostasPage: React.FC = () => {
                                 ))}
                             </div>
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-hide-mobile">
+                          <th className="col-hide-mobile px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[#607B89]">
                             Vendedor
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider col-hide-mobile">
+                          <th className="col-hide-mobile px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[#607B89]">
                             Vencimento
                           </th>
-                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-[#607B89]">
                             Ações
                           </th>
                         </tr>
                       </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredPropostas.length === 0 ? (
-                          <tr>
-                            <td colSpan={9} className="px-6 py-12 text-center">
-                              <p className="text-sm font-medium text-[#244455]">
-                                Nenhuma proposta encontrada.
-                              </p>
-                              <p className="mt-1 text-sm text-[#607B89]">
-                                Revise os filtros aplicados ou cadastre uma nova proposta.
-                              </p>
-                            </td>
-                          </tr>
-                        ) : (
-                          filteredPropostas.map((proposta) => {
+                      <tbody className="divide-y divide-[#E4EDF0] bg-white">
+                        {filteredPropostas.map((proposta) => {
                             const totalVersoes = Number((proposta as any).totalVersoes || 0);
                             const ultimaVersao =
                               Number((proposta as any).ultimaVersao || totalVersoes || 0);
@@ -2905,8 +2769,6 @@ const PropostasPage: React.FC = () => {
                             <tr
                               key={proposta.id}
                               className={`hover:bg-gray-50 ${propostasSelecionadas.includes(proposta.id?.toString() || proposta.numero) ? 'bg-[#159A9C]/10' : ''} transition-colors duration-200`}
-                              onMouseEnter={(e) => handleMouseEnterProposta(proposta, e)}
-                              onMouseLeave={handleMouseLeaveProposta}
                             >
                               {/* Checkbox */}
                               <td className="px-6 py-4 whitespace-nowrap">
@@ -3097,44 +2959,17 @@ const PropostasPage: React.FC = () => {
                               </td>
                             </tr>
                             );
-                          })
-                        )}
+                          })}
                       </tbody>
                     </table>
                   </div>
                 </div>
 
-                {/* Paginação */}
-                <div className="bg-white px-6 py-3 border-t border-gray-200 sm:px-6">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm text-gray-700">
-                      Mostrando <span className="font-medium">1</span> a{' '}
-                      <span className="font-medium">{filteredPropostas.length}</span> de{' '}
-                      <span className="font-medium">{filteredPropostas.length}</span> resultados
-                    </div>
-                    <div className="flex space-x-2">
-                      <button className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">
-                        Anterior
-                      </button>
-                      <button className="px-3 py-1 bg-[#159A9C] hover:bg-[#0F7B7D] text-white rounded text-sm transition-colors">
-                        1
-                      </button>
-                      <button className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">
-                        Próximo
-                      </button>
-                    </div>
-                  </div>
+                <div className="border-t border-[#DEE8EC] bg-white px-6 py-3 text-sm text-[#607B89]">
+                  Exibindo {filteredPropostas.length} proposta(s) na visualizacao atual.
                 </div>
               </DataTableCard>
             )}
-
-            {/* Modal de Proposta */}
-            <ModalProposta
-              isOpen={showCreateModal}
-              onClose={() => setShowCreateModal(false)}
-              onSave={handleSaveProposta}
-              isLoading={isLoadingCreate}
-            />
 
             {/* Modal de Visualização de Proposta */}
             {selectedPropostaForView && (
@@ -3145,17 +2980,46 @@ const PropostasPage: React.FC = () => {
                 onPropostaUpdated={() => carregarPropostas({ force: true, source: 'modal-view' })}
               />
             )}
-
-
             {showMotivoPerdaModal && propostaMotivoPerda && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B1A2B]/50 p-4">
-                <div className="w-full max-w-lg rounded-xl border border-[#DDE3EA] bg-white p-6 shadow-2xl">
-                  <h3 className="text-lg font-semibold text-[#002333]">Motivo de perda</h3>
-                  <p className="mt-1 text-sm text-[#355166]">
-                    Proposta {safeRender(propostaMotivoPerda?.numero) || safeRender(propostaMotivoPerda?.id)}
-                  </p>
-
-                  <label htmlFor="motivo-perda" className="mt-4 block text-sm font-medium text-[#133147]">
+              <BaseModal
+                isOpen={showMotivoPerdaModal}
+                onClose={() => {
+                  if (savingMotivoPerda) return;
+                  setShowMotivoPerdaModal(false);
+                  setPropostaMotivoPerda(null);
+                  setMotivoPerdaDraft('');
+                }}
+                title="Motivo de perda"
+                subtitle={`Proposta ${safeRender(propostaMotivoPerda?.numero) || safeRender(propostaMotivoPerda?.id)}`}
+                size="medium"
+                footer={
+                  <div className="flex justify-end gap-2">
+                    <ModalButton
+                      type="button"
+                      variant="secondary"
+                      onClick={() => {
+                        if (savingMotivoPerda) return;
+                        setShowMotivoPerdaModal(false);
+                        setPropostaMotivoPerda(null);
+                        setMotivoPerdaDraft('');
+                      }}
+                      disabled={savingMotivoPerda}
+                    >
+                      Cancelar
+                    </ModalButton>
+                    <ModalButton
+                      type="button"
+                      variant="primary"
+                      onClick={confirmarMotivoPerda}
+                      loading={savingMotivoPerda}
+                    >
+                      Salvar motivo
+                    </ModalButton>
+                  </div>
+                }
+              >
+                <div className="space-y-3">
+                  <label htmlFor="motivo-perda" className="block text-sm font-medium text-[#133147]">
                     Informe o motivo (opcional)
                   </label>
                   <textarea
@@ -3164,36 +3028,12 @@ const PropostasPage: React.FC = () => {
                     onChange={(event) => setMotivoPerdaDraft(event.target.value)}
                     rows={4}
                     maxLength={600}
-                    className="mt-2 w-full rounded-lg border border-[#C6D2DE] px-3 py-2 text-sm text-[#002333] shadow-sm outline-none transition focus:border-[#159A9C] focus:ring-2 focus:ring-[#159A9C]/20"
+                    className="w-full rounded-lg border border-[#C6D2DE] px-3 py-2 text-sm text-[#002333] shadow-sm outline-none transition focus:border-[#159A9C] focus:ring-2 focus:ring-[#159A9C]/20"
                     placeholder="Ex.: escopo fora do orcamento, prazo nao atende, concorrencia..."
                   />
-                  <div className="mt-1 text-right text-xs text-[#5A768C]">{motivoPerdaDraft.length}/600</div>
-
-                  <div className="mt-5 flex justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (savingMotivoPerda) return;
-                        setShowMotivoPerdaModal(false);
-                        setPropostaMotivoPerda(null);
-                        setMotivoPerdaDraft('');
-                      }}
-                      className="rounded-lg border border-[#C6D2DE] px-4 py-2 text-sm font-medium text-[#355166] hover:bg-[#F4F7FA] disabled:opacity-60"
-                      disabled={savingMotivoPerda}
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={confirmarMotivoPerda}
-                      className="rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-semibold text-white hover:bg-[#127F81] disabled:opacity-60"
-                      disabled={savingMotivoPerda}
-                    >
-                      {savingMotivoPerda ? 'Salvando...' : 'Salvar motivo'}
-                    </button>
-                  </div>
+                  <div className="text-right text-xs text-[#5A768C]">{motivoPerdaDraft.length}/600</div>
                 </div>
-              </div>
+              </BaseModal>
             )}
             {/* Modal Wizard removido daqui - movido para o início do JSX */}
 
@@ -3212,79 +3052,9 @@ const PropostasPage: React.FC = () => {
           onAcoesMassa={handleAcoesMassa}
           visible={propostasSelecionadas.length > 0 && viewMode !== 'dashboard'}
         />
-
-        {/* Preview de Proposta - Hover tooltip */}
-        <PreviewProposta
-          proposta={previewProposta}
-          isVisible={showPreview}
-          onClose={() => setShowPreview(false)}
-          onViewFull={() => {
-            if (previewProposta) {
-              handleViewProposta(previewProposta);
-              setShowPreview(false);
-            }
-          }}
-          onEdit={() => {
-            if (previewProposta) {
-              void handleEditProposta(previewProposta);
-              setShowPreview(false);
-            }
-          }}
-          onDownload={() => {
-            if (previewProposta) {
-              handleGeneratePDF(previewProposta);
-              setShowPreview(false);
-            }
-          }}
-          onSend={async () => {
-            if (previewProposta) {
-              try {
-                await enviarPropostaPorEmail(previewProposta);
-                await carregarPropostas({ force: true, source: 'preview-send' });
-                showNotification(
-                  `Proposta ${previewProposta.numero} enviada por email com sucesso.`,
-                  'success',
-                );
-              } catch (error) {
-                const message = error instanceof Error ? error.message : 'Erro ao enviar proposta.';
-                showNotification(message, 'error');
-              } finally {
-                setShowPreview(false);
-              }
-            }
-          }}
-          position={previewPosition}
-        />
-
-        {/* Notificações Toast */}
-        {notification && (
-          <div
-            className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg ${
-              notification.type === 'success'
-                ? 'bg-[#159A9C]/10 text-[#0F7B7D] border border-[#159A9C]/30'
-                : 'bg-[#DC2626]/10 text-[#DC2626] border border-[#DC2626]/30'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              {notification.type === 'success' ? (
-                <CheckCircle className="w-5 h-5" />
-              ) : (
-                <XCircle className="w-5 h-5" />
-              )}
-              <span className="font-medium">{notification.message}</span>
-              <button
-                onClick={() => setNotification(null)}
-                className="ml-2 text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
 };
 
 export default PropostasPage;
-

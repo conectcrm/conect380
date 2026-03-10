@@ -28,6 +28,20 @@ interface Vendedor {
   ativo: boolean;
 }
 
+interface ProdutoComponentePlano {
+  childItemId: string;
+  componentRole: 'included' | 'required' | 'optional' | 'recommended' | 'addon';
+  quantity?: number;
+  sortOrder?: number;
+  affectsPrice?: boolean;
+  isDefault?: boolean;
+  nome?: string;
+  preco?: number;
+  tipoItem?: string;
+  status?: string;
+  metadata?: Record<string, unknown>;
+}
+
 interface Produto {
   id: string;
   nome: string;
@@ -45,11 +59,22 @@ interface Produto {
   produtosCombo?: Produto[];
   precoOriginal?: number;
   desconto?: number;
-  tipoItem?: 'produto' | 'servico' | 'licenca' | 'modulo' | 'plano' | 'aplicativo';
+  tipoItem?:
+    | 'produto'
+    | 'servico'
+    | 'licenca'
+    | 'modulo'
+    | 'plano'
+    | 'aplicativo'
+    | 'peca'
+    | 'acessorio'
+    | 'pacote'
+    | 'garantia';
   tipoLicenciamento?: string;
   periodicidadeLicenca?: string;
   renovacaoAutomatica?: boolean;
   quantidadeLicencas?: number;
+  componentes?: ProdutoComponentePlano[];
 }
 
 interface ProdutoProposta {
@@ -327,6 +352,39 @@ class PropostasService {
               status: produto.status || 'ativo',
               tipoLicenciamento: produto.tipoLicenciamento,
               periodicidadeLicenca: produto.periodicidadeLicenca,
+              componentes: Array.isArray(produto.componentes)
+                ? produto.componentes.map((componente: any) => ({
+                    childItemId: componente.childItemId,
+                    componentRole: componente.componentRole || 'included',
+                    quantity:
+                      componente.quantity === undefined || componente.quantity === null
+                        ? 1
+                        : Number(componente.quantity),
+                    sortOrder:
+                      componente.sortOrder === undefined || componente.sortOrder === null
+                        ? undefined
+                        : Number(componente.sortOrder),
+                    affectsPrice:
+                      componente.affectsPrice === undefined
+                        ? undefined
+                        : Boolean(componente.affectsPrice),
+                    isDefault:
+                      componente.isDefault === undefined
+                        ? undefined
+                        : Boolean(componente.isDefault),
+                    nome: componente.nome,
+                    preco:
+                      componente.preco === undefined || componente.preco === null
+                        ? undefined
+                        : Number(componente.preco),
+                    tipoItem: componente.tipoItem,
+                    status: componente.status,
+                    metadata:
+                      componente.metadata && typeof componente.metadata === 'object'
+                        ? componente.metadata
+                        : undefined,
+                  }))
+                : undefined,
             }))
         : [];
 
@@ -445,22 +503,63 @@ class PropostasService {
       return [];
     }
 
-    return proposta.produtos.map((produto: any) => ({
-      produto: {
-        id: produto.id || produto.produtoId || `prod_${Date.now()}`,
-        nome: produto.nome || produto.produtoNome || 'Produto',
-        preco: produto.precoUnitario || produto.preco || 0,
-        categoria: produto.categoria || 'Geral',
-        unidade: produto.unidade || 'unidade',
-        descricao: produto.descricao || '',
-        tipo: 'produto',
-      },
-      quantidade: produto.quantidade || 1,
-      desconto: produto.desconto || 0,
-      subtotal:
-        produto.subtotal ||
-        (produto.precoUnitario || produto.preco || 0) * (produto.quantidade || 1),
-    }));
+    return proposta.produtos.map((produto: any) => {
+      const nestedProduto =
+        produto?.produto && typeof produto.produto === 'object' ? produto.produto : null;
+      const componentes = Array.isArray(produto?.componentesPlano)
+        ? (produto.componentesPlano as ProdutoComponentePlano[])
+        : Array.isArray(produto?.componentes)
+          ? (produto.componentes as ProdutoComponentePlano[])
+          : Array.isArray(nestedProduto?.componentesPlano)
+            ? (nestedProduto.componentesPlano as ProdutoComponentePlano[])
+            : Array.isArray(nestedProduto?.componentes)
+              ? (nestedProduto.componentes as ProdutoComponentePlano[])
+              : undefined;
+      const tipoItemRaw = String(
+        produto?.tipoItem || nestedProduto?.tipoItem || nestedProduto?.tipo || 'produto',
+      ).toLowerCase();
+      const tipoItem: Produto['tipoItem'] =
+        [
+          'produto',
+          'servico',
+          'licenca',
+          'modulo',
+          'plano',
+          'aplicativo',
+          'peca',
+          'acessorio',
+          'pacote',
+          'garantia',
+        ].includes(tipoItemRaw)
+          ? (tipoItemRaw as Produto['tipoItem'])
+          : 'produto';
+
+      return {
+        produto: {
+          id: produto?.id || produto?.produtoId || nestedProduto?.id || `prod_${Date.now()}`,
+          nome: produto?.nome || produto?.produtoNome || nestedProduto?.nome || 'Produto',
+          preco:
+            produto?.precoUnitario ??
+            produto?.preco ??
+            nestedProduto?.precoUnitario ??
+            nestedProduto?.preco ??
+            0,
+          categoria: produto?.categoria || nestedProduto?.categoria || 'Geral',
+          unidade: produto?.unidade || nestedProduto?.unidade || 'unidade',
+          descricao: produto?.descricao || nestedProduto?.descricao || '',
+          tipo: 'produto',
+          status: produto?.status || nestedProduto?.status || 'ativo',
+          tipoItem,
+          componentes,
+        },
+        quantidade: produto?.quantidade || 1,
+        desconto: produto?.desconto || 0,
+        subtotal:
+          produto?.subtotal ||
+          (produto?.precoUnitario || produto?.preco || nestedProduto?.preco || 0) *
+            (produto?.quantidade || 1),
+      };
+    });
   }
 
   private mapVendedor(proposta: PropostaBasica): Vendedor {
@@ -739,6 +838,40 @@ class PropostasService {
                     unidade: itemCombo.unidade || 'unidade',
                     tipoItem: itemCombo.tipoItem || 'produto',
                     precoUnitario: Number(itemCombo.preco || 0),
+                  }))
+                : undefined,
+            componentesPlano:
+              produto.produto.tipoItem === 'plano' && Array.isArray(produto.produto.componentes)
+                ? produto.produto.componentes.map((componente) => ({
+                    childItemId: componente.childItemId,
+                    componentRole: componente.componentRole || 'included',
+                    quantity:
+                      componente.quantity === undefined || componente.quantity === null
+                        ? 1
+                        : Number(componente.quantity),
+                    sortOrder:
+                      componente.sortOrder === undefined || componente.sortOrder === null
+                        ? undefined
+                        : Number(componente.sortOrder),
+                    affectsPrice:
+                      componente.affectsPrice === undefined
+                        ? undefined
+                        : Boolean(componente.affectsPrice),
+                    isDefault:
+                      componente.isDefault === undefined
+                        ? undefined
+                        : Boolean(componente.isDefault),
+                    nome: componente.nome || '',
+                    preco:
+                      componente.preco === undefined || componente.preco === null
+                        ? undefined
+                        : Number(componente.preco),
+                    tipoItem: componente.tipoItem,
+                    status: componente.status,
+                    metadata:
+                      componente.metadata && typeof componente.metadata === 'object'
+                        ? componente.metadata
+                        : undefined,
                   }))
                 : undefined,
           })) || [],

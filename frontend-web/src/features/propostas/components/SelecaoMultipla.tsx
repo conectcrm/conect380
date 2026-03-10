@@ -1,15 +1,5 @@
 import React, { useState } from 'react';
-import {
-  Check,
-  ChevronDown,
-  Download,
-  Send,
-  FileSignature,
-  Receipt,
-  Trash2,
-  UserCheck,
-  X,
-} from 'lucide-react';
+import { Check, Download, Trash2, X } from 'lucide-react';
 import { useGlobalConfirmation } from '../../../contexts/GlobalConfirmationContext';
 
 interface SelecaoMultiplaProps {
@@ -32,63 +22,15 @@ export const SelecaoMultipla: React.FC<SelecaoMultiplaProps> = ({
   visible,
 }) => {
   const { confirm } = useGlobalConfirmation();
-  const [showAcoes, setShowAcoes] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const quantidade = propostasSelecionadas.length;
   const todaSelecionadas = quantidade === totalPropostas && totalPropostas > 0;
 
-  const acoesMassa = [
-    {
-      id: 'enviar-email',
-      label: 'Enviar por Email',
-      icon: Send,
-      color: 'blue',
-      description: 'Enviar propostas selecionadas por email',
-    },
-    {
-      id: 'gerar-contratos',
-      label: 'Gerar Contratos',
-      icon: FileSignature,
-      color: 'green',
-      description: 'Gerar contratos para propostas aprovadas',
-    },
-    {
-      id: 'criar-faturas',
-      label: 'Criar Faturas',
-      icon: Receipt,
-      color: 'purple',
-      description: 'Criar faturas em lote',
-    },
-    {
-      id: 'avancar-fluxo',
-      label: 'Avançar Fluxo',
-      icon: UserCheck,
-      color: 'indigo',
-      description: 'Avançar para próxima etapa do fluxo',
-    },
-    {
-      id: 'exportar-pdf',
-      label: 'Exportar PDF',
-      icon: Download,
-      color: 'gray',
-      description: 'Baixar propostas em PDF',
-    },
-    {
-      id: 'excluir',
-      label: 'Excluir',
-      icon: Trash2,
-      color: 'red',
-      description: 'Excluir propostas selecionadas',
-    },
-  ];
-
   const handleAcao = async (acaoId: string) => {
     if (quantidade === 0) {
       return;
     }
-
-    const acao = acoesMassa.find((a) => a.id === acaoId);
 
     if (acaoId === 'excluir') {
       if (
@@ -96,16 +38,9 @@ export const SelecaoMultipla: React.FC<SelecaoMultiplaProps> = ({
       ) {
         return;
       }
-    } else if (acao) {
-      if (
-        !(await confirm(`Executar "${acao.label}" em ${quantidade} proposta(s) selecionada(s)?`))
-      ) {
-        return;
-      }
     }
 
     setLoading(true);
-    setShowAcoes(false);
 
     try {
       await onAcoesMassa(acaoId);
@@ -122,14 +57,14 @@ export const SelecaoMultipla: React.FC<SelecaoMultiplaProps> = ({
 
   return (
     <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
-      <div className="bg-white rounded-lg shadow-xl border border-gray-200 px-4 sm:px-6 py-4 flex flex-wrap items-center gap-3 sm:gap-4 w-[calc(100vw-1rem)] sm:w-auto sm:min-w-[400px] max-w-xl sm:max-w-none min-w-0">
+      <div className="min-w-0 w-[calc(100vw-1rem)] max-w-xl rounded-2xl border border-[#D4E2E7] bg-white px-4 py-4 shadow-[0_20px_50px_-24px_rgba(15,57,74,0.45)] sm:w-auto sm:min-w-[400px] sm:max-w-none sm:px-6">
         {/* Status da Seleção */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
-            <div className="w-5 h-5 bg-blue-500 rounded flex items-center justify-center">
+            <div className="flex h-5 w-5 items-center justify-center rounded bg-[#159A9C]">
               <Check className="w-3 h-3 text-white" />
             </div>
-            <span className="font-medium text-gray-900">
+            <span className="font-medium text-[#19384C]">
               {quantidade} de {totalPropostas} selecionada(s)
             </span>
           </div>
@@ -138,16 +73,18 @@ export const SelecaoMultipla: React.FC<SelecaoMultiplaProps> = ({
           <div className="flex items-center gap-1">
             {!todaSelecionadas && (
               <button
+                type="button"
                 onClick={onSelectAll}
-                className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                className="text-sm font-medium text-[#159A9C] transition hover:text-[#0F7B7D] hover:underline"
               >
                 Selecionar tudo
               </button>
             )}
             {quantidade > 0 && (
               <button
+                type="button"
                 onClick={onDeselectAll}
-                className="text-sm text-gray-600 hover:text-gray-800 hover:underline ml-2"
+                className="ml-2 text-sm font-medium text-[#607B89] transition hover:text-[#244455] hover:underline"
               >
                 Limpar seleção
               </button>
@@ -156,77 +93,40 @@ export const SelecaoMultipla: React.FC<SelecaoMultiplaProps> = ({
         </div>
 
         {/* Ações Rápidas */}
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="ml-auto flex items-center gap-2">
           {/* Exportar */}
           <button
+            type="button"
             onClick={onExportarSelecionadas}
-            className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            className="inline-flex items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 py-2 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
             title="Exportar selecionadas"
           >
             <Download className="w-4 h-4" />
             Exportar
           </button>
 
-          {/* Menu de Ações */}
-          <div className="relative">
-            <button
-              onClick={() => setShowAcoes(!showAcoes)}
-              disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg transition-colors"
-            >
-              {loading ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <>
-                  <span>Ações</span>
-                  <ChevronDown
-                    className={`w-4 h-4 transition-transform ${showAcoes ? 'rotate-180' : ''}`}
-                  />
-                </>
-              )}
-            </button>
-
-            {/* Dropdown de Ações */}
-            {showAcoes && (
-              <div className="absolute bottom-full mb-2 right-0 w-64 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-10">
-                <div className="px-3 py-2 border-b border-gray-100">
-                  <h4 className="font-medium text-gray-900">Ações em Massa</h4>
-                  <p className="text-sm text-gray-500">Executar em {quantidade} proposta(s)</p>
-                </div>
-
-                {acoesMassa.map((acao) => {
-                  const Icon = acao.icon;
-                  const colorClasses = {
-                    blue: 'text-blue-600 hover:bg-blue-50',
-                    green: 'text-green-600 hover:bg-green-50',
-                    purple: 'text-purple-600 hover:bg-purple-50',
-                    indigo: 'text-indigo-600 hover:bg-indigo-50',
-                    gray: 'text-gray-600 hover:bg-gray-50',
-                    red: 'text-red-600 hover:bg-red-50',
-                  };
-
-                  return (
-                    <button
-                      key={acao.id}
-                      onClick={() => handleAcao(acao.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-gray-50 ${colorClasses[acao.color as keyof typeof colorClasses]} transition-colors`}
-                    >
-                      <Icon className="w-4 h-4 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm">{acao.label}</div>
-                        <div className="text-xs text-gray-500 truncate">{acao.description}</div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+          <button
+            type="button"
+            onClick={() => void handleAcao('excluir')}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-lg bg-[#DC2626] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#B91C1C] disabled:cursor-not-allowed disabled:opacity-60"
+            title="Excluir propostas selecionadas"
+          >
+            {loading ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <>
+                <Trash2 className="w-4 h-4" />
+                Excluir
+              </>
             )}
-          </div>
+          </button>
 
           {/* Fechar */}
           <button
+            type="button"
             onClick={onDeselectAll}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            className="rounded-lg p-2 text-[#8BA0AA] transition hover:bg-[#F6FAFB] hover:text-[#244455]"
             title="Fechar"
           >
             <X className="w-4 h-4" />

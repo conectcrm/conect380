@@ -1,4 +1,11 @@
 ﻿import React, { useState } from 'react';
+import {
+  BaseModal,
+  FormField,
+  FormInput,
+  FormTextarea,
+  ModalButton,
+} from '../../../components/modals/BaseModal';
 import { toastService } from '../../../services/toastService';
 import {
   Eye,
@@ -112,7 +119,7 @@ const buscarClienteComCache = async (nome: string): Promise<ClienteContatoData |
           clientesService.getSearchCooldownRemaining(),
         );
         console.warn(
-          `Busca de clientes em cooldown (${cooldownMs}ms restantes). Ignorando requisicao para "${nome}".`, 
+          `Busca de clientes em cooldown (${cooldownMs}ms restantes). Ignorando requisicao para "${nome}".`,
         );
         armazenarNoCache(nome, null, cooldownMs);
         return null;
@@ -224,6 +231,37 @@ interface PropostaActionsProps {
   hideView?: boolean;
 }
 
+type PromptDialogState = {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  placeholder?: string;
+  confirmText: string;
+  cancelText: string;
+  value: string;
+  required?: boolean;
+  multiline?: boolean;
+  inputType?: 'text' | 'email';
+  error?: string;
+  confirmVariant?: 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'info';
+  validate?: (value: string) => string | null;
+};
+
+type PlanoComponentePdf = {
+  childItemId: string;
+  componentRole: 'included' | 'required' | 'optional' | 'recommended' | 'addon';
+  quantity?: number;
+  nome?: string;
+};
+
+const componentRoleLabelsPdf: Record<PlanoComponentePdf['componentRole'], string> = {
+  included: 'Incluido',
+  required: 'Obrigatorio',
+  optional: 'Opcional',
+  recommended: 'Recomendado',
+  addon: 'Add-on',
+};
+
 const PropostaActions: React.FC<PropostaActionsProps> = ({
   proposta,
   onViewProposta,
@@ -250,11 +288,13 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const [avancandoFluxo, setAvancandoFluxo] = useState(false);
   const [decidindoAlcadaAprovacao, setDecidindoAlcadaAprovacao] = useState(false);
   const [decidindoAlcadaReprovacao, setDecidindoAlcadaReprovacao] = useState(false);
+  const [promptDialog, setPromptDialog] = useState<PromptDialogState | null>(null);
   const propostaCompletaCacheRef = React.useRef<PropostaCompleta | null>(
     proposta && typeof (proposta as any).cliente === 'object'
       ? (proposta as PropostaCompleta)
       : null,
   );
+  const promptResolverRef = React.useRef<((value: string | null) => void) | null>(null);
 
   // Funcao para detectar se e PropostaCompleta ou PropostaUI
   const isPropostaCompleta = (prop: PropostaCompleta | PropostaUI): prop is PropostaCompleta => {
@@ -264,6 +304,72 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   React.useEffect(() => {
     propostaCompletaCacheRef.current = isPropostaCompleta(proposta) ? proposta : null;
   }, [proposta]);
+
+  React.useEffect(() => {
+    return () => {
+      if (promptResolverRef.current) {
+        promptResolverRef.current(null);
+        promptResolverRef.current = null;
+      }
+    };
+  }, []);
+
+  const closePromptDialog = React.useCallback(() => {
+    if (promptResolverRef.current) {
+      promptResolverRef.current(null);
+      promptResolverRef.current = null;
+    }
+    setPromptDialog(null);
+  }, []);
+
+  const askForInput = React.useCallback(
+    (
+      config: Omit<PromptDialogState, 'isOpen' | 'value' | 'error'> & {
+        defaultValue?: string;
+      },
+    ) =>
+      new Promise<string | null>((resolve) => {
+        promptResolverRef.current = resolve;
+        setPromptDialog({
+          ...config,
+          isOpen: true,
+          value: config.defaultValue ?? '',
+          error: undefined,
+        });
+      }),
+    [],
+  );
+
+  const submitPromptDialog = React.useCallback(() => {
+    if (!promptDialog || !promptResolverRef.current) {
+      setPromptDialog(null);
+      return;
+    }
+
+    const normalizedValue = promptDialog.value.trim();
+
+    if (promptDialog.required && !normalizedValue) {
+      setPromptDialog((current) =>
+        current ? { ...current, error: 'Este campo e obrigatorio.' } : current,
+      );
+      return;
+    }
+
+    if (promptDialog.validate) {
+      const validationError = promptDialog.validate(normalizedValue);
+      if (validationError) {
+        setPromptDialog((current) =>
+          current ? { ...current, error: validationError } : current,
+        );
+        return;
+      }
+    }
+
+    const resolver = promptResolverRef.current;
+    promptResolverRef.current = null;
+    setPromptDialog(null);
+    resolver(normalizedValue);
+  }, [promptDialog]);
 
   const obterAprovacaoInterna = () => {
     const source = proposta as any;
@@ -405,6 +511,93 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     return String(value || '').trim();
   };
 
+  const normalizarComponentesPlanoPdf = (value: unknown): PlanoComponentePdf[] => {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value
+      .map((raw) => {
+        if (!raw || typeof raw !== 'object') {
+          return null;
+        }
+
+        const record = raw as Record<string, unknown>;
+        const childItemId = String(record.childItemId || record.child_item_id || '').trim();
+        if (!childItemId) {
+          return null;
+        }
+
+        const componentRoleRaw = String(record.componentRole || record.component_role || 'included');
+        const componentRole = (
+          ['included', 'required', 'optional', 'recommended', 'addon'].includes(componentRoleRaw)
+            ? componentRoleRaw
+            : 'included'
+        ) as PlanoComponentePdf['componentRole'];
+
+        const quantity = Number(record.quantity);
+
+        return {
+          childItemId,
+          componentRole,
+          quantity: Number.isFinite(quantity) ? quantity : undefined,
+          nome: typeof record.nome === 'string' ? record.nome : undefined,
+        } as PlanoComponentePdf;
+      })
+      .filter((item): item is PlanoComponentePdf => Boolean(item));
+  };
+
+  const montarDescricaoComposicaoPlanoPdf = (
+    componentesPlano: PlanoComponentePdf[],
+    limit = 6,
+  ): string | undefined => {
+    if (!Array.isArray(componentesPlano) || componentesPlano.length === 0) {
+      return undefined;
+    }
+
+    const linhas = componentesPlano.slice(0, limit).map((componente) => {
+      const nome = componente.nome?.trim() || 'Item da composicao';
+      const quantidade =
+        typeof componente.quantity === 'number' && componente.quantity > 1
+          ? ` x${componente.quantity}`
+          : '';
+      const papel = componentRoleLabelsPdf[componente.componentRole || 'included'] || 'Incluido';
+      return `- ${nome}${quantidade} (${papel})`;
+    });
+
+    if (componentesPlano.length > limit) {
+      linhas.push(`- +${componentesPlano.length - limit} componente(s) adicional(is)`);
+    }
+
+    return `Composicao do plano:\n${linhas.join('\n')}`;
+  };
+
+  const montarDescricaoItemPdf = (
+    descricaoBase: string,
+    tipoItem: unknown,
+    componentesPlano: PlanoComponentePdf[],
+  ): string | undefined => {
+    const partes: string[] = [];
+    if (descricaoBase) {
+      partes.push(descricaoBase);
+    }
+
+    const tipoItemNormalizado = String(tipoItem || '')
+      .trim()
+      .toLowerCase();
+    const temComposicao = Array.isArray(componentesPlano) && componentesPlano.length > 0;
+    const descricaoJaTemComposicao = descricaoBase.toLowerCase().includes('composicao do plano');
+    if ((tipoItemNormalizado === 'plano' || temComposicao) && !descricaoJaTemComposicao) {
+      const descricaoComposicao = montarDescricaoComposicaoPlanoPdf(componentesPlano);
+      if (descricaoComposicao) {
+        partes.push(descricaoComposicao);
+      }
+    }
+
+    const descricaoFinal = partes.join('\n\n').trim();
+    return descricaoFinal || undefined;
+  };
+
   const descreverFormaPagamentoPdf = (formaPagamento: unknown, parcelas?: unknown) => {
     const normalized = String(formaPagamento || '')
       .trim()
@@ -531,12 +724,20 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       const desconto = Math.max(0, Number(item?.desconto ?? produto?.desconto ?? 0));
       const valorTotalCalculado = valorUnitario * quantidade * (1 - desconto / 100);
       const valorTotal = Number(item?.subtotal ?? item?.valorTotal ?? valorTotalCalculado);
+      const tipoItem = item?.tipoItem ?? produto?.tipoItem;
+      const componentesPlano = normalizarComponentesPlanoPdf(
+        item?.componentesPlano ??
+          item?.componentes ??
+          produto?.componentesPlano ??
+          produto?.componentes,
+      );
+      const descricaoBase = String(
+        produto?.descricao || item?.descricao || item?.detalhes || item?.observacoes || '',
+      ).trim();
 
       return {
         nome,
-        descricao: String(
-          produto?.descricao || item?.descricao || item?.detalhes || item?.observacoes || '',
-        ).trim(),
+        descricao: montarDescricaoItemPdf(descricaoBase, tipoItem, componentesPlano),
         quantidade,
         unidade:
           String(produto?.unidade || item?.unidade || item?.unidadeMedida || 'un').trim() || 'un',
@@ -1480,9 +1681,15 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           break;
 
         case 'negociacao': {
-          const aprovar = window.confirm(
-            'Deseja marcar esta proposta como APROVADA?\n\nClique em OK para aprovar ou Cancelar para rejeitar.',
-          );
+          const aprovar = await confirm({
+            title: 'Encerrar negociacao da proposta',
+            message:
+              'Confirme para aprovar a proposta agora. Se preferir rejeitar, use cancelar e confirme a rejeicao na etapa seguinte.',
+            confirmText: 'Aprovar proposta',
+            cancelText: 'Rejeitar proposta',
+            icon: 'info',
+            confirmButtonClass: 'bg-[#159A9C] hover:bg-[#0F7B7D] focus:ring-[#159A9C]',
+          });
 
           if (aprovar) {
             await sincronizarStatusProposta('aprovada', {
@@ -1494,10 +1701,35 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
             break;
           }
 
-          const motivoPerda = window.prompt(
-            'Informe o motivo da perda (opcional):',
-            'Cliente optou por outra proposta',
-          );
+          const confirmarRejeicao = await confirm({
+            title: 'Confirmar rejeicao da proposta',
+            message: 'A proposta sera marcada como rejeitada. Deseja continuar?',
+            confirmText: 'Sim, rejeitar',
+            cancelText: 'Voltar',
+            icon: 'warning',
+            confirmButtonClass: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
+          });
+
+          if (!confirmarRejeicao) {
+            toastService.info('Negociacao mantida sem alteracoes.');
+            break;
+          }
+
+          const motivoPerda = await askForInput({
+            title: 'Registrar motivo da perda',
+            message: 'Se quiser, descreva o motivo da rejeicao para manter o historico comercial mais completo.',
+            placeholder: 'Cliente optou por outra proposta',
+            confirmText: 'Rejeitar proposta',
+            cancelText: 'Cancelar',
+            defaultValue: 'Cliente optou por outra proposta',
+            multiline: true,
+            confirmVariant: 'danger',
+          });
+
+          if (motivoPerda === null) {
+            toastService.info('Rejeicao cancelada.');
+            break;
+          }
 
           await sincronizarStatusProposta('rejeitada', {
             source: 'fluxo-avanco',
@@ -1699,10 +1931,16 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       return;
     }
 
-    const motivoReprovacao = window.prompt(
-      'Informe o motivo da reprovacao interna (opcional):',
-      'Desconto acima da politica comercial',
-    );
+    const motivoReprovacao = await askForInput({
+      title: 'Reprovar alcada interna',
+      message: 'Informe o motivo da reprovacao. Esse texto ajuda a equipe comercial a corrigir a proposta.',
+      placeholder: 'Descreva o motivo da reprovacao',
+      confirmText: 'Confirmar reprovacao',
+      cancelText: 'Cancelar',
+      defaultValue: 'Desconto acima da politica comercial',
+      multiline: true,
+      confirmVariant: 'danger',
+    });
     if (motivoReprovacao === null) {
       return;
     }
@@ -1743,17 +1981,21 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     let emailFinal = (clienteData.email || '').trim();
 
     if (!emailFinal) {
-      const emailInformado = prompt(
-        `O cliente "${clienteData.nome}" nao possui e-mail cadastrado.\n\nDigite o e-mail para envio da proposta:`,
-      );
+      const emailInformado = await askForInput({
+        title: 'Informar e-mail do cliente',
+        message: `O cliente "${clienteData.nome}" nao possui e-mail cadastrado. Informe o endereco para enviar a proposta.`,
+        placeholder: 'cliente@empresa.com',
+        confirmText: 'Usar e-mail',
+        cancelText: 'Cancelar',
+        required: true,
+        inputType: 'email',
+        confirmVariant: 'primary',
+        validate: (value) =>
+          emailRegex.test(value) ? null : `E-mail informado e invalido: ${value || 'vazio'}`,
+      });
 
       if (!emailInformado) {
         toastService.error('Envio cancelado - E-mail e obrigatorio');
-        return;
-      }
-
-      if (!emailRegex.test(emailInformado)) {
-        toastService.error('E-mail informado e invalido: ' + emailInformado);
         return;
       }
 
@@ -1771,18 +2013,21 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       emailFinal.includes('@ficticio.');
 
     if (isEmailFicticio) {
-      // Solicitar email real do usuario
-      const emailReal = prompt(
-        `O email cadastrado "${clienteData.email}" e ficticio.\n\nPor favor, digite o email REAL do cliente "${clienteData.nome}":\n\n(Ex: dhonlenofreitas@hotmail.com)`,
-      );
+      const emailReal = await askForInput({
+        title: 'Corrigir e-mail ficticio',
+        message: `O e-mail cadastrado "${clienteData.email}" parece ficticio. Informe o e-mail real do cliente "${clienteData.nome}" para continuar.`,
+        placeholder: 'cliente@empresa.com',
+        confirmText: 'Corrigir e enviar',
+        cancelText: 'Cancelar',
+        required: true,
+        inputType: 'email',
+        confirmVariant: 'primary',
+        validate: (value) =>
+          emailRegex.test(value) ? null : `E-mail informado e invalido: ${value || 'vazio'}`,
+      });
 
       if (!emailReal) {
         toastService.error('Envio cancelado - Email real e obrigatorio');
-        return;
-      }
-
-      if (!emailRegex.test(emailReal)) {
-        toastService.error('Email informado e invalido: ' + emailReal);
         return;
       }
 
@@ -1929,6 +2174,14 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const buttonClass = showLabels
     ? 'flex items-center space-x-2 px-3 py-2 text-sm font-medium rounded-md transition-colors'
     : 'p-2 rounded-md transition-colors';
+  const buttonThemeClass = {
+    primary: 'text-[#159A9C] hover:bg-[#F2FBFA] hover:text-[#0F7B7D]',
+    success: 'text-[#15803D] hover:bg-[#F0FDF4] hover:text-[#166534]',
+    warning: 'text-[#B45309] hover:bg-[#FFF7ED] hover:text-[#92400E]',
+    danger: 'text-[#DC2626] hover:bg-[#FEF2F2] hover:text-[#B91C1C]',
+    neutral: 'text-[#607B89] hover:bg-[#F6FAFB] hover:text-[#244455]',
+    accent: 'text-[#7C3AED] hover:bg-[#F5F3FF] hover:text-[#6D28D9]',
+  } as const;
   const statusFluxoAtual = String(getPropostaData().status || '')
     .trim()
     .toLowerCase();
@@ -1945,8 +2198,9 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       {/* Visualizar */}
       {!hideView && (
         <button
+          type="button"
           onClick={() => onViewProposta(proposta)}
-          className={`${buttonClass} text-blue-600 hover:text-blue-900 hover:bg-blue-50`}
+          className={`${buttonClass} ${buttonThemeClass.primary}`}
           title="Visualizar proposta"
         >
           <Eye className="w-4 h-4" />
@@ -1956,9 +2210,10 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
       {/* Email */}
       <button
+        type="button"
         onClick={handleSendEmail}
         disabled={sendingEmail}
-        className={`${buttonClass} text-green-600 hover:text-green-900 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed`}
+        className={`${buttonClass} ${buttonThemeClass.success} disabled:cursor-not-allowed disabled:opacity-50`}
         title={clienteData?.email ? 'Enviar por email' : 'Informar e-mail e enviar'}
       >
         {sendingEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
@@ -1967,9 +2222,10 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
       {/* WhatsApp */}
       <button
+        type="button"
         onClick={handleSendWhatsApp}
         disabled={!clienteData?.nome}
-        className={`${buttonClass} text-green-500 hover:text-green-700 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed`}
+        className={`${buttonClass} ${buttonThemeClass.success} disabled:cursor-not-allowed disabled:opacity-50`}
         title={
           clienteData?.telefone
             ? 'Enviar por WhatsApp'
@@ -1982,9 +2238,10 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
       {/* Download PDF */}
       <button
+        type="button"
         onClick={handleDownloadPdf}
         disabled={downloadingPdf}
-        className={`${buttonClass} text-red-600 hover:text-red-900 hover:bg-red-50 disabled:opacity-50`}
+        className={`${buttonClass} ${buttonThemeClass.danger} disabled:opacity-50`}
         title="Baixar PDF"
       >
         {downloadingPdf ? (
@@ -1997,8 +2254,9 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
       {/* Compartilhar */}
       <button
+        type="button"
         onClick={handleShare}
-        className={`${buttonClass} text-purple-600 hover:text-purple-900 hover:bg-purple-50`}
+        className={`${buttonClass} ${buttonThemeClass.accent}`}
         title="Compartilhar link"
       >
         <Share2 className="w-4 h-4" />
@@ -2006,12 +2264,12 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       </button>
 
       {/* SEPARADOR VISUAL */}
-      <div className="h-6 w-px bg-gray-300 mx-2"></div>
+      <div className="mx-2 h-6 w-px bg-[#D4E2E7]"></div>
       {/* Decisao de alcada */}
       {possuiAprovacaoPendente && (
         <>
           <span
-            className={`${buttonClass} text-amber-700 bg-amber-50 border border-amber-200 cursor-default`}
+            className={`${buttonClass} cursor-default border border-[#F4D58D] bg-[#FFF7ED] text-[#92400E]`}
             title={
               aprovacaoInternaAtual?.motivo ||
               'Proposta com desconto acima da politica. Exige aprovacao interna.'
@@ -2022,9 +2280,10 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           </span>
 
           <button
+            type="button"
             onClick={handleAprovarAlcada}
             disabled={decidindoAlcadaAprovacao || decidindoAlcadaReprovacao}
-            className={`${buttonClass} text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50 disabled:opacity-50`}
+            className={`${buttonClass} ${buttonThemeClass.success} disabled:opacity-50`}
             title="Aprovar alcada interna"
           >
             {decidindoAlcadaAprovacao ? (
@@ -2036,9 +2295,10 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           </button>
 
           <button
+            type="button"
             onClick={handleReprovarAlcada}
             disabled={decidindoAlcadaAprovacao || decidindoAlcadaReprovacao}
-            className={`${buttonClass} text-rose-700 hover:text-rose-900 hover:bg-rose-50 disabled:opacity-50`}
+            className={`${buttonClass} ${buttonThemeClass.danger} disabled:opacity-50`}
             title="Reprovar alcada interna"
           >
             {decidindoAlcadaReprovacao ? (
@@ -2056,9 +2316,10 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       {/* Gerar Contrato */}
       {podeGerarContrato() && (
         <button
+          type="button"
           onClick={handleGerarContrato}
           disabled={gerandoContrato || !automacaoAvancadaDisponivel}
-          className={`${buttonClass} text-blue-600 hover:text-blue-900 hover:bg-blue-50 disabled:opacity-50`}
+          className={`${buttonClass} ${buttonThemeClass.primary} disabled:opacity-50`}
           title={
             automacaoAvancadaDisponivel
               ? 'Gerar contrato a partir desta proposta'
@@ -2077,11 +2338,12 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       {/* Criar Fatura */}
       {podeCriarFatura() && (
         <button
+          type="button"
           onClick={() => {
             void handleCriarFatura();
           }}
           disabled={criandoFatura || !automacaoAvancadaDisponivel}
-          className={`${buttonClass} text-green-600 hover:text-green-900 hover:bg-green-50 disabled:opacity-50`}
+          className={`${buttonClass} ${buttonThemeClass.success} disabled:opacity-50`}
           title={
             automacaoAvancadaDisponivel
               ? 'Criar fatura automatica'
@@ -2099,9 +2361,10 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
       {/* Avancar Fluxo */}
       <button
+        type="button"
         onClick={handleAvancarFluxo}
         disabled={avancandoFluxo || bloqueadoPorAlcada}
-        className={`${buttonClass} text-orange-600 hover:text-orange-900 hover:bg-orange-50 disabled:opacity-50`}
+        className={`${buttonClass} ${buttonThemeClass.warning} disabled:opacity-50`}
         title={tituloBotaoFluxo}
       >
         {avancandoFluxo ? (
@@ -2137,10 +2400,76 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           }}
         />
       )}
+
+      {promptDialog && (
+        <BaseModal
+          isOpen={promptDialog.isOpen}
+          onClose={closePromptDialog}
+          title={promptDialog.title}
+          subtitle={promptDialog.message}
+          size="medium"
+          footer={
+            <div className="flex items-center justify-end gap-3">
+              <ModalButton type="button" variant="secondary" onClick={closePromptDialog}>
+                {promptDialog.cancelText}
+              </ModalButton>
+              <ModalButton
+                type="button"
+                variant={promptDialog.confirmVariant || 'primary'}
+                onClick={submitPromptDialog}
+              >
+                {promptDialog.confirmText}
+              </ModalButton>
+            </div>
+          }
+        >
+          <FormField
+            label="Detalhes"
+            required={Boolean(promptDialog.required)}
+            error={promptDialog.error}
+          >
+            {promptDialog.multiline ? (
+              <FormTextarea
+                value={promptDialog.value}
+                onChange={(event) =>
+                  setPromptDialog((current) =>
+                    current
+                      ? {
+                          ...current,
+                          value: event.target.value,
+                          error: undefined,
+                        }
+                      : current,
+                  )
+                }
+                placeholder={promptDialog.placeholder}
+                rows={4}
+                autoFocus
+              />
+            ) : (
+              <FormInput
+                type={promptDialog.inputType || 'text'}
+                value={promptDialog.value}
+                onChange={(event) =>
+                  setPromptDialog((current) =>
+                    current
+                      ? {
+                          ...current,
+                          value: event.target.value,
+                          error: undefined,
+                        }
+                      : current,
+                  )
+                }
+                placeholder={promptDialog.placeholder}
+                autoFocus
+              />
+            )}
+          </FormField>
+        </BaseModal>
+      )}
     </div>
   );
 };
 
 export default PropostaActions;
-
-
