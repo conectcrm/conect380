@@ -29,7 +29,7 @@ import { ProdutoListFilters, ProdutoListResult } from './produtos.service';
 @Controller('produtos')
 @UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
 @Permissions(Permission.CRM_PRODUTOS_READ)
-@UseInterceptors(CacheInterceptor) // 🚀 Cache ativado para produtos
+@UseInterceptors(CacheInterceptor) // Cache ativado para produtos
 export class ProdutosController {
   constructor(private readonly produtosService: ProdutosService) {}
 
@@ -120,7 +120,7 @@ export class ProdutosController {
   }
 
   @Get()
-  @CacheTTL(60 * 1000) // 🚀 Cache: 1 minuto (listagem muda frequentemente)
+  @CacheTTL(60 * 1000) // Cache: 1 minuto (listagem muda frequentemente)
   async findAll(
     @EmpresaId() empresaId: string,
     @Query('categoria') categoria?: string,
@@ -171,13 +171,13 @@ export class ProdutosController {
   }
 
   @Get('estatisticas')
-  @CacheTTL(2 * 60 * 1000) // 🚀 Cache: 2 minutos (estatísticas mudam menos)
+  @CacheTTL(2 * 60 * 1000) // Cache: 2 minutos (estatísticas mudam menos)
   async getEstatisticas(@EmpresaId() empresaId: string) {
     return this.produtosService.getEstatisticas(empresaId);
   }
 
   @Get(':id')
-  @CacheTTL(5 * 60 * 1000) // 🚀 Cache: 5 minutos (produto individual muda pouco)
+  @CacheTTL(5 * 60 * 1000) // Cache: 5 minutos (produto individual muda pouco)
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @EmpresaId() empresaId: string,
@@ -211,6 +211,6 @@ export class ProdutosController {
     @EmpresaId() empresaId: string,
   ): Promise<{ message: string }> {
     await this.produtosService.remove(id, empresaId);
-    return { message: 'Produto excluído com sucesso' };
+    return { message: 'Produto descontinuado com sucesso' };
   }
 }

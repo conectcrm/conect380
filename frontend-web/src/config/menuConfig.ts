@@ -16,6 +16,7 @@ import {
   Database,
   UserCog,
   Archive,
+  Car,
   Phone,
   Zap,
   Receipt,
@@ -767,6 +768,17 @@ export const menuConfig: MenuConfig[] = [
         requiredModule: 'VENDAS',
         group: 'Cat\u00e1logo',
       },
+      {
+        id: 'comercial-veiculos',
+        title: 'Estoque de Veiculos',
+        shortTitle: 'Veiculos',
+        icon: Car,
+        href: '/vendas/veiculos',
+        color: 'blue',
+        permissions: ['crm.produtos.read'],
+        requiredModule: 'VENDAS',
+        group: 'Cat\u00e1logo',
+      },
       ...(catalogoFeatures.combosEnabled
         ? [
             {
@@ -1050,6 +1062,14 @@ const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
     pattern: '/vendas/aprovacoes',
     permissions: ['financeiro.pagamentos.manage'],
   },
+  {
+    pattern: '/veiculos',
+    permissions: ['crm.produtos.read'],
+  },
+  {
+    pattern: '/vendas/veiculos',
+    permissions: ['crm.produtos.read'],
+  },
   ...(catalogoFeatures.combosEnabled
     ? ([
         {
@@ -1135,6 +1155,7 @@ const ROUTE_PATH_ALIASES: Record<string, string[]> = {
   '/aprovacoes/pendentes': ['/financeiro/compras/aprovacoes', '/vendas/aprovacoes'],
   '/produtos': ['/vendas/produtos'],
   '/produtos/categorias': ['/vendas/produtos'],
+  '/veiculos': ['/vendas/veiculos'],
   ...(catalogoFeatures.combosEnabled ? { '/combos': ['/vendas/combos'] } : {}),
   '/agenda': ['/crm/agenda'],
   '/billing': ['/billing/assinaturas'],

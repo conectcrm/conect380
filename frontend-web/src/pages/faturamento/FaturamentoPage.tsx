@@ -106,6 +106,8 @@ export default function FaturamentoPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const faturaIdParam = searchParams.get('faturaId');
+  const clienteIdParam = (searchParams.get('clienteId') || '').trim();
+  const clienteNomeParam = (searchParams.get('cliente') || '').trim();
   const [faturas, setFaturas] = useState<Fatura[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [modalAberto, setModalAberto] = useState(false);
@@ -128,6 +130,34 @@ export default function FaturamentoPage() {
     valorEmAberto?: number;
   }>({});
   const [buscaDebounced] = useDebounce(busca, 500);
+
+  useEffect(() => {
+    if (clienteNomeParam && !busca.trim()) {
+      setBusca(clienteNomeParam);
+    }
+  }, [clienteNomeParam, busca]);
+
+  useEffect(() => {
+    if (!clienteIdParam) {
+      return;
+    }
+
+    const clienteIdNumerico = Number(clienteIdParam);
+    if (!Number.isInteger(clienteIdNumerico) || clienteIdNumerico <= 0) {
+      return;
+    }
+
+    setFiltros((prev) => {
+      if (prev.clienteId === clienteIdNumerico) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        clienteId: clienteIdNumerico,
+      };
+    });
+  }, [clienteIdParam]);
 
   // Estados para seleção múltipla
   const [faturasSelecionadas, setFaturasSelecionadas] = useState<number[]>([]);
@@ -1231,6 +1261,13 @@ export default function FaturamentoPage() {
 
   const termoBusca = busca.trim().toLowerCase();
   const faturasFiltradas = faturas.filter((fatura) => {
+    if (clienteIdParam) {
+      const clienteIdFatura = String((fatura as any).cliente?.id || fatura.clienteId || '').trim();
+      if (clienteIdFatura && clienteIdFatura !== clienteIdParam) {
+        return false;
+      }
+    }
+
     if (!termoBusca) {
       return true;
     }

@@ -9,20 +9,21 @@ import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { useI18n } from '../../contexts/I18nContext';
-import { X, Tag, Package, DollarSign, AlertTriangle, Keyboard } from 'lucide-react';
+import { X, Tag, Package, DollarSign, AlertTriangle, Keyboard, Plus, Trash2 } from 'lucide-react';
 import { MoneyInput } from '../common/MoneyInput';
-import { useProdutosParaPropostas } from '../../shared/produtosAdapter';
-import { useAutoSave } from '../../hooks/useAutoSave';
 import { useModalKeyboardShortcuts } from '../../hooks/useModalKeyboardShortcuts';
 import { SaveStatus } from '../SaveStatus';
 import { useProdutoSoftware } from '../../hooks/useProdutoSoftware';
+import { produtosService, Produto, ProdutoComponente } from '../../services/produtosService';
 import {
-  camposSoftware,
-  precisaCamposSoftware,
-  validarDadosSoftware,
-} from '../../config/camposSoftware';
+  catalogoService,
+  CatalogTemplate,
+  CatalogTemplateField,
+} from '../../services/catalogoService';
 import { categoriasProdutosService } from '../../services/categoriasProdutosService';
 import { CategoriaProduto } from '../../types/produtos';
+import { useAuth } from '../../hooks/useAuth';
+import { isCatalogApiEnabledForTenant } from '../../config/catalogoFeaturesFlags';
 
 const normalizeCatalogName = (value?: string | null) =>
   (value || '')
@@ -35,15 +36,34 @@ const normalizeCatalogName = (value?: string | null) =>
 interface ProdutoFormData {
   nome: string;
   tipo?: 'produto' | 'servico' | 'software'; // Novo campo para detectar software
-  tipoItem: 'produto' | 'servico' | 'licenca' | 'modulo' | 'plano' | 'aplicativo';
+  tipoItem:
+    | 'produto'
+    | 'servico'
+    | 'licenca'
+    | 'modulo'
+    | 'plano'
+    | 'aplicativo'
+    | 'peca'
+    | 'acessorio'
+    | 'pacote'
+    | 'garantia';
   categoria: string;
   categoriaId?: string;
   subcategoriaId?: string;
   configuracaoId?: string;
   precoUnitario: number;
   custoUnitario?: number;
-  frequencia: 'unico' | 'mensal' | 'anual';
-  unidadeMedida: 'unidade' | 'saca' | 'hectare' | 'pacote' | 'licenca';
+  frequencia: 'unico' | 'mensal' | 'anual' | 'trimestral' | 'sob_consulta';
+  unidadeMedida:
+    | 'unidade'
+    | 'saca'
+    | 'hectare'
+    | 'pacote'
+    | 'licenca'
+    | 'hora'
+    | 'dia'
+    | 'mensal'
+    | 'assinatura';
   status: 'ativo' | 'inativo' | 'descontinuado';
   descricao?: string;
   sku?: string;
@@ -53,20 +73,56 @@ interface ProdutoFormData {
   estoqueMaximo?: number;
   tags?: string[];
   variacoes?: string[];
+  templateCode?: string;
+  atributosTemplate?: Record<string, unknown>;
   // Campos específicos para software
   tipoLicenciamento?: string;
   periodicidadeLicenca?: string;
   renovacaoAutomatica?: boolean;
   quantidadeLicencas?: number;
+  componentes?: ProdutoComponente[];
 }
 
 interface ModalCadastroProdutoProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: ProdutoFormData) => void;
-  produtoEditando?: ProdutoFormData | null;
+  onSubmit: (data: ProdutoFormData) => void | Promise<void>;
+  produtoEditando?: (ProdutoFormData & { produtoId?: string }) | null;
+  defaultTipoItem?: ProdutoFormData['tipoItem'];
   loading?: boolean;
 }
+
+const tiposItemPermitidos = new Set<ProdutoFormData['tipoItem']>([
+  'produto',
+  'servico',
+  'licenca',
+  'modulo',
+  'plano',
+  'aplicativo',
+  'peca',
+  'acessorio',
+  'pacote',
+  'garantia',
+]);
+
+const resolveTipoItemPadrao = (tipoItem?: string | null): ProdutoFormData['tipoItem'] => {
+  if (tipoItem && tiposItemPermitidos.has(tipoItem as ProdutoFormData['tipoItem'])) {
+    return tipoItem as ProdutoFormData['tipoItem'];
+  }
+
+  return 'produto';
+};
+
+const componenteRoleOptions: Array<{
+  value: ProdutoComponente['componentRole'];
+  label: string;
+}> = [
+  { value: 'included', label: 'Incluído' },
+  { value: 'required', label: 'Obrigatório' },
+  { value: 'optional', label: 'Opcional' },
+  { value: 'recommended', label: 'Recomendado' },
+  { value: 'addon', label: 'Add-on' },
+];
 
 // Schema de validação
 const schema = yup.object().shape({
@@ -77,7 +133,21 @@ const schema = yup.object().shape({
   tipoItem: yup
     .string()
     .required('Tipo do item é obrigatório')
-    .oneOf(['produto', 'servico', 'licenca', 'modulo', 'plano', 'aplicativo'], 'Tipo inválido'),
+    .oneOf(
+      [
+        'produto',
+        'servico',
+        'licenca',
+        'modulo',
+        'plano',
+        'aplicativo',
+        'peca',
+        'acessorio',
+        'pacote',
+        'garantia',
+      ],
+      'Tipo inválido',
+    ),
   categoria: yup.string().required('Categoria é obrigatória'),
   categoriaId: yup.string().optional(),
   subcategoriaId: yup.string().optional(),
@@ -94,11 +164,14 @@ const schema = yup.object().shape({
   frequencia: yup
     .string()
     .required('Frequência é obrigatória')
-    .oneOf(['unico', 'mensal', 'anual'], 'Frequência inválida'),
+    .oneOf(['unico', 'mensal', 'anual', 'trimestral', 'sob_consulta'], 'Frequência inválida'),
   unidadeMedida: yup
     .string()
     .required('Unidade de medida é obrigatória')
-    .oneOf(['unidade', 'saca', 'hectare', 'pacote', 'licenca'], 'Unidade inválida'),
+    .oneOf(
+      ['unidade', 'saca', 'hectare', 'pacote', 'licenca', 'hora', 'dia', 'mensal', 'assinatura'],
+      'Unidade inválida',
+    ),
   status: yup
     .string()
     .required('Status é obrigatório')
@@ -123,6 +196,7 @@ const schema = yup.object().shape({
     .min(0, 'Estoque máximo deve ser maior ou igual a zero'),
   tags: yup.array().of(yup.string()).default([]),
   variacoes: yup.array().of(yup.string()).default([]),
+  componentes: yup.array().default([]),
   // Validação condicional para campos de software
   tipoLicenciamento: yup.string().when('tipoItem', {
     is: (tipoItem: string) => ['licenca', 'modulo', 'aplicativo'].includes(tipoItem),
@@ -145,7 +219,7 @@ const schema = yup.object().shape({
 });
 
 // Opções
-const tiposItem = [
+const tiposItemBase = [
   { value: 'produto', label: 'Produto' },
   { value: 'servico', label: 'Serviço' },
   { value: 'licenca', label: 'Licença' },
@@ -154,10 +228,23 @@ const tiposItem = [
   { value: 'aplicativo', label: 'Aplicativo' },
 ];
 
-const frequencias = [
+const tiposItemCatalogo = [
+  { value: 'peca', label: 'Peca' },
+  { value: 'acessorio', label: 'Acessorio' },
+  { value: 'pacote', label: 'Pacote' },
+  { value: 'garantia', label: 'Garantia' },
+];
+
+const frequenciasBase = [
   { value: 'unico', label: 'Único' },
   { value: 'mensal', label: 'Mensal' },
   { value: 'anual', label: 'Anual' },
+];
+
+const frequenciasCatalogo = [
+  ...frequenciasBase,
+  { value: 'trimestral', label: 'Trimestral' },
+  { value: 'sob_consulta', label: 'Sob consulta' },
 ];
 
 const unidadesMedida = [
@@ -165,23 +252,61 @@ const unidadesMedida = [
   { value: 'saca', label: 'Saca' },
   { value: 'hectare', label: 'Hectare' },
   { value: 'pacote', label: 'Pacote' },
+  { value: 'hora', label: 'Hora' },
+  { value: 'dia', label: 'Dia' },
+  { value: 'mensal', label: 'Mensal' },
   { value: 'licenca', label: 'Licença' },
+  { value: 'assinatura', label: 'Assinatura' },
 ];
+
+const inferTemplateCodeByTipoItem = (tipoItem: ProdutoFormData['tipoItem']): string => {
+  if (tipoItem === 'plano') return 'software_plan';
+  if (tipoItem === 'modulo' || tipoItem === 'licenca' || tipoItem === 'aplicativo') {
+    return 'software_module';
+  }
+  if (tipoItem === 'pacote') return 'service_package';
+  if (tipoItem === 'peca') return 'autoparts_item';
+  if (tipoItem === 'acessorio' || tipoItem === 'garantia' || tipoItem === 'servico') {
+    return 'retail_accessory_or_service';
+  }
+
+  return '';
+};
 
 export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
   isOpen,
   onClose,
   onSubmit,
   produtoEditando,
+  defaultTipoItem = 'produto',
   loading = false,
 }) => {
   // Hook de internacionalização
   const { t } = useI18n();
+  const { user } = useAuth();
 
   const [tagInput, setTagInput] = useState('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isFormInitialized, setIsFormInitialized] = useState(false);
   const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
+  const [itensComposicao, setItensComposicao] = useState<Produto[]>([]);
+  const [loadingItensComposicao, setLoadingItensComposicao] = useState(false);
+  const [novoComponenteItemId, setNovoComponenteItemId] = useState('');
+  const [novoComponenteRole, setNovoComponenteRole] =
+    useState<ProdutoComponente['componentRole']>('included');
+  const [activeStep, setActiveStep] = useState(1);
+  const [catalogTemplates, setCatalogTemplates] = useState<CatalogTemplate[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [selectedTemplateCode, setSelectedTemplateCode] = useState('');
+  const [templateFieldValues, setTemplateFieldValues] = useState<Record<string, unknown>>({});
+  const [templateFieldErrors, setTemplateFieldErrors] = useState<Record<string, string>>({});
+  const [showCustoField, setShowCustoField] = useState(false);
+  const empresaId = user?.empresa?.id || null;
+  const catalogApiEnabled = useMemo(
+    () => isCatalogApiEnabledForTenant(empresaId),
+    [empresaId],
+  );
+  const initialTipoItem = resolveTipoItemPadrao(defaultTipoItem);
 
   // Estado para categorias carregadas do backend
   const [categoriasCatalogo, setCategoriasCatalogo] = useState<CategoriaProduto[]>([]);
@@ -243,15 +368,16 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
     handleSubmit,
     control,
     setValue,
+    trigger,
     watch,
     reset,
-    formState: { errors, isValid, isSubmitting, isDirty },
+    formState: { errors, isValid, isSubmitting },
   } = useForm<ProdutoFormData>({
     resolver: yupResolver(schema),
     mode: 'onChange',
     defaultValues: {
       nome: '',
-      tipoItem: 'produto',
+      tipoItem: initialTipoItem,
       categoria: '',
       categoriaId: undefined,
       subcategoriaId: undefined,
@@ -269,16 +395,19 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
       estoqueMaximo: undefined,
       tags: [],
       variacoes: [],
+      templateCode: undefined,
+      atributosTemplate: undefined,
       // Valores padrão para campos de software
       tipoLicenciamento: '',
       periodicidadeLicenca: '',
       renovacaoAutomatica: false,
       quantidadeLicencas: 1,
+      componentes: [],
     },
   });
 
   // Hook para produtos de software (após declaração do watch)
-  const tipoAtual = watch('tipoItem') || 'produto';
+  const tipoAtual = watch('tipoItem') || initialTipoItem;
   const tipoGeral = watch('tipo'); // Para capturar se tipo === "software"
   const { campos, isSoftware, TIPOS_LICENCIAMENTO, PERIODICIDADES_LICENCA } = useProdutoSoftware(
     tipoAtual,
@@ -286,9 +415,62 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
   );
 
   const watchedFields = watch();
+  const tiposItem = useMemo(
+    () => (catalogApiEnabled ? [...tiposItemBase, ...tiposItemCatalogo] : tiposItemBase),
+    [catalogApiEnabled],
+  );
+  const frequencias = useMemo(
+    () => (catalogApiEnabled ? frequenciasCatalogo : frequenciasBase),
+    [catalogApiEnabled],
+  );
+  const composicaoPlanoHabilitada = catalogApiEnabled && tipoAtual === 'plano';
+  const itemComEstoque = ['produto', 'peca', 'acessorio'].includes(tipoAtual);
+  const componentesSelecionados = watchedFields.componentes || [];
   const dialogTitleId = useId();
   const dialogDescriptionId = useId();
-  const isItemRecorrente = ['plano', 'licenca', 'modulo', 'aplicativo'].includes(tipoAtual);
+  const isItemRecorrente = ['plano', 'licenca', 'modulo', 'aplicativo', 'pacote'].includes(
+    tipoAtual,
+  );
+  const precoLabel = 'Preço de Venda *';
+  const custoLabel = isSoftware
+    ? 'Custo Operacional Estimado'
+    : tipoAtual === 'servico' || tipoAtual === 'pacote'
+      ? 'Custo de Entrega'
+      : tipoAtual === 'garantia'
+        ? 'Custo de Cobertura'
+        : 'Custo de Aquisição';
+  const custoHint = isSoftware
+    ? 'Opcional. Use para estimar o custo interno de atender esse item.'
+    : tipoAtual === 'garantia'
+      ? 'Opcional. Use para provisionamento interno da garantia.'
+      : 'Opcional. Use para margem e acompanhamento interno.';
+  const custoOpcionalPorContexto =
+    isSoftware || tipoAtual === 'servico' || tipoAtual === 'pacote' || tipoAtual === 'garantia';
+  const custoUnitarioPreenchido =
+    watchedFields.custoUnitario !== undefined && watchedFields.custoUnitario !== null;
+  const exibirCampoCusto = !custoOpcionalPorContexto || custoUnitarioPreenchido || showCustoField;
+  const fornecedorLabel = 'Fornecedor';
+  const fornecedorHint = isSoftware
+    ? 'Opcional. Para item proprio (plano/modulo interno), pode deixar em branco.'
+    : 'Opcional. Informe apenas quando existir parceiro ou fornecedor externo.';
+  const steps = useMemo(
+    () => [
+      { id: 1, title: 'Classificacao' },
+      { id: 2, title: 'Comercial' },
+      { id: 3, title: composicaoPlanoHabilitada ? 'Operacao e composicao' : 'Operacao' },
+    ],
+    [composicaoPlanoHabilitada],
+  );
+  const totalSteps = steps.length;
+  const isFirstStep = activeStep === 1;
+  const isLastStep = activeStep === totalSteps;
+
+  const selectedTemplate = useMemo(
+    () => catalogTemplates.find((template) => template.code === selectedTemplateCode) || null,
+    [catalogTemplates, selectedTemplateCode],
+  );
+  const templateFields = selectedTemplate?.fields || [];
+
   const categoriaSelecionada = useMemo(() => {
     const categoriaPorId = categoriasCatalogo.find((categoria) => categoria.id === watchedFields.categoriaId);
     if (categoriaPorId) {
@@ -335,6 +517,20 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
     return Array.from(nomes).sort((left, right) => left.localeCompare(right, 'pt-BR'));
   }, [categoriasCatalogo, categoriasFallback, watchedFields.categoria]);
 
+  const itensDisponiveisParaAdicionar = useMemo(() => {
+    const componentesIds = new Set(
+      componentesSelecionados.map((componente) => componente.childItemId),
+    );
+
+    return itensComposicao.filter(
+      (item) =>
+        item.id !== produtoEditando?.produtoId &&
+        item.status === 'ativo' &&
+        item.tipoItem !== 'plano' &&
+        !componentesIds.has(item.id),
+    );
+  }, [componentesSelecionados, itensComposicao, produtoEditando?.produtoId]);
+
   const labelClass = 'mb-1 block text-sm font-medium text-[#244455]';
   const inputClass =
     'w-full rounded-lg border border-[#D4E2E7] px-3 py-2 text-sm text-[#19384C] placeholder:text-[#8AA0AB] focus:border-[#159A9C] focus:outline-none focus:ring-2 focus:ring-[#159A9C]/25';
@@ -347,6 +543,174 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
     'inline-flex items-center rounded-lg border border-[#D4E2E7] bg-white px-4 py-2 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-60';
   const helperLinkButtonClass =
     'mt-3 inline-flex items-center rounded-lg border border-[#D4E2E7] bg-white px-3 py-2 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB]';
+
+  const updateTemplateFieldValue = (fieldKey: string, value: unknown) => {
+    setTemplateFieldValues((currentValues) => ({
+      ...currentValues,
+      [fieldKey]: value,
+    }));
+
+    setTemplateFieldErrors((currentErrors) => {
+      if (!currentErrors[fieldKey]) {
+        return currentErrors;
+      }
+
+      const { [fieldKey]: _removed, ...remainingErrors } = currentErrors;
+      return remainingErrors;
+    });
+  };
+
+  const isTemplateFieldEmpty = (field: CatalogTemplateField, value: unknown): boolean => {
+    if (field.fieldType === 'boolean') {
+      return value === null || value === undefined;
+    }
+
+    if (field.fieldType === 'multiselect') {
+      return !Array.isArray(value) || value.length === 0;
+    }
+
+    if (value === null || value === undefined) {
+      return true;
+    }
+
+    if (typeof value === 'string') {
+      return value.trim().length === 0;
+    }
+
+    return false;
+  };
+
+  const validateTemplateRequiredFields = (): boolean => {
+    if (!selectedTemplate || templateFields.length === 0) {
+      setTemplateFieldErrors({});
+      return true;
+    }
+
+    const nextErrors: Record<string, string> = {};
+
+    for (const field of templateFields) {
+      if (!field.required) {
+        continue;
+      }
+
+      const value = templateFieldValues[field.fieldKey];
+      if (isTemplateFieldEmpty(field, value)) {
+        nextErrors[field.fieldKey] = 'Campo obrigatório';
+      }
+    }
+
+    setTemplateFieldErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const renderTemplateFieldInput = (field: CatalogTemplateField) => {
+    const fieldValue = templateFieldValues[field.fieldKey];
+    const fieldError = templateFieldErrors[field.fieldKey];
+
+    if (field.fieldType === 'boolean') {
+      return (
+        <label className="flex items-center gap-2 rounded-lg border border-[#D4E2E7] px-3 py-2 text-sm text-[#244455]">
+          <input
+            type="checkbox"
+            checked={Boolean(fieldValue)}
+            onChange={(event) => updateTemplateFieldValue(field.fieldKey, event.target.checked)}
+            className="rounded border-[#B4BEC9] text-[#159A9C] focus:ring-[#159A9C]"
+          />
+          {field.label}
+          {field.required ? ' *' : ''}
+        </label>
+      );
+    }
+
+    if (field.fieldType === 'textarea' || field.fieldType === 'json') {
+      return (
+        <textarea
+          rows={3}
+          value={typeof fieldValue === 'string' ? fieldValue : fieldValue ? String(fieldValue) : ''}
+          onChange={(event) => updateTemplateFieldValue(field.fieldKey, event.target.value)}
+          className={fieldError ? inputErrorClass : inputClass}
+          placeholder={field.label}
+        />
+      );
+    }
+
+    if (field.fieldType === 'select') {
+      return (
+        <select
+          value={typeof fieldValue === 'string' ? fieldValue : ''}
+          onChange={(event) => updateTemplateFieldValue(field.fieldKey, event.target.value)}
+          className={fieldError ? inputErrorClass : inputClass}
+        >
+          <option value="">Selecione</option>
+          {(field.options || []).map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      );
+    }
+
+    if (field.fieldType === 'multiselect') {
+      return (
+        <select
+          multiple
+          value={Array.isArray(fieldValue) ? fieldValue.map(String) : []}
+          onChange={(event) =>
+            updateTemplateFieldValue(
+              field.fieldKey,
+              Array.from(event.target.selectedOptions).map((option) => option.value),
+            )
+          }
+          className={fieldError ? inputErrorClass : inputClass}
+        >
+          {(field.options || []).map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      );
+    }
+
+    if (field.fieldType === 'money') {
+      const value =
+        typeof fieldValue === 'number'
+          ? fieldValue
+          : typeof fieldValue === 'string' && fieldValue.trim() !== ''
+            ? Number(fieldValue)
+            : undefined;
+
+      return (
+        <MoneyInput
+          value={Number.isFinite(value as number) ? (value as number) : undefined}
+          onChange={(nextValue) => updateTemplateFieldValue(field.fieldKey, nextValue)}
+          placeholder="R$ 0,00"
+          className={fieldError ? inputErrorClass : inputClass}
+        />
+      );
+    }
+
+    return (
+      <input
+        type={field.fieldType === 'date' ? 'date' : field.fieldType === 'number' ? 'number' : 'text'}
+        value={fieldValue === null || fieldValue === undefined ? '' : String(fieldValue)}
+        onChange={(event) => {
+          if (field.fieldType === 'number') {
+            updateTemplateFieldValue(
+              field.fieldKey,
+              event.target.value === '' ? undefined : Number(event.target.value),
+            );
+            return;
+          }
+
+          updateTemplateFieldValue(field.fieldKey, event.target.value);
+        }}
+        className={fieldError ? inputErrorClass : inputClass}
+        placeholder={field.label}
+      />
+    );
+  };
 
   const handleOpenCatalogStructure = (targetTab: 'categorias' | 'subcategorias' | 'configuracoes') => {
     const params = new URLSearchParams();
@@ -368,7 +732,19 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
     try {
       if (loading) return;
 
-      await onSubmit(data);
+      if (!validateTemplateRequiredFields()) {
+        setActiveStep(2);
+        return;
+      }
+
+      const payload: ProdutoFormData = {
+        ...data,
+        templateCode: selectedTemplateCode,
+        atributosTemplate:
+          Object.keys(templateFieldValues).length > 0 ? templateFieldValues : undefined,
+      };
+
+      await onSubmit(payload);
       setHasUnsavedChanges(false);
       setIsFormInitialized(false);
     } catch (error) {
@@ -384,31 +760,72 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
     }
   };
 
-  // Hook de Auto-Save
-  const { lastSaveAttempt } = useAutoSave({
-    delay: 30000, // 30 segundos
-    enabled: isOpen && !loading,
-    onSave: async () => {
-      if (isValid && hasUnsavedChanges) {
-        const data = watchedFields as ProdutoFormData;
-        await onSubmit(data);
-        setHasUnsavedChanges(false);
+  const getFieldsToValidateByStep = (step: number): Array<keyof ProdutoFormData> => {
+    if (step === 1) {
+      return ['nome', 'tipoItem', 'categoria'];
+    }
+
+    if (step === 2) {
+      const baseFields: Array<keyof ProdutoFormData> = [
+        'precoUnitario',
+        'frequencia',
+        'unidadeMedida',
+        'status',
+      ];
+
+      if (isSoftware) {
+        baseFields.push('tipoLicenciamento', 'periodicidadeLicenca', 'quantidadeLicencas');
       }
-    },
-    hasUnsavedChanges,
-    isFormValid: isValid,
-  });
+
+      return baseFields;
+    }
+
+    return [];
+  };
+
+  const handleNextStep = async () => {
+    if (isLastStep) {
+      return;
+    }
+
+    const fieldsToValidate = getFieldsToValidateByStep(activeStep);
+    if (fieldsToValidate.length > 0) {
+      const isStepValid = await trigger(fieldsToValidate);
+      if (!isStepValid) {
+        return;
+      }
+    }
+
+    if (activeStep === 2 && !validateTemplateRequiredFields()) {
+      return;
+    }
+
+    setActiveStep((currentStep) => Math.min(totalSteps, currentStep + 1));
+  };
+
+  const handlePreviousStep = () => {
+    setActiveStep((currentStep) => Math.max(1, currentStep - 1));
+  };
 
   // Hook de Atalhos de Teclado
   useModalKeyboardShortcuts({
     isOpen,
     onSave: () => {
-      if (isValid && !isSubmitting) {
+      if (isSubmitting) {
+        return;
+      }
+
+      if (!isLastStep) {
+        void handleNextStep();
+        return;
+      }
+
+      if (isValid) {
         handleSubmit(onFormSubmit)();
       }
     },
     onClose: handleClose,
-    canSave: isValid && !isSubmitting,
+    canSave: (isLastStep ? isValid : true) && !isSubmitting,
   });
 
   // Efeito para detectar mudanças - só após inicialização
@@ -475,16 +892,166 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
     }
   }, [configuracoesDisponiveis, isOpen, setValue, watchedFields.configuracaoId]);
 
+  useEffect(() => {
+    if (!isOpen || !catalogApiEnabled) {
+      setCatalogTemplates([]);
+      setSelectedTemplateCode('');
+      setTemplateFieldValues({});
+      setTemplateFieldErrors({});
+      setLoadingTemplates(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    const carregarTemplates = async () => {
+      try {
+        setLoadingTemplates(true);
+        const templatesCatalogo = await catalogoService.listTemplates();
+        const templateInferido = inferTemplateCodeByTipoItem(tipoAtual);
+        const templateEditandoCode = produtoEditando?.templateCode || '';
+        const templates = templatesCatalogo.filter(
+          (template) =>
+            template.businessType === tipoAtual ||
+            template.code === templateInferido ||
+            template.code === templateEditandoCode,
+        );
+
+        if (!isMounted) {
+          return;
+        }
+
+        setCatalogTemplates(templates);
+
+        const codigoPreferencial =
+          produtoEditando?.templateCode || inferTemplateCodeByTipoItem(tipoAtual);
+        const templateValido =
+          templates.find((template) => template.code === codigoPreferencial)?.code || '';
+        const fallbackTemplate = templateValido || templates[0]?.code || '';
+
+        setSelectedTemplateCode(fallbackTemplate);
+        setTemplateFieldValues(
+          produtoEditando?.atributosTemplate && typeof produtoEditando.atributosTemplate === 'object'
+            ? produtoEditando.atributosTemplate
+            : {},
+        );
+        setTemplateFieldErrors({});
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        console.error('Erro ao carregar templates de catalogo:', error);
+        setCatalogTemplates([]);
+        setSelectedTemplateCode('');
+      } finally {
+        if (isMounted) {
+          setLoadingTemplates(false);
+        }
+      }
+    };
+
+    void carregarTemplates();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [
+    catalogApiEnabled,
+    isOpen,
+    produtoEditando?.atributosTemplate,
+    produtoEditando?.templateCode,
+    tipoAtual,
+  ]);
+
+  useEffect(() => {
+    if (!isOpen || !catalogApiEnabled || tipoAtual !== 'plano') {
+      setItensComposicao([]);
+      setLoadingItensComposicao(false);
+      setNovoComponenteItemId('');
+      setNovoComponenteRole('included');
+      return;
+    }
+
+    let isMounted = true;
+
+    const carregarItensComposicao = async () => {
+      try {
+        setLoadingItensComposicao(true);
+        const itens = await produtosService.findAll({ status: 'ativo' });
+
+        if (!isMounted) {
+          return;
+        }
+
+        setItensComposicao(itens);
+      } catch (error) {
+        if (isMounted) {
+          console.error('Erro ao carregar itens para composicao do plano:', error);
+          setItensComposicao([]);
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingItensComposicao(false);
+        }
+      }
+    };
+
+    void carregarItensComposicao();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [catalogApiEnabled, isOpen, tipoAtual]);
+
+  useEffect(() => {
+    if (!selectedTemplate) {
+      return;
+    }
+
+    const allowedFieldKeys = new Set(templateFields.map((field) => field.fieldKey));
+
+    setTemplateFieldValues((currentValues) =>
+      Object.fromEntries(
+        Object.entries(currentValues).filter(([fieldKey]) => allowedFieldKeys.has(fieldKey)),
+      ),
+    );
+
+    setTemplateFieldErrors((currentErrors) =>
+      Object.fromEntries(
+        Object.entries(currentErrors).filter(([fieldKey]) => allowedFieldKeys.has(fieldKey)),
+      ),
+    );
+  }, [selectedTemplate, templateFields]);
+
   // Efeito para preencher dados na edição
   useEffect(() => {
     if (isOpen) {
+      const tipoInicialFormulario = resolveTipoItemPadrao(
+        produtoEditando?.tipoItem || initialTipoItem,
+      );
+
       setHasUnsavedChanges(false);
       setIsFormInitialized(false);
+      setActiveStep(1);
+      setTemplateFieldErrors({});
+      setTemplateFieldValues(
+        produtoEditando?.atributosTemplate && typeof produtoEditando.atributosTemplate === 'object'
+          ? produtoEditando.atributosTemplate
+          : {},
+      );
+      setSelectedTemplateCode(
+        produtoEditando?.templateCode ||
+          inferTemplateCodeByTipoItem(tipoInicialFormulario),
+      );
+      setShowCustoField(
+        produtoEditando?.custoUnitario !== undefined && produtoEditando?.custoUnitario !== null,
+      );
 
       if (produtoEditando) {
         reset({
           nome: produtoEditando.nome || '',
-          tipoItem: produtoEditando.tipoItem || 'produto',
+          tipoItem: tipoInicialFormulario,
           categoria: produtoEditando.categoria || '',
           categoriaId: produtoEditando.categoriaId,
           subcategoriaId: produtoEditando.subcategoriaId,
@@ -507,15 +1074,18 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
           estoqueMaximo: produtoEditando.estoqueMaximo,
           tags: produtoEditando.tags || [],
           variacoes: produtoEditando.variacoes || [],
+          templateCode: produtoEditando.templateCode,
+          atributosTemplate: produtoEditando.atributosTemplate,
           tipoLicenciamento: produtoEditando.tipoLicenciamento || '',
           periodicidadeLicenca: produtoEditando.periodicidadeLicenca || '',
           renovacaoAutomatica: produtoEditando.renovacaoAutomatica ?? false,
           quantidadeLicencas: produtoEditando.quantidadeLicencas ?? 1,
+          componentes: produtoEditando.componentes || [],
         });
       } else {
         reset({
           nome: '',
-          tipoItem: 'produto',
+          tipoItem: initialTipoItem,
           categoria: '',
           categoriaId: undefined,
           subcategoriaId: undefined,
@@ -533,17 +1103,20 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
           estoqueMaximo: undefined,
           tags: [],
           variacoes: [],
+          templateCode: undefined,
+          atributosTemplate: undefined,
           tipoLicenciamento: '',
           periodicidadeLicenca: '',
           renovacaoAutomatica: false,
           quantidadeLicencas: 1,
+          componentes: [],
         });
       }
 
       // Marca como inicializado após um pequeno delay para evitar detecção de mudança
       setTimeout(() => setIsFormInitialized(true), 100);
     }
-  }, [produtoEditando, isOpen, reset]);
+  }, [initialTipoItem, isOpen, produtoEditando, reset]);
 
   const handleConfirmClose = () => {
     setHasUnsavedChanges(false);
@@ -567,6 +1140,82 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
   const removerTag = (tagParaRemover: string) => {
     const tagsFiltradas = watchedFields.tags?.filter((tag) => tag !== tagParaRemover) || [];
     setValue('tags', tagsFiltradas, { shouldValidate: true });
+  };
+
+  const formatCurrency = (value?: number) => {
+    if (value === undefined || value === null || !Number.isFinite(value)) {
+      return null;
+    }
+
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
+  };
+
+  const obterRotuloTipoItem = (tipoItem?: string) =>
+    tiposItem.find((tipo) => tipo.value === tipoItem)?.label || 'Item';
+
+  const adicionarComponente = () => {
+    if (!novoComponenteItemId) {
+      return;
+    }
+
+    const itemSelecionado = itensComposicao.find((item) => item.id === novoComponenteItemId);
+    if (!itemSelecionado) {
+      return;
+    }
+
+    const novoComponente: ProdutoComponente = {
+      childItemId: itemSelecionado.id,
+      componentRole: novoComponenteRole,
+      quantity: 1,
+      sortOrder: componentesSelecionados.length,
+      affectsPrice: ['optional', 'addon'].includes(novoComponenteRole),
+      isDefault: !['optional', 'addon'].includes(novoComponenteRole),
+      nome: itemSelecionado.nome,
+      preco: itemSelecionado.preco,
+      tipoItem: itemSelecionado.tipoItem,
+      status: itemSelecionado.status,
+    };
+
+    setValue('componentes', [...componentesSelecionados, novoComponente], {
+      shouldDirty: true,
+    });
+    setNovoComponenteItemId('');
+    setNovoComponenteRole('included');
+  };
+
+  const atualizarComponente = (
+    index: number,
+    patch: Partial<ProdutoComponente>,
+  ) => {
+    const proximosComponentes = componentesSelecionados.map((componente, componenteIndex) =>
+      componenteIndex === index
+        ? {
+            ...componente,
+            ...patch,
+            sortOrder: componenteIndex,
+          }
+        : componente,
+    );
+
+    setValue('componentes', proximosComponentes, {
+      shouldDirty: true,
+    });
+  };
+
+  const removerComponente = (childItemId: string) => {
+    const proximosComponentes = componentesSelecionados
+      .filter((componente) => componente.childItemId !== childItemId)
+      .map((componente, index) => ({
+        ...componente,
+        sortOrder: index,
+      }));
+
+    setValue('componentes', proximosComponentes, {
+      shouldDirty: true,
+    });
   };
 
   if (!isOpen) return null;
@@ -642,17 +1291,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
               </div>
 
               <div className="flex items-center space-x-4">
-                <SaveStatus
-                  isDirty={hasUnsavedChanges}
-                  isSaving={isSubmitting}
-                  lastSaved={
-                    isFormInitialized
-                      ? undefined
-                      : lastSaveAttempt
-                        ? new Date(lastSaveAttempt)
-                        : undefined
-                  }
-                />
+                <SaveStatus isDirty={hasUnsavedChanges} isSaving={isSubmitting} />
                 <button
                   onClick={handleClose}
                   disabled={isSubmitting}
@@ -666,10 +1305,49 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
             {/* Formulário em Grid */}
             <form onSubmit={handleSubmit(onFormSubmit)} className="bg-[#F6FAFB] p-4 sm:p-6">
-              <div
-                className={`grid grid-cols-1 gap-6 ${isSoftware ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}
-              >
-                {/* Coluna 1: Informações Básicas */}
+              <div className="mb-6 rounded-xl border border-[#DEE8EC] bg-white p-3 sm:p-4">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  {steps.map((step) => {
+                    const isCurrentStep = step.id === activeStep;
+                    const isCompletedStep = step.id < activeStep;
+
+                    return (
+                      <button
+                        key={step.id}
+                        type="button"
+                        onClick={() => {
+                          if (step.id <= activeStep) {
+                            setActiveStep(step.id);
+                          }
+                        }}
+                        disabled={step.id > activeStep}
+                        className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition ${
+                          isCurrentStep
+                            ? 'border-[#159A9C] bg-[#EFF8F8] text-[#0F7B7D]'
+                            : isCompletedStep
+                              ? 'border-[#CFE7E8] bg-[#F7FCFA] text-[#35616D] hover:bg-[#EFF8F8]'
+                              : 'border-[#D4E2E7] bg-[#F9FCFD] text-[#7A8D99]'
+                        } disabled:cursor-not-allowed disabled:opacity-80`}
+                      >
+                        <span
+                          className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
+                            isCurrentStep || isCompletedStep
+                              ? 'bg-[#159A9C] text-white'
+                              : 'bg-[#D4E2E7] text-[#607B89]'
+                          }`}
+                        >
+                          {step.id}
+                        </span>
+                        <span className="font-medium">{step.title}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {activeStep === 1 && (
+                <div className="grid grid-cols-1 gap-6">
+                  {/* Coluna 1: Informações Básicas */}
                 <div className="space-y-4 rounded-xl border border-[#DEE8EC] bg-white p-4">
                   <h3 className={sectionTitleClass}>
                     <Package className="mr-2 h-5 w-5 text-[#159A9C]" />
@@ -871,7 +1549,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                   {/* Preço */}
                   <div>
                     <label htmlFor="precoUnitario" className={labelClass}>
-                      Preço Unitário *
+                      {precoLabel}
                     </label>
                     <Controller
                       name="precoUnitario"
@@ -891,23 +1569,57 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                   </div>
 
                   <div>
-                    <label htmlFor="custoUnitario" className={labelClass}>
-                      Custo Unitário
-                    </label>
-                    <Controller
-                      name="custoUnitario"
-                      control={control}
-                      render={({ field }) => (
-                        <MoneyInput
-                          value={field.value}
-                          onChange={field.onChange}
-                          placeholder="R$ 0,00"
-                          className={errors.custoUnitario ? inputErrorClass : inputClass}
-                        />
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <label htmlFor="custoUnitario" className="text-sm font-medium text-[#244455]">
+                        {custoLabel}
+                      </label>
+                      {custoOpcionalPorContexto && exibirCampoCusto && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setValue('custoUnitario', undefined, {
+                              shouldDirty: true,
+                              shouldValidate: true,
+                            });
+                            setShowCustoField(false);
+                          }}
+                          className="text-xs font-medium text-[#607B89] transition hover:text-[#35538A]"
+                        >
+                          Remover custo
+                        </button>
                       )}
-                    />
-                    {errors.custoUnitario && (
-                      <p className="mt-1 text-sm text-red-600">{errors.custoUnitario.message}</p>
+                    </div>
+
+                    {!exibirCampoCusto ? (
+                      <div className="rounded-lg border border-dashed border-[#D4E2E7] bg-[#F9FCFD] p-3">
+                        <p className="text-xs text-[#607B89]">{custoHint}</p>
+                        <button
+                          type="button"
+                          onClick={() => setShowCustoField(true)}
+                          className="mt-2 inline-flex h-8 items-center rounded-lg border border-[#D4E2E7] bg-white px-3 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+                        >
+                          Adicionar custo interno
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <Controller
+                          name="custoUnitario"
+                          control={control}
+                          render={({ field }) => (
+                            <MoneyInput
+                              value={field.value}
+                              onChange={field.onChange}
+                              placeholder="R$ 0,00"
+                              className={errors.custoUnitario ? inputErrorClass : inputClass}
+                            />
+                          )}
+                        />
+                        <p className="mt-1 text-xs text-[#607B89]">{custoHint}</p>
+                        {errors.custoUnitario && (
+                          <p className="mt-1 text-sm text-red-600">{errors.custoUnitario.message}</p>
+                        )}
+                      </>
                     )}
                   </div>
 
@@ -927,7 +1639,7 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
                   <div>
                     <label htmlFor="fornecedor" className={labelClass}>
-                      Fornecedor
+                      {fornecedorLabel}
                     </label>
                     <input
                       {...register('fornecedor')}
@@ -936,12 +1648,18 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                       className={errors.fornecedor ? inputErrorClass : inputClass}
                       placeholder="Nome do fornecedor"
                     />
+                    <p className="mt-1 text-xs text-[#607B89]">{fornecedorHint}</p>
                     {errors.fornecedor && (
                       <p className="mt-1 text-sm text-red-600">{errors.fornecedor.message}</p>
                     )}
                   </div>
                 </div>
 
+                </div>
+            )}
+
+              {activeStep === 2 && (
+                <div className={`grid grid-cols-1 gap-6 ${isSoftware ? 'lg:grid-cols-2' : ''}`}>
                 {/* Coluna 2: Configurações */}
                 <div className="space-y-4 rounded-xl border border-[#DEE8EC] bg-white p-4">
                   <h3 className={sectionTitleClass}>
@@ -951,8 +1669,8 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
 
                   <div className="rounded-lg border border-[#DEEFE7] bg-[#F7FCFA] p-3 text-sm text-[#35616D]">
                     {isItemRecorrente
-                      ? 'Item recorrente: configure frequência mensal ou anual para refletir o ciclo comercial.'
-                      : 'Item de cobrança única: mantenha frequência em único para evitar distorção no catálogo.'}
+                      ? 'Item recorrente: configure mensal, trimestral, anual ou sob consulta conforme o ciclo comercial.'
+                      : 'Item de cobrança única: mantenha frequência em unico para evitar distorção no catálogo.'}
                   </div>
 
                   {/* Frequência */}
@@ -1037,7 +1755,88 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                     )}
                   </div>
 
-                  {tipoAtual === 'produto' && (
+                  {catalogApiEnabled && (
+                    <div className="space-y-3 rounded-lg border border-[#DEEFE7] bg-[#F7FCFA] p-3">
+                      <div>
+                        <p className="text-sm font-medium text-[#244455]">Template do catalogo</p>
+                        <p className="mt-1 text-xs text-[#607B89]">
+                          Defina os campos especializados por nicho sem inflar o cadastro base.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className={labelClass}>Template aplicado</label>
+                        <select
+                          value={selectedTemplateCode}
+                          onChange={(event) => {
+                            const nextTemplateCode = event.target.value;
+                            setSelectedTemplateCode(nextTemplateCode);
+                            if (!nextTemplateCode) {
+                              setTemplateFieldValues({});
+                            }
+                            setTemplateFieldErrors({});
+                          }}
+                          className={inputClass}
+                          disabled={loadingTemplates}
+                        >
+                          <option value="">
+                            {loadingTemplates
+                              ? 'Carregando templates...'
+                              : 'Sem template especializado'}
+                          </option>
+                          {catalogTemplates.map((template) => (
+                            <option key={template.code} value={template.code}>
+                              {template.nome}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {selectedTemplate ? (
+                        <div className="space-y-3 rounded-lg border border-[#D4E2E7] bg-white p-3">
+                          <p className="text-sm font-medium text-[#19384C]">
+                            Campos dinamicos: {selectedTemplate.nome}
+                          </p>
+
+                          {templateFields.length === 0 ? (
+                            <p className="text-xs text-[#607B89]">
+                              Este template nao possui campos extras configurados.
+                            </p>
+                          ) : (
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                              {templateFields.map((field) => {
+                                const fieldError = templateFieldErrors[field.fieldKey];
+                                const helperText = fieldError || field.helpText;
+
+                                return (
+                                  <div key={field.id}>
+                                    {field.fieldType !== 'boolean' && (
+                                      <label className={labelClass}>
+                                        {field.label}
+                                        {field.required ? ' *' : ''}
+                                      </label>
+                                    )}
+                                    {renderTemplateFieldInput(field)}
+                                    {helperText && (
+                                      <p className={fieldError ? 'mt-1 text-xs text-red-600' : 'mt-1 text-xs text-[#607B89]'}>
+                                        {helperText}
+                                      </p>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-[#607B89]">
+                          Nenhum template especializado selecionado para este item.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {itemComEstoque && (
                     <div className="space-y-3 rounded-lg border border-[#DEEFE7] bg-[#F7FCFA] p-3">
                       <p className="text-sm font-medium text-[#244455]">Controle de estoque</p>
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -1236,12 +2035,206 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                   </div>
                 )}
 
+              </div>
+            )}
+
+              {activeStep === 3 && (
+                <div className="grid grid-cols-1 gap-6">
                 {/* Coluna 3: Tags e Variações */}
                 <div className="space-y-4 rounded-xl border border-[#DEE8EC] bg-white p-4">
                   <h3 className={sectionTitleClass}>
                     <Tag className="mr-2 h-5 w-5 text-[#159A9C]" />
                     Tags e Variações
                   </h3>
+
+                  {composicaoPlanoHabilitada && (
+                    <div className="space-y-3 rounded-lg border border-[#DEEFE7] bg-[#F7FCFA] p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium text-[#244455]">Composicao do plano</p>
+                          <p className="mt-1 text-xs text-[#607B89]">
+                            Vincule modulos, licencas, aplicativos e servicos incluidos na oferta.
+                          </p>
+                        </div>
+                        <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-[#0F7B7D]">
+                          {componentesSelecionados.length} item(ns)
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_160px_auto]">
+                        <div>
+                          <label className={labelClass}>Adicionar item</label>
+                          <select
+                            value={novoComponenteItemId}
+                            onChange={(event) => setNovoComponenteItemId(event.target.value)}
+                            className={inputClass}
+                            disabled={loadingItensComposicao}
+                          >
+                            <option value="">
+                              {loadingItensComposicao
+                                ? 'Carregando itens...'
+                                : 'Selecione um item do catalogo'}
+                            </option>
+                            {itensDisponiveisParaAdicionar.map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.nome} · {obterRotuloTipoItem(item.tipoItem)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className={labelClass}>Relacao</label>
+                          <select
+                            value={novoComponenteRole}
+                            onChange={(event) =>
+                              setNovoComponenteRole(
+                                event.target.value as ProdutoComponente['componentRole'],
+                              )
+                            }
+                            className={inputClass}
+                          >
+                            {componenteRoleOptions.map((role) => (
+                              <option key={role.value} value={role.value}>
+                                {role.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="flex items-end">
+                          <button
+                            type="button"
+                            onClick={adicionarComponente}
+                            disabled={!novoComponenteItemId}
+                            className={primaryButtonClass}
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Incluir
+                          </button>
+                        </div>
+                      </div>
+
+                      {!loadingItensComposicao && itensDisponiveisParaAdicionar.length === 0 && (
+                        <div className="rounded-lg border border-dashed border-[#CFE7E8] bg-white px-3 py-3 text-sm text-[#607B89]">
+                          {componentesSelecionados.length > 0
+                            ? 'Todos os itens ativos disponiveis ja foram vinculados a este plano.'
+                            : 'Nenhum item elegivel encontrado para compor o plano.'}
+                        </div>
+                      )}
+
+                      {componentesSelecionados.length > 0 && (
+                        <div className="space-y-3">
+                          {componentesSelecionados.map((componente, index) => {
+                            const itemRelacionado = itensComposicao.find(
+                              (item) => item.id === componente.childItemId,
+                            );
+                            const nomeComponente =
+                              componente.nome || itemRelacionado?.nome || 'Item do catalogo';
+                            const tipoComponente =
+                              componente.tipoItem || itemRelacionado?.tipoItem || 'produto';
+                            const precoComponente = formatCurrency(
+                              componente.preco ?? itemRelacionado?.preco,
+                            );
+
+                            return (
+                              <div
+                                key={`${componente.childItemId}-${index}`}
+                                className="rounded-lg border border-[#D4E2E7] bg-white p-3"
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <p className="text-sm font-medium text-[#19384C]">
+                                      {nomeComponente}
+                                    </p>
+                                    <p className="mt-1 text-xs text-[#607B89]">
+                                      {obterRotuloTipoItem(tipoComponente)}
+                                      {precoComponente ? ` · ${precoComponente}` : ''}
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => removerComponente(componente.childItemId)}
+                                    className="rounded-lg p-2 text-[#7A8D99] transition hover:bg-[#F6FAFB] hover:text-[#244455]"
+                                    aria-label={`Remover ${nomeComponente} da composicao`}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
+
+                                <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                                  <div>
+                                    <label className={labelClass}>Relacao</label>
+                                    <select
+                                      value={componente.componentRole}
+                                      onChange={(event) =>
+                                        atualizarComponente(index, {
+                                          componentRole:
+                                            event.target.value as ProdutoComponente['componentRole'],
+                                        })
+                                      }
+                                      className={inputClass}
+                                    >
+                                      {componenteRoleOptions.map((role) => (
+                                        <option key={role.value} value={role.value}>
+                                          {role.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+
+                                  <div>
+                                    <label className={labelClass}>Quantidade padrao</label>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      value={componente.quantity ?? 1}
+                                      onChange={(event) =>
+                                        atualizarComponente(index, {
+                                          quantity: Number(event.target.value || 1),
+                                        })
+                                      }
+                                      className={inputClass}
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                                  <label className="flex items-center gap-2 rounded-lg border border-[#D4E2E7] px-3 py-2 text-sm text-[#244455]">
+                                    <input
+                                      type="checkbox"
+                                      checked={Boolean(componente.affectsPrice)}
+                                      onChange={(event) =>
+                                        atualizarComponente(index, {
+                                          affectsPrice: event.target.checked,
+                                        })
+                                      }
+                                      className="rounded border-[#B4BEC9] text-[#159A9C] focus:ring-[#159A9C]"
+                                    />
+                                    Afeta o preco final da oferta
+                                  </label>
+
+                                  <label className="flex items-center gap-2 rounded-lg border border-[#D4E2E7] px-3 py-2 text-sm text-[#244455]">
+                                    <input
+                                      type="checkbox"
+                                      checked={componente.isDefault !== false}
+                                      onChange={(event) =>
+                                        atualizarComponente(index, {
+                                          isDefault: event.target.checked,
+                                        })
+                                      }
+                                      className="rounded border-[#B4BEC9] text-[#159A9C] focus:ring-[#159A9C]"
+                                    />
+                                    Incluido por padrao
+                                  </label>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Tags */}
                   <div>
@@ -1286,31 +2279,65 @@ export const ModalCadastroProduto: React.FC<ModalCadastroProdutoProps> = ({
                   </div>
                 </div>
               </div>
+            )}
 
               {/* Botões de Ação */}
-              <div className="mt-6 flex justify-end space-x-3 border-t border-[#DEE8EC] pt-6">
-                <button
-                  type="button"
-                  onClick={handleClose}
-                  disabled={isSubmitting}
-                  className={secondaryButtonClass}
-                >
-                  {t('common.cancel')}
-                </button>
-                <button
-                  type="submit"
-                  disabled={!isValid || isSubmitting || loading}
-                  className={primaryButtonClass}
-                >
-                  {loading ? (
-                    <>
-                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                      Salvando...
-                    </>
-                  ) : (
-                    <>{produtoEditando ? t('common.update') : 'Salvar item'}</>
+              <div className="mt-6 flex flex-col gap-3 border-t border-[#DEE8EC] pt-6 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs font-medium text-[#607B89]">
+                  Etapa {activeStep} de {totalSteps}
+                </p>
+
+                <div className="flex flex-wrap justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={handleClose}
+                    disabled={isSubmitting}
+                    className={secondaryButtonClass}
+                  >
+                    {t('common.cancel')}
+                  </button>
+
+                  {!isFirstStep && (
+                    <button
+                      type="button"
+                      onClick={handlePreviousStep}
+                      disabled={isSubmitting || loading}
+                      className={secondaryButtonClass}
+                    >
+                      Voltar
+                    </button>
                   )}
-                </button>
+
+                  {!isLastStep && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleNextStep();
+                      }}
+                      disabled={isSubmitting || loading}
+                      className={primaryButtonClass}
+                    >
+                      Próximo
+                    </button>
+                  )}
+
+                  {isLastStep && (
+                    <button
+                      type="submit"
+                      disabled={!isValid || isSubmitting || loading}
+                      className={primaryButtonClass}
+                    >
+                      {loading ? (
+                        <>
+                          <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                          Salvando...
+                        </>
+                      ) : (
+                        <>{produtoEditando ? t('common.update') : 'Salvar item'}</>
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
             </form>
           </div>

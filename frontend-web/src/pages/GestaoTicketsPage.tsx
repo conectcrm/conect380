@@ -271,6 +271,14 @@ const GestaoTicketsPage: React.FC = () => {
   const location = useLocation();
   const { user } = useAuth();
   const returnToTicketsPath = `${location.pathname}${location.search}${location.hash}`;
+  const clienteIdQuery = useMemo(
+    () => new URLSearchParams(location.search).get('clienteId')?.trim() || '',
+    [location.search],
+  );
+  const clienteNomeQuery = useMemo(
+    () => new URLSearchParams(location.search).get('cliente')?.trim() || '',
+    [location.search],
+  );
 
   // Estados principais
   const [tickets, setTickets] = useState<TicketType[]>([]);
@@ -366,6 +374,12 @@ const GestaoTicketsPage: React.FC = () => {
       }));
     }
   }, [buscaDebounced, filtros.busca]);
+
+  useEffect(() => {
+    if (clienteNomeQuery && !busca.trim()) {
+      setBusca(clienteNomeQuery);
+    }
+  }, [clienteNomeQuery, busca]);
 
 // Carregar dados para os modais de ações em lote
   useEffect(() => {
@@ -858,6 +872,22 @@ const GestaoTicketsPage: React.FC = () => {
     const sortDirection: SortDirection = filtros.sortDirection || 'desc';
 
     const filtrados = tickets.filter((ticket) => {
+      if (clienteIdQuery) {
+        const ticketClienteId = String(ticket.cliente?.id || ticket.clienteId || '').trim();
+        if (ticketClienteId && ticketClienteId !== clienteIdQuery) {
+          return false;
+        }
+      }
+
+      if (clienteNomeQuery) {
+        const ticketClienteNome = String(ticket.cliente?.nome || '')
+          .toLowerCase()
+          .trim();
+        if (ticketClienteNome && !ticketClienteNome.includes(clienteNomeQuery.toLowerCase())) {
+          return false;
+        }
+      }
+
       if (inicio || fim) {
         const criadoEm = new Date(ticket.createdAt);
         if (!Number.isFinite(criadoEm.getTime())) {
@@ -916,6 +946,8 @@ const GestaoTicketsPage: React.FC = () => {
     filtros.sortField,
     filtros.sortDirection,
     user?.id,
+    clienteIdQuery,
+    clienteNomeQuery,
   ]);
 
   useEffect(() => {

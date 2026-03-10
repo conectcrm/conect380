@@ -34,6 +34,7 @@ import { EmpresaId } from '../../common/decorators/empresa.decorator';
 import { PaginationParams } from '../../common/interfaces/common.interface';
 import { CacheInterceptor, CacheTTL } from '../../common/interceptors/cache.interceptor';
 import { CacheService } from '../../common/services/cache.service';
+import { CreateClienteDto, UpdateClienteDto } from './dto/cliente.dto';
 
 const CLIENTES_UPLOADS_SUBDIR = 'clientes';
 const CLIENTES_AVATAR_SUBDIR = 'avatar';
@@ -252,12 +253,124 @@ export class ClientesController {
     };
   }
 
+  @Get(':id/tickets/resumo')
+  @ApiOperation({ summary: 'Obter resumo de tickets e atendimentos do cliente' })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'Resumo de tickets retornado com sucesso' })
+  @ApiResponse({ status: 404, description: 'Cliente nao encontrado' })
+  async getTicketsResumo(
+    @EmpresaId() empresaId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('limit') limit?: string,
+  ) {
+    const cliente = await this.clientesService.findById(id, empresaId);
+
+    if (!cliente) {
+      throw new NotFoundException('Cliente nao encontrado');
+    }
+
+    const resumo = await this.clientesService.getTicketsResumo(
+      id,
+      empresaId,
+      limit ? Number(limit) : undefined,
+    );
+
+    return {
+      success: true,
+      data: resumo,
+    };
+  }
+
+  @Get(':id/propostas/resumo')
+  @ApiOperation({ summary: 'Obter resumo de propostas do cliente' })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'Resumo de propostas retornado com sucesso' })
+  @ApiResponse({ status: 404, description: 'Cliente nao encontrado' })
+  async getPropostasResumo(
+    @EmpresaId() empresaId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('limit') limit?: string,
+  ) {
+    const cliente = await this.clientesService.findById(id, empresaId);
+
+    if (!cliente) {
+      throw new NotFoundException('Cliente nao encontrado');
+    }
+
+    const resumo = await this.clientesService.getPropostasResumo(
+      id,
+      empresaId,
+      limit ? Number(limit) : undefined,
+    );
+
+    return {
+      success: true,
+      data: resumo,
+    };
+  }
+
+  @Get(':id/contratos/resumo')
+  @ApiOperation({ summary: 'Obter resumo de contratos do cliente' })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'Resumo de contratos retornado com sucesso' })
+  @ApiResponse({ status: 404, description: 'Cliente nao encontrado' })
+  async getContratosResumo(
+    @EmpresaId() empresaId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('limit') limit?: string,
+  ) {
+    const cliente = await this.clientesService.findById(id, empresaId);
+
+    if (!cliente) {
+      throw new NotFoundException('Cliente nao encontrado');
+    }
+
+    const resumo = await this.clientesService.getContratosResumo(
+      id,
+      empresaId,
+      limit ? Number(limit) : undefined,
+    );
+
+    return {
+      success: true,
+      data: resumo,
+    };
+  }
+
+  @Get(':id/faturas/resumo')
+  @ApiOperation({ summary: 'Obter resumo de faturas do cliente' })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'Resumo de faturas retornado com sucesso' })
+  @ApiResponse({ status: 404, description: 'Cliente nao encontrado' })
+  async getFaturasResumo(
+    @EmpresaId() empresaId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('limit') limit?: string,
+  ) {
+    const cliente = await this.clientesService.findById(id, empresaId);
+
+    if (!cliente) {
+      throw new NotFoundException('Cliente nao encontrado');
+    }
+
+    const resumo = await this.clientesService.getFaturasResumo(
+      id,
+      empresaId,
+      limit ? Number(limit) : undefined,
+    );
+
+    return {
+      success: true,
+      data: resumo,
+    };
+  }
+
   @Post()
   @Permissions(Permission.CRM_CLIENTES_CREATE)
   @ApiOperation({ summary: 'Criar novo cliente' })
   @ApiResponse({ status: 201, description: 'Cliente criado com sucesso' })
   @ApiResponse({ status: 400, description: 'Dados invalidos' })
-  async create(@EmpresaId() empresaId: string, @Body() clienteData: Partial<Cliente>) {
+  async create(@EmpresaId() empresaId: string, @Body() clienteData: CreateClienteDto) {
     const cliente = await this.clientesService.create({
       ...clienteData,
       empresaId,
@@ -280,7 +393,7 @@ export class ClientesController {
   async update(
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
-    @Body() updateData: Partial<Cliente>,
+    @Body() updateData: UpdateClienteDto,
   ) {
     const cliente = await this.clientesService.update(id, empresaId, updateData);
 

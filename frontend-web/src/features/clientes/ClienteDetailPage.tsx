@@ -13,6 +13,7 @@ import {
   Loader2,
   Mail,
   MapPin,
+  MessageCircle,
   Phone,
   Plus,
   Star,
@@ -33,7 +34,16 @@ import {
   SectionCard,
 } from '../../components/layout-v2';
 import { useGlobalConfirmation } from '../../contexts/GlobalConfirmationContext';
-import { Cliente, ClienteAttachment, clientesService } from '../../services/clientesService';
+import {
+  Cliente,
+  ClienteAttachment,
+  ClienteContratosResumo,
+  ClienteFaturasResumo,
+  ClienteOmnichannelContexto,
+  ClientePropostasResumo,
+  ClienteTicketsResumo,
+  clientesService,
+} from '../../services/clientesService';
 import { Contato, contatosService } from '../../services/contatosService';
 import { UploadResult } from '../../services/uploadService';
 
@@ -41,6 +51,90 @@ type DemandasResumo = {
   total: number;
   abertas: number;
   urgentes: number;
+};
+
+const ticketStatusLabelMap: Record<string, string> = {
+  FILA: 'Fila',
+  EM_ATENDIMENTO: 'Em atendimento',
+  ENVIO_ATIVO: 'Envio ativo',
+  AGUARDANDO_CLIENTE: 'Aguardando cliente',
+  AGUARDANDO_INTERNO: 'Aguardando interno',
+  CONCLUIDO: 'Concluido',
+  ENCERRADO: 'Encerrado',
+  CANCELADO: 'Cancelado',
+};
+
+const ticketStatusClassMap: Record<string, string> = {
+  FILA: 'border-amber-200 bg-amber-50 text-amber-700',
+  EM_ATENDIMENTO: 'border-sky-200 bg-sky-50 text-sky-700',
+  ENVIO_ATIVO: 'border-cyan-200 bg-cyan-50 text-cyan-700',
+  AGUARDANDO_CLIENTE: 'border-yellow-200 bg-yellow-50 text-yellow-700',
+  AGUARDANDO_INTERNO: 'border-indigo-200 bg-indigo-50 text-indigo-700',
+  CONCLUIDO: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  ENCERRADO: 'border-slate-200 bg-slate-50 text-slate-700',
+  CANCELADO: 'border-rose-200 bg-rose-50 text-rose-700',
+};
+
+const propostaStatusLabelMap: Record<string, string> = {
+  rascunho: 'Rascunho',
+  enviada: 'Enviada',
+  visualizada: 'Visualizada',
+  negociacao: 'Negociacao',
+  aprovada: 'Aprovada',
+  contrato_gerado: 'Contrato gerado',
+  contrato_assinado: 'Contrato assinado',
+  fatura_criada: 'Fatura criada',
+  aguardando_pagamento: 'Aguardando pagamento',
+  pago: 'Pago',
+  rejeitada: 'Rejeitada',
+  expirada: 'Expirada',
+};
+
+const propostaStatusClassMap: Record<string, string> = {
+  rascunho: 'border-slate-200 bg-slate-50 text-slate-700',
+  enviada: 'border-sky-200 bg-sky-50 text-sky-700',
+  visualizada: 'border-cyan-200 bg-cyan-50 text-cyan-700',
+  negociacao: 'border-yellow-200 bg-yellow-50 text-yellow-700',
+  aprovada: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  contrato_gerado: 'border-teal-200 bg-teal-50 text-teal-700',
+  contrato_assinado: 'border-green-200 bg-green-50 text-green-700',
+  fatura_criada: 'border-indigo-200 bg-indigo-50 text-indigo-700',
+  aguardando_pagamento: 'border-amber-200 bg-amber-50 text-amber-700',
+  pago: 'border-lime-200 bg-lime-50 text-lime-700',
+  rejeitada: 'border-rose-200 bg-rose-50 text-rose-700',
+  expirada: 'border-orange-200 bg-orange-50 text-orange-700',
+};
+
+const contratoStatusLabelMap: Record<string, string> = {
+  aguardando_assinatura: 'Aguardando assinatura',
+  assinado: 'Assinado',
+  cancelado: 'Cancelado',
+  expirado: 'Expirado',
+};
+
+const contratoStatusClassMap: Record<string, string> = {
+  aguardando_assinatura: 'border-amber-200 bg-amber-50 text-amber-700',
+  assinado: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  cancelado: 'border-rose-200 bg-rose-50 text-rose-700',
+  expirado: 'border-slate-200 bg-slate-50 text-slate-700',
+};
+
+const faturaStatusLabelMap: Record<string, string> = {
+  pendente: 'Pendente',
+  enviada: 'Enviada',
+  paga: 'Paga',
+  vencida: 'Vencida',
+  cancelada: 'Cancelada',
+  parcialmente_paga: 'Parcialmente paga',
+};
+
+const faturaStatusClassMap: Record<string, string> = {
+  pendente: 'border-amber-200 bg-amber-50 text-amber-700',
+  enviada: 'border-sky-200 bg-sky-50 text-sky-700',
+  paga: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  vencida: 'border-rose-200 bg-rose-50 text-rose-700',
+  cancelada: 'border-slate-200 bg-slate-50 text-slate-700',
+  parcialmente_paga: 'border-cyan-200 bg-cyan-50 text-cyan-700',
 };
 
 const statusLabelMap: Record<Cliente['status'], string> = {
@@ -108,6 +202,17 @@ const ClienteDetailPage: React.FC = () => {
   const [contatoActionId, setContatoActionId] = useState<string | null>(null);
   const [notasTotal, setNotasTotal] = useState<number | null>(null);
   const [demandasResumo, setDemandasResumo] = useState<DemandasResumo | null>(null);
+  const [ticketsResumo, setTicketsResumo] = useState<ClienteTicketsResumo | null>(null);
+  const [propostasResumo, setPropostasResumo] = useState<ClientePropostasResumo | null>(null);
+  const [contratosResumo, setContratosResumo] = useState<ClienteContratosResumo | null>(null);
+  const [faturasResumo, setFaturasResumo] = useState<ClienteFaturasResumo | null>(null);
+  const [contextoOmnichannel, setContextoOmnichannel] =
+    useState<ClienteOmnichannelContexto | null>(null);
+  const [ticketsLoading, setTicketsLoading] = useState(false);
+  const [propostasLoading, setPropostasLoading] = useState(false);
+  const [contratosLoading, setContratosLoading] = useState(false);
+  const [faturasLoading, setFaturasLoading] = useState(false);
+  const [contextoLoading, setContextoLoading] = useState(false);
 
   const loadCliente = useCallback(async (clienteId: string): Promise<Cliente> => {
     return clientesService.getClienteById(clienteId);
@@ -156,13 +261,42 @@ const ClienteDetailPage: React.FC = () => {
   );
 
   const loadRelacionamentos = useCallback(async (clienteId: string): Promise<void> => {
-    const [notasResult, demandasResult] = await Promise.all([
+    setTicketsLoading(true);
+    setPropostasLoading(true);
+    setContratosLoading(true);
+    setFaturasLoading(true);
+    setContextoLoading(true);
+
+    const [
+      notasResult,
+      demandasResult,
+      ticketsResult,
+      propostasResult,
+      contratosResult,
+      faturasResult,
+      contextoResult,
+    ] = await Promise.all([
       clientesService.contarNotasCliente(clienteId).catch(() => null),
       clientesService.contarDemandasCliente(clienteId).catch(() => null),
+      clientesService.getResumoTicketsCliente(clienteId).catch(() => null),
+      clientesService.getResumoPropostasCliente(clienteId).catch(() => null),
+      clientesService.getResumoContratosCliente(clienteId).catch(() => null),
+      clientesService.getResumoFaturasCliente(clienteId).catch(() => null),
+      clientesService.getContextoOmnichannelCliente(clienteId).catch(() => null),
     ]);
 
     setNotasTotal(notasResult?.total ?? null);
     setDemandasResumo(demandasResult ?? null);
+    setTicketsResumo(ticketsResult ?? null);
+    setPropostasResumo(propostasResult ?? null);
+    setContratosResumo(contratosResult ?? null);
+    setFaturasResumo(faturasResult ?? null);
+    setContextoOmnichannel(contextoResult ?? null);
+    setTicketsLoading(false);
+    setPropostasLoading(false);
+    setContratosLoading(false);
+    setFaturasLoading(false);
+    setContextoLoading(false);
   }, []);
 
   const loadPageData = useCallback(async () => {
@@ -192,6 +326,11 @@ const ClienteDetailPage: React.FC = () => {
       setContatos([]);
       setNotasTotal(null);
       setDemandasResumo(null);
+      setTicketsResumo(null);
+      setPropostasResumo(null);
+      setContratosResumo(null);
+      setFaturasResumo(null);
+      setContextoOmnichannel(null);
     } finally {
       setLoading(false);
     }
@@ -361,6 +500,7 @@ const ClienteDetailPage: React.FC = () => {
   const tipoLabel = cliente.tipo === 'pessoa_fisica' ? 'Pessoa Fisica' : 'Pessoa Juridica';
   const statusLabel = statusLabelMap[cliente.status] || cliente.status;
   const statusClass = statusClassMap[cliente.status] || statusClassMap.inativo;
+  const clienteQuery = `clienteId=${encodeURIComponent(id)}&cliente=${encodeURIComponent(cliente.nome || '')}`;
 
   return (
     <div className="space-y-4 pt-1 sm:pt-2">
@@ -372,7 +512,7 @@ const ClienteDetailPage: React.FC = () => {
               Perfil do Cliente
             </span>
           }
-          description="Visao completa do cliente com dados, anexos e historico do cadastro."
+          description="Visao cadastral do cliente com dados, anexos e historico de atualizacoes."
           actions={
             <div className="flex flex-wrap items-center gap-2">
               <Link
@@ -459,6 +599,31 @@ const ClienteDetailPage: React.FC = () => {
                 demandasResumo && (demandasResumo.urgentes > 0 || demandasResumo.abertas > 0)
                   ? 'warning'
                   : 'neutral',
+            },
+            {
+              label: 'Tickets abertos',
+              value: ticketsResumo === null ? '--' : String(ticketsResumo.abertos),
+              tone: ticketsResumo && ticketsResumo.abertos > 0 ? 'warning' : 'neutral',
+            },
+            {
+              label: 'Propostas pendentes',
+              value: propostasResumo === null ? '--' : String(propostasResumo.pendentes),
+              tone: propostasResumo && propostasResumo.pendentes > 0 ? 'warning' : 'neutral',
+            },
+            {
+              label: 'Contratos pendentes',
+              value: contratosResumo === null ? '--' : String(contratosResumo.pendentes),
+              tone: contratosResumo && contratosResumo.pendentes > 0 ? 'warning' : 'neutral',
+            },
+            {
+              label: 'Faturas pendentes',
+              value: faturasResumo === null ? '--' : String(faturasResumo.pendentes),
+              tone: faturasResumo && faturasResumo.pendentes > 0 ? 'warning' : 'neutral',
+            },
+            {
+              label: 'Segmento omnichannel',
+              value: contextoOmnichannel?.cliente?.segmento || '--',
+              tone: contextoOmnichannel?.cliente?.segmento === 'VIP' ? 'accent' : 'neutral',
             },
           ]}
         />
@@ -723,6 +888,20 @@ const ClienteDetailPage: React.FC = () => {
                 </p>
                 <p className="text-sm text-[#355061]">{formatDateTime(cliente.updated_at)}</p>
               </div>
+              <div className="rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3">
+                <p className="mb-1 inline-flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-[#6C8794]">
+                  <Phone className="h-4 w-4" />
+                  Ultimo contato
+                </p>
+                <p className="text-sm text-[#355061]">{formatDateTime(cliente.ultimo_contato || undefined)}</p>
+              </div>
+              <div className="rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3">
+                <p className="mb-1 inline-flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-[#6C8794]">
+                  <CalendarDays className="h-4 w-4" />
+                  Proximo contato
+                </p>
+                <p className="text-sm text-[#355061]">{formatDateTime(cliente.proximo_contato || undefined)}</p>
+              </div>
             </div>
           </section>
 
@@ -749,7 +928,390 @@ const ClienteDetailPage: React.FC = () => {
                     : 'Nao disponivel'}
                 </p>
               </div>
+              <div className="rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3">
+                <p className="mb-1 inline-flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-[#6C8794]">
+                  <MessageCircle className="h-4 w-4" />
+                  Tickets e atendimentos
+                </p>
+                <p className="text-sm text-[#355061]">
+                  {ticketsResumo
+                    ? `${ticketsResumo.total} total, ${ticketsResumo.abertos} abertos e ${ticketsResumo.resolvidos} resolvidos`
+                    : 'Nao disponivel'}
+                </p>
+                <p className="mt-1 text-xs text-[#607B89]">
+                  Ultimo atendimento:{' '}
+                  {ticketsResumo?.ultimoAtendimentoEm
+                    ? formatDateTime(ticketsResumo.ultimoAtendimentoEm)
+                    : 'Nao identificado'}
+                </p>
+              </div>
+              <div className="rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3">
+                <p className="mb-1 inline-flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-[#6C8794]">
+                  <FileText className="h-4 w-4" />
+                  Propostas comerciais
+                </p>
+                <p className="text-sm text-[#355061]">
+                  {propostasResumo
+                    ? `${propostasResumo.total} total, ${propostasResumo.pendentes} pendentes e ${propostasResumo.aprovadas} aprovadas`
+                    : 'Nao disponivel'}
+                </p>
+                <p className="mt-1 text-xs text-[#607B89]">
+                  Ultimo registro:{' '}
+                  {propostasResumo?.ultimoRegistroEm
+                    ? formatDateTime(propostasResumo.ultimoRegistroEm)
+                    : 'Nao identificado'}
+                </p>
+              </div>
+              <div className="rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3">
+                <p className="mb-1 inline-flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-[#6C8794]">
+                  <FileText className="h-4 w-4" />
+                  Contratos
+                </p>
+                <p className="text-sm text-[#355061]">
+                  {contratosResumo
+                    ? `${contratosResumo.total} total, ${contratosResumo.pendentes} pendentes e ${contratosResumo.assinados} assinados`
+                    : 'Nao disponivel'}
+                </p>
+                <p className="mt-1 text-xs text-[#607B89]">
+                  Ultimo registro:{' '}
+                  {contratosResumo?.ultimoRegistroEm
+                    ? formatDateTime(contratosResumo.ultimoRegistroEm)
+                    : 'Nao identificado'}
+                </p>
+              </div>
+              <div className="rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3">
+                <p className="mb-1 inline-flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-[#6C8794]">
+                  <FileText className="h-4 w-4" />
+                  Faturas
+                </p>
+                <p className="text-sm text-[#355061]">
+                  {faturasResumo
+                    ? `${faturasResumo.total} total, ${faturasResumo.pendentes} pendentes e ${faturasResumo.pagas} pagas`
+                    : 'Nao disponivel'}
+                </p>
+                <p className="mt-1 text-xs text-[#607B89]">
+                  Ultimo registro:{' '}
+                  {faturasResumo?.ultimoRegistroEm
+                    ? formatDateTime(faturasResumo.ultimoRegistroEm)
+                    : 'Nao identificado'}
+                </p>
+              </div>
+              <div className="rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3">
+                <p className="mb-1 inline-flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-[#6C8794]">
+                  <MessageCircle className="h-4 w-4" />
+                  Contexto omnichannel
+                </p>
+                {contextoLoading ? (
+                  <p className="text-sm text-[#607B89]">Carregando contexto omnichannel...</p>
+                ) : contextoOmnichannel ? (
+                  <>
+                    <p className="text-sm text-[#355061]">
+                      Segmento {contextoOmnichannel.cliente.segmento}, avaliacao media{' '}
+                      {contextoOmnichannel.estatisticas.avaliacaoMedia.toFixed(1)} e tempo medio{' '}
+                      {contextoOmnichannel.estatisticas.tempoMedioResposta}.
+                    </p>
+                    <p className="mt-1 text-xs text-[#607B89]">
+                      {contextoOmnichannel.estatisticas.ticketsAbertos} ticket(s) aberto(s),{' '}
+                      {contextoOmnichannel.estatisticas.ticketsResolvidos} resolvido(s) e ultimo contato em{' '}
+                      {formatDateTime(contextoOmnichannel.cliente.ultimoContato)}.
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-[#607B89]">Nao disponivel</p>
+                )}
+              </div>
             </div>
+          </section>
+
+          <section className="space-y-3">
+            <h3 className="text-base font-semibold text-[#19384C]">Historico omnichannel</h3>
+
+            {contextoLoading ? (
+              <div className="flex items-center gap-2 rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3 text-sm text-[#607B89]">
+                <Loader2 className="h-4 w-4 animate-spin text-[#159A9C]" />
+                Carregando historico omnichannel...
+              </div>
+            ) : !contextoOmnichannel || contextoOmnichannel.historico.tickets.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-[#D1E0E5] bg-[#FBFDFE] p-3 text-sm text-[#607B89]">
+                Nenhum evento omnichannel recente encontrado para este cliente.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {contextoOmnichannel.historico.tickets.slice(0, 3).map((ticket) => {
+                  const statusChave = (ticket.status || '').toUpperCase();
+                  const statusLabel = ticketStatusLabelMap[statusChave] || ticket.status;
+                  const statusClass =
+                    ticketStatusClassMap[statusChave] ||
+                    'border-slate-200 bg-slate-50 text-slate-700';
+
+                  return (
+                    <div key={ticket.id} className="rounded-xl border border-[#DCE8EC] bg-white p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <Link
+                            to={`/atendimento/tickets/${ticket.id}`}
+                            className="text-sm font-semibold text-[#159A9C] hover:text-[#0F7B7D]"
+                          >
+                            {ticket.numero ? `#${ticket.numero}` : 'Ticket'} -{' '}
+                            {ticket.assunto || 'Sem assunto'}
+                          </Link>
+                          <p className="mt-1 text-xs text-[#607B89]">
+                            Criado em {formatDateTime(ticket.criadoEm)}
+                            {ticket.canalId ? ` - Canal ${ticket.canalId}` : ''}
+                          </p>
+                        </div>
+                        <span
+                          className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${statusClass}`}
+                        >
+                          {statusLabel}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-base font-semibold text-[#19384C]">Ultimos tickets</h3>
+              <Link
+                to={`/atendimento/tickets?${clienteQuery}`}
+                className="rounded-lg border border-[#D4E2E7] px-2.5 py-1 text-xs font-medium text-[#355061] transition-colors hover:bg-[#F6FBFC]"
+              >
+                Abrir atendimento
+              </Link>
+            </div>
+
+            {ticketsLoading ? (
+              <div className="flex items-center gap-2 rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3 text-sm text-[#607B89]">
+                <Loader2 className="h-4 w-4 animate-spin text-[#159A9C]" />
+                Carregando tickets...
+              </div>
+            ) : !ticketsResumo || ticketsResumo.tickets.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-[#D1E0E5] bg-[#FBFDFE] p-3 text-sm text-[#607B89]">
+                Nenhum ticket vinculado a este cliente.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {ticketsResumo.tickets.map((ticket) => {
+                  const statusLabel = ticketStatusLabelMap[ticket.status] || ticket.status;
+                  const statusClass =
+                    ticketStatusClassMap[ticket.status] || 'border-slate-200 bg-slate-50 text-slate-700';
+
+                  return (
+                    <div key={ticket.id} className="rounded-xl border border-[#DCE8EC] bg-white p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <Link
+                            to={`/atendimento/tickets/${ticket.id}`}
+                            className="text-sm font-semibold text-[#159A9C] hover:text-[#0F7B7D]"
+                          >
+                            {ticket.numero ? `#${ticket.numero}` : 'Ticket'} -{' '}
+                            {ticket.assunto || 'Sem assunto'}
+                          </Link>
+                          <p className="mt-1 text-xs text-[#607B89]">
+                            Atualizado em {formatDateTime(ticket.atualizadoEm)}
+                          </p>
+                        </div>
+                        <span
+                          className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${statusClass}`}
+                        >
+                          {statusLabel}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-base font-semibold text-[#19384C]">Ultimas propostas</h3>
+              <Link
+                to={`/vendas/propostas?${clienteQuery}`}
+                className="rounded-lg border border-[#D4E2E7] px-2.5 py-1 text-xs font-medium text-[#355061] transition-colors hover:bg-[#F6FBFC]"
+              >
+                Abrir propostas
+              </Link>
+            </div>
+
+            {propostasLoading ? (
+              <div className="flex items-center gap-2 rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3 text-sm text-[#607B89]">
+                <Loader2 className="h-4 w-4 animate-spin text-[#159A9C]" />
+                Carregando propostas...
+              </div>
+            ) : !propostasResumo || propostasResumo.propostas.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-[#D1E0E5] bg-[#FBFDFE] p-3 text-sm text-[#607B89]">
+                Nenhuma proposta vinculada a este cliente.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {propostasResumo.propostas.map((proposta) => {
+                  const statusNormalizado = (proposta.status || '').toLowerCase();
+                  const statusLabel =
+                    propostaStatusLabelMap[statusNormalizado] || proposta.status || 'Sem status';
+                  const statusClass =
+                    propostaStatusClassMap[statusNormalizado] ||
+                    'border-slate-200 bg-slate-50 text-slate-700';
+
+                  return (
+                    <div
+                      key={proposta.id}
+                      className="rounded-xl border border-[#DCE8EC] bg-white p-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <Link
+                            to={`/vendas/propostas?proposta=${proposta.id}&${clienteQuery}`}
+                            className="text-sm font-semibold text-[#159A9C] hover:text-[#0F7B7D]"
+                          >
+                            {proposta.numero || 'Proposta'} - {proposta.titulo || 'Sem titulo'}
+                          </Link>
+                          <p className="mt-1 text-xs text-[#607B89]">
+                            Atualizada em {formatDateTime(proposta.atualizadaEm)}
+                          </p>
+                          <p className="mt-1 text-xs font-medium text-[#355061]">
+                            Valor: {formatCurrency(proposta.valor)}
+                          </p>
+                        </div>
+                        <span
+                          className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${statusClass}`}
+                        >
+                          {statusLabel}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-base font-semibold text-[#19384C]">Ultimos contratos</h3>
+              <Link
+                to={`/contratos?${clienteQuery}`}
+                className="rounded-lg border border-[#D4E2E7] px-2.5 py-1 text-xs font-medium text-[#355061] transition-colors hover:bg-[#F6FBFC]"
+              >
+                Abrir contratos
+              </Link>
+            </div>
+
+            {contratosLoading ? (
+              <div className="flex items-center gap-2 rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3 text-sm text-[#607B89]">
+                <Loader2 className="h-4 w-4 animate-spin text-[#159A9C]" />
+                Carregando contratos...
+              </div>
+            ) : !contratosResumo || contratosResumo.contratos.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-[#D1E0E5] bg-[#FBFDFE] p-3 text-sm text-[#607B89]">
+                Nenhum contrato vinculado a este cliente.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {contratosResumo.contratos.map((contrato) => {
+                  const statusNormalizado = (contrato.status || '').toLowerCase();
+                  const statusLabel =
+                    contratoStatusLabelMap[statusNormalizado] || contrato.status || 'Sem status';
+                  const statusClass =
+                    contratoStatusClassMap[statusNormalizado] ||
+                    'border-slate-200 bg-slate-50 text-slate-700';
+
+                  return (
+                    <div
+                      key={contrato.id}
+                      className="rounded-xl border border-[#DCE8EC] bg-white p-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <Link
+                            to={`/contratos/${contrato.id}`}
+                            className="text-sm font-semibold text-[#159A9C] hover:text-[#0F7B7D]"
+                          >
+                            {contrato.numero || `Contrato ${contrato.id}`} - {contrato.tipo}
+                          </Link>
+                          <p className="mt-1 text-xs text-[#607B89]">
+                            Vigencia: {formatDate(contrato.dataInicio)} ate {formatDate(contrato.dataFim)}
+                          </p>
+                          <p className="mt-1 text-xs font-medium text-[#355061]">
+                            Valor: {formatCurrency(contrato.valorTotal)}
+                          </p>
+                        </div>
+                        <span
+                          className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${statusClass}`}
+                        >
+                          {statusLabel}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-base font-semibold text-[#19384C]">Ultimas faturas</h3>
+              <Link
+                to={`/financeiro/faturamento?${clienteQuery}`}
+                className="rounded-lg border border-[#D4E2E7] px-2.5 py-1 text-xs font-medium text-[#355061] transition-colors hover:bg-[#F6FBFC]"
+              >
+                Abrir faturamento
+              </Link>
+            </div>
+
+            {faturasLoading ? (
+              <div className="flex items-center gap-2 rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3 text-sm text-[#607B89]">
+                <Loader2 className="h-4 w-4 animate-spin text-[#159A9C]" />
+                Carregando faturas...
+              </div>
+            ) : !faturasResumo || faturasResumo.faturas.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-[#D1E0E5] bg-[#FBFDFE] p-3 text-sm text-[#607B89]">
+                Nenhuma fatura vinculada a este cliente.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {faturasResumo.faturas.map((fatura) => {
+                  const statusNormalizado = (fatura.status || '').toLowerCase();
+                  const statusLabel =
+                    faturaStatusLabelMap[statusNormalizado] || fatura.status || 'Sem status';
+                  const statusClass =
+                    faturaStatusClassMap[statusNormalizado] ||
+                    'border-slate-200 bg-slate-50 text-slate-700';
+
+                  return (
+                    <div key={fatura.id} className="rounded-xl border border-[#DCE8EC] bg-white p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <Link
+                            to={`/financeiro/faturamento?faturaId=${String(fatura.id)}&${clienteQuery}`}
+                            className="text-sm font-semibold text-[#159A9C] hover:text-[#0F7B7D]"
+                          >
+                            {fatura.numero || `Fatura ${fatura.id}`}
+                          </Link>
+                          <p className="mt-1 text-xs text-[#607B89]">
+                            Vencimento: {formatDate(fatura.dataVencimento)}
+                          </p>
+                          <p className="mt-1 text-xs font-medium text-[#355061]">
+                            Pago {formatCurrency(fatura.valorPago)} de {formatCurrency(fatura.valorTotal)}
+                          </p>
+                        </div>
+                        <span
+                          className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${statusClass}`}
+                        >
+                          {statusLabel}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
 
           <section className="space-y-3">

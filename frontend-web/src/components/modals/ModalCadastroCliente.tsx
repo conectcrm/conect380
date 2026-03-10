@@ -4,6 +4,7 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import toast from 'react-hot-toast';
 import { AlertCircle, Building, Clock, Mail, User, X, Loader2 } from 'lucide-react';
+import { CreateClientePayload } from '../../services/clientesService';
 
 type ClienteTipo = 'pessoa_fisica' | 'pessoa_juridica';
 type PhoneCountry = {
@@ -19,7 +20,7 @@ type PhoneCountry = {
 interface ModalCadastroClienteProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (cliente: Record<string, unknown>) => Promise<void>;
+  onSave: (cliente: CreateClientePayload) => Promise<void>;
   cliente?: ClienteModalData;
   isLoading?: boolean;
 }
@@ -32,19 +33,13 @@ interface ClienteModalData {
   tipo?: ClienteTipo;
   documento?: string;
   status?: 'cliente' | 'lead' | 'prospect' | 'inativo';
-  empresa?: string;
-  cargo?: string;
-  site?: string;
-  data_nascimento?: string;
-  genero?: string;
-  profissao?: string;
-  renda?: number | null;
   cep?: string;
   endereco?: string;
   cidade?: string;
   estado?: string;
-  tags?: string[];
   observacoes?: string;
+  ultimo_contato?: string | null;
+  proximo_contato?: string | null;
 }
 
 interface ClienteFormData {
@@ -62,6 +57,8 @@ interface ClienteFormData {
   cidade?: string;
   estado?: string;
   observacoes?: string;
+  ultimo_contato?: string;
+  proximo_contato?: string;
 }
 
 const validarCPF = (cpf: string): boolean => {
@@ -363,6 +360,8 @@ const defaultValues: ClienteFormData = {
   cidade: '',
   estado: '',
   observacoes: '',
+  ultimo_contato: '',
+  proximo_contato: '',
 };
 
 const clienteSchema = yup
@@ -525,6 +524,8 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
         cidade: cliente.cidade || '',
         estado: cliente.estado || '',
         observacoes: cliente.observacoes || '',
+        ultimo_contato: cliente.ultimo_contato ? cliente.ultimo_contato.slice(0, 10) : '',
+        proximo_contato: cliente.proximo_contato ? cliente.proximo_contato.slice(0, 10) : '',
       });
 
       setPhoneCountryIso(parsedPhone.country.iso2);
@@ -589,21 +590,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
         .map((parte) => parte?.trim())
         .filter(Boolean)
         .join(', ');
-      const legacyProfileData = cliente
-        ? {
-            empresa: cliente.empresa,
-            cargo: cliente.cargo,
-            site: cliente.site,
-            data_nascimento: cliente.data_nascimento,
-            genero: cliente.genero,
-            profissao: cliente.profissao,
-            renda: cliente.renda,
-            tags: cliente.tags,
-          }
-        : {};
-
-      const payload = {
-        ...legacyProfileData,
+      const payload: CreateClientePayload = {
         nome: data.nome.trim(),
         email: data.email?.trim() || '',
         telefone: data.telefone?.trim() || undefined,
@@ -612,19 +599,17 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
           data.tipo === 'pessoa_fisica'
             ? data.cpf?.replace(/\D/g, '')
             : data.cnpj?.replace(/\D/g, ''),
-        status: cliente?.status ?? 'cliente',
+        status: cliente?.status ?? 'lead',
         cep: data.cep ? data.cep.replace(/\D/g, '') : undefined,
         endereco: endereco || undefined,
         cidade: data.cidade?.trim() || undefined,
         estado: data.estado?.trim().toUpperCase() || undefined,
         observacoes: data.observacoes?.trim() || '',
+        ultimo_contato: data.ultimo_contato ? new Date(data.ultimo_contato).toISOString() : null,
+        proximo_contato: data.proximo_contato ? new Date(data.proximo_contato).toISOString() : null,
       };
 
-      const sanitizedPayload = Object.fromEntries(
-        Object.entries(payload).filter(([, value]) => value !== undefined),
-      );
-
-      await onSave(sanitizedPayload);
+      await onSave(payload);
 
       toast.dismiss(loadingToast);
       toast.success(
@@ -657,7 +642,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                   {cliente ? 'Editar cliente' : 'Novo cliente'}
                 </h2>
                 <p className="text-sm text-[#607B89]">
-                  Cadastro basico para criacao rapida com campos avancados opcionais.
+                  Cadastro de cliente alinhado ao escopo oficial do modulo.
                 </p>
               </div>
 
@@ -863,7 +848,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                 <div className="border-b border-gray-200 pb-2">
                   <h3 className="text-base font-semibold text-[#002333] flex items-center gap-2">
                     <Building className="h-4 w-4 text-[#159A9C]" />
-                    Cadastro avancado
+                    Dados complementares
                   </h3>
                 </div>
 
@@ -947,6 +932,32 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                 </div>
 
                 <div className="space-y-3 rounded-lg border border-[#DCE8EC] bg-white p-3">
+                  <h4 className="text-sm font-semibold text-[#244455]">Follow-up</h4>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Ultimo contato
+                      </label>
+                      <input
+                        {...register('ultimo_contato')}
+                        type="date"
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Proximo contato
+                      </label>
+                      <input
+                        {...register('proximo_contato')}
+                        type="date"
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3 rounded-lg border border-[#DCE8EC] bg-white p-3">
                   <h4 className="text-sm font-semibold text-[#244455]">Observacoes internas</h4>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -972,7 +983,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
             <div className="sticky bottom-0 border-t border-gray-200 bg-gray-50 px-1 py-4">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-sm text-gray-500 text-center sm:text-left">
-                  Obrigatorio no cadastro basico: tipo, CPF/CNPJ, nome e um contato.
+                  Campos permitidos no fluxo atual: identificacao, contato, endereco, follow-up e observacoes.
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">

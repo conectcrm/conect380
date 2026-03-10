@@ -42,22 +42,35 @@ export class CreateProdutoDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
-  @Transform(({ value }) => (value ? parseFloat(value) : 0))
+  @Transform(({ value }) =>
+    value === undefined || value === null || value === '' ? undefined : parseFloat(value),
+  )
   custoUnitario?: number;
 
   @IsOptional()
   @IsString()
-  @IsEnum(['produto', 'servico', 'licenca', 'modulo', 'plano', 'aplicativo'])
+  @IsEnum([
+    'produto',
+    'servico',
+    'licenca',
+    'modulo',
+    'plano',
+    'aplicativo',
+    'peca',
+    'acessorio',
+    'pacote',
+    'garantia',
+  ])
   tipoItem?: string;
 
   @IsOptional()
   @IsString()
-  @IsEnum(['unico', 'mensal', 'anual'])
+  @IsEnum(['unico', 'mensal', 'anual', 'trimestral', 'sob_consulta'])
   frequencia?: string;
 
   @IsOptional()
   @IsString()
-  @IsEnum(['unidade', 'saca', 'hectare', 'pacote', 'licenca'])
+  @IsEnum(['unidade', 'saca', 'hectare', 'pacote', 'licenca', 'hora', 'dia', 'mensal', 'assinatura'])
   unidadeMedida?: string;
 
   @IsOptional()

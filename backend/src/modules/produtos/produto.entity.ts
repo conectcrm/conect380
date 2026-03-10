@@ -61,7 +61,7 @@ export class Produto {
     scale: 2,
     nullable: true,
   })
-  custoUnitario: number;
+  custoUnitario?: number | null;
 
   @Column({
     type: 'varchar',

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   AlertCircle,
   ArrowLeft,
@@ -195,11 +195,14 @@ const getPropostaLabel = (item: Contrato, propostasPorId: Record<string, string>
 
 const ContratosPage: React.FC<ContratosPageProps> = ({ contratoId: propContratoId }) => {
   const { id: paramContratoId } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { confirm } = useGlobalConfirmation();
 
   const contratoId = propContratoId || paramContratoId;
   const isDetalhe = Boolean(contratoId);
+  const clienteIdParam = (searchParams.get('clienteId') || '').trim();
+  const clienteNomeParam = (searchParams.get('cliente') || '').trim().toLowerCase();
 
   const [contrato, setContrato] = useState<Contrato | null>(null);
   const [contratos, setContratos] = useState<Contrato[]>([]);
@@ -210,6 +213,12 @@ const ContratosPage: React.FC<ContratosPageProps> = ({ contratoId: propContratoI
   const [registrandoAssinaturaExterna, setRegistrandoAssinaturaExterna] = useState(false);
   const [clientesPorId, setClientesPorId] = useState<Record<string, ClienteResolvido>>({});
   const [propostasPorId, setPropostasPorId] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!busca.trim() && clienteNomeParam) {
+      setBusca(searchParams.get('cliente') || '');
+    }
+  }, [busca, clienteNomeParam, searchParams]);
 
   useEffect(() => {
     if (isDetalhe && contratoId) {
@@ -400,19 +409,33 @@ const ContratosPage: React.FC<ContratosPageProps> = ({ contratoId: propContratoI
 
   const contratosFiltrados = useMemo(() => {
     const termo = normalizarTexto(busca);
-    if (!termo) return contratos;
+    const filtradosPorBusca = !termo
+      ? contratos
+      : contratos.filter((item) => {
+          const campos = [
+            item.numero,
+            item.propostaId,
+            getPropostaLabel(item, propostasPorId),
+            getClienteNome(item, clientesPorId),
+            getClienteEmail(item, clientesPorId),
+          ];
+          return campos.some((campo) => normalizarTexto(campo).includes(termo));
+        });
 
-    return contratos.filter((item) => {
-      const campos = [
-        item.numero,
-        item.propostaId,
-        getPropostaLabel(item, propostasPorId),
-        getClienteNome(item, clientesPorId),
-        getClienteEmail(item, clientesPorId),
-      ];
-      return campos.some((campo) => normalizarTexto(campo).includes(termo));
+    if (!clienteIdParam && !clienteNomeParam) {
+      return filtradosPorBusca;
+    }
+
+    return filtradosPorBusca.filter((item) => {
+      const clienteIdContrato = String(item.cliente?.id || '').trim();
+      if (clienteIdParam && clienteIdContrato && clienteIdContrato === clienteIdParam) {
+        return true;
+      }
+
+      const clienteNomeContrato = normalizarTexto(getClienteNome(item, clientesPorId));
+      return clienteNomeParam ? clienteNomeContrato.includes(clienteNomeParam) : !clienteIdParam;
     });
-  }, [busca, contratos, clientesPorId, propostasPorId]);
+  }, [busca, contratos, clientesPorId, propostasPorId, clienteIdParam, clienteNomeParam]);
 
   const resumo = useMemo(() => {
     const total = contratos.length;

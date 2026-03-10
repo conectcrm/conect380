@@ -60,6 +60,20 @@ interface Cliente {
   updatedAt?: string;
 }
 
+interface ProdutoComponentePlano {
+  childItemId: string;
+  componentRole: 'included' | 'required' | 'optional' | 'recommended' | 'addon';
+  quantity?: number;
+  sortOrder?: number;
+  affectsPrice?: boolean;
+  isDefault?: boolean;
+  nome?: string;
+  preco?: number;
+  tipoItem?: string;
+  status?: string;
+  metadata?: Record<string, unknown>;
+}
+
 interface Produto {
   id: string;
   nome: string;
@@ -71,11 +85,22 @@ interface Produto {
   descricao?: string;
   unidade: string; // Mudando para obrigatório para compatibilidade
   // Campos específicos para software
-  tipoItem?: 'produto' | 'servico' | 'licenca' | 'modulo' | 'plano' | 'aplicativo';
+  tipoItem?:
+    | 'produto'
+    | 'servico'
+    | 'licenca'
+    | 'modulo'
+    | 'plano'
+    | 'aplicativo'
+    | 'peca'
+    | 'acessorio'
+    | 'pacote'
+    | 'garantia';
   tipoLicenciamento?: string;
   periodicidadeLicenca?: string;
   renovacaoAutomatica?: boolean;
   quantidadeLicencas?: number;
+  componentes?: ProdutoComponentePlano[];
   // Campos para combos
   precoOriginal?: number;
   desconto?: number;
@@ -104,6 +129,70 @@ interface PropostaFormData {
 }
 
 type QuickActionType = 'draft';
+type TipoItemCatalogo = NonNullable<Produto['tipoItem']>;
+type NichoCatalogo = 'geral' | 'software' | 'servicos' | 'automotivo' | 'imobiliario';
+
+const tipoItemLabels: Record<TipoItemCatalogo, string> = {
+  produto: 'Produto',
+  servico: 'Servico',
+  licenca: 'Licenca',
+  modulo: 'Modulo',
+  plano: 'Plano',
+  aplicativo: 'Aplicativo',
+  peca: 'Peca',
+  acessorio: 'Acessorio',
+  pacote: 'Pacote',
+  garantia: 'Garantia',
+};
+
+const nichoCatalogoConfig: Record<
+  NichoCatalogo,
+  {
+    label: string;
+    description: string;
+    defaultTipoItem: '' | TipoItemCatalogo;
+    tiposRecomendados: TipoItemCatalogo[];
+  }
+> = {
+  geral: {
+    label: 'Visao geral',
+    description: 'Sem recorte de nicho.',
+    defaultTipoItem: '',
+    tiposRecomendados: [],
+  },
+  software: {
+    label: 'Software e SaaS',
+    description: 'Planos, modulos, licencas e aplicativos.',
+    defaultTipoItem: 'plano',
+    tiposRecomendados: ['plano', 'modulo', 'licenca', 'aplicativo', 'pacote', 'servico'],
+  },
+  servicos: {
+    label: 'Servicos',
+    description: 'Servicos avulsos e pacotes comerciais.',
+    defaultTipoItem: 'servico',
+    tiposRecomendados: ['servico', 'pacote', 'garantia'],
+  },
+  automotivo: {
+    label: 'Automotivo',
+    description: 'Pecas, acessorios, servicos e garantia.',
+    defaultTipoItem: 'peca',
+    tiposRecomendados: ['peca', 'acessorio', 'servico', 'garantia', 'pacote'],
+  },
+  imobiliario: {
+    label: 'Imobiliario',
+    description: 'Servicos e pacotes para operacao imobiliaria.',
+    defaultTipoItem: 'servico',
+    tiposRecomendados: ['servico', 'pacote', 'garantia'],
+  },
+};
+
+const componentRoleLabels: Record<ProdutoComponentePlano['componentRole'], string> = {
+  included: 'Incluido',
+  required: 'Obrigatorio',
+  optional: 'Opcional',
+  recommended: 'Recomendado',
+  addon: 'Add-on',
+};
 
 // Função auxiliar para detectar se é produto de software
 const isProdutoSoftware = (produto: Produto): boolean => {
@@ -119,6 +208,54 @@ const comboContemItemDescontinuado = (produto: Produto): boolean => {
     return false;
   }
   return produto.produtosCombo.some((item) => item.status === 'descontinuado');
+};
+
+const getPlanoComponentes = (produto: Produto): ProdutoComponentePlano[] => {
+  if (produto.tipoItem !== 'plano' || !Array.isArray(produto.componentes)) {
+    return [];
+  }
+
+  return produto.componentes.filter(
+    (componente) => componente && typeof componente === 'object' && Boolean(componente.childItemId),
+  );
+};
+
+const getResumoComposicaoPlano = (produto: Produto): string | null => {
+  const componentes = getPlanoComponentes(produto);
+  if (componentes.length === 0) {
+    return null;
+  }
+
+  const nomes = componentes
+    .map((componente) => componente.nome?.trim())
+    .filter((nome): nome is string => Boolean(nome && nome.length > 0));
+
+  if (nomes.length === 0) {
+    return `${componentes.length} item(ns) na composicao`;
+  }
+
+  if (nomes.length <= 3) {
+    return nomes.join(', ');
+  }
+
+  return `${nomes.slice(0, 3).join(', ')} +${nomes.length - 3}`;
+};
+
+const isTipoItemCatalogo = (value: string): value is TipoItemCatalogo =>
+  Object.prototype.hasOwnProperty.call(tipoItemLabels, value);
+
+const getDetalhesComposicaoPlano = (produto: Produto, limit = 3): string[] => {
+  const componentes = getPlanoComponentes(produto);
+
+  return componentes.slice(0, limit).map((componente) => {
+    const nome = componente.nome?.trim() || 'Item da composicao';
+    const quantidade =
+      typeof componente.quantity === 'number' && componente.quantity > 1
+        ? ` x${componente.quantity}`
+        : '';
+    const papel = componentRoleLabels[componente.componentRole || 'included'] || 'Incluido';
+    return `${nome}${quantidade} (${papel})`;
+  });
 };
 
 // Schema de validação por etapa
@@ -208,6 +345,8 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
   const [buscarProduto, setBuscarProduto] = useState('');
   const [categoriaSelecionada, setCategoriaSelecionada] = useState('');
   const [tipoSelecionado, setTipoSelecionado] = useState(''); // 'produto', 'combo' ou ''
+  const [nichoSelecionado, setNichoSelecionado] = useState<NichoCatalogo>('geral');
+  const [tipoItemSelecionado, setTipoItemSelecionado] = useState<TipoItemCatalogo | ''>('');
   const [showProdutoSearch, setShowProdutoSearch] = useState(false);
 
   // Etapas do wizard
@@ -408,6 +547,8 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
       setBuscarProduto('');
       setCategoriaSelecionada('');
       setTipoSelecionado('');
+      setNichoSelecionado('geral');
+      setTipoItemSelecionado('');
       setShowProdutoSearch(false);
       setQuickAction(null);
 
@@ -496,6 +637,53 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
     }
   }, [watchedCliente?.id, getValues, setValue]); // Otimizado com ID do cliente
 
+  const nichoSelecionadoConfig = nichoCatalogoConfig[nichoSelecionado];
+
+  const tiposItemDisponiveis = useMemo(() => {
+    const tipos = new Set<TipoItemCatalogo>();
+
+    produtosDisponiveis.forEach((produto) => {
+      if (produto.tipoItem && isTipoItemCatalogo(produto.tipoItem)) {
+        tipos.add(produto.tipoItem);
+      }
+    });
+
+    return Array.from(tipos).sort((left, right) =>
+      tipoItemLabels[left].localeCompare(tipoItemLabels[right], 'pt-BR'),
+    );
+  }, [produtosDisponiveis]);
+
+  const resolveDefaultTipoItemPorNicho = useCallback(
+    (nicho: NichoCatalogo): '' | TipoItemCatalogo => {
+      const config = nichoCatalogoConfig[nicho];
+      if (!config.defaultTipoItem) {
+        return '';
+      }
+
+      if (tiposItemDisponiveis.includes(config.defaultTipoItem)) {
+        return config.defaultTipoItem;
+      }
+
+      const recomendadoDisponivel = config.tiposRecomendados.find((tipo) =>
+        tiposItemDisponiveis.includes(tipo),
+      );
+
+      return recomendadoDisponivel || '';
+    },
+    [tiposItemDisponiveis],
+  );
+
+  const handleNichoChange = useCallback(
+    (nextNicho: NichoCatalogo) => {
+      setNichoSelecionado(nextNicho);
+      setTipoItemSelecionado(resolveDefaultTipoItemPorNicho(nextNicho));
+      setTipoSelecionado('');
+      setCategoriaSelecionada('');
+      setBuscarProduto('');
+    },
+    [resolveDefaultTipoItemPorNicho],
+  );
+
   // Filtrar produtos
   const produtosFiltrados = useMemo(() => {
     let filtered = produtosDisponiveis;
@@ -507,6 +695,19 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
     filtered = filtered.filter(
       (p) => p.tipo === 'combo' || (p.status || 'ativo') !== 'descontinuado',
     );
+
+    if (nichoSelecionado !== 'geral') {
+      const tiposPermitidos = new Set(nichoSelecionadoConfig.tiposRecomendados);
+      filtered = filtered.filter(
+        (p) =>
+          p.tipo === 'combo' ||
+          (p.tipoItem ? tiposPermitidos.has(p.tipoItem as TipoItemCatalogo) : false),
+      );
+    }
+
+    if (tipoItemSelecionado) {
+      filtered = filtered.filter((p) => p.tipoItem === tipoItemSelecionado);
+    }
 
     if (categoriaSelecionada) {
       filtered = filtered.filter((p) => p.categoria === categoriaSelecionada);
@@ -530,6 +731,9 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
     produtosDisponiveis,
     buscarProduto,
     categoriaSelecionada,
+    nichoSelecionado,
+    nichoSelecionadoConfig.tiposRecomendados,
+    tipoItemSelecionado,
     tipoSelecionado,
     catalogoFeatures.combosEnabled,
   ]);
@@ -1023,13 +1227,35 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                 {/* Busca de Produtos */}
                 {showProdutoSearch && (
                   <div className="p-4 bg-gray-50 rounded-lg space-y-4">
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                      {/* Filtro por nicho */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Nicho</label>
+                        <select
+                          value={nichoSelecionado}
+                          onChange={(e) => handleNichoChange(e.target.value as NichoCatalogo)}
+                          className={fieldClass}
+                        >
+                          {Object.entries(nichoCatalogoConfig).map(([key, config]) => (
+                            <option key={key} value={key}>
+                              {config.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
                       {/* Filtro por tipo */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
                         <select
                           value={tipoSelecionado}
-                          onChange={(e) => setTipoSelecionado(e.target.value)}
+                          onChange={(e) => {
+                            const nextTipo = e.target.value;
+                            setTipoSelecionado(nextTipo);
+                            if (nextTipo === 'combo') {
+                              setTipoItemSelecionado('');
+                            }
+                          }}
                           className={fieldClass}
                         >
                           <option value="">Todos os tipos</option>
@@ -1037,6 +1263,30 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                           {catalogoFeatures.combosEnabled && (
                             <option value="combo">Combos</option>
                           )}
+                        </select>
+                      </div>
+
+                      {/* Filtro por tipo de item */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Tipo de item
+                        </label>
+                        <select
+                          value={tipoItemSelecionado}
+                          onChange={(e) =>
+                            setTipoItemSelecionado(
+                              e.target.value ? (e.target.value as TipoItemCatalogo) : '',
+                            )
+                          }
+                          className={fieldClass}
+                          disabled={tipoSelecionado === 'combo'}
+                        >
+                          <option value="">Todos os itens</option>
+                          {tiposItemDisponiveis.map((tipoItem) => (
+                            <option key={tipoItem} value={tipoItem}>
+                              {tipoItemLabels[tipoItem]}
+                            </option>
+                          ))}
                         </select>
                       </div>
 
@@ -1078,28 +1328,63 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                     </div>
 
                     {/* Estatísticas */}
+                    {nichoSelecionado !== 'geral' && (
+                      <div className="rounded-lg border border-[#DCE6F8] bg-[#F4F8FF] p-3">
+                        <p className="text-xs font-medium text-[#35538A]">
+                          {nichoSelecionadoConfig.description}
+                        </p>
+                        {nichoSelecionadoConfig.tiposRecomendados.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {nichoSelecionadoConfig.tiposRecomendados.map((tipoItem) => (
+                              <button
+                                key={tipoItem}
+                                type="button"
+                                onClick={() => {
+                                  setTipoItemSelecionado(tipoItem);
+                                  setTipoSelecionado('produto');
+                                }}
+                                className={`inline-flex h-7 items-center rounded-full border px-3 text-xs font-medium transition ${
+                                  tipoItemSelecionado === tipoItem
+                                    ? 'border-[#35538A] bg-[#35538A] text-white'
+                                    : 'border-[#C7D9F7] bg-white text-[#35538A] hover:bg-[#EEF4FF]'
+                                }`}
+                              >
+                                {tipoItemLabels[tipoItem]}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-between text-sm text-gray-600 bg-white px-3 py-2 rounded border">
                       <div className="flex items-center gap-4">
                         <span>
                           <strong>{produtosFiltrados.length}</strong> itens encontrados
                         </span>
-                        <span>•</span>
+                        <span>|</span>
                         <span>
                           {produtosFiltrados.filter((p) => p.tipo === 'produto').length} produtos
                         </span>
                         {catalogoFeatures.combosEnabled && (
                           <>
-                            <span>•</span>
+                            <span>|</span>
                             <span>
                               {produtosFiltrados.filter((p) => p.tipo === 'combo').length} combos
                             </span>
                           </>
                         )}
                       </div>
-                      {(tipoSelecionado || categoriaSelecionada || buscarProduto) && (
+                      {(nichoSelecionado !== 'geral' ||
+                        tipoSelecionado ||
+                        tipoItemSelecionado ||
+                        categoriaSelecionada ||
+                        buscarProduto) && (
                         <button
                           onClick={() => {
+                            setNichoSelecionado('geral');
                             setTipoSelecionado('');
+                            setTipoItemSelecionado('');
                             setCategoriaSelecionada('');
                             setBuscarProduto('');
                           }}
@@ -1159,6 +1444,12 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                                     showLabel={false}
                                   />
                                 )}
+                                {produto.tipoItem === 'plano' &&
+                                  getPlanoComponentes(produto).length > 0 && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-[#EFF8F8] px-2 py-1 text-xs font-medium text-[#0F7B7D]">
+                                    {getPlanoComponentes(produto).length} componentes
+                                  </span>
+                                )}
                               </div>
                               <div className="text-right">
                                 <div className="text-lg font-bold text-[#159A9C]">
@@ -1188,6 +1479,29 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                             <div className="product-description text-sm text-gray-600 mb-2">
                               {produto.descricao}
                             </div>
+                            {produto.tipoItem === 'plano' && getResumoComposicaoPlano(produto) && (
+                              <div className="mb-2 rounded-md border border-[#D4E2E7] bg-[#F8FBFC] px-2.5 py-1.5 text-xs text-[#35538A]">
+                                Composicao: {getResumoComposicaoPlano(produto)}
+                              </div>
+                            )}
+                            {produto.tipoItem === 'plano' &&
+                              getDetalhesComposicaoPlano(produto).length > 0 && (
+                              <div className="mb-2 space-y-1 rounded-md border border-[#D4E2E7] bg-white px-2.5 py-1.5">
+                                {getDetalhesComposicaoPlano(produto).map((detalhe, index) => (
+                                  <p
+                                    key={`${produto.id}-detalhe-${index}`}
+                                    className="text-xs text-[#35538A]"
+                                  >
+                                    {detalhe}
+                                  </p>
+                                ))}
+                                {getPlanoComponentes(produto).length > 3 && (
+                                  <p className="text-xs font-medium text-[#607B89]">
+                                    +{getPlanoComponentes(produto).length - 3} componente(s)
+                                  </p>
+                                )}
+                              </div>
+                            )}
 
                             <div className="flex items-center justify-between">
                               <div className="flex flex-wrap gap-1">
@@ -1254,6 +1568,33 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                               <p className="text-sm text-gray-600 mb-3">
                                 {produtoAtual.produto.descricao}
                               </p>
+                              {produtoAtual.produto.tipoItem === 'plano' &&
+                                getResumoComposicaoPlano(produtoAtual.produto) && (
+                                <div className="mb-3 rounded-md border border-[#D4E2E7] bg-[#F8FBFC] px-2.5 py-1.5 text-xs text-[#35538A]">
+                                  Composicao: {getResumoComposicaoPlano(produtoAtual.produto)}
+                                </div>
+                              )}
+                              {produtoAtual.produto.tipoItem === 'plano' &&
+                                getDetalhesComposicaoPlano(produtoAtual.produto).length > 0 && (
+                                <div className="mb-3 space-y-1 rounded-md border border-[#D4E2E7] bg-white px-2.5 py-1.5">
+                                  {getDetalhesComposicaoPlano(produtoAtual.produto).map(
+                                    (detalhe, index) => (
+                                      <p
+                                        key={`${produtoAtual.produto.id}-detalhe-${index}`}
+                                        className="text-xs text-[#35538A]"
+                                      >
+                                        {detalhe}
+                                      </p>
+                                    ),
+                                  )}
+                                  {getPlanoComponentes(produtoAtual.produto).length > 3 && (
+                                    <p className="text-xs font-medium text-[#607B89]">
+                                      +{getPlanoComponentes(produtoAtual.produto).length - 3}{' '}
+                                      componente(s)
+                                    </p>
+                                  )}
+                                </div>
+                              )}
 
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 <div>
@@ -1646,7 +1987,8 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                         produtoAtual.desconto || 0,
                       );
                       return (
-                      <div key={produto.id} className="flex justify-between text-sm">
+                      <div key={produto.id} className="space-y-1">
+                        <div className="flex justify-between text-sm">
                         <span>
                           {produtoAtual.produto.nome} (x{produtoAtual.quantidade}{' '}
                           {produtoAtual.produto.tipoItem &&
@@ -1654,6 +1996,12 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                             ? 'licenças'
                             : produtoAtual.produto.unidade || 'unidades'}
                           )
+                          {produtoAtual.produto.tipoItem === 'plano' &&
+                            getResumoComposicaoPlano(produtoAtual.produto) && (
+                            <span className="ml-1 text-xs text-[#35538A]">
+                              - {getResumoComposicaoPlano(produtoAtual.produto)}
+                            </span>
+                          )}
                         </span>
                         <span className="font-medium">
                           {new Intl.NumberFormat('pt-BR', {
@@ -1661,6 +2009,22 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                             currency: 'BRL',
                           }).format(subtotalItem)}
                         </span>
+                      </div>
+                      {produtoAtual.produto.tipoItem === 'plano' &&
+                        getDetalhesComposicaoPlano(produtoAtual.produto).length > 0 && (
+                        <div className="pl-2 space-y-1">
+                          {getDetalhesComposicaoPlano(produtoAtual.produto).map(
+                            (detalhe, detalheIndex) => (
+                              <p
+                                key={`${produto.id}-resumo-detalhe-${detalheIndex}`}
+                                className="text-xs text-[#35538A]"
+                              >
+                                {detalhe}
+                              </p>
+                            ),
+                          )}
+                        </div>
+                      )}
                       </div>
                       );
                     })}

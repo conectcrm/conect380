@@ -494,6 +494,11 @@ jobs:
       - name: Sanity check frontend
         run: npm --prefix frontend-web run deps:check || true
 
+      - name: Validar gate tenant do catalogo flexivel
+        env:
+          CI: true
+        run: npm --prefix frontend-web run test -- --runTestsByPath src/services/__tests__/produtosService.catalogGate.test.ts --watch=false --runInBand
+
   frontend-e2e-pipeline-ui:
     name: Frontend - E2E Pipeline UI (Playwright)
     runs-on: ubuntu-latest

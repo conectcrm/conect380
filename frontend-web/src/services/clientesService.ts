@@ -28,12 +28,37 @@ export interface Cliente {
   genero?: string;
   profissao?: string;
   renda?: number;
+  ultimo_contato?: string | null;
+  proximo_contato?: string | null;
   created_at?: string;
   updated_at?: string;
   avatar?: string;
   avatarUrl?: string;
   avatar_url?: string;
   foto?: string;
+}
+
+export type ClienteStatus = Cliente['status'];
+
+export interface CreateClientePayload {
+  nome: string;
+  email: string;
+  telefone?: string;
+  tipo: Cliente['tipo'];
+  documento?: string;
+  cpf_cnpj?: string;
+  status?: ClienteStatus;
+  ativo?: boolean;
+  endereco?: string;
+  cidade?: string;
+  estado?: string;
+  cep?: string;
+  observacoes?: string;
+  ultimo_contato?: string | null;
+  proximo_contato?: string | null;
+  avatar?: string;
+  avatarUrl?: string;
+  avatar_url?: string;
 }
 
 export interface ClienteAttachment {
@@ -47,6 +72,118 @@ export interface ClienteAttachment {
   tamanho: number;
   url: string;
   created_at?: string;
+}
+
+export interface ClienteTicketResumoItem {
+  id: string;
+  numero: number | null;
+  status: string;
+  prioridade: string;
+  assunto: string | null;
+  atualizadoEm: string;
+}
+
+export interface ClienteTicketsResumo {
+  total: number;
+  abertos: number;
+  resolvidos: number;
+  ultimoAtendimentoEm: string | null;
+  tickets: ClienteTicketResumoItem[];
+}
+
+export interface ClientePropostaResumoItem {
+  id: string;
+  numero: string | null;
+  titulo: string | null;
+  status: string;
+  valor: number;
+  atualizadaEm: string;
+}
+
+export interface ClientePropostasResumo {
+  total: number;
+  aprovadas: number;
+  pendentes: number;
+  rejeitadas: number;
+  ultimoRegistroEm: string | null;
+  propostas: ClientePropostaResumoItem[];
+}
+
+export interface ClienteContratoResumoItem {
+  id: number;
+  numero: string;
+  status: string;
+  tipo: string;
+  valorTotal: number;
+  dataInicio: string;
+  dataFim: string;
+  atualizadoEm: string;
+}
+
+export interface ClienteContratosResumo {
+  total: number;
+  pendentes: number;
+  assinados: number;
+  encerrados: number;
+  ultimoRegistroEm: string | null;
+  contratos: ClienteContratoResumoItem[];
+}
+
+export interface ClienteFaturaResumoItem {
+  id: number;
+  numero: string;
+  status: string;
+  valorTotal: number;
+  valorPago: number;
+  dataVencimento: string;
+  atualizadoEm: string;
+}
+
+export interface ClienteFaturasResumo {
+  total: number;
+  pagas: number;
+  pendentes: number;
+  vencidas: number;
+  ultimoRegistroEm: string | null;
+  faturas: ClienteFaturaResumoItem[];
+}
+
+export interface ClienteOmnichannelTicketResumoItem {
+  id: string;
+  numero: number | null;
+  status: string;
+  assunto: string | null;
+  criadoEm: string;
+  canalId?: string | null;
+}
+
+export interface ClienteOmnichannelContexto {
+  cliente: {
+    id: string | null;
+    nome: string;
+    email: string | null;
+    telefone: string | null;
+    documento?: string | null;
+    empresa?: string | null;
+    cargo?: string | null;
+    segmento: string;
+    primeiroContato: string;
+    ultimoContato: string;
+    tags?: string[];
+  };
+  estatisticas: {
+    valorTotalGasto: number;
+    totalTickets: number;
+    ticketsResolvidos: number;
+    ticketsAbertos: number;
+    avaliacaoMedia: number;
+    tempoMedioResposta: string;
+  };
+  historico: {
+    propostas: Record<string, unknown>[];
+    faturas: Record<string, unknown>[];
+    tickets: ClienteOmnichannelTicketResumoItem[];
+  };
 }
 
 export interface NotaCliente {
@@ -436,9 +573,7 @@ class ClientesService {
     return this.normalizeCliente(payload);
   }
 
-  async createCliente(
-    cliente: Omit<Cliente, 'id' | 'created_at' | 'updated_at'>,
-  ): Promise<Cliente> {
+  async createCliente(cliente: CreateClientePayload): Promise<Cliente> {
     const payload = await this.handleRequest(
       () => api.post<Cliente>(this.baseUrl, cliente),
       'Erro ao criar cliente',
@@ -446,7 +581,7 @@ class ClientesService {
     return this.normalizeCliente(payload);
   }
 
-  async updateCliente(id: string, cliente: Partial<Cliente>): Promise<Cliente> {
+  async updateCliente(id: string, cliente: Partial<CreateClientePayload>): Promise<Cliente> {
     const payload = await this.handleRequest(
       () => api.put<Cliente>(`${this.baseUrl}/${id}`, cliente),
       'Erro ao atualizar cliente',
@@ -553,6 +688,96 @@ class ClientesService {
       () => api.delete(`${this.baseUrl}/${clienteId}/anexos/${anexoId}`),
       'Erro ao remover anexo do cliente',
     );
+  }
+
+  async getResumoTicketsCliente(
+    clienteId: string,
+    limit = 5,
+  ): Promise<ClienteTicketsResumo> {
+    const queryString = this.buildQueryString({ limit });
+
+    const payload = await this.handleRequest(
+      () =>
+        api.get<ClienteTicketsResumo>(`${this.baseUrl}/${clienteId}/tickets/resumo${queryString}`),
+      'Erro ao carregar resumo de tickets do cliente',
+    );
+
+    if (this.isObject(payload) && this.isObject(payload.data)) {
+      return payload.data as unknown as ClienteTicketsResumo;
+    }
+
+    return payload as unknown as ClienteTicketsResumo;
+  }
+
+  async getResumoPropostasCliente(
+    clienteId: string,
+    limit = 5,
+  ): Promise<ClientePropostasResumo> {
+    const queryString = this.buildQueryString({ limit });
+
+    const payload = await this.handleRequest(
+      () =>
+        api.get<ClientePropostasResumo>(
+          `${this.baseUrl}/${clienteId}/propostas/resumo${queryString}`,
+        ),
+      'Erro ao carregar resumo de propostas do cliente',
+    );
+
+    if (this.isObject(payload) && this.isObject(payload.data)) {
+      return payload.data as unknown as ClientePropostasResumo;
+    }
+
+    return payload as unknown as ClientePropostasResumo;
+  }
+
+  async getResumoContratosCliente(
+    clienteId: string,
+    limit = 5,
+  ): Promise<ClienteContratosResumo> {
+    const queryString = this.buildQueryString({ limit });
+
+    const payload = await this.handleRequest(
+      () =>
+        api.get<ClienteContratosResumo>(`${this.baseUrl}/${clienteId}/contratos/resumo${queryString}`),
+      'Erro ao carregar resumo de contratos do cliente',
+    );
+
+    if (this.isObject(payload) && this.isObject(payload.data)) {
+      return payload.data as unknown as ClienteContratosResumo;
+    }
+
+    return payload as unknown as ClienteContratosResumo;
+  }
+
+  async getResumoFaturasCliente(
+    clienteId: string,
+    limit = 5,
+  ): Promise<ClienteFaturasResumo> {
+    const queryString = this.buildQueryString({ limit });
+
+    const payload = await this.handleRequest(
+      () => api.get<ClienteFaturasResumo>(`${this.baseUrl}/${clienteId}/faturas/resumo${queryString}`),
+      'Erro ao carregar resumo de faturas do cliente',
+    );
+
+    if (this.isObject(payload) && this.isObject(payload.data)) {
+      return payload.data as unknown as ClienteFaturasResumo;
+    }
+
+    return payload as unknown as ClienteFaturasResumo;
+  }
+
+  async getContextoOmnichannelCliente(clienteId: string): Promise<ClienteOmnichannelContexto> {
+    const payload = await this.handleRequest(
+      () => api.get<ClienteOmnichannelContexto>(`/api/atendimento/clientes/${clienteId}/contexto`),
+      'Erro ao carregar contexto omnichannel do cliente',
+    );
+
+    if (this.isObject(payload) && this.isObject(payload.data)) {
+      return payload.data as unknown as ClienteOmnichannelContexto;
+    }
+
+    return payload as unknown as ClienteOmnichannelContexto;
   }
 
   // ========================================

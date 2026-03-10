@@ -112,6 +112,9 @@ const ProdutosPage = React.lazy(() => import('./features/produtos/ProdutosPage')
 const CategoriasProdutosPage = React.lazy(
   () => import('./features/produtos/CategoriasProdutosPage'),
 );
+const VehicleInventoryPage = React.lazy(
+  () => import('./features/veiculos/VehicleInventoryPage'),
+);
 const CombosPage = React.lazy(() => import('./features/combos/CombosPage'));
 const NovoComboPage = React.lazy(() => import('./features/combos/NovoComboPage'));
 
@@ -759,6 +762,14 @@ const AppRoutes: React.FC = () => {
                     element={protegerRota(ModuloEnum.VENDAS, <ProdutosPage />)}
                   />
                   <Route
+                    path="/veiculos"
+                    element={protegerRota(ModuloEnum.VENDAS, <VehicleInventoryPage />)}
+                  />
+                  <Route
+                    path="/vendas/veiculos"
+                    element={protegerRota(ModuloEnum.VENDAS, <VehicleInventoryPage />)}
+                  />
+                  <Route
                     path="/produtos/categorias"
                     element={protegerRota(ModuloEnum.VENDAS, <CategoriasProdutosPage />)}
                   />
@@ -1074,5 +1085,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-
-

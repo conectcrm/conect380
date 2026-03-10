@@ -169,7 +169,7 @@ export class ProdutosService {
         subcategoriaId: hierarchy.subcategoria?.id ?? null,
         configuracaoId: hierarchy.configuracao?.id ?? null,
         preco: payload.preco,
-        custoUnitario: payload.custoUnitario ?? payload.preco ?? 0,
+        custoUnitario: payload.custoUnitario ?? null,
         tipoItem,
         frequencia: payload.frequencia || 'unico',
         unidadeMedida: payload.unidadeMedida || 'unidade',
@@ -320,7 +320,9 @@ export class ProdutosService {
 
   async remove(id: string, empresaId: string): Promise<void> {
     const produto = await this.findOne(id, empresaId);
-    await this.produtoRepository.remove(produto);
+    produto.status = 'descontinuado';
+    produto.ativo = false;
+    await this.produtoRepository.save(produto);
     this.invalidateProdutosCache(empresaId);
   }
 
@@ -378,7 +380,7 @@ export class ProdutosService {
     const estoquesBaixos = await this.produtoRepository
       .createQueryBuilder('produto')
       .where('produto.empresa_id = :empresaId', { empresaId })
-      .andWhere("COALESCE(produto.tipoItem, 'produto') = 'produto'")
+      .andWhere("LOWER(COALESCE(produto.tipoItem, 'produto')) IN ('produto', 'peca', 'acessorio')")
       .andWhere('COALESCE(produto.estoque, 0) <= COALESCE(produto."estoqueMinimo", 5)')
       .getCount();
 

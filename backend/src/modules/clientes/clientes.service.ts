@@ -1,12 +1,93 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder } from 'typeorm';
+import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import { Cliente, StatusCliente, TipoCliente } from './cliente.entity';
 import { ClienteAnexo } from './cliente-anexo.entity';
+import { Ticket, StatusTicket } from '../atendimento/entities/ticket.entity';
+import { Proposta } from '../propostas/proposta.entity';
+import { Contrato, StatusContrato } from '../contratos/entities/contrato.entity';
+import { Fatura, StatusFatura } from '../faturamento/entities/fatura.entity';
 import { PaginationParams, PaginatedResponse } from '../../common/interfaces/common.interface';
+import { CreateClienteDto, UpdateClienteDto } from './dto/cliente.dto';
 
 type ClientesQueryParams = PaginationParams & {
   ids?: string[] | string;
+};
+
+type CreateClienteInput = CreateClienteDto & { empresaId: string };
+
+type TicketResumoItem = {
+  id: string;
+  numero: number | null;
+  status: StatusTicket;
+  prioridade: string;
+  assunto: string | null;
+  atualizadoEm: string;
+};
+
+type ClienteTicketsResumo = {
+  total: number;
+  abertos: number;
+  resolvidos: number;
+  ultimoAtendimentoEm: string | null;
+  tickets: TicketResumoItem[];
+};
+
+type PropostaResumoItem = {
+  id: string;
+  numero: string | null;
+  titulo: string | null;
+  status: string;
+  valor: number;
+  atualizadaEm: string;
+};
+
+type ClientePropostasResumo = {
+  total: number;
+  aprovadas: number;
+  pendentes: number;
+  rejeitadas: number;
+  ultimoRegistroEm: string | null;
+  propostas: PropostaResumoItem[];
+};
+
+type ContratoResumoItem = {
+  id: number;
+  numero: string;
+  status: StatusContrato;
+  tipo: string;
+  valorTotal: number;
+  dataInicio: string;
+  dataFim: string;
+  atualizadoEm: string;
+};
+
+type ClienteContratosResumo = {
+  total: number;
+  pendentes: number;
+  assinados: number;
+  encerrados: number;
+  ultimoRegistroEm: string | null;
+  contratos: ContratoResumoItem[];
+};
+
+type FaturaResumoItem = {
+  id: number;
+  numero: string;
+  status: StatusFatura;
+  valorTotal: number;
+  valorPago: number;
+  dataVencimento: string;
+  atualizadoEm: string;
+};
+
+type ClienteFaturasResumo = {
+  total: number;
+  pagas: number;
+  pendentes: number;
+  vencidas: number;
+  ultimoRegistroEm: string | null;
+  faturas: FaturaResumoItem[];
 };
 
 @Injectable()
@@ -14,15 +95,311 @@ export class ClientesService {
   private statusColumnSupported: boolean | null = null;
   private avatarColumnSupported: boolean | null = null;
   private clienteAnexosTableSupported: boolean | null = null;
+  private ultimoContatoColumnSupported: boolean | null = null;
+  private proximoContatoColumnSupported: boolean | null = null;
 
   constructor(
     @InjectRepository(Cliente)
     private clienteRepository: Repository<Cliente>,
     @InjectRepository(ClienteAnexo)
     private clienteAnexoRepository: Repository<ClienteAnexo>,
+    @InjectRepository(Ticket)
+    private ticketRepository: Repository<Ticket>,
+    @InjectRepository(Proposta)
+    private propostaRepository: Repository<Proposta>,
+    @InjectRepository(Contrato)
+    private contratoRepository: Repository<Contrato>,
+    @InjectRepository(Fatura)
+    private faturaRepository: Repository<Fatura>,
   ) {}
 
-  async create(clienteData: Partial<Cliente>): Promise<Cliente> {
+  async getTicketsResumo(clienteId: string, empresaId: string, limit = 5): Promise<ClienteTicketsResumo> {
+    const limiteSeguro = Math.min(Math.max(Number(limit) || 5, 1), 20);
+
+    const statusAbertos: StatusTicket[] = [
+      StatusTicket.FILA,
+      StatusTicket.EM_ATENDIMENTO,
+      StatusTicket.ENVIO_ATIVO,
+      StatusTicket.AGUARDANDO_CLIENTE,
+      StatusTicket.AGUARDANDO_INTERNO,
+    ];
+
+    const statusResolvidos: StatusTicket[] = [StatusTicket.CONCLUIDO, StatusTicket.ENCERRADO];
+
+    const [total, abertos, resolvidos, ticketsRecentes] = await Promise.all([
+      this.ticketRepository.count({
+        where: {
+          empresaId,
+          clienteId,
+        },
+      }),
+      this.ticketRepository.count({
+        where: {
+          empresaId,
+          clienteId,
+          status: In(statusAbertos),
+        },
+      }),
+      this.ticketRepository.count({
+        where: {
+          empresaId,
+          clienteId,
+          status: In(statusResolvidos),
+        },
+      }),
+      this.ticketRepository.find({
+        where: {
+          empresaId,
+          clienteId,
+        },
+        order: {
+          updatedAt: 'DESC',
+        },
+        take: limiteSeguro,
+      }),
+    ]);
+
+    const tickets = ticketsRecentes.map((ticket) => ({
+      id: ticket.id,
+      numero: ticket.numero ?? null,
+      status: ticket.status,
+      prioridade: ticket.prioridade,
+      assunto: ticket.assunto ?? ticket.titulo ?? null,
+      atualizadoEm: (ticket.updatedAt ?? ticket.createdAt).toISOString(),
+    }));
+
+    return {
+      total,
+      abertos,
+      resolvidos,
+      ultimoAtendimentoEm: tickets[0]?.atualizadoEm ?? null,
+      tickets,
+    };
+  }
+
+  async getPropostasResumo(
+    clienteId: string,
+    empresaId: string,
+    limit = 5,
+  ): Promise<ClientePropostasResumo> {
+    const limiteSeguro = Math.min(Math.max(Number(limit) || 5, 1), 20);
+
+    const statusAprovadas = [
+      'aprovada',
+      'contrato_gerado',
+      'contrato_assinado',
+      'fatura_criada',
+      'aguardando_pagamento',
+      'pago',
+    ];
+    const statusPendentes = ['rascunho', 'enviada', 'visualizada', 'negociacao'];
+    const statusRejeitadas = ['rejeitada', 'expirada'];
+
+    const baseWhere =
+      "proposta.empresaId = :empresaId AND (proposta.cliente ->> 'id' = :clienteId OR proposta.cliente ->> 'clienteId' = :clienteId)";
+    const baseParams = { empresaId, clienteId };
+
+    const [total, aprovadas, pendentes, rejeitadas, propostasRecentes] = await Promise.all([
+      this.propostaRepository
+        .createQueryBuilder('proposta')
+        .where(baseWhere, baseParams)
+        .getCount(),
+      this.propostaRepository
+        .createQueryBuilder('proposta')
+        .where(baseWhere, baseParams)
+        .andWhere('LOWER(proposta.status) IN (:...statusAprovadas)', { statusAprovadas })
+        .getCount(),
+      this.propostaRepository
+        .createQueryBuilder('proposta')
+        .where(baseWhere, baseParams)
+        .andWhere('LOWER(proposta.status) IN (:...statusPendentes)', { statusPendentes })
+        .getCount(),
+      this.propostaRepository
+        .createQueryBuilder('proposta')
+        .where(baseWhere, baseParams)
+        .andWhere('LOWER(proposta.status) IN (:...statusRejeitadas)', { statusRejeitadas })
+        .getCount(),
+      this.propostaRepository
+        .createQueryBuilder('proposta')
+        .where(baseWhere, baseParams)
+        .orderBy('proposta.atualizadaEm', 'DESC')
+        .take(limiteSeguro)
+        .getMany(),
+    ]);
+
+    const propostas = propostasRecentes.map((proposta) => ({
+      id: proposta.id,
+      numero: proposta.numero ?? null,
+      titulo: proposta.titulo ?? null,
+      status: proposta.status,
+      valor: Number(proposta.total ?? proposta.valor ?? 0),
+      atualizadaEm: (proposta.atualizadaEm ?? proposta.criadaEm).toISOString(),
+    }));
+
+    return {
+      total,
+      aprovadas,
+      pendentes,
+      rejeitadas,
+      ultimoRegistroEm: propostas[0]?.atualizadaEm ?? null,
+      propostas,
+    };
+  }
+
+  async getContratosResumo(
+    clienteId: string,
+    empresaId: string,
+    limit = 5,
+  ): Promise<ClienteContratosResumo> {
+    const limiteSeguro = Math.min(Math.max(Number(limit) || 5, 1), 20);
+
+    const [total, pendentes, assinados, encerrados, contratosRecentes] = await Promise.all([
+      this.contratoRepository.count({
+        where: {
+          empresa_id: empresaId,
+          clienteId,
+          ativo: true,
+        },
+      }),
+      this.contratoRepository.count({
+        where: {
+          empresa_id: empresaId,
+          clienteId,
+          ativo: true,
+          status: StatusContrato.AGUARDANDO_ASSINATURA,
+        },
+      }),
+      this.contratoRepository.count({
+        where: {
+          empresa_id: empresaId,
+          clienteId,
+          ativo: true,
+          status: StatusContrato.ASSINADO,
+        },
+      }),
+      this.contratoRepository
+        .createQueryBuilder('contrato')
+        .where('contrato.empresa_id = :empresaId', { empresaId })
+        .andWhere('contrato.clienteId = :clienteId', { clienteId })
+        .andWhere('contrato.ativo = :ativo', { ativo: true })
+        .andWhere('contrato.status IN (:...statusEncerrados)', {
+          statusEncerrados: [StatusContrato.CANCELADO, StatusContrato.EXPIRADO],
+        })
+        .getCount(),
+      this.contratoRepository.find({
+        where: {
+          empresa_id: empresaId,
+          clienteId,
+          ativo: true,
+        },
+        order: {
+          updatedAt: 'DESC',
+        },
+        take: limiteSeguro,
+      }),
+    ]);
+
+    const contratos = contratosRecentes.map((contrato) => ({
+      id: contrato.id,
+      numero: contrato.numero,
+      status: contrato.status,
+      tipo: contrato.tipo,
+      valorTotal: Number(contrato.valorTotal || 0),
+      dataInicio: contrato.dataInicio ? new Date(contrato.dataInicio).toISOString() : '',
+      dataFim: contrato.dataFim ? new Date(contrato.dataFim).toISOString() : '',
+      atualizadoEm: contrato.updatedAt.toISOString(),
+    }));
+
+    return {
+      total,
+      pendentes,
+      assinados,
+      encerrados,
+      ultimoRegistroEm: contratos[0]?.atualizadoEm ?? null,
+      contratos,
+    };
+  }
+
+  async getFaturasResumo(
+    clienteId: string,
+    empresaId: string,
+    limit = 5,
+  ): Promise<ClienteFaturasResumo> {
+    const limiteSeguro = Math.min(Math.max(Number(limit) || 5, 1), 20);
+
+    const statusPendentes = [
+      StatusFatura.PENDENTE,
+      StatusFatura.ENVIADA,
+      StatusFatura.PARCIALMENTE_PAGA,
+    ];
+
+    const [total, pagas, pendentes, vencidas, faturasRecentes] = await Promise.all([
+      this.faturaRepository.count({
+        where: {
+          empresaId,
+          clienteId,
+          ativo: true,
+        },
+      }),
+      this.faturaRepository.count({
+        where: {
+          empresaId,
+          clienteId,
+          ativo: true,
+          status: StatusFatura.PAGA,
+        },
+      }),
+      this.faturaRepository
+        .createQueryBuilder('fatura')
+        .where('fatura.empresa_id = :empresaId', { empresaId })
+        .andWhere('fatura.clienteId = :clienteId', { clienteId })
+        .andWhere('fatura.ativo = :ativo', { ativo: true })
+        .andWhere('fatura.status IN (:...statusPendentes)', { statusPendentes })
+        .getCount(),
+      this.faturaRepository.count({
+        where: {
+          empresaId,
+          clienteId,
+          ativo: true,
+          status: StatusFatura.VENCIDA,
+        },
+      }),
+      this.faturaRepository.find({
+        where: {
+          empresaId,
+          clienteId,
+          ativo: true,
+        },
+        order: {
+          updatedAt: 'DESC',
+        },
+        take: limiteSeguro,
+      }),
+    ]);
+
+    const faturas = faturasRecentes.map((fatura) => ({
+      id: fatura.id,
+      numero: fatura.numero,
+      status: fatura.status,
+      valorTotal: Number(fatura.valorTotal || 0),
+      valorPago: Number(fatura.valorPago || 0),
+      dataVencimento: fatura.dataVencimento
+        ? new Date(fatura.dataVencimento).toISOString()
+        : '',
+      atualizadoEm: (fatura.updatedAt ?? fatura.createdAt).toISOString(),
+    }));
+
+    return {
+      total,
+      pagas,
+      pendentes,
+      vencidas,
+      ultimoRegistroEm: faturas[0]?.atualizadoEm ?? null,
+      faturas,
+    };
+  }
+
+  async create(clienteData: CreateClienteInput): Promise<Cliente> {
     const status = this.normalizeStatus(clienteData.status) ?? StatusCliente.LEAD;
     const ativo = clienteData.ativo ?? status !== StatusCliente.INATIVO;
     const avatarUrl = this.extractAvatarUrl(clienteData);
@@ -55,6 +432,11 @@ export class ClientesService {
       await this.updateStatusColumn(saved.id, saved.empresaId, status);
     }
 
+    await this.updateFollowupColumns(saved.id, saved.empresaId, {
+      ultimo_contato: this.parseOptionalDate((clienteData as any).ultimo_contato),
+      proximo_contato: this.parseOptionalDate((clienteData as any).proximo_contato),
+    });
+
     const reloaded = await this.findById(saved.id, saved.empresaId);
     if (reloaded) {
       return reloaded;
@@ -83,6 +465,8 @@ export class ClientesService {
       email: 'cliente.email',
       tipo: 'cliente.tipo',
       status: hasStatusColumn ? 'cliente.status' : 'cliente.ativo',
+      ultimo_contato: 'cliente.ultimo_contato',
+      proximo_contato: 'cliente.proximo_contato',
     };
     const sortColumn = sortMap[sortBy] ?? sortMap.created_at;
     const direction = sortOrder === 'ASC' ? 'ASC' : 'DESC';
@@ -125,6 +509,8 @@ export class ClientesService {
       email: 'cliente.email',
       tipo: 'cliente.tipo',
       status: hasStatusColumn ? 'cliente.status' : 'cliente.ativo',
+      ultimo_contato: 'cliente.ultimo_contato',
+      proximo_contato: 'cliente.proximo_contato',
     };
     const sortColumn = sortMap[sortBy] ?? sortMap.created_at;
     const direction = sortOrder === 'ASC' ? 'ASC' : 'DESC';
@@ -154,6 +540,8 @@ export class ClientesService {
       'estado',
       'cep',
       'endereco',
+      'ultimo_contato',
+      'proximo_contato',
       'observacoes',
       'created_at',
       'updated_at',
@@ -171,6 +559,8 @@ export class ClientesService {
       cliente.estado,
       cliente.cep,
       cliente.endereco,
+      cliente.ultimo_contato ? new Date(cliente.ultimo_contato).toISOString() : '',
+      cliente.proximo_contato ? new Date(cliente.proximo_contato).toISOString() : '',
       cliente.observacoes,
       cliente.created_at ? new Date(cliente.created_at).toISOString() : '',
       cliente.updated_at ? new Date(cliente.updated_at).toISOString() : '',
@@ -194,7 +584,7 @@ export class ClientesService {
     return withStatus;
   }
 
-  async update(id: string, empresaId: string, updateData: Partial<Cliente>): Promise<Cliente> {
+  async update(id: string, empresaId: string, updateData: UpdateClienteDto): Promise<Cliente> {
     const payload: Partial<Cliente> = { ...updateData };
     delete (payload as any).status;
     delete (payload as any).avatar;
@@ -224,6 +614,11 @@ export class ClientesService {
     if (normalizedStatus && (await this.hasStatusColumn())) {
       await this.updateStatusColumn(id, empresaId, normalizedStatus);
     }
+
+    await this.updateFollowupColumns(id, empresaId, {
+      ultimo_contato: this.parseOptionalDate((updateData as any).ultimo_contato),
+      proximo_contato: this.parseOptionalDate((updateData as any).proximo_contato),
+    });
 
     return this.findById(id, empresaId);
   }
@@ -330,13 +725,21 @@ export class ClientesService {
   }
 
   async getClientesProximoContato(empresaId: string): Promise<Cliente[]> {
-    const clientes = await this.clienteRepository.find({
-      where: {
-        empresaId,
-        ativo: true,
-      },
-      order: { updated_at: 'DESC' },
-    });
+    const queryBuilder = this.clienteRepository
+      .createQueryBuilder('cliente')
+      .where('cliente.empresa_id = :empresaId', { empresaId })
+      .andWhere('cliente.ativo = true');
+
+    if (await this.hasProximoContatoColumn()) {
+      queryBuilder
+        .andWhere('cliente.proximo_contato IS NOT NULL')
+        .orderBy('cliente.proximo_contato', 'ASC')
+        .addOrderBy('cliente.updated_at', 'DESC');
+    } else {
+      queryBuilder.orderBy('cliente.updated_at', 'DESC');
+    }
+
+    const clientes = await queryBuilder.getMany();
 
     return this.attachStatuses(clientes);
   }
@@ -440,7 +843,8 @@ export class ClientesService {
         cliente.status =
           fallbackStatus ?? (cliente.ativo ? StatusCliente.CLIENTE : StatusCliente.INATIVO);
       });
-      return this.attachAvatarFields(clientes);
+      const withAvatar = await this.attachAvatarFields(clientes);
+      return this.attachFollowupFields(withAvatar);
     }
 
     const ids = clientes.map((cliente) => cliente.id);
@@ -462,7 +866,8 @@ export class ClientesService {
         (cliente.ativo ? StatusCliente.CLIENTE : StatusCliente.INATIVO);
     });
 
-    return this.attachAvatarFields(clientes);
+    const withAvatar = await this.attachAvatarFields(clientes);
+    return this.attachFollowupFields(withAvatar);
   }
 
   private async countByStatus(empresaId: string, status: StatusCliente): Promise<number> {
@@ -506,6 +911,23 @@ export class ClientesService {
     }
 
     return undefined;
+  }
+
+  private parseOptionalDate(value: unknown): Date | null | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (value === null || value === '') {
+      return null;
+    }
+
+    const parsed = new Date(String(value));
+    if (Number.isNaN(parsed.getTime())) {
+      return undefined;
+    }
+
+    return parsed;
   }
 
   private toPositiveInt(value: unknown, fallback: number): number {
@@ -556,6 +978,48 @@ export class ClientesService {
 
     this.avatarColumnSupported = Boolean(result?.[0]?.exists);
     return this.avatarColumnSupported;
+  }
+
+  private async hasUltimoContatoColumn(): Promise<boolean> {
+    if (this.ultimoContatoColumnSupported !== null) {
+      return this.ultimoContatoColumnSupported;
+    }
+
+    const result: Array<{ exists: boolean }> = await this.clienteRepository.query(
+      `
+        SELECT EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'clientes'
+            AND column_name = 'ultimo_contato'
+        ) AS "exists"
+      `,
+    );
+
+    this.ultimoContatoColumnSupported = Boolean(result?.[0]?.exists);
+    return this.ultimoContatoColumnSupported;
+  }
+
+  private async hasProximoContatoColumn(): Promise<boolean> {
+    if (this.proximoContatoColumnSupported !== null) {
+      return this.proximoContatoColumnSupported;
+    }
+
+    const result: Array<{ exists: boolean }> = await this.clienteRepository.query(
+      `
+        SELECT EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'clientes'
+            AND column_name = 'proximo_contato'
+        ) AS "exists"
+      `,
+    );
+
+    this.proximoContatoColumnSupported = Boolean(result?.[0]?.exists);
+    return this.proximoContatoColumnSupported;
   }
 
   async isAnexosStorageAvailable(): Promise<boolean> {
@@ -618,6 +1082,99 @@ export class ClientesService {
     });
 
     return clientes;
+  }
+
+  private async attachFollowupFields(clientes: Cliente[]): Promise<Cliente[]> {
+    if (clientes.length === 0) {
+      return clientes;
+    }
+
+    const [hasUltimoContatoColumn, hasProximoContatoColumn] = await Promise.all([
+      this.hasUltimoContatoColumn(),
+      this.hasProximoContatoColumn(),
+    ]);
+
+    if (!hasUltimoContatoColumn && !hasProximoContatoColumn) {
+      clientes.forEach((cliente) => {
+        cliente.ultimo_contato = undefined;
+        cliente.proximo_contato = undefined;
+      });
+      return clientes;
+    }
+
+    const ids = clientes.map((cliente) => cliente.id);
+    const rows: Array<{
+      id: string;
+      ultimo_contato?: Date | null;
+      proximo_contato?: Date | null;
+    }> = await this.clienteRepository.query(
+      `
+        SELECT id, ultimo_contato, proximo_contato
+        FROM clientes
+        WHERE id = ANY($1::uuid[])
+      `,
+      [ids],
+    );
+
+    const followupById = new Map(rows.map((row) => [row.id, row]));
+
+    clientes.forEach((cliente) => {
+      const followupData = followupById.get(cliente.id);
+      cliente.ultimo_contato = hasUltimoContatoColumn
+        ? ((followupData?.ultimo_contato as Date | null) ?? null)
+        : undefined;
+      cliente.proximo_contato = hasProximoContatoColumn
+        ? ((followupData?.proximo_contato as Date | null) ?? null)
+        : undefined;
+    });
+
+    return clientes;
+  }
+
+  private async updateFollowupColumns(
+    id: string,
+    empresaId: string,
+    followupData: {
+      ultimo_contato?: Date | null;
+      proximo_contato?: Date | null;
+    },
+  ): Promise<void> {
+    const [hasUltimoContatoColumn, hasProximoContatoColumn] = await Promise.all([
+      this.hasUltimoContatoColumn(),
+      this.hasProximoContatoColumn(),
+    ]);
+
+    const shouldUpdateUltimoContato = hasUltimoContatoColumn && followupData.ultimo_contato !== undefined;
+    const shouldUpdateProximoContato = hasProximoContatoColumn && followupData.proximo_contato !== undefined;
+
+    if (!shouldUpdateUltimoContato && !shouldUpdateProximoContato) {
+      return;
+    }
+
+    const updateClauses: string[] = [];
+    const values: Array<string | Date | null> = [];
+
+    if (shouldUpdateUltimoContato) {
+      updateClauses.push(`ultimo_contato = $${values.length + 1}`);
+      values.push(followupData.ultimo_contato ?? null);
+    }
+
+    if (shouldUpdateProximoContato) {
+      updateClauses.push(`proximo_contato = $${values.length + 1}`);
+      values.push(followupData.proximo_contato ?? null);
+    }
+
+    values.push(id, empresaId);
+
+    await this.clienteRepository.query(
+      `
+        UPDATE clientes
+        SET ${updateClauses.join(', ')}
+        WHERE id = $${values.length - 1}
+          AND empresa_id = $${values.length}
+      `,
+      values,
+    );
   }
 
   private extractAvatarUrl(value: unknown): string | null | undefined {

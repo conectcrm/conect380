@@ -309,6 +309,8 @@ const PropostasPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+  const clienteIdParam = (searchParams.get('clienteId') || '').trim();
+  const clienteNomeParam = (searchParams.get('cliente') || '').trim();
   // Estados inicializados com arrays vazios - dados vêm do banco
   const [propostas, setPropostas] = useState<any[]>([]);
   const [filteredPropostas, setFilteredPropostas] = useState<any[]>([]);
@@ -372,6 +374,12 @@ const PropostasPage: React.FC = () => {
 
   // 🆕 Estados para UX Melhorada - Fase 2
   const [propostasSelecionadas, setPropostasSelecionadas] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (clienteNomeParam && !searchTerm.trim()) {
+      setSearchTerm(clienteNomeParam);
+    }
+  }, [clienteNomeParam, searchTerm]);
 
   useEffect(() => {
     if (viewMode === 'dashboard' && propostasSelecionadas.length > 0) {
@@ -880,6 +888,29 @@ const PropostasPage: React.FC = () => {
       filtered = filtered.filter((proposta) => proposta.vendedor === selectedVendedor);
     }
 
+    // Filtro por cliente vindo da URL (navegacao cruzada CRM-012)
+    if (clienteIdParam || clienteNomeParam) {
+      const clienteNomeNormalizado = clienteNomeParam.toLowerCase();
+      filtered = filtered.filter((proposta) => {
+        const clienteIdDaProposta = String(
+          proposta.clienteId || proposta.cliente_id || proposta.cliente?.id || '',
+        ).trim();
+        const clienteNomeDaProposta = String(proposta.cliente || proposta.cliente?.nome || '')
+          .toLowerCase()
+          .trim();
+
+        if (clienteIdParam && clienteIdDaProposta && clienteIdDaProposta === clienteIdParam) {
+          return true;
+        }
+
+        if (clienteNomeNormalizado) {
+          return clienteNomeDaProposta.includes(clienteNomeNormalizado);
+        }
+
+        return !clienteIdParam;
+      });
+    }
+
     // Filtros avançados do componente FiltrosAvancados
     if (filtrosAvancados.status) {
       filtered = filtered.filter((p) => p.status === filtrosAvancados.status);
@@ -959,6 +990,8 @@ const PropostasPage: React.FC = () => {
     sortBy,
     sortOrder,
     filtrosAvancados,
+    clienteIdParam,
+    clienteNomeParam,
   ]);
 
   // Função para aplicar filtros avançados

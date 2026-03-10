@@ -28,23 +28,50 @@ import {
 import { ConfirmationModal } from '../../components/common/ConfirmationModal';
 import { useConfirmation } from '../../hooks/useConfirmation';
 import { ModalCadastroProduto } from '../../components/modals/ModalCadastroProdutoLandscape';
-import { produtosService, Produto, ProdutoEstatisticas } from '../../services/produtosService';
+import {
+  produtosService,
+  Produto,
+  ProdutoComponente,
+  ProdutoEstatisticas,
+} from '../../services/produtosService';
 import { categoriasProdutosService } from '../../services/categoriasProdutosService';
 import { CategoriaProduto } from '../../types/produtos';
+import { useAuth } from '../../hooks/useAuth';
+import { userHasPermission } from '../../config/menuConfig';
+import { isCatalogApiEnabledForTenant } from '../../config/catalogoFeaturesFlags';
 import toast from 'react-hot-toast';
 
 // Interface para o novo modal
 interface ProdutoFormData {
   nome: string;
-  tipoItem: 'produto' | 'servico' | 'licenca' | 'modulo' | 'plano' | 'aplicativo';
+  tipoItem:
+    | 'produto'
+    | 'servico'
+    | 'licenca'
+    | 'modulo'
+    | 'plano'
+    | 'aplicativo'
+    | 'peca'
+    | 'acessorio'
+    | 'pacote'
+    | 'garantia';
   categoria: string;
   categoriaId?: string;
   subcategoriaId?: string;
   configuracaoId?: string;
   precoUnitario: number;
   custoUnitario?: number;
-  frequencia: 'unico' | 'mensal' | 'anual';
-  unidadeMedida: 'unidade' | 'saca' | 'hectare' | 'pacote' | 'licenca';
+  frequencia: 'unico' | 'mensal' | 'anual' | 'trimestral' | 'sob_consulta';
+  unidadeMedida:
+    | 'unidade'
+    | 'saca'
+    | 'hectare'
+    | 'pacote'
+    | 'licenca'
+    | 'hora'
+    | 'dia'
+    | 'mensal'
+    | 'assinatura';
   status: 'ativo' | 'inativo' | 'descontinuado';
   descricao?: string;
   sku?: string;
@@ -58,13 +85,26 @@ interface ProdutoFormData {
   periodicidadeLicenca?: string;
   renovacaoAutomatica?: boolean;
   quantidadeLicencas?: number;
+  templateCode?: string;
+  atributosTemplate?: Record<string, unknown>;
+  componentes?: ProdutoComponente[];
 }
 
 // Interface para compatibilidade com o componente atual
 interface ProdutoLegacy {
   id: string;
   nome: string;
-  tipoItem: 'produto' | 'servico' | 'licenca' | 'modulo' | 'plano' | 'aplicativo';
+  tipoItem:
+    | 'produto'
+    | 'servico'
+    | 'licenca'
+    | 'modulo'
+    | 'plano'
+    | 'aplicativo'
+    | 'peca'
+    | 'acessorio'
+    | 'pacote'
+    | 'garantia';
   categoria: string;
   categoriaId?: string;
   subcategoriaId?: string;
@@ -72,9 +112,18 @@ interface ProdutoLegacy {
   subcategoriaNome?: string;
   configuracaoNome?: string;
   preco: number;
-  custoUnitario: number;
-  frequencia: 'unico' | 'mensal' | 'anual';
-  unidadeMedida: 'unidade' | 'saca' | 'hectare' | 'pacote' | 'licenca';
+  custoUnitario?: number | null;
+  frequencia: 'unico' | 'mensal' | 'anual' | 'trimestral' | 'sob_consulta';
+  unidadeMedida:
+    | 'unidade'
+    | 'saca'
+    | 'hectare'
+    | 'pacote'
+    | 'licenca'
+    | 'hora'
+    | 'dia'
+    | 'mensal'
+    | 'assinatura';
   estoque: {
     atual: number;
     minimo: number;
@@ -94,6 +143,9 @@ interface ProdutoLegacy {
   periodicidadeLicenca?: string;
   renovacaoAutomatica?: boolean;
   quantidadeLicencas?: number;
+  templateCode?: string;
+  atributosTemplate?: Record<string, unknown>;
+  componentes?: ProdutoComponente[];
   criadoEm: string;
   atualizadoEm: string;
 }
@@ -123,6 +175,54 @@ const tipoItemConfig = {
   modulo: 'Módulo',
   plano: 'Plano',
   aplicativo: 'Aplicativo',
+  peca: 'Peça',
+  acessorio: 'Acessório',
+  pacote: 'Pacote',
+  garantia: 'Garantia',
+};
+
+type TipoItemCatalogo = keyof typeof tipoItemConfig;
+type NichoCatalogo = 'geral' | 'software' | 'servicos' | 'automotivo' | 'imobiliario';
+
+const nichoCatalogoConfig: Record<
+  NichoCatalogo,
+  {
+    label: string;
+    description: string;
+    defaultTipo: 'todos' | TipoItemCatalogo;
+    tiposRecomendados: TipoItemCatalogo[];
+  }
+> = {
+  geral: {
+    label: 'Visão Geral',
+    description: 'Catálogo completo sem recorte de nicho.',
+    defaultTipo: 'todos',
+    tiposRecomendados: [],
+  },
+  software: {
+    label: 'Software e SaaS',
+    description: 'Planos, módulos, licenças e ofertas de software.',
+    defaultTipo: 'plano',
+    tiposRecomendados: ['plano', 'modulo', 'licenca', 'aplicativo', 'pacote', 'servico'],
+  },
+  servicos: {
+    label: 'Serviços',
+    description: 'Serviços avulsos e pacotes recorrentes.',
+    defaultTipo: 'servico',
+    tiposRecomendados: ['servico', 'pacote', 'garantia'],
+  },
+  automotivo: {
+    label: 'Automotivo',
+    description: 'Peças, acessórios, serviços e garantia automotiva.',
+    defaultTipo: 'peca',
+    tiposRecomendados: ['peca', 'acessorio', 'servico', 'garantia', 'pacote'],
+  },
+  imobiliario: {
+    label: 'Imobiliário',
+    description: 'Serviços, pacotes e garantias para operação imobiliária.',
+    defaultTipo: 'servico',
+    tiposRecomendados: ['servico', 'pacote', 'garantia'],
+  },
 };
 
 const normalizeCatalogName = (value?: string | null) =>
@@ -134,7 +234,16 @@ const normalizeCatalogName = (value?: string | null) =>
 
 const ProdutosPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { confirmationState, showConfirmation } = useConfirmation();
+  const canCreateProduto = userHasPermission(user, 'crm.produtos.create');
+  const canUpdateProduto = userHasPermission(user, 'crm.produtos.update');
+  const canDeleteProduto = userHasPermission(user, 'crm.produtos.delete');
+  const empresaId = user?.empresa?.id || null;
+  const catalogApiEnabled = useMemo(
+    () => isCatalogApiEnabledForTenant(empresaId),
+    [empresaId],
+  );
 
   // Estados principais
   const [produtos, setProdutos] = useState<ProdutoLegacy[]>([]);
@@ -149,6 +258,7 @@ const ProdutosPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [nichoFilter, setNichoFilter] = useState<NichoCatalogo>('geral');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [tipoFilter, setTipoFilter] = useState<string>('todos');
   const [categoriaFilter, setCategoriaFilter] = useState<string>('todas');
@@ -214,8 +324,16 @@ const ProdutosPage: React.FC = () => {
       setError(null);
 
       const { sortBy, sortOrder } = resolveSortParams();
+      const categoriaSelecionadaId =
+        categoriaFilter !== 'todas'
+          ? categoriasCatalogo.find(
+              (categoria) =>
+                normalizeCatalogName(categoria.nome) === normalizeCatalogName(categoriaFilter),
+            )?.id
+          : undefined;
       const resposta = await produtosService.listPaginated({
         categoria: categoriaFilter !== 'todas' ? categoriaFilter : undefined,
+        categoriaId: categoriaSelecionadaId,
         subcategoriaId: subcategoriaFilter !== 'todas' ? subcategoriaFilter : undefined,
         configuracaoId: configuracaoFilter !== 'todas' ? configuracaoFilter : undefined,
         status: statusFilter !== 'todos' ? statusFilter : undefined,
@@ -242,7 +360,7 @@ const ProdutosPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [categoriaFilter, configuracaoFilter, currentPage, debouncedSearchTerm, itemsPerPage, resolveSortParams, statusFilter, subcategoriaFilter, tipoFilter]);
+  }, [categoriaFilter, categoriasCatalogo, configuracaoFilter, currentPage, debouncedSearchTerm, itemsPerPage, resolveSortParams, statusFilter, subcategoriaFilter, tipoFilter]);
 
   useEffect(() => {
     void carregarCategorias();
@@ -336,10 +454,17 @@ const ProdutosPage: React.FC = () => {
     };
   }, [categoriaSelecionada]);
 
-  const tipos = useMemo(
-    () => Object.keys(tipoItemConfig) as Array<keyof typeof tipoItemConfig>,
-    [],
-  );
+  const tipos = useMemo(() => Object.keys(tipoItemConfig) as TipoItemCatalogo[], []);
+  const nichoSelecionadoConfig = nichoCatalogoConfig[nichoFilter];
+  const defaultTipoItemModal = useMemo<ProdutoFormData['tipoItem']>(() => {
+    if (tipoFilter !== 'todos' && tipos.includes(tipoFilter as TipoItemCatalogo)) {
+      return tipoFilter as ProdutoFormData['tipoItem'];
+    }
+
+    return nichoSelecionadoConfig.defaultTipo === 'todos'
+      ? 'produto'
+      : nichoSelecionadoConfig.defaultTipo;
+  }, [nichoSelecionadoConfig.defaultTipo, tipoFilter, tipos]);
 
   useEffect(() => {
     if (categoriaFilter === 'todas') {
@@ -379,18 +504,40 @@ const ProdutosPage: React.FC = () => {
 
   const hasFilters =
     searchTerm.trim().length > 0 ||
+    nichoFilter !== 'geral' ||
     statusFilter !== 'todos' ||
     tipoFilter !== 'todos' ||
     categoriaFilter !== 'todas' ||
     subcategoriaFilter !== 'todas' ||
     configuracaoFilter !== 'todas';
 
+  const handleNichoChange = useCallback((nextNicho: NichoCatalogo) => {
+    setNichoFilter(nextNicho);
+    const config = nichoCatalogoConfig[nextNicho];
+    setTipoFilter(config.defaultTipo);
+    setCategoriaFilter('todas');
+    setSubcategoriaFilter('todas');
+    setConfiguracaoFilter('todas');
+    setCurrentPage(1);
+  }, []);
+
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, tipoFilter, categoriaFilter, subcategoriaFilter, configuracaoFilter, itemsPerPage, sortOption]);
+  }, [
+    searchTerm,
+    nichoFilter,
+    statusFilter,
+    tipoFilter,
+    categoriaFilter,
+    subcategoriaFilter,
+    configuracaoFilter,
+    itemsPerPage,
+    sortOption,
+  ]);
 
   const handleClearFilters = () => {
     setSearchTerm('');
+    setNichoFilter('geral');
     setStatusFilter('todos');
     setTipoFilter('todos');
     setCategoriaFilter('todas');
@@ -409,8 +556,16 @@ const ProdutosPage: React.FC = () => {
       setIsExporting(true);
 
       const { sortBy, sortOrder } = resolveSortParams();
+      const categoriaSelecionadaId =
+        categoriaFilter !== 'todas'
+          ? categoriasCatalogo.find(
+              (categoria) =>
+                normalizeCatalogName(categoria.nome) === normalizeCatalogName(categoriaFilter),
+            )?.id
+          : undefined;
       const csvBlob = await produtosService.exportCsv({
         categoria: categoriaFilter !== 'todas' ? categoriaFilter : undefined,
+        categoriaId: categoriaSelecionadaId,
         subcategoriaId: subcategoriaFilter !== 'todas' ? subcategoriaFilter : undefined,
         configuracaoId: configuracaoFilter !== 'todas' ? configuracaoFilter : undefined,
         status: statusFilter !== 'todos' ? statusFilter : undefined,
@@ -436,7 +591,7 @@ const ProdutosPage: React.FC = () => {
     } finally {
       setIsExporting(false);
     }
-  }, [categoriaFilter, configuracaoFilter, debouncedSearchTerm, resolveSortParams, statusFilter, subcategoriaFilter, tipoFilter, totalItems]);
+  }, [categoriaFilter, categoriasCatalogo, configuracaoFilter, debouncedSearchTerm, resolveSortParams, statusFilter, subcategoriaFilter, tipoFilter, totalItems]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -445,12 +600,58 @@ const ProdutosPage: React.FC = () => {
     }).format(value);
   };
 
+  const formatOptionalCurrency = (value?: number | null) => {
+    return typeof value === 'number' && Number.isFinite(value)
+      ? formatCurrency(value)
+      : 'Não informado';
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('pt-BR');
   };
 
+  const getPlanoComponentes = (produto: ProdutoLegacy): ProdutoComponente[] => {
+    if (produto.tipoItem !== 'plano' || !Array.isArray(produto.componentes)) {
+      return [];
+    }
+
+    return produto.componentes.filter((componente) => Boolean(componente.childItemId));
+  };
+
+  const getResumoComposicaoPlano = (produto: ProdutoLegacy): string | null => {
+    const componentes = getPlanoComponentes(produto);
+    if (componentes.length === 0) {
+      return null;
+    }
+
+    const nomes = componentes
+      .map((componente) => componente.nome?.trim())
+      .filter((nome): nome is string => Boolean(nome && nome.length > 0));
+
+    if (nomes.length === 0) {
+      return `${componentes.length} item(ns)`;
+    }
+
+    if (nomes.length <= 3) {
+      return nomes.join(', ');
+    }
+
+    return `${nomes.slice(0, 3).join(', ')} +${nomes.length - 3}`;
+  };
+
+  const roleLabel: Record<NonNullable<ProdutoComponente['componentRole']>, string> = {
+    included: 'Incluido',
+    required: 'Obrigatorio',
+    optional: 'Opcional',
+    recommended: 'Recomendado',
+    addon: 'Add-on',
+  };
+
+  const isTipoComEstoque = (tipoItem: ProdutoLegacy['tipoItem']) =>
+    tipoItem === 'produto' || tipoItem === 'peca' || tipoItem === 'acessorio';
+
   const getEstoqueStatus = (produto: ProdutoLegacy) => {
-    if (produto.tipoItem !== 'produto') return null;
+    if (!isTipoComEstoque(produto.tipoItem)) return null;
 
     if (produto.estoque.atual <= produto.estoque.minimo) {
       return { label: 'Baixo', color: 'text-[#002333]', icon: AlertTriangle };
@@ -471,15 +672,8 @@ const ProdutosPage: React.FC = () => {
     setIsModalOpen(false);
   };
 
-  // Funções para o modal de cadastro
-  const handleNovoProduto = () => {
-    setProdutoParaEditar(null);
-    setShowModalAvancado(true);
-  };
-
-  const handleEditarProduto = (produto: ProdutoLegacy) => {
-    // Converter produto existente para formato do novo modal
-    setProdutoParaEditar({
+  const mapProdutoParaFormulario = useCallback(
+    (produto: ProdutoLegacy): ProdutoFormData & { produtoId?: string } => ({
       produtoId: produto.id,
       nome: produto.nome,
       tipoItem: produto.tipoItem,
@@ -488,7 +682,7 @@ const ProdutosPage: React.FC = () => {
       subcategoriaId: produto.subcategoriaId,
       configuracaoId: produto.configuracaoId,
       precoUnitario: produto.preco,
-      custoUnitario: produto.custoUnitario,
+      custoUnitario: produto.custoUnitario ?? undefined,
       frequencia: produto.frequencia,
       unidadeMedida: produto.unidadeMedida,
       status: produto.status,
@@ -504,15 +698,55 @@ const ProdutosPage: React.FC = () => {
       periodicidadeLicenca: produto.periodicidadeLicenca,
       renovacaoAutomatica: produto.renovacaoAutomatica,
       quantidadeLicencas: produto.quantidadeLicencas,
-    });
+      templateCode: produto.templateCode,
+      atributosTemplate: produto.atributosTemplate,
+      componentes: produto.componentes || [],
+    }),
+    [],
+  );
+
+  // Funções para o modal de cadastro
+  const handleNovoProduto = () => {
+    if (!canCreateProduto) {
+      toast.error('Você não tem permissão para criar itens.');
+      return;
+    }
+
+    setProdutoParaEditar(null);
     setShowModalAvancado(true);
   };
 
+  const handleEditarProduto = async (produto: ProdutoLegacy) => {
+    if (!canUpdateProduto) {
+      toast.error('Você não tem permissão para editar itens.');
+      return;
+    }
+
+    try {
+      const produtoCompleto = catalogApiEnabled
+        ? (produtosService.transformApiToLegacy(
+            await produtosService.findById(produto.id),
+          ) as ProdutoLegacy)
+        : produto;
+
+      setProdutoParaEditar(mapProdutoParaFormulario(produtoCompleto));
+      setShowModalAvancado(true);
+    } catch (error) {
+      console.error('Erro ao preparar edicao do item:', error);
+      toast.error('Nao foi possivel carregar os detalhes completos do item.');
+    }
+  };
+
   const handleExcluirProduto = (produto: ProdutoLegacy) => {
+    if (!canDeleteProduto) {
+      toast.error('Você não tem permissão para descontinuar itens.');
+      return;
+    }
+
     showConfirmation({
-      title: 'Confirmar exclusão',
-      message: `Tem certeza que deseja excluir o item "${produto.nome}"?\n\nEsta ação não pode ser desfeita.`,
-      confirmText: 'Excluir',
+      title: 'Confirmar descontinuação',
+      message: `Tem certeza que deseja descontinuar o item "${produto.nome}"?\n\nO item permanecerá no histórico e deixará de ser ofertado em novos usos comerciais.`,
+      confirmText: 'Descontinuar',
       cancelText: 'Cancelar',
       icon: 'danger',
       confirmButtonClass: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
@@ -520,10 +754,10 @@ const ProdutosPage: React.FC = () => {
         try {
           await produtosService.delete(produto.id);
           await carregarProdutos();
-          toast.success(`Item "${produto.nome}" excluído com sucesso!`);
+          toast.success(`Item "${produto.nome}" descontinuado com sucesso!`);
         } catch (error) {
-          console.error('Erro ao excluir item:', error);
-          toast.error('Erro ao excluir item');
+          console.error('Erro ao descontinuar item:', error);
+          toast.error('Erro ao descontinuar item');
         }
       },
     });
@@ -581,10 +815,10 @@ const ProdutosPage: React.FC = () => {
         Icon: Check,
       },
       {
-        key: 'faturamento',
-        label: 'Faturamento Total',
+        key: 'valor-catalogo',
+        label: 'Valor do Catálogo',
         value: formatCurrency(estatisticas.valorTotal),
-        description: 'Receita acumulada',
+        description: 'Soma dos preços de venda cadastrados',
         iconWrapper: 'bg-[#002333]',
         iconColor: 'text-white',
         Icon: DollarSign,
@@ -620,7 +854,7 @@ const ProdutosPage: React.FC = () => {
               Catálogo de Itens
             </span>
           }
-          description="Gestão completa de produtos, serviços, planos, licenças, módulos e aplicativos"
+          description="Gestão completa de produtos, serviços, planos, módulos, licenças, peças, acessórios, pacotes e garantias"
           actions={
             <>
               <button
@@ -639,13 +873,15 @@ const ProdutosPage: React.FC = () => {
                 <Download className="h-4 w-4" />
                 {isExporting ? 'Exportando...' : 'Exportar'}
               </button>
-              <button
-                className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition hover:bg-[#117C7E]"
-                onClick={handleNovoProduto}
-              >
-                <Plus className="h-4 w-4" />
-                Novo Item
-              </button>
+              {canCreateProduto && (
+                <button
+                  className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition hover:bg-[#117C7E]"
+                  onClick={handleNovoProduto}
+                >
+                  <Plus className="h-4 w-4" />
+                  Novo Item
+                </button>
+              )}
             </>
           }
         />
@@ -692,6 +928,18 @@ const ProdutosPage: React.FC = () => {
 
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap lg:col-span-2 xl:col-span-2">
             <select
+              value={nichoFilter}
+              onChange={(e) => handleNichoChange(e.target.value as NichoCatalogo)}
+              className="h-10 rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+            >
+              {Object.entries(nichoCatalogoConfig).map(([key, config]) => (
+                <option key={key} value={key}>
+                  Nicho: {config.label}
+                </option>
+              ))}
+            </select>
+
+            <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="h-10 rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
@@ -710,7 +958,7 @@ const ProdutosPage: React.FC = () => {
               <option value="todos">Todos os Tipos</option>
               {tipos.map((tipo) => (
                 <option key={tipo} value={tipo}>
-                  {tipoItemConfig[tipo as keyof typeof tipoItemConfig] || tipo}
+                  {tipoItemConfig[tipo] || tipo}
                 </option>
               ))}
             </select>
@@ -781,6 +1029,33 @@ const ProdutosPage: React.FC = () => {
             )}
           </div>
         </div>
+
+        {nichoFilter !== 'geral' && (
+          <div className="mt-3 space-y-2 rounded-xl border border-[#DCE6F8] bg-[#F4F8FF] p-3">
+            <p className="text-xs font-medium text-[#35538A]">{nichoSelecionadoConfig.description}</p>
+            {nichoSelecionadoConfig.tiposRecomendados.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {nichoSelecionadoConfig.tiposRecomendados.map((tipo) => (
+                  <button
+                    key={tipo}
+                    type="button"
+                    onClick={() => {
+                      setTipoFilter(tipo);
+                      setCurrentPage(1);
+                    }}
+                    className={`inline-flex h-8 items-center rounded-full border px-3 text-xs font-medium transition ${
+                      tipoFilter === tipo
+                        ? 'border-[#35538A] bg-[#35538A] text-white'
+                        : 'border-[#C7D9F7] bg-white text-[#35538A] hover:bg-[#EEF4FF]'
+                    }`}
+                  >
+                    {tipoItemConfig[tipo]}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {categoriaSelecionada && !categoriaTemSubcategorias ? (
           <p className="mt-3 text-xs text-[#607B89]">
@@ -886,6 +1161,11 @@ const ProdutosPage: React.FC = () => {
           </div>
           {hasFilters && (
             <div className="mt-3 flex flex-wrap gap-2">
+              {nichoFilter !== 'geral' && (
+                <span className="rounded-full border border-[#DCE6F8] bg-[#F4F8FF] px-3 py-1 text-xs font-medium text-[#35538A]">
+                  Nicho: {nichoSelecionadoConfig.label}
+                </span>
+              )}
               {categoriaFilter !== 'todas' && (
                 <span className="rounded-full border border-[#D4E2E7] bg-white px-3 py-1 text-xs font-medium text-[#244455]">
                   Categoria: {categoriaFilter}
@@ -976,12 +1256,17 @@ const ProdutosPage: React.FC = () => {
                       </div>
                       <div>
                         <p className="text-[#6B8693]">Preço</p>
+                        {produto.tipoItem === 'plano' && getPlanoComponentes(produto).length > 0 && (
+                          <span className="mt-0.5 block text-[11px] text-[#6B8693]">
+                            Composicao: {getPlanoComponentes(produto).length} item(ns)
+                          </span>
+                        )}
                         <p className="font-medium text-[#1E3A4B]">{formatCurrency(produto.preco)}</p>
                       </div>
                       <div>
                         <p className="text-[#6B8693]">Estoque</p>
                         <p className="font-medium text-[#1E3A4B]">
-                          {produto.tipoItem === 'produto' ? `${produto.estoque.atual} un.` : 'N/A'}
+                          {isTipoComEstoque(produto.tipoItem) ? `${produto.estoque.atual} un.` : 'N/A'}
                         </p>
                       </div>
                       <div>
@@ -998,20 +1283,24 @@ const ProdutosPage: React.FC = () => {
                       >
                         <Eye className="h-4 w-4" />
                       </button>
-                      <button
-                        onClick={() => handleEditarProduto(produto)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#0F7B7D] hover:bg-[#ECF7F3]"
-                        title="Editar"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleExcluirProduto(produto)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#B4233A] hover:bg-[#FFF2F4]"
-                        title="Excluir"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      {canUpdateProduto && (
+                        <button
+                          onClick={() => handleEditarProduto(produto)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#0F7B7D] hover:bg-[#ECF7F3]"
+                          title="Editar"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                      )}
+                      {canDeleteProduto && (
+                        <button
+                          onClick={() => handleExcluirProduto(produto)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#B4233A] hover:bg-[#FFF2F4]"
+                          title="Descontinuar"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -1062,6 +1351,11 @@ const ProdutosPage: React.FC = () => {
                               {produto.nome}
                             </div>
                             <div className="text-xs text-[#002333]/70">SKU: {produto.sku}</div>
+                            {produto.tipoItem === 'plano' && getPlanoComponentes(produto).length > 0 && (
+                              <div className="mt-1 text-xs text-[#35538A]">
+                                Composicao: {getPlanoComponentes(produto).length} item(ns)
+                              </div>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -1087,11 +1381,11 @@ const ProdutosPage: React.FC = () => {
                             {formatCurrency(produto.preco)}
                           </div>
                           <div className="text-xs text-[#002333]/70">
-                            Custo: {formatCurrency(produto.custoUnitario)}
+                            Custo interno: {formatOptionalCurrency(produto.custoUnitario)}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          {produto.tipoItem !== 'produto' ? (
+                          {!isTipoComEstoque(produto.tipoItem) ? (
                             <span className="text-sm text-[#002333]/70">N/A</span>
                           ) : (
                             <div className="text-sm">
@@ -1127,20 +1421,24 @@ const ProdutosPage: React.FC = () => {
                             >
                               <Eye className="w-4 h-4" />
                             </button>
-                            <button
-                              onClick={() => handleEditarProduto(produto)}
-                              className="text-[#0F7B7D] hover:text-[#159A9C] p-1 rounded hover:bg-[#DEEFE7] transition-colors"
-                              title="Editar"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleExcluirProduto(produto)}
-                              className="text-[#002333] hover:text-[#0F7B7D] p-1 rounded hover:bg-[#B4BEC9]/30 transition-colors"
-                              title="Excluir"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            {canUpdateProduto && (
+                              <button
+                                onClick={() => handleEditarProduto(produto)}
+                                className="text-[#0F7B7D] hover:text-[#159A9C] p-1 rounded hover:bg-[#DEEFE7] transition-colors"
+                                title="Editar"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                            )}
+                            {canDeleteProduto && (
+                              <button
+                                onClick={() => handleExcluirProduto(produto)}
+                                className="text-[#002333] hover:text-[#0F7B7D] p-1 rounded hover:bg-[#B4BEC9]/30 transition-colors"
+                                title="Descontinuar"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1284,14 +1582,14 @@ const ProdutosPage: React.FC = () => {
                     </p>
                   </div>
                   <div>
-                    <h4 className="text-sm font-semibold text-[#002333]">Custo</h4>
+                    <h4 className="text-sm font-semibold text-[#002333]">Custo Interno</h4>
                     <p className="text-sm text-[#002333]/70">
-                      {formatCurrency(selectedProduto.custoUnitario)}
+                      {formatOptionalCurrency(selectedProduto.custoUnitario)}
                     </p>
                   </div>
                 </div>
 
-                {selectedProduto.tipoItem === 'produto' && (
+                {isTipoComEstoque(selectedProduto.tipoItem) && (
                   <div>
                     <h4 className="text-sm font-semibold text-[#002333]">Estoque</h4>
                     <p className="text-sm text-[#002333]/70">
@@ -1364,6 +1662,34 @@ const ProdutosPage: React.FC = () => {
                   </div>
                 )}
 
+                {selectedProduto.tipoItem === 'plano' && getPlanoComponentes(selectedProduto).length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-[#002333]">Composicao do plano</h4>
+                    <div className="mt-2 space-y-2">
+                      {getPlanoComponentes(selectedProduto).map((componente, index) => (
+                        <div
+                          key={`${componente.childItemId}-${index}`}
+                          className="rounded-lg border border-[#D4E2E7] bg-[#F8FBFC] px-3 py-2"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm font-medium text-[#19384C]">
+                              {componente.nome || 'Item do catalogo'}
+                            </p>
+                            <span className="rounded-full bg-white px-2 py-0.5 text-xs text-[#35538A]">
+                              {roleLabel[componente.componentRole || 'included']}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-[#607B89]">
+                            Qtd padrao: {componente.quantity ?? 1}
+                            {componente.affectsPrice ? ' · afeta preco' : ''}
+                            {componente.isDefault === false ? ' · nao padrao' : ''}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
                     <h4 className="text-sm font-semibold text-[#002333]">Criado em</h4>
@@ -1403,6 +1729,7 @@ const ProdutosPage: React.FC = () => {
           void handleSaveProduto(data as any);
         }}
         produtoEditando={produtoParaEditar}
+        defaultTipoItem={defaultTipoItemModal}
         loading={isLoadingSave}
       />
       <ConfirmationModal confirmationState={confirmationState} />

@@ -27,6 +27,8 @@ import ModalConfiguracao from '../../components/modais/ModalConfiguracao';
 import { categoriasProdutosService } from '../../services/categoriasProdutosService';
 import { getCatalogoFeaturesConfig } from '../../config/catalogoFeaturesFlags';
 import { normalizeOptionalMojibakeText } from '../../utils/textEncoding';
+import { useAuth } from '../../hooks/useAuth';
+import { userHasPermission } from '../../config/menuConfig';
 import toast from 'react-hot-toast';
 
 // Interfaces
@@ -92,9 +94,13 @@ const iconButtonDeleteClass =
 
 const CategoriasProdutosPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const categoriasAvancadasEnabled = catalogoFeatures.categoriasAvancadasEnabled;
   const { confirmationState, showConfirmation } = useConfirmation();
+  const canCreateCatalogo = userHasPermission(user, 'crm.produtos.create');
+  const canUpdateCatalogo = userHasPermission(user, 'crm.produtos.update');
+  const canDeleteCatalogo = userHasPermission(user, 'crm.produtos.delete');
 
   // Estados
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -215,10 +221,6 @@ const CategoriasProdutosPage: React.FC = () => {
         }
       }
 
-      // Se nao ha categorias, adicionar algumas padrao
-      if (categoriasConvertidas.length === 0) {
-        await criarCategoriasIniciais();
-      }
     } catch (error) {
       console.error('Erro ao carregar categorias:', error);
       toast.error('Erro ao carregar categorias');
@@ -265,16 +267,31 @@ const CategoriasProdutosPage: React.FC = () => {
 
   // Funcoes de manipulacao
   const handleNovaCategoria = () => {
+    if (!canCreateCatalogo) {
+      toast.error('Você não tem permissão para criar categorias.');
+      return;
+    }
+
     setEditingItem(null);
     setShowModalCategoria(true);
   };
 
   const handleEditarCategoria = (categoria: Categoria) => {
+    if (!canUpdateCatalogo) {
+      toast.error('Você não tem permissão para editar categorias.');
+      return;
+    }
+
     setEditingItem(categoria);
     setShowModalCategoria(true);
   };
 
   const handleNovaSubcategoria = () => {
+    if (!canCreateCatalogo) {
+      toast.error('Você não tem permissão para criar subcategorias.');
+      return;
+    }
+
     if (!selectedCategoria) {
       toast.error('Selecione uma categoria primeiro');
       return;
@@ -284,11 +301,21 @@ const CategoriasProdutosPage: React.FC = () => {
   };
 
   const handleEditarSubcategoria = (subcategoria: Subcategoria) => {
+    if (!canUpdateCatalogo) {
+      toast.error('Você não tem permissão para editar subcategorias.');
+      return;
+    }
+
     setEditingItem(subcategoria);
     setShowModalSubcategoria(true);
   };
 
   const handleNovaConfiguracao = () => {
+    if (!canCreateCatalogo) {
+      toast.error('Você não tem permissão para criar configurações.');
+      return;
+    }
+
     if (!selectedSubcategoria) {
       toast.error('Selecione uma subcategoria primeiro');
       return;
@@ -298,11 +325,21 @@ const CategoriasProdutosPage: React.FC = () => {
   };
 
   const handleEditarConfiguracao = (configuracao: Configuracao) => {
+    if (!canUpdateCatalogo) {
+      toast.error('Você não tem permissão para editar configurações.');
+      return;
+    }
+
     setEditingItem(configuracao);
     setShowModalConfiguracao(true);
   };
 
   const handleExcluirCategoria = (categoria: Categoria) => {
+    if (!canDeleteCatalogo) {
+      toast.error('Você não tem permissão para excluir categorias.');
+      return;
+    }
+
     showConfirmation({
       title: 'Excluir categoria',
       message: `Tem certeza que deseja excluir a categoria "${categoria.nome}"? Todas as subcategorias e configurações vinculadas também serão removidas.`,
@@ -332,6 +369,11 @@ const CategoriasProdutosPage: React.FC = () => {
   };
 
   const handleExcluirSubcategoria = (subcategoria: Subcategoria) => {
+    if (!canDeleteCatalogo) {
+      toast.error('Você não tem permissão para excluir subcategorias.');
+      return;
+    }
+
     showConfirmation({
       title: 'Excluir subcategoria',
       message: `Tem certeza que deseja excluir a subcategoria "${subcategoria.nome}"?`,
@@ -360,6 +402,11 @@ const CategoriasProdutosPage: React.FC = () => {
   };
 
   const handleExcluirConfiguracao = (configuracao: Configuracao) => {
+    if (!canDeleteCatalogo) {
+      toast.error('Você não tem permissão para excluir configurações.');
+      return;
+    }
+
     showConfirmation({
       title: 'Excluir configuração',
       message: `Tem certeza que deseja excluir a configuração "${configuracao.nome}"?`,
@@ -592,10 +639,12 @@ const CategoriasProdutosPage: React.FC = () => {
               : 'Ajuste os filtros para localizar a categoria desejada.'
           }
           action={
-            <button type="button" onClick={handleNovaCategoria} className={actionButtonClass}>
-              <Plus className="h-4 w-4" />
-              Nova categoria
-            </button>
+            canCreateCatalogo ? (
+              <button type="button" onClick={handleNovaCategoria} className={actionButtonClass}>
+                <Plus className="h-4 w-4" />
+                Nova categoria
+              </button>
+            ) : undefined
           }
         />
       );
@@ -648,7 +697,8 @@ const CategoriasProdutosPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1">
+                {(canUpdateCatalogo || canDeleteCatalogo) && (
+                  <div className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={(event) => {
@@ -673,7 +723,8 @@ const CategoriasProdutosPage: React.FC = () => {
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
-                </div>
+                  </div>
+                )}
               </div>
             </article>
           );
@@ -723,10 +774,12 @@ const CategoriasProdutosPage: React.FC = () => {
             title="Nenhuma subcategoria encontrada"
             description="Crie a primeira subcategoria para detalhar os tipos de item desta categoria."
             action={
-              <button type="button" onClick={handleNovaSubcategoria} className={actionButtonClass}>
-                <Plus className="h-4 w-4" />
-                Nova subcategoria
-              </button>
+              canCreateCatalogo ? (
+                <button type="button" onClick={handleNovaSubcategoria} className={actionButtonClass}>
+                  <Plus className="h-4 w-4" />
+                  Nova subcategoria
+                </button>
+              ) : undefined
             }
           />
         </div>
@@ -795,7 +848,8 @@ const CategoriasProdutosPage: React.FC = () => {
                   )}
                 </div>
 
-                <div className="flex items-center gap-1">
+                {(canUpdateCatalogo || canDeleteCatalogo) && (
+                  <div className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={(event) => {
@@ -820,7 +874,8 @@ const CategoriasProdutosPage: React.FC = () => {
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
-                </div>
+                  </div>
+                )}
               </div>
             </article>
           );
@@ -872,10 +927,12 @@ const CategoriasProdutosPage: React.FC = () => {
             title="Nenhuma configuração encontrada"
             description="Crie configurações para variações comerciais e cálculo de preço final."
             action={
-              <button type="button" onClick={handleNovaConfiguracao} className={actionButtonClass}>
-                <Plus className="h-4 w-4" />
-                Nova configuração
-              </button>
+              canCreateCatalogo ? (
+                <button type="button" onClick={handleNovaConfiguracao} className={actionButtonClass}>
+                  <Plus className="h-4 w-4" />
+                  Nova configuração
+                </button>
+              ) : undefined
             }
           />
         </div>
@@ -919,7 +976,8 @@ const CategoriasProdutosPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1">
+                {(canUpdateCatalogo || canDeleteCatalogo) && (
+                  <div className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => handleEditarConfiguracao(configuracao)}
@@ -938,7 +996,8 @@ const CategoriasProdutosPage: React.FC = () => {
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
-                </div>
+                  </div>
+                )}
               </div>
             </article>
           );
@@ -977,14 +1036,16 @@ const CategoriasProdutosPage: React.FC = () => {
                 <ArrowLeft className="h-4 w-4" />
                 Voltar
               </button>
-              <button
-                type="button"
-                className={`${actionButtonClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1A9E87]/35`}
-                onClick={handlePrimaryAction}
-              >
-                <Plus className="h-4 w-4" />
-                {primaryActionLabel}
-              </button>
+              {canCreateCatalogo && (
+                <button
+                  type="button"
+                  className={`${actionButtonClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1A9E87]/35`}
+                  onClick={handlePrimaryAction}
+                >
+                  <Plus className="h-4 w-4" />
+                  {primaryActionLabel}
+                </button>
+              )}
             </>
           }
         />

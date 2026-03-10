@@ -88,6 +88,11 @@ import { SystemBranding } from '../modules/system-branding/entities/system-brand
 import { CategoriaProduto } from '../modules/categorias-produtos/entities/categoria-produto.entity';
 import { SubcategoriaProduto } from '../modules/categorias-produtos/entities/subcategoria-produto.entity';
 import { ConfiguracaoProduto } from '../modules/categorias-produtos/entities/configuracao-produto.entity';
+import { CatalogItem } from '../modules/catalogo/entities/catalog-item.entity';
+import { CatalogItemComponent } from '../modules/catalogo/entities/catalog-item-component.entity';
+import { CatalogTemplate } from '../modules/catalogo/entities/catalog-template.entity';
+import { CatalogTemplateField } from '../modules/catalogo/entities/catalog-template-field.entity';
+import { VehicleInventoryItem } from '../modules/vehicle-inventory/entities/vehicle-inventory-item.entity';
 
 @Injectable()
 export class DatabaseConfig implements TypeOrmOptionsFactory {
@@ -192,6 +197,11 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         CategoriaProduto, // ✅ Catálogo: categorias de produtos
         SubcategoriaProduto, // ✅ Catálogo: subcategorias de produtos
         ConfiguracaoProduto, // ✅ Catálogo: configurações de subcategoria
+        CatalogItem, // ✅ Catálogo flexível: item base
+        CatalogItemComponent, // ✅ Catálogo flexível: composição de itens
+        CatalogTemplate, // ✅ Catálogo flexível: templates de cadastro
+        CatalogTemplateField, // ✅ Catálogo flexível: campos dinâmicos
+        VehicleInventoryItem, // ✅ Estoque especializado para loja de veiculos
       ],
       autoLoadEntities: true,
       synchronize: false, // ✅ DESABILITADO - usar migrations para segurança

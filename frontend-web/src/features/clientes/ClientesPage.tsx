@@ -9,6 +9,7 @@ import {
   clientesService,
   Cliente,
   ClienteAttachment,
+  CreateClientePayload,
   ClienteFilters,
   ClientesEstatisticas,
   PaginatedClientes,
@@ -78,6 +79,13 @@ const formatDocumento = (documento?: string, tipo?: Cliente['tipo']): string => 
   }
 
   return documento;
+};
+
+const formatDateShort = (value?: string | null): string => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString('pt-BR');
 };
 
 const CLIENTES_PAGE_STATE_STORAGE_KEY = 'conectcrm_clientes_page_state_v1';
@@ -187,7 +195,7 @@ const loadSavedClientesViews = (): SavedClientesView[] => {
 
 const toCreateClientePayload = (
   cliente: Cliente,
-): Omit<Cliente, 'id' | 'created_at' | 'updated_at'> => ({
+): CreateClientePayload => ({
   nome: cliente.nome,
   email: cliente.email ?? '',
   telefone: cliente.telefone,
@@ -198,19 +206,12 @@ const toCreateClientePayload = (
   cidade: cliente.cidade,
   estado: cliente.estado,
   cep: cliente.cep,
-  empresa: cliente.empresa,
-  cargo: cliente.cargo,
-  site: cliente.site,
   observacoes: cliente.observacoes,
-  tags: cliente.tags,
-  data_nascimento: cliente.data_nascimento,
-  genero: cliente.genero,
-  profissao: cliente.profissao,
-  renda: cliente.renda,
+  ultimo_contato: cliente.ultimo_contato,
+  proximo_contato: cliente.proximo_contato,
   avatar: cliente.avatar,
   avatarUrl: cliente.avatarUrl,
   avatar_url: cliente.avatar_url,
-  foto: cliente.foto,
 });
 
 const ClientesPage: React.FC = () => {
@@ -1491,9 +1492,7 @@ const ClientesPage: React.FC = () => {
   };
 
   // Handler para salvar cliente (criar/editar)
-  const handleSaveCliente = async (
-    clienteData: Omit<Cliente, 'id' | 'created_at' | 'updated_at'>,
-  ) => {
+  const handleSaveCliente = async (clienteData: CreateClientePayload) => {
     try {
       setIsModalLoading(true);
 
@@ -1689,7 +1688,7 @@ const ClientesPage: React.FC = () => {
     ? 'Carregando clientes...'
     : isRefreshingResults
       ? 'Atualizando resultados...'
-      : `Gerencie seus ${estatisticas.total} clientes e contatos`;
+      : `Gerencie o cadastro e relacionamento basico de ${estatisticas.total} clientes`;
   const hasFilters = Boolean(searchTerm || selectedStatus || selectedTipo);
   const activeView = savedViews.find((view) => view.id === activeViewId) ?? null;
   const hasFilterChips = hasFilters || Boolean(activeView);
@@ -2214,6 +2213,9 @@ const ClientesPage: React.FC = () => {
                           />
                         </button>
                       </th>
+                      <th className="w-48 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">
+                        Follow-up
+                      </th>
                       <th className="w-32 px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-[#607B89]">
                         Acoes
                       </th>
@@ -2352,6 +2354,15 @@ const ClientesPage: React.FC = () => {
                                 year: 'numeric',
                               })
                             : '-'}
+                        </td>
+
+                        <td className="px-4 py-3 text-xs text-[#4F6D7B]">
+                          <p>
+                            Ultimo: <span className="font-medium text-[#244455]">{formatDateShort(cliente.ultimo_contato)}</span>
+                          </p>
+                          <p>
+                            Proximo: <span className="font-medium text-[#244455]">{formatDateShort(cliente.proximo_contato)}</span>
+                          </p>
                         </td>
 
                         <td className="px-4 py-3 text-right">

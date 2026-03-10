@@ -6,6 +6,7 @@ import { Proposta as PropostaEntity } from './proposta.entity';
 import { User } from '../users/user.entity';
 import { Cliente } from '../clientes/cliente.entity';
 import { Produto as ProdutoEntity } from '../produtos/produto.entity';
+import { CatalogItem as CatalogItemEntity } from '../catalogo/entities/catalog-item.entity';
 
 type SalesFlowStatus =
   | 'rascunho'
@@ -239,6 +240,8 @@ export class PropostasService {
     private clienteRepository: Repository<Cliente>,
     @InjectRepository(ProdutoEntity)
     private produtoRepository: Repository<ProdutoEntity>,
+    @InjectRepository(CatalogItemEntity)
+    private catalogItemRepository: Repository<CatalogItemEntity>,
   ) {
     // Inicializar contador baseado nas propostas existentes
     this.inicializarContador();
@@ -273,31 +276,77 @@ export class PropostasService {
       return Array.isArray(produtos) ? produtos : [];
     }
 
+    const toId = (value: unknown): string => String(value || '').trim();
+    const extractItemId = (record: Record<string, unknown>): string => {
+      return toId(
+        record.id ??
+          record.produtoId ??
+          record.produto_id ??
+          (record.produto && typeof record.produto === 'object'
+            ? (record.produto as Record<string, unknown>).id
+            : undefined),
+      );
+    };
+    const collectComponentIds = (value: unknown): string[] => {
+      if (!Array.isArray(value)) {
+        return [];
+      }
+
+      return value
+        .map((raw) => {
+          if (!raw || typeof raw !== 'object') {
+            return '';
+          }
+
+          const record = raw as Record<string, unknown>;
+          const nome = typeof record.nome === 'string' ? record.nome.trim() : '';
+          if (nome) {
+            return '';
+          }
+
+          return toId(record.childItemId ?? record.child_item_id ?? record.id ?? record.itemId);
+        })
+        .filter((id) => Boolean(id));
+    };
+
     const ids = Array.from(
       new Set(
-        produtos
-          .map((item) => {
+        produtos.flatMap((item) => {
             if (!item || typeof item !== 'object') {
-              return '';
+              return [];
             }
+
             const record = item as Record<string, unknown>;
             const nome = typeof record.nome === 'string' ? record.nome.trim() : '';
             const produtoNome =
               typeof record.produtoNome === 'string' ? record.produtoNome.trim() : '';
-            if (nome || produtoNome) {
-              return '';
+            const collected: string[] = [];
+
+            if (!nome && !produtoNome) {
+              const itemId = extractItemId(record);
+              if (itemId) {
+                collected.push(itemId);
+              }
             }
 
-            const id =
-              record.id ??
-              record.produtoId ??
-              record.produto_id ??
-              (record.produto && typeof record.produto === 'object'
-                ? (record.produto as Record<string, unknown>).id
-                : undefined);
-            return id ? String(id) : '';
-          })
-          .filter((id) => Boolean(id)),
+            collected.push(...collectComponentIds(record.componentesPlano));
+            collected.push(...collectComponentIds(record.componentes));
+
+            if (record.produto && typeof record.produto === 'object') {
+              const nested = record.produto as Record<string, unknown>;
+              const nestedNome = typeof nested.nome === 'string' ? nested.nome.trim() : '';
+              if (!nestedNome) {
+                const nestedId = extractItemId(nested);
+                if (nestedId) {
+                  collected.push(nestedId);
+                }
+              }
+              collected.push(...collectComponentIds(nested.componentesPlano));
+              collected.push(...collectComponentIds(nested.componentes));
+            }
+
+            return collected.filter((id) => Boolean(id));
+          }),
       ),
     );
 
@@ -306,14 +355,100 @@ export class PropostasService {
     }
 
     const encontrados = await this.produtoRepository.find({
-      select: ['id', 'nome', 'descricao'],
+      select: ['id', 'nome', 'descricao', 'preco', 'tipoItem', 'status'],
       where: {
         empresaId,
         id: In(ids),
       },
     });
 
-    const map = new Map(encontrados.map((p) => [p.id, p]));
+    const resolvedItemsMap = new Map<
+      string,
+      {
+        nome: string;
+        descricao?: string | null;
+        preco?: number;
+        tipoItem?: string | null;
+        status?: string | null;
+      }
+    >(
+      encontrados.map((item) => [
+        item.id,
+        {
+          nome: item.nome,
+          descricao: item.descricao ?? undefined,
+          preco: Number(item.preco || 0),
+          tipoItem: item.tipoItem ?? undefined,
+          status: item.status ?? undefined,
+        },
+      ]),
+    );
+
+    const missingIds = ids.filter((id) => !resolvedItemsMap.has(id));
+    if (missingIds.length > 0) {
+      const catalogItems = await this.catalogItemRepository.find({
+        select: ['id', 'nome', 'descricao', 'salePrice', 'businessType', 'status'],
+        where: {
+          empresaId,
+          id: In(missingIds),
+        },
+      });
+
+      catalogItems.forEach((item) => {
+        resolvedItemsMap.set(item.id, {
+          nome: item.nome,
+          descricao: item.descricao ?? undefined,
+          preco: Number(item.salePrice || 0),
+          tipoItem: item.businessType ?? undefined,
+          status: item.status ?? undefined,
+        });
+      });
+    }
+
+    const enrichComponentList = (value: unknown): { value: unknown; changed: boolean } => {
+      if (!Array.isArray(value)) {
+        return { value, changed: false };
+      }
+
+      let changed = false;
+      const enriched = value.map((raw) => {
+        if (!raw || typeof raw !== 'object') {
+          return raw;
+        }
+
+        const record = raw as Record<string, unknown>;
+        const nome = typeof record.nome === 'string' ? record.nome.trim() : '';
+        if (nome) {
+          return raw;
+        }
+
+        const childId = toId(
+          record.childItemId ?? record.child_item_id ?? record.id ?? record.itemId,
+        );
+        if (!childId) {
+          return raw;
+        }
+
+        const resolved = resolvedItemsMap.get(childId);
+        if (!resolved) {
+          return raw;
+        }
+
+        changed = true;
+        return {
+          ...record,
+          nome: resolved.nome,
+          preco:
+            record.preco === undefined || record.preco === null
+              ? Number(resolved.preco || 0)
+              : record.preco,
+          tipoItem: record.tipoItem ?? resolved.tipoItem ?? undefined,
+          status: record.status ?? resolved.status ?? undefined,
+        };
+      });
+
+      return { value: changed ? enriched : value, changed };
+    };
 
     return produtos.map((item) => {
       if (!item || typeof item !== 'object') {
@@ -321,29 +456,77 @@ export class PropostasService {
       }
 
       const record = item as Record<string, unknown>;
-      const nome = typeof record.nome === 'string' ? record.nome.trim() : '';
-      const produtoNome = typeof record.produtoNome === 'string' ? record.produtoNome.trim() : '';
-      if (nome || produtoNome) {
-        return item;
+      let changed = false;
+      const nextRecord: Record<string, unknown> = { ...record };
+
+      const nome = typeof nextRecord.nome === 'string' ? nextRecord.nome.trim() : '';
+      const produtoNome =
+        typeof nextRecord.produtoNome === 'string' ? nextRecord.produtoNome.trim() : '';
+      if (!nome && !produtoNome) {
+        const itemId = extractItemId(nextRecord);
+        if (itemId) {
+          const resolved = resolvedItemsMap.get(itemId);
+          if (resolved) {
+            nextRecord.nome = resolved.nome;
+            if (nextRecord.descricao === undefined || nextRecord.descricao === null) {
+              nextRecord.descricao = resolved.descricao ?? undefined;
+            }
+            changed = true;
+          }
+        }
       }
 
-      const id =
-        record.id ??
-        record.produtoId ??
-        record.produto_id ??
-        (record.produto && typeof record.produto === 'object'
-          ? (record.produto as Record<string, unknown>).id
-          : undefined);
-      const resolved = id ? map.get(String(id)) : undefined;
-      if (!resolved) {
-        return item;
+      const componentesPlano = enrichComponentList(record.componentesPlano);
+      if (componentesPlano.changed) {
+        nextRecord.componentesPlano = componentesPlano.value;
+        changed = true;
       }
 
-      return {
-        ...record,
-        nome: resolved.nome,
-        descricao: record.descricao ?? resolved.descricao ?? undefined,
-      };
+      const componentes = enrichComponentList(record.componentes);
+      if (componentes.changed) {
+        nextRecord.componentes = componentes.value;
+        changed = true;
+      }
+
+      if (record.produto && typeof record.produto === 'object') {
+        const nested = record.produto as Record<string, unknown>;
+        const nextNested: Record<string, unknown> = { ...nested };
+        let nestedChanged = false;
+
+        const nestedNome = typeof nextNested.nome === 'string' ? nextNested.nome.trim() : '';
+        if (!nestedNome) {
+          const nestedId = extractItemId(nextNested);
+          if (nestedId) {
+            const resolved = resolvedItemsMap.get(nestedId);
+            if (resolved) {
+              nextNested.nome = resolved.nome;
+              if (nextNested.descricao === undefined || nextNested.descricao === null) {
+                nextNested.descricao = resolved.descricao ?? undefined;
+              }
+              nestedChanged = true;
+            }
+          }
+        }
+
+        const nestedComponentesPlano = enrichComponentList(nested.componentesPlano);
+        if (nestedComponentesPlano.changed) {
+          nextNested.componentesPlano = nestedComponentesPlano.value;
+          nestedChanged = true;
+        }
+
+        const nestedComponentes = enrichComponentList(nested.componentes);
+        if (nestedComponentes.changed) {
+          nextNested.componentes = nestedComponentes.value;
+          nestedChanged = true;
+        }
+
+        if (nestedChanged) {
+          nextRecord.produto = nextNested;
+          changed = true;
+        }
+      }
+
+      return changed ? nextRecord : item;
     });
   }
 

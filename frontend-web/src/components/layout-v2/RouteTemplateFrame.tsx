@@ -57,7 +57,7 @@ const routeRules: RouteTemplateRule[] = [
   },
   {
     pattern:
-      /^\/(clientes|contatos|pipeline|propostas|vendas\/propostas|produtos(\/categorias)?|vendas\/produtos|atendimento\/tickets|financeiro(\/.*)?|agenda|crm\/agenda|crm\/clientes|crm\/contatos|crm\/leads|crm\/interacoes|crm\/pipeline|leads|interacoes|cotacoes|vendas\/cotacoes|orcamentos|combos|vendas\/combos|aprovacoes\/pendentes|vendas\/aprovacoes|portal|billing(\/.*)?|assinaturas|faturamento|notifications|atendimento|atendimento\/automacoes)$/,
+      /^\/(clientes|contatos|pipeline|propostas|vendas\/propostas|produtos(\/categorias)?|vendas\/produtos|veiculos|vendas\/veiculos|atendimento\/tickets|financeiro(\/.*)?|agenda|crm\/agenda|crm\/clientes|crm\/contatos|crm\/leads|crm\/interacoes|crm\/pipeline|leads|interacoes|cotacoes|vendas\/cotacoes|orcamentos|combos|vendas\/combos|aprovacoes\/pendentes|vendas\/aprovacoes|portal|billing(\/.*)?|assinaturas|faturamento|notifications|atendimento|atendimento\/automacoes)$/,
     type: 'LIST',
   },
   {

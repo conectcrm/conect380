@@ -4,9 +4,23 @@ import * as handlebars from 'handlebars';
 import * as fs from 'fs';
 import * as path from 'path';
 
+type PlanoComponentePdf = {
+  childItemId: string;
+  componentRole: 'included' | 'required' | 'optional' | 'recommended' | 'addon';
+  quantity?: number;
+  nome?: string;
+};
+
 @Injectable()
 export class PdfService {
   private readonly templatesPath: string;
+  private readonly componentRoleLabels: Record<PlanoComponentePdf['componentRole'], string> = {
+    included: 'Incluido',
+    required: 'Obrigatorio',
+    optional: 'Opcional',
+    recommended: 'Recomendado',
+    addon: 'Add-on',
+  };
 
   constructor() {
     this.templatesPath = this.resolveTemplatesPath();
@@ -283,7 +297,8 @@ export class PdfService {
     const itensProcessados = itensOriginais
       .map((item: any, index: number) => {
         const nome = this.toNonEmptyString(item?.nome || item?.descricao) || `Item ${index + 1}`;
-        const descricao = this.toNonEmptyString(item?.descricao);
+        const descricaoBase = this.toNonEmptyString(item?.descricao);
+        const descricao = this.mergeDescricaoComComposicaoPlano(item, descricaoBase);
         const quantidade = Math.max(0.01, this.toNumber(item?.quantidade, 1));
         const unidade = this.toNonEmptyString(item?.unidade) || 'un';
         const valorUnitario = Math.max(
@@ -323,6 +338,93 @@ export class PdfService {
         valorTotal: valorUnitarioFallback,
       },
     ];
+  }
+
+  private normalizePlanoComponentes(value: unknown): PlanoComponentePdf[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value
+      .map((raw) => {
+        if (!raw || typeof raw !== 'object') {
+          return null;
+        }
+
+        const record = raw as Record<string, unknown>;
+        const childItemId = this.toNonEmptyString(record.childItemId || record.child_item_id);
+        if (!childItemId) {
+          return null;
+        }
+
+        const componentRoleRaw = this.toNonEmptyString(
+          record.componentRole || record.component_role || 'included',
+        ).toLowerCase();
+        const componentRole = (
+          ['included', 'required', 'optional', 'recommended', 'addon'].includes(componentRoleRaw)
+            ? componentRoleRaw
+            : 'included'
+        ) as PlanoComponentePdf['componentRole'];
+
+        const quantity = this.toNumber(record.quantity, 1);
+        const nome = this.toNonEmptyString(record.nome);
+
+        return {
+          childItemId,
+          componentRole,
+          quantity: Number.isFinite(quantity) ? quantity : undefined,
+          nome: nome || undefined,
+        } as PlanoComponentePdf;
+      })
+      .filter((item): item is PlanoComponentePdf => Boolean(item));
+  }
+
+  private buildComposicaoPlanoDescricao(componentes: PlanoComponentePdf[], limit = 6): string {
+    if (!Array.isArray(componentes) || componentes.length === 0) {
+      return '';
+    }
+
+    const linhas = componentes.slice(0, limit).map((componente) => {
+      const nome = this.toNonEmptyString(componente.nome) || 'Item da composicao';
+      const quantidade =
+        typeof componente.quantity === 'number' && componente.quantity > 1
+          ? ` x${componente.quantity}`
+          : '';
+      const papel =
+        this.componentRoleLabels[componente.componentRole || 'included'] || 'Incluido';
+      return `- ${nome}${quantidade} (${papel})`;
+    });
+
+    if (componentes.length > limit) {
+      linhas.push(`- +${componentes.length - limit} componente(s) adicional(is)`);
+    }
+
+    return `Composicao do plano:\n${linhas.join('\n')}`;
+  }
+
+  private mergeDescricaoComComposicaoPlano(item: any, descricaoBase: string): string {
+    const tipoItem = this.toNonEmptyString(item?.tipoItem || item?.produto?.tipoItem).toLowerCase();
+    const componentesPlano = this.normalizePlanoComponentes(
+      item?.componentesPlano ??
+        item?.componentes ??
+        item?.produto?.componentesPlano ??
+        item?.produto?.componentes,
+    );
+    const temComposicao = Array.isArray(componentesPlano) && componentesPlano.length > 0;
+    if (tipoItem !== 'plano' && !temComposicao) {
+      return descricaoBase;
+    }
+
+    const composicaoDescricao = this.buildComposicaoPlanoDescricao(componentesPlano);
+    if (!composicaoDescricao) {
+      return descricaoBase;
+    }
+
+    if (descricaoBase.toLowerCase().includes('composicao do plano')) {
+      return descricaoBase;
+    }
+
+    return descricaoBase ? `${descricaoBase}\n\n${composicaoDescricao}` : composicaoDescricao;
   }
 
   private toNumber(value: unknown, fallback = 0): number {
@@ -446,4 +548,3 @@ export class PdfService {
     return 'status-muted';
   }
 }
-
