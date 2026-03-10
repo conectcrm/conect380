@@ -1,5 +1,6 @@
 import { PartialType } from '@nestjs/mapped-types';
 import {
+  IsArray,
   IsBoolean,
   IsDateString,
   IsEmail,
@@ -96,6 +97,24 @@ export class CreateClienteDto {
   @IsOptional()
   @IsDateString()
   proximo_contato?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  tags?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  origem?: string;
+
+  @IsOptional()
+  @IsString()
+  responsavel_id?: string;
+
+  @IsOptional()
+  @IsString()
+  responsavelId?: string;
 }
 
 export class UpdateClienteDto extends PartialType(CreateClienteDto) {}

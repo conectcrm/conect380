@@ -34,8 +34,8 @@ Legenda:
 | CRM-011 | Concluido | Perfil do cliente agora consome contexto omnichannel (segmento, estatisticas e historico recente) reaproveitando endpoints de atendimento. |
 | CRM-012 | Concluido | Perfil do cliente agora abre tickets, propostas, contratos e faturamento com query params de cliente (`clienteId`/`cliente`) e as paginas destino aplicam pre-filtro automaticamente. |
 | CRM-013 | Parcial | Ha base de endpoint/estrutura para contato, mas sem fluxo operacional completo de ultimo e proximo contato na tela principal. |
-| CRM-014 | Nao iniciado | Filtros operacionais de follow-up pendente e vencido nao estao implementados na listagem. |
-| CRM-015 | Parcial | Tags aparecem no dominio/UI, mas sem fechamento consistente de persistencia e filtragem fim a fim. |
+| CRM-014 | Concluido | Listagem/exportacao de clientes agora aceitam `followup` (`pendente`/`vencido`) com filtro operacional por `proximo_contato`, incluindo UI, URL e views salvas. |
+| CRM-015 | Concluido | Tags agora persistem no backend (create/update), aparecem no cadastro/perfil e podem ser filtradas na listagem/exportacao com estado completo na UI. |
 | CRM-016 | Nao iniciado | Origem e responsavel comercial nao estao implementados de forma operacional completa no modulo. |
 | CRM-017 | Parcial | Ha KPIs basicos de clientes, mas faltam indicadores de follow-up e carteira comercial completa. |
 | CRM-018 | Nao iniciado | Nao ha evidencia de suite de contrato dedicada entre frontend e backend para o modulo de clientes. |

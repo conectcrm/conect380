@@ -38,6 +38,7 @@ interface ClienteModalData {
   cidade?: string;
   estado?: string;
   observacoes?: string;
+  tags?: string[];
   ultimo_contato?: string | null;
   proximo_contato?: string | null;
 }
@@ -56,6 +57,7 @@ interface ClienteFormData {
   bairro?: string;
   cidade?: string;
   estado?: string;
+  tags?: string;
   observacoes?: string;
   ultimo_contato?: string;
   proximo_contato?: string;
@@ -359,6 +361,7 @@ const defaultValues: ClienteFormData = {
   bairro: '',
   cidade: '',
   estado: '',
+  tags: '',
   observacoes: '',
   ultimo_contato: '',
   proximo_contato: '',
@@ -523,6 +526,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
         bairro: enderecoParts.length >= 4 ? enderecoParts[3] : enderecoParts[2] || '',
         cidade: cliente.cidade || '',
         estado: cliente.estado || '',
+        tags: cliente.tags?.join(', ') || '',
         observacoes: cliente.observacoes || '',
         ultimo_contato: cliente.ultimo_contato ? cliente.ultimo_contato.slice(0, 10) : '',
         proximo_contato: cliente.proximo_contato ? cliente.proximo_contato.slice(0, 10) : '',
@@ -604,6 +608,10 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
         endereco: endereco || undefined,
         cidade: data.cidade?.trim() || undefined,
         estado: data.estado?.trim().toUpperCase() || undefined,
+        tags: (data.tags || '')
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean),
         observacoes: data.observacoes?.trim() || '',
         ultimo_contato: data.ultimo_contato ? new Date(data.ultimo_contato).toISOString() : null,
         proximo_contato: data.proximo_contato ? new Date(data.proximo_contato).toISOString() : null,
@@ -961,6 +969,17 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                   <h4 className="text-sm font-semibold text-[#244455]">Observacoes internas</h4>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tags (separadas por virgula)
+                    </label>
+                    <input
+                      {...register('tags')}
+                      type="text"
+                      className={inputClass}
+                      placeholder="vip, recorrente, decisor"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Observacoes ({watchedObservacoes.length}/1000)
                     </label>
                     <textarea
@@ -983,7 +1002,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
             <div className="sticky bottom-0 border-t border-gray-200 bg-gray-50 px-1 py-4">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-sm text-gray-500 text-center sm:text-left">
-                  Campos permitidos no fluxo atual: identificacao, contato, endereco, follow-up e observacoes.
+                  Campos permitidos no fluxo atual: identificacao, contato, endereco, tags, follow-up e observacoes.
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">

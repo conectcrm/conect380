@@ -97,6 +97,7 @@ export class ClientesService {
   private clienteAnexosTableSupported: boolean | null = null;
   private ultimoContatoColumnSupported: boolean | null = null;
   private proximoContatoColumnSupported: boolean | null = null;
+  private tagsColumnSupported: boolean | null = null;
 
   constructor(
     @InjectRepository(Cliente)
@@ -437,6 +438,12 @@ export class ClientesService {
       proximo_contato: this.parseOptionalDate((clienteData as any).proximo_contato),
     });
 
+    await this.updateTagsColumn(
+      saved.id,
+      saved.empresaId,
+      this.parseOptionalTags((clienteData as any).tags),
+    );
+
     const reloaded = await this.findById(saved.id, saved.empresaId);
     if (reloaded) {
       return reloaded;
@@ -542,6 +549,7 @@ export class ClientesService {
       'endereco',
       'ultimo_contato',
       'proximo_contato',
+      'tags',
       'observacoes',
       'created_at',
       'updated_at',
@@ -561,6 +569,7 @@ export class ClientesService {
       cliente.endereco,
       cliente.ultimo_contato ? new Date(cliente.ultimo_contato).toISOString() : '',
       cliente.proximo_contato ? new Date(cliente.proximo_contato).toISOString() : '',
+      cliente.tags?.join(', ') ?? '',
       cliente.observacoes,
       cliente.created_at ? new Date(cliente.created_at).toISOString() : '',
       cliente.updated_at ? new Date(cliente.updated_at).toISOString() : '',
@@ -585,10 +594,17 @@ export class ClientesService {
   }
 
   async update(id: string, empresaId: string, updateData: UpdateClienteDto): Promise<Cliente> {
-    const payload: Partial<Cliente> = { ...updateData };
-    delete (payload as any).status;
-    delete (payload as any).avatar;
-    delete (payload as any).avatarUrl;
+    const {
+      status: _status,
+      avatar: _avatar,
+      avatarUrl: _avatarUrl,
+      tags: _tags,
+      ultimo_contato: _ultimoContato,
+      proximo_contato: _proximoContato,
+      ...rest
+    } = updateData as any;
+
+    const payload: Partial<Cliente> = { ...rest };
 
     if ((updateData as any).documento !== undefined || (updateData as any).cpf_cnpj !== undefined) {
       payload.documento = (updateData as any).documento ?? (updateData as any).cpf_cnpj;
@@ -619,6 +635,8 @@ export class ClientesService {
       ultimo_contato: this.parseOptionalDate((updateData as any).ultimo_contato),
       proximo_contato: this.parseOptionalDate((updateData as any).proximo_contato),
     });
+
+    await this.updateTagsColumn(id, empresaId, this.parseOptionalTags((updateData as any).tags));
 
     return this.findById(id, empresaId);
   }
@@ -823,6 +841,31 @@ export class ClientesService {
       queryBuilder.andWhere('cliente.tipo = :tipo', { tipo: params.tipo });
     }
 
+    const tag = this.normalizeTagFilter(params.tag);
+    if (tag && (await this.hasTagsColumn())) {
+      queryBuilder.andWhere(
+        `
+          EXISTS (
+            SELECT 1
+            FROM regexp_split_to_table(COALESCE(cliente.tags, ''), '\\s*,\\s*') AS tag_item
+            WHERE LOWER(tag_item) = LOWER(:tag)
+          )
+        `,
+        { tag },
+      );
+    }
+
+    const followup = this.normalizeFollowup(params.followup);
+    if (followup && (await this.hasProximoContatoColumn())) {
+      queryBuilder.andWhere('cliente.proximo_contato IS NOT NULL');
+
+      if (followup === 'vencido') {
+        queryBuilder.andWhere('cliente.proximo_contato < CURRENT_DATE');
+      } else {
+        queryBuilder.andWhere('cliente.proximo_contato >= CURRENT_DATE');
+      }
+    }
+
     const ids = this.normalizeIds(params.ids);
     if (ids.length > 0) {
       queryBuilder.andWhere('cliente.id IN (:...ids)', { ids });
@@ -844,7 +887,8 @@ export class ClientesService {
           fallbackStatus ?? (cliente.ativo ? StatusCliente.CLIENTE : StatusCliente.INATIVO);
       });
       const withAvatar = await this.attachAvatarFields(clientes);
-      return this.attachFollowupFields(withAvatar);
+      const withFollowup = await this.attachFollowupFields(withAvatar);
+      return this.attachTagsFields(withFollowup);
     }
 
     const ids = clientes.map((cliente) => cliente.id);
@@ -867,7 +911,8 @@ export class ClientesService {
     });
 
     const withAvatar = await this.attachAvatarFields(clientes);
-    return this.attachFollowupFields(withAvatar);
+    const withFollowup = await this.attachFollowupFields(withAvatar);
+    return this.attachTagsFields(withFollowup);
   }
 
   private async countByStatus(empresaId: string, status: StatusCliente): Promise<number> {
@@ -911,6 +956,51 @@ export class ClientesService {
     }
 
     return undefined;
+  }
+
+  private normalizeFollowup(value?: string): 'pendente' | 'vencido' | undefined {
+    if (!value) {
+      return undefined;
+    }
+
+    if (value === 'pendente' || value === 'vencido') {
+      return value;
+    }
+
+    return undefined;
+  }
+
+  private normalizeTagFilter(value?: string): string | undefined {
+    if (!value) {
+      return undefined;
+    }
+
+    const normalized = value.trim();
+    return normalized.length > 0 ? normalized : undefined;
+  }
+
+  private parseOptionalTags(value: unknown): string[] | null | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (value === null) {
+      return null;
+    }
+
+    if (Array.isArray(value)) {
+      const normalized = value
+        .map((item) => String(item).trim())
+        .filter(Boolean);
+      return normalized.length > 0 ? Array.from(new Set(normalized)) : null;
+    }
+
+    const normalized = String(value)
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    return normalized.length > 0 ? Array.from(new Set(normalized)) : null;
   }
 
   private parseOptionalDate(value: unknown): Date | null | undefined {
@@ -1022,6 +1112,27 @@ export class ClientesService {
     return this.proximoContatoColumnSupported;
   }
 
+  private async hasTagsColumn(): Promise<boolean> {
+    if (this.tagsColumnSupported !== null) {
+      return this.tagsColumnSupported;
+    }
+
+    const result: Array<{ exists: boolean }> = await this.clienteRepository.query(
+      `
+        SELECT EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'clientes'
+            AND column_name = 'tags'
+        ) AS "exists"
+      `,
+    );
+
+    this.tagsColumnSupported = Boolean(result?.[0]?.exists);
+    return this.tagsColumnSupported;
+  }
+
   async isAnexosStorageAvailable(): Promise<boolean> {
     return this.hasClienteAnexosTable();
   }
@@ -1131,6 +1242,46 @@ export class ClientesService {
     return clientes;
   }
 
+  private async attachTagsFields(clientes: Cliente[]): Promise<Cliente[]> {
+    if (clientes.length === 0) {
+      return clientes;
+    }
+
+    if (!(await this.hasTagsColumn())) {
+      clientes.forEach((cliente) => {
+        cliente.tags = undefined;
+      });
+      return clientes;
+    }
+
+    const ids = clientes.map((cliente) => cliente.id);
+    const rows: Array<{ id: string; tags?: string | null }> = await this.clienteRepository.query(
+      `
+        SELECT id, tags
+        FROM clientes
+        WHERE id = ANY($1::uuid[])
+      `,
+      [ids],
+    );
+
+    const tagsById = new Map(rows.map((row) => [row.id, row.tags ?? null]));
+
+    clientes.forEach((cliente) => {
+      const rawTags = tagsById.get(cliente.id);
+      if (!rawTags) {
+        cliente.tags = [];
+        return;
+      }
+
+      cliente.tags = rawTags
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter(Boolean);
+    });
+
+    return clientes;
+  }
+
   private async updateFollowupColumns(
     id: string,
     empresaId: string,
@@ -1174,6 +1325,28 @@ export class ClientesService {
           AND empresa_id = $${values.length}
       `,
       values,
+    );
+  }
+
+  private async updateTagsColumn(
+    id: string,
+    empresaId: string,
+    tags: string[] | null | undefined,
+  ): Promise<void> {
+    if (!(await this.hasTagsColumn()) || tags === undefined) {
+      return;
+    }
+
+    const tagsValue = tags && tags.length > 0 ? tags.join(', ') : null;
+
+    await this.clienteRepository.query(
+      `
+        UPDATE clientes
+        SET tags = $1
+        WHERE id = $2
+          AND empresa_id = $3
+      `,
+      [tagsValue, id, empresaId],
     );
   }
 

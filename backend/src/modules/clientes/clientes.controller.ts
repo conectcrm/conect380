@@ -160,6 +160,10 @@ export class ClientesController {
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'status', required: false, type: String })
   @ApiQuery({ name: 'tipo', required: false, type: String })
+  @ApiQuery({ name: 'followup', required: false, enum: ['pendente', 'vencido'] })
+  @ApiQuery({ name: 'tag', required: false, type: String })
+  @ApiQuery({ name: 'origem', required: false, type: String })
+  @ApiQuery({ name: 'responsavelId', required: false, type: String })
   @ApiQuery({ name: 'sortBy', required: false, type: String })
   @ApiQuery({ name: 'sortOrder', required: false, enum: ['ASC', 'DESC'] })
   @ApiResponse({ status: 200, description: 'Lista de clientes retornada com sucesso' })
@@ -185,6 +189,10 @@ export class ClientesController {
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'status', required: false, type: String })
   @ApiQuery({ name: 'tipo', required: false, type: String })
+  @ApiQuery({ name: 'followup', required: false, enum: ['pendente', 'vencido'] })
+  @ApiQuery({ name: 'tag', required: false, type: String })
+  @ApiQuery({ name: 'origem', required: false, type: String })
+  @ApiQuery({ name: 'responsavelId', required: false, type: String })
   @ApiResponse({ status: 200, description: 'CSV de clientes gerado com sucesso' })
   async exportClientes(
     @EmpresaId() empresaId: string,

@@ -46,6 +46,7 @@ export interface CreateClientePayload {
   telefone?: string;
   tipo: Cliente['tipo'];
   documento?: string;
+  tags?: string[];
   cpf_cnpj?: string;
   status?: ClienteStatus;
   ativo?: boolean;
@@ -317,6 +318,8 @@ export interface ClienteFilters {
   search?: string;
   status?: string;
   tipo?: string;
+  tag?: string;
+  followup?: '' | 'pendente' | 'vencido';
   page?: number;
   limit?: number;
   sortBy?: string;

@@ -101,6 +101,8 @@ type SavedClientesView = {
   searchTerm: string;
   status: string;
   tipo: string;
+  tag: string;
+  followup: '' | 'pendente' | 'vencido';
   viewMode: ClientesViewMode;
   limit: number;
   sortBy: string;
@@ -113,6 +115,8 @@ type PersistedClientesPageState = {
   searchTerm: string;
   status: string;
   tipo: string;
+  tag: string;
+  followup: '' | 'pendente' | 'vencido';
   viewMode: ClientesViewMode;
   page: number;
   limit: number;
@@ -168,7 +172,7 @@ const loadSavedClientesViews = (): SavedClientesView[] => {
       return [];
     }
 
-    const normalized = parsed
+    const normalized: SavedClientesView[] = parsed
       .filter(
         (view) =>
           typeof view?.id === 'string' &&
@@ -180,6 +184,11 @@ const loadSavedClientesViews = (): SavedClientesView[] => {
       )
       .map((view) => ({
         ...view,
+        tag: typeof view.tag === 'string' ? view.tag : '',
+        followup:
+          view.followup === 'pendente' || view.followup === 'vencido'
+            ? (view.followup as 'pendente' | 'vencido')
+            : '',
         isDefault: Boolean(view.isDefault),
       }));
 
@@ -207,6 +216,7 @@ const toCreateClientePayload = (
   estado: cliente.estado,
   cep: cliente.cep,
   observacoes: cliente.observacoes,
+  tags: cliente.tags,
   ultimo_contato: cliente.ultimo_contato,
   proximo_contato: cliente.proximo_contato,
   avatar: cliente.avatar,
@@ -230,12 +240,21 @@ const ClientesPage: React.FC = () => {
     search: persistedStateRef.current.searchTerm ?? '',
     status: persistedStateRef.current.status ?? '',
     tipo: persistedStateRef.current.tipo ?? '',
+    tag: persistedStateRef.current.tag ?? '',
+    followup: persistedStateRef.current.followup ?? '',
     sortBy: persistedStateRef.current.sortBy ?? 'created_at',
     sortOrder: persistedStateRef.current.sortOrder ?? 'DESC',
   }));
   const [searchTerm, setSearchTerm] = useState(persistedStateRef.current.searchTerm ?? '');
   const [selectedStatus, setSelectedStatus] = useState(persistedStateRef.current.status ?? '');
   const [selectedTipo, setSelectedTipo] = useState(persistedStateRef.current.tipo ?? '');
+  const [selectedTag, setSelectedTag] = useState(persistedStateRef.current.tag ?? '');
+  const [selectedFollowup, setSelectedFollowup] = useState<'' | 'pendente' | 'vencido'>(
+    persistedStateRef.current.followup === 'pendente' ||
+      persistedStateRef.current.followup === 'vencido'
+      ? persistedStateRef.current.followup
+      : '',
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -467,11 +486,15 @@ const ClientesPage: React.FC = () => {
         const nextSearch = shouldApplySearch ? normalizedSearch : (prev.search ?? '');
         const nextStatus = selectedStatus;
         const nextTipo = selectedTipo;
+        const nextTag = selectedTag.trim();
+        const nextFollowup = selectedFollowup;
 
         if (
           (prev.search ?? '') === nextSearch &&
           (prev.status ?? '') === nextStatus &&
           (prev.tipo ?? '') === nextTipo &&
+          (prev.tag ?? '') === nextTag &&
+          (prev.followup ?? '') === nextFollowup &&
           currentPage === 1
         ) {
           return prev;
@@ -482,13 +505,15 @@ const ClientesPage: React.FC = () => {
           search: nextSearch,
           status: nextStatus,
           tipo: nextTipo,
+          tag: nextTag,
+          followup: nextFollowup,
           page: 1, // Reset para primeira pagina quando filtros mudam
         };
       });
     }, CLIENTES_SEARCH_DEBOUNCE_MS);
 
     return () => clearTimeout(delayDebounce);
-  }, [searchTerm, selectedStatus, selectedTipo]);
+  }, [searchTerm, selectedStatus, selectedTipo, selectedTag, selectedFollowup]);
 
   useEffect(() => {
     if (hasHydratedQueryRef.current) {
@@ -500,6 +525,8 @@ const ClientesPage: React.FC = () => {
     const querySearch = searchParams.get('q');
     const queryStatus = searchParams.get('status');
     const queryTipo = searchParams.get('tipo');
+    const queryTag = searchParams.get('tag');
+    const queryFollowup = searchParams.get('followup');
     const queryView = searchParams.get('view');
     const queryPage = Number(searchParams.get('page') || '');
     const queryLimit = Number(searchParams.get('limit') || '');
@@ -511,6 +538,8 @@ const ClientesPage: React.FC = () => {
       querySearch,
       queryStatus,
       queryTipo,
+      queryTag,
+      queryFollowup,
       queryView,
       searchParams.get('page'),
       searchParams.get('limit'),
@@ -535,6 +564,16 @@ const ClientesPage: React.FC = () => {
       setSelectedTipo(queryTipo);
     }
 
+    if (queryTag !== null) {
+      setSelectedTag(queryTag);
+    }
+
+    if (queryFollowup === 'pendente' || queryFollowup === 'vencido') {
+      setSelectedFollowup(queryFollowup);
+    } else if (queryFollowup !== null) {
+      setSelectedFollowup('');
+    }
+
     if (queryView === 'cards' || queryView === 'table') {
       setViewMode(queryView);
     }
@@ -550,6 +589,11 @@ const ClientesPage: React.FC = () => {
       const nextSearch = querySearch ?? prev.search ?? '';
       const nextStatus = queryStatus ?? prev.status ?? '';
       const nextTipo = queryTipo ?? prev.tipo ?? '';
+      const nextTag = queryTag ?? prev.tag ?? '';
+      const nextFollowup =
+        queryFollowup === 'pendente' || queryFollowup === 'vencido'
+          ? queryFollowup
+          : (prev.followup ?? '');
       const nextSortBy = querySortBy ?? prev.sortBy ?? 'created_at';
       const nextSortOrder =
         querySortOrder === 'ASC' || querySortOrder === 'DESC'
@@ -562,6 +606,8 @@ const ClientesPage: React.FC = () => {
         (prev.search ?? '') === nextSearch &&
         (prev.status ?? '') === nextStatus &&
         (prev.tipo ?? '') === nextTipo &&
+        (prev.tag ?? '') === nextTag &&
+        (prev.followup ?? '') === nextFollowup &&
         (prev.sortBy ?? 'created_at') === nextSortBy &&
         (prev.sortOrder ?? 'DESC') === nextSortOrder
       ) {
@@ -575,6 +621,8 @@ const ClientesPage: React.FC = () => {
         search: nextSearch,
         status: nextStatus,
         tipo: nextTipo,
+        tag: nextTag,
+        followup: nextFollowup,
         sortBy: nextSortBy,
         sortOrder: nextSortOrder,
       };
@@ -590,6 +638,8 @@ const ClientesPage: React.FC = () => {
       searchTerm,
       status: selectedStatus,
       tipo: selectedTipo,
+      tag: selectedTag,
+      followup: selectedFollowup,
       viewMode,
       page: filters.page ?? 1,
       limit: filters.limit ?? 10,
@@ -608,6 +658,8 @@ const ClientesPage: React.FC = () => {
     searchTerm,
     selectedStatus,
     selectedTipo,
+    selectedTag,
+    selectedFollowup,
     viewMode,
   ]);
 
@@ -637,6 +689,8 @@ const ClientesPage: React.FC = () => {
     setOrDelete('q', normalizedSearch);
     setOrDelete('status', selectedStatus);
     setOrDelete('tipo', selectedTipo);
+    setOrDelete('tag', selectedTag.trim());
+    setOrDelete('followup', selectedFollowup);
     setOrDelete('view', viewMode === 'table' ? null : viewMode);
     setOrDelete('page', String(filters.page ?? 1), (filters.page ?? 1) > 1);
     setOrDelete('limit', String(filters.limit ?? 10), (filters.limit ?? 10) !== 10);
@@ -665,6 +719,8 @@ const ClientesPage: React.FC = () => {
     searchParamsSerialized,
     selectedStatus,
     selectedTipo,
+    selectedTag,
+    selectedFollowup,
     setSearchParams,
     viewMode,
   ]);
@@ -677,6 +733,8 @@ const ClientesPage: React.FC = () => {
     filters.search,
     filters.status,
     filters.tipo,
+    filters.tag,
+    filters.followup,
     filters.sortBy,
     filters.sortOrder,
     filters.limit,
@@ -869,10 +927,20 @@ const ClientesPage: React.FC = () => {
     setSelectedTipo(tipo);
   };
 
+  const handleTagChange = (tag: string) => {
+    setSelectedTag(tag);
+  };
+
+  const handleFollowupChange = (followup: '' | 'pendente' | 'vencido') => {
+    setSelectedFollowup(followup);
+  };
+
   const handleClearFilters = () => {
     setSearchTerm('');
     setSelectedStatus('');
     setSelectedTipo('');
+    setSelectedTag('');
+    setSelectedFollowup('');
     setActiveViewId('');
   };
 
@@ -1116,6 +1184,8 @@ const ClientesPage: React.FC = () => {
     setSearchTerm(selectedView.searchTerm);
     setSelectedStatus(selectedView.status);
     setSelectedTipo(selectedView.tipo);
+    setSelectedTag(selectedView.tag);
+    setSelectedFollowup(selectedView.followup);
     setViewMode(selectedView.viewMode);
     setFilters((prev) => ({
       ...prev,
@@ -1124,6 +1194,8 @@ const ClientesPage: React.FC = () => {
       search: selectedView.searchTerm,
       status: selectedView.status,
       tipo: selectedView.tipo,
+      tag: selectedView.tag,
+      followup: selectedView.followup,
       sortBy: selectedView.sortBy,
       sortOrder: selectedView.sortOrder,
     }));
@@ -1196,6 +1268,8 @@ const ClientesPage: React.FC = () => {
         searchTerm,
         status: selectedStatus,
         tipo: selectedTipo,
+        tag: selectedTag,
+        followup: selectedFollowup,
         viewMode,
         limit: filters.limit ?? 10,
         sortBy: filters.sortBy ?? 'created_at',
@@ -1294,6 +1368,8 @@ const ClientesPage: React.FC = () => {
       searchParams.get('q'),
       searchParams.get('status'),
       searchParams.get('tipo'),
+      searchParams.get('tag'),
+      searchParams.get('followup'),
       searchParams.get('view'),
       searchParams.get('page'),
       searchParams.get('limit'),
@@ -1317,6 +1393,8 @@ const ClientesPage: React.FC = () => {
     setSearchTerm(defaultView.searchTerm);
     setSelectedStatus(defaultView.status);
     setSelectedTipo(defaultView.tipo);
+    setSelectedTag(defaultView.tag);
+    setSelectedFollowup(defaultView.followup);
     setViewMode(defaultView.viewMode);
     setFilters((prev) => ({
       ...prev,
@@ -1325,6 +1403,8 @@ const ClientesPage: React.FC = () => {
       search: defaultView.searchTerm,
       status: defaultView.status,
       tipo: defaultView.tipo,
+      tag: defaultView.tag,
+      followup: defaultView.followup,
       sortBy: defaultView.sortBy,
       sortOrder: defaultView.sortOrder,
     }));
@@ -1346,6 +1426,8 @@ const ClientesPage: React.FC = () => {
       activeView.searchTerm === searchTerm &&
       activeView.status === selectedStatus &&
       activeView.tipo === selectedTipo &&
+      activeView.tag === selectedTag &&
+      activeView.followup === selectedFollowup &&
       activeView.viewMode === viewMode &&
       activeView.limit === (filters.limit ?? 10) &&
       activeView.sortBy === (filters.sortBy ?? 'created_at') &&
@@ -1363,6 +1445,8 @@ const ClientesPage: React.FC = () => {
     searchTerm,
     selectedStatus,
     selectedTipo,
+    selectedTag,
+    selectedFollowup,
     viewMode,
   ]);
 
@@ -1689,13 +1773,17 @@ const ClientesPage: React.FC = () => {
     : isRefreshingResults
       ? 'Atualizando resultados...'
       : `Gerencie o cadastro e relacionamento basico de ${estatisticas.total} clientes`;
-  const hasFilters = Boolean(searchTerm || selectedStatus || selectedTipo);
+  const hasFilters = Boolean(
+    searchTerm || selectedStatus || selectedTipo || selectedTag || selectedFollowup,
+  );
   const activeView = savedViews.find((view) => view.id === activeViewId) ?? null;
   const hasFilterChips = hasFilters || Boolean(activeView);
   const activeFilterCount =
     Number(Boolean(searchTerm.trim())) +
     Number(Boolean(selectedStatus)) +
     Number(Boolean(selectedTipo)) +
+    Number(Boolean(selectedTag.trim())) +
+    Number(Boolean(selectedFollowup)) +
     Number(Boolean(activeViewId));
   const isRenameMode = saveViewModalMode === 'rename' && Boolean(activeView);
   const saveViewModalTitle = isRenameMode
@@ -1852,6 +1940,32 @@ const ClientesPage: React.FC = () => {
           </div>
 
           <div className="w-full sm:w-auto">
+            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Tag</label>
+            <input
+              type="text"
+              value={selectedTag}
+              onChange={(e) => handleTagChange(e.target.value)}
+              placeholder="Ex: vip"
+              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[170px]"
+            />
+          </div>
+
+          <div className="w-full sm:w-auto">
+            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Follow-up</label>
+            <select
+              value={selectedFollowup}
+              onChange={(e) =>
+                handleFollowupChange(e.target.value as '' | 'pendente' | 'vencido')
+              }
+              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[170px]"
+            >
+              <option value="">Todos</option>
+              <option value="pendente">Pendente</option>
+              <option value="vencido">Vencido</option>
+            </select>
+          </div>
+
+          <div className="w-full sm:w-auto">
             <label className="mb-2 block text-sm font-medium text-[#385A6A]">Views salvas</label>
             <div className="flex flex-wrap items-center gap-2">
               <select
@@ -1997,6 +2111,36 @@ const ClientesPage: React.FC = () => {
                 onClick={() => setSelectedTipo('')}
                 className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
                 title="Remover filtro de tipo"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          )}
+
+          {selectedTag.trim() && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+              Tag:{' '}
+              <strong className="font-semibold text-[#1C3B4C]">{selectedTag.trim()}</strong>
+              <button
+                onClick={() => setSelectedTag('')}
+                className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                title="Remover filtro de tag"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          )}
+
+          {selectedFollowup && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+              Follow-up:{' '}
+              <strong className="font-semibold text-[#1C3B4C]">
+                {selectedFollowup === 'vencido' ? 'Vencido' : 'Pendente'}
+              </strong>
+              <button
+                onClick={() => setSelectedFollowup('')}
+                className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                title="Remover filtro de follow-up"
               >
                 <X className="h-3 w-3" />
               </button>
