@@ -177,6 +177,18 @@ const formatCurrency = (value?: number): string => {
   }).format(value);
 };
 
+const ensureSiteProtocol = (site?: string | null): string | null => {
+  if (!site) {
+    return null;
+  }
+
+  if (site.startsWith('http://') || site.startsWith('https://')) {
+    return site;
+  }
+
+  return `https://${site}`;
+};
+
 const ClienteDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -501,6 +513,7 @@ const ClienteDetailPage: React.FC = () => {
   const statusLabel = statusLabelMap[cliente.status] || cliente.status;
   const statusClass = statusClassMap[cliente.status] || statusClassMap.inativo;
   const clienteQuery = `clienteId=${encodeURIComponent(id)}&cliente=${encodeURIComponent(cliente.nome || '')}`;
+  const siteUrl = ensureSiteProtocol(cliente.site);
 
   return (
     <div className="space-y-4 pt-1 sm:pt-2">
@@ -512,7 +525,7 @@ const ClienteDetailPage: React.FC = () => {
               Perfil do Cliente
             </span>
           }
-          description="Visao cadastral do cliente com dados, anexos e historico de atualizacoes."
+          description="Visao 360 do cliente com dados cadastrais, relacionamento e historico comercial."
           actions={
             <div className="flex flex-wrap items-center gap-2">
               <Link
@@ -629,8 +642,8 @@ const ClienteDetailPage: React.FC = () => {
         />
       </SectionCard>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <Card className="space-y-6 p-4 xl:col-span-2">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <Card className="space-y-6 p-4">
           <section className="space-y-3">
             <h3 className="text-base font-semibold text-[#19384C]">Contato</h3>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -679,9 +692,9 @@ const ClienteDetailPage: React.FC = () => {
                 <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[#6C8794]">
                   Site
                 </p>
-                {cliente.site ? (
+                {siteUrl ? (
                   <a
-                    href={cliente.site}
+                    href={siteUrl}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-2 text-sm text-[#159A9C] hover:text-[#0F7B7D]"
@@ -870,7 +883,7 @@ const ClienteDetailPage: React.FC = () => {
           </section>
         </Card>
 
-        <Card className="space-y-6 p-4">
+        <Card className="space-y-6 p-4 xl:sticky xl:top-24 xl:self-start">
           <section className="space-y-3">
             <h3 className="text-base font-semibold text-[#19384C]">Historico</h3>
             <div className="space-y-3">
