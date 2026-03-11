@@ -10,6 +10,7 @@ import { PropostasModule } from '../propostas/propostas.module';
 import { FeatureFlagTenant } from '../dashboard-v2/entities/feature-flag-tenant.entity';
 import { Empresa } from '../../empresas/entities/empresa.entity';
 import { OportunidadesStaleMonitorService } from './oportunidades-stale-monitor.service';
+import { Lead } from '../leads/lead.entity';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { OportunidadesStaleMonitorService } from './oportunidades-stale-monitor.
       OportunidadeStageEvent,
       FeatureFlagTenant,
       Empresa,
+      Lead,
     ]),
     DashboardV2Module,
     PropostasModule,

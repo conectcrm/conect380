@@ -4,11 +4,13 @@ import { Repository } from 'typeorm';
 import {
   Oportunidade,
   EstagioOportunidade,
+  OrigemOportunidade,
   LifecycleStatusOportunidade,
 } from './oportunidade.entity';
 import { Atividade, TipoAtividade } from './atividade.entity';
 import { OportunidadeStageEvent } from './oportunidade-stage-event.entity';
 import { DashboardV2JobsService } from '../dashboard-v2/dashboard-v2.jobs.service';
+import { Lead, OrigemLead, StatusLead } from '../leads/lead.entity';
 import {
   CreateOportunidadeDto,
   LifecycleTransitionDto,
@@ -437,6 +439,8 @@ export class OportunidadesService {
     private stageEventRepository: Repository<OportunidadeStageEvent>,
     @InjectRepository(FeatureFlagTenant)
     private readonly featureFlagRepository: Repository<FeatureFlagTenant>,
+    @InjectRepository(Lead)
+    private readonly leadRepository: Repository<Lead>,
     @Optional()
     private readonly dashboardV2JobsService?: DashboardV2JobsService,
   ) {}
@@ -507,6 +511,333 @@ export class OportunidadesService {
 
     const parsed = new Date(trimmed);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  private normalizeText(value?: string | null): string | undefined {
+    if (typeof value !== 'string') {
+      return undefined;
+    }
+
+    const normalized = value.trim();
+    return normalized.length > 0 ? normalized : undefined;
+  }
+
+  private normalizeEmail(value?: string | null): string | undefined {
+    const normalized = this.normalizeText(value);
+    return normalized ? normalized.toLowerCase() : undefined;
+  }
+
+  private normalizePhoneDigits(value?: string | null): string | undefined {
+    const normalized = this.normalizeText(value);
+    if (!normalized) {
+      return undefined;
+    }
+
+    const digits = normalized.replace(/\D/g, '');
+    return digits.length > 0 ? digits : undefined;
+  }
+
+  private parseCustomFields(value: unknown): Record<string, unknown> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return {};
+    }
+
+    return { ...(value as Record<string, unknown>) };
+  }
+
+  private mapOpportunityOriginToLeadOrigin(
+    origem?: OrigemOportunidade | string | null,
+  ): OrigemLead {
+    switch ((origem || '').toString().trim().toLowerCase()) {
+      case OrigemOportunidade.WEBSITE:
+        return OrigemLead.FORMULARIO;
+      case OrigemOportunidade.CAMPANHA:
+        return OrigemLead.IMPORTACAO;
+      case OrigemOportunidade.REDES_SOCIAIS:
+        return OrigemLead.WHATSAPP;
+      case OrigemOportunidade.INDICACAO:
+      case OrigemOportunidade.PARCEIRO:
+        return OrigemLead.INDICACAO;
+      case OrigemOportunidade.TELEFONE:
+      case OrigemOportunidade.EMAIL:
+        return OrigemLead.MANUAL;
+      case OrigemOportunidade.EVENTO:
+        return OrigemLead.OUTRO;
+      default:
+        return OrigemLead.MANUAL;
+    }
+  }
+
+  private mapOpportunityStageToLeadStatus(
+    estagio?: EstagioOportunidade | string | null,
+  ): StatusLead {
+    const normalized = normalizeStageRuleInput(estagio);
+
+    switch (normalized) {
+      case EstagioOportunidade.LEADS:
+        return StatusLead.NOVO;
+      case EstagioOportunidade.QUALIFICACAO:
+        return StatusLead.QUALIFICADO;
+      case EstagioOportunidade.PROPOSTA:
+      case EstagioOportunidade.NEGOCIACAO:
+      case EstagioOportunidade.FECHAMENTO:
+      case EstagioOportunidade.GANHO:
+        return StatusLead.CONVERTIDO;
+      case EstagioOportunidade.PERDIDO:
+        return StatusLead.DESQUALIFICADO;
+      default:
+        return StatusLead.NOVO;
+    }
+  }
+
+  private calculateLeadScore(input: {
+    email?: string;
+    telefone?: string;
+    empresa_nome?: string;
+    observacoes?: string;
+    status?: StatusLead;
+  }): number {
+    let score = 0;
+
+    if (input.email) score += 25;
+    if (input.telefone) score += 25;
+    if (input.empresa_nome) score += 20;
+    if (input.observacoes && input.observacoes.length > 10) score += 15;
+    if (input.status === StatusLead.CONTATADO) score += 15;
+
+    return Math.min(score, 100);
+  }
+
+  private buildLeadSnapshotFromOpportunity(oportunidade: Oportunidade): {
+    oportunidadeId: string;
+    nome: string;
+    email?: string;
+    telefone?: string;
+    empresa_nome?: string;
+    observacoes?: string;
+    responsavel_id?: string;
+    origem: OrigemLead;
+    status: StatusLead;
+  } | null {
+    const oportunidadeId = String(oportunidade.id);
+    const nome =
+      this.normalizeText(oportunidade.nomeContato) ||
+      this.normalizeText(oportunidade.cliente?.nome) ||
+      this.normalizeText(oportunidade.empresaContato) ||
+      this.normalizeText(oportunidade.titulo);
+
+    if (!nome) {
+      return null;
+    }
+
+    const email =
+      this.normalizeEmail(oportunidade.emailContato) ||
+      this.normalizeEmail(oportunidade.cliente?.email);
+    const telefone =
+      this.normalizeText(oportunidade.telefoneContato) ||
+      this.normalizeText(oportunidade.cliente?.telefone);
+    const empresa_nome =
+      this.normalizeText(oportunidade.empresaContato) ||
+      this.normalizeText(oportunidade.cliente?.nome);
+    const observacoes = this.normalizeText(oportunidade.descricao);
+    const responsavel_id =
+      this.normalizeText((oportunidade as any).responsavel_id) ||
+      this.normalizeText(oportunidade.responsavel?.id);
+
+    return {
+      oportunidadeId,
+      nome,
+      email,
+      telefone,
+      empresa_nome,
+      observacoes,
+      responsavel_id,
+      origem: this.mapOpportunityOriginToLeadOrigin(oportunidade.origem),
+      status: this.mapOpportunityStageToLeadStatus(oportunidade.estagio),
+    };
+  }
+
+  private isPipelineMirroredLead(lead: Lead, oportunidadeId: string): boolean {
+    const customFields = this.parseCustomFields(lead.campos_customizados);
+    const customOpportunityId = customFields.pipeline_oportunidade_id;
+
+    return (
+      customFields.pipeline_sync === true ||
+      (typeof customOpportunityId === 'string' && customOpportunityId === oportunidadeId)
+    );
+  }
+
+  private async findLeadCandidateForOpportunity(
+    empresaId: string,
+    snapshot: {
+      oportunidadeId: string;
+      nome: string;
+      email?: string;
+      telefone?: string;
+    },
+  ): Promise<Lead | null> {
+    const byLinkedOpportunity = await this.leadRepository
+      .createQueryBuilder('lead')
+      .where('lead.empresa_id = :empresaId', { empresaId })
+      .andWhere('lead.oportunidade_id = :oportunidadeId', {
+        oportunidadeId: snapshot.oportunidadeId,
+      })
+      .orderBy('lead.updated_at', 'DESC')
+      .getOne();
+
+    if (byLinkedOpportunity) {
+      return byLinkedOpportunity;
+    }
+
+    if (snapshot.email) {
+      const byEmail = await this.leadRepository
+        .createQueryBuilder('lead')
+        .where('lead.empresa_id = :empresaId', { empresaId })
+        .andWhere('LOWER(COALESCE(lead.email, \'\')) = :email', { email: snapshot.email })
+        .andWhere('(lead.oportunidade_id IS NULL OR lead.oportunidade_id = :oportunidadeId)', {
+          oportunidadeId: snapshot.oportunidadeId,
+        })
+        .orderBy('lead.updated_at', 'DESC')
+        .getOne();
+
+      if (byEmail) {
+        return byEmail;
+      }
+    }
+
+    const phoneDigits = this.normalizePhoneDigits(snapshot.telefone);
+    if (phoneDigits) {
+      return this.leadRepository
+        .createQueryBuilder('lead')
+        .where('lead.empresa_id = :empresaId', { empresaId })
+        .andWhere(
+          "regexp_replace(COALESCE(lead.telefone, ''), '[^0-9]', '', 'g') = :phoneDigits",
+          { phoneDigits },
+        )
+        .andWhere('LOWER(COALESCE(lead.nome, \'\')) = :nome', {
+          nome: snapshot.nome.toLowerCase(),
+        })
+        .andWhere('(lead.oportunidade_id IS NULL OR lead.oportunidade_id = :oportunidadeId)', {
+          oportunidadeId: snapshot.oportunidadeId,
+        })
+        .orderBy('lead.updated_at', 'DESC')
+        .getOne();
+    }
+
+    return null;
+  }
+
+  private async syncLeadMirrorFromOpportunity(
+    oportunidade: Oportunidade,
+    empresaId: string,
+    source: 'create' | 'update' | 'update_estagio' | 'reopen',
+  ): Promise<void> {
+    try {
+      const leadsColumns = await this.getTableColumns('leads');
+      if (leadsColumns.size === 0) {
+        return;
+      }
+
+      const snapshot = this.buildLeadSnapshotFromOpportunity(oportunidade);
+      if (!snapshot) {
+        return;
+      }
+
+      const existingLead = await this.findLeadCandidateForOpportunity(empresaId, snapshot);
+      const nowIso = new Date().toISOString();
+
+      if (!existingLead) {
+        const newLead = this.leadRepository.create({
+          empresaId,
+          nome: snapshot.nome,
+          email: snapshot.email,
+          telefone: snapshot.telefone,
+          empresa_nome: snapshot.empresa_nome,
+          status: snapshot.status,
+          origem: snapshot.origem,
+          observacoes: snapshot.observacoes,
+          responsavel_id: snapshot.responsavel_id,
+          oportunidade_id: snapshot.oportunidadeId,
+          convertido_em:
+            snapshot.status === StatusLead.CONVERTIDO ? new Date() : null,
+          campos_customizados: {
+            pipeline_sync: true,
+            pipeline_oportunidade_id: snapshot.oportunidadeId,
+            pipeline_sync_source: source,
+            pipeline_sync_at: nowIso,
+          },
+          score: this.calculateLeadScore({
+            email: snapshot.email,
+            telefone: snapshot.telefone,
+            empresa_nome: snapshot.empresa_nome,
+            observacoes: snapshot.observacoes,
+            status: snapshot.status,
+          }),
+        });
+
+        await this.leadRepository.save(newLead);
+        return;
+      }
+
+      const isPipelineMirror = this.isPipelineMirroredLead(
+        existingLead,
+        snapshot.oportunidadeId,
+      );
+      const customFields = this.parseCustomFields(existingLead.campos_customizados);
+      const nextStatus =
+        existingLead.status === StatusLead.CONVERTIDO && !isPipelineMirror
+          ? StatusLead.CONVERTIDO
+          : snapshot.status;
+
+      existingLead.nome = snapshot.nome;
+
+      if (snapshot.email) {
+        existingLead.email = snapshot.email;
+      }
+      if (snapshot.telefone) {
+        existingLead.telefone = snapshot.telefone;
+      }
+      if (snapshot.empresa_nome) {
+        existingLead.empresa_nome = snapshot.empresa_nome;
+      }
+      if (snapshot.responsavel_id) {
+        existingLead.responsavel_id = snapshot.responsavel_id;
+      }
+
+      existingLead.status = nextStatus;
+      existingLead.origem = snapshot.origem;
+      if (!existingLead.oportunidade_id) {
+        existingLead.oportunidade_id = snapshot.oportunidadeId;
+      }
+      if (!existingLead.observacoes && snapshot.observacoes) {
+        existingLead.observacoes = snapshot.observacoes;
+      }
+      if (nextStatus === StatusLead.CONVERTIDO && !existingLead.convertido_em) {
+        existingLead.convertido_em = new Date();
+      }
+
+      existingLead.campos_customizados = {
+        ...customFields,
+        pipeline_sync: true,
+        pipeline_oportunidade_id: snapshot.oportunidadeId,
+        pipeline_sync_source: source,
+        pipeline_sync_at: nowIso,
+      };
+
+      existingLead.score = this.calculateLeadScore({
+        email: this.normalizeEmail(existingLead.email),
+        telefone: this.normalizeText(existingLead.telefone),
+        empresa_nome: this.normalizeText(existingLead.empresa_nome),
+        observacoes: this.normalizeText(existingLead.observacoes),
+        status: existingLead.status,
+      });
+
+      await this.leadRepository.save(existingLead);
+    } catch (error: any) {
+      this.logger.warn(
+        `Falha ao sincronizar Lead da oportunidade ${oportunidade.id}: ${error?.message || error}`,
+      );
+    }
   }
 
   private parseDateValue(value: unknown): Date | null {
@@ -1341,7 +1672,9 @@ export class OportunidadesService {
       source: 'create',
     }).catch(() => undefined);
 
-    return this.findOne(savedOportunidadeId, empresaId);
+    const oportunidade = await this.findOne(savedOportunidadeId, empresaId);
+    await this.syncLeadMirrorFromOpportunity(oportunidade, empresaId, 'create');
+    return oportunidade;
   }
 
   async findAll(empresaId: string, filters?: OportunidadeFindFilters): Promise<Oportunidade[]> {
@@ -1735,7 +2068,9 @@ export class OportunidadesService {
       );
     }
 
-    return this.findOne(id, empresaId);
+    const oportunidadeAtualizada = await this.findOne(id, empresaId);
+    await this.syncLeadMirrorFromOpportunity(oportunidadeAtualizada, empresaId, 'update');
+    return oportunidadeAtualizada;
   }
 
   async updateEstagio(
@@ -1866,7 +2201,9 @@ export class OportunidadesService {
       },
     );
 
-    return this.findOne(id, empresaId);
+    const oportunidadeAtualizada = await this.findOne(id, empresaId);
+    await this.syncLeadMirrorFromOpportunity(oportunidadeAtualizada, empresaId, 'update_estagio');
+    return oportunidadeAtualizada;
   }
 
   async getLifecycleFeatureFlag(empresaId: string): Promise<LifecycleFlagDecision> {
@@ -2541,7 +2878,9 @@ export class OportunidadesService {
       },
     );
 
-    return this.findOne(id, empresaId, { include_deleted: true });
+    const oportunidadeAtualizada = await this.findOne(id, empresaId, { include_deleted: true });
+    await this.syncLeadMirrorFromOpportunity(oportunidadeAtualizada, empresaId, 'reopen');
+    return oportunidadeAtualizada;
   }
 
   async restaurar(

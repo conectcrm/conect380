@@ -29,6 +29,7 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { Permission } from '../../common/permissions/permissions.constants';
 import { EmpresaId, SkipEmpresaValidation } from '../../common/decorators/empresa.decorator';
+import { CurrentUser } from '../../common/decorators/user.decorator';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { StatusLead, OrigemLead } from './lead.entity';
 
@@ -138,8 +139,15 @@ export class LeadsController {
     @Param('id') id: string,
     @Body() convertLeadDto: ConvertLeadDto,
     @EmpresaId() empresaId: string,
+    @CurrentUser() user: { id?: string; sub?: string },
   ) {
-    return this.leadsService.converterParaOportunidade(id, convertLeadDto, empresaId);
+    const actorUserId = user?.id || user?.sub;
+    return this.leadsService.converterParaOportunidade(
+      id,
+      convertLeadDto,
+      empresaId,
+      actorUserId,
+    );
   }
 
   /**

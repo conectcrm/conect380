@@ -32,6 +32,7 @@ import * as Papa from 'papaparse';
 @Injectable()
 export class LeadsService {
   private readonly logger = new Logger(LeadsService.name);
+  private readonly leadColumnEnumCache = new Map<string, Set<string> | null>();
 
   constructor(
     @InjectRepository(Lead)
@@ -160,12 +161,196 @@ export class LeadsService {
     return EstagioOportunidade.LEADS;
   }
 
-  private mapearOrigemParaBanco(origem?: string): OrigemOportunidade {
-    if (!origem) {
-      return OrigemOportunidade.WEBSITE;
+  private async getLeadColumnEnumValues(columnName: string): Promise<Set<string> | null> {
+    if (this.leadColumnEnumCache.has(columnName)) {
+      return this.leadColumnEnumCache.get(columnName) || null;
     }
 
-    switch (origem) {
+    const metadataRows = await this.leadsRepository.query(
+      `
+        SELECT data_type, udt_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'leads'
+          AND column_name = $1
+        LIMIT 1
+      `,
+      [columnName],
+    );
+
+    const metadata = metadataRows?.[0] || null;
+    if (!metadata || metadata.data_type !== 'USER-DEFINED' || !metadata.udt_name) {
+      this.leadColumnEnumCache.set(columnName, null);
+      return null;
+    }
+
+    const enumRows = await this.leadsRepository.query(
+      `
+        SELECT e.enumlabel
+        FROM pg_type t
+        INNER JOIN pg_namespace n ON n.oid = t.typnamespace
+        INNER JOIN pg_enum e ON e.enumtypid = t.oid
+        WHERE n.nspname = 'public'
+          AND t.typname = $1
+        ORDER BY e.enumsortorder
+      `,
+      [metadata.udt_name],
+    );
+
+    const values = new Set<string>(
+      (enumRows || [])
+        .map((row: { enumlabel?: string }) => (row.enumlabel || '').toString().trim().toLowerCase())
+        .filter((value: string) => value.length > 0),
+    );
+
+    const resolved = values.size > 0 ? values : null;
+    this.leadColumnEnumCache.set(columnName, resolved);
+    return resolved;
+  }
+
+  private normalizarStatusLead(status?: string | null): StatusLead {
+    const normalized = (status || '').toString().trim().toLowerCase();
+    switch (normalized) {
+      case StatusLead.NOVO:
+      case 'novo':
+        return StatusLead.NOVO;
+      case StatusLead.CONTATADO:
+      case 'contatado':
+        return StatusLead.CONTATADO;
+      case StatusLead.QUALIFICADO:
+      case 'qualificado':
+        return StatusLead.QUALIFICADO;
+      case StatusLead.CONVERTIDO:
+      case 'convertido':
+        return StatusLead.CONVERTIDO;
+      case StatusLead.DESQUALIFICADO:
+      case 'desqualificado':
+      case 'perdido':
+        return StatusLead.DESQUALIFICADO;
+      default:
+        return StatusLead.NOVO;
+    }
+  }
+
+  private async mapearStatusLeadParaBanco(status?: string | null): Promise<string> {
+    const normalized = this.normalizarStatusLead(status);
+    const enumValues = await this.getLeadColumnEnumValues('status');
+
+    if (!enumValues) {
+      return normalized;
+    }
+
+    if (enumValues.has(normalized)) {
+      return normalized;
+    }
+
+    if (normalized === StatusLead.DESQUALIFICADO && enumValues.has('perdido')) {
+      return 'perdido';
+    }
+
+    if (enumValues.has(StatusLead.NOVO)) {
+      return StatusLead.NOVO;
+    }
+
+    return Array.from(enumValues.values())[0] || normalized;
+  }
+
+  private normalizarOrigemLead(origem?: string): OrigemLead {
+    if (!origem) {
+      return OrigemLead.MANUAL;
+    }
+
+    const normalized = origem.trim().toLowerCase();
+    if (!normalized) {
+      return OrigemLead.MANUAL;
+    }
+
+    if (Object.values(OrigemLead).includes(normalized as OrigemLead)) {
+      return normalized as OrigemLead;
+    }
+
+    switch (normalized) {
+      case 'site':
+      case 'website':
+      case 'landing_page':
+      case 'landing-page':
+      case 'landing':
+        return OrigemLead.FORMULARIO;
+      case 'csv':
+      case 'campanha':
+      case 'publicidade':
+      case 'ads':
+        return OrigemLead.IMPORTACAO;
+      case 'telefone':
+      case 'email':
+        return OrigemLead.MANUAL;
+      case 'redes_sociais':
+      case 'midia_social':
+      case 'social':
+      case 'social_media':
+      case 'chat':
+      case 'webchat':
+      case 'instagram':
+      case 'facebook':
+      case 'linkedin':
+        return OrigemLead.WHATSAPP;
+      case 'parceiro':
+        return OrigemLead.INDICACAO;
+      case 'evento':
+      case 'outros':
+      case 'unknown':
+        return OrigemLead.OUTRO;
+      default:
+        return OrigemLead.OUTRO;
+    }
+  }
+
+  private async mapearOrigemLeadParaBanco(origem?: string): Promise<string> {
+    const normalized = this.normalizarOrigemLead(origem);
+    const enumValues = await this.getLeadColumnEnumValues('origem');
+
+    if (!enumValues) {
+      return normalized;
+    }
+
+    if (enumValues.has(normalized)) {
+      return normalized;
+    }
+
+    const candidatesByOrigin: Record<OrigemLead, string[]> = {
+      [OrigemLead.FORMULARIO]: ['formulario', 'site', 'website', 'outros'],
+      [OrigemLead.IMPORTACAO]: ['importacao', 'campanha', 'outros'],
+      [OrigemLead.API]: ['api', 'outros'],
+      [OrigemLead.WHATSAPP]: ['whatsapp', 'chat', 'redes_sociais', 'outros'],
+      [OrigemLead.MANUAL]: ['manual', 'outros'],
+      [OrigemLead.INDICACAO]: ['indicacao', 'outros'],
+      [OrigemLead.OUTRO]: ['outro', 'outros'],
+    };
+
+    for (const candidate of candidatesByOrigin[normalized] || []) {
+      if (enumValues.has(candidate)) {
+        return candidate;
+      }
+    }
+
+    return Array.from(enumValues.values())[0] || normalized;
+  }
+
+  private normalizarLeadDoBanco(lead: Lead): Lead {
+    const normalizedStatus = this.normalizarStatusLead(lead.status as unknown as string);
+    const normalizedOrigem = lead.origem
+      ? this.normalizarOrigemLead(lead.origem as unknown as string)
+      : undefined;
+
+    return {
+      ...lead,
+      status: normalizedStatus,
+      origem: normalizedOrigem,
+    } as Lead;
+  }
+
+  private mapearOrigemLeadParaOportunidade(origem?: string): OrigemOportunidade {
+    switch (this.normalizarOrigemLead(origem)) {
       case OrigemLead.FORMULARIO:
         return OrigemOportunidade.WEBSITE;
       case OrigemLead.IMPORTACAO:
@@ -178,28 +363,8 @@ export class LeadsService {
       case OrigemLead.INDICACAO:
         return OrigemOportunidade.INDICACAO;
       case OrigemLead.OUTRO:
-        return OrigemOportunidade.PARCEIRO;
-      case 'website':
-        return OrigemOportunidade.WEBSITE;
-      case 'indicacao':
-        return OrigemOportunidade.INDICACAO;
-      case 'evento':
-        return OrigemOportunidade.EVENTO;
-      case 'telefone':
-        return OrigemOportunidade.TELEFONE;
-      case 'email':
-        return OrigemOportunidade.EMAIL;
-      case 'redes_sociais':
-      case 'midia_social':
-        return OrigemOportunidade.REDES_SOCIAIS;
-      case 'campanha':
-      case 'publicidade':
-        return OrigemOportunidade.CAMPANHA;
-      case 'parceiro':
-      case 'outro':
-        return OrigemOportunidade.PARCEIRO;
       default:
-        return OrigemOportunidade.WEBSITE;
+        return OrigemOportunidade.PARCEIRO;
     }
   }
 
@@ -346,12 +511,14 @@ export class LeadsService {
 
       const sanitizedDto = this.sanitizeLeadInput(dto);
       this.logger.debug(`[LeadsService.create] payload=${JSON.stringify(this.buildLeadPayloadLogMeta(sanitizedDto))}`);
+      const origemBanco = await this.mapearOrigemLeadParaBanco(sanitizedDto.origem as string);
+      const statusBanco = await this.mapearStatusLeadParaBanco(sanitizedDto.status as string);
 
       const lead = this.leadsRepository.create({
         ...sanitizedDto,
         empresaId,
-        status: sanitizedDto.status || StatusLead.NOVO,
-        origem: (this.mapearOrigemParaBanco(sanitizedDto.origem as string) || 'website') as OrigemLead,
+        status: statusBanco as any,
+        origem: origemBanco as any,
       });
       this.logger.debug(`[LeadsService.create] lead-before-save=${JSON.stringify(this.buildLeadEntityLogMeta(lead))}`);
 
@@ -396,12 +563,21 @@ export class LeadsService {
 
       // Filtros
       if (filtros?.status) {
-        query.andWhere('lead.status = :status', { status: filtros.status });
+        const statusFiltro = filtros.status.toString().trim().toLowerCase();
+        if (statusFiltro === 'operacionais' || statusFiltro === 'abertos') {
+          query.andWhere('lead.status <> :statusConvertidoFiltro', {
+            statusConvertidoFiltro: await this.mapearStatusLeadParaBanco(StatusLead.CONVERTIDO),
+          });
+        } else {
+          query.andWhere('lead.status = :status', {
+            status: await this.mapearStatusLeadParaBanco(statusFiltro),
+          });
+        }
       }
 
       if (filtros?.origem) {
         query.andWhere('lead.origem = :origem', {
-          origem: this.mapearOrigemParaBanco(filtros.origem as string),
+          origem: await this.mapearOrigemLeadParaBanco(filtros.origem as string),
         });
       }
 
@@ -428,13 +604,48 @@ export class LeadsService {
 
       // Aplicar paginação
       query.skip(skip).take(limit);
-      query.orderBy('lead.created_at', 'DESC');
+
+      const statusQualificado = await this.mapearStatusLeadParaBanco(StatusLead.QUALIFICADO);
+      const statusContatado = await this.mapearStatusLeadParaBanco(StatusLead.CONTATADO);
+      const statusNovo = await this.mapearStatusLeadParaBanco(StatusLead.NOVO);
+      const statusDesqualificado = await this.mapearStatusLeadParaBanco(
+        StatusLead.DESQUALIFICADO,
+      );
+      const statusConvertido = await this.mapearStatusLeadParaBanco(StatusLead.CONVERTIDO);
+
+      query
+        .addSelect(
+          `
+            CASE
+              WHEN lead.status = :statusQualificado THEN 0
+              WHEN lead.status = :statusContatado THEN 1
+              WHEN lead.status = :statusNovo THEN 2
+              WHEN lead.status = :statusDesqualificado THEN 3
+              WHEN lead.status = :statusConvertido THEN 4
+              ELSE 5
+            END
+          `,
+          'lead_status_prioridade',
+        )
+        .orderBy('lead.responsavel_id', 'ASC', 'NULLS FIRST')
+        .addOrderBy('lead_status_prioridade', 'ASC')
+        .addOrderBy('lead.score', 'DESC')
+        .addOrderBy('lead.updated_at', 'DESC')
+        .addOrderBy('lead.created_at', 'DESC')
+        .setParameters({
+          statusQualificado,
+          statusContatado,
+          statusNovo,
+          statusDesqualificado,
+          statusConvertido,
+        });
 
       const [leads, total] = await query.getManyAndCount();
-      this.logger.debug(`[LeadsService.findAll] resultado=${JSON.stringify({ total, page, limit, totalPages: Math.ceil(total / limit), retornados: leads.length, ids: leads.map((l) => l.id) })}`);
+      const leadsNormalizados = leads.map((lead) => this.normalizarLeadDoBanco(lead));
+      this.logger.debug(`[LeadsService.findAll] resultado=${JSON.stringify({ total, page, limit, totalPages: Math.ceil(total / limit), retornados: leadsNormalizados.length, ids: leadsNormalizados.map((l) => l.id) })}`);
 
       return {
-        data: leads,
+        data: leadsNormalizados,
         total,
         page,
         limit,
@@ -448,7 +659,7 @@ export class LeadsService {
   /**
    * Buscar lead por ID
    */
-  async findOne(id: string, empresaId: string): Promise<Lead> {
+  async findOne(id: string, empresaId: string, normalizeResponse: boolean = true): Promise<Lead> {
     try {
       const lead = await this.leadsRepository.findOne({
         where: {
@@ -462,7 +673,7 @@ export class LeadsService {
         throw new NotFoundException(`Lead com ID ${id} não encontrado`);
       }
 
-      return lead;
+      return normalizeResponse ? this.normalizarLeadDoBanco(lead) : lead;
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
@@ -477,9 +688,19 @@ export class LeadsService {
    */
   async update(id: string, dto: UpdateLeadDto, empresaId: string): Promise<Lead> {
     try {
-      const lead = await this.findOne(id, empresaId);
+      const lead = await this.findOne(id, empresaId, false);
 
       const sanitizedDto = this.sanitizeLeadInput(dto);
+      if (sanitizedDto.status !== undefined) {
+        sanitizedDto.status = (await this.mapearStatusLeadParaBanco(
+          sanitizedDto.status as string,
+        )) as any;
+      }
+      if (sanitizedDto.origem !== undefined) {
+        sanitizedDto.origem = (await this.mapearOrigemLeadParaBanco(
+          sanitizedDto.origem as string,
+        )) as any;
+      }
       Object.assign(lead, sanitizedDto);
 
       // Recalcular score se campos relevantes mudaram
@@ -508,7 +729,7 @@ export class LeadsService {
    */
   async remove(id: string, empresaId: string): Promise<void> {
     try {
-      const lead = await this.findOne(id, empresaId);
+      const lead = await this.findOne(id, empresaId, false);
 
       if (lead.status === StatusLead.CONVERTIDO) {
         throw new BadRequestException('Não é possível deletar um lead já convertido');
@@ -531,9 +752,10 @@ export class LeadsService {
     leadId: string,
     dto: ConvertLeadDto,
     empresaId: string,
+    actorUserId?: string,
   ): Promise<Oportunidade> {
     try {
-      const lead = await this.findOne(leadId, empresaId);
+      const lead = await this.findOne(leadId, empresaId, false);
 
       if (lead.status === StatusLead.CONVERTIDO) {
         throw new BadRequestException('Lead já foi convertido anteriormente');
@@ -560,6 +782,16 @@ export class LeadsService {
           : dto.valor_estimado !== undefined && dto.valor_estimado !== null
             ? dto.valor_estimado
             : 0;
+      const responsavelConversao =
+        this.normalizeIdentifier((dto as any).responsavel_id) ||
+        this.normalizeIdentifier(lead.responsavel_id) ||
+        this.normalizeIdentifier(actorUserId);
+
+      if (!responsavelConversao) {
+        throw new BadRequestException(
+          'Nao foi possivel converter o lead sem usuario responsavel definido.',
+        );
+      }
 
       // Criar oportunidade usando OportunidadesService (schema-aware e compativel com bancos legados)
       const savedOportunidade = await this.oportunidadesService.create(
@@ -572,8 +804,8 @@ export class LeadsService {
             (dto.estagio as EstagioOportunidade) || EstagioOportunidade.LEADS,
           ),
           prioridade: PrioridadeOportunidade.MEDIA,
-          origem: this.mapearOrigemParaBanco(lead.origem),
-          responsavel_id: lead.responsavel_id as any,
+          origem: this.mapearOrigemLeadParaOportunidade(lead.origem),
+          responsavel_id: responsavelConversao as any,
           nomeContato: lead.nome,
           emailContato: lead.email,
           telefoneContato: lead.telefone,
@@ -584,6 +816,7 @@ export class LeadsService {
       );
 
       // Atualizar lead
+      lead.responsavel_id = lead.responsavel_id || responsavelConversao;
       lead.status = StatusLead.CONVERTIDO;
       lead.oportunidade_id = savedOportunidade.id.toString();
       lead.convertido_em = new Date();
@@ -719,6 +952,8 @@ export class LeadsService {
 
       const rows = parseResult.data;
       result.total = rows.length;
+      const statusNovoBanco = await this.mapearStatusLeadParaBanco(StatusLead.NOVO);
+      const origemImportacaoBanco = await this.mapearOrigemLeadParaBanco(OrigemLead.IMPORTACAO);
 
       // Processar cada linha
       for (let i = 0; i < rows.length; i++) {
@@ -732,13 +967,9 @@ export class LeadsService {
           }
 
           // Validar origem se fornecida
-          let origem = OrigemLead.IMPORTACAO;
-          if (row.origem) {
-            const origemUpper = row.origem.toUpperCase();
-            if (Object.values(OrigemLead).includes(origemUpper as OrigemLead)) {
-              origem = origemUpper as OrigemLead;
-            }
-          }
+          const origem = row.origem
+            ? await this.mapearOrigemLeadParaBanco(row.origem)
+            : origemImportacaoBanco;
 
           // Buscar responsável por email se fornecido
           let responsavel_id: string | undefined;
@@ -760,11 +991,11 @@ export class LeadsService {
             email: row.email?.trim() || undefined,
             telefone: row.telefone?.trim() || undefined,
             empresa_nome: row.empresa_nome?.trim() || undefined,
-            origem,
+            origem: origem as any,
             observacoes: row.observacoes?.trim() || undefined,
             responsavel_id,
             empresaId,
-            status: StatusLead.NOVO,
+            status: statusNovoBanco as any,
           });
 
           // Calcular score
