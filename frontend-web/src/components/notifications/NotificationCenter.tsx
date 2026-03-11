@@ -301,7 +301,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
           aria-labelledby={panelTitleId}
           tabIndex={-1}
           onKeyDown={handlePanelKeyDown}
-          className="absolute right-0 bottom-full z-50 mb-2 flex max-h-[600px] w-[calc(100vw-1rem)] flex-col rounded-2xl border border-[#D7E4E8] bg-white shadow-lg sm:bottom-auto sm:top-full sm:mb-0 sm:mt-2 sm:w-96"
+          className="fixed left-2 right-2 top-[calc(env(safe-area-inset-top,0px)+86px)] z-50 flex max-h-[min(72vh,600px)] flex-col rounded-2xl border border-[#D7E4E8] bg-white shadow-lg sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96 sm:max-h-[600px]"
         >
           <div className="border-b border-[#E5EEF2] p-4">
             <div className="mb-3 flex items-center justify-between">
