@@ -33,14 +33,14 @@ Legenda:
 | CRM-010 | Concluido | Perfil do cliente agora exibe resumo de faturas (total/pagas/pendentes/vencidas), ultimo registro e lista das ultimas faturas com acesso rapido ao financeiro. |
 | CRM-011 | Concluido | Perfil do cliente agora consome contexto omnichannel (segmento, estatisticas e historico recente) reaproveitando endpoints de atendimento. |
 | CRM-012 | Concluido | Perfil do cliente agora abre tickets, propostas, contratos e faturamento com query params de cliente (`clienteId`/`cliente`) e as paginas destino aplicam pre-filtro automaticamente. |
-| CRM-013 | Parcial | Ha base de endpoint/estrutura para contato, mas sem fluxo operacional completo de ultimo e proximo contato na tela principal. |
+| CRM-013 | Concluido | Ultimo e proximo contato agora estao persistidos, exibidos no perfil e utilizados na listagem (cards e tabela), com fluxo operacional completo de follow-up. |
 | CRM-014 | Concluido | Listagem/exportacao de clientes agora aceitam `followup` (`pendente`/`vencido`) com filtro operacional por `proximo_contato`, incluindo UI, URL e views salvas. |
 | CRM-015 | Concluido | Tags agora persistem no backend (create/update), aparecem no cadastro/perfil e podem ser filtradas na listagem/exportacao com estado completo na UI. |
-| CRM-016 | Nao iniciado | Origem e responsavel comercial nao estao implementados de forma operacional completa no modulo. |
-| CRM-017 | Parcial | Ha KPIs basicos de clientes, mas faltam indicadores de follow-up e carteira comercial completa. |
-| CRM-018 | Nao iniciado | Nao ha evidencia de suite de contrato dedicada entre frontend e backend para o modulo de clientes. |
-| CRM-019 | Nao iniciado | Nao ha evidencia de cobertura funcional minima consolidada para listagem/perfil e integracoes principais. |
-| CRM-020 | Nao iniciado | Checklist de QA dedicado ao modulo de clientes ainda nao foi formalizado. |
+| CRM-016 | Concluido | Origem e responsavel comercial agora persistem no backend, aparecem no cadastro e podem ser filtrados na listagem/exportacao. |
+| CRM-017 | Concluido | Dashboard de clientes agora destaca KPIs de follow-up (pendente/vencido) e carteira comercial (com/sem responsavel), com escopo Global e Filtrado explicito. |
+| CRM-018 | Concluido | Suite de contrato dedicada criada com artefato explicito (`docs/features/contracts/clientes.contract.json`) e testes automatizados de create/update/read no backend e frontend. |
+| CRM-019 | Concluido | Suite funcional minima criada no backend para listagem, cadastro, edicao, abertura de perfil e integracao principal do perfil (resumo de tickets). |
+| CRM-020 | Concluido | Checklist de QA do modulo formalizado em `docs/features/CRM-020_CHECKLIST_QA_CLIENTES_360_2026-03.md`, cobrindo validacao manual de listagem, cadastro, perfil e integracoes. |
 
 ## Prioridades
 

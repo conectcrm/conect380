@@ -39,6 +39,9 @@ interface ClienteModalData {
   estado?: string;
   observacoes?: string;
   tags?: string[];
+  origem?: string | null;
+  responsavel_id?: string | null;
+  responsavelId?: string | null;
   ultimo_contato?: string | null;
   proximo_contato?: string | null;
 }
@@ -58,6 +61,8 @@ interface ClienteFormData {
   cidade?: string;
   estado?: string;
   tags?: string;
+  origem?: string;
+  responsavel_id?: string;
   observacoes?: string;
   ultimo_contato?: string;
   proximo_contato?: string;
@@ -362,6 +367,8 @@ const defaultValues: ClienteFormData = {
   cidade: '',
   estado: '',
   tags: '',
+  origem: '',
+  responsavel_id: '',
   observacoes: '',
   ultimo_contato: '',
   proximo_contato: '',
@@ -527,6 +534,8 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
         cidade: cliente.cidade || '',
         estado: cliente.estado || '',
         tags: cliente.tags?.join(', ') || '',
+        origem: cliente.origem || '',
+        responsavel_id: cliente.responsavel_id || cliente.responsavelId || '',
         observacoes: cliente.observacoes || '',
         ultimo_contato: cliente.ultimo_contato ? cliente.ultimo_contato.slice(0, 10) : '',
         proximo_contato: cliente.proximo_contato ? cliente.proximo_contato.slice(0, 10) : '',
@@ -612,6 +621,8 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
           .split(',')
           .map((tag) => tag.trim())
           .filter(Boolean),
+        origem: data.origem?.trim() || undefined,
+        responsavel_id: data.responsavel_id?.trim() || undefined,
         observacoes: data.observacoes?.trim() || '',
         ultimo_contato: data.ultimo_contato ? new Date(data.ultimo_contato).toISOString() : null,
         proximo_contato: data.proximo_contato ? new Date(data.proximo_contato).toISOString() : null,
@@ -966,6 +977,32 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                 </div>
 
                 <div className="space-y-3 rounded-lg border border-[#DCE8EC] bg-white p-3">
+                  <h4 className="text-sm font-semibold text-[#244455]">Comercial</h4>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Origem</label>
+                      <input
+                        {...register('origem')}
+                        type="text"
+                        className={inputClass}
+                        placeholder="Ex.: Indicacao, Meta Ads, WhatsApp"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Responsavel comercial (ID)
+                      </label>
+                      <input
+                        {...register('responsavel_id')}
+                        type="text"
+                        className={inputClass}
+                        placeholder="UUID do responsavel"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3 rounded-lg border border-[#DCE8EC] bg-white p-3">
                   <h4 className="text-sm font-semibold text-[#244455]">Observacoes internas</h4>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1002,7 +1039,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
             <div className="sticky bottom-0 border-t border-gray-200 bg-gray-50 px-1 py-4">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-sm text-gray-500 text-center sm:text-left">
-                  Campos permitidos no fluxo atual: identificacao, contato, endereco, tags, follow-up e observacoes.
+                  Campos permitidos no fluxo atual: identificacao, contato, endereco, follow-up, comercial, tags e observacoes.
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">

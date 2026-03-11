@@ -84,6 +84,9 @@ Usar este checklist em qualquer uma destas situacoes:
 ## Fase 6: Filtros e busca
 
 - [ ] Busca principal tem placeholder claro e icone.
+- [ ] Digitacao da busca filtra localmente os dados ja carregados.
+- [ ] Nao existe chamada HTTP por tecla digitada (`onChange` sem refresh da listagem).
+- [ ] Carregamento remoto ocorre apenas para filtros estruturais, paginacao, ordenacao ou refresh explicito.
 - [ ] Filtros usam o mesmo padrao visual de inputs/selects.
 - [ ] Botao de limpar filtros (ou fluxo equivalente) existe quando necessario.
 - [ ] Filtros ativos sao visiveis via chips/resumo quando ha multiplos criterios.
@@ -164,4 +167,3 @@ Uma tela padronizada deve:
 - evitar duplicidade visual
 - manter usabilidade em desktop e mobile
 - compilar sem regressao
-

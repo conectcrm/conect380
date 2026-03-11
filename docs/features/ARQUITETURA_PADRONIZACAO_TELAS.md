@@ -197,6 +197,25 @@ Requisitos:
 - acao "Limpar" e/ou "Salvar view" quando existir fluxo de filtros complexos
 - chips de filtros ativos quando houver mais de 1 criterio
 
+### Requisito obrigatorio de busca incremental (sem refresh por tecla)
+
+Para qualquer nova tela com busca digitavel (lista, tabela, picker de modal):
+
+- a digitacao deve filtrar localmente os dados ja carregados em memoria
+- e proibido disparar chamada HTTP a cada tecla digitada (`onChange`)
+- recarga de backend deve ocorrer apenas em eventos estruturais:
+  - mudanca de pagina
+  - mudanca de ordenacao
+  - mudanca de filtros de backend (status/tipo/categoria etc.)
+  - acao explicita de atualizar
+- quando houver termo de busca, a contagem e a renderizacao devem usar a colecao local filtrada
+- padrao tecnico recomendado: `normalizeSearchValue` + `matchesLocalSearchTerm` em `frontend-web/src/utils/localSearch.ts`
+
+Excecao controlada:
+
+- quando o volume nao puder ser carregado em memoria, usar busca remota com debounce + estado visual de "buscando"
+- mesmo nessa excecao, nao recarregar a tela inteira nem quebrar a experiencia de digitacao
+
 ### Bloco 3: Estados da pagina
 
 Obrigatorio:

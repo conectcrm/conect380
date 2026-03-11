@@ -44,7 +44,7 @@ import {
   PageHeader,
   SectionCard,
 } from '../../components/layout-v2';
-import ActiveEmpresaBadge from '../../components/tenant/ActiveEmpresaBadge';
+import { matchesLocalSearchTerm, normalizeSearchValue } from '../../utils/localSearch';
 
 const CLIENTE_STATUS_OPTIONS: Array<{ value: Cliente['status']; label: string }> = [
   { value: 'lead', label: 'Lead' },
@@ -81,18 +81,8 @@ const formatDocumento = (documento?: string, tipo?: Cliente['tipo']): string => 
   return documento;
 };
 
-const formatDateShort = (value?: string | null): string => {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-  return date.toLocaleDateString('pt-BR');
-};
-
 const CLIENTES_PAGE_STATE_STORAGE_KEY = 'conectcrm_clientes_page_state_v1';
 const CLIENTES_SAVED_VIEWS_STORAGE_KEY = 'conectcrm_clientes_saved_views_v1';
-const CLIENTES_SEARCH_DEBOUNCE_MS = 500;
-const CLIENTES_SEARCH_MIN_CHARS = 2;
-
 type ClientesViewMode = 'cards' | 'table';
 
 type SavedClientesView = {
@@ -240,21 +230,14 @@ const ClientesPage: React.FC = () => {
     search: persistedStateRef.current.searchTerm ?? '',
     status: persistedStateRef.current.status ?? '',
     tipo: persistedStateRef.current.tipo ?? '',
-    tag: persistedStateRef.current.tag ?? '',
-    followup: persistedStateRef.current.followup ?? '',
+    tag: '',
+    followup: '',
     sortBy: persistedStateRef.current.sortBy ?? 'created_at',
     sortOrder: persistedStateRef.current.sortOrder ?? 'DESC',
   }));
   const [searchTerm, setSearchTerm] = useState(persistedStateRef.current.searchTerm ?? '');
   const [selectedStatus, setSelectedStatus] = useState(persistedStateRef.current.status ?? '');
   const [selectedTipo, setSelectedTipo] = useState(persistedStateRef.current.tipo ?? '');
-  const [selectedTag, setSelectedTag] = useState(persistedStateRef.current.tag ?? '');
-  const [selectedFollowup, setSelectedFollowup] = useState<'' | 'pendente' | 'vencido'>(
-    persistedStateRef.current.followup === 'pendente' ||
-      persistedStateRef.current.followup === 'vencido'
-      ? persistedStateRef.current.followup
-      : '',
-  );
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -390,7 +373,7 @@ const ClientesPage: React.FC = () => {
         ...filters,
         page: filters.page ?? 1,
         limit: filters.limit ?? 10,
-        search: filters.search ?? '',
+        search: '',
         status: filters.status ?? '',
         tipo: filters.tipo ?? '',
         sortBy: filters.sortBy ?? 'created_at',
@@ -469,51 +452,40 @@ const ClientesPage: React.FC = () => {
     [filters, loadEstatisticas, calcularEstatisticasLocais],
   );
 
-  // Aplicar filtros com debounce para busca
+  // Aplicar filtros de backend (status/tipo) sem depender da digitacao da busca
   useEffect(() => {
-    // Pular execucao na primeira montagem (valores iniciais vazios)
     if (isFirstMount.current) {
       isFirstMount.current = false;
       return;
     }
 
-    const delayDebounce = setTimeout(() => {
-      setFilters((prev) => {
-        const currentPage = prev.page ?? 1;
-        const normalizedSearch = searchTerm.trim();
-        const shouldApplySearch =
-          normalizedSearch.length === 0 || normalizedSearch.length >= CLIENTES_SEARCH_MIN_CHARS;
-        const nextSearch = shouldApplySearch ? normalizedSearch : (prev.search ?? '');
-        const nextStatus = selectedStatus;
-        const nextTipo = selectedTipo;
-        const nextTag = selectedTag.trim();
-        const nextFollowup = selectedFollowup;
+    setFilters((prev) => {
+      const currentPage = prev.page ?? 1;
+      const nextStatus = selectedStatus;
+      const nextTipo = selectedTipo;
 
-        if (
-          (prev.search ?? '') === nextSearch &&
-          (prev.status ?? '') === nextStatus &&
-          (prev.tipo ?? '') === nextTipo &&
-          (prev.tag ?? '') === nextTag &&
-          (prev.followup ?? '') === nextFollowup &&
-          currentPage === 1
-        ) {
-          return prev;
-        }
+      if (
+        (prev.search ?? '') === '' &&
+        (prev.status ?? '') === nextStatus &&
+        (prev.tipo ?? '') === nextTipo &&
+        (prev.tag ?? '') === '' &&
+        (prev.followup ?? '') === '' &&
+        currentPage === 1
+      ) {
+        return prev;
+      }
 
-        return {
-          ...prev,
-          search: nextSearch,
-          status: nextStatus,
-          tipo: nextTipo,
-          tag: nextTag,
-          followup: nextFollowup,
-          page: 1, // Reset para primeira pagina quando filtros mudam
-        };
-      });
-    }, CLIENTES_SEARCH_DEBOUNCE_MS);
-
-    return () => clearTimeout(delayDebounce);
-  }, [searchTerm, selectedStatus, selectedTipo, selectedTag, selectedFollowup]);
+      return {
+        ...prev,
+        search: '',
+        status: nextStatus,
+        tipo: nextTipo,
+        tag: '',
+        followup: '',
+        page: 1,
+      };
+    });
+  }, [selectedStatus, selectedTipo]);
 
   useEffect(() => {
     if (hasHydratedQueryRef.current) {
@@ -525,8 +497,6 @@ const ClientesPage: React.FC = () => {
     const querySearch = searchParams.get('q');
     const queryStatus = searchParams.get('status');
     const queryTipo = searchParams.get('tipo');
-    const queryTag = searchParams.get('tag');
-    const queryFollowup = searchParams.get('followup');
     const queryView = searchParams.get('view');
     const queryPage = Number(searchParams.get('page') || '');
     const queryLimit = Number(searchParams.get('limit') || '');
@@ -538,8 +508,6 @@ const ClientesPage: React.FC = () => {
       querySearch,
       queryStatus,
       queryTipo,
-      queryTag,
-      queryFollowup,
       queryView,
       searchParams.get('page'),
       searchParams.get('limit'),
@@ -564,16 +532,6 @@ const ClientesPage: React.FC = () => {
       setSelectedTipo(queryTipo);
     }
 
-    if (queryTag !== null) {
-      setSelectedTag(queryTag);
-    }
-
-    if (queryFollowup === 'pendente' || queryFollowup === 'vencido') {
-      setSelectedFollowup(queryFollowup);
-    } else if (queryFollowup !== null) {
-      setSelectedFollowup('');
-    }
-
     if (queryView === 'cards' || queryView === 'table') {
       setViewMode(queryView);
     }
@@ -586,14 +544,9 @@ const ClientesPage: React.FC = () => {
       const nextPage = Number.isFinite(queryPage) && queryPage > 0 ? queryPage : (prev.page ?? 1);
       const nextLimit =
         Number.isFinite(queryLimit) && queryLimit > 0 ? queryLimit : (prev.limit ?? 10);
-      const nextSearch = querySearch ?? prev.search ?? '';
+      const nextSearch = '';
       const nextStatus = queryStatus ?? prev.status ?? '';
       const nextTipo = queryTipo ?? prev.tipo ?? '';
-      const nextTag = queryTag ?? prev.tag ?? '';
-      const nextFollowup =
-        queryFollowup === 'pendente' || queryFollowup === 'vencido'
-          ? queryFollowup
-          : (prev.followup ?? '');
       const nextSortBy = querySortBy ?? prev.sortBy ?? 'created_at';
       const nextSortOrder =
         querySortOrder === 'ASC' || querySortOrder === 'DESC'
@@ -606,8 +559,8 @@ const ClientesPage: React.FC = () => {
         (prev.search ?? '') === nextSearch &&
         (prev.status ?? '') === nextStatus &&
         (prev.tipo ?? '') === nextTipo &&
-        (prev.tag ?? '') === nextTag &&
-        (prev.followup ?? '') === nextFollowup &&
+        (prev.tag ?? '') === '' &&
+        (prev.followup ?? '') === '' &&
         (prev.sortBy ?? 'created_at') === nextSortBy &&
         (prev.sortOrder ?? 'DESC') === nextSortOrder
       ) {
@@ -621,8 +574,8 @@ const ClientesPage: React.FC = () => {
         search: nextSearch,
         status: nextStatus,
         tipo: nextTipo,
-        tag: nextTag,
-        followup: nextFollowup,
+        tag: '',
+        followup: '',
         sortBy: nextSortBy,
         sortOrder: nextSortOrder,
       };
@@ -638,8 +591,8 @@ const ClientesPage: React.FC = () => {
       searchTerm,
       status: selectedStatus,
       tipo: selectedTipo,
-      tag: selectedTag,
-      followup: selectedFollowup,
+      tag: '',
+      followup: '',
       viewMode,
       page: filters.page ?? 1,
       limit: filters.limit ?? 10,
@@ -658,8 +611,6 @@ const ClientesPage: React.FC = () => {
     searchTerm,
     selectedStatus,
     selectedTipo,
-    selectedTag,
-    selectedFollowup,
     viewMode,
   ]);
 
@@ -675,7 +626,7 @@ const ClientesPage: React.FC = () => {
 
   useEffect(() => {
     const nextParams = new URLSearchParams(searchParamsSerialized);
-    const normalizedSearch = (filters.search ?? '').trim();
+    const normalizedSearch = searchTerm.trim();
 
     const setOrDelete = (key: string, value: string | null | undefined, keepWhenValue = true) => {
       if (!value || !keepWhenValue) {
@@ -689,8 +640,6 @@ const ClientesPage: React.FC = () => {
     setOrDelete('q', normalizedSearch);
     setOrDelete('status', selectedStatus);
     setOrDelete('tipo', selectedTipo);
-    setOrDelete('tag', selectedTag.trim());
-    setOrDelete('followup', selectedFollowup);
     setOrDelete('view', viewMode === 'table' ? null : viewMode);
     setOrDelete('page', String(filters.page ?? 1), (filters.page ?? 1) > 1);
     setOrDelete('limit', String(filters.limit ?? 10), (filters.limit ?? 10) !== 10);
@@ -713,14 +662,12 @@ const ClientesPage: React.FC = () => {
     activeViewId,
     filters.limit,
     filters.page,
-    filters.search,
     filters.sortBy,
     filters.sortOrder,
+    searchTerm,
     searchParamsSerialized,
     selectedStatus,
     selectedTipo,
-    selectedTag,
-    selectedFollowup,
     setSearchParams,
     viewMode,
   ]);
@@ -730,7 +677,7 @@ const ClientesPage: React.FC = () => {
     setSelectAllFiltered(false);
     setExcludedClientes([]);
   }, [
-    filters.search,
+    searchTerm,
     filters.status,
     filters.tipo,
     filters.tag,
@@ -927,20 +874,10 @@ const ClientesPage: React.FC = () => {
     setSelectedTipo(tipo);
   };
 
-  const handleTagChange = (tag: string) => {
-    setSelectedTag(tag);
-  };
-
-  const handleFollowupChange = (followup: '' | 'pendente' | 'vencido') => {
-    setSelectedFollowup(followup);
-  };
-
   const handleClearFilters = () => {
     setSearchTerm('');
     setSelectedStatus('');
     setSelectedTipo('');
-    setSelectedTag('');
-    setSelectedFollowup('');
     setActiveViewId('');
   };
 
@@ -961,12 +898,31 @@ const ClientesPage: React.FC = () => {
     }));
   };
 
+  const normalizedSearchTerm = normalizeSearchValue(searchTerm);
+  const clientesFiltrados = useMemo(() => {
+    if (!normalizedSearchTerm) {
+      return clientes;
+    }
+
+    return clientes.filter((cliente) => {
+      return matchesLocalSearchTerm(normalizedSearchTerm, [
+        cliente.nome,
+        cliente.documento,
+        cliente.email,
+        cliente.telefone,
+        cliente.empresa,
+      ]);
+    });
+  }, [clientes, normalizedSearchTerm]);
+
   const visibleClienteIds = useMemo(
-    () => clientes.map((cliente) => cliente.id).filter((id): id is string => Boolean(id)),
-    [clientes],
+    () => clientesFiltrados.map((cliente) => cliente.id).filter((id): id is string => Boolean(id)),
+    [clientesFiltrados],
   );
 
-  const totalRegistros = clientesData?.total ?? clientes.length;
+  const totalRegistros = normalizedSearchTerm
+    ? clientesFiltrados.length
+    : (clientesData?.total ?? clientes.length);
   const selectedCount = useMemo(() => {
     if (selectAllFiltered) {
       return Math.max(totalRegistros - excludedClientes.length, 0);
@@ -976,7 +932,7 @@ const ClientesPage: React.FC = () => {
   }, [excludedClientes.length, selectAllFiltered, selectedClientes.length, totalRegistros]);
 
   const hasBulkSelection = selectedCount > 0;
-  const canSelectAcrossPages = totalRegistros > visibleClienteIds.length;
+  const canSelectAcrossPages = !normalizedSearchTerm && totalRegistros > visibleClienteIds.length;
   const areAllVisibleSelected =
     visibleClienteIds.length > 0 &&
     visibleClienteIds.every((id) =>
@@ -1184,18 +1140,16 @@ const ClientesPage: React.FC = () => {
     setSearchTerm(selectedView.searchTerm);
     setSelectedStatus(selectedView.status);
     setSelectedTipo(selectedView.tipo);
-    setSelectedTag(selectedView.tag);
-    setSelectedFollowup(selectedView.followup);
     setViewMode(selectedView.viewMode);
     setFilters((prev) => ({
       ...prev,
       page: 1,
       limit: selectedView.limit,
-      search: selectedView.searchTerm,
+      search: '',
       status: selectedView.status,
       tipo: selectedView.tipo,
-      tag: selectedView.tag,
-      followup: selectedView.followup,
+      tag: '',
+      followup: '',
       sortBy: selectedView.sortBy,
       sortOrder: selectedView.sortOrder,
     }));
@@ -1268,8 +1222,8 @@ const ClientesPage: React.FC = () => {
         searchTerm,
         status: selectedStatus,
         tipo: selectedTipo,
-        tag: selectedTag,
-        followup: selectedFollowup,
+        tag: '',
+        followup: '',
         viewMode,
         limit: filters.limit ?? 10,
         sortBy: filters.sortBy ?? 'created_at',
@@ -1368,8 +1322,6 @@ const ClientesPage: React.FC = () => {
       searchParams.get('q'),
       searchParams.get('status'),
       searchParams.get('tipo'),
-      searchParams.get('tag'),
-      searchParams.get('followup'),
       searchParams.get('view'),
       searchParams.get('page'),
       searchParams.get('limit'),
@@ -1393,18 +1345,16 @@ const ClientesPage: React.FC = () => {
     setSearchTerm(defaultView.searchTerm);
     setSelectedStatus(defaultView.status);
     setSelectedTipo(defaultView.tipo);
-    setSelectedTag(defaultView.tag);
-    setSelectedFollowup(defaultView.followup);
     setViewMode(defaultView.viewMode);
     setFilters((prev) => ({
       ...prev,
       page: 1,
       limit: defaultView.limit,
-      search: defaultView.searchTerm,
+      search: '',
       status: defaultView.status,
       tipo: defaultView.tipo,
-      tag: defaultView.tag,
-      followup: defaultView.followup,
+      tag: '',
+      followup: '',
       sortBy: defaultView.sortBy,
       sortOrder: defaultView.sortOrder,
     }));
@@ -1426,8 +1376,6 @@ const ClientesPage: React.FC = () => {
       activeView.searchTerm === searchTerm &&
       activeView.status === selectedStatus &&
       activeView.tipo === selectedTipo &&
-      activeView.tag === selectedTag &&
-      activeView.followup === selectedFollowup &&
       activeView.viewMode === viewMode &&
       activeView.limit === (filters.limit ?? 10) &&
       activeView.sortBy === (filters.sortBy ?? 'created_at') &&
@@ -1445,8 +1393,6 @@ const ClientesPage: React.FC = () => {
     searchTerm,
     selectedStatus,
     selectedTipo,
-    selectedTag,
-    selectedFollowup,
     viewMode,
   ]);
 
@@ -1773,18 +1719,15 @@ const ClientesPage: React.FC = () => {
     : isRefreshingResults
       ? 'Atualizando resultados...'
       : `Gerencie o cadastro e relacionamento basico de ${estatisticas.total} clientes`;
-  const hasFilters = Boolean(
-    searchTerm || selectedStatus || selectedTipo || selectedTag || selectedFollowup,
-  );
+  const hasFilters = Boolean(searchTerm || selectedStatus || selectedTipo);
   const activeView = savedViews.find((view) => view.id === activeViewId) ?? null;
   const hasFilterChips = hasFilters || Boolean(activeView);
   const activeFilterCount =
     Number(Boolean(searchTerm.trim())) +
     Number(Boolean(selectedStatus)) +
     Number(Boolean(selectedTipo)) +
-    Number(Boolean(selectedTag.trim())) +
-    Number(Boolean(selectedFollowup)) +
     Number(Boolean(activeViewId));
+  const oportunidadesAtivas = Number(estatisticas.prospects ?? 0) + Number(estatisticas.leads ?? 0);
   const isRenameMode = saveViewModalMode === 'rename' && Boolean(activeView);
   const saveViewModalTitle = isRenameMode
     ? 'Renomear view'
@@ -1823,7 +1766,6 @@ const ClientesPage: React.FC = () => {
             </span>
           }
           description={pageDescription}
-          filters={<ActiveEmpresaBadge variant="page" />}
           actions={
             <div className="flex flex-wrap items-center gap-2">
               <div className="inline-flex items-center rounded-lg border border-[#D4E2E7] bg-white p-1">
@@ -1877,11 +1819,12 @@ const ClientesPage: React.FC = () => {
 
         {!isLoading && (
           <InlineStats
+            compact
             stats={[
-              { label: 'Total', value: String(estatisticas.total), tone: 'neutral' },
-              { label: 'Ativos', value: String(estatisticas.ativos), tone: 'accent' },
-              { label: 'Prospects', value: String(estatisticas.prospects), tone: 'accent' },
-              { label: 'Leads', value: String(estatisticas.leads), tone: 'neutral' },
+              { label: 'Total de clientes', value: String(estatisticas.total), tone: 'neutral' },
+              { label: 'Clientes ativos', value: String(estatisticas.ativos), tone: 'accent' },
+              { label: 'Oportunidades abertas', value: String(oportunidadesAtivas), tone: 'warning' },
+              { label: 'Registros exibidos', value: String(clientesFiltrados.length), tone: 'neutral' },
             ]}
           />
         )}
@@ -1936,32 +1879,6 @@ const ClientesPage: React.FC = () => {
                   {option.label}
                 </option>
               ))}
-            </select>
-          </div>
-
-          <div className="w-full sm:w-auto">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Tag</label>
-            <input
-              type="text"
-              value={selectedTag}
-              onChange={(e) => handleTagChange(e.target.value)}
-              placeholder="Ex: vip"
-              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[170px]"
-            />
-          </div>
-
-          <div className="w-full sm:w-auto">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Follow-up</label>
-            <select
-              value={selectedFollowup}
-              onChange={(e) =>
-                handleFollowupChange(e.target.value as '' | 'pendente' | 'vencido')
-              }
-              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[170px]"
-            >
-              <option value="">Todos</option>
-              <option value="pendente">Pendente</option>
-              <option value="vencido">Vencido</option>
             </select>
           </div>
 
@@ -2117,36 +2034,6 @@ const ClientesPage: React.FC = () => {
             </span>
           )}
 
-          {selectedTag.trim() && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
-              Tag:{' '}
-              <strong className="font-semibold text-[#1C3B4C]">{selectedTag.trim()}</strong>
-              <button
-                onClick={() => setSelectedTag('')}
-                className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
-                title="Remover filtro de tag"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          )}
-
-          {selectedFollowup && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
-              Follow-up:{' '}
-              <strong className="font-semibold text-[#1C3B4C]">
-                {selectedFollowup === 'vencido' ? 'Vencido' : 'Pendente'}
-              </strong>
-              <button
-                onClick={() => setSelectedFollowup('')}
-                className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
-                title="Remover filtro de follow-up"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          )}
-
           <button
             onClick={handleClearFilters}
             className="inline-flex items-center gap-1 rounded-full border border-[#D2DFE4] bg-white px-3 py-1 text-xs font-medium text-[#486978] transition-colors hover:bg-[#F3F8FA]"
@@ -2165,7 +2052,7 @@ const ClientesPage: React.FC = () => {
         </div>
       )}
 
-      {!isLoading && clientes.length === 0 && (
+      {!isLoading && clientesFiltrados.length === 0 && (
         <EmptyState
           icon={<Users className="h-5 w-5" />}
           title={hasFilters ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'}
@@ -2199,12 +2086,12 @@ const ClientesPage: React.FC = () => {
         />
       )}
 
-      {clientes.length > 0 && (
+      {clientesFiltrados.length > 0 && (
         <DataTableCard>
           {viewMode === 'cards' ? (
             <div className="p-4 sm:p-5">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                {clientes.map((cliente) => (
+                {clientesFiltrados.map((cliente) => (
                   <ClienteCard
                     key={cliente.id}
                     cliente={cliente}
@@ -2222,7 +2109,7 @@ const ClientesPage: React.FC = () => {
               <div className="flex flex-col gap-3 border-b border-[#E1EAEE] bg-[#F8FBFC] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                 <div className="flex flex-wrap items-center gap-3 text-sm text-[#516F7D]">
                   <span>
-                    {clientes.length} de {totalRegistros} registros
+                    {clientesFiltrados.length} de {totalRegistros} registros
                   </span>
                   {hasFilters && (
                     <span className="rounded-full border border-[#CDE6DF] bg-[#ECF7F3] px-2 py-0.5 text-xs font-medium text-[#0F7B7D]">
@@ -2304,7 +2191,7 @@ const ClientesPage: React.FC = () => {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1180px] bg-white">
+                <table className="w-full min-w-[1080px] bg-white">
                   <thead className="border-b border-[#E1EAEE] bg-[#F8FBFC]">
                     <tr>
                       <th className="w-12 px-4 py-3 text-left" onClick={(e) => e.stopPropagation()}>
@@ -2357,16 +2244,13 @@ const ClientesPage: React.FC = () => {
                           />
                         </button>
                       </th>
-                      <th className="w-48 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">
-                        Follow-up
-                      </th>
                       <th className="w-32 px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-[#607B89]">
                         Acoes
                       </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#EEF3F5] bg-white">
-                    {clientes.map((cliente, index) => (
+                    {clientesFiltrados.map((cliente, index) => (
                       <tr
                         key={cliente.id}
                         className={`cursor-pointer transition-colors ${
@@ -2498,15 +2382,6 @@ const ClientesPage: React.FC = () => {
                                 year: 'numeric',
                               })
                             : '-'}
-                        </td>
-
-                        <td className="px-4 py-3 text-xs text-[#4F6D7B]">
-                          <p>
-                            Ultimo: <span className="font-medium text-[#244455]">{formatDateShort(cliente.ultimo_contato)}</span>
-                          </p>
-                          <p>
-                            Proximo: <span className="font-medium text-[#244455]">{formatDateShort(cliente.proximo_contato)}</span>
-                          </p>
                         </td>
 
                         <td className="px-4 py-3 text-right">

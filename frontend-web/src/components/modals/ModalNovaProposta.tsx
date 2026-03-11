@@ -33,6 +33,7 @@ import {
 } from '../../features/propostas/services/propostasService';
 import { clientesService, Cliente as ClienteService } from '../../services/clientesService';
 import { gerarTokenNumerico } from '../../utils/tokenUtils';
+import { matchesLocalSearchTerm, normalizeSearchValue } from '../../utils/localSearch';
 import { BadgeProdutoSoftware } from '../common/BadgeProdutoSoftware';
 import { getCatalogoFeaturesConfig } from '../../config/catalogoFeaturesFlags';
 
@@ -691,6 +692,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
   // Filtrar produtos
   const produtosFiltrados = useMemo(() => {
     let filtered = produtosDisponiveis;
+    const normalizedBuscarProduto = normalizeSearchValue(buscarProduto);
 
     if (!catalogoFeatures.combosEnabled) {
       filtered = filtered.filter((p) => p.tipo !== 'combo');
@@ -727,14 +729,9 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
       }
     }
 
-    if (buscarProduto) {
-      filtered = filtered.filter(
-        (p) =>
-          p.nome.toLowerCase().includes(buscarProduto.toLowerCase()) ||
-          p.categoria.toLowerCase().includes(buscarProduto.toLowerCase()) ||
-          p.descricao?.toLowerCase().includes(buscarProduto.toLowerCase()),
-      );
-    }
+    filtered = filtered.filter((p) =>
+      matchesLocalSearchTerm(normalizedBuscarProduto, [p.nome, p.categoria, p.descricao]),
+    );
 
     return filtered;
   }, [

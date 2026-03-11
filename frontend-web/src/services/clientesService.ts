@@ -24,6 +24,9 @@ export interface Cliente {
   site?: string;
   observacoes?: string;
   tags?: string[];
+  origem?: string | null;
+  responsavel_id?: string | null;
+  responsavelId?: string | null;
   data_nascimento?: string;
   genero?: string;
   profissao?: string;
@@ -47,6 +50,9 @@ export interface CreateClientePayload {
   tipo: Cliente['tipo'];
   documento?: string;
   tags?: string[];
+  origem?: string;
+  responsavel_id?: string;
+  responsavelId?: string;
   cpf_cnpj?: string;
   status?: ClienteStatus;
   ativo?: boolean;
@@ -319,6 +325,8 @@ export interface ClienteFilters {
   status?: string;
   tipo?: string;
   tag?: string;
+  origem?: string;
+  responsavelId?: string;
   followup?: '' | 'pendente' | 'vencido';
   page?: number;
   limit?: number;
@@ -353,6 +361,8 @@ class ClientesService {
       avatar_url: cliente.avatar_url ?? cliente.avatarUrl ?? cliente.avatar,
       avatarUrl: cliente.avatarUrl ?? cliente.avatar_url ?? cliente.avatar,
       avatar: cliente.avatar ?? cliente.avatar_url ?? cliente.avatarUrl,
+      responsavel_id: cliente.responsavel_id ?? cliente.responsavelId ?? null,
+      responsavelId: cliente.responsavelId ?? cliente.responsavel_id ?? null,
     });
 
     if (this.isObject(payload) && this.isObject(payload.data)) {

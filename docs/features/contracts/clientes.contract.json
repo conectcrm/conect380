@@ -1,0 +1,55 @@
+{
+  "version": "2026-03-10",
+  "module": "clientes",
+  "create": {
+    "required": ["nome", "email"],
+    "optional": [
+      "telefone",
+      "tipo",
+      "documento",
+      "cpf_cnpj",
+      "endereco",
+      "cidade",
+      "estado",
+      "cep",
+      "observacoes",
+      "status",
+      "ativo",
+      "avatar",
+      "avatarUrl",
+      "avatar_url",
+      "ultimo_contato",
+      "proximo_contato",
+      "tags",
+      "origem",
+      "responsavel_id",
+      "responsavelId"
+    ]
+  },
+  "update": {
+    "partialOfCreate": true
+  },
+  "read": {
+    "required": ["id", "nome", "email", "tipo", "status", "empresa_id", "ativo"],
+    "optional": [
+      "documento",
+      "telefone",
+      "endereco",
+      "cidade",
+      "estado",
+      "cep",
+      "observacoes",
+      "avatar",
+      "avatarUrl",
+      "avatar_url",
+      "tags",
+      "ultimo_contato",
+      "proximo_contato",
+      "origem",
+      "responsavel_id",
+      "responsavelId",
+      "created_at",
+      "updated_at"
+    ]
+  }
+}

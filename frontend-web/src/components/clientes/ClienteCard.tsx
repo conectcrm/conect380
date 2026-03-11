@@ -23,6 +23,19 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({
 }) => {
   const [showAttachments, setShowAttachments] = useState(false);
 
+  const formatFollowupDate = (value?: string | null): string => {
+    if (!value) {
+      return 'Nao informado';
+    }
+
+    const parsedDate = new Date(value);
+    if (Number.isNaN(parsedDate.getTime())) {
+      return 'Nao informado';
+    }
+
+    return parsedDate.toLocaleDateString('pt-BR');
+  };
+
   const statusLabelMap: Record<string, string> = {
     cliente: 'Cliente',
     prospect: 'Prospect',
@@ -149,6 +162,15 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({
           )}
         </div>
       )}
+
+      <div className="mb-3 rounded-lg border border-[#E5EDF1] bg-[#FAFCFD] px-2.5 py-2">
+        <p className="text-[11px] text-[#607987]">
+          Ultimo contato: <span className="font-medium text-[#355061]">{formatFollowupDate(cliente.ultimo_contato)}</span>
+        </p>
+        <p className="text-[11px] text-[#607987]">
+          Proximo contato: <span className="font-medium text-[#355061]">{formatFollowupDate(cliente.proximo_contato)}</span>
+        </p>
+      </div>
 
       <div className="flex items-center justify-between border-t border-[#E6EEF2] pt-2.5">
         <span

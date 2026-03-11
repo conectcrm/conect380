@@ -400,6 +400,8 @@ export class ClientesService {
     };
   }
 
+  private origemColumnSupported: boolean | null = null;
+  private responsavelIdColumnSupported: boolean | null = null;
   async create(clienteData: CreateClienteInput): Promise<Cliente> {
     const status = this.normalizeStatus(clienteData.status) ?? StatusCliente.LEAD;
     const ativo = clienteData.ativo ?? status !== StatusCliente.INATIVO;
@@ -443,6 +445,13 @@ export class ClientesService {
       saved.empresaId,
       this.parseOptionalTags((clienteData as any).tags),
     );
+
+    await this.updateOrigemResponsavelColumns(saved.id, saved.empresaId, {
+      origem: this.parseOptionalString((clienteData as any).origem),
+      responsavel_id: this.parseOptionalString(
+        (clienteData as any).responsavel_id ?? (clienteData as any).responsavelId,
+      ),
+    });
 
     const reloaded = await this.findById(saved.id, saved.empresaId);
     if (reloaded) {
@@ -550,6 +559,8 @@ export class ClientesService {
       'ultimo_contato',
       'proximo_contato',
       'tags',
+      'origem',
+      'responsavel_id',
       'observacoes',
       'created_at',
       'updated_at',
@@ -570,6 +581,8 @@ export class ClientesService {
       cliente.ultimo_contato ? new Date(cliente.ultimo_contato).toISOString() : '',
       cliente.proximo_contato ? new Date(cliente.proximo_contato).toISOString() : '',
       cliente.tags?.join(', ') ?? '',
+      cliente.origem ?? '',
+      cliente.responsavel_id ?? '',
       cliente.observacoes,
       cliente.created_at ? new Date(cliente.created_at).toISOString() : '',
       cliente.updated_at ? new Date(cliente.updated_at).toISOString() : '',
@@ -599,6 +612,9 @@ export class ClientesService {
       avatar: _avatar,
       avatarUrl: _avatarUrl,
       tags: _tags,
+      origem: _origem,
+      responsavel_id: _responsavel_id,
+      responsavelId: _responsavelId,
       ultimo_contato: _ultimoContato,
       proximo_contato: _proximoContato,
       ...rest
@@ -637,6 +653,13 @@ export class ClientesService {
     });
 
     await this.updateTagsColumn(id, empresaId, this.parseOptionalTags((updateData as any).tags));
+
+    await this.updateOrigemResponsavelColumns(id, empresaId, {
+      origem: this.parseOptionalString((updateData as any).origem),
+      responsavel_id: this.parseOptionalString(
+        (updateData as any).responsavel_id ?? (updateData as any).responsavelId,
+      ),
+    });
 
     return this.findById(id, empresaId);
   }
@@ -841,6 +864,16 @@ export class ClientesService {
       queryBuilder.andWhere('cliente.tipo = :tipo', { tipo: params.tipo });
     }
 
+    const origem = this.normalizeTextFilter(params.origem);
+    if (origem && (await this.hasOrigemColumn())) {
+      queryBuilder.andWhere("LOWER(COALESCE(cliente.origem, '')) = LOWER(:origem)", { origem });
+    }
+
+    const responsavelId = this.normalizeTextFilter(params.responsavelId);
+    if (responsavelId && (await this.hasResponsavelIdColumn())) {
+      queryBuilder.andWhere('cliente.responsavel_id = :responsavelId', { responsavelId });
+    }
+
     const tag = this.normalizeTagFilter(params.tag);
     if (tag && (await this.hasTagsColumn())) {
       queryBuilder.andWhere(
@@ -888,7 +921,8 @@ export class ClientesService {
       });
       const withAvatar = await this.attachAvatarFields(clientes);
       const withFollowup = await this.attachFollowupFields(withAvatar);
-      return this.attachTagsFields(withFollowup);
+      const withTags = await this.attachTagsFields(withFollowup);
+      return this.attachOrigemResponsavelFields(withTags);
     }
 
     const ids = clientes.map((cliente) => cliente.id);
@@ -912,7 +946,8 @@ export class ClientesService {
 
     const withAvatar = await this.attachAvatarFields(clientes);
     const withFollowup = await this.attachFollowupFields(withAvatar);
-    return this.attachTagsFields(withFollowup);
+    const withTags = await this.attachTagsFields(withFollowup);
+    return this.attachOrigemResponsavelFields(withTags);
   }
 
   private async countByStatus(empresaId: string, status: StatusCliente): Promise<number> {
@@ -979,6 +1014,15 @@ export class ClientesService {
     return normalized.length > 0 ? normalized : undefined;
   }
 
+  private normalizeTextFilter(value?: string): string | undefined {
+    if (!value) {
+      return undefined;
+    }
+
+    const normalized = value.trim();
+    return normalized.length > 0 ? normalized : undefined;
+  }
+
   private parseOptionalTags(value: unknown): string[] | null | undefined {
     if (value === undefined) {
       return undefined;
@@ -1001,6 +1045,19 @@ export class ClientesService {
       .filter(Boolean);
 
     return normalized.length > 0 ? Array.from(new Set(normalized)) : null;
+  }
+
+  private parseOptionalString(value: unknown): string | null | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (value === null) {
+      return null;
+    }
+
+    const normalized = String(value).trim();
+    return normalized.length > 0 ? normalized : null;
   }
 
   private parseOptionalDate(value: unknown): Date | null | undefined {
@@ -1131,6 +1188,48 @@ export class ClientesService {
 
     this.tagsColumnSupported = Boolean(result?.[0]?.exists);
     return this.tagsColumnSupported;
+  }
+
+  private async hasOrigemColumn(): Promise<boolean> {
+    if (this.origemColumnSupported !== null) {
+      return this.origemColumnSupported;
+    }
+
+    const result: Array<{ exists: boolean }> = await this.clienteRepository.query(
+      `
+        SELECT EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'clientes'
+            AND column_name = 'origem'
+        ) AS "exists"
+      `,
+    );
+
+    this.origemColumnSupported = Boolean(result?.[0]?.exists);
+    return this.origemColumnSupported;
+  }
+
+  private async hasResponsavelIdColumn(): Promise<boolean> {
+    if (this.responsavelIdColumnSupported !== null) {
+      return this.responsavelIdColumnSupported;
+    }
+
+    const result: Array<{ exists: boolean }> = await this.clienteRepository.query(
+      `
+        SELECT EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'clientes'
+            AND column_name = 'responsavel_id'
+        ) AS "exists"
+      `,
+    );
+
+    this.responsavelIdColumnSupported = Boolean(result?.[0]?.exists);
+    return this.responsavelIdColumnSupported;
   }
 
   async isAnexosStorageAvailable(): Promise<boolean> {
@@ -1282,6 +1381,59 @@ export class ClientesService {
     return clientes;
   }
 
+  private async attachOrigemResponsavelFields(clientes: Cliente[]): Promise<Cliente[]> {
+    if (clientes.length === 0) {
+      return clientes;
+    }
+
+    const [hasOrigemColumn, hasResponsavelIdColumn] = await Promise.all([
+      this.hasOrigemColumn(),
+      this.hasResponsavelIdColumn(),
+    ]);
+
+    if (!hasOrigemColumn && !hasResponsavelIdColumn) {
+      clientes.forEach((cliente) => {
+        cliente.origem = undefined;
+        cliente.responsavel_id = undefined;
+      });
+      return clientes;
+    }
+
+    const ids = clientes.map((cliente) => cliente.id);
+    const selectColumns = ['id'];
+    if (hasOrigemColumn) {
+      selectColumns.push('origem');
+    }
+    if (hasResponsavelIdColumn) {
+      selectColumns.push('responsavel_id');
+    }
+
+    const rows: Array<{
+      id: string;
+      origem?: string | null;
+      responsavel_id?: string | null;
+    }> = await this.clienteRepository.query(
+      `
+        SELECT ${selectColumns.join(', ')}
+        FROM clientes
+        WHERE id = ANY($1::uuid[])
+      `,
+      [ids],
+    );
+
+    const valuesById = new Map(rows.map((row) => [row.id, row]));
+
+    clientes.forEach((cliente) => {
+      const row = valuesById.get(cliente.id);
+      cliente.origem = hasOrigemColumn ? ((row?.origem as string | null) ?? null) : undefined;
+      cliente.responsavel_id = hasResponsavelIdColumn
+        ? ((row?.responsavel_id as string | null) ?? null)
+        : undefined;
+    });
+
+    return clientes;
+  }
+
   private async updateFollowupColumns(
     id: string,
     empresaId: string,
@@ -1347,6 +1499,53 @@ export class ClientesService {
           AND empresa_id = $3
       `,
       [tagsValue, id, empresaId],
+    );
+  }
+
+  private async updateOrigemResponsavelColumns(
+    id: string,
+    empresaId: string,
+    payload: {
+      origem?: string | null;
+      responsavel_id?: string | null;
+    },
+  ): Promise<void> {
+    const [hasOrigemColumn, hasResponsavelIdColumn] = await Promise.all([
+      this.hasOrigemColumn(),
+      this.hasResponsavelIdColumn(),
+    ]);
+
+    const shouldUpdateOrigem = hasOrigemColumn && payload.origem !== undefined;
+    const shouldUpdateResponsavelId =
+      hasResponsavelIdColumn && payload.responsavel_id !== undefined;
+
+    if (!shouldUpdateOrigem && !shouldUpdateResponsavelId) {
+      return;
+    }
+
+    const updateClauses: string[] = [];
+    const values: Array<string | null> = [];
+
+    if (shouldUpdateOrigem) {
+      updateClauses.push(`origem = $${values.length + 1}`);
+      values.push(payload.origem ?? null);
+    }
+
+    if (shouldUpdateResponsavelId) {
+      updateClauses.push(`responsavel_id = $${values.length + 1}`);
+      values.push(payload.responsavel_id ?? null);
+    }
+
+    values.push(id, empresaId);
+
+    await this.clienteRepository.query(
+      `
+        UPDATE clientes
+        SET ${updateClauses.join(', ')}
+        WHERE id = $${values.length - 1}
+          AND empresa_id = $${values.length}
+      `,
+      values,
     );
   }
 

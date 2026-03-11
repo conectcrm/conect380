@@ -493,6 +493,18 @@ export const ModalDetalhesCliente: React.FC<ModalDetalhesClienteProps> = ({
                       <p className="text-sm text-[#607B89]">Nao informado</p>
                     )}
                   </div>
+                  <div className="rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3">
+                    <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[#6C8794]">
+                      Ultimo contato
+                    </p>
+                    <p className="text-sm text-[#355061]">{formatDate(cliente.ultimo_contato ?? undefined)}</p>
+                  </div>
+                  <div className="rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3">
+                    <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[#6C8794]">
+                      Proximo contato
+                    </p>
+                    <p className="text-sm text-[#355061]">{formatDate(cliente.proximo_contato ?? undefined)}</p>
+                  </div>
                 </div>
               </section>
 

@@ -39,6 +39,7 @@ import { CategoriaProduto } from '../../types/produtos';
 import { useAuth } from '../../hooks/useAuth';
 import { userHasPermission } from '../../config/menuConfig';
 import { isCatalogApiEnabledForTenant } from '../../config/catalogoFeaturesFlags';
+import { matchesLocalSearchTerm, normalizeSearchValue } from '../../utils/localSearch';
 import toast from 'react-hot-toast';
 
 // Interface para o novo modal
@@ -257,7 +258,6 @@ const ProdutosPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [nichoFilter, setNichoFilter] = useState<NichoCatalogo>('geral');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [tipoFilter, setTipoFilter] = useState<string>('todos');
@@ -280,14 +280,6 @@ const ProdutosPage: React.FC = () => {
   >(null);
   const [isLoadingSave, setIsLoadingSave] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm.trim());
-    }, 300);
-
-    return () => window.clearTimeout(timer);
-  }, [searchTerm]);
 
   const resolveSortParams = useCallback(() => {
     switch (sortOption) {
@@ -338,7 +330,6 @@ const ProdutosPage: React.FC = () => {
         configuracaoId: configuracaoFilter !== 'todas' ? configuracaoFilter : undefined,
         status: statusFilter !== 'todos' ? statusFilter : undefined,
         tipoItem: tipoFilter !== 'todos' ? tipoFilter : undefined,
-        search: debouncedSearchTerm || undefined,
         page: currentPage,
         limit: itemsPerPage,
         sortBy,
@@ -360,7 +351,7 @@ const ProdutosPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [categoriaFilter, categoriasCatalogo, configuracaoFilter, currentPage, debouncedSearchTerm, itemsPerPage, resolveSortParams, statusFilter, subcategoriaFilter, tipoFilter]);
+  }, [categoriaFilter, categoriasCatalogo, configuracaoFilter, currentPage, itemsPerPage, resolveSortParams, statusFilter, subcategoriaFilter, tipoFilter]);
 
   useEffect(() => {
     void carregarCategorias();
@@ -511,6 +502,28 @@ const ProdutosPage: React.FC = () => {
     subcategoriaFilter !== 'todas' ||
     configuracaoFilter !== 'todas';
 
+  const normalizedSearchTerm = normalizeSearchValue(searchTerm);
+
+  const produtosFiltrados = useMemo(() => {
+    if (!normalizedSearchTerm) {
+      return produtos;
+    }
+
+    return produtos.filter((produto) => {
+      return matchesLocalSearchTerm(normalizedSearchTerm, [
+        produto.nome,
+        produto.sku,
+        produto.fornecedor,
+        produto.categoria,
+        produto.subcategoriaNome,
+        produto.configuracaoNome,
+        produto.descricao,
+      ]);
+    });
+  }, [normalizedSearchTerm, produtos]);
+
+  const totalItensLista = normalizedSearchTerm ? produtosFiltrados.length : totalItems;
+
   const handleNichoChange = useCallback((nextNicho: NichoCatalogo) => {
     setNichoFilter(nextNicho);
     const config = nichoCatalogoConfig[nextNicho];
@@ -524,7 +537,6 @@ const ProdutosPage: React.FC = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [
-    searchTerm,
     nichoFilter,
     statusFilter,
     tipoFilter,
@@ -570,7 +582,7 @@ const ProdutosPage: React.FC = () => {
         configuracaoId: configuracaoFilter !== 'todas' ? configuracaoFilter : undefined,
         status: statusFilter !== 'todos' ? statusFilter : undefined,
         tipoItem: tipoFilter !== 'todos' ? tipoFilter : undefined,
-        search: debouncedSearchTerm || undefined,
+        search: searchTerm.trim() || undefined,
         sortBy,
         sortOrder,
       });
@@ -591,7 +603,7 @@ const ProdutosPage: React.FC = () => {
     } finally {
       setIsExporting(false);
     }
-  }, [categoriaFilter, categoriasCatalogo, configuracaoFilter, debouncedSearchTerm, resolveSortParams, statusFilter, subcategoriaFilter, tipoFilter, totalItems]);
+  }, [categoriaFilter, categoriasCatalogo, configuracaoFilter, resolveSortParams, searchTerm, statusFilter, subcategoriaFilter, tipoFilter, totalItems]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -1151,7 +1163,7 @@ const ProdutosPage: React.FC = () => {
         <div className="border-b border-[#E1EAEE] bg-[#F8FBFC] px-4 py-3 sm:px-5">
           <div className="flex flex-wrap items-center gap-3 text-sm text-[#516F7D]">
             <h3 className="text-sm font-semibold text-[#1B3B4E]">
-              Lista de Itens ({totalItems})
+              Lista de Itens ({totalItensLista})
             </h3>
             {hasFilters && (
               <span className="rounded-full border border-[#CDE6DF] bg-[#ECF7F3] px-2 py-0.5 text-xs font-medium text-[#0F7B7D]">
@@ -1201,7 +1213,7 @@ const ProdutosPage: React.FC = () => {
           </div>
         )}
 
-        {produtos.length === 0 ? (
+        {produtosFiltrados.length === 0 ? (
           <div className="p-4 sm:p-5">
             <EmptyState
               icon={<Package className="h-5 w-5" />}
@@ -1216,7 +1228,7 @@ const ProdutosPage: React.FC = () => {
         ) : (
           <>
             <div className="divide-y divide-[#EAF0F2] lg:hidden">
-              {produtos.map((produto) => {
+              {produtosFiltrados.map((produto) => {
                 const statusInfo = statusConfig[produto.status];
                 const StatusIcon = statusInfo.icon;
 
@@ -1338,7 +1350,7 @@ const ProdutosPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-[#DEEFE7]">
-                  {produtos.map((produto) => {
+                  {produtosFiltrados.map((produto) => {
                     const statusInfo = statusConfig[produto.status];
                     const estoqueStatus = getEstoqueStatus(produto);
                     const StatusIcon = statusInfo.icon;
@@ -1454,7 +1466,7 @@ const ProdutosPage: React.FC = () => {
           <div className="flex flex-col gap-3 border-t border-[#E1EAEE] bg-[#F8FBFC] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <div className="flex flex-wrap items-center gap-3 text-xs text-[#5F7B89] sm:text-sm">
               <span>
-                {produtos.length} de {totalItems} registros
+                {produtosFiltrados.length} de {normalizedSearchTerm ? produtos.length : totalItems} registros
               </span>
               <select
                 value={itemsPerPage}
