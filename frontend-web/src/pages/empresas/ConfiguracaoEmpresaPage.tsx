@@ -8,7 +8,6 @@ import {
   Shield,
   Users,
   Mail,
-  MessageSquare,
   Database,
   Building2,
   Send,
@@ -35,8 +34,7 @@ const EMPRESA_CONFIG_TABS = [
   { id: 'seguranca', label: 'Segurança', icon: Shield },
   { id: 'usuarios', label: 'Usuários e Permissões', icon: Users },
   { id: 'email', label: 'Email/SMTP', icon: Mail },
-  { id: 'comunicacao', label: 'Comunicação', icon: MessageSquare },
-  { id: 'backup', label: 'Backup e Dados', icon: Database },
+  { id: 'backup', label: 'Snapshot Config.', icon: Database },
 ] as const;
 
 type EmpresaConfigTabId = (typeof EMPRESA_CONFIG_TABS)[number]['id'];
@@ -164,18 +162,14 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
         throw new Error('Usuário não possui empresa associada');
       }
 
-      console.log('Enviando configura??es da empresa (resumo):', {
-        activeTab,
-        hasLogo: Boolean(formData.logoUrl),
-        emailsHabilitados: Boolean(formData.emailsHabilitados),
-        smtpConfigurado: Boolean(formData.smtpUsuario && formData.smtpSenha),
-        whatsappHabilitado: Boolean(formData.whatsappHabilitado),
-        whatsappTokenConfigurado: Boolean(formData.whatsappApiToken),
-        smsHabilitado: Boolean(formData.smsHabilitado),
-        smsApiKeyConfigurada: Boolean(formData.smsApiKey),
-        pushHabilitado: Boolean(formData.pushHabilitado),
-        pushApiKeyConfigurada: Boolean(formData.pushApiKey),
-      });
+      if (process.env.NODE_ENV !== 'production') {
+        console.debug('Enviando configurações da empresa (resumo):', {
+          activeTab,
+          hasLogo: Boolean(formData.logoUrl),
+          emailsHabilitados: Boolean(formData.emailsHabilitados),
+          smtpConfigurado: Boolean(formData.smtpUsuario && formData.smtpSenha),
+        });
+      }
 
       const updatedConfig = await empresaConfigService.updateConfig(formData);
       setConfig(updatedConfig);
@@ -405,16 +399,18 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
       setBackupHistory(latestHistory);
 
       if (latestHistory.length === 0) {
-        toastService.info('Nenhum backup disponível para esta empresa.');
+        toastService.info('Nenhum snapshot disponível para esta empresa.');
         setShowBackupHistory(false);
         return;
       }
 
-      toastService.info(`Histórico atualizado: ${latestHistory.length} backup${latestHistory.length > 1 ? 's' : ''}.`);
+      toastService.info(
+        `Histórico atualizado: ${latestHistory.length} snapshot${latestHistory.length > 1 ? 's' : ''}.`,
+      );
       setShowBackupHistory(true);
     } catch (err) {
       console.error('Erro ao carregar histórico de backups:', err);
-      toastService.error('Não foi possível carregar o histórico de backups.');
+      toastService.error('Não foi possível carregar o histórico de snapshots.');
       setShowBackupHistory(false);
     }
   };
@@ -425,7 +421,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
         1,
         Math.round(ultimoBackup.sizeBytes / 1024),
       )} KB`
-    : 'Nenhum backup executado ainda.';
+    : 'Nenhum snapshot executado ainda.';
 
   const ultimoBackupIcon = ultimoBackup ? (
     <CheckCircle className="h-6 w-6 text-[#159A9C]" />
@@ -899,73 +895,13 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                       <p className="text-xs text-gray-500 mt-1">Entre 5 e 480 minutos (8 horas)</p>
                     </div>
 
-                    {/* Complexidade Senha */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Complexidade de Senha
-                      </label>
-                      <select
-                        value={formData.senhaComplexidade || 'media'}
-                        onChange={(e) => handleInputChange('senhaComplexidade', e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
-                      >
-                        <option value="baixa">Baixa (mínimo 6 caracteres)</option>
-                        <option value="media">Média (8 caracteres + números)</option>
-                        <option value="alta">Alta (12 caracteres + números + símbolos)</option>
-                      </select>
-                    </div>
-
-                    {/* Auditoria */}
-                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          Logs de Auditoria
-                        </label>
-                        <p className="text-xs text-gray-500">Registrar ações dos usuários</p>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={formData.auditoria !== false}
-                        onChange={(e) => handleInputChange('auditoria', e.target.checked)}
-                        className="h-5 w-5 text-[#159A9C] focus:ring-[#159A9C] rounded"
-                      />
-                    </div>
-
-                    {/* Force SSL */}
-                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          Forçar HTTPS
-                        </label>
-                        <p className="text-xs text-gray-500">Redirecionar HTTP para HTTPS</p>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={formData.forceSsl !== false}
-                        onChange={(e) => handleInputChange('forceSsl', e.target.checked)}
-                        className="h-5 w-5 text-[#159A9C] focus:ring-[#159A9C] rounded"
-                      />
-                    </div>
-
-                    {/* IP Whitelist */}
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        IPs Permitidos (Whitelist)
-                      </label>
-                      <textarea
-                        value={formData.ipWhitelist?.join('\n') || ''}
-                        onChange={(e) =>
-                          handleInputChange(
-                            'ipWhitelist',
-                            e.target.value.split('\n').filter((ip) => ip.trim()),
-                          )
-                        }
-                        placeholder="192.168.1.1&#10;10.0.0.0/24"
-                        rows={3}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Um IP por linha. Deixe vazio para permitir todos.
+                    <div className="md:col-span-2 rounded-lg border border-[#DCE6EA] bg-[#F8FBFC] p-4">
+                      <p className="text-sm font-medium text-[#244455]">Escopo desta tela</p>
+                      <p className="mt-1 text-xs text-[#607B89]">
+                        Mantemos aqui apenas controles com efeito operacional validado:
+                        Autenticação 2FA e tempo de sessão. Regras avançadas (complexidade de
+                        senha, whitelist de IP e políticas de TLS) seguem gestão central de
+                        infraestrutura e segurança.
                       </p>
                     </div>
                   </div>
@@ -980,34 +916,15 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                   </h2>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Limite de Usuários */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Limite de Usuários
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="1000"
-                        value={formData.limiteUsuarios || 10}
-                        onChange={(e) =>
-                          handleInputChange('limiteUsuarios', parseInt(e.target.value))
-                        }
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Número máximo de usuários ativos na empresa (1-1000)
-                      </p>
-                    </div>
-
-                    {/* Aprovação de Novos Usuários */}
+                    {/* Dupla aprovação para mudanças sensíveis */}
                     <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
                       <div>
                         <label className="block text-sm font-medium text-gray-700">
-                          Aprovação de Novos Usuários
+                          Dupla aprovação para acessos sensíveis
                         </label>
                         <p className="text-xs text-gray-500 mt-1">
-                          Exigir aprovação manual para novos cadastros
+                          Novos usuários e mudanças críticas de acesso ficam pendentes de segunda
+                          aprovação.
                         </p>
                       </div>
                       <input
@@ -1020,29 +937,9 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                       />
                     </div>
 
-                    {/* Expiração de Convites */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Validade do Convite (horas)
-                      </label>
-                      <input
-                        type="number"
-                        min="24"
-                        max="168"
-                        value={formData.conviteExpiracaoHoras || 72}
-                        onChange={(e) =>
-                          handleInputChange('conviteExpiracaoHoras', parseInt(e.target.value))
-                        }
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Tempo até o convite de cadastro expirar (24-168 horas = 1-7 dias)
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Alçada de Aprovação Financeira (R$)
+                        Alçada de aprovação financeira (R$)
                       </label>
                       <input
                         type="number"
@@ -1059,7 +956,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                       />
                       <p className="text-xs text-gray-500 mt-1">
                         Contas a pagar com valor total igual ou acima deste valor exigem aprovação.
-                        Use 0 para desativar a regra automática.
+                        Use 0 para desativar a regra automática e liberar fluxo direto.
                       </p>
                     </div>
 
@@ -1067,10 +964,11 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                     <div className="flex items-start gap-3 p-4 bg-[#DEEFE7] rounded-lg border border-[#B4BEC9]">
                       <Info className="h-5 w-5 text-[#159A9C] flex-shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-sm font-medium text-[#002333]">Gestão de Permissões</p>
+                        <p className="text-sm font-medium text-[#002333]">Escopo desta aba</p>
                         <p className="text-xs text-[#002333] mt-1">
-                          Configure perfis e permissões detalhadas na seção "Gestão de Usuários" do
-                          menu Administração.
+                          Esta aba controla regras operacionais entre módulos: governança de acessos
+                          (dupla aprovação) e aprovação financeira por alçada. Limites de usuários e
+                          expiração de convites seguem política de plano.
                         </p>
                       </div>
                     </div>
@@ -1256,300 +1154,34 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                 </div>
               )}
 
-              {activeTab === 'comunicacao' && (
-                <div className="space-y-6">
-                  <h2 className="text-2xl font-bold text-[#002333] flex items-center gap-2">
-                    <MessageSquare className="h-6 w-6 text-[#159A9C]" />
-                    Configurações de Comunicação
-                  </h2>
-
-                  {/* SEÇÃO 1: WhatsApp */}
-                  <div className="border-l-4 border-[#159A9C] pl-6 py-4 bg-[#DEEFE7]/30">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                      <MessageSquare className="h-5 w-5 text-[#159A9C]" />
-                      WhatsApp Business API
-                    </h3>
-
-                    <div className="space-y-4">
-                      {/* Toggle WhatsApp */}
-                      <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700">
-                            Habilitar WhatsApp
-                          </label>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Ative para enviar mensagens via WhatsApp Business API
-                          </p>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={formData.whatsappHabilitado || false}
-                          onChange={(e) =>
-                            handleInputChange('whatsappHabilitado', e.target.checked)
-                          }
-                          className="h-5 w-5 text-[#159A9C] rounded focus:ring-[#159A9C] cursor-pointer"
-                        />
-                      </div>
-
-                      {formData.whatsappHabilitado && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Número WhatsApp <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="tel"
-                              value={formData.whatsappNumero || ''}
-                              onChange={(e) => handleInputChange('whatsappNumero', e.target.value)}
-                              placeholder="+55 11 98765-4321"
-                              maxLength={20}
-                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
-                            />
-                          </div>
-
-                          <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Token API WhatsApp <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="password"
-                              value={formData.whatsappApiToken || ''}
-                              onChange={(e) =>
-                                handleInputChange('whatsappApiToken', e.target.value)
-                              }
-                              placeholder="••••••••••••••••••••••••••••"
-                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
-                            />
-                            <p className="text-xs text-gray-500 mt-1">
-                              Token de acesso da Meta Business API
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* SEÇÃO 2: SMS */}
-                  <div className="border-l-4 border-[#159A9C] pl-6 py-4 bg-[#DEEFE7]/30">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                      <MessageSquare className="h-5 w-5 text-[#159A9C]" />
-                      SMS
-                    </h3>
-
-                    <div className="space-y-4">
-                      {/* Toggle SMS */}
-                      <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700">
-                            Habilitar SMS
-                          </label>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Ative para enviar mensagens via SMS
-                          </p>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={formData.smsHabilitado || false}
-                          onChange={(e) => handleInputChange('smsHabilitado', e.target.checked)}
-                          className="h-5 w-5 text-[#159A9C] rounded focus:ring-[#159A9C] cursor-pointer"
-                        />
-                      </div>
-
-                      {formData.smsHabilitado && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Provedor SMS <span className="text-red-500">*</span>
-                            </label>
-                            <select
-                              value={formData.smsProvider || 'twilio'}
-                              onChange={(e) => handleInputChange('smsProvider', e.target.value)}
-                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
-                            >
-                              <option value="twilio">Twilio</option>
-                              <option value="nexmo">Nexmo (Vonage)</option>
-                              <option value="sinch">Sinch</option>
-                            </select>
-                          </div>
-
-                          <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Chave API SMS <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="password"
-                              value={formData.smsApiKey || ''}
-                              onChange={(e) => handleInputChange('smsApiKey', e.target.value)}
-                              placeholder="••••••••••••••••••••••••••••"
-                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
-                            />
-                            <p className="text-xs text-gray-500 mt-1">
-                              Chave de autenticação do provedor selecionado
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* SEÇÃO 3: Push Notifications */}
-                  <div className="border-l-4 border-[#159A9C] pl-6 py-4 bg-[#DEEFE7]/30">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                      <MessageSquare className="h-5 w-5 text-[#159A9C]" />
-                      Push Notifications
-                    </h3>
-
-                    <div className="space-y-4">
-                      {/* Toggle Push */}
-                      <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700">
-                            Habilitar Push Notifications
-                          </label>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Ative para enviar notificações push para dispositivos móveis
-                          </p>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={formData.pushHabilitado || false}
-                          onChange={(e) => handleInputChange('pushHabilitado', e.target.checked)}
-                          className="h-5 w-5 text-[#159A9C] rounded focus:ring-[#159A9C] cursor-pointer"
-                        />
-                      </div>
-
-                      {formData.pushHabilitado && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Provedor Push <span className="text-red-500">*</span>
-                            </label>
-                            <select
-                              value={formData.pushProvider || 'fcm'}
-                              onChange={(e) => handleInputChange('pushProvider', e.target.value)}
-                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
-                            >
-                              <option value="fcm">Firebase Cloud Messaging (FCM)</option>
-                              <option value="apns">Apple Push Notification (APNS)</option>
-                              <option value="onesignal">OneSignal</option>
-                            </select>
-                          </div>
-
-                          <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Chave API Push <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="password"
-                              value={formData.pushApiKey || ''}
-                              onChange={(e) => handleInputChange('pushApiKey', e.target.value)}
-                              placeholder="••••••••••••••••••••••••••••"
-                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
-                            />
-                            <p className="text-xs text-gray-500 mt-1">
-                              Chave de servidor ou token de autenticação
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Card Informativo Geral */}
-                  <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <Info className="h-5 w-5 text-gray-600 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Integração Multi-Canal</p>
-                      <p className="text-xs text-gray-700 mt-1">
-                        Configure múltiplos canais de comunicação para aumentar o alcance. Você pode
-                        ativar todos simultaneamente e o sistema escolherá o melhor canal
-                        automaticamente.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {activeTab === 'backup' && (
                 <div className="space-y-6">
                   <h2 className="text-2xl font-bold text-[#002333] flex items-center gap-2">
                     <Database className="h-6 w-6 text-[#159A9C]" />
-                    Configurações de Backup e Dados
+                    Snapshot de Configurações
                   </h2>
 
-                  {/* Status do Último Backup */}
+                  {/* Status do Último Snapshot */}
                   <div className="p-4 bg-[#DEEFE7] rounded-lg border border-[#B4BEC9]">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-[#002333]">Último Backup</p>
+                        <p className="text-sm font-medium text-[#002333]">Último Snapshot</p>
                         <p className="text-xs text-[#002333] mt-1">{ultimoBackupDescricao}</p>
                       </div>
                       {ultimoBackupIcon}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Backup Automático */}
-                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          Backup Automático
-                        </label>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Executar backup automaticamente
-                        </p>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={formData.backupAutomatico || false}
-                        onChange={(e) => handleInputChange('backupAutomatico', e.target.checked)}
-                        className="h-5 w-5 text-[#159A9C] rounded focus:ring-[#159A9C] cursor-pointer"
-                      />
-                    </div>
-
-                    {/* Frequência do Backup */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Frequência do Backup
-                      </label>
-                      <select
-                        value={formData.backupFrequencia || 'diario'}
-                        onChange={(e) => handleInputChange('backupFrequencia', e.target.value)}
-                        disabled={!formData.backupAutomatico}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <option value="diario">Diário (todo dia às 02:00)</option>
-                        <option value="semanal">Semanal (domingos às 02:00)</option>
-                        <option value="mensal">Mensal (dia 1 às 02:00)</option>
-                      </select>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Horário automático em fuso GMT-3 (Brasília)
-                      </p>
-                    </div>
-
-                    {/* Retenção de Backups */}
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Período de Retenção (dias)
-                      </label>
-                      <input
-                        type="number"
-                        min="7"
-                        max="365"
-                        value={formData.backupRetencaoDias || 30}
-                        onChange={(e) =>
-                          handleInputChange('backupRetencaoDias', parseInt(e.target.value))
-                        }
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Backups mais antigos que este período serão removidos automaticamente (7-365
-                        dias)
-                      </p>
-                    </div>
+                  <div className="rounded-lg border border-[#DCE6EA] bg-[#F8FBFC] p-4">
+                    <p className="text-sm font-medium text-[#244455]">Escopo desta aba</p>
+                    <p className="mt-1 text-xs text-[#607B89]">
+                      Esta tela opera snapshots manuais das configurações da empresa e consulta de
+                      histórico. Regras automáticas de agenda e retenção ficam no nível de
+                      infraestrutura e não são configuradas aqui.
+                    </p>
                   </div>
 
-                  {/* Ações de Backup */}
+                  {/* Ações de Snapshot */}
                   <div className="border-t pt-6 space-y-4">
                     <div className="flex flex-col sm:flex-row gap-3">
                       <button
@@ -1558,7 +1190,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                         className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                         <Database className="h-4 w-4" />
-                        {executingBackup ? 'Executando Backup...' : 'Executar Backup Agora'}
+                        {executingBackup ? 'Gerando Snapshot...' : 'Gerar Snapshot Agora'}
                       </button>
 
                       <button
@@ -1590,7 +1222,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                               backupResult.success ? 'text-green-900' : 'text-red-900'
                             }`}
                           >
-                            {backupResult.success ? 'Backup Concluído' : 'Falha no Backup'}
+                            {backupResult.success ? 'Snapshot Concluído' : 'Falha no Snapshot'}
                           </p>
                           <p
                             className={`text-xs mt-1 ${
@@ -1606,7 +1238,9 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                     {showBackupHistory && backupHistory.length > 0 && (
                       <div className="rounded-lg border border-[#B4BEC9] bg-white">
                         <div className="border-b border-[#DCE6EA] px-4 py-3">
-                          <p className="text-sm font-medium text-[#002333]">Histórico de Backups</p>
+                          <p className="text-sm font-medium text-[#002333]">
+                            Histórico de Snapshots
+                          </p>
                           <p className="text-xs text-gray-500 mt-1">Exibindo os 10 mais recentes.</p>
                         </div>
                         <ul className="divide-y divide-[#EEF3F5]">
@@ -1635,13 +1269,13 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
 
                   {/* Cards Informativos */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-lg border border-amber-200">
-                      <Info className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex items-start gap-3 p-4 bg-[#DEEFE7] rounded-lg border border-[#B4BEC9]">
+                      <Info className="h-5 w-5 text-[#159A9C] flex-shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-sm font-medium text-amber-900">Backup Seguro</p>
-                        <p className="text-xs text-amber-700 mt-1">
-                          Todos os backups são criptografados e armazenados em infraestrutura
-                          redundante.
+                        <p className="text-sm font-medium text-[#002333]">Operação disponível hoje</p>
+                        <p className="text-xs text-[#355061] mt-1">
+                          O recurso atual foi validado para geração manual de snapshot e consulta do
+                          histórico mais recente.
                         </p>
                       </div>
                     </div>
@@ -1649,10 +1283,10 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                     <div className="flex items-start gap-3 p-4 bg-green-50 rounded-lg border border-green-200">
                       <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-sm font-medium text-green-900">Recuperação Rápida</p>
+                        <p className="text-sm font-medium text-green-900">Recuperação</p>
                         <p className="text-xs text-green-700 mt-1">
-                          Em caso de necessidade, entre em contato com suporte para restaurar um
-                          backup.
+                          Em caso de necessidade, acione o suporte com o nome do arquivo do snapshot
+                          para conduzir a restauração.
                         </p>
                       </div>
                     </div>
@@ -1664,7 +1298,6 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                 activeTab !== 'seguranca' &&
                 activeTab !== 'usuarios' &&
                 activeTab !== 'email' &&
-                activeTab !== 'comunicacao' &&
                 activeTab !== 'backup' && (
                   <div className="text-center py-12 text-gray-500">
                     <Info className="h-12 w-12 mx-auto mb-4 text-gray-400" />
