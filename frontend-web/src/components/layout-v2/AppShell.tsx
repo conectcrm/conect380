@@ -1,12 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ChevronDown, LogOut, Menu, Settings, Shield, User, Users, X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useProfile, type PerfilUsuario } from '../../contexts/ProfileContext';
 import { useSidebar } from '../../contexts/SidebarContext';
 import { useModulosAtivos } from '../../hooks/useModuloAtivo';
-import { getMenuParaEmpresa } from '../../config/menuConfig';
+import { getMenuParaEmpresa, type MenuConfig } from '../../config/menuConfig';
 import HierarchicalNavGroup from '../navigation/HierarchicalNavGroup';
+import GlobalSearchCommand, { type GlobalSearchEntry } from '../navigation/GlobalSearchCommand';
 import NotificationCenter from '../notifications/NotificationCenter';
 import Conect360Logo from '../ui/Conect360Logo';
 import ActiveEmpresaBadge from '../tenant/ActiveEmpresaBadge';
@@ -18,6 +19,39 @@ import { openGuardianPortal } from '../../utils/guardianPortal';
 
 type AppShellProps = {
   children: React.ReactNode;
+};
+
+const MOBILE_BREAKPOINT = 768;
+
+const isMobileAutoHideEnabledForViewport = (): boolean => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const screenWidth = typeof window.screen?.width === 'number' ? window.screen.width : window.innerWidth;
+  const screenHeight =
+    typeof window.screen?.height === 'number' ? window.screen.height : window.innerHeight;
+  const shortestScreenEdge = Math.min(screenWidth, screenHeight);
+  const isPhoneLikeScreen = shortestScreenEdge <= 820;
+
+  if (!isPhoneLikeScreen || window.innerWidth >= MOBILE_BREAKPOINT) {
+    return false;
+  }
+
+  const hasTouchFirstViewport =
+    typeof window.matchMedia === 'function' ? window.matchMedia('(hover: none)').matches : false;
+
+  const hasTouchPoints =
+    typeof navigator !== 'undefined' && typeof navigator.maxTouchPoints === 'number'
+      ? navigator.maxTouchPoints > 0
+      : false;
+
+  const isLikelyMobileUserAgent =
+    typeof navigator !== 'undefined'
+      ? /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent || '')
+      : false;
+
+  return hasTouchFirstViewport || (hasTouchPoints && isLikelyMobileUserAgent);
 };
 
 const availableProfiles: Array<{
@@ -68,11 +102,18 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showProfileSelector, setShowProfileSelector] = useState(false);
+  const [isMobileAutoHideEnabled, setIsMobileAutoHideEnabled] = useState(
+    () => isMobileAutoHideEnabledForViewport(),
+  );
+  const [isMobileTopbarHidden, setIsMobileTopbarHidden] = useState(false);
+  const lastScrollYRef = useRef(0);
 
   useEffect(() => {
     setMobileOpen(false);
     setShowUserMenu(false);
     setShowProfileSelector(false);
+    setIsMobileTopbarHidden(false);
+    lastScrollYRef.current = window.scrollY;
     setActiveSubmenuPanel(null);
   }, [location.pathname, setActiveSubmenuPanel]);
 
@@ -91,10 +132,122 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    const SCROLL_HIDE_THRESHOLD = 90;
+    const SCROLL_DELTA_THRESHOLD = 8;
+    let ticking = false;
+
+    const updateTopbarVisibility = () => {
+      ticking = false;
+
+      if (!isMobileAutoHideEnabled) {
+        if (isMobileTopbarHidden) {
+          setIsMobileTopbarHidden(false);
+        }
+        lastScrollYRef.current = window.scrollY;
+        return;
+      }
+
+      const currentScrollY = Math.max(window.scrollY, 0);
+      const scrollDelta = currentScrollY - lastScrollYRef.current;
+
+      if (currentScrollY <= 16) {
+        if (isMobileTopbarHidden) {
+          setIsMobileTopbarHidden(false);
+        }
+      } else if (
+        scrollDelta > SCROLL_DELTA_THRESHOLD &&
+        currentScrollY > SCROLL_HIDE_THRESHOLD &&
+        !isMobileTopbarHidden
+      ) {
+        setIsMobileTopbarHidden(true);
+      } else if (scrollDelta < -SCROLL_DELTA_THRESHOLD && isMobileTopbarHidden) {
+        setIsMobileTopbarHidden(false);
+      }
+
+      lastScrollYRef.current = currentScrollY;
+    };
+
+    const onScroll = () => {
+      if (ticking) {
+        return;
+      }
+
+      ticking = true;
+      window.requestAnimationFrame(updateTopbarVisibility);
+    };
+
+    const onResize = () => {
+      const nextIsMobileAutoHideEnabled = isMobileAutoHideEnabledForViewport();
+      setIsMobileAutoHideEnabled(nextIsMobileAutoHideEnabled);
+
+      if (!nextIsMobileAutoHideEnabled) {
+        setIsMobileTopbarHidden(false);
+      }
+    };
+
+    lastScrollYRef.current = window.scrollY;
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onResize, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [isMobileAutoHideEnabled, isMobileTopbarHidden]);
+
   const menuFiltrado = useMemo(() => {
     if (loadingModulos) return [];
     return getMenuParaEmpresa(modulosAtivos, user);
   }, [loadingModulos, modulosAtivos, user]);
+
+  const globalSearchEntries = useMemo<GlobalSearchEntry[]>(() => {
+    const normalizePath = (href: string): string => {
+      if (href.length > 1 && href.endsWith('/')) {
+        return href.slice(0, -1);
+      }
+      return href;
+    };
+
+    const entriesByPath = new Map<string, GlobalSearchEntry>();
+
+    const visit = (items: MenuConfig[], trail: string[] = []): void => {
+      items.forEach((item) => {
+        const nextTrail = [...trail, item.title];
+
+        if (item.href) {
+          const normalizedHref = normalizePath(item.href);
+          const parentTrail = trail.join(' / ');
+
+          const entry: GlobalSearchEntry = {
+            id: `${item.id}-${normalizedHref}`,
+            title: item.title,
+            href: item.href,
+            icon: item.icon,
+            section: trail[0] ?? item.title,
+            subtitle: parentTrail || undefined,
+            keywords: [item.shortTitle, item.group, item.section].filter(Boolean) as string[],
+          };
+
+          const existing = entriesByPath.get(normalizedHref);
+          const shouldReplace = !existing || (!existing.subtitle && Boolean(entry.subtitle));
+          if (shouldReplace) {
+            entriesByPath.set(normalizedHref, entry);
+          }
+        }
+
+        if (item.children?.length) {
+          visit(item.children, nextTrail);
+        }
+      });
+    };
+
+    visit(menuFiltrado);
+
+    return Array.from(entriesByPath.values()).sort((a, b) =>
+      a.title.localeCompare(b.title, 'pt-BR', { sensitivity: 'base' }),
+    );
+  }, [menuFiltrado]);
 
   const roleKey = String(user?.role || '').toLowerCase();
   const isAdmin =
@@ -182,183 +335,184 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
       <div className="min-h-screen md:pl-[74px]">
         <header className={`sticky top-0 z-20 ${shellTokens.topbar}`}>
-          <div className={`flex h-[86px] items-center justify-between ${shellSpacing.pageOuterX}`}>
-            <div className="flex items-center gap-3">
-              <button
-                data-testid="mobile-menu-open"
-                type="button"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#D6E3E7] text-[#496372] md:hidden"
-                onClick={() => setMobileOpen(true)}
-                aria-label="Abrir menu"
-              >
-                <Menu className="h-5 w-5" />
-              </button>
-              <div className="md:hidden">
-                <Brand />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2" data-testid="topbar-actions-tray">
-              {isSuperAdmin ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleOpenGuardianCompanies}
-                    className="rounded-full outline-none transition-transform hover:-translate-y-[1px] focus-visible:ring-2 focus-visible:ring-[#159A9C]/30 sm:hidden"
-                    title="Abrir painel Guardian"
-                    aria-label="Abrir painel Guardian"
-                  >
-                    <ActiveEmpresaBadge variant="header" compact />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleOpenGuardianCompanies}
-                    className="hidden rounded-full outline-none transition-transform hover:-translate-y-[1px] focus-visible:ring-2 focus-visible:ring-[#159A9C]/30 sm:inline-flex"
-                    title="Abrir painel Guardian"
-                    aria-label="Abrir painel Guardian"
-                  >
-                    <ActiveEmpresaBadge variant="header" />
-                  </button>
-                </>
-              ) : (
-                <>
-                  <ActiveEmpresaBadge variant="header" compact className="sm:hidden" />
-                  <ActiveEmpresaBadge variant="header" className="hidden sm:inline-flex" />
-                </>
-              )}
-              <NotificationCenter />
-
-              <div className="relative" data-user-menu>
+          <div
+            data-testid="mobile-topbar-container"
+            className={`transition-[max-height,opacity,transform] duration-200 ease-out md:max-h-[86px] md:translate-y-0 md:opacity-100 md:pointer-events-auto ${
+              isMobileAutoHideEnabled && isMobileTopbarHidden
+                ? 'max-h-0 -translate-y-2 opacity-0 pointer-events-none overflow-hidden'
+                : 'max-h-[86px] translate-y-0 opacity-100 overflow-visible'
+            }`}
+          >
+            <div className={`flex h-[86px] items-center justify-between ${shellSpacing.pageOuterX}`}>
+              <div className="flex items-center gap-3">
                 <button
+                  data-testid="mobile-menu-open"
                   type="button"
-                  data-user-menu
-                  onClick={() => setShowUserMenu((value) => !value)}
-                  className="inline-flex items-center gap-2 rounded-full border border-[#D2E0E6] bg-white px-2 py-1.5 hover:bg-[#F5FBF9]"
-                  aria-label="Perfil do usuario"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#D6E3E7] text-[#496372] md:hidden"
+                  onClick={() => setMobileOpen(true)}
+                  aria-label="Abrir menu"
                 >
-                  <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[#20B4A7] to-[#118A88] text-[11px] font-bold text-white">
-                    {avatarUrl ? (
-                      <img
-                        src={avatarUrl}
-                        alt={user?.nome || 'Usuario'}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      initials
-                    )}
-                  </span>
-                  <span className="hidden text-left sm:block">
-                    <span className="block text-[11px] leading-none text-[#55707E]">
-                      {user?.nome || 'Administrador'}
-                    </span>
-                    <span className="mt-1 block text-[11px] font-semibold leading-none text-[#1D3E4F]">
-                      {roleKey === 'superadmin' ? 'Super Admin' : 'Administrador'}
-                    </span>
-                  </span>
-                  <ChevronDown className="h-4 w-4 text-[#6A8795]" />
+                  <Menu className="h-5 w-5" />
                 </button>
+                <div className="md:hidden">
+                  <Conect360Logo variant="icon" size="sm" className="h-8 w-8" />
+                </div>
+              </div>
 
-                {showUserMenu ? (
-                  <div
-                    data-user-menu
-                    className="absolute right-0 top-full z-50 mt-2 w-72 rounded-2xl border border-[#D8E5E9] bg-white p-2 shadow-[0_28px_56px_-40px_rgba(7,36,51,0.8)]"
-                  >
-                    <Link
-                      to="/perfil"
-                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-[#214251] hover:bg-[#EEF5F8]"
-                      onClick={() => setShowUserMenu(false)}
-                    >
-                      <User className="h-4 w-4 text-[#5F7B88]" />
-                      Meu Perfil
-                    </Link>
+              <div className="flex items-center gap-2" data-testid="topbar-actions-tray">
+                <GlobalSearchCommand entries={globalSearchEntries} />
 
+                {isSuperAdmin ? (
+                  <>
                     <button
                       type="button"
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        navigate('/configuracoes/empresa');
-                      }}
-                      className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-[#214251] hover:bg-[#EEF5F8]"
+                      onClick={handleOpenGuardianCompanies}
+                      className="hidden rounded-full outline-none transition-transform hover:-translate-y-[1px] focus-visible:ring-2 focus-visible:ring-[#159A9C]/30 sm:inline-flex"
+                      title="Abrir painel Guardian"
+                      aria-label="Abrir painel Guardian"
                     >
-                      <Settings className="h-4 w-4 text-[#5F7B88]" />
-                      Configuracoes
+                      <ActiveEmpresaBadge variant="header" />
                     </button>
+                  </>
+                ) : (
+                  <>
+                    <ActiveEmpresaBadge variant="header" className="hidden sm:inline-flex" />
+                  </>
+                )}
+                <NotificationCenter />
 
-                    {canAccessGuardian ? (
+                <div className="relative" data-user-menu>
+                  <button
+                    type="button"
+                    data-user-menu
+                    onClick={() => setShowUserMenu((value) => !value)}
+                    className="inline-flex items-center gap-2 rounded-full border border-[#D2E0E6] bg-white px-2 py-1.5 hover:bg-[#F5FBF9]"
+                    aria-label="Perfil do usuario"
+                  >
+                    <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[#20B4A7] to-[#118A88] text-[11px] font-bold text-white">
+                      {avatarUrl ? (
+                        <img
+                          src={avatarUrl}
+                          alt={user?.nome || 'Usuario'}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        initials
+                      )}
+                    </span>
+                    <span className="hidden text-left sm:block">
+                      <span className="block text-[11px] leading-none text-[#55707E]">
+                        {user?.nome || 'Administrador'}
+                      </span>
+                      <span className="mt-1 block text-[11px] font-semibold leading-none text-[#1D3E4F]">
+                        {roleKey === 'superadmin' ? 'Super Admin' : 'Administrador'}
+                      </span>
+                    </span>
+                    <ChevronDown className="h-4 w-4 text-[#6A8795]" />
+                  </button>
+
+                  {showUserMenu ? (
+                    <div
+                      data-user-menu
+                      className="absolute right-0 top-full z-50 mt-2 w-72 rounded-2xl border border-[#D8E5E9] bg-white p-2 shadow-[0_28px_56px_-40px_rgba(7,36,51,0.8)]"
+                    >
+                      <Link
+                        to="/perfil"
+                        className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-[#214251] hover:bg-[#EEF5F8]"
+                        onClick={() => setShowUserMenu(false)}
+                      >
+                        <User className="h-4 w-4 text-[#5F7B88]" />
+                        Meu Perfil
+                      </Link>
+
                       <button
                         type="button"
                         onClick={() => {
                           setShowUserMenu(false);
-                          openGuardianPortal('/governance/companies');
+                          navigate('/configuracoes/empresa');
                         }}
                         className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-[#214251] hover:bg-[#EEF5F8]"
                       >
-                        <Shield className="h-4 w-4 text-[#5F7B88]" />
-                        Painel Guardian
+                        <Settings className="h-4 w-4 text-[#5F7B88]" />
+                        Configuracoes
                       </button>
-                    ) : null}
 
-                    {isAdmin ? (
-                      <div className="relative mt-1" data-profile-selector>
+                      {canAccessGuardian ? (
                         <button
                           type="button"
-                          onClick={() => setShowProfileSelector((value) => !value)}
-                          className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm font-medium text-[#214251] hover:bg-[#EEF5F8]"
+                          onClick={() => {
+                            setShowUserMenu(false);
+                            openGuardianPortal('/governance/companies');
+                          }}
+                          className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-[#214251] hover:bg-[#EEF5F8]"
                         >
-                          <span className="inline-flex items-center gap-2">
-                            <Users className="h-4 w-4 text-[#5F7B88]" />
-                            Alterar Perfil
-                          </span>
-                          <span
-                            className={`rounded px-1.5 py-0.5 text-xs ${getTipoColor(perfilSelecionado)}`}
-                          >
-                            {getCurrentProfile().nome}
-                          </span>
+                          <Shield className="h-4 w-4 text-[#5F7B88]" />
+                          Painel Guardian
                         </button>
+                      ) : null}
 
-                        {showProfileSelector ? (
-                          <div
-                            data-profile-selector
-                            className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-xl border border-[#D8E5E9] bg-white shadow-[0_24px_48px_-36px_rgba(7,36,51,0.8)]"
+                      {isAdmin ? (
+                        <div className="relative mt-1" data-profile-selector>
+                          <button
+                            type="button"
+                            onClick={() => setShowProfileSelector((value) => !value)}
+                            className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm font-medium text-[#214251] hover:bg-[#EEF5F8]"
                           >
-                            <div className="max-h-64 overflow-y-auto">
-                              {availableProfiles.map((profile) => (
-                                <button
-                                  key={profile.id}
-                                  type="button"
-                                  onClick={() => handleProfileSelect(profile.id)}
-                                  className={`w-full border-l-2 px-3 py-2 text-left hover:bg-[#F6FBF9] ${
-                                    perfilSelecionado === profile.id
-                                      ? 'border-[#159A9C] bg-[#159A9C]/5'
-                                      : 'border-transparent'
-                                  }`}
-                                >
-                                  <div className="text-sm font-semibold text-[#214251]">
-                                    {profile.nome}
-                                  </div>
-                                  <div className="text-xs text-[#6A8795]">{profile.descricao}</div>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
+                            <span className="inline-flex items-center gap-2">
+                              <Users className="h-4 w-4 text-[#5F7B88]" />
+                              Alterar Perfil
+                            </span>
+                            <span
+                              className={`rounded px-1.5 py-0.5 text-xs ${getTipoColor(perfilSelecionado)}`}
+                            >
+                              {getCurrentProfile().nome}
+                            </span>
+                          </button>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        logout();
-                        navigate('/login');
-                      }}
-                      className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-[#B4233A] hover:bg-[#FFF2F4]"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      Sair
-                    </button>
-                  </div>
-                ) : null}
+                          {showProfileSelector ? (
+                            <div
+                              data-profile-selector
+                              className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-xl border border-[#D8E5E9] bg-white shadow-[0_24px_48px_-36px_rgba(7,36,51,0.8)]"
+                            >
+                              <div className="max-h-64 overflow-y-auto">
+                                {availableProfiles.map((profile) => (
+                                  <button
+                                    key={profile.id}
+                                    type="button"
+                                    onClick={() => handleProfileSelect(profile.id)}
+                                    className={`w-full border-l-2 px-3 py-2 text-left hover:bg-[#F6FBF9] ${
+                                      perfilSelecionado === profile.id
+                                        ? 'border-[#159A9C] bg-[#159A9C]/5'
+                                        : 'border-transparent'
+                                    }`}
+                                  >
+                                    <div className="text-sm font-semibold text-[#214251]">
+                                      {profile.nome}
+                                    </div>
+                                    <div className="text-xs text-[#6A8795]">{profile.descricao}</div>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          logout();
+                          navigate('/login');
+                        }}
+                        className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-[#B4233A] hover:bg-[#FFF2F4]"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        Sair
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </div>
           </div>
