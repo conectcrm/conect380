@@ -57,6 +57,8 @@ const DEBUG = process.env.REACT_APP_DEBUG_WS === 'true';
 
 // x SINGLETON: Garantir apenas 1 instância WebSocket
 let globalSocket: Socket | null = null;
+let providerInstanceCount = 0;
+let globalCleanupTimer: number | null = null;
 
 export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }) => {
   const [connected, setConnected] = useState(false);
@@ -71,6 +73,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
   }, [connecting]);
 
   const connect = () => {
+    if (globalCleanupTimer) {
+      window.clearTimeout(globalCleanupTimer);
+      globalCleanupTimer = null;
+    }
+
     // Se já está conectado, não fazer nada
     if (globalSocket?.connected) {
       if (DEBUG) console.log('"️ [WebSocketContext] WebSocket já conectado');
@@ -207,6 +214,18 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
   }, [isAuthenticated]);
 
   useEffect(() => {
+    providerInstanceCount += 1;
+    if (globalCleanupTimer) {
+      window.clearTimeout(globalCleanupTimer);
+      globalCleanupTimer = null;
+    }
+
+    return () => {
+      providerInstanceCount = Math.max(0, providerInstanceCount - 1);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isAuthenticated || typeof window === 'undefined') {
       return;
     }
@@ -235,12 +254,19 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
   useEffect(
     () => () => {
       // S& Delay pequeno para evitar desconexão prematura no StrictMode
-      setTimeout(() => {
+      if (globalCleanupTimer) {
+        window.clearTimeout(globalCleanupTimer);
+      }
+      globalCleanupTimer = window.setTimeout(() => {
+        if (providerInstanceCount > 0) {
+          globalCleanupTimer = null;
+          return;
+        }
         if (globalSocket) {
           try {
             if (DEBUG) console.log('xR [WebSocketContext] Desconectando WebSocket');
             // S& Verificar se está conectado antes de desconectar
-            if (globalSocket.connected || globalSocket.active) {
+            if (globalSocket.connected) {
               globalSocket.disconnect();
             }
           } catch (err) {
@@ -252,6 +278,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
               window.clearTimeout(reconnectTimeoutRef.current);
               reconnectTimeoutRef.current = null;
             }
+            globalCleanupTimer = null;
           }
         }
       }, 100);
@@ -280,5 +307,3 @@ export const useWebSocketStatus = () => {
   }
   return context;
 };
-
-
