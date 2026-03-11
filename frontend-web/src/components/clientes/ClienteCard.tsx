@@ -113,7 +113,7 @@ export const ClienteCard: React.FC<ClienteCardProps> = ({
               onView?.(cliente);
             }}
             className="rounded-lg p-1 text-[#7A95A2] transition-colors hover:bg-[#EAF3F6] hover:text-[#159A9C]"
-            title="Ver detalhes"
+            title="Abrir perfil"
           >
             <Eye className="h-3.5 w-3.5" />
           </button>

@@ -2,13 +2,11 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import toast from 'react-hot-toast';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import ModalCadastroCliente from '../../components/modals/ModalCadastroCliente';
-import { ModalDetalhesCliente } from '../../components/modals/ModalDetalhesCliente';
 import { ClienteCard } from '../../components/clientes';
 import { useGlobalConfirmation } from '../../contexts/GlobalConfirmationContext';
 import {
   clientesService,
   Cliente,
-  ClienteAttachment,
   CreateClientePayload,
   ClienteFilters,
   ClientesEstatisticas,
@@ -116,17 +114,6 @@ type PersistedClientesPageState = {
 };
 
 type SaveViewModalMode = 'save' | 'rename';
-
-type ClienteNotasResumo = {
-  total: number;
-  importantes: number;
-};
-
-type ClienteDemandasResumo = {
-  total: number;
-  abertas: number;
-  urgentes: number;
-};
 
 const loadPersistedClientesState = (): Partial<PersistedClientesPageState> => {
   if (typeof window === 'undefined') {
@@ -240,16 +227,8 @@ const ClientesPage: React.FC = () => {
   const [selectedTipo, setSelectedTipo] = useState(persistedStateRef.current.tipo ?? '');
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [isModalLoading, setIsModalLoading] = useState(false);
-  const [clienteAttachments, setClienteAttachments] = useState<ClienteAttachment[]>([]);
-  const [attachmentsLoading, setAttachmentsLoading] = useState(false);
-  const [clienteNotasResumo, setClienteNotasResumo] = useState<ClienteNotasResumo | null>(null);
-  const [clienteDemandasResumo, setClienteDemandasResumo] = useState<ClienteDemandasResumo | null>(
-    null,
-  );
-  const [relacionamentosLoading, setRelacionamentosLoading] = useState(false);
   const [viewMode, setViewMode] = useState<ClientesViewMode>(() => {
     if (persistedStateRef.current.viewMode) {
       return persistedStateRef.current.viewMode;
@@ -323,12 +302,14 @@ const ClientesPage: React.FC = () => {
   const hasAppliedDefaultViewRef = useRef(false);
   const processedHighlightRef = useRef('');
   const clientesRequestRef = useRef(0);
-  const attachmentsRequestRef = useRef(0);
-  const relacionamentosRequestRef = useRef(0);
   const inFlightLoadKeyRef = useRef<string | null>(null);
   const lastEstatisticasLoadedAtRef = useRef(0);
   const hasLoadedEstatisticasRef = useRef(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const clientesProfileBasePath = useMemo(
+    () => (location.pathname.startsWith('/crm/') ? '/crm/clientes' : '/clientes'),
+    [location.pathname],
+  );
 
   // Funcao para calcular estatisticas baseadas nos dados carregados
   const calcularEstatisticasLocais = useCallback((clientesData: Cliente[]) => {
@@ -709,8 +690,7 @@ const ClientesPage: React.FC = () => {
 
     const clienteDaPagina = clientes.find((cliente) => cliente.id === highlightId);
     if (clienteDaPagina) {
-      setSelectedCliente(clienteDaPagina);
-      setShowDetailsModal(true);
+      navigate(`${clientesProfileBasePath}/${clienteDaPagina.id}`);
       setSearchParams(nextParams, { replace: true });
       return;
     }
@@ -721,8 +701,7 @@ const ClientesPage: React.FC = () => {
       try {
         const cliente = await clientesService.getClienteById(highlightId);
         if (!cancelled && cliente?.id) {
-          setSelectedCliente(cliente);
-          setShowDetailsModal(true);
+          navigate(`${clientesProfileBasePath}/${cliente.id}`);
         }
       } catch {
         if (!cancelled) {
@@ -742,66 +721,7 @@ const ClientesPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [clientes, isLoading, searchParams, setSearchParams]);
-
-  const loadClienteAttachments = useCallback(async (clienteId: string) => {
-    const requestId = ++attachmentsRequestRef.current;
-
-    try {
-      setAttachmentsLoading(true);
-      const attachments = await clientesService.listarAnexosCliente(clienteId);
-
-      if (attachmentsRequestRef.current !== requestId) {
-        return;
-      }
-
-      setClienteAttachments(attachments);
-    } catch (error) {
-      if (attachmentsRequestRef.current !== requestId) {
-        return;
-      }
-
-      console.error('Erro ao carregar anexos do cliente:', error);
-      setClienteAttachments([]);
-      toast.error('Nao foi possivel carregar os anexos do cliente.');
-    } finally {
-      if (attachmentsRequestRef.current === requestId) {
-        setAttachmentsLoading(false);
-      }
-    }
-  }, []);
-
-  const loadClienteRelacionamentos = useCallback(async (clienteId: string) => {
-    const requestId = ++relacionamentosRequestRef.current;
-
-    try {
-      setRelacionamentosLoading(true);
-
-      const [notasResumo, demandasResumo] = await Promise.all([
-        clientesService.contarNotasCliente(clienteId).catch(() => null),
-        clientesService.contarDemandasCliente(clienteId).catch(() => null),
-      ]);
-
-      if (relacionamentosRequestRef.current !== requestId) {
-        return;
-      }
-
-      setClienteNotasResumo(notasResumo);
-      setClienteDemandasResumo(demandasResumo);
-    } catch (error) {
-      if (relacionamentosRequestRef.current !== requestId) {
-        return;
-      }
-
-      console.error('Erro ao carregar resumo de relacionamentos do cliente:', error);
-      setClienteNotasResumo(null);
-      setClienteDemandasResumo(null);
-    } finally {
-      if (relacionamentosRequestRef.current === requestId) {
-        setRelacionamentosLoading(false);
-      }
-    }
-  }, []);
+  }, [clientes, clientesProfileBasePath, isLoading, navigate, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -842,22 +762,6 @@ const ClientesPage: React.FC = () => {
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [searchTerm]);
-
-  useEffect(() => {
-    if (!showDetailsModal || !selectedCliente?.id) {
-      attachmentsRequestRef.current += 1;
-      relacionamentosRequestRef.current += 1;
-      setClienteAttachments([]);
-      setAttachmentsLoading(false);
-      setClienteNotasResumo(null);
-      setClienteDemandasResumo(null);
-      setRelacionamentosLoading(false);
-      return;
-    }
-
-    loadClienteAttachments(selectedCliente.id);
-    loadClienteRelacionamentos(selectedCliente.id);
-  }, [loadClienteAttachments, loadClienteRelacionamentos, selectedCliente?.id, showDetailsModal]);
 
   // Notificacao de boas-vindas removida - usar apenas toast para feedback imediato
 
@@ -1561,15 +1465,6 @@ const ClientesPage: React.FC = () => {
       await clientesService.deleteCliente(id);
       await loadClientes(true);
 
-      if (selectedCliente?.id === id) {
-        setShowDetailsModal(false);
-        setSelectedCliente(null);
-        setClienteAttachments([]);
-        setClienteNotasResumo(null);
-        setClienteDemandasResumo(null);
-        setRelacionamentosLoading(false);
-      }
-
       setSelectedClientes((prev) => prev.filter((clienteId) => clienteId !== id));
       setExcludedClientes((prev) => prev.filter((clienteId) => clienteId !== id));
       toast.dismiss(loadingToast);
@@ -1653,15 +1548,10 @@ const ClientesPage: React.FC = () => {
   };
 
   const handleViewCliente = (cliente: Cliente) => {
-    setSelectedCliente(cliente);
-    setShowDetailsModal(true);
-  };
-
-  const handleOpenClienteProfile = (clienteId: string) => {
-    const basePath = location.pathname.startsWith('/crm/') ? '/crm/clientes' : '/clientes';
-    setShowDetailsModal(false);
-    setSelectedCliente(null);
-    navigate(`${basePath}/${clienteId}`);
+    if (!cliente.id) {
+      return;
+    }
+    navigate(`${clientesProfileBasePath}/${cliente.id}`);
   };
 
   const handleAvatarUpdate = (clienteId: string, avatar: UploadResult) => {
@@ -1683,33 +1573,11 @@ const ClientesPage: React.FC = () => {
     });
   };
 
-  const handleAttachmentAdd = async (clienteId: string, attachment: UploadResult) => {
-    if (selectedCliente?.id === clienteId && showDetailsModal) {
-      await loadClienteAttachments(clienteId);
-    }
-
+  const handleAttachmentAdd = async (_clienteId: string, attachment: UploadResult) => {
     toast.success(`Anexo ${attachment.fileName} adicionado com sucesso.`, {
       duration: 3500,
       position: 'top-right',
     });
-  };
-
-  const handleAttachmentRemove = async (clienteId: string, attachmentId: string) => {
-    try {
-      await clientesService.removerAnexoCliente(clienteId, attachmentId);
-
-      setClienteAttachments((prev) => prev.filter((attachment) => attachment.id !== attachmentId));
-      toast.success('Anexo removido com sucesso.', {
-        duration: 3000,
-        position: 'top-right',
-      });
-    } catch (error) {
-      console.error('Erro ao remover anexo do cliente:', error);
-      toast.error('Nao foi possivel remover o anexo.', {
-        duration: 5000,
-        position: 'top-right',
-      });
-    }
   };
 
   const isInitialLoading = isLoading && clientes.length === 0;
@@ -2392,7 +2260,7 @@ const ClientesPage: React.FC = () => {
                                 handleViewCliente(cliente);
                               }}
                               className="rounded-lg p-1.5 text-[#7A95A2] transition-colors hover:bg-[#EAF3F6] hover:text-[#159A9C]"
-                              title="Ver detalhes"
+                              title="Abrir perfil"
                             >
                               <Eye className="h-4 w-4" />
                             </button>
@@ -2587,32 +2455,6 @@ const ClientesPage: React.FC = () => {
         onSave={handleSaveCliente}
         cliente={selectedCliente}
         isLoading={isModalLoading}
-      />
-
-      {/* Modal de Detalhes */}
-      <ModalDetalhesCliente
-        key={selectedCliente?.id ?? 'detalhes-cliente'}
-        isOpen={showDetailsModal}
-        onClose={() => {
-          setShowDetailsModal(false);
-          setSelectedCliente(null);
-        }}
-        cliente={selectedCliente}
-        onEdit={(cliente) => {
-          setShowDetailsModal(false);
-          setSelectedCliente(cliente);
-          setShowCreateModal(true);
-        }}
-        onDelete={handleDeleteCliente}
-        onOpenProfile={handleOpenClienteProfile}
-        onAvatarUpdate={handleAvatarUpdate}
-        onAttachmentAdd={handleAttachmentAdd}
-        attachments={clienteAttachments}
-        attachmentsLoading={attachmentsLoading}
-        onAttachmentRemove={handleAttachmentRemove}
-        notasResumo={clienteNotasResumo}
-        demandasResumo={clienteDemandasResumo}
-        relacionamentosLoading={relacionamentosLoading}
       />
     </div>
   );
