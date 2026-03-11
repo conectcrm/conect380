@@ -24,6 +24,10 @@ export interface User {
       email?: boolean;
       push?: boolean;
     };
+    seguranca?: {
+      mfa_login_habilitado?: boolean;
+    };
+    mfa_login_habilitado?: boolean;
   };
   idioma_preferido: string;
   ultimo_login?: string | Date | null;

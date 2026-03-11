@@ -36,6 +36,7 @@ type ProfileFormState = {
   idioma_preferido: string;
   notificacoes_email: boolean;
   notificacoes_push: boolean;
+  mfa_login_habilitado: boolean;
 };
 
 type PasswordFormState = {
@@ -54,6 +55,7 @@ const DEFAULT_PROFILE_FORM: ProfileFormState = {
   idioma_preferido: 'pt-BR',
   notificacoes_email: true,
   notificacoes_push: true,
+  mfa_login_habilitado: true,
 };
 
 const DEFAULT_PASSWORD_FORM: PasswordFormState = {
@@ -178,6 +180,12 @@ const buildProfileState = (user: AuthUser | null): ProfileFormState => ({
     typeof user?.configuracoes?.notificacoes?.push === 'boolean'
       ? user.configuracoes.notificacoes.push
       : true,
+  mfa_login_habilitado:
+    typeof user?.configuracoes?.seguranca?.mfa_login_habilitado === 'boolean'
+      ? user.configuracoes.seguranca.mfa_login_habilitado
+      : typeof user?.configuracoes?.mfa_login_habilitado === 'boolean'
+        ? user.configuracoes.mfa_login_habilitado
+        : true,
 });
 
 const areProfileStatesEqual = (left: ProfileFormState, right: ProfileFormState): boolean =>
@@ -185,7 +193,8 @@ const areProfileStatesEqual = (left: ProfileFormState, right: ProfileFormState):
   left.telefone.trim() === right.telefone.trim() &&
   left.idioma_preferido === right.idioma_preferido &&
   left.notificacoes_email === right.notificacoes_email &&
-  left.notificacoes_push === right.notificacoes_push;
+  left.notificacoes_push === right.notificacoes_push &&
+  left.mfa_login_habilitado === right.mfa_login_habilitado;
 
 const PerfilPage: React.FC = () => {
   const location = useLocation();
@@ -230,6 +239,8 @@ const PerfilPage: React.FC = () => {
     user?.idioma_preferido,
     user?.configuracoes?.notificacoes?.email,
     user?.configuracoes?.notificacoes?.push,
+    user?.configuracoes?.seguranca?.mfa_login_habilitado,
+    user?.configuracoes?.mfa_login_habilitado,
   ]);
 
   useEffect(() => {
@@ -267,6 +278,10 @@ const PerfilPage: React.FC = () => {
     () => !areProfileStatesEqual(profileForm, baselineProfileForm),
     [profileForm, baselineProfileForm],
   );
+  const canConfigureLoginMfa = useMemo(() => {
+    const normalizedRole = String(user?.role || '').trim().toLowerCase();
+    return ['superadmin', 'admin', 'manager', 'gerente'].includes(normalizedRole);
+  }, [user?.role]);
 
   const canSaveProfile =
     Boolean(user) &&
@@ -454,6 +469,9 @@ const PerfilPage: React.FC = () => {
 
       const telefoneLimpo = profileForm.telefone.trim();
       const existingConfig = user.configuracoes || {};
+      const mfaPreferenceConfig = {
+        mfa_login_habilitado: profileForm.mfa_login_habilitado,
+      };
       let nextProfileState = profileForm;
       let avatarUrlFinal = user.avatar_url;
       let updatedAtFinal = user.updated_at || new Date();
@@ -464,6 +482,11 @@ const PerfilPage: React.FC = () => {
           email: profileForm.notificacoes_email,
           push: profileForm.notificacoes_push,
         },
+        seguranca: {
+          ...(existingConfig.seguranca || {}),
+          ...mfaPreferenceConfig,
+        },
+        ...mfaPreferenceConfig,
       };
 
       const payloadConfig = {
@@ -473,6 +496,11 @@ const PerfilPage: React.FC = () => {
           email: profileForm.notificacoes_email,
           push: profileForm.notificacoes_push,
         },
+        seguranca: {
+          ...(existingConfig.seguranca || {}),
+          ...mfaPreferenceConfig,
+        },
+        ...mfaPreferenceConfig,
       };
 
       if (hasProfileChanges) {
@@ -499,6 +527,12 @@ const PerfilPage: React.FC = () => {
             typeof updatedUser.configuracoes?.notificacoes?.push === 'boolean'
               ? updatedUser.configuracoes.notificacoes.push
               : profileForm.notificacoes_push,
+          mfa_login_habilitado:
+            typeof updatedUser.configuracoes?.seguranca?.mfa_login_habilitado === 'boolean'
+              ? updatedUser.configuracoes.seguranca.mfa_login_habilitado
+              : typeof updatedUser.configuracoes?.mfa_login_habilitado === 'boolean'
+                ? updatedUser.configuracoes.mfa_login_habilitado
+                : profileForm.mfa_login_habilitado,
         };
 
         setProfileForm(nextProfileState);
@@ -513,6 +547,12 @@ const PerfilPage: React.FC = () => {
             email: nextProfileState.notificacoes_email,
             push: nextProfileState.notificacoes_push,
           },
+          seguranca: {
+            ...(user.configuracoes?.seguranca || {}),
+            ...(updatedUser.configuracoes?.seguranca || {}),
+            mfa_login_habilitado: nextProfileState.mfa_login_habilitado,
+          },
+          mfa_login_habilitado: nextProfileState.mfa_login_habilitado,
         };
 
         updatedAtFinal = updatedUser.updated_at || new Date();
@@ -894,6 +934,35 @@ const PerfilPage: React.FC = () => {
                     />
                   </label>
                 </div>
+
+                {canConfigureLoginMfa ? (
+                  <div className="space-y-3 rounded-lg border border-[#E5EEF2] bg-white p-4">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+                      <Shield className="h-4 w-4 text-[#159A9C]" />
+                      Preferencia de seguranca
+                    </div>
+
+                    <label className={preferenceToggleRowClassName}>
+                      <div>
+                        <span className="text-sm text-gray-700">
+                          Verificacao em duas etapas no login (2FA)
+                        </span>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Controla sua preferencia individual de seguranca para acessos
+                          administrativos.
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={profileForm.mfa_login_habilitado}
+                        onChange={(event) =>
+                          handleProfileChange('mfa_login_habilitado', event.target.checked)
+                        }
+                        className={`mt-0.5 ${checkboxClassName}`}
+                      />
+                    </label>
+                  </div>
+                ) : null}
 
                 <div className="space-y-3 rounded-lg border border-[#E5EEF2] bg-white p-4">
                   <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">

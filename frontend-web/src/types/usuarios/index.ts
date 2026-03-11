@@ -30,6 +30,10 @@ export interface Usuario {
       email?: boolean;
       push?: boolean;
     };
+    seguranca?: {
+      mfa_login_habilitado?: boolean;
+    };
+    mfa_login_habilitado?: boolean;
   };
   ativo: boolean;
   deve_trocar_senha?: boolean;
@@ -63,6 +67,10 @@ export interface NovoUsuario {
       email?: boolean;
       push?: boolean;
     };
+    seguranca?: {
+      mfa_login_habilitado?: boolean;
+    };
+    mfa_login_habilitado?: boolean;
   };
   ativo?: boolean;
 }
@@ -82,6 +90,10 @@ export interface AtualizarUsuario {
       email?: boolean;
       push?: boolean;
     };
+    seguranca?: {
+      mfa_login_habilitado?: boolean;
+    };
+    mfa_login_habilitado?: boolean;
   };
   ativo?: boolean;
 }

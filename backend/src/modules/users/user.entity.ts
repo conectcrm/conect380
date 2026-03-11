@@ -82,6 +82,10 @@ export class User {
       email?: boolean;
       push?: boolean;
     };
+    seguranca?: {
+      mfa_login_habilitado?: boolean;
+    };
+    mfa_login_habilitado?: boolean;
   };
 
   @Column({ default: true })

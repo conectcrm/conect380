@@ -606,13 +606,35 @@ export class AuthService {
       .execute();
   }
 
-  private async shouldRequireAdminMfa(user: Pick<User, 'role' | 'empresa_id'>): Promise<boolean> {
-    if (!this.isAdminRoleForMfa(user.role)) {
-      return false;
+  private resolveUserMfaPreference(
+    user: Pick<User, 'configuracoes'>,
+  ): boolean | null {
+    const configuracoes = user?.configuracoes;
+    if (!configuracoes || typeof configuracoes !== 'object') {
+      return null;
     }
 
-    if (String(user.role || '').trim().toLowerCase() === UserRole.SUPERADMIN) {
-      return true;
+    const seguranca = (configuracoes as Record<string, unknown>).seguranca;
+    if (seguranca && typeof seguranca === 'object') {
+      const nestedPreference = (seguranca as Record<string, unknown>).mfa_login_habilitado;
+      if (typeof nestedPreference === 'boolean') {
+        return nestedPreference;
+      }
+    }
+
+    const legacyPreference = (configuracoes as Record<string, unknown>).mfa_login_habilitado;
+    if (typeof legacyPreference === 'boolean') {
+      return legacyPreference;
+    }
+
+    return null;
+  }
+
+  private async shouldRequireAdminMfa(
+    user: Pick<User, 'role' | 'empresa_id' | 'configuracoes'>,
+  ): Promise<boolean> {
+    if (!this.isAdminRoleForMfa(user.role)) {
+      return false;
     }
 
     const globalAdminMfaRequired = this.parseBooleanFlag(
@@ -622,6 +644,11 @@ export class AuthService {
 
     if (globalAdminMfaRequired) {
       return true;
+    }
+
+    const userMfaPreference = this.resolveUserMfaPreference(user);
+    if (userMfaPreference !== null) {
+      return userMfaPreference;
     }
 
     if (!user.empresa_id) {

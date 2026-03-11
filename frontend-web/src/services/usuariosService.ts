@@ -296,7 +296,17 @@ class UsuariosService {
 
   // Formatador específico para o tipo User (usado no contexto de autenticação)
   private formatarUsuarioParaUser(usuario: any): User {
-    const notificacoes = usuario.configuracoes?.notificacoes;
+    const existingConfig =
+      usuario.configuracoes && typeof usuario.configuracoes === 'object' ? usuario.configuracoes : {};
+    const notificacoes = existingConfig.notificacoes;
+    const nestedMfaPreference = existingConfig?.seguranca?.mfa_login_habilitado;
+    const legacyMfaPreference = existingConfig?.mfa_login_habilitado;
+    const mfaLoginHabilitado =
+      typeof nestedMfaPreference === 'boolean'
+        ? nestedMfaPreference
+        : typeof legacyMfaPreference === 'boolean'
+          ? legacyMfaPreference
+          : undefined;
 
     return {
       id: usuario.id,
@@ -308,8 +318,10 @@ class UsuariosService {
       permissions: usuario.permissions || usuario.permissoes || [],
       avatar_url: usuario.avatar_url,
       configuracoes: {
-        tema: usuario.configuracoes?.tema || 'light',
+        ...existingConfig,
+        tema: existingConfig.tema || 'light',
         notificacoes: {
+          ...(existingConfig.notificacoes || {}),
           email:
             typeof notificacoes?.email === 'boolean'
               ? notificacoes.email
@@ -319,6 +331,15 @@ class UsuariosService {
               ? notificacoes.push
               : true,
         },
+        seguranca: {
+          ...(existingConfig.seguranca || {}),
+          ...(typeof mfaLoginHabilitado === 'boolean'
+            ? { mfa_login_habilitado: mfaLoginHabilitado }
+            : {}),
+        },
+        ...(typeof mfaLoginHabilitado === 'boolean'
+          ? { mfa_login_habilitado: mfaLoginHabilitado }
+          : {}),
       },
       idioma_preferido: usuario.idioma_preferido || 'pt-BR',
       ultimo_login: usuario.ultimo_login || null,
@@ -605,6 +626,18 @@ class UsuariosService {
   }
 
   private formatarUsuario(usuario: any): Usuario {
+    const existingConfig =
+      usuario.configuracoes && typeof usuario.configuracoes === 'object' ? usuario.configuracoes : {};
+    const notificacoes = existingConfig.notificacoes;
+    const nestedMfaPreference = existingConfig?.seguranca?.mfa_login_habilitado;
+    const legacyMfaPreference = existingConfig?.mfa_login_habilitado;
+    const mfaLoginHabilitado =
+      typeof nestedMfaPreference === 'boolean'
+        ? nestedMfaPreference
+        : typeof legacyMfaPreference === 'boolean'
+          ? legacyMfaPreference
+          : undefined;
+
     return {
       id: usuario.id,
       nome: usuario.nome,
@@ -615,12 +648,29 @@ class UsuariosService {
       empresa_id: usuario.empresa_id,
       avatar_url: usuario.avatar_url,
       idioma_preferido: usuario.idioma_preferido || 'pt-BR',
-      configuracoes: usuario.configuracoes || {
-        tema: 'light',
+      configuracoes: {
+        ...existingConfig,
+        tema: existingConfig.tema || 'light',
         notificacoes: {
-          email: true,
-          push: true,
+          ...(existingConfig.notificacoes || {}),
+          email:
+            typeof notificacoes?.email === 'boolean'
+              ? notificacoes.email
+              : true,
+          push:
+            typeof notificacoes?.push === 'boolean'
+              ? notificacoes.push
+              : true,
         },
+        seguranca: {
+          ...(existingConfig.seguranca || {}),
+          ...(typeof mfaLoginHabilitado === 'boolean'
+            ? { mfa_login_habilitado: mfaLoginHabilitado }
+            : {}),
+        },
+        ...(typeof mfaLoginHabilitado === 'boolean'
+          ? { mfa_login_habilitado: mfaLoginHabilitado }
+          : {}),
       },
       ativo: usuario.ativo,
       deve_trocar_senha: Boolean(usuario.deve_trocar_senha),
