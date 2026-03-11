@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toastService } from '../services/toastService';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -246,6 +246,7 @@ const CORES_GRAFICOS = [
 const PipelinePage: React.FC = () => {
   const { confirm } = useGlobalConfirmation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { isAuthenticated, user } = useAuth();
 
   const [loading, setLoading] = useState(true);
@@ -436,6 +437,23 @@ const PipelinePage: React.FC = () => {
     }
     void carregarDados();
   }, [isAuthenticated, navigate, lifecycleView]);
+
+  useEffect(() => {
+    const oportunidadeIdParam = searchParams.get('oportunidadeId');
+    if (!oportunidadeIdParam || loading) {
+      return;
+    }
+
+    const oportunidade = oportunidades.find((item) => String(item.id) === oportunidadeIdParam);
+    if (!oportunidade) {
+      return;
+    }
+
+    setOportunidadeDetalhes(oportunidade);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('oportunidadeId');
+    setSearchParams(nextParams, { replace: true });
+  }, [loading, oportunidades, searchParams, setSearchParams]);
 
   const carregarDados = async () => {
     try {
@@ -1624,7 +1642,6 @@ const PipelinePage: React.FC = () => {
             stats={[
               { label: 'Oportunidades', value: String(estatisticas.totalOportunidades), tone: 'neutral' },
               { label: 'Pipeline', value: formatarMoeda(estatisticas.valorTotalPipeline), tone: 'accent' },
-              { label: 'Ticket médio', value: formatarMoeda(estatisticas.valorMedio), tone: 'neutral' },
               { label: 'Conversão', value: `${estatisticas.taxaConversao.toFixed(1)}%`, tone: 'accent' },
             ]}
           />
@@ -3651,6 +3668,3 @@ const PipelinePage: React.FC = () => {
 };
 
 export default PipelinePage;
-
-
-

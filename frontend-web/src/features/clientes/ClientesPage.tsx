@@ -1590,11 +1590,6 @@ const ClientesPage: React.FC = () => {
   const hasFilters = Boolean(searchTerm || selectedStatus || selectedTipo);
   const activeView = savedViews.find((view) => view.id === activeViewId) ?? null;
   const hasFilterChips = hasFilters || Boolean(activeView);
-  const activeFilterCount =
-    Number(Boolean(searchTerm.trim())) +
-    Number(Boolean(selectedStatus)) +
-    Number(Boolean(selectedTipo)) +
-    Number(Boolean(activeViewId));
   const oportunidadesAtivas = Number(estatisticas.prospects ?? 0) + Number(estatisticas.leads ?? 0);
   const isRenameMode = saveViewModalMode === 'rename' && Boolean(activeView);
   const saveViewModalTitle = isRenameMode
@@ -1625,12 +1620,6 @@ const ClientesPage: React.FC = () => {
           title={
             <span className="inline-flex items-center gap-2">
               <span>Clientes</span>
-              {activeFilterCount > 0 ? (
-                <span className="inline-flex items-center rounded-full border border-[#CDE6DF] bg-[#ECF7F3] px-2 py-0.5 text-xs font-semibold text-[#0F7B7D]">
-                  {activeFilterCount} filtro{activeFilterCount === 1 ? '' : 's'} ativo
-                  {activeFilterCount === 1 ? '' : 's'}
-                </span>
-              ) : null}
             </span>
           }
           description={pageDescription}
@@ -1692,7 +1681,6 @@ const ClientesPage: React.FC = () => {
               { label: 'Total de clientes', value: String(estatisticas.total), tone: 'neutral' },
               { label: 'Clientes ativos', value: String(estatisticas.ativos), tone: 'accent' },
               { label: 'Oportunidades abertas', value: String(oportunidadesAtivas), tone: 'warning' },
-              { label: 'Registros exibidos', value: String(clientesFiltrados.length), tone: 'neutral' },
             ]}
           />
         )}

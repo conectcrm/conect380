@@ -1,7 +1,8 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
+import { useNavigate } from 'react-router-dom';
 import { toastService } from '../services/toastService';
 import {
   RefreshCw,
@@ -29,7 +30,6 @@ import {
 } from 'lucide-react';
 import { useGlobalConfirmation } from '../contexts/GlobalConfirmationContext';
 import { FiltersBar, InlineStats, PageHeader, SectionCard } from '../components/layout-v2';
-import ActiveEmpresaBadge from '../components/tenant/ActiveEmpresaBadge';
 import leadsService, {
   Lead,
   StatusLead,
@@ -39,6 +39,8 @@ import leadsService, {
   UpdateLeadDto,
   ImportLeadResult,
 } from '../services/leadsService';
+import usersService, { User as UsuarioResponsavel } from '../services/usersService';
+import { matchesLocalSearchTerm, normalizeSearchValue } from '../utils/localSearch';
 
 // Schema de validação para o modal de Lead
 const leadSchema = yup.object().shape({
@@ -100,15 +102,77 @@ const convertSchema = yup.object().shape({
   observacoes: yup.string().optional(),
 });
 
+const LEADS_SAVED_VIEWS_STORAGE_KEY = 'conectcrm_leads_saved_views_v1';
+
+interface LeadsSavedView {
+  id: string;
+  nome: string;
+  busca: string;
+  status: string;
+  origem: string;
+  responsavelId: string;
+  dataInicio: string;
+  dataFim: string;
+  itensPorPagina: number;
+}
+
+const readLeadsSavedViews = (): LeadsSavedView[] => {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(LEADS_SAVED_VIEWS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.filter((view) => {
+      return (
+        typeof view?.id === 'string' &&
+        typeof view?.nome === 'string' &&
+        typeof view?.busca === 'string' &&
+        typeof view?.status === 'string' &&
+        typeof view?.origem === 'string' &&
+        typeof view?.responsavelId === 'string' &&
+        typeof view?.dataInicio === 'string' &&
+        typeof view?.dataFim === 'string' &&
+        typeof view?.itensPorPagina === 'number'
+      );
+    });
+  } catch {
+    return [];
+  }
+};
+
 const LeadsPage: React.FC = () => {
   const { confirm } = useGlobalConfirmation();
+  const navigate = useNavigate();
   // Estados principais
   const [leads, setLeads] = useState<Lead[]>([]);
   const [estatisticas, setEstatisticas] = useState<LeadEstatisticas | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
-  const [filtroStatus, setFiltroStatus] = useState<string>('todos');
+  const [filtroStatus, setFiltroStatus] = useState<string>('operacionais');
+  const [filtroOrigem, setFiltroOrigem] = useState<string>('todas');
+  const [filtroResponsavel, setFiltroResponsavel] = useState<string>('todos');
+  const [filtroDataInicio, setFiltroDataInicio] = useState('');
+  const [filtroDataFim, setFiltroDataFim] = useState('');
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [itensPorPagina, setItensPorPagina] = useState(12);
+  const [totalRegistros, setTotalRegistros] = useState(0);
+  const [totalPaginas, setTotalPaginas] = useState(1);
+  const [responsaveis, setResponsaveis] = useState<UsuarioResponsavel[]>([]);
+  const [loadingResponsaveis, setLoadingResponsaveis] = useState(false);
+  const [processingLeadId, setProcessingLeadId] = useState<string | null>(null);
+  const [atribuindoLeadId, setAtribuindoLeadId] = useState<string | null>(null);
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+  const [bulkResponsavelId, setBulkResponsavelId] = useState('');
+  const [bulkActionLoading, setBulkActionLoading] = useState<string | null>(null);
+  const [savedViews, setSavedViews] = useState<LeadsSavedView[]>(() => readLeadsSavedViews());
+  const [activeViewId, setActiveViewId] = useState('');
+  const [viewNameInput, setViewNameInput] = useState('');
 
   // Estados de UI
   const [showDialog, setShowDialog] = useState(false);
@@ -159,23 +223,60 @@ const LeadsPage: React.FC = () => {
     },
   });
 
-  // Carregar dados ao montar componente
-  useEffect(() => {
-    carregarDados();
-  }, []);
+
+  const carregarResponsaveis = async () => {
+    try {
+      setLoadingResponsaveis(true);
+      const usuarios = await usersService.listarAtivos();
+      setResponsaveis((usuarios || []).filter((usuario) => Boolean(usuario?.id)));
+    } catch (err) {
+      console.error('Erro ao carregar responsáveis:', err);
+      setResponsaveis([]);
+    } finally {
+      setLoadingResponsaveis(false);
+    }
+  };
 
   const carregarDados = async () => {
     try {
       setLoading(true);
       setError(null);
 
+      const filtros: any = {
+        page: paginaAtual,
+        limit: itensPorPagina,
+      };
+
+
+      if (filtroStatus !== 'todos') {
+        filtros.status = filtroStatus;
+      }
+
+      if (filtroOrigem !== 'todas') {
+        filtros.origem = filtroOrigem;
+      }
+
+      if (filtroResponsavel !== 'todos') {
+        filtros.responsavel_id = filtroResponsavel;
+      }
+
+      if (filtroDataInicio) {
+        filtros.dataInicio = `${filtroDataInicio}T00:00:00.000Z`;
+      }
+
+      if (filtroDataFim) {
+        filtros.dataFim = `${filtroDataFim}T23:59:59.999Z`;
+      }
+
       // Carregar leads e estatísticas em paralelo
       const [leadsData, statsData] = await Promise.all([
-        leadsService.listar({ limit: 100 }),
+        leadsService.listar(filtros),
         leadsService.getEstatisticas(),
       ]);
 
       setLeads(leadsData.data || []);
+      setTotalRegistros(leadsData.total || 0);
+      setTotalPaginas(leadsData.totalPages || 1);
       setEstatisticas(statsData);
     } catch (err: unknown) {
       console.error('Erro ao carregar dados:', err);
@@ -186,10 +287,40 @@ const LeadsPage: React.FC = () => {
       const fallbackMessage = err instanceof Error ? err.message : undefined;
       setError(normalizedMessage || fallbackMessage || 'Erro ao carregar leads');
       setLeads([]);
+      setTotalRegistros(0);
+      setTotalPaginas(1);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    carregarResponsaveis();
+  }, []);
+
+  useEffect(() => {
+    carregarDados();
+  }, [
+    paginaAtual,
+    itensPorPagina,
+    filtroStatus,
+    filtroOrigem,
+    filtroResponsavel,
+    filtroDataInicio,
+    filtroDataFim,
+  ]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.localStorage.setItem(LEADS_SAVED_VIEWS_STORAGE_KEY, JSON.stringify(savedViews));
+  }, [savedViews]);
+
+  useEffect(() => {
+    setSelectedLeadIds((prev) => prev.filter((leadId) => leads.some((lead) => lead.id === leadId)));
+  }, [leads]);
 
   const handleOpenDialog = (lead?: Lead) => {
     if (lead) {
@@ -280,9 +411,11 @@ const LeadsPage: React.FC = () => {
 
   const handleQualificar = async (id: string) => {
     try {
+      setProcessingLeadId(id);
       setError(null);
       await leadsService.qualificar(id, 'Lead qualificado manualmente');
-      carregarDados();
+      await carregarDados();
+      toastService.success('Lead qualificado com sucesso!');
     } catch (err: unknown) {
       console.error('Erro ao qualificar:', err);
       const responseMessage = (err as any)?.response?.data?.message;
@@ -290,7 +423,85 @@ const LeadsPage: React.FC = () => {
         ? responseMessage.join('. ')
         : responseMessage;
       const fallbackMessage = err instanceof Error ? err.message : undefined;
-      setError(normalizedMessage || fallbackMessage || 'Erro ao qualificar lead');
+      const errorMsg = normalizedMessage || fallbackMessage || 'Erro ao qualificar lead';
+      setError(errorMsg);
+      toastService.error(errorMsg);
+    } finally {
+      setProcessingLeadId(null);
+    }
+  };
+
+  const handleRegistrarContato = async (id: string) => {
+    try {
+      setProcessingLeadId(id);
+      setError(null);
+      await leadsService.registrarPrimeiroContato(id, 'Contato registrado manualmente');
+      await carregarDados();
+      toastService.success('Contato registrado com sucesso!');
+    } catch (err: unknown) {
+      console.error('Erro ao registrar contato:', err);
+      const responseMessage = (err as any)?.response?.data?.message;
+      const normalizedMessage = Array.isArray(responseMessage)
+        ? responseMessage.join('. ')
+        : responseMessage;
+      const fallbackMessage = err instanceof Error ? err.message : undefined;
+      const errorMsg = normalizedMessage || fallbackMessage || 'Erro ao registrar contato';
+      setError(errorMsg);
+      toastService.error(errorMsg);
+    } finally {
+      setProcessingLeadId(null);
+    }
+  };
+
+  const handleDesqualificar = async (id: string) => {
+    if (!(await confirm('Tem certeza que deseja desqualificar este lead?'))) {
+      return;
+    }
+
+    try {
+      setProcessingLeadId(id);
+      setError(null);
+      await leadsService.desqualificar(id, 'Lead desqualificado manualmente');
+      await carregarDados();
+      toastService.success('Lead desqualificado com sucesso!');
+    } catch (err: unknown) {
+      console.error('Erro ao desqualificar:', err);
+      const responseMessage = (err as any)?.response?.data?.message;
+      const normalizedMessage = Array.isArray(responseMessage)
+        ? responseMessage.join('. ')
+        : responseMessage;
+      const fallbackMessage = err instanceof Error ? err.message : undefined;
+      const errorMsg = normalizedMessage || fallbackMessage || 'Erro ao desqualificar lead';
+      setError(errorMsg);
+      toastService.error(errorMsg);
+    } finally {
+      setProcessingLeadId(null);
+    }
+  };
+
+  const handleAtribuirResponsavel = async (lead: Lead, responsavelId: string) => {
+    if (!responsavelId || responsavelId === lead.responsavel_id) {
+      return;
+    }
+
+    try {
+      setAtribuindoLeadId(lead.id);
+      setError(null);
+      await leadsService.atribuirResponsavel(lead.id, responsavelId);
+      await carregarDados();
+      toastService.success('Responsável atualizado com sucesso!');
+    } catch (err: unknown) {
+      console.error('Erro ao atribuir responsável:', err);
+      const responseMessage = (err as any)?.response?.data?.message;
+      const normalizedMessage = Array.isArray(responseMessage)
+        ? responseMessage.join('. ')
+        : responseMessage;
+      const fallbackMessage = err instanceof Error ? err.message : undefined;
+      const errorMsg = normalizedMessage || fallbackMessage || 'Erro ao atribuir responsável';
+      setError(errorMsg);
+      toastService.error(errorMsg);
+    } finally {
+      setAtribuindoLeadId(null);
     }
   };
 
@@ -303,6 +514,24 @@ const LeadsPage: React.FC = () => {
       observacoes: lead.observacoes || '',
     });
     setShowConvertDialog(true);
+  };
+
+  const getLeadOportunidadeId = (lead?: Lead | null): string | null => {
+    if (!lead) return null;
+    const oportunidadeId = lead.oportunidade_id || lead.convertido_oportunidade_id;
+    if (!oportunidadeId || typeof oportunidadeId !== 'string') return null;
+    const normalized = oportunidadeId.trim();
+    return normalized.length > 0 ? normalized : null;
+  };
+
+  const abrirLeadNoPipeline = (lead?: Lead | null) => {
+    const oportunidadeId = getLeadOportunidadeId(lead);
+    if (oportunidadeId) {
+      navigate(`/crm/pipeline?oportunidadeId=${oportunidadeId}`);
+      return;
+    }
+
+    navigate('/crm/pipeline');
   };
 
   const onSubmitConvert = async (data: any) => {
@@ -333,13 +562,20 @@ const LeadsPage: React.FC = () => {
         convertData.descricao = data.observacoes;
       }
 
-      await leadsService.converter(leadToConvert.id, convertData);
+      const oportunidade = await leadsService.converter(leadToConvert.id, convertData);
+      const oportunidadeId = Number((oportunidade as any)?.id);
 
       toastService.success('Lead convertido em oportunidade com sucesso!');
       setShowConvertDialog(false);
       setLeadToConvert(null);
       resetConvertForm();
-      await carregarDados();
+
+      if (Number.isFinite(oportunidadeId) && oportunidadeId > 0) {
+        navigate(`/crm/pipeline?oportunidadeId=${oportunidadeId}`);
+        return;
+      }
+
+      navigate('/crm/pipeline');
     } catch (err: unknown) {
       console.error('Erro ao converter lead:', err);
       const responseMessage = (err as any)?.response?.data?.message;
@@ -418,17 +654,23 @@ const LeadsPage: React.FC = () => {
     }
   };
 
-  // Filtrar leads
-  const leadsFiltrados = leads.filter((lead) => {
-    const matchBusca =
-      lead.nome?.toLowerCase().includes(busca.toLowerCase()) ||
-      lead.email?.toLowerCase().includes(busca.toLowerCase()) ||
-      lead.empresa_nome?.toLowerCase().includes(busca.toLowerCase());
+  const normalizedBusca = normalizeSearchValue(busca);
+  const leadsFiltrados = useMemo(() => {
+    if (!normalizedBusca) {
+      return leads;
+    }
 
-    const matchStatus = filtroStatus === 'todos' || lead.status === filtroStatus;
-
-    return matchBusca && matchStatus;
-  });
+    return leads.filter((lead) =>
+      matchesLocalSearchTerm(normalizedBusca, [
+        lead.nome,
+        lead.email,
+        lead.telefone,
+        lead.empresa_nome,
+        lead.responsavel?.nome,
+        lead.responsavel?.username,
+      ]),
+    );
+  }, [leads, normalizedBusca]);
 
   // Labels de status
   const getStatusLabel = (status: StatusLead) => {
@@ -471,14 +713,235 @@ const LeadsPage: React.FC = () => {
     return colors[status] || 'bg-gray-100 text-gray-800';
   };
 
+  const formatDateTime = (value?: string | null) => {
+    if (!value) return 'Sem registro';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Sem registro';
+    return new Intl.DateTimeFormat('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(date);
+  };
+
+  const getResponsavelLabel = (lead: Lead) =>
+    lead.responsavel?.nome || lead.responsavel?.username || 'Sem responsável';
+
+  const getNextActionLabel = (lead: Lead) => {
+    switch (lead.status) {
+      case StatusLead.NOVO:
+        return 'Qualificar lead';
+      case StatusLead.CONTATADO:
+        return 'Registrar qualificação';
+      case StatusLead.QUALIFICADO:
+        return 'Converter em oportunidade';
+      case StatusLead.DESQUALIFICADO:
+        return 'Revisar oportunidade futura';
+      case StatusLead.CONVERTIDO:
+        return 'Acompanhar no pipeline';
+      default:
+        return 'Acompanhar lead';
+    }
+  };
+
+  const getObservacaoResumo = (lead: Lead) => {
+    if (!lead.observacoes) return null;
+    const normalized = lead.observacoes.replace(/\s+/g, ' ').trim();
+    if (!normalized) return null;
+    return normalized.length > 88 ? `${normalized.slice(0, 88)}...` : normalized;
+  };
+
+  const totalLeadsAbertos = Math.max(
+    (estatisticas?.total || 0) - (estatisticas?.convertidos || 0),
+    0,
+  );
+  const leadsProntosParaConversao = estatisticas?.qualificados || 0;
+  const taxaConversao = estatisticas?.taxaConversao || 0;
+
   const pageDescription = loading
     ? 'Carregando...'
-    : `Gerencie seus ${leads.length} leads e converta em oportunidades`;
-  const hasFilters = Boolean(busca.trim()) || filtroStatus !== 'todos';
+    : `Gerencie seus ${totalRegistros} leads na pré-venda e converta em oportunidades`;
+  const hasFilters =
+    Boolean(busca.trim()) ||
+    filtroStatus !== 'operacionais' ||
+    filtroOrigem !== 'todas' ||
+    filtroResponsavel !== 'todos' ||
+    Boolean(filtroDataInicio) ||
+    Boolean(filtroDataFim);
 
   const handleClearFilters = () => {
     setBusca('');
-    setFiltroStatus('todos');
+    setFiltroStatus('operacionais');
+    setFiltroOrigem('todas');
+    setFiltroResponsavel('todos');
+    setFiltroDataInicio('');
+    setFiltroDataFim('');
+    setPaginaAtual(1);
+    setSelectedLeadIds([]);
+  };
+
+  const activeSavedView = savedViews.find((view) => view.id === activeViewId) || null;
+  const totalRegistrosVisiveis = normalizedBusca ? leadsFiltrados.length : totalRegistros;
+  const totalPaginasVisiveis = normalizedBusca ? 1 : totalPaginas;
+  const bulkSelectedCount = selectedLeadIds.length;
+  const allVisibleSelected =
+    leadsFiltrados.length > 0 && leadsFiltrados.every((lead) => selectedLeadIds.includes(lead.id));
+
+  const toggleLeadSelection = (leadId: string) => {
+    setSelectedLeadIds((prev) =>
+      prev.includes(leadId) ? prev.filter((id) => id !== leadId) : [...prev, leadId],
+    );
+  };
+
+  const toggleSelectAllVisible = () => {
+    if (allVisibleSelected) {
+      setSelectedLeadIds([]);
+      return;
+    }
+    setSelectedLeadIds(leadsFiltrados.map((lead) => lead.id));
+  };
+
+  const executeBulkAction = async (
+    actionId: string,
+    actionLabel: string,
+    callback: (leadId: string) => Promise<unknown>,
+  ) => {
+    if (selectedLeadIds.length === 0) {
+      toastService.error('Selecione pelo menos um lead.');
+      return;
+    }
+
+    setBulkActionLoading(actionId);
+    setError(null);
+
+    try {
+      const results = await Promise.allSettled(selectedLeadIds.map((leadId) => callback(leadId)));
+      const successCount = results.filter((result) => result.status === 'fulfilled').length;
+      const errorCount = results.length - successCount;
+
+      if (successCount > 0) {
+        toastService.success(
+          `${actionLabel}: ${successCount} ${successCount > 1 ? 'leads atualizados' : 'lead atualizado'}.`,
+        );
+      }
+
+      if (errorCount > 0) {
+        toastService.error(`${errorCount} ${errorCount > 1 ? 'falhas' : 'falha'} ao processar.`);
+      }
+
+      await carregarDados();
+      setSelectedLeadIds([]);
+      setBulkResponsavelId('');
+    } catch (err: unknown) {
+      const responseMessage = (err as any)?.response?.data?.message;
+      const normalizedMessage = Array.isArray(responseMessage)
+        ? responseMessage.join('. ')
+        : responseMessage;
+      const fallbackMessage = err instanceof Error ? err.message : undefined;
+      const errorMsg = normalizedMessage || fallbackMessage || 'Erro ao executar ação em lote';
+      setError(errorMsg);
+      toastService.error(errorMsg);
+    } finally {
+      setBulkActionLoading(null);
+    }
+  };
+
+  const handleBulkQualificar = async () => {
+    await executeBulkAction('qualificar', 'Qualificação em lote', (leadId) =>
+      leadsService.qualificar(leadId, 'Lead qualificado em lote'),
+    );
+  };
+
+  const handleBulkDesqualificar = async () => {
+    if (!(await confirm('Deseja desqualificar os leads selecionados?'))) {
+      return;
+    }
+
+    await executeBulkAction('desqualificar', 'Desqualificação em lote', (leadId) =>
+      leadsService.desqualificar(leadId, 'Lead desqualificado em lote'),
+    );
+  };
+
+  const handleBulkAtribuirResponsavel = async () => {
+    if (!bulkResponsavelId) {
+      toastService.error('Selecione um responsável para aplicar em lote.');
+      return;
+    }
+
+    await executeBulkAction('atribuir', 'Atribuição em lote', (leadId) =>
+      leadsService.atribuirResponsavel(leadId, bulkResponsavelId),
+    );
+  };
+
+  const applySavedView = (view: LeadsSavedView) => {
+    setBusca(view.busca);
+    setFiltroStatus(view.status || 'operacionais');
+    setFiltroOrigem(view.origem || 'todas');
+    setFiltroResponsavel(view.responsavelId || 'todos');
+    setFiltroDataInicio(view.dataInicio || '');
+    setFiltroDataFim(view.dataFim || '');
+    setItensPorPagina(view.itensPorPagina || 12);
+    setPaginaAtual(1);
+    setViewNameInput(view.nome);
+  };
+
+  const handleSavedViewChange = (viewId: string) => {
+    setActiveViewId(viewId);
+
+    if (!viewId) {
+      setViewNameInput('');
+      return;
+    }
+
+    const view = savedViews.find((item) => item.id === viewId);
+    if (!view) {
+      return;
+    }
+
+    applySavedView(view);
+  };
+
+  const handleSaveCurrentView = () => {
+    const nome = viewNameInput.trim();
+    if (!nome) {
+      toastService.error('Informe um nome para salvar a view.');
+      return;
+    }
+
+    const viewId = activeViewId || `leads-view-${Date.now()}`;
+    const nextView: LeadsSavedView = {
+      id: viewId,
+      nome,
+      busca: busca.trim(),
+      status: filtroStatus,
+      origem: filtroOrigem,
+      responsavelId: filtroResponsavel,
+      dataInicio: filtroDataInicio,
+      dataFim: filtroDataFim,
+      itensPorPagina,
+    };
+
+    setSavedViews((prev) => [nextView, ...prev.filter((item) => item.id !== viewId)]);
+    setActiveViewId(viewId);
+    toastService.success(activeSavedView ? 'View atualizada.' : 'View salva.');
+  };
+
+  const handleDeleteSavedView = async () => {
+    if (!activeSavedView) {
+      toastService.error('Selecione uma view salva para excluir.');
+      return;
+    }
+
+    if (!(await confirm(`Deseja remover a view "${activeSavedView.nome}"?`))) {
+      return;
+    }
+
+    setSavedViews((prev) => prev.filter((view) => view.id !== activeSavedView.id));
+    setActiveViewId('');
+    setViewNameInput('');
+    toastService.success('View removida.');
   };
 
   return (
@@ -493,7 +956,6 @@ const LeadsPage: React.FC = () => {
             </span>
           }
           description={pageDescription}
-          filters={<ActiveEmpresaBadge variant="page" />}
           actions={
             <div className="flex flex-wrap items-center gap-2">
               <button
@@ -525,21 +987,20 @@ const LeadsPage: React.FC = () => {
         {!loading && (
           <InlineStats
             stats={[
-              { label: 'Total', value: String(estatisticas?.total || 0), tone: 'neutral' },
               {
-                label: 'Qualificados',
-                value: String(estatisticas?.qualificados || 0),
+                label: 'Em aberto',
+                value: String(totalLeadsAbertos),
+                tone: 'accent',
+              },
+              {
+                label: 'Prontos para converter',
+                value: String(leadsProntosParaConversao),
                 tone: 'accent',
               },
               {
                 label: 'Taxa de conversão',
-                value: `${(estatisticas?.taxaConversao || 0).toFixed(1)}%`,
+                value: `${taxaConversao.toFixed(1)}%`,
                 tone: 'accent',
-              },
-              {
-                label: 'Score médio',
-                value: String((estatisticas?.scoreMedio || 0).toFixed(0)),
-                tone: 'neutral',
               },
             ]}
           />
@@ -548,8 +1009,8 @@ const LeadsPage: React.FC = () => {
 
       <div className="max-w-7xl mx-auto space-y-6">
         <FiltersBar className="p-4">
-          <div className="flex w-full flex-col gap-4 sm:flex-row sm:items-end">
-            <div className="flex-1">
+          <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-12">
+            <div className="lg:col-span-5">
               <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
                 Buscar leads
               </label>
@@ -559,21 +1020,28 @@ const LeadsPage: React.FC = () => {
                   type="text"
                   placeholder="Buscar por nome, email ou empresa..."
                   value={busca}
-                  onChange={(e) => setBusca(e.target.value)}
+                  onChange={(e) => {
+                    setBusca(e.target.value);
+                    setPaginaAtual(1);
+                  }}
                   className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
                 />
               </div>
             </div>
 
-            <div className="w-full sm:w-64">
+            <div className="lg:col-span-2">
               <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
                 Status
               </label>
               <select
                 value={filtroStatus}
-                onChange={(e) => setFiltroStatus(e.target.value)}
+                onChange={(e) => {
+                  setFiltroStatus(e.target.value);
+                  setPaginaAtual(1);
+                }}
                 className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
               >
+                <option value="operacionais">Pré-venda (abertos)</option>
                 <option value="todos">Todos os status</option>
                 <option value={StatusLead.NOVO}>Novos</option>
                 <option value={StatusLead.CONTATADO}>Contatados</option>
@@ -583,7 +1051,101 @@ const LeadsPage: React.FC = () => {
               </select>
             </div>
 
-            <div className="w-full sm:w-auto">
+            <div className="lg:col-span-2">
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                Origem
+              </label>
+              <select
+                value={filtroOrigem}
+                onChange={(e) => {
+                  setFiltroOrigem(e.target.value);
+                  setPaginaAtual(1);
+                }}
+                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+              >
+                <option value="todas">Todas as origens</option>
+                <option value={OrigemLead.MANUAL}>Manual</option>
+                <option value={OrigemLead.FORMULARIO}>Formulário</option>
+                <option value={OrigemLead.WHATSAPP}>WhatsApp</option>
+                <option value={OrigemLead.IMPORTACAO}>Importação</option>
+                <option value={OrigemLead.INDICACAO}>Indicação</option>
+                <option value={OrigemLead.API}>API</option>
+                <option value={OrigemLead.OUTRO}>Outro</option>
+              </select>
+            </div>
+
+            <div className="lg:col-span-3">
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                Responsável
+              </label>
+              <select
+                value={filtroResponsavel}
+                onChange={(e) => {
+                  setFiltroResponsavel(e.target.value);
+                  setPaginaAtual(1);
+                }}
+                disabled={loadingResponsaveis}
+                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <option value="todos">Todos os responsáveis</option>
+                {responsaveis.map((responsavel) => (
+                  <option key={responsavel.id} value={responsavel.id}>
+                    {responsavel.nome || responsavel.username}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="lg:col-span-2">
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                De
+              </label>
+              <input
+                type="date"
+                value={filtroDataInicio}
+                onChange={(e) => {
+                  setFiltroDataInicio(e.target.value);
+                  setPaginaAtual(1);
+                }}
+                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+              />
+            </div>
+
+            <div className="lg:col-span-2">
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                Até
+              </label>
+              <input
+                type="date"
+                value={filtroDataFim}
+                onChange={(e) => {
+                  setFiltroDataFim(e.target.value);
+                  setPaginaAtual(1);
+                }}
+                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+              />
+            </div>
+
+            <div className="lg:col-span-2">
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                Itens por página
+              </label>
+              <select
+                value={itensPorPagina}
+                onChange={(e) => {
+                  setItensPorPagina(Number(e.target.value));
+                  setPaginaAtual(1);
+                }}
+                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+              >
+                <option value={6}>6</option>
+                <option value={9}>9</option>
+                <option value={12}>12</option>
+                <option value={24}>24</option>
+              </select>
+            </div>
+
+            <div className="lg:col-span-2">
               <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
                 Ações
               </label>
@@ -599,6 +1161,119 @@ const LeadsPage: React.FC = () => {
             </div>
           </div>
         </FiltersBar>
+
+        <div className="flex flex-col gap-3 rounded-xl border border-[#D4E2E7] bg-white p-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="grid w-full grid-cols-1 gap-2 md:grid-cols-3 lg:w-auto lg:min-w-[680px]">
+            <div className="md:col-span-1">
+              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                Views salvas
+              </label>
+              <select
+                value={activeViewId}
+                onChange={(e) => handleSavedViewChange(e.target.value)}
+                className="h-9 w-full rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+              >
+                <option value="">Sem view salva</option>
+                {savedViews.map((view) => (
+                  <option key={view.id} value={view.id}>
+                    {view.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="md:col-span-2">
+              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                Nome da view
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={viewNameInput}
+                  onChange={(e) => setViewNameInput(e.target.value)}
+                  placeholder="Ex.: Leads sem responsável"
+                  className="h-9 flex-1 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveCurrentView}
+                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#159A9C] px-3 text-sm font-medium text-[#159A9C] transition-colors hover:bg-[#F4FBF9]"
+                >
+                  <Save className="h-4 w-4" />
+                  {activeSavedView ? 'Atualizar' : 'Salvar'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteSavedView}
+                  disabled={!activeSavedView}
+                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#E8C8CB] px-3 text-sm font-medium text-[#B03A48] transition-colors hover:bg-[#FFF5F5] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Excluir
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {leadsFiltrados.length > 0 && (
+          <div className="flex flex-col gap-3 rounded-xl border border-[#D4E2E7] bg-white p-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-3">
+              <label className="inline-flex items-center gap-2 text-sm font-medium text-[#244455]">
+                <input
+                  type="checkbox"
+                  checked={allVisibleSelected}
+                  onChange={toggleSelectAllVisible}
+                  className="h-4 w-4 rounded border-[#BFD2DB] text-[#159A9C] focus:ring-[#159A9C]/30"
+                />
+                Selecionar página
+              </label>
+              <span className="rounded-full bg-[#F2F8FA] px-3 py-1 text-xs font-medium text-[#4C6575]">
+                {bulkSelectedCount} selecionado(s)
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={bulkResponsavelId}
+                onChange={(e) => setBulkResponsavelId(e.target.value)}
+                disabled={loadingResponsaveis || bulkActionLoading !== null}
+                className="h-9 min-w-[220px] rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <option value="">Atribuir responsável em lote</option>
+                {responsaveis.map((responsavel) => (
+                  <option key={responsavel.id} value={responsavel.id}>
+                    {responsavel.nome || responsavel.username}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleBulkAtribuirResponsavel}
+                disabled={!bulkSelectedCount || !bulkResponsavelId || bulkActionLoading !== null}
+                className="inline-flex h-9 items-center rounded-lg border border-[#D4E2E7] px-3 text-xs font-medium text-[#244455] transition-colors hover:bg-[#F8FCFC] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {bulkActionLoading === 'atribuir' ? 'Aplicando...' : 'Aplicar responsável'}
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkQualificar}
+                disabled={!bulkSelectedCount || bulkActionLoading !== null}
+                className="inline-flex h-9 items-center rounded-lg bg-green-600 px-3 text-xs font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {bulkActionLoading === 'qualificar' ? 'Processando...' : 'Qualificar em lote'}
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkDesqualificar}
+                disabled={!bulkSelectedCount || bulkActionLoading !== null}
+                className="inline-flex h-9 items-center rounded-lg border border-[#F3CFD1] bg-[#FFF5F5] px-3 text-xs font-medium text-[#B03A48] transition-colors hover:bg-[#FFE9EA] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {bulkActionLoading === 'desqualificar'
+                  ? 'Processando...'
+                  : 'Desqualificar em lote'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Error Alert */}
         {error && (
@@ -638,39 +1313,50 @@ const LeadsPage: React.FC = () => {
           {leadsFiltrados.map((lead) => (
             <div
               key={lead.id}
-              className="bg-white rounded-lg shadow-sm border hover:shadow-lg transition-shadow duration-300"
+              className="rounded-xl border border-[#D4E2E7] bg-white shadow-sm transition-shadow duration-300 hover:shadow-lg"
             >
               <div className="p-6">
-                {/* Header do Card */}
-                <div className="flex items-start justify-between mb-4">
+                <div className="mb-4 flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div className="w-12 h-12 rounded-xl bg-[#159A9C] flex items-center justify-center text-white shadow-md flex-shrink-0">
                       <UserPlus className="h-6 w-6" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="text-lg font-semibold text-gray-900 truncate">{lead.nome}</h3>
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                          lead.status,
-                        )}`}
-                      >
-                        {getStatusLabel(lead.status)}
-                      </span>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(
+                            lead.status,
+                          )}`}
+                        >
+                          {getStatusLabel(lead.status)}
+                        </span>
+                        <span className="inline-flex items-center rounded-full bg-[#EFF5F7] px-2.5 py-0.5 text-[11px] font-medium text-[#4C6575]">
+                          {getOrigemLabel(lead.origem)}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Ações */}
-                  <div className="flex gap-1 flex-shrink-0 ml-2">
+                  <div className="ml-2 flex flex-shrink-0 gap-1">
+                    <label className="inline-flex cursor-pointer items-center rounded-lg p-2 hover:bg-[#F4FBF9]">
+                      <input
+                        type="checkbox"
+                        checked={selectedLeadIds.includes(lead.id)}
+                        onChange={() => toggleLeadSelection(lead.id)}
+                        className="h-4 w-4 rounded border-[#BFD2DB] text-[#159A9C] focus:ring-[#159A9C]/30"
+                      />
+                    </label>
                     <button
                       onClick={() => handleOpenDialog(lead)}
-                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                      className="rounded-lg p-2 transition-colors hover:bg-gray-100"
                       title="Editar"
                     >
                       <Edit2 className="h-4 w-4 text-gray-600" />
                     </button>
                     <button
                       onClick={() => handleDelete(lead.id)}
-                      className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                      className="rounded-lg p-2 transition-colors hover:bg-red-50"
                       title="Excluir"
                     >
                       <Trash2 className="h-4 w-4 text-red-500" />
@@ -678,8 +1364,7 @@ const LeadsPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Conteúdo */}
-                <div className="space-y-2 mb-4">
+                <div className="mb-4 space-y-2">
                   {lead.email && (
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <Mail className="h-4 w-4 text-gray-400" />
@@ -698,43 +1383,183 @@ const LeadsPage: React.FC = () => {
                       <span className="truncate">{lead.empresa_nome}</span>
                     </div>
                   )}
+                  <div className="flex items-center gap-2 text-sm">
+                    <User className="h-4 w-4 text-gray-400" />
+                    <span
+                      className={
+                        getResponsavelLabel(lead) === 'Sem responsável'
+                          ? 'font-medium text-amber-700'
+                          : 'text-gray-600'
+                      }
+                    >
+                      {getResponsavelLabel(lead)}
+                    </span>
+                  </div>
+
+                  <div className="pt-1">
+                    <select
+                      value={lead.responsavel_id || ''}
+                      onChange={(event) => handleAtribuirResponsavel(lead, event.target.value)}
+                      disabled={loadingResponsaveis || atribuindoLeadId === lead.id}
+                      className="h-9 w-full rounded-lg border border-[#D4E2E7] bg-white px-3 text-xs text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <option value="" disabled>
+                        Sem responsável
+                      </option>
+                      {lead.responsavel_id &&
+                        !responsaveis.some((responsavel) => responsavel.id === lead.responsavel_id) && (
+                          <option value={lead.responsavel_id}>{getResponsavelLabel(lead)}</option>
+                        )}
+                      {responsaveis.map((responsavel) => (
+                        <option key={responsavel.id} value={responsavel.id}>
+                          {responsavel.nome || responsavel.username}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
-                {/* Footer do Card */}
-                <div className="flex items-center justify-between pt-4 border-t">
+                <div className="mb-4 grid grid-cols-2 gap-2">
+                  <div className="rounded-lg border border-[#E0EBEF] bg-[#F8FCFC] px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-[#6C8695]">
+                      Última interação
+                    </p>
+                    <p className="mt-1 text-xs font-medium text-[#244455]">
+                      {formatDateTime(lead.data_ultima_interacao || lead.updated_at)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-[#E0EBEF] bg-[#F8FCFC] px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-[#6C8695]">
+                      Criado em
+                    </p>
+                    <p className="mt-1 text-xs font-medium text-[#244455]">
+                      {formatDateTime(lead.created_at)}
+                    </p>
+                  </div>
+                </div>
+
+                {getObservacaoResumo(lead) && (
+                  <div className="mb-4 rounded-lg border border-[#EAF1F4] bg-[#FAFCFD] px-3 py-2 text-xs text-[#4C6575]">
+                    {getObservacaoResumo(lead)}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between border-t pt-4">
                   <div className="flex items-center gap-2">
                     <Target className="h-4 w-4 text-yellow-500" />
                     <span className="text-sm font-medium text-gray-700">Score: {lead.score}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    {getOrigemLabel(lead.origem)}
-                  </div>
+                  <div className="text-xs font-medium text-[#5E7987]">{getNextActionLabel(lead)}</div>
                 </div>
 
-                {/* Botão de Qualificação */}
-                {lead.status === StatusLead.NOVO && (
+                {(lead.status === StatusLead.NOVO || lead.status === StatusLead.CONTATADO) && (
                   <button
                     onClick={() => handleQualificar(lead.id)}
-                    className="mt-4 w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center justify-center gap-2 transition-colors text-sm font-medium"
+                    disabled={processingLeadId === lead.id}
+                    className="mt-4 w-full rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
                   >
-                    <CheckCircle className="h-4 w-4" />
-                    Qualificar Lead
+                    <span className="inline-flex items-center justify-center gap-2">
+                      {processingLeadId === lead.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCircle className="h-4 w-4" />
+                      )}
+                      {processingLeadId === lead.id ? 'Processando...' : 'Qualificar Lead'}
+                    </span>
                   </button>
                 )}
 
                 {lead.status === StatusLead.QUALIFICADO && (
                   <button
                     onClick={() => handleOpenConvertDialog(lead)}
-                    className="mt-4 w-full px-4 py-2 bg-[#159A9C] hover:bg-[#0F7B7D] text-white rounded-lg flex items-center justify-center gap-2 transition-colors text-sm font-medium"
+                    disabled={processingLeadId === lead.id}
+                    className="mt-4 w-full rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0F7B7D]"
                   >
-                    <ArrowRight className="h-4 w-4" />
-                    Converter em Oportunidade
+                    <span className="inline-flex items-center justify-center gap-2">
+                      <ArrowRight className="h-4 w-4" />
+                      Converter em Oportunidade
+                    </span>
                   </button>
+                )}
+
+                {lead.status === StatusLead.CONVERTIDO && (
+                  <button
+                    onClick={() => abrirLeadNoPipeline(lead)}
+                    className="mt-4 w-full rounded-lg border border-[#159A9C] px-4 py-2 text-sm font-medium text-[#0F7B7D] transition-colors hover:bg-[#F4FBF9]"
+                  >
+                    <span className="inline-flex items-center justify-center gap-2">
+                      <ArrowRight className="h-4 w-4" />
+                      Abrir no Pipeline
+                    </span>
+                  </button>
+                )}
+
+                {lead.status === StatusLead.DESQUALIFICADO && (
+                  <button
+                    onClick={() => handleOpenDialog(lead)}
+                    disabled={processingLeadId === lead.id}
+                    className="mt-4 w-full rounded-lg border border-[#D4E2E7] px-4 py-2 text-sm font-medium text-[#244455] transition-colors hover:bg-[#F8FCFC]"
+                  >
+                    <span className="inline-flex items-center justify-center gap-2">
+                      <Edit2 className="h-4 w-4" />
+                      Revisar Lead
+                    </span>
+                  </button>
+                )}
+
+                {lead.status !== StatusLead.CONVERTIDO && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {lead.status === StatusLead.NOVO && (
+                      <button
+                        onClick={() => handleRegistrarContato(lead.id)}
+                        disabled={processingLeadId === lead.id}
+                        className="inline-flex flex-1 items-center justify-center rounded-lg border border-[#D4E2E7] bg-white px-3 py-2 text-xs font-medium text-[#244455] transition-colors hover:bg-[#F8FCFC] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Registrar contato
+                      </button>
+                    )}
+                    {lead.status !== StatusLead.DESQUALIFICADO && (
+                      <button
+                        onClick={() => handleDesqualificar(lead.id)}
+                        disabled={processingLeadId === lead.id}
+                        className="inline-flex flex-1 items-center justify-center rounded-lg border border-[#F3CFD1] bg-[#FFF5F5] px-3 py-2 text-xs font-medium text-[#B03A48] transition-colors hover:bg-[#FFE9EA] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Desqualificar
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
           ))}
         </div>
+
+        {!loading && totalPaginasVisiveis > 1 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#D4E2E7] bg-white px-4 py-3">
+            <span className="text-sm text-[#4C6575]">
+              Exibindo {leadsFiltrados.length} de {totalRegistrosVisiveis} registros
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPaginaAtual((prev) => Math.max(1, prev - 1))}
+                disabled={paginaAtual <= 1}
+                className="inline-flex h-9 items-center rounded-lg border border-[#D4E2E7] px-3 text-sm text-[#244455] transition-colors hover:bg-[#F8FCFC] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Anterior
+              </button>
+              <span className="text-sm font-medium text-[#244455]">
+                Página {paginaAtual} de {totalPaginasVisiveis}
+              </span>
+              <button
+                onClick={() => setPaginaAtual((prev) => Math.min(totalPaginasVisiveis, prev + 1))}
+                disabled={paginaAtual >= totalPaginasVisiveis}
+                className="inline-flex h-9 items-center rounded-lg border border-[#D4E2E7] px-3 text-sm text-[#244455] transition-colors hover:bg-[#F8FCFC] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Próxima
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modal de Criação/Edição - REFATORADO */}
