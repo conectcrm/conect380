@@ -98,7 +98,7 @@ api.interceptors.request.use(
     }
 
     // Debug específico para requisições de eventos
-    if (config.url?.includes('/eventos')) {
+    if (DEBUG && config.url?.includes('/eventos')) {
       console.log('📅 [FRONTEND] Enviando requisição para eventos:', {
         method: config.method?.toUpperCase(),
         url: config.url,
@@ -110,7 +110,7 @@ api.interceptors.request.use(
     }
 
     // Debug específico para requisições de contratos
-    if (config.url?.includes('/contratos')) {
+    if (DEBUG && config.url?.includes('/contratos')) {
       console.log('📋 [FRONTEND] Enviando requisição para contratos:', {
         method: config.method?.toUpperCase(),
         url: config.url,
@@ -122,7 +122,7 @@ api.interceptors.request.use(
     }
 
     // Debug específico para requisições de faturamento
-    if (config.url?.includes('/faturamento')) {
+    if (DEBUG && config.url?.includes('/faturamento')) {
       console.log('💰 [FRONTEND] Enviando requisição para faturamento:', {
         method: config.method?.toUpperCase(),
         url: config.url,
@@ -207,7 +207,7 @@ api.interceptors.response.use(
     }
 
     // Debug específico para respostas de contratos
-    if (response.config.url?.includes('/contratos')) {
+    if (DEBUG && response.config.url?.includes('/contratos')) {
       console.log('✅ [FRONTEND] Resposta de contratos recebida:', {
         status: response.status,
         data: response.data,
@@ -217,7 +217,7 @@ api.interceptors.response.use(
     }
 
     // Debug específico para respostas de faturamento
-    if (response.config.url?.includes('/faturamento')) {
+    if (DEBUG && response.config.url?.includes('/faturamento')) {
       console.log('✅ [FRONTEND] Resposta de faturamento recebida:', {
         status: response.status,
         data: response.data,
@@ -257,7 +257,7 @@ api.interceptors.response.use(
     }
 
     // Debug específico para erros de faturamento
-    if (error.config?.url?.includes('/faturamento')) {
+    if (DEBUG && error.config?.url?.includes('/faturamento')) {
       console.error('❌ [FRONTEND] Erro na requisição de faturamento:', {
         status: error.response?.status,
         statusText: error.response?.statusText,
