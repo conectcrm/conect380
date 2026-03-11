@@ -1,6 +1,6 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository, SelectQueryBuilder } from 'typeorm';
+import { Brackets, In, Repository, SelectQueryBuilder } from 'typeorm';
 import { Cliente, StatusCliente, TipoCliente } from './cliente.entity';
 import { ClienteAnexo } from './cliente-anexo.entity';
 import { Ticket, StatusTicket } from '../atendimento/entities/ticket.entity';
@@ -114,7 +114,11 @@ export class ClientesService {
     private faturaRepository: Repository<Fatura>,
   ) {}
 
-  async getTicketsResumo(clienteId: string, empresaId: string, limit = 5): Promise<ClienteTicketsResumo> {
+  async getTicketsResumo(
+    clienteId: string,
+    empresaId: string,
+    limit = 5,
+  ): Promise<ClienteTicketsResumo> {
     const limiteSeguro = Math.min(Math.max(Number(limit) || 5, 1), 20);
 
     const statusAbertos: StatusTicket[] = [
@@ -183,46 +187,159 @@ export class ClientesService {
     empresaId: string,
     limit = 5,
   ): Promise<ClientePropostasResumo> {
-    const limiteSeguro = Math.min(Math.max(Number(limit) || 5, 1), 20);
+    const limiteSeguro = Math.min(Math.max(Number(limit) || 5, 1), 200);
 
     const statusAprovadas = [
       'aprovada',
+      'aprovado',
       'contrato_gerado',
       'contrato_assinado',
       'fatura_criada',
       'aguardando_pagamento',
       'pago',
+      'assinado',
     ];
-    const statusPendentes = ['rascunho', 'enviada', 'visualizada', 'negociacao'];
-    const statusRejeitadas = ['rejeitada', 'expirada'];
+    const statusPendentes = [
+      'rascunho',
+      'pendente',
+      'enviada',
+      'visualizada',
+      'negociacao',
+      'em_negociacao',
+      'em_analise',
+    ];
+    const statusRejeitadas = [
+      'rejeitada',
+      'rejeitado',
+      'expirada',
+      'cancelada',
+      'perdida',
+      'perdido',
+    ];
 
-    const baseWhere =
-      "proposta.empresaId = :empresaId AND (proposta.cliente ->> 'id' = :clienteId OR proposta.cliente ->> 'clienteId' = :clienteId)";
-    const baseParams = { empresaId, clienteId };
+    const propostaColumnsRows: Array<{ column_name?: string }> =
+      await this.propostaRepository.query(
+        `
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'propostas'
+      `,
+      );
+
+    const resolveColumnName = (...possibleNames: string[]): string | null => {
+      for (const possibleName of possibleNames) {
+        const match = propostaColumnsRows.find(
+          (row) => row?.column_name && row.column_name.toLowerCase() === possibleName.toLowerCase(),
+        );
+        if (match?.column_name) {
+          return match.column_name;
+        }
+      }
+      return null;
+    };
+
+    const toColumnExpression = (columnName: string | null): string | null => {
+      if (!columnName) return null;
+      return /^[a-z0-9_]+$/.test(columnName)
+        ? `proposta.${columnName}`
+        : `proposta."${columnName}"`;
+    };
+
+    const clienteJsonColumnExpr = toColumnExpression(resolveColumnName('cliente'));
+    const clienteIdColumnExpr = toColumnExpression(resolveColumnName('cliente_id', 'clienteId'));
+
+    const cliente = await this.clienteRepository.findOne({
+      where: { id: clienteId, empresaId },
+      select: ['id', 'nome', 'email', 'documento', 'telefone'],
+    });
+
+    const escapeLikePattern = (value: string): string => value.replace(/[!%_]/g, '!$&');
+
+    const clienteDocumentoOriginal = String(cliente?.documento || '')
+      .trim()
+      .toLowerCase();
+    const clienteTelefoneOriginal = String(cliente?.telefone || '')
+      .trim()
+      .toLowerCase();
+    const clienteEmail = (cliente?.email || '').trim().toLowerCase();
+    const clienteNome = (cliente?.nome || '').trim().toLowerCase();
+    const clienteDocumento = String(cliente?.documento || '').replace(/\D/g, '');
+    const clienteTelefone = String(cliente?.telefone || '').replace(/\D/g, '');
+
+    const clienteSearchTerms = Array.from(
+      new Set(
+        [
+          String(clienteId || '')
+            .trim()
+            .toLowerCase(),
+          clienteEmail,
+          clienteNome,
+          clienteDocumentoOriginal,
+          clienteDocumento,
+          clienteTelefoneOriginal,
+          clienteTelefone,
+        ].filter((term) => term.length >= 4),
+      ),
+    );
+
+    const buildBasePropostaQuery = (): SelectQueryBuilder<Proposta> => {
+      const query = this.propostaRepository
+        .createQueryBuilder('proposta')
+        .where('proposta.empresaId = :empresaId', { empresaId });
+
+      query.andWhere(
+        new Brackets((subQuery) => {
+          let hasAnyClientCondition = false;
+
+          if (clienteIdColumnExpr) {
+            hasAnyClientCondition = true;
+            subQuery.where(`CAST(${clienteIdColumnExpr} AS text) = :clienteId`, { clienteId });
+          }
+
+          if (clienteJsonColumnExpr && clienteSearchTerms.length > 0) {
+            clienteSearchTerms.forEach((term, index) => {
+              const paramName = `clienteTerm${index}`;
+              const clause = `LOWER(CAST(${clienteJsonColumnExpr} AS text)) LIKE :${paramName} ESCAPE '!'`;
+              const params = { [paramName]: `%${escapeLikePattern(term)}%` };
+
+              if (!hasAnyClientCondition && index === 0) {
+                subQuery.where(clause, params);
+              } else {
+                subQuery.orWhere(clause, params);
+              }
+            });
+
+            hasAnyClientCondition = true;
+          }
+
+          if (!hasAnyClientCondition) {
+            subQuery.where('1 = 0');
+          }
+        }),
+      );
+
+      return query;
+    };
 
     const [total, aprovadas, pendentes, rejeitadas, propostasRecentes] = await Promise.all([
-      this.propostaRepository
-        .createQueryBuilder('proposta')
-        .where(baseWhere, baseParams)
+      buildBasePropostaQuery().getCount(),
+      buildBasePropostaQuery()
+        .andWhere('LOWER(CAST(proposta.status AS text)) IN (:...statusAprovadas)', {
+          statusAprovadas,
+        })
         .getCount(),
-      this.propostaRepository
-        .createQueryBuilder('proposta')
-        .where(baseWhere, baseParams)
-        .andWhere('LOWER(proposta.status) IN (:...statusAprovadas)', { statusAprovadas })
+      buildBasePropostaQuery()
+        .andWhere('LOWER(CAST(proposta.status AS text)) IN (:...statusPendentes)', {
+          statusPendentes,
+        })
         .getCount(),
-      this.propostaRepository
-        .createQueryBuilder('proposta')
-        .where(baseWhere, baseParams)
-        .andWhere('LOWER(proposta.status) IN (:...statusPendentes)', { statusPendentes })
+      buildBasePropostaQuery()
+        .andWhere('LOWER(CAST(proposta.status AS text)) IN (:...statusRejeitadas)', {
+          statusRejeitadas,
+        })
         .getCount(),
-      this.propostaRepository
-        .createQueryBuilder('proposta')
-        .where(baseWhere, baseParams)
-        .andWhere('LOWER(proposta.status) IN (:...statusRejeitadas)', { statusRejeitadas })
-        .getCount(),
-      this.propostaRepository
-        .createQueryBuilder('proposta')
-        .where(baseWhere, baseParams)
+      buildBasePropostaQuery()
         .orderBy('proposta.atualizadaEm', 'DESC')
         .take(limiteSeguro)
         .getMany(),
@@ -384,9 +501,7 @@ export class ClientesService {
       status: fatura.status,
       valorTotal: Number(fatura.valorTotal || 0),
       valorPago: Number(fatura.valorPago || 0),
-      dataVencimento: fatura.dataVencimento
-        ? new Date(fatura.dataVencimento).toISOString()
-        : '',
+      dataVencimento: fatura.dataVencimento ? new Date(fatura.dataVencimento).toISOString() : '',
       atualizadoEm: (fatura.updatedAt ?? fatura.createdAt).toISOString(),
     }));
 
@@ -1033,9 +1148,7 @@ export class ClientesService {
     }
 
     if (Array.isArray(value)) {
-      const normalized = value
-        .map((item) => String(item).trim())
-        .filter(Boolean);
+      const normalized = value.map((item) => String(item).trim()).filter(Boolean);
       return normalized.length > 0 ? Array.from(new Set(normalized)) : null;
     }
 
@@ -1447,8 +1560,10 @@ export class ClientesService {
       this.hasProximoContatoColumn(),
     ]);
 
-    const shouldUpdateUltimoContato = hasUltimoContatoColumn && followupData.ultimo_contato !== undefined;
-    const shouldUpdateProximoContato = hasProximoContatoColumn && followupData.proximo_contato !== undefined;
+    const shouldUpdateUltimoContato =
+      hasUltimoContatoColumn && followupData.ultimo_contato !== undefined;
+    const shouldUpdateProximoContato =
+      hasProximoContatoColumn && followupData.proximo_contato !== undefined;
 
     if (!shouldUpdateUltimoContato && !shouldUpdateProximoContato) {
       return;
