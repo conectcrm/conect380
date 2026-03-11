@@ -310,7 +310,9 @@ class PropostasService {
       // Verificar se temos cache válido
       const now = Date.now();
       const isCacheValid =
-        this.produtosCache && now - this.produtosCacheTimestamp < this.CACHE_DURATION;
+        Array.isArray(this.produtosCache) &&
+        this.produtosCache.length > 0 &&
+        now - this.produtosCacheTimestamp < this.CACHE_DURATION;
 
       if (isCacheValid) {
         return this.produtosCache!;
@@ -321,7 +323,11 @@ class PropostasService {
         await new Promise((resolve) => setTimeout(resolve, 500));
 
         // Verificar se o cache foi atualizado enquanto esperava
-        if (this.produtosCache && Date.now() - this.produtosCacheTimestamp < this.CACHE_DURATION) {
+        if (
+          Array.isArray(this.produtosCache) &&
+          this.produtosCache.length > 0 &&
+          Date.now() - this.produtosCacheTimestamp < this.CACHE_DURATION
+        ) {
           return this.produtosCache;
         }
       }
@@ -330,7 +336,27 @@ class PropostasService {
 
       // Carregar catálogo de itens do backend
       const { produtosService } = await import('../../../services/produtosService');
-      const produtosAPI = await produtosService.findAll();
+      const PAGE_LIMIT = 100;
+      let page = 1;
+      let totalPages = 1;
+      const produtosAPI: any[] = [];
+
+      // Usa o mesmo fluxo paginado da tela de Catalogo de Itens para evitar divergencia.
+      do {
+        const response = await produtosService.listPaginated({
+          page,
+          limit: PAGE_LIMIT,
+          sortBy: 'nome',
+          sortOrder: 'ASC',
+        });
+
+        if (Array.isArray(response?.data) && response.data.length > 0) {
+          produtosAPI.push(...response.data);
+        }
+
+        totalPages = Math.max(1, Number(response?.meta?.totalPages || 1));
+        page += 1;
+      } while (page <= totalPages);
 
       const itensCatalogo: Produto[] = Array.isArray(produtosAPI)
         ? produtosAPI
@@ -347,7 +373,13 @@ class PropostasService {
               configuracaoId: produto.configuracaoId || undefined,
               descricao: produto.descricao || '',
               unidade: produto.unidade || produto.unidadeMedida || 'unidade',
-              tipo: produto.configuracaoNome || produto.tipoItem || 'produto',
+              tipo:
+                typeof produto?.tipoItem === 'string' &&
+                ['plano', 'modulo', 'licenca', 'aplicativo'].includes(
+                  produto.tipoItem.trim().toLowerCase(),
+                )
+                  ? 'software'
+                  : 'produto',
               tipoItem: produto.tipoItem,
               status: produto.status || 'ativo',
               tipoLicenciamento: produto.tipoLicenciamento,
@@ -464,7 +496,7 @@ class PropostasService {
 
     // Sem fallback mock: manter somente dados reais
     this.produtosCache = [];
-    this.produtosCacheTimestamp = Date.now();
+    this.produtosCacheTimestamp = 0;
     return [];
   }
 

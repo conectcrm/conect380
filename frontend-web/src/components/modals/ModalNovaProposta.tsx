@@ -196,10 +196,14 @@ const componentRoleLabels: Record<ProdutoComponentePlano['componentRole'], strin
 
 // Função auxiliar para detectar se é produto de software
 const isProdutoSoftware = (produto: Produto): boolean => {
+  const tipoItem = String(produto.tipoItem || '').trim().toLowerCase();
+  const categoria = String(produto.categoria || '').trim().toLowerCase();
+
   return (
     produto.tipo === 'software' ||
-    produto.categoria?.toLowerCase().includes('software') ||
-    (produto.tipoItem && ['licenca', 'modulo', 'aplicativo'].includes(produto.tipoItem))
+    categoria.includes('software') ||
+    categoria.includes('saas') ||
+    ['plano', 'licenca', 'modulo', 'aplicativo'].includes(tipoItem)
   );
 };
 
@@ -714,7 +718,13 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
     }
 
     if (tipoSelecionado) {
-      filtered = filtered.filter((p) => p.tipo === tipoSelecionado);
+      // "Tipo" no picker significa: itens avulsos vs combos.
+      // Produtos de software também devem aparecer quando "Produtos" estiver selecionado.
+      if (tipoSelecionado === 'combo') {
+        filtered = filtered.filter((p) => p.tipo === 'combo');
+      } else if (tipoSelecionado === 'produto') {
+        filtered = filtered.filter((p) => p.tipo !== 'combo');
+      }
     }
 
     if (buscarProduto) {
@@ -1364,7 +1374,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                         </span>
                         <span>|</span>
                         <span>
-                          {produtosFiltrados.filter((p) => p.tipo === 'produto').length} produtos
+                          {produtosFiltrados.filter((p) => p.tipo !== 'combo').length} produtos
                         </span>
                         {catalogoFeatures.combosEnabled && (
                           <>

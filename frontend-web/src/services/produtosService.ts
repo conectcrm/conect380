@@ -484,23 +484,23 @@ class ProdutosService {
 
   // Buscar todos os produtos
   async findAll(filters?: { categoria?: string; status?: string }): Promise<Produto[]> {
-    try {
-      if (this.useCatalogApi()) {
-        const legacyFilters = filters as ProdutoListFilters | undefined;
-        const produtos = await catalogoService
-          .listAllItems({
-            status: filters?.status,
-            categoriaId: legacyFilters?.categoriaId,
-            subcategoriaId: legacyFilters?.subcategoriaId,
-            configuracaoId: legacyFilters?.configuracaoId,
-          })
-          .then((items) => items.map((item) => this.mapCatalogItemToProduto(item)));
-
-        return produtos.filter((produto) =>
-          filters?.categoria ? produto.categoria === filters.categoria : true,
-        );
+    const parseLegacyPayload = (payload: unknown): Produto[] => {
+      if (Array.isArray(payload)) {
+        return payload as Produto[];
       }
 
+      if (
+        payload &&
+        typeof payload === 'object' &&
+        Array.isArray((payload as { data?: unknown }).data)
+      ) {
+        return (payload as { data: Produto[] }).data;
+      }
+
+      return [];
+    };
+
+    const buildLegacyParams = () => {
       const params = new URLSearchParams();
       if (filters?.categoria) params.append('categoria', filters.categoria);
       if ((filters as ProdutoListFilters)?.subcategoriaId) {
@@ -510,9 +510,53 @@ class ProdutosService {
         params.append('configuracaoId', (filters as ProdutoListFilters).configuracaoId as string);
       }
       if (filters?.status) params.append('status', filters.status);
+      return params;
+    };
 
-      const response = await api.get(`/produtos?${params.toString()}`);
-      return response.data;
+    const listFromLegacy = async (): Promise<Produto[]> => {
+      const response = await api.get(`/produtos?${buildLegacyParams().toString()}`);
+      return parseLegacyPayload(response.data);
+    };
+
+    try {
+      if (this.useCatalogApi()) {
+        try {
+          const legacyFilters = filters as ProdutoListFilters | undefined;
+          const produtosCatalogo = await catalogoService
+            .listAllItems({
+              status: filters?.status,
+              categoriaId: legacyFilters?.categoriaId,
+              subcategoriaId: legacyFilters?.subcategoriaId,
+              configuracaoId: legacyFilters?.configuracaoId,
+            })
+            .then((items) => items.map((item) => this.mapCatalogItemToProduto(item)));
+
+          const filtradosCatalogo = produtosCatalogo.filter((produto) =>
+            filters?.categoria ? produto.categoria === filters.categoria : true,
+          );
+
+          if (filtradosCatalogo.length > 0) {
+            return filtradosCatalogo;
+          }
+
+          const produtosLegado = await listFromLegacy();
+          if (produtosLegado.length > 0) {
+            console.warn(
+              '[produtosService] Catalogo retornou vazio para o tenant ativo; usando fallback legado /produtos',
+            );
+          }
+
+          return produtosLegado;
+        } catch (catalogError) {
+          console.warn(
+            '[produtosService] Falha ao consultar /catalog/items; usando fallback legado /produtos',
+            catalogError,
+          );
+          return listFromLegacy();
+        }
+      }
+
+      return listFromLegacy();
     } catch (error) {
       console.error('Erro ao buscar produtos:', error);
       throw error;
@@ -520,19 +564,7 @@ class ProdutosService {
   }
 
   async listPaginated(filters: ProdutoListFilters = {}): Promise<ProdutoListResponse> {
-    try {
-      if (this.useCatalogApi()) {
-        const response = await catalogoService.listItems(this.mapProdutoFiltersToCatalog(filters));
-        const data = response.data
-          .map((item) => this.mapCatalogItemToProduto(item))
-          .filter((produto) => (filters.categoria ? produto.categoria === filters.categoria : true));
-
-        return {
-          data,
-          meta: response.meta,
-        };
-      }
-
+    const buildLegacyParams = () => {
       const params = new URLSearchParams();
       if (filters.categoria) params.append('categoria', filters.categoria);
       if (filters.subcategoriaId) params.append('subcategoriaId', filters.subcategoriaId);
@@ -544,9 +576,89 @@ class ProdutosService {
       if (filters.limit) params.append('limit', String(filters.limit));
       if (filters.sortBy) params.append('sortBy', filters.sortBy);
       if (filters.sortOrder) params.append('sortOrder', filters.sortOrder);
+      return params;
+    };
 
-      const response = await api.get(`/produtos?${params.toString()}`);
-      return response.data;
+    const normalizeLegacyPaginated = (payload: unknown): ProdutoListResponse => {
+      if (
+        payload &&
+        typeof payload === 'object' &&
+        Array.isArray((payload as { data?: unknown }).data) &&
+        (payload as { meta?: unknown }).meta
+      ) {
+        return payload as ProdutoListResponse;
+      }
+
+      if (Array.isArray(payload)) {
+        const total = payload.length;
+        const page = filters.page || 1;
+        const limit = filters.limit || Math.max(total, 1);
+        return {
+          data: payload as Produto[],
+          meta: {
+            total,
+            page,
+            limit,
+            totalPages: Math.max(1, Math.ceil(total / limit)),
+          },
+        };
+      }
+
+      return {
+        data: [],
+        meta: {
+          total: 0,
+          page: filters.page || 1,
+          limit: filters.limit || 10,
+          totalPages: 1,
+        },
+      };
+    };
+
+    const listFromLegacyPaginated = async (): Promise<ProdutoListResponse> => {
+      const response = await api.get(`/produtos?${buildLegacyParams().toString()}`);
+      return normalizeLegacyPaginated(response.data);
+    };
+
+    try {
+      if (this.useCatalogApi()) {
+        try {
+          const response = await catalogoService.listItems(this.mapProdutoFiltersToCatalog(filters));
+          const data = response.data
+            .map((item) => this.mapCatalogItemToProduto(item))
+            .filter((produto) =>
+              filters.categoria ? produto.categoria === filters.categoria : true,
+            );
+
+          if (data.length > 0) {
+            return {
+              data,
+              meta: response.meta,
+            };
+          }
+
+          const legado = await listFromLegacyPaginated();
+          if (legado.data.length > 0) {
+            console.warn(
+              '[produtosService] listPaginated: catalogo vazio; usando fallback legado /produtos',
+            );
+            return legado;
+          }
+
+          return {
+            data,
+            meta: response.meta,
+          };
+        } catch (catalogError) {
+          console.warn(
+            '[produtosService] listPaginated: falha ao consultar /catalog/items; usando fallback legado /produtos',
+            catalogError,
+          );
+          return listFromLegacyPaginated();
+        }
+      }
+
+      return listFromLegacyPaginated();
     } catch (error) {
       console.error('Erro ao buscar produtos paginados:', error);
       throw error;
