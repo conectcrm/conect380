@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { isMenuItemAllowedInMvp } from './mvpScope';
 import { getCatalogoFeaturesConfig } from './catalogoFeaturesFlags';
+import { isOmnichannelEnabled } from './featureFlags';
 import type { User } from '../types';
 
 const catalogoFeatures = getCatalogoFeaturesConfig();
@@ -584,6 +585,68 @@ const filterMenuByPermissions = (
   return filterMenuByPermissionsInternal(items, context);
 };
 
+const atendimentoChildren: MenuConfig[] = [
+  {
+    id: 'atendimento-tickets',
+    title: 'Tickets',
+    icon: Ticket,
+    href: '/atendimento/tickets',
+    color: 'purple',
+    permissions: ['atendimento.tickets.read', 'ATENDIMENTO'],
+    contextBadgeKey: 'slaRisk',
+    group: 'Opera\u00e7\u00e3o',
+  },
+  {
+    id: 'atendimento-automacoes',
+    title: 'Automa\u00e7\u00f5es',
+    icon: Zap,
+    href: '/atendimento/automacoes',
+    color: 'purple',
+    permissions: ['config.automacoes.manage', 'atendimento.filas.manage'],
+    group: 'Gest\u00e3o',
+  },
+  {
+    id: 'atendimento-equipe',
+    title: 'Equipe',
+    icon: Users,
+    href: '/atendimento/equipe',
+    color: 'purple',
+    permissions: ['users.read', 'atendimento.filas.manage'],
+    group: 'Gest\u00e3o',
+  },
+  {
+    id: 'atendimento-analytics',
+    title: 'Analytics',
+    icon: BarChart3,
+    href: '/atendimento/analytics',
+    color: 'purple',
+    permissions: ['relatorios.read'],
+    group: 'Configura\u00e7\u00e3o',
+  },
+  {
+    id: 'atendimento-configuracoes',
+    title: 'Configura\u00e7\u00f5es',
+    icon: Settings,
+    href: '/atendimento/configuracoes',
+    color: 'purple',
+    permissions: ['atendimento.filas.manage', 'atendimento.sla.manage'],
+    group: 'Configura\u00e7\u00e3o',
+  },
+];
+
+if (isOmnichannelEnabled) {
+  atendimentoChildren.unshift({
+    id: 'atendimento-inbox',
+    title: 'Chat',
+    icon: MessageSquare,
+    href: '/atendimento/inbox',
+    color: 'purple',
+    permissions: ['atendimento.chats.read'],
+    contextBadgeKey: 'atendimentoUnread',
+    group: 'Opera\u00e7\u00e3o',
+  });
+}
+
 export const menuConfig: MenuConfig[] = [
   {
     id: 'dashboard',
@@ -599,69 +662,12 @@ export const menuConfig: MenuConfig[] = [
     title: 'Atendimento',
     shortTitle: 'Atend.',
     icon: MessageSquare,
-    href: '/atendimento',
+    href: isOmnichannelEnabled ? '/atendimento' : '/atendimento/tickets',
     color: 'purple',
     permissions: ['atendimento.chats.read', 'atendimento.tickets.read', 'ATENDIMENTO'],
     requiredModule: 'ATENDIMENTO', // Requer licenca de Atendimento
     section: 'Opera\u00e7\u00f5es',
-    children: [
-      {
-        id: 'atendimento-inbox',
-        title: 'Chat',
-        icon: MessageSquare,
-        href: '/atendimento/inbox',
-        color: 'purple',
-        permissions: ['atendimento.chats.read'],
-        contextBadgeKey: 'atendimentoUnread',
-        group: 'Opera\u00e7\u00e3o',
-      },
-      {
-        id: 'atendimento-tickets',
-        title: 'Tickets',
-        icon: Ticket,
-        href: '/atendimento/tickets',
-        color: 'purple',
-        permissions: ['atendimento.tickets.read', 'ATENDIMENTO'],
-        contextBadgeKey: 'slaRisk',
-        group: 'Opera\u00e7\u00e3o',
-      },
-      {
-        id: 'atendimento-automacoes',
-        title: 'Automa\u00e7\u00f5es',
-        icon: Zap,
-        href: '/atendimento/automacoes',
-        color: 'purple',
-        permissions: ['config.automacoes.manage', 'atendimento.filas.manage'],
-        group: 'Gest\u00e3o',
-      },
-      {
-        id: 'atendimento-equipe',
-        title: 'Equipe',
-        icon: Users,
-        href: '/atendimento/equipe',
-        color: 'purple',
-        permissions: ['users.read', 'atendimento.filas.manage'],
-        group: 'Gest\u00e3o',
-      },
-      {
-        id: 'atendimento-analytics',
-        title: 'Analytics',
-        icon: BarChart3,
-        href: '/atendimento/analytics',
-        color: 'purple',
-        permissions: ['relatorios.read'],
-        group: 'Configura\u00e7\u00e3o',
-      },
-      {
-        id: 'atendimento-configuracoes',
-        title: 'Configura\u00e7\u00f5es',
-        icon: Settings,
-        href: '/atendimento/configuracoes',
-        color: 'purple',
-        permissions: ['atendimento.filas.manage', 'atendimento.sla.manage'],
-        group: 'Configura\u00e7\u00e3o',
-      },
-    ],
+    children: atendimentoChildren,
   },
   {
     id: 'comercial',

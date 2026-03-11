@@ -33,6 +33,7 @@ import {
   SectionCard,
 } from '../../components/layout-v2';
 import { useGlobalConfirmation } from '../../contexts/GlobalConfirmationContext';
+import { isOmnichannelEnabled } from '../../config/featureFlags';
 import {
   Cliente,
   ClienteAttachment,
@@ -407,7 +408,7 @@ const ClienteDetailPage: React.FC = () => {
     setPropostasLoading(true);
     setContratosLoading(true);
     setFaturasLoading(true);
-    setContextoLoading(true);
+    setContextoLoading(isOmnichannelEnabled);
 
     const [
       notasResult,
@@ -424,7 +425,9 @@ const ClienteDetailPage: React.FC = () => {
       clientesService.getResumoPropostasCliente(clienteId, 100).catch(() => null),
       clientesService.getResumoContratosCliente(clienteId).catch(() => null),
       clientesService.getResumoFaturasCliente(clienteId).catch(() => null),
-      clientesService.getContextoOmnichannelCliente(clienteId).catch(() => null),
+      isOmnichannelEnabled
+        ? clientesService.getContextoOmnichannelCliente(clienteId).catch(() => null)
+        : Promise.resolve(null),
     ]);
 
     setNotasTotal(notasResult?.total ?? null);
@@ -433,7 +436,7 @@ const ClienteDetailPage: React.FC = () => {
     setPropostasResumo(propostasResult ?? null);
     setContratosResumo(contratosResult ?? null);
     setFaturasResumo(faturasResult ?? null);
-    setContextoOmnichannel(contextoResult ?? null);
+    setContextoOmnichannel(isOmnichannelEnabled ? (contextoResult ?? null) : null);
     setTicketsLoading(false);
     setPropostasLoading(false);
     setContratosLoading(false);
@@ -802,7 +805,10 @@ const ClienteDetailPage: React.FC = () => {
           ? 'warning'
           : 'neutral',
     },
-    {
+  ];
+
+  if (isOmnichannelEnabled) {
+    profileTabs.push({
       key: 'omnichannel',
       label: 'Segmento omnichannel',
       value: contextoOmnichannel?.cliente?.segmento || '--',
@@ -811,8 +817,8 @@ const ClienteDetailPage: React.FC = () => {
         relacionamentoBadge > 0
           ? 'accent'
           : 'neutral',
-    },
-  ];
+    });
+  }
 
   const showContatoSection = activeTab === 'tipo';
   const showContatosSection = activeTab === 'contatos';
@@ -822,10 +828,10 @@ const ClienteDetailPage: React.FC = () => {
   const showHistoricoSection = activeTab === 'tipo';
   const showNotasSection = activeTab === 'notas';
   const showDemandasSection = activeTab === 'demandas';
-  const showResumoOmnichannelSection = activeTab === 'omnichannel';
+  const showResumoOmnichannelSection = isOmnichannelEnabled && activeTab === 'omnichannel';
   const showRelacionamentosSection =
     showNotasSection || showDemandasSection || showResumoOmnichannelSection;
-  const showHistoricoOmnichannelSection = activeTab === 'omnichannel';
+  const showHistoricoOmnichannelSection = isOmnichannelEnabled && activeTab === 'omnichannel';
   const showTicketsSection = activeTab === 'tickets';
   const showPropostasSection = activeTab === 'propostas';
   const showContratosSection = activeTab === 'contratos';

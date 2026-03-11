@@ -39,6 +39,7 @@ import ScrollToTop from './components/common/ScrollToTop';
 import { useAuth } from './hooks/useAuth';
 import { getMvpBlockedRouteInfo } from './config/mvpScope';
 import { getCatalogoFeaturesConfig } from './config/catalogoFeaturesFlags';
+import { isOmnichannelEnabled } from './config/featureFlags';
 import { buildGuardianUrl } from './utils/guardianPortal';
 // Demandas agora sao Tickets - imports removidos (apenas redirects mantidos)
 // Sprint 2 - Fase 3e: Admin Console Tickets Configuráveis
@@ -317,14 +318,26 @@ const AppRoutes: React.FC = () => {
             element={
               <PermissionPathGuard>
                 <DashboardLayout>
-                  {protegerRota(ModuloEnum.ATENDIMENTO, <InboxAtendimentoPage />)}
+                  {isOmnichannelEnabled ? (
+                    protegerRota(ModuloEnum.ATENDIMENTO, <InboxAtendimentoPage />)
+                  ) : (
+                    <Navigate to="/atendimento/tickets" replace />
+                  )}
                 </DashboardLayout>
               </PermissionPathGuard>
             }
           />
 
           {/* Redirect: Chat antigo para Nova Inbox */}
-          <Route path="/atendimento/chat" element={<Navigate to="/atendimento/inbox" replace />} />
+          <Route
+            path="/atendimento/chat"
+            element={
+              <Navigate
+                to={isOmnichannelEnabled ? '/atendimento/inbox' : '/atendimento/tickets'}
+                replace
+              />
+            }
+          />
 
           {/* Todas as outras rotas renderizam dentro do DashboardLayout */}
           <Route
@@ -587,7 +600,13 @@ const AppRoutes: React.FC = () => {
                   {/* Atendimento Omnichannel - Protegido */}
                   <Route
                     path="/atendimento"
-                    element={protegerRota(ModuloEnum.ATENDIMENTO, <AtendimentoDashboard />)}
+                    element={
+                      isOmnichannelEnabled ? (
+                        protegerRota(ModuloEnum.ATENDIMENTO, <AtendimentoDashboard />)
+                      ) : (
+                        <Navigate to="/atendimento/tickets" replace />
+                      )
+                    }
                   />
                   {/* ETAPA 3: Páginas Consolidadas */}
                   <Route
