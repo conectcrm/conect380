@@ -213,6 +213,20 @@ jobs:
               docker compose --env-file "${ENV_FILE}" logs --tail=200 backend || true
               exit 1
             fi
+            BRANDING_STATUS="$(curl -sS --max-time 8 -o /tmp/branding-smoke.json -w '%{http_code}' http://127.0.0.1:3500/system-branding/public || true)"
+            AUTH_STATUS="$(curl -sS --max-time 8 -o /tmp/auth-smoke.json -w '%{http_code}' -X POST http://127.0.0.1:3500/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"smoke@invalid.local\",\"password\":\"invalid\"}' || true)"
+            if [ -z "${BRANDING_STATUS}" ] || [ "${BRANDING_STATUS}" = "000" ] || [ "${BRANDING_STATUS}" -ge 500 ]; then
+              echo "Falha: smoke /system-branding/public retornou status ${BRANDING_STATUS}."
+              cat /tmp/branding-smoke.json || true
+              docker compose --env-file "${ENV_FILE}" logs --tail=200 backend || true
+              exit 1
+            fi
+            if [ -z "${AUTH_STATUS}" ] || [ "${AUTH_STATUS}" = "000" ] || [ "${AUTH_STATUS}" -ge 500 ]; then
+              echo "Falha: smoke /auth/login retornou status ${AUTH_STATUS}."
+              cat /tmp/auth-smoke.json || true
+              docker compose --env-file "${ENV_FILE}" logs --tail=200 backend || true
+              exit 1
+            fi
       - name: 🚀 Deploy para Azure App Service
         if: ${{ env.AZURE_WEBAPP_NAME != '' }}
         uses: azure/webapps-deploy@v2
