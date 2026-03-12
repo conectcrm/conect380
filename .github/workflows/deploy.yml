@@ -93,18 +93,25 @@ jobs:
       - name: 🚀 Deploy para Azure VM (SSH)
         if: ${{ env.AWS_EC2_HOST != '' }}
         uses: appleboy/ssh-action@v1.0.0
+        env:
+          DEPLOY_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           host: ${{ secrets.AWS_EC2_HOST }}
           username: ${{ secrets.AWS_EC2_USER }}
           key: ${{ secrets.AWS_SSH_PRIVATE_KEY }}
           port: 22
           script_stop: true
+          envs: DEPLOY_GITHUB_TOKEN,GITHUB_REPOSITORY,GITHUB_SHA
           script: |
             set -eu
+            if [ ! -d /home/azureuser/conect360/.git ]; then
+              rm -rf /home/azureuser/conect360
+              git clone --depth 1 "https://x-access-token:${DEPLOY_GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" /home/azureuser/conect360
+            fi
             cd /home/azureuser/conect360
-            test -d .git
+            git remote set-url origin "https://github.com/${GITHUB_REPOSITORY}.git"
             git fetch --all --tags
-            git checkout -f ${{ github.sha }}
+            git checkout -f "${GITHUB_SHA}"
             echo "Deploying commit $(git rev-parse --short HEAD)"
             echo "Disk usage before cleanup:"
             df -h
