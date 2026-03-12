@@ -132,52 +132,62 @@ jobs:
             done
             if [ -z "${ENV_FILE}" ]; then
               ENV_FILE=".env.production"
-              POSTGRES_CONTAINER="$(docker ps -a --format '{{.Names}}' | grep -E 'postgres' | head -n1 || true)"
-              BACKEND_CONTAINER="$(docker ps -a --format '{{.Names}}' | grep -E 'backend' | head -n1 || true)"
-              DB_PASSWORD=""
-              DB_USERNAME=""
-              DB_NAME=""
-              JWT_SECRET_VALUE=""
-              if [ -n "${POSTGRES_CONTAINER}" ]; then
+            fi
+            [ -f "${ENV_FILE}" ] || touch "${ENV_FILE}"
+            set -a
+            . "./${ENV_FILE}"
+            set +a
+            POSTGRES_CONTAINER="$(docker ps -a --format '{{.Names}}' | grep -E 'postgres' | head -n1 || true)"
+            BACKEND_CONTAINER="$(docker ps -a --format '{{.Names}}' | grep -E 'backend' | head -n1 || true)"
+            DB_PASSWORD="${DATABASE_PASSWORD:-}"
+            DB_USERNAME="${DATABASE_USERNAME:-}"
+            DB_NAME="${DATABASE_NAME:-}"
+            JWT_SECRET_VALUE="${JWT_SECRET:-}"
+            if [ -n "${POSTGRES_CONTAINER}" ]; then
+              if [ -z "${DB_PASSWORD}" ]; then
                 DB_PASSWORD="$(docker inspect "${POSTGRES_CONTAINER}" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null | grep '^POSTGRES_PASSWORD=' | head -n1 | cut -d= -f2- || true)"
+              fi
+              if [ -z "${DB_USERNAME}" ]; then
                 DB_USERNAME="$(docker inspect "${POSTGRES_CONTAINER}" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null | grep '^POSTGRES_USER=' | head -n1 | cut -d= -f2- || true)"
+              fi
+              if [ -z "${DB_NAME}" ]; then
                 DB_NAME="$(docker inspect "${POSTGRES_CONTAINER}" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null | grep '^POSTGRES_DB=' | head -n1 | cut -d= -f2- || true)"
               fi
-              if [ -n "${BACKEND_CONTAINER}" ]; then
-                JWT_SECRET_VALUE="$(docker inspect "${BACKEND_CONTAINER}" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null | grep '^JWT_SECRET=' | head -n1 | cut -d= -f2- || true)"
-              fi
-              if [ -z "${DB_PASSWORD}" ] && [ -n "${DATABASE_PASSWORD:-}" ]; then DB_PASSWORD="${DATABASE_PASSWORD}"; fi
-              if [ -z "${DB_USERNAME}" ] && [ -n "${DATABASE_USERNAME:-}" ]; then DB_USERNAME="${DATABASE_USERNAME}"; fi
-              if [ -z "${DB_NAME}" ] && [ -n "${DATABASE_NAME:-}" ]; then DB_NAME="${DATABASE_NAME}"; fi
-              if [ -z "${JWT_SECRET_VALUE}" ] && [ -n "${JWT_SECRET:-}" ]; then JWT_SECRET_VALUE="${JWT_SECRET}"; fi
-              if [ -z "${DB_PASSWORD}" ] && [ -n "${POSTGRES_CONTAINER}" ]; then
-                docker start "${POSTGRES_CONTAINER}" >/dev/null 2>&1 || true
-                DB_PASSWORD="conectcrm_prod_2026_secure"
-                docker exec -u postgres "${POSTGRES_CONTAINER}" psql -d postgres -c "ALTER USER postgres WITH PASSWORD '${DB_PASSWORD}';" >/dev/null
-              fi
-              : "${DB_USERNAME:=postgres}"
-              : "${DB_NAME:=conectcrm}"
-              if [ -z "${DB_PASSWORD}" ]; then
-                echo "Falha: nao foi possivel recuperar DATABASE_PASSWORD para ${ENV_FILE}."
-                exit 1
-              fi
-              if [ -z "${JWT_SECRET_VALUE}" ]; then
-                JWT_SECRET_VALUE="$(openssl rand -hex 32 2>/dev/null || true)"
-              fi
-              if [ -z "${JWT_SECRET_VALUE}" ]; then
-                JWT_SECRET_VALUE="$(cat /proc/sys/kernel/random/uuid 2>/dev/null | tr -d '-')"
-              fi
-              if [ -z "${JWT_SECRET_VALUE}" ]; then
-                echo "Falha: nao foi possivel definir JWT_SECRET para ${ENV_FILE}."
-                exit 1
-              fi
-              {
-                echo "DATABASE_NAME=${DB_NAME}"
-                echo "DATABASE_USERNAME=${DB_USERNAME}"
-                echo "DATABASE_PASSWORD=${DB_PASSWORD}"
-                echo "JWT_SECRET=${JWT_SECRET_VALUE}"
-              } > "${ENV_FILE}"
             fi
+            if [ -n "${BACKEND_CONTAINER}" ] && [ -z "${JWT_SECRET_VALUE}" ]; then
+              JWT_SECRET_VALUE="$(docker inspect "${BACKEND_CONTAINER}" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null | grep '^JWT_SECRET=' | head -n1 | cut -d= -f2- || true)"
+            fi
+            if [ -z "${DB_PASSWORD}" ] && [ -n "${POSTGRES_CONTAINER}" ]; then
+              docker start "${POSTGRES_CONTAINER}" >/dev/null 2>&1 || true
+              DB_PASSWORD="conectcrm_prod_2026_secure"
+              docker exec -u postgres "${POSTGRES_CONTAINER}" psql -d postgres -c "ALTER USER postgres WITH PASSWORD '${DB_PASSWORD}';" >/dev/null
+            fi
+            : "${DB_USERNAME:=postgres}"
+            : "${DB_NAME:=conectcrm}"
+            if [ -z "${DB_PASSWORD}" ]; then
+              echo "Falha: nao foi possivel recuperar DATABASE_PASSWORD para ${ENV_FILE}."
+              exit 1
+            fi
+            if [ -z "${JWT_SECRET_VALUE}" ]; then
+              JWT_SECRET_VALUE="$(openssl rand -hex 32 2>/dev/null || true)"
+            fi
+            if [ -z "${JWT_SECRET_VALUE}" ]; then
+              JWT_SECRET_VALUE="$(cat /proc/sys/kernel/random/uuid 2>/dev/null | tr -d '-')"
+            fi
+            if [ -z "${JWT_SECRET_VALUE}" ]; then
+              echo "Falha: nao foi possivel definir JWT_SECRET para ${ENV_FILE}."
+              exit 1
+            fi
+            TMP_ENV="$(mktemp)"
+            grep -Ev '^(DATABASE_NAME|DATABASE_USERNAME|DATABASE_PASSWORD|JWT_SECRET)=' "${ENV_FILE}" > "${TMP_ENV}" || true
+            {
+              cat "${TMP_ENV}"
+              echo "DATABASE_NAME=${DB_NAME}"
+              echo "DATABASE_USERNAME=${DB_USERNAME}"
+              echo "DATABASE_PASSWORD=${DB_PASSWORD}"
+              echo "JWT_SECRET=${JWT_SECRET_VALUE}"
+            } > "${ENV_FILE}"
+            rm -f "${TMP_ENV}"
             set -a
             . "./${ENV_FILE}"
             set +a
