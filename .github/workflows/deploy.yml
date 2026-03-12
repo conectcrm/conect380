@@ -199,6 +199,7 @@ jobs:
             docker compose --env-file "${ENV_FILE}" up -d backend
             docker compose --env-file "${ENV_FILE}" run --rm backend npm run migration:run
             docker compose --env-file "${ENV_FILE}" up -d frontend
+            docker compose --env-file "${ENV_FILE}" --profile edge up -d nginx || true
             BACKEND_READY=0
             for i in $(seq 1 45); do
               if curl -fsS --max-time 3 http://127.0.0.1:3500/health > /dev/null; then
@@ -227,6 +228,9 @@ jobs:
               docker compose --env-file "${ENV_FILE}" logs --tail=200 backend || true
               exit 1
             fi
+            PUBLIC_API_STATUS="$(curl -sS --max-time 12 -o /tmp/public-api-health.txt -w '%{http_code}' https://api.conect360.com/health || true)"
+            echo "Public API /health status: ${PUBLIC_API_STATUS}"
+            docker ps --format '{{.Names}} {{.Status}}' | grep -E 'conectcrm-(backend|frontend|nginx|postgres|redis)' || true
       - name: 🚀 Deploy para Azure App Service
         if: ${{ env.AZURE_WEBAPP_NAME != '' }}
         uses: azure/webapps-deploy@v2
