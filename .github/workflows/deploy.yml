@@ -161,11 +161,21 @@ jobs:
                 echo "Falha: nao foi possivel recuperar DATABASE_PASSWORD para ${ENV_FILE}."
                 exit 1
               fi
+              if [ -z "${JWT_SECRET_VALUE}" ]; then
+                JWT_SECRET_VALUE="$(openssl rand -hex 32 2>/dev/null || true)"
+              fi
+              if [ -z "${JWT_SECRET_VALUE}" ]; then
+                JWT_SECRET_VALUE="$(cat /proc/sys/kernel/random/uuid 2>/dev/null | tr -d '-')"
+              fi
+              if [ -z "${JWT_SECRET_VALUE}" ]; then
+                echo "Falha: nao foi possivel definir JWT_SECRET para ${ENV_FILE}."
+                exit 1
+              fi
               {
                 echo "DATABASE_NAME=${DB_NAME}"
                 echo "DATABASE_USERNAME=${DB_USERNAME}"
                 echo "DATABASE_PASSWORD=${DB_PASSWORD}"
-                if [ -n "${JWT_SECRET_VALUE}" ]; then echo "JWT_SECRET=${JWT_SECRET_VALUE}"; fi
+                echo "JWT_SECRET=${JWT_SECRET_VALUE}"
               } > "${ENV_FILE}"
             fi
             set -a
