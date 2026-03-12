@@ -59,6 +59,12 @@ Conect360 é uma **suite CRM all-in-one** desenvolvida para PMEs brasileiras, qu
 
 ## ✨ Módulos do Sistema
 
+Observacao importante:
+
+1. a lista abaixo combina capacidades implementadas, capacidades parcialmente consolidadas e roadmap de produto;
+2. para saber o que ja possui requisito formal vigente por modulo, consulte `docs/handbook/MATRIZ_COBERTURA_REQUISITOS_2026-03.md`;
+3. itens marcados como `roadmap` ou sem contrato funcional vigente nao devem ser tratados como prontos para implementacao sem refinamento adicional.
+
 ### 1️⃣ Módulo CRM & Vendas
 
 - **Pipeline Visual (Kanban)** - Gestão de oportunidades com drag & drop
@@ -122,7 +128,7 @@ Conect360 é uma **suite CRM all-in-one** desenvolvida para PMEs brasileiras, qu
 ### 7️⃣ Módulo Calendário & Agenda
 
 - **Agendamentos** - Reuniões e follow-ups
-- **Sincronização Google Calendar** - Integração nativa
+- **Sincronização Google Calendar** - roadmap de integração externa
 - **Notificações Automáticas** - Lembretes por email/WhatsApp
 - **Agenda de Equipe** - Visualização compartilhada
 
@@ -133,6 +139,14 @@ Conect360 é uma **suite CRM all-in-one** desenvolvida para PMEs brasileiras, qu
 - **Métricas de Atendimento** - SLA, tempo médio, satisfação
 - **Forecast** - Previsão de receita e demanda
 - **Relatórios Customizados** - Exportação CSV/PDF (roadmap)
+
+### Estado de maturidade documental
+
+Como regra prática:
+
+1. Clientes 360, oportunidades/lifecycle, financeiro operacional/pagamentos e Guardian possuem documentação de requisito mais madura;
+2. agenda, analytics, contratos, atendimento omnichannel amplo e automação/IA ainda exigem maior consolidação documental para futuras evoluções;
+3. NFe/NFSe, assinatura eletrônica, sincronização externa de calendário e canal email omnichannel ainda precisam de requisito formal vigente antes de novas implementações guiadas por IA.
 
 ---
 

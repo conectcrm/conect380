@@ -1,5 +1,15 @@
 # ✅ Agenda Integrada ao Sistema de Notificações
 
+> Escopo do documento
+>
+> Este arquivo registra uma integração implementada na Agenda com o sistema de notificações.
+> Ele não é um contrato funcional completo da Agenda, nem substitui requisitos formais para evolução futura do módulo.
+> Para cobertura atual de requisitos, consulte [docs/handbook/MATRIZ_COBERTURA_REQUISITOS_2026-03.md](../handbook/MATRIZ_COBERTURA_REQUISITOS_2026-03.md) e [docs/README.md](../README.md).
+
+> Status documental
+>
+> Evidência técnica/histórica de implementação datada de 2025. Pode ser usada para rastrear comportamento existente, mas não para assumir que o domínio Agenda esteja integralmente especificado.
+
 ## 🎯 **Status: IMPLEMENTADO COM SUCESSO**
 
 **Data**: 22 de julho de 2025  

@@ -2,6 +2,18 @@
 
 Guia rápido para subir o Conect360 localmente em **5–10 minutos**.
 
+## Aviso de escopo
+
+Este guia cobre setup tecnico rapido do ambiente.
+
+Ele NAO significa que todos os modulos prometidos no produto estejam igualmente maduros, homologados ou com requisito formal fechado.
+
+Para entender escopo de produto e cobertura real de requisitos, consulte antes ou depois do setup:
+
+1. `README.md`
+2. `VISAO_SISTEMA_2025.md`
+3. `docs/handbook/MATRIZ_COBERTURA_REQUISITOS_2026-03.md`
+
 ---
 
 ## 📋 Pré-requisitos

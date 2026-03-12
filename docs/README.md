@@ -1,124 +1,111 @@
 
-# 📚 Documentação do Conect360
+# Documentacao do Conect360
 
-## 📁 Estrutura da Documentação
+## Objetivo
 
-### 📋 `/changelog`
+Este arquivo explica como navegar na documentacao do projeto sem confundir:
 
-**27 arquivos** - Histórico de correções, mudanças e status do sistema
+1. visao oficial do produto;
+2. requisitos vigentes;
+3. documentacao de implementacao;
+4. documentos historicos ou operacionais.
 
-- Correções de bugs e problemas
-- Status de implementações
-- Soluções aplicadas
-- Reorganizações realizadas
+## Leia primeiro
 
-### 📖 `/guides`
+Para entender o produto e o estado atual da documentacao, comece por:
 
-**11 arquivos** - Guias e manuais de configuração
+1. `../README.md`
+2. `../VISAO_SISTEMA_2025.md`
+3. `./INDICE_DOCUMENTACAO.md`
+4. `./handbook/MATRIZ_COBERTURA_REQUISITOS_2026-03.md`
+5. `./handbook/PLANO_SANEAMENTO_DOCUMENTACAO_2026-03.md`
 
-- Guias de configuração do sistema
-- Instruções de setup
-- Credenciais e dependências
-- Melhorias e otimizações
+## Fonte de verdade por tipo de documento
 
-### 🔧 `/implementation`
+### Requisitos vigentes
 
-**49 arquivos** - Documentação de funcionalidades implementadas
+Use primeiro:
 
-- Sistemas implementados (dashboard, funil, clientes, etc.)
-- Módulos e componentes
-- Integrações e APIs
-- Interfaces e layouts
+1. `docs/features/`
+2. `docs/handbook/MATRIZ_COBERTURA_REQUISITOS_2026-03.md`
 
-### 🐛 `/debug`
+Tipos esperados nessa area:
 
-**6 arquivos** - Logs de debug e diagnósticos
+1. contrato funcional;
+2. minuta de requisitos;
+3. backlog tecnico;
+4. checklist de QA, piloto ou sign-off.
 
-- Diagnósticos de performance
-- Logs de depuração
-- Execução de processos
+### Governanca e contexto
 
-### 📘 `/handbook`
+Use:
 
-Governança de foco e operação do Copilot (índices, decisões, auditorias e guias práticos).
+1. `docs/handbook/`
 
-Links rápidos:
+Arquivos principais:
 
-- [INDICE_DOCUMENTACAO.md](./handbook/INDICE_DOCUMENTACAO.md)
-- [CONTEXTO_ATUAL.md](./handbook/CONTEXTO_ATUAL.md)
-- [PRIORIDADES_ATIVAS.md](./handbook/PRIORIDADES_ATIVAS.md)
-- [DECISOES_TECNICAS.md](./handbook/DECISOES_TECNICAS.md)
-- [TEMPLATE_TAREFA.md](./handbook/TEMPLATE_TAREFA.md)
-- [AUDITORIA_DOCUMENTACAO_ATUAL.md](./handbook/AUDITORIA_DOCUMENTACAO_ATUAL.md)
-- [MAPA_MODULOS_TECNICOS.md](./handbook/MAPA_MODULOS_TECNICOS.md)
+1. `INDICE_DOCUMENTACAO.md`
+2. `AUDITORIA_DOCUMENTACAO_ATUAL.md`
+3. `MAPA_MODULOS_TECNICOS.md`
+4. `MATRIZ_COBERTURA_REQUISITOS_2026-03.md`
+5. `PLANO_SANEAMENTO_DOCUMENTACAO_2026-03.md`
 
-### 📱 Webhook WhatsApp (NOVO!)
+### Implementacao
 
-**10 arquivos** - Documentação completa do webhook WhatsApp Business API
+Use com cautela:
 
-- Status atual do sistema
-- Resolução de problemas (401, UUID)
-- Guias de configuração e ativação
-- Testes e validação
-- Scripts de automação
+1. `docs/implementation/`
 
-**🚀 Início Rápido Webhook**: [STATUS_WEBHOOK_ATUAL.md](./STATUS_WEBHOOK_ATUAL.md)  
-**📚 Índice Completo**: [INDICE_WEBHOOK_WHATSAPP.md](./INDICE_WEBHOOK_WHATSAPP.md)
+Esses arquivos explicam como algo foi implementado, mas nao substituem contrato funcional ou backlog vigente.
 
----
+### Operacao e validacao
 
-## 📂 Estrutura Geral do Projeto
+Use:
+
+1. `docs/runbooks/`
+2. `docs/features/evidencias/`
+
+Esses arquivos ajudam em rollout, homologacao e suporte, mas tambem nao substituem requisito funcional.
+
+### Historico
+
+Use apenas quando precisar de contexto antigo:
+
+1. `docs/archive/`
+
+## Estrutura resumida
 
 ```text
-conectcrm/
-├── 📁 docs/                    # Toda documentação (.md)
-│   ├── 📱 Webhook WhatsApp     # 10 arquivos (NOVO!)
-│   ├── 📋 changelog/           # 27 arquivos
-│   ├── 📖 guides/              # 11 arquivos
-│   ├── 🔧 implementation/      # 49 arquivos
-│   ├── 🐛 debug/               # 6 arquivos
-│   └── 📘 handbook/            # Governança (Copilot)
-├── 📁 temp/                    # Arquivos temporários e testes
-├── 📁 backend/                 # API backend (NestJS)
-├── 📁 frontend-web/            # Interface web (React)
-├── 📁 mobile/                  # App mobile
-├── 📁 scripts/                 # Scripts de automação
-├── 📁 public/                  # Arquivos públicos
-└── ⚙️ Arquivos de configuração # tsconfig.json, craco.config.js, etc.
+docs/
+├── features/         # requisitos, backlog, contratos, checklists
+├── handbook/         # governanca documental e contexto
+├── implementation/   # documentacao de implementacao
+├── runbooks/         # procedimentos operacionais
+├── archive/          # historico e legado
+├── changelog/        # historico de alteracoes
+├── guides/           # guias auxiliares
+└── debug/            # diagnosticos pontuais
 ```
 
-## ⚠️ Arquivos Importantes na Raiz
+## Regra pratica para novos documentos
 
-Os seguintes arquivos **NÃO foram movidos** por serem críticos para o funcionamento:
+Antes de criar um novo arquivo, decida primeiro o papel dele:
 
-- `tsconfig.json` - Configuração TypeScript global
-- `craco.config.js` - Configuração do React
-- `*.bat` e `*.ps1` - Scripts com caminhos hardcoded
-- `init-users.sql` - Script SQL referenciado em múltiplos lugares
+1. se define escopo, aceite ou comportamento esperado, ele deve ir para `docs/features/`;
+2. se explica navegacao, criterio ou governanca, ele deve ir para `docs/handbook/`;
+3. se descreve uma entrega pronta, ele deve ir para `docs/implementation/`;
+4. se descreve operacao, teste manual ou resposta a incidente, ele deve ir para `docs/runbooks/`.
 
-## 📝 IMPORTANTE: Criação de Novos Documentos
+## Alertas importantes
 
-### 🎯 Antes de criar um novo arquivo .md:
+1. Nao use `docs/archive/` como base primaria para novas implementacoes.
+2. Nao use `docs/implementation/` como substituto de requisito funcional.
+3. Nao use indices de subsistema como se fossem indice principal do produto.
 
-1. **Determine a categoria** do documento:
-   - 📋 **Correção/Bug/Status** → `docs/changelog/`
-   - 📖 **Guia/Manual/Config** → `docs/guides/`
-   - 🔧 **Implementação/Feature** → `docs/implementation/`
-   - 🐛 **Debug/Diagnóstico** → `docs/debug/`
+## Proximo passo sugerido
 
-2. **Se não se encaixar em nenhuma categoria:**
-   - Crie uma nova pasta em `docs/` com nome descritivo
-   - Exemplo: `docs/api/`, `docs/deployment/`, `docs/security/`
+Se a duvida for "qual documento manda neste modulo?", consulte primeiro:
 
-3. **Nomenclatura recomendada:**
-   - Use MAIÚSCULAS para consistência: `NOVA_FUNCIONALIDADE.md`
-   - Seja descritivo: `IMPLEMENTACAO_CHAT_REAL_TIME.md`
-   - Use underscore para separar palavras
-
-### ⚠️ NÃO criar arquivos .md na raiz do projeto!
-
-A raiz deve conter apenas arquivos críticos de configuração.
-
----
-
-_Organização realizada em: 23/07/2025_
+1. `./handbook/MATRIZ_COBERTURA_REQUISITOS_2026-03.md`
+2. `./handbook/MAPA_MODULOS_TECNICOS.md`
+3. `./features/` correspondente ao dominio.
