@@ -179,7 +179,20 @@ jobs:
             docker compose --env-file "${ENV_FILE}" up -d backend
             docker compose --env-file "${ENV_FILE}" run --rm backend npm run migration:run
             docker compose --env-file "${ENV_FILE}" up -d frontend
-            curl -fsS http://127.0.0.1:3500/health > /dev/null
+            BACKEND_READY=0
+            for i in $(seq 1 45); do
+              if curl -fsS --max-time 3 http://127.0.0.1:3500/health > /dev/null; then
+                BACKEND_READY=1
+                break
+              fi
+              sleep 2
+            done
+            if [ "${BACKEND_READY}" -ne 1 ]; then
+              echo "Falha: backend nao respondeu no health check apos o deploy."
+              docker compose --env-file "${ENV_FILE}" ps || true
+              docker compose --env-file "${ENV_FILE}" logs --tail=200 backend || true
+              exit 1
+            fi
       - name: 🚀 Deploy para Azure App Service
         if: ${{ env.AZURE_WEBAPP_NAME != '' }}
         uses: azure/webapps-deploy@v2
