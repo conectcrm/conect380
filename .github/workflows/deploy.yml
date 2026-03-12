@@ -123,8 +123,15 @@ jobs:
             echo "Disk usage before cleanup:"
             df -h
             cd .production
-            ENV_FILE=".env.production"
-            if [ ! -f "${ENV_FILE}" ]; then
+            ENV_FILE=""
+            for candidate in .env.production .env.prod .env; do
+              if [ -f "${candidate}" ]; then
+                ENV_FILE="${candidate}"
+                break
+              fi
+            done
+            if [ -z "${ENV_FILE}" ]; then
+              ENV_FILE=".env.production"
               DB_PASSWORD="$(docker inspect conectcrm-postgres --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null | grep '^POSTGRES_PASSWORD=' | head -n1 | cut -d= -f2- || true)"
               DB_USERNAME="$(docker inspect conectcrm-postgres --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null | grep '^POSTGRES_USER=' | head -n1 | cut -d= -f2- || true)"
               DB_NAME="$(docker inspect conectcrm-postgres --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null | grep '^POSTGRES_DB=' | head -n1 | cut -d= -f2- || true)"
