@@ -95,13 +95,17 @@ jobs:
         uses: appleboy/ssh-action@v1.0.0
         env:
           DEPLOY_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DATABASE_NAME: ${{ secrets.DATABASE_NAME }}
+          DATABASE_USERNAME: ${{ secrets.DATABASE_USERNAME }}
+          DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
         with:
           host: ${{ secrets.AWS_EC2_HOST }}
           username: ${{ secrets.AWS_EC2_USER }}
           key: ${{ secrets.AWS_SSH_PRIVATE_KEY }}
           port: 22
           script_stop: true
-          envs: DEPLOY_GITHUB_TOKEN,GITHUB_REPOSITORY,GITHUB_SHA
+          envs: DEPLOY_GITHUB_TOKEN,GITHUB_REPOSITORY,GITHUB_SHA,DATABASE_NAME,DATABASE_USERNAME,DATABASE_PASSWORD,JWT_SECRET
           script: |
             set -eu
             mkdir -p /home/azureuser/conect360
@@ -125,6 +129,10 @@ jobs:
               DB_USERNAME="$(docker inspect conectcrm-postgres --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null | grep '^POSTGRES_USER=' | head -n1 | cut -d= -f2- || true)"
               DB_NAME="$(docker inspect conectcrm-postgres --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null | grep '^POSTGRES_DB=' | head -n1 | cut -d= -f2- || true)"
               JWT_SECRET_VALUE="$(docker inspect conectcrm-backend --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null | grep '^JWT_SECRET=' | head -n1 | cut -d= -f2- || true)"
+              if [ -z "${DB_PASSWORD}" ] && [ -n "${DATABASE_PASSWORD:-}" ]; then DB_PASSWORD="${DATABASE_PASSWORD}"; fi
+              if [ -z "${DB_USERNAME}" ] && [ -n "${DATABASE_USERNAME:-}" ]; then DB_USERNAME="${DATABASE_USERNAME}"; fi
+              if [ -z "${DB_NAME}" ] && [ -n "${DATABASE_NAME:-}" ]; then DB_NAME="${DATABASE_NAME}"; fi
+              if [ -z "${JWT_SECRET_VALUE}" ] && [ -n "${JWT_SECRET:-}" ]; then JWT_SECRET_VALUE="${JWT_SECRET}"; fi
               : "${DB_USERNAME:=postgres}"
               : "${DB_NAME:=conectcrm}"
               if [ -z "${DB_PASSWORD}" ]; then
