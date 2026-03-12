@@ -30,6 +30,14 @@ const normalizePort = (port?: string | number | null) => {
   return asString ? `:${asString}` : '';
 };
 
+const derivePublicApiHost = (host: string) => {
+  const withoutWww = host.startsWith('www.') ? host.slice(4) : host;
+  if (withoutWww.startsWith('api.')) {
+    return withoutWww;
+  }
+  return `api.${withoutWww}`;
+};
+
 const buildUrl = (
   protocol: 'http' | 'https' | 'ws' | 'wss',
   host: string,
@@ -120,7 +128,8 @@ const resolveHostAwareBaseUrl = ({
     return buildUrl(privateProtocol, currentHost, localPort, path);
   }
 
-  return buildUrl(protocol, currentHost, publicPort, path);
+  const publicHost = derivePublicApiHost(currentHost);
+  return buildUrl(protocol, publicHost, publicPort, path);
 };
 
 interface ApiBaseUrlOptions {
