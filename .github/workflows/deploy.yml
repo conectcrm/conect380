@@ -132,8 +132,8 @@ jobs:
             done
             if [ -z "${ENV_FILE}" ]; then
               ENV_FILE=".env.production"
-              POSTGRES_CONTAINER="$(docker ps -a --format '{{.Names}}' | grep -E '^conectcrm-postgres$|^production-postgres' | head -n1 || true)"
-              BACKEND_CONTAINER="$(docker ps -a --format '{{.Names}}' | grep -E '^conectcrm-backend$|^production-backend' | head -n1 || true)"
+              POSTGRES_CONTAINER="$(docker ps -a --format '{{.Names}}' | grep -E 'postgres' | head -n1 || true)"
+              BACKEND_CONTAINER="$(docker ps -a --format '{{.Names}}' | grep -E 'backend' | head -n1 || true)"
               DB_PASSWORD=""
               DB_USERNAME=""
               DB_NAME=""
@@ -150,6 +150,11 @@ jobs:
               if [ -z "${DB_USERNAME}" ] && [ -n "${DATABASE_USERNAME:-}" ]; then DB_USERNAME="${DATABASE_USERNAME}"; fi
               if [ -z "${DB_NAME}" ] && [ -n "${DATABASE_NAME:-}" ]; then DB_NAME="${DATABASE_NAME}"; fi
               if [ -z "${JWT_SECRET_VALUE}" ] && [ -n "${JWT_SECRET:-}" ]; then JWT_SECRET_VALUE="${JWT_SECRET}"; fi
+              if [ -z "${DB_PASSWORD}" ] && [ -n "${POSTGRES_CONTAINER}" ]; then
+                docker start "${POSTGRES_CONTAINER}" >/dev/null 2>&1 || true
+                DB_PASSWORD="conectcrm_prod_2026_secure"
+                docker exec -u postgres "${POSTGRES_CONTAINER}" psql -d postgres -c "ALTER USER postgres WITH PASSWORD '${DB_PASSWORD}';" >/dev/null
+              fi
               : "${DB_USERNAME:=postgres}"
               : "${DB_NAME:=conectcrm}"
               if [ -z "${DB_PASSWORD}" ]; then
