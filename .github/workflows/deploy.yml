@@ -104,15 +104,17 @@ jobs:
           envs: DEPLOY_GITHUB_TOKEN,GITHUB_REPOSITORY,GITHUB_SHA
           script: |
             set -eu
-            if [ ! -d /home/azureuser/conect360/.git ]; then
-              rm -rf /home/azureuser/conect360
-              git clone --depth 1 --no-single-branch "https://x-access-token:${DEPLOY_GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" /home/azureuser/conect360
-            fi
+            mkdir -p /home/azureuser/conect360
             cd /home/azureuser/conect360
-            git remote set-url origin "https://github.com/${GITHUB_REPOSITORY}.git"
+            if [ ! -d /home/azureuser/conect360/.git ]; then
+              git init
+              git remote add origin "https://x-access-token:${DEPLOY_GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+            fi
+            git remote set-url origin "https://x-access-token:${DEPLOY_GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
             git fetch --all --tags
             git fetch --depth 1 origin "${GITHUB_SHA}"
             git checkout -f "${GITHUB_SHA}"
+            git remote set-url origin "https://github.com/${GITHUB_REPOSITORY}.git"
             echo "Deploying commit $(git rev-parse --short HEAD)"
             echo "Disk usage before cleanup:"
             df -h
