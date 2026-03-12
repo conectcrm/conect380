@@ -98,11 +98,20 @@ jobs:
           username: ${{ secrets.AWS_EC2_USER }}
           key: ${{ secrets.AWS_SSH_PRIVATE_KEY }}
           port: 22
+          script_stop: true
           script: |
+            set -eu
             cd /home/azureuser/conect360
+            test -d .git
             git fetch --all --tags
-            git checkout -f ${{ github.ref_name }}
+            git checkout -f ${{ github.sha }}
+            echo "Deploying commit $(git rev-parse --short HEAD)"
+            echo "Disk usage before cleanup:"
+            df -h
             cd .production
+            docker image prune -af
+            echo "Disk usage after cleanup:"
+            df -h
             docker compose up -d postgres redis
             docker compose build backend frontend
             docker compose up -d backend
