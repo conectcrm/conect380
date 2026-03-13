@@ -24,6 +24,7 @@ import ConversionFunnel from './components/ConversionFunnel';
 import InsightsPanel from './components/InsightsPanel';
 import PipelineStageSummary from './components/PipelineStageSummary';
 import api from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 type ChartWindow = '3m' | '6m' | '12m';
 
@@ -292,6 +293,7 @@ const buildMonthlySeries = (points: DashboardV2TrendPoint[]): MonthTrend[] => {
 
 const DashboardV2Page: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { data, loading, error, filters, activeRange, setFilters, refresh, refreshing } =
     useDashboardV2(true);
   const [chartWindow, setChartWindow] = useState<ChartWindow>('3m');
@@ -536,6 +538,30 @@ const DashboardV2Page: React.FC = () => {
       : `${getActivityTypeLabel(dominantActivityType.tipo)} lidera o mix, mas o período segue distribuído entre mais frentes comerciais.`
     : 'Sem movimentação registrada no período selecionado.';
 
+  const metaProgressPercent = Math.max(0, Math.min(100, goalProgress));
+  const horaAtual = new Date().getHours();
+  const saudacaoPeriodo = horaAtual < 12 ? 'Bom dia' : horaAtual < 18 ? 'Boa tarde' : 'Boa noite';
+  const primeiroNome =
+    user?.nome && user.nome.trim().length > 0 ? user.nome.trim().split(/\s+/)[0] : 'time';
+  const empresaLabel = user?.empresa?.nome || 'operacao comercial';
+  const saudacaoTitulo = `${saudacaoPeriodo}, ${primeiroNome}`;
+  const vendedorSelecionadoLabel = filters.vendedorId
+    ? vendedorOptions.find((option) => option.id === filters.vendedorId)?.nome ||
+      'Vendedor filtrado'
+    : 'Todos os vendedores';
+  const statusComercialLabel =
+    metaProgressPercent >= 100
+      ? 'Meta superada'
+      : metaProgressPercent >= 70
+        ? 'Em caminho certo'
+        : 'Em atencao';
+  const statusComercialTone =
+    metaProgressPercent >= 100
+      ? 'bg-[#E8F6F4] text-[#166A6B]'
+      : metaProgressPercent >= 70
+        ? 'bg-[#EAF5FA] text-[#2C708D]'
+        : 'bg-[#FFF4E9] text-[#A06213]';
+
   if (loading) {
     return (
       <div className="space-y-3.5">
@@ -593,45 +619,144 @@ const DashboardV2Page: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <section className="rounded-[20px] border border-[#DCE7EB] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)]">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-[22px] font-semibold tracking-[-0.014em] text-[#143548]">
-              Dashboard Comercial
-            </h2>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <span className="inline-flex items-center rounded-full border border-[#D6E4E9] bg-[#F5FAFB] px-2.5 py-1 text-[12px] font-medium text-[#4C6977]">
-                Período: {formatRangeLabel(activeRange.periodStart, activeRange.periodEnd)}
+      <section className="mb-6 rounded-[20px] border border-[#DCE7EB] bg-[linear-gradient(135deg,#F9FDFD_0%,#F0F8F8_55%,#F8FCFC_100%)] p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)]">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="min-w-0">
+            <span className="inline-flex items-center rounded-full border border-[#CFE6E8] bg-white/80 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4C7283]">
+              Dashboard Comercial Global
+            </span>
+            <h1 className="mt-2 text-[27px] font-semibold tracking-[-0.02em] text-[#173A4E]">
+              {saudacaoTitulo}
+            </h1>
+            <p className="mt-1 text-[14px] text-[#4D6D7B]">
+              Visao consolidada de vendas em{' '}
+              <span className="font-semibold text-[#1D4F63]">{empresaLabel}</span>.
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center rounded-full border border-[#D3E4E8] bg-white px-2.5 py-1 text-[12px] font-medium text-[#466777]">
+                Periodo: {formatRangeLabel(activeRange.periodStart, activeRange.periodEnd)}
               </span>
-              <span className="inline-flex items-center rounded-full border border-[#D6E4E9] bg-[#F5FAFB] px-2.5 py-1 text-[12px] font-medium text-[#4C6977]">
+              <span className="inline-flex items-center rounded-full border border-[#D3E4E8] bg-white px-2.5 py-1 text-[12px] font-medium text-[#466777]">
                 Atualizado: {latestGeneratedAtLabel}
+              </span>
+              <span className="inline-flex items-center rounded-full border border-[#D3E4E8] bg-white px-2.5 py-1 text-[12px] font-medium text-[#466777]">
+                Equipe: {vendedorSelecionadoLabel}
+              </span>
+              <span
+                className={`inline-flex items-center rounded-full px-2.5 py-1 text-[12px] font-semibold ${statusComercialTone}`}
+              >
+                {statusComercialLabel}
               </span>
             </div>
           </div>
 
-          <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:justify-end">
-            <label htmlFor="dashboard-v2-period" className="text-[13px] font-medium text-[#567583]">
-              Período
-            </label>
-            <select
-              id="dashboard-v2-period"
-              value={filters.periodPreset}
-              onChange={(event) =>
-                handlePeriodPresetChange(event.target.value as DashboardV2PeriodPreset)
-              }
-              className="w-full min-w-0 rounded-[10px] border border-[#D5E3E8] bg-white px-3 py-2 text-[13px] text-[#244556] focus:border-[#159A9C] focus:outline-none sm:w-auto sm:min-w-[180px]"
-            >
-              {dashboardPeriodOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+          <div className="w-full rounded-[14px] border border-[#D5E3E8] bg-white/80 p-3.5 xl:w-auto xl:min-w-[560px]">
+            <div className="flex w-full flex-wrap items-center gap-2">
+              <label
+                htmlFor="dashboard-v2-period"
+                className="text-[13px] font-medium text-[#567583]"
+              >
+                Periodo
+              </label>
+              <select
+                id="dashboard-v2-period"
+                value={filters.periodPreset}
+                onChange={(event) =>
+                  handlePeriodPresetChange(event.target.value as DashboardV2PeriodPreset)
+                }
+                className="w-full min-w-0 rounded-[10px] border border-[#D5E3E8] bg-white px-3 py-2 text-[13px] text-[#244556] focus:border-[#159A9C] focus:outline-none sm:w-auto sm:min-w-[180px]"
+              >
+                {dashboardPeriodOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+
+              {filters.periodPreset === 'custom' ? (
+                <>
+                  <input
+                    type="date"
+                    aria-label="Data inicial"
+                    value={filters.customStart || ''}
+                    onChange={(event) =>
+                      setFilters({
+                        customStart: event.target.value || undefined,
+                      })
+                    }
+                    className="w-full rounded-[10px] border border-[#D5E3E8] bg-white px-3 py-2 text-[13px] text-[#244556] focus:border-[#159A9C] focus:outline-none sm:w-auto"
+                  />
+                  <input
+                    type="date"
+                    aria-label="Data final"
+                    value={filters.customEnd || ''}
+                    onChange={(event) =>
+                      setFilters({
+                        customEnd: event.target.value || undefined,
+                      })
+                    }
+                    className="w-full rounded-[10px] border border-[#D5E3E8] bg-white px-3 py-2 text-[13px] text-[#244556] focus:border-[#159A9C] focus:outline-none sm:w-auto"
+                  />
+                </>
+              ) : null}
+
+              <label
+                htmlFor="dashboard-v2-vendedor"
+                className="text-[13px] font-medium text-[#567583]"
+              >
+                Vendedor
+              </label>
+              <select
+                id="dashboard-v2-vendedor"
+                value={filters.vendedorId || ''}
+                onChange={(event) =>
+                  setFilters({
+                    vendedorId: event.target.value || undefined,
+                  })
+                }
+                className="w-full min-w-0 rounded-[10px] border border-[#D5E3E8] bg-white px-3 py-2 text-[13px] text-[#244556] focus:border-[#159A9C] focus:outline-none sm:w-auto sm:min-w-[220px]"
+              >
+                <option value="">Todos</option>
+                {vendedorOptions.map((vendedor, index) => (
+                  <option key={`${vendedor.id}-${index}`} value={vendedor.id}>
+                    {vendedor.nome}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setFilters({
+                    periodPreset: '30d',
+                    customStart: undefined,
+                    customEnd: undefined,
+                    vendedorId: undefined,
+                    pipelineId: undefined,
+                  });
+                }}
+                disabled={!hasActiveFilters}
+                className="inline-flex items-center gap-2 rounded-[10px] border border-[#D5E3E8] px-3 py-2 text-[13px] font-semibold text-[#26495C] hover:bg-[#F3F9F8] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Limpar filtros
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  void refresh();
+                }}
+                className="inline-flex items-center gap-2 rounded-[10px] border border-[#D5E3E8] px-3 py-2 text-[13px] font-semibold text-[#26495C] hover:bg-[#F3F9F8]"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+                Atualizar
+              </button>
+            </div>
 
             <div
-              className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto"
+              className="mt-2.5 flex w-full flex-wrap items-center gap-1.5"
               role="group"
-              aria-label="Atalhos de período"
+              aria-label="Atalhos de periodo"
             >
               {dashboardQuickPeriodChips.map((chip) => {
                 const isActive = filters.periodPreset === chip.value;
@@ -653,89 +778,46 @@ const DashboardV2Page: React.FC = () => {
                 );
               })}
             </div>
-
-            {filters.periodPreset === 'custom' ? (
-              <>
-                <input
-                  type="date"
-                  aria-label="Data inicial"
-                  value={filters.customStart || ''}
-                  onChange={(event) =>
-                    setFilters({
-                      customStart: event.target.value || undefined,
-                    })
-                  }
-                  className="w-full rounded-[10px] border border-[#D5E3E8] bg-white px-3 py-2 text-[13px] text-[#244556] focus:border-[#159A9C] focus:outline-none sm:w-auto"
-                />
-                <input
-                  type="date"
-                  aria-label="Data final"
-                  value={filters.customEnd || ''}
-                  onChange={(event) =>
-                    setFilters({
-                      customEnd: event.target.value || undefined,
-                    })
-                  }
-                  className="w-full rounded-[10px] border border-[#D5E3E8] bg-white px-3 py-2 text-[13px] text-[#244556] focus:border-[#159A9C] focus:outline-none sm:w-auto"
-                />
-              </>
-            ) : null}
-
-            <label
-              htmlFor="dashboard-v2-vendedor"
-              className="text-[13px] font-medium text-[#567583]"
-            >
-              Vendedor
-            </label>
-            <select
-              id="dashboard-v2-vendedor"
-              value={filters.vendedorId || ''}
-              onChange={(event) =>
-                setFilters({
-                  vendedorId: event.target.value || undefined,
-                })
-              }
-              className="w-full min-w-0 rounded-[10px] border border-[#D5E3E8] bg-white px-3 py-2 text-[13px] text-[#244556] focus:border-[#159A9C] focus:outline-none sm:w-auto sm:min-w-[240px]"
-            >
-              <option value="">Todos</option>
-              {vendedorOptions.map((vendedor, index) => (
-                <option key={`${vendedor.id}-${index}`} value={vendedor.id}>
-                  {vendedor.nome}
-                </option>
-              ))}
-            </select>
-
-            <button
-              type="button"
-              onClick={() => {
-                setFilters({
-                  periodPreset: '30d',
-                  customStart: undefined,
-                  customEnd: undefined,
-                  vendedorId: undefined,
-                  pipelineId: undefined,
-                });
-              }}
-              disabled={!hasActiveFilters}
-              className="inline-flex items-center gap-2 rounded-[10px] border border-[#D5E3E8] px-3 py-2 text-[13px] font-semibold text-[#26495C] hover:bg-[#F3F9F8] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Limpar filtros
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                void refresh();
-              }}
-              className="inline-flex items-center gap-2 rounded-[10px] border border-[#D5E3E8] px-3 py-2 text-[13px] font-semibold text-[#26495C] hover:bg-[#F3F9F8]"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-              Atualizar
-            </button>
           </div>
         </div>
-      </section>
 
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="flex items-center justify-between rounded-[12px] border border-[#DCE7EB] bg-white/90 px-3 py-2">
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-[#7A929E]">Meta concluida</p>
+              <p className="text-[16px] font-semibold text-[#18374B]">
+                {metaProgressPercent.toFixed(0)}%
+              </p>
+            </div>
+            <Target className="h-5 w-5 text-[#159A9C]" />
+          </div>
+          <div className="flex items-center justify-between rounded-[12px] border border-[#DCE7EB] bg-white/90 px-3 py-2">
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-[#7A929E]">Faturamento</p>
+              <p className="text-[16px] font-semibold text-[#18374B]">
+                {formatCompactCurrency(data.overview.receitaFechada)}
+              </p>
+            </div>
+            <DollarSign className="h-5 w-5 text-[#159A9C]" />
+          </div>
+          <div className="flex items-center justify-between rounded-[12px] border border-[#DCE7EB] bg-white/90 px-3 py-2">
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-[#7A929E]">Ganhos</p>
+              <p className="text-[16px] font-semibold text-[#18374B]">
+                {formatNumber(Number(wonStage?.quantidade || 0))} vendas
+              </p>
+            </div>
+            <BadgeCheck className="h-5 w-5 text-[#159A9C]" />
+          </div>
+        </div>
+
+        <div className="mt-4 h-2 w-full rounded-full bg-[#DEEFE7]">
+          <div
+            className="h-2 rounded-full bg-[#159A9C] transition-all"
+            style={{ width: `${metaProgressPercent}%` }}
+          />
+        </div>
+      </section>
       <section className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 min-[1850px]:grid-cols-5">
         <KpiTrendCard
           title="Faturamento"
@@ -848,10 +930,7 @@ const DashboardV2Page: React.FC = () => {
               </p>
             </div>
             <span className="inline-flex items-center rounded-full border border-[#D6E4E9] bg-[#F5FAFB] px-2.5 py-1 text-[12px] font-medium text-[#4C6977]">
-              {formatRangeLabel(
-                salesActivities.range.periodStart,
-                salesActivities.range.periodEnd,
-              )}
+              {formatRangeLabel(salesActivities.range.periodStart, salesActivities.range.periodEnd)}
             </span>
           </div>
 
@@ -864,7 +943,9 @@ const DashboardV2Page: React.FC = () => {
                 {formatNumber(salesActivities.totalAtividades)}
               </p>
               <p className="mt-3 text-[12px] text-[#6C8591]">
-                {salesActivityRangeDays > 0 ? `${salesActivityRangeDays} dias no recorte.` : 'Período indisponível.'}
+                {salesActivityRangeDays > 0
+                  ? `${salesActivityRangeDays} dias no recorte.`
+                  : 'Período indisponível.'}
               </p>
             </div>
 
@@ -875,7 +956,9 @@ const DashboardV2Page: React.FC = () => {
               <p className="mt-2 text-[28px] font-semibold leading-none text-[#16384B]">
                 {averageActivitiesPerDay.toFixed(1)}
               </p>
-              <p className="mt-3 text-[12px] text-[#6C8591]">média diária de atividade no período</p>
+              <p className="mt-3 text-[12px] text-[#6C8591]">
+                média diária de atividade no período
+              </p>
             </div>
 
             <div className="rounded-[14px] border border-[#E1EBEE] bg-[#FBFEFF] p-4">
@@ -929,7 +1012,9 @@ const DashboardV2Page: React.FC = () => {
                             </span>
                           </div>
                           <div className="flex items-center gap-3 text-[12px] text-[#5F7987]">
-                            <span className="font-semibold text-[#16384B]">{formatNumber(item.quantidade)}</span>
+                            <span className="font-semibold text-[#16384B]">
+                              {formatNumber(item.quantidade)}
+                            </span>
                             <span>{percent.toFixed(0)}%</span>
                           </div>
                         </div>
@@ -944,9 +1029,7 @@ const DashboardV2Page: React.FC = () => {
                     );
                   })
                 ) : (
-                  <span className="text-[13px] text-[#718A97]">
-                    Sem atividades no período.
-                  </span>
+                  <span className="text-[13px] text-[#718A97]">Sem atividades no período.</span>
                 )}
               </div>
             </div>
@@ -1025,7 +1108,9 @@ const DashboardV2Page: React.FC = () => {
                       <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#E8F6F4] text-[11px] font-semibold text-[#196A6B]">
                         {index + 1}
                       </span>
-                      <p className="truncate text-[13px] font-semibold text-[#20485B]">{seller.nome}</p>
+                      <p className="truncate text-[13px] font-semibold text-[#20485B]">
+                        {seller.nome}
+                      </p>
                     </div>
                     <span className="rounded-full bg-[#E8F6F4] px-2 py-0.5 text-[11px] font-semibold text-[#1C6C6E]">
                       {seller.quantidade} atividades
@@ -1048,10 +1133,11 @@ const DashboardV2Page: React.FC = () => {
                     {seller.oportunidadesAtivas} oportunidades com interação
                   </p>
                   <p className="mt-0.5 text-[11px] text-[#879CA7]">
-                    Participação no período: {' '}
+                    Participação no período:{' '}
                     {salesActivities.totalAtividades > 0
                       ? ((seller.quantidade / salesActivities.totalAtividades) * 100).toFixed(0)
-                      : '0'}%
+                      : '0'}
+                    %
                   </p>
                   <p className="mt-0.5 text-[11px] text-[#879CA7]">
                     Última atividade: {formatActivityTimestamp(seller.ultimaAtividadeEm)}

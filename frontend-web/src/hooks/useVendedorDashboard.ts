@@ -5,14 +5,9 @@ import { API_BASE_URL } from '../services/api';
 const DASHBOARD_FETCH_TIMEOUT_MS = 20_000;
 const STATUS_PROPOSTA_ATIVA = new Set(['enviada', 'visualizada']);
 
-export type VendedorDashboardPeriodo =
-  | 'semanal'
-  | 'mensal'
-  | 'trimestral'
-  | 'semestral'
-  | 'anual';
+export type VendedorDashboardPeriodo = 'semanal' | 'mensal' | 'trimestral' | 'semestral' | 'anual';
 
-const fetchJsonWithTimeout = async <T,>(
+const fetchJsonWithTimeout = async <T>(
   url: string,
   options: RequestInit,
   timeoutMs: number,
@@ -41,6 +36,25 @@ const toNumber = (value: unknown): number => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const toNullableNumber = (value: unknown): number | null => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const toNonEmptyText = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  const normalizedLower = normalized.toLowerCase();
+  if (
+    normalizedLower === '[object object]' ||
+    normalizedLower === 'undefined' ||
+    normalizedLower === 'null'
+  ) {
+    return null;
+  }
+  return normalized.length > 0 ? normalized : null;
+};
+
 const toIsoDate = (value: Date): string => value.toISOString().split('T')[0];
 
 const formatHour = (value: Date): string =>
@@ -49,9 +63,7 @@ const formatHour = (value: Date): string =>
     minute: '2-digit',
   });
 
-const mapAlertType = (
-  tipo: string,
-): 'meta' | 'atividade' | 'proposta' | 'lead' | 'conquista' => {
+const mapAlertType = (tipo: string): 'meta' | 'atividade' | 'proposta' | 'lead' | 'conquista' => {
   switch (tipo) {
     case 'meta':
       return 'meta';
@@ -114,10 +126,13 @@ const mapAgendaTipoFromBackend = (
   }
   if (normalized === 'ligacao') return 'call';
   if (normalized === 'follow-up') return 'followup';
+  if (normalized === 'email') return 'email';
   return 'tarefa';
 };
 
-const mapAgendaStatus = (status?: string): 'agendado' | 'em_andamento' | 'concluido' | 'cancelado' => {
+const mapAgendaStatus = (
+  status?: string,
+): 'agendado' | 'em_andamento' | 'concluido' | 'cancelado' => {
   const normalized = String(status || '').toLowerCase();
   if (normalized === 'cancelado') return 'cancelado';
   if (normalized === 'concluido') return 'concluido';
@@ -127,6 +142,7 @@ const mapAgendaStatus = (status?: string): 'agendado' | 'em_andamento' | 'conclu
 
 const mapAgendaPrioridade = (prioridade?: string): 'baixa' | 'media' | 'alta' | 'urgente' => {
   const normalized = String(prioridade || '').toLowerCase();
+  if (normalized === 'urgente') return 'urgente';
   if (normalized === 'alta') return 'alta';
   if (normalized === 'baixa') return 'baixa';
   return 'media';
@@ -155,6 +171,49 @@ const getProximaAcaoByStatus = (status: string): string => {
 const getDiasAte = (from: Date, targetDate: Date): number => {
   const oneDay = 1000 * 60 * 60 * 24;
   return Math.ceil((targetDate.getTime() - from.getTime()) / oneDay);
+};
+
+const resolvePropostaClienteLabel = (proposta: PropostaResponse): string => {
+  const candidates: unknown[] = [
+    proposta.clienteNome,
+    proposta.cliente_nome,
+    proposta.nomeCliente,
+    proposta.titulo,
+  ];
+
+  if (typeof proposta.cliente === 'string') {
+    candidates.unshift(proposta.cliente);
+  } else if (proposta.cliente && typeof proposta.cliente === 'object') {
+    const cliente = proposta.cliente as Record<string, unknown>;
+    const clienteContato =
+      cliente.contato && typeof cliente.contato === 'object'
+        ? (cliente.contato as Record<string, unknown>)
+        : null;
+    candidates.unshift(
+      cliente.nome,
+      cliente.nomeCompleto,
+      cliente.razaoSocial,
+      cliente.razao_social,
+      cliente.nomeFantasia,
+      cliente.nome_fantasia,
+      cliente.empresa,
+      cliente.cliente,
+      cliente.name,
+      clienteContato?.nome,
+      clienteContato?.nomeCompleto,
+      clienteContato?.razaoSocial,
+      clienteContato?.razao_social,
+    );
+  }
+
+  const firstValid = candidates
+    .map((candidate) => toNonEmptyText(candidate))
+    .find((candidate): candidate is string => Boolean(candidate));
+
+  if (firstValid) return firstValid;
+
+  const numero = toNonEmptyText(proposta.numero);
+  return numero ? `Proposta ${numero}` : 'Cliente nao informado';
 };
 
 const startOfDay = (value: Date): Date => {
@@ -219,9 +278,76 @@ const getPeriodoBounds = (
 };
 
 interface DashboardResumoResponse {
-  kpis?: any;
-  vendedoresRanking?: any[];
-  alertas?: any[];
+  kpis?: {
+    faturamentoTotal?: { valor?: number; meta?: number };
+    emNegociacao?: { valor?: number; quantidade?: number; propostas?: unknown[] };
+    taxaSucessoGeral?: { percentual?: number };
+    ticketMedio?: { valor?: number };
+    cicloMedio?: { dias?: number };
+    agenda?: {
+      resumoHoje?: {
+        totalEventos?: number;
+        estatisticasPorTipo?: {
+          reuniao?: number;
+          ligacao?: number;
+          apresentacao?: number;
+          visita?: number;
+          'follow-up'?: number;
+          outro?: number;
+        };
+      };
+      resumoSemana?: {
+        totalEventos?: number;
+        estatisticasPorTipo?: {
+          reuniao?: number;
+          ligacao?: number;
+          apresentacao?: number;
+          visita?: number;
+          'follow-up'?: number;
+          outro?: number;
+        };
+      };
+      metasAtividade?: {
+        callsDiarias?: number;
+        ligacoesDiarias?: number;
+        reunioesSemana?: number;
+        reunioesSemanais?: number;
+        followupsDiarios?: number;
+        followUpsDiarios?: number;
+      };
+      metas?: {
+        callsDiarias?: number;
+        ligacoesDiarias?: number;
+        reunioesSemana?: number;
+        reunioesSemanais?: number;
+        followupsDiarios?: number;
+        followUpsDiarios?: number;
+      };
+    };
+    satisfacaoCliente?: { valor?: number };
+    satisfacao?: { valor?: number };
+    csat?: { valor?: number };
+  };
+  vendedoresRanking?: Array<{
+    id?: string;
+    posicao?: number;
+    vendas?: number;
+    meta?: number;
+    variacao?: number;
+    badges?: unknown[];
+    pontos?: number;
+  }>;
+  alertas?: Array<{
+    id?: string | number;
+    tipo?: string;
+    severidade?: string;
+    titulo?: string;
+    descricao?: string;
+    acao?: {
+      texto?: string;
+      url?: string;
+    };
+  }>;
   metadata?: {
     vendedoresDisponiveis?: Array<{ id: string }>;
   };
@@ -257,9 +383,12 @@ interface LeadResponse {
 interface PropostaResponse {
   id?: string;
   numero?: string;
-  titulo?: string;
+  titulo?: string | null;
   status?: string;
-  cliente?: string;
+  cliente?: unknown;
+  clienteNome?: string | null;
+  cliente_nome?: string | null;
+  nomeCliente?: string | null;
   valor?: number;
   createdAt?: string;
   updatedAt?: string;
@@ -287,12 +416,15 @@ export interface VendedorKPIs {
   ranking: {
     posicao: number;
     total: number;
-    pontos: number;
-    nivel: string;
+    pontos: number | null;
+    nivel: string | null;
     proximoNivel: {
-      nome: string;
-      pontosNecessarios: number;
+      nome: string | null;
+      pontosNecessarios: number | null;
     };
+    vendas: number;
+    meta: number;
+    variacao: number;
   };
   pipeline: {
     valor: number;
@@ -320,16 +452,16 @@ export interface VendedorKPIs {
       propostas: number;
     };
     metas: {
-      callsDiarias: number;
-      reunioesSemana: number;
-      followupsDiarios: number;
+      callsDiarias: number | null;
+      reunioesSemana: number | null;
+      followupsDiarios: number | null;
     };
   };
   performance: {
     taxaConversao: number;
     ticketMedio: number;
     tempoMedioCiclo: number;
-    satisfacaoCliente: number;
+    satisfacaoCliente: number | null;
     nota: number;
     estrelas: number;
   };
@@ -341,8 +473,8 @@ export interface PropostaAtiva {
   valor: number;
   probabilidade: number;
   temperatura: 'quente' | 'morno' | 'frio';
-  prazo: string;
-  diasAteVencimento: number;
+  prazo?: string;
+  diasAteVencimento?: number;
   proximaAcao: string;
   status: string;
 }
@@ -377,6 +509,14 @@ interface UseVendedorDashboardOptions {
   periodo?: VendedorDashboardPeriodo;
 }
 
+interface VendedorDashboardInsights {
+  statusMeta?: 'superada' | 'quase_la' | 'caminho_certo' | 'atencao';
+  produtividadeDiaria?: number;
+  efetividadePipeline?: number;
+  projecaoMensal?: number;
+  performanceGeral?: number;
+}
+
 interface VendedorDashboardData {
   kpis: VendedorKPIs;
   propostas: PropostaAtiva[];
@@ -403,7 +543,17 @@ const emptyData: VendedorDashboardData = {
   alertas: [],
 };
 
-export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) => {
+export const useVendedorDashboard = (
+  options: UseVendedorDashboardOptions = {},
+): {
+  data: VendedorDashboardData;
+  loading: boolean;
+  error: string | null;
+  refresh: () => void;
+  insights: VendedorDashboardInsights;
+  period: VendedorDashboardPeriodo;
+  lastUpdatedAt: string | null;
+} => {
   const { user } = useAuth();
   const periodoSelecionado: VendedorDashboardPeriodo = options.periodo || 'mensal';
   const [data, setData] = useState<VendedorDashboardData>(emptyData);
@@ -411,7 +561,7 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
   const [error, setError] = useState<string | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
 
-  const loadVendedorData = useCallback(async () => {
+  const loadVendedorData = useCallback(async (): Promise<void> => {
     try {
       setLoading(true);
       setError(null);
@@ -442,11 +592,17 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
       );
 
       const now = new Date();
-      const agendaStart = new Date(now);
-      agendaStart.setHours(0, 0, 0, 0);
+      const todayStart = startOfDay(now);
+      const todayEnd = endOfDay(now);
+      const weeklyBounds = getPeriodoBounds('semanal', now);
+
+      const agendaStart = new Date(weeklyBounds.inicio);
       const agendaEnd = new Date(now);
       agendaEnd.setDate(agendaEnd.getDate() + 14);
       agendaEnd.setHours(23, 59, 59, 999);
+      if (weeklyBounds.fim.getTime() > agendaEnd.getTime()) {
+        agendaEnd.setTime(weeklyBounds.fim.getTime());
+      }
 
       const leadsParams = new URLSearchParams({
         limit: '20',
@@ -506,7 +662,7 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
       const kpisResumo = resumo?.kpis ?? {};
       const rankingLista = Array.isArray(resumo?.vendedoresRanking) ? resumo.vendedoresRanking : [];
       const rankingAtual =
-        rankingLista.find((item: any) => String(item?.id) === String(user?.id)) || rankingLista[0];
+        rankingLista.find((item) => String(item?.id) === String(user?.id)) || rankingLista[0];
 
       const metaMensal = toNumber(kpisResumo?.faturamentoTotal?.meta);
       const metaAtual = toNumber(kpisResumo?.faturamentoTotal?.valor);
@@ -517,19 +673,16 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
       const diasNoPeriodo = periodInfo.totalDias;
       const diasDecorridos = periodInfo.diasDecorridos;
       const diasRestantes = Math.max(0, diasNoPeriodo - diasDecorridos);
-
       const agendaResumo = kpisResumo?.agenda ?? {};
-      const estatisticasPorTipo = agendaResumo?.estatisticasPorTipo ?? {};
-      const callsHoje = toNumber(estatisticasPorTipo?.ligacao);
-      const reunioesHoje = toNumber(estatisticasPorTipo?.reuniao);
-      const followupsHoje = toNumber(estatisticasPorTipo?.['follow-up']);
-      const emailsHoje = toNumber(estatisticasPorTipo?.outro);
-      const propostasHoje = toNumber(kpisResumo?.emNegociacao?.quantidade);
 
       const taxaConversao = toNumber(kpisResumo?.taxaSucessoGeral?.percentual);
       const ticketMedio = toNumber(kpisResumo?.ticketMedio?.valor);
       const tempoMedioCiclo = toNumber(kpisResumo?.cicloMedio?.dias);
-      const satisfacaoCliente = 4.5;
+      const satisfacaoCliente = toNullableNumber(
+        kpisResumo?.satisfacaoCliente?.valor ??
+          kpisResumo?.satisfacao?.valor ??
+          kpisResumo?.csat?.valor,
+      );
       const notaBase =
         taxaConversao * 0.1 +
         Math.min(ticketMedio / 3000, 3) +
@@ -541,24 +694,24 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
       const pipelineValor = toNumber(kpisResumo?.emNegociacao?.valor);
       const pipelineQuantidade = toNumber(kpisResumo?.emNegociacao?.quantidade);
       const pipelineProbabilidade = Math.max(0, Math.min(100, Math.round(taxaConversao)));
-      const quenteQuantidade = Math.round(pipelineQuantidade * 0.3);
-      const mornoQuantidade = Math.round(pipelineQuantidade * 0.4);
-      const frioQuantidade = Math.max(0, pipelineQuantidade - quenteQuantidade - mornoQuantidade);
-      const quenteValor = Number((pipelineValor * 0.4).toFixed(2));
-      const mornoValor = Number((pipelineValor * 0.35).toFixed(2));
-      const frioValor = Number((pipelineValor - quenteValor - mornoValor).toFixed(2));
 
       const totalRanking =
         toNumber(resumo?.metadata?.vendedoresDisponiveis?.length) || rankingLista.length;
       const valorVendasRanking = toNumber(rankingAtual?.vendas);
-      const pontosRanking = Math.round(valorVendasRanking / 1000);
-
-      const valorMedioProposta = pipelineQuantidade > 0 ? pipelineValor / pipelineQuantidade : 0;
+      const metaRanking = toNumber(rankingAtual?.meta);
+      const variacaoRanking = toNumber(rankingAtual?.variacao);
+      const rankingBadges = Array.isArray(rankingAtual?.badges)
+        ? rankingAtual.badges.map((badge: unknown) => String(badge))
+        : [];
+      const pontosRanking = toNullableNumber(rankingAtual?.pontos);
+      const nivelRanking = rankingBadges.length > 0 ? rankingBadges[0] : null;
       const propostasNumerosResumo = Array.isArray(kpisResumo?.emNegociacao?.propostas)
         ? kpisResumo.emNegociacao.propostas.map((value: unknown) => String(value))
         : [];
 
-      const propostasApi = Array.isArray(propostasResult?.propostas) ? propostasResult.propostas : [];
+      const propostasApi = Array.isArray(propostasResult?.propostas)
+        ? propostasResult.propostas
+        : [];
       const propostasApiFiltradas = propostasApi
         .filter((item) => STATUS_PROPOSTA_ATIVA.has(String(item?.status || '').toLowerCase()))
         .filter((item) => {
@@ -578,47 +731,45 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
           : propostasApiFiltradas
       ).slice(0, 5);
 
-      const propostasAtivas: PropostaAtiva[] =
-        propostasApiOrdenadas.length > 0
-          ? propostasApiOrdenadas.map((proposta) => {
-              const status = String(proposta.status || 'em negociacao');
-              const probabilidade = getProbabilidadeByStatus(status, pipelineProbabilidade);
-              const valor = toNumber(proposta.valor) || Number(valorMedioProposta.toFixed(2));
+      const propostasAtivas: PropostaAtiva[] = propostasApiOrdenadas.map((proposta, index) => {
+        const status = String(proposta.status || 'em negociacao');
+        const probabilidade = getProbabilidadeByStatus(status, pipelineProbabilidade);
+        const valor = toNumber(proposta.valor);
 
-              const createdAt = proposta.createdAt ? new Date(proposta.createdAt) : now;
-              const dueDate = new Date(createdAt);
-              const validade = Math.max(1, toNumber(proposta.validadeDias) || 7);
-              dueDate.setDate(dueDate.getDate() + validade);
+        const createdAtRaw = proposta.createdAt || proposta.updatedAt;
+        const createdAtDate = createdAtRaw ? new Date(createdAtRaw) : null;
+        const hasCreatedAt = Boolean(createdAtDate && !Number.isNaN(createdAtDate.getTime()));
+        const dueDate = hasCreatedAt && createdAtDate ? new Date(createdAtDate) : null;
+        if (dueDate) {
+          const validade = Math.max(1, toNumber(proposta.validadeDias) || 7);
+          dueDate.setDate(dueDate.getDate() + validade);
+        }
 
-              return {
-                id: String(proposta.id || proposta.numero || `proposta-${Math.random()}`),
-                cliente: String(proposta.cliente || proposta.titulo || `Proposta ${proposta.numero || ''}`).trim(),
-                valor,
-                probabilidade,
-                temperatura: getTemperatura(probabilidade),
-                prazo: toIsoDate(dueDate),
-                diasAteVencimento: getDiasAte(now, dueDate),
-                proximaAcao: getProximaAcaoByStatus(status),
-                status,
-              };
-            })
-          : propostasNumerosResumo.slice(0, 5).map((numero, index) => {
-              const probabilidade = Math.max(35, pipelineProbabilidade - index * 10);
-              const dueDate = new Date(now);
-              dueDate.setDate(dueDate.getDate() + index + 2);
+        return {
+          id: String(proposta.id || proposta.numero || `proposta-${index + 1}`),
+          cliente: resolvePropostaClienteLabel(proposta),
+          valor,
+          probabilidade,
+          temperatura: getTemperatura(probabilidade),
+          prazo: dueDate ? toIsoDate(dueDate) : undefined,
+          diasAteVencimento: dueDate ? getDiasAte(now, dueDate) : undefined,
+          proximaAcao: getProximaAcaoByStatus(status),
+          status,
+        };
+      });
 
-              return {
-                id: numero,
-                cliente: `Proposta ${numero}`,
-                valor: Number(valorMedioProposta.toFixed(2)),
-                probabilidade,
-                temperatura: getTemperatura(probabilidade),
-                prazo: toIsoDate(dueDate),
-                diasAteVencimento: getDiasAte(now, dueDate),
-                proximaAcao: 'Realizar follow-up',
-                status: 'enviada',
-              };
-            });
+      const distribuicaoPipeline = {
+        quente: { valor: 0, quantidade: 0 },
+        morno: { valor: 0, quantidade: 0 },
+        frio: { valor: 0, quantidade: 0 },
+      };
+      for (const proposta of propostasApiFiltradas) {
+        const status = String(proposta.status || 'em negociacao');
+        const probabilidade = getProbabilidadeByStatus(status, pipelineProbabilidade);
+        const temperatura = getTemperatura(probabilidade);
+        distribuicaoPipeline[temperatura].quantidade += 1;
+        distribuicaoPipeline[temperatura].valor += toNumber(proposta.valor);
+      }
 
       const agendaRaw: AgendaEventoResponse[] = Array.isArray(agendaResult)
         ? agendaResult
@@ -648,7 +799,9 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
         const titulo = evento.titulo || 'Atividade';
         agendaItems.push({
           id: evento.id,
-          tipo: evento.tipo ? mapAgendaTipoFromBackend(evento.tipo) : mapAgendaTipo(titulo, evento.descricao),
+          tipo: evento.tipo
+            ? mapAgendaTipoFromBackend(evento.tipo)
+            : mapAgendaTipo(titulo, evento.descricao),
           titulo,
           cliente: evento.local || undefined,
           horario: formatHour(inicio),
@@ -661,8 +814,106 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
 
       const agenda = agendaItems
         .sort((a, b) => a._sort - b._sort)
+        .filter((item) => item._sort >= now.getTime())
         .slice(0, 5)
         .map(({ _sort, ...item }) => item);
+
+      const createActivityCounters = (): {
+        calls: number;
+        reunioes: number;
+        followups: number;
+        emails: number;
+        propostas: number;
+      } => ({
+        calls: 0,
+        reunioes: 0,
+        followups: 0,
+        emails: 0,
+        propostas: 0,
+      });
+      const mapResumoAgendaToCounters = (
+        stats?:
+          | {
+              reuniao?: number;
+              ligacao?: number;
+              apresentacao?: number;
+              visita?: number;
+              'follow-up'?: number;
+              outro?: number;
+            }
+          | undefined,
+      ): ReturnType<typeof createActivityCounters> => ({
+        calls: toNumber(stats?.ligacao),
+        reunioes:
+          toNumber(stats?.reuniao) + toNumber(stats?.apresentacao) + toNumber(stats?.visita),
+        followups: toNumber(stats?.['follow-up']),
+        emails: toNumber(stats?.outro),
+        propostas: 0,
+      });
+
+      const hasResumoHojeAgenda = Boolean(agendaResumo?.resumoHoje?.estatisticasPorTipo);
+      const hasResumoSemanaAgenda = Boolean(agendaResumo?.resumoSemana?.estatisticasPorTipo);
+
+      const atividadesHoje = hasResumoHojeAgenda
+        ? mapResumoAgendaToCounters(agendaResumo?.resumoHoje?.estatisticasPorTipo)
+        : createActivityCounters();
+      const atividadesSemana = hasResumoSemanaAgenda
+        ? mapResumoAgendaToCounters(agendaResumo?.resumoSemana?.estatisticasPorTipo)
+        : createActivityCounters();
+
+      const incrementarAtividade = (
+        target: ReturnType<typeof createActivityCounters>,
+        tipo: AtividadeAgenda['tipo'],
+      ): void => {
+        if (tipo === 'call') target.calls += 1;
+        if (tipo === 'reuniao') target.reunioes += 1;
+        if (tipo === 'followup') target.followups += 1;
+        if (tipo === 'email') target.emails += 1;
+      };
+
+      if (!hasResumoHojeAgenda || !hasResumoSemanaAgenda) {
+        for (const item of agendaItems) {
+          const inicioEvento = new Date(item._sort);
+          if (!hasResumoHojeAgenda && inicioEvento >= todayStart && inicioEvento <= todayEnd) {
+            incrementarAtividade(atividadesHoje, item.tipo);
+          }
+          if (
+            !hasResumoSemanaAgenda &&
+            inicioEvento >= weeklyBounds.inicio &&
+            inicioEvento <= weeklyBounds.fim
+          ) {
+            incrementarAtividade(atividadesSemana, item.tipo);
+          }
+        }
+      }
+
+      for (const proposta of propostasApiFiltradas) {
+        const createdAtRaw = proposta.createdAt || proposta.updatedAt;
+        if (!createdAtRaw) {
+          continue;
+        }
+        const createdAt = new Date(createdAtRaw);
+        if (Number.isNaN(createdAt.getTime())) {
+          continue;
+        }
+        if (createdAt >= todayStart && createdAt <= todayEnd) {
+          atividadesHoje.propostas += 1;
+        }
+        if (createdAt >= weeklyBounds.inicio && createdAt <= weeklyBounds.fim) {
+          atividadesSemana.propostas += 1;
+        }
+      }
+
+      const metasAtividade = agendaResumo?.metasAtividade ?? agendaResumo?.metas ?? {};
+      const callsMetaDiarias = toNullableNumber(
+        metasAtividade?.callsDiarias ?? metasAtividade?.ligacoesDiarias,
+      );
+      const reunioesMetaSemanais = toNullableNumber(
+        metasAtividade?.reunioesSemana ?? metasAtividade?.reunioesSemanais,
+      );
+      const followupsMetaDiarios = toNullableNumber(
+        metasAtividade?.followupsDiarios ?? metasAtividade?.followUpsDiarios,
+      );
 
       const leadsRaw = Array.isArray(leadsResult?.data) ? leadsResult.data : [];
       const leads = leadsRaw
@@ -687,7 +938,8 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
             fonte: String(lead.origem || 'manual'),
             score: toNumber(lead.score),
             interesse: mapLeadInterest(status),
-            ultimoContato: lead.data_ultima_interacao || lead.created_at || new Date().toISOString(),
+            ultimoContato:
+              lead.data_ultima_interacao || lead.created_at || new Date().toISOString(),
             proximaAcao: mapLeadAction(status),
             telefone: lead.telefone || '',
             email: lead.email || '',
@@ -695,9 +947,14 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
         });
 
       const alertasApi = Array.isArray(resumo?.alertas) ? resumo.alertas : [];
-      const alertas = alertasApi.map((alerta: any, index: number) => {
-        const severidade = ['baixa', 'media', 'alta', 'critica'].includes(alerta?.severidade)
-          ? alerta.severidade
+      const alertas = alertasApi.map((alerta, index: number) => {
+        const severidade: 'baixa' | 'media' | 'alta' | 'critica' = [
+          'baixa',
+          'media',
+          'alta',
+          'critica',
+        ].includes(String(alerta?.severidade))
+          ? (String(alerta?.severidade) as 'baixa' | 'media' | 'alta' | 'critica')
           : 'media';
 
         return {
@@ -729,41 +986,40 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
             posicao: toNumber(rankingAtual?.posicao),
             total: totalRanking,
             pontos: pontosRanking,
-            nivel: pontosRanking >= 1000 ? 'Vendedor Gold' : 'Vendedor Silver',
+            nivel: nivelRanking,
             proximoNivel: {
-              nome: 'Vendedor Platinum',
-              pontosNecessarios: Math.max(0, 1500 - pontosRanking),
+              nome: null,
+              pontosNecessarios: null,
             },
+            vendas: valorVendasRanking,
+            meta: metaRanking,
+            variacao: variacaoRanking,
           },
           pipeline: {
             valor: pipelineValor,
             quantidade: pipelineQuantidade,
             probabilidade: pipelineProbabilidade,
-            distribuicao: {
-              quente: { valor: quenteValor, quantidade: quenteQuantidade },
-              morno: { valor: mornoValor, quantidade: mornoQuantidade },
-              frio: { valor: frioValor, quantidade: frioQuantidade },
-            },
+            distribuicao: distribuicaoPipeline,
           },
           atividades: {
             hoje: {
-              calls: callsHoje,
-              reunioes: reunioesHoje,
-              followups: followupsHoje,
-              emails: emailsHoje,
-              propostas: propostasHoje,
+              calls: atividadesHoje.calls,
+              reunioes: atividadesHoje.reunioes,
+              followups: atividadesHoje.followups,
+              emails: atividadesHoje.emails,
+              propostas: atividadesHoje.propostas,
             },
             semana: {
-              calls: callsHoje * 5,
-              reunioes: reunioesHoje * 5,
-              followups: followupsHoje * 5,
-              emails: emailsHoje * 5,
-              propostas: propostasHoje * 5,
+              calls: atividadesSemana.calls,
+              reunioes: atividadesSemana.reunioes,
+              followups: atividadesSemana.followups,
+              emails: atividadesSemana.emails,
+              propostas: atividadesSemana.propostas,
             },
             metas: {
-              callsDiarias: 10,
-              reunioesSemana: 10,
-              followupsDiarios: 6,
+              callsDiarias: callsMetaDiarias,
+              reunioesSemana: reunioesMetaSemanais,
+              followupsDiarios: followupsMetaDiarios,
             },
           },
           performance: {
@@ -805,10 +1061,14 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
     return () => window.clearInterval(interval);
   }, [loadVendedorData, options.autoRefresh, options.refreshInterval]);
 
-  const insights = useMemo(() => {
+  const insights = useMemo<VendedorDashboardInsights>(() => {
     if (!data.kpis.meta) return {};
 
     const { meta, atividades, performance, pipeline } = data.kpis;
+    const performanceParts = [performance.nota * 10, performance.taxaConversao];
+    if (typeof performance.satisfacaoCliente === 'number') {
+      performanceParts.push(performance.satisfacaoCliente * 20);
+    }
 
     return {
       statusMeta:
@@ -823,10 +1083,12 @@ export const useVendedorDashboard = (options: UseVendedorDashboardOptions = {}) 
         atividades.hoje.calls + atividades.hoje.reunioes + atividades.hoje.followups,
       efetividadePipeline: (pipeline.valor * pipeline.probabilidade) / 100,
       projecaoMensal: meta.atual + meta.mediaVendasDiarias * meta.diasRestantes,
-      performanceGeral: Math.round(
-        (performance.nota * 10 + performance.taxaConversao + performance.satisfacaoCliente * 20) /
-          3,
-      ),
+      performanceGeral:
+        performanceParts.length > 0
+          ? Math.round(
+              performanceParts.reduce((acc, item) => acc + item, 0) / performanceParts.length,
+            )
+          : 0,
     };
   }, [data.kpis]);
 

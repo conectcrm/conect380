@@ -6,6 +6,7 @@ import { User, UserRole } from '../users/user.entity';
 import { Cliente } from '../clientes/cliente.entity';
 import { MetasService } from '../metas/metas.service';
 import { EventosService } from '../eventos/eventos.service';
+import { SessaoTriagem } from '../triagem/entities/sessao-triagem.entity';
 
 export interface DashboardKPIs {
   faturamentoTotal: {
@@ -57,6 +58,11 @@ export interface DashboardKPIs {
     percentual: number;
     variacao: number;
   };
+  satisfacaoCliente?: {
+    valor: number | null;
+    amostra: number;
+    fonte: 'triagem_csat_vendedor' | 'triagem_csat_empresa' | 'indisponivel';
+  };
   agenda: {
     totalEventos: number;
     eventosConcluidos: number;
@@ -71,6 +77,39 @@ export interface DashboardKPIs {
       outro: number;
     };
     produtividade: number;
+    resumoHoje?: {
+      totalEventos: number;
+      estatisticasPorTipo: {
+        reuniao: number;
+        ligacao: number;
+        apresentacao: number;
+        visita: number;
+        'follow-up': number;
+        outro: number;
+      };
+    };
+    resumoSemana?: {
+      totalEventos: number;
+      estatisticasPorTipo: {
+        reuniao: number;
+        ligacao: number;
+        apresentacao: number;
+        visita: number;
+        'follow-up': number;
+        outro: number;
+      };
+    };
+    metasAtividade?: {
+      callsDiarias: number;
+      reunioesSemana: number;
+      followupsDiarios: number;
+      amostraEventos: number;
+      fonte: 'historico_eventos_periodo_anterior' | 'indisponivel';
+      periodoBase: {
+        inicio: string;
+        fim: string;
+      };
+    };
   };
 }
 
@@ -108,6 +147,18 @@ export interface DashboardChartsData {
   funilVendas: Array<{ etapa: string; quantidade: number; valor: number }>;
 }
 
+interface EventStatsSnapshot {
+  totalEventos?: number;
+  estatisticasPorTipo?: {
+    reuniao?: number;
+    ligacao?: number;
+    apresentacao?: number;
+    visita?: number;
+    'follow-up'?: number;
+    outro?: number;
+  };
+}
+
 @Injectable()
 export class DashboardService {
   private readonly statusAprovadaAliases = ['aprovada', 'aceita'];
@@ -120,6 +171,8 @@ export class DashboardService {
     private userRepository: Repository<User>,
     @InjectRepository(Cliente)
     private clienteRepository: Repository<Cliente>,
+    @InjectRepository(SessaoTriagem)
+    private sessaoTriagemRepository: Repository<SessaoTriagem>,
     private metasService: MetasService,
     private eventosService: EventosService,
   ) {}
@@ -349,6 +402,38 @@ export class DashboardService {
       vendedorId,
       empresaId,
     );
+    const [satisfacaoCliente, metasAtividade] = await Promise.all([
+      this.calculateSatisfacaoCliente(dataInicio, dataFim, empresaId, vendedorId),
+      this.calculateMetasAtividade(periodoAnterior.dataInicio, periodoAnterior.dataFim, vendedorId, empresaId),
+    ]);
+
+    const hoje = new Date();
+    const inicioHoje = new Date(hoje);
+    inicioHoje.setHours(0, 0, 0, 0);
+    const fimHoje = new Date(hoje);
+    fimHoje.setHours(23, 59, 59, 999);
+
+    const diaSemana = (hoje.getDay() + 6) % 7;
+    const inicioSemana = new Date(inicioHoje);
+    inicioSemana.setDate(inicioSemana.getDate() - diaSemana);
+    const fimSemana = new Date(inicioSemana);
+    fimSemana.setDate(fimSemana.getDate() + 6);
+    fimSemana.setHours(23, 59, 59, 999);
+
+    const [eventStatsHoje, eventStatsSemana] = await Promise.all([
+      this.eventosService.getEventStatsByPeriod(
+        inicioHoje.toISOString().split('T')[0],
+        fimHoje.toISOString().split('T')[0],
+        vendedorId,
+        empresaId,
+      ),
+      this.eventosService.getEventStatsByPeriod(
+        inicioSemana.toISOString().split('T')[0],
+        fimSemana.toISOString().split('T')[0],
+        vendedorId,
+        empresaId,
+      ),
+    ]);
 
     return {
       faturamentoTotal: {
@@ -400,6 +485,7 @@ export class DashboardService {
         percentual: Number(taxaSucessoAtual.toFixed(1)),
         variacao: Number(variacaoTaxaSucesso.toFixed(1)),
       },
+      satisfacaoCliente,
       agenda: {
         totalEventos: eventStats.totalEventos,
         eventosConcluidos: eventStats.eventosConcluidos,
@@ -407,6 +493,29 @@ export class DashboardService {
         eventosHoje: eventStats.eventosHoje,
         estatisticasPorTipo: eventStats.estatisticasPorTipo,
         produtividade: eventStats.produtividade,
+        resumoHoje: {
+          totalEventos: Number(eventStatsHoje?.totalEventos || 0),
+          estatisticasPorTipo: {
+            reuniao: Number(eventStatsHoje?.estatisticasPorTipo?.reuniao || 0),
+            ligacao: Number(eventStatsHoje?.estatisticasPorTipo?.ligacao || 0),
+            apresentacao: Number(eventStatsHoje?.estatisticasPorTipo?.apresentacao || 0),
+            visita: Number(eventStatsHoje?.estatisticasPorTipo?.visita || 0),
+            'follow-up': Number(eventStatsHoje?.estatisticasPorTipo?.['follow-up'] || 0),
+            outro: Number(eventStatsHoje?.estatisticasPorTipo?.outro || 0),
+          },
+        },
+        resumoSemana: {
+          totalEventos: Number(eventStatsSemana?.totalEventos || 0),
+          estatisticasPorTipo: {
+            reuniao: Number(eventStatsSemana?.estatisticasPorTipo?.reuniao || 0),
+            ligacao: Number(eventStatsSemana?.estatisticasPorTipo?.ligacao || 0),
+            apresentacao: Number(eventStatsSemana?.estatisticasPorTipo?.apresentacao || 0),
+            visita: Number(eventStatsSemana?.estatisticasPorTipo?.visita || 0),
+            'follow-up': Number(eventStatsSemana?.estatisticasPorTipo?.['follow-up'] || 0),
+            outro: Number(eventStatsSemana?.estatisticasPorTipo?.outro || 0),
+          },
+        },
+        metasAtividade,
       },
     };
   }
@@ -577,6 +686,118 @@ export class DashboardService {
   }
 
   // Métodos auxiliares privados
+  private getRangeDaysInclusive(dataInicio: Date, dataFim: Date): number {
+    const oneDay = 1000 * 60 * 60 * 24;
+    const inicio = new Date(dataInicio);
+    const fim = new Date(dataFim);
+    inicio.setHours(0, 0, 0, 0);
+    fim.setHours(0, 0, 0, 0);
+    const diffDays = Math.floor((fim.getTime() - inicio.getTime()) / oneDay) + 1;
+    return Math.max(1, diffDays);
+  }
+
+  private async calculateMetasAtividade(
+    dataInicioBase: Date,
+    dataFimBase: Date,
+    vendedorId?: string,
+    empresaId?: string,
+  ): Promise<NonNullable<DashboardKPIs['agenda']['metasAtividade']>> {
+    const stats = (await this.eventosService.getEventStatsByPeriod(
+      dataInicioBase.toISOString().split('T')[0],
+      dataFimBase.toISOString().split('T')[0],
+      vendedorId,
+      empresaId,
+    )) as EventStatsSnapshot;
+
+    const diasNoRange = this.getRangeDaysInclusive(dataInicioBase, dataFimBase);
+    const semanasNoRange = Math.max(1, diasNoRange / 7);
+    const estatisticasPorTipo = stats?.estatisticasPorTipo || {};
+
+    const totalLigacoes = Number(estatisticasPorTipo?.ligacao || 0);
+    const totalFollowups = Number(estatisticasPorTipo?.['follow-up'] || 0);
+    const totalReunioes =
+      Number(estatisticasPorTipo?.reuniao || 0) +
+      Number(estatisticasPorTipo?.apresentacao || 0) +
+      Number(estatisticasPorTipo?.visita || 0);
+
+    return {
+      callsDiarias: Math.max(0, Math.round(totalLigacoes / diasNoRange)),
+      reunioesSemana: Math.max(0, Math.round(totalReunioes / semanasNoRange)),
+      followupsDiarios: Math.max(0, Math.round(totalFollowups / diasNoRange)),
+      amostraEventos: Number(stats?.totalEventos || 0),
+      fonte:
+        Number(stats?.totalEventos || 0) > 0
+          ? 'historico_eventos_periodo_anterior'
+          : 'indisponivel',
+      periodoBase: {
+        inicio: dataInicioBase.toISOString().split('T')[0],
+        fim: dataFimBase.toISOString().split('T')[0],
+      },
+    };
+  }
+
+  private async calculateSatisfacaoCliente(
+    dataInicio: Date,
+    dataFim: Date,
+    empresaId?: string,
+    vendedorId?: string,
+  ): Promise<NonNullable<DashboardKPIs['satisfacaoCliente']>> {
+    if (!empresaId) {
+      return { valor: null, amostra: 0, fonte: 'indisponivel' };
+    }
+
+    const buscarMedia = async (
+      vendedorEscopo?: string,
+    ): Promise<{ valor: number | null; amostra: number }> => {
+      const query = this.sessaoTriagemRepository
+        .createQueryBuilder('sessao')
+        .select('AVG(sessao.satisfacaoNota)', 'media')
+        .addSelect('COUNT(sessao.id)', 'total')
+        .where('sessao.empresaId = :empresaId', { empresaId })
+        .andWhere('sessao.satisfacaoNota IS NOT NULL')
+        .andWhere('COALESCE(sessao.concluidoEm, sessao.updatedAt) BETWEEN :dataInicio AND :dataFim', {
+          dataInicio,
+          dataFim,
+        });
+
+      if (vendedorEscopo) {
+        query.andWhere('sessao.atendenteId = :vendedorId', { vendedorId: vendedorEscopo });
+      }
+
+      const result = await query.getRawOne<{ media?: string | null; total?: string | null }>();
+      const total = Number(result?.total || 0);
+      const mediaBruta = Number(result?.media);
+      if (total <= 0 || !Number.isFinite(mediaBruta)) {
+        return { valor: null, amostra: 0 };
+      }
+
+      const valorEscalaCinco = Number(Math.max(0, Math.min(5, mediaBruta / 2)).toFixed(1));
+      return { valor: valorEscalaCinco, amostra: total };
+    };
+
+    if (vendedorId) {
+      const vendedorCsat = await buscarMedia(vendedorId);
+      if (vendedorCsat.valor !== null && vendedorCsat.amostra > 0) {
+        return {
+          valor: vendedorCsat.valor,
+          amostra: vendedorCsat.amostra,
+          fonte: 'triagem_csat_vendedor',
+        };
+      }
+    }
+
+    const empresaCsat = await buscarMedia();
+    if (empresaCsat.valor !== null && empresaCsat.amostra > 0) {
+      return {
+        valor: empresaCsat.valor,
+        amostra: empresaCsat.amostra,
+        fonte: 'triagem_csat_empresa',
+      };
+    }
+
+    return { valor: null, amostra: 0, fonte: 'indisponivel' };
+  }
+
   private getDateRange(periodo: string): { dataInicio: Date; dataFim: Date } {
     const dataFim = new Date();
     const dataInicio = this.getRangeStart(periodo, dataFim);
@@ -1224,4 +1445,3 @@ export class DashboardService {
     return ['Todas', 'Norte', 'Nordeste', 'Centro-Oeste', 'Sudeste', 'Sul'];
   }
 }
-
