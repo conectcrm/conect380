@@ -40,7 +40,7 @@ Legenda:
 | CRM-017 | Concluido | Dashboard de clientes agora destaca KPIs de follow-up (pendente/vencido) e carteira comercial (com/sem responsavel), com escopo Global e Filtrado explicito. |
 | CRM-018 | Concluido | Suite de contrato dedicada criada com artefato explicito (`docs/features/contracts/clientes.contract.json`) e testes automatizados de create/update/read no backend e frontend. |
 | CRM-019 | Concluido | Suite funcional minima criada no backend para listagem, cadastro, edicao, abertura de perfil e integracao principal do perfil (resumo de tickets). |
-| CRM-020 | Concluido | Checklist de QA do modulo formalizado em `docs/features/CRM-020_CHECKLIST_QA_CLIENTES_360_2026-03.md`, cobrindo validacao manual de listagem, cadastro, perfil e integracoes. |
+| CRM-020 | Concluido | Checklist de QA formalizado em `docs/features/CRM-020_CHECKLIST_QA_CLIENTES_360_2026-03.md`; rodada automatizada validada em 2026-03-12 com evidencias em `docs/features/evidencias/CRM020_QA_CLIENTES_360_20260312.md` (capturas/CSV, estados/UX e cadastro/perfil complementar) e gate E2E agregado `13/13` cenarios PASS em mock; gaps de UI da rodada foram corrigidos, restando sign-off manual final no ambiente alvo guiado por runbook/template e utilitarios CLI (`qa:crm020:signoff:init|seed:local|pendings:complete|finalize|report|validate|close|close:apply|apply`). |
 
 ## Prioridades
 
