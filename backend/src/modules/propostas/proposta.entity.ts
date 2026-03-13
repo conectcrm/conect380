@@ -92,9 +92,6 @@ export class Proposta {
   @Column({ nullable: true })
   source: string;
 
-  @Column({ type: 'uuid', name: 'oportunidade_id', nullable: true })
-  oportunidade_id?: string | null;
-
   @Column({ nullable: true })
   vendedor_id: string;
 

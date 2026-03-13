@@ -278,8 +278,6 @@ const converterPropostaParaUI = async (proposta: any) => {
       : Array.isArray((proposta as any).emailDetails?.historicoEventos)
         ? (proposta as any).emailDetails.historicoEventos
         : [],
-    oportunidade: (proposta as any).oportunidade,
-    isPropostaPrincipal: Boolean((proposta as any).isPropostaPrincipal),
     produtos: Array.isArray((proposta as any).produtos) ? (proposta as any).produtos : [],
     versoes,
     totalVersoes,
@@ -660,8 +658,6 @@ const PropostasPage: React.FC = () => {
                   : Array.isArray((proposta as any).emailDetails?.versoes)
                     ? (proposta as any).emailDetails.versoes
                     : [],
-                oportunidade: (proposta as any).oportunidade,
-                isPropostaPrincipal: Boolean((proposta as any).isPropostaPrincipal),
               };
               return await converterPropostaParaUI(propostaFormatada);
             }),
@@ -2896,16 +2892,11 @@ const PropostasPage: React.FC = () => {
                                     </div>
                                   )}
                                   {proposta.oportunidade && (
-                                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                                    <div className="mt-1">
                                       <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-[#159A9C]/10 text-[#159A9C] border border-[#159A9C]/20">
                                         <Target className="w-3 h-3 mr-1" />
                                         {proposta.oportunidade.titulo}
                                       </span>
-                                      {proposta.isPropostaPrincipal && (
-                                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-[#FFF7ED] text-[#B45309] border border-[#F4D58D]">
-                                          Principal
-                                        </span>
-                                      )}
                                     </div>
                                   )}
                                 </div>

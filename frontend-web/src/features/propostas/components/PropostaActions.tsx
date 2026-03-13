@@ -21,7 +21,6 @@ import {
   ShieldAlert,
   ShieldCheck,
   ShieldX,
-  Star,
 } from 'lucide-react';
 import { emailServiceReal } from '../../../services/emailServiceReal';
 import { PropostaCompleta } from '../services/propostasService';
@@ -295,7 +294,6 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const [gerandoContrato, setGerandoContrato] = useState(false);
   const [criandoFatura, setCriandoFatura] = useState(false);
   const [avancandoFluxo, setAvancandoFluxo] = useState(false);
-  const [definindoComoPrincipal, setDefinindoComoPrincipal] = useState(false);
   const [decidindoAlcadaAprovacao, setDecidindoAlcadaAprovacao] = useState(false);
   const [decidindoAlcadaReprovacao, setDecidindoAlcadaReprovacao] = useState(false);
   const [promptDialog, setPromptDialog] = useState<PromptDialogState | null>(null);
@@ -497,9 +495,6 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const statusFluxoAtual = String(getPropostaData().status || '')
     .trim()
     .toLowerCase();
-  const oportunidadeVinculada = (proposta as any)?.oportunidade;
-  const ehPropostaPrincipal = Boolean((proposta as any)?.isPropostaPrincipal);
-  const podeDefinirComoPrincipal = Boolean(oportunidadeVinculada?.id) && !ehPropostaPrincipal;
   const editavelComoRascunho = statusFluxoAtual === 'rascunho';
   const statusEncerradoSemAcoesComerciais = ['rejeitada', 'expirada', 'pago'].includes(
     statusFluxoAtual,
@@ -2202,26 +2197,6 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     }
   };
 
-  const handleDefinirComoPrincipal = async () => {
-    const propostaId = String((proposta as any)?.id || getPropostaData().id || '').trim();
-    if (!propostaId || !oportunidadeVinculada?.id) {
-      toastService.error('A proposta precisa estar vinculada a uma oportunidade para ser principal.');
-      return;
-    }
-
-    try {
-      setDefinindoComoPrincipal(true);
-      await propostasApiService.definirComoPrincipal(propostaId);
-      toastService.success('Proposta principal definida com sucesso.');
-      onPropostaUpdated?.();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao definir proposta principal.';
-      toastService.error(message);
-    } finally {
-      setDefinindoComoPrincipal(false);
-    }
-  };
-
   const buttonClass = showLabels
     ? 'flex items-center space-x-2 px-3 py-2 text-sm font-medium rounded-md transition-colors'
     : 'p-2 rounded-md transition-colors';
@@ -2325,23 +2300,6 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         >
           <Pencil className="w-4 h-4" />
           {showLabels && <span>Editar</span>}
-        </button>
-      )}
-
-      {podeDefinirComoPrincipal && (
-        <button
-          type="button"
-          onClick={handleDefinirComoPrincipal}
-          disabled={definindoComoPrincipal}
-          className={`${buttonClass} ${buttonThemeClass.warning} disabled:opacity-50`}
-          title={`Definir como proposta principal de ${oportunidadeVinculada.titulo}`}
-        >
-          {definindoComoPrincipal ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Star className="w-4 h-4" />
-          )}
-          {showLabels && <span>Definir principal</span>}
         </button>
       )}
 

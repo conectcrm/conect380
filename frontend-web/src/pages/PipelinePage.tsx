@@ -52,7 +52,6 @@ import {
   CheckCircle,
   SlidersHorizontal,
   MoreHorizontal,
-  FileText,
 } from 'lucide-react';
 import { oportunidadesService } from '../services/oportunidadesService';
 import usuariosService from '../services/usuariosService';
@@ -2692,31 +2691,6 @@ const PipelinePage: React.FC = () => {
                             <span className="truncate font-medium">{oportunidade.nomeContato}</span>
                           </div>
                         ) : null}
-
-                        {oportunidade.propostaPrincipal && (
-                          <div
-                            className={`mb-2 rounded-lg border px-2 py-1.5 text-xs ${
-                              oportunidade.propostaPrincipal.sugerePerda
-                                ? 'border-red-200 bg-red-50 text-red-700'
-                                : 'border-[#B4BEC9]/60 bg-[#F6FAFB] text-[#244455]'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <FileText className="h-3.5 w-3.5" />
-                              <span className="font-semibold">
-                                {oportunidade.propostaPrincipal.numero || 'Proposta principal'}
-                              </span>
-                              <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide">
-                                {oportunidade.propostaPrincipal.status}
-                              </span>
-                            </div>
-                            {oportunidade.propostaPrincipal.sugerePerda && (
-                              <div className="mt-1 text-[11px] font-medium">
-                                Proposta rejeitada ou expirada. Avalie marcar a oportunidade como perdida.
-                              </div>
-                            )}
-                          </div>
-                        )}
 
                         {/* Data */}
                         {oportunidade.dataFechamentoEsperado && (

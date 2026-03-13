@@ -34,7 +34,6 @@ export interface ProdutoProposta {
 export interface Proposta {
   id?: string;
   numero?: string;
-  isPropostaPrincipal?: boolean;
   cliente: Cliente;
   vendedor?: {
     id: string;
@@ -65,7 +64,7 @@ export interface Proposta {
   observacoes?: string;
   incluirImpostosPDF?: boolean;
   oportunidade?: {
-    id: string;
+    id: number;
     titulo: string;
     estagio: string;
     valor: number;
@@ -229,7 +228,6 @@ class PropostasService {
       ...proposta,
       cliente: proposta.cliente ? { ...proposta.cliente } : proposta.cliente,
       vendedor: proposta.vendedor ? { ...proposta.vendedor } : undefined,
-      oportunidade: proposta.oportunidade ? { ...proposta.oportunidade } : undefined,
       produtos: Array.isArray(proposta.produtos)
         ? proposta.produtos.map((produto) => ({ ...produto }))
         : [],
@@ -487,17 +485,6 @@ class PropostasService {
     } catch (error) {
       console.error('Erro ao atualizar status da proposta:', error);
       throw this.buildDomainError('atualizar o status da proposta', error);
-    }
-  }
-
-  async definirComoPrincipal(id: string): Promise<Proposta> {
-    try {
-      const response = await api.put(`${this.baseURL}/${id}/principal`);
-      this.clearCache();
-      return response.data?.proposta || response.data;
-    } catch (error) {
-      console.error('Erro ao definir proposta principal:', error);
-      throw this.buildDomainError('definir a proposta principal', error);
     }
   }
 
@@ -765,3 +752,4 @@ class PropostasService {
 }
 
 export const propostasService = new PropostasService();
+
