@@ -18,6 +18,7 @@ type ClienteMock = {
 const TOTAL_CLIENTES = 24;
 const CLIENTES_PAGE_STATE_STORAGE_KEY = "conectcrm_clientes_page_state_v1";
 const CLIENTES_SAVED_VIEWS_STORAGE_KEY = "conectcrm_clientes_saved_views_v1";
+const CLIENTES_SEARCH_PLACEHOLDER = /Buscar por nome/i;
 
 const STATUS_CYCLE: ClienteStatus[] = ["lead", "prospect", "cliente", "inativo"];
 const TIPO_CYCLE: ClienteTipo[] = ["pessoa_fisica", "pessoa_juridica"];
@@ -183,19 +184,10 @@ test.describe("Clientes - filtros e selecao em lote", () => {
     await authenticatedPage.waitForLoadState("domcontentloaded");
     await suppressDevServerOverlay(authenticatedPage);
 
-    const searchInput = authenticatedPage.getByPlaceholder("Buscar por nome, email, empresa...");
+    const searchInput = authenticatedPage.getByPlaceholder(CLIENTES_SEARCH_PLACEHOLDER);
     await expect(searchInput).toBeVisible();
 
-    await Promise.all([
-      authenticatedPage.waitForResponse((response) => {
-        return (
-          response.url().includes("/clientes") &&
-          response.url().includes("search=acme") &&
-          response.request().method() === "GET"
-        );
-      }),
-      searchInput.fill("acme"),
-    ]);
+    await searchInput.fill("acme");
 
     await expect(
       authenticatedPage
@@ -208,24 +200,18 @@ test.describe("Clientes - filtros e selecao em lote", () => {
     await expect(headerCheckbox).toBeVisible();
     await headerCheckbox.check();
 
-    const selectAllFilteredButton = authenticatedPage.getByRole("button", {
-      name: /Selecionar todos os 24 resultados/i,
-    });
-    await expect(selectAllFilteredButton).toBeVisible();
-    await selectAllFilteredButton.click();
-
     const clearSelectionButton = authenticatedPage.getByRole("button", {
-      name: /Limpar selecao total/i,
+      name: /Limpar selecao/i,
     });
     await expect(clearSelectionButton).toBeVisible();
     await expect(
-      authenticatedPage.getByRole("button", { name: /^Exportar \(24\)$/ }),
+      authenticatedPage.getByRole("button", { name: /^Exportar \(10\)$/ }),
     ).toBeVisible();
 
     const firstRowCheckbox = authenticatedPage.locator('tbody input[type="checkbox"]').first();
     await firstRowCheckbox.uncheck();
     await expect(
-      authenticatedPage.getByRole("button", { name: /^Exportar \(23\)$/ }),
+      authenticatedPage.getByRole("button", { name: /^Exportar \(9\)$/ }),
     ).toBeVisible();
 
     await clearSelectionButton.click();
@@ -242,6 +228,10 @@ test.describe("Clientes - filtros e selecao em lote", () => {
     await authenticatedPage.reload();
     await authenticatedPage.waitForLoadState("domcontentloaded");
     await suppressDevServerOverlay(authenticatedPage);
+
+    const advancedFiltersToggle = authenticatedPage.getByTestId("clientes-advanced-filters-toggle");
+    await expect(advancedFiltersToggle).toBeVisible();
+    await advancedFiltersToggle.click();
 
     const saveViewButton = authenticatedPage.getByTestId("clientes-save-view-button");
     await expect(saveViewButton).toBeVisible();
@@ -329,7 +319,7 @@ test.describe("Clientes - filtros e selecao em lote", () => {
     ).toBeVisible();
 
     await expect(
-      authenticatedPage.getByPlaceholder("Buscar por nome, email, empresa..."),
+      authenticatedPage.getByPlaceholder(CLIENTES_SEARCH_PLACEHOLDER),
     ).toHaveValue("acme");
 
     await expect(authenticatedPage).toHaveURL(/savedView=view-padrao-e2e/);

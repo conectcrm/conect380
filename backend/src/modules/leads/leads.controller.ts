@@ -11,6 +11,7 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  Req,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { LeadsService } from './leads.service';
@@ -28,6 +29,7 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { Permission } from '../../common/permissions/permissions.constants';
 import { EmpresaId, SkipEmpresaValidation } from '../../common/decorators/empresa.decorator';
+import { CurrentUser } from '../../common/decorators/user.decorator';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { StatusLead, OrigemLead } from './lead.entity';
 
@@ -42,8 +44,12 @@ export class LeadsController {
   @Post('capture')
   @Public()
   @SkipEmpresaValidation()
-  capturePublic(@Body() dto: CaptureLeadDto) {
-    return this.leadsService.captureFromPublic(dto);
+  capturePublic(@Body() dto: CaptureLeadDto, @Req() req: any) {
+    const hostHeader = req?.headers?.['x-forwarded-host'] || req?.headers?.host;
+    return this.leadsService.captureFromPublic(dto, {
+      host: Array.isArray(hostHeader) ? hostHeader[0] : hostHeader,
+      query: (req?.query || {}) as Record<string, unknown>,
+    });
   }
 
   /**
@@ -51,8 +57,13 @@ export class LeadsController {
    */
   @Post()
   @Permissions(Permission.CRM_LEADS_CREATE)
-  create(@Body() createLeadDto: CreateLeadDto, @EmpresaId() empresaId: string) {
-    return this.leadsService.create(createLeadDto, empresaId);
+  create(
+    @Body() createLeadDto: CreateLeadDto,
+    @EmpresaId() empresaId: string,
+    @CurrentUser() user: { id?: string; sub?: string },
+  ) {
+    const actorUserId = user?.id || user?.sub;
+    return this.leadsService.create(createLeadDto, empresaId, actorUserId);
   }
 
   /**
@@ -133,8 +144,15 @@ export class LeadsController {
     @Param('id') id: string,
     @Body() convertLeadDto: ConvertLeadDto,
     @EmpresaId() empresaId: string,
+    @CurrentUser() user: { id?: string; sub?: string },
   ) {
-    return this.leadsService.converterParaOportunidade(id, convertLeadDto, empresaId);
+    const actorUserId = user?.id || user?.sub;
+    return this.leadsService.converterParaOportunidade(
+      id,
+      convertLeadDto,
+      empresaId,
+      actorUserId,
+    );
   }
 
   /**

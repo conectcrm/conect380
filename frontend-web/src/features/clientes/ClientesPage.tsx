@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import toast from 'react-hot-toast';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import ModalCadastroCliente from '../../components/modals/ModalCadastroCliente';
-import { ModalDetalhesCliente } from '../../components/modals/ModalDetalhesCliente';
 import { ClienteCard } from '../../components/clientes';
 import { useGlobalConfirmation } from '../../contexts/GlobalConfirmationContext';
 import {
   clientesService,
   Cliente,
-  ClienteAttachment,
+  CreateClientePayload,
   ClienteFilters,
   ClientesEstatisticas,
   PaginatedClientes,
@@ -20,15 +19,14 @@ import {
   Search,
   Filter,
   Download,
-  Copy,
   BookmarkPlus,
   BookmarkX,
   Eye,
   Edit,
-  Star,
   Trash2,
   X,
   ChevronLeft,
+  ChevronDown,
   ChevronRight,
   Loader2,
   Grid3X3,
@@ -43,7 +41,7 @@ import {
   PageHeader,
   SectionCard,
 } from '../../components/layout-v2';
-import ActiveEmpresaBadge from '../../components/tenant/ActiveEmpresaBadge';
+import { matchesLocalSearchTerm, normalizeSearchValue } from '../../utils/localSearch';
 
 const CLIENTE_STATUS_OPTIONS: Array<{ value: Cliente['status']; label: string }> = [
   { value: 'lead', label: 'Lead' },
@@ -63,9 +61,31 @@ const getStatusLabel = (status: string): string =>
 const getTipoLabel = (tipo: string): string =>
   CLIENTE_TIPO_OPTIONS.find((option) => option.value === tipo)?.label ?? tipo;
 
+const getFollowupLabel = (followup: '' | 'pendente' | 'vencido'): string => {
+  if (followup === 'pendente') return 'Pendente';
+  if (followup === 'vencido') return 'Vencido';
+  return '';
+};
+
+const formatDocumento = (documento?: string, tipo?: Cliente['tipo']): string => {
+  if (!documento) return '-';
+
+  const digits = documento.replace(/\D/g, '');
+  if (digits.length === 11 || tipo === 'pessoa_fisica') {
+    if (digits.length !== 11) return documento;
+    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+  }
+
+  if (digits.length === 14 || tipo === 'pessoa_juridica') {
+    if (digits.length !== 14) return documento;
+    return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
+  }
+
+  return documento;
+};
+
 const CLIENTES_PAGE_STATE_STORAGE_KEY = 'conectcrm_clientes_page_state_v1';
 const CLIENTES_SAVED_VIEWS_STORAGE_KEY = 'conectcrm_clientes_saved_views_v1';
-
 type ClientesViewMode = 'cards' | 'table';
 
 type SavedClientesView = {
@@ -74,6 +94,9 @@ type SavedClientesView = {
   searchTerm: string;
   status: string;
   tipo: string;
+  tag: string;
+  origem: string;
+  followup: '' | 'pendente' | 'vencido';
   viewMode: ClientesViewMode;
   limit: number;
   sortBy: string;
@@ -86,6 +109,9 @@ type PersistedClientesPageState = {
   searchTerm: string;
   status: string;
   tipo: string;
+  tag: string;
+  origem: string;
+  followup: '' | 'pendente' | 'vencido';
   viewMode: ClientesViewMode;
   page: number;
   limit: number;
@@ -130,7 +156,7 @@ const loadSavedClientesViews = (): SavedClientesView[] => {
       return [];
     }
 
-    const normalized = parsed
+    const normalized: SavedClientesView[] = parsed
       .filter(
         (view) =>
           typeof view?.id === 'string' &&
@@ -142,6 +168,12 @@ const loadSavedClientesViews = (): SavedClientesView[] => {
       )
       .map((view) => ({
         ...view,
+        tag: typeof view.tag === 'string' ? view.tag : '',
+        origem: typeof view.origem === 'string' ? view.origem : '',
+        followup:
+          view.followup === 'pendente' || view.followup === 'vencido'
+            ? (view.followup as 'pendente' | 'vencido')
+            : '',
         isDefault: Boolean(view.isDefault),
       }));
 
@@ -157,7 +189,7 @@ const loadSavedClientesViews = (): SavedClientesView[] => {
 
 const toCreateClientePayload = (
   cliente: Cliente,
-): Omit<Cliente, 'id' | 'created_at' | 'updated_at'> => ({
+): CreateClientePayload => ({
   nome: cliente.nome,
   email: cliente.email ?? '',
   telefone: cliente.telefone,
@@ -168,22 +200,18 @@ const toCreateClientePayload = (
   cidade: cliente.cidade,
   estado: cliente.estado,
   cep: cliente.cep,
-  empresa: cliente.empresa,
-  cargo: cliente.cargo,
-  site: cliente.site,
   observacoes: cliente.observacoes,
   tags: cliente.tags,
-  data_nascimento: cliente.data_nascimento,
-  genero: cliente.genero,
-  profissao: cliente.profissao,
-  renda: cliente.renda,
+  ultimo_contato: cliente.ultimo_contato,
+  proximo_contato: cliente.proximo_contato,
   avatar: cliente.avatar,
   avatarUrl: cliente.avatarUrl,
   avatar_url: cliente.avatar_url,
-  foto: cliente.foto,
 });
 
 const ClientesPage: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { confirm } = useGlobalConfirmation();
   const persistedStateRef = useRef<Partial<PersistedClientesPageState>>(
     loadPersistedClientesState(),
@@ -197,19 +225,39 @@ const ClientesPage: React.FC = () => {
     search: persistedStateRef.current.searchTerm ?? '',
     status: persistedStateRef.current.status ?? '',
     tipo: persistedStateRef.current.tipo ?? '',
+    tag: persistedStateRef.current.tag ?? '',
+    origem: persistedStateRef.current.origem ?? '',
+    responsavelId: '',
+    followup:
+      persistedStateRef.current.followup === 'pendente' ||
+      persistedStateRef.current.followup === 'vencido'
+        ? persistedStateRef.current.followup
+        : '',
     sortBy: persistedStateRef.current.sortBy ?? 'created_at',
     sortOrder: persistedStateRef.current.sortOrder ?? 'DESC',
   }));
   const [searchTerm, setSearchTerm] = useState(persistedStateRef.current.searchTerm ?? '');
   const [selectedStatus, setSelectedStatus] = useState(persistedStateRef.current.status ?? '');
   const [selectedTipo, setSelectedTipo] = useState(persistedStateRef.current.tipo ?? '');
+  const [selectedTag, setSelectedTag] = useState(persistedStateRef.current.tag ?? '');
+  const [selectedOrigem, setSelectedOrigem] = useState(persistedStateRef.current.origem ?? '');
+  const [selectedFollowup, setSelectedFollowup] = useState<'' | 'pendente' | 'vencido'>(
+    persistedStateRef.current.followup === 'pendente' || persistedStateRef.current.followup === 'vencido'
+      ? persistedStateRef.current.followup
+      : '',
+  );
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(
+    Boolean(
+      (persistedStateRef.current.tag ?? '').trim() ||
+        (persistedStateRef.current.origem ?? '').trim() ||
+        (persistedStateRef.current.followup ?? '') ||
+        (persistedStateRef.current.activeViewId ?? ''),
+    ),
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [isModalLoading, setIsModalLoading] = useState(false);
-  const [clienteAttachments, setClienteAttachments] = useState<ClienteAttachment[]>([]);
-  const [attachmentsLoading, setAttachmentsLoading] = useState(false);
   const [viewMode, setViewMode] = useState<ClientesViewMode>(() => {
     if (persistedStateRef.current.viewMode) {
       return persistedStateRef.current.viewMode;
@@ -282,8 +330,15 @@ const ClientesPage: React.FC = () => {
   const hasHydratedQueryRef = useRef(false);
   const hasAppliedDefaultViewRef = useRef(false);
   const processedHighlightRef = useRef('');
-  const attachmentsRequestRef = useRef(0);
+  const clientesRequestRef = useRef(0);
+  const inFlightLoadKeyRef = useRef<string | null>(null);
+  const lastEstatisticasLoadedAtRef = useRef(0);
+  const hasLoadedEstatisticasRef = useRef(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const clientesProfileBasePath = useMemo(
+    () => (location.pathname.startsWith('/crm/') ? '/crm/clientes' : '/clientes'),
+    [location.pathname],
+  );
 
   // Funcao para calcular estatisticas baseadas nos dados carregados
   const calcularEstatisticasLocais = useCallback((clientesData: Cliente[]) => {
@@ -324,20 +379,59 @@ const ClientesPage: React.FC = () => {
   // Carregar clientes (memoizado para evitar loops)
   const loadClientes = useCallback(
     async (forceFresh = false) => {
+      const normalizedFilters: ClienteFilters = {
+        ...filters,
+        page: filters.page ?? 1,
+        limit: filters.limit ?? 10,
+        search: '',
+        status: filters.status ?? '',
+        tipo: filters.tipo ?? '',
+        sortBy: filters.sortBy ?? 'created_at',
+        sortOrder: filters.sortOrder ?? 'DESC',
+      };
+      const loadKey = JSON.stringify(normalizedFilters);
+
+      if (!forceFresh && inFlightLoadKeyRef.current === loadKey) {
+        return;
+      }
+
+      if (!forceFresh) {
+        inFlightLoadKeyRef.current = loadKey;
+      }
+      const requestId = ++clientesRequestRef.current;
+
       try {
         setIsLoading(true);
 
         const requestFilters: ClienteFilters = forceFresh
-          ? { ...filters, cacheBust: Date.now() }
-          : filters;
+          ? { ...normalizedFilters, cacheBust: Date.now() }
+          : normalizedFilters;
 
         const data = await clientesService.getClientes(requestFilters);
+
+        if (clientesRequestRef.current !== requestId) {
+          return;
+        }
+
         setClientesData(data);
         setClientes(data.data);
 
-        // Calcular estatisticas locais apos carregar dados
-        await loadEstatisticas(data.data);
+        const shouldReloadStats =
+          forceFresh ||
+          !hasLoadedEstatisticasRef.current ||
+          Date.now() - lastEstatisticasLoadedAtRef.current > 30000;
+
+        if (shouldReloadStats) {
+          // Estatisticas sao globais e nao precisam ser buscadas em toda digitacao de filtro.
+          await loadEstatisticas(data.data);
+          hasLoadedEstatisticasRef.current = true;
+          lastEstatisticasLoadedAtRef.current = Date.now();
+        }
       } catch (error) {
+        if (clientesRequestRef.current !== requestId) {
+          return;
+        }
+
         console.error('Erro ao carregar clientes:', error);
 
         toast.error('Erro ao carregar clientes do servidor. Verifique sua conexao.', {
@@ -357,32 +451,57 @@ const ClientesPage: React.FC = () => {
         });
         calcularEstatisticasLocais([]);
       } finally {
-        setIsLoading(false);
+        if (!forceFresh && inFlightLoadKeyRef.current === loadKey) {
+          inFlightLoadKeyRef.current = null;
+        }
+        if (clientesRequestRef.current === requestId) {
+          setIsLoading(false);
+        }
       }
     },
     [filters, loadEstatisticas, calcularEstatisticasLocais],
   );
 
-  // Aplicar filtros com debounce para busca
+  // Aplicar filtros de backend sem depender da digitacao da busca
   useEffect(() => {
-    // Pular execucao na primeira montagem (valores iniciais vazios)
     if (isFirstMount.current) {
       isFirstMount.current = false;
       return;
     }
 
-    const delayDebounce = setTimeout(() => {
-      setFilters((prev) => ({
-        ...prev,
-        search: searchTerm,
-        status: selectedStatus,
-        tipo: selectedTipo,
-        page: 1, // Reset para primeira pagina quando filtros mudam
-      }));
-    }, 300); // 300ms de delay para busca
+    setFilters((prev) => {
+      const currentPage = prev.page ?? 1;
+      const nextStatus = selectedStatus;
+      const nextTipo = selectedTipo;
+      const nextTag = selectedTag.trim();
+      const nextOrigem = selectedOrigem.trim();
+      const nextFollowup = selectedFollowup;
 
-    return () => clearTimeout(delayDebounce);
-  }, [searchTerm, selectedStatus, selectedTipo]);
+      if (
+        (prev.search ?? '') === '' &&
+        (prev.status ?? '') === nextStatus &&
+        (prev.tipo ?? '') === nextTipo &&
+        (prev.tag ?? '') === nextTag &&
+        (prev.origem ?? '') === nextOrigem &&
+        (prev.followup ?? '') === nextFollowup &&
+        currentPage === 1
+      ) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        search: '',
+        status: nextStatus,
+        tipo: nextTipo,
+        tag: nextTag,
+        origem: nextOrigem,
+        responsavelId: '',
+        followup: nextFollowup,
+        page: 1,
+      };
+    });
+  }, [selectedStatus, selectedTipo, selectedTag, selectedOrigem, selectedFollowup]);
 
   useEffect(() => {
     if (hasHydratedQueryRef.current) {
@@ -394,6 +513,9 @@ const ClientesPage: React.FC = () => {
     const querySearch = searchParams.get('q');
     const queryStatus = searchParams.get('status');
     const queryTipo = searchParams.get('tipo');
+    const queryTag = searchParams.get('tag');
+    const queryOrigem = searchParams.get('origem');
+    const queryFollowup = searchParams.get('followup');
     const queryView = searchParams.get('view');
     const queryPage = Number(searchParams.get('page') || '');
     const queryLimit = Number(searchParams.get('limit') || '');
@@ -405,6 +527,9 @@ const ClientesPage: React.FC = () => {
       querySearch,
       queryStatus,
       queryTipo,
+      queryTag,
+      queryOrigem,
+      queryFollowup,
       queryView,
       searchParams.get('page'),
       searchParams.get('limit'),
@@ -429,6 +554,20 @@ const ClientesPage: React.FC = () => {
       setSelectedTipo(queryTipo);
     }
 
+    if (queryTag !== null) {
+      setSelectedTag(queryTag);
+    }
+
+    if (queryOrigem !== null) {
+      setSelectedOrigem(queryOrigem);
+    }
+
+    if (queryFollowup === 'pendente' || queryFollowup === 'vencido') {
+      setSelectedFollowup(queryFollowup);
+    } else if (queryFollowup === '') {
+      setSelectedFollowup('');
+    }
+
     if (queryView === 'cards' || queryView === 'table') {
       setViewMode(queryView);
     }
@@ -437,19 +576,55 @@ const ClientesPage: React.FC = () => {
       setActiveViewId(querySavedView);
     }
 
-    setFilters((prev) => ({
-      ...prev,
-      page: Number.isFinite(queryPage) && queryPage > 0 ? queryPage : (prev.page ?? 1),
-      limit: Number.isFinite(queryLimit) && queryLimit > 0 ? queryLimit : (prev.limit ?? 10),
-      search: querySearch ?? prev.search ?? '',
-      status: queryStatus ?? prev.status ?? '',
-      tipo: queryTipo ?? prev.tipo ?? '',
-      sortBy: querySortBy ?? prev.sortBy ?? 'created_at',
-      sortOrder:
+    setFilters((prev) => {
+      const nextPage = Number.isFinite(queryPage) && queryPage > 0 ? queryPage : (prev.page ?? 1);
+      const nextLimit =
+        Number.isFinite(queryLimit) && queryLimit > 0 ? queryLimit : (prev.limit ?? 10);
+      const nextSearch = '';
+      const nextStatus = queryStatus ?? prev.status ?? '';
+      const nextTipo = queryTipo ?? prev.tipo ?? '';
+      const nextTag = queryTag ?? prev.tag ?? '';
+      const nextOrigem = queryOrigem ?? prev.origem ?? '';
+      const nextFollowup =
+        queryFollowup === 'pendente' || queryFollowup === 'vencido'
+          ? queryFollowup
+          : ((prev.followup ?? '') as '' | 'pendente' | 'vencido');
+      const nextSortBy = querySortBy ?? prev.sortBy ?? 'created_at';
+      const nextSortOrder =
         querySortOrder === 'ASC' || querySortOrder === 'DESC'
           ? querySortOrder
-          : (prev.sortOrder ?? 'DESC'),
-    }));
+          : (prev.sortOrder ?? 'DESC');
+
+      if (
+        (prev.page ?? 1) === nextPage &&
+        (prev.limit ?? 10) === nextLimit &&
+        (prev.search ?? '') === nextSearch &&
+        (prev.status ?? '') === nextStatus &&
+        (prev.tipo ?? '') === nextTipo &&
+        (prev.tag ?? '') === nextTag &&
+        (prev.origem ?? '') === nextOrigem &&
+        (prev.followup ?? '') === nextFollowup &&
+        (prev.sortBy ?? 'created_at') === nextSortBy &&
+        (prev.sortOrder ?? 'DESC') === nextSortOrder
+      ) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        page: nextPage,
+        limit: nextLimit,
+        search: nextSearch,
+        status: nextStatus,
+        tipo: nextTipo,
+        tag: nextTag,
+        origem: nextOrigem,
+        responsavelId: '',
+        followup: nextFollowup,
+        sortBy: nextSortBy,
+        sortOrder: nextSortOrder,
+      };
+    });
   }, [searchParams]);
 
   useEffect(() => {
@@ -461,6 +636,9 @@ const ClientesPage: React.FC = () => {
       searchTerm,
       status: selectedStatus,
       tipo: selectedTipo,
+      tag: selectedTag,
+      origem: selectedOrigem,
+      followup: selectedFollowup,
       viewMode,
       page: filters.page ?? 1,
       limit: filters.limit ?? 10,
@@ -479,6 +657,9 @@ const ClientesPage: React.FC = () => {
     searchTerm,
     selectedStatus,
     selectedTipo,
+    selectedTag,
+    selectedOrigem,
+    selectedFollowup,
     viewMode,
   ]);
 
@@ -490,8 +671,11 @@ const ClientesPage: React.FC = () => {
     window.localStorage.setItem(CLIENTES_SAVED_VIEWS_STORAGE_KEY, JSON.stringify(savedViews));
   }, [savedViews]);
 
+  const searchParamsSerialized = searchParams.toString();
+
   useEffect(() => {
-    const nextParams = new URLSearchParams(searchParams);
+    const nextParams = new URLSearchParams(searchParamsSerialized);
+    const normalizedSearch = searchTerm.trim();
 
     const setOrDelete = (key: string, value: string | null | undefined, keepWhenValue = true) => {
       if (!value || !keepWhenValue) {
@@ -502,9 +686,13 @@ const ClientesPage: React.FC = () => {
       nextParams.set(key, value);
     };
 
-    setOrDelete('q', searchTerm.trim());
+    setOrDelete('q', normalizedSearch);
     setOrDelete('status', selectedStatus);
     setOrDelete('tipo', selectedTipo);
+    setOrDelete('tag', selectedTag.trim());
+    setOrDelete('origem', selectedOrigem.trim());
+    nextParams.delete('responsavelId');
+    setOrDelete('followup', selectedFollowup);
     setOrDelete('view', viewMode === 'table' ? null : viewMode);
     setOrDelete('page', String(filters.page ?? 1), (filters.page ?? 1) > 1);
     setOrDelete('limit', String(filters.limit ?? 10), (filters.limit ?? 10) !== 10);
@@ -520,7 +708,7 @@ const ClientesPage: React.FC = () => {
     );
     setOrDelete('savedView', activeViewId);
 
-    if (nextParams.toString() !== searchParams.toString()) {
+    if (nextParams.toString() !== searchParamsSerialized) {
       setSearchParams(nextParams, { replace: true });
     }
   }, [
@@ -529,10 +717,13 @@ const ClientesPage: React.FC = () => {
     filters.page,
     filters.sortBy,
     filters.sortOrder,
-    searchParams,
     searchTerm,
+    searchParamsSerialized,
     selectedStatus,
     selectedTipo,
+    selectedTag,
+    selectedOrigem,
+    selectedFollowup,
     setSearchParams,
     viewMode,
   ]);
@@ -542,9 +733,12 @@ const ClientesPage: React.FC = () => {
     setSelectAllFiltered(false);
     setExcludedClientes([]);
   }, [
-    filters.search,
+    searchTerm,
     filters.status,
     filters.tipo,
+    filters.tag,
+    filters.origem,
+    filters.followup,
     filters.sortBy,
     filters.sortOrder,
     filters.limit,
@@ -572,8 +766,7 @@ const ClientesPage: React.FC = () => {
 
     const clienteDaPagina = clientes.find((cliente) => cliente.id === highlightId);
     if (clienteDaPagina) {
-      setSelectedCliente(clienteDaPagina);
-      setShowDetailsModal(true);
+      navigate(`${clientesProfileBasePath}/${clienteDaPagina.id}`);
       setSearchParams(nextParams, { replace: true });
       return;
     }
@@ -584,8 +777,7 @@ const ClientesPage: React.FC = () => {
       try {
         const cliente = await clientesService.getClienteById(highlightId);
         if (!cancelled && cliente?.id) {
-          setSelectedCliente(cliente);
-          setShowDetailsModal(true);
+          navigate(`${clientesProfileBasePath}/${cliente.id}`);
         }
       } catch {
         if (!cancelled) {
@@ -605,34 +797,7 @@ const ClientesPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [clientes, isLoading, searchParams, setSearchParams]);
-
-  const loadClienteAttachments = useCallback(async (clienteId: string) => {
-    const requestId = ++attachmentsRequestRef.current;
-
-    try {
-      setAttachmentsLoading(true);
-      const attachments = await clientesService.listarAnexosCliente(clienteId);
-
-      if (attachmentsRequestRef.current !== requestId) {
-        return;
-      }
-
-      setClienteAttachments(attachments);
-    } catch (error) {
-      if (attachmentsRequestRef.current !== requestId) {
-        return;
-      }
-
-      console.error('Erro ao carregar anexos do cliente:', error);
-      setClienteAttachments([]);
-      toast.error('Nao foi possivel carregar os anexos do cliente.');
-    } finally {
-      if (attachmentsRequestRef.current === requestId) {
-        setAttachmentsLoading(false);
-      }
-    }
-  }, []);
+  }, [clientes, clientesProfileBasePath, isLoading, navigate, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -674,17 +839,6 @@ const ClientesPage: React.FC = () => {
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [searchTerm]);
 
-  useEffect(() => {
-    if (!showDetailsModal || !selectedCliente?.id) {
-      attachmentsRequestRef.current += 1;
-      setClienteAttachments([]);
-      setAttachmentsLoading(false);
-      return;
-    }
-
-    loadClienteAttachments(selectedCliente.id);
-  }, [loadClienteAttachments, selectedCliente?.id, showDetailsModal]);
-
   // Notificacao de boas-vindas removida - usar apenas toast para feedback imediato
 
   // Handlers para filtros simplificados
@@ -700,11 +854,27 @@ const ClientesPage: React.FC = () => {
     setSelectedTipo(tipo);
   };
 
+  const handleTagChange = (tag: string) => {
+    setSelectedTag(tag);
+  };
+
+  const handleOrigemChange = (origem: string) => {
+    setSelectedOrigem(origem);
+  };
+
+  const handleFollowupChange = (followup: '' | 'pendente' | 'vencido') => {
+    setSelectedFollowup(followup);
+  };
+
   const handleClearFilters = () => {
     setSearchTerm('');
     setSelectedStatus('');
     setSelectedTipo('');
+    setSelectedTag('');
+    setSelectedOrigem('');
+    setSelectedFollowup('');
     setActiveViewId('');
+    setShowAdvancedFilters(false);
   };
 
   const handlePageChange = (page: number) => {
@@ -724,12 +894,31 @@ const ClientesPage: React.FC = () => {
     }));
   };
 
+  const normalizedSearchTerm = normalizeSearchValue(searchTerm);
+  const clientesFiltrados = useMemo(() => {
+    if (!normalizedSearchTerm) {
+      return clientes;
+    }
+
+    return clientes.filter((cliente) => {
+      return matchesLocalSearchTerm(normalizedSearchTerm, [
+        cliente.nome,
+        cliente.documento,
+        cliente.email,
+        cliente.telefone,
+        cliente.empresa,
+      ]);
+    });
+  }, [clientes, normalizedSearchTerm]);
+
   const visibleClienteIds = useMemo(
-    () => clientes.map((cliente) => cliente.id).filter((id): id is string => Boolean(id)),
-    [clientes],
+    () => clientesFiltrados.map((cliente) => cliente.id).filter((id): id is string => Boolean(id)),
+    [clientesFiltrados],
   );
 
-  const totalRegistros = clientesData?.total ?? clientes.length;
+  const totalRegistros = normalizedSearchTerm
+    ? clientesFiltrados.length
+    : (clientesData?.total ?? clientes.length);
   const selectedCount = useMemo(() => {
     if (selectAllFiltered) {
       return Math.max(totalRegistros - excludedClientes.length, 0);
@@ -739,7 +928,7 @@ const ClientesPage: React.FC = () => {
   }, [excludedClientes.length, selectAllFiltered, selectedClientes.length, totalRegistros]);
 
   const hasBulkSelection = selectedCount > 0;
-  const canSelectAcrossPages = totalRegistros > visibleClienteIds.length;
+  const canSelectAcrossPages = !normalizedSearchTerm && totalRegistros > visibleClienteIds.length;
   const areAllVisibleSelected =
     visibleClienteIds.length > 0 &&
     visibleClienteIds.every((id) =>
@@ -947,14 +1136,21 @@ const ClientesPage: React.FC = () => {
     setSearchTerm(selectedView.searchTerm);
     setSelectedStatus(selectedView.status);
     setSelectedTipo(selectedView.tipo);
+    setSelectedTag(selectedView.tag ?? '');
+    setSelectedOrigem(selectedView.origem ?? '');
+    setSelectedFollowup(selectedView.followup ?? '');
     setViewMode(selectedView.viewMode);
     setFilters((prev) => ({
       ...prev,
       page: 1,
       limit: selectedView.limit,
-      search: selectedView.searchTerm,
+      search: '',
       status: selectedView.status,
       tipo: selectedView.tipo,
+      tag: selectedView.tag ?? '',
+      origem: selectedView.origem ?? '',
+      responsavelId: '',
+      followup: selectedView.followup ?? '',
       sortBy: selectedView.sortBy,
       sortOrder: selectedView.sortOrder,
     }));
@@ -1027,6 +1223,9 @@ const ClientesPage: React.FC = () => {
         searchTerm,
         status: selectedStatus,
         tipo: selectedTipo,
+        tag: selectedTag.trim(),
+        origem: selectedOrigem.trim(),
+        followup: selectedFollowup,
         viewMode,
         limit: filters.limit ?? 10,
         sortBy: filters.sortBy ?? 'created_at',
@@ -1125,6 +1324,9 @@ const ClientesPage: React.FC = () => {
       searchParams.get('q'),
       searchParams.get('status'),
       searchParams.get('tipo'),
+      searchParams.get('tag'),
+      searchParams.get('origem'),
+      searchParams.get('followup'),
       searchParams.get('view'),
       searchParams.get('page'),
       searchParams.get('limit'),
@@ -1148,14 +1350,21 @@ const ClientesPage: React.FC = () => {
     setSearchTerm(defaultView.searchTerm);
     setSelectedStatus(defaultView.status);
     setSelectedTipo(defaultView.tipo);
+    setSelectedTag(defaultView.tag ?? '');
+    setSelectedOrigem(defaultView.origem ?? '');
+    setSelectedFollowup(defaultView.followup ?? '');
     setViewMode(defaultView.viewMode);
     setFilters((prev) => ({
       ...prev,
       page: 1,
       limit: defaultView.limit,
-      search: defaultView.searchTerm,
+      search: '',
       status: defaultView.status,
       tipo: defaultView.tipo,
+      tag: defaultView.tag ?? '',
+      origem: defaultView.origem ?? '',
+      responsavelId: '',
+      followup: defaultView.followup ?? '',
       sortBy: defaultView.sortBy,
       sortOrder: defaultView.sortOrder,
     }));
@@ -1177,6 +1386,9 @@ const ClientesPage: React.FC = () => {
       activeView.searchTerm === searchTerm &&
       activeView.status === selectedStatus &&
       activeView.tipo === selectedTipo &&
+      (activeView.tag ?? '') === selectedTag.trim() &&
+      (activeView.origem ?? '') === selectedOrigem.trim() &&
+      (activeView.followup ?? '') === selectedFollowup &&
       activeView.viewMode === viewMode &&
       activeView.limit === (filters.limit ?? 10) &&
       activeView.sortBy === (filters.sortBy ?? 'created_at') &&
@@ -1194,6 +1406,9 @@ const ClientesPage: React.FC = () => {
     searchTerm,
     selectedStatus,
     selectedTipo,
+    selectedTag,
+    selectedOrigem,
+    selectedFollowup,
     viewMode,
   ]);
 
@@ -1323,9 +1538,7 @@ const ClientesPage: React.FC = () => {
   };
 
   // Handler para salvar cliente (criar/editar)
-  const handleSaveCliente = async (
-    clienteData: Omit<Cliente, 'id' | 'created_at' | 'updated_at'>,
-  ) => {
+  const handleSaveCliente = async (clienteData: CreateClientePayload) => {
     try {
       setIsModalLoading(true);
 
@@ -1363,12 +1576,6 @@ const ClientesPage: React.FC = () => {
 
       await clientesService.deleteCliente(id);
       await loadClientes(true);
-
-      if (selectedCliente?.id === id) {
-        setShowDetailsModal(false);
-        setSelectedCliente(null);
-        setClienteAttachments([]);
-      }
 
       setSelectedClientes((prev) => prev.filter((clienteId) => clienteId !== id));
       setExcludedClientes((prev) => prev.filter((clienteId) => clienteId !== id));
@@ -1453,8 +1660,10 @@ const ClientesPage: React.FC = () => {
   };
 
   const handleViewCliente = (cliente: Cliente) => {
-    setSelectedCliente(cliente);
-    setShowDetailsModal(true);
+    if (!cliente.id) {
+      return;
+    }
+    navigate(`${clientesProfileBasePath}/${cliente.id}`);
   };
 
   const handleAvatarUpdate = (clienteId: string, avatar: UploadResult) => {
@@ -1476,46 +1685,43 @@ const ClientesPage: React.FC = () => {
     });
   };
 
-  const handleAttachmentAdd = async (clienteId: string, attachment: UploadResult) => {
-    if (selectedCliente?.id === clienteId && showDetailsModal) {
-      await loadClienteAttachments(clienteId);
-    }
-
+  const handleAttachmentAdd = async (_clienteId: string, attachment: UploadResult) => {
     toast.success(`Anexo ${attachment.fileName} adicionado com sucesso.`, {
       duration: 3500,
       position: 'top-right',
     });
   };
 
-  const handleAttachmentRemove = async (clienteId: string, attachmentId: string) => {
-    try {
-      await clientesService.removerAnexoCliente(clienteId, attachmentId);
-
-      setClienteAttachments((prev) => prev.filter((attachment) => attachment.id !== attachmentId));
-      toast.success('Anexo removido com sucesso.', {
-        duration: 3000,
-        position: 'top-right',
-      });
-    } catch (error) {
-      console.error('Erro ao remover anexo do cliente:', error);
-      toast.error('Nao foi possivel remover o anexo.', {
-        duration: 5000,
-        position: 'top-right',
-      });
-    }
-  };
-
-  const pageDescription = isLoading
+  const isInitialLoading = isLoading && clientes.length === 0;
+  const isRefreshingResults = isLoading && clientes.length > 0;
+  const pageDescription = isInitialLoading
     ? 'Carregando clientes...'
-    : `Gerencie seus ${estatisticas.total} clientes e contatos`;
-  const hasFilters = Boolean(searchTerm || selectedStatus || selectedTipo);
+    : isRefreshingResults
+      ? 'Atualizando resultados...'
+      : `Gerencie o cadastro e relacionamento basico de ${estatisticas.total} clientes`;
+  const hasFilters = Boolean(
+    searchTerm ||
+      selectedStatus ||
+      selectedTipo ||
+      selectedTag.trim() ||
+      selectedOrigem.trim() ||
+      selectedFollowup,
+  );
   const activeView = savedViews.find((view) => view.id === activeViewId) ?? null;
+  const hasAdvancedFilters = Boolean(
+    selectedTag.trim() ||
+      selectedOrigem.trim() ||
+      selectedFollowup ||
+      activeViewId,
+  );
+  const advancedFiltersCount = [
+    selectedTag.trim(),
+    selectedOrigem.trim(),
+    selectedFollowup,
+    activeViewId,
+  ].filter(Boolean).length;
   const hasFilterChips = hasFilters || Boolean(activeView);
-  const activeFilterCount =
-    Number(Boolean(searchTerm.trim())) +
-    Number(Boolean(selectedStatus)) +
-    Number(Boolean(selectedTipo)) +
-    Number(Boolean(activeViewId));
+  const oportunidadesAtivas = Number(estatisticas.prospects ?? 0) + Number(estatisticas.leads ?? 0);
   const isRenameMode = saveViewModalMode === 'rename' && Boolean(activeView);
   const saveViewModalTitle = isRenameMode
     ? 'Renomear view'
@@ -1545,16 +1751,9 @@ const ClientesPage: React.FC = () => {
           title={
             <span className="inline-flex items-center gap-2">
               <span>Clientes</span>
-              {activeFilterCount > 0 ? (
-                <span className="inline-flex items-center rounded-full border border-[#CDE6DF] bg-[#ECF7F3] px-2 py-0.5 text-xs font-semibold text-[#0F7B7D]">
-                  {activeFilterCount} filtro{activeFilterCount === 1 ? '' : 's'} ativo
-                  {activeFilterCount === 1 ? '' : 's'}
-                </span>
-              ) : null}
             </span>
           }
           description={pageDescription}
-          filters={<ActiveEmpresaBadge variant="page" />}
           actions={
             <div className="flex flex-wrap items-center gap-2">
               <div className="inline-flex items-center rounded-lg border border-[#D4E2E7] bg-white p-1">
@@ -1608,154 +1807,195 @@ const ClientesPage: React.FC = () => {
 
         {!isLoading && (
           <InlineStats
+            compact
             stats={[
-              { label: 'Total', value: String(estatisticas.total), tone: 'neutral' },
-              { label: 'Ativos', value: String(estatisticas.ativos), tone: 'accent' },
-              { label: 'Prospects', value: String(estatisticas.prospects), tone: 'accent' },
-              { label: 'Leads', value: String(estatisticas.leads), tone: 'neutral' },
+              { label: 'Total de clientes', value: String(estatisticas.total), tone: 'neutral' },
+              { label: 'Clientes ativos', value: String(estatisticas.ativos), tone: 'accent' },
+              { label: 'Oportunidades abertas', value: String(oportunidadesAtivas), tone: 'warning' },
             ]}
           />
         )}
       </SectionCard>
 
       <FiltersBar className="p-4">
-        <div className="flex w-full flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
-          <div className="w-full sm:min-w-[260px] sm:flex-1">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">
-              Buscar clientes
-              <span className="ml-1 text-xs font-normal text-[#6F8B98]">atalho: /</span>
-            </label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Buscar por nome, email, empresa..."
-                value={searchTerm}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
-              />
+        <div className="flex w-full flex-col gap-4">
+          <div className="flex w-full flex-col gap-3 xl:flex-row xl:items-end">
+            <div className="w-full xl:min-w-[300px] xl:flex-1">
+              <label className="mb-2 block text-sm font-medium text-[#385A6A]">
+                Buscar clientes
+                <span className="ml-1 text-xs font-normal text-[#6F8B98]">atalho: /</span>
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Buscar por nome, CPF/CNPJ, email ou telefone..."
+                  value={searchTerm}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                />
+              </div>
             </div>
-          </div>
 
-          <div className="w-full sm:w-auto">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Status</label>
-            <select
-              value={selectedStatus}
-              onChange={(e) => handleStatusChange(e.target.value)}
-              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[170px]"
-            >
-              <option value="">Todos os status</option>
-              {CLIENTE_STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="w-full sm:w-auto">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Tipo</label>
-            <select
-              value={selectedTipo}
-              onChange={(e) => handleTipoChange(e.target.value)}
-              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[170px]"
-            >
-              <option value="">Todos os tipos</option>
-              {CLIENTE_TIPO_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="w-full sm:w-auto">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Views salvas</label>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="w-full xl:w-auto">
+              <label className="mb-2 block text-sm font-medium text-[#385A6A]">Status</label>
               <select
-                value={activeViewId}
-                onChange={(e) => handleSavedViewChange(e.target.value)}
-                data-testid="clientes-saved-views-select"
-                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:min-w-[190px] sm:w-auto"
+                value={selectedStatus}
+                onChange={(e) => handleStatusChange(e.target.value)}
+                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 xl:w-[180px]"
               >
-                <option value="">Sem view salva</option>
-                {savedViews.map((view) => (
-                  <option key={view.id} value={view.id}>
-                    {view.isDefault ? `${view.name} (padrao)` : view.name}
+                <option value="">Todos os status</option>
+                {CLIENTE_STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>
-              <button
-                onClick={() => handleOpenSaveViewModal()}
-                data-testid="clientes-save-view-button"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[#B4BEC9] bg-white px-3 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
-                title={activeViewId ? 'Salvar alteracoes da view ativa' : 'Salvar view atual'}
-              >
-                <BookmarkPlus className="h-4 w-4" />
-                <span>Salvar</span>
-              </button>
-              {activeViewId && (
-                <button
-                  onClick={handleDuplicateActiveView}
-                  data-testid="clientes-duplicate-view-button"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#D4E2E7] bg-white px-3 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
-                  title="Duplicar view ativa"
-                >
-                  <Copy className="h-4 w-4" />
-                  <span>Duplicar</span>
-                </button>
-              )}
-              {activeViewId && (
-                <button
-                  onClick={handleSetDefaultActiveView}
-                  data-testid="clientes-set-default-view-button"
-                  disabled={Boolean(activeView?.isDefault)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#D4E2E7] bg-white px-3 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9] disabled:cursor-not-allowed disabled:opacity-60"
-                  title={activeView?.isDefault ? 'View padrao ativa' : 'Definir como view padrao'}
-                >
-                  <Star className="h-4 w-4" />
-                  <span>{activeView?.isDefault ? 'Padrao' : 'Definir padrao'}</span>
-                </button>
-              )}
-              {activeViewId && (
-                <button
-                  onClick={() => handleOpenSaveViewModal('rename')}
-                  data-testid="clientes-rename-view-button"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#D4E2E7] bg-white px-3 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
-                  title="Renomear view ativa"
-                >
-                  <Edit className="h-4 w-4" />
-                  <span>Renomear</span>
-                </button>
-              )}
-              {activeViewId && (
-                <button
-                  onClick={handleDeleteActiveView}
-                  data-testid="clientes-delete-view-button"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#E4C7C7] bg-white px-3 py-2 text-sm font-medium text-[#9E3535] transition-colors hover:bg-[#FFF5F5]"
-                  title="Excluir view ativa"
-                >
-                  <BookmarkX className="h-4 w-4" />
-                  <span>Excluir</span>
-                </button>
-              )}
             </div>
-          </div>
 
-          <div className="w-full sm:w-auto">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Acoes</label>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="w-full xl:w-auto">
+              <label className="mb-2 block text-sm font-medium text-[#385A6A]">Tipo</label>
+              <select
+                value={selectedTipo}
+                onChange={(e) => handleTipoChange(e.target.value)}
+                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 xl:w-[180px]"
+              >
+                <option value="">Todos os tipos</option>
+                {CLIENTE_TIPO_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex w-full flex-wrap items-end gap-2 xl:w-auto xl:justify-end">
               <button
-                onClick={handleClearFilters}
-                disabled={!hasFilterChips}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9] disabled:cursor-not-allowed disabled:opacity-60"
+                type="button"
+                data-testid="clientes-advanced-filters-toggle"
+                onClick={() => setShowAdvancedFilters((current) => !current)}
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
               >
                 <Filter className="h-4 w-4" />
+                Filtros avancados
+                {hasAdvancedFilters ? (
+                  <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#E9F6F3] px-1.5 text-xs font-semibold text-[#0F7B7D]">
+                    {advancedFiltersCount}
+                  </span>
+                ) : null}
+                <ChevronDown
+                  className={`h-4 w-4 text-[#5D7A88] transition-transform ${
+                    showAdvancedFilters ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+
+              <button
+                type="button"
+                onClick={handleClearFilters}
+                disabled={!hasFilterChips}
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <X className="h-4 w-4" />
                 Limpar
               </button>
             </div>
           </div>
+
+          {showAdvancedFilters && (
+            <div className="rounded-xl border border-[#DCE8EC] bg-[#F8FBFC] p-3 sm:p-4">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="w-full">
+                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Tag</label>
+                  <input
+                    type="text"
+                    value={selectedTag}
+                    onChange={(e) => handleTagChange(e.target.value)}
+                    data-testid="clientes-filter-tag"
+                    placeholder="Ex.: vip"
+                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                  />
+                </div>
+
+                <div className="w-full">
+                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Follow-up</label>
+                  <select
+                    value={selectedFollowup}
+                    onChange={(e) => handleFollowupChange(e.target.value as '' | 'pendente' | 'vencido')}
+                    data-testid="clientes-filter-followup"
+                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                  >
+                    <option value="">Todos</option>
+                    <option value="pendente">Pendente</option>
+                    <option value="vencido">Vencido</option>
+                  </select>
+                </div>
+
+                <div className="w-full">
+                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Origem</label>
+                  <input
+                    type="text"
+                    value={selectedOrigem}
+                    onChange={(e) => handleOrigemChange(e.target.value)}
+                    data-testid="clientes-filter-origem"
+                    placeholder="Ex.: Indicacao"
+                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3 border-t border-[#DFEAEE] pt-3">
+                <label className="mb-2 block text-sm font-medium text-[#385A6A]">Views salvas</label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={activeViewId}
+                    onChange={(e) => handleSavedViewChange(e.target.value)}
+                    data-testid="clientes-saved-views-select"
+                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:min-w-[190px] sm:w-auto"
+                  >
+                    <option value="">Sem view salva</option>
+                    {savedViews.map((view) => (
+                      <option key={view.id} value={view.id}>
+                        {view.isDefault ? `${view.name} (padrao)` : view.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => handleOpenSaveViewModal()}
+                    data-testid="clientes-save-view-button"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#B4BEC9] bg-white px-3 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
+                    title={activeViewId ? 'Salvar alteracoes da view ativa' : 'Salvar view atual'}
+                  >
+                    <BookmarkPlus className="h-4 w-4" />
+                    <span>Salvar</span>
+                  </button>
+                  {activeViewId && (
+                    <button
+                      onClick={() => handleOpenSaveViewModal('rename')}
+                      data-testid="clientes-rename-view-button"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#D4E2E7] bg-white px-3 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
+                      title="Renomear view ativa"
+                    >
+                      <Edit className="h-4 w-4" />
+                      <span>Renomear</span>
+                    </button>
+                  )}
+                  {activeViewId && (
+                    <button
+                      onClick={handleDeleteActiveView}
+                      data-testid="clientes-delete-view-button"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#E4C7C7] bg-white px-3 py-2 text-sm font-medium text-[#9E3535] transition-colors hover:bg-[#FFF5F5]"
+                      title="Excluir view ativa"
+                    >
+                      <BookmarkX className="h-4 w-4" />
+                      <span>Excluir</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </FiltersBar>
 
@@ -1822,6 +2062,49 @@ const ClientesPage: React.FC = () => {
             </span>
           )}
 
+          {selectedTag.trim() && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+              Tag: <strong className="font-semibold text-[#1C3B4C]">{selectedTag.trim()}</strong>
+              <button
+                onClick={() => setSelectedTag('')}
+                className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                title="Remover filtro de tag"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          )}
+
+          {selectedFollowup && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+              Follow-up:{' '}
+              <strong className="font-semibold text-[#1C3B4C]">
+                {getFollowupLabel(selectedFollowup)}
+              </strong>
+              <button
+                onClick={() => setSelectedFollowup('')}
+                className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                title="Remover filtro de follow-up"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          )}
+
+          {selectedOrigem.trim() && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+              Origem:{' '}
+              <strong className="font-semibold text-[#1C3B4C]">{selectedOrigem.trim()}</strong>
+              <button
+                onClick={() => setSelectedOrigem('')}
+                className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                title="Remover filtro de origem"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          )}
+
           <button
             onClick={handleClearFilters}
             className="inline-flex items-center gap-1 rounded-full border border-[#D2DFE4] bg-white px-3 py-1 text-xs font-medium text-[#486978] transition-colors hover:bg-[#F3F8FA]"
@@ -1832,9 +2115,15 @@ const ClientesPage: React.FC = () => {
         </div>
       )}
 
-      {isLoading && <LoadingSkeleton lines={7} />}
+      {isInitialLoading && <LoadingSkeleton lines={7} />}
 
-      {!isLoading && clientes.length === 0 && (
+      {isRefreshingResults && (
+        <div className="rounded-xl border border-[#DCE8EC] bg-[#F6FBFC] px-4 py-2 text-sm text-[#446675]">
+          Atualizando resultados da busca...
+        </div>
+      )}
+
+      {!isLoading && clientesFiltrados.length === 0 && (
         <EmptyState
           icon={<Users className="h-5 w-5" />}
           title={hasFilters ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'}
@@ -1868,12 +2157,12 @@ const ClientesPage: React.FC = () => {
         />
       )}
 
-      {!isLoading && clientes.length > 0 && (
+      {clientesFiltrados.length > 0 && (
         <DataTableCard>
           {viewMode === 'cards' ? (
             <div className="p-4 sm:p-5">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                {clientes.map((cliente) => (
+                {clientesFiltrados.map((cliente) => (
                   <ClienteCard
                     key={cliente.id}
                     cliente={cliente}
@@ -1891,7 +2180,7 @@ const ClientesPage: React.FC = () => {
               <div className="flex flex-col gap-3 border-b border-[#E1EAEE] bg-[#F8FBFC] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                 <div className="flex flex-wrap items-center gap-3 text-sm text-[#516F7D]">
                   <span>
-                    {clientes.length} de {totalRegistros} registros
+                    {clientesFiltrados.length} de {totalRegistros} registros
                   </span>
                   {hasFilters && (
                     <span className="rounded-full border border-[#CDE6DF] bg-[#ECF7F3] px-2 py-0.5 text-xs font-medium text-[#0F7B7D]">
@@ -1973,7 +2262,7 @@ const ClientesPage: React.FC = () => {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="min-w-full bg-white">
+                <table className="w-full min-w-[1080px] bg-white">
                   <thead className="border-b border-[#E1EAEE] bg-[#F8FBFC]">
                     <tr>
                       <th className="w-12 px-4 py-3 text-left" onClick={(e) => e.stopPropagation()}>
@@ -1984,7 +2273,7 @@ const ClientesPage: React.FC = () => {
                           className="h-4 w-4 rounded border-[#BFD0D8] text-[#159A9C] focus:ring-[#159A9C]"
                         />
                       </th>
-                      <th className="w-1/2 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">
+                      <th className="w-[28%] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">
                         <button
                           onClick={() => handleSort('nome')}
                           className="inline-flex items-center gap-1 transition-colors hover:text-[#159A9C]"
@@ -1995,7 +2284,16 @@ const ClientesPage: React.FC = () => {
                           />
                         </button>
                       </th>
-                      <th className="w-36 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">
+                      <th className="w-28 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">
+                        Tipo
+                      </th>
+                      <th className="w-48 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">
+                        CPF/CNPJ
+                      </th>
+                      <th className="w-[26%] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">
+                        Contato
+                      </th>
+                      <th className="w-40 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">
                         <button
                           onClick={() => handleSort('status')}
                           className="inline-flex items-center gap-1 transition-colors hover:text-[#159A9C]"
@@ -2006,7 +2304,7 @@ const ClientesPage: React.FC = () => {
                           />
                         </button>
                       </th>
-                      <th className="w-40 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">
+                      <th className="w-36 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#607B89]">
                         <button
                           onClick={() => handleSort('created_at')}
                           className="inline-flex items-center gap-1 transition-colors hover:text-[#159A9C]"
@@ -2023,7 +2321,7 @@ const ClientesPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#EEF3F5] bg-white">
-                    {clientes.map((cliente, index) => (
+                    {clientesFiltrados.map((cliente, index) => (
                       <tr
                         key={cliente.id}
                         className={`cursor-pointer transition-colors ${
@@ -2059,10 +2357,63 @@ const ClientesPage: React.FC = () => {
                               <p className="truncate text-sm font-semibold text-[#19384C]">
                                 {cliente.nome}
                               </p>
-                              {cliente.empresa && (
-                                <p className="truncate text-xs text-[#6B8693]">{cliente.empresa}</p>
+                              {(cliente.cidade || cliente.estado || cliente.empresa) && (
+                                <p className="truncate text-xs text-[#6B8693]">
+                                  {cliente.cidade || cliente.estado
+                                    ? [cliente.cidade, cliente.estado]
+                                        .filter((value): value is string => Boolean(value))
+                                        .join(' - ')
+                                    : cliente.empresa}
+                                </p>
                               )}
                             </div>
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${
+                              cliente.tipo === 'pessoa_juridica'
+                                ? 'border-[#CFE1EC] bg-[#F2F8FB] text-[#325569]'
+                                : 'border-[#D6E7E2] bg-[#EFF7F4] text-[#1A8877]'
+                            }`}
+                          >
+                            {cliente.tipo === 'pessoa_juridica'
+                              ? 'Pessoa juridica'
+                              : 'Pessoa fisica'}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <p className="text-sm font-medium text-[#244455]">
+                            {formatDocumento(cliente.documento, cliente.tipo)}
+                          </p>
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <div className="space-y-1">
+                            {cliente.email ? (
+                              <a
+                                href={`mailto:${cliente.email}`}
+                                onClick={(event) => event.stopPropagation()}
+                                className="block truncate text-sm text-[#159A9C] hover:text-[#0F7B7D]"
+                              >
+                                {cliente.email}
+                              </a>
+                            ) : (
+                              <p className="truncate text-xs text-[#7B95A1]">Sem e-mail</p>
+                            )}
+                            {cliente.telefone ? (
+                              <a
+                                href={`tel:${cliente.telefone}`}
+                                onClick={(event) => event.stopPropagation()}
+                                className="block truncate text-sm text-[#355061]"
+                              >
+                                {cliente.telefone}
+                              </a>
+                            ) : (
+                              <p className="truncate text-xs text-[#7B95A1]">Sem telefone</p>
+                            )}
                           </div>
                         </td>
 
@@ -2112,7 +2463,7 @@ const ClientesPage: React.FC = () => {
                                 handleViewCliente(cliente);
                               }}
                               className="rounded-lg p-1.5 text-[#7A95A2] transition-colors hover:bg-[#EAF3F6] hover:text-[#159A9C]"
-                              title="Ver detalhes"
+                              title="Abrir perfil"
                             >
                               <Eye className="h-4 w-4" />
                             </button>
@@ -2307,28 +2658,6 @@ const ClientesPage: React.FC = () => {
         onSave={handleSaveCliente}
         cliente={selectedCliente}
         isLoading={isModalLoading}
-      />
-
-      {/* Modal de Detalhes */}
-      <ModalDetalhesCliente
-        key={selectedCliente?.id ?? 'detalhes-cliente'}
-        isOpen={showDetailsModal}
-        onClose={() => {
-          setShowDetailsModal(false);
-          setSelectedCliente(null);
-        }}
-        cliente={selectedCliente}
-        onEdit={(cliente) => {
-          setShowDetailsModal(false);
-          setSelectedCliente(cliente);
-          setShowCreateModal(true);
-        }}
-        onDelete={handleDeleteCliente}
-        onAvatarUpdate={handleAvatarUpdate}
-        onAttachmentAdd={handleAttachmentAdd}
-        attachments={clienteAttachments}
-        attachmentsLoading={attachmentsLoading}
-        onAttachmentRemove={handleAttachmentRemove}
       />
     </div>
   );
