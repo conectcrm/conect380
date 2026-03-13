@@ -376,6 +376,31 @@ export class LeadsService {
     return normalized === '' ? undefined : normalized;
   }
 
+  private async validarResponsavelAtivoDaEmpresa(
+    responsavelId: string,
+    empresaId: string,
+  ): Promise<string> {
+    const normalizedResponsavelId = this.normalizeIdentifier(responsavelId);
+    if (!normalizedResponsavelId) {
+      throw new BadRequestException('Responsavel invalido para atribuicao do lead.');
+    }
+
+    const responsavelValido = await this.leadsRepository.manager.findOne(User, {
+      where: {
+        id: normalizedResponsavelId,
+        empresa_id: empresaId,
+        ativo: true,
+      },
+      select: ['id'],
+    });
+
+    if (!responsavelValido) {
+      throw new BadRequestException('Responsavel invalido ou nao pertence a empresa do lead.');
+    }
+
+    return responsavelValido.id;
+  }
+
   private extractSubdominioFromHost(host?: string): string | undefined {
     const hostRaw = this.normalizeIdentifier(host);
     if (!hostRaw) {
@@ -505,11 +530,30 @@ export class LeadsService {
   /**
    * Criar novo lead
    */
-  async create(dto: CreateLeadDto, empresaId: string): Promise<Lead> {
+  async create(dto: CreateLeadDto, empresaId: string, actorUserId?: string): Promise<Lead> {
     try {
       this.logger.debug(`[LeadsService.create] empresaId=${empresaId}`);
 
       const sanitizedDto = this.sanitizeLeadInput(dto);
+      const responsavelPayloadId = this.normalizeIdentifier(sanitizedDto.responsavel_id);
+      const responsavelActorId = this.normalizeIdentifier(actorUserId);
+      let responsavelIdToPersist: string | undefined;
+
+      if (responsavelPayloadId) {
+        responsavelIdToPersist = await this.validarResponsavelAtivoDaEmpresa(
+          responsavelPayloadId,
+          empresaId,
+        );
+      } else if (responsavelActorId) {
+        // Regra de negocio: lead criado manualmente fica atribuido ao usuario autenticado.
+        responsavelIdToPersist = responsavelActorId;
+      }
+
+      if (responsavelIdToPersist) {
+        sanitizedDto.responsavel_id = responsavelIdToPersist;
+      } else {
+        delete (sanitizedDto as any).responsavel_id;
+      }
       this.logger.debug(`[LeadsService.create] payload=${JSON.stringify(this.buildLeadPayloadLogMeta(sanitizedDto))}`);
       const origemBanco = await this.mapearOrigemLeadParaBanco(sanitizedDto.origem as string);
       const statusBanco = await this.mapearStatusLeadParaBanco(sanitizedDto.status as string);
@@ -689,8 +733,48 @@ export class LeadsService {
   async update(id: string, dto: UpdateLeadDto, empresaId: string): Promise<Lead> {
     try {
       const lead = await this.findOne(id, empresaId, false);
+      const previousResponsavelId =
+        typeof lead.responsavel_id === 'string' && lead.responsavel_id.trim().length > 0
+          ? lead.responsavel_id.trim()
+          : null;
 
       const sanitizedDto = this.sanitizeLeadInput(dto);
+      const hasResponsavelPayload = Object.prototype.hasOwnProperty.call(dto, 'responsavel_id');
+      this.logger.debug(
+        `[LeadsService.update] leadId=${id} empresaId=${empresaId} payload=${JSON.stringify({
+          hasResponsavelPayload,
+          responsavel_id:
+            hasResponsavelPayload && typeof (dto as any).responsavel_id !== 'undefined'
+              ? (dto as any).responsavel_id
+              : '__absent__',
+          status: dto.status ?? null,
+          origem: dto.origem ?? null,
+        })}`,
+      );
+
+      // Tratar troca de responsável de forma explícita para evitar persistência do vínculo antigo
+      // quando a relação "responsavel" já veio carregada no entity.
+      if (hasResponsavelPayload) {
+        const responsavelPayload = (dto as any).responsavel_id;
+        let normalizedResponsavelId =
+          typeof responsavelPayload === 'string' && responsavelPayload.trim().length > 0
+            ? responsavelPayload.trim()
+            : null;
+
+        if (normalizedResponsavelId) {
+          normalizedResponsavelId = await this.validarResponsavelAtivoDaEmpresa(
+            normalizedResponsavelId,
+            empresaId,
+          );
+        }
+
+        lead.responsavel_id = normalizedResponsavelId;
+        lead.responsavel = normalizedResponsavelId
+          ? ({ id: normalizedResponsavelId } as User)
+          : null;
+        delete (sanitizedDto as any).responsavel_id;
+      }
+
       if (sanitizedDto.status !== undefined) {
         sanitizedDto.status = (await this.mapearStatusLeadParaBanco(
           sanitizedDto.status as string,
@@ -714,9 +798,18 @@ export class LeadsService {
 
       await this.leadsRepository.save(lead);
 
-      return await this.findOne(id, empresaId);
+      const updatedLead = await this.findOne(id, empresaId);
+      const persistedResponsavelId =
+        typeof updatedLead.responsavel_id === 'string' && updatedLead.responsavel_id.trim().length > 0
+          ? updatedLead.responsavel_id.trim()
+          : null;
+      this.logger.debug(
+        `[LeadsService.update] leadId=${id} responsavel(before=${previousResponsavelId}, after=${persistedResponsavelId})`,
+      );
+
+      return updatedLead;
     } catch (error) {
-      if (error instanceof NotFoundException) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
       }
       this.logError('[LeadsService.update] erro ao atualizar lead', error);

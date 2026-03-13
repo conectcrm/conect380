@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
@@ -10,6 +10,7 @@ import {
   Edit2,
   Trash2,
   Search,
+  Filter,
   CheckCircle,
   X,
   UserPlus,
@@ -27,6 +28,7 @@ import {
   Save,
   DollarSign,
   Calendar,
+  ChevronDown,
 } from 'lucide-react';
 import { useGlobalConfirmation } from '../contexts/GlobalConfirmationContext';
 import { FiltersBar, InlineStats, PageHeader, SectionCard } from '../components/layout-v2';
@@ -40,7 +42,6 @@ import leadsService, {
   ImportLeadResult,
 } from '../services/leadsService';
 import usersService, { User as UsuarioResponsavel } from '../services/usersService';
-import { matchesLocalSearchTerm, normalizeSearchValue } from '../utils/localSearch';
 
 // Schema de validação para o modal de Lead
 const leadSchema = yup.object().shape({
@@ -103,6 +104,7 @@ const convertSchema = yup.object().shape({
 });
 
 const LEADS_SAVED_VIEWS_STORAGE_KEY = 'conectcrm_leads_saved_views_v1';
+const LEAD_UNASSIGNED_OPTION_VALUE = '__sem_responsavel__';
 
 interface LeadsSavedView {
   id: string;
@@ -110,7 +112,6 @@ interface LeadsSavedView {
   busca: string;
   status: string;
   origem: string;
-  responsavelId: string;
   dataInicio: string;
   dataFim: string;
   itensPorPagina: number;
@@ -134,7 +135,6 @@ const readLeadsSavedViews = (): LeadsSavedView[] => {
         typeof view?.busca === 'string' &&
         typeof view?.status === 'string' &&
         typeof view?.origem === 'string' &&
-        typeof view?.responsavelId === 'string' &&
         typeof view?.dataInicio === 'string' &&
         typeof view?.dataFim === 'string' &&
         typeof view?.itensPorPagina === 'number'
@@ -152,11 +152,12 @@ const LeadsPage: React.FC = () => {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [estatisticas, setEstatisticas] = useState<LeadEstatisticas | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isFiltering, setIsFiltering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
+  const [buscaDebounced, setBuscaDebounced] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<string>('operacionais');
   const [filtroOrigem, setFiltroOrigem] = useState<string>('todas');
-  const [filtroResponsavel, setFiltroResponsavel] = useState<string>('todos');
   const [filtroDataInicio, setFiltroDataInicio] = useState('');
   const [filtroDataFim, setFiltroDataFim] = useState('');
   const [paginaAtual, setPaginaAtual] = useState(1);
@@ -173,6 +174,8 @@ const LeadsPage: React.FC = () => {
   const [savedViews, setSavedViews] = useState<LeadsSavedView[]>(() => readLeadsSavedViews());
   const [activeViewId, setActiveViewId] = useState('');
   const [viewNameInput, setViewNameInput] = useState('');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [cardViewMode, setCardViewMode] = useState<'compacto' | 'detalhado'>('compacto');
 
   // Estados de UI
   const [showDialog, setShowDialog] = useState(false);
@@ -180,10 +183,16 @@ const LeadsPage: React.FC = () => {
   const [showConvertDialog, setShowConvertDialog] = useState(false);
   const [leadToConvert, setLeadToConvert] = useState<Lead | null>(null);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showInteracaoDialog, setShowInteracaoDialog] = useState(false);
+  const [leadParaInteracao, setLeadParaInteracao] = useState<Lead | null>(null);
+  const [interacaoObservacao, setInteracaoObservacao] = useState('');
+  const [leadDetalhesAberto, setLeadDetalhesAberto] = useState<Lead | null>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importResult, setImportResult] = useState<ImportLeadResult | null>(null);
   const [importing, setImporting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const hasLoadedOnceRef = useRef(false);
+  const previousBuscaDebouncedRef = useRef('');
 
   // React Hook Form para modal de Lead
   const {
@@ -238,8 +247,13 @@ const LeadsPage: React.FC = () => {
   };
 
   const carregarDados = async () => {
+    const usarCarregamentoSuave = hasLoadedOnceRef.current;
     try {
-      setLoading(true);
+      if (usarCarregamentoSuave) {
+        setIsFiltering(true);
+      } else {
+        setLoading(true);
+      }
       setError(null);
 
       const filtros: any = {
@@ -256,16 +270,16 @@ const LeadsPage: React.FC = () => {
         filtros.origem = filtroOrigem;
       }
 
-      if (filtroResponsavel !== 'todos') {
-        filtros.responsavel_id = filtroResponsavel;
-      }
-
       if (filtroDataInicio) {
         filtros.dataInicio = `${filtroDataInicio}T00:00:00.000Z`;
       }
 
       if (filtroDataFim) {
         filtros.dataFim = `${filtroDataFim}T23:59:59.999Z`;
+      }
+
+      if (buscaDebounced) {
+        filtros.busca = buscaDebounced;
       }
 
       // Carregar leads e estatísticas em paralelo
@@ -290,7 +304,12 @@ const LeadsPage: React.FC = () => {
       setTotalRegistros(0);
       setTotalPaginas(1);
     } finally {
-      setLoading(false);
+      if (usarCarregamentoSuave) {
+        setIsFiltering(false);
+      } else {
+        setLoading(false);
+      }
+      hasLoadedOnceRef.current = true;
     }
   };
 
@@ -299,13 +318,29 @@ const LeadsPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setBuscaDebounced(busca.trim());
+    }, 500);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [busca]);
+
+  useEffect(() => {
+    const buscaMudou = previousBuscaDebouncedRef.current !== buscaDebounced;
+    previousBuscaDebouncedRef.current = buscaDebounced;
+
+    if (buscaMudou && paginaAtual !== 1) {
+      setPaginaAtual(1);
+      return;
+    }
+
     carregarDados();
   }, [
     paginaAtual,
     itensPorPagina,
+    buscaDebounced,
     filtroStatus,
     filtroOrigem,
-    filtroResponsavel,
     filtroDataInicio,
     filtroDataFim,
   ]);
@@ -321,6 +356,20 @@ const LeadsPage: React.FC = () => {
   useEffect(() => {
     setSelectedLeadIds((prev) => prev.filter((leadId) => leads.some((lead) => lead.id === leadId)));
   }, [leads]);
+
+  useEffect(() => {
+    if (!leadDetalhesAberto) return;
+
+    const leadAtualizado = leads.find((lead) => lead.id === leadDetalhesAberto.id);
+    if (!leadAtualizado) {
+      setLeadDetalhesAberto(null);
+      return;
+    }
+
+    if (leadAtualizado !== leadDetalhesAberto) {
+      setLeadDetalhesAberto(leadAtualizado);
+    }
+  }, [leads, leadDetalhesAberto]);
 
   const handleOpenDialog = (lead?: Lead) => {
     if (lead) {
@@ -397,7 +446,10 @@ const LeadsPage: React.FC = () => {
     try {
       setError(null);
       await leadsService.deletar(id);
-      carregarDados();
+      if (leadDetalhesAberto?.id === id) {
+        setLeadDetalhesAberto(null);
+      }
+      await carregarDados();
     } catch (err: unknown) {
       console.error('Erro ao deletar:', err);
       const responseMessage = (err as any)?.response?.data?.message;
@@ -431,13 +483,15 @@ const LeadsPage: React.FC = () => {
     }
   };
 
-  const handleRegistrarContato = async (id: string) => {
+  const handleRegistrarContato = async (id: string, observacoes?: string): Promise<boolean> => {
     try {
       setProcessingLeadId(id);
       setError(null);
-      await leadsService.registrarPrimeiroContato(id, 'Contato registrado manualmente');
+      const observacaoFinal = observacoes?.trim() || 'Contato registrado manualmente';
+      await leadsService.registrarPrimeiroContato(id, observacaoFinal);
       await carregarDados();
       toastService.success('Contato registrado com sucesso!');
+      return true;
     } catch (err: unknown) {
       console.error('Erro ao registrar contato:', err);
       const responseMessage = (err as any)?.response?.data?.message;
@@ -448,6 +502,7 @@ const LeadsPage: React.FC = () => {
       const errorMsg = normalizedMessage || fallbackMessage || 'Erro ao registrar contato';
       setError(errorMsg);
       toastService.error(errorMsg);
+      return false;
     } finally {
       setProcessingLeadId(null);
     }
@@ -479,17 +534,43 @@ const LeadsPage: React.FC = () => {
     }
   };
 
-  const handleAtribuirResponsavel = async (lead: Lead, responsavelId: string) => {
-    if (!responsavelId || responsavelId === lead.responsavel_id) {
+  const handleAtribuirResponsavel = async (lead: Lead, responsavelId: string | null) => {
+    const normalizeResponsavelId = (value?: string | null): string | null => {
+      if (typeof value !== 'string') return null;
+      const normalized = value.trim();
+      return normalized.length > 0 ? normalized : null;
+    };
+
+    const novoResponsavelId = responsavelId?.trim() || null;
+    const responsavelAtualId = lead.responsavel_id?.trim() || null;
+
+    if (novoResponsavelId === responsavelAtualId) {
       return;
     }
 
     try {
       setAtribuindoLeadId(lead.id);
       setError(null);
-      await leadsService.atribuirResponsavel(lead.id, responsavelId);
+      const leadAtualizado = await leadsService.atribuirResponsavel(lead.id, novoResponsavelId);
+      const responsavelRetornadoId = normalizeResponsavelId(
+        leadAtualizado?.responsavel_id || leadAtualizado?.responsavel?.id || null,
+      );
+
+      if (responsavelRetornadoId !== novoResponsavelId) {
+        console.warn('[LeadsPage] divergencia na atribuicao de responsavel', {
+          leadId: lead.id,
+          esperado: novoResponsavelId,
+          retornado: responsavelRetornadoId,
+        });
+        throw new Error(
+          'A atualização não foi confirmada pelo servidor. Recarregue a tela e tente novamente.',
+        );
+      }
+
       await carregarDados();
-      toastService.success('Responsável atualizado com sucesso!');
+      toastService.success(
+        novoResponsavelId ? 'Responsável atualizado com sucesso!' : 'Responsável removido com sucesso!',
+      );
     } catch (err: unknown) {
       console.error('Erro ao atribuir responsável:', err);
       const responseMessage = (err as any)?.response?.data?.message;
@@ -503,6 +584,45 @@ const LeadsPage: React.FC = () => {
     } finally {
       setAtribuindoLeadId(null);
     }
+  };
+
+  const handleOpenInteracaoDialog = (lead: Lead) => {
+    setLeadParaInteracao(lead);
+    setInteracaoObservacao('');
+    setShowInteracaoDialog(true);
+  };
+
+  const handleOpenLeadDetalhes = (lead: Lead) => {
+    setLeadDetalhesAberto(lead);
+  };
+
+  const handleCloseLeadDetalhes = () => {
+    setLeadDetalhesAberto(null);
+  };
+
+  const handleCloseInteracaoDialog = () => {
+    if (leadParaInteracao?.id && processingLeadId === leadParaInteracao.id) {
+      return;
+    }
+
+    setShowInteracaoDialog(false);
+    setLeadParaInteracao(null);
+    setInteracaoObservacao('');
+  };
+
+  const handleConfirmarInteracao = async () => {
+    if (!leadParaInteracao?.id) {
+      return;
+    }
+
+    const sucesso = await handleRegistrarContato(leadParaInteracao.id, interacaoObservacao);
+    if (!sucesso) {
+      return;
+    }
+
+    setShowInteracaoDialog(false);
+    setLeadParaInteracao(null);
+    setInteracaoObservacao('');
   };
 
   const handleOpenConvertDialog = (lead: Lead) => {
@@ -654,23 +774,7 @@ const LeadsPage: React.FC = () => {
     }
   };
 
-  const normalizedBusca = normalizeSearchValue(busca);
-  const leadsFiltrados = useMemo(() => {
-    if (!normalizedBusca) {
-      return leads;
-    }
-
-    return leads.filter((lead) =>
-      matchesLocalSearchTerm(normalizedBusca, [
-        lead.nome,
-        lead.email,
-        lead.telefone,
-        lead.empresa_nome,
-        lead.responsavel?.nome,
-        lead.responsavel?.username,
-      ]),
-    );
-  }, [leads, normalizedBusca]);
+  const leadsFiltrados = leads;
 
   // Labels de status
   const getStatusLabel = (status: StatusLead) => {
@@ -767,24 +871,40 @@ const LeadsPage: React.FC = () => {
     Boolean(busca.trim()) ||
     filtroStatus !== 'operacionais' ||
     filtroOrigem !== 'todas' ||
-    filtroResponsavel !== 'todos' ||
     Boolean(filtroDataInicio) ||
     Boolean(filtroDataFim);
+  const hasAdvancedFilters =
+    filtroOrigem !== 'todas' ||
+    Boolean(filtroDataInicio) ||
+    Boolean(filtroDataFim) ||
+    itensPorPagina !== 12 ||
+    Boolean(activeViewId);
+  const advancedFiltersCount = [
+    filtroOrigem !== 'todas',
+    Boolean(filtroDataInicio),
+    Boolean(filtroDataFim),
+    itensPorPagina !== 12,
+    Boolean(activeViewId),
+  ].filter(Boolean).length;
+  const isDetailedCardView = cardViewMode === 'detalhado';
 
   const handleClearFilters = () => {
     setBusca('');
     setFiltroStatus('operacionais');
     setFiltroOrigem('todas');
-    setFiltroResponsavel('todos');
     setFiltroDataInicio('');
     setFiltroDataFim('');
+    setItensPorPagina(12);
     setPaginaAtual(1);
     setSelectedLeadIds([]);
+    setActiveViewId('');
+    setViewNameInput('');
+    setShowAdvancedFilters(false);
   };
 
   const activeSavedView = savedViews.find((view) => view.id === activeViewId) || null;
-  const totalRegistrosVisiveis = normalizedBusca ? leadsFiltrados.length : totalRegistros;
-  const totalPaginasVisiveis = normalizedBusca ? 1 : totalPaginas;
+  const totalRegistrosVisiveis = totalRegistros;
+  const totalPaginasVisiveis = totalPaginas;
   const bulkSelectedCount = selectedLeadIds.length;
   const allVisibleSelected =
     leadsFiltrados.length > 0 && leadsFiltrados.every((lead) => selectedLeadIds.includes(lead.id));
@@ -879,12 +999,12 @@ const LeadsPage: React.FC = () => {
     setBusca(view.busca);
     setFiltroStatus(view.status || 'operacionais');
     setFiltroOrigem(view.origem || 'todas');
-    setFiltroResponsavel(view.responsavelId || 'todos');
     setFiltroDataInicio(view.dataInicio || '');
     setFiltroDataFim(view.dataFim || '');
     setItensPorPagina(view.itensPorPagina || 12);
     setPaginaAtual(1);
     setViewNameInput(view.nome);
+    setShowAdvancedFilters(true);
   };
 
   const handleSavedViewChange = (viewId: string) => {
@@ -917,7 +1037,6 @@ const LeadsPage: React.FC = () => {
       busca: busca.trim(),
       status: filtroStatus,
       origem: filtroOrigem,
-      responsavelId: filtroResponsavel,
       dataInicio: filtroDataInicio,
       dataFim: filtroDataFim,
       itensPorPagina,
@@ -1007,213 +1126,248 @@ const LeadsPage: React.FC = () => {
         )}
       </SectionCard>
 
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="mx-auto max-w-[1760px] space-y-6">
         <FiltersBar className="p-4">
-          <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-12">
-            <div className="lg:col-span-5">
-              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
-                Buscar leads
-              </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
-                <input
-                  type="text"
-                  placeholder="Buscar por nome, email ou empresa..."
-                  value={busca}
+          <div className="flex w-full flex-col gap-4">
+            <div className="flex w-full flex-col gap-3 xl:flex-row xl:items-end">
+              <div className="w-full xl:min-w-[320px] xl:flex-1">
+                <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                  Buscar leads
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
+                  <input
+                    type="text"
+                    placeholder="Buscar por nome, email ou empresa..."
+                    value={busca}
+                    onChange={(e) => setBusca(e.target.value)}
+                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-9 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                  />
+                  {isFiltering ? (
+                    <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-[#9AAEB8]" />
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="w-full xl:w-auto">
+                <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                  Status
+                </label>
+                <select
+                  value={filtroStatus}
                   onChange={(e) => {
-                    setBusca(e.target.value);
+                    setFiltroStatus(e.target.value);
                     setPaginaAtual(1);
                   }}
-                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
-                />
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 xl:w-[220px]"
+                >
+                  <option value="operacionais">Pré-venda (abertos)</option>
+                  <option value="todos">Todos os status</option>
+                  <option value={StatusLead.NOVO}>Novos</option>
+                  <option value={StatusLead.CONTATADO}>Contatados</option>
+                  <option value={StatusLead.QUALIFICADO}>Qualificados</option>
+                  <option value={StatusLead.DESQUALIFICADO}>Desqualificados</option>
+                  <option value={StatusLead.CONVERTIDO}>Convertidos</option>
+                </select>
+              </div>
+
+              <div className="flex w-full flex-wrap items-end gap-2 xl:w-auto xl:justify-end">
+                <div className="inline-flex h-10 overflow-hidden rounded-lg border border-[#B4BEC9] bg-white">
+                  <button
+                    type="button"
+                    data-testid="leads-view-compact"
+                    onClick={() => setCardViewMode('compacto')}
+                    className={`px-3 text-xs font-semibold uppercase tracking-wide transition-colors ${
+                      cardViewMode === 'compacto'
+                        ? 'bg-[#E9F6F3] text-[#0F7B7D]'
+                        : 'text-[#5E7987] hover:bg-[#F6FAF9]'
+                    }`}
+                  >
+                    Compacto
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="leads-view-detailed"
+                    onClick={() => setCardViewMode('detalhado')}
+                    className={`px-3 text-xs font-semibold uppercase tracking-wide transition-colors ${
+                      cardViewMode === 'detalhado'
+                        ? 'bg-[#E9F6F3] text-[#0F7B7D]'
+                        : 'text-[#5E7987] hover:bg-[#F6FAF9]'
+                    }`}
+                  >
+                    Detalhado
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  data-testid="leads-advanced-filters-toggle"
+                  onClick={() => setShowAdvancedFilters((current) => !current)}
+                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
+                >
+                  <Filter className="h-4 w-4" />
+                  Filtros avancados
+                  {hasAdvancedFilters ? (
+                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#E9F6F3] px-1.5 text-xs font-semibold text-[#0F7B7D]">
+                      {advancedFiltersCount}
+                    </span>
+                  ) : null}
+                  <ChevronDown
+                    className={`h-4 w-4 text-[#5D7A88] transition-transform ${
+                      showAdvancedFilters ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleClearFilters}
+                  disabled={!hasFilters && !activeSavedView}
+                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <X className="h-4 w-4" />
+                  Limpar
+                </button>
               </div>
             </div>
 
-            <div className="lg:col-span-2">
-              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
-                Status
-              </label>
-              <select
-                value={filtroStatus}
-                onChange={(e) => {
-                  setFiltroStatus(e.target.value);
-                  setPaginaAtual(1);
-                }}
-                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
-              >
-                <option value="operacionais">Pré-venda (abertos)</option>
-                <option value="todos">Todos os status</option>
-                <option value={StatusLead.NOVO}>Novos</option>
-                <option value={StatusLead.CONTATADO}>Contatados</option>
-                <option value={StatusLead.QUALIFICADO}>Qualificados</option>
-                <option value={StatusLead.DESQUALIFICADO}>Desqualificados</option>
-                <option value={StatusLead.CONVERTIDO}>Convertidos</option>
-              </select>
-            </div>
+            {showAdvancedFilters && (
+              <div className="rounded-xl border border-[#DCE8EC] bg-[#F8FBFC] p-3 sm:p-4">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="w-full">
+                    <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                      Origem
+                    </label>
+                    <select
+                      value={filtroOrigem}
+                      onChange={(e) => {
+                        setFiltroOrigem(e.target.value);
+                        setPaginaAtual(1);
+                      }}
+                      data-testid="leads-filter-origem"
+                      className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                    >
+                      <option value="todas">Todas as origens</option>
+                      <option value={OrigemLead.MANUAL}>Manual</option>
+                      <option value={OrigemLead.FORMULARIO}>Formulário</option>
+                      <option value={OrigemLead.WHATSAPP}>WhatsApp</option>
+                      <option value={OrigemLead.IMPORTACAO}>Importação</option>
+                      <option value={OrigemLead.INDICACAO}>Indicação</option>
+                      <option value={OrigemLead.API}>API</option>
+                      <option value={OrigemLead.OUTRO}>Outro</option>
+                    </select>
+                  </div>
 
-            <div className="lg:col-span-2">
-              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
-                Origem
-              </label>
-              <select
-                value={filtroOrigem}
-                onChange={(e) => {
-                  setFiltroOrigem(e.target.value);
-                  setPaginaAtual(1);
-                }}
-                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
-              >
-                <option value="todas">Todas as origens</option>
-                <option value={OrigemLead.MANUAL}>Manual</option>
-                <option value={OrigemLead.FORMULARIO}>Formulário</option>
-                <option value={OrigemLead.WHATSAPP}>WhatsApp</option>
-                <option value={OrigemLead.IMPORTACAO}>Importação</option>
-                <option value={OrigemLead.INDICACAO}>Indicação</option>
-                <option value={OrigemLead.API}>API</option>
-                <option value={OrigemLead.OUTRO}>Outro</option>
-              </select>
-            </div>
+                  <div className="w-full">
+                    <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                      De
+                    </label>
+                    <input
+                      type="date"
+                      value={filtroDataInicio}
+                      onChange={(e) => {
+                        setFiltroDataInicio(e.target.value);
+                        setPaginaAtual(1);
+                      }}
+                      data-testid="leads-filter-data-inicio"
+                      className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                    />
+                  </div>
 
-            <div className="lg:col-span-3">
-              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
-                Responsável
-              </label>
-              <select
-                value={filtroResponsavel}
-                onChange={(e) => {
-                  setFiltroResponsavel(e.target.value);
-                  setPaginaAtual(1);
-                }}
-                disabled={loadingResponsaveis}
-                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <option value="todos">Todos os responsáveis</option>
-                {responsaveis.map((responsavel) => (
-                  <option key={responsavel.id} value={responsavel.id}>
-                    {responsavel.nome || responsavel.username}
-                  </option>
-                ))}
-              </select>
-            </div>
+                  <div className="w-full">
+                    <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                      Ate
+                    </label>
+                    <input
+                      type="date"
+                      value={filtroDataFim}
+                      onChange={(e) => {
+                        setFiltroDataFim(e.target.value);
+                        setPaginaAtual(1);
+                      }}
+                      data-testid="leads-filter-data-fim"
+                      className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                    />
+                  </div>
 
-            <div className="lg:col-span-2">
-              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
-                De
-              </label>
-              <input
-                type="date"
-                value={filtroDataInicio}
-                onChange={(e) => {
-                  setFiltroDataInicio(e.target.value);
-                  setPaginaAtual(1);
-                }}
-                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
-              />
-            </div>
+                  <div className="w-full">
+                    <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                      Itens por pagina
+                    </label>
+                    <select
+                      value={itensPorPagina}
+                      onChange={(e) => {
+                        setItensPorPagina(Number(e.target.value));
+                        setPaginaAtual(1);
+                      }}
+                      data-testid="leads-filter-limit"
+                      className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                    >
+                      <option value={6}>6</option>
+                      <option value={9}>9</option>
+                      <option value={12}>12</option>
+                      <option value={24}>24</option>
+                    </select>
+                  </div>
+                </div>
 
-            <div className="lg:col-span-2">
-              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
-                Até
-              </label>
-              <input
-                type="date"
-                value={filtroDataFim}
-                onChange={(e) => {
-                  setFiltroDataFim(e.target.value);
-                  setPaginaAtual(1);
-                }}
-                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
-              />
-            </div>
-
-            <div className="lg:col-span-2">
-              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
-                Itens por página
-              </label>
-              <select
-                value={itensPorPagina}
-                onChange={(e) => {
-                  setItensPorPagina(Number(e.target.value));
-                  setPaginaAtual(1);
-                }}
-                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
-              >
-                <option value={6}>6</option>
-                <option value={9}>9</option>
-                <option value={12}>12</option>
-                <option value={24}>24</option>
-              </select>
-            </div>
-
-            <div className="lg:col-span-2">
-              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
-                Ações
-              </label>
-              <button
-                type="button"
-                onClick={handleClearFilters}
-                disabled={!hasFilters}
-                className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <X className="h-4 w-4" />
-                Limpar
-              </button>
-            </div>
+                <div className="mt-3 border-t border-[#DFEAEE] pt-3">
+                  <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                    Views salvas
+                  </label>
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                    <div className="md:col-span-1">
+                      <select
+                        value={activeViewId}
+                        onChange={(e) => handleSavedViewChange(e.target.value)}
+                        data-testid="leads-saved-views-select"
+                        className="h-9 w-full rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                      >
+                        <option value="">Sem view salva</option>
+                        {savedViews.map((view) => (
+                          <option key={view.id} value={view.id}>
+                            {view.nome}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          type="text"
+                          value={viewNameInput}
+                          onChange={(e) => setViewNameInput(e.target.value)}
+                          placeholder="Ex.: Leads de marco"
+                          data-testid="leads-saved-view-name"
+                          className="h-9 min-w-[220px] flex-1 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSaveCurrentView}
+                          data-testid="leads-save-view-button"
+                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#159A9C] px-3 text-sm font-medium text-[#159A9C] transition-colors hover:bg-[#F4FBF9]"
+                        >
+                          <Save className="h-4 w-4" />
+                          {activeSavedView ? 'Atualizar' : 'Salvar'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleDeleteSavedView}
+                          disabled={!activeSavedView}
+                          data-testid="leads-delete-view-button"
+                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#E8C8CB] px-3 text-sm font-medium text-[#B03A48] transition-colors hover:bg-[#FFF5F5] disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Excluir
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </FiltersBar>
-
-        <div className="flex flex-col gap-3 rounded-xl border border-[#D4E2E7] bg-white p-3 lg:flex-row lg:items-end lg:justify-between">
-          <div className="grid w-full grid-cols-1 gap-2 md:grid-cols-3 lg:w-auto lg:min-w-[680px]">
-            <div className="md:col-span-1">
-              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
-                Views salvas
-              </label>
-              <select
-                value={activeViewId}
-                onChange={(e) => handleSavedViewChange(e.target.value)}
-                className="h-9 w-full rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
-              >
-                <option value="">Sem view salva</option>
-                {savedViews.map((view) => (
-                  <option key={view.id} value={view.id}>
-                    {view.nome}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="md:col-span-2">
-              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
-                Nome da view
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={viewNameInput}
-                  onChange={(e) => setViewNameInput(e.target.value)}
-                  placeholder="Ex.: Leads sem responsável"
-                  className="h-9 flex-1 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
-                />
-                <button
-                  type="button"
-                  onClick={handleSaveCurrentView}
-                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#159A9C] px-3 text-sm font-medium text-[#159A9C] transition-colors hover:bg-[#F4FBF9]"
-                >
-                  <Save className="h-4 w-4" />
-                  {activeSavedView ? 'Atualizar' : 'Salvar'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDeleteSavedView}
-                  disabled={!activeSavedView}
-                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#E8C8CB] px-3 text-sm font-medium text-[#B03A48] transition-colors hover:bg-[#FFF5F5] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Excluir
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
 
         {leadsFiltrados.length > 0 && (
           <div className="flex flex-col gap-3 rounded-xl border border-[#D4E2E7] bg-white p-3 lg:flex-row lg:items-center lg:justify-between">
@@ -1309,21 +1463,49 @@ const LeadsPage: React.FC = () => {
         )}
 
         {/* Grid de Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div
+          className={`grid grid-cols-1 gap-3 ${
+            isDetailedCardView
+              ? 'md:grid-cols-2 xl:grid-cols-2'
+              : 'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
+          }`}
+        >
           {leadsFiltrados.map((lead) => (
-            <div
+            <article
               key={lead.id}
-              className="rounded-xl border border-[#D4E2E7] bg-white shadow-sm transition-shadow duration-300 hover:shadow-lg"
+              role="button"
+              tabIndex={0}
+              onClick={() => handleOpenLeadDetalhes(lead)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  handleOpenLeadDetalhes(lead);
+                }
+              }}
+              className={`group relative overflow-hidden border border-[#D4E2E7] bg-white shadow-[0_10px_28px_-24px_rgba(6,60,70,0.55)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_34px_-26px_rgba(6,60,70,0.6)] ${
+                isDetailedCardView ? 'rounded-2xl' : 'rounded-xl'
+              }`}
             >
-              <div className="p-6">
-                <div className="mb-4 flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="w-12 h-12 rounded-xl bg-[#159A9C] flex items-center justify-center text-white shadow-md flex-shrink-0">
-                      <UserPlus className="h-6 w-6" />
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#159A9C] via-[#1FA77D] to-[#4F87A8]" />
+              <div className={isDetailedCardView ? 'p-4' : 'p-3'}>
+                <div className={`${isDetailedCardView ? 'mb-3 gap-3' : 'mb-2.5 gap-2'} flex items-start justify-between`}>
+                  <div className={`${isDetailedCardView ? 'gap-3' : 'gap-2'} flex min-w-0 flex-1 items-start`}>
+                    <div
+                      className={`flex flex-shrink-0 items-center justify-center rounded-xl bg-[#159A9C] text-white shadow-sm ${
+                        isDetailedCardView ? 'h-10 w-10' : 'h-9 w-9'
+                      }`}
+                    >
+                      <UserPlus className="h-5 w-5" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-semibold text-gray-900 truncate">{lead.nome}</h3>
-                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <h3
+                        className={`truncate font-semibold text-[#143548] ${
+                          isDetailedCardView ? 'text-base' : 'text-[15px]'
+                        }`}
+                      >
+                        {lead.nome}
+                      </h3>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
                         <span
                           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(
                             lead.status,
@@ -1335,27 +1517,40 @@ const LeadsPage: React.FC = () => {
                           {getOrigemLabel(lead.origem)}
                         </span>
                       </div>
+                      {lead.email && (
+                        <div className="mt-1.5 flex items-center gap-1.5 text-xs text-[#5D7887]">
+                          <Mail className="h-3.5 w-3.5 text-[#88A0AD]" />
+                          <span className="truncate">{lead.email}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  <div className="ml-2 flex flex-shrink-0 gap-1">
+                  <div className="ml-1 flex flex-shrink-0 items-center gap-1">
                     <label className="inline-flex cursor-pointer items-center rounded-lg p-2 hover:bg-[#F4FBF9]">
                       <input
                         type="checkbox"
                         checked={selectedLeadIds.includes(lead.id)}
                         onChange={() => toggleLeadSelection(lead.id)}
+                        onClick={(event) => event.stopPropagation()}
                         className="h-4 w-4 rounded border-[#BFD2DB] text-[#159A9C] focus:ring-[#159A9C]/30"
                       />
                     </label>
                     <button
-                      onClick={() => handleOpenDialog(lead)}
-                      className="rounded-lg p-2 transition-colors hover:bg-gray-100"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleOpenDialog(lead);
+                      }}
+                      className="rounded-lg p-2 transition-colors hover:bg-[#EEF3F6]"
                       title="Editar"
                     >
-                      <Edit2 className="h-4 w-4 text-gray-600" />
+                      <Edit2 className="h-4 w-4 text-[#5D7887]" />
                     </button>
                     <button
-                      onClick={() => handleDelete(lead.id)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleDelete(lead.id);
+                      }}
                       className="rounded-lg p-2 transition-colors hover:bg-red-50"
                       title="Excluir"
                     >
@@ -1364,68 +1559,315 @@ const LeadsPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="mb-4 space-y-2">
-                  {lead.email && (
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Mail className="h-4 w-4 text-gray-400" />
-                      <span className="truncate">{lead.email}</span>
-                    </div>
-                  )}
-                  {lead.telefone && (
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Phone className="h-4 w-4 text-gray-400" />
-                      <span>{lead.telefone}</span>
-                    </div>
-                  )}
-                  {lead.empresa_nome && (
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Briefcase className="h-4 w-4 text-gray-400" />
-                      <span className="truncate">{lead.empresa_nome}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 text-sm">
-                    <User className="h-4 w-4 text-gray-400" />
-                    <span
-                      className={
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-lg border border-[#E3EDF1] bg-[#FAFCFD] px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-[#6B8492]">
+                      Responsável
+                    </p>
+                    <p
+                      className={`mt-1 truncate text-xs font-medium ${
                         getResponsavelLabel(lead) === 'Sem responsável'
-                          ? 'font-medium text-amber-700'
-                          : 'text-gray-600'
-                      }
+                          ? 'text-amber-700'
+                          : 'text-[#28495A]'
+                      }`}
                     >
                       {getResponsavelLabel(lead)}
-                    </span>
+                    </p>
                   </div>
-
-                  <div className="pt-1">
-                    <select
-                      value={lead.responsavel_id || ''}
-                      onChange={(event) => handleAtribuirResponsavel(lead, event.target.value)}
-                      disabled={loadingResponsaveis || atribuindoLeadId === lead.id}
-                      className="h-9 w-full rounded-lg border border-[#D4E2E7] bg-white px-3 text-xs text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      <option value="" disabled>
-                        Sem responsável
-                      </option>
-                      {lead.responsavel_id &&
-                        !responsaveis.some((responsavel) => responsavel.id === lead.responsavel_id) && (
-                          <option value={lead.responsavel_id}>{getResponsavelLabel(lead)}</option>
-                        )}
-                      {responsaveis.map((responsavel) => (
-                        <option key={responsavel.id} value={responsavel.id}>
-                          {responsavel.nome || responsavel.username}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="rounded-lg border border-[#E3EDF1] bg-[#FAFCFD] px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-[#6B8492]">
+                      Score
+                    </p>
+                    <p className="mt-1 text-xs font-semibold text-[#234A5A]">{lead.score}</p>
+                  </div>
+                  <div className="col-span-2 rounded-lg border border-[#E3EDF1] bg-[#FAFCFD] px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-[#6B8492]">
+                      Última interação
+                    </p>
+                    <p className="mt-1 text-xs font-medium text-[#3F5E6E]">
+                      {formatDateTime(lead.data_ultima_interacao || lead.updated_at)}
+                    </p>
                   </div>
                 </div>
 
-                <div className="mb-4 grid grid-cols-2 gap-2">
+                {isDetailedCardView && (
+                  <div className="mt-3 space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-lg border border-[#E3EDF1] bg-white px-3 py-2">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-[#6B8492]">
+                          Telefone
+                        </p>
+                        <p className="mt-1 truncate text-xs font-medium text-[#28495A]">
+                          {lead.telefone || 'Não informado'}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-[#E3EDF1] bg-white px-3 py-2">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-[#6B8492]">
+                          Empresa
+                        </p>
+                        <p className="mt-1 truncate text-xs font-medium text-[#28495A]">
+                          {lead.empresa_nome || 'Não informada'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#6B8492]">
+                        Atribuição rápida
+                      </label>
+                      <select
+                        value={lead.responsavel_id || LEAD_UNASSIGNED_OPTION_VALUE}
+                        onChange={(event) =>
+                          handleAtribuirResponsavel(
+                            lead,
+                            event.target.value === LEAD_UNASSIGNED_OPTION_VALUE
+                              ? null
+                              : event.target.value,
+                          )
+                        }
+                        onClick={(event) => event.stopPropagation()}
+                        disabled={loadingResponsaveis || atribuindoLeadId === lead.id}
+                        data-testid={`lead-card-responsavel-${lead.id}`}
+                        className="h-9 w-full rounded-lg border border-[#D4E2E7] bg-white px-3 text-xs text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <option value={LEAD_UNASSIGNED_OPTION_VALUE}>Sem responsável</option>
+                        {lead.responsavel_id &&
+                          !responsaveis.some(
+                            (responsavel) => responsavel.id === lead.responsavel_id,
+                          ) && (
+                            <option value={lead.responsavel_id}>{getResponsavelLabel(lead)}</option>
+                          )}
+                        {responsaveis.map((responsavel) => (
+                          <option key={responsavel.id} value={responsavel.id}>
+                            {responsavel.nome || responsavel.username}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {getObservacaoResumo(lead) && (
+                      <div className="rounded-lg border border-[#EAF1F4] bg-[#FAFCFD] px-3 py-2 text-xs text-[#4C6575]">
+                        {getObservacaoResumo(lead)}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="mt-3 flex items-center justify-between gap-3 border-t border-[#E8EFF3] pt-3">
+                  <span className="text-xs font-medium text-[#597887]">{getNextActionLabel(lead)}</span>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleOpenLeadDetalhes(lead);
+                    }}
+                    className="inline-flex items-center rounded-lg border border-[#BCD0D9] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#2A566A] transition-colors hover:bg-[#F1F7FA]"
+                  >
+                    Ver detalhes
+                  </button>
+                </div>
+
+                <div className="mt-3">
+                  {(lead.status === StatusLead.NOVO || lead.status === StatusLead.CONTATADO) && (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleQualificar(lead.id);
+                      }}
+                      disabled={processingLeadId === lead.id}
+                      className="w-full rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {processingLeadId === lead.id ? 'Processando...' : 'Qualificar lead'}
+                    </button>
+                  )}
+
+                  {lead.status === StatusLead.QUALIFICADO && (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleOpenConvertDialog(lead);
+                      }}
+                      className="w-full rounded-lg bg-[#159A9C] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#0F7B7D]"
+                    >
+                      Converter em oportunidade
+                    </button>
+                  )}
+
+                  {lead.status === StatusLead.CONVERTIDO && (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        abrirLeadNoPipeline(lead);
+                      }}
+                      className="w-full rounded-lg border border-[#159A9C] px-3 py-2 text-xs font-semibold text-[#0F7B7D] transition-colors hover:bg-[#F4FBF9]"
+                    >
+                      Abrir no pipeline
+                    </button>
+                  )}
+
+                  {lead.status === StatusLead.DESQUALIFICADO && (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleOpenDialog(lead);
+                      }}
+                      className="w-full rounded-lg border border-[#D4E2E7] px-3 py-2 text-xs font-semibold text-[#244455] transition-colors hover:bg-[#F8FCFC]"
+                    >
+                      Revisar lead
+                    </button>
+                  )}
+
+                  {isDetailedCardView && (
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      {lead.status === StatusLead.NOVO && (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleOpenInteracaoDialog(lead);
+                          }}
+                          disabled={processingLeadId === lead.id}
+                          data-testid={`lead-card-registrar-interacao-${lead.id}`}
+                          className="rounded-lg border border-[#D4E2E7] bg-white px-3 py-2 text-xs font-medium text-[#244455] transition-colors hover:bg-[#F8FCFC] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Registrar interação
+                        </button>
+                      )}
+
+                      {lead.status !== StatusLead.DESQUALIFICADO &&
+                        lead.status !== StatusLead.CONVERTIDO && (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleDesqualificar(lead.id);
+                            }}
+                            disabled={processingLeadId === lead.id}
+                            className="rounded-lg border border-[#F3CFD1] bg-[#FFF5F5] px-3 py-2 text-xs font-medium text-[#B03A48] transition-colors hover:bg-[#FFE9EA] disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            Desqualificar
+                          </button>
+                        )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+
+        {leadDetalhesAberto && (
+          <div className="fixed inset-0 z-50 flex">
+            <button
+              type="button"
+              aria-label="Fechar detalhes"
+              className="h-full flex-1 bg-black/35"
+              onClick={handleCloseLeadDetalhes}
+            />
+            <aside className="h-full w-full max-w-xl overflow-y-auto border-l border-[#CFE0E7] bg-white shadow-2xl">
+              <div className="sticky top-0 z-10 border-b border-[#DCE8EC] bg-white/95 px-5 py-4 backdrop-blur">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#6A8492]">
+                      Detalhes do lead
+                    </p>
+                    <h3 className="truncate text-xl font-bold text-[#123245]">
+                      {leadDetalhesAberto.nome}
+                    </h3>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(
+                          leadDetalhesAberto.status,
+                        )}`}
+                      >
+                        {getStatusLabel(leadDetalhesAberto.status)}
+                      </span>
+                      <span className="inline-flex items-center rounded-full bg-[#EFF5F7] px-2.5 py-0.5 text-[11px] font-medium text-[#4C6575]">
+                        {getOrigemLabel(leadDetalhesAberto.origem)}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCloseLeadDetalhes}
+                    className="rounded-lg p-2 text-[#516F7D] transition-colors hover:bg-[#EEF4F7]"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-4 px-5 py-5">
+                <div className="rounded-xl border border-[#DCE8EC] bg-[#FAFCFD] p-4">
+                  <h4 className="mb-3 text-sm font-semibold text-[#1A3E52]">Contato</h4>
+                  <div className="space-y-2 text-sm text-[#3E5D6D]">
+                    {leadDetalhesAberto.email ? (
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4 text-[#7A94A2]" />
+                        <span>{leadDetalhesAberto.email}</span>
+                      </div>
+                    ) : null}
+                    {leadDetalhesAberto.telefone ? (
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-4 w-4 text-[#7A94A2]" />
+                        <span>{leadDetalhesAberto.telefone}</span>
+                      </div>
+                    ) : null}
+                    {leadDetalhesAberto.empresa_nome ? (
+                      <div className="flex items-center gap-2">
+                        <Briefcase className="h-4 w-4 text-[#7A94A2]" />
+                        <span>{leadDetalhesAberto.empresa_nome}</span>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-[#DCE8EC] p-4">
+                  <h4 className="mb-3 text-sm font-semibold text-[#1A3E52]">Responsável</h4>
+                  <select
+                    value={leadDetalhesAberto.responsavel_id || LEAD_UNASSIGNED_OPTION_VALUE}
+                    onChange={(event) =>
+                      handleAtribuirResponsavel(
+                        leadDetalhesAberto,
+                        event.target.value === LEAD_UNASSIGNED_OPTION_VALUE
+                          ? null
+                          : event.target.value,
+                      )
+                    }
+                    disabled={loadingResponsaveis || atribuindoLeadId === leadDetalhesAberto.id}
+                    data-testid={`lead-card-responsavel-${leadDetalhesAberto.id}`}
+                    className="h-10 w-full rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <option value={LEAD_UNASSIGNED_OPTION_VALUE}>Sem responsável</option>
+                    {leadDetalhesAberto.responsavel_id &&
+                      !responsaveis.some(
+                        (responsavel) => responsavel.id === leadDetalhesAberto.responsavel_id,
+                      ) && (
+                        <option value={leadDetalhesAberto.responsavel_id}>
+                          {getResponsavelLabel(leadDetalhesAberto)}
+                        </option>
+                      )}
+                    {responsaveis.map((responsavel) => (
+                      <option key={responsavel.id} value={responsavel.id}>
+                        {responsavel.nome || responsavel.username}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
                   <div className="rounded-lg border border-[#E0EBEF] bg-[#F8FCFC] px-3 py-2">
                     <p className="text-[10px] font-semibold uppercase tracking-wide text-[#6C8695]">
                       Última interação
                     </p>
                     <p className="mt-1 text-xs font-medium text-[#244455]">
-                      {formatDateTime(lead.data_ultima_interacao || lead.updated_at)}
+                      {formatDateTime(
+                        leadDetalhesAberto.data_ultima_interacao || leadDetalhesAberto.updated_at,
+                      )}
                     </p>
                   </div>
                   <div className="rounded-lg border border-[#E0EBEF] bg-[#F8FCFC] px-3 py-2">
@@ -1433,106 +1875,123 @@ const LeadsPage: React.FC = () => {
                       Criado em
                     </p>
                     <p className="mt-1 text-xs font-medium text-[#244455]">
-                      {formatDateTime(lead.created_at)}
+                      {formatDateTime(leadDetalhesAberto.created_at)}
                     </p>
                   </div>
                 </div>
 
-                {getObservacaoResumo(lead) && (
-                  <div className="mb-4 rounded-lg border border-[#EAF1F4] bg-[#FAFCFD] px-3 py-2 text-xs text-[#4C6575]">
-                    {getObservacaoResumo(lead)}
+                <div className="rounded-xl border border-[#DCE8EC] p-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-[#1A3E52]">Qualificação</h4>
+                    <div className="inline-flex items-center gap-2 text-sm font-semibold text-[#1F5266]">
+                      <Target className="h-4 w-4 text-yellow-500" />
+                      Score: {leadDetalhesAberto.score}
+                    </div>
                   </div>
-                )}
-
-                <div className="flex items-center justify-between border-t pt-4">
-                  <div className="flex items-center gap-2">
-                    <Target className="h-4 w-4 text-yellow-500" />
-                    <span className="text-sm font-medium text-gray-700">Score: {lead.score}</span>
-                  </div>
-                  <div className="text-xs font-medium text-[#5E7987]">{getNextActionLabel(lead)}</div>
                 </div>
-
-                {(lead.status === StatusLead.NOVO || lead.status === StatusLead.CONTATADO) && (
-                  <button
-                    onClick={() => handleQualificar(lead.id)}
-                    disabled={processingLeadId === lead.id}
-                    className="mt-4 w-full rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
-                  >
-                    <span className="inline-flex items-center justify-center gap-2">
-                      {processingLeadId === lead.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <CheckCircle className="h-4 w-4" />
-                      )}
-                      {processingLeadId === lead.id ? 'Processando...' : 'Qualificar Lead'}
-                    </span>
-                  </button>
-                )}
-
-                {lead.status === StatusLead.QUALIFICADO && (
-                  <button
-                    onClick={() => handleOpenConvertDialog(lead)}
-                    disabled={processingLeadId === lead.id}
-                    className="mt-4 w-full rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0F7B7D]"
-                  >
-                    <span className="inline-flex items-center justify-center gap-2">
-                      <ArrowRight className="h-4 w-4" />
-                      Converter em Oportunidade
-                    </span>
-                  </button>
-                )}
-
-                {lead.status === StatusLead.CONVERTIDO && (
-                  <button
-                    onClick={() => abrirLeadNoPipeline(lead)}
-                    className="mt-4 w-full rounded-lg border border-[#159A9C] px-4 py-2 text-sm font-medium text-[#0F7B7D] transition-colors hover:bg-[#F4FBF9]"
-                  >
-                    <span className="inline-flex items-center justify-center gap-2">
-                      <ArrowRight className="h-4 w-4" />
-                      Abrir no Pipeline
-                    </span>
-                  </button>
-                )}
-
-                {lead.status === StatusLead.DESQUALIFICADO && (
-                  <button
-                    onClick={() => handleOpenDialog(lead)}
-                    disabled={processingLeadId === lead.id}
-                    className="mt-4 w-full rounded-lg border border-[#D4E2E7] px-4 py-2 text-sm font-medium text-[#244455] transition-colors hover:bg-[#F8FCFC]"
-                  >
-                    <span className="inline-flex items-center justify-center gap-2">
-                      <Edit2 className="h-4 w-4" />
-                      Revisar Lead
-                    </span>
-                  </button>
-                )}
-
-                {lead.status !== StatusLead.CONVERTIDO && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {lead.status === StatusLead.NOVO && (
-                      <button
-                        onClick={() => handleRegistrarContato(lead.id)}
-                        disabled={processingLeadId === lead.id}
-                        className="inline-flex flex-1 items-center justify-center rounded-lg border border-[#D4E2E7] bg-white px-3 py-2 text-xs font-medium text-[#244455] transition-colors hover:bg-[#F8FCFC] disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        Registrar contato
-                      </button>
-                    )}
-                    {lead.status !== StatusLead.DESQUALIFICADO && (
-                      <button
-                        onClick={() => handleDesqualificar(lead.id)}
-                        disabled={processingLeadId === lead.id}
-                        className="inline-flex flex-1 items-center justify-center rounded-lg border border-[#F3CFD1] bg-[#FFF5F5] px-3 py-2 text-xs font-medium text-[#B03A48] transition-colors hover:bg-[#FFE9EA] disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        Desqualificar
-                      </button>
-                    )}
+                {getObservacaoResumo(leadDetalhesAberto) && (
+                  <div className="rounded-xl border border-[#EAF1F4] bg-[#FAFCFD] px-4 py-3 text-sm text-[#4C6575]">
+                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[#6A8492]">
+                      Última observação
+                    </p>
+                    {getObservacaoResumo(leadDetalhesAberto)}
                   </div>
                 )}
+
+                <div className="rounded-xl border border-[#DCE8EC] p-4">
+                  <h4 className="mb-3 text-sm font-semibold text-[#1A3E52]">Ações</h4>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {(leadDetalhesAberto.status === StatusLead.NOVO ||
+                      leadDetalhesAberto.status === StatusLead.CONTATADO) && (
+                      <button
+                        type="button"
+                        onClick={() => handleQualificar(leadDetalhesAberto.id)}
+                        disabled={processingLeadId === leadDetalhesAberto.id}
+                        className="rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {processingLeadId === leadDetalhesAberto.id
+                          ? 'Processando...'
+                          : 'Qualificar lead'}
+                      </button>
+                    )}
+
+                    {leadDetalhesAberto.status === StatusLead.QUALIFICADO && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenConvertDialog(leadDetalhesAberto)}
+                        className="rounded-lg bg-[#159A9C] px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0F7B7D]"
+                      >
+                        Converter em oportunidade
+                      </button>
+                    )}
+
+                    {leadDetalhesAberto.status === StatusLead.CONVERTIDO && (
+                      <button
+                        type="button"
+                        onClick={() => abrirLeadNoPipeline(leadDetalhesAberto)}
+                        className="rounded-lg border border-[#159A9C] px-3 py-2 text-sm font-medium text-[#0F7B7D] transition-colors hover:bg-[#F4FBF9]"
+                      >
+                        Abrir no pipeline
+                      </button>
+                    )}
+
+                    {leadDetalhesAberto.status === StatusLead.DESQUALIFICADO && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenDialog(leadDetalhesAberto)}
+                        className="rounded-lg border border-[#D4E2E7] px-3 py-2 text-sm font-medium text-[#244455] transition-colors hover:bg-[#F8FCFC]"
+                      >
+                        Revisar lead
+                      </button>
+                    )}
+
+                    {leadDetalhesAberto.status === StatusLead.NOVO && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenInteracaoDialog(leadDetalhesAberto)}
+                        disabled={processingLeadId === leadDetalhesAberto.id}
+                        data-testid={`lead-card-registrar-interacao-${leadDetalhesAberto.id}`}
+                        className="rounded-lg border border-[#D4E2E7] bg-white px-3 py-2 text-sm font-medium text-[#244455] transition-colors hover:bg-[#F8FCFC] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Registrar interação
+                      </button>
+                    )}
+
+                    {leadDetalhesAberto.status !== StatusLead.DESQUALIFICADO &&
+                      leadDetalhesAberto.status !== StatusLead.CONVERTIDO && (
+                        <button
+                          type="button"
+                          onClick={() => handleDesqualificar(leadDetalhesAberto.id)}
+                          disabled={processingLeadId === leadDetalhesAberto.id}
+                          className="rounded-lg border border-[#F3CFD1] bg-[#FFF5F5] px-3 py-2 text-sm font-medium text-[#B03A48] transition-colors hover:bg-[#FFE9EA] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Desqualificar
+                        </button>
+                      )}
+
+                    {leadDetalhesAberto.status !== StatusLead.DESQUALIFICADO && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenDialog(leadDetalhesAberto)}
+                        className="rounded-lg border border-[#C9DAE2] px-3 py-2 text-sm font-medium text-[#365C6F] transition-colors hover:bg-[#F4FAFC]"
+                      >
+                        Editar lead
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(leadDetalhesAberto.id)}
+                      className="rounded-lg border border-[#F3CFD1] bg-[#FFF5F5] px-3 py-2 text-sm font-medium text-[#B03A48] transition-colors hover:bg-[#FFE9EA]"
+                    >
+                      Excluir lead
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            </aside>
+          </div>
+        )}
 
         {!loading && totalPaginasVisiveis > 1 && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#D4E2E7] bg-white px-4 py-3">
@@ -1935,6 +2394,76 @@ const LeadsPage: React.FC = () => {
                     Converter em Oportunidade
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Registro de Interação */}
+      {showInteracaoDialog && leadParaInteracao && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-xl overflow-hidden rounded-lg bg-white shadow-xl">
+            <div className="border-b border-gray-200 bg-gradient-to-r from-[#159A9C] to-[#0F7B7D] px-6 py-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold text-white">Registrar interação</h2>
+                  <p className="mt-0.5 text-sm text-white/85">
+                    {leadParaInteracao.nome}
+                    {leadParaInteracao.email ? ` (${leadParaInteracao.email})` : ''}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCloseInteracaoDialog}
+                  disabled={processingLeadId === leadParaInteracao.id}
+                  className="rounded-lg p-2 text-white transition-colors hover:bg-white/20 disabled:opacity-50"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-3 px-6 py-5">
+              <label
+                htmlFor="lead-interacao-observacao"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Observação da interação (opcional)
+              </label>
+              <textarea
+                id="lead-interacao-observacao"
+                value={interacaoObservacao}
+                onChange={(event) => setInteracaoObservacao(event.target.value)}
+                rows={4}
+                maxLength={1200}
+                data-testid="lead-interacao-observacao"
+                placeholder="Ex.: Conversei com o lead, confirmou interesse e pediu retorno na próxima semana."
+                disabled={processingLeadId === leadParaInteracao.id}
+                className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 disabled:cursor-not-allowed disabled:bg-gray-50"
+              />
+              <p className="text-xs text-gray-500">
+                Se vazio, será registrado como "Contato registrado manualmente".
+              </p>
+            </div>
+
+            <div className="flex gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">
+              <button
+                type="button"
+                onClick={handleCloseInteracaoDialog}
+                disabled={processingLeadId === leadParaInteracao.id}
+                className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-white disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmarInteracao}
+                disabled={processingLeadId === leadParaInteracao.id}
+                data-testid="lead-interacao-confirmar"
+                className="flex-1 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:bg-gray-300"
+              >
+                {processingLeadId === leadParaInteracao.id ? 'Registrando...' : 'Registrar interação'}
               </button>
             </div>
           </div>

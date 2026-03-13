@@ -57,8 +57,13 @@ export class LeadsController {
    */
   @Post()
   @Permissions(Permission.CRM_LEADS_CREATE)
-  create(@Body() createLeadDto: CreateLeadDto, @EmpresaId() empresaId: string) {
-    return this.leadsService.create(createLeadDto, empresaId);
+  create(
+    @Body() createLeadDto: CreateLeadDto,
+    @EmpresaId() empresaId: string,
+    @CurrentUser() user: { id?: string; sub?: string },
+  ) {
+    const actorUserId = user?.id || user?.sub;
+    return this.leadsService.create(createLeadDto, empresaId, actorUserId);
   }
 
   /**

@@ -356,7 +356,7 @@ class LeadsService {
   /**
    * Atribui um responsável a um lead
    */
-  async atribuirResponsavel(id: string, responsavel_id: string): Promise<Lead> {
+  async atribuirResponsavel(id: string, responsavel_id: string | null): Promise<Lead> {
     return this.handleRequest<Lead>(
       () =>
         api.patch(`${this.baseUrl}/${id}`, {

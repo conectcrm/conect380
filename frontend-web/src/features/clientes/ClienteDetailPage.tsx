@@ -1216,6 +1216,32 @@ const ClienteDetailPage: React.FC = () => {
                 </section>
               ) : null}
 
+              {showDadosAdicionaisSection ? (
+                <section className="space-y-3">
+                  <h3 className="text-base font-semibold text-[#19384C]">Dados comerciais</h3>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div className="rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3">
+                      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[#6C8794]">
+                        Origem
+                      </p>
+                      <p className="inline-flex items-center gap-2 text-sm text-[#355061]">
+                        <Tag className="h-4 w-4 text-[#6C8794]" />
+                        {cliente.origem || 'Nao informada'}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3">
+                      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[#6C8794]">
+                        Responsavel ID
+                      </p>
+                      <p className="inline-flex items-center gap-2 break-all text-sm text-[#355061]">
+                        <User className="h-4 w-4 text-[#6C8794]" />
+                        {cliente.responsavel_id || cliente.responsavelId || 'Nao informado'}
+                      </p>
+                    </div>
+                  </div>
+                </section>
+              ) : null}
+
               {showObservacoesSection ? (
                 <section className="space-y-3">
                   <h3 className="text-base font-semibold text-[#19384C]">Observacoes</h3>

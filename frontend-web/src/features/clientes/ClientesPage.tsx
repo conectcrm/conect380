@@ -19,15 +19,14 @@ import {
   Search,
   Filter,
   Download,
-  Copy,
   BookmarkPlus,
   BookmarkX,
   Eye,
   Edit,
-  Star,
   Trash2,
   X,
   ChevronLeft,
+  ChevronDown,
   ChevronRight,
   Loader2,
   Grid3X3,
@@ -62,6 +61,12 @@ const getStatusLabel = (status: string): string =>
 const getTipoLabel = (tipo: string): string =>
   CLIENTE_TIPO_OPTIONS.find((option) => option.value === tipo)?.label ?? tipo;
 
+const getFollowupLabel = (followup: '' | 'pendente' | 'vencido'): string => {
+  if (followup === 'pendente') return 'Pendente';
+  if (followup === 'vencido') return 'Vencido';
+  return '';
+};
+
 const formatDocumento = (documento?: string, tipo?: Cliente['tipo']): string => {
   if (!documento) return '-';
 
@@ -90,6 +95,7 @@ type SavedClientesView = {
   status: string;
   tipo: string;
   tag: string;
+  origem: string;
   followup: '' | 'pendente' | 'vencido';
   viewMode: ClientesViewMode;
   limit: number;
@@ -104,6 +110,7 @@ type PersistedClientesPageState = {
   status: string;
   tipo: string;
   tag: string;
+  origem: string;
   followup: '' | 'pendente' | 'vencido';
   viewMode: ClientesViewMode;
   page: number;
@@ -162,6 +169,7 @@ const loadSavedClientesViews = (): SavedClientesView[] => {
       .map((view) => ({
         ...view,
         tag: typeof view.tag === 'string' ? view.tag : '',
+        origem: typeof view.origem === 'string' ? view.origem : '',
         followup:
           view.followup === 'pendente' || view.followup === 'vencido'
             ? (view.followup as 'pendente' | 'vencido')
@@ -217,14 +225,35 @@ const ClientesPage: React.FC = () => {
     search: persistedStateRef.current.searchTerm ?? '',
     status: persistedStateRef.current.status ?? '',
     tipo: persistedStateRef.current.tipo ?? '',
-    tag: '',
-    followup: '',
+    tag: persistedStateRef.current.tag ?? '',
+    origem: persistedStateRef.current.origem ?? '',
+    responsavelId: '',
+    followup:
+      persistedStateRef.current.followup === 'pendente' ||
+      persistedStateRef.current.followup === 'vencido'
+        ? persistedStateRef.current.followup
+        : '',
     sortBy: persistedStateRef.current.sortBy ?? 'created_at',
     sortOrder: persistedStateRef.current.sortOrder ?? 'DESC',
   }));
   const [searchTerm, setSearchTerm] = useState(persistedStateRef.current.searchTerm ?? '');
   const [selectedStatus, setSelectedStatus] = useState(persistedStateRef.current.status ?? '');
   const [selectedTipo, setSelectedTipo] = useState(persistedStateRef.current.tipo ?? '');
+  const [selectedTag, setSelectedTag] = useState(persistedStateRef.current.tag ?? '');
+  const [selectedOrigem, setSelectedOrigem] = useState(persistedStateRef.current.origem ?? '');
+  const [selectedFollowup, setSelectedFollowup] = useState<'' | 'pendente' | 'vencido'>(
+    persistedStateRef.current.followup === 'pendente' || persistedStateRef.current.followup === 'vencido'
+      ? persistedStateRef.current.followup
+      : '',
+  );
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(
+    Boolean(
+      (persistedStateRef.current.tag ?? '').trim() ||
+        (persistedStateRef.current.origem ?? '').trim() ||
+        (persistedStateRef.current.followup ?? '') ||
+        (persistedStateRef.current.activeViewId ?? ''),
+    ),
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
@@ -433,7 +462,7 @@ const ClientesPage: React.FC = () => {
     [filters, loadEstatisticas, calcularEstatisticasLocais],
   );
 
-  // Aplicar filtros de backend (status/tipo) sem depender da digitacao da busca
+  // Aplicar filtros de backend sem depender da digitacao da busca
   useEffect(() => {
     if (isFirstMount.current) {
       isFirstMount.current = false;
@@ -444,13 +473,17 @@ const ClientesPage: React.FC = () => {
       const currentPage = prev.page ?? 1;
       const nextStatus = selectedStatus;
       const nextTipo = selectedTipo;
+      const nextTag = selectedTag.trim();
+      const nextOrigem = selectedOrigem.trim();
+      const nextFollowup = selectedFollowup;
 
       if (
         (prev.search ?? '') === '' &&
         (prev.status ?? '') === nextStatus &&
         (prev.tipo ?? '') === nextTipo &&
-        (prev.tag ?? '') === '' &&
-        (prev.followup ?? '') === '' &&
+        (prev.tag ?? '') === nextTag &&
+        (prev.origem ?? '') === nextOrigem &&
+        (prev.followup ?? '') === nextFollowup &&
         currentPage === 1
       ) {
         return prev;
@@ -461,12 +494,14 @@ const ClientesPage: React.FC = () => {
         search: '',
         status: nextStatus,
         tipo: nextTipo,
-        tag: '',
-        followup: '',
+        tag: nextTag,
+        origem: nextOrigem,
+        responsavelId: '',
+        followup: nextFollowup,
         page: 1,
       };
     });
-  }, [selectedStatus, selectedTipo]);
+  }, [selectedStatus, selectedTipo, selectedTag, selectedOrigem, selectedFollowup]);
 
   useEffect(() => {
     if (hasHydratedQueryRef.current) {
@@ -478,6 +513,9 @@ const ClientesPage: React.FC = () => {
     const querySearch = searchParams.get('q');
     const queryStatus = searchParams.get('status');
     const queryTipo = searchParams.get('tipo');
+    const queryTag = searchParams.get('tag');
+    const queryOrigem = searchParams.get('origem');
+    const queryFollowup = searchParams.get('followup');
     const queryView = searchParams.get('view');
     const queryPage = Number(searchParams.get('page') || '');
     const queryLimit = Number(searchParams.get('limit') || '');
@@ -489,6 +527,9 @@ const ClientesPage: React.FC = () => {
       querySearch,
       queryStatus,
       queryTipo,
+      queryTag,
+      queryOrigem,
+      queryFollowup,
       queryView,
       searchParams.get('page'),
       searchParams.get('limit'),
@@ -513,6 +554,20 @@ const ClientesPage: React.FC = () => {
       setSelectedTipo(queryTipo);
     }
 
+    if (queryTag !== null) {
+      setSelectedTag(queryTag);
+    }
+
+    if (queryOrigem !== null) {
+      setSelectedOrigem(queryOrigem);
+    }
+
+    if (queryFollowup === 'pendente' || queryFollowup === 'vencido') {
+      setSelectedFollowup(queryFollowup);
+    } else if (queryFollowup === '') {
+      setSelectedFollowup('');
+    }
+
     if (queryView === 'cards' || queryView === 'table') {
       setViewMode(queryView);
     }
@@ -528,6 +583,12 @@ const ClientesPage: React.FC = () => {
       const nextSearch = '';
       const nextStatus = queryStatus ?? prev.status ?? '';
       const nextTipo = queryTipo ?? prev.tipo ?? '';
+      const nextTag = queryTag ?? prev.tag ?? '';
+      const nextOrigem = queryOrigem ?? prev.origem ?? '';
+      const nextFollowup =
+        queryFollowup === 'pendente' || queryFollowup === 'vencido'
+          ? queryFollowup
+          : ((prev.followup ?? '') as '' | 'pendente' | 'vencido');
       const nextSortBy = querySortBy ?? prev.sortBy ?? 'created_at';
       const nextSortOrder =
         querySortOrder === 'ASC' || querySortOrder === 'DESC'
@@ -540,8 +601,9 @@ const ClientesPage: React.FC = () => {
         (prev.search ?? '') === nextSearch &&
         (prev.status ?? '') === nextStatus &&
         (prev.tipo ?? '') === nextTipo &&
-        (prev.tag ?? '') === '' &&
-        (prev.followup ?? '') === '' &&
+        (prev.tag ?? '') === nextTag &&
+        (prev.origem ?? '') === nextOrigem &&
+        (prev.followup ?? '') === nextFollowup &&
         (prev.sortBy ?? 'created_at') === nextSortBy &&
         (prev.sortOrder ?? 'DESC') === nextSortOrder
       ) {
@@ -555,8 +617,10 @@ const ClientesPage: React.FC = () => {
         search: nextSearch,
         status: nextStatus,
         tipo: nextTipo,
-        tag: '',
-        followup: '',
+        tag: nextTag,
+        origem: nextOrigem,
+        responsavelId: '',
+        followup: nextFollowup,
         sortBy: nextSortBy,
         sortOrder: nextSortOrder,
       };
@@ -572,8 +636,9 @@ const ClientesPage: React.FC = () => {
       searchTerm,
       status: selectedStatus,
       tipo: selectedTipo,
-      tag: '',
-      followup: '',
+      tag: selectedTag,
+      origem: selectedOrigem,
+      followup: selectedFollowup,
       viewMode,
       page: filters.page ?? 1,
       limit: filters.limit ?? 10,
@@ -592,6 +657,9 @@ const ClientesPage: React.FC = () => {
     searchTerm,
     selectedStatus,
     selectedTipo,
+    selectedTag,
+    selectedOrigem,
+    selectedFollowup,
     viewMode,
   ]);
 
@@ -621,6 +689,10 @@ const ClientesPage: React.FC = () => {
     setOrDelete('q', normalizedSearch);
     setOrDelete('status', selectedStatus);
     setOrDelete('tipo', selectedTipo);
+    setOrDelete('tag', selectedTag.trim());
+    setOrDelete('origem', selectedOrigem.trim());
+    nextParams.delete('responsavelId');
+    setOrDelete('followup', selectedFollowup);
     setOrDelete('view', viewMode === 'table' ? null : viewMode);
     setOrDelete('page', String(filters.page ?? 1), (filters.page ?? 1) > 1);
     setOrDelete('limit', String(filters.limit ?? 10), (filters.limit ?? 10) !== 10);
@@ -649,6 +721,9 @@ const ClientesPage: React.FC = () => {
     searchParamsSerialized,
     selectedStatus,
     selectedTipo,
+    selectedTag,
+    selectedOrigem,
+    selectedFollowup,
     setSearchParams,
     viewMode,
   ]);
@@ -662,6 +737,7 @@ const ClientesPage: React.FC = () => {
     filters.status,
     filters.tipo,
     filters.tag,
+    filters.origem,
     filters.followup,
     filters.sortBy,
     filters.sortOrder,
@@ -778,11 +854,27 @@ const ClientesPage: React.FC = () => {
     setSelectedTipo(tipo);
   };
 
+  const handleTagChange = (tag: string) => {
+    setSelectedTag(tag);
+  };
+
+  const handleOrigemChange = (origem: string) => {
+    setSelectedOrigem(origem);
+  };
+
+  const handleFollowupChange = (followup: '' | 'pendente' | 'vencido') => {
+    setSelectedFollowup(followup);
+  };
+
   const handleClearFilters = () => {
     setSearchTerm('');
     setSelectedStatus('');
     setSelectedTipo('');
+    setSelectedTag('');
+    setSelectedOrigem('');
+    setSelectedFollowup('');
     setActiveViewId('');
+    setShowAdvancedFilters(false);
   };
 
   const handlePageChange = (page: number) => {
@@ -1044,6 +1136,9 @@ const ClientesPage: React.FC = () => {
     setSearchTerm(selectedView.searchTerm);
     setSelectedStatus(selectedView.status);
     setSelectedTipo(selectedView.tipo);
+    setSelectedTag(selectedView.tag ?? '');
+    setSelectedOrigem(selectedView.origem ?? '');
+    setSelectedFollowup(selectedView.followup ?? '');
     setViewMode(selectedView.viewMode);
     setFilters((prev) => ({
       ...prev,
@@ -1052,8 +1147,10 @@ const ClientesPage: React.FC = () => {
       search: '',
       status: selectedView.status,
       tipo: selectedView.tipo,
-      tag: '',
-      followup: '',
+      tag: selectedView.tag ?? '',
+      origem: selectedView.origem ?? '',
+      responsavelId: '',
+      followup: selectedView.followup ?? '',
       sortBy: selectedView.sortBy,
       sortOrder: selectedView.sortOrder,
     }));
@@ -1126,8 +1223,9 @@ const ClientesPage: React.FC = () => {
         searchTerm,
         status: selectedStatus,
         tipo: selectedTipo,
-        tag: '',
-        followup: '',
+        tag: selectedTag.trim(),
+        origem: selectedOrigem.trim(),
+        followup: selectedFollowup,
         viewMode,
         limit: filters.limit ?? 10,
         sortBy: filters.sortBy ?? 'created_at',
@@ -1226,6 +1324,9 @@ const ClientesPage: React.FC = () => {
       searchParams.get('q'),
       searchParams.get('status'),
       searchParams.get('tipo'),
+      searchParams.get('tag'),
+      searchParams.get('origem'),
+      searchParams.get('followup'),
       searchParams.get('view'),
       searchParams.get('page'),
       searchParams.get('limit'),
@@ -1249,6 +1350,9 @@ const ClientesPage: React.FC = () => {
     setSearchTerm(defaultView.searchTerm);
     setSelectedStatus(defaultView.status);
     setSelectedTipo(defaultView.tipo);
+    setSelectedTag(defaultView.tag ?? '');
+    setSelectedOrigem(defaultView.origem ?? '');
+    setSelectedFollowup(defaultView.followup ?? '');
     setViewMode(defaultView.viewMode);
     setFilters((prev) => ({
       ...prev,
@@ -1257,8 +1361,10 @@ const ClientesPage: React.FC = () => {
       search: '',
       status: defaultView.status,
       tipo: defaultView.tipo,
-      tag: '',
-      followup: '',
+      tag: defaultView.tag ?? '',
+      origem: defaultView.origem ?? '',
+      responsavelId: '',
+      followup: defaultView.followup ?? '',
       sortBy: defaultView.sortBy,
       sortOrder: defaultView.sortOrder,
     }));
@@ -1280,6 +1386,9 @@ const ClientesPage: React.FC = () => {
       activeView.searchTerm === searchTerm &&
       activeView.status === selectedStatus &&
       activeView.tipo === selectedTipo &&
+      (activeView.tag ?? '') === selectedTag.trim() &&
+      (activeView.origem ?? '') === selectedOrigem.trim() &&
+      (activeView.followup ?? '') === selectedFollowup &&
       activeView.viewMode === viewMode &&
       activeView.limit === (filters.limit ?? 10) &&
       activeView.sortBy === (filters.sortBy ?? 'created_at') &&
@@ -1297,6 +1406,9 @@ const ClientesPage: React.FC = () => {
     searchTerm,
     selectedStatus,
     selectedTipo,
+    selectedTag,
+    selectedOrigem,
+    selectedFollowup,
     viewMode,
   ]);
 
@@ -1587,8 +1699,27 @@ const ClientesPage: React.FC = () => {
     : isRefreshingResults
       ? 'Atualizando resultados...'
       : `Gerencie o cadastro e relacionamento basico de ${estatisticas.total} clientes`;
-  const hasFilters = Boolean(searchTerm || selectedStatus || selectedTipo);
+  const hasFilters = Boolean(
+    searchTerm ||
+      selectedStatus ||
+      selectedTipo ||
+      selectedTag.trim() ||
+      selectedOrigem.trim() ||
+      selectedFollowup,
+  );
   const activeView = savedViews.find((view) => view.id === activeViewId) ?? null;
+  const hasAdvancedFilters = Boolean(
+    selectedTag.trim() ||
+      selectedOrigem.trim() ||
+      selectedFollowup ||
+      activeViewId,
+  );
+  const advancedFiltersCount = [
+    selectedTag.trim(),
+    selectedOrigem.trim(),
+    selectedFollowup,
+    activeViewId,
+  ].filter(Boolean).length;
   const hasFilterChips = hasFilters || Boolean(activeView);
   const oportunidadesAtivas = Number(estatisticas.prospects ?? 0) + Number(estatisticas.leads ?? 0);
   const isRenameMode = saveViewModalMode === 'rename' && Boolean(activeView);
@@ -1687,143 +1818,184 @@ const ClientesPage: React.FC = () => {
       </SectionCard>
 
       <FiltersBar className="p-4">
-        <div className="flex w-full flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
-          <div className="w-full sm:min-w-[260px] sm:flex-1">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">
-              Buscar clientes
-              <span className="ml-1 text-xs font-normal text-[#6F8B98]">atalho: /</span>
-            </label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Buscar por nome, CPF/CNPJ, email ou telefone..."
-                value={searchTerm}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
-              />
+        <div className="flex w-full flex-col gap-4">
+          <div className="flex w-full flex-col gap-3 xl:flex-row xl:items-end">
+            <div className="w-full xl:min-w-[300px] xl:flex-1">
+              <label className="mb-2 block text-sm font-medium text-[#385A6A]">
+                Buscar clientes
+                <span className="ml-1 text-xs font-normal text-[#6F8B98]">atalho: /</span>
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Buscar por nome, CPF/CNPJ, email ou telefone..."
+                  value={searchTerm}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                />
+              </div>
             </div>
-          </div>
 
-          <div className="w-full sm:w-auto">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Status</label>
-            <select
-              value={selectedStatus}
-              onChange={(e) => handleStatusChange(e.target.value)}
-              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[170px]"
-            >
-              <option value="">Todos os status</option>
-              {CLIENTE_STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="w-full sm:w-auto">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Tipo</label>
-            <select
-              value={selectedTipo}
-              onChange={(e) => handleTipoChange(e.target.value)}
-              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[170px]"
-            >
-              <option value="">Todos os tipos</option>
-              {CLIENTE_TIPO_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="w-full sm:w-auto">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Views salvas</label>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="w-full xl:w-auto">
+              <label className="mb-2 block text-sm font-medium text-[#385A6A]">Status</label>
               <select
-                value={activeViewId}
-                onChange={(e) => handleSavedViewChange(e.target.value)}
-                data-testid="clientes-saved-views-select"
-                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:min-w-[190px] sm:w-auto"
+                value={selectedStatus}
+                onChange={(e) => handleStatusChange(e.target.value)}
+                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 xl:w-[180px]"
               >
-                <option value="">Sem view salva</option>
-                {savedViews.map((view) => (
-                  <option key={view.id} value={view.id}>
-                    {view.isDefault ? `${view.name} (padrao)` : view.name}
+                <option value="">Todos os status</option>
+                {CLIENTE_STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>
-              <button
-                onClick={() => handleOpenSaveViewModal()}
-                data-testid="clientes-save-view-button"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[#B4BEC9] bg-white px-3 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
-                title={activeViewId ? 'Salvar alteracoes da view ativa' : 'Salvar view atual'}
-              >
-                <BookmarkPlus className="h-4 w-4" />
-                <span>Salvar</span>
-              </button>
-              {activeViewId && (
-                <button
-                  onClick={handleDuplicateActiveView}
-                  data-testid="clientes-duplicate-view-button"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#D4E2E7] bg-white px-3 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
-                  title="Duplicar view ativa"
-                >
-                  <Copy className="h-4 w-4" />
-                  <span>Duplicar</span>
-                </button>
-              )}
-              {activeViewId && (
-                <button
-                  onClick={handleSetDefaultActiveView}
-                  data-testid="clientes-set-default-view-button"
-                  disabled={Boolean(activeView?.isDefault)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#D4E2E7] bg-white px-3 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9] disabled:cursor-not-allowed disabled:opacity-60"
-                  title={activeView?.isDefault ? 'View padrao ativa' : 'Definir como view padrao'}
-                >
-                  <Star className="h-4 w-4" />
-                  <span>{activeView?.isDefault ? 'Padrao' : 'Definir padrao'}</span>
-                </button>
-              )}
-              {activeViewId && (
-                <button
-                  onClick={() => handleOpenSaveViewModal('rename')}
-                  data-testid="clientes-rename-view-button"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#D4E2E7] bg-white px-3 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
-                  title="Renomear view ativa"
-                >
-                  <Edit className="h-4 w-4" />
-                  <span>Renomear</span>
-                </button>
-              )}
-              {activeViewId && (
-                <button
-                  onClick={handleDeleteActiveView}
-                  data-testid="clientes-delete-view-button"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#E4C7C7] bg-white px-3 py-2 text-sm font-medium text-[#9E3535] transition-colors hover:bg-[#FFF5F5]"
-                  title="Excluir view ativa"
-                >
-                  <BookmarkX className="h-4 w-4" />
-                  <span>Excluir</span>
-                </button>
-              )}
             </div>
-          </div>
 
-          <div className="w-full sm:w-auto">
-            <label className="mb-2 block text-sm font-medium text-[#385A6A]">Acoes</label>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="w-full xl:w-auto">
+              <label className="mb-2 block text-sm font-medium text-[#385A6A]">Tipo</label>
+              <select
+                value={selectedTipo}
+                onChange={(e) => handleTipoChange(e.target.value)}
+                className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 xl:w-[180px]"
+              >
+                <option value="">Todos os tipos</option>
+                {CLIENTE_TIPO_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex w-full flex-wrap items-end gap-2 xl:w-auto xl:justify-end">
               <button
-                onClick={handleClearFilters}
-                disabled={!hasFilterChips}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9] disabled:cursor-not-allowed disabled:opacity-60"
+                type="button"
+                data-testid="clientes-advanced-filters-toggle"
+                onClick={() => setShowAdvancedFilters((current) => !current)}
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
               >
                 <Filter className="h-4 w-4" />
+                Filtros avancados
+                {hasAdvancedFilters ? (
+                  <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#E9F6F3] px-1.5 text-xs font-semibold text-[#0F7B7D]">
+                    {advancedFiltersCount}
+                  </span>
+                ) : null}
+                <ChevronDown
+                  className={`h-4 w-4 text-[#5D7A88] transition-transform ${
+                    showAdvancedFilters ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+
+              <button
+                type="button"
+                onClick={handleClearFilters}
+                disabled={!hasFilterChips}
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <X className="h-4 w-4" />
                 Limpar
               </button>
             </div>
           </div>
+
+          {showAdvancedFilters && (
+            <div className="rounded-xl border border-[#DCE8EC] bg-[#F8FBFC] p-3 sm:p-4">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="w-full">
+                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Tag</label>
+                  <input
+                    type="text"
+                    value={selectedTag}
+                    onChange={(e) => handleTagChange(e.target.value)}
+                    data-testid="clientes-filter-tag"
+                    placeholder="Ex.: vip"
+                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                  />
+                </div>
+
+                <div className="w-full">
+                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Follow-up</label>
+                  <select
+                    value={selectedFollowup}
+                    onChange={(e) => handleFollowupChange(e.target.value as '' | 'pendente' | 'vencido')}
+                    data-testid="clientes-filter-followup"
+                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                  >
+                    <option value="">Todos</option>
+                    <option value="pendente">Pendente</option>
+                    <option value="vencido">Vencido</option>
+                  </select>
+                </div>
+
+                <div className="w-full">
+                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Origem</label>
+                  <input
+                    type="text"
+                    value={selectedOrigem}
+                    onChange={(e) => handleOrigemChange(e.target.value)}
+                    data-testid="clientes-filter-origem"
+                    placeholder="Ex.: Indicacao"
+                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3 border-t border-[#DFEAEE] pt-3">
+                <label className="mb-2 block text-sm font-medium text-[#385A6A]">Views salvas</label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={activeViewId}
+                    onChange={(e) => handleSavedViewChange(e.target.value)}
+                    data-testid="clientes-saved-views-select"
+                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:min-w-[190px] sm:w-auto"
+                  >
+                    <option value="">Sem view salva</option>
+                    {savedViews.map((view) => (
+                      <option key={view.id} value={view.id}>
+                        {view.isDefault ? `${view.name} (padrao)` : view.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => handleOpenSaveViewModal()}
+                    data-testid="clientes-save-view-button"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#B4BEC9] bg-white px-3 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
+                    title={activeViewId ? 'Salvar alteracoes da view ativa' : 'Salvar view atual'}
+                  >
+                    <BookmarkPlus className="h-4 w-4" />
+                    <span>Salvar</span>
+                  </button>
+                  {activeViewId && (
+                    <button
+                      onClick={() => handleOpenSaveViewModal('rename')}
+                      data-testid="clientes-rename-view-button"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#D4E2E7] bg-white px-3 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
+                      title="Renomear view ativa"
+                    >
+                      <Edit className="h-4 w-4" />
+                      <span>Renomear</span>
+                    </button>
+                  )}
+                  {activeViewId && (
+                    <button
+                      onClick={handleDeleteActiveView}
+                      data-testid="clientes-delete-view-button"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#E4C7C7] bg-white px-3 py-2 text-sm font-medium text-[#9E3535] transition-colors hover:bg-[#FFF5F5]"
+                      title="Excluir view ativa"
+                    >
+                      <BookmarkX className="h-4 w-4" />
+                      <span>Excluir</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </FiltersBar>
 
@@ -1884,6 +2056,49 @@ const ClientesPage: React.FC = () => {
                 onClick={() => setSelectedTipo('')}
                 className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
                 title="Remover filtro de tipo"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          )}
+
+          {selectedTag.trim() && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+              Tag: <strong className="font-semibold text-[#1C3B4C]">{selectedTag.trim()}</strong>
+              <button
+                onClick={() => setSelectedTag('')}
+                className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                title="Remover filtro de tag"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          )}
+
+          {selectedFollowup && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+              Follow-up:{' '}
+              <strong className="font-semibold text-[#1C3B4C]">
+                {getFollowupLabel(selectedFollowup)}
+              </strong>
+              <button
+                onClick={() => setSelectedFollowup('')}
+                className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                title="Remover filtro de follow-up"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          )}
+
+          {selectedOrigem.trim() && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+              Origem:{' '}
+              <strong className="font-semibold text-[#1C3B4C]">{selectedOrigem.trim()}</strong>
+              <button
+                onClick={() => setSelectedOrigem('')}
+                className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                title="Remover filtro de origem"
               >
                 <X className="h-3 w-3" />
               </button>

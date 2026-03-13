@@ -82,6 +82,146 @@ async function mockClientesModalToProfileFlow(page: any) {
     });
   });
 
+  await page.route(/\/clientes\/[^/]+\/tickets\/resumo(\?.*)?$/, async (route: any) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+
+    const url = new URL(route.request().url());
+    if (!isApiRequest(url)) {
+      await route.fallback();
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        total: 0,
+        abertos: 0,
+        resolvidos: 0,
+        ultimoAtendimentoEm: null,
+        tickets: [],
+      }),
+    });
+  });
+
+  await page.route(/\/clientes\/[^/]+\/propostas\/resumo(\?.*)?$/, async (route: any) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+
+    const url = new URL(route.request().url());
+    if (!isApiRequest(url)) {
+      await route.fallback();
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        total: 0,
+        aprovadas: 0,
+        pendentes: 0,
+        rejeitadas: 0,
+        ultimoRegistroEm: null,
+        propostas: [],
+      }),
+    });
+  });
+
+  await page.route(/\/clientes\/[^/]+\/contratos\/resumo(\?.*)?$/, async (route: any) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+
+    const url = new URL(route.request().url());
+    if (!isApiRequest(url)) {
+      await route.fallback();
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        total: 0,
+        pendentes: 0,
+        assinados: 0,
+        encerrados: 0,
+        ultimoRegistroEm: null,
+        contratos: [],
+      }),
+    });
+  });
+
+  await page.route(/\/clientes\/[^/]+\/faturas\/resumo(\?.*)?$/, async (route: any) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+
+    const url = new URL(route.request().url());
+    if (!isApiRequest(url)) {
+      await route.fallback();
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        total: 0,
+        pagas: 0,
+        pendentes: 0,
+        vencidas: 0,
+        ultimoRegistroEm: null,
+        faturas: [],
+      }),
+    });
+  });
+
+  await page.route(/\/api\/atendimento\/clientes\/[^/]+\/contexto$/, async (route: any) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        cliente: {
+          id: CLIENTE_ID,
+          nome: CLIENTE_FIXTURE.nome,
+          email: CLIENTE_FIXTURE.email,
+          telefone: CLIENTE_FIXTURE.telefone,
+          segmento: "geral",
+          primeiroContato: "2026-02-20T10:00:00.000Z",
+          ultimoContato: "2026-02-24T10:00:00.000Z",
+          tags: [],
+        },
+        estatisticas: {
+          valorTotalGasto: 0,
+          totalTickets: 0,
+          ticketsResolvidos: 0,
+          ticketsAbertos: 0,
+          avaliacaoMedia: 0,
+          tempoMedioResposta: "0m",
+        },
+        historico: {
+          propostas: [],
+          faturas: [],
+          tickets: [],
+        },
+      }),
+    });
+  });
+
   await page.route(/\/clientes\/[^/]+\/anexos(\?.*)?$/, async (route: any) => {
     if (route.request().method() !== "GET") {
       await route.fallback();
@@ -140,7 +280,7 @@ async function mockClientesModalToProfileFlow(page: any) {
   });
 }
 
-test.describe("Clientes - modal para perfil completo", () => {
+test.describe("Clientes - navegacao para perfil completo", () => {
   async function assertModalNavigation(
     authenticatedPage: any,
     listPath: "/clientes" | "/crm/clientes",
@@ -153,16 +293,9 @@ test.describe("Clientes - modal para perfil completo", () => {
 
     await expect(authenticatedPage.getByRole("heading", { name: /Clientes/i })).toBeVisible();
 
-    const detailsButton = authenticatedPage.getByRole("button", { name: /Ver detalhes/i }).first();
+    const detailsButton = authenticatedPage.locator('button[title="Abrir perfil"]').first();
     await expect(detailsButton).toBeVisible();
     await detailsButton.click();
-
-    const modal = authenticatedPage.getByRole("dialog");
-    await expect(modal).toBeVisible();
-    await expect(modal.getByRole("button", { name: /Abrir perfil completo/i })).toBeVisible();
-    await expect(modal.getByText(CLIENTE_FIXTURE.nome)).toBeVisible();
-
-    await modal.getByRole("button", { name: /Abrir perfil completo/i }).click();
 
     await authenticatedPage.waitForURL(`**${detailPath}`);
     await expect(authenticatedPage).toHaveURL(new RegExp(`${detailPath.replace(/\//g, "\\/")}$`));
@@ -174,16 +307,16 @@ test.describe("Clientes - modal para perfil completo", () => {
     await expect(
       authenticatedPage.getByRole("link", { name: CLIENTE_FIXTURE.email }),
     ).toBeVisible();
-    await expect(authenticatedPage.getByText(/Arquivos e documentos/i)).toBeVisible();
+    await expect(authenticatedPage.getByRole("heading", { name: /Contato/i })).toBeVisible();
   }
 
-  test("abre detalhes no modal e navega para pagina completa em /clientes", async ({
+  test("abre perfil completo a partir de /clientes", async ({
     authenticatedPage,
   }) => {
     await assertModalNavigation(authenticatedPage, "/clientes", `/clientes/${CLIENTE_ID}`);
   });
 
-  test("abre detalhes no modal e navega para pagina completa em /crm/clientes", async ({
+  test("abre perfil completo a partir de /crm/clientes", async ({
     authenticatedPage,
   }) => {
     await assertModalNavigation(authenticatedPage, "/crm/clientes", `/crm/clientes/${CLIENTE_ID}`);
