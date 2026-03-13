@@ -28,7 +28,8 @@ const isMobileAutoHideEnabledForViewport = (): boolean => {
     return false;
   }
 
-  const screenWidth = typeof window.screen?.width === 'number' ? window.screen.width : window.innerWidth;
+  const screenWidth =
+    typeof window.screen?.width === 'number' ? window.screen.width : window.innerWidth;
   const screenHeight =
     typeof window.screen?.height === 'number' ? window.screen.height : window.innerHeight;
   const shortestScreenEdge = Math.min(screenWidth, screenHeight);
@@ -102,8 +103,8 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showProfileSelector, setShowProfileSelector] = useState(false);
-  const [isMobileAutoHideEnabled, setIsMobileAutoHideEnabled] = useState(
-    () => isMobileAutoHideEnabledForViewport(),
+  const [isMobileAutoHideEnabled, setIsMobileAutoHideEnabled] = useState(() =>
+    isMobileAutoHideEnabledForViewport(),
   );
   const [isMobileTopbarHidden, setIsMobileTopbarHidden] = useState(false);
   const lastScrollYRef = useRef(0);
@@ -334,7 +335,7 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
       ) : null}
 
       <div className="min-h-screen md:pl-[74px]">
-        <header className={`sticky top-0 z-20 ${shellTokens.topbar}`}>
+        <header className={`sticky top-0 z-40 ${shellTokens.topbar}`}>
           <div
             data-testid="mobile-topbar-container"
             className={`transition-[max-height,opacity,transform] duration-200 ease-out md:max-h-[86px] md:translate-y-0 md:opacity-100 md:pointer-events-auto ${
@@ -343,7 +344,9 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
                 : 'max-h-[86px] translate-y-0 opacity-100 overflow-visible'
             }`}
           >
-            <div className={`flex h-[86px] items-center justify-between ${shellSpacing.pageOuterX}`}>
+            <div
+              className={`flex h-[86px] items-center justify-between ${shellSpacing.pageOuterX}`}
+            >
               <div className="flex items-center gap-3">
                 <button
                   data-testid="mobile-menu-open"
@@ -489,7 +492,9 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
                                     <div className="text-sm font-semibold text-[#214251]">
                                       {profile.nome}
                                     </div>
-                                    <div className="text-xs text-[#6A8795]">{profile.descricao}</div>
+                                    <div className="text-xs text-[#6A8795]">
+                                      {profile.descricao}
+                                    </div>
                                   </button>
                                 ))}
                               </div>

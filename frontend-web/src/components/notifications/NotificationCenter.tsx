@@ -206,15 +206,15 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'urgent':
-        return 'border-l-red-500 bg-red-50';
+        return 'border-l-red-500';
       case 'high':
-        return 'border-l-orange-500 bg-orange-50';
+        return 'border-l-orange-500';
       case 'medium':
-        return 'border-l-yellow-500 bg-yellow-50';
+        return 'border-l-yellow-500';
       case 'low':
-        return 'border-l-gray-500 bg-gray-50';
+        return 'border-l-gray-500';
       default:
-        return 'border-l-gray-300 bg-white';
+        return 'border-l-gray-300';
     }
   };
 
@@ -301,7 +301,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
           aria-labelledby={panelTitleId}
           tabIndex={-1}
           onKeyDown={handlePanelKeyDown}
-          className="fixed left-2 right-2 top-[calc(env(safe-area-inset-top,0px)+86px)] z-50 flex max-h-[min(72vh,600px)] flex-col rounded-2xl border border-[#D7E4E8] bg-white shadow-lg sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96 sm:max-h-[600px]"
+          className="fixed left-2 right-2 top-[calc(env(safe-area-inset-top,0px)+86px)] z-50 flex max-h-[min(calc(100vh-110px),600px)] flex-col rounded-2xl border border-[#D7E4E8] bg-white shadow-lg sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96 sm:max-h-[min(calc(100vh-120px),600px)]"
         >
           <div className="border-b border-[#E5EEF2] p-4">
             <div className="mb-3 flex items-center justify-between">
@@ -450,7 +450,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                     } ${getPriorityColor(notification.priority)}`}
                   >
                     <div className="flex items-start space-x-3">
-                      <div className="mt-0.5 flex-shrink-0">{getNotificationIcon(notification.type)}</div>
+                      <div className="mt-0.5 flex-shrink-0">
+                        {getNotificationIcon(notification.type)}
+                      </div>
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between">
@@ -463,7 +465,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                               {notification.title}
                             </p>
                             <p className="mt-1 text-sm text-[#607B89]">{notification.message}</p>
-                            <p className="mt-2 text-xs text-[#7A8F9B]">{formatTime(notification.timestamp)}</p>
+                            <p className="mt-2 text-xs text-[#7A8F9B]">
+                              {formatTime(notification.timestamp)}
+                            </p>
                           </div>
 
                           <div className="ml-2 flex items-center space-x-1">
