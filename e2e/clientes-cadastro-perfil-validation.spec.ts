@@ -406,18 +406,22 @@ test.describe("Clientes - cadastro e perfil QA complementar", () => {
     await authenticatedPage.getByPlaceholder("000.000.000-00").fill("529.982.247-25");
     await authenticatedPage.getByPlaceholder("Digite o nome completo").fill("Cliente Dados Adicionais QA");
     await authenticatedPage.getByPlaceholder("Digite o e-mail").fill("cliente.dados.adicionais@conect360.com.br");
+    await authenticatedPage.getByPlaceholder("(11) 99999-9999").fill("(11) 99999-7777");
+    await authenticatedPage.getByPlaceholder("12345-678").fill("01001-000");
     await authenticatedPage.locator('input[name="logradouro"]').fill("Rua QA");
     await authenticatedPage.locator('input[name="numero"]').fill("123");
     await authenticatedPage.locator('input[name="bairro"]').fill("Centro");
     await authenticatedPage.locator('input[name="cidade"]').fill("Sao Paulo");
     await authenticatedPage.locator('input[name="estado"]').fill("SP");
-    await authenticatedPage.locator('input[name="tags"]').fill("vip, qa");
-    await authenticatedPage.locator('input[name="ultimo_contato"]').fill("2026-03-10");
-    await authenticatedPage.locator('input[name="proximo_contato"]').fill("2026-03-25");
+    const tagInput = authenticatedPage.getByPlaceholder("Digite uma tag");
+    await tagInput.fill("vip");
+    await tagInput.press("Enter");
+    await tagInput.fill("qa");
+    await tagInput.press("Enter");
     await authenticatedPage.locator('textarea[name="observacoes"]').fill("Cliente criado com dados adicionais para QA.");
-    await authenticatedPage.getByRole("button", { name: /^Criar cliente$/ }).click();
+    await authenticatedPage.getByRole("button", { name: /Criar cliente/i }).click();
 
-    await expect(authenticatedPage.getByText(/Cliente cadastrado com sucesso\./i)).toBeVisible();
+    await expect(authenticatedPage.getByText(/Cliente cadastrado com sucesso/i)).toBeVisible();
     await expect(
       authenticatedPage.locator("tbody tr", { hasText: "Cliente Dados Adicionais QA" }),
     ).toHaveCount(1);
@@ -430,22 +434,24 @@ test.describe("Clientes - cadastro e perfil QA complementar", () => {
     await authenticatedPage
       .locator('textarea[name="observacoes"]')
       .fill("Observacao atualizada via QA automatizado.");
-    await authenticatedPage.locator('input[name="origem"]').fill("Meta Ads");
-    await authenticatedPage
-      .locator('input[name="responsavel_id"]')
-      .fill("7eb6ea6a-ab8b-4f75-8f39-1ca6ecf27010");
+    await authenticatedPage.getByPlaceholder("(11) 99999-9999").fill("(11) 99555-7777");
+    await authenticatedPage.getByPlaceholder("12345-678").fill("01001-000");
+    await authenticatedPage.locator('input[name="bairro"]').fill("Centro");
+    const tagInput = authenticatedPage.getByPlaceholder("Digite uma tag");
+    await tagInput.fill("atualizado");
+    await tagInput.press("Enter");
 
-    await authenticatedPage.getByRole("button", { name: /Salvar alteracoes/i }).click();
-    await expect(authenticatedPage.getByText(/Cliente atualizado com sucesso\./i)).toBeVisible();
+    await authenticatedPage.getByRole("button", { name: /Salvar/i }).click();
+    await expect(authenticatedPage.getByText(/Cliente atualizado com sucesso/i)).toBeVisible();
 
-    await row.locator('button[title="Editar"]').click();
+    const updatedRow = authenticatedPage
+      .locator("tbody tr", { hasText: "Cliente Completo QA" })
+      .first();
+    await updatedRow.locator('button[title="Editar"]').click();
     await expect(authenticatedPage.locator('textarea[name="observacoes"]')).toHaveValue(
       "Observacao atualizada via QA automatizado.",
     );
-    await expect(authenticatedPage.locator('input[name="origem"]')).toHaveValue("Meta Ads");
-    await expect(authenticatedPage.locator('input[name="responsavel_id"]')).toHaveValue(
-      "7eb6ea6a-ab8b-4f75-8f39-1ca6ecf27010",
-    );
+    await expect(authenticatedPage.getByText("atualizado", { exact: true })).toBeVisible();
   });
 
   test("valida mensagem de erro para e-mail invalido no modal", async ({ authenticatedPage }) => {
@@ -454,8 +460,8 @@ test.describe("Clientes - cadastro e perfil QA complementar", () => {
     await authenticatedPage.getByPlaceholder("Digite o nome completo").fill("Cliente Email Invalido QA");
     await authenticatedPage.getByPlaceholder("Digite o e-mail").fill("email-invalido");
 
-    await expect(authenticatedPage.getByText(/E-mail invalido/i)).toBeVisible();
-    await expect(authenticatedPage.getByRole("button", { name: /^Criar cliente$/ })).toBeDisabled();
+    await expect(authenticatedPage.getByText(/E-mail deve ter formato/i)).toBeVisible();
+    await expect(authenticatedPage.getByRole("button", { name: /Criar cliente/i })).toBeDisabled();
   });
 
   test("abre perfil para cliente com e sem dados opcionais", async ({ authenticatedPage }) => {

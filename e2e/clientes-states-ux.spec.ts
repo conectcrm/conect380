@@ -262,6 +262,7 @@ test.describe("Clientes - estados e UX", () => {
     await authenticatedPage.waitForLoadState("domcontentloaded");
 
     await expect(authenticatedPage.locator("table")).toHaveCount(0);
-    await expect(authenticatedPage.locator('button[title="Abrir perfil"]').first()).toBeVisible();
+    await expect(authenticatedPage.getByText("Cliente UX Alpha")).toBeVisible();
+    await expect(authenticatedPage.getByText("Cliente UX Beta")).toBeVisible();
   });
 });

@@ -54,7 +54,7 @@ test.describe('Pipeline - validacao de estagio (UI)', () => {
   test('exibe erro contextual no modal de mudanca de estagio quando backend retorna 400', async ({ page }) => {
     await bootstrapPipelineUiAuthenticatedSession(page);
     await mockPipelineStageApis(page, async ({ method, pathname, route }) => {
-      if (method === 'PATCH' && /\/oportunidades\/1$/.test(pathname)) {
+      if (method === 'PATCH' && /\/oportunidades\/1\/estagio$/.test(pathname)) {
         await json(route, 400, {
           statusCode: 400,
           message: 'Transicao invalida: leads nao pode ir direto para qualification neste cenario',
@@ -69,7 +69,12 @@ test.describe('Pipeline - validacao de estagio (UI)', () => {
     await expect(page.getByTestId('pipeline-view-kanban')).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('pipeline-card-1')).toBeVisible({ timeout: 15000 });
 
-    await page.getByTestId('pipeline-card-1').dragTo(page.getByTestId('pipeline-column-qualification'));
+    const dragData = await page.evaluateHandle(() => new DataTransfer());
+    const card = page.getByTestId('pipeline-card-1');
+    const qualificationDropzone = page.getByTestId('pipeline-column-dropzone-qualification');
+    await card.dispatchEvent('dragstart', { dataTransfer: dragData });
+    await qualificationDropzone.dispatchEvent('dragover', { dataTransfer: dragData });
+    await qualificationDropzone.dispatchEvent('drop', { dataTransfer: dragData });
 
     await expect(page.getByTestId('modal-mudanca-estagio')).toBeVisible();
     await page.getByTestId('modal-mudanca-estagio-motivo').selectOption('avanco_natural');
@@ -80,25 +85,38 @@ test.describe('Pipeline - validacao de estagio (UI)', () => {
 
   test('fecha modal e move card quando backend aceita a mudanca de estagio', async ({ page }) => {
     await bootstrapPipelineUiAuthenticatedSession(page);
-    await mockPipelineStageApis(page);
-
-    await page.route('**/oportunidades/1', async (route) => {
-      if (route.request().method() !== 'PATCH') {
-        return route.continue();
+    let oportunidades = [{ ...OPORTUNIDADE_STAGE_BASE }];
+    await mockPipelineStageApis(page, async ({ method, pathname, route }) => {
+      if (method === 'GET' && pathname.endsWith('/oportunidades')) {
+        await json(route, 200, oportunidades);
+        return true;
       }
 
-      return json(route, 200, {
-        ...OPORTUNIDADE_STAGE_BASE,
-        estagio: 'qualification',
-        updatedAt: new Date().toISOString(),
-      });
+      if (method === 'PATCH' && /\/oportunidades\/1\/estagio$/.test(pathname)) {
+        oportunidades = [
+          {
+            ...OPORTUNIDADE_STAGE_BASE,
+            estagio: 'qualification',
+            updatedAt: new Date().toISOString(),
+          },
+        ];
+        await json(route, 200, oportunidades[0]);
+        return true;
+      }
+
+      return false;
     });
 
     await page.goto('/pipeline');
     await expect(page.getByTestId('pipeline-view-kanban')).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('pipeline-card-1')).toBeVisible({ timeout: 15000 });
 
-    await page.getByTestId('pipeline-card-1').dragTo(page.getByTestId('pipeline-column-qualification'));
+    const dragData = await page.evaluateHandle(() => new DataTransfer());
+    const card = page.getByTestId('pipeline-card-1');
+    const qualificationDropzone = page.getByTestId('pipeline-column-dropzone-qualification');
+    await card.dispatchEvent('dragstart', { dataTransfer: dragData });
+    await qualificationDropzone.dispatchEvent('dragover', { dataTransfer: dragData });
+    await qualificationDropzone.dispatchEvent('drop', { dataTransfer: dragData });
 
     await expect(page.getByTestId('modal-mudanca-estagio')).toBeVisible();
     await page.getByTestId('modal-mudanca-estagio-motivo').selectOption('avanco_natural');

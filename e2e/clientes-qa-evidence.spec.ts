@@ -516,21 +516,36 @@ test.describe("Clientes - evidencias QA CRM-020", () => {
     await authenticatedPage.getByPlaceholder("000.000.000-00").fill("529.982.247-25");
     await authenticatedPage.getByPlaceholder("Digite o nome completo").fill("Cliente QA Evidencia");
     await authenticatedPage.getByPlaceholder("Digite o e-mail").fill("cliente.qa.evidencia@conect360.com.br");
-    await authenticatedPage.locator('input[name="origem"]').fill("Meta Ads");
-    await authenticatedPage
-      .locator('input[name="responsavel_id"]')
-      .fill("7eb6ea6a-ab8b-4f75-8f39-1ca6ecf27010");
-    await authenticatedPage.locator('input[name="tags"]').fill("vip, qa");
-    await authenticatedPage.getByRole("button", { name: /^Criar cliente$/ }).click();
-    await expect(authenticatedPage.getByText(/Cliente cadastrado com sucesso\./i)).toBeVisible();
+    await authenticatedPage.getByPlaceholder("(11) 99999-9999").fill("(11) 99999-8888");
+    await authenticatedPage.getByPlaceholder("12345-678").fill("01001-000");
+    await authenticatedPage.locator('input[name="logradouro"]').fill("Rua Evidencia");
+    await authenticatedPage.locator('input[name="numero"]').fill("123");
+    await authenticatedPage.locator('input[name="bairro"]').fill("Centro");
+    await authenticatedPage.locator('input[name="cidade"]').fill("Sao Paulo");
+    await authenticatedPage.locator('input[name="estado"]').fill("SP");
+    const createTagInput = authenticatedPage.getByPlaceholder("Digite uma tag");
+    await createTagInput.fill("vip");
+    await createTagInput.press("Enter");
+    await createTagInput.fill("qa");
+    await createTagInput.press("Enter");
+    await authenticatedPage.locator('textarea[name="observacoes"]').fill("Cliente criado para evidencia CRM-020.");
+    await authenticatedPage.getByRole("button", { name: /Criar cliente/i }).click();
+    await expect(authenticatedPage.getByText(/Cliente cadastrado com sucesso/i)).toBeVisible();
     await saveScreenshot(authenticatedPage, EVIDENCE_ARTIFACTS.cadastroSucesso);
 
     await searchInput.fill(BASE_CLIENTE_NOME);
     const baseRow = authenticatedPage.locator("tbody tr", { hasText: BASE_CLIENTE_NOME }).first();
     await baseRow.locator('button[title="Editar"]').click();
-    await authenticatedPage.getByPlaceholder("Observacoes sobre o cliente").fill("Cliente atualizado para evidencia CRM-020.");
-    await authenticatedPage.getByRole("button", { name: /Salvar alteracoes/i }).click();
-    await expect(authenticatedPage.getByText(/Cliente atualizado com sucesso\./i)).toBeVisible();
+    await authenticatedPage.getByPlaceholder("(11) 99999-9999").fill("(11) 98765-4321");
+    await authenticatedPage.getByPlaceholder("12345-678").fill("01001-000");
+    await authenticatedPage.locator('input[name="logradouro"]').fill("Rua Base QA");
+    await authenticatedPage.locator('input[name="numero"]').fill("100");
+    await authenticatedPage.locator('input[name="bairro"]').fill("Centro");
+    await authenticatedPage.locator('input[name="cidade"]').fill("Sao Paulo");
+    await authenticatedPage.locator('input[name="estado"]').fill("SP");
+    await authenticatedPage.locator('textarea[name="observacoes"]').fill("Cliente atualizado para evidencia CRM-020.");
+    await authenticatedPage.getByRole("button", { name: /Salvar altera/i }).click();
+    await expect(authenticatedPage.getByText(/Cliente atualizado com sucesso/i)).toBeVisible();
     await saveScreenshot(authenticatedPage, EVIDENCE_ARTIFACTS.edicaoSucesso);
 
     await baseRow.locator('button[title="Abrir perfil"]').click();

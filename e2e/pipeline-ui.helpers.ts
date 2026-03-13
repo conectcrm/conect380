@@ -78,6 +78,32 @@ export async function mockPipelineUiApis(page: Page, options: PipelineUiMockOpti
       return;
     }
 
+    if (method === 'GET' && pathname.endsWith('/oportunidades/lifecycle/feature-flag')) {
+      return json(route, 200, {
+        enabled: true,
+        source: 'e2e-mock',
+        rolloutPercentage: 100,
+      });
+    }
+
+    if (method === 'GET' && pathname.endsWith('/oportunidades/lifecycle/stale-policy')) {
+      return json(route, 200, {
+        enabled: true,
+        thresholdDays: 14,
+        autoArchiveEnabled: false,
+        autoArchiveAfterDays: 30,
+      });
+    }
+
+    if (method === 'GET' && pathname.endsWith('/oportunidades/stale')) {
+      return json(route, 200, {
+        enabled: true,
+        thresholdDays: 14,
+        generatedAt: new Date().toISOString(),
+        stale: [],
+      });
+    }
+
     if (method === 'GET' && pathname.endsWith('/oportunidades')) {
       return json(route, 200, options.oportunidades);
     }

@@ -8,6 +8,7 @@ import {
 const PROPOSTA_ID = 'prop-acoes-sucesso-e2e-1';
 const PROPOSTA_NUMERO = 'P-2026-E2E-ACOES-SUCESSO';
 const TOKEN_PORTAL = '654321';
+const FRONTEND_ORIGIN = new URL(process.env.FRONTEND_URL || 'http://localhost:3000').origin;
 
 const PROPOSTA_LISTA = {
   id: PROPOSTA_ID,
@@ -184,7 +185,10 @@ const setupPropostasAcoesSucessoApis = async (
         }
       }
 
-      if (url.hostname === 'localhost' && url.port === '3000') {
+      if (
+        url.hostname === 'localhost' &&
+        ['3000', '3300'].includes(url.port)
+      ) {
         if (method === 'GET' && pathname === '/api/whatsapp/status') {
           whatsappStatusCalls += 1;
           await json(route, 200, {
@@ -270,7 +274,7 @@ test.describe('Propostas - acoes comerciais com sucesso', () => {
     expect(shareCalls[0]).toMatchObject({
       title: `Proposta ${PROPOSTA_NUMERO} - ConectCRM`,
       text: 'Proposta comercial para Cliente Acoes Sucesso',
-      url: `http://localhost:3000/portal/${PROPOSTA_NUMERO}/${TOKEN_PORTAL}`,
+      url: `${FRONTEND_ORIGIN}/portal/${PROPOSTA_NUMERO}/${TOKEN_PORTAL}`,
     });
     expect(clipboardWrites).toHaveLength(0);
   });
@@ -307,7 +311,7 @@ test.describe('Propostas - acoes comerciais com sucesso', () => {
 
     const clipboardWrites = await page.evaluate(() => (window as any).__clipboardWrites || []);
     expect(clipboardWrites).toEqual([
-      `http://localhost:3000/portal/${PROPOSTA_NUMERO}/${TOKEN_PORTAL}`,
+      `${FRONTEND_ORIGIN}/portal/${PROPOSTA_NUMERO}/${TOKEN_PORTAL}`,
     ]);
   });
 

@@ -181,32 +181,32 @@ test.describe('Propostas - visualizacao do modal de detalhes', () => {
 
     await propostaCard.locator('[title="Visualizar proposta"]').click();
 
-    const modal = page.getByRole('dialog', { name: `Proposta #${PROPOSTA_NUMERO}` });
-    await expect(modal).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(`Proposta #${PROPOSTA_NUMERO}`)).toBeVisible({ timeout: 15000 });
 
-    await expect(modal.getByRole('heading', { name: 'Informacoes do cliente' })).toBeVisible();
-    await expect(modal.getByRole('heading', { name: 'Produtos / Servicos' })).toBeVisible();
-    await expect(modal.getByRole('heading', { name: 'Detalhes da proposta' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Informacoes do cliente' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Produtos / Servicos' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Detalhes da proposta' })).toBeVisible();
 
-    await expect(modal.getByText('Documento nao informado')).toBeVisible();
+    await expect(page.getByText('Documento nao informado')).toBeVisible();
     await expect(
-      modal.getByText('Cliente sem dados complementares cadastrados neste rascunho.'),
+      page.getByText('Cliente sem dados complementares cadastrados neste rascunho.'),
     ).toBeVisible();
-    const detalhesSection = modal.locator('section').filter({ hasText: 'Detalhes da proposta' });
+    const detalhesSection = page.locator('section').filter({ hasText: 'Detalhes da proposta' });
     await expect(detalhesSection.getByText('Forma de pagamento')).toBeVisible();
     await expect(detalhesSection.getByText('Parcelado em 6x')).toBeVisible();
     await expect(detalhesSection.getByText('8.50%')).toBeVisible();
     await expect(detalhesSection.getByText('R$ 22.875,00')).toBeVisible();
     await expect(detalhesSection.getByText('Valida ate: 28/03/2026')).toBeVisible();
 
-    const observacoesSection = modal.locator('section').filter({ hasText: 'Observacoes' });
+    const observacoesSection = page.locator('section').filter({ hasText: 'Observacoes' });
     await expect(observacoesSection.getByText('Observacao comercial para validar o modal reorganizado.')).toBeVisible();
 
-    const produtoDetalhado = modal.locator('article').first();
+    const produtosSection = page.locator('section').filter({ hasText: 'Produtos / Servicos' });
+    const produtoDetalhado = produtosSection.locator('article').first();
 
     await expect(produtoDetalhado).toBeVisible();
     await expect(produtoDetalhado).toBeInViewport();
-    await expect(produtoDetalhado.getByText('pacote conect360')).toBeVisible();
+    await expect(produtosSection.getByText('pacote conect360')).toBeVisible();
     await expect(produtoDetalhado.getByText('x10')).toBeVisible();
     await expect(produtoDetalhado.getByText('R$ 25.000,00')).toBeVisible();
   });

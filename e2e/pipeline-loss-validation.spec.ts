@@ -70,14 +70,11 @@ test.describe('Pipeline - validacao de perda (UI)', () => {
     await expect(page.getByTestId('pipeline-card-1')).toBeVisible({ timeout: 15000 });
 
     const card = page.getByTestId('pipeline-card-1');
-    const colunaPerdido = page.getByTestId('pipeline-column-lost');
-    await colunaPerdido.scrollIntoViewIfNeeded();
-    await card.dispatchEvent('dragstart');
-    await colunaPerdido.dispatchEvent('dragover');
-    await colunaPerdido.dispatchEvent('drop');
+    await card.getByRole('button', { name: /abrir menu de/i }).click();
+    await page.getByRole('button', { name: 'Marcar como perdido' }).click();
 
     await expect(page.getByTestId('modal-motivo-perda')).toBeVisible();
-    await page.getByTestId('modal-motivo-perda-option-PRECO').click();
+    await page.getByTestId('modal-motivo-perda-option-preco').click();
     await page.getByTestId('modal-motivo-perda-confirmar').click();
 
     await expect(page.getByTestId('modal-motivo-perda-error')).toContainText('Motivo de perda invalido');
@@ -85,19 +82,25 @@ test.describe('Pipeline - validacao de perda (UI)', () => {
 
   test('fecha modal e move card quando backend aceita registrar perda', async ({ page }) => {
     await bootstrapPipelineUiAuthenticatedSession(page);
-    await mockPipelineLossApis(page);
-
-    await page.route('**/oportunidades/1/estagio', async (route) => {
-      if (route.request().method() !== 'PATCH') {
-        return route.continue();
+    let oportunidades = [{ ...OPORTUNIDADE_LOSS_BASE }];
+    await mockPipelineLossApis(page, async ({ method, pathname, route }) => {
+      if (method === 'GET' && pathname.endsWith('/oportunidades')) {
+        await json(route, 200, oportunidades);
+        return true;
       }
 
-      return json(route, 200, {
-        ...OPORTUNIDADE_LOSS_BASE,
-        estagio: 'lost',
-        motivoPerda: 'PRECO',
-        updatedAt: new Date().toISOString(),
-      });
+      if (method === 'PATCH' && /\/oportunidades\/1\/estagio$/.test(pathname)) {
+        oportunidades = [];
+        await json(route, 200, {
+          ...OPORTUNIDADE_LOSS_BASE,
+          estagio: 'lost',
+          motivoPerda: 'PRECO',
+          updatedAt: new Date().toISOString(),
+        });
+        return true;
+      }
+
+      return false;
     });
 
     await page.goto('/pipeline');
@@ -105,17 +108,14 @@ test.describe('Pipeline - validacao de perda (UI)', () => {
     await expect(page.getByTestId('pipeline-card-1')).toBeVisible({ timeout: 15000 });
 
     const card = page.getByTestId('pipeline-card-1');
-    const colunaPerdido = page.getByTestId('pipeline-column-lost');
-    await colunaPerdido.scrollIntoViewIfNeeded();
-    await card.dispatchEvent('dragstart');
-    await colunaPerdido.dispatchEvent('dragover');
-    await colunaPerdido.dispatchEvent('drop');
+    await card.getByRole('button', { name: /abrir menu de/i }).click();
+    await page.getByRole('button', { name: 'Marcar como perdido' }).click();
 
     await expect(page.getByTestId('modal-motivo-perda')).toBeVisible();
-    await page.getByTestId('modal-motivo-perda-option-PRECO').click();
+    await page.getByTestId('modal-motivo-perda-option-preco').click();
     await page.getByTestId('modal-motivo-perda-confirmar').click();
 
     await expect(page.getByTestId('modal-motivo-perda')).toHaveCount(0);
-    await expect(page.getByTestId('pipeline-column-lost').getByTestId('pipeline-card-1')).toBeVisible();
+    await expect(page.getByTestId('pipeline-card-1')).toHaveCount(0);
   });
 });

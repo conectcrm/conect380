@@ -55,6 +55,7 @@ const TermosUsoPage = React.lazy(() => import('./pages/public/TermosUsoPage'));
 const PoliticaPrivacidadePage = React.lazy(() => import('./pages/public/PoliticaPrivacidadePage'));
 
 const ClientesPage = React.lazy(() => import('./features/clientes/ClientesPage'));
+const ClienteDetailPage = React.lazy(() => import('./features/clientes/ClienteDetailPage'));
 const ContatosPage = React.lazy(() => import('./features/contatos/ContatosPage'));
 const LeadsPage = React.lazy(() => import('./pages/LeadsPage'));
 const InteracoesPage = React.lazy(() => import('./pages/InteracoesPage'));
@@ -739,6 +740,10 @@ const AppRoutes: React.FC = () => {
                     element={protegerRota(ModuloEnum.CRM, <ClientesPage />)}
                   />
                   <Route
+                    path="/clientes/:id"
+                    element={protegerRota(ModuloEnum.CRM, <ClienteDetailPage />)}
+                  />
+                  <Route
                     path="/contatos"
                     element={protegerRota(ModuloEnum.CRM, <ContatosPage />)}
                   />
@@ -831,6 +836,10 @@ const AppRoutes: React.FC = () => {
                   <Route
                     path="/crm/clientes"
                     element={protegerRota(ModuloEnum.CRM, <ClientesPage />)}
+                  />
+                  <Route
+                    path="/crm/clientes/:id"
+                    element={protegerRota(ModuloEnum.CRM, <ClienteDetailPage />)}
                   />
                   <Route
                     path="/crm/contatos"
