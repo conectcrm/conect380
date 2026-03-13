@@ -1,4 +1,4 @@
-export { shellTokens, shellSpacing, shellRadius } from './tokens';
+export { shellTokens, shellFieldTokens, shellSpacing, shellRadius } from './tokens';
 export { default as AppShell } from './AppShell';
 export { default as RouteTemplateFrame, resolveTemplateForPath } from './RouteTemplateFrame';
 export { default as PageTemplate } from './templates/PageTemplates';

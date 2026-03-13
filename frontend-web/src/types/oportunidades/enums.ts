@@ -39,12 +39,29 @@ export enum TipoAtividade {
 }
 
 export enum MotivoPerda {
-  PRECO = 'PRECO',
-  CONCORRENTE = 'CONCORRENTE',
-  TIMING = 'TIMING',
-  ORCAMENTO = 'ORCAMENTO',
-  PRODUTO = 'PRODUTO',
-  PROJETO_CANCELADO = 'PROJETO_CANCELADO',
-  SEM_RESPOSTA = 'SEM_RESPOSTA',
-  OUTRO = 'OUTRO',
+  PRECO = 'preco',
+  CONCORRENTE = 'concorrente',
+  TIMING = 'timing',
+  ORCAMENTO = 'orcamento',
+  PRODUTO = 'produto',
+  PROJETO_CANCELADO = 'projeto_cancelado',
+  SEM_RESPOSTA = 'sem_resposta',
+  OUTRO = 'outro',
+}
+
+export enum LifecycleStatusOportunidade {
+  OPEN = 'open',
+  WON = 'won',
+  LOST = 'lost',
+  ARCHIVED = 'archived',
+  DELETED = 'deleted',
+}
+
+export enum LifecycleViewOportunidade {
+  OPEN = 'open',
+  CLOSED = 'closed',
+  ARCHIVED = 'archived',
+  DELETED = 'deleted',
+  ALL_ACTIVE = 'all_active',
+  ALL = 'all',
 }
