@@ -316,6 +316,7 @@ export class OportunidadesController {
       {
         titulo: oportunidade.titulo || `Proposta da oportunidade ${oportunidade.id}`,
         cliente: clientePayload,
+        oportunidadeId: id,
         valor: Number(oportunidade.valor || 0),
         total: Number(oportunidade.valor || 0),
         status: 'rascunho',

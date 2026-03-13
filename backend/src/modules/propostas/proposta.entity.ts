@@ -92,6 +92,9 @@ export class Proposta {
   @Column({ nullable: true })
   source: string;
 
+  @Column({ type: 'uuid', name: 'oportunidade_id', nullable: true })
+  oportunidade_id?: string | null;
+
   @Column({ nullable: true })
   vendedor_id: string;
 
@@ -120,6 +123,14 @@ export class Proposta {
     sentAt?: string;
     emailCliente?: string;
     linkPortal?: string;
+    fluxoStatus?: string;
+    motivoPerda?: string;
+    historicoEventos?: Array<Record<string, unknown>>;
+    portalEventos?: Array<Record<string, unknown>>;
+    versoes?: Array<Record<string, unknown>>;
+    aprovacaoInterna?: Record<string, unknown>;
+    lembretes?: Array<Record<string, unknown>>;
+    [key: string]: unknown;
   };
 
   @CreateDateColumn()

@@ -6,15 +6,36 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   Min,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
+
+const parseOptionalNumber = ({ value }: { value: unknown }) => {
+  if (value === '' || value === null || value === undefined) {
+    return undefined;
+  }
+
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : value;
+};
+
+const parseOptionalInteger = ({ value }: { value: unknown }) => {
+  if (value === '' || value === null || value === undefined) {
+    return undefined;
+  }
+
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isInteger(parsed) ? parsed : value;
+};
 
 export interface PropostaDto {
   id: string;
   numero: string;
   titulo?: string;
   status: string;
+  motivoPerda?: string;
   cliente: string;
   valor: number;
   createdAt: string;
@@ -31,12 +52,20 @@ export interface PropostaDto {
         ativo: boolean;
       };
   formaPagamento?: string;
+  parcelas?: number;
   validadeDias?: number;
+  oportunidade?: {
+    id: string;
+    titulo: string;
+    estagio: string;
+    valor: number;
+  };
+  isPropostaPrincipal?: boolean;
 }
 
 // DTO permissivo para preservar compatibilidade com payloads legados do frontend.
 // Valida apenas campos conhecidos no topo, sem bloquear estruturas extras enquanto
-// o contrato do modulo ainda está sendo normalizado.
+// o contrato do modulo ainda esta sendo normalizado.
 export class CriarPropostaDto {
   @IsOptional()
   @IsString()
@@ -50,26 +79,41 @@ export class CriarPropostaDto {
   clienteId?: string;
 
   @IsOptional()
+  @Transform(({ value }) => {
+    if (value === '' || value === null || value === undefined) {
+      return undefined;
+    }
+    return String(value).trim();
+  })
+  @IsUUID()
+  oportunidadeId?: string;
+
+  @IsOptional()
   @IsArray()
   produtos?: Array<Record<string, unknown>>;
 
   @IsOptional()
+  @Transform(parseOptionalNumber)
   @IsNumber()
   subtotal?: number;
 
   @IsOptional()
+  @Transform(parseOptionalNumber)
   @IsNumber()
   descontoGlobal?: number;
 
   @IsOptional()
+  @Transform(parseOptionalNumber)
   @IsNumber()
   impostos?: number;
 
   @IsOptional()
+  @Transform(parseOptionalNumber)
   @IsNumber()
   total?: number;
 
   @IsOptional()
+  @Transform(parseOptionalNumber)
   @IsNumber()
   valor?: number;
 
@@ -78,6 +122,14 @@ export class CriarPropostaDto {
   formaPagamento?: string;
 
   @IsOptional()
+  @Transform(parseOptionalInteger)
+  @IsInt()
+  @Min(1)
+  @Max(24)
+  parcelas?: number;
+
+  @IsOptional()
+  @Transform(parseOptionalInteger)
   @IsInt()
   @Min(1)
   @Max(3650)
@@ -120,26 +172,41 @@ export class AtualizarPropostaDto {
   cliente?: string | Record<string, unknown>;
 
   @IsOptional()
+  @Transform(({ value }) => {
+    if (value === '' || value === null || value === undefined) {
+      return undefined;
+    }
+    return String(value).trim();
+  })
+  @IsUUID()
+  oportunidadeId?: string;
+
+  @IsOptional()
   @IsArray()
   produtos?: Array<Record<string, unknown>>;
 
   @IsOptional()
+  @Transform(parseOptionalNumber)
   @IsNumber()
   subtotal?: number;
 
   @IsOptional()
+  @Transform(parseOptionalNumber)
   @IsNumber()
   descontoGlobal?: number;
 
   @IsOptional()
+  @Transform(parseOptionalNumber)
   @IsNumber()
   impostos?: number;
 
   @IsOptional()
+  @Transform(parseOptionalNumber)
   @IsNumber()
   total?: number;
 
   @IsOptional()
+  @Transform(parseOptionalNumber)
   @IsNumber()
   valor?: number;
 
@@ -148,6 +215,14 @@ export class AtualizarPropostaDto {
   formaPagamento?: string;
 
   @IsOptional()
+  @Transform(parseOptionalInteger)
+  @IsInt()
+  @Min(1)
+  @Max(24)
+  parcelas?: number;
+
+  @IsOptional()
+  @Transform(parseOptionalInteger)
   @IsInt()
   @Min(1)
   @Max(3650)
@@ -192,6 +267,10 @@ export class AtualizarStatusDto {
   @IsOptional()
   @IsString()
   observacoes?: string;
+
+  @IsOptional()
+  @IsString()
+  motivoPerda?: string;
 }
 
 export interface PropostaResponseDto {
