@@ -6,6 +6,10 @@ import { BaseModal, ModalButton } from '../../../components/modals/BaseModal';
 import { produtosService } from '../../../services/produtosService';
 import { toastService } from '../../../services/toastService';
 import {
+  MENSAGEM_PROPOSTA_SEM_ITENS,
+  propostaPossuiItensComerciais,
+} from '../utils/propostaItens';
+import {
   User,
   Calendar,
   MapPin,
@@ -25,6 +29,7 @@ interface ModalVisualizarPropostaProps {
   isOpen: boolean;
   onClose: () => void;
   proposta: PropostaCompleta | null;
+  onEditProposta?: (proposta: PropostaCompleta) => void;
   onPropostaUpdated?: () => void;
 }
 
@@ -138,6 +143,33 @@ const formatDateTime = (date: Date | string | undefined | null) => {
   const d = new Date(date);
   if (Number.isNaN(d.getTime())) return '-';
   return d.toLocaleString('pt-BR');
+};
+
+const descreverFormaPagamento = (formaPagamento: unknown, parcelas?: unknown) => {
+  const normalized = String(formaPagamento || '')
+    .trim()
+    .toLowerCase();
+
+  if (normalized === 'avista' || normalized === 'a_vista' || normalized === 'a-vista') {
+    return 'A vista';
+  }
+
+  if (normalized === 'boleto') {
+    return 'Boleto';
+  }
+
+  if (normalized === 'cartao' || normalized === 'cartao_credito') {
+    return 'Cartao';
+  }
+
+  if (normalized === 'parcelado') {
+    const totalParcelas = Number(parcelas);
+    return Number.isFinite(totalParcelas) && totalParcelas > 1
+      ? `Parcelado em ${totalParcelas}x`
+      : 'Parcelado';
+  }
+
+  return normalized ? normalized.replace(/_/g, ' ') : 'Nao informado';
 };
 
 const getStatusColor = (status?: string) => {
@@ -460,6 +492,7 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
   isOpen,
   onClose,
   proposta,
+  onEditProposta,
   onPropostaUpdated,
 }) => {
   const [historico, setHistorico] = useState<HistoricoResposta | null>(null);
@@ -731,6 +764,8 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
   }, [historico?.log]);
 
   if (!proposta) return null;
+  const propostaSemItens = !propostaPossuiItensComerciais(proposta);
+  const propostaEditavel = String(proposta.status || '').trim().toLowerCase() === 'rascunho';
 
   const versaoSnapshotAtual = (() => {
     if (!historico?.versoes || historico.versoes.length === 0) {
@@ -831,6 +866,14 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
       })
       .filter((item) => item.nome.trim().length > 0);
   })();
+  const subtotalProposta = Number(proposta.subtotal || 0);
+  const totalProposta = Number(proposta.total || 0);
+  const descontoGlobalPercentual = Number(proposta.descontoGlobal || 0);
+  const impostosPercentual = Number(proposta.impostos || 0);
+  const formaPagamentoDescricao = descreverFormaPagamento(
+    proposta.formaPagamento,
+    proposta.parcelas,
+  );
 
   const missingIdsKey = (() => {
     const missingIds = Array.from(
@@ -923,9 +966,17 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
 
       <div className="mb-4 rounded-xl border border-[#E2ECF0] bg-[#F7FBFC] p-3 sm:p-4">
         <h4 className="mb-3 text-sm font-medium text-[#19384C]">Compartilhar proposta</h4>
+        {propostaSemItens && propostaEditavel && (
+          <div className="mb-3 rounded-lg border border-[#F4D58D] bg-[#FFF7ED] px-3 py-2 text-xs text-[#92400E]">
+            {MENSAGEM_PROPOSTA_SEM_ITENS}
+          </div>
+        )}
         <PropostaActions
           proposta={proposta}
           onViewProposta={() => {}}
+          onEditProposta={
+            onEditProposta ? (propostaAtual) => onEditProposta(propostaAtual as PropostaCompleta) : undefined
+          }
           onPropostaUpdated={onPropostaUpdated}
           showLabels={true}
           hideView={true}
@@ -1300,160 +1351,87 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
         )}
       </div>
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <div className="space-y-4">
-            <h4 className="border-b border-[#E2ECF0] pb-2 text-lg font-semibold text-[#19384C]">Informacoes do cliente</h4>
-
-            <div className="space-y-3">
-              <div className="flex items-center">
-                <User className="mr-3 h-4 w-4 text-[#8BA0AA]" />
-                <div>
-                  <p className="text-sm font-medium text-[#19384C]">{proposta.cliente?.nome || 'Nome nao informado'}</p>
-                  <p className="text-xs text-[#607B89]">
-                    {proposta.cliente?.tipoPessoa === 'juridica' ? 'Pessoa Juridica' : 'Pessoa Fisica'}
-                  </p>
-                </div>
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] xl:gap-6">
+          <div className="space-y-5">
+            <section className="rounded-xl border border-[#DCE7EC] bg-white p-4">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#E2ECF0] pb-3">
+                <h4 className="text-lg font-semibold text-[#19384C]">Informacoes do cliente</h4>
+                <span className="rounded-full bg-[#F1F7FA] px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#486572]">
+                  {proposta.cliente?.tipoPessoa === 'juridica' ? 'Pessoa juridica' : 'Pessoa fisica'}
+                </span>
               </div>
 
-              {proposta.cliente?.email && (
-                <div className="flex items-center">
-                  <Mail className="mr-3 h-4 w-4 text-[#8BA0AA]" />
-                  <span className="text-sm text-[#355166]">{proposta.cliente.email}</span>
-                </div>
-              )}
-
-              {proposta.cliente?.telefone && (
-                <div className="flex items-center">
-                  <Phone className="mr-3 h-4 w-4 text-[#8BA0AA]" />
-                  <span className="text-sm text-[#355166]">{proposta.cliente.telefone}</span>
-                </div>
-              )}
-
-              {proposta.cliente?.endereco && (
-                <div className="flex items-center">
-                  <MapPin className="mr-3 h-4 w-4 text-[#8BA0AA]" />
-                  <span className="text-sm text-[#355166]">
-                    {proposta.cliente.endereco}
-                    {proposta.cliente.cidade && `, ${proposta.cliente.cidade}`}
-                    {proposta.cliente.estado && ` - ${proposta.cliente.estado}`}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h4 className="border-b border-[#E2ECF0] pb-2 text-lg font-semibold text-[#19384C]">Detalhes da proposta</h4>
-
-            <div className="space-y-3">
-              <div className="rounded-md border border-[#E2ECF0] bg-white p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[#607B89]">
-                  O que esta sendo negociado
-                </p>
-                {itensNegociados.length > 0 ? (
-                  <>
-                    <ul className="mt-2 space-y-1">
-                      {itensNegociados.slice(0, 3).map((item, index) => {
-                        const nomeResolvido =
-                          item.nome.startsWith('Item ') &&
-                          item.produtoId &&
-                          nomesProdutosPorId[item.produtoId]
-                            ? nomesProdutosPorId[item.produtoId]
-                            : item.nome;
-
-                        return (
-                          <li
-                            key={`${item.produtoId || item.nome}-${item.quantidade}-${index}`}
-                            className="flex items-start justify-between gap-3 text-sm"
-                          >
-                            <span className="text-[#19384C]">
-                              {nomeResolvido}
-                              {getComposicaoDetalhes(item).length > 0 && (
-                                  <span className="mt-0.5 block text-xs text-[#35538A]">
-                                    {getComposicaoDetalhes(item)[0]}
-                                    {(item.componentesPlano?.length || 0) > 1
-                                      ? ` +${(item.componentesPlano?.length || 0) - 1}`
-                                      : ''}
-                                  </span>
-                                )}
-                            </span>
-                            <span className="text-[#607B89]">x{Math.max(1, item.quantidade || 1)}</span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                    {itensNegociados.length > 3 && (
-                      <p className="mt-2 text-xs text-[#607B89]">
-                        + {itensNegociados.length - 3} item(ns)
-                      </p>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <User className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[#19384C]">
+                      {proposta.cliente?.nome || 'Nome nao informado'}
+                    </p>
+                    {proposta.cliente?.documento ? (
+                      <p className="text-xs text-[#607B89]">Documento: {proposta.cliente.documento}</p>
+                    ) : (
+                      <p className="text-xs text-[#607B89]">Documento nao informado</p>
                     )}
-                  </>
-                ) : loadingCiclo ? (
-                  <div className="mt-2 flex items-center gap-2 text-sm text-[#607B89]">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Carregando itens...
                   </div>
-                ) : (
-                  <p className="mt-2 text-sm text-[#355166]">{proposta.titulo || 'Proposta comercial'}</p>
+                </div>
+
+                {proposta.cliente?.email && (
+                  <div className="flex items-start gap-3">
+                    <Mail className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
+                    <span className="text-sm text-[#355166]">{proposta.cliente.email}</span>
+                  </div>
+                )}
+
+                {proposta.cliente?.telefone && (
+                  <div className="flex items-start gap-3">
+                    <Phone className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
+                    <span className="text-sm text-[#355166]">{proposta.cliente.telefone}</span>
+                  </div>
+                )}
+
+                {proposta.cliente?.endereco && (
+                  <div className="flex items-start gap-3">
+                    <MapPin className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
+                    <span className="text-sm text-[#355166]">
+                      {proposta.cliente.endereco}
+                      {proposta.cliente.cidade && `, ${proposta.cliente.cidade}`}
+                      {proposta.cliente.estado && ` - ${proposta.cliente.estado}`}
+                    </span>
+                  </div>
+                )}
+
+                {!proposta.cliente?.email &&
+                  !proposta.cliente?.telefone &&
+                  !proposta.cliente?.endereco && (
+                    <div className="rounded-lg border border-dashed border-[#DCE7EC] bg-[#FAFCFD] px-3 py-2 text-xs text-[#607B89]">
+                      Cliente sem dados complementares cadastrados neste rascunho.
+                    </div>
+                  )}
+              </div>
+            </section>
+
+            <section className="rounded-xl border border-[#DCE7EC] bg-white p-4">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#E2ECF0] pb-3">
+                <h4 className="text-lg font-semibold text-[#19384C]">Produtos / Servicos</h4>
+                {itensNegociados.length > 0 && (
+                  <span className="rounded-full bg-[#F1F7FA] px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#486572]">
+                    {itensNegociados.length} item(ns)
+                  </span>
                 )}
               </div>
 
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-[#607B89]">Subtotal:</span>
-                <span className="text-sm font-medium">{formatCurrency(proposta.subtotal)}</span>
-              </div>
-
-              <div className="flex items-center justify-between border-t pt-2">
-                <span className="text-base font-semibold text-[#19384C]">Total:</span>
-                <span className="text-lg font-bold text-[#159A9C]">{formatCurrency(proposta.total)}</span>
-              </div>
-
-              <div className="flex items-center">
-                <Calendar className="mr-3 h-4 w-4 text-[#8BA0AA]" />
-                <div>
-                  <p className="text-sm font-medium text-[#19384C]">Valida ate: {formatDate(proposta.dataValidade)}</p>
-                  <p className="text-xs text-[#607B89]">Criada em: {proposta.criadaEm ? formatDate(proposta.criadaEm) : 'N/A'}</p>
-                </div>
-              </div>
-
-              {typeof proposta.vendedor === 'object' && (
-                <div className="flex items-center">
-                  <Building className="mr-3 h-4 w-4 text-[#8BA0AA]" />
-                  <div>
-                    <p className="text-sm font-medium text-[#19384C]">{proposta.vendedor.nome}</p>
-                    <p className="text-xs text-[#607B89]">Vendedor responsavel</p>
+              {itensNegociados.length === 0 ? (
+                loadingCiclo ? (
+                  <div className="flex items-center gap-2 text-sm text-[#607B89]">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Carregando itens negociados...
                   </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-6">
-          <h4 className="mb-3 border-b border-[#E2ECF0] pb-2 text-lg font-semibold text-[#19384C]">Produtos / Servicos</h4>
-
-          {itensNegociados.length === 0 ? (
-            loadingCiclo ? (
-              <div className="flex items-center gap-2 text-sm text-[#607B89]">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Carregando itens negociados...
-              </div>
-            ) : (
-            <p className="text-sm text-[#607B89]">Nenhum item informado nesta proposta.</p>
-            )
-          ) : (
-            <div className="overflow-x-auto rounded-md border border-[#E2ECF0] bg-white">
-              <table className="min-w-full divide-y divide-[#E4EDF0]">
-                <thead className="bg-[#F7FBFC]">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[#607B89]">Produto</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[#607B89]">Qtd</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[#607B89]">Preco Unit.</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-[#607B89]">Desconto</th>
-                    <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-[#607B89]">Subtotal</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#E4EDF0] bg-white">
+                ) : (
+                  <p className="text-sm text-[#607B89]">Nenhum item informado nesta proposta.</p>
+                )
+              ) : (
+                <div className="space-y-3">
                   {itensNegociados.map((item, index) => {
                     const nomeProdutoRaw = item?.nome || 'Produto/Servico';
                     const nomeProduto =
@@ -1464,60 +1442,219 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
                         : nomeProdutoRaw;
                     const descricaoProduto = item?.descricao || '';
                     const precoUnit = Number(item?.precoUnitario || 0);
-                    const quantidade = Number(item?.quantidade || 0);
+                    const quantidade = Math.max(1, Number(item?.quantidade || 0));
                     const desconto = Number(item?.desconto || 0);
                     const subtotal = Number(item?.subtotal || 0);
+                    const composicaoDetalhes = getComposicaoDetalhes(item);
 
                     return (
-                      <tr key={`${item.produtoId || nomeProduto}-${index}`}>
-                        <td className="px-4 py-2 align-top">
-                          <div>
-                            <div className="text-sm font-medium text-[#19384C]">{nomeProduto}</div>
+                      <article
+                        key={`${item.produtoId || nomeProduto}-${index}`}
+                        className="rounded-lg border border-[#E2ECF0] bg-[#FBFDFD] p-3"
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-[#19384C]">{nomeProduto}</p>
                             {descricaoProduto ? (
-                              <div className="text-xs text-[#607B89]">{descricaoProduto}</div>
+                              <p className="mt-1 text-xs text-[#607B89]">{descricaoProduto}</p>
                             ) : null}
-                            {getComposicaoDetalhes(item).length > 0 && (
-                              <div className="mt-1 space-y-1 rounded-md border border-[#D4E2E7] bg-[#F8FBFC] px-2 py-1.5">
-                                {getComposicaoDetalhes(item).map((detalhe, detalheIndex) => (
-                                  <p
-                                    key={`${item.produtoId || nomeProduto}-comp-${detalheIndex}`}
-                                    className="text-xs text-[#35538A]"
-                                  >
-                                    {detalhe}
-                                  </p>
-                                ))}
-                                {(item.componentesPlano?.length || 0) > 3 && (
-                                  <p className="text-xs font-medium text-[#607B89]">
-                                    +{(item.componentesPlano?.length || 0) - 3} componente(s)
-                                  </p>
-                                )}
-                              </div>
+                          </div>
+                          <span className="inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[#486572] shadow-sm ring-1 ring-[#DCE7EC]">
+                            x{quantidade}
+                          </span>
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                          <div className="rounded-md bg-white px-3 py-2 ring-1 ring-[#E7EFF3]">
+                            <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Qtd</p>
+                            <p className="mt-1 text-sm font-semibold text-[#19384C]">{quantidade}</p>
+                          </div>
+                          <div className="rounded-md bg-white px-3 py-2 ring-1 ring-[#E7EFF3]">
+                            <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Unitario</p>
+                            <p className="mt-1 text-sm font-semibold text-[#19384C]">
+                              {formatCurrency(precoUnit)}
+                            </p>
+                          </div>
+                          <div className="rounded-md bg-white px-3 py-2 ring-1 ring-[#E7EFF3]">
+                            <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Desconto</p>
+                            <p className="mt-1 text-sm font-semibold text-[#19384C]">{desconto}%</p>
+                          </div>
+                          <div className="rounded-md bg-white px-3 py-2 ring-1 ring-[#E7EFF3]">
+                            <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Subtotal</p>
+                            <p className="mt-1 text-sm font-semibold text-[#159A9C]">
+                              {formatCurrency(subtotal)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {composicaoDetalhes.length > 0 && (
+                          <div className="mt-3 space-y-1 rounded-md border border-[#D4E2E7] bg-white px-3 py-2">
+                            {composicaoDetalhes.map((detalhe, detalheIndex) => (
+                              <p
+                                key={`${item.produtoId || nomeProduto}-comp-${detalheIndex}`}
+                                className="text-xs text-[#35538A]"
+                              >
+                                {detalhe}
+                              </p>
+                            ))}
+                            {(item.componentesPlano?.length || 0) > 3 && (
+                              <p className="text-xs font-medium text-[#607B89]">
+                                +{(item.componentesPlano?.length || 0) - 3} componente(s)
+                              </p>
                             )}
                           </div>
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-2 text-sm text-[#19384C]">{quantidade}</td>
-                        <td className="whitespace-nowrap px-4 py-2 text-sm text-[#19384C]">
-                          {formatCurrency(precoUnit)}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-2 text-sm text-[#19384C]">{desconto}%</td>
-                        <td className="whitespace-nowrap px-4 py-2 text-right text-sm text-[#19384C]">
-                          {formatCurrency(subtotal)}
-                        </td>
-                      </tr>
+                        )}
+                      </article>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                </div>
+              )}
+            </section>
 
-        {proposta.observacoes && (
-          <div className="mt-6">
-            <h4 className="mb-4 border-b border-[#E2ECF0] pb-2 text-lg font-semibold text-[#19384C]">Observacoes</h4>
-            <p className="whitespace-pre-wrap text-sm text-[#355166]">{proposta.observacoes}</p>
+            {proposta.observacoes && (
+              <section className="rounded-xl border border-[#DCE7EC] bg-white p-4">
+                <h4 className="mb-3 border-b border-[#E2ECF0] pb-2 text-lg font-semibold text-[#19384C]">
+                  Observacoes
+                </h4>
+                <p className="whitespace-pre-wrap text-sm text-[#355166]">{proposta.observacoes}</p>
+              </section>
+            )}
           </div>
-        )}
+
+          <div className="space-y-5">
+            <section className="rounded-xl border border-[#DCE7EC] bg-white p-4">
+              <h4 className="mb-4 border-b border-[#E2ECF0] pb-3 text-lg font-semibold text-[#19384C]">
+                Detalhes da proposta
+              </h4>
+
+              <div className="rounded-lg border border-[#E2ECF0] bg-[#FBFDFD] p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#607B89]">
+                  O que esta sendo negociado
+                </p>
+                {itensNegociados.length > 0 ? (
+                  <>
+                    <ul className="mt-2 space-y-1.5">
+                      {itensNegociados.slice(0, 4).map((item, index) => {
+                        const nomeResolvido =
+                          item.nome.startsWith('Item ') &&
+                          item.produtoId &&
+                          nomesProdutosPorId[item.produtoId]
+                            ? nomesProdutosPorId[item.produtoId]
+                            : item.nome;
+                        const composicaoDetalhes = getComposicaoDetalhes(item);
+
+                        return (
+                          <li
+                            key={`${item.produtoId || item.nome}-${item.quantidade}-${index}`}
+                            className="flex items-start justify-between gap-3 text-sm"
+                          >
+                            <span className="min-w-0 text-[#19384C]">
+                              {nomeResolvido}
+                              {composicaoDetalhes.length > 0 && (
+                                <span className="mt-0.5 block text-xs text-[#35538A]">
+                                  {composicaoDetalhes[0]}
+                                  {(item.componentesPlano?.length || 0) > 1
+                                    ? ` +${(item.componentesPlano?.length || 0) - 1}`
+                                    : ''}
+                                </span>
+                              )}
+                            </span>
+                            <span className="whitespace-nowrap text-[#607B89]">
+                              x{Math.max(1, item.quantidade || 1)}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    {itensNegociados.length > 4 && (
+                      <p className="mt-2 text-xs text-[#607B89]">
+                        + {itensNegociados.length - 4} item(ns)
+                      </p>
+                    )}
+                  </>
+                ) : loadingCiclo ? (
+                  <div className="mt-2 flex items-center gap-2 text-sm text-[#607B89]">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Carregando itens...
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-[#355166]">
+                    {proposta.titulo || 'Proposta comercial'}
+                  </p>
+                )}
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-md bg-[#F8FBFC] px-3 py-2 ring-1 ring-[#E7EFF3]">
+                  <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Subtotal</p>
+                  <p className="mt-1 text-sm font-semibold text-[#19384C]">
+                    {formatCurrency(subtotalProposta)}
+                  </p>
+                </div>
+                <div className="rounded-md bg-[#F8FBFC] px-3 py-2 ring-1 ring-[#E7EFF3]">
+                  <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Desconto global</p>
+                  <p className="mt-1 text-sm font-semibold text-[#19384C]">
+                    {descontoGlobalPercentual.toFixed(2)}%
+                  </p>
+                </div>
+                <div className="rounded-md bg-[#F8FBFC] px-3 py-2 ring-1 ring-[#E7EFF3]">
+                  <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Impostos</p>
+                  <p className="mt-1 text-sm font-semibold text-[#19384C]">
+                    {impostosPercentual.toFixed(2)}%
+                  </p>
+                </div>
+                <div className="rounded-md bg-[#F2FBF8] px-3 py-2 ring-1 ring-[#D5ECE3]">
+                  <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Total</p>
+                  <p className="mt-1 text-lg font-bold text-[#159A9C]">
+                    {formatCurrency(totalProposta)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-md border border-[#E2ECF0] bg-white p-3">
+                  <div className="flex items-start gap-3">
+                    <Calendar className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
+                    <div>
+                      <p className="text-sm font-medium text-[#19384C]">
+                        Valida ate: {formatDate(proposta.dataValidade)}
+                      </p>
+                      <p className="text-xs text-[#607B89]">
+                        Criada em: {proposta.criadaEm ? formatDate(proposta.criadaEm) : 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-md border border-[#E2ECF0] bg-white p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-[#607B89]">
+                    Forma de pagamento
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-[#19384C]">
+                    {formaPagamentoDescricao}
+                  </p>
+                  {Number.isFinite(Number(proposta.parcelas)) && Number(proposta.parcelas) > 1 && (
+                    <p className="mt-1 text-xs text-[#607B89]">
+                      Parcelas: {Number(proposta.parcelas)}x
+                    </p>
+                  )}
+                </div>
+
+                {typeof proposta.vendedor === 'object' ? (
+                  <div className="rounded-md border border-[#E2ECF0] bg-white p-3 sm:col-span-2">
+                    <div className="flex items-start gap-3">
+                      <Building className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
+                      <div>
+                        <p className="text-sm font-medium text-[#19384C]">{proposta.vendedor.nome}</p>
+                        <p className="text-xs text-[#607B89]">Vendedor responsavel</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </section>
+          </div>
+        </div>
 
     </BaseModal>
   );

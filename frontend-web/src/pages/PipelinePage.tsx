@@ -49,6 +49,7 @@ import {
   Bookmark,
   Archive,
   RotateCcw,
+  CheckCircle,
   SlidersHorizontal,
   MoreHorizontal,
 } from 'lucide-react';
@@ -630,6 +631,19 @@ const PipelinePage: React.FC = () => {
     return LifecycleStatusOportunidade.OPEN;
   };
 
+  const isTerminalStage = (estagio: EstagioOportunidade): boolean =>
+    estagio === EstagioOportunidade.GANHO || estagio === EstagioOportunidade.PERDIDO;
+
+  const canMarkOpportunityAsWon = (oportunidade: Oportunidade): boolean =>
+    lifecycleFeatureEnabled &&
+    getLifecycleStatus(oportunidade) === LifecycleStatusOportunidade.OPEN &&
+    oportunidade.estagio === EstagioOportunidade.FECHAMENTO;
+
+  const canMarkOpportunityAsLost = (oportunidade: Oportunidade): boolean =>
+    lifecycleFeatureEnabled &&
+    getLifecycleStatus(oportunidade) === LifecycleStatusOportunidade.OPEN &&
+    !isTerminalStage(oportunidade.estagio);
+
   const canManipulateKanban =
     !lifecycleFeatureEnabled || lifecycleView === LifecycleViewOportunidade.OPEN;
 
@@ -697,6 +711,73 @@ const PipelinePage: React.FC = () => {
     await oportunidadesService.reabrirOportunidade(oportunidade.id);
     toastService.success('Oportunidade reaberta com sucesso.');
     await carregarDados();
+  };
+
+  const handlePrepararPerdaOportunidade = (oportunidade: Oportunidade) => {
+    if (!canMarkOpportunityAsLost(oportunidade)) {
+      toastService.warning('Apenas oportunidades abertas podem ser marcadas como perdidas.');
+      return;
+    }
+
+    setOpenCardActionsMenuId(null);
+    setOpenListActionsMenuId(null);
+    setErroMotivoPerda(null);
+    setDraggedItem(null);
+    setOportunidadeParaPerder(oportunidade);
+    setShowModalMotivoPerda(true);
+  };
+
+  const handleMarcarOportunidadeComoGanha = async (oportunidade: Oportunidade) => {
+    if (!canMarkOpportunityAsWon(oportunidade)) {
+      toastService.warning(
+        'Somente oportunidades abertas em Fechamento podem ser marcadas como ganho.',
+      );
+      return;
+    }
+
+    const confirmou = await confirm({
+      title: 'Marcar oportunidade como ganha',
+      message:
+        'Ao confirmar, a oportunidade sera encerrada como ganha e saira da visao Abertas.',
+      confirmText: 'Marcar como ganho',
+      cancelText: 'Cancelar',
+      confirmButtonClass: 'bg-green-600 hover:bg-green-700 focus:ring-green-500',
+      icon: 'success',
+    });
+
+    if (!confirmou) {
+      return;
+    }
+
+    try {
+      setLoadingMudancaEstagio(true);
+      setErroMudancaEstagio(null);
+      setOpenCardActionsMenuId(null);
+      setOpenListActionsMenuId(null);
+      setDraggedItem(null);
+
+      await oportunidadesService.atualizarEstagio(oportunidade.id, {
+        estagio: EstagioOportunidade.GANHO,
+      });
+
+      if (oportunidadeDetalhes?.id === oportunidade.id) {
+        setOportunidadeDetalhes(null);
+      }
+
+      await carregarDados();
+      toastService.success('Oportunidade marcada como ganha com sucesso!');
+    } catch (err) {
+      console.error('Erro ao marcar oportunidade como ganha:', err);
+      const errorMessage = extrairMensagemErroApi(
+        err,
+        'Erro ao marcar oportunidade como ganha',
+      );
+      toastService.error(errorMessage);
+      setErroMudancaEstagio(errorMessage);
+      setError(errorMessage);
+    } finally {
+      setLoadingMudancaEstagio(false);
+    }
   };
 
   const handleExcluirPermanenteOportunidade = async (oportunidade: Oportunidade) => {
@@ -776,10 +857,10 @@ const PipelinePage: React.FC = () => {
 
     try {
       const response = await oportunidadesService.gerarProposta(oportunidade.id);
-      toastService.success('Proposta gerada com sucesso!');
+      toastService.success('Rascunho de proposta criado. Complete os itens na tela de Propostas.');
 
       // Redirecionar para a página de propostas com a proposta recém-criada
-      navigate(`/vendas/propostas?proposta=${response.proposta.id}`);
+      navigate(`/vendas/propostas?proposta=${response.proposta.id}&mode=edit&origem=pipeline`);
     } catch (err: unknown) {
       console.error('Erro ao gerar proposta:', err);
       const errorMessage = err instanceof Error ? err.message : 'Erro ao gerar proposta';
@@ -866,6 +947,17 @@ const PipelinePage: React.FC = () => {
   // Salvar oportunidade (criar ou atualizar)
   const handleSalvarOportunidade = async (data: NovaOportunidade) => {
     try {
+      const estagioAlterado =
+        !oportunidadeEditando || oportunidadeEditando.estagio !== data.estagio;
+      if (lifecycleFeatureEnabled && estagioAlterado && isTerminalStage(data.estagio)) {
+        const mensagem =
+          data.estagio === EstagioOportunidade.GANHO
+            ? 'Use a acao "Marcar como ganho" para encerrar a oportunidade.'
+            : 'Use a acao "Marcar como perdido" para registrar a perda com motivo.';
+        toastService.warning(mensagem);
+        throw new Error(mensagem);
+      }
+
       if (oportunidadeEditando) {
         // Atualizar existente
         await oportunidadesService.atualizarOportunidade({ id: oportunidadeEditando.id, ...data });
@@ -1130,6 +1222,17 @@ const PipelinePage: React.FC = () => {
       return;
     }
 
+    if (
+      lifecycleFeatureEnabled &&
+      (novoEstagio === EstagioOportunidade.GANHO || novoEstagio === EstagioOportunidade.PERDIDO)
+    ) {
+      toastService.warning(
+        'Use as acoes "Marcar como ganho" ou "Marcar como perdido" para encerrar a oportunidade.',
+      );
+      setDraggedItem(null);
+      return;
+    }
+
     // ✅ Se for movido para PERDIDO, abrir modal de motivo de perda
     const permitidos = ALLOWED_STAGE_TRANSITIONS[estagioAtual] || [];
     if (!permitidos.includes(novoEstagio)) {
@@ -1264,6 +1367,9 @@ const PipelinePage: React.FC = () => {
       setOportunidadeParaPerder(null);
       setDraggedItem(null);
       setErroMotivoPerda(null);
+      if (oportunidadeDetalhes?.id === oportunidadeParaPerder.id) {
+        setOportunidadeDetalhes(null);
+      }
 
       toastService.success('Oportunidade marcada como perdida com sucesso!');
     } catch (err: any) {
@@ -2443,6 +2549,11 @@ const PipelinePage: React.FC = () => {
                             oportunidade.estagio === EstagioOportunidade.PERDIDO
                           ? 'Reabrir'
                           : 'Arquivar';
+                    const canMarkAsWonCard = canMarkOpportunityAsWon(oportunidade);
+                    const canMarkAsLostCard = canMarkOpportunityAsLost(oportunidade);
+                    const showClosingQuickActionsCard =
+                      oportunidade.estagio === EstagioOportunidade.FECHAMENTO &&
+                      (canMarkAsWonCard || canMarkAsLostCard);
 
                     return (
                       <div
@@ -2595,7 +2706,38 @@ const PipelinePage: React.FC = () => {
 
                         {/* Ações */}
                         <div className="flex items-center justify-between gap-2 border-t border-gray-100 pt-2">
-                          {lifecycleFeatureEnabled ? (
+                          {showClosingQuickActionsCard ? (
+                            <div className="flex items-center gap-1">
+                              {canMarkAsWonCard && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void handleMarcarOportunidadeComoGanha(oportunidade);
+                                  }}
+                                  type="button"
+                                  className="inline-flex items-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2 py-1 text-xs font-semibold text-green-700 transition-colors hover:bg-green-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/25"
+                                  title="Marcar como ganho"
+                                >
+                                  <CheckCircle className="h-3.5 w-3.5" />
+                                  Ganho
+                                </button>
+                              )}
+                              {canMarkAsLostCard && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handlePrepararPerdaOportunidade(oportunidade);
+                                  }}
+                                  type="button"
+                                  className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-700 transition-colors hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/25"
+                                  title="Marcar como perdido"
+                                >
+                                  <AlertCircle className="h-3.5 w-3.5" />
+                                  Perdido
+                                </button>
+                              )}
+                            </div>
+                          ) : lifecycleFeatureEnabled ? (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -2633,7 +2775,43 @@ const PipelinePage: React.FC = () => {
                             </button>
 
                             {cardActionsMenuOpen && (
-                              <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded-lg border border-[#B4BEC9]/60 bg-white p-1 shadow-lg">
+                              <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-[#B4BEC9]/60 bg-white p-1 shadow-lg">
+                                {lifecycleFeatureEnabled && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenCardActionsMenuId(null);
+                                      void handleLifecyclePrimaryAction(oportunidade);
+                                    }}
+                                    className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#0F7B7D] transition-colors hover:bg-[#DEEFE7]/60"
+                                  >
+                                    {lifecyclePrimaryLabel}
+                                  </button>
+                                )}
+                                {canMarkAsWonCard && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenCardActionsMenuId(null);
+                                      void handleMarcarOportunidadeComoGanha(oportunidade);
+                                    }}
+                                    className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-green-700 transition-colors hover:bg-green-50"
+                                  >
+                                    Marcar como ganho
+                                  </button>
+                                )}
+                                {canMarkAsLostCard && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenCardActionsMenuId(null);
+                                      handlePrepararPerdaOportunidade(oportunidade);
+                                    }}
+                                    className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-red-700 transition-colors hover:bg-red-50"
+                                  >
+                                    Marcar como perdido
+                                  </button>
+                                )}
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -2672,7 +2850,7 @@ const PipelinePage: React.FC = () => {
                                   }}
                                   className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
                                 >
-                                  Gerar proposta
+                                  Criar rascunho de proposta
                                 </button>
                                 <button
                                   type="button"
@@ -2795,6 +2973,8 @@ const PipelinePage: React.FC = () => {
                             oportunidade.estagio === EstagioOportunidade.PERDIDO
                           ? 'Reabrir'
                           : 'Arquivar';
+                    const canMarkAsWonList = canMarkOpportunityAsWon(oportunidade);
+                    const canMarkAsLostList = canMarkOpportunityAsLost(oportunidade);
                     return (
                       <tr
                         key={oportunidade.id}
@@ -2876,6 +3056,30 @@ const PipelinePage: React.FC = () => {
                                     {lifecyclePrimaryLabelList}
                                   </button>
                                 )}
+                                {canMarkAsWonList && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenListActionsMenuId(null);
+                                      void handleMarcarOportunidadeComoGanha(oportunidade);
+                                    }}
+                                    className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-green-700 transition-colors hover:bg-green-50"
+                                  >
+                                    Marcar como ganho
+                                  </button>
+                                )}
+                                {canMarkAsLostList && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenListActionsMenuId(null);
+                                      handlePrepararPerdaOportunidade(oportunidade);
+                                    }}
+                                    className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-red-700 transition-colors hover:bg-red-50"
+                                  >
+                                    Marcar como perdido
+                                  </button>
+                                )}
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -2914,7 +3118,7 @@ const PipelinePage: React.FC = () => {
                                   }}
                                   className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
                                 >
-                                  Gerar proposta
+                                  Criar rascunho de proposta
                                 </button>
                                 <button
                                   type="button"
@@ -3480,6 +3684,7 @@ const PipelinePage: React.FC = () => {
         oportunidade={oportunidadeEditando}
         estagioInicial={estagioNovaOportunidade}
         estagiosPermitidos={estagiosKanbanVisiveis.map((estagio) => estagio.id)}
+        lifecycleFeatureEnabled={lifecycleFeatureEnabled}
         usuarios={usuarios}
         loadingUsuarios={false}
       />
@@ -3539,6 +3744,10 @@ const PipelinePage: React.FC = () => {
         }}
         onClonar={handleClonarOportunidade}
         exclusaoDireta={!lifecycleFeatureEnabled}
+        onMarcarComoGanho={lifecycleFeatureEnabled ? handleMarcarOportunidadeComoGanha : undefined}
+        onMarcarComoPerdido={
+          lifecycleFeatureEnabled ? handlePrepararPerdaOportunidade : undefined
+        }
         onArquivar={lifecycleFeatureEnabled ? handleArquivarOportunidade : undefined}
         onRestaurar={lifecycleFeatureEnabled ? handleRestaurarOportunidade : undefined}
         onReabrir={lifecycleFeatureEnabled ? handleReabrirOportunidade : undefined}

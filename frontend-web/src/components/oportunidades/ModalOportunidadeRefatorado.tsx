@@ -24,6 +24,7 @@ import {
 import { Oportunidade, NovaOportunidade } from '../../types/oportunidades';
 import {
   EstagioOportunidade,
+  LifecycleStatusOportunidade,
   PrioridadeOportunidade,
   OrigemOportunidade,
 } from '../../types/oportunidades/enums';
@@ -44,6 +45,7 @@ interface ModalOportunidadeProps {
   oportunidade?: Oportunidade | null;
   estagioInicial?: EstagioOportunidade;
   estagiosPermitidos?: EstagioOportunidade[];
+  lifecycleFeatureEnabled?: boolean;
   usuarios?: Usuario[];
   loadingUsuarios?: boolean;
 }
@@ -103,6 +105,7 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
   oportunidade,
   estagioInicial = EstagioOportunidade.LEADS,
   estagiosPermitidos,
+  lifecycleFeatureEnabled = false,
   usuarios = [],
   loadingUsuarios = false,
 }) => {
@@ -121,6 +124,17 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
   const [showClienteDropdown, setShowClienteDropdown] = useState(false);
   const [loadingClientes, setLoadingClientes] = useState(false);
   const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
+  const lifecycleStatusAtual = useMemo<LifecycleStatusOportunidade>(() => {
+    if (!oportunidade) return LifecycleStatusOportunidade.OPEN;
+    if (oportunidade.lifecycle_status) return oportunidade.lifecycle_status;
+    if (oportunidade.estagio === EstagioOportunidade.GANHO) {
+      return LifecycleStatusOportunidade.WON;
+    }
+    if (oportunidade.estagio === EstagioOportunidade.PERDIDO) {
+      return LifecycleStatusOportunidade.LOST;
+    }
+    return LifecycleStatusOportunidade.OPEN;
+  }, [oportunidade]);
 
   // Estado do formulário
   const [formData, setFormData] = useState<NovaOportunidade>({
@@ -241,13 +255,37 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
     const todosEstagios = Object.entries(ESTAGIOS_LABELS) as Array<
       [EstagioOportunidade, string]
     >;
+    const estagiosBase =
+      oportunidade || !estagiosPermitidos?.length
+        ? todosEstagios
+        : todosEstagios.filter(([estagio]) => estagiosPermitidos.includes(estagio));
 
-    if (oportunidade || !estagiosPermitidos?.length) {
-      return todosEstagios;
+    if (!lifecycleFeatureEnabled) {
+      return estagiosBase;
     }
 
-    return todosEstagios.filter(([estagio]) => estagiosPermitidos.includes(estagio));
-  }, [oportunidade, estagiosPermitidos]);
+    if (!oportunidade) {
+      return estagiosBase.filter(
+        ([estagio]) =>
+          estagio !== EstagioOportunidade.GANHO && estagio !== EstagioOportunidade.PERDIDO,
+      );
+    }
+
+    if (lifecycleStatusAtual !== LifecycleStatusOportunidade.OPEN) {
+      return estagiosBase.filter(([estagio]) => estagio === oportunidade.estagio);
+    }
+
+    return estagiosBase.filter(
+      ([estagio]) =>
+        estagio !== EstagioOportunidade.GANHO && estagio !== EstagioOportunidade.PERDIDO,
+    );
+  }, [oportunidade, estagiosPermitidos, lifecycleFeatureEnabled, lifecycleStatusAtual]);
+
+  const bloqueiaSelecaoEstagio =
+    loading ||
+    (lifecycleFeatureEnabled &&
+      Boolean(oportunidade) &&
+      lifecycleStatusAtual !== LifecycleStatusOportunidade.OPEN);
 
   useEffect(() => {
     if (!isOpen || oportunidade || !estagiosPermitidos?.length) {
@@ -873,7 +911,7 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
                         onChange={handleChange}
                         className="w-full px-4 py-2.5 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm bg-white"
                         required
-                        disabled={loading}
+                        disabled={bloqueiaSelecaoEstagio}
                       >
                         {estagiosDisponiveis.map(([value, label]) => (
                           <option key={value} value={value}>
@@ -881,6 +919,13 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
                           </option>
                         ))}
                       </select>
+                      {lifecycleFeatureEnabled && (
+                        <p className="mt-2 text-xs text-[#002333]/60">
+                          {oportunidade && lifecycleStatusAtual !== LifecycleStatusOportunidade.OPEN
+                            ? 'Estagio bloqueado para oportunidades fechadas, arquivadas ou na lixeira. Use as acoes do detalhe para restaurar ou reabrir.'
+                            : 'Ganhos e perdas devem ser registrados pelas acoes explicitas de fechamento no card ou no detalhe.'}
+                        </p>
+                      )}
                     </div>
 
                     {/* Prioridade */}

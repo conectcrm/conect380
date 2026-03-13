@@ -1960,6 +1960,12 @@ export class OportunidadesService {
             'Para marcar como perdido, use PATCH /oportunidades/:id/estagio com motivoPerda.',
           );
         }
+
+        if (lifecycleEnabled && nextStage === EstagioOportunidade.GANHO) {
+          throw new BadRequestException(
+            'Para marcar como ganho, use PATCH /oportunidades/:id/estagio.',
+          );
+        }
       }
 
       updateData.estagio = this.toDatabaseEstagio(

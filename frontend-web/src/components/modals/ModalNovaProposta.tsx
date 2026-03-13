@@ -309,16 +309,107 @@ interface ModalNovaPropostaProps {
   isOpen: boolean;
   onClose: () => void;
   onPropostaCriada?: (proposta: PropostaCompleta) => void;
+  propostaInicial?: PropostaCompleta | null;
+  contextMessage?: string | null;
 }
+
+const LEGACY_PIPELINE_OBSERVACAO_REGEX =
+  /^Gerada automaticamente a partir da oportunidade [0-9a-f-]+$/i;
+
+const normalizarObservacoesIniciais = (observacoes?: string | null): string => {
+  const texto = String(observacoes || '').trim();
+  if (!texto) {
+    return '';
+  }
+
+  return LEGACY_PIPELINE_OBSERVACAO_REGEX.test(texto) ? '' : texto;
+};
+
+const criarValoresIniciaisProposta = (
+  propostaInicial: PropostaCompleta | null,
+  vendedorAtual: Vendedor | null,
+): PropostaFormData => {
+  if (!propostaInicial) {
+    return {
+      titulo: '',
+      vendedor: vendedorAtual ?? null,
+      cliente: null,
+      produtos: [],
+      descontoGlobal: 0,
+      impostos: 12,
+      formaPagamento: 'avista',
+      parcelas: undefined,
+      validadeDias: 15,
+      observacoes: '',
+      incluirImpostosPDF: true,
+    };
+  }
+
+  return {
+    titulo: propostaInicial.titulo || '',
+    vendedor: propostaInicial.vendedor || vendedorAtual || null,
+    cliente: propostaInicial.cliente
+      ? {
+          id: propostaInicial.cliente.id,
+          nome: propostaInicial.cliente.nome,
+          documento: propostaInicial.cliente.documento || '',
+          email: propostaInicial.cliente.email || '',
+          telefone: propostaInicial.cliente.telefone || '',
+          endereco: propostaInicial.cliente.endereco || '',
+          cidade: propostaInicial.cliente.cidade || '',
+          estado: propostaInicial.cliente.estado || '',
+          cep: propostaInicial.cliente.cep || '',
+          tipoPessoa: propostaInicial.cliente.tipoPessoa || 'fisica',
+        }
+      : null,
+    produtos: Array.isArray(propostaInicial.produtos)
+      ? propostaInicial.produtos.map((item) => ({
+          produto: {
+            id: item.produto.id,
+            nome: item.produto.nome,
+            preco: Number(item.produto.preco || 0),
+            categoria: item.produto.categoria || 'Geral',
+            subcategoria: item.produto.subcategoria,
+            tipo: item.produto.tipo,
+            status: item.produto.status || 'ativo',
+            descricao: item.produto.descricao || '',
+            unidade: item.produto.unidade || 'unidade',
+            tipoItem: item.produto.tipoItem,
+            tipoLicenciamento: item.produto.tipoLicenciamento,
+            periodicidadeLicenca: item.produto.periodicidadeLicenca,
+            renovacaoAutomatica: item.produto.renovacaoAutomatica,
+            quantidadeLicencas: item.produto.quantidadeLicencas,
+            componentes: item.produto.componentes,
+            precoOriginal: item.produto.precoOriginal,
+            desconto: item.produto.desconto,
+            produtosCombo: item.produto.produtosCombo,
+          },
+          quantidade: Number(item.quantidade || 1),
+          desconto: Number(item.desconto || 0),
+          subtotal: Number(item.subtotal || 0),
+        }))
+      : [],
+    descontoGlobal: Number(propostaInicial.descontoGlobal || 0),
+    impostos: Number(propostaInicial.impostos || 0),
+    formaPagamento: propostaInicial.formaPagamento || 'avista',
+    parcelas: propostaInicial.parcelas,
+    validadeDias: Number(propostaInicial.validadeDias || 15),
+    observacoes: normalizarObservacoesIniciais(propostaInicial.observacoes),
+    incluirImpostosPDF: propostaInicial.incluirImpostosPDF ?? true,
+  };
+};
 
 export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
   isOpen,
   onClose,
   onPropostaCriada,
+  propostaInicial = null,
+  contextMessage = null,
 }) => {
   // Hook de internacionalização
   const { t } = useI18n();
   const catalogoFeatures = useMemo(() => getCatalogoFeaturesConfig(), []);
+  const isEditMode = Boolean(propostaInicial?.id);
 
   // Estados principais
   const [etapaAtual, setEtapaAtual] = useState(0);
@@ -527,27 +618,12 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
     },
     [vendedores],
   );
-
-  // Consolidado: Reset e carregamento de dados ao abrir modal (SEM DEPENDÊNCIAS EXTRAS)
+  // Consolidado: Reset e carregamento de dados ao abrir modal
   useEffect(() => {
     if (isOpen) {
-      // 1. Reset form preservando vendedor selecionado
       const vendedorSelecionado = getValues('vendedor');
-      reset({
-        titulo: '',
-        vendedor: vendedorSelecionado ?? null,
-        cliente: null,
-        produtos: [],
-        descontoGlobal: 0,
-        impostos: 12,
-        formaPagamento: 'avista',
-        parcelas: undefined,
-        validadeDias: 15,
-        observacoes: '',
-        incluirImpostosPDF: true,
-      });
+      reset(criarValoresIniciaisProposta(propostaInicial, vendedorSelecionado ?? null));
 
-      // 2. Reset UI states
       setEtapaAtual(0);
       setBuscarProduto('');
       setCategoriaSelecionada('');
@@ -557,10 +633,8 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
       setShowProdutoSearch(false);
       setQuickAction(null);
 
-      // 3. Carregar dados apenas se não carregados
       const carregarDados = async () => {
         try {
-          // Carregar vendedores
           if (!vendedoresCarregadosRef.current) {
             setIsLoadingVendedores(true);
             vendedoresCarregadosRef.current = true;
@@ -572,15 +646,20 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
 
             setVendedores(vendedoresList);
 
-            // Só seta o vendedor se o campo estiver vazio
-            const vendedorAtualForm = getValues('vendedor');
-            if (vendedorAtual && (vendedorAtualForm === null || vendedorAtualForm === undefined)) {
-              setValue('vendedor', vendedorAtual, { shouldDirty: false, shouldTouch: false });
+            if (isEditMode && propostaInicial?.vendedor) {
+              setValue('vendedor', propostaInicial.vendedor, {
+                shouldDirty: false,
+                shouldTouch: false,
+              });
+            } else {
+              const vendedorAtualForm = getValues('vendedor');
+              if (vendedorAtual && (vendedorAtualForm === null || vendedorAtualForm === undefined)) {
+                setValue('vendedor', vendedorAtual, { shouldDirty: false, shouldTouch: false });
+              }
             }
             setIsLoadingVendedores(false);
           }
 
-          // Carregar clientes
           if (!clientesCarregadosRef.current) {
             setIsLoadingClientes(true);
             clientesCarregadosRef.current = true;
@@ -603,7 +682,6 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
             setIsLoadingClientes(false);
           }
 
-          // Carregar produtos
           if (!produtosCarregadosRef.current) {
             setIsLoadingProdutos(true);
             produtosCarregadosRef.current = true;
@@ -615,7 +693,6 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
         } catch (error) {
           console.error('Erro ao carregar dados:', error);
           toast.error('Erro ao carregar dados');
-          // Reset refs em caso de erro
           vendedoresCarregadosRef.current = false;
           clientesCarregadosRef.current = false;
           produtosCarregadosRef.current = false;
@@ -625,14 +702,13 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
         }
       };
 
-      carregarDados();
+      void carregarDados();
     } else {
-      // Ao fechar o modal, resetar refs para próxima abertura
       vendedoresCarregadosRef.current = false;
       clientesCarregadosRef.current = false;
       produtosCarregadosRef.current = false;
     }
-  }, [isOpen]); // APENAS isOpen como dependência
+  }, [getValues, isEditMode, isOpen, propostaInicial, reset, setValue]);
 
   // Gerar título automático quando cliente for selecionado com controle otimizado
   useEffect(() => {
@@ -784,6 +860,85 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
     return subtotalBruto - descontoValor;
   };
 
+  const normalizarInteiroIntervaloInput = (
+    value: unknown,
+    options: {
+      min: number;
+      max?: number;
+      fallback: number;
+    },
+  ) => {
+    const numero = parseInt(String(value ?? '').trim(), 10);
+    if (!Number.isFinite(numero)) {
+      return options.fallback;
+    }
+
+    const maximo = options.max ?? Number.POSITIVE_INFINITY;
+    return Math.min(maximo, Math.max(options.min, numero));
+  };
+
+  const normalizarPercentualInput = (value: unknown, fallback: number) => {
+    const percentual = Number(String(value ?? '').trim().replace(',', '.'));
+    if (!Number.isFinite(percentual)) {
+      return fallback;
+    }
+
+    return Math.min(100, Math.max(0, percentual));
+  };
+
+  const normalizarQuantidadeInput = (value: unknown) =>
+    normalizarInteiroIntervaloInput(value, {
+      min: 1,
+      fallback: 1,
+    });
+
+  const normalizarDescontoInput = (value: unknown) => normalizarPercentualInput(value, 0);
+
+  const normalizarDescontoGlobalInput = (value: unknown) => normalizarPercentualInput(value, 0);
+
+  const normalizarImpostosInput = (value: unknown) => normalizarPercentualInput(value, 12);
+
+  const normalizarParcelasInput = (value: unknown) =>
+    normalizarInteiroIntervaloInput(value, {
+      min: 1,
+      max: 24,
+      fallback: 1,
+    });
+
+  const normalizarValidadeDiasInput = (value: unknown) =>
+    normalizarInteiroIntervaloInput(value, {
+      min: 1,
+      max: 365,
+      fallback: 15,
+    });
+
+  const selecionarConteudoNumericoAoFocar = (event: React.FocusEvent<HTMLInputElement>) => {
+    window.requestAnimationFrame(() => {
+      event.currentTarget.select();
+    });
+  };
+
+  const atualizarSubtotalProdutoForm = (
+    index: number,
+    overrides?: {
+      quantidade?: unknown;
+      desconto?: unknown;
+    },
+  ) => {
+    const produtoAtual = getValues(`produtos.${index}`);
+    if (!produtoAtual?.produto) {
+      return;
+    }
+
+    const quantidade = normalizarQuantidadeInput(overrides?.quantidade ?? produtoAtual.quantidade);
+    const desconto = normalizarDescontoInput(overrides?.desconto ?? produtoAtual.desconto);
+    const subtotal = calcularSubtotalProduto(produtoAtual.produto, quantidade, desconto);
+    setValue(`produtos.${index}.subtotal`, subtotal, {
+      shouldDirty: true,
+      shouldValidate: false,
+    });
+  };
+
   // Validar etapa atual
   const validarEtapa = async (etapa: number) => {
     const etapaKey = Object.keys(etapaSchemas)[etapa] as keyof typeof etapaSchemas;
@@ -812,42 +967,46 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
     }
   };
 
+  const montarPayloadProposta = (data: PropostaFormData, options?: { tokenPortal?: string }) => {
+    const temProdutosSoftware = data.produtos?.some((produto) => isProdutoSoftware(produto.produto));
+    const validadeDias = temProdutosSoftware && !data.validadeDias ? 30 : data.validadeDias || 15;
+
+    return {
+      ...data,
+      validadeDias,
+      parcelas: data.formaPagamento === 'parcelado' ? data.parcelas : undefined,
+      subtotal: totaisCombinados.subtotal,
+      total: totaisCombinados.total,
+      dataValidade: new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000),
+      status: (propostaInicial?.status || 'rascunho') as PropostaCompleta['status'],
+      tokenPortal: options?.tokenPortal || propostaInicial?.tokenPortal,
+      vendedor: data.vendedor || {
+        id: '',
+        nome: 'Vendedor Padrao',
+        email: '',
+        tipo: 'vendedor' as const,
+        ativo: true,
+      },
+    } satisfies PropostaCompleta;
+  };
+
   // Handler para salvar rascunho na etapa final
 
   const handleSaveAsDraft = async () => {
     try {
       setQuickAction('draft');
       const formData = watch();
-
-      // Verificar se há produtos de software
-      const temProdutosSoftware = formData.produtos?.some((produto) =>
-        isProdutoSoftware(produto.produto),
-      );
-      const validadeDias =
-        temProdutosSoftware && !formData.validadeDias ? 30 : formData.validadeDias || 15;
-
-      const propostaData: PropostaCompleta = {
-        ...formData,
-        validadeDias,
-        parcelas: formData.formaPagamento === 'parcelado' ? formData.parcelas : undefined,
-        status: 'rascunho',
-        dataValidade: new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000),
-        subtotal: totaisCombinados.subtotal,
-        total: totaisCombinados.total,
-        vendedor: formData.vendedor || {
-          id: '',
-          nome: 'Vendedor Padrão',
-          email: '',
-          tipo: 'vendedor' as const,
-          ativo: true,
-        },
-      };
-
-      const proposta = await propostasService.criarProposta(propostaData);
+      const propostaData = montarPayloadProposta(formData);
+      const proposta =
+        isEditMode && propostaInicial?.id
+          ? await propostasService.atualizarProposta(propostaInicial.id, propostaData)
+          : await propostasService.criarProposta(propostaData);
       if (onPropostaCriada) {
         onPropostaCriada(proposta);
       }
-      toast.success('Proposta salva como rascunho!');
+      toast.success(
+        isEditMode ? 'Rascunho atualizado com sucesso!' : 'Proposta salva como rascunho!',
+      );
       onClose();
     } catch (error) {
       console.error('Erro ao salvar rascunho:', error);
@@ -859,38 +1018,24 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
     }
   };
 
-  // Submissão final
+  // Submissao final
   const onSubmit = async (data: PropostaFormData) => {
     try {
       setIsLoading(true);
 
-      // Verificar se há produtos de software
-      const temProdutosSoftware = data.produtos?.some((produto) =>
-        isProdutoSoftware(produto.produto),
+      const propostaData = montarPayloadProposta(data, {
+        tokenPortal: propostaInicial?.tokenPortal || gerarTokenNumerico(),
+      });
+      const propostaCriada =
+        isEditMode && propostaInicial?.id
+          ? await propostasService.atualizarProposta(propostaInicial.id, propostaData)
+          : await propostasService.criarProposta(propostaData);
+
+      toast.success(
+        isEditMode
+          ? `Proposta ${propostaCriada.numero} atualizada com sucesso!`
+          : `Proposta ${propostaCriada.numero} criada com sucesso!`,
       );
-
-      // Para produtos de software, usar validade padrão de 30 dias se não especificado
-      const validadeDias = temProdutosSoftware && !data.validadeDias ? 30 : data.validadeDias || 15;
-
-      // Gerar token para o portal do cliente
-      const tokenPortal = gerarTokenNumerico();
-
-      const propostaData: PropostaCompleta = {
-        ...data,
-        validadeDias,
-        parcelas: data.formaPagamento === 'parcelado' ? data.parcelas : undefined,
-        subtotal: totaisCombinados.subtotal,
-        total: totaisCombinados.total,
-        dataValidade: new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000),
-        status: 'rascunho',
-        tokenPortal,
-      };
-
-      const propostaCriada = await propostasService.criarProposta(propostaData);
-
-      toast.success(`Proposta ${propostaCriada.numero} criada com sucesso!`);
-
-      // Email removido - usuário pode enviar manualmente pela interface de propostas
 
       if (onPropostaCriada) {
         onPropostaCriada(propostaCriada);
@@ -978,15 +1123,20 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
         className="modal-content modal-nova-proposta flex h-[94vh] max-h-[94vh] w-full max-w-[1240px] flex-col overflow-hidden rounded-[20px] border border-[#DCE7EB] bg-white shadow-[0_30px_70px_-36px_rgba(16,57,74,0.45)]"
       >
         <p id={modalDescriptionId} className="sr-only">
-          Fluxo em etapas para criar proposta comercial com cliente, itens, condicoes e resumo.
+          {isEditMode
+            ? 'Fluxo em etapas para revisar e completar um rascunho de proposta comercial.'
+            : 'Fluxo em etapas para criar proposta comercial com cliente, itens, condicoes e resumo.'}
         </p>
         {/* Header do Modal - Compacto */}
         <div className="flex-shrink-0 border-b border-[#DEE8EC] bg-white px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
               <h2 id={modalTitleId} className="truncate text-lg font-semibold text-[#19384C]">
-                Nova Proposta
+                {isEditMode ? 'Editar Rascunho de Proposta' : 'Nova Proposta'}
               </h2>
+              {contextMessage && (
+                <p className="mt-1 text-sm text-[#607B89]">{contextMessage}</p>
+              )}
             </div>
             <button
               ref={closeButtonRef}
@@ -1619,9 +1769,11 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                                     render={({ field: controllerField }) => (
                                       <input
                                         {...controllerField}
+                                        value={controllerField.value ?? ''}
                                         type="number"
                                         min="1"
                                         step="1"
+                                        inputMode="numeric"
                                         placeholder={
                                           produtoAtual.produto.tipoItem &&
                                           ['licenca', 'modulo', 'aplicativo'].includes(
@@ -1631,18 +1783,37 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                                             : 'Ex: 1'
                                         }
                                         className={fieldClass}
+                                        onFocus={selecionarConteudoNumericoAoFocar}
                                         onChange={(e) => {
-                                          const quantidade = parseInt(e.target.value) || 1;
-                                          controllerField.onChange(quantidade);
-                                          const produtoAtual = watchedProdutos?.[index];
-                                          if (produtoAtual) {
-                                            const subtotal = calcularSubtotalProduto(
-                                              produtoAtual.produto,
-                                              quantidade,
-                                              produtoAtual.desconto || 0,
-                                            );
-                                            setValue(`produtos.${index}.subtotal`, subtotal);
+                                          const valorDigitado = e.target.value;
+                                          if (valorDigitado === '') {
+                                            controllerField.onChange('');
+                                            atualizarSubtotalProdutoForm(index, {
+                                              quantidade: '',
+                                              desconto: watchedProdutos?.[index]?.desconto,
+                                            });
+                                            return;
                                           }
+
+                                          const quantidade = normalizarQuantidadeInput(
+                                            valorDigitado,
+                                          );
+                                          controllerField.onChange(quantidade);
+                                          atualizarSubtotalProdutoForm(index, {
+                                            quantidade,
+                                            desconto: watchedProdutos?.[index]?.desconto,
+                                          });
+                                        }}
+                                        onBlur={(e) => {
+                                          controllerField.onBlur();
+                                          const quantidade = normalizarQuantidadeInput(
+                                            e.target.value,
+                                          );
+                                          controllerField.onChange(quantidade);
+                                          atualizarSubtotalProdutoForm(index, {
+                                            quantidade,
+                                            desconto: watchedProdutos?.[index]?.desconto,
+                                          });
                                         }}
                                       />
                                     )}
@@ -1659,23 +1830,42 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                                     render={({ field: controllerField }) => (
                                       <input
                                         {...controllerField}
+                                        value={controllerField.value ?? ''}
                                         type="number"
                                         min="0"
                                         max="100"
                                         step="0.01"
+                                        inputMode="decimal"
                                         className={fieldClass}
+                                        onFocus={selecionarConteudoNumericoAoFocar}
                                         onChange={(e) => {
-                                          const desconto = parseFloat(e.target.value) || 0;
-                                          controllerField.onChange(desconto);
-                                          const produtoAtual = watchedProdutos?.[index];
-                                          if (produtoAtual) {
-                                            const subtotal = calcularSubtotalProduto(
-                                              produtoAtual.produto,
-                                              produtoAtual.quantidade || 1,
-                                              desconto,
-                                            );
-                                            setValue(`produtos.${index}.subtotal`, subtotal);
+                                          const valorDigitado = e.target.value;
+                                          if (valorDigitado === '') {
+                                            controllerField.onChange('');
+                                            atualizarSubtotalProdutoForm(index, {
+                                              quantidade: watchedProdutos?.[index]?.quantidade,
+                                              desconto: '',
+                                            });
+                                            return;
                                           }
+
+                                          const desconto = normalizarDescontoInput(valorDigitado);
+                                          controllerField.onChange(desconto);
+                                          atualizarSubtotalProdutoForm(index, {
+                                            quantidade: watchedProdutos?.[index]?.quantidade,
+                                            desconto,
+                                          });
+                                        }}
+                                        onBlur={(e) => {
+                                          controllerField.onBlur();
+                                          const desconto = normalizarDescontoInput(
+                                            e.target.value,
+                                          );
+                                          controllerField.onChange(desconto);
+                                          atualizarSubtotalProdutoForm(index, {
+                                            quantidade: watchedProdutos?.[index]?.quantidade,
+                                            desconto,
+                                          });
                                         }}
                                       />
                                     )}
@@ -1740,11 +1930,27 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                         render={({ field }) => (
                           <input
                             {...field}
+                            value={field.value ?? ''}
                             type="number"
                             min="0"
                             max="100"
                             step="0.01"
+                            inputMode="decimal"
                             className={fieldClass}
+                            onFocus={selecionarConteudoNumericoAoFocar}
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              if (value === '') {
+                                field.onChange('');
+                                return;
+                              }
+
+                              field.onChange(normalizarDescontoGlobalInput(value));
+                            }}
+                            onBlur={(event) => {
+                              field.onBlur();
+                              field.onChange(normalizarDescontoGlobalInput(event.target.value));
+                            }}
                           />
                         )}
                       />
@@ -1761,11 +1967,27 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                         render={({ field }) => (
                           <input
                             {...field}
+                            value={field.value ?? ''}
                             type="number"
                             min="0"
                             max="100"
                             step="0.01"
+                            inputMode="decimal"
                             className={fieldClass}
+                            onFocus={selecionarConteudoNumericoAoFocar}
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              if (value === '') {
+                                field.onChange('');
+                                return;
+                              }
+
+                              field.onChange(normalizarImpostosInput(value));
+                            }}
+                            onBlur={(event) => {
+                              field.onBlur();
+                              field.onChange(normalizarImpostosInput(event.target.value));
+                            }}
                           />
                         )}
                       />
@@ -1808,11 +2030,17 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                               min="1"
                               max="24"
                               step="1"
+                              inputMode="numeric"
                               className={fieldClass}
                               value={field.value ?? ''}
+                              onFocus={selecionarConteudoNumericoAoFocar}
                               onChange={(event) => {
                                 const value = event.target.value;
-                                field.onChange(value ? Number(value) : undefined);
+                                field.onChange(value === '' ? '' : normalizarParcelasInput(value));
+                              }}
+                              onBlur={(event) => {
+                                field.onBlur();
+                                field.onChange(normalizarParcelasInput(event.target.value));
                               }}
                             />
                           )}
@@ -1835,10 +2063,27 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                           render={({ field }) => (
                             <input
                               {...field}
+                              value={field.value ?? ''}
                               type="number"
                               min="1"
                               max="365"
+                              step="1"
+                              inputMode="numeric"
                               className={fieldClass}
+                              onFocus={selecionarConteudoNumericoAoFocar}
+                              onChange={(event) => {
+                                const value = event.target.value;
+                                if (value === '') {
+                                  field.onChange('');
+                                  return;
+                                }
+
+                                field.onChange(normalizarValidadeDiasInput(value));
+                              }}
+                              onBlur={(event) => {
+                                field.onBlur();
+                                field.onChange(normalizarValidadeDiasInput(event.target.value));
+                              }}
                             />
                           )}
                         />
@@ -2153,10 +2398,10 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                     onClick={handleSaveAsDraft}
                     disabled={!isValid || hasPendingAction}
                     className={secondaryButtonClass}
-                    title="Salvar como rascunho"
+                    title={isEditMode ? 'Atualizar rascunho' : 'Salvar como rascunho'}
                   >
                     <Save className="h-4 w-4 mr-1" />
-                    Rascunho
+                    {isEditMode ? 'Atualizar rascunho' : 'Rascunho'}
                   </button>
                   <button
                     onClick={handleSubmit(onSubmit)}
@@ -2171,7 +2416,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                     ) : (
                       <>
                         <FileText className="h-4 w-4 mr-2" />
-                        Salvar Proposta
+                        {isEditMode ? 'Salvar alteracoes' : 'Salvar Proposta'}
                       </>
                     )}
                   </button>
@@ -2206,10 +2451,10 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                     onClick={handleSaveAsDraft}
                     disabled={!isValid || hasPendingAction}
                     className={secondaryButtonClass}
-                    title="Salvar como rascunho"
+                    title={isEditMode ? 'Atualizar rascunho' : 'Salvar como rascunho'}
                   >
                     <Save className="h-3 w-3 mr-1" />
-                    Rascunho
+                    {isEditMode ? 'Atualizar rascunho' : 'Rascunho'}
                   </button>
                   {/* Main action button */}
                   <button
@@ -2225,7 +2470,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                     ) : (
                       <>
                         <FileText className="h-4 w-4 mr-1" />
-                        Salvar Proposta
+                        {isEditMode ? 'Salvar alteracoes' : 'Salvar Proposta'}
                       </>
                     )}
                   </button>

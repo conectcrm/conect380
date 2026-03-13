@@ -320,7 +320,7 @@ export class OportunidadesController {
         total: Number(oportunidade.valor || 0),
         status: 'rascunho',
         source: 'oportunidade',
-        observacoes: `Gerada automaticamente a partir da oportunidade ${oportunidade.id}`,
+        observacoes: '',
       } as any,
       empresaId,
     );

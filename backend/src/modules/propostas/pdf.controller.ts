@@ -22,6 +22,22 @@ import { Permission } from '../../common/permissions/permissions.constants';
 export class PdfController {
   constructor(private readonly pdfService: PdfService) {}
 
+  private possuiItensComerciais(dadosProposta: any): boolean {
+    if (!Array.isArray(dadosProposta?.itens) || dadosProposta.itens.length === 0) {
+      return false;
+    }
+
+    return dadosProposta.itens.some((item: any) => {
+      if (!item || typeof item !== 'object') {
+        return false;
+      }
+
+      const nome = String(item.nome || item.titulo || item.descricao || '').trim();
+      const quantidade = Number(item.quantidade ?? 1);
+      return Boolean(nome && Number.isFinite(quantidade) && quantidade > 0);
+    });
+  }
+
   private resolveErrorMessage(error: unknown, fallbackMessage: string): string {
     if (error instanceof BadRequestException) {
       const response = error.getResponse();
@@ -73,6 +89,12 @@ export class PdfController {
 
       if (!tiposPermitidos.includes(tipo)) {
         throw new BadRequestException('Tipo de template nao suportado');
+      }
+
+      if (!this.possuiItensComerciais(dadosProposta)) {
+        throw new BadRequestException(
+          'A proposta precisa ter ao menos um item/produto antes de gerar o PDF final.',
+        );
       }
 
       const pdfBuffer = await this.pdfService.gerarProposta(tipo, dadosProposta);

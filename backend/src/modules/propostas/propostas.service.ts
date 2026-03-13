@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { isUUID } from 'class-validator';
 import { In, Like, Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
 import { Proposta as PropostaEntity } from './proposta.entity';
@@ -269,6 +270,67 @@ export class PropostasService {
 
   private buildPropostaNotFoundByIdentifierMessage(identifier: string): string {
     return `Proposta com ID/Numero ${identifier} nao encontrada`;
+  }
+
+  private propostaTemItensComerciais(produtos: unknown): boolean {
+    if (!Array.isArray(produtos) || produtos.length === 0) {
+      return false;
+    }
+
+    return produtos.some((item) => {
+      if (!item || typeof item !== 'object') {
+        return false;
+      }
+
+      const record = item as Record<string, unknown>;
+      const produto =
+        record.produto && typeof record.produto === 'object'
+          ? (record.produto as Record<string, unknown>)
+          : null;
+      const nome = String(
+        record.nome ??
+          record.produtoNome ??
+          record.descricao ??
+          produto?.nome ??
+          produto?.titulo ??
+          '',
+      ).trim();
+      const produtoId = String(record.produtoId ?? record.id ?? produto?.id ?? '').trim();
+      const quantidade = Number(record.quantidade ?? produto?.quantidade ?? 1);
+
+      return Boolean((produtoId || nome) && Number.isFinite(quantidade) && quantidade > 0);
+    });
+  }
+
+  private assertItensComerciaisParaFluxo(
+    produtos: unknown,
+    acao: 'enviar' | 'aprovar' | 'seguir_fluxo' | 'gerar_pdf',
+  ): void {
+    if (this.propostaTemItensComerciais(produtos)) {
+      return;
+    }
+
+    const mensagens: Record<typeof acao, string> = {
+      enviar: 'A proposta precisa ter ao menos um item/produto antes de ser enviada ao cliente.',
+      aprovar: 'A proposta precisa ter ao menos um item/produto antes de ser aprovada.',
+      seguir_fluxo:
+        'A proposta precisa ter ao menos um item/produto antes de avancar para etapas comerciais finais.',
+      gerar_pdf: 'A proposta precisa ter ao menos um item/produto antes de gerar o PDF final.',
+    };
+
+    throw new BadRequestException(mensagens[acao]);
+  }
+
+  private statusExigeItensComerciais(status: SalesFlowStatus): boolean {
+    return [
+      'enviada',
+      'aprovada',
+      'contrato_gerado',
+      'contrato_assinado',
+      'fatura_criada',
+      'aguardando_pagamento',
+      'pago',
+    ].includes(status);
   }
 
   private async enrichSnapshotProdutos(produtos: unknown[], empresaId?: string): Promise<unknown[]> {
@@ -1303,6 +1365,71 @@ export class PropostasService {
     return usersRows?.[0]?.id || randomUUID();
   }
 
+  private isUuid(value?: string | null): boolean {
+    return Boolean(value && isUUID(String(value).trim()));
+  }
+
+  private async findVendedorIdByNome(
+    nomeVendedor: string,
+    empresaId?: string,
+  ): Promise<string | null> {
+    const nomeNormalizado = String(nomeVendedor || '').trim();
+    if (!nomeNormalizado) {
+      return null;
+    }
+
+    const vendedor = await this.userRepository.findOne({
+      where: empresaId
+        ? { nome: nomeNormalizado, empresa_id: empresaId }
+        : { nome: nomeNormalizado },
+    });
+
+    return vendedor?.id || null;
+  }
+
+  private async resolveVendedorIdFromPayload(
+    vendedor: unknown,
+    empresaId?: string,
+    explicitVendedorId?: unknown,
+  ): Promise<string | null> {
+    const explicitId = String(explicitVendedorId || '').trim();
+    if (this.isUuid(explicitId)) {
+      return explicitId;
+    }
+
+    if (!vendedor) {
+      return null;
+    }
+
+    if (typeof vendedor === 'string') {
+      const vendedorNormalizado = vendedor.trim();
+      if (!vendedorNormalizado) {
+        return null;
+      }
+
+      if (this.isUuid(vendedorNormalizado)) {
+        return vendedorNormalizado;
+      }
+
+      return this.findVendedorIdByNome(vendedorNormalizado, empresaId);
+    }
+
+    if (typeof vendedor === 'object') {
+      const vendedorRecord = vendedor as Record<string, unknown>;
+      const vendedorId = String(vendedorRecord.id || '').trim();
+      if (this.isUuid(vendedorId)) {
+        return vendedorId;
+      }
+
+      const nomeVendedor = String(vendedorRecord.nome || '').trim();
+      if (nomeVendedor) {
+        return this.findVendedorIdByNome(nomeVendedor, empresaId);
+      }
+    }
+
+    return null;
+  }
+
   private async ensureLegacyOportunidadeId(
     empresaId: string,
     titulo: string,
@@ -1825,33 +1952,34 @@ export class PropostasService {
       const empresaIdProposta =
         empresaId ?? (dadosProposta as any).empresaId ?? (dadosProposta as any).empresa_id;
 
-      // Buscar vendedor pelo nome para obter o UUID
-      let vendedorId = null;
-      if (dadosProposta.vendedor) {
-        // Se vendedor for um objeto, usar o ID direto
-        if (typeof dadosProposta.vendedor === 'object' && dadosProposta.vendedor.id) {
-          vendedorId = dadosProposta.vendedor.id;
-          this.logger.debug(`Vendedor recebido (objeto): ${JSON.stringify({ nome: this.summarizeText((dadosProposta.vendedor as any).nome, 40), vendedorId })}`);
-        } else {
-          // Se vendedor for uma string, buscar pelo nome
-          const nomeVendedor =
-            typeof dadosProposta.vendedor === 'string'
-              ? dadosProposta.vendedor
-              : dadosProposta.vendedor.nome;
+      const vendedorId = await this.resolveVendedorIdFromPayload(
+        dadosProposta.vendedor,
+        empresaIdProposta,
+        (dadosProposta as any).vendedorId,
+      );
 
-          const vendedor = await this.userRepository.findOne({
-            where: empresaIdProposta
-              ? { nome: nomeVendedor, empresa_id: empresaIdProposta }
-              : { nome: nomeVendedor },
-          });
-
-          if (vendedor) {
-            vendedorId = vendedor.id;
-            this.logger.debug(`Vendedor encontrado por nome: ${JSON.stringify({ nome: this.summarizeText(nomeVendedor, 40), vendedorId })}`);
-          } else {
-            this.logger.warn(`Vendedor nao encontrado: ${this.summarizeText(nomeVendedor, 40)}`);
-          }
-        }
+      if (vendedorId) {
+        this.logger.debug(
+          `Vendedor resolvido para criacao: ${JSON.stringify({
+            nome:
+              dadosProposta.vendedor && typeof dadosProposta.vendedor === 'object'
+                ? this.summarizeText((dadosProposta.vendedor as any).nome, 40)
+                : this.summarizeText(dadosProposta.vendedor as string, 40),
+            vendedorId,
+          })}`,
+        );
+      } else if (dadosProposta.vendedor !== undefined || (dadosProposta as any).vendedorId !== undefined) {
+        this.logger.warn(
+          `Vendedor nao resolvido para criacao: ${JSON.stringify({
+            vendedor: this.summarizeText(
+              typeof dadosProposta.vendedor === 'string'
+                ? dadosProposta.vendedor
+                : (dadosProposta.vendedor as any)?.nome,
+              40,
+            ),
+            vendedorId: this.summarizeText(String((dadosProposta as any).vendedorId || ''), 40),
+          })}`,
+        );
       }
 
       // Processar cliente baseado no tipo de dados recebido
@@ -2263,6 +2391,12 @@ export class PropostasService {
 
       if (dadosProposta.status !== undefined) {
         const fluxoStatus = this.normalizeStatusInput(dadosProposta.status as string);
+        if (this.statusExigeItensComerciais(fluxoStatus)) {
+          this.assertItensComerciaisParaFluxo(
+            dadosProposta.produtos !== undefined ? dadosProposta.produtos : proposta.produtos,
+            fluxoStatus === 'enviada' ? 'enviar' : 'seguir_fluxo',
+          );
+        }
         proposta.status = this.mapFlowStatusToDatabaseStatus(fluxoStatus, false) as any;
         proposta.emailDetails = {
           ...(proposta.emailDetails || {}),
@@ -2295,17 +2429,12 @@ export class PropostasService {
         proposta.source = dadosProposta.source || null;
       }
 
-      if (dadosProposta.vendedor !== undefined) {
-        let vendedorId: string | null = null;
-
-        if (dadosProposta.vendedor && typeof dadosProposta.vendedor === 'object') {
-          vendedorId = (dadosProposta.vendedor as any).id || null;
-        } else if (typeof dadosProposta.vendedor === 'string') {
-          const vendedor = await this.userRepository.findOne({
-            where: empresaId ? { nome: dadosProposta.vendedor, empresa_id: empresaId } : { nome: dadosProposta.vendedor },
-          });
-          vendedorId = vendedor?.id || null;
-        }
+      if (dadosProposta.vendedor !== undefined || (dadosProposta as any).vendedorId !== undefined) {
+        const vendedorId = await this.resolveVendedorIdFromPayload(
+          dadosProposta.vendedor,
+          empresaId,
+          (dadosProposta as any).vendedorId,
+        );
 
         proposta.vendedor_id = vendedorId;
       }
@@ -2437,6 +2566,17 @@ export class PropostasService {
         throw new BadRequestException(
           `Transicao de status invalida: ${statusAnterior} -> ${fluxoStatus}. ` +
             `Permitidos: ${allowed.join(', ') || 'nenhum'}`,
+        );
+      }
+
+      if (this.statusExigeItensComerciais(fluxoStatus)) {
+        this.assertItensComerciaisParaFluxo(
+          proposta.produtos,
+          fluxoStatus === 'enviada'
+            ? 'enviar'
+            : fluxoStatus === 'aprovada'
+              ? 'aprovar'
+              : 'seguir_fluxo',
         );
       }
 
@@ -2636,6 +2776,7 @@ export class PropostasService {
         throw new Error(this.buildPropostaNotFoundMessage(propostaId));
       }
 
+      this.assertItensComerciaisParaFluxo(proposta.produtos, 'enviar');
       proposta.status = this.mapFlowStatusToDatabaseStatus('enviada', false) as any;
       let emailDetails = {
         ...(proposta.emailDetails || {}),
@@ -2708,6 +2849,7 @@ export class PropostasService {
       }
 
       // Atualizar status para enviada
+      this.assertItensComerciaisParaFluxo(proposta.produtos, 'enviar');
       proposta.status = this.mapFlowStatusToDatabaseStatus('enviada', false) as any;
       let emailDetails = {
         ...(proposta.emailDetails || {}),
@@ -2981,6 +3123,7 @@ export class PropostasService {
       Math.ceil((novaData.getTime() - hoje.getTime()) / (24 * 60 * 60 * 1000)),
     );
 
+    this.assertItensComerciaisParaFluxo(proposta.produtos, 'enviar');
     proposta.dataVencimento = novaData;
     proposta.validadeDias = diffDias;
     proposta.status = this.mapFlowStatusToDatabaseStatus('enviada', false) as any;

@@ -44,6 +44,8 @@ interface ModalDetalhesOportunidadeProps {
   onEditar: (oportunidade: Oportunidade) => void;
   onClonar?: (oportunidade: Oportunidade) => void;
   exclusaoDireta?: boolean;
+  onMarcarComoGanho?: (oportunidade: Oportunidade) => Promise<void> | void;
+  onMarcarComoPerdido?: (oportunidade: Oportunidade) => Promise<void> | void;
   onArquivar?: (oportunidade: Oportunidade) => Promise<void> | void;
   onRestaurar?: (oportunidade: Oportunidade) => Promise<void> | void;
   onReabrir?: (oportunidade: Oportunidade) => Promise<void> | void;
@@ -57,6 +59,8 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
   onEditar,
   onClonar,
   exclusaoDireta = false,
+  onMarcarComoGanho,
+  onMarcarComoPerdido,
   onArquivar,
   onRestaurar,
   onReabrir,
@@ -77,7 +81,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
   const [abaSelecionada, setAbaSelecionada] = useState<'detalhes' | 'atividades'>('detalhes');
   const [limiteHistoricoEstagios, setLimiteHistoricoEstagios] = useState(30);
   const [acaoLifecycleLoading, setAcaoLifecycleLoading] = useState<
-    'arquivar' | 'restaurar' | 'reabrir' | 'excluir' | 'excluir_permanente' | null
+    'ganhar' | 'arquivar' | 'restaurar' | 'reabrir' | 'excluir' | 'excluir_permanente' | null
   >(null);
 
   const descricaoAtividadeLimpa = novaDescricaoAtividade.trim();
@@ -222,6 +226,13 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
   const podeArquivar =
     lifecycleStatus !== LifecycleStatusOportunidade.ARCHIVED &&
     lifecycleStatus !== LifecycleStatusOportunidade.DELETED;
+  const podeMarcarComoGanho =
+    lifecycleStatus === LifecycleStatusOportunidade.OPEN &&
+    oportunidade.estagio === EstagioOportunidade.FECHAMENTO;
+  const podeMarcarComoPerdido =
+    lifecycleStatus === LifecycleStatusOportunidade.OPEN &&
+    oportunidade.estagio !== EstagioOportunidade.GANHO &&
+    oportunidade.estagio !== EstagioOportunidade.PERDIDO;
   const podeRestaurar =
     lifecycleStatus === LifecycleStatusOportunidade.ARCHIVED ||
     lifecycleStatus === LifecycleStatusOportunidade.DELETED;
@@ -234,7 +245,7 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
   const podeExcluirPermanente = lifecycleStatus === LifecycleStatusOportunidade.DELETED;
 
   const executarAcaoLifecycle = async (
-    acao: 'arquivar' | 'restaurar' | 'reabrir' | 'excluir' | 'excluir_permanente',
+    acao: 'ganhar' | 'arquivar' | 'restaurar' | 'reabrir' | 'excluir' | 'excluir_permanente',
     callback: ((item: Oportunidade) => Promise<void> | void) | undefined,
     confirmacao: string,
   ) => {
@@ -250,6 +261,18 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
       toastService.error('Nao foi possivel concluir a acao solicitada.');
     } finally {
       setAcaoLifecycleLoading(null);
+    }
+  };
+
+  const iniciarFluxoPerda = async () => {
+    if (!onMarcarComoPerdido) return;
+
+    try {
+      await Promise.resolve(onMarcarComoPerdido(oportunidade));
+      onClose();
+    } catch (err) {
+      console.error('Erro ao iniciar fluxo de perda:', err);
+      toastService.error('Nao foi possivel iniciar o fluxo de perda.');
     }
   };
 
@@ -881,6 +904,36 @@ const ModalDetalhesOportunidade: React.FC<ModalDetalhesOportunidadeProps> = ({
       {/* Footer */}
       <div className="border-t border-[#B4BEC9]/35 px-6 py-4 bg-[#DEEFE7]/35 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
+          {podeMarcarComoGanho && onMarcarComoGanho && (
+            <button
+              onClick={() =>
+                void executarAcaoLifecycle(
+                  'ganhar',
+                  onMarcarComoGanho,
+                  'Deseja marcar esta oportunidade como ganha?',
+                )
+              }
+              type="button"
+              disabled={acaoLifecycleLoading !== null}
+              className="px-3 py-2 rounded-lg border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 transition-colors text-sm font-medium inline-flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <CheckCircle className="h-4 w-4" />
+              {acaoLifecycleLoading === 'ganhar' ? 'Marcando...' : 'Marcar como ganho'}
+            </button>
+          )}
+
+          {podeMarcarComoPerdido && onMarcarComoPerdido && (
+            <button
+              onClick={() => void iniciarFluxoPerda()}
+              type="button"
+              disabled={acaoLifecycleLoading !== null}
+              className="px-3 py-2 rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-colors text-sm font-medium inline-flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <AlertCircle className="h-4 w-4" />
+              Marcar como perdido
+            </button>
+          )}
+
           {podeArquivar && onArquivar && (
             <button
               onClick={() =>

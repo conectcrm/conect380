@@ -9,6 +9,7 @@ import {
 import { toastService } from '../../../services/toastService';
 import {
   Eye,
+  Pencil,
   Mail,
   MessageSquare,
   Download,
@@ -37,6 +38,11 @@ import { authService } from '../../../services/authService';
 import { useNavigate } from 'react-router-dom';
 import ModalEnviarWhatsApp from '../../../components/whatsapp/ModalEnviarWhatsApp';
 import { useGlobalConfirmation } from '../../../contexts/GlobalConfirmationContext';
+import {
+  MENSAGEM_PROPOSTA_SEM_ITENS,
+  extrairItensComerciaisDaProposta,
+  propostaPossuiItensComerciais,
+} from '../utils/propostaItens';
 
 type ClienteContatoData = {
   id?: string;
@@ -225,6 +231,7 @@ type PropostaUI = {
 interface PropostaActionsProps {
   proposta: PropostaCompleta | PropostaUI;
   onViewProposta: (proposta: PropostaCompleta | PropostaUI) => void;
+  onEditProposta?: (proposta: PropostaCompleta | PropostaUI) => void;
   onPropostaUpdated?: () => void;
   className?: string;
   showLabels?: boolean;
@@ -265,6 +272,7 @@ const componentRoleLabelsPdf: Record<PlanoComponentePdf['componentRole'], string
 const PropostaActions: React.FC<PropostaActionsProps> = ({
   proposta,
   onViewProposta,
+  onEditProposta,
   onPropostaUpdated,
   className = '',
   showLabels = false,
@@ -484,6 +492,40 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     }
   };
 
+  const statusFluxoAtual = String(getPropostaData().status || '')
+    .trim()
+    .toLowerCase();
+  const editavelComoRascunho = statusFluxoAtual === 'rascunho';
+  const statusEncerradoSemAcoesComerciais = ['rejeitada', 'expirada', 'pago'].includes(
+    statusFluxoAtual,
+  );
+  const bloquearAcaoSemItens = async (acao: string) => {
+    let propostaFonte: any = proposta;
+    if (!propostaPossuiItensComerciais(propostaFonte)) {
+      const propostaId = (proposta as any)?.id || getPropostaData().id;
+      if (propostaId) {
+        try {
+          const propostaDetalhada = await propostasApiService.findById(String(propostaId));
+          if (propostaDetalhada) {
+            propostaFonte = {
+              ...propostaFonte,
+              ...propostaDetalhada,
+            };
+          }
+        } catch (error) {
+          console.warn('Nao foi possivel validar itens detalhados da proposta:', error);
+        }
+      }
+    }
+
+    if (propostaPossuiItensComerciais(propostaFonte)) {
+      return false;
+    }
+
+    toastService.error(`${acao}: ${MENSAGEM_PROPOSTA_SEM_ITENS}`);
+    return true;
+  };
+
   const formatarDataIso = (value: unknown, fallback: Date) => {
     const parsed = value ? new Date(String(value)) : fallback;
     if (Number.isNaN(parsed.getTime())) {
@@ -628,48 +670,9 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     const propostaData = getPropostaData();
     const propostaId = (proposta as any)?.id || propostaData.id;
 
-    const extrairItensDaProposta = (fonte: any): any[] => {
-      if (!fonte) {
-        return [];
-      }
-
-      const listasDiretas = [
-        fonte.produtos,
-        fonte.itens,
-        fonte.items,
-        fonte.produtosSelecionados,
-        fonte.snapshot?.produtos,
-      ];
-
-      for (const lista of listasDiretas) {
-        if (Array.isArray(lista) && lista.length > 0) {
-          return lista;
-        }
-      }
-
-      const versoes = Array.isArray(fonte.versoes)
-        ? fonte.versoes
-        : Array.isArray(fonte.emailDetails?.versoes)
-          ? fonte.emailDetails.versoes
-          : [];
-      if (versoes.length > 0) {
-        const versoesOrdenadas = [...versoes].sort(
-          (a: any, b: any) => Number(a?.versao || 0) - Number(b?.versao || 0),
-        );
-        const ultimaVersao = versoesOrdenadas[versoesOrdenadas.length - 1];
-        const itensVersao = ultimaVersao?.snapshot?.produtos;
-        if (Array.isArray(itensVersao) && itensVersao.length > 0) {
-          return itensVersao;
-        }
-      }
-
-      return [];
-    };
-
     let fonteProposta: any = proposta as any;
-    let itensOriginais = extrairItensDaProposta(fonteProposta);
+    let itensOriginais = extrairItensComerciaisDaProposta(fonteProposta);
 
-  // Quando a linha da lista nao carrega produtos completos, busca o detalhe da proposta.
     if (itensOriginais.length === 0 && propostaId) {
       try {
         const propostaDetalhada = await propostasApiService.findById(String(propostaId));
@@ -680,26 +683,18 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
             cliente: (propostaDetalhada as any).cliente || fonteProposta.cliente,
             vendedor: (propostaDetalhada as any).vendedor || fonteProposta.vendedor,
           };
-          itensOriginais = extrairItensDaProposta(propostaDetalhada as any);
+          itensOriginais = extrairItensComerciaisDaProposta(propostaDetalhada as any);
         }
       } catch (error) {
-      console.warn('Nao foi possivel carregar os itens detalhados da proposta para o PDF:', error);
+        console.warn('Nao foi possivel carregar os itens detalhados da proposta para o PDF:', error);
       }
     }
 
-    const itens = (
-      itensOriginais.length > 0
-        ? itensOriginais
-        : [
-            {
-              nome: propostaData.titulo || 'Item da proposta',
-              quantidade: 1,
-              valorUnitario: Number(propostaData.total || 0),
-              desconto: 0,
-              valorTotal: Number(propostaData.total || 0),
-            },
-          ]
-    ).map((item: any, index: number) => {
+    if (!propostaPossuiItensComerciais(fonteProposta)) {
+      throw new Error(MENSAGEM_PROPOSTA_SEM_ITENS);
+    }
+
+    const itens = itensOriginais.map((item: any, index: number) => {
       const produto = item?.produto && typeof item.produto === 'object' ? item.produto : item;
       const nome = String(
         produto?.nome ||
@@ -1668,15 +1663,26 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       // Determinar proxima acao baseada no status atual
       switch (status) {
         case 'rascunho':
+          if (await bloquearAcaoSemItens('Avanco de fluxo bloqueado')) {
+            return;
+          }
           await handleSendEmail(); // Enviar proposta por email
           return;
 
         case 'enviada':
+        case 'visualizada':
           await sincronizarStatusProposta('negociacao', {
             source: 'fluxo-avanco',
-            observacoes: 'Status avancado automaticamente para negociacao.',
+            observacoes:
+              status === 'visualizada'
+                ? 'Proposta visualizada avancada automaticamente para negociacao.'
+                : 'Status avancado automaticamente para negociacao.',
           });
-          toastService.success('Proposta avancada para negociacao.');
+          toastService.success(
+            status === 'visualizada'
+              ? 'Proposta visualizada avancada para negociacao.'
+              : 'Proposta avancada para negociacao.',
+          );
           onPropostaUpdated?.();
           break;
 
@@ -1692,6 +1698,9 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           });
 
           if (aprovar) {
+            if (await bloquearAcaoSemItens('Aprovacao bloqueada')) {
+              return;
+            }
             await sincronizarStatusProposta('aprovada', {
               source: 'fluxo-avanco',
               observacoes: 'Proposta aprovada durante o fluxo de negociacao.',
@@ -1974,6 +1983,10 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
   // Enviar proposta por email
   const handleSendEmail = async () => {
+    if (await bloquearAcaoSemItens('Envio bloqueado')) {
+      return;
+    }
+
     const clienteData = await getClienteData({ allowLookup: true });
 
     // Validar se o email e valido
@@ -2092,12 +2105,17 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
   // Enviar proposta por WhatsApp
   const handleSendWhatsApp = async () => {
-    const dadosPDF = await montarDadosPdfProposta();
+    if (await bloquearAcaoSemItens('Envio bloqueado')) {
+      return;
+    }
 
-    if (!dadosPDF.cliente?.telefone) {
+    const clienteWhatsapp = await getClienteData({ allowLookup: true });
+    if (!clienteWhatsapp.telefone) {
       toastService.error('Cliente nao possui telefone cadastrado');
       return;
     }
+
+    const dadosPDF = await montarDadosPdfProposta();
 
     // Gerar PDF para anexar
     try {
@@ -2124,6 +2142,10 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
   // Download da proposta em PDF
   const handleDownloadPdf = async () => {
+    if (await bloquearAcaoSemItens('Geracao de PDF bloqueada')) {
+      return;
+    }
+
     setDownloadingPdf(true);
     try {
       const propostaData = getPropostaData();
@@ -2141,6 +2163,10 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
   // Compartilhar proposta
   const handleShare = async () => {
+    if (await bloquearAcaoSemItens('Compartilhamento bloqueado')) {
+      return;
+    }
+
     const propostaData = getPropostaData();
     const propostaId = (proposta as any)?.id || (propostaData as any)?.id;
     if (!propostaId) {
@@ -2182,16 +2208,73 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     neutral: 'text-[#607B89] hover:bg-[#F6FAFB] hover:text-[#244455]',
     accent: 'text-[#7C3AED] hover:bg-[#F5F3FF] hover:text-[#6D28D9]',
   } as const;
-  const statusFluxoAtual = String(getPropostaData().status || '')
-    .trim()
-    .toLowerCase();
   const pagamentoControladoNoFinanceiro = statusFluxoAtual === 'aguardando_pagamento';
-  const assinaturaContratoPendente = statusFluxoAtual === 'contrato_gerado';
-  const tituloBotaoFluxo = pagamentoControladoNoFinanceiro
-    ? 'Pagamento desta proposta e controlado no modulo de faturamento'
-    : assinaturaContratoPendente
-      ? 'Confirmar assinatura externa do contrato para seguir'
-      : 'Avancar para proxima etapa do fluxo automatizado';
+  const exibirEmailDireto = !editavelComoRascunho && !statusEncerradoSemAcoesComerciais;
+  const exibirWhatsApp = !statusEncerradoSemAcoesComerciais;
+  const exibirCompartilhar = !statusEncerradoSemAcoesComerciais;
+  const exibirGerarContrato = podeGerarContrato();
+  const exibirCriarFatura = podeCriarFatura();
+  const exibirAvancarFluxo = !statusEncerradoSemAcoesComerciais;
+  const exibirSeparadorAutomacao =
+    possuiAprovacaoPendente || exibirGerarContrato || exibirCriarFatura || exibirAvancarFluxo;
+  const getFlowActionMeta = (
+    status: string,
+  ): {
+    label: string;
+    title: string;
+  } => {
+    switch (status) {
+      case 'rascunho':
+        return {
+          label: 'Enviar proposta',
+          title: 'Enviar proposta por email e avancar para enviada',
+        };
+      case 'enviada':
+      case 'visualizada':
+        return {
+          label: 'Ir para negociacao',
+          title: 'Avancar proposta para negociacao',
+        };
+      case 'negociacao':
+        return {
+          label: 'Decidir negociacao',
+          title: 'Aprovar ou rejeitar a proposta para encerrar a negociacao',
+        };
+      case 'aprovada':
+        return {
+          label: 'Formalizar venda',
+          title: 'Gerar contrato ou criar fatura a partir da proposta aprovada',
+        };
+      case 'contrato_gerado':
+        return {
+          label: 'Confirmar assinatura',
+          title: 'Confirmar assinatura externa do contrato para seguir',
+        };
+      case 'contrato_assinado':
+        return {
+          label: 'Gerar fatura',
+          title: 'Criar fatura automatica a partir do contrato assinado',
+        };
+      case 'fatura_criada':
+        return {
+          label: 'Ir para cobranca',
+          title: 'Atualizar para aguardando pagamento e abrir o financeiro',
+        };
+      case 'aguardando_pagamento':
+        return {
+          label: 'Abrir financeiro',
+          title: 'Pagamento desta proposta e controlado no modulo de faturamento',
+        };
+      default:
+        return {
+          label: 'Avancar Fluxo',
+          title: pagamentoControladoNoFinanceiro
+            ? 'Pagamento desta proposta e controlado no modulo de faturamento'
+            : 'Avancar para proxima etapa do fluxo automatizado',
+        };
+    }
+  };
+  const flowActionMeta = getFlowActionMeta(statusFluxoAtual);
 
   return (
     <div className={`flex items-center space-x-1 ${className}`}>
@@ -2208,33 +2291,53 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         </button>
       )}
 
+      {onEditProposta && editavelComoRascunho && (
+        <button
+          type="button"
+          onClick={() => onEditProposta(proposta)}
+          className={`${buttonClass} ${buttonThemeClass.neutral}`}
+          title="Editar rascunho"
+        >
+          <Pencil className="w-4 h-4" />
+          {showLabels && <span>Editar</span>}
+        </button>
+      )}
+
       {/* Email */}
-      <button
-        type="button"
-        onClick={handleSendEmail}
-        disabled={sendingEmail}
-        className={`${buttonClass} ${buttonThemeClass.success} disabled:cursor-not-allowed disabled:opacity-50`}
-        title={clienteData?.email ? 'Enviar por email' : 'Informar e-mail e enviar'}
-      >
-        {sendingEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
-        {showLabels && <span>Email</span>}
-      </button>
+      {exibirEmailDireto && (
+        <button
+          type="button"
+          onClick={handleSendEmail}
+          disabled={sendingEmail}
+          className={`${buttonClass} ${buttonThemeClass.success} disabled:cursor-not-allowed disabled:opacity-50`}
+          title={clienteData?.email ? 'Enviar por email' : 'Informar e-mail e enviar'}
+        >
+          {sendingEmail ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Mail className="w-4 h-4" />
+          )}
+          {showLabels && <span>Email</span>}
+        </button>
+      )}
 
       {/* WhatsApp */}
-      <button
-        type="button"
-        onClick={handleSendWhatsApp}
-        disabled={!clienteData?.nome}
-        className={`${buttonClass} ${buttonThemeClass.success} disabled:cursor-not-allowed disabled:opacity-50`}
-        title={
-          clienteData?.telefone
-            ? 'Enviar por WhatsApp'
-            : 'Enviar por WhatsApp (o telefone sera validado ao iniciar o envio)'
-        }
-      >
-        <MessageSquare className="w-4 h-4" />
-        {showLabels && <span>WhatsApp</span>}
-      </button>
+      {exibirWhatsApp && (
+        <button
+          type="button"
+          onClick={handleSendWhatsApp}
+          disabled={!clienteData?.nome}
+          className={`${buttonClass} ${buttonThemeClass.success} disabled:cursor-not-allowed disabled:opacity-50`}
+          title={
+            clienteData?.telefone
+              ? 'Enviar por WhatsApp'
+              : 'Enviar por WhatsApp (telefone do cliente sera validado antes de gerar o PDF)'
+          }
+        >
+          <MessageSquare className="w-4 h-4" />
+          {showLabels && <span>WhatsApp</span>}
+        </button>
+      )}
 
       {/* Download PDF */}
       <button
@@ -2253,18 +2356,20 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       </button>
 
       {/* Compartilhar */}
-      <button
-        type="button"
-        onClick={handleShare}
-        className={`${buttonClass} ${buttonThemeClass.accent}`}
-        title="Compartilhar link"
-      >
-        <Share2 className="w-4 h-4" />
-        {showLabels && <span>Compartilhar</span>}
-      </button>
+      {exibirCompartilhar && (
+        <button
+          type="button"
+          onClick={handleShare}
+          className={`${buttonClass} ${buttonThemeClass.accent}`}
+          title="Compartilhar link"
+        >
+          <Share2 className="w-4 h-4" />
+          {showLabels && <span>Compartilhar</span>}
+        </button>
+      )}
 
       {/* SEPARADOR VISUAL */}
-      <div className="mx-2 h-6 w-px bg-[#D4E2E7]"></div>
+      {exibirSeparadorAutomacao && <div className="mx-2 h-6 w-px bg-[#D4E2E7]"></div>}
       {/* Decisao de alcada */}
       {possuiAprovacaoPendente && (
         <>
@@ -2314,7 +2419,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       {/* NOVOS BOTOES DE AUTOMACAO */}
 
       {/* Gerar Contrato */}
-      {podeGerarContrato() && (
+      {exibirGerarContrato && (
         <button
           type="button"
           onClick={handleGerarContrato}
@@ -2336,7 +2441,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       )}
 
       {/* Criar Fatura */}
-      {podeCriarFatura() && (
+      {exibirCriarFatura && (
         <button
           type="button"
           onClick={() => {
@@ -2360,20 +2465,22 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       )}
 
       {/* Avancar Fluxo */}
-      <button
-        type="button"
-        onClick={handleAvancarFluxo}
-        disabled={avancandoFluxo || bloqueadoPorAlcada}
-        className={`${buttonClass} ${buttonThemeClass.warning} disabled:opacity-50`}
-        title={tituloBotaoFluxo}
-      >
-        {avancandoFluxo ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
-        ) : (
-          <ArrowRight className="w-4 h-4" />
-        )}
-        {showLabels && <span>Avancar Fluxo</span>}
-      </button>
+      {exibirAvancarFluxo && (
+        <button
+          type="button"
+          onClick={handleAvancarFluxo}
+          disabled={avancandoFluxo || bloqueadoPorAlcada}
+          className={`${buttonClass} ${buttonThemeClass.warning} disabled:opacity-50`}
+          title={flowActionMeta.title}
+        >
+          {avancandoFluxo ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <ArrowRight className="w-4 h-4" />
+          )}
+          {showLabels && <span>{flowActionMeta.label}</span>}
+        </button>
+      )}
 
       {/* Modal WhatsApp */}
       {showWhatsAppModal && clienteData && (

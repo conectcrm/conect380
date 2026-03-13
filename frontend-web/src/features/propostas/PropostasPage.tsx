@@ -25,6 +25,11 @@ import {
   propostasService as propostasFeatureService,
   type PropostaCompleta as PropostaCompletaFeature,
 } from './services/propostasService';
+import {
+  extrairItensComerciaisDaProposta,
+  MENSAGEM_PROPOSTA_SEM_ITENS,
+  propostaPossuiItensComerciais,
+} from './utils/propostaItens';
 import SelecaoMultipla from './components/SelecaoMultipla';
 import { safeRender } from '../../utils/safeRender';
 import {
@@ -371,6 +376,9 @@ const PropostasPage: React.FC = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedPropostaForView, setSelectedPropostaForView] =
     useState<PropostaCompletaFeature | null>(null);
+  const [selectedPropostaForEdit, setSelectedPropostaForEdit] =
+    useState<PropostaCompletaFeature | null>(null);
+  const [wizardContextMessage, setWizardContextMessage] = useState<string | null>(null);
 
   // 🆕 Estados para UX Melhorada - Fase 2
   const [propostasSelecionadas, setPropostasSelecionadas] = useState<string[]>([]);
@@ -627,6 +635,29 @@ const PropostasPage: React.FC = () => {
                   new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
                 vendedor: proposta.vendedor,
                 produtos: (proposta as any).produtos || [],
+                descontoGlobal: (proposta as any).descontoGlobal,
+                impostos: (proposta as any).impostos,
+                formaPagamento: (proposta as any).formaPagamento,
+                parcelas: (proposta as any).parcelas,
+                validadeDias: (proposta as any).validadeDias,
+                incluirImpostosPDF: (proposta as any).incluirImpostosPDF,
+                aprovacaoInterna:
+                  (proposta as any).aprovacaoInterna || (proposta as any).emailDetails?.aprovacaoInterna,
+                lembretes: Array.isArray((proposta as any).lembretes)
+                  ? (proposta as any).lembretes
+                  : Array.isArray((proposta as any).emailDetails?.lembretes)
+                    ? (proposta as any).emailDetails.lembretes
+                    : [],
+                historicoEventos: Array.isArray((proposta as any).historicoEventos)
+                  ? (proposta as any).historicoEventos
+                  : Array.isArray((proposta as any).emailDetails?.historicoEventos)
+                    ? (proposta as any).emailDetails.historicoEventos
+                    : [],
+                versoes: Array.isArray((proposta as any).versoes)
+                  ? (proposta as any).versoes
+                  : Array.isArray((proposta as any).emailDetails?.versoes)
+                    ? (proposta as any).emailDetails.versoes
+                    : [],
               };
               return await converterPropostaParaUI(propostaFormatada);
             }),
@@ -722,32 +753,83 @@ const PropostasPage: React.FC = () => {
     };
   }, []);
 
-  const handleVisualizarProposta = (proposta: any) => {
+  const handleCloseWizardModal = useCallback(() => {
+    setShowWizardModal(false);
+    setSelectedPropostaForEdit(null);
+    setWizardContextMessage(null);
+  }, []);
+
+  const handleOpenCreateWizard = useCallback(() => {
+    setSelectedPropostaForEdit(null);
+    setWizardContextMessage(null);
+    setShowWizardModal(true);
+  }, []);
+
+  const handleVisualizarProposta = useCallback((proposta: any) => {
     void handleViewProposta(proposta);
-  };
-  // ✅ DETECTAR PROPOSTA RECÉM-GERADA DO PIPELINE
+  }, []);
+
+  const handleEditProposta = useCallback(
+    async (
+      proposta: any,
+      options?: {
+        fromPipeline?: boolean;
+      },
+    ) => {
+      try {
+        const propostaId = proposta?.id ? String(proposta.id) : '';
+        if (!propostaId) {
+          showNotification('Proposta sem identificador para edicao.', 'error');
+          return;
+        }
+
+        const propostaCompleta = await propostasFeatureService.obterProposta(propostaId);
+        if (!propostaCompleta) {
+          showNotification('Nao foi possivel carregar o rascunho da proposta.', 'error');
+          return;
+        }
+
+        setSelectedPropostaForEdit(propostaCompleta);
+        setWizardContextMessage(
+          options?.fromPipeline && !propostaPossuiItensComerciais(propostaCompleta)
+            ? `Rascunho criado a partir da oportunidade. ${MENSAGEM_PROPOSTA_SEM_ITENS}`
+            : null,
+        );
+        setShowViewModal(false);
+        setShowWizardModal(true);
+      } catch (error) {
+        console.error('Erro ao preparar edicao da proposta:', error);
+        showNotification('Erro ao abrir a proposta para edicao.', 'error');
+      }
+    },
+    [showNotification],
+  );
+  // Detectar proposta recem-gerada a partir do Pipeline
   useEffect(() => {
     const propostaId = searchParams.get('proposta');
+    const mode = (searchParams.get('mode') || '').trim().toLowerCase();
+    const origem = (searchParams.get('origem') || '').trim().toLowerCase();
 
     if (propostaId && propostas.length > 0) {
-      // Aguardar 500ms para garantir que propostas carregaram
       const timer = setTimeout(() => {
         const propostaEncontrada = propostas.find((p) => p.id === propostaId);
 
         if (propostaEncontrada) {
-          console.log('✅ Proposta recém-gerada encontrada:', propostaEncontrada);
+          if (mode === 'edit') {
+            void handleEditProposta(propostaEncontrada, {
+              fromPipeline: origem === 'pipeline',
+            });
+          } else {
+            handleVisualizarProposta(propostaEncontrada);
+          }
 
-          // Abrir modal de detalhes automaticamente
-          handleVisualizarProposta(propostaEncontrada);
-
-          // Limpar query string da URL
           navigate(location.pathname, { replace: true });
         }
       }, 500);
 
       return () => clearTimeout(timer);
     }
-  }, [searchParams, propostas, location.pathname, navigate]);
+  }, [searchParams, propostas, location.pathname, navigate, handleEditProposta, handleVisualizarProposta]);
   // 🔄 POLLING AUTOMÁTICO DESABILITADO - Causava múltiplas requisições desnecessárias
   // useEffect(() => {
   //   const intervalo = setInterval(() => {
@@ -1561,70 +1643,25 @@ const PropostasPage: React.FC = () => {
       throw new Error('Proposta nao encontrada ou dados incompletos.');
     }
 
-    const extrairItensDaProposta = (fonte: any): any[] => {
-      if (!fonte) {
-        return [];
-      }
-
-      const listasDiretas = [
-        fonte.produtos,
-        fonte.itens,
-        fonte.items,
-        fonte.produtosSelecionados,
-        fonte.snapshot?.produtos,
-      ];
-
-      for (const lista of listasDiretas) {
-        if (Array.isArray(lista) && lista.length > 0) {
-          return lista;
-        }
-      }
-
-      const versoes = Array.isArray(fonte.versoes)
-        ? fonte.versoes
-        : Array.isArray(fonte.emailDetails?.versoes)
-          ? fonte.emailDetails.versoes
-          : [];
-      if (versoes.length > 0) {
-        const versoesOrdenadas = [...versoes].sort(
-          (a: any, b: any) => Number(a?.versao || 0) - Number(b?.versao || 0),
-        );
-        const ultimaVersao = versoesOrdenadas[versoesOrdenadas.length - 1];
-        const itensVersao = ultimaVersao?.snapshot?.produtos;
-        if (Array.isArray(itensVersao) && itensVersao.length > 0) {
-          return itensVersao;
-        }
-      }
-
-      return [];
-    };
-
     let propostaCompleta = proposta;
-    let itensOriginais = extrairItensDaProposta(propostaCompleta);
+    let itensOriginais = extrairItensComerciaisDaProposta(propostaCompleta);
     if (itensOriginais.length === 0 && proposta?.id) {
       try {
         const propostaDetalhada = await propostasFeatureService.obterProposta(String(proposta.id));
         if (propostaDetalhada) {
           propostaCompleta = propostaDetalhada;
-          itensOriginais = extrairItensDaProposta(propostaDetalhada);
+          itensOriginais = extrairItensComerciaisDaProposta(propostaDetalhada);
         }
       } catch (error) {
         console.warn('Nao foi possivel carregar itens detalhados para exportacao PDF:', error);
       }
     }
 
-    const itens = (
-      itensOriginais.length > 0
-        ? itensOriginais
-        : [
-            {
-              nome: propostaCompleta.titulo || 'Item da proposta',
-              quantidade: 1,
-              precoUnitario: Number((propostaCompleta as any).valor || propostaCompleta.total || 0),
-              desconto: 0,
-            },
-          ]
-    ).map((item: any, index: number) => {
+    if (!propostaPossuiItensComerciais(propostaCompleta)) {
+      throw new Error(MENSAGEM_PROPOSTA_SEM_ITENS);
+    }
+
+    const itens = itensOriginais.map((item: any, index: number) => {
       const produto = item?.produto && typeof item.produto === 'object' ? item.produto : item;
 
       const nome =
@@ -2191,7 +2228,7 @@ const PropostasPage: React.FC = () => {
           ) : (
             <button
               type="button"
-              onClick={() => setShowWizardModal(true)}
+              onClick={handleOpenCreateWizard}
               className={actionPrimaryButtonClass}
             >
               <Plus className="h-4 w-4" />
@@ -2207,13 +2244,12 @@ const PropostasPage: React.FC = () => {
     <div className="space-y-4">
       <ModalNovaProposta
         isOpen={showWizardModal}
-        onClose={() => {
-          setShowWizardModal(false);
-        }}
+        onClose={handleCloseWizardModal}
+        propostaInicial={selectedPropostaForEdit}
+        contextMessage={wizardContextMessage}
         onPropostaCriada={(proposta) => {
-          // Recarregar a lista de propostas
           carregarPropostas({ force: true });
-          setShowWizardModal(false);
+          handleCloseWizardModal();
         }}
       />
 
@@ -2233,7 +2269,7 @@ const PropostasPage: React.FC = () => {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowWizardModal(true)}
+                  onClick={handleOpenCreateWizard}
                   className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#159A9C] px-4 text-sm font-medium text-white transition hover:bg-[#117C7E] self-start shadow-[0_10px_20px_-16px_rgba(17,124,126,0.5)] sm:flex-shrink-0"
                 >
                   <Plus className="h-4 w-4" />
@@ -2617,6 +2653,7 @@ const PropostasPage: React.FC = () => {
                           <PropostaActions
                             proposta={proposta}
                             onViewProposta={handleViewProposta}
+                            onEditProposta={handleEditProposta}
                             onPropostaUpdated={() =>
                               carregarPropostas({ force: true, source: 'actions' })
                             }
@@ -2984,6 +3021,7 @@ const PropostasPage: React.FC = () => {
                                 <PropostaActions
                                   proposta={proposta}
                                   onViewProposta={handleViewProposta}
+                                  onEditProposta={handleEditProposta}
                                   onPropostaUpdated={() =>
                                     carregarPropostas({ force: true, source: 'actions' })
                                   }
@@ -3010,6 +3048,7 @@ const PropostasPage: React.FC = () => {
                 isOpen={showViewModal}
                 onClose={() => setShowViewModal(false)}
                 proposta={selectedPropostaForView}
+                onEditProposta={handleEditProposta}
                 onPropostaUpdated={() => carregarPropostas({ force: true, source: 'modal-view' })}
               />
             )}

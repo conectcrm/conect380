@@ -29,6 +29,14 @@ export async function bootstrapPipelineUiAuthenticatedSession(page: Page) {
       'crm.oportunidades.read',
       'crm.oportunidades.update',
       'crm.oportunidades.create',
+      'crm.clientes.read',
+      'crm.produtos.read',
+      'comercial.propostas.read',
+      'comercial.propostas.create',
+      'comercial.propostas.update',
+      'financeiro.faturamento.read',
+      'financeiro.faturamento.manage',
+      'financeiro.pagamentos.read',
     ];
 
     const fakeUser = {
@@ -99,6 +107,14 @@ export async function mockPipelineUiApis(page: Page, options: PipelineUiMockOpti
         'crm.oportunidades.read',
         'crm.oportunidades.update',
         'crm.oportunidades.create',
+        'crm.clientes.read',
+        'crm.produtos.read',
+        'comercial.propostas.read',
+        'comercial.propostas.create',
+        'comercial.propostas.update',
+        'financeiro.faturamento.read',
+        'financeiro.faturamento.manage',
+        'financeiro.pagamentos.read',
       ];
 
       return json(route, 200, {

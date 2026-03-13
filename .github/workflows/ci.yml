@@ -499,6 +499,8 @@ jobs:
           CI: true
         run: npm --prefix frontend-web run test -- --runTestsByPath src/services/__tests__/produtosService.catalogGate.test.ts --watch=false --runInBand
 
+  # Mantemos o nome/id legado deste job para nao quebrar branch protection ou required checks
+  # ja configurados no repositório. O escopo efetivo executado aqui e o Comercial Core.
   frontend-e2e-pipeline-ui:
     name: Frontend - E2E Pipeline UI (Playwright)
     runs-on: ubuntu-latest
@@ -510,19 +512,22 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Detectar mudancas relevantes (Pipeline UI)
-        id: pipeline_ui_changes
+      - name: Detectar mudancas relevantes (Comercial Core)
+        id: comercial_core_changes
         uses: dorny/paths-filter@v3
         with:
           filters: |
-            pipeline_ui:
+            comercial_core:
               - '.github/workflows/ci.yml'
               - 'e2e/pipeline-*.spec.ts'
+              - 'e2e/propostas-*.spec.ts'
               - 'e2e/pipeline-ui.helpers.ts'
               - 'e2e/fixtures.ts'
               - 'playwright.config.ts'
               - 'frontend-web/craco.config.js'
               - 'frontend-web/src/pages/PipelinePage.tsx'
+              - 'frontend-web/src/features/propostas/**'
+              - 'frontend-web/src/components/modals/ModalNovaProposta.tsx'
               - 'frontend-web/src/components/oportunidades/**'
               - 'frontend-web/src/services/api.ts'
               - 'frontend-web/src/services/oportunidadesService.ts'
@@ -539,12 +544,12 @@ jobs:
               - 'frontend-web/package.json'
               - 'frontend-web/package-lock.json'
 
-      - name: Pular E2E Pipeline UI (sem mudancas relevantes)
-        if: steps.pipeline_ui_changes.outputs.pipeline_ui != 'true'
-        run: echo "Sem alteracoes no escopo do pipeline UI; job finalizado sem executar Playwright."
+      - name: Pular E2E Comercial Core (sem mudancas relevantes)
+        if: steps.comercial_core_changes.outputs.comercial_core != 'true'
+        run: echo "Sem alteracoes no escopo comercial core; job finalizado sem executar Playwright."
 
       - name: Setup Node.js
-        if: steps.pipeline_ui_changes.outputs.pipeline_ui == 'true'
+        if: steps.comercial_core_changes.outputs.comercial_core == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '22.16.0'
@@ -554,19 +559,19 @@ jobs:
             frontend-web/package-lock.json
 
       - name: Instalar dependencias root (Playwright)
-        if: steps.pipeline_ui_changes.outputs.pipeline_ui == 'true'
+        if: steps.comercial_core_changes.outputs.comercial_core == 'true'
         run: npm ci
 
       - name: Instalar dependencias frontend
-        if: steps.pipeline_ui_changes.outputs.pipeline_ui == 'true'
+        if: steps.comercial_core_changes.outputs.comercial_core == 'true'
         run: npm --prefix frontend-web ci
 
       - name: Instalar browser Chromium (Playwright)
-        if: steps.pipeline_ui_changes.outputs.pipeline_ui == 'true'
+        if: steps.comercial_core_changes.outputs.comercial_core == 'true'
         run: npx playwright install --with-deps chromium
 
       - name: Subir frontend (modo CI)
-        if: steps.pipeline_ui_changes.outputs.pipeline_ui == 'true'
+        if: steps.comercial_core_changes.outputs.comercial_core == 'true'
         env:
           PORT: '3000'
           BROWSER: 'none'
@@ -587,15 +592,15 @@ jobs:
           tail -n 200 frontend.log || true
           exit 1
 
-      - name: Rodar E2E Pipeline UI (Playwright)
-        if: steps.pipeline_ui_changes.outputs.pipeline_ui == 'true'
-        run: npm run test:e2e:pipeline-ui
+      - name: Rodar E2E Pipeline UI (escopo Comercial Core)
+        if: steps.comercial_core_changes.outputs.comercial_core == 'true'
+        run: npm run test:e2e:comercial:core
 
-      - name: Upload artefatos Playwright (Pipeline UI)
-        if: ${{ !cancelled() && steps.pipeline_ui_changes.outputs.pipeline_ui == 'true' }}
+      - name: Upload artefatos Playwright (Comercial Core)
+        if: ${{ !cancelled() && steps.comercial_core_changes.outputs.comercial_core == 'true' }}
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-pipeline-ui-artifacts
+          name: playwright-comercial-core-artifacts
           path: |
             playwright-report/
             test-results/
@@ -604,7 +609,7 @@ jobs:
           retention-days: 14
 
       - name: Encerrar frontend
-        if: ${{ always() && steps.pipeline_ui_changes.outputs.pipeline_ui == 'true' }}
+        if: ${{ always() && steps.comercial_core_changes.outputs.comercial_core == 'true' }}
         run: |
           if [ -f frontend.pid ]; then
             kill "$(cat frontend.pid)" || true
@@ -927,7 +932,7 @@ jobs:
           echo "Backend E2E Guardian Hardening: ${{ needs.backend-e2e-guardian-hardening.result }}"
           echo "Backend E2E Guardian Security: ${{ needs.backend-e2e-guardian-security.result }}"
           echo "Frontend: ${{ needs.frontend.result }}"
-          echo "Frontend E2E Pipeline UI: ${{ needs.frontend-e2e-pipeline-ui.result }}"
+          echo "Frontend E2E Pipeline UI (escopo Comercial Core): ${{ needs.frontend-e2e-pipeline-ui.result }}"
           echo "Frontend E2E Billing Critical: ${{ needs.frontend-e2e-billing-critical.result }}"
           echo "Frontend Guardian Exposure Scan: ${{ needs.frontend-guardian-exposure-scan.result }}"
           echo "Frontend E2E Guardian Billing Governance: ${{ needs.frontend-e2e-guardian-billing-governance.result }}"
