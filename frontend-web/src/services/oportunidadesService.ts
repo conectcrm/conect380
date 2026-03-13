@@ -460,6 +460,16 @@ class OportunidadesService {
         ? new Date(oportunidade.last_interaction_at)
         : null,
       stale_since: oportunidade.stale_since ? new Date(oportunidade.stale_since) : null,
+      proposta_principal_id: oportunidade.proposta_principal_id ?? null,
+      propostaPrincipal: oportunidade.propostaPrincipal
+        ? {
+            id: String(oportunidade.propostaPrincipal.id || ''),
+            numero: oportunidade.propostaPrincipal.numero || '',
+            titulo: oportunidade.propostaPrincipal.titulo || '',
+            status: oportunidade.propostaPrincipal.status || 'rascunho',
+            sugerePerda: Boolean(oportunidade.propostaPrincipal.sugerePerda),
+          }
+        : undefined,
     };
   }
 
@@ -515,4 +525,3 @@ class OportunidadesService {
 }
 
 export const oportunidadesService = new OportunidadesService();
-

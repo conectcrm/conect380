@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PdfController } from './pdf.controller';
 import { PdfService } from './pdf.service';
@@ -15,11 +15,13 @@ import { Cliente } from '../clientes/cliente.entity';
 import { Produto } from '../produtos/produto.entity';
 import { CatalogItem } from '../catalogo/entities/catalog-item.entity';
 import { EmpresasModule } from '../../empresas/empresas.module';
+import { OportunidadesModule } from '../oportunidades/oportunidades.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Proposta, PropostaPortalToken, User, Cliente, Produto, CatalogItem]),
     EmpresasModule,
+    forwardRef(() => OportunidadesModule),
   ],
   providers: [PdfService, PropostasService, PortalService, EmailIntegradoService],
   controllers: [PdfController, PropostasController, PortalController, EmailController],
