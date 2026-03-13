@@ -464,6 +464,27 @@ export class OportunidadesService {
     return [];
   }
 
+  private getPropostaEmailDetailsColumn(columns: Set<string>): string | null {
+    if (columns.has('emailDetails')) {
+      return '"emailDetails"';
+    }
+
+    if (columns.has('email_details')) {
+      return 'email_details';
+    }
+
+    return null;
+  }
+
+  private buildPropostaFlowStatusExpression(alias: string, columns: Set<string>): string {
+    const emailDetailsColumn = this.getPropostaEmailDetailsColumn(columns);
+    if (!emailDetailsColumn) {
+      return `${alias}.status::text`;
+    }
+
+    return `COALESCE(${alias}.${emailDetailsColumn}->>'fluxoStatus', ${alias}.status::text)`;
+  }
+
   private parseBooleanFlag(value: unknown): boolean {
     if (typeof value === 'boolean') {
       return value;
@@ -1680,6 +1701,7 @@ export class OportunidadesService {
   async findAll(empresaId: string, filters?: OportunidadeFindFilters): Promise<Oportunidade[]> {
     const schema = await this.resolveOportunidadesSchema();
     const usersColumns = await this.getTableColumns('users');
+    const propostasColumns = await this.getTableColumns('propostas');
     const lifecycleEnabled = await this.isLifecycleEnabledForTenant({ empresaId, schema });
     const responsavelRef = `oportunidade.${this.quoteIdentifier(schema.responsavelColumn)}`;
     const createdAtRef = `oportunidade.${this.quoteIdentifier(schema.createdAtColumn)}`;
@@ -1735,6 +1757,10 @@ export class OportunidadesService {
     const reopenedByExpr = schema.reopenedByColumn
       ? `oportunidade.${this.quoteIdentifier(schema.reopenedByColumn)}`
       : 'NULL';
+    const hasPropostaPrincipalColumn = schema.columns.has('proposta_principal_id');
+    const propostaPrincipalStatusExpr = hasPropostaPrincipalColumn
+      ? this.buildPropostaFlowStatusExpression('proposta_principal', propostasColumns)
+      : 'NULL';
 
     const queryBuilder = this.oportunidadeRepository
       .createQueryBuilder('oportunidade')
@@ -1777,6 +1803,20 @@ export class OportunidadesService {
       .addSelect('cliente.telefone', 'cliente__telefone')
       .where('oportunidade.empresa_id = :empresaId', { empresaId })
       .orderBy(updatedAtRef, 'DESC');
+
+    if (hasPropostaPrincipalColumn) {
+      queryBuilder
+        .leftJoin(
+          'propostas',
+          'proposta_principal',
+          'proposta_principal.id::text = oportunidade.proposta_principal_id::text AND proposta_principal.empresa_id = oportunidade.empresa_id',
+        )
+        .addSelect('oportunidade.proposta_principal_id::text', 'proposta_principal_id')
+        .addSelect('proposta_principal.id::text', 'proposta_principal__id')
+        .addSelect('proposta_principal.numero', 'proposta_principal__numero')
+        .addSelect('proposta_principal.titulo', 'proposta_principal__titulo')
+        .addSelect(propostaPrincipalStatusExpr, 'proposta_principal__status');
+    }
 
     if (filters?.estagio) {
       queryBuilder.andWhere('oportunidade.estagio::text IN (:...estagios)', {
@@ -1864,10 +1904,22 @@ export class OportunidadesService {
       emailContato: item.emailContato ?? undefined,
       telefoneContato: item.telefoneContato ?? undefined,
       empresaContato: item.empresaContato ?? undefined,
+      proposta_principal_id: item.proposta_principal_id ?? null,
+      propostaPrincipal: item.proposta_principal__id
+        ? {
+            id: item.proposta_principal__id,
+            numero: item.proposta_principal__numero || '',
+            titulo: item.proposta_principal__titulo || '',
+            status: item.proposta_principal__status || 'rascunho',
+            sugerePerda: ['rejeitada', 'expirada'].includes(
+              String(item.proposta_principal__status || '').trim().toLowerCase(),
+            ),
+          }
+        : undefined,
       atividades: [],
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
-    })) as Oportunidade[];
+    })) as unknown as Oportunidade[];
   }
 
   async findOne(

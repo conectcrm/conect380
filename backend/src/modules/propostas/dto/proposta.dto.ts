@@ -6,6 +6,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   Min,
 } from 'class-validator';
@@ -53,6 +54,13 @@ export interface PropostaDto {
   formaPagamento?: string;
   parcelas?: number;
   validadeDias?: number;
+  oportunidade?: {
+    id: string;
+    titulo: string;
+    estagio: string;
+    valor: number;
+  };
+  isPropostaPrincipal?: boolean;
 }
 
 // DTO permissivo para preservar compatibilidade com payloads legados do frontend.
@@ -69,6 +77,16 @@ export class CriarPropostaDto {
   @IsOptional()
   @IsString()
   clienteId?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === '' || value === null || value === undefined) {
+      return undefined;
+    }
+    return String(value).trim();
+  })
+  @IsUUID()
+  oportunidadeId?: string;
 
   @IsOptional()
   @IsArray()
@@ -152,6 +170,16 @@ export class AtualizarPropostaDto {
 
   @IsOptional()
   cliente?: string | Record<string, unknown>;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === '' || value === null || value === undefined) {
+      return undefined;
+    }
+    return String(value).trim();
+  })
+  @IsUUID()
+  oportunidadeId?: string;
 
   @IsOptional()
   @IsArray()
@@ -252,4 +280,3 @@ export interface PropostaResponseDto {
   timestamp?: string;
   error?: string;
 }
-

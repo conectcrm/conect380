@@ -106,6 +106,13 @@ interface PropostaFormData {
 interface PropostaCompleta extends PropostaFormData {
   id?: string;
   numero?: string;
+  oportunidade?: {
+    id: string;
+    titulo: string;
+    estagio: string;
+    valor: number;
+  };
+  isPropostaPrincipal?: boolean;
   subtotal: number;
   total: number;
   dataValidade: Date;
@@ -641,6 +648,15 @@ class PropostasService {
     return {
       id: propostaAny.id,
       numero: propostaAny.numero,
+      oportunidade: propostaAny.oportunidade
+        ? {
+            id: String(propostaAny.oportunidade.id || '').trim(),
+            titulo: propostaAny.oportunidade.titulo || 'Oportunidade vinculada',
+            estagio: propostaAny.oportunidade.estagio || '',
+            valor: Number(propostaAny.oportunidade.valor || 0),
+          }
+        : undefined,
+      isPropostaPrincipal: Boolean(propostaAny.isPropostaPrincipal),
       titulo: propostaAny.titulo || propostaAny.numero || cliente.nome || 'Proposta Comercial',
       status: (propostaAny.status as any) || 'rascunho',
       motivoPerda: propostaAny.motivoPerda || undefined,
@@ -852,6 +868,7 @@ class PropostasService {
       titulo: dados.titulo || this.gerarTituloAutomatico(dados.cliente),
       cliente: clientePayload || dados.cliente?.nome || 'Cliente nao informado',
       clienteId: dados.cliente?.id,
+      oportunidadeId: dados.oportunidade?.id,
       subtotal,
       total: valorTotal,
       valor: valorTotal,
@@ -1030,6 +1047,16 @@ class PropostasService {
       return this.mapPropostaBasica(propostaAtualizada);
     } catch (error) {
       console.error(`❌ Erro ao atualizar status da proposta ${id}:`, error);
+      return null;
+    }
+  }
+
+  async definirComoPrincipal(id: string): Promise<PropostaCompleta | null> {
+    try {
+      const propostaAtualizada = await sharedPropostasService.definirComoPrincipal(id);
+      return this.mapPropostaBasica(propostaAtualizada);
+    } catch (error) {
+      console.error(`Erro ao definir proposta principal ${id}:`, error);
       return null;
     }
   }

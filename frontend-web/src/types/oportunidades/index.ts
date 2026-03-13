@@ -90,6 +90,14 @@ export interface Oportunidade {
   stale_days?: number;
   last_interaction_at?: Date | string | null;
   stale_since?: Date | string | null;
+  proposta_principal_id?: string | null;
+  propostaPrincipal?: {
+    id: string;
+    numero: string;
+    titulo?: string;
+    status: string;
+    sugerePerda?: boolean;
+  };
 }
 
 export interface Atividade {

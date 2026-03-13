@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { OportunidadesService } from './oportunidades.service';
 import { OportunidadesController } from './oportunidades.controller';
@@ -23,7 +23,7 @@ import { Lead } from '../leads/lead.entity';
       Lead,
     ]),
     DashboardV2Module,
-    PropostasModule,
+    forwardRef(() => PropostasModule),
   ],
   controllers: [OportunidadesController],
   providers: [OportunidadesService, OportunidadesStaleMonitorService],

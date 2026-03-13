@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { isUUID } from 'class-validator';
 import { In, Like, Repository } from 'typeorm';
@@ -8,6 +8,11 @@ import { User } from '../users/user.entity';
 import { Cliente } from '../clientes/cliente.entity';
 import { Produto as ProdutoEntity } from '../produtos/produto.entity';
 import { CatalogItem as CatalogItemEntity } from '../catalogo/entities/catalog-item.entity';
+import {
+  EstagioOportunidade,
+  LifecycleStatusOportunidade,
+} from '../oportunidades/oportunidade.entity';
+import { OportunidadesService } from '../oportunidades/oportunidades.service';
 
 type SalesFlowStatus =
   | 'rascunho'
@@ -74,6 +79,30 @@ const WON_STATUS_VALUES = new Set<SalesFlowStatus>([
   'aguardando_pagamento',
   'pago',
 ]);
+
+const PROPOSTA_SYNC_STATUS_TO_STAGE: Partial<Record<SalesFlowStatus, EstagioOportunidade>> = {
+  rascunho: EstagioOportunidade.PROPOSTA,
+  enviada: EstagioOportunidade.NEGOCIACAO,
+  visualizada: EstagioOportunidade.NEGOCIACAO,
+  negociacao: EstagioOportunidade.NEGOCIACAO,
+  aprovada: EstagioOportunidade.FECHAMENTO,
+  contrato_gerado: EstagioOportunidade.FECHAMENTO,
+  contrato_assinado: EstagioOportunidade.GANHO,
+  fatura_criada: EstagioOportunidade.GANHO,
+  aguardando_pagamento: EstagioOportunidade.GANHO,
+  pago: EstagioOportunidade.GANHO,
+};
+
+const PROPOSTA_STATUS_SUGERE_PERDA = new Set<SalesFlowStatus>(['rejeitada', 'expirada']);
+
+const OPORTUNIDADE_SYNC_FORWARD_ORDER: readonly EstagioOportunidade[] = [
+  EstagioOportunidade.LEADS,
+  EstagioOportunidade.QUALIFICACAO,
+  EstagioOportunidade.PROPOSTA,
+  EstagioOportunidade.NEGOCIACAO,
+  EstagioOportunidade.FECHAMENTO,
+  EstagioOportunidade.GANHO,
+];
 
 const FLOW_STATUS_TRANSITIONS: Record<SalesFlowStatus, readonly SalesFlowStatus[]> = {
   rascunho: ['enviada', 'aprovada', 'rejeitada', 'expirada'],
@@ -158,6 +187,14 @@ export interface Proposta {
   id: string;
   numero: string;
   titulo?: string;
+  oportunidadeId?: string;
+  oportunidade?: {
+    id: string;
+    titulo: string;
+    estagio: string;
+    valor: number;
+  };
+  isPropostaPrincipal?: boolean;
   cliente: {
     id: string;
     nome: string;
@@ -243,6 +280,8 @@ export class PropostasService {
     private produtoRepository: Repository<ProdutoEntity>,
     @InjectRepository(CatalogItemEntity)
     private catalogItemRepository: Repository<CatalogItemEntity>,
+    @Inject(forwardRef(() => OportunidadesService))
+    private readonly oportunidadesService: OportunidadesService,
   ) {
     // Inicializar contador baseado nas propostas existentes
     this.inicializarContador();
@@ -262,6 +301,300 @@ export class PropostasService {
     }
 
     return fallbackMessage;
+  }
+
+  private normalizeOportunidadeId(value: unknown): string | null {
+    if (value === undefined || value === null || value === '') {
+      return null;
+    }
+
+    const normalized = String(value).trim();
+    return normalized.length > 0 ? normalized : null;
+  }
+
+  private mapPropostaStatusToOportunidadeStage(
+    status?: SalesFlowStatus | string | null,
+  ): EstagioOportunidade | null {
+    const normalized = status ? this.normalizeStatusInput(String(status)) : null;
+    if (!normalized) {
+      return null;
+    }
+
+    return PROPOSTA_SYNC_STATUS_TO_STAGE[normalized] || null;
+  }
+
+  private async hydratePropostasOpportunityContext(
+    propostas: Proposta[],
+    empresaId?: string,
+  ): Promise<Proposta[]> {
+    if (!Array.isArray(propostas) || propostas.length === 0) {
+      return propostas;
+    }
+
+    const propostaColumns = await this.getTableColumns('propostas');
+    if (!propostaColumns.has('oportunidade_id')) {
+      return propostas;
+    }
+
+    const oportunidadeColumns = await this.getTableColumns('oportunidades');
+    const propostaIds = propostas
+      .map((proposta) => String(proposta.id || '').trim())
+      .filter((id) => id.length > 0);
+
+    if (propostaIds.length === 0) {
+      return propostas;
+    }
+
+    const params: unknown[] = [propostaIds];
+    const empresaFilter = empresaId ? 'AND p.empresa_id = $2' : '';
+    if (empresaId) {
+      params.push(empresaId);
+    }
+
+    const rowsRaw = await this.propostaRepository.query(
+      `
+        SELECT
+          p.id::text AS proposta_id,
+          p.oportunidade_id::text AS oportunidade_id,
+          o.titulo AS oportunidade_titulo,
+          o.estagio::text AS oportunidade_estagio,
+          o.valor AS oportunidade_valor,
+          ${
+            oportunidadeColumns.has('proposta_principal_id')
+              ? 'o.proposta_principal_id::text'
+              : 'NULL::text'
+          } AS proposta_principal_id
+        FROM propostas p
+        LEFT JOIN oportunidades o
+          ON o.id = p.oportunidade_id
+         AND o.empresa_id = p.empresa_id
+        WHERE p.id::text = ANY($1::text[])
+        ${empresaFilter}
+      `,
+      params,
+    );
+
+    const rows = this.extractQueryRows<{
+      proposta_id?: string;
+      oportunidade_id?: string | null;
+      oportunidade_titulo?: string | null;
+      oportunidade_estagio?: string | null;
+      oportunidade_valor?: number | string | null;
+      proposta_principal_id?: string | null;
+    }>(rowsRaw);
+
+    const contextMap = new Map<
+      string,
+      {
+        oportunidadeId: string | null;
+        oportunidade?: Proposta['oportunidade'];
+        isPropostaPrincipal: boolean;
+      }
+    >();
+
+    rows.forEach((row) => {
+      const propostaId = String(row?.proposta_id || '').trim();
+      if (!propostaId) {
+        return;
+      }
+
+      const oportunidadeId = this.normalizeOportunidadeId(row?.oportunidade_id);
+      contextMap.set(propostaId, {
+        oportunidadeId,
+        oportunidade: oportunidadeId
+          ? {
+              id: oportunidadeId,
+              titulo: row?.oportunidade_titulo || 'Oportunidade vinculada',
+              estagio: String(row?.oportunidade_estagio || '').trim(),
+              valor: Number(row?.oportunidade_valor || 0),
+            }
+          : undefined,
+        isPropostaPrincipal:
+          Boolean(row?.proposta_principal_id) &&
+          String(row?.proposta_principal_id).trim() === propostaId,
+      });
+    });
+
+    return propostas.map((proposta) => {
+      const context = contextMap.get(String(proposta.id || '').trim());
+      if (!context) {
+        return proposta;
+      }
+
+      return {
+        ...proposta,
+        oportunidadeId: context.oportunidadeId ?? proposta.oportunidadeId,
+        oportunidade: context.oportunidade || proposta.oportunidade,
+        isPropostaPrincipal: context.isPropostaPrincipal,
+      };
+    });
+  }
+
+  private async maybeAssignPropostaPrincipalOnCreate(
+    propostaId: string,
+    oportunidadeId: string | null,
+    empresaId?: string,
+    options?: { force?: boolean },
+  ): Promise<boolean> {
+    if (!propostaId || !oportunidadeId || !empresaId) {
+      return false;
+    }
+
+    const oportunidadeColumns = await this.getTableColumns('oportunidades');
+    if (!oportunidadeColumns.has('proposta_principal_id')) {
+      return false;
+    }
+
+    const rowsRaw = await this.propostaRepository.query(
+      `
+        SELECT proposta_principal_id::text AS proposta_principal_id
+        FROM oportunidades
+        WHERE id = $1
+          AND empresa_id = $2
+        LIMIT 1
+      `,
+      [oportunidadeId, empresaId],
+    );
+    const rows = this.extractQueryRows<{ proposta_principal_id?: string | null }>(rowsRaw);
+    const propostaPrincipalAtual = String(rows?.[0]?.proposta_principal_id || '').trim();
+
+    if (!options?.force && propostaPrincipalAtual) {
+      return propostaPrincipalAtual === propostaId;
+    }
+
+    await this.propostaRepository.query(
+      `
+        UPDATE oportunidades
+        SET proposta_principal_id = $1
+        WHERE id = $2
+          AND empresa_id = $3
+      `,
+      [propostaId, oportunidadeId, empresaId],
+    );
+
+    return true;
+  }
+
+  private async resolvePrimaryProposalLink(
+    propostaId: string,
+    empresaId?: string,
+  ): Promise<{ oportunidadeId: string | null; isPrimary: boolean }> {
+    const propostaColumns = await this.getTableColumns('propostas');
+    if (!propostaColumns.has('oportunidade_id')) {
+      return { oportunidadeId: null, isPrimary: false };
+    }
+
+    const oportunidadeColumns = await this.getTableColumns('oportunidades');
+    const params: unknown[] = [propostaId];
+    const empresaFilter = empresaId ? 'AND p.empresa_id = $2' : '';
+    if (empresaId) {
+      params.push(empresaId);
+    }
+
+    const rowsRaw = await this.propostaRepository.query(
+      `
+        SELECT
+          p.oportunidade_id,
+          ${
+            oportunidadeColumns.has('proposta_principal_id')
+              ? 'o.proposta_principal_id::text'
+              : 'NULL::text'
+          } AS proposta_principal_id
+        FROM propostas p
+        LEFT JOIN oportunidades o
+          ON o.id = p.oportunidade_id
+         AND o.empresa_id = p.empresa_id
+        WHERE p.id = $1
+        ${empresaFilter}
+        LIMIT 1
+      `,
+      params,
+    );
+
+    const rows = this.extractQueryRows<{
+      oportunidade_id?: string | null;
+      proposta_principal_id?: string | null;
+    }>(rowsRaw);
+
+    const oportunidadeId = this.normalizeOportunidadeId(rows?.[0]?.oportunidade_id);
+    const propostaPrincipalId = String(rows?.[0]?.proposta_principal_id || '').trim();
+
+    return {
+      oportunidadeId,
+      isPrimary: Boolean(propostaPrincipalId) && propostaPrincipalId === propostaId,
+    };
+  }
+
+  private async syncOportunidadeFromPropostaPrincipal(
+    propostaId: string,
+    empresaId?: string,
+  ): Promise<void> {
+    try {
+      if (!empresaId) {
+        return;
+      }
+
+      const link = await this.resolvePrimaryProposalLink(propostaId, empresaId);
+      if (!link.oportunidadeId || !link.isPrimary) {
+        return;
+      }
+
+      const proposta = await this.obterProposta(propostaId, empresaId);
+      if (!proposta) {
+        return;
+      }
+
+      if (PROPOSTA_STATUS_SUGERE_PERDA.has(proposta.status)) {
+        return;
+      }
+
+      const targetStage = this.mapPropostaStatusToOportunidadeStage(proposta.status);
+      if (!targetStage) {
+        return;
+      }
+
+      const oportunidade = await this.oportunidadesService.findOne(
+        String(link.oportunidadeId),
+        empresaId,
+      );
+      const lifecycleStatus =
+        oportunidade.lifecycle_status ||
+        (oportunidade.estagio === EstagioOportunidade.GANHO
+          ? LifecycleStatusOportunidade.WON
+          : oportunidade.estagio === EstagioOportunidade.PERDIDO
+            ? LifecycleStatusOportunidade.LOST
+            : LifecycleStatusOportunidade.OPEN);
+
+      if (lifecycleStatus !== LifecycleStatusOportunidade.OPEN) {
+        return;
+      }
+
+      const currentStageIndex = OPORTUNIDADE_SYNC_FORWARD_ORDER.indexOf(oportunidade.estagio);
+      const targetStageIndex = OPORTUNIDADE_SYNC_FORWARD_ORDER.indexOf(targetStage);
+      if (
+        currentStageIndex === -1 ||
+        targetStageIndex === -1 ||
+        targetStageIndex <= currentStageIndex
+      ) {
+        return;
+      }
+
+      let oportunidadeAtual = oportunidade;
+      for (const stage of OPORTUNIDADE_SYNC_FORWARD_ORDER.slice(
+        currentStageIndex + 1,
+        targetStageIndex + 1,
+      )) {
+        oportunidadeAtual = await this.oportunidadesService.updateEstagio(
+          String(oportunidadeAtual.id),
+          { estagio: stage },
+          empresaId,
+        );
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao sincronizar oportunidade pela proposta principal ${propostaId}: ${this.resolveErrorMessage(error, 'erro inesperado')}`,
+      );
+    }
   }
 
   private buildPropostaNotFoundMessage(propostaId: string): string {
@@ -1560,6 +1893,9 @@ export class PropostasService {
       id: row?.id ?? overrides.id ?? randomUUID(),
       numero: row?.numero ?? overrides.numero ?? this.gerarNumero(),
       titulo: row?.titulo ?? overrides.titulo,
+      oportunidadeId:
+        overrides.oportunidadeId ??
+        this.normalizeOportunidadeId(row?.oportunidade_id ?? row?.oportunidadeId),
       cliente,
       produtos: produtos as Proposta['produtos'],
       subtotal,
@@ -1606,6 +1942,7 @@ export class PropostasService {
       id: entity.id,
       numero: entity.numero,
       titulo: entity.titulo,
+      oportunidadeId: this.normalizeOportunidadeId(entity.oportunidade_id),
       cliente: entity.cliente,
       produtos: entity.produtos,
       subtotal: Number(entity.subtotal),
@@ -1817,12 +2154,13 @@ export class PropostasService {
           empresaId,
         );
 
-        return propostas.map((proposta) =>
+        const propostasComStatus = propostas.map((proposta) =>
           this.aplicarStatusContratoAssinadoSeNecessario(
             proposta,
             propostasComContratoAssinado.has(String(proposta.id || '')),
           ),
         );
+        return this.hydratePropostasOpportunityContext(propostasComStatus, empresaId);
       }
 
       const entities = await this.propostaRepository.find({
@@ -1838,12 +2176,13 @@ export class PropostasService {
         empresaId,
       );
 
-      return propostas.map((proposta) =>
+      const propostasComStatus = propostas.map((proposta) =>
         this.aplicarStatusContratoAssinadoSeNecessario(
           proposta,
           propostasComContratoAssinado.has(String(proposta.id || '')),
         ),
       );
+      return this.hydratePropostasOpportunityContext(propostasComStatus, empresaId);
     } catch (error) {
       this.logger.error('Erro ao listar propostas', error?.stack || String(error));
       return [];
@@ -1911,10 +2250,15 @@ export class PropostasService {
           empresaId,
         );
 
-        return this.aplicarStatusContratoAssinadoSeNecessario(
+        const propostaComStatus = this.aplicarStatusContratoAssinadoSeNecessario(
           proposta,
           propostasComContratoAssinado.has(String(proposta.id || '')),
         );
+        const [propostaHidratada] = await this.hydratePropostasOpportunityContext(
+          [propostaComStatus],
+          empresaId,
+        );
+        return propostaHidratada || propostaComStatus;
       }
 
       const entity = await this.propostaRepository.findOne({
@@ -1932,10 +2276,15 @@ export class PropostasService {
         empresaId,
       );
 
-      return this.aplicarStatusContratoAssinadoSeNecessario(
+      const propostaComStatus = this.aplicarStatusContratoAssinadoSeNecessario(
         proposta,
         propostasComContratoAssinado.has(String(proposta.id || '')),
       );
+      const [propostaHidratada] = await this.hydratePropostasOpportunityContext(
+        [propostaComStatus],
+        empresaId,
+      );
+      return propostaHidratada || propostaComStatus;
     } catch (error) {
       this.logger.error('Erro ao obter proposta', error?.stack || String(error));
       return null;
@@ -2053,6 +2402,9 @@ export class PropostasService {
       const legacySchema = this.isLegacyPropostasSchema(propostaColumns);
       const fluxoStatus = this.normalizeStatusInput(dadosProposta.status as string | undefined);
       const motivoPerda = this.sanitizeMotivoPerda((dadosProposta as any).motivoPerda);
+      const oportunidadeId = this.normalizeOportunidadeId(
+        (dadosProposta as any).oportunidadeId ?? (dadosProposta as any).oportunidade_id,
+      );
       const observacoesComFluxo = this.mergeLegacyFlowMetadata(undefined, {
         observacoes: dadosProposta.observacoes,
         fluxoStatus,
@@ -2080,7 +2432,8 @@ export class PropostasService {
         if (propostaColumns.has('oportunidade_id')) {
           insertColumns.push('oportunidade_id');
           insertValues.push(
-            await this.ensureLegacyOportunidadeId(empresaIdProposta, titulo, valor, vendedorId),
+            oportunidadeId ??
+              (await this.ensureLegacyOportunidadeId(empresaIdProposta, titulo, valor, vendedorId)),
           );
         }
 
@@ -2129,10 +2482,11 @@ export class PropostasService {
         );
         const rows = this.extractQueryRows<any>(rowsRaw);
 
-        return this.buildLegacyInterface(
+        const propostaCriada = this.buildLegacyInterface(
           rows?.[0],
           {
             cliente: clienteProcessado,
+            oportunidadeId,
             produtos: dadosProposta.produtos || [],
             subtotal: dadosProposta.subtotal || 0,
             descontoGlobal: dadosProposta.descontoGlobal || 0,
@@ -2150,6 +2504,30 @@ export class PropostasService {
           },
           typeof dadosProposta.cliente === 'string' ? dadosProposta.cliente : clienteProcessado?.nome,
         );
+
+        if (oportunidadeId) {
+          const vinculadaComoPrincipal = await this.maybeAssignPropostaPrincipalOnCreate(
+            String(propostaCriada.id || ''),
+            oportunidadeId,
+            empresaIdProposta,
+            {
+              force: (dadosProposta.source || '').toString().trim().toLowerCase() === 'oportunidade',
+            },
+          );
+
+          if (vinculadaComoPrincipal) {
+            await this.syncOportunidadeFromPropostaPrincipal(
+              String(propostaCriada.id || ''),
+              empresaIdProposta,
+            );
+          }
+        }
+
+        const [propostaHidratada] = await this.hydratePropostasOpportunityContext(
+          [propostaCriada],
+          empresaIdProposta,
+        );
+        return propostaHidratada || propostaCriada;
       }
 
       const emailDetailsIniciais: Record<string, unknown> = {
@@ -2182,6 +2560,7 @@ export class PropostasService {
           ? new Date(dadosProposta.dataVencimento)
           : new Date(dataVencimentoCalculada),
         source: dadosProposta.source || 'api',
+        oportunidade_id: propostaColumns.has('oportunidade_id') ? oportunidadeId : undefined,
         vendedor_id: vendedorId,
         emailDetails: emailDetailsIniciais as any,
       });
@@ -2205,7 +2584,26 @@ export class PropostasService {
       const propostaSalva = await this.propostaRepository.save(novaProposta);
       this.logger.log(`Proposta criada no banco: ${propostaSalva.id} - ${propostaSalva.numero}`);
 
-      return this.entityToInterface(propostaSalva);
+      if (oportunidadeId) {
+        const vinculadaComoPrincipal = await this.maybeAssignPropostaPrincipalOnCreate(
+          propostaSalva.id,
+          oportunidadeId,
+          empresaIdProposta,
+          {
+            force: (dadosProposta.source || '').toString().trim().toLowerCase() === 'oportunidade',
+          },
+        );
+
+        if (vinculadaComoPrincipal) {
+          await this.syncOportunidadeFromPropostaPrincipal(propostaSalva.id, empresaIdProposta);
+        }
+      }
+
+      const [propostaHidratada] = await this.hydratePropostasOpportunityContext(
+        [this.entityToInterface(propostaSalva)],
+        empresaIdProposta,
+      );
+      return propostaHidratada || this.entityToInterface(propostaSalva);
     } catch (error) {
       this.logger.error('Erro ao criar proposta', error?.stack || String(error));
       throw error;
@@ -2231,6 +2629,14 @@ export class PropostasService {
         if (dadosProposta.titulo !== undefined) {
           setClauses.push(`"titulo" = $${idx++}`);
           params.push(dadosProposta.titulo || null);
+        }
+
+        const oportunidadeId = this.normalizeOportunidadeId(
+          (dadosProposta as any).oportunidadeId ?? (dadosProposta as any).oportunidade_id,
+        );
+        if (propostaColumns.has('oportunidade_id') && (dadosProposta as any).oportunidadeId !== undefined) {
+          setClauses.push(`"oportunidade_id" = $${idx++}`);
+          params.push(oportunidadeId);
         }
 
         const valorAtualizado =
@@ -2320,6 +2726,7 @@ export class PropostasService {
         if (!propostaAtualizada) {
           throw new Error(this.buildPropostaNotFoundMessage(id));
         }
+        await this.syncOportunidadeFromPropostaPrincipal(id, empresaId);
         return propostaAtualizada;
       }
 
@@ -2333,6 +2740,12 @@ export class PropostasService {
 
       if (dadosProposta.titulo !== undefined) {
         proposta.titulo = dadosProposta.titulo || null;
+      }
+
+      if ((dadosProposta as any).oportunidadeId !== undefined) {
+        proposta.oportunidade_id = this.normalizeOportunidadeId(
+          (dadosProposta as any).oportunidadeId ?? (dadosProposta as any).oportunidade_id,
+        );
       }
 
       if (dadosProposta.cliente !== undefined) {
@@ -2463,7 +2876,12 @@ export class PropostasService {
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);
       this.logger.log(`Proposta atualizada: ${propostaAtualizada.id}`);
-      return this.entityToInterface(propostaAtualizada);
+      await this.syncOportunidadeFromPropostaPrincipal(propostaAtualizada.id, empresaId);
+      const [propostaHidratada] = await this.hydratePropostasOpportunityContext(
+        [this.entityToInterface(propostaAtualizada)],
+        empresaId,
+      );
+      return propostaHidratada || this.entityToInterface(propostaAtualizada);
     } catch (error) {
       this.logger.error('Erro ao atualizar proposta', error?.stack || String(error));
       throw error;
@@ -2483,6 +2901,40 @@ export class PropostasService {
       this.logger.error('Erro ao remover proposta', error?.stack || String(error));
       return false;
     }
+  }
+
+  async definirComoPrincipal(propostaId: string, empresaId?: string): Promise<Proposta> {
+    const oportunidadeColumns = await this.getTableColumns('oportunidades');
+    if (!oportunidadeColumns.has('proposta_principal_id')) {
+      throw new BadRequestException(
+        'Recurso de proposta principal indisponivel. Execute as migrations pendentes.',
+      );
+    }
+
+    const link = await this.resolvePrimaryProposalLink(propostaId, empresaId);
+    if (!link.oportunidadeId) {
+      throw new BadRequestException(
+        'Somente propostas vinculadas a uma oportunidade podem ser definidas como principais.',
+      );
+    }
+
+    if (!empresaId) {
+      throw new BadRequestException(
+        'Nao foi possivel determinar a empresa da proposta para definir a proposta principal.',
+      );
+    }
+
+    await this.maybeAssignPropostaPrincipalOnCreate(propostaId, link.oportunidadeId, empresaId, {
+      force: true,
+    });
+    await this.syncOportunidadeFromPropostaPrincipal(propostaId, empresaId);
+
+    const propostaAtualizada = await this.obterProposta(propostaId, empresaId);
+    if (!propostaAtualizada) {
+      throw new Error(this.buildPropostaNotFoundMessage(propostaId));
+    }
+
+    return propostaAtualizada;
   }
 
   /**
@@ -2547,6 +2999,7 @@ export class PropostasService {
         this.logger.log(
           `Status da proposta ${propostaId} atualizado para: ${fluxoStatus} (legacy mode)`,
         );
+        await this.syncOportunidadeFromPropostaPrincipal(propostaId, empresaId);
         return propostaAtualizada;
       }
 
@@ -2648,8 +3101,12 @@ export class PropostasService {
 
       const propostaAtualizada = await this.savePropostaWithStatusFallback(proposta, fluxoStatus);
       this.logger.log(`Status da proposta ${propostaId} atualizado para: ${fluxoStatus}`);
-
-      return this.entityToInterface(propostaAtualizada);
+      await this.syncOportunidadeFromPropostaPrincipal(propostaAtualizada.id, empresaId);
+      const [propostaHidratada] = await this.hydratePropostasOpportunityContext(
+        [this.entityToInterface(propostaAtualizada)],
+        empresaId,
+      );
+      return propostaHidratada || this.entityToInterface(propostaAtualizada);
     } catch (error) {
       this.logger.error('Erro ao atualizar status', error?.stack || String(error));
       throw error;
@@ -2750,8 +3207,12 @@ export class PropostasService {
 
       const propostaAtualizada = await this.savePropostaWithStatusFallback(proposta, 'visualizada');
       this.logger.log(`Proposta ${propostaId} marcada como visualizada`);
-
-      return this.entityToInterface(propostaAtualizada);
+      await this.syncOportunidadeFromPropostaPrincipal(propostaAtualizada.id, empresaId);
+      const [propostaHidratada] = await this.hydratePropostasOpportunityContext(
+        [this.entityToInterface(propostaAtualizada)],
+        empresaId,
+      );
+      return propostaHidratada || this.entityToInterface(propostaAtualizada);
     } catch (error) {
       this.logger.error('Erro ao marcar como visualizada', error?.stack || String(error));
       throw error;
@@ -2806,8 +3267,12 @@ export class PropostasService {
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);
       this.logger.log(`Email registrado para proposta ${propostaId} (${this.maskEmail(emailCliente)})`);
-
-      return this.entityToInterface(propostaAtualizada);
+      await this.syncOportunidadeFromPropostaPrincipal(propostaAtualizada.id, empresaId);
+      const [propostaHidratada] = await this.hydratePropostasOpportunityContext(
+        [this.entityToInterface(propostaAtualizada)],
+        empresaId,
+      );
+      return propostaHidratada || this.entityToInterface(propostaAtualizada);
     } catch (error) {
       this.logger.error('Erro ao registrar envio de email', error?.stack || String(error));
       throw error;
@@ -2867,8 +3332,12 @@ export class PropostasService {
 
       const propostaAtualizada = await this.propostaRepository.save(proposta);
       this.logger.log(`Proposta ${proposta.numero} marcada como enviada automaticamente`);
-
-      return this.entityToInterface(propostaAtualizada);
+      await this.syncOportunidadeFromPropostaPrincipal(propostaAtualizada.id, empresaId);
+      const [propostaHidratada] = await this.hydratePropostasOpportunityContext(
+        [this.entityToInterface(propostaAtualizada)],
+        empresaId,
+      );
+      return propostaHidratada || this.entityToInterface(propostaAtualizada);
     } catch (error) {
       this.logger.error('Erro ao marcar proposta como enviada', error?.stack || String(error));
       throw error;

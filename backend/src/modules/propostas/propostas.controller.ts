@@ -101,7 +101,10 @@ export class PropostasController {
       observacoes: proposta.observacoes,
       vendedor: proposta.vendedor,
       formaPagamento: proposta.formaPagamento,
+      parcelas: (proposta as any).parcelas,
       validadeDias: proposta.validadeDias,
+      oportunidade: proposta.oportunidade,
+      isPropostaPrincipal: proposta.isPropostaPrincipal,
     };
   }
 
@@ -480,6 +483,41 @@ export class PropostasController {
     }
   }
 
+  @Put(':id/principal')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_UPDATE)
+  async definirComoPrincipal(
+    @EmpresaId() empresaId: string,
+    @Param('id') propostaId: string,
+  ): Promise<PropostaResponseDto> {
+    try {
+      this.logger.log(`[PROPOSTAS] Definindo proposta principal: ${propostaId}`);
+
+      const proposta = await this.propostasService.definirComoPrincipal(propostaId, empresaId);
+
+      return {
+        success: true,
+        message: 'Proposta principal definida com sucesso',
+        proposta: this.toPropostaDto(proposta),
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      this.logger.error('[PROPOSTAS] Erro ao definir proposta principal:', error);
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Erro ao definir proposta principal',
+          error: this.resolveErrorMessage(error, 'Falha ao definir proposta principal'),
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
   /**
    * Obtem uma proposta por ID
    */
@@ -549,6 +587,7 @@ export class PropostasController {
       const propostaParaCriar: Partial<Proposta> = {
         titulo: payload.titulo || `Proposta ${Date.now()}`,
         cliente: payload.cliente,
+        oportunidadeId: payload.oportunidadeId || payload.oportunidade_id,
         produtos: payload.produtos || [],
         subtotal: payload.subtotal || 0,
         descontoGlobal: payload.descontoGlobal || 0,
