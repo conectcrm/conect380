@@ -1982,7 +1982,7 @@ const PipelinePage: React.FC = () => {
       {showPipelineWorkspace && (
         <>
       {/* Barra de trabalho sticky */}
-            <SectionCard className="sticky top-2 z-20 border border-[#B4BEC9]/40 bg-white/95 p-3 backdrop-blur supports-[backdrop-filter]:bg-white/85 sm:p-4">
+            <SectionCard className="sticky top-2 z-10 border border-[#B4BEC9]/40 bg-white/95 p-3 backdrop-blur supports-[backdrop-filter]:bg-white/85 sm:p-4">
         <div className="flex flex-col gap-3">
           {lifecycleFeatureEnabled && (
             <div className="flex flex-wrap items-center gap-2">

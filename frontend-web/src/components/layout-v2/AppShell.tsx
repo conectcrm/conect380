@@ -335,7 +335,7 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
       ) : null}
 
       <div className="min-h-screen md:pl-[74px]">
-        <header className={`sticky top-0 z-40 ${shellTokens.topbar}`}>
+        <header className={`sticky top-0 z-20 ${shellTokens.topbar}`}>
           <div
             data-testid="mobile-topbar-container"
             className={`transition-[max-height,opacity,transform] duration-200 ease-out md:max-h-[86px] md:translate-y-0 md:opacity-100 md:pointer-events-auto ${
