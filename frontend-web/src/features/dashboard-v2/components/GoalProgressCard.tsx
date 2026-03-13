@@ -25,6 +25,7 @@ const GoalProgressCard: React.FC<GoalProgressCardProps> = ({
   const progress = clampPercent(progressPercent);
   const arcLength = 84;
   const offset = arcLength - (arcLength * progress) / 100;
+  const trendSignal = trendPercent >= 0 ? '+' : '-';
 
   return (
     <article className="min-h-[232px] rounded-[20px] border border-[#DCE7EB] bg-white px-5 py-5 shadow-[0_16px_30px_-24px_rgba(15,57,74,0.28)]">
@@ -73,7 +74,8 @@ const GoalProgressCard: React.FC<GoalProgressCardProps> = ({
       <div className="mt-3.5 flex items-center gap-1.5 text-[14px]">
         <span className="inline-flex items-center gap-1 font-semibold text-[#159B82]">
           <ArrowUpRight className="h-3.5 w-3.5" />
-          +{Math.abs(trendPercent).toFixed(0)}
+          {trendSignal}
+          {Math.abs(trendPercent).toFixed(0)}%
         </span>
       </div>
 

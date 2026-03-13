@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   AlertTriangle,
   ArrowUp,
@@ -14,7 +14,26 @@ import {
   Trophy,
   Users,
 } from 'lucide-react';
-import { useVendedorDashboard } from '../../hooks/useVendedorDashboard';
+import {
+  useVendedorDashboard,
+  type VendedorDashboardPeriodo,
+} from '../../hooks/useVendedorDashboard';
+
+const vendedorPeriodOptions: Array<{ value: VendedorDashboardPeriodo; label: string }> = [
+  { value: 'semanal', label: 'Semana atual' },
+  { value: 'mensal', label: 'Mes atual' },
+  { value: 'trimestral', label: 'Trimestre atual' },
+  { value: 'semestral', label: 'Semestre atual' },
+  { value: 'anual', label: 'Ano atual' },
+];
+
+const vendedorPeriodLabels: Record<VendedorDashboardPeriodo, string> = {
+  semanal: 'Semana atual',
+  mensal: 'Mes atual',
+  trimestral: 'Trimestre atual',
+  semestral: 'Semestre atual',
+  anual: 'Ano atual',
+};
 
 const formatCurrency = (value: number): string =>
   value.toLocaleString('pt-BR', {
@@ -27,6 +46,18 @@ const formatDate = (value: string): string => {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
   return parsed.toLocaleDateString('pt-BR');
+};
+
+const formatDateTime = (value: string): string => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'Atualizado agora';
+  return parsed.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 };
 
 const propostaStyleByTemperature = (
@@ -65,9 +96,11 @@ const alertaSeverityColor = (severity: 'baixa' | 'media' | 'alta' | 'critica'): 
 };
 
 const VendedorDashboard: React.FC = () => {
-  const { data, loading, error, refresh, insights } = useVendedorDashboard({
+  const [periodo, setPeriodo] = useState<VendedorDashboardPeriodo>('mensal');
+  const { data, loading, error, refresh, insights, lastUpdatedAt } = useVendedorDashboard({
     autoRefresh: true,
     refreshInterval: 5 * 60 * 1000,
+    periodo,
   });
 
   if (loading && !data.kpis.meta) {
@@ -110,43 +143,100 @@ const VendedorDashboard: React.FC = () => {
     (kpis.atividades?.semana?.calls || 0) +
     (kpis.atividades?.semana?.reunioes || 0) +
     (kpis.atividades?.semana?.followups || 0);
+  const hasActiveFilters = periodo !== 'mensal';
+  const ultimaAtualizacaoLabel = lastUpdatedAt ? formatDateTime(lastUpdatedAt) : 'Atualizado agora';
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
-        <div className="bg-white border border-[#DEEFE7] rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <section className="mb-6 rounded-[20px] border border-[#DCE7EB] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h1 className="text-3xl font-bold flex items-center text-[#002333]">
-                <Trophy className="h-8 w-8 mr-3 text-[#159A9C]" />
+              <h1 className="text-[20px] font-semibold tracking-[-0.012em] text-[#18374B]">
                 Dashboard Comercial
+                <span className="ml-2 text-[14px] font-medium text-[#159A9C]">Vendedor</span>
               </h1>
-              <p className="mt-2 text-[#002333]/70">
-                Posicao no ranking: #{kpis.ranking?.posicao || 0} de {kpis.ranking?.total || 0}
+              <p className="mt-1 text-[13px] text-[#617D89]">
+                Pipeline, agenda e metas com foco na execucao comercial diaria.
+              </p>
+              <p className="mt-1 text-[12px] text-[#7A929E]">
+                Ultima sincronizacao: {ultimaAtualizacaoLabel} (auto refresh a cada 5 min)
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="text-right">
-                <div className="text-2xl font-bold text-[#002333]">{kpis.meta?.percentual || 0}%</div>
-                <div className="text-sm text-[#002333]/70">meta mensal concluida</div>
-              </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <label htmlFor="dashboard-vendedor-periodo" className="text-[13px] font-medium text-[#567583]">
+                Periodo
+              </label>
+              <select
+                id="dashboard-vendedor-periodo"
+                value={periodo}
+                onChange={(event) => setPeriodo(event.target.value as VendedorDashboardPeriodo)}
+                className="rounded-[10px] border border-[#D5E3E8] bg-white px-3 py-2 text-[13px] text-[#244556] focus:border-[#159A9C] focus:outline-none"
+              >
+                {vendedorPeriodOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+
               <button
+                type="button"
+                onClick={() => setPeriodo('mensal')}
+                disabled={!hasActiveFilters}
+                className="inline-flex items-center gap-2 rounded-[10px] border border-[#D5E3E8] px-3 py-2 text-[13px] font-semibold text-[#26495C] hover:bg-[#F3F9F8] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Limpar filtros
+              </button>
+
+              <button
+                type="button"
                 onClick={refresh}
                 disabled={loading}
-                className="px-3 py-2 rounded-lg border border-[#159A9C] text-[#159A9C] hover:bg-[#159A9C]/5 disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-[10px] border border-[#D5E3E8] px-3 py-2 text-[13px] font-semibold text-[#26495C] hover:bg-[#F3F9F8] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+                Atualizar
               </button>
             </div>
           </div>
-          <div className="w-full bg-[#DEEFE7] rounded-full h-2 mt-4">
+
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="flex items-center justify-between rounded-[12px] border border-[#DCE7EB] bg-[#FBFDFD] px-3 py-2">
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-[#7A929E]">Ranking</p>
+                <p className="text-[16px] font-semibold text-[#18374B]">
+                  #{kpis.ranking?.posicao || 0} de {kpis.ranking?.total || 0}
+                </p>
+              </div>
+              <Trophy className="h-5 w-5 text-[#159A9C]" />
+            </div>
+            <div className="flex items-center justify-between rounded-[12px] border border-[#DCE7EB] bg-[#FBFDFD] px-3 py-2">
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-[#7A929E]">Meta concluida</p>
+                <p className="text-[16px] font-semibold text-[#18374B]">{kpis.meta?.percentual || 0}%</p>
+              </div>
+              <Target className="h-5 w-5 text-[#159A9C]" />
+            </div>
+            <div className="flex items-center justify-between rounded-[12px] border border-[#DCE7EB] bg-[#FBFDFD] px-3 py-2">
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-[#7A929E]">Periodo ativo</p>
+                <p className="text-[16px] font-semibold text-[#18374B]">
+                  {vendedorPeriodLabels[periodo]}
+                </p>
+              </div>
+              <Calendar className="h-5 w-5 text-[#159A9C]" />
+            </div>
+          </div>
+
+          <div className="mt-4 h-2 w-full rounded-full bg-[#DEEFE7]">
             <div
               className="bg-[#159A9C] h-2 rounded-full transition-all"
               style={{ width: `${Math.min(100, kpis.meta?.percentual || 0)}%` }}
             />
           </div>
-        </div>
+        </section>
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
