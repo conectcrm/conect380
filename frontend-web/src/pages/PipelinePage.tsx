@@ -50,7 +50,7 @@ import {
   Archive,
   RotateCcw,
   CheckCircle,
-  SlidersHorizontal,
+  Settings2,
   MoreHorizontal,
   FileText,
 } from 'lucide-react';
@@ -1755,39 +1755,33 @@ const PipelinePage: React.FC = () => {
         )}
 
         {lifecycleFeatureEnabled && (
-          <div className="space-y-2 rounded-lg border border-[#B4BEC9]/40 bg-[#DEEFE7]/30 px-3 py-3">
-            <div className="flex items-center gap-2 text-sm font-medium text-[#002333]">
-              <Archive className="h-4 w-4 text-[#159A9C]" />
-              <span>Carteira do Pipeline</span>
-            </div>
-            <div className="inline-flex rounded-lg border border-[#B4BEC9]/60 bg-white p-1">
+          <div className="space-y-3 rounded-lg border border-[#B4BEC9]/40 bg-[#DEEFE7]/30 px-3 py-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="inline-flex items-center gap-2 text-xs font-medium text-[#214251]">
+                <Archive className="h-3.5 w-3.5 text-[#159A9C]" />
+                <span>Carteira do Pipeline</span>
+              </div>
               <button
                 type="button"
-                onClick={() => setWorkspaceTab('pipeline')}
-                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  workspaceTab === 'pipeline'
-                    ? 'bg-[#159A9C] text-white'
-                    : 'text-[#002333] hover:bg-[#DEEFE7]/60'
-                }`}
-              >
-                <Grid3X3 className="h-4 w-4" />
-                Pipeline
-              </button>
-              <button
-                type="button"
-                onClick={() => setWorkspaceTab('parametros')}
-                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                onClick={() =>
+                  setWorkspaceTab((prev) => (prev === 'parametros' ? 'pipeline' : 'parametros'))
+                }
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
                   workspaceTab === 'parametros'
-                    ? 'bg-[#159A9C] text-white'
-                    : 'text-[#002333] hover:bg-[#DEEFE7]/60'
+                    ? 'border-[#159A9C] bg-[#DEEFE7]/80 text-[#0F7B7D]'
+                    : 'border-[#B4BEC9]/70 bg-white text-[#002333] hover:bg-[#DEEFE7]/60'
                 }`}
+                title={
+                  workspaceTab === 'parametros'
+                    ? 'Fechar configuracoes da pagina'
+                    : 'Abrir configuracoes da pagina'
+                }
               >
-                <SlidersHorizontal className="h-4 w-4" />
-                Parâmetros
+                <Settings2 className="h-3.5 w-3.5" />
+                Configurar
               </button>
             </div>
-
-            {workspaceTab === 'parametros' ? (
+            {workspaceTab === 'parametros' && (
               <div className="space-y-3 rounded-lg border border-[#B4BEC9]/35 bg-white/80 p-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
@@ -1971,10 +1965,6 @@ const PipelinePage: React.FC = () => {
                   )}
                 </div>
               </div>
-            ) : (
-              <p className="text-xs text-[#002333]/65">
-                Os controles de carteira foram movidos para a barra fixa do Pipeline.
-              </p>
             )}
           </div>
         )}
