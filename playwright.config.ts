@@ -1,5 +1,12 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+const shouldStartWebServer = ['1', 'true', 'yes'].includes(
+  String(process.env.PLAYWRIGHT_WEB_SERVER || '')
+    .trim()
+    .toLowerCase(),
+);
+
 /**
  * Configuração do Playwright para testes E2E
  * ConectCRM - Sistema de Chat em Tempo Real
@@ -26,7 +33,7 @@ export default defineConfig({
   /* Configurações compartilhadas */
   use: {
     /* URL base */
-    baseURL: process.env.FRONTEND_URL || 'http://localhost:3000',
+    baseURL: frontendUrl,
 
     /* Screenshots e vídeos */
     screenshot: 'only-on-failure',
@@ -80,10 +87,14 @@ export default defineConfig({
     // },
   ],
 
-  /* Run your local dev server before starting the tests */
-  // webServer: {
-  //   command: 'npm run start',
-  //   url: 'http://localhost:3000',
-  //   reuseExistingServer: !process.env.CI,
-  // },
+  ...(shouldStartWebServer
+    ? {
+        webServer: {
+          command: 'npm run start:frontend',
+          url: frontendUrl,
+          reuseExistingServer: !process.env.CI,
+          timeout: 180 * 1000,
+        },
+      }
+    : {}),
 });

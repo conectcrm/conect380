@@ -25,11 +25,27 @@ export function json(route: Route, status: number, body: unknown) {
 
 export async function bootstrapPipelineUiAuthenticatedSession(page: Page) {
   await page.addInitScript(() => {
+    const pipelinePermissions = [
+      'crm.oportunidades.read',
+      'crm.oportunidades.update',
+      'crm.oportunidades.create',
+      'crm.clientes.read',
+      'crm.produtos.read',
+      'comercial.propostas.read',
+      'comercial.propostas.create',
+      'comercial.propostas.update',
+      'financeiro.faturamento.read',
+      'financeiro.faturamento.manage',
+      'financeiro.pagamentos.read',
+    ];
+
     const fakeUser = {
       id: 'user-e2e-1',
       nome: 'Usuario E2E',
       email: 'usuario.e2e@conectcrm.test',
       role: 'admin',
+      permissoes: pipelinePermissions,
+      permissions: pipelinePermissions,
       empresa: {
         id: 'empresa-e2e-1',
         nome: 'Empresa E2E',
@@ -87,6 +103,20 @@ export async function mockPipelineUiApis(page: Page, options: PipelineUiMockOpti
     }
 
     if (method === 'GET' && pathname.endsWith('/users/profile')) {
+      const pipelinePermissions = [
+        'crm.oportunidades.read',
+        'crm.oportunidades.update',
+        'crm.oportunidades.create',
+        'crm.clientes.read',
+        'crm.produtos.read',
+        'comercial.propostas.read',
+        'comercial.propostas.create',
+        'comercial.propostas.update',
+        'financeiro.faturamento.read',
+        'financeiro.faturamento.manage',
+        'financeiro.pagamentos.read',
+      ];
+
       return json(route, 200, {
         success: true,
         data: {
@@ -94,6 +124,8 @@ export async function mockPipelineUiApis(page: Page, options: PipelineUiMockOpti
           nome: 'Usuario E2E',
           email: 'usuario.e2e@conectcrm.test',
           role: 'admin',
+          permissoes: pipelinePermissions,
+          permissions: pipelinePermissions,
           empresa: {
             id: 'empresa-e2e-1',
             nome: 'Empresa E2E',
@@ -173,4 +205,3 @@ export async function mockPipelineUiApis(page: Page, options: PipelineUiMockOpti
     return route.continue();
   });
 }
-

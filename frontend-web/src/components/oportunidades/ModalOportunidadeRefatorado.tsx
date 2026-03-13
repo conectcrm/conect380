@@ -24,6 +24,7 @@ import {
 import { Oportunidade, NovaOportunidade } from '../../types/oportunidades';
 import {
   EstagioOportunidade,
+  LifecycleStatusOportunidade,
   PrioridadeOportunidade,
   OrigemOportunidade,
 } from '../../types/oportunidades/enums';
@@ -43,6 +44,8 @@ interface ModalOportunidadeProps {
   onSave: (data: NovaOportunidade) => Promise<void>;
   oportunidade?: Oportunidade | null;
   estagioInicial?: EstagioOportunidade;
+  estagiosPermitidos?: EstagioOportunidade[];
+  lifecycleFeatureEnabled?: boolean;
   usuarios?: Usuario[];
   loadingUsuarios?: boolean;
 }
@@ -52,7 +55,7 @@ interface ValidationError {
   message: string;
 }
 
-type TabType = 'detalhes' | 'atividades' | 'historico';
+type TabType = 'detalhes' | 'atividades';
 
 // ========================================
 // CONSTANTES E CONFIGURAÇÕES
@@ -101,6 +104,8 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
   onSave,
   oportunidade,
   estagioInicial = EstagioOportunidade.LEADS,
+  estagiosPermitidos,
+  lifecycleFeatureEnabled = false,
   usuarios = [],
   loadingUsuarios = false,
 }) => {
@@ -119,6 +124,17 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
   const [showClienteDropdown, setShowClienteDropdown] = useState(false);
   const [loadingClientes, setLoadingClientes] = useState(false);
   const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
+  const lifecycleStatusAtual = useMemo<LifecycleStatusOportunidade>(() => {
+    if (!oportunidade) return LifecycleStatusOportunidade.OPEN;
+    if (oportunidade.lifecycle_status) return oportunidade.lifecycle_status;
+    if (oportunidade.estagio === EstagioOportunidade.GANHO) {
+      return LifecycleStatusOportunidade.WON;
+    }
+    if (oportunidade.estagio === EstagioOportunidade.PERDIDO) {
+      return LifecycleStatusOportunidade.LOST;
+    }
+    return LifecycleStatusOportunidade.OPEN;
+  }, [oportunidade]);
 
   // Estado do formulário
   const [formData, setFormData] = useState<NovaOportunidade>({
@@ -234,6 +250,66 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
       }));
     }
   }, [isOpen, oportunidade, user]);
+
+  const estagiosDisponiveis = useMemo(() => {
+    const todosEstagios = Object.entries(ESTAGIOS_LABELS) as Array<
+      [EstagioOportunidade, string]
+    >;
+    const estagiosBase =
+      oportunidade || !estagiosPermitidos?.length
+        ? todosEstagios
+        : todosEstagios.filter(([estagio]) => estagiosPermitidos.includes(estagio));
+
+    if (!lifecycleFeatureEnabled) {
+      return estagiosBase;
+    }
+
+    if (!oportunidade) {
+      return estagiosBase.filter(
+        ([estagio]) =>
+          estagio !== EstagioOportunidade.GANHO && estagio !== EstagioOportunidade.PERDIDO,
+      );
+    }
+
+    if (lifecycleStatusAtual !== LifecycleStatusOportunidade.OPEN) {
+      return estagiosBase.filter(([estagio]) => estagio === oportunidade.estagio);
+    }
+
+    return estagiosBase.filter(
+      ([estagio]) =>
+        estagio !== EstagioOportunidade.GANHO && estagio !== EstagioOportunidade.PERDIDO,
+    );
+  }, [oportunidade, estagiosPermitidos, lifecycleFeatureEnabled, lifecycleStatusAtual]);
+
+  const bloqueiaSelecaoEstagio =
+    loading ||
+    (lifecycleFeatureEnabled &&
+      Boolean(oportunidade) &&
+      lifecycleStatusAtual !== LifecycleStatusOportunidade.OPEN);
+
+  useEffect(() => {
+    if (!isOpen || oportunidade || !estagiosPermitidos?.length) {
+      return;
+    }
+
+    const estagioAtualPermitido = estagiosPermitidos.includes(formData.estagio);
+    if (estagioAtualPermitido) {
+      return;
+    }
+
+    const fallback = estagiosPermitidos.includes(estagioInicial)
+      ? estagioInicial
+      : estagiosPermitidos[0];
+
+    if (!fallback) {
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      estagio: fallback,
+    }));
+  }, [isOpen, oportunidade, estagiosPermitidos, formData.estagio, estagioInicial]);
 
   // ========================================
   // VALIDAÇÕES
@@ -454,6 +530,24 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
     onClose();
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') void handleClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, handleClose]);
+
   // ========================================
   // HELPERS
   // ========================================
@@ -502,8 +596,17 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-      <div className="bg-white rounded-xl w-[calc(100%-2rem)] sm:w-[700px] md:w-[900px] lg:w-[1000px] xl:w-[1100px] max-w-[1200px] max-h-[90vh] overflow-hidden shadow-2xl modal-content flex flex-col">
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-oportunidade-title"
+      onClick={() => void handleClose()}
+    >
+      <div
+        className="bg-white rounded-xl w-[calc(100%-2rem)] sm:w-[700px] md:w-[900px] lg:w-[1000px] xl:w-[1100px] max-w-[1200px] max-h-[90vh] overflow-hidden shadow-2xl modal-content flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* ==================== HEADER ==================== */}
         <div className="sticky top-0 bg-white border-b border-[#DEEFE7] px-6 py-4 flex items-center justify-between z-10">
           <div className="flex items-center gap-4">
@@ -511,7 +614,7 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
               <FileText className="h-6 w-6 text-[#159A9C]" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-[#002333]">
+              <h2 id="modal-oportunidade-title" className="text-2xl font-bold text-[#002333]">
                 {oportunidade ? 'Editar Oportunidade' : 'Nova Oportunidade'}
               </h2>
               <p className="text-sm text-[#002333]/60 mt-0.5">
@@ -539,8 +642,10 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
             <button
               onClick={handleClose}
               disabled={loading}
+              type="button"
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
               title="Fechar"
+              aria-label="Fechar"
             >
               <X className="h-5 w-5 text-[#002333]" />
             </button>
@@ -806,14 +911,21 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
                         onChange={handleChange}
                         className="w-full px-4 py-2.5 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm bg-white"
                         required
-                        disabled={loading}
+                        disabled={bloqueiaSelecaoEstagio}
                       >
-                        {Object.entries(ESTAGIOS_LABELS).map(([value, label]) => (
+                        {estagiosDisponiveis.map(([value, label]) => (
                           <option key={value} value={value}>
                             {label}
                           </option>
                         ))}
                       </select>
+                      {lifecycleFeatureEnabled && (
+                        <p className="mt-2 text-xs text-[#002333]/60">
+                          {oportunidade && lifecycleStatusAtual !== LifecycleStatusOportunidade.OPEN
+                            ? 'Estagio bloqueado para oportunidades fechadas, arquivadas ou na lixeira. Use as acoes do detalhe para restaurar ou reabrir.'
+                            : 'Ganhos e perdas devem ser registrados pelas acoes explicitas de fechamento no card ou no detalhe.'}
+                        </p>
+                      )}
                     </div>
 
                     {/* Prioridade */}

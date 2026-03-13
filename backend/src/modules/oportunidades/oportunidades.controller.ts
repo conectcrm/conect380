@@ -15,7 +15,13 @@ import {
   CreateOportunidadeDto,
   UpdateOportunidadeDto,
   UpdateEstagioDto,
+  LifecycleTransitionDto,
+  LifecycleViewOportunidade,
   MetricasQueryDto,
+  OportunidadesListQueryDto,
+  StaleDealsQueryDto,
+  UpdateLifecycleFeatureFlagDto,
+  UpdateStalePolicyDto,
 } from './dto/oportunidade.dto';
 import { CreateAtividadeDto } from './dto/atividade.dto';
 import { TipoAtividade } from './atividade.entity';
@@ -25,7 +31,7 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { Permission } from '../../common/permissions/permissions.constants';
 import { EmpresaId } from '../../common/decorators/empresa.decorator';
-import { EstagioOportunidade } from './oportunidade.entity';
+import { EstagioOportunidade, LifecycleStatusOportunidade } from './oportunidade.entity';
 import { PropostasService } from '../propostas/propostas.service';
 
 @Controller('oportunidades')
@@ -51,26 +57,131 @@ export class OportunidadesController {
     @Query('cliente_id') cliente_id?: string,
     @Query('dataInicio') dataInicio?: string,
     @Query('dataFim') dataFim?: string,
+    @Query('lifecycle_status') lifecycle_status?: LifecycleStatusOportunidade,
+    @Query('lifecycle_view') lifecycle_view?: LifecycleViewOportunidade,
+    @Query('include_deleted') include_deleted?: string,
   ) {
+    const includeDeleted = ['true', '1', 'yes'].includes(
+      (include_deleted || '').toString().trim().toLowerCase(),
+    );
+
     const filters = {
       estagio,
       responsavel_id: responsavel_id || undefined,
       cliente_id: cliente_id || undefined,
       dataInicio,
       dataFim,
+      lifecycle_status,
+      lifecycle_view,
+      include_deleted: includeDeleted,
     };
 
     return this.oportunidadesService.findAll(empresaId, filters);
   }
 
   @Get('pipeline')
-  getPipelineData(@EmpresaId() empresaId: string) {
-    return this.oportunidadesService.getPipelineData(empresaId);
+  getPipelineData(
+    @EmpresaId() empresaId: string,
+    @Query('lifecycle_status') lifecycle_status?: LifecycleStatusOportunidade,
+    @Query('lifecycle_view') lifecycle_view?: LifecycleViewOportunidade,
+    @Query('include_deleted') include_deleted?: string,
+  ) {
+    const filters: Partial<OportunidadesListQueryDto> = {
+      lifecycle_status,
+      lifecycle_view,
+      include_deleted: ['true', '1', 'yes'].includes(
+        (include_deleted || '').toString().trim().toLowerCase(),
+      ),
+    };
+    return this.oportunidadesService.getPipelineData(empresaId, filters);
   }
 
   @Get('metricas')
   getMetricas(@EmpresaId() empresaId: string, @Query() queryDto?: MetricasQueryDto) {
     return this.oportunidadesService.getMetricas(empresaId, queryDto);
+  }
+
+  @Get('lifecycle/feature-flag')
+  getLifecycleFeatureFlag(@EmpresaId() empresaId: string) {
+    return this.oportunidadesService.getLifecycleFeatureFlag(empresaId);
+  }
+
+  @Patch('lifecycle/feature-flag')
+  @Permissions(Permission.CONFIG_AUTOMACOES_MANAGE)
+  setLifecycleFeatureFlag(
+    @EmpresaId() empresaId: string,
+    @Body() body: UpdateLifecycleFeatureFlagDto,
+    @Request() req,
+  ) {
+    return this.oportunidadesService.setLifecycleFeatureFlag({
+      empresaId,
+      enabled: body.enabled,
+      rolloutPercentage: body.rolloutPercentage,
+      updatedBy: req.user?.id || null,
+    });
+  }
+
+  @Get('lifecycle/stale-policy')
+  getStalePolicy(@EmpresaId() empresaId: string) {
+    return this.oportunidadesService.getStalePolicy(empresaId);
+  }
+
+  @Patch('lifecycle/stale-policy')
+  @Permissions(Permission.CONFIG_AUTOMACOES_MANAGE)
+  setStalePolicy(
+    @EmpresaId() empresaId: string,
+    @Body() body: UpdateStalePolicyDto,
+    @Request() req,
+  ) {
+    return this.oportunidadesService.setStalePolicy({
+      empresaId,
+      enabled: body.enabled,
+      thresholdDays: body.thresholdDays,
+      autoArchiveEnabled: body.autoArchiveEnabled,
+      autoArchiveAfterDays: body.autoArchiveAfterDays,
+      updatedBy: req.user?.id || null,
+    });
+  }
+
+  @Get('stale')
+  listStaleDeals(@EmpresaId() empresaId: string, @Query() queryDto?: StaleDealsQueryDto) {
+    const parsedThresholdDays = queryDto?.threshold_days ? Number(queryDto.threshold_days) : undefined;
+    const parsedLimit = queryDto?.limit ? Number(queryDto.limit) : undefined;
+
+    return this.oportunidadesService.listarOportunidadesParadas(empresaId, {
+      thresholdDays: Number.isFinite(parsedThresholdDays) ? parsedThresholdDays : undefined,
+      limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
+    });
+  }
+
+  @Post('stale/auto-archive/run')
+  @Permissions(Permission.CONFIG_AUTOMACOES_MANAGE)
+  runAutoArchiveStale(
+    @EmpresaId() empresaId: string,
+    @Query('dry_run') dryRun?: string,
+  ) {
+    const isDryRun = ['1', 'true', 'yes', 'sim'].includes((dryRun || '').toString().toLowerCase());
+    return this.oportunidadesService.processarAutoArquivamentoStale(empresaId, {
+      dryRun: isDryRun,
+      trigger: 'manual',
+    });
+  }
+
+  @Get('atividades/resumo-gerencial')
+  getResumoAtividadesComerciais(
+    @EmpresaId() empresaId: string,
+    @Query('periodStart') periodStart?: string,
+    @Query('periodEnd') periodEnd?: string,
+    @Query('vendedorId') vendedorId?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = limit ? Number(limit) : undefined;
+    return this.oportunidadesService.obterResumoAtividadesComerciais(empresaId, {
+      periodStart,
+      periodEnd,
+      vendedorId,
+      limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
+    });
   }
 
   @Get(':id')
@@ -102,13 +213,66 @@ export class OportunidadesController {
 
   @Delete(':id')
   @Permissions(Permission.CRM_OPORTUNIDADES_DELETE)
-  remove(@Param('id') id: string, @EmpresaId() empresaId: string) {
-    return this.oportunidadesService.remove(id, empresaId);
+  remove(@Param('id') id: string, @EmpresaId() empresaId: string, @Request() req) {
+    return this.oportunidadesService.remove(id, empresaId, req.user?.id);
+  }
+
+  @Delete(':id/permanente')
+  @Permissions(Permission.CRM_OPORTUNIDADES_DELETE, Permission.ADMIN_EMPRESAS_MANAGE)
+  removePermanente(@Param('id') id: string, @EmpresaId() empresaId: string, @Request() req) {
+    return this.oportunidadesService.removePermanente(id, empresaId, req.user?.id);
+  }
+
+  @Post(':id/arquivar')
+  @Permissions(Permission.CRM_OPORTUNIDADES_UPDATE)
+  arquivar(
+    @Param('id') id: string,
+    @EmpresaId() empresaId: string,
+    @Body() body: LifecycleTransitionDto,
+    @Request() req,
+  ) {
+    return this.oportunidadesService.arquivar(id, empresaId, req.user?.id, body);
+  }
+
+  @Post(':id/restaurar')
+  @Permissions(Permission.CRM_OPORTUNIDADES_UPDATE)
+  restaurar(
+    @Param('id') id: string,
+    @EmpresaId() empresaId: string,
+    @Body() body: LifecycleTransitionDto,
+    @Request() req,
+  ) {
+    return this.oportunidadesService.restaurar(id, empresaId, req.user?.id, body);
+  }
+
+  @Post(':id/reabrir')
+  @Permissions(Permission.CRM_OPORTUNIDADES_UPDATE)
+  reabrir(
+    @Param('id') id: string,
+    @EmpresaId() empresaId: string,
+    @Body() body: LifecycleTransitionDto,
+    @Request() req,
+  ) {
+    return this.oportunidadesService.reabrir(id, empresaId, req.user?.id, body);
   }
 
   @Get(':id/atividades')
   listarAtividades(@Param('id') id: string, @EmpresaId() empresaId: string) {
     return this.oportunidadesService.listarAtividades(id, empresaId);
+  }
+
+  @Get(':id/historico-estagios')
+  listarHistoricoEstagios(
+    @Param('id') id: string,
+    @EmpresaId() empresaId: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = limit ? Number(limit) : undefined;
+    return this.oportunidadesService.listarHistoricoEstagios(
+      id,
+      empresaId,
+      Number.isFinite(parsedLimit) ? parsedLimit : undefined,
+    );
   }
 
   @Post(':id/atividades')
@@ -156,7 +320,7 @@ export class OportunidadesController {
         total: Number(oportunidade.valor || 0),
         status: 'rascunho',
         source: 'oportunidade',
-        observacoes: `Gerada automaticamente a partir da oportunidade ${oportunidade.id}`,
+        observacoes: '',
       } as any,
       empresaId,
     );
