@@ -34,7 +34,13 @@ Sincronizar o clone runtime com o `HEAD` atual do workspace principal:
 npm run runtime:sync
 ```
 
-Esse comando usa `npm ci` na raiz, `backend`, `frontend-web`, `admin-web` e `guardian-web`.
+Esse comando valida se a branch do workspace principal esta alinhada com o upstream remoto (`origin/<branch>`). Se houver divergencia (`ahead`/`behind`) ou `detached HEAD`, a sincronizacao e bloqueada para evitar regressao acidental.
+
+Quando a divergencia for intencional (ex.: validacao local antes de push), use:
+
+```powershell
+npm run runtime:sync:allow-divergent
+```
 
 Subir o sistema a partir do clone runtime:
 
@@ -65,13 +71,15 @@ npm run runtime:start:guardian-web
 1. Git e mudancas de branch ficam em `c:\Projetos\conect360`.
 2. Execucao do sistema para validacao fica em `c:\Projetos\conect360-runtime`.
 3. Antes de subir o sistema, rode `npm run runtime:sync`.
-4. Se ainda nao houver dependencias, rode `npm run runtime:deps:install`.
-5. Instale dependencias com `npm ci`, nao com `npm install`.
-6. Nao fazer desenvolvimento direto no clone runtime.
+4. Se `runtime:sync` bloquear por divergencia, alinhe com o remoto (push/pull) ou use `runtime:sync:allow-divergent` apenas quando for intencional.
+5. Se ainda nao houver dependencias, rode `npm run runtime:deps:install`.
+6. Instale dependencias com `npm ci`, nao com `npm install`.
+7. Nao fazer desenvolvimento direto no clone runtime.
 
 ## Observacoes
 
 1. O clone runtime fica em `detached HEAD` por design. Isso reduz risco de commits acidentais.
 2. O clone runtime sincroniza com o commit atual do workspace principal, nao com mudancas nao commitadas.
 3. Se o clone runtime estiver com alteracoes locais, a sincronizacao e bloqueada para evitar sobrescrita silenciosa.
-4. Se `npm install` alterar arquivos rastreados no clone runtime, guarde isso com `git stash` e refaca a instalacao com `npm ci`.
+4. A sincronizacao grava metadados em `.runtime-workspace.json`, incluindo estado `ahead/behind` e se houve bypass de seguranca.
+5. Se `npm install` alterar arquivos rastreados no clone runtime, guarde isso com `git stash` e refaca a instalacao com `npm ci`.
