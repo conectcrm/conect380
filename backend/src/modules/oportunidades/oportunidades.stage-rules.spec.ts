@@ -1,5 +1,6 @@
 import { EstagioOportunidade, LifecycleStatusOportunidade } from './oportunidade.entity';
 import {
+  getDefaultOportunidadeProbabilityByStage,
   getAllowedNextOportunidadeLifecycleStatuses,
   getAllowedNextOportunidadeStages,
   isOportunidadeLifecycleTransitionAllowed,
@@ -103,6 +104,18 @@ describe('Oportunidades stage rules', () => {
     expect(isOportunidadeTerminalStage('won')).toBe(true);
     expect(isOportunidadeTerminalStage('perdido')).toBe(true);
     expect(isOportunidadeTerminalStage(EstagioOportunidade.PROPOSTA)).toBe(false);
+  });
+
+  it('retorna probabilidade padrao por estagio', () => {
+    expect(getDefaultOportunidadeProbabilityByStage(EstagioOportunidade.LEADS)).toBe(20);
+    expect(getDefaultOportunidadeProbabilityByStage(EstagioOportunidade.QUALIFICACAO)).toBe(40);
+    expect(getDefaultOportunidadeProbabilityByStage(EstagioOportunidade.PROPOSTA)).toBe(60);
+    expect(getDefaultOportunidadeProbabilityByStage(EstagioOportunidade.NEGOCIACAO)).toBe(80);
+    expect(getDefaultOportunidadeProbabilityByStage(EstagioOportunidade.FECHAMENTO)).toBe(95);
+    expect(getDefaultOportunidadeProbabilityByStage(EstagioOportunidade.GANHO)).toBe(100);
+    expect(getDefaultOportunidadeProbabilityByStage(EstagioOportunidade.PERDIDO)).toBe(0);
+    expect(getDefaultOportunidadeProbabilityByStage('qualificado')).toBe(40);
+    expect(getDefaultOportunidadeProbabilityByStage('estagio-inexistente')).toBe(50);
   });
 
   it('permite transicoes validas de lifecycle', () => {

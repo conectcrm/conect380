@@ -645,11 +645,39 @@ const PipelinePage: React.FC = () => {
     getLifecycleStatus(oportunidade) === LifecycleStatusOportunidade.OPEN &&
     !isTerminalStage(oportunidade.estagio);
 
+  const isOpportunityOpenForProcess = (oportunidade: Oportunidade): boolean =>
+    !lifecycleFeatureEnabled || getLifecycleStatus(oportunidade) === LifecycleStatusOportunidade.OPEN;
+
+  const canEditOpportunity = (oportunidade: Oportunidade): boolean =>
+    isOpportunityOpenForProcess(oportunidade) && !isTerminalStage(oportunidade.estagio);
+
+  const canDuplicateOpportunity = (oportunidade: Oportunidade): boolean =>
+    isOpportunityOpenForProcess(oportunidade) && !isTerminalStage(oportunidade.estagio);
+
+  const canCreateProposalDraft = (oportunidade: Oportunidade): boolean => {
+    if (!isOpportunityOpenForProcess(oportunidade)) {
+      return false;
+    }
+
+    return (
+      oportunidade.estagio === EstagioOportunidade.PROPOSTA ||
+      oportunidade.estagio === EstagioOportunidade.NEGOCIACAO ||
+      oportunidade.estagio === EstagioOportunidade.FECHAMENTO
+    );
+  };
+
   const canManipulateKanban =
     !lifecycleFeatureEnabled || lifecycleView === LifecycleViewOportunidade.OPEN;
 
   // Abrir modal para editar oportunidade existente
   const handleEditarOportunidade = (oportunidade: Oportunidade) => {
+    if (!canEditOpportunity(oportunidade)) {
+      toastService.warning(
+        'Edicao disponivel apenas para oportunidades abertas e fora dos estagios Ganho/Perdido.',
+      );
+      return;
+    }
+
     setOportunidadeEditando(oportunidade);
     setShowModal(true);
   };
@@ -828,6 +856,12 @@ const PipelinePage: React.FC = () => {
 
   // Clonar oportunidade
   const handleClonarOportunidade = (oportunidade: Oportunidade) => {
+    if (!canDuplicateOpportunity(oportunidade)) {
+      toastService.warning(
+        'Duplicacao disponivel apenas para oportunidades abertas e fora dos estagios Ganho/Perdido.',
+      );
+      return;
+    }
     // Criar cópia dos dados (sem ID e datas)
     const oportunidadeClonada = {
       titulo: `${oportunidade.titulo} (Cópia)`,
@@ -855,6 +889,12 @@ const PipelinePage: React.FC = () => {
   // Gerar proposta a partir da oportunidade
   const handleGerarProposta = async (oportunidade: Oportunidade, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    if (!canCreateProposalDraft(oportunidade)) {
+      toastService.warning(
+        'Rascunho de proposta disponivel apenas para oportunidades abertas em Proposta, Negociacao ou Fechamento.',
+      );
+      return;
+    }
 
     try {
       const response = await oportunidadesService.gerarProposta(oportunidade.id);
@@ -2523,7 +2563,12 @@ const PipelinePage: React.FC = () => {
                     const showStaleBadge =
                       Boolean(oportunidade.is_stale) &&
                       staleDaysCard > 0 &&
-                      lifecycleStatusCard === LifecycleStatusOportunidade.OPEN;
+                      lifecycleStatusCard === LifecycleStatusOportunidade.OPEN &&
+                      !isTerminalStage(oportunidade.estagio);
+                    const showDeadlineWarningCard =
+                      diasAteVencimento !== null &&
+                      isOpportunityOpenForProcess(oportunidade) &&
+                      !isTerminalStage(oportunidade.estagio);
                     const isDragEnabled =
                       canManipulateKanban &&
                       (!lifecycleFeatureEnabled ||
@@ -2542,6 +2587,9 @@ const PipelinePage: React.FC = () => {
                           : 'Arquivar';
                     const canMarkAsWonCard = canMarkOpportunityAsWon(oportunidade);
                     const canMarkAsLostCard = canMarkOpportunityAsLost(oportunidade);
+                    const canEditCard = canEditOpportunity(oportunidade);
+                    const canDuplicateCard = canDuplicateOpportunity(oportunidade);
+                    const canCreateProposalCard = canCreateProposalDraft(oportunidade);
                     const showClosingQuickActionsCard =
                       oportunidade.estagio === EstagioOportunidade.FECHAMENTO &&
                       (canMarkAsWonCard || canMarkAsLostCard);
@@ -2611,7 +2659,7 @@ const PipelinePage: React.FC = () => {
                         </div>
 
                         {/* Badge de SLA */}
-                        {diasAteVencimento !== null && (
+                        {showDeadlineWarningCard && (
                           <>
                             {diasAteVencimento < 0 && (
                               <div className="mb-2 px-2 py-1 bg-red-100 border border-red-200 rounded-lg flex items-center gap-2">
@@ -2838,36 +2886,42 @@ const PipelinePage: React.FC = () => {
                                 >
                                   Ver detalhes
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setOpenCardActionsMenuId(null);
-                                    handleEditarOportunidade(oportunidade);
-                                  }}
-                                  className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
-                                >
-                                  Editar
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setOpenCardActionsMenuId(null);
-                                    handleClonarOportunidade(oportunidade);
-                                  }}
-                                  className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
-                                >
-                                  Duplicar
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setOpenCardActionsMenuId(null);
-                                    void handleGerarProposta(oportunidade);
-                                  }}
-                                  className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
-                                >
-                                  Criar rascunho de proposta
-                                </button>
+                                {canEditCard && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenCardActionsMenuId(null);
+                                      handleEditarOportunidade(oportunidade);
+                                    }}
+                                    className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                  >
+                                    Editar
+                                  </button>
+                                )}
+                                {canDuplicateCard && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenCardActionsMenuId(null);
+                                      handleClonarOportunidade(oportunidade);
+                                    }}
+                                    className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                  >
+                                    Duplicar
+                                  </button>
+                                )}
+                                {canCreateProposalCard && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenCardActionsMenuId(null);
+                                      void handleGerarProposta(oportunidade);
+                                    }}
+                                    className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                  >
+                                    Criar rascunho de proposta
+                                  </button>
+                                )}
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -2978,7 +3032,8 @@ const PipelinePage: React.FC = () => {
                     const showStaleBadgeList =
                       Boolean(oportunidade.is_stale) &&
                       staleDaysList > 0 &&
-                      lifecycleStatus === LifecycleStatusOportunidade.OPEN;
+                      lifecycleStatus === LifecycleStatusOportunidade.OPEN &&
+                      !isTerminalStage(oportunidade.estagio);
                     const listRowId = String(oportunidade.id);
                     const listActionsMenuOpen = openListActionsMenuId === listRowId;
                     const lifecyclePrimaryLabelList =
@@ -2991,6 +3046,9 @@ const PipelinePage: React.FC = () => {
                           : 'Arquivar';
                     const canMarkAsWonList = canMarkOpportunityAsWon(oportunidade);
                     const canMarkAsLostList = canMarkOpportunityAsLost(oportunidade);
+                    const canEditList = canEditOpportunity(oportunidade);
+                    const canDuplicateList = canDuplicateOpportunity(oportunidade);
+                    const canCreateProposalList = canCreateProposalDraft(oportunidade);
                     return (
                       <tr
                         key={oportunidade.id}
@@ -3106,36 +3164,42 @@ const PipelinePage: React.FC = () => {
                                 >
                                   Ver detalhes
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setOpenListActionsMenuId(null);
-                                    handleEditarOportunidade(oportunidade);
-                                  }}
-                                  className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
-                                >
-                                  Editar
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setOpenListActionsMenuId(null);
-                                    handleClonarOportunidade(oportunidade);
-                                  }}
-                                  className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
-                                >
-                                  Duplicar
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setOpenListActionsMenuId(null);
-                                    void handleGerarProposta(oportunidade);
-                                  }}
-                                  className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
-                                >
-                                  Criar rascunho de proposta
-                                </button>
+                                {canEditList && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenListActionsMenuId(null);
+                                      handleEditarOportunidade(oportunidade);
+                                    }}
+                                    className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                  >
+                                    Editar
+                                  </button>
+                                )}
+                                {canDuplicateList && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenListActionsMenuId(null);
+                                      handleClonarOportunidade(oportunidade);
+                                    }}
+                                    className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                  >
+                                    Duplicar
+                                  </button>
+                                )}
+                                {canCreateProposalList && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenListActionsMenuId(null);
+                                      void handleGerarProposta(oportunidade);
+                                    }}
+                                    className="block w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-[#002333] transition-colors hover:bg-[#DEEFE7]/60"
+                                  >
+                                    Criar rascunho de proposta
+                                  </button>
+                                )}
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -3754,10 +3818,7 @@ const PipelinePage: React.FC = () => {
       <ModalDetalhesOportunidade
         oportunidade={oportunidadeDetalhes}
         onClose={() => setOportunidadeDetalhes(null)}
-        onEditar={(oportunidade) => {
-          setOportunidadeEditando(oportunidade);
-          setShowModal(true);
-        }}
+        onEditar={handleEditarOportunidade}
         onClonar={handleClonarOportunidade}
         exclusaoDireta={!lifecycleFeatureEnabled}
         onMarcarComoGanho={lifecycleFeatureEnabled ? handleMarcarOportunidadeComoGanha : undefined}

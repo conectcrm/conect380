@@ -249,9 +249,30 @@ export const OPORTUNIDADE_STAGE_TRANSITIONS: Record<
   [EstagioOportunidade.PERDIDO]: [],
 };
 
+export const OPORTUNIDADE_DEFAULT_PROBABILIDADE_BY_STAGE: Record<
+  EstagioOportunidade,
+  number
+> = {
+  [EstagioOportunidade.LEADS]: 20,
+  [EstagioOportunidade.QUALIFICACAO]: 40,
+  [EstagioOportunidade.PROPOSTA]: 60,
+  [EstagioOportunidade.NEGOCIACAO]: 80,
+  [EstagioOportunidade.FECHAMENTO]: 95,
+  [EstagioOportunidade.GANHO]: 100,
+  [EstagioOportunidade.PERDIDO]: 0,
+};
+
 export function isOportunidadeTerminalStage(stage?: EstagioOportunidade | string | null): boolean {
   const normalized = normalizeStageRuleInput(stage);
   return normalized === EstagioOportunidade.GANHO || normalized === EstagioOportunidade.PERDIDO;
+}
+
+export function getDefaultOportunidadeProbabilityByStage(
+  stage?: EstagioOportunidade | string | null,
+): number {
+  const normalized = normalizeStageRuleInput(stage);
+  if (!normalized) return 50;
+  return OPORTUNIDADE_DEFAULT_PROBABILIDADE_BY_STAGE[normalized] ?? 50;
 }
 
 export function getAllowedNextOportunidadeStages(
@@ -2034,6 +2055,10 @@ export class OportunidadesService {
           updateData[schema.lifecycleStatusColumn] = LifecycleStatusOportunidade.OPEN;
         }
       }
+
+      if (schema.columns.has('probabilidade') && updateOportunidadeDto.probabilidade === undefined) {
+        updateData.probabilidade = getDefaultOportunidadeProbabilityByStage(nextStage);
+      }
     }
 
     if (updateOportunidadeDto.responsavel_id !== undefined) {
@@ -2179,6 +2204,10 @@ export class OportunidadesService {
     const updatePayload: Record<string, unknown> = {
       estagio: this.toDatabaseEstagio(nextStage, schema.estagioMode),
     };
+
+    if (schema.columns.has('probabilidade')) {
+      updatePayload.probabilidade = getDefaultOportunidadeProbabilityByStage(nextStage);
+    }
 
     if (schema.lifecycleStatusColumn) {
       if (nextStage === EstagioOportunidade.GANHO) {
@@ -3050,6 +3079,10 @@ export class OportunidadesService {
     const updatePayload: Record<string, unknown> = {
       estagio: this.toDatabaseEstagio(reopenedStage, schema.estagioMode),
     };
+
+    if (schema.columns.has('probabilidade')) {
+      updatePayload.probabilidade = getDefaultOportunidadeProbabilityByStage(reopenedStage);
+    }
 
     if (schema.lifecycleStatusColumn && lifecycleEnabled) {
       updatePayload[schema.lifecycleStatusColumn] = LifecycleStatusOportunidade.OPEN;
