@@ -1,9 +1,9 @@
 export enum UserRole {
   SUPERADMIN = 'superadmin',
   ADMIN = 'admin',
-  MANAGER = 'manager',
+  GERENTE = 'gerente',
   VENDEDOR = 'vendedor',
-  USER = 'user',
+  SUPORTE = 'suporte',
   FINANCEIRO = 'financeiro',
 }
 
@@ -240,18 +240,18 @@ export interface UsuarioMutationResult {
 export const ROLE_LABELS: Record<UserRole, string> = {
   [UserRole.SUPERADMIN]: 'Super Admin',
   [UserRole.ADMIN]: 'Administrador',
-  [UserRole.MANAGER]: 'Gerente',
+  [UserRole.GERENTE]: 'Gerente',
   [UserRole.VENDEDOR]: 'Vendedor',
-  [UserRole.USER]: 'Usuário',
+  [UserRole.SUPORTE]: 'Suporte',
   [UserRole.FINANCEIRO]: 'Financeiro',
 };
 
 export const ROLE_COLORS: Record<UserRole, string> = {
   [UserRole.SUPERADMIN]: 'bg-purple-100 text-purple-800',
   [UserRole.ADMIN]: 'bg-red-100 text-red-800',
-  [UserRole.MANAGER]: 'bg-blue-100 text-blue-800',
+  [UserRole.GERENTE]: 'bg-blue-100 text-blue-800',
   [UserRole.VENDEDOR]: 'bg-green-100 text-green-800',
-  [UserRole.USER]: 'bg-gray-100 text-gray-800',
+  [UserRole.SUPORTE]: 'bg-gray-100 text-gray-800',
   [UserRole.FINANCEIRO]: 'bg-amber-100 text-amber-800',
 };
 

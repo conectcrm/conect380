@@ -142,9 +142,9 @@ type PermissionCatalogState = {
 };
 
 const ATENDIMENTO_GROUP_ROLES: string[] = [
-  UserRole.USER,
+  UserRole.SUPORTE,
   UserRole.VENDEDOR,
-  UserRole.MANAGER,
+  UserRole.GERENTE,
   UserRole.SUPERADMIN,
 ];
 
@@ -159,10 +159,10 @@ const PERMISSOES_MODAL_GROUPS_FALLBACK: PermissaoModalGroup[] = [
     label: 'Dashboards e Relatorios',
     description: 'Visualizacao de indicadores e analises',
     roles: [
-      UserRole.USER,
+      UserRole.SUPORTE,
       UserRole.VENDEDOR,
       UserRole.FINANCEIRO,
-      UserRole.MANAGER,
+      UserRole.GERENTE,
       UserRole.SUPERADMIN,
     ],
     options: [
@@ -175,10 +175,10 @@ const PERMISSOES_MODAL_GROUPS_FALLBACK: PermissaoModalGroup[] = [
     label: 'CRM',
     description: 'Clientes, leads, oportunidades, produtos e agenda',
     roles: [
-      UserRole.USER,
+      UserRole.SUPORTE,
       UserRole.VENDEDOR,
       UserRole.FINANCEIRO,
-      UserRole.MANAGER,
+      UserRole.GERENTE,
       UserRole.SUPERADMIN,
     ],
     options: [
@@ -229,10 +229,10 @@ const PERMISSOES_MODAL_GROUPS_FALLBACK: PermissaoModalGroup[] = [
     label: 'Comercial',
     description: 'Acesso aos recursos comerciais',
     roles: [
-      UserRole.USER,
+      UserRole.SUPORTE,
       UserRole.VENDEDOR,
       UserRole.FINANCEIRO,
-      UserRole.MANAGER,
+      UserRole.GERENTE,
       UserRole.ADMIN,
       UserRole.SUPERADMIN,
     ],
@@ -248,7 +248,7 @@ const PERMISSOES_MODAL_GROUPS_FALLBACK: PermissaoModalGroup[] = [
     id: 'financeiro',
     label: 'Financeiro',
     description: 'Faturamento e pagamentos',
-    roles: [UserRole.FINANCEIRO, UserRole.MANAGER, UserRole.SUPERADMIN],
+    roles: [UserRole.FINANCEIRO, UserRole.GERENTE, UserRole.SUPERADMIN],
     options: [
       { value: 'financeiro.faturamento.read', label: 'Faturamento: visualizar' },
       { value: 'financeiro.faturamento.manage', label: 'Faturamento: gerenciar' },
@@ -260,7 +260,7 @@ const PERMISSOES_MODAL_GROUPS_FALLBACK: PermissaoModalGroup[] = [
     id: 'configuracoes',
     label: 'Configuracoes',
     description: 'Empresa, integracoes e automacoes',
-    roles: [UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPERADMIN],
+    roles: [UserRole.GERENTE, UserRole.ADMIN, UserRole.SUPERADMIN],
     options: [
       { value: 'config.empresa.read', label: 'Empresa: visualizar configuracoes' },
       { value: 'config.empresa.update', label: 'Empresa: atualizar configuracoes' },
@@ -272,7 +272,7 @@ const PERMISSOES_MODAL_GROUPS_FALLBACK: PermissaoModalGroup[] = [
     id: 'administracao',
     label: 'Administracao',
     description: 'Permissoes de gestao de usuarios e governanca',
-    roles: [UserRole.MANAGER, UserRole.ADMIN, UserRole.SUPERADMIN],
+    roles: [UserRole.GERENTE, UserRole.ADMIN, UserRole.SUPERADMIN],
     options: [
       { value: 'users.read', label: 'Usuarios: visualizar' },
       { value: 'users.create', label: 'Usuarios: criar' },
@@ -338,14 +338,14 @@ const DEFAULT_PERMISSION_CATALOG: PermissionCatalogState = ensureAtendimentoAnal
 });
 
 const getRoleCandidates = (role?: UserRole): string[] => {
-  const selectedRole = role ?? UserRole.USER;
+  const selectedRole = role ?? UserRole.SUPORTE;
 
-  if (selectedRole === UserRole.MANAGER) {
-    return [UserRole.MANAGER, 'gerente'];
+  if (selectedRole === UserRole.GERENTE) {
+    return [UserRole.GERENTE, 'manager'];
   }
 
-  if (selectedRole === UserRole.USER) {
-    return [UserRole.USER, 'suporte'];
+  if (selectedRole === UserRole.SUPORTE) {
+    return [UserRole.SUPORTE, 'user'];
   }
 
   return [selectedRole];
@@ -437,9 +437,13 @@ const GestaoUsuariosPage: React.FC = () => {
   const canManageAccessReview =
     canManageAccessApprovals ||
     normalizedAuthRole === 'gerente' ||
-    normalizedAuthRole === UserRole.MANAGER;
+    normalizedAuthRole === 'manager' ||
+    normalizedAuthRole === UserRole.GERENTE;
   const canViewAccessApprovals =
-    canManageAccessApprovals || normalizedAuthRole === 'gerente' || normalizedAuthRole === UserRole.MANAGER;
+    canManageAccessApprovals ||
+    normalizedAuthRole === 'gerente' ||
+    normalizedAuthRole === 'manager' ||
+    normalizedAuthRole === UserRole.GERENTE;
 
   // Estados principais
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -481,7 +485,7 @@ const GestaoUsuariosPage: React.FC = () => {
     email: '',
     telefone: '',
     senha: '',
-    role: UserRole.USER,
+    role: UserRole.SUPORTE,
     permissoes: [],
     ativo: true,
     idioma_preferido: 'pt-BR',
@@ -765,7 +769,7 @@ const GestaoUsuariosPage: React.FC = () => {
         email: '',
         telefone: '',
         senha: '',
-        role: UserRole.USER,
+        role: UserRole.SUPORTE,
         permissoes: [],
         ativo: true,
         idioma_preferido: 'pt-BR',
@@ -794,7 +798,7 @@ const GestaoUsuariosPage: React.FC = () => {
       email: '',
       telefone: '',
       senha: '',
-      role: UserRole.USER,
+      role: UserRole.SUPORTE,
       permissoes: [],
       ativo: true,
       idioma_preferido: 'pt-BR',
@@ -1098,11 +1102,11 @@ const GestaoUsuariosPage: React.FC = () => {
     }
 
     const normalized = role.toLowerCase();
-    if (normalized === 'gerente') {
-      return ROLE_LABELS[UserRole.MANAGER];
+    if (normalized === 'gerente' || normalized === 'manager') {
+      return ROLE_LABELS[UserRole.GERENTE];
     }
-    if (normalized === 'suporte') {
-      return ROLE_LABELS[UserRole.USER];
+    if (normalized === 'suporte' || normalized === 'user') {
+      return ROLE_LABELS[UserRole.SUPORTE];
     }
 
     return ROLE_LABELS[normalized as UserRole] ?? role;
@@ -1256,7 +1260,7 @@ const GestaoUsuariosPage: React.FC = () => {
     return map;
   }, [catalogoPermissoes.groups]);
 
-  const roleSelecionadoFormulario = (formData.role as UserRole) || UserRole.USER;
+  const roleSelecionadoFormulario = (formData.role as UserRole) || UserRole.SUPORTE;
   const gruposPermissaoDoFormulario = getPermissionGroupsByRole(
     catalogoPermissoes,
     roleSelecionadoFormulario,
@@ -1408,10 +1412,10 @@ const GestaoUsuariosPage: React.FC = () => {
               <option value="">Todos os papeis</option>
               <option value={UserRole.SUPERADMIN}>Super Admin</option>
               <option value={UserRole.ADMIN}>Administrador</option>
-              <option value={UserRole.MANAGER}>Gerente</option>
+              <option value={UserRole.GERENTE}>Gerente</option>
               <option value={UserRole.FINANCEIRO}>Financeiro</option>
               <option value={UserRole.VENDEDOR}>Vendedor</option>
-              <option value={UserRole.USER}>Usuario</option>
+              <option value={UserRole.SUPORTE}>Suporte</option>
             </select>
 
             <select
@@ -2375,7 +2379,7 @@ const GestaoUsuariosPage: React.FC = () => {
                     Papel <span className="text-red-500">*</span>
                   </label>
                   <select
-                    value={formData.role || UserRole.USER}
+                    value={formData.role || UserRole.SUPORTE}
                     onChange={(e) => handleRoleChange(e.target.value as UserRole)}
                     className={modalInputClass}
                     required
@@ -2383,10 +2387,10 @@ const GestaoUsuariosPage: React.FC = () => {
                     {editingUsuario?.role === UserRole.SUPERADMIN && (
                       <option value={UserRole.SUPERADMIN}>Super Admin</option>
                     )}
-                    <option value={UserRole.USER}>Usuario</option>
+                    <option value={UserRole.SUPORTE}>Suporte</option>
                     <option value={UserRole.VENDEDOR}>Vendedor</option>
                     <option value={UserRole.FINANCEIRO}>Financeiro</option>
-                    <option value={UserRole.MANAGER}>Gerente</option>
+                    <option value={UserRole.GERENTE}>Gerente</option>
                     <option value={UserRole.ADMIN}>Administrador</option>
                   </select>
                 </div>

@@ -2243,11 +2243,9 @@ export class UsersService {
       por_perfil: {
         admin: adminCount,
         gerente: gerenteCount,
-        manager: gerenteCount, // alias legado
         vendedor: vendedorCount,
         suporte: suporteCount,
         financeiro: financeiroCount,
-        user: suporteCount, // alias legado
       },
     };
   }
@@ -2616,4 +2614,3 @@ export class UsersService {
     }
   }
 }
-

@@ -730,7 +730,7 @@ export class AnalyticsService {
       where: {
         empresa_id: empresaId,
         ativo: true,
-        role: In([UserRole.ADMIN, UserRole.MANAGER, UserRole.VENDEDOR]),
+        role: In([UserRole.ADMIN, UserRole.GERENTE, UserRole.VENDEDOR]),
       },
     });
   }

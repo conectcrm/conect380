@@ -377,17 +377,14 @@ class UsuariosService {
 
       // O backend retorna um objeto com {success: true, data: {...}}
       const backendData = response.data.data || response.data;
-      const distribuicaoPorRole = {
-        [UserRole.SUPERADMIN]: 0,
-        [UserRole.ADMIN]: 0,
-        [UserRole.MANAGER]: 0,
-        [UserRole.VENDEDOR]: 0,
-        [UserRole.USER]: 0,
-        [UserRole.FINANCEIRO]: 0,
-        ...(backendData.por_perfil?.financeiro !== undefined
-          ? { [UserRole.FINANCEIRO]: Number(backendData.por_perfil.financeiro) || 0 }
-          : {}),
-        ...(backendData.por_perfil || {}),
+      const porPerfil = backendData.por_perfil ?? {};
+      const distribuicaoPorRole: Record<UserRole, number> = {
+        [UserRole.SUPERADMIN]: Number(porPerfil.superadmin) || 0,
+        [UserRole.ADMIN]: Number(porPerfil.admin) || 0,
+        [UserRole.GERENTE]: Number(porPerfil.gerente ?? porPerfil.manager) || 0,
+        [UserRole.VENDEDOR]: Number(porPerfil.vendedor) || 0,
+        [UserRole.SUPORTE]: Number(porPerfil.suporte ?? porPerfil.user) || 0,
+        [UserRole.FINANCEIRO]: Number(porPerfil.financeiro) || 0,
       };
 
       // Mapear os dados do backend para o formato esperado pelo frontend
@@ -408,9 +405,9 @@ class UsuariosService {
         distribuicaoPorRole: {
           [UserRole.SUPERADMIN]: 0,
           [UserRole.ADMIN]: 0,
-          [UserRole.MANAGER]: 0,
+          [UserRole.GERENTE]: 0,
           [UserRole.VENDEDOR]: 0,
-          [UserRole.USER]: 0,
+          [UserRole.SUPORTE]: 0,
           [UserRole.FINANCEIRO]: 0,
         },
         ultimosLogins: 0,

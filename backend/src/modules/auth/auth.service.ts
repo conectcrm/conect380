@@ -195,7 +195,7 @@ export class AuthService {
     }
 
     const normalizedRole = role.trim().toLowerCase();
-    if (normalizedRole === UserRole.MANAGER) {
+    if (normalizedRole === 'manager' || normalizedRole === 'gestor') {
       return true;
     }
 

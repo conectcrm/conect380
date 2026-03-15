@@ -41,7 +41,7 @@ export class DashboardController {
       role === UserRole.SUPERADMIN ||
       role === UserRole.ADMIN ||
       role === UserRole.GERENTE ||
-      role === UserRole.MANAGER ||
+      role === 'manager' ||
       role === 'gestor' ||
       role === 'superadmin'
     );
