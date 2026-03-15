@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { cotacaoService } from '../../../services/cotacaoService';
 import { toastService } from '../../../services/toastService';
 import { exportToCSV, exportToExcel } from '../../../utils/exportUtils';
@@ -194,6 +195,7 @@ function getPrioridadeBadge(prioridade: PrioridadeCotacao) {
 function CotacaoPage() {
   const { confirm } = useGlobalConfirmation();
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [cotacoes, setCotacoes] = useState<Cotacao[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erroCarregamento, setErroCarregamento] = useState<string | null>(null);
@@ -247,6 +249,25 @@ function CotacaoPage() {
     if (!selectAllRef.current) return;
     selectAllRef.current.indeterminate = isSomeSelected;
   }, [isSomeSelected]);
+
+  useEffect(() => {
+    const cotacaoIdParam = searchParams.get('cotacaoId');
+    if (!cotacaoIdParam || carregando) {
+      return;
+    }
+
+    const cotacao = cotacoes.find((item) => String(item.id) === cotacaoIdParam);
+    if (!cotacao) {
+      return;
+    }
+
+    setCotacaoDetalhes(cotacao);
+    setModalDetalhesAberto(true);
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('cotacaoId');
+    setSearchParams(nextParams, { replace: true });
+  }, [carregando, cotacoes, searchParams, setSearchParams]);
 
   const carregarCotacoes = async () => {
     setCarregando(true);

@@ -21,8 +21,9 @@ export interface Notification {
     label: string;
     onClick: () => void;
   };
-  entityType?: 'cliente' | 'proposta' | 'tarefa' | 'agenda';
+  entityType?: 'cliente' | 'proposta' | 'tarefa' | 'agenda' | 'oportunidade' | 'cotacao';
   entityId?: string;
+  data?: Record<string, unknown> | null;
   priority: 'low' | 'medium' | 'high' | 'urgent';
   autoClose?: boolean;
   duration?: number;
@@ -331,6 +332,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         existingNotification.duration !== updatedNotification.duration ||
         existingNotification.entityType !== updatedNotification.entityType ||
         existingNotification.entityId !== updatedNotification.entityId ||
+        JSON.stringify(existingNotification.data ?? null) !==
+          JSON.stringify(updatedNotification.data ?? null) ||
         existingNotification.timestamp.getTime() !== updatedNotification.timestamp.getTime();
 
       if (!hasChanged) {

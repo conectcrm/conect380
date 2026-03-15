@@ -1,6 +1,7 @@
 ﻿import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../contexts/NotificationContext';
+import { resolveNotificationDestination } from '../components/notifications/notificationNavigation';
 import {
   DataTableCard,
   EmptyState,
@@ -166,6 +167,14 @@ const NotificationsPage: React.FC = () => {
     setIsConfirmingClearAll(false);
   };
 
+  const handleNotificationOpen = (notification: (typeof notifications)[number]) => {
+    const destination = resolveNotificationDestination(notification);
+    if (!notification.read) {
+      void markAsRead(notification.id);
+    }
+    navigate(destination);
+  };
+
   return (
     <div className="space-y-4 pt-1 sm:pt-2">
       <SectionCard className="space-y-4 p-4 sm:p-5">
@@ -319,7 +328,16 @@ const NotificationsPage: React.FC = () => {
             {filteredNotifications.map((notification) => (
               <div
                 key={notification.id}
-                className={`border-l-4 px-4 py-4 transition-colors hover:bg-[#F7FBFC] sm:px-5 ${getPriorityAccentClass(
+                role="button"
+                tabIndex={0}
+                onClick={() => handleNotificationOpen(notification)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    handleNotificationOpen(notification);
+                  }
+                }}
+                className={`cursor-pointer border-l-4 px-4 py-4 transition-colors hover:bg-[#F7FBFC] sm:px-5 ${getPriorityAccentClass(
                   notification.priority,
                 )} ${!notification.read ? 'bg-[#159A9C]/4' : 'bg-white'}`}
               >
@@ -370,7 +388,10 @@ const NotificationsPage: React.FC = () => {
                         {notification.action ? (
                           <button
                             type="button"
-                            onClick={() => notification.action?.onClick()}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              notification.action?.onClick();
+                            }}
                             className="mt-2 inline-flex items-center rounded-lg border border-[#BDE5DE] bg-[#F4FBF9] px-3 py-1.5 text-xs font-semibold text-[#0F7B7D] transition-colors hover:bg-[#EAF7F4]"
                           >
                             {notification.action.label}
@@ -382,7 +403,10 @@ const NotificationsPage: React.FC = () => {
                         {!notification.read ? (
                           <button
                             type="button"
-                            onClick={() => void markAsRead(notification.id)}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void markAsRead(notification.id);
+                            }}
                             className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#DCE8EC] bg-white text-[#607B89] transition-colors hover:bg-[#F4FBF9] hover:text-[#159A9C]"
                             title="Marcar como lida"
                           >
@@ -392,7 +416,10 @@ const NotificationsPage: React.FC = () => {
 
                         <button
                           type="button"
-                          onClick={() => void removeNotification(notification.id)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void removeNotification(notification.id);
+                          }}
                           className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#F5D0D5] bg-white text-red-600 transition-colors hover:bg-[#FFF5F6] hover:text-red-700"
                           title="Excluir notificação"
                         >

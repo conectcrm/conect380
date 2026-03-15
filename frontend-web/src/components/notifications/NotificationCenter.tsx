@@ -3,6 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../../contexts/NotificationContext';
 import notificationService from '../../services/notificationService';
 import {
+  extractNotificationEntityFromData,
+  resolveNotificationDestination,
+} from './notificationNavigation';
+import {
   Bell,
   BellOff,
   Check,
@@ -110,6 +114,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
           if (apiNotif.type === 'COTACAO_APROVADA') type = 'success';
           else if (apiNotif.type === 'COTACAO_REPROVADA') type = 'error';
           else if (apiNotif.type === 'COTACAO_PENDENTE') type = 'warning';
+          const entityHint = extractNotificationEntityFromData(apiNotif.data);
 
           const parsedTimestamp = new Date(apiNotif.createdAt);
           const timestamp = Number.isNaN(parsedTimestamp.getTime()) ? new Date() : parsedTimestamp;
@@ -124,6 +129,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
             timestamp,
             autoClose: true,
             duration: 5000,
+            entityType: entityHint.entityType,
+            entityId: entityHint.entityId,
+            data: apiNotif.data ?? null,
             // Evita toasts duplicados em hidratação inicial e atualizações já conhecidas
             silent: isInitialSyncRef.current || alreadySeen || apiNotif.read,
           });
@@ -255,6 +263,15 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
   const handleSettingsClick = () => {
     closePopover();
     navigate('/perfil?section=notifications');
+  };
+
+  const handleNotificationOpen = (notification: (typeof notifications)[number]) => {
+    const destination = resolveNotificationDestination(notification);
+    if (!notification.read) {
+      void markAsRead(notification.id);
+    }
+    closePopover();
+    navigate(destination);
   };
 
   const handleClearAllRequest = () => {
@@ -445,7 +462,16 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                 {filteredNotifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`border-l-4 p-4 transition-colors hover:bg-[#F7FBFC] ${
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleNotificationOpen(notification)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        handleNotificationOpen(notification);
+                      }
+                    }}
+                    className={`cursor-pointer border-l-4 p-4 transition-colors hover:bg-[#F7FBFC] ${
                       !notification.read ? 'bg-[#159A9C]/4' : 'bg-white'
                     } ${getPriorityColor(notification.priority)}`}
                   >
@@ -474,7 +500,10 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                             {!notification.read && (
                               <button
                                 type="button"
-                                onClick={() => void markAsRead(notification.id)}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void markAsRead(notification.id);
+                                }}
                                 className="rounded p-1.5 text-gray-400 transition-colors duration-200 hover:bg-[#DEEFE7]/55 hover:text-[#159A9C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35 sm:p-1"
                                 title="Marcar como lida"
                                 aria-label={`Marcar notificação ${notification.title} como lida`}
@@ -484,7 +513,10 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                             )}
                             <button
                               type="button"
-                              onClick={() => void removeNotification(notification.id)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void removeNotification(notification.id);
+                              }}
                               className="rounded p-1.5 text-gray-400 transition-colors duration-200 hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 sm:p-1"
                               title="Remover"
                               aria-label={`Remover notificação ${notification.title}`}
@@ -497,7 +529,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                         {notification.action && (
                           <button
                             type="button"
-                            onClick={() => {
+                            onClick={(event) => {
+                              event.stopPropagation();
                               notification.action.onClick();
                               closePopover();
                             }}
