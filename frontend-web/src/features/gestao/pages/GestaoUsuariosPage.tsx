@@ -127,6 +127,15 @@ const PERMISSAO_ATENDIMENTO_TOKENS = new Set([
   'atendimento.sla.manage',
 ]);
 
+const ROLE_SELECT_OPTIONS: Array<{ value: UserRole; label: string }> = [
+  { value: UserRole.SUPERADMIN, label: 'Super Admin' },
+  { value: UserRole.SUPORTE, label: 'Suporte' },
+  { value: UserRole.VENDEDOR, label: 'Vendedor' },
+  { value: UserRole.FINANCEIRO, label: 'Financeiro' },
+  { value: UserRole.GERENTE, label: 'Gerente' },
+  { value: UserRole.ADMIN, label: 'Administrador' },
+];
+
 type PermissaoModalOption = { value: string; label: string; legacy?: boolean };
 type PermissaoModalGroup = {
   id: string;
@@ -439,6 +448,8 @@ const GestaoUsuariosPage: React.FC = () => {
     normalizedAuthRole === 'gerente' ||
     normalizedAuthRole === 'manager' ||
     normalizedAuthRole === UserRole.GERENTE;
+  const canManageAccessRecertification = canManageAccessReview;
+  const canManageAccessRequestDecisions = canManageAccessApprovals;
   const canViewAccessApprovals =
     canManageAccessApprovals ||
     normalizedAuthRole === 'gerente' ||
@@ -447,6 +458,7 @@ const GestaoUsuariosPage: React.FC = () => {
 
   // Estados principais
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [atendentesIds, setAtendentesIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalUsuariosSistema, setTotalUsuariosSistema] = useState(0);
@@ -501,6 +513,59 @@ const GestaoUsuariosPage: React.FC = () => {
   const [resetSenhaLoading, setResetSenhaLoading] = useState(false);
   const [novaSenhaGerada, setNovaSenhaGerada] = useState<string | null>(null);
   const [resetSenhaError, setResetSenhaError] = useState<string | null>(null);
+
+  const assignableRolesForActor = useMemo<UserRole[]>(() => {
+    if (normalizedAuthRole === UserRole.SUPERADMIN) {
+      return [
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+        UserRole.GERENTE,
+        UserRole.FINANCEIRO,
+        UserRole.VENDEDOR,
+        UserRole.SUPORTE,
+      ];
+    }
+
+    if (normalizedAuthRole === UserRole.ADMIN) {
+      return [UserRole.GERENTE, UserRole.FINANCEIRO, UserRole.VENDEDOR, UserRole.SUPORTE];
+    }
+
+    if (
+      normalizedAuthRole === UserRole.GERENTE ||
+      normalizedAuthRole === 'gerente' ||
+      normalizedAuthRole === 'manager'
+    ) {
+      return [UserRole.VENDEDOR, UserRole.SUPORTE];
+    }
+
+    return [];
+  }, [normalizedAuthRole]);
+
+  const roleOptionsForForm = useMemo<Array<{ value: UserRole; label: string }>>(() => {
+    const allowSuperAdminOption =
+      editingUsuario?.role === UserRole.SUPERADMIN &&
+      assignableRolesForActor.includes(UserRole.SUPERADMIN);
+
+    return ROLE_SELECT_OPTIONS.filter((option) => {
+      if (!assignableRolesForActor.includes(option.value)) {
+        return false;
+      }
+
+      if (option.value === UserRole.SUPERADMIN && !allowSuperAdminOption) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [assignableRolesForActor, editingUsuario?.role]);
+
+  const defaultRoleForForm = useMemo<UserRole>(() => {
+    if (assignableRolesForActor.includes(UserRole.SUPORTE)) {
+      return UserRole.SUPORTE;
+    }
+
+    return assignableRolesForActor[0] ?? UserRole.SUPORTE;
+  }, [assignableRolesForActor]);
 
   const showFeedback = (
     type: 'success' | 'error' | 'info',
@@ -594,17 +659,34 @@ const GestaoUsuariosPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const { usuarios: lista, total } = await usuariosService.listarUsuarios({
-        limite: 1000,
-        pagina: 1,
-      });
+      const [{ usuarios: lista, total }, atendentes] = await Promise.all([
+        usuariosService.listarUsuarios({
+          limite: 1000,
+          pagina: 1,
+        }),
+        usuariosService
+          .listarAtendentes()
+          .catch((loadAtendentesError) => {
+            console.warn(
+              'Nao foi possivel carregar lista dedicada de atendentes, fallback local sera usado.',
+              loadAtendentesError,
+            );
+            return null;
+          }),
+      ]);
       setUsuarios(lista);
       setTotalUsuariosSistema(total);
+      if (Array.isArray(atendentes)) {
+        setAtendentesIds(new Set(atendentes.map((atendente) => atendente.id)));
+      } else {
+        setAtendentesIds(new Set());
+      }
     } catch (err: unknown) {
       console.error('Erro ao carregar usuarios:', err);
       setError(getErrorMessage(err, 'Erro ao carregar usuarios'));
       setUsuarios([]);
       setTotalUsuariosSistema(0);
+      setAtendentesIds(new Set());
     } finally {
       setLoading(false);
     }
@@ -707,6 +789,10 @@ const GestaoUsuariosPage: React.FC = () => {
 
     // Filtro de atendentes
     if (apenasAtendentes) {
+      const atendenteCarregadoPorEndpoint = atendentesIds.has(usuario.id);
+      if (atendenteCarregadoPorEndpoint) {
+        return true;
+      }
       const temPermissaoAtendimento =
         usuario.permissoes?.some((perm) => PERMISSAO_ATENDIMENTO_TOKENS.has(perm)) ?? false;
       if (!temPermissaoAtendimento) return false;
@@ -750,14 +836,18 @@ const GestaoUsuariosPage: React.FC = () => {
   const handleOpenDialog = (usuario?: Usuario): void => {
     setFormError(null);
     setPermissionSearch('');
+    const roleFallback = roleOptionsForForm[0]?.value ?? defaultRoleForForm;
     if (usuario) {
+      const roleInicial = assignableRolesForActor.includes(usuario.role)
+        ? usuario.role
+        : roleFallback;
       setEditingUsuario(usuario);
       setFormData({
         nome: usuario.nome,
         email: usuario.email,
         telefone: usuario.telefone || '',
-        role: usuario.role,
-        permissoes: usuario.permissoes || [],
+        role: roleInicial,
+        permissoes: normalizePermissionsForRole(roleInicial, usuario.permissoes || []),
         ativo: usuario.ativo,
         avatar_url: usuario.avatar_url,
         idioma_preferido: usuario.idioma_preferido || 'pt-BR',
@@ -769,7 +859,7 @@ const GestaoUsuariosPage: React.FC = () => {
         email: '',
         telefone: '',
         senha: '',
-        role: UserRole.SUPORTE,
+        role: roleFallback,
         permissoes: [],
         ativo: true,
         idioma_preferido: 'pt-BR',
@@ -798,7 +888,7 @@ const GestaoUsuariosPage: React.FC = () => {
       email: '',
       telefone: '',
       senha: '',
-      role: UserRole.SUPORTE,
+      role: defaultRoleForForm,
       permissoes: [],
       ativo: true,
       idioma_preferido: 'pt-BR',
@@ -817,7 +907,7 @@ const GestaoUsuariosPage: React.FC = () => {
           nome: formData.nome,
           email: formData.email,
           telefone: formData.telefone,
-          role: formData.role,
+          role: roleSelecionadoFormulario,
           permissoes: formData.permissoes,
           ativo: formData.ativo,
           avatar_url: formData.avatar_url,
@@ -839,7 +929,10 @@ const GestaoUsuariosPage: React.FC = () => {
           setFormError('Senha e obrigatoria para criar novo usuario.');
           return;
         }
-        const resultado = await usuariosService.criarUsuario(formData as NovoUsuario);
+        const resultado = await usuariosService.criarUsuario({
+          ...(formData as NovoUsuario),
+          role: roleSelecionadoFormulario,
+        });
 
         if (resultado.mode === 'applied' && resultado.usuario) {
           setUsuarios((prev) => [...prev, resultado.usuario as Usuario]);
@@ -1199,6 +1292,14 @@ const GestaoUsuariosPage: React.FC = () => {
   };
 
   const handleAprovarSolicitacaoAcesso = (request: UserAccessChangeRequest): void => {
+    if (!canManageAccessRequestDecisions) {
+      showFeedback(
+        'error',
+        'Somente administradores podem aprovar solicitacoes sensiveis de acesso.',
+      );
+      return;
+    }
+
     openConfirmDialog({
       title: 'Aprovar alteracao sensivel',
       description: `Deseja aprovar e aplicar agora a solicitacao ${request.id}?`,
@@ -1225,6 +1326,14 @@ const GestaoUsuariosPage: React.FC = () => {
   };
 
   const handleRejeitarSolicitacaoAcesso = (request: UserAccessChangeRequest): void => {
+    if (!canManageAccessRequestDecisions) {
+      showFeedback(
+        'error',
+        'Somente administradores podem rejeitar solicitacoes sensiveis de acesso.',
+      );
+      return;
+    }
+
     openConfirmDialog({
       title: 'Rejeitar alteracao sensivel',
       description: `Deseja rejeitar a solicitacao ${request.id}?`,
@@ -1260,7 +1369,10 @@ const GestaoUsuariosPage: React.FC = () => {
     return map;
   }, [catalogoPermissoes.groups]);
 
-  const roleSelecionadoFormulario = (formData.role as UserRole) || UserRole.SUPORTE;
+  const roleSelecionadoFormulario =
+    roleOptionsForForm.find((option) => option.value === formData.role)?.value ??
+    roleOptionsForForm[0]?.value ??
+    defaultRoleForForm;
   const gruposPermissaoDoFormulario = getPermissionGroupsByRole(
     catalogoPermissoes,
     roleSelecionadoFormulario,
@@ -1587,7 +1699,7 @@ const GestaoUsuariosPage: React.FC = () => {
                       </span>
                     </div>
 
-                    {canManageAccessReview ? (
+                    {canManageAccessRequestDecisions ? (
                       <div className="mt-3 flex flex-wrap items-center gap-2">
                         <button
                           type="button"
@@ -1724,7 +1836,7 @@ const GestaoUsuariosPage: React.FC = () => {
                       Ultimo login: {formatarDataHora(usuario.ultimo_login || undefined)}
                     </div>
 
-                    {canManageAccessApprovals ? (
+                    {canManageAccessRecertification ? (
                       <div className="mt-3 flex flex-wrap items-center gap-2">
                         <button
                           type="button"
@@ -2379,19 +2491,23 @@ const GestaoUsuariosPage: React.FC = () => {
                     Papel <span className="text-red-500">*</span>
                   </label>
                   <select
-                    value={formData.role || UserRole.SUPORTE}
+                    value={roleSelecionadoFormulario}
                     onChange={(e) => handleRoleChange(e.target.value as UserRole)}
                     className={modalInputClass}
+                    disabled={roleOptionsForForm.length === 0}
                     required
                   >
-                    {editingUsuario?.role === UserRole.SUPERADMIN && (
-                      <option value={UserRole.SUPERADMIN}>Super Admin</option>
+                    {roleOptionsForForm.length === 0 ? (
+                      <option value={defaultRoleForForm}>
+                        {ROLE_LABELS[defaultRoleForForm] ?? 'Perfil indisponivel'}
+                      </option>
+                    ) : (
+                      roleOptionsForForm.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))
                     )}
-                    <option value={UserRole.SUPORTE}>Suporte</option>
-                    <option value={UserRole.VENDEDOR}>Vendedor</option>
-                    <option value={UserRole.FINANCEIRO}>Financeiro</option>
-                    <option value={UserRole.GERENTE}>Gerente</option>
-                    <option value={UserRole.ADMIN}>Administrador</option>
                   </select>
                 </div>
               </div>

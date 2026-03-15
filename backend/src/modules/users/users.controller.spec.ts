@@ -8,6 +8,7 @@ describe('UsersController Security', () => {
     criar: jest.fn(),
     findOne: jest.fn(),
     atualizar: jest.fn(),
+    excluir: jest.fn(),
     isDualApprovalRequiredForAccessChanges: jest.fn().mockResolvedValue(false),
     isSensitiveAccessChangePayload: jest.fn((payload: Record<string, unknown>) =>
       ['role', 'permissoes', 'ativo', 'deve_trocar_senha'].some((field) => field in (payload ?? {})),
@@ -358,6 +359,40 @@ describe('UsersController Security', () => {
       }),
     );
     expect(result.message).toContain('pendente');
+  });
+
+  it('exclui usuario dentro do escopo gerenciavel', async () => {
+    const admin = {
+      id: 'admin-1',
+      nome: 'Admin 1',
+      email: 'admin@empresa.com',
+      role: UserRole.ADMIN,
+      empresa_id: 'empresa-1',
+    } as any;
+
+    usersServiceMock.findOne.mockResolvedValue({
+      id: 'user-4',
+      role: UserRole.VENDEDOR,
+      empresa_id: 'empresa-1',
+    });
+
+    const result = await controller.excluirUsuario(admin, 'user-4');
+
+    expect(usersServiceMock.excluir).toHaveBeenCalledWith(
+      'user-4',
+      'empresa-1',
+      expect.objectContaining({
+        source: 'users.controller.excluirUsuario',
+        actor: expect.objectContaining({
+          id: 'admin-1',
+          email: 'admin@empresa.com',
+        }),
+      }),
+    );
+    expect(result).toEqual({
+      success: true,
+      message: 'Usuario excluido com sucesso',
+    });
   });
 
   it('aplica escopo de leitura de time para gerente na listagem', async () => {

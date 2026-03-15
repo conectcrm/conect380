@@ -1477,6 +1477,28 @@ export class UsersController {
     };
   }
 
+  @Delete(':id')
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
+  @Permissions(Permission.USERS_UPDATE)
+  @ApiOperation({ summary: 'Excluir usuario' })
+  @ApiResponse({ status: 200, description: 'Usuario excluido com sucesso' })
+  async excluirUsuario(@CurrentUser() user: User, @Param('id') id: string) {
+    await this.ensureCanManageUser(user, id, 'excluir');
+    await this.usersService.excluir(id, user.empresa_id, {
+      actor: {
+        id: user.id,
+        nome: user.nome,
+        email: user.email,
+      },
+      source: 'users.controller.excluirUsuario',
+    });
+
+    return {
+      success: true,
+      message: 'Usuario excluido com sucesso',
+    };
+  }
+
   @Patch(':id/status')
   @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
   @Permissions(Permission.USERS_STATUS_UPDATE)
