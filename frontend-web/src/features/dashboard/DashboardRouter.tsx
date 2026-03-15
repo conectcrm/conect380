@@ -4,8 +4,10 @@ import { useProfile, type PerfilUsuario } from '../../contexts/ProfileContext';
 import OperacionalDashboard from './OperacionalDashboard';
 import SuporteDashboard from './SuporteDashboard';
 import VendedorDashboard from './VendedorDashboard';
+import DashboardLegacyFallback from './DashboardLegacyFallback';
 import DashboardV2Page from '../dashboard-v2/DashboardV2Page';
 import FinanceiroDashboardV2 from '../dashboard-v2/FinanceiroDashboardV2';
+import { useDashboardV2Flag } from '../dashboard-v2/useDashboardV2';
 
 type UserRecord =
   | {
@@ -86,6 +88,26 @@ const DashboardRouter: React.FC = () => {
   const userRecord: UserRecord = user;
   const perfilBase = resolveBaseProfile(userRecord);
   const perfilAtivo = canSwitchProfile(userRecord) ? perfilSelecionado : perfilBase;
+  const perfilExigeDashboardV2 =
+    perfilAtivo === 'financeiro' || perfilAtivo === 'gerente' || perfilAtivo === 'administrador';
+  const {
+    loading: dashboardV2FlagLoading,
+    error: dashboardV2FlagError,
+    flag: dashboardV2Flag,
+  } = useDashboardV2Flag(perfilExigeDashboardV2);
+
+  if (perfilExigeDashboardV2 && dashboardV2FlagLoading) {
+    return (
+      <div className="space-y-3">
+        <div className="h-9 w-56 animate-pulse rounded-xl bg-[#E6EFF0]" />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="h-32 animate-pulse rounded-[14px] bg-[#E6EFF0]" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   const renderDashboard = (): React.ReactNode => {
     switch (perfilAtivo) {
@@ -96,11 +118,32 @@ const DashboardRouter: React.FC = () => {
       case 'suporte':
         return <SuporteDashboard />;
       case 'financeiro':
+        if (!dashboardV2Flag.enabled) {
+          return (
+            <DashboardLegacyFallback
+              reason={dashboardV2FlagError || 'Dashboard V2 desabilitado para esta empresa.'}
+            />
+          );
+        }
         return <FinanceiroDashboardV2 />;
       case 'gerente':
       case 'administrador':
+        if (!dashboardV2Flag.enabled) {
+          return (
+            <DashboardLegacyFallback
+              reason={dashboardV2FlagError || 'Dashboard V2 desabilitado para esta empresa.'}
+            />
+          );
+        }
         return <DashboardV2Page />;
       default:
+        if (perfilExigeDashboardV2 && !dashboardV2Flag.enabled) {
+          return (
+            <DashboardLegacyFallback
+              reason={dashboardV2FlagError || 'Dashboard V2 desabilitado para esta empresa.'}
+            />
+          );
+        }
         return <DashboardV2Page />;
     }
   };
