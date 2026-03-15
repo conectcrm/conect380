@@ -453,21 +453,18 @@ jobs:
 
       - name: Detectar mudancas relevantes (Guardian Hardening)
         id: guardian_hardening_changes
-        uses: dorny/paths-filter@v3
-        with:
-          base: HEAD^
-          ref: HEAD
-          filters: |
-            guardian_hardening:
-              - 'backend/test/guardian/**'
-              - 'backend/test/_support/e2e-app.helper.ts'
-              - 'backend/src/modules/guardian/**'
-              - 'backend/src/modules/admin/guards/legacy-admin-transition.guard.ts'
-              - 'backend/src/modules/planos/assinatura-due-date-scheduler.service.ts'
-              - 'backend/src/modules/planos/assinaturas.controller.ts'
-              - 'backend/src/modules/planos/planos.controller.ts'
-              - 'backend/package.json'
-              - 'backend/package-lock.json'
+        run: |
+          if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR HEAD^ HEAD || true)
+          else
+            CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r --diff-filter=ACMR HEAD || true)
+          fi
+
+          if echo "$CHANGED_FILES" | grep -E '^(backend/test/guardian/|backend/test/_support/e2e-app.helper.ts|backend/src/modules/guardian/|backend/src/modules/admin/guards/legacy-admin-transition.guard.ts|backend/src/modules/planos/assinatura-due-date-scheduler.service.ts|backend/src/modules/planos/assinaturas.controller.ts|backend/src/modules/planos/planos.controller.ts|backend/package\.json|backend/package-lock\.json)' >/dev/null; then
+            echo "guardian_hardening=true" >> $GITHUB_OUTPUT
+          else
+            echo "guardian_hardening=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Pular E2E Guardian Hardening (sem mudancas relevantes)
         if: steps.guardian_hardening_changes.outputs.guardian_hardening != 'true'
@@ -538,25 +535,18 @@ jobs:
 
       - name: Detectar mudancas relevantes (Guardian Security)
         id: guardian_security_changes
-        uses: dorny/paths-filter@v3
-        with:
-          base: HEAD^
-          ref: HEAD
-          filters: |
-            guardian_security:
-              - 'backend/test/guardian/guardian-mfa-session.e2e-spec.ts'
-              - 'backend/test/guardian/guardian-backend-bypass.e2e-spec.ts'
-              - 'backend/test/_support/e2e-app.helper.ts'
-              - 'backend/src/modules/guardian/**'
-              - 'backend/src/modules/auth/**'
-              - 'backend/src/modules/admin/**'
-              - 'backend/src/modules/users/**'
-              - 'backend/src/modules/planos/**'
-              - 'backend/src/main.ts'
-              - 'backend/src/app.module.ts'
-              - 'backend/src/config/**'
-              - 'backend/package.json'
-              - 'backend/package-lock.json'
+        run: |
+          if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR HEAD^ HEAD || true)
+          else
+            CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r --diff-filter=ACMR HEAD || true)
+          fi
+
+          if echo "$CHANGED_FILES" | grep -E '^(backend/test/guardian/guardian-mfa-session.e2e-spec.ts|backend/test/guardian/guardian-backend-bypass.e2e-spec.ts|backend/test/_support/e2e-app.helper.ts|backend/src/modules/guardian/|backend/src/modules/auth/|backend/src/modules/admin/|backend/src/modules/users/|backend/src/modules/planos/|backend/src/main.ts|backend/src/app.module.ts|backend/src/config/|backend/package\.json|backend/package-lock\.json)' >/dev/null; then
+            echo "guardian_security=true" >> $GITHUB_OUTPUT
+          else
+            echo "guardian_security=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Pular E2E Guardian Security (sem mudancas relevantes)
         if: steps.guardian_security_changes.outputs.guardian_security != 'true'
@@ -624,36 +614,18 @@ jobs:
 
       - name: Detectar mudancas relevantes (Comercial Core)
         id: comercial_core_changes
-        uses: dorny/paths-filter@v3
-        with:
-          base: HEAD^
-          ref: HEAD
-          filters: |
-            comercial_core:
-              - 'e2e/pipeline-*.spec.ts'
-              - 'e2e/propostas-*.spec.ts'
-              - 'e2e/pipeline-ui.helpers.ts'
-              - 'e2e/fixtures.ts'
-              - 'playwright.config.ts'
-              - 'frontend-web/craco.config.js'
-              - 'frontend-web/src/pages/PipelinePage.tsx'
-              - 'frontend-web/src/features/propostas/**'
-              - 'frontend-web/src/components/modals/ModalNovaProposta.tsx'
-              - 'frontend-web/src/components/oportunidades/**'
-              - 'frontend-web/src/services/api.ts'
-              - 'frontend-web/src/services/oportunidadesService.ts'
-              - 'frontend-web/src/services/modulosService.ts'
-              - 'frontend-web/src/services/minhasEmpresasService.ts'
-              - 'frontend-web/src/contexts/AuthContext.tsx'
-              - 'frontend-web/src/contexts/EmpresaContextAPIReal.tsx'
-              - 'frontend-web/src/hooks/useModuloAtivo.ts'
-              - 'frontend-web/src/components/licensing/PermissionPathGuard.tsx'
-              - 'frontend-web/src/types/oportunidades/**'
-              - 'frontend-web/src/App.tsx'
-              - 'package.json'
-              - 'package-lock.json'
-              - 'frontend-web/package.json'
-              - 'frontend-web/package-lock.json'
+        run: |
+          if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR HEAD^ HEAD || true)
+          else
+            CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r --diff-filter=ACMR HEAD || true)
+          fi
+
+          if echo "$CHANGED_FILES" | grep -E '^(e2e/pipeline-.*\.spec\.ts|e2e/propostas-.*\.spec\.ts|e2e/pipeline-ui.helpers.ts|e2e/fixtures.ts|playwright.config.ts|frontend-web/craco.config.js|frontend-web/src/pages/PipelinePage.tsx|frontend-web/src/features/propostas/|frontend-web/src/components/modals/ModalNovaProposta.tsx|frontend-web/src/components/oportunidades/|frontend-web/src/services/api.ts|frontend-web/src/services/oportunidadesService.ts|frontend-web/src/services/modulosService.ts|frontend-web/src/services/minhasEmpresasService.ts|frontend-web/src/contexts/AuthContext.tsx|frontend-web/src/contexts/EmpresaContextAPIReal.tsx|frontend-web/src/hooks/useModuloAtivo.ts|frontend-web/src/components/licensing/PermissionPathGuard.tsx|frontend-web/src/types/oportunidades/|frontend-web/src/App.tsx|package\.json|package-lock\.json|frontend-web/package\.json|frontend-web/package-lock\.json)' >/dev/null; then
+            echo "comercial_core=true" >> $GITHUB_OUTPUT
+          else
+            echo "comercial_core=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Pular E2E Comercial Core (sem mudancas relevantes)
         if: steps.comercial_core_changes.outputs.comercial_core != 'true'
@@ -836,7 +808,8 @@ jobs:
       - name: Checkout codigo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 2
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Detectar mudancas relevantes (Guardian Exposure Scan)
         id: guardian_exposure_changes
@@ -891,22 +864,18 @@ jobs:
 
       - name: Detectar mudancas relevantes (Guardian Billing Governance)
         id: guardian_billing_governance_changes
-        uses: dorny/paths-filter@v3
-        with:
-          base: HEAD^
-          ref: HEAD
-          filters: |
-            guardian_billing_governance:
-              - 'e2e/guardian-billing-governance.spec.ts'
-              - 'e2e/guardian-responsive-visual.spec.ts'
-              - 'playwright.config.ts'
-              - 'guardian-web/src/**'
-              - 'backend/src/modules/guardian/**'
-              - 'backend/src/modules/planos/**'
-              - 'package.json'
-              - 'package-lock.json'
-              - 'guardian-web/package.json'
-              - 'guardian-web/package-lock.json'
+        run: |
+          if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR HEAD^ HEAD || true)
+          else
+            CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r --diff-filter=ACMR HEAD || true)
+          fi
+
+          if echo "$CHANGED_FILES" | grep -E '^(e2e/guardian-billing-governance.spec.ts|e2e/guardian-responsive-visual.spec.ts|playwright.config.ts|guardian-web/src/|backend/src/modules/guardian/|backend/src/modules/planos/|package\.json|package-lock\.json|guardian-web/package\.json|guardian-web/package-lock\.json)' >/dev/null; then
+            echo "guardian_billing_governance=true" >> $GITHUB_OUTPUT
+          else
+            echo "guardian_billing_governance=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Pular E2E Guardian Billing Governance (sem mudancas relevantes)
         if: steps.guardian_billing_governance_changes.outputs.guardian_billing_governance != 'true'
