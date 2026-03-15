@@ -26,6 +26,7 @@ import { ModuloEnum } from './services/modulosService';
 import { protegerRota } from './utils/routeGuardHelper';
 // Importar páginas de núcleos
 import ModuleUnderConstruction from './components/common/ModuleUnderConstruction';
+import SalesCelebrationHost from './components/feedback/SalesCelebrationHost';
 import Conect360Logo from './components/ui/Conect360Logo';
 // Sistema de Filas - ETAPA 5 (Núcleo Atendimento)
 // Sistema de Distribuição Automática - Núcleo Atendimento
@@ -1021,6 +1022,8 @@ const App: React.FC = () => {
                                 >
                                   <AppRoutes />
                                 </Suspense>
+
+                                <SalesCelebrationHost />
 
                                 {/* Toast Notifications */}
                                 <Toaster

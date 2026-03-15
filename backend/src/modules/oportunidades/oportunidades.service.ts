@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import {
   Oportunidade,
   EstagioOportunidade,
@@ -22,6 +22,9 @@ import {
 } from './dto/oportunidade.dto';
 import { CreateAtividadeDto } from './dto/atividade.dto';
 import { FeatureFlagTenant } from '../dashboard-v2/entities/feature-flag-tenant.entity';
+import { User, UserRole } from '../users/user.entity';
+import { NotificationService } from '../../notifications/notification.service';
+import { NotificationType } from '../../notifications/entities/notification.entity';
 import { createHash } from 'crypto';
 
 const ALL_OPORTUNIDADE_STAGES = new Set<string>([
@@ -462,9 +465,120 @@ export class OportunidadesService {
     private readonly featureFlagRepository: Repository<FeatureFlagTenant>,
     @InjectRepository(Lead)
     private readonly leadRepository: Repository<Lead>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    @Optional()
+    private readonly notificationService?: NotificationService,
     @Optional()
     private readonly dashboardV2JobsService?: DashboardV2JobsService,
   ) {}
+
+  private formatCurrencyBrl(value: unknown): string {
+    const parsed = Number(value ?? 0);
+    const safeValue = Number.isFinite(parsed) ? parsed : 0;
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+    }).format(safeValue);
+  }
+
+  private async notifyManagersOnWonOpportunity(input: {
+    empresaId: string;
+    oportunidade: Oportunidade;
+    actorUserId?: string;
+    source: 'update' | 'update_estagio';
+  }): Promise<void> {
+    if (!this.notificationService) {
+      return;
+    }
+
+    try {
+      let recipients = await this.userRepository.find({
+        where: {
+          empresa_id: input.empresaId,
+          ativo: true,
+          role: In([UserRole.GERENTE]),
+        },
+        select: ['id'],
+      });
+
+      // Fallback para administradores quando nao houver gerente ativo.
+      if (recipients.length === 0) {
+        recipients = await this.userRepository.find({
+          where: {
+            empresa_id: input.empresaId,
+            ativo: true,
+            role: In([UserRole.ADMIN, UserRole.SUPERADMIN]),
+          },
+          select: ['id'],
+        });
+      }
+
+      if (recipients.length === 0) {
+        return;
+      }
+
+      const actorIdNormalized =
+        typeof input.actorUserId === 'string' ? input.actorUserId.trim() : '';
+      const filteredRecipients = actorIdNormalized
+        ? recipients.filter((recipient) => recipient.id !== actorIdNormalized)
+        : recipients;
+      if (filteredRecipients.length === 0) {
+        return;
+      }
+
+      const actorCandidates = [input.actorUserId, input.oportunidade.responsavel_id].filter(
+        (id): id is string => typeof id === 'string' && id.trim().length > 0,
+      );
+      const actor = actorCandidates.length
+        ? await this.userRepository.findOne({
+            where: {
+              empresa_id: input.empresaId,
+              id: In(actorCandidates),
+            },
+            select: ['id', 'nome'],
+          })
+        : null;
+      const actorName = actor?.nome?.trim() || 'Equipe comercial';
+
+      const oportunidadeTitulo = String(input.oportunidade.titulo || 'Oportunidade').trim();
+      const valor = this.formatCurrencyBrl(input.oportunidade.valor);
+      const title = 'Venda concluida no pipeline';
+      const message = `${actorName} concluiu a oportunidade "${oportunidadeTitulo}" como ganha. Valor: ${valor}.`;
+
+      const jobs = filteredRecipients.map((recipient) =>
+        this.notificationService!.create({
+          empresaId: input.empresaId,
+          userId: recipient.id,
+          type: NotificationType.SISTEMA,
+          title,
+          message,
+          data: {
+            category: 'comercial',
+            event: 'venda_concluida',
+            source: input.source,
+            oportunidadeId: String(input.oportunidade.id || ''),
+            oportunidadeTitulo,
+            valor: Number(input.oportunidade.valor ?? 0),
+            actorUserId: input.actorUserId || null,
+          },
+        }),
+      );
+
+      const settled = await Promise.allSettled(jobs);
+      const failed = settled.filter((result) => result.status === 'rejected').length;
+      if (failed > 0) {
+        this.logger.warn(
+          `Falha ao entregar ${failed} notificacao(oes) de venda concluida para empresa ${input.empresaId}`,
+        );
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao notificar gestores sobre venda concluida (${input.oportunidade.id}): ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
 
   private quoteIdentifier(identifier: string): string {
     return `"${identifier.replace(/"/g, '""')}"`;
@@ -2153,6 +2267,19 @@ export class OportunidadesService {
 
     const oportunidadeAtualizada = await this.findOne(id, empresaId);
     await this.syncLeadMirrorFromOpportunity(oportunidadeAtualizada, empresaId, 'update');
+
+    const becameWonNow =
+      estagioAnterior !== EstagioOportunidade.GANHO &&
+      oportunidadeAtualizada.estagio === EstagioOportunidade.GANHO;
+    if (becameWonNow) {
+      void this.notifyManagersOnWonOpportunity({
+        empresaId,
+        oportunidade: oportunidadeAtualizada,
+        actorUserId: actorUserId ?? oportunidade.responsavel_id,
+        source: 'update',
+      });
+    }
+
     return oportunidadeAtualizada;
   }
 
@@ -2290,6 +2417,19 @@ export class OportunidadesService {
 
     const oportunidadeAtualizada = await this.findOne(id, empresaId);
     await this.syncLeadMirrorFromOpportunity(oportunidadeAtualizada, empresaId, 'update_estagio');
+
+    const becameWonNow =
+      currentStage !== EstagioOportunidade.GANHO &&
+      oportunidadeAtualizada.estagio === EstagioOportunidade.GANHO;
+    if (becameWonNow) {
+      void this.notifyManagersOnWonOpportunity({
+        empresaId,
+        oportunidade: oportunidadeAtualizada,
+        actorUserId: actorUserId ?? oportunidade.responsavel_id,
+        source: 'update_estagio',
+      });
+    }
+
     return oportunidadeAtualizada;
   }
 

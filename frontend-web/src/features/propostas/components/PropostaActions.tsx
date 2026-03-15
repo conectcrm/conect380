@@ -38,6 +38,7 @@ import { propostasService as propostasApiService } from '../../../services/propo
 import { authService } from '../../../services/authService';
 import { useNavigate } from 'react-router-dom';
 import ModalEnviarWhatsApp from '../../../components/whatsapp/ModalEnviarWhatsApp';
+import { triggerSalesCelebration } from '../../../components/feedback/SalesCelebrationHost';
 import { useGlobalConfirmation } from '../../../contexts/GlobalConfirmationContext';
 import {
   MENSAGEM_PROPOSTA_SEM_ITENS,
@@ -927,6 +928,17 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       }
 
       throw error;
+    }
+
+    if (novoStatus === 'aprovada') {
+      const propostaData = getPropostaData();
+      const tituloProposta =
+        String(propostaData.titulo || propostaData.numero || 'Proposta comercial').trim() ||
+        'Proposta comercial';
+      triggerSalesCelebration({
+        kind: 'proposta-aprovada',
+        subtitle: `"${tituloProposta}" foi aprovada.`,
+      });
     }
 
     window.dispatchEvent(

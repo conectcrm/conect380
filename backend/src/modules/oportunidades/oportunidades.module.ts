@@ -11,6 +11,8 @@ import { FeatureFlagTenant } from '../dashboard-v2/entities/feature-flag-tenant.
 import { Empresa } from '../../empresas/entities/empresa.entity';
 import { OportunidadesStaleMonitorService } from './oportunidades-stale-monitor.service';
 import { Lead } from '../leads/lead.entity';
+import { User } from '../users/user.entity';
+import { NotificationModule } from '../../notifications/notification.module';
 
 @Module({
   imports: [
@@ -21,8 +23,10 @@ import { Lead } from '../leads/lead.entity';
       FeatureFlagTenant,
       Empresa,
       Lead,
+      User,
     ]),
     DashboardV2Module,
+    NotificationModule,
     forwardRef(() => PropostasModule),
   ],
   controllers: [OportunidadesController],

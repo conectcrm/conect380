@@ -78,6 +78,7 @@ import ModalMudancaEstagio from '../components/oportunidades/ModalMudancaEstagio
 import ModalDetalhesOportunidade from '../components/oportunidades/ModalDetalhesOportunidade';
 import ModalExport from '../components/oportunidades/ModalExport';
 import ModalMotivoPerda from '../components/oportunidades/ModalMotivoPerda';
+import { triggerSalesCelebration } from '../components/feedback/SalesCelebrationHost';
 import { useAuth } from '../contexts/AuthContext';
 import { userHasPermission } from '../config/menuConfig';
 import { useGlobalConfirmation } from '../contexts/GlobalConfirmationContext';
@@ -865,6 +866,10 @@ const PipelinePage: React.FC = () => {
 
       await carregarDados();
       toastService.success('Oportunidade marcada como ganha com sucesso!');
+      triggerSalesCelebration({
+        kind: 'venda-concluida',
+        subtitle: `"${oportunidade.titulo}" foi marcada como ganha.`,
+      });
     } catch (err) {
       console.error('Erro ao marcar oportunidade como ganha:', err);
       const errorMessage = extrairMensagemErroApi(
@@ -1086,6 +1091,15 @@ const PipelinePage: React.FC = () => {
           ? 'Oportunidade atualizada com sucesso!'
           : 'Oportunidade criada com sucesso!',
       );
+      const vendaConcluidaDireto =
+        data.estagio === EstagioOportunidade.GANHO &&
+        (!oportunidadeEditando || oportunidadeEditando.estagio !== EstagioOportunidade.GANHO);
+      if (vendaConcluidaDireto) {
+        triggerSalesCelebration({
+          kind: 'venda-concluida',
+          subtitle: `"${data.titulo}" foi registrada como ganha.`,
+        });
+      }
     } catch (err) {
       console.error('Erro ao salvar oportunidade:', err);
       toastService.error('Erro ao salvar oportunidade');
@@ -1436,6 +1450,12 @@ const PipelinePage: React.FC = () => {
 
       // Toast de sucesso (você pode usar uma lib de toast aqui)
       toastService.success('Oportunidade movida com sucesso!');
+      if (novoEstagio === EstagioOportunidade.GANHO) {
+        triggerSalesCelebration({
+          kind: 'venda-concluida',
+          subtitle: `"${oportunidade.titulo}" foi marcada como ganha.`,
+        });
+      }
     } catch (err) {
       console.error('Erro ao mover oportunidade:', err);
       const errorMessage = extrairMensagemErroApi(err, 'Erro ao mover oportunidade');
