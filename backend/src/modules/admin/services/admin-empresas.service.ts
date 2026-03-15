@@ -23,6 +23,7 @@ import * as bcrypt from 'bcryptjs';
 @Injectable()
 export class AdminEmpresasService {
   private readonly logger = new Logger(AdminEmpresasService.name);
+  private static readonly EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   constructor(
     @InjectRepository(Empresa)
@@ -142,25 +143,46 @@ export class AdminEmpresasService {
    * Criar nova empresa (onboarding completo)
    */
   async criar(dto: CreateEmpresaAdminDto) {
-    this.logger.log(`Criando nova empresa: ${dto.nome}`);
+    const nomeEmpresa = this.normalizeRequiredText(dto.nome, 'Nome da empresa');
+    const cnpjEmpresa = this.normalizeCnpj(dto.cnpj);
+    const emailEmpresa = this.normalizeRequiredEmail(dto.email, 'Email da empresa');
+    const telefoneEmpresa = this.normalizeTelefone(dto.telefone);
+    const enderecoEmpresa = this.normalizeOptionalText(dto.endereco) || '';
+    const cidadeEmpresa = this.normalizeOptionalText(dto.cidade) || '';
+    const estadoEmpresa = this.normalizeEstado(dto.estado) || '';
+    const cepEmpresa = this.normalizeCep(dto.cep) || '';
+    const adminNome = this.normalizeRequiredText(dto.admin_nome, 'Nome do administrador');
+    const adminEmail = this.normalizeRequiredEmail(dto.admin_email, 'Email do administrador');
+
+    this.logger.log(`Criando nova empresa: ${nomeEmpresa}`);
 
     const empresaExistente = await this.empresaRepository.findOne({
-      where: { cnpj: dto.cnpj },
+      where: { cnpj: cnpjEmpresa },
     });
 
     if (empresaExistente) {
       throw new BadRequestException('CNPJ ja cadastrado no sistema');
     }
 
-    const emailExistente = await this.empresaRepository.findOne({
-      where: { email: dto.email },
-    });
+    const emailExistente = await this.empresaRepository
+      .createQueryBuilder('empresa')
+      .where('LOWER(empresa.email) = LOWER(:email)', { email: emailEmpresa })
+      .getOne();
 
     if (emailExistente) {
       throw new BadRequestException('Email da empresa ja cadastrado');
     }
 
-    const slug = this.gerarSlug(dto.nome);
+    const emailAdminExistente = await this.userRepository
+      .createQueryBuilder('usuario')
+      .where('LOWER(usuario.email) = LOWER(:email)', { email: adminEmail })
+      .getOne();
+
+    if (emailAdminExistente) {
+      throw new BadRequestException('Email do administrador ja cadastrado');
+    }
+
+    const slug = this.gerarSlug(nomeEmpresa);
     const subdominio = slug;
 
     const trialDays = Number.parseInt(String(dto.trial_days || '7'), 10) || 7;
@@ -181,15 +203,15 @@ export class AdminEmpresasService {
     const assinaturaInicialStatus = assinaturaStatusMap[String(dto.status || 'trial')] || 'trial';
 
     const empresa = this.empresaRepository.create({
-      nome: dto.nome,
+      nome: nomeEmpresa,
       slug,
-      cnpj: dto.cnpj,
-      email: dto.email,
-      telefone: dto.telefone,
-      endereco: dto.endereco || '',
-      cidade: dto.cidade || '',
-      estado: dto.estado || '',
-      cep: dto.cep || '',
+      cnpj: cnpjEmpresa,
+      email: emailEmpresa,
+      telefone: telefoneEmpresa,
+      endereco: enderecoEmpresa,
+      cidade: cidadeEmpresa,
+      estado: estadoEmpresa,
+      cep: cepEmpresa,
       subdominio,
       plano: planoCode,
       status: dto.status || 'trial',
@@ -206,8 +228,8 @@ export class AdminEmpresasService {
 
     const hashedPassword = await bcrypt.hash(dto.admin_senha, 10);
     const adminUser = this.userRepository.create({
-      nome: dto.admin_nome,
-      email: dto.admin_email,
+      nome: adminNome,
+      email: adminEmail,
       senha: hashedPassword,
       role: UserRole.ADMIN,
       empresa_id: empresaSalva.id,
@@ -231,10 +253,7 @@ export class AdminEmpresasService {
       observacoes: `Assinatura criada via admin.criar em ${hoje.toISOString()}`,
     });
 
-    await this.empresaModuloService.ativarPlano(
-      empresaSalva.id,
-      this.toEmpresaModuloPlanoCode(planoCode) as any,
-    );
+    await this.sincronizarModulosEmpresaComPlano(empresaSalva.id, planoCatalogo);
 
     this.logger.log(`Empresa criada com sucesso: ${empresaSalva.id}`);
 
@@ -262,6 +281,57 @@ export class AdminEmpresasService {
       });
       delete updatePayload.plano;
       delete updatePayload.valor_mensal;
+    }
+
+    if (typeof updatePayload.nome === 'string') {
+      updatePayload.nome = this.normalizeRequiredText(updatePayload.nome, 'Nome da empresa');
+      empresa.slug = this.gerarSlug(updatePayload.nome);
+    }
+
+    if (typeof updatePayload.cnpj === 'string') {
+      const cnpjNormalizado = this.normalizeCnpj(updatePayload.cnpj);
+      if (cnpjNormalizado !== empresa.cnpj) {
+        const cnpjEmUso = await this.empresaRepository.findOne({ where: { cnpj: cnpjNormalizado } });
+        if (cnpjEmUso && cnpjEmUso.id !== empresa.id) {
+          throw new BadRequestException('CNPJ ja cadastrado no sistema');
+        }
+      }
+      updatePayload.cnpj = cnpjNormalizado;
+    }
+
+    if (typeof updatePayload.email === 'string') {
+      const emailNormalizado = this.normalizeRequiredEmail(updatePayload.email, 'Email da empresa');
+      if (emailNormalizado.toLowerCase() !== String(empresa.email || '').toLowerCase()) {
+        const emailEmUso = await this.empresaRepository
+          .createQueryBuilder('empresa')
+          .where('LOWER(empresa.email) = LOWER(:email)', { email: emailNormalizado })
+          .getOne();
+
+        if (emailEmUso && emailEmUso.id !== empresa.id) {
+          throw new BadRequestException('Email da empresa ja cadastrado');
+        }
+      }
+      updatePayload.email = emailNormalizado;
+    }
+
+    if (typeof updatePayload.telefone === 'string') {
+      updatePayload.telefone = this.normalizeTelefone(updatePayload.telefone);
+    }
+
+    if (typeof updatePayload.endereco === 'string') {
+      updatePayload.endereco = this.normalizeOptionalText(updatePayload.endereco) || '';
+    }
+
+    if (typeof updatePayload.cidade === 'string') {
+      updatePayload.cidade = this.normalizeOptionalText(updatePayload.cidade) || '';
+    }
+
+    if (typeof updatePayload.estado === 'string') {
+      updatePayload.estado = this.normalizeEstado(updatePayload.estado) || '';
+    }
+
+    if (typeof updatePayload.cep === 'string') {
+      updatePayload.cep = this.normalizeCep(updatePayload.cep) || '';
     }
 
     if (Object.keys(updatePayload).length === 0) {
@@ -501,6 +571,87 @@ export class AdminEmpresasService {
     }
 
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(candidate) ? candidate : null;
+  }
+
+  private normalizeText(value?: string | null): string {
+    return String(value || '')
+      .trim()
+      .replace(/\s+/g, ' ');
+  }
+
+  private normalizeOptionalText(value?: string | null): string | undefined {
+    const normalized = this.normalizeText(value);
+    return normalized.length > 0 ? normalized : undefined;
+  }
+
+  private normalizeRequiredText(value: string, fieldLabel: string): string {
+    const normalized = this.normalizeText(value);
+    if (!normalized) {
+      throw new BadRequestException(`${fieldLabel} invalido`);
+    }
+    return normalized;
+  }
+
+  private normalizeDigits(value?: string | null): string {
+    return String(value || '').replace(/\D/g, '');
+  }
+
+  private normalizeCnpj(value: string): string {
+    const digits = this.normalizeDigits(value);
+    if (digits.length !== 14) {
+      throw new BadRequestException('CNPJ invalido');
+    }
+    return digits;
+  }
+
+  private normalizeTelefone(value: string): string {
+    const digits = this.normalizeDigits(value);
+    if (digits.length < 10 || digits.length > 11) {
+      throw new BadRequestException('Telefone invalido');
+    }
+    return digits;
+  }
+
+  private normalizeCep(value?: string | null): string | undefined {
+    if (value === undefined || value === null) {
+      return undefined;
+    }
+
+    const digits = this.normalizeDigits(value);
+    if (!digits) {
+      return undefined;
+    }
+
+    if (digits.length !== 8) {
+      throw new BadRequestException('CEP invalido');
+    }
+
+    return digits;
+  }
+
+  private normalizeEstado(value?: string | null): string | undefined {
+    if (value === undefined || value === null) {
+      return undefined;
+    }
+
+    const normalized = this.normalizeText(value).toUpperCase();
+    if (!normalized) {
+      return undefined;
+    }
+
+    if (normalized.length !== 2) {
+      throw new BadRequestException('Estado invalido');
+    }
+
+    return normalized;
+  }
+
+  private normalizeRequiredEmail(value: string, fieldLabel: string): string {
+    const normalized = this.normalizeText(value).toLowerCase();
+    if (!AdminEmpresasService.EMAIL_REGEX.test(normalized)) {
+      throw new BadRequestException(`${fieldLabel} invalido`);
+    }
+    return normalized;
   }
 
   private normalizeOptionalReason(input?: string): string | null {
@@ -748,6 +899,23 @@ export class AdminEmpresasService {
     return Number(parsed.toFixed(2));
   }
 
+  private extractPlanoModuleCodes(plano: Plano): string[] {
+    return (plano.modulosInclusos || [])
+      .map((item) => String(item?.modulo?.codigo || '').trim())
+      .filter(Boolean);
+  }
+
+  private async sincronizarModulosEmpresaComPlano(empresaId: string, plano: Plano): Promise<void> {
+    const modulos = this.extractPlanoModuleCodes(plano);
+    if (modulos.length === 0) {
+      throw new BadRequestException(
+        `Plano "${plano.codigo}" sem modulos vinculados no catalogo.`,
+      );
+    }
+
+    await this.empresaModuloService.sincronizarModulosPlano(empresaId, modulos, plano.codigo);
+  }
+
   private resolvePlanCode(rawInput: string): string {
     const normalized = this.normalizePlanInput(rawInput);
     const aliases: Record<string, string> = {
@@ -766,18 +934,6 @@ export class AdminEmpresasService {
     };
 
     return aliases[normalized] || normalized;
-  }
-
-  private toEmpresaModuloPlanoCode(planCode: string): 'STARTER' | 'BUSINESS' | 'ENTERPRISE' {
-    if (planCode === 'enterprise') {
-      return 'ENTERPRISE';
-    }
-
-    if (planCode === 'business' || planCode === 'professional' || planCode === 'custom') {
-      return 'BUSINESS';
-    }
-
-    return 'STARTER';
   }
 
   private async resolvePlanoFromInput(planoInput: string): Promise<Plano> {
@@ -850,6 +1006,8 @@ export class AdminEmpresasService {
     } else if (assinaturaAtual.plano?.id !== planoDestino.id) {
       assinaturaAtualizada = await this.assinaturasService.alterarPlano(empresaId, planoDestino.id);
     }
+
+    await this.sincronizarModulosEmpresaComPlano(empresaId, planoDestino);
 
     const valorNovo = this.toMoney(assinaturaAtualizada?.valorMensal ?? planoDestino.preco);
 

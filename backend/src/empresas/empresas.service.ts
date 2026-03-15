@@ -8,9 +8,10 @@ import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { MailService } from '../mail/mail.service';
 import { EmpresaModuloService } from '../modules/empresas/services/empresa-modulo.service';
-import { PlanoEnum } from '../modules/empresas/entities/empresa-modulo.entity';
 import { PlanosService } from '../modules/planos/planos.service';
 import { AssinaturasService } from '../modules/planos/assinaturas.service';
+import { FeatureFlagTenant } from '../modules/dashboard-v2/entities/feature-flag-tenant.entity';
+import { DEFAULT_PLANOS_SISTEMA } from '../modules/planos/planos.defaults';
 
 type RegistroEmpresaConsentAuditMeta = {
   ip?: string | null;
@@ -22,6 +23,10 @@ type RegistroEmpresaConsentAuditMeta = {
 @Injectable()
 export class EmpresasService {
   private readonly logger = new Logger(EmpresasService.name);
+  private static readonly DASHBOARD_V2_FLAG_KEY = 'dashboard_v2_enabled';
+  private static readonly SELF_SIGNUP_PLANOS_CANONICOS = new Set(
+    DEFAULT_PLANOS_SISTEMA.map((plano) => String(plano.codigo || '').trim().toLowerCase()),
+  );
   private static readonly TERMOS_VERSAO_ATUAL = process.env.LGPD_TERMOS_VERSAO || '2026-02-23';
   private static readonly PRIVACIDADE_VERSAO_ATUAL =
     process.env.LGPD_PRIVACIDADE_VERSAO || '2026-02-23';
@@ -77,7 +82,9 @@ export class EmpresasService {
   ]);
 
   private normalizeText(value?: string | null): string {
-    return String(value || '').trim();
+    return String(value || '')
+      .trim()
+      .replace(/\s+/g, ' ');
   }
 
   private normalizeDigits(value?: string | null): string {
@@ -290,11 +297,33 @@ export class EmpresasService {
     private empresaRepository: Repository<Empresa>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(FeatureFlagTenant)
+    private readonly featureFlagTenantRepository: Repository<FeatureFlagTenant>,
     private mailService: MailService,
     private empresaModuloService: EmpresaModuloService,
     private planosService: PlanosService,
     private assinaturasService: AssinaturasService,
   ) {}
+
+  private async habilitarDashboardV2ParaEmpresa(empresaId: string): Promise<void> {
+    await this.featureFlagTenantRepository
+      .createQueryBuilder()
+      .insert()
+      .into(FeatureFlagTenant)
+      .values({
+        empresa_id: empresaId,
+        flag_key: EmpresasService.DASHBOARD_V2_FLAG_KEY,
+        enabled: true,
+        rollout_percentage: 0,
+        updated_by: null,
+        updated_at: new Date(),
+      })
+      .orUpdate(
+        ['enabled', 'rollout_percentage', 'updated_by', 'updated_at'],
+        ['empresa_id', 'flag_key'],
+      )
+      .execute();
+  }
 
   async registrarEmpresa(
     createEmpresaDto: CreateEmpresaDto,
@@ -424,10 +453,37 @@ export class EmpresasService {
         observacoes: `Trial de ${EmpresasService.TRIAL_DIAS_CADASTRO} dias criado no self-signup`,
       });
 
-      const planoEnum = this.mapearPlanoParaEnum(planoCodigo);
-      if (planoEnum) {
-        await this.empresaModuloService.ativarPlano(empresaSalva.id, planoEnum);
-        this.logger.log(`Modulos do plano ${planoEnum} ativados para empresa ${empresaSalva.id}`);
+      const modulosPlano = (planoCatalogo.modulosInclusos || [])
+        .map((item) => String(item?.modulo?.codigo || '').trim())
+        .filter(Boolean);
+
+      if (modulosPlano.length === 0) {
+        this.logger.error(
+          `[REGISTRO_EMPRESA] Plano ${planoCodigo} sem modulos vinculados no catalogo`,
+        );
+        throw new HttpException(
+          'Plano selecionado sem modulos configurados. Contate o suporte.',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      await this.empresaModuloService.sincronizarModulosPlano(
+        empresaSalva.id,
+        modulosPlano,
+        planoCodigo,
+      );
+      this.logger.log(
+        `Modulos do plano ${planoCodigo} ativados para empresa ${empresaSalva.id}: ${modulosPlano.join(', ')}`,
+      );
+
+      try {
+        await this.habilitarDashboardV2ParaEmpresa(empresaSalva.id);
+      } catch (flagError) {
+        const flagMessage =
+          flagError instanceof Error ? flagError.message : 'erro desconhecido ao habilitar flag';
+        this.logger.warn(
+          `[REGISTRO_EMPRESA] Falha ao habilitar dashboard_v2_enabled para empresa ${empresaSalva.id}: ${flagMessage}`,
+        );
       }
 
       this.logger.log(
@@ -563,6 +619,22 @@ export class EmpresasService {
     const empresa = await this.obterPorId(id);
     const payload: Partial<Empresa> = { ...updateData };
 
+    if (payload.nome) {
+      payload.nome = this.normalizeText(payload.nome);
+    }
+
+    if (payload.endereco) {
+      payload.endereco = this.normalizeText(payload.endereco);
+    }
+
+    if (payload.cidade) {
+      payload.cidade = this.normalizeText(payload.cidade);
+    }
+
+    if (payload.slug) {
+      payload.slug = this.gerarSlug(this.normalizeText(payload.slug));
+    }
+
     // Validar CNPJ se estiver sendo alterado
     if (payload.cnpj && payload.cnpj !== empresa.cnpj) {
       const cnpjNormalizado = this.validarCnpj(payload.cnpj);
@@ -607,7 +679,13 @@ export class EmpresasService {
   }
 
   async listarPlanos(): Promise<any[]> {
-    const planosCatalogo = await this.planosService.listarTodos();
+    const planosCatalogo = (await this.planosService.listarTodos()).filter((plano) => {
+      const codigoPlano = String(plano?.codigo || '')
+        .trim()
+        .toLowerCase();
+
+      return EmpresasService.SELF_SIGNUP_PLANOS_CANONICOS.has(codigoPlano);
+    });
 
     if (planosCatalogo.length > 0) {
       return planosCatalogo.map((plano) => {
@@ -791,28 +869,4 @@ export class EmpresasService {
       .slice(0, 100); // Limita a 100 caracteres
   }
 
-  /**
-   * Mapeia string do plano para PlanoEnum
-   * Aceita: 'starter', 'business', 'enterprise' e aliases legados ('professional', 'pro')
-   */
-  private mapearPlanoParaEnum(plano: string): PlanoEnum | null {
-    const planoUpper = plano?.toUpperCase();
-
-    // Mapeamento de nomes variados para PlanoEnum
-    const mapeamento: Record<string, PlanoEnum> = {
-      STARTER: PlanoEnum.STARTER,
-      BASIC: PlanoEnum.STARTER,
-      BASICO: PlanoEnum.STARTER,
-      PROFESSIONAL: PlanoEnum.BUSINESS,
-      BUSINESS: PlanoEnum.BUSINESS,
-      PRO: PlanoEnum.BUSINESS,
-      ENTERPRISE: PlanoEnum.ENTERPRISE,
-      PREMIUM: PlanoEnum.ENTERPRISE,
-      EMPRESARIAL: PlanoEnum.ENTERPRISE,
-    };
-
-    return mapeamento[planoUpper] || null;
-  }
 }
-
-

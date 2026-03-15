@@ -189,3 +189,185 @@ describe('AdminEmpresasService - notificacoes de status', () => {
     expect(usersService.resetarSenha).not.toHaveBeenCalled();
   });
 });
+
+describe('AdminEmpresasService - normalizacao de dados', () => {
+  let service: AdminEmpresasService;
+
+  const empresaRepository = {
+    findOne: jest.fn(),
+    save: jest.fn(),
+    create: jest.fn(),
+    createQueryBuilder: jest.fn(),
+  };
+
+  const userRepository = {
+    findOne: jest.fn(),
+    save: jest.fn(),
+    create: jest.fn(),
+    createQueryBuilder: jest.fn(),
+    find: jest.fn(),
+  };
+
+  const moduloEmpresaRepository = {
+    find: jest.fn(),
+    findOne: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn(),
+  };
+
+  const historicoPlanoRepository = {
+    find: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn(),
+  };
+
+  const empresaModuloService = {
+    listar: jest.fn(),
+    sincronizarModulosPlano: jest.fn(),
+  };
+
+  const planosService = {
+    buscarPorCodigo: jest.fn(),
+    listarTodos: jest.fn(),
+  };
+
+  const assinaturasService = {
+    criar: jest.fn(),
+    buscarPorEmpresa: jest.fn(),
+    alterarPlano: jest.fn(),
+  };
+
+  const usersService = {
+    resetarSenha: jest.fn(),
+  };
+
+  const mailService = {
+    enviarEmailStatusEmpresa: jest.fn(),
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    service = new AdminEmpresasService(
+      empresaRepository as any,
+      userRepository as any,
+      moduloEmpresaRepository as any,
+      historicoPlanoRepository as any,
+      empresaModuloService as any,
+      planosService as any,
+      assinaturasService as any,
+      usersService as any,
+      mailService as any,
+    );
+  });
+
+  it('normaliza campos ao criar empresa via admin', async () => {
+    const plano = {
+      id: 'plano-1',
+      codigo: 'starter',
+      preco: 149,
+      modulosInclusos: [{ modulo: { codigo: 'crm' } }],
+    };
+
+    const empresaEmailQB = {
+      where: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(null),
+    };
+    const adminEmailQB = {
+      where: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(null),
+    };
+
+    empresaRepository.findOne.mockResolvedValue(null);
+    empresaRepository.createQueryBuilder.mockReturnValue(empresaEmailQB);
+    userRepository.createQueryBuilder.mockReturnValue(adminEmailQB);
+    planosService.buscarPorCodigo.mockResolvedValue(plano);
+
+    empresaRepository.create
+      .mockImplementationOnce((payload: any) => ({ id: 'empresa-1', ...payload }))
+      .mockImplementationOnce((payload: any) => ({ id: 'user-1', ...payload }));
+
+    empresaRepository.save.mockResolvedValue({ id: 'empresa-1' });
+    userRepository.save.mockResolvedValue({ id: 'user-1' });
+    assinaturasService.criar.mockResolvedValue({ id: 'assinatura-1' });
+    empresaModuloService.sincronizarModulosPlano.mockResolvedValue(undefined);
+
+    jest.spyOn(service, 'buscarPorId').mockResolvedValue({ id: 'empresa-1' } as any);
+
+    await service.criar({
+      nome: '  Empresa   de   Teste  ',
+      cnpj: '12.345.678/0001-95',
+      email: '  CONTATO@EXEMPLO.COM  ',
+      telefone: ' (11) 99999-0000 ',
+      endereco: '  Rua   A,   100  ',
+      cidade: '  Sao   Paulo  ',
+      estado: ' sp ',
+      cep: ' 01001-000 ',
+      plano: 'starter',
+      admin_nome: '  Maria   Silva  ',
+      admin_email: '  ADMIN@EXEMPLO.COM  ',
+      admin_senha: 'Senha@123',
+      trial_days: 7,
+    });
+
+    const empresaPayload = empresaRepository.create.mock.calls[0][0];
+    expect(empresaPayload).toMatchObject({
+      nome: 'Empresa de Teste',
+      slug: 'empresa-de-teste',
+      cnpj: '12345678000195',
+      email: 'contato@exemplo.com',
+      telefone: '11999990000',
+      endereco: 'Rua A, 100',
+      cidade: 'Sao Paulo',
+      estado: 'SP',
+      cep: '01001000',
+    });
+
+    const adminPayload = userRepository.create.mock.calls[0][0];
+    expect(adminPayload).toMatchObject({
+      nome: 'Maria Silva',
+      email: 'admin@exemplo.com',
+    });
+  });
+
+  it('normaliza campos ao atualizar empresa via admin', async () => {
+    const empresa = {
+      id: 'empresa-1',
+      nome: 'Empresa Base',
+      slug: 'empresa-base',
+      cnpj: '12345678000195',
+      email: 'base@empresa.com',
+      telefone: '11911112222',
+      endereco: '',
+      cidade: '',
+      estado: '',
+      cep: '',
+      plano: 'starter',
+    };
+
+    empresaRepository.findOne.mockResolvedValue(empresa);
+    empresaRepository.save.mockImplementation(async (payload: any) => payload);
+    jest.spyOn(service, 'buscarPorId').mockResolvedValue({ id: 'empresa-1' } as any);
+
+    await service.atualizar('empresa-1', {
+      nome: '  Nova   Empresa  ',
+      telefone: ' (11) 98888-7777 ',
+      endereco: '  Rua   Nova  ',
+      cidade: '  Rio   Branco ',
+      estado: ' ac ',
+      cep: ' 69900-123 ',
+    });
+
+    expect(empresaRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nome: 'Nova Empresa',
+        slug: 'nova-empresa',
+        telefone: '11988887777',
+        endereco: 'Rua Nova',
+        cidade: 'Rio Branco',
+        estado: 'AC',
+        cep: '69900123',
+      }),
+    );
+  });
+});
