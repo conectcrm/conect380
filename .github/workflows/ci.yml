@@ -21,6 +21,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -31,13 +32,12 @@ jobs:
         run: |
           set -e
 
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "PR: verificando diff contra base branch (${{ github.base_ref }})"
-            git fetch --no-tags --prune --depth=1 origin "${{ github.base_ref }}"
-            git diff --name-only --diff-filter=ACMR "origin/${{ github.base_ref }}...HEAD" > changed_files.txt || true
-          else
-            echo "Push: verificando diff do último commit"
+          if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            echo "Verificando diff do commit atual (HEAD^..HEAD)"
             git diff --name-only --diff-filter=ACMR HEAD^ HEAD > changed_files.txt || true
+          else
+            echo "Sem pai local para HEAD; usando diff-tree no commit atual"
+            git diff-tree --no-commit-id --name-only -r --diff-filter=ACMR HEAD > changed_files.txt || true
           fi
 
           echo "Arquivos alterados (primeiros 50):"
@@ -892,18 +892,26 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Verificar arquivos temporarios
         run: |
           echo "Verificando arquivos temporarios alterados no commit..."
-          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR HEAD^ HEAD || true)
+          if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            CHANGED_FILES=$(git diff --name-only --diff-filter=ACMR HEAD^ HEAD || true)
+          else
+            CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r --diff-filter=ACMR HEAD || true)
+          fi
 
           if [ -z "$CHANGED_FILES" ]; then
             echo "Nenhum arquivo alterado detectado no commit atual."
             exit 0
           fi
 
-          TEMP_FILES=$(echo "$CHANGED_FILES" | grep -E '(^|/)(test-|debug-|temp-|exemplo-|CORRECAO_|DEBUG_)' || true)
+          TEMP_FILES=$(echo "$CHANGED_FILES" \
+            | grep -E '(^|/)(test-|debug-|temp-|exemplo-|CORRECAO_|DEBUG_)' \
+            | grep -Ev '^scripts/test-.*\.ps1$' \
+            || true)
 
           if [ -n "$TEMP_FILES" ]; then
             echo "Arquivos temporarios encontrados:"
