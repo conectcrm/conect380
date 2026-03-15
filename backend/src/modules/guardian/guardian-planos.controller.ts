@@ -99,6 +99,12 @@ export class GuardianPlanosController {
       : this.planosService.ativar(id);
   }
 
+  @Post('bootstrap-defaults')
+  @HttpCode(HttpStatus.OK)
+  async bootstrapDefaults(@Body() body?: { overwrite?: boolean }) {
+    return this.planosService.bootstrapDefaults({ overwrite: Boolean(body?.overwrite) });
+  }
+
   private parseIncludeInactive(raw: string | undefined): boolean {
     if (raw === undefined) {
       return true;

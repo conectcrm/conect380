@@ -17,7 +17,7 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
     cnpj: '',
     email: '',
     telefone: '',
-    planoSelecionado: 'Professional' as 'Starter' | 'Professional' | 'Enterprise',
+    planoSelecionado: 'Business' as 'Starter' | 'Business' | 'Enterprise',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -25,15 +25,15 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
   const planos = [
     {
       nome: 'Starter' as const,
-      preco: 79.9,
+      preco: 149,
       descricao: 'Ideal para pequenas empresas',
       features: ['Até 10 usuários', 'API básica', 'Suporte por email', 'Backup manual'],
       cor: 'green',
       popular: false,
     },
     {
-      nome: 'Professional' as const,
-      preco: 199.9,
+      nome: 'Business' as const,
+      preco: 549,
       descricao: 'Para empresas em crescimento',
       features: ['Até 50 usuários', 'API completa', 'Suporte prioritário', 'Backup automático'],
       cor: 'blue',
@@ -41,7 +41,7 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
     },
     {
       nome: 'Enterprise' as const,
-      preco: 499.9,
+      preco: 1790,
       descricao: 'Para grandes organizações',
       features: [
         'Usuários ilimitados',
@@ -98,7 +98,7 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
       const planoInfo = planos.find((p) => p.nome === formData.planoSelecionado)!;
       const planoIdMap: Record<typeof planoInfo.nome, string> = {
         Starter: 'starter',
-        Professional: 'professional',
+        Business: 'business',
         Enterprise: 'enterprise',
       };
 
@@ -129,7 +129,7 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
         cnpj: '',
         email: '',
         telefone: '',
-        planoSelecionado: 'Professional',
+        planoSelecionado: 'Business',
       });
       setStep(1);
       setErrors({});

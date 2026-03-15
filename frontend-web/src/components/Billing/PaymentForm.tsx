@@ -1,27 +1,23 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
 import {
-  CreditCard,
-  Smartphone,
-  Building,
-  Lock,
-  CheckCircle,
   AlertCircle,
+  Building,
+  CheckCircle,
+  CreditCard,
   Loader2,
+  Lock,
+  Smartphone,
 } from 'lucide-react';
+import { api } from '../../services/api';
 
 interface PaymentMethod {
   id: string;
   name: string;
   icon: React.ComponentType<any>;
-  type: 'card' | 'pix' | 'bank';
-  fees?: string;
-  processingTime: string;
-  available: boolean;
+  description: string;
 }
 
 interface PaymentFormProps {
@@ -35,312 +31,99 @@ interface PaymentFormProps {
   onPaymentSuccess: (paymentData: any) => void;
   onCancel: () => void;
   className?: string;
+  checkoutEnabled?: boolean;
 }
+
+const PAYMENT_METHODS: PaymentMethod[] = [
+  {
+    id: 'card',
+    name: 'Cartao de Credito',
+    icon: CreditCard,
+    description: 'Aprovacao imediata',
+  },
+  {
+    id: 'pix',
+    name: 'PIX',
+    icon: Smartphone,
+    description: 'Confirmacao em ate 2 minutos',
+  },
+  {
+    id: 'boleto',
+    name: 'Boleto Bancario',
+    icon: Building,
+    description: 'Confirmacao em 1-3 dias uteis',
+  },
+];
+
+const parsePrice = (preco?: number | string): number => {
+  if (typeof preco === 'number') {
+    return Number.isFinite(preco) ? preco : 0;
+  }
+
+  if (typeof preco === 'string') {
+    const parsed = Number(preco);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return 0;
+};
 
 export const PaymentForm: React.FC<PaymentFormProps> = ({
   planoSelecionado,
   onPaymentSuccess,
   onCancel,
   className,
+  checkoutEnabled = true,
 }) => {
   const [selectedMethod, setSelectedMethod] = useState<string>('card');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentStep, setPaymentStep] = useState<'method' | 'details' | 'processing' | 'success'>(
-    'method',
-  );
-  const [formData, setFormData] = useState({
-    // Dados do cartão
-    cardNumber: '',
-    cardName: '',
-    cardExpiry: '',
-    cardCvv: '',
-    // Dados pessoais
-    email: '',
-    cpf: '',
-    phone: '',
-    // Endereço
-    cep: '',
-    address: '',
-    city: '',
-    state: '',
-  });
+  const [error, setError] = useState<string | null>(null);
 
-  // Helper function para garantir que o preço seja sempre um número
-  const getPrice = (preco?: number | string): number => {
-    if (!preco) return 0;
-    return typeof preco === 'string' ? parseFloat(preco) : preco;
-  };
+  const price = useMemo(() => parsePrice(planoSelecionado?.preco), [planoSelecionado?.preco]);
+  const hasValidPlan = Boolean(planoSelecionado?.id);
 
-  // Helper function para formatar preço
-  const formatPrice = (preco?: number | string): string => {
-    const price = getPrice(preco);
-    return price.toFixed(2);
-  };
-
-  const paymentMethods: PaymentMethod[] = [
-    {
-      id: 'card',
-      name: 'Cartão de Crédito',
-      icon: CreditCard,
-      type: 'card',
-      fees: 'Taxa: 3,9%',
-      processingTime: 'Aprovação imediata',
-      available: true,
-    },
-    {
-      id: 'pix',
-      name: 'PIX',
-      icon: Smartphone,
-      type: 'pix',
-      processingTime: 'Confirmação em até 2 minutos',
-      available: true,
-    },
-    {
-      id: 'boleto',
-      name: 'Boleto Bancário',
-      icon: Building,
-      type: 'bank',
-      processingTime: 'Confirmação em 1-3 dias úteis',
-      available: true,
-    },
-  ];
-
-  const handleInputChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const formatCardNumber = (value: string) => {
-    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-    const matches = v.match(/\d{4,16}/g);
-    const match = (matches && matches[0]) || '';
-    const parts = [];
-    for (let i = 0, len = match.length; i < len; i += 4) {
-      parts.push(match.substring(i, i + 4));
+  const handleCheckout = async () => {
+    if (!checkoutEnabled) {
+      setError('Checkout indisponivel para tenant proprietario com politica interna.');
+      return;
     }
-    if (parts.length) {
-      return parts.join(' ');
-    } else {
-      return v;
-    }
-  };
 
-  const formatExpiry = (value: string) => {
-    const v = value.replace(/\D/g, '');
-    if (v.length >= 2) {
-      return `${v.slice(0, 2)}/${v.slice(2, 4)}`;
+    if (!planoSelecionado?.id) {
+      setError('Plano nao selecionado para checkout.');
+      return;
     }
-    return v;
-  };
-
-  const validateForm = () => {
-    if (selectedMethod === 'card') {
-      return (
-        formData.cardNumber.replace(/\s/g, '').length === 16 &&
-        formData.cardName.length > 0 &&
-        formData.cardExpiry.length === 5 &&
-        formData.cardCvv.length >= 3 &&
-        formData.email.length > 0
-      );
-    }
-    return formData.email.length > 0;
-  };
-
-  const handlePayment = async () => {
-    if (!validateForm()) return;
 
     setIsProcessing(true);
-    setPaymentStep('processing');
+    setError(null);
 
     try {
-      // Simular processamento
-      await new Promise((resolve) => setTimeout(resolve, 3000));
+      const response = await api.post('/assinaturas/checkout', {
+        planoId: planoSelecionado.id,
+      });
 
-      const paymentData = {
+      const checkoutData = response?.data || {};
+      const checkoutUrl = checkoutData.initPoint || checkoutData.sandboxInitPoint;
+
+      if (!checkoutUrl || typeof checkoutUrl !== 'string') {
+        throw new Error('Checkout indisponivel no momento. Tente novamente.');
+      }
+
+      onPaymentSuccess({
+        status: 'redirect',
         method: selectedMethod,
-        plano: planoSelecionado,
-        userData: formData,
-        transactionId: `tx_${Date.now()}`,
-        status: 'success',
-      };
+        ...checkoutData,
+      });
 
-      setPaymentStep('success');
-      setTimeout(() => {
-        onPaymentSuccess(paymentData);
-      }, 2000);
-    } catch (error) {
-      console.error('Erro no pagamento:', error);
+      window.location.assign(checkoutUrl);
+    } catch (checkoutError: any) {
+      const backendMessage =
+        checkoutError?.response?.data?.message ||
+        checkoutError?.message ||
+        'Nao foi possivel iniciar o checkout seguro.';
+      setError(String(backendMessage));
       setIsProcessing(false);
-      setPaymentStep('details');
     }
   };
-
-  const renderMethodSelection = () => (
-    <div className="space-y-4">
-      <div>
-        <h3 className="mb-2 text-lg font-semibold text-[#002333]">Escolha a forma de pagamento</h3>
-        <p className="text-sm text-[#385A6A]">Selecione como deseja pagar pela assinatura</p>
-      </div>
-
-      <div className="grid gap-3">
-        {paymentMethods.map((method) => {
-          const Icon = method.icon;
-          return (
-            <button
-              key={method.id}
-              onClick={() => setSelectedMethod(method.id)}
-              disabled={!method.available}
-              className={`w-full p-4 border-2 rounded-xl text-left transition-all duration-200 hover:border-[#159A9C]/40 hover:bg-[#159A9C]/5 ${
-                selectedMethod === method.id
-                  ? 'border-[#159A9C] bg-[#159A9C]/5 shadow-md'
-                  : 'border-[#D4E2E7] bg-white'
-              } ${!method.available && 'opacity-50 cursor-not-allowed'}`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white rounded-lg border border-gray-200">
-                    <Icon className="w-5 h-5 text-gray-700" />
-                  </div>
-                  <div>
-                    <div className="font-medium text-[#002333]">{method.name}</div>
-                    <div className="text-sm text-[#385A6A]">{method.processingTime}</div>
-                    {method.fees && (
-                      <div className="text-xs font-medium text-yellow-700">{method.fees}</div>
-                    )}
-                  </div>
-                </div>
-                {selectedMethod === method.id && <CheckCircle className="w-5 h-5 text-[#159A9C]" />}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-
-  const renderCardForm = () => (
-    <div className="space-y-4">
-      <div>
-        <h3 className="mb-2 text-lg font-semibold text-[#002333]">Dados do cartão de crédito</h3>
-        <p className="text-sm text-[#385A6A]">Seus dados estão protegidos com criptografia SSL</p>
-      </div>
-
-      <div className="grid gap-4">
-        <div>
-          <Label htmlFor="cardNumber">Número do cartão</Label>
-          <Input
-            id="cardNumber"
-            placeholder="1234 5678 9012 3456"
-            value={formData.cardNumber}
-            onChange={(e) => handleInputChange('cardNumber', formatCardNumber(e.target.value))}
-            maxLength={19}
-          />
-        </div>
-
-        <div>
-          <Label htmlFor="cardName">Nome no cartão</Label>
-          <Input
-            id="cardName"
-            placeholder="Nome como está no cartão"
-            value={formData.cardName}
-            onChange={(e) => handleInputChange('cardName', e.target.value.toUpperCase())}
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="cardExpiry">Validade</Label>
-            <Input
-              id="cardExpiry"
-              placeholder="MM/AA"
-              value={formData.cardExpiry}
-              onChange={(e) => handleInputChange('cardExpiry', formatExpiry(e.target.value))}
-              maxLength={5}
-            />
-          </div>
-          <div>
-            <Label htmlFor="cardCvv">CVV</Label>
-            <Input
-              id="cardCvv"
-              placeholder="123"
-              value={formData.cardCvv}
-              onChange={(e) => handleInputChange('cardCvv', e.target.value.replace(/\D/g, ''))}
-              maxLength={4}
-            />
-          </div>
-        </div>
-
-        <div>
-          <Label htmlFor="email">E-mail</Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="seu@email.com"
-            value={formData.email}
-            onChange={(e) => handleInputChange('email', e.target.value)}
-          />
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderPixForm = () => (
-    <div className="space-y-4">
-      <div>
-        <h3 className="mb-2 text-lg font-semibold text-[#002333]">Pagamento via PIX</h3>
-        <p className="text-sm text-[#385A6A]">
-          Após confirmar, você receberá o QR Code para pagamento
-        </p>
-      </div>
-
-      <div>
-        <Label htmlFor="email">E-mail para confirmação</Label>
-        <Input
-          id="email"
-          type="email"
-          placeholder="seu@email.com"
-          value={formData.email}
-          onChange={(e) => handleInputChange('email', e.target.value)}
-        />
-      </div>
-    </div>
-  );
-
-  const renderProcessing = () => (
-    <div className="text-center py-8">
-      <Loader2 className="w-12 h-12 text-[#159A9C] animate-spin mx-auto mb-4" />
-      <h3 className="mb-2 text-lg font-semibold text-[#002333]">Processando pagamento...</h3>
-      <p className="text-sm text-[#385A6A]">Por favor, aguarde enquanto processamos seu pagamento</p>
-    </div>
-  );
-
-  const renderSuccess = () => (
-    <div className="text-center py-8">
-      <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-      <h3 className="mb-2 text-xl font-bold text-[#002333]">Pagamento realizado com sucesso!</h3>
-      <p className="mb-4 text-sm text-[#385A6A]">
-        Sua assinatura foi ativada e você já pode usar todos os recursos
-      </p>
-      <Badge variant="secondary" className="text-sm bg-green-100 text-green-800">
-        Assinatura Ativa
-      </Badge>
-    </div>
-  );
-
-  if (paymentStep === 'processing') {
-    return (
-      <Card className={className}>
-        <CardContent className="p-6">{renderProcessing()}</CardContent>
-      </Card>
-    );
-  }
-
-  if (paymentStep === 'success') {
-    return (
-      <Card className={className}>
-        <CardContent className="p-6">{renderSuccess()}</CardContent>
-      </Card>
-    );
-  }
 
   return (
     <Card className={className}>
@@ -348,86 +131,119 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
         <div className="flex items-center justify-between">
           <CardTitle>Finalizar Assinatura</CardTitle>
           <Button variant="ghost" size="sm" onClick={onCancel}>
-            ✕
+            x
           </Button>
         </div>
 
         {planoSelecionado && (
-            <div className="mt-4 rounded-lg bg-[#DEEFE7] p-4">
+          <div className="mt-4 rounded-lg bg-[#DEEFE7] p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="font-semibold text-[#002333]">{planoSelecionado.nome}</div>
-                  <div className="text-sm text-[#385A6A]">{planoSelecionado.periodo || 'Cobranca mensal'}</div>
+              <div>
+                <div className="font-semibold text-[#002333]">{planoSelecionado.nome}</div>
+                <div className="text-sm text-[#385A6A]">
+                  {planoSelecionado.periodo || 'Cobranca mensal'}
                 </div>
+              </div>
               <div className="text-left sm:text-right">
                 <div className="text-2xl font-bold text-[#002333]">
-                  R$ {formatPrice(planoSelecionado.preco)}
+                  {price.toLocaleString('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL',
+                  })}
                 </div>
-                <div className="text-sm text-[#385A6A]">por mês</div>
+                <div className="text-sm text-[#385A6A]">por mes</div>
               </div>
             </div>
           </div>
         )}
       </CardHeader>
 
-      <CardContent className="p-6 pt-0">
-        {paymentStep === 'method' && (
-          <div className="space-y-6">
-            {renderMethodSelection()}
+      <CardContent className="space-y-6 p-6 pt-0">
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold text-[#002333]">Forma de pagamento</h3>
+          <p className="text-sm text-[#385A6A]">
+            {checkoutEnabled
+              ? 'A cobranca final e concluida no checkout seguro do Mercado Pago.'
+              : 'Este tenant utiliza politica interna de cobranca e nao realiza checkout self-service.'}
+          </p>
+          <div className="grid gap-3">
+            {PAYMENT_METHODS.map((method) => {
+              const Icon = method.icon;
+              const isSelected = selectedMethod === method.id;
 
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Button
-                onClick={() => setPaymentStep('details')}
-                className="flex-1 bg-[#159A9C] hover:bg-[#0F7B7D]"
-                disabled={!selectedMethod}
-              >
-                Continuar
-              </Button>
-              <Button variant="outline" onClick={onCancel}>
-                Cancelar
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {paymentStep === 'details' && (
-          <div className="space-y-6">
-            {selectedMethod === 'card' && renderCardForm()}
-            {selectedMethod === 'pix' && renderPixForm()}
-
-            <div className="rounded-lg border border-[#DEEFE7] bg-[#DEEFE7]/55 p-4">
-              <div className="flex items-start gap-3">
-                <Lock className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#159A9C]" />
-                <div className="text-sm">
-                  <div className="font-medium text-[#244455]">Pagamento Seguro</div>
-                  <div className="text-[#385A6A]">
-                    Seus dados são protegidos com criptografia SSL de 256 bits
+              return (
+                <button
+                  key={method.id}
+                  type="button"
+                  onClick={() => setSelectedMethod(method.id)}
+                  className={`w-full rounded-xl border-2 p-4 text-left transition-all duration-200 hover:border-[#159A9C]/40 hover:bg-[#159A9C]/5 ${
+                    isSelected ? 'border-[#159A9C] bg-[#159A9C]/5 shadow-md' : 'border-[#D4E2E7] bg-white'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-lg border border-gray-200 bg-white p-2">
+                        <Icon className="h-5 w-5 text-gray-700" />
+                      </div>
+                      <div>
+                        <div className="font-medium text-[#002333]">{method.name}</div>
+                        <div className="text-sm text-[#385A6A]">{method.description}</div>
+                      </div>
+                    </div>
+                    {isSelected && <CheckCircle className="h-5 w-5 text-[#159A9C]" />}
                   </div>
-                </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-[#DEEFE7] bg-[#DEEFE7]/55 p-4">
+          <div className="flex items-start gap-3">
+            <Lock className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#159A9C]" />
+            <div className="text-sm">
+              <div className="font-medium text-[#244455]">Checkout seguro</div>
+              <div className="text-[#385A6A]">
+                Seus dados de pagamento sao processados no provedor seguro. Este sistema nao armazena dados de cartao.
               </div>
             </div>
+          </div>
+        </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Button
-                onClick={handlePayment}
-                className="flex-1 bg-[#159A9C] hover:bg-[#0F7B7D]"
-                disabled={!validateForm() || isProcessing}
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                    Processando...
-                  </>
-                ) : (
-                  `Pagar R$ ${formatPrice(planoSelecionado?.preco)}`
-                )}
-              </Button>
-              <Button variant="outline" onClick={() => setPaymentStep('method')}>
-                Voltar
-              </Button>
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+              <span>{error}</span>
             </div>
           </div>
         )}
+
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Button
+            onClick={handleCheckout}
+            className="flex-1 bg-[#159A9C] hover:bg-[#0F7B7D]"
+            disabled={!hasValidPlan || isProcessing || !checkoutEnabled}
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Redirecionando para checkout...
+              </>
+            ) : (
+              checkoutEnabled ? 'Ir para checkout seguro' : 'Checkout indisponivel'
+            )}
+          </Button>
+          <Button variant="outline" onClick={onCancel} disabled={isProcessing}>
+            Cancelar
+          </Button>
+        </div>
+
+        <div className="text-center">
+          <Badge variant="outline" className="text-xs text-[#5A7582]">
+            Se o redirecionamento falhar, tente novamente em alguns segundos.
+          </Badge>
+        </div>
       </CardContent>
     </Card>
   );

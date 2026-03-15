@@ -8,9 +8,9 @@ Definir pacote comercial de venda com linguagem unica para proposta, site e CRM.
 
 | Codigo | Nome comercial | Preco mensal (BRL) | Perfil ideal |
 |---|---|---:|---|
-| `starter` | Starter | 99 | Operacao pequena iniciando processo |
-| `business` | Business | 299 | Empresa em crescimento com time comercial |
-| `enterprise` | Enterprise | 899 | Operacao com escala e governanca forte |
+| `starter` | Starter | 149 | Operacao pequena iniciando processo |
+| `business` | Business | 549 | Empresa em crescimento com time comercial |
+| `enterprise` | Enterprise | 1790 | Operacao com escala e governanca forte |
 
 ## Proposta de valor (copy curta)
 

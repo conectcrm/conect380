@@ -141,6 +141,12 @@ export class AssinaturaDueDateSchedulerService implements OnModuleInit, OnModule
 
       const today = this.startOfDay(new Date());
       for (const assinatura of assinaturas) {
+        const tenantPolicy = await this.assinaturasService.obterPoliticaTenant(assinatura.empresaId);
+        if (!tenantPolicy.enforceLifecycleTransitions) {
+          summary.skipped += 1;
+          continue;
+        }
+
         const dueDate = this.startOfDay(new Date(assinatura.proximoVencimento));
         if (Number.isNaN(dueDate.getTime())) {
           summary.skipped += 1;

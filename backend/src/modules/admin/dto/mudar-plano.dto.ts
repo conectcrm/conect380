@@ -4,9 +4,9 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 export class MudarPlanoDto {
   @ApiProperty({
     description:
-      'Identificador do plano no catalogo de assinaturas (codigo ou alias comum). Ex.: starter, professional, enterprise.',
-    example: 'professional',
-    enum: ['starter', 'professional', 'enterprise', 'custom'],
+      'Identificador do plano no catalogo de assinaturas (codigo ou alias comum). Ex.: starter, business, enterprise.',
+    example: 'business',
+    enum: ['starter', 'business', 'enterprise', 'custom'],
   })
   @IsString()
   plano: string;

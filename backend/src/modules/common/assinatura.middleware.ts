@@ -118,7 +118,20 @@ export class AssinaturaMiddleware implements NestMiddleware {
 
     try {
       const assinatura = await this.assinaturasService.buscarPorEmpresa(empresaId);
+      const tenantPolicy =
+        (assinatura as any)?.billingPolicy ||
+        (await this.assinaturasService.obterPoliticaTenant(empresaId));
       if (!assinatura) {
+        if (tenantPolicy.isPlatformOwner) {
+          (req as any).subscription = {
+            plano: 'OWNER_INTERNAL',
+            status: 'active',
+            billingPolicy: tenantPolicy,
+          };
+          next();
+          return;
+        }
+
         throw new HttpException(
           {
             message: 'Empresa nao possui assinatura ativa',
@@ -130,7 +143,7 @@ export class AssinaturaMiddleware implements NestMiddleware {
       }
 
       const canonicalStatus = toCanonicalAssinaturaStatus(assinatura.status);
-      if (!hasSubscriptionAccess(canonicalStatus)) {
+      if (!tenantPolicy.billingExempt && !hasSubscriptionAccess(canonicalStatus)) {
         throw new HttpException(
           {
             message: `Assinatura ${canonicalStatus}. Entre em contato com o suporte.`,
@@ -143,7 +156,11 @@ export class AssinaturaMiddleware implements NestMiddleware {
       }
 
       const requiredModule = this.resolveRequiredModuleFromPath(req.path);
-      if (requiredModule && !this.hasModuleEntitlement(assinatura, requiredModule)) {
+      if (
+        requiredModule &&
+        !tenantPolicy.fullModuleAccess &&
+        !this.hasModuleEntitlement(assinatura, requiredModule)
+      ) {
         throw new HttpException(
           {
             message: `Modulo ${requiredModule} nao incluido no plano atual`,
@@ -158,7 +175,7 @@ export class AssinaturaMiddleware implements NestMiddleware {
 
       if (this.isResourceConsumingOperation(req)) {
         const permitido = await this.assinaturasService.registrarChamadaApi(empresaId);
-        if (!permitido) {
+        if (!permitido && !tenantPolicy.monitorOnlyLimits) {
           throw new HttpException(
             {
               message: 'Limite de chamadas da API excedido para hoje',
@@ -173,6 +190,7 @@ export class AssinaturaMiddleware implements NestMiddleware {
       (req as any).subscription = {
         plano: assinatura.plano?.nome,
         status: canonicalStatus,
+        billingPolicy: tenantPolicy,
         limites: {
           usuarios: assinatura.plano?.limiteUsuarios,
           clientes: assinatura.plano?.limiteClientes,

@@ -15,7 +15,7 @@ Validar conflitos entre matriz comercial v1 e implementacao atual.
 
 | Verificacao | Resultado | Evidencia |
 |---|---|---|
-| Precos baseline (99/299/899) | OK | `empresas.service.ts` |
+| Precos baseline (149/549/1790) | OK | `empresas.service.ts` |
 | Modulos por plano (starter/business/enterprise) | OK | `empresa-modulo.service.ts` |
 | Nomenclatura de plano unica (`business`) | NAO OK | coexistem `business` e `professional` |
 | Limite de usuarios no starter | NAO OK | 3 em `listarPlanos` vs 5 em `getLimitesPadrao` |

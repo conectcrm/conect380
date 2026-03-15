@@ -28,7 +28,7 @@ describe('AssinaturasController', () => {
     assinaturasService.criarAssinaturaPendenteParaCheckout.mockResolvedValueOnce({
       id: '22222222-2222-2222-2222-222222222222',
       plano: { nome: 'Business' },
-      valorMensal: 299,
+      valorMensal: 549,
     });
     mercadoPagoService.createPreference.mockResolvedValueOnce({
       id: 'pref-123',

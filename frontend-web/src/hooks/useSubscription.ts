@@ -54,6 +54,17 @@ export interface AssinaturaEmpresa {
   storageUtilizado: number; // bytes
   apiCallsHoje: number;
   observacoes?: string;
+  billingPolicy?: BillingPolicy;
+}
+
+export interface BillingPolicy {
+  isPlatformOwner: boolean;
+  billingExempt: boolean;
+  monitorOnlyLimits: boolean;
+  fullModuleAccess: boolean;
+  allowCheckout: boolean;
+  allowPlanMutation: boolean;
+  enforceLifecycleTransitions: boolean;
 }
 
 export interface LimitesInfo {
@@ -78,6 +89,15 @@ type StatusInfo = {
 type RawRecord = Record<string, any>;
 
 const ONE_MB = 1024 * 1024;
+const DEFAULT_BILLING_POLICY: BillingPolicy = {
+  isPlatformOwner: false,
+  billingExempt: false,
+  monitorOnlyLimits: false,
+  fullModuleAccess: false,
+  allowCheckout: true,
+  allowPlanMutation: true,
+  enforceLifecycleTransitions: true,
+};
 
 const normalizeNumber = (value: unknown, fallback = 0): number => {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -185,6 +205,27 @@ const normalizeAssinatura = (input: any): AssinaturaEmpresa | null => {
     storageUtilizado: normalizeNumber(raw.storageUtilizado, 0),
     apiCallsHoje: normalizeNumber(raw.apiCallsHoje, 0),
     observacoes: raw.observacoes ? String(raw.observacoes) : undefined,
+    billingPolicy: normalizeBillingPolicy(raw.billingPolicy),
+  };
+};
+
+const normalizeBillingPolicy = (input: any): BillingPolicy => {
+  if (!input || typeof input !== 'object') {
+    return DEFAULT_BILLING_POLICY;
+  }
+
+  const raw = input as RawRecord;
+  return {
+    isPlatformOwner: Boolean(raw.isPlatformOwner),
+    billingExempt: Boolean(raw.billingExempt),
+    monitorOnlyLimits:
+      raw.monitorOnlyLimits !== undefined
+        ? Boolean(raw.monitorOnlyLimits)
+        : Boolean(raw.billingExempt),
+    fullModuleAccess: Boolean(raw.fullModuleAccess),
+    allowCheckout: raw.allowCheckout !== false,
+    allowPlanMutation: raw.allowPlanMutation !== false,
+    enforceLifecycleTransitions: raw.enforceLifecycleTransitions !== false,
   };
 };
 
@@ -216,11 +257,14 @@ const normalizeLimites = (input: any): LimitesInfo | null => {
     storageDisponivel:
       raw.storageDisponivel !== undefined
         ? normalizeNumber(raw.storageDisponivel, 0)
-        : Math.max(0, limiteStorage - normalizeNumber(raw.storageUtilizado, 0)),
+        : limiteStorage < 0
+          ? -1
+          : Math.max(0, limiteStorage - normalizeNumber(raw.storageUtilizado, 0)),
   };
 };
 
 const ACCESS_STATUSES: AssinaturaStatusCanonical[] = ['trial', 'active', 'past_due'];
+const CANONICAL_PLAN_CODES = new Set(['starter', 'business', 'enterprise']);
 
 export const useSubscription = () => {
   const { user } = useAuth();
@@ -312,8 +356,15 @@ export const useSubscription = () => {
 
           return left.nome.localeCompare(right.nome, 'pt-BR');
         });
-      setPlanos(planosAtivos);
-      return planosAtivos;
+
+      const planosCanonicos = planosAtivos.filter((plano) =>
+        CANONICAL_PLAN_CODES.has(String(plano.codigo || '').trim().toLowerCase()),
+      );
+
+      const planosVisiveis = planosCanonicos.length > 0 ? planosCanonicos : planosAtivos;
+
+      setPlanos(planosVisiveis);
+      return planosVisiveis;
     } catch (err) {
       console.error('Erro ao buscar planos:', err);
       return [];
@@ -365,7 +416,17 @@ export const useSubscription = () => {
 
   const temAcessoModulo = useCallback(
     (codigoModulo: string): boolean => {
-      if (!assinatura || !ACCESS_STATUSES.includes(assinatura.status)) {
+      if (!assinatura) {
+        return false;
+      }
+
+      if (assinatura.billingPolicy?.fullModuleAccess) {
+        return true;
+      }
+
+      const assinaturaComAcesso =
+        assinatura.billingPolicy?.billingExempt || ACCESS_STATUSES.includes(assinatura.status);
+      if (!assinaturaComAcesso) {
         return false;
       }
 
@@ -412,18 +473,21 @@ export const useSubscription = () => {
     }
 
     const percentual = (usado: number, total: number) => {
-      if (total <= 0) {
+      if (total < 0) {
         return 0;
       }
+
+      if (total === 0) {
+        return 0;
+      }
+
       return Math.min((usado / total) * 100, 100);
     };
 
-    const usuariosTotal =
-      limites.limiteUsuarios < 0 ? limites.usuariosAtivos : limites.limiteUsuarios;
-    const clientesTotal =
-      limites.limiteClientes < 0 ? limites.clientesCadastrados : limites.limiteClientes;
-    const storageTotalBytes =
-      limites.limiteStorage < 0 ? limites.storageUtilizado : limites.limiteStorage;
+    const usuariosTotal = limites.limiteUsuarios;
+    const clientesTotal = limites.limiteClientes;
+    const storageTotalBytes = limites.limiteStorage;
+    const storageTotalMb = storageTotalBytes < 0 ? -1 : Math.round(storageTotalBytes / ONE_MB);
 
     return {
       usuarios: {
@@ -438,7 +502,7 @@ export const useSubscription = () => {
       },
       storage: {
         usado: Math.round(limites.storageUtilizado / ONE_MB),
-        total: Math.round(storageTotalBytes / ONE_MB),
+        total: storageTotalMb,
         percentual: percentual(limites.storageUtilizado, storageTotalBytes),
       },
     };
@@ -451,6 +515,15 @@ export const useSubscription = () => {
         cor: 'gray',
         texto: 'Sem assinatura',
         descricao: 'Empresa nao possui assinatura cadastrada',
+      };
+    }
+
+    if (assinatura.billingPolicy?.isPlatformOwner) {
+      return {
+        status: 'active',
+        cor: 'green',
+        texto: 'Interno',
+        descricao: 'Tenant proprietario com politica interna de cobranca',
       };
     }
 
@@ -531,7 +604,13 @@ export const useSubscription = () => {
     getStatusInfo,
 
     temAssinatura: !!assinatura,
-    assinaturaAtiva: assinatura?.status === 'active',
+    assinaturaAtiva: Boolean(
+      assinatura && (assinatura.status === 'active' || assinatura.billingPolicy?.billingExempt),
+    ),
+    isOwnerTenant: Boolean(assinatura?.billingPolicy?.isPlatformOwner),
+    billingPolicy: assinatura?.billingPolicy || DEFAULT_BILLING_POLICY,
+    podeFazerCheckout: Boolean(assinatura?.billingPolicy?.allowCheckout ?? true),
+    podeAlterarPlano: Boolean(assinatura?.billingPolicy?.allowPlanMutation ?? true),
     precisaUpgrade: (modulo: string) => !temAcessoModulo(modulo),
   };
 };

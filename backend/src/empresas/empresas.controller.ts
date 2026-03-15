@@ -12,6 +12,7 @@ import {
   Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { EmpresasService } from './empresas.service';
 import { CreateEmpresaDto, VerificarEmailDto } from './dto/empresas.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
@@ -48,6 +49,7 @@ export class EmpresasController {
 
 
   @Post('registro')
+  @Throttle({ default: { limit: 3, ttl: 60 * 60 * 1000 } })
   @ApiOperation({ summary: 'Registrar nova empresa' })
   @ApiResponse({ status: 201, description: 'Empresa registrada com sucesso' })
   @ApiResponse({ status: 400, description: 'Dados inválidos' })
@@ -61,7 +63,9 @@ export class EmpresasController {
       });
       return {
         success: true,
-        message: 'Empresa registrada com sucesso. Verifique seu email para ativar a conta.',
+        message: empresa.email_verificado
+          ? 'Empresa registrada com sucesso.'
+          : 'Empresa registrada com sucesso. Verifique seu email para ativar a conta.',
         data: empresa,
       };
     } catch (error) {
@@ -73,6 +77,7 @@ export class EmpresasController {
   }
 
   @Get('verificar-cnpj/:cnpj')
+  @Throttle({ default: { limit: 20, ttl: 60 * 1000 } })
   @ApiOperation({ summary: 'Verificar disponibilidade de CNPJ' })
   async verificarCNPJ(@Param('cnpj') cnpj: string) {
     try {
@@ -82,11 +87,15 @@ export class EmpresasController {
         message: disponivel ? 'CNPJ disponível' : 'CNPJ já cadastrado',
       };
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
       throw new HttpException('Erro ao verificar CNPJ', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
   @Get('verificar-email/:email')
+  @Throttle({ default: { limit: 20, ttl: 60 * 1000 } })
   @ApiOperation({ summary: 'Verificar disponibilidade de email' })
   async verificarEmail(@Param('email') email: string) {
     try {
@@ -96,11 +105,15 @@ export class EmpresasController {
         message: disponivel ? 'Email disponível' : 'Email já cadastrado',
       };
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
       throw new HttpException('Erro ao verificar email', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
   @Post('verificar-email')
+  @Throttle({ default: { limit: 10, ttl: 60 * 1000 } })
   @ApiOperation({ summary: 'Verificar email de ativação' })
   async verificarEmailAtivacao(@Body() verificarEmailDto: VerificarEmailDto) {
     try {
@@ -119,6 +132,7 @@ export class EmpresasController {
   }
 
   @Post('reenviar-ativacao')
+  @Throttle({ default: { limit: 3, ttl: 5 * 60 * 1000 } })
   @ApiOperation({ summary: 'Reenviar email de ativação' })
   async reenviarEmailAtivacao(@Body() body: { email: string }) {
     try {
@@ -260,8 +274,8 @@ export class MinhasEmpresasController {
 
     if (plano === 'professional' || plano === 'business' || plano === 'pro') {
       return {
-        id: 'professional',
-        nome: 'Professional',
+        id: 'business',
+        nome: 'Business',
         preco: Number(valorMensal ?? 0),
         features: [],
         limitesUsuarios,

@@ -11,6 +11,7 @@ import { ModuloSistema } from './entities/modulo-sistema.entity';
 import { PlanoModulo } from './entities/plano-modulo.entity';
 import { CriarPlanoDto } from './dto/criar-plano.dto';
 import { AtualizarPlanoDto } from './dto/atualizar-plano.dto';
+import { DEFAULT_MODULOS_SISTEMA, DEFAULT_PLANOS_SISTEMA } from './planos.defaults';
 
 @Injectable()
 export class PlanosService {
@@ -28,6 +29,7 @@ export class PlanosService {
   ) {}
 
   async listarTodos(includeInactive = false): Promise<Plano[]> {
+    await this.seedDefaultsIfEmpty();
     const where = includeInactive ? undefined : { ativo: true };
 
     return this.planoRepository.find({
@@ -51,10 +53,18 @@ export class PlanosService {
   }
 
   async buscarPorCodigo(codigo: string): Promise<Plano> {
-    const plano = await this.planoRepository.findOne({
+    let plano = await this.planoRepository.findOne({
       where: { codigo },
       relations: ['modulosInclusos', 'modulosInclusos.modulo'],
     });
+
+    if (!plano) {
+      await this.seedDefaultsIfEmpty();
+      plano = await this.planoRepository.findOne({
+        where: { codigo },
+        relations: ['modulosInclusos', 'modulosInclusos.modulo'],
+      });
+    }
 
     if (!plano) {
       throw new NotFoundException(`Plano com codigo ${codigo} nao encontrado`);
@@ -195,6 +205,7 @@ export class PlanosService {
   }
 
   async listarModulosDisponiveis(): Promise<ModuloSistema[]> {
+    await this.seedDefaultsIfEmpty();
     return this.moduloSistemaRepository.find({
       where: { ativo: true },
       order: { ordem: 'ASC', nome: 'ASC' },
@@ -204,5 +215,150 @@ export class PlanosService {
   async criarModuloSistema(dados: Partial<ModuloSistema>): Promise<ModuloSistema> {
     const modulo = this.moduloSistemaRepository.create(dados);
     return this.moduloSistemaRepository.save(modulo);
+  }
+
+  async bootstrapDefaults(options?: { overwrite?: boolean }): Promise<{
+    modulosCriados: number;
+    modulosAtualizados: number;
+    planosCriados: number;
+    planosAtualizados: number;
+    overwrite: boolean;
+  }> {
+    const overwrite = Boolean(options?.overwrite);
+    let modulosCriados = 0;
+    let modulosAtualizados = 0;
+    let planosCriados = 0;
+    let planosAtualizados = 0;
+
+    const modulosByCode = new Map<string, ModuloSistema>();
+
+    for (const moduloDefault of DEFAULT_MODULOS_SISTEMA) {
+      let modulo = await this.moduloSistemaRepository.findOne({
+        where: { codigo: moduloDefault.codigo },
+      });
+
+      if (!modulo) {
+        modulo = this.moduloSistemaRepository.create({
+          ...moduloDefault,
+          ativo: true,
+          essencial: Boolean(moduloDefault.essencial),
+        });
+        modulo = await this.moduloSistemaRepository.save(modulo);
+        modulosCriados += 1;
+      } else if (overwrite) {
+        Object.assign(modulo, {
+          ...moduloDefault,
+          ativo: true,
+          essencial: Boolean(moduloDefault.essencial),
+        });
+        modulo = await this.moduloSistemaRepository.save(modulo);
+        modulosAtualizados += 1;
+      }
+
+      modulosByCode.set(moduloDefault.codigo, modulo);
+    }
+
+    for (const planoDefault of DEFAULT_PLANOS_SISTEMA) {
+      let plano = await this.planoRepository.findOne({
+        where: { codigo: planoDefault.codigo },
+      });
+      let convertedLegacyProfessional = false;
+
+      if (!plano && planoDefault.codigo === 'business') {
+        const legacyProfessional = await this.planoRepository.findOne({
+          where: { codigo: 'professional' },
+        });
+
+        if (legacyProfessional) {
+          plano = legacyProfessional;
+          convertedLegacyProfessional = true;
+        }
+      }
+
+      const payload = {
+        nome: planoDefault.nome,
+        codigo: planoDefault.codigo,
+        descricao: planoDefault.descricao,
+        preco: planoDefault.preco,
+        limiteUsuarios: planoDefault.limiteUsuarios,
+        limiteClientes: planoDefault.limiteClientes,
+        limiteStorage: planoDefault.limiteStorage,
+        limiteApiCalls: planoDefault.limiteApiCalls,
+        whiteLabel: planoDefault.whiteLabel,
+        suportePrioritario: planoDefault.suportePrioritario,
+        ativo: true,
+        ordem: planoDefault.ordem,
+      };
+      let shouldSyncModules = false;
+
+      if (!plano) {
+        plano = this.planoRepository.create(payload);
+        plano = await this.planoRepository.save(plano);
+        planosCriados += 1;
+        shouldSyncModules = true;
+      } else if (overwrite || convertedLegacyProfessional) {
+        const updatePayload = convertedLegacyProfessional && !overwrite
+          ? {
+              codigo: planoDefault.codigo,
+              nome: planoDefault.nome,
+              ativo: true,
+              ordem: plano.ordem || planoDefault.ordem,
+            }
+          : payload;
+
+        Object.assign(plano, updatePayload);
+        plano = await this.planoRepository.save(plano);
+        planosAtualizados += 1;
+        shouldSyncModules = true;
+      }
+
+      const moduleIds = planoDefault.modulosCodigos
+        .map((codigo) => modulosByCode.get(codigo)?.id)
+        .filter((id): id is string => Boolean(id));
+
+      if (moduleIds.length === 0) {
+        throw new BadRequestException(
+          `Plano ${planoDefault.codigo} sem modulos validos para vinculo.`,
+        );
+      }
+
+      if (shouldSyncModules) {
+        await this.planoModuloRepository.delete({ plano: { id: plano.id } });
+        await this.associarModulos(plano.id, moduleIds);
+      }
+    }
+
+    return {
+      modulosCriados,
+      modulosAtualizados,
+      planosCriados,
+      planosAtualizados,
+      overwrite,
+    };
+  }
+
+  private async seedDefaultsIfEmpty(): Promise<void> {
+    const planosExistentes = await this.planoRepository.find({
+      select: ['codigo'],
+    });
+
+    if (planosExistentes.length === 0) {
+      await this.bootstrapDefaults({ overwrite: false });
+      return;
+    }
+
+    const codigosExistentes = new Set(
+      planosExistentes.map((plano) => String(plano.codigo || '').trim().toLowerCase()),
+    );
+
+    const faltamPlanosCanonicos = DEFAULT_PLANOS_SISTEMA.some(
+      (planoDefault) => !codigosExistentes.has(String(planoDefault.codigo).toLowerCase()),
+    );
+
+    if (!faltamPlanosCanonicos) {
+      return;
+    }
+
+    await this.bootstrapDefaults({ overwrite: false });
   }
 }

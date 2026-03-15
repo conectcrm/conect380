@@ -537,11 +537,6 @@ export class AdminEmpresasService {
         clientes: 1000,
         armazenamento: '5GB',
       },
-      professional: {
-        usuarios: 50,
-        clientes: 10000,
-        armazenamento: '50GB',
-      },
       business: {
         usuarios: 50,
         clientes: 10000,
@@ -760,11 +755,11 @@ export class AdminEmpresasService {
       start: 'starter',
       basico: 'starter',
       basic: 'starter',
-      professional: 'professional',
-      profissonal: 'professional',
-      profissional: 'professional',
-      pro: 'professional',
-      business: 'professional',
+      professional: 'business',
+      profissonal: 'business',
+      profissional: 'business',
+      pro: 'business',
+      business: 'business',
       enterprise: 'enterprise',
       custom: 'custom',
       personalizado: 'custom',
@@ -778,7 +773,7 @@ export class AdminEmpresasService {
       return 'ENTERPRISE';
     }
 
-    if (planCode === 'professional' || planCode === 'custom') {
+    if (planCode === 'business' || planCode === 'professional' || planCode === 'custom') {
       return 'BUSINESS';
     }
 
@@ -896,7 +891,7 @@ export class AdminEmpresasService {
         whatsapp_conexoes: 1,
         email_envios_dia: 100,
       },
-      professional: {
+      business: {
         usuarios: 20,
         leads: 10000,
         storage_mb: 10240, // 10GB
@@ -922,7 +917,7 @@ export class AdminEmpresasService {
       },
     };
 
-    const planoNormalizado = plano?.toLowerCase() || 'starter';
+    const planoNormalizado = this.resolvePlanCode(plano || 'starter');
     return limitesBasePorPlano[planoNormalizado] || limitesBasePorPlano.starter;
   }
 }

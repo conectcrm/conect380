@@ -16,6 +16,9 @@ import {
 import { Plano } from './entities/plano.entity';
 import { CriarAssinaturaDto } from './dto/criar-assinatura.dto';
 import { canTransitionSubscriptionStatus, hasSubscriptionAccess } from './subscription-state-machine';
+import { User } from '../users/user.entity';
+import { Cliente } from '../clientes/cliente.entity';
+import { TenantBillingPolicy, TenantBillingPolicyService } from './tenant-billing-policy.service';
 
 type TransitionOptions = {
   dataFim?: Date | null;
@@ -32,7 +35,101 @@ export class AssinaturasService {
 
     @InjectRepository(Plano)
     private planoRepository: Repository<Plano>,
+
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
+
+    @InjectRepository(Cliente)
+    private clienteRepository: Repository<Cliente>,
+    private readonly tenantBillingPolicyService: TenantBillingPolicyService,
   ) {}
+
+  private isUnlimitedLimit(limit: number): boolean {
+    return Number(limit) < 0;
+  }
+
+  async obterPoliticaTenant(empresaId: string): Promise<TenantBillingPolicy> {
+    return this.tenantBillingPolicyService.resolveForEmpresa(empresaId);
+  }
+
+  private applyTenantBillingPolicy(
+    assinatura: AssinaturaEmpresa | null,
+    policy: TenantBillingPolicy,
+  ): AssinaturaEmpresa | null {
+    if (!assinatura) {
+      return assinatura;
+    }
+
+    const assinaturaWithPolicy = assinatura as AssinaturaEmpresa & {
+      billingPolicy?: TenantBillingPolicy;
+    };
+    assinaturaWithPolicy.billingPolicy = policy;
+    return assinaturaWithPolicy;
+  }
+
+  private ensureCheckoutAllowed(policy: TenantBillingPolicy): void {
+    if (policy.allowCheckout) {
+      return;
+    }
+
+    throw new BadRequestException(
+      'Checkout indisponivel para tenant proprietario com politica interna de cobranca.',
+    );
+  }
+
+  private ensurePlanMutationAllowed(policy: TenantBillingPolicy): void {
+    if (policy.allowPlanMutation) {
+      return;
+    }
+
+    throw new BadRequestException(
+      'Alteracao de plano indisponivel para tenant proprietario com politica interna.',
+    );
+  }
+
+  private ensureLifecycleTransitionAllowed(policy: TenantBillingPolicy): void {
+    if (policy.enforceLifecycleTransitions) {
+      return;
+    }
+
+    throw new BadRequestException(
+      'Transicao de status de assinatura bloqueada para tenant proprietario.',
+    );
+  }
+
+  private async sincronizarContadoresOperacionais(
+    empresaId: string,
+    assinatura: AssinaturaEmpresa,
+  ): Promise<void> {
+    const [usuariosAtivos, clientesCadastrados] = await Promise.all([
+      this.userRepository.count({
+        where: {
+          empresa_id: empresaId,
+          ativo: true,
+        },
+      }),
+      this.clienteRepository.count({
+        where: {
+          empresaId,
+          ativo: true,
+        },
+      }),
+    ]);
+
+    const usuariosAjustados = Math.max(0, usuariosAtivos);
+    const clientesAjustados = Math.max(0, clientesCadastrados);
+
+    if (
+      assinatura.usuariosAtivos === usuariosAjustados &&
+      assinatura.clientesCadastrados === clientesAjustados
+    ) {
+      return;
+    }
+
+    assinatura.usuariosAtivos = usuariosAjustados;
+    assinatura.clientesCadastrados = clientesAjustados;
+    await this.assinaturaRepository.save(assinatura);
+  }
 
   private statusAliasesFromCanonical(
     statuses: readonly CanonicalAssinaturaStatus[],
@@ -147,7 +244,13 @@ export class AssinaturasService {
   }
 
   async buscarPorEmpresa(empresaId: string): Promise<AssinaturaEmpresa | null> {
-    return this.buscarAssinaturaMaisRecente(empresaId, { includePlano: true });
+    const assinatura = await this.buscarAssinaturaMaisRecente(empresaId, { includePlano: true });
+    if (!assinatura) {
+      return null;
+    }
+
+    const policy = await this.obterPoliticaTenant(empresaId);
+    return this.applyTenantBillingPolicy(assinatura, policy);
   }
 
   async listarTodas(status?: AssinaturaStatus): Promise<AssinaturaEmpresa[]> {
@@ -169,6 +272,7 @@ export class AssinaturasService {
   }
 
   async criar(dados: CriarAssinaturaDto): Promise<AssinaturaEmpresa> {
+    const policy = await this.obterPoliticaTenant(dados.empresaId);
     const assinaturaExistente = await this.buscarAssinaturaMaisRecente(dados.empresaId);
     if (assinaturaExistente) {
       const currentStatus = toCanonicalAssinaturaStatus(assinaturaExistente.status);
@@ -187,7 +291,9 @@ export class AssinaturasService {
       throw new NotFoundException(`Plano com ID ${dados.planoId} nao encontrado`);
     }
 
-    const initialStatus = toCanonicalAssinaturaStatus(dados.status || 'active');
+    const initialStatus = policy.isPlatformOwner
+      ? 'active'
+      : toCanonicalAssinaturaStatus(dados.status || 'active');
     const assinatura = this.assinaturaRepository.create({
       empresaId: dados.empresaId,
       plano,
@@ -200,13 +306,17 @@ export class AssinaturasService {
       observacoes: dados.observacoes,
     });
 
-    return this.assinaturaRepository.save(assinatura);
+    const savedAssinatura = await this.assinaturaRepository.save(assinatura);
+    return this.applyTenantBillingPolicy(savedAssinatura, policy) as AssinaturaEmpresa;
   }
 
   async criarAssinaturaPendenteParaCheckout(
     empresaId: string,
     planoId: string,
   ): Promise<AssinaturaEmpresa> {
+    const policy = await this.obterPoliticaTenant(empresaId);
+    this.ensureCheckoutAllowed(policy);
+
     const plano = await this.planoRepository.findOne({ where: { id: planoId } });
     if (!plano) {
       throw new NotFoundException(`Plano com ID ${planoId} nao encontrado`);
@@ -256,6 +366,9 @@ export class AssinaturasService {
   }
 
   async alterarPlano(empresaId: string, novoPlanoId: string): Promise<AssinaturaEmpresa> {
+    const policy = await this.obterPoliticaTenant(empresaId);
+    this.ensurePlanMutationAllowed(policy);
+
     const assinatura = await this.buscarAssinaturaObrigatoria(empresaId, { includePlano: true });
     const assinaturaStatus = toCanonicalAssinaturaStatus(assinatura.status);
 
@@ -274,60 +387,85 @@ export class AssinaturasService {
     assinatura.plano = novoPlano;
     assinatura.valorMensal = novoPlano.preco;
 
-    return this.assinaturaRepository.save(assinatura);
+    const assinaturaAtualizada = await this.assinaturaRepository.save(assinatura);
+    return this.applyTenantBillingPolicy(assinaturaAtualizada, policy) as AssinaturaEmpresa;
   }
 
   async cancelar(empresaId: string, dataFim?: Date): Promise<AssinaturaEmpresa> {
+    const policy = await this.obterPoliticaTenant(empresaId);
+    this.ensureLifecycleTransitionAllowed(policy);
+
     const assinatura = await this.buscarAssinaturaObrigatoria(empresaId, { includePlano: true });
     const currentStatus = toCanonicalAssinaturaStatus(assinatura.status);
 
     if (currentStatus === 'canceled') {
       assinatura.dataFim = dataFim || assinatura.dataFim || new Date();
       assinatura.renovacaoAutomatica = false;
-      return this.assinaturaRepository.save(assinatura);
+      const assinaturaAtualizada = await this.assinaturaRepository.save(assinatura);
+      return this.applyTenantBillingPolicy(assinaturaAtualizada, policy) as AssinaturaEmpresa;
     }
 
-    return this.transicionarAssinatura(assinatura, 'canceled', {
+    const assinaturaAtualizada = await this.transicionarAssinatura(assinatura, 'canceled', {
       dataFim: dataFim || new Date(),
       renovacaoAutomatica: false,
       observacao: 'Cancelamento solicitado',
     });
+    return this.applyTenantBillingPolicy(assinaturaAtualizada, policy) as AssinaturaEmpresa;
   }
 
   async suspender(empresaId: string): Promise<AssinaturaEmpresa> {
+    const policy = await this.obterPoliticaTenant(empresaId);
+    this.ensureLifecycleTransitionAllowed(policy);
+
     const assinatura = await this.buscarAssinaturaObrigatoria(empresaId, { includePlano: true });
 
-    return this.transicionarAssinatura(assinatura, 'suspended', {
+    const assinaturaAtualizada = await this.transicionarAssinatura(assinatura, 'suspended', {
       observacao: 'Suspensao aplicada',
     });
+    return this.applyTenantBillingPolicy(assinaturaAtualizada, policy) as AssinaturaEmpresa;
   }
 
   async reativar(empresaId: string): Promise<AssinaturaEmpresa> {
+    const policy = await this.obterPoliticaTenant(empresaId);
+    this.ensureLifecycleTransitionAllowed(policy);
+
     const assinatura = await this.buscarAssinaturaObrigatoria(empresaId, { includePlano: true });
 
-    return this.transicionarAssinatura(assinatura, 'active', {
+    const assinaturaAtualizada = await this.transicionarAssinatura(assinatura, 'active', {
       dataFim: null,
       renovacaoAutomatica: true,
       observacao: 'Reativacao aplicada',
     });
+    return this.applyTenantBillingPolicy(assinaturaAtualizada, policy) as AssinaturaEmpresa;
   }
 
   async marcarPastDue(empresaId: string): Promise<AssinaturaEmpresa> {
+    const policy = await this.obterPoliticaTenant(empresaId);
+    this.ensureLifecycleTransitionAllowed(policy);
+
     const assinatura = await this.buscarAssinaturaObrigatoria(empresaId, { includePlano: true });
 
-    return this.transicionarAssinatura(assinatura, 'past_due', {
+    const assinaturaAtualizada = await this.transicionarAssinatura(assinatura, 'past_due', {
       observacao: 'Marcada como inadimplente',
     });
+    return this.applyTenantBillingPolicy(assinaturaAtualizada, policy) as AssinaturaEmpresa;
   }
 
   async registrarPagamentoConfirmado(empresaId: string): Promise<AssinaturaEmpresa> {
+    const policy = await this.obterPoliticaTenant(empresaId);
+    if (!policy.enforceLifecycleTransitions) {
+      const assinaturaAtual = await this.buscarAssinaturaObrigatoria(empresaId, { includePlano: true });
+      return this.applyTenantBillingPolicy(assinaturaAtual, policy) as AssinaturaEmpresa;
+    }
+
     const assinatura = await this.buscarAssinaturaObrigatoria(empresaId, { includePlano: true });
 
-    return this.transicionarAssinatura(assinatura, 'active', {
+    const assinaturaAtualizada = await this.transicionarAssinatura(assinatura, 'active', {
       dataFim: null,
       renovacaoAutomatica: true,
       observacao: 'Pagamento confirmado',
     });
+    return this.applyTenantBillingPolicy(assinaturaAtualizada, policy) as AssinaturaEmpresa;
   }
 
   async verificarLimites(empresaId: string): Promise<{
@@ -341,24 +479,49 @@ export class AssinaturasService {
     podeAdicionarCliente: boolean;
     storageDisponivel: number;
   }> {
+    const policy = await this.obterPoliticaTenant(empresaId);
     const assinatura = await this.buscarAssinaturaObrigatoria(empresaId, { includePlano: true });
     const currentStatus = toCanonicalAssinaturaStatus(assinatura.status);
-    if (currentStatus === 'canceled') {
+    if (!policy.billingExempt && currentStatus === 'canceled') {
       throw new NotFoundException(`Assinatura ativa para empresa ${empresaId} nao encontrada`);
     }
 
-    const storageDisponivel = assinatura.plano.limiteStorage - assinatura.storageUtilizado;
+    await this.sincronizarContadoresOperacionais(empresaId, assinatura);
+
+    if (policy.monitorOnlyLimits) {
+      return {
+        usuariosAtivos: assinatura.usuariosAtivos,
+        limiteUsuarios: -1,
+        clientesCadastrados: assinatura.clientesCadastrados,
+        limiteClientes: -1,
+        storageUtilizado: assinatura.storageUtilizado,
+        limiteStorage: -1,
+        podeAdicionarUsuario: true,
+        podeAdicionarCliente: true,
+        storageDisponivel: -1,
+      };
+    }
+
+    const limiteUsuarios = assinatura.plano.limiteUsuarios;
+    const limiteClientes = assinatura.plano.limiteClientes;
+    const limiteStorage = assinatura.plano.limiteStorage;
+
+    const storageDisponivel = this.isUnlimitedLimit(limiteStorage)
+      ? -1
+      : Math.max(0, limiteStorage - assinatura.storageUtilizado);
 
     return {
       usuariosAtivos: assinatura.usuariosAtivos,
-      limiteUsuarios: assinatura.plano.limiteUsuarios,
+      limiteUsuarios,
       clientesCadastrados: assinatura.clientesCadastrados,
-      limiteClientes: assinatura.plano.limiteClientes,
+      limiteClientes,
       storageUtilizado: assinatura.storageUtilizado,
-      limiteStorage: assinatura.plano.limiteStorage,
-      podeAdicionarUsuario: assinatura.usuariosAtivos < assinatura.plano.limiteUsuarios,
-      podeAdicionarCliente: assinatura.clientesCadastrados < assinatura.plano.limiteClientes,
-      storageDisponivel: Math.max(0, storageDisponivel),
+      limiteStorage,
+      podeAdicionarUsuario:
+        this.isUnlimitedLimit(limiteUsuarios) || assinatura.usuariosAtivos < limiteUsuarios,
+      podeAdicionarCliente:
+        this.isUnlimitedLimit(limiteClientes) || assinatura.clientesCadastrados < limiteClientes,
+      storageDisponivel,
     };
   }
 
@@ -370,10 +533,11 @@ export class AssinaturasService {
       storageUtilizado?: number;
     },
   ): Promise<AssinaturaEmpresa> {
+    const policy = await this.obterPoliticaTenant(empresaId);
     const assinatura = await this.buscarAssinaturaObrigatoria(empresaId, { includePlano: true });
     const currentStatus = toCanonicalAssinaturaStatus(assinatura.status);
 
-    if (!hasSubscriptionAccess(currentStatus)) {
+    if (!policy.billingExempt && !hasSubscriptionAccess(currentStatus)) {
       throw new BadRequestException(
         `Nao e possivel atualizar contadores para assinatura em estado ${currentStatus}`,
       );
@@ -391,18 +555,20 @@ export class AssinaturasService {
       assinatura.storageUtilizado = dados.storageUtilizado;
     }
 
-    return this.assinaturaRepository.save(assinatura);
+    const assinaturaAtualizada = await this.assinaturaRepository.save(assinatura);
+    return this.applyTenantBillingPolicy(assinaturaAtualizada, policy) as AssinaturaEmpresa;
   }
 
   async registrarChamadaApi(empresaId: string): Promise<boolean> {
+    const policy = await this.obterPoliticaTenant(empresaId);
     const assinatura = await this.buscarAssinaturaMaisRecente(empresaId, { includePlano: true });
 
     if (!assinatura) {
-      return false;
+      return policy.billingExempt;
     }
 
     const currentStatus = toCanonicalAssinaturaStatus(assinatura.status);
-    if (!hasSubscriptionAccess(currentStatus)) {
+    if (!policy.billingExempt && !hasSubscriptionAccess(currentStatus)) {
       return false;
     }
 
@@ -417,6 +583,14 @@ export class AssinaturasService {
     }
 
     await this.assinaturaRepository.save(assinatura);
+
+    if (policy.monitorOnlyLimits) {
+      return true;
+    }
+
+    if (this.isUnlimitedLimit(assinatura.plano.limiteApiCalls)) {
+      return true;
+    }
 
     return assinatura.apiCallsHoje <= assinatura.plano.limiteApiCalls;
   }

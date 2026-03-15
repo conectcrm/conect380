@@ -20,8 +20,28 @@ interface UsageMeterProps {
   showDetails?: boolean;
 }
 
+type UsageMetric = {
+  id: 'usuarios' | 'clientes' | 'storage' | 'api';
+  label: string;
+  icon: React.ReactNode;
+  current: number;
+  limitLabel: string;
+  percentage: number;
+  unit: string;
+  isUnlimited: boolean;
+};
+
+const formatLimitLabel = (limit: number, unit: string): string => {
+  if (limit < 0) {
+    return 'Ilimitado';
+  }
+
+  return `${limit.toLocaleString('pt-BR')} ${unit}`.trim();
+};
+
 export const UsageMeter: React.FC<UsageMeterProps> = ({ onUpgrade, showDetails = false }) => {
-  const { assinatura, limites, calcularProgresso, loading } = useSubscription();
+  const { assinatura, limites, calcularProgresso, loading, isOwnerTenant, podeAlterarPlano } =
+    useSubscription();
 
   if (loading || !assinatura || !limites) {
     return (
@@ -38,86 +58,108 @@ export const UsageMeter: React.FC<UsageMeterProps> = ({ onUpgrade, showDetails =
   }
 
   const progresso = calcularProgresso();
+  if (!progresso) {
+    return null;
+  }
 
-  if (!progresso) return null;
+  const apiLimit = assinatura.plano.limiteApiCalls;
+  const apiPercentage =
+    apiLimit > 0 ? Math.min((assinatura.apiCallsHoje / apiLimit) * 100, 100) : 0;
 
-  const getStatusIcon = (percentual: number) => {
-    if (percentual >= 95) return <AlertTriangle className="h-4 w-4 text-red-500" />;
-    if (percentual >= 80) return <Info className="h-4 w-4 text-yellow-500" />;
-    return <CheckCircle className="h-4 w-4 text-green-500" />;
-  };
-
-  const getStatusColor = (percentual: number) => {
-    if (percentual >= 95) return 'text-red-600';
-    if (percentual >= 80) return 'text-yellow-600';
-    return 'text-[#159A9C]';
-  };
-
-  const getProgressColor = (percentual: number) => {
-    if (percentual >= 95) return 'bg-red-600';
-    if (percentual >= 80) return 'bg-yellow-500';
-    return 'bg-[#159A9C]';
-  };
-
-  const metrics = [
+  const metrics: UsageMetric[] = [
     {
       id: 'usuarios',
-      label: 'Usuários',
+      label: 'Usuarios',
       icon: <Users className="h-5 w-5" />,
       current: progresso.usuarios.usado,
-      limit: progresso.usuarios.total,
+      limitLabel: formatLimitLabel(progresso.usuarios.total, 'usuarios'),
       percentage: progresso.usuarios.percentual,
-      unit: 'usuários',
+      unit: 'usuarios',
+      isUnlimited: progresso.usuarios.total < 0,
     },
     {
       id: 'clientes',
       label: 'Clientes',
       icon: <UserCheck className="h-5 w-5" />,
       current: progresso.clientes.usado,
-      limit: progresso.clientes.total,
+      limitLabel: formatLimitLabel(progresso.clientes.total, 'clientes'),
       percentage: progresso.clientes.percentual,
       unit: 'clientes',
+      isUnlimited: progresso.clientes.total < 0,
     },
     {
       id: 'storage',
       label: 'Armazenamento',
       icon: <Database className="h-5 w-5" />,
       current: progresso.storage.usado,
-      limit: progresso.storage.total,
+      limitLabel:
+        progresso.storage.total < 0
+          ? 'Ilimitado'
+          : `${progresso.storage.total.toLocaleString('pt-BR')} MB`,
       percentage: progresso.storage.percentual,
       unit: 'MB',
+      isUnlimited: progresso.storage.total < 0,
     },
     {
       id: 'api',
       label: 'API Calls (hoje)',
       icon: <Zap className="h-5 w-5" />,
       current: assinatura.apiCallsHoje,
-      limit: assinatura.plano.limiteApiCalls,
-      percentage: (assinatura.apiCallsHoje / assinatura.plano.limiteApiCalls) * 100,
+      limitLabel: formatLimitLabel(apiLimit, 'calls'),
+      percentage: apiPercentage,
       unit: 'calls',
+      isUnlimited: apiLimit < 0,
     },
   ];
 
-  const hasWarnings = metrics.some((metric) => metric.percentage >= 80);
-  const hasCritical = metrics.some((metric) => metric.percentage >= 95);
+  const hasWarnings = metrics.some((metric) => !metric.isUnlimited && metric.percentage >= 80);
+  const hasCritical = metrics.some((metric) => !metric.isUnlimited && metric.percentage >= 95);
+
+  const getStatusIcon = (metric: UsageMetric) => {
+    if (metric.isUnlimited) return <CheckCircle className="h-4 w-4 text-green-500" />;
+    if (metric.percentage >= 95) return <AlertTriangle className="h-4 w-4 text-red-500" />;
+    if (metric.percentage >= 80) return <Info className="h-4 w-4 text-yellow-500" />;
+    return <CheckCircle className="h-4 w-4 text-green-500" />;
+  };
+
+  const getStatusColor = (metric: UsageMetric) => {
+    if (metric.isUnlimited) return 'text-[#159A9C]';
+    if (metric.percentage >= 95) return 'text-red-600';
+    if (metric.percentage >= 80) return 'text-yellow-600';
+    return 'text-[#159A9C]';
+  };
+
+  const getProgressColor = (metric: UsageMetric) => {
+    if (metric.isUnlimited) return 'bg-[#159A9C]';
+    if (metric.percentage >= 95) return 'bg-red-600';
+    if (metric.percentage >= 80) return 'bg-yellow-500';
+    return 'bg-[#159A9C]';
+  };
+
+  const getPercentualLabel = (metric: UsageMetric) => {
+    if (metric.isUnlimited) {
+      return 'Sem limite neste recurso';
+    }
+
+    return `${metric.percentage.toFixed(1)}% utilizado`;
+  };
 
   if (!showDetails) {
-    // Versão compacta
     return (
       <Card
         className={`${hasCritical ? 'border-red-200' : hasWarnings ? 'border-yellow-200' : 'border-[#DEEFE7]'}`}
       >
         <CardContent className="p-4">
-          <div className="flex items-center justify-between mb-3">
+          <div className="mb-3 flex items-center justify-between">
             <h4 className="font-medium">Uso dos Recursos</h4>
             {hasCritical && (
               <Badge variant="destructive" className="text-xs">
-                Limite Crítico
+                Limite Critico
               </Badge>
             )}
             {hasWarnings && !hasCritical && (
-              <Badge variant="outline" className="text-xs border-yellow-300 text-yellow-700">
-                Atenção
+              <Badge variant="outline" className="border-yellow-300 text-xs text-yellow-700">
+                Atencao
               </Badge>
             )}
           </div>
@@ -127,33 +169,34 @@ export const UsageMeter: React.FC<UsageMeterProps> = ({ onUpgrade, showDetails =
               <div key={metric.id} className="flex items-center gap-3">
                 <div className="text-[#6E8997]">{metric.icon}</div>
                 <div className="flex-1">
-                  <div className="flex justify-between text-sm mb-1">
+                  <div className="mb-1 flex justify-between text-sm">
                     <span className="text-[#244455]">{metric.label}</span>
-                    <span className={getStatusColor(metric.percentage)}>
-                      {metric.current}/{metric.limit} {metric.unit}
+                    <span className={getStatusColor(metric)}>
+                      {metric.current.toLocaleString('pt-BR')} / {metric.limitLabel}
                     </span>
                   </div>
                   <div className="relative">
                     <Progress value={metric.percentage} className="h-1.5" />
                     <div
-                      className={`absolute top-0 left-0 h-1.5 rounded-full transition-all ${getProgressColor(metric.percentage)}`}
+                      className={`absolute left-0 top-0 h-1.5 rounded-full transition-all ${getProgressColor(metric)}`}
                       style={{ width: `${Math.min(metric.percentage, 100)}%` }}
                     />
                   </div>
                 </div>
-                {getStatusIcon(metric.percentage)}
+                {getStatusIcon(metric)}
               </div>
             ))}
           </div>
 
-          {(hasCritical || hasWarnings) && onUpgrade && (
+          {(hasCritical || hasWarnings) && onUpgrade && !isOwnerTenant && (
             <Button
               onClick={onUpgrade}
               size="sm"
-              className="w-full mt-4"
+              className="mt-4 w-full"
+              disabled={!podeAlterarPlano}
               variant={hasCritical ? 'destructive' : 'default'}
             >
-              {hasCritical ? 'Upgrade Necessário' : 'Considerar Upgrade'}
+              {hasCritical ? 'Upgrade Necessario' : 'Considerar Upgrade'}
             </Button>
           )}
         </CardContent>
@@ -161,7 +204,6 @@ export const UsageMeter: React.FC<UsageMeterProps> = ({ onUpgrade, showDetails =
     );
   }
 
-  // Versão detalhada
   return (
     <div className="space-y-6">
       <Card>
@@ -172,7 +214,7 @@ export const UsageMeter: React.FC<UsageMeterProps> = ({ onUpgrade, showDetails =
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {metrics.map((metric) => (
               <div key={metric.id} className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -180,51 +222,50 @@ export const UsageMeter: React.FC<UsageMeterProps> = ({ onUpgrade, showDetails =
                     <div className="text-[#6E8997]">{metric.icon}</div>
                     <span className="font-medium text-[#244455]">{metric.label}</span>
                   </div>
-                  {getStatusIcon(metric.percentage)}
+                  {getStatusIcon(metric)}
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>
-                      {metric.current} {metric.unit}
+                      {metric.current.toLocaleString('pt-BR')} {metric.unit}
                     </span>
-                    <span className="text-[#6E8997]">
-                      de {metric.limit} {metric.unit}
-                    </span>
+                    <span className="text-[#6E8997]">de {metric.limitLabel}</span>
                   </div>
 
                   <div className="relative">
                     <Progress value={metric.percentage} className="h-3" />
                     <div
-                      className={`absolute top-0 left-0 h-3 rounded-full transition-all ${getProgressColor(metric.percentage)}`}
+                      className={`absolute left-0 top-0 h-3 rounded-full transition-all ${getProgressColor(metric)}`}
                       style={{ width: `${Math.min(metric.percentage, 100)}%` }}
                     />
                   </div>
 
-                  <div className="flex justify-between items-center">
-                    <span className={`text-sm font-medium ${getStatusColor(metric.percentage)}`}>
-                      {metric.percentage.toFixed(1)}% utilizado
+                  <div className="flex items-center justify-between">
+                    <span className={`text-sm font-medium ${getStatusColor(metric)}`}>
+                      {getPercentualLabel(metric)}
                     </span>
 
-                    {metric.percentage >= 95 && (
+                    {!metric.isUnlimited && metric.percentage >= 95 && (
                       <Badge variant="destructive" className="text-xs">
                         Limite Atingido
                       </Badge>
                     )}
-                    {metric.percentage >= 80 && metric.percentage < 95 && (
+                    {!metric.isUnlimited && metric.percentage >= 80 && metric.percentage < 95 && (
                       <Badge
                         variant="outline"
-                        className="text-xs border-yellow-300 text-yellow-700"
+                        className="border-yellow-300 text-xs text-yellow-700"
                       >
-                        Próximo do Limite
+                        Proximo do Limite
                       </Badge>
                     )}
                   </div>
                 </div>
 
-                {/* Estimativa baseada no uso */}
                 {metric.id === 'api' && (
-                  <div className="border-t border-[#DEEFE7] pt-2 text-xs text-[#6E8997]">Reset diário às 00:00</div>
+                  <div className="border-t border-[#DEEFE7] pt-2 text-xs text-[#6E8997]">
+                    Reset diario as 00:00
+                  </div>
                 )}
               </div>
             ))}
@@ -232,34 +273,34 @@ export const UsageMeter: React.FC<UsageMeterProps> = ({ onUpgrade, showDetails =
         </CardContent>
       </Card>
 
-      {/* Recomendações */}
-      {(hasCritical || hasWarnings) && (
+      {(hasCritical || hasWarnings) && !isOwnerTenant && (
         <Card
           className={hasCritical ? 'border-red-200 bg-red-50' : 'border-yellow-200 bg-yellow-50'}
         >
           <CardContent className="pt-6">
             <div className="flex items-start gap-3">
               {hasCritical ? (
-                <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600" />
               ) : (
-                <Info className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-yellow-600" />
               )}
 
               <div className="flex-1">
                 <h4 className={`font-medium ${hasCritical ? 'text-red-800' : 'text-yellow-800'}`}>
-                  {hasCritical ? 'Ação Necessária' : 'Recomendação'}
+                  {hasCritical ? 'Acao Necessaria' : 'Recomendacao'}
                 </h4>
 
-                <p className={`text-sm mt-1 ${hasCritical ? 'text-red-700' : 'text-yellow-700'}`}>
+                <p className={`mt-1 text-sm ${hasCritical ? 'text-red-700' : 'text-yellow-700'}`}>
                   {hasCritical
-                    ? 'Você atingiu o limite de alguns recursos. Faça upgrade para continuar usando todas as funcionalidades.'
-                    : 'Você está próximo do limite de alguns recursos. Considere fazer upgrade para evitar interrupções.'}
+                    ? 'Voce atingiu o limite de alguns recursos. Faca upgrade para continuar usando todas as funcionalidades.'
+                    : 'Voce esta proximo do limite de alguns recursos. Considere fazer upgrade para evitar interrupcoes.'}
                 </p>
 
                 {onUpgrade && (
                   <Button
                     onClick={onUpgrade}
                     size="sm"
+                    disabled={!podeAlterarPlano}
                     className={`mt-3 ${hasCritical ? 'bg-red-600 hover:bg-red-700' : 'bg-[#159A9C] hover:bg-[#0F7B7D]'}`}
                   >
                     Ver Planos Superiores

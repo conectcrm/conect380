@@ -15,17 +15,21 @@ import { AuthRefreshToken } from './entities/auth-refresh-token.entity';
 import { MailModule } from '../../mail/mail.module';
 import { resolveJwtSecret } from '../../config/jwt.config';
 import { EmpresaConfig } from '../empresas/entities/empresa-config.entity';
+import { Empresa } from '../../empresas/entities/empresa.entity';
+import { PlanosModule } from '../planos/planos.module';
 
 @Module({
   imports: [
     UsersModule,
     MailModule,
+    PlanosModule,
     TypeOrmModule.forFeature([
       PasswordResetToken,
       MfaLoginChallenge,
       AuthLoginAttempt,
       AuthRefreshToken,
       EmpresaConfig,
+      Empresa,
     ]),
     PassportModule,
     JwtModule.registerAsync({

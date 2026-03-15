@@ -56,7 +56,14 @@ const mapPlanoToCheckout = (plano: Plano) => {
 export const BillingPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { planos } = useSubscription();
+  const {
+    planos,
+    isOwnerTenant = false,
+    podeFazerCheckout = true,
+  } = useSubscription() as ReturnType<typeof useSubscription> & {
+    isOwnerTenant?: boolean;
+    podeFazerCheckout?: boolean;
+  };
 
   const activeTab = useMemo(
     () => resolveTabFromLocation(location.pathname, location.search),
@@ -115,10 +122,16 @@ export const BillingPage: React.FC = () => {
     }
   }, [activeTab, navigateToTab, selectedPlanId]);
 
+  useEffect(() => {
+    if (isOwnerTenant && activeTab === 'payment') {
+      navigateToTab('plans');
+    }
+  }, [activeTab, isOwnerTenant, navigateToTab]);
+
   const currentPrimaryTab: BillingPrimaryTab = activeTab === 'payment' ? 'plans' : activeTab;
 
   const handlePlanSelect = (plano: Plano, context: { requiresPayment: boolean }) => {
-    if (context.requiresPayment) {
+    if (context.requiresPayment && podeFazerCheckout) {
       navigateToTab('payment', plano.id);
       return;
     }
@@ -135,6 +148,15 @@ export const BillingPage: React.FC = () => {
     navigateToTab('plans');
   };
 
+  const handleOpenDocumentation = useCallback(() => {
+    const docsUrl = (process.env.REACT_APP_BILLING_DOCS_URL || 'https://docs.conect360.com.br/billing').trim();
+    window.open(docsUrl, '_blank', 'noopener,noreferrer');
+  }, []);
+
+  const handleOpenSupport = useCallback(() => {
+    navigate('/atendimento/tickets/novo?origem=billing');
+  }, [navigate]);
+
   const renderContent = () => {
     switch (activeTab) {
       case 'plans':
@@ -149,6 +171,7 @@ export const BillingPage: React.FC = () => {
         return (
           <PaymentForm
             planoSelecionado={selectedPlan ? mapPlanoToCheckout(selectedPlan) : undefined}
+            checkoutEnabled={podeFazerCheckout}
             onPaymentSuccess={handlePaymentSuccess}
             onCancel={() => navigateToTab('plans')}
           />
@@ -227,7 +250,7 @@ export const BillingPage: React.FC = () => {
                 : 'border border-[#D4E2E7] bg-white text-[#244455] hover:bg-[#F6FAF9]'
             }`}
           >
-            Planos e Upgrade
+            {isOwnerTenant ? 'Planos' : 'Planos e Upgrade'}
           </button>
         </div>
       </FiltersBar>
@@ -245,6 +268,7 @@ export const BillingPage: React.FC = () => {
           <div className="flex flex-col justify-center gap-3 sm:flex-row">
             <button
               type="button"
+              onClick={handleOpenDocumentation}
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
             >
               <FileText className="h-4 w-4" />
@@ -252,6 +276,7 @@ export const BillingPage: React.FC = () => {
             </button>
             <button
               type="button"
+              onClick={handleOpenSupport}
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 py-2 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
             >
               <HelpCircle className="h-4 w-4" />

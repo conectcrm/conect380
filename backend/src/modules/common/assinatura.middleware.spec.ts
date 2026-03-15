@@ -3,6 +3,7 @@ import { AssinaturaMiddleware } from './assinatura.middleware';
 
 describe('AssinaturaMiddleware', () => {
   const assinaturasService = {
+    obterPoliticaTenant: jest.fn(),
     buscarPorEmpresa: jest.fn(),
     registrarChamadaApi: jest.fn(),
   };
@@ -12,6 +13,15 @@ describe('AssinaturaMiddleware', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     middleware = new AssinaturaMiddleware(assinaturasService as any);
+    assinaturasService.obterPoliticaTenant.mockResolvedValue({
+      isPlatformOwner: false,
+      billingExempt: false,
+      monitorOnlyLimits: false,
+      fullModuleAccess: false,
+      allowCheckout: true,
+      allowPlanMutation: true,
+      enforceLifecycleTransitions: true,
+    });
     assinaturasService.registrarChamadaApi.mockResolvedValue(true);
   });
 
@@ -98,5 +108,31 @@ describe('AssinaturaMiddleware', () => {
     ).rejects.toMatchObject({
       status: HttpStatus.SERVICE_UNAVAILABLE,
     });
+  });
+
+  it('permite tenant proprietario mesmo sem assinatura ativa', async () => {
+    assinaturasService.obterPoliticaTenant.mockResolvedValueOnce({
+      isPlatformOwner: true,
+      billingExempt: true,
+      monitorOnlyLimits: true,
+      fullModuleAccess: true,
+      allowCheckout: false,
+      allowPlanMutation: false,
+      enforceLifecycleTransitions: false,
+    });
+    assinaturasService.buscarPorEmpresa.mockResolvedValueOnce(null);
+
+    const next = jest.fn();
+    await middleware.use(
+      {
+        path: '/clientes',
+        method: 'GET',
+        user: { empresaId: 'owner-tenant-id' },
+      } as any,
+      {} as any,
+      next,
+    );
+
+    expect(next).toHaveBeenCalledTimes(1);
   });
 });

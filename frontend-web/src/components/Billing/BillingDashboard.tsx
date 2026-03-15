@@ -26,9 +26,29 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
   onUpgrade,
   onManageBilling,
 }) => {
-  const { assinatura, loading, error, calcularProgresso, getStatusInfo } =
-    useSubscription();
+  const {
+    assinatura,
+    loading,
+    error,
+    calcularProgresso,
+    getStatusInfo,
+    isOwnerTenant,
+    podeAlterarPlano,
+  } = useSubscription();
+  const parseDateSafe = (value: string): Date => {
+    const raw = String(value || '').trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      const [year, month, day] = raw.split('-').map((part) => Number(part));
+      return new Date(year, month - 1, day, 12, 0, 0, 0);
+    }
 
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) {
+      return new Date();
+    }
+
+    return parsed;
+  };
 
   if (loading) {
     return (
@@ -81,10 +101,27 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
 
   const statusInfo = getStatusInfo();
   const progresso = calcularProgresso();
-  const proximoVencimento = new Date(assinatura.proximoVencimento);
+  const proximoVencimento = parseDateSafe(assinatura.proximoVencimento);
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  proximoVencimento.setHours(0, 0, 0, 0);
   const diasParaVencimento = Math.ceil(
-    (proximoVencimento.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+    (proximoVencimento.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24),
   );
+  const usuariosTotalLabel =
+    progresso && progresso.usuarios.total < 0
+      ? 'Ilimitado'
+      : String(progresso?.usuarios.total || 0);
+  const clientesTotalLabel =
+    progresso && progresso.clientes.total < 0
+      ? 'Ilimitado'
+      : String(progresso?.clientes.total || 0);
+  const storageTotalLabel =
+    progresso && progresso.storage.total < 0 ? 'Ilimitado' : `${progresso?.storage.total || 0} MB`;
+  const apiLimit = assinatura.plano.limiteApiCalls;
+  const apiPercentual =
+    apiLimit > 0 ? Math.min((assinatura.apiCallsHoje / apiLimit) * 100, 100) : 0;
+  const apiLimiteLabel = apiLimit < 0 ? 'Ilimitado' : apiLimit.toLocaleString('pt-BR');
 
   return (
     <div className="space-y-6">
@@ -103,15 +140,17 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
             {statusInfo.texto}
           </Badge>
 
-          <Button
-            onClick={onManageBilling}
-            variant="outline"
-            size="sm"
-            className="border-[#B4BEC9] text-[#19384C] hover:bg-[#F6FAF9]"
-          >
-            <CreditCard className="h-4 w-4 mr-2" />
-            Gerenciar
-          </Button>
+          {!isOwnerTenant && (
+            <Button
+              onClick={onManageBilling}
+              variant="outline"
+              size="sm"
+              className="border-[#B4BEC9] text-[#19384C] hover:bg-[#F6FAF9]"
+            >
+              <CreditCard className="h-4 w-4 mr-2" />
+              Gerenciar
+            </Button>
+          )}
         </div>
       </div>
 
@@ -134,14 +173,23 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
 
             <div>
               <p className="text-sm text-[#385A6A]">Proximo Vencimento</p>
-              <p className="text-lg font-semibold">
-                {proximoVencimento.toLocaleDateString('pt-BR')}
-              </p>
-              <p
-                className={`text-sm ${diasParaVencimento <= 7 ? 'text-red-600' : 'text-gray-500'}`}
-              >
-                {diasParaVencimento > 0 ? `${diasParaVencimento} dias restantes` : 'Vencido'}
-              </p>
+              {isOwnerTenant ? (
+                <>
+                  <p className="text-lg font-semibold">Nao aplicavel</p>
+                  <p className="text-sm text-gray-500">Cobranca interna da plataforma</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-lg font-semibold">
+                    {proximoVencimento.toLocaleDateString('pt-BR')}
+                  </p>
+                  <p
+                    className={`text-sm ${diasParaVencimento <= 7 ? 'text-red-600' : 'text-gray-500'}`}
+                  >
+                    {diasParaVencimento > 0 ? `${diasParaVencimento} dias restantes` : 'Vencido'}
+                  </p>
+                </>
+              )}
             </div>
 
             <div>
@@ -185,14 +233,16 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>{progresso.usuarios.usado}</span>
-                  <span className="text-gray-500">de {progresso.usuarios.total}</span>
+                  <span className="text-gray-500">de {usuariosTotalLabel}</span>
                 </div>
                 <Progress
                   value={progresso.usuarios.percentual}
                   className={`h-2 ${progresso.usuarios.percentual > 90 ? 'bg-red-100' : 'bg-blue-100'}`}
                 />
                 <p className="text-xs text-gray-600">
-                  {progresso.usuarios.percentual.toFixed(1)}% utilizado
+                  {progresso.usuarios.total < 0
+                    ? 'Sem limite de usuarios'
+                    : `${progresso.usuarios.percentual.toFixed(1)}% utilizado`}
                 </p>
               </div>
             </CardContent>
@@ -210,14 +260,16 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>{progresso.clientes.usado}</span>
-                  <span className="text-gray-500">de {progresso.clientes.total}</span>
+                  <span className="text-gray-500">de {clientesTotalLabel}</span>
                 </div>
                 <Progress
                   value={progresso.clientes.percentual}
                   className={`h-2 ${progresso.clientes.percentual > 90 ? 'bg-red-100' : 'bg-green-100'}`}
                 />
                 <p className="text-xs text-gray-600">
-                  {progresso.clientes.percentual.toFixed(1)}% utilizado
+                  {progresso.clientes.total < 0
+                    ? 'Sem limite de clientes'
+                    : `${progresso.clientes.percentual.toFixed(1)}% utilizado`}
                 </p>
               </div>
             </CardContent>
@@ -235,14 +287,16 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>{progresso.storage.usado} MB</span>
-                  <span className="text-gray-500">de {progresso.storage.total} MB</span>
+                  <span className="text-gray-500">de {storageTotalLabel}</span>
                 </div>
                 <Progress
                   value={progresso.storage.percentual}
                   className={`h-2 ${progresso.storage.percentual > 90 ? 'bg-red-100' : 'bg-purple-100'}`}
                 />
                 <p className="text-xs text-gray-600">
-                  {progresso.storage.percentual.toFixed(1)}% utilizado
+                  {progresso.storage.total < 0
+                    ? 'Sem limite de armazenamento'
+                    : `${progresso.storage.percentual.toFixed(1)}% utilizado`}
                 </p>
               </div>
             </CardContent>
@@ -260,15 +314,16 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>{assinatura.apiCallsHoje}</span>
-                  <span className="text-gray-500">de {assinatura.plano.limiteApiCalls}</span>
+                  <span className="text-gray-500">de {apiLimiteLabel}</span>
                 </div>
                 <Progress
-                  value={(assinatura.apiCallsHoje / assinatura.plano.limiteApiCalls) * 100}
+                  value={apiPercentual}
                   className="h-2 bg-orange-100"
                 />
                 <p className="text-xs text-gray-600">
-                  {((assinatura.apiCallsHoje / assinatura.plano.limiteApiCalls) * 100).toFixed(1)}%
-                  do limite diario
+                  {apiLimit < 0
+                    ? 'Sem limite diario'
+                    : `${apiPercentual.toFixed(1)}% do limite diario`}
                 </p>
               </div>
             </CardContent>
@@ -282,7 +337,8 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
           {/* Alerta de Limite */}
           {(progresso.usuarios.percentual > 90 ||
             progresso.clientes.percentual > 90 ||
-            progresso.storage.percentual > 90) && (
+            progresso.storage.percentual > 90) &&
+            !isOwnerTenant && (
             <Card className="border-yellow-200 bg-yellow-50">
               <CardContent className="pt-6">
                 <div className="flex items-start gap-3">
@@ -297,6 +353,7 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
                       onClick={onUpgrade}
                       size="sm"
                       className="mt-3 bg-[#159A9C] hover:bg-[#0F7B7D]"
+                      disabled={!podeAlterarPlano}
                     >
                       Ver Planos Superiores
                     </Button>
@@ -307,7 +364,7 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
           )}
 
           {/* Vencimento Proximo */}
-          {diasParaVencimento <= 7 && diasParaVencimento > 0 && (
+          {!isOwnerTenant && diasParaVencimento <= 7 && diasParaVencimento > 0 && (
             <Card className="border-red-200 bg-red-50">
               <CardContent className="pt-6">
                 <div className="flex items-start gap-3">
@@ -336,4 +393,3 @@ export const BillingDashboard: React.FC<BillingDashboardProps> = ({
     </div>
   );
 };
-

@@ -12,6 +12,7 @@ describe('AssinaturaDueDateSchedulerService', () => {
   };
 
   const assinaturasService = {
+    obterPoliticaTenant: jest.fn(),
     marcarPastDue: jest.fn(),
     suspender: jest.fn(),
   };
@@ -34,6 +35,15 @@ describe('AssinaturaDueDateSchedulerService', () => {
     mercadoPagoService.reconcileRecentPayments.mockResolvedValue({
       processed: 2,
       errors: 0,
+    });
+    assinaturasService.obterPoliticaTenant.mockResolvedValue({
+      isPlatformOwner: false,
+      billingExempt: false,
+      monitorOnlyLimits: false,
+      fullModuleAccess: false,
+      allowCheckout: true,
+      allowPlanMutation: true,
+      enforceLifecycleTransitions: true,
     });
 
     service = new AssinaturaDueDateSchedulerService(
@@ -152,6 +162,40 @@ describe('AssinaturaDueDateSchedulerService', () => {
         checked: 1,
         pastDueApplied: 1,
         errors: 1,
+      }),
+    );
+  });
+
+  it('ignora transicoes automaticas para tenant proprietario', async () => {
+    assinaturaRepository.manager.query.mockResolvedValueOnce([
+      {
+        id: 'sub-5',
+        empresaId: '55555555-5555-5555-5555-555555555555',
+        status: 'active',
+        proximoVencimento: '2026-01-01',
+      },
+    ]);
+    assinaturasService.obterPoliticaTenant.mockResolvedValueOnce({
+      isPlatformOwner: true,
+      billingExempt: true,
+      monitorOnlyLimits: true,
+      fullModuleAccess: true,
+      allowCheckout: false,
+      allowPlanMutation: false,
+      enforceLifecycleTransitions: false,
+    });
+
+    const summary = await service.runDueDateStatusCycle();
+
+    expect(assinaturasService.marcarPastDue).not.toHaveBeenCalled();
+    expect(assinaturasService.suspender).not.toHaveBeenCalled();
+    expect(summary).toEqual(
+      expect.objectContaining({
+        checked: 1,
+        pastDueApplied: 0,
+        suspendedApplied: 0,
+        skipped: 1,
+        errors: 0,
       }),
     );
   });

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
-import { Check, Crown, Users, UserCheck, Database, Zap, Star, Sparkles } from 'lucide-react';
+import { AlertCircle, Check, Crown, Users, UserCheck, Database, Zap, Star, Sparkles } from 'lucide-react';
 import { useSubscription, Plano } from '../../hooks/useSubscription';
 import { formatCurrency } from '../../utils/formatters';
 
@@ -20,10 +20,16 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
   onClose,
   showCurrentPlan = true,
 }) => {
-  const { planos, assinatura, loading, alterarPlano } = useSubscription();
+  const { planos, assinatura, loading, alterarPlano, isOwnerTenant, podeAlterarPlano } =
+    useSubscription();
   const [isChangingPlan, setIsChangingPlan] = useState(false);
+  const planActionsLocked = isOwnerTenant || !podeAlterarPlano;
 
   const handlePlanSelect = async (plano: Plano) => {
+    if (planActionsLocked) {
+      return;
+    }
+
     if (assinatura && plano.id !== assinatura.plano.id) {
       setIsChangingPlan(true);
       try {
@@ -44,6 +50,7 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
     switch (codigo) {
       case 'starter':
         return <Users className="h-8 w-8" />;
+      case 'business':
       case 'professional':
         return <Star className="h-8 w-8" />;
       case 'enterprise':
@@ -56,6 +63,7 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
   const getPlanColor = (codigo: string) => {
     switch (codigo) {
       case 'starter':
+      case 'business':
       case 'professional':
       case 'enterprise':
         return 'text-[#159A9C]';
@@ -67,6 +75,7 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
   const getPlanBorderColor = (codigo: string) => {
     switch (codigo) {
       case 'starter':
+      case 'business':
       case 'professional':
       case 'enterprise':
       default:
@@ -109,8 +118,68 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
     return limit.toLocaleString('pt-BR');
   };
 
+  const getPlanPositioning = (codigo: string): string => {
+    switch (codigo) {
+      case 'starter':
+        return 'Operacao inicial com foco em estrutura comercial essencial.';
+      case 'business':
+      case 'professional':
+        return 'Escala de vendas com processos integrados entre equipes.';
+      case 'enterprise':
+        return 'Governanca, seguranca e operacao multiequipe de alta complexidade.';
+      default:
+        return 'Plano flexivel para evoluir com a sua operacao.';
+    }
+  };
+
+  const getPlanValuePillars = (plano: Plano): string[] => {
+    const pilares: string[] = [];
+
+    if (planoTemModulo(plano, 'CRM')) {
+      pilares.push('CRM e relacionamento');
+    }
+    if (planoTemModulo(plano, 'ATENDIMENTO')) {
+      pilares.push('Atendimento omnichannel');
+    }
+    if (planoTemModulo(plano, 'VENDAS')) {
+      pilares.push('Pipeline e propostas');
+    }
+    if (planoTemModulo(plano, 'FINANCEIRO')) {
+      pilares.push('Financeiro integrado');
+    }
+    if (planoTemModulo(plano, 'BILLING')) {
+      pilares.push('Gestao de assinaturas');
+    }
+    if (planoTemModulo(plano, 'ADMINISTRACAO')) {
+      pilares.push('Governanca avancada');
+    }
+
+    if (plano.whiteLabel) {
+      pilares.push('White-label');
+    }
+
+    pilares.push(plano.suportePrioritario ? 'Suporte prioritario' : 'Suporte padrao');
+
+    return Array.from(new Set(pilares)).slice(0, 4);
+  };
+
+  const getPlanModulesSummary = (plano: Plano): string => {
+    const nomes = (plano.modulosInclusos || [])
+      .map((modulo) => String(modulo.nome || '').trim())
+      .filter(Boolean);
+
+    if (nomes.length === 0) {
+      return '--';
+    }
+
+    const principais = nomes.slice(0, 3).join(', ');
+    return nomes.length > 3 ? `${principais} +${nomes.length - 3}` : principais;
+  };
+
   const getRecommendedPlan = () => {
-    const prioritizedPlan = planos.find((plano) => plano.codigo === 'professional');
+    const prioritizedPlan = planos.find(
+      (plano) => plano.codigo === 'business' || plano.codigo === 'professional',
+    );
     if (prioritizedPlan) {
       return prioritizedPlan.codigo;
     }
@@ -136,6 +205,16 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
 
   return (
     <div className="space-y-6">
+      {planActionsLocked && (
+        <div className="mx-auto flex max-w-4xl items-start gap-3 rounded-lg border border-[#F4D7A1] bg-[#FFF8E8] p-4 text-sm text-[#7A4D0E]">
+          <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+          <span>
+            Tenant proprietario com politica interna: checkout e alteracoes de plano ficam
+            desabilitados neste ambiente.
+          </span>
+        </div>
+      )}
+
       <div className="text-center">
         <h2 className="text-3xl font-bold text-[#002333]">Escolha o Plano Ideal</h2>
         <p className="mt-4 text-lg text-[#385A6A]">Planos flexiveis que crescem com sua empresa</p>
@@ -182,31 +261,24 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
               </CardHeader>
 
               <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <Users className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm text-[#244455]">
-                      {formatLimit(plano.limiteUsuarios)} usuarios
-                    </span>
-                  </div>
+                <div className="rounded-lg border border-[#DEEFE7] bg-[#F6FAF9] p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#5A7582]">
+                    Perfil recomendado
+                  </p>
+                  <p className="mt-1 text-sm text-[#244455]">{getPlanPositioning(plano.codigo)}</p>
+                </div>
 
-                  <div className="flex items-center gap-3">
-                    <UserCheck className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm text-[#244455]">
-                      {formatLimit(plano.limiteClientes)} clientes
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <Database className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm text-[#244455]">{getStorageLabel(plano.limiteStorage)} de armazenamento</span>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <Zap className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm text-[#244455]">
-                      {formatLimit(plano.limiteApiCalls)} API calls/hora
-                    </span>
+                <div>
+                  <h4 className="text-sm font-medium text-[#244455]">Beneficios principais:</h4>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {getPlanValuePillars(plano).map((pilar) => (
+                      <span
+                        key={pilar}
+                        className="rounded-full border border-[#D4E2E7] bg-white px-2 py-1 text-xs text-[#244455]"
+                      >
+                        {pilar}
+                      </span>
+                    ))}
                   </div>
                 </div>
 
@@ -258,9 +330,44 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
                   </div>
                 )}
 
+                <details className="rounded-lg border border-[#DEEFE7] bg-white p-3">
+                  <summary className="cursor-pointer text-sm font-medium text-[#244455]">
+                    Detalhes tecnicos de capacidade
+                  </summary>
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center gap-3">
+                      <Users className="h-4 w-4 text-gray-400" />
+                      <span className="text-sm text-[#244455]">
+                        {formatLimit(plano.limiteUsuarios)} usuarios
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <UserCheck className="h-4 w-4 text-gray-400" />
+                      <span className="text-sm text-[#244455]">
+                        {formatLimit(plano.limiteClientes)} clientes
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <Database className="h-4 w-4 text-gray-400" />
+                      <span className="text-sm text-[#244455]">
+                        {getStorageLabel(plano.limiteStorage)} de armazenamento
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <Zap className="h-4 w-4 text-gray-400" />
+                      <span className="text-sm text-[#244455]">
+                        {formatLimit(plano.limiteApiCalls)} API calls/dia
+                      </span>
+                    </div>
+                  </div>
+                </details>
+
                 <Button
                   onClick={() => handlePlanSelect(plano)}
-                  disabled={isCurrent || isChangingPlan}
+                  disabled={isCurrent || isChangingPlan || planActionsLocked}
                   className={`
                     w-full mt-6
                     ${isCurrent ? 'bg-green-600 hover:bg-green-700' : ''}
@@ -268,7 +375,13 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
                   `}
                   size="lg"
                 >
-                  {isCurrent ? 'Plano Atual' : assinatura ? 'Alterar para este Plano' : 'Escolher este Plano'}
+                  {isCurrent
+                    ? 'Plano Atual'
+                    : planActionsLocked
+                      ? 'Gerenciado internamente'
+                      : assinatura
+                        ? 'Alterar para este Plano'
+                        : 'Escolher este Plano'}
                 </Button>
               </CardContent>
             </Card>
@@ -296,42 +409,51 @@ export const PlanSelection: React.FC<PlanSelectionProps> = ({
                 </thead>
                 <tbody className="space-y-2">
                   <tr className="border-b border-[#DEEFE7]">
-                    <td className="py-2 text-[#244455] whitespace-nowrap">Usuarios</td>
+                    <td className="py-2 text-[#244455] whitespace-nowrap">Perfil recomendado</td>
                     {planos.map((plano) => (
                       <td key={plano.id} className="py-2 text-center text-[#244455] whitespace-nowrap">
-                        {formatLimit(plano.limiteUsuarios)}
+                        {getPlanPositioning(plano.codigo)}
                       </td>
                     ))}
                   </tr>
                   <tr className="border-b border-[#DEEFE7]">
-                    <td className="py-2 text-[#244455] whitespace-nowrap">Clientes</td>
+                    <td className="py-2 text-[#244455] whitespace-nowrap">Beneficios-chave</td>
                     {planos.map((plano) => (
                       <td key={plano.id} className="py-2 text-center text-[#244455] whitespace-nowrap">
-                        {formatLimit(plano.limiteClientes)}
+                        {getPlanValuePillars(plano).join(' • ')}
                       </td>
                     ))}
                   </tr>
                   <tr className="border-b border-[#DEEFE7]">
-                    <td className="py-2 text-[#244455] whitespace-nowrap">Storage</td>
+                    <td className="py-2 text-[#244455] whitespace-nowrap">Modulos principais</td>
                     {planos.map((plano) => (
                       <td key={plano.id} className="py-2 text-center text-[#244455] whitespace-nowrap">
-                        {getStorageLabel(plano.limiteStorage)}
+                        {getPlanModulesSummary(plano)}
                       </td>
                     ))}
                   </tr>
                   <tr className="border-b border-[#DEEFE7]">
-                    <td className="py-2 text-[#244455] whitespace-nowrap">API calls/hora</td>
+                    <td className="py-2 text-[#244455] whitespace-nowrap">Suporte</td>
                     {planos.map((plano) => (
                       <td key={plano.id} className="py-2 text-center text-[#244455] whitespace-nowrap">
-                        {formatLimit(plano.limiteApiCalls)}
+                        {plano.suportePrioritario ? 'Prioritario' : 'Padrao'}
                       </td>
                     ))}
                   </tr>
-                  <tr>
+                  <tr className="border-b border-[#DEEFE7]">
                     <td className="py-2 text-[#244455] whitespace-nowrap">White-label</td>
                     {planos.map((plano) => (
                       <td key={plano.id} className="py-2 text-center text-[#244455] whitespace-nowrap">
                         {plano.whiteLabel ? 'Sim' : '--'}
+                      </td>
+                    ))}
+                  </tr>
+                  <tr>
+                    <td className="py-2 text-[#244455] whitespace-nowrap">Capacidade tecnica</td>
+                    {planos.map((plano) => (
+                      <td key={plano.id} className="py-2 text-center text-[#5A7582] whitespace-nowrap">
+                        Usuarios {formatLimit(plano.limiteUsuarios)} | Clientes{' '}
+                        {formatLimit(plano.limiteClientes)}
                       </td>
                     ))}
                   </tr>

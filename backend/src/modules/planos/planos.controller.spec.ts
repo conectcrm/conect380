@@ -11,6 +11,7 @@ describe('PlanosController (legacy write transition)', () => {
     'desativar',
     'ativar',
     'toggleStatus',
+    'bootstrapDefaults',
   ];
 
   it.each(methodNames)(

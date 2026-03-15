@@ -85,7 +85,7 @@ const PLANOS = [
   {
     id: 'starter',
     nome: 'Starter',
-    preco: 99,
+    preco: 149,
     descricao: 'Ideal para pequenas empresas',
     recursos: [
       'Até 3 usuários',
@@ -97,9 +97,9 @@ const PLANOS = [
     popular: false,
   },
   {
-    id: 'professional',
-    nome: 'Professional',
-    preco: 299,
+    id: 'business',
+    nome: 'Business',
+    preco: 549,
     descricao: 'Para empresas em crescimento',
     recursos: [
       'Até 10 usuários',
@@ -114,7 +114,7 @@ const PLANOS = [
   {
     id: 'enterprise',
     nome: 'Enterprise',
-    preco: 899,
+    preco: 1790,
     descricao: 'Para grandes operações',
     recursos: [
       'Usuários ilimitados',
@@ -145,7 +145,7 @@ export const RegistroEmpresaPage: React.FC = () => {
   } = useForm<RegistroFormData>({
     resolver: yupResolver(registroSchema),
     defaultValues: {
-      plano: 'professional', // Plano padrão
+      plano: 'business', // Plano padrão
     },
   });
 

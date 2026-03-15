@@ -16,9 +16,9 @@ Definir baseline unico de planos para uso comercial, billing e entitlement backe
 
 | Plano | Preco mensal (BRL) | Usuarios | Clientes | Storage | API calls por dia | WhatsApp conexoes | Email envios por dia | White label | Suporte |
 |---|---:|---:|---:|---:|---:|---:|---:|---|---|
-| STARTER | 99 | 3 | 1000 | 5 GB | 5000 | 1 | 100 | Nao | Email |
-| BUSINESS | 299 | 10 | 10000 | 50 GB | 50000 | 5 | 1000 | Parcial | Prioritario |
-| ENTERPRISE | 899 | Ilimitado* | Ilimitado* | 500 GB | 500000 | 20 | 10000 | Completo | Dedicado |
+| STARTER | 149 | 3 | 1000 | 5 GB | 5000 | 1 | 100 | Nao | Email |
+| BUSINESS | 549 | 10 | 10000 | 50 GB | 50000 | 5 | 1000 | Parcial | Prioritario |
+| ENTERPRISE | 1790 | Ilimitado* | Ilimitado* | 500 GB | 500000 | 20 | 10000 | Completo | Dedicado |
 
 `*` Implementacao tecnica pode usar sentinela interna (`-1` ou valor alto) para ilimitado.
 

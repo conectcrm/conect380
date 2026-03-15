@@ -135,4 +135,12 @@ export class PlanosController {
 
     return plano;
   }
+
+  @Post('bootstrap-defaults')
+  @UseGuards(LegacyAdminTransitionGuard)
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
+  @Permissions(Permission.PLANOS_MANAGE)
+  async bootstrapDefaults(@Body() body?: { overwrite?: boolean }) {
+    return this.planosService.bootstrapDefaults({ overwrite: Boolean(body?.overwrite) });
+  }
 }

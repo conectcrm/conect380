@@ -18,7 +18,7 @@ export class Plano {
   nome: string;
 
   @Column({ length: 50, unique: true })
-  codigo: string; // starter, professional, enterprise
+  codigo: string; // starter, business, enterprise
 
   @Column({ type: 'text', nullable: true })
   descricao: string;
@@ -36,7 +36,7 @@ export class Plano {
   limiteStorage: number;
 
   @Column({ type: 'int', default: 1000 })
-  limiteApiCalls: number; // por hora
+  limiteApiCalls: number; // por dia
 
   @Column({ type: 'boolean', default: false })
   whiteLabel: boolean;

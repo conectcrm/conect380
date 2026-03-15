@@ -11,9 +11,14 @@ import { EmpresaModuloController } from '../modules/empresas/controllers/empresa
 import { EmpresaConfig } from '../modules/empresas/entities/empresa-config.entity';
 import { EmpresaConfigService } from '../modules/empresas/services/empresa-config.service';
 import { EmpresaConfigController } from '../modules/empresas/controllers/empresa-config.controller';
+import { PlanosModule } from '../modules/planos/planos.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Empresa, User, EmpresaModulo, EmpresaConfig]), MailModule],
+  imports: [
+    TypeOrmModule.forFeature([Empresa, User, EmpresaModulo, EmpresaConfig]),
+    MailModule,
+    PlanosModule,
+  ],
   controllers: [
     // ⚠️ ORDEM CRÍTICA: Rotas específicas ANTES de rotas dinâmicas!
     // EmpresaConfigController tem @Controller('empresas/config') → deve vir ANTES

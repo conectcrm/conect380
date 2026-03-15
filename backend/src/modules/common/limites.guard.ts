@@ -63,6 +63,10 @@ export class LimitesGuard implements CanActivate {
           return true;
       }
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
       console.error('Erro ao verificar limites:', error);
       throw new HttpException('Erro interno do servidor', HttpStatus.INTERNAL_SERVER_ERROR);
     }
@@ -107,6 +111,10 @@ export class LimitesGuard implements CanActivate {
   }
 
   private verificarLimiteStorage(limites: any, verificacao: LimiteVerificacao): boolean {
+    if (Number(limites?.limiteStorage) < 0) {
+      return true;
+    }
+
     if (verificacao.operacao === 'criar' && verificacao.quantidadeAdicional) {
       const storageAposUpload = limites.storageUtilizado + verificacao.quantidadeAdicional;
 
