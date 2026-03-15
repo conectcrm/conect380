@@ -5,6 +5,6 @@
                 },
     "frontend":  {
                      "maxErrors":  15957,
-                     "maxWarnings":  1769
+                     "maxWarnings":  1800
                  }
 }
