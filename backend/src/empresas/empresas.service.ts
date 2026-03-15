@@ -24,6 +24,11 @@ type RegistroEmpresaConsentAuditMeta = {
 export class EmpresasService {
   private readonly logger = new Logger(EmpresasService.name);
   private static readonly DASHBOARD_V2_FLAG_KEY = 'dashboard_v2_enabled';
+  private static readonly OPORTUNIDADES_LIFECYCLE_FLAG_KEY = 'crm_oportunidades_lifecycle_v1';
+  private static readonly SELF_SIGNUP_ENABLE_OPORTUNIDADES_LIFECYCLE =
+    String(process.env.SELF_SIGNUP_ENABLE_OPORTUNIDADES_LIFECYCLE || 'true')
+      .trim()
+      .toLowerCase() !== 'false';
   private static readonly SELF_SIGNUP_PLANOS_CANONICOS = new Set(
     DEFAULT_PLANOS_SISTEMA.map((plano) => String(plano.codigo || '').trim().toLowerCase()),
   );
@@ -305,17 +310,25 @@ export class EmpresasService {
     private assinaturasService: AssinaturasService,
   ) {}
 
-  private async habilitarDashboardV2ParaEmpresa(empresaId: string): Promise<void> {
+  private async upsertTenantFeatureFlag(input: {
+    empresaId: string;
+    flagKey: string;
+    enabled: boolean;
+    rolloutPercentage?: number;
+    updatedBy?: string | null;
+  }): Promise<void> {
+    const rolloutPercentage = Math.max(0, Math.min(100, Number(input.rolloutPercentage || 0)));
+
     await this.featureFlagTenantRepository
       .createQueryBuilder()
       .insert()
       .into(FeatureFlagTenant)
       .values({
-        empresa_id: empresaId,
-        flag_key: EmpresasService.DASHBOARD_V2_FLAG_KEY,
-        enabled: true,
-        rollout_percentage: 0,
-        updated_by: null,
+        empresa_id: input.empresaId,
+        flag_key: input.flagKey,
+        enabled: input.enabled,
+        rollout_percentage: rolloutPercentage,
+        updated_by: input.updatedBy || null,
         updated_at: new Date(),
       })
       .orUpdate(
@@ -323,6 +336,26 @@ export class EmpresasService {
         ['empresa_id', 'flag_key'],
       )
       .execute();
+  }
+
+  private async habilitarDashboardV2ParaEmpresa(empresaId: string): Promise<void> {
+    await this.upsertTenantFeatureFlag({
+      empresaId,
+      flagKey: EmpresasService.DASHBOARD_V2_FLAG_KEY,
+      enabled: true,
+      rolloutPercentage: 0,
+      updatedBy: null,
+    });
+  }
+
+  private async habilitarLifecycleOportunidadesParaEmpresa(empresaId: string): Promise<void> {
+    await this.upsertTenantFeatureFlag({
+      empresaId,
+      flagKey: EmpresasService.OPORTUNIDADES_LIFECYCLE_FLAG_KEY,
+      enabled: true,
+      rolloutPercentage: 0,
+      updatedBy: null,
+    });
   }
 
   async registrarEmpresa(
@@ -483,6 +516,22 @@ export class EmpresasService {
           flagError instanceof Error ? flagError.message : 'erro desconhecido ao habilitar flag';
         this.logger.warn(
           `[REGISTRO_EMPRESA] Falha ao habilitar dashboard_v2_enabled para empresa ${empresaSalva.id}: ${flagMessage}`,
+        );
+      }
+
+      if (EmpresasService.SELF_SIGNUP_ENABLE_OPORTUNIDADES_LIFECYCLE) {
+        try {
+          await this.habilitarLifecycleOportunidadesParaEmpresa(empresaSalva.id);
+        } catch (flagError) {
+          const flagMessage =
+            flagError instanceof Error ? flagError.message : 'erro desconhecido ao habilitar flag';
+          this.logger.warn(
+            `[REGISTRO_EMPRESA] Falha ao habilitar crm_oportunidades_lifecycle_v1 para empresa ${empresaSalva.id}: ${flagMessage}`,
+          );
+        }
+      } else {
+        this.logger.debug(
+          `[REGISTRO_EMPRESA] crm_oportunidades_lifecycle_v1 nao habilitada para empresa ${empresaSalva.id} porque SELF_SIGNUP_ENABLE_OPORTUNIDADES_LIFECYCLE=false`,
         );
       }
 

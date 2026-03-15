@@ -47,6 +47,23 @@ DO UPDATE SET
    - smoke com transicoes lifecycle: `powershell -ExecutionPolicy Bypass -File scripts/test-opp304-piloto-lifecycle.ps1 -BaseUrl <url_homolog> -Token <jwt_valido> -RunLifecycleActions -OportunidadeId <id_aberta> -ClosedOportunidadeId <id_fechada>`;
    - validar relatorio em `docs/features/evidencias/OPP304_PILOTO_API_SMOKE_<timestamp>.md`.
 
+### 4.1 Pacote de normalizacao (lote)
+
+Para alinhar owner tenant e clientes no mesmo comportamento de lifecycle:
+
+1. Auditoria (dry-run, sem escrita):
+   - `npm run audit:opp304:lifecycle`
+2. Aplicacao em lote (todos os tenants ativos):
+   - `npm run normalize:opp304:lifecycle:apply`
+3. Aplicacao segmentada por lista de empresas:
+   - `powershell -ExecutionPolicy Bypass -File scripts/normalize-opp304-lifecycle-flags.ps1 -Apply -EmpresaIds "<empresa_id_1>,<empresa_id_2>"`
+4. Evidencia automatica:
+   - `docs/features/evidencias/OPP304_NORMALIZACAO_LIFECYCLE_<timestamp>.md`
+
+Observacao para novos tenants:
+
+1. Manter `SELF_SIGNUP_ENABLE_OPORTUNIDADES_LIFECYCLE=true` no backend para registrar a flag no onboarding e evitar drift entre empresas novas e antigas.
+
 ## 5. Monitoramento nas primeiras 48h
 
 Indicadores minimos:
