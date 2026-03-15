@@ -67,7 +67,6 @@ const PATH_PREFIX_TO_MODULE: Array<{ prefix: string; module: EntitlementModule }
   { prefix: '/admin', module: 'ADMINISTRACAO' },
   { prefix: '/users', module: 'ADMINISTRACAO' },
   { prefix: '/users-debug', module: 'ADMINISTRACAO' },
-  { prefix: '/empresas/modulos', module: 'ADMINISTRACAO' },
   { prefix: '/empresas/config', module: 'ADMINISTRACAO' },
 ];
 

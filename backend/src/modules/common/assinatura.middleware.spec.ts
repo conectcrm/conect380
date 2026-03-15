@@ -91,6 +91,37 @@ describe('AssinaturaMiddleware', () => {
     }
   });
 
+  it('nao bloqueia consulta de modulos ativos da propria empresa', async () => {
+    assinaturasService.buscarPorEmpresa.mockResolvedValueOnce({
+      status: 'active',
+      usuariosAtivos: 1,
+      clientesCadastrados: 10,
+      storageUtilizado: 1024,
+      apiCallsHoje: 2,
+      plano: {
+        nome: 'Starter',
+        limiteUsuarios: 3,
+        limiteClientes: 1000,
+        limiteStorage: 1024 * 1024 * 1024,
+        limiteApiCalls: 5000,
+        modulosInclusos: [{ modulo: { codigo: 'CRM' } }],
+      },
+    });
+
+    const next = jest.fn();
+    await middleware.use(
+      {
+        path: '/empresas/modulos/ativos',
+        method: 'GET',
+        user: { empresaId: '11111111-1111-1111-1111-111111111111' },
+      } as any,
+      {} as any,
+      next,
+    );
+
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
   it('falha fechado quando ocorre erro interno de validacao', async () => {
     assinaturasService.buscarPorEmpresa.mockRejectedValueOnce(new Error('db_offline'));
 

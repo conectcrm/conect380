@@ -53,6 +53,11 @@ export class PlanosService {
   }
 
   async buscarPorCodigo(codigo: string): Promise<Plano> {
+    const codigoNormalizado = String(codigo || '').trim().toLowerCase();
+    const codigosCanonicos = new Set(
+      DEFAULT_PLANOS_SISTEMA.map((planoDefault) => String(planoDefault.codigo).toLowerCase()),
+    );
+
     let plano = await this.planoRepository.findOne({
       where: { codigo },
       relations: ['modulosInclusos', 'modulosInclusos.modulo'],
@@ -68,6 +73,21 @@ export class PlanosService {
 
     if (!plano) {
       throw new NotFoundException(`Plano com codigo ${codigo} nao encontrado`);
+    }
+
+    if (
+      codigosCanonicos.has(codigoNormalizado) &&
+      (!plano.modulosInclusos || plano.modulosInclusos.length === 0)
+    ) {
+      await this.bootstrapDefaults({ overwrite: false });
+      plano = await this.planoRepository.findOne({
+        where: { codigo },
+        relations: ['modulosInclusos', 'modulosInclusos.modulo'],
+      });
+    }
+
+    if (!plano || !plano.modulosInclusos || plano.modulosInclusos.length === 0) {
+      throw new NotFoundException(`Plano com codigo ${codigo} sem modulos vinculados`);
     }
 
     return plano;
@@ -290,6 +310,7 @@ export class PlanosService {
         ordem: planoDefault.ordem,
       };
       let shouldSyncModules = false;
+      let existingModuleLinks = 0;
 
       if (!plano) {
         plano = this.planoRepository.create(payload);
@@ -310,6 +331,16 @@ export class PlanosService {
         plano = await this.planoRepository.save(plano);
         planosAtualizados += 1;
         shouldSyncModules = true;
+      }
+
+      if (plano && !shouldSyncModules) {
+        existingModuleLinks = await this.planoModuloRepository.count({
+          where: { plano: { id: plano.id } },
+        });
+
+        if (existingModuleLinks === 0) {
+          shouldSyncModules = true;
+        }
       }
 
       const moduleIds = planoDefault.modulosCodigos

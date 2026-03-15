@@ -168,6 +168,7 @@ export class OportunidadesController {
   }
 
   @Get('atividades/resumo-gerencial')
+  @Permissions(Permission.DASHBOARD_READ)
   getResumoAtividadesComerciais(
     @EmpresaId() empresaId: string,
     @Query('periodStart') periodStart?: string,
