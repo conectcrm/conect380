@@ -362,7 +362,7 @@ const installGuardianBillingMocks = async (page: Page) => {
 };
 
 test.describe('Guardian billing governance - plan catalog', () => {
-  test('cria, edita, alterna status e remove plano', async ({ page }) => {
+  test('cria, edita e alterna status de plano', async ({ page }) => {
     await page.addInitScript(() => {
       window.localStorage.setItem('guardian_auth_token', 'guardian-mock-token');
       window.localStorage.setItem(
@@ -427,15 +427,11 @@ test.describe('Guardian billing governance - plan catalog', () => {
     expect(calls.updated).toHaveLength(1);
     expect(calls.updated[0].modulosInclusos).toEqual(expect.arrayContaining(['mod-api', 'mod-finance']));
 
-    await createdRow.getByRole('button', { name: 'Desativar' }).click();
+    await createdRow.getByRole('button', { name: 'Arquivar' }).click();
     await expect(createdRow).toContainText('Inativo');
-    expect(calls.toggled.length).toBeGreaterThanOrEqual(1);
 
-    page.once('dialog', (dialog) => dialog.accept());
-    await createdRow.getByRole('button', { name: 'Excluir' }).click();
-
-    await expect(page.getByText('Plano Enterprise Plus removido com sucesso.')).toBeVisible();
-    await expect(catalogTable).not.toContainText('Enterprise Plus');
-    expect(calls.deleted.length).toBeGreaterThanOrEqual(1);
+    await createdRow.getByRole('button', { name: 'Reativar' }).click();
+    await expect(createdRow).toContainText('Ativo');
+    expect(calls.toggled.length).toBeGreaterThanOrEqual(2);
   });
 });
