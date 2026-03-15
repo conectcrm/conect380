@@ -15,6 +15,8 @@ import { UsersDebugController } from './users-debug.controller';
 import { UserActivitiesService } from './services/user-activities.service';
 import { UserActivitiesController } from './user-activities.controller';
 import { AdminBreakGlassAccessService } from './services/admin-break-glass-access.service';
+import { LimitesGuard } from '../common/limites.guard';
+import { PlanosModule } from '../planos/planos.module';
 
 const usersDevControllers = process.env.NODE_ENV === 'development' ? [UsersDebugController] : [];
 
@@ -30,9 +32,10 @@ const usersDevControllers = process.env.NODE_ENV === 'development' ? [UsersDebug
       Notification,
     ]),
     NotificationModule,
+    PlanosModule,
     MulterModule.register({}),
   ],
-  providers: [UsersService, UserActivitiesService, AdminBreakGlassAccessService],
+  providers: [UsersService, UserActivitiesService, AdminBreakGlassAccessService, LimitesGuard],
   controllers: [UsersController, ...usersDevControllers, UserActivitiesController],
   exports: [UsersService, UserActivitiesService, AdminBreakGlassAccessService, TypeOrmModule],
 })

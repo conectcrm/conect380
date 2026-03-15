@@ -118,7 +118,7 @@ describe('menuConfig permission filtering', () => {
     expect(hasAccess).toBe(true);
   });
 
-  it('keeps admin role with governance-only defaults', () => {
+  it('keeps admin role with tenant operational + governance defaults', () => {
     const adminUsers = canUserAccessPath('/configuracoes/usuarios', ALL_MODULES, {
       email: 'admin@empresa.com',
       role: 'admin',
@@ -136,8 +136,8 @@ describe('menuConfig permission filtering', () => {
     } as any);
 
     expect(adminUsers).toBe(true);
-    expect(adminComercial).toBe(false);
-    expect(adminFinanceiro).toBe(false);
+    expect(adminComercial).toBe(true);
+    expect(adminFinanceiro).toBe(true);
   });
 
   it('requires both ticket create and cliente read for ticket create page', () => {

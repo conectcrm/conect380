@@ -41,6 +41,7 @@ import {
 import { resolveUserPermissions } from '../../common/permissions/permissions.utils';
 import { CurrentUser } from '../../common/decorators/user.decorator';
 import { User, UserRole } from './user.entity';
+import { LimitesGuard, VerificarLimites } from '../common/limites.guard';
 import {
   UserAccessChangeAction,
   UserAccessChangeRequest,
@@ -1327,6 +1328,8 @@ export class UsersController {
   @Post()
   @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
   @Permissions(Permission.USERS_CREATE)
+  @UseGuards(LimitesGuard)
+  @VerificarLimites({ tipo: 'usuarios', operacao: 'criar' })
   @ApiOperation({ summary: 'Criar novo usuário' })
   @ApiResponse({ status: 201, description: 'Usuário criado com sucesso' })
   async criarUsuario(@CurrentUser() user: User, @Body() dadosUsuario: any) {

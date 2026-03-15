@@ -201,7 +201,7 @@ export class DashboardService {
       regiao,
       empresaId,
     );
-    const valorMeta = metaNoPeriodo > 0 ? metaNoPeriodo : 450000;
+    const valorMeta = Math.max(0, Number(metaNoPeriodo || 0));
 
     // Faturamento Total
     const faturamentoAtual = await this.calculateFaturamento(
@@ -561,14 +561,20 @@ export class DashboardService {
       const variacao =
         vendasAnterior > 0 ? ((vendasAtual - vendasAnterior) / vendasAnterior) * 100 : 0;
 
-      // Meta do vendedor (exemplo: 20% da meta total)
-      const meta = this.getMeta(periodo) * 0.2;
+      const metaNoPeriodo = await this.metasService.getMetaValorParaRange(
+        dataInicio,
+        dataFim,
+        vendedor.id,
+        undefined,
+        empresaId,
+      );
+      const meta = Math.max(0, Number(metaNoPeriodo || 0));
 
       // Badges baseados na performance
       const badges = this.calculateBadges(vendasAtual, meta, variacao);
 
       // Cor baseada na performance
-      const progressoMeta = (vendasAtual / meta) * 100;
+      const progressoMeta = meta > 0 ? (vendasAtual / meta) * 100 : 0;
       const cor = this.getVendedorCor(progressoMeta);
 
       ranking.push({
@@ -615,7 +621,7 @@ export class DashboardService {
     const ranking =
       precomputed?.ranking ??
       (await this.getVendedoresRanking(periodo, empresaId, vendedorId));
-    const vendedoresEmRisco = ranking.filter((v) => v.vendas / v.meta < 0.7);
+    const vendedoresEmRisco = ranking.filter((v) => v.meta > 0 && v.vendas / v.meta < 0.7);
 
     for (const vendedor of vendedoresEmRisco) {
       alertas.push({
@@ -666,7 +672,7 @@ export class DashboardService {
     // Verificar conquistas
     const kpis =
       precomputed?.kpis ?? (await this.getKPIs(periodo, vendedorId, undefined, empresaId));
-    if (kpis.faturamentoTotal.valor >= kpis.faturamentoTotal.meta) {
+    if (kpis.faturamentoTotal.meta > 0 && kpis.faturamentoTotal.valor >= kpis.faturamentoTotal.meta) {
       alertas.push({
         id: 'meta-superada',
         tipo: 'conquista',
@@ -881,24 +887,6 @@ export class DashboardService {
         return 'vs ano anterior';
       default:
         return 'vs período anterior';
-    }
-  }
-
-  private getMeta(periodo: string): number {
-    // Metas exemplo - em produção, viriam do banco
-    switch (periodo) {
-      case 'semanal':
-        return 112500;
-      case 'mensal':
-        return 450000;
-      case 'trimestral':
-        return 1350000;
-      case 'semestral':
-        return 2700000;
-      case 'anual':
-        return 5400000;
-      default:
-        return 450000;
     }
   }
 
@@ -1198,7 +1186,7 @@ export class DashboardService {
 
   private calculateBadges(vendas: number, meta: number, variacao: number): string[] {
     const badges: string[] = [];
-    const progressoMeta = (vendas / meta) * 100;
+    const progressoMeta = meta > 0 ? (vendas / meta) * 100 : 0;
 
     if (progressoMeta >= 110) badges.push('top_performer');
     if (progressoMeta >= 100) badges.push('goal_crusher');
@@ -1248,7 +1236,7 @@ export class DashboardService {
     const metaMensal =
       metaNoPeriodo > 0
         ? Number((metaNoPeriodo / mesesNoRange).toFixed(2))
-        : Number(this.getMeta('mensal'));
+        : 0;
 
     const vendasMensais = this.buildVendasMensais(propostas, dataInicio, dataFim, metaMensal);
     const propostasPorStatus = this.buildPropostasPorStatus(propostas);

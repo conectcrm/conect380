@@ -40,7 +40,7 @@ export class LimitesGuard implements CanActivate {
       return true; // Sem limite definido, permite acesso
     }
 
-    const empresaId = request.user?.empresaId;
+    const empresaId = this.resolveEmpresaId(request?.user);
 
     if (!empresaId) {
       throw new HttpException('Usuário não autenticado', HttpStatus.UNAUTHORIZED);
@@ -70,6 +70,16 @@ export class LimitesGuard implements CanActivate {
       console.error('Erro ao verificar limites:', error);
       throw new HttpException('Erro interno do servidor', HttpStatus.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  private resolveEmpresaId(user: any): string | null {
+    const candidate = user?.empresaId ?? user?.empresa_id;
+    if (typeof candidate !== 'string') {
+      return null;
+    }
+
+    const normalized = candidate.trim();
+    return normalized.length > 0 ? normalized : null;
   }
 
   private verificarLimiteUsuarios(limites: any, verificacao: LimiteVerificacao): boolean {

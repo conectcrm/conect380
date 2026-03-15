@@ -274,6 +274,13 @@ const FINANCEIRO_DEFAULT_PERMISSIONS = [
   'crm.clientes.read',
 ];
 
+const ADMIN_OPERATIONAL_PERMISSIONS = [
+  ...CRM_FULL_PERMISSIONS,
+  ...COMERCIAL_FULL_PERMISSIONS,
+  ...ATENDIMENTO_MANAGER_PERMISSIONS,
+  ...FINANCEIRO_DEFAULT_PERMISSIONS,
+];
+
 const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
   superadmin: [...ALL_PERMISSION_VALUES],
   admin: [
@@ -281,6 +288,7 @@ const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
     ...BASIC_PROFILE_PERMISSIONS,
     ...INSIGHTS_PERMISSIONS,
     ...CONFIG_FULL_PERMISSIONS,
+    ...ADMIN_OPERATIONAL_PERMISSIONS,
     'planos.manage',
     'admin.empresas.manage',
   ],

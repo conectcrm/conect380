@@ -83,6 +83,14 @@ describe('UsersController Security', () => {
     expect(result.data.senha).toBeUndefined();
   });
 
+  it('aplica verificacao de limite de usuarios na rota de criacao', () => {
+    const limiteMetadata = Reflect.getMetadata('limite-verificacao', controller.criarUsuario);
+    expect(limiteMetadata).toEqual({
+      tipo: 'usuarios',
+      operacao: 'criar',
+    });
+  });
+
   it('registra solicitacao pendente ao criar usuario quando dupla aprovacao estiver ativa', async () => {
     const admin = {
       id: 'admin-1',
