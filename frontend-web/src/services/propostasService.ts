@@ -34,6 +34,7 @@ export interface ProdutoProposta {
 export interface Proposta {
   id?: string;
   numero?: string;
+  isPropostaPrincipal?: boolean;
   cliente: Cliente;
   vendedor?: {
     id: string;
@@ -45,19 +46,54 @@ export interface Proposta {
   descontoGlobal: number;
   impostos: number;
   total: number;
-  status: 'rascunho' | 'enviada' | 'aprovada' | 'rejeitada' | 'expirada';
+  status:
+    | 'rascunho'
+    | 'enviada'
+    | 'visualizada'
+    | 'negociacao'
+    | 'aprovada'
+    | 'contrato_gerado'
+    | 'contrato_assinado'
+    | 'fatura_criada'
+    | 'aguardando_pagamento'
+    | 'pago'
+    | 'rejeitada'
+    | 'expirada';
+  motivoPerda?: string;
   formaPagamento: string;
   validadeDias: number;
   observacoes?: string;
   incluirImpostosPDF?: boolean;
   oportunidade?: {
-    id: number;
+    id: string;
     titulo: string;
     estagio: string;
     valor: number;
   };
   createdAt?: Date;
   updatedAt?: Date;
+  versoes?: Array<{
+    versao?: number;
+    criadaEm?: string;
+    timestamp?: string;
+    snapshot?: {
+      total?: number;
+      valor?: number;
+      status?: string;
+    };
+  }>;
+  emailDetails?: {
+    versoes?: Array<{
+      versao?: number;
+      criadaEm?: string;
+      timestamp?: string;
+      snapshot?: {
+        total?: number;
+        valor?: number;
+        status?: string;
+      };
+    }>;
+  };
 }
 
 export interface PropostaCreate {
@@ -90,6 +126,35 @@ export interface PropostaEstatisticas {
   propostasAprovadas: number;
   estatisticasPorStatus: Record<string, number>;
   estatisticasPorVendedor: Record<string, number>;
+  motivosPerdaTop?: Array<{ motivo: string; quantidade: number }>;
+  conversaoPorVendedor?: Array<{
+    vendedor: string;
+    total: number;
+    ganhas: number;
+    perdidas: number;
+    taxaConversao: number;
+  }>;
+  conversaoPorProduto?: Array<{
+    produto: string;
+    total: number;
+    ganhas: number;
+    perdidas: number;
+    taxaConversao: number;
+  }>;
+  aprovacoesPendentes?: number;
+  followupsPendentes?: number;
+  propostasComVersao?: number;
+  mediaVersoesPorProposta?: number;
+  revisoesUltimos7Dias?: number;
+  usoItensVsCombos?: {
+    itensAvulsos: number;
+    combos: number;
+    propostasComItensAvulsos: number;
+    propostasComCombos: number;
+    propostasMistas: number;
+    percentualItensAvulsos: number;
+    percentualCombos: number;
+  };
 }
 
 class PropostasService {
@@ -164,10 +229,112 @@ class PropostasService {
       ...proposta,
       cliente: proposta.cliente ? { ...proposta.cliente } : proposta.cliente,
       vendedor: proposta.vendedor ? { ...proposta.vendedor } : undefined,
+      oportunidade: proposta.oportunidade ? { ...proposta.oportunidade } : undefined,
       produtos: Array.isArray(proposta.produtos)
         ? proposta.produtos.map((produto) => ({ ...produto }))
         : [],
     };
+  }
+
+  private isComboItem(item: unknown): boolean {
+    if (!item || typeof item !== 'object') {
+      return false;
+    }
+
+    const record = item as Record<string, unknown>;
+    const tipo = String(record.tipo ?? record.itemTipo ?? '').trim().toLowerCase();
+    if (tipo === 'combo' || tipo.includes('combo')) {
+      return true;
+    }
+
+    const origem = String(record.origem ?? '').trim().toLowerCase();
+    if (origem === 'combo' || origem.includes('combo')) {
+      return true;
+    }
+
+    const unidade = String(record.unidade ?? '').trim().toLowerCase();
+    if (unidade === 'combo' || unidade === 'pacote') {
+      return true;
+    }
+
+    if (record.comboId || record.combo_id || record.idCombo) {
+      return true;
+    }
+
+    return Array.isArray(record.produtosCombo) && record.produtosCombo.length > 0;
+  }
+
+  private normalizeUsoItensVsCombos(
+    payload: unknown,
+  ): NonNullable<PropostaEstatisticas['usoItensVsCombos']> {
+    const usage = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
+    const itensAvulsos = Number(usage.itensAvulsos || 0);
+    const combos = Number(usage.combos || 0);
+    const totalItens = Math.max(itensAvulsos + combos, 0);
+    const percentualItensAvulsosPayload = Number(usage.percentualItensAvulsos);
+    const percentualCombosPayload = Number(usage.percentualCombos);
+
+    return {
+      itensAvulsos,
+      combos,
+      propostasComItensAvulsos: Number(usage.propostasComItensAvulsos || 0),
+      propostasComCombos: Number(usage.propostasComCombos || 0),
+      propostasMistas: Number(usage.propostasMistas || 0),
+      percentualItensAvulsos:
+        Number.isFinite(percentualItensAvulsosPayload) && percentualItensAvulsosPayload >= 0
+          ? percentualItensAvulsosPayload
+          : totalItens > 0
+            ? Number(((itensAvulsos / totalItens) * 100).toFixed(2))
+            : 0,
+      percentualCombos:
+        Number.isFinite(percentualCombosPayload) && percentualCombosPayload >= 0
+          ? percentualCombosPayload
+          : totalItens > 0
+            ? Number(((combos / totalItens) * 100).toFixed(2))
+            : 0,
+    };
+  }
+
+  private calcularUsoItensVsCombos(propostas: Proposta[]): NonNullable<PropostaEstatisticas['usoItensVsCombos']> {
+    let itensAvulsos = 0;
+    let combos = 0;
+    let propostasComItensAvulsos = 0;
+    let propostasComCombos = 0;
+    let propostasMistas = 0;
+
+    propostas.forEach((proposta) => {
+      let propostaTemItemAvulso = false;
+      let propostaTemCombo = false;
+
+      (proposta.produtos || []).forEach((item) => {
+        if (this.isComboItem(item)) {
+          combos += 1;
+          propostaTemCombo = true;
+          return;
+        }
+
+        itensAvulsos += 1;
+        propostaTemItemAvulso = true;
+      });
+
+      if (propostaTemItemAvulso) {
+        propostasComItensAvulsos += 1;
+      }
+      if (propostaTemCombo) {
+        propostasComCombos += 1;
+      }
+      if (propostaTemItemAvulso && propostaTemCombo) {
+        propostasMistas += 1;
+      }
+    });
+
+    return this.normalizeUsoItensVsCombos({
+      itensAvulsos,
+      combos,
+      propostasComItensAvulsos,
+      propostasComCombos,
+      propostasMistas,
+    });
   }
 
   private isRateLimitError(error: unknown): boolean {
@@ -305,9 +472,16 @@ class PropostasService {
     }
   }
 
-  async updateStatus(id: string, status: Proposta['status']): Promise<Proposta> {
+  async updateStatus(
+    id: string,
+    status: Proposta['status'],
+    metadata?: { source?: string; observacoes?: string; motivoPerda?: string },
+  ): Promise<Proposta> {
     try {
-      const response = await api.put(`${this.baseURL}/${id}/status`, { status });
+      const response = await api.put(`${this.baseURL}/${id}/status`, {
+        status,
+        ...(metadata || {}),
+      });
       this.clearCache();
       return response.data?.proposta || response.data;
     } catch (error) {
@@ -316,17 +490,87 @@ class PropostasService {
     }
   }
 
+  async definirComoPrincipal(id: string): Promise<Proposta> {
+    try {
+      const response = await api.put(`${this.baseURL}/${id}/principal`);
+      this.clearCache();
+      return response.data?.proposta || response.data;
+    } catch (error) {
+      console.error('Erro ao definir proposta principal:', error);
+      throw this.buildDomainError('definir a proposta principal', error);
+    }
+  }
+
   async getEstatisticas(): Promise<PropostaEstatisticas> {
     try {
+      try {
+        const response = await api.get(`${this.baseURL}/estatisticas/dashboard`);
+        const payload = response.data?.success === false ? null : response.data;
+
+        if (payload && typeof payload === 'object' && payload.totalPropostas !== undefined) {
+          return {
+            totalPropostas: Number(payload.totalPropostas || 0),
+            valorTotalPipeline: Number(payload.valorTotalPipeline || 0),
+            taxaConversao: Number(payload.taxaConversao || 0),
+            propostasAprovadas: Number(payload.propostasAprovadas || 0),
+            estatisticasPorStatus: payload.estatisticasPorStatus || {},
+            estatisticasPorVendedor: payload.estatisticasPorVendedor || {},
+            motivosPerdaTop: Array.isArray(payload.motivosPerdaTop)
+              ? payload.motivosPerdaTop
+              : [],
+            conversaoPorVendedor: Array.isArray(payload.conversaoPorVendedor)
+              ? payload.conversaoPorVendedor
+              : [],
+            conversaoPorProduto: Array.isArray(payload.conversaoPorProduto)
+              ? payload.conversaoPorProduto
+              : [],
+            aprovacoesPendentes: Number(payload.aprovacoesPendentes || 0),
+            followupsPendentes: Number(payload.followupsPendentes || 0),
+            propostasComVersao: Number(payload.propostasComVersao || 0),
+            mediaVersoesPorProposta: Number(payload.mediaVersoesPorProposta || 0),
+            revisoesUltimos7Dias: Number(payload.revisoesUltimos7Dias || 0),
+            usoItensVsCombos: this.normalizeUsoItensVsCombos(payload.usoItensVsCombos),
+          };
+        }
+      } catch (dashboardError) {
+        console.warn('Falha ao carregar dashboard de propostas no backend, usando fallback local.');
+      }
+
       const propostas = await this.findAll();
       const totalPropostas = propostas.length;
       const valorTotalPipeline = propostas.reduce((total, p) => total + (p.total || 0), 0);
       const propostasAprovadas = propostas.filter((p) => p.status === 'aprovada').length;
       const taxaConversao = totalPropostas > 0 ? (propostasAprovadas / totalPropostas) * 100 : 0;
+      const usoItensVsCombos = this.calcularUsoItensVsCombos(propostas);
+      const limiteRevisaoRecente = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      let propostasComVersao = 0;
+      let totalVersoes = 0;
+      let revisoesUltimos7Dias = 0;
 
       const estatisticasPorStatus: Record<string, number> = {};
       propostas.forEach((p) => {
         estatisticasPorStatus[p.status] = (estatisticasPorStatus[p.status] || 0) + 1;
+
+        const versoes = Array.isArray((p as any).versoes)
+          ? (p as any).versoes
+          : Array.isArray((p as any).emailDetails?.versoes)
+            ? (p as any).emailDetails.versoes
+            : [];
+        const quantidadeVersoes = versoes.length;
+
+        if (quantidadeVersoes > 1) {
+          propostasComVersao += 1;
+        }
+        totalVersoes += Math.max(quantidadeVersoes, 1);
+
+        const possuiRevisaoRecente = versoes.some((versao: any) => {
+          const timestamp = new Date(versao?.criadaEm || versao?.timestamp || '').getTime();
+          return Number.isFinite(timestamp) && timestamp >= limiteRevisaoRecente;
+        });
+
+        if (possuiRevisaoRecente) {
+          revisoesUltimos7Dias += 1;
+        }
       });
 
       const estatisticasPorVendedor: Record<string, number> = {
@@ -342,6 +586,16 @@ class PropostasService {
         propostasAprovadas,
         estatisticasPorStatus,
         estatisticasPorVendedor,
+        motivosPerdaTop: [],
+        conversaoPorVendedor: [],
+        conversaoPorProduto: [],
+        aprovacoesPendentes: 0,
+        followupsPendentes: 0,
+        propostasComVersao,
+        mediaVersoesPorProposta:
+          totalPropostas > 0 ? Number((totalVersoes / totalPropostas).toFixed(2)) : 0,
+        revisoesUltimos7Dias,
+        usoItensVsCombos,
       };
     } catch (error) {
       console.error('Erro ao calcular estatísticas:', error);
@@ -378,6 +632,56 @@ class PropostasService {
       console.error('Erro ao converter proposta em pedido:', error);
       throw this.buildDomainError('converter a proposta em pedido', error);
     }
+  }
+
+  async obterEstatisticasProposta(propostaId: string): Promise<any> {
+    const response = await api.get(`${this.baseURL}/${propostaId}/estatisticas`);
+    return response.data;
+  }
+
+  async agendarLembrete(propostaId: string, diasApos: number): Promise<any> {
+    const response = await api.post(`${this.baseURL}/${propostaId}/agendar-lembrete`, { diasApos });
+    return response.data;
+  }
+
+  async obterPropostasExpiradas(vendedorId?: string): Promise<any[]> {
+    const query = vendedorId ? `?vendedorId=${encodeURIComponent(vendedorId)}` : '';
+    const response = await api.get(`${this.baseURL}/expiradas${query}`);
+    return Array.isArray(response.data) ? response.data : [];
+  }
+
+  async reativarProposta(propostaId: string, novaDataValidade: string): Promise<any> {
+    const response = await api.post(`${this.baseURL}/${propostaId}/reativar`, {
+      novaDataValidade,
+    });
+    this.clearCache();
+    return response.data;
+  }
+
+  async obterHistoricoProposta(propostaId: string): Promise<any> {
+    const response = await api.get(`${this.baseURL}/${propostaId}/historico`);
+    return response.data;
+  }
+
+  async obterAprovacaoInterna(propostaId: string): Promise<any> {
+    const response = await api.get(`${this.baseURL}/${propostaId}/aprovacao`);
+    return response.data?.aprovacao || response.data;
+  }
+
+  async solicitarAprovacaoInterna(
+    propostaId: string,
+    payload?: { solicitadaPorId?: string; solicitadaPorNome?: string; observacoes?: string },
+  ): Promise<any> {
+    const response = await api.post(`${this.baseURL}/${propostaId}/aprovacao/solicitar`, payload || {});
+    return response.data?.aprovacao || response.data;
+  }
+
+  async decidirAprovacaoInterna(
+    propostaId: string,
+    payload: { aprovada: boolean; usuarioId?: string; usuarioNome?: string; observacoes?: string },
+  ): Promise<any> {
+    const response = await api.post(`${this.baseURL}/${propostaId}/aprovacao/decidir`, payload);
+    return response.data?.aprovacao || response.data;
   }
 
   validateProposta(proposta: Partial<Proposta>): { valid: boolean; errors: string[] } {

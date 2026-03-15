@@ -12,13 +12,17 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permission } from '../../../common/permissions/permissions.constants';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { TiposServicoService } from '../services/tipos-servico.service';
 import { CreateTipoServicoDto } from '../dto/create-tipo-servico.dto';
 import { UpdateTipoServicoDto } from '../dto/update-tipo-servico.dto';
 
 @Controller('configuracoes-tickets/tipos-servico')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.ATENDIMENTO_SLA_MANAGE)
 export class TiposServicoController {
   constructor(private readonly tiposService: TiposServicoService) {}
 

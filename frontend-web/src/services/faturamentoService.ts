@@ -51,7 +51,7 @@ export interface ItemFatura {
 export interface Fatura {
   id: number;
   numero: string;
-  contratoId: string;
+  contratoId?: string;
   contrato?: any;
   clienteId: number;
   cliente?: any;
@@ -70,6 +70,7 @@ export interface Fatura {
   valorPago?: number;
   percentualDesconto?: number;
   formaPagamento?: FormaPagamento;
+  formaPagamentoPreferida?: FormaPagamento;
   observacoes?: string;
   linkPagamento?: string;
   arquivoUrl?: string;
@@ -82,7 +83,7 @@ export interface Fatura {
 }
 
 export interface NovaFatura {
-  contratoId: string;
+  contratoId?: string;
   clienteId: string; // UUID string
   usuarioResponsavelId: string;
   tipo: TipoFatura;
@@ -122,13 +123,24 @@ export interface NovoPagamento {
   observacoes?: string;
 }
 
+export interface EstatisticasPagamentos {
+  totalPagamentos: number;
+  valorTotal: number;
+  valorLiquido: number;
+  taxasTotal: number;
+  porMetodo: Record<string, { quantidade: number; valor: number }>;
+  porStatus: Record<string, { quantidade: number; valor: number }>;
+}
+
 export interface FiltrosFatura {
   busca?: string;
   status?: StatusFatura;
   tipo?: TipoFatura;
   clienteId?: number;
+  contratoId?: number;
   dataInicial?: string;
   dataFinal?: string;
+  periodoCampo?: 'emissao' | 'vencimento';
   valorMinimo?: number;
   valorMaximo?: number;
   usuarioResponsavelId?: number;
@@ -186,6 +198,21 @@ export type FaturasPaginadasResponse = {
   aggregates?: Aggregates;
 };
 
+export interface EnvioFaturaEmailResultado {
+  enviado: boolean;
+  simulado: boolean;
+  motivo?: string;
+  detalhes?: string;
+  message?: string;
+}
+
+export interface EnvioFaturaEmailPayload {
+  email?: string;
+  templateId?: string;
+  assunto?: string;
+  conteudo?: string;
+}
+
 // Serviço
 export const faturamentoService = {
   // ==================== FATURAS ====================
@@ -209,6 +236,7 @@ export const faturamentoService = {
           clienteId: 'clienteId',
           dataInicial: 'dataInicio',
           dataFinal: 'dataFim',
+          periodoCampo: 'periodoCampo',
           formaPagamento: 'formaPagamento',
           vencidas: 'vencidas',
           q: 'q',
@@ -340,6 +368,16 @@ export const faturamentoService = {
     }
   },
 
+  async marcarFaturaComoPaga(id: number, valorPago: number): Promise<Fatura> {
+    try {
+      const response = await api.put(`/faturamento/faturas/${id}/pagar`, { valorPago });
+      return response.data.data || response.data;
+    } catch (error) {
+      console.error('Erro ao marcar fatura como paga:', error);
+      throw error;
+    }
+  },
+
   async excluirFatura(id: number): Promise<void> {
     try {
       await api.delete(`/faturamento/faturas/${id}`);
@@ -360,9 +398,32 @@ export const faturamentoService = {
     }
   },
 
-  async enviarFaturaPorEmail(id: number, email?: string): Promise<void> {
+  async enviarFaturaPorEmail(
+    id: number,
+    payload?: string | EnvioFaturaEmailPayload,
+  ): Promise<EnvioFaturaEmailResultado> {
     try {
-      await api.post(`/faturamento/faturas/${id}/enviar-email`, { email });
+      const body = typeof payload === 'string' ? { email: payload } : payload || {};
+      const response = await api.post(`/faturamento/faturas/${id}/enviar-email`, body);
+      const responsePayload = response?.data ?? {};
+      const data = responsePayload?.data ?? responsePayload ?? {};
+      const enviado = typeof data?.enviado === 'boolean' ? data.enviado : true;
+      const simulado = Boolean(data?.simulado);
+      const motivo =
+        typeof data?.motivo === 'string' && data.motivo.trim().length > 0 ? data.motivo : undefined;
+      const detalhes =
+        typeof data?.detalhes === 'string' && data.detalhes.trim().length > 0
+          ? data.detalhes
+          : undefined;
+      const message =
+        typeof responsePayload?.message === 'string' && responsePayload.message.trim().length > 0
+          ? responsePayload.message
+          : undefined;
+
+      if (!enviado) {
+        throw new Error(message || 'Falha ao enviar fatura por email.');
+      }
+      return { enviado, simulado, motivo, detalhes, message };
     } catch (error) {
       console.error('Erro ao enviar fatura por email:', error);
       throw error;
@@ -371,8 +432,10 @@ export const faturamentoService = {
 
   async gerarLinkPagamento(id: number): Promise<string> {
     try {
-      const response = await api.post(`/faturamento/faturas/${id}/link-pagamento`);
-      return response.data.data?.linkPagamento || response.data.linkPagamento;
+      void id;
+      throw new Error(
+        'Link de pagamento ainda nao esta disponivel na API de faturamento desta versao',
+      );
     } catch (error) {
       console.error('Erro ao gerar link de pagamento:', error);
       throw error;
@@ -381,10 +444,10 @@ export const faturamentoService = {
 
   async baixarPDF(id: number): Promise<Blob> {
     try {
-      const response = await api.get(`/faturamento/faturas/${id}/pdf`, {
-        responseType: 'blob',
-      });
-      return response.data;
+      void id;
+      throw new Error(
+        'Download de PDF de fatura ainda nao esta disponivel na API de faturamento desta versao',
+      );
     } catch (error) {
       console.error('Erro ao baixar PDF da fatura:', error);
       throw error;
@@ -453,9 +516,34 @@ export const faturamentoService = {
 
   async obterEstatisticas(periodo?: { inicio: string; fim: string }) {
     try {
-      const params = periodo ? `?inicio=${periodo.inicio}&fim=${periodo.fim}` : '';
-      const response = await api.get(`/faturamento/relatorios/estatisticas${params}`);
-      return response.data.data || response.data;
+      const res = await this.listarFaturasPaginadas({
+        dataInicial: periodo?.inicio,
+        dataFinal: periodo?.fim,
+        page: 1,
+        pageSize: 1000,
+      });
+
+      const faturas = res.data || [];
+      const totalFaturas = res.total ?? faturas.length;
+      const valorTotal = Number(res.aggregates?.valorTotal ?? 0);
+      const valorRecebido = Number(res.aggregates?.valorRecebido ?? 0);
+      const valorEmAberto = Number(res.aggregates?.valorEmAberto ?? 0);
+
+      return {
+        totalFaturas,
+        valorTotal,
+        valorRecebido,
+        valorEmAberto,
+        faturasPagas: faturas.filter((f) => f.status === StatusFatura.PAGA).length,
+        faturasPendentes: faturas.filter((f) =>
+          [
+            StatusFatura.PENDENTE,
+            StatusFatura.ENVIADA,
+            StatusFatura.PARCIALMENTE_PAGA,
+          ].includes(f.status),
+        ).length,
+        faturasVencidas: faturas.filter((f) => f.status === StatusFatura.VENCIDA).length,
+      };
     } catch (error) {
       console.error('Erro ao obter estatísticas:', error);
       throw error;
@@ -464,10 +552,59 @@ export const faturamentoService = {
 
   async obterFaturasVencidas(): Promise<Fatura[]> {
     try {
-      const response = await api.get('/faturamento/relatorios/vencidas');
-      return response.data.data || response.data;
+      return await this.listarFaturas({
+        status: StatusFatura.VENCIDA,
+        page: 1,
+        pageSize: 200,
+      });
     } catch (error) {
       console.error('Erro ao obter faturas vencidas:', error);
+      throw error;
+    }
+  },
+
+  async obterEstatisticasPagamentos(periodo?: {
+    dataInicio?: string;
+    dataFim?: string;
+    gateway?: string;
+  }): Promise<EstatisticasPagamentos> {
+    try {
+      const params = new URLSearchParams();
+      if (periodo?.dataInicio) params.append('dataInicio', periodo.dataInicio);
+      if (periodo?.dataFim) params.append('dataFim', periodo.dataFim);
+      if (periodo?.gateway) params.append('gateway', periodo.gateway);
+
+      const response = await api.get(`/faturamento/pagamentos/estatisticas?${params.toString()}`);
+      return response.data?.data || response.data;
+    } catch (error) {
+      console.error('Erro ao obter estatísticas de pagamentos:', error);
+      throw error;
+    }
+  },
+
+  async enviarLembretesVencimento(): Promise<void> {
+    try {
+      await api.post('/faturamento/enviar-lembretes-vencimento');
+    } catch (error) {
+      console.error('Erro ao enviar lembretes de vencimento:', error);
+      throw error;
+    }
+  },
+
+  async verificarFaturasVencidas(): Promise<void> {
+    try {
+      await api.post('/faturamento/verificar-faturas-vencidas');
+    } catch (error) {
+      console.error('Erro ao verificar faturas vencidas:', error);
+      throw error;
+    }
+  },
+
+  async processarCobrancasRecorrentes(): Promise<void> {
+    try {
+      await api.post('/faturamento/processar-cobrancas-recorrentes');
+    } catch (error) {
+      console.error('Erro ao processar cobrancas recorrentes:', error);
       throw error;
     }
   },

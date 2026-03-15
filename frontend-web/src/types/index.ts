@@ -4,9 +4,35 @@ export interface User {
   nome: string;
   email: string;
   telefone?: string;
-  role: 'superadmin' | 'admin' | 'manager' | 'vendedor' | 'user';
+  role:
+  | 'superadmin'
+  | 'admin'
+  | 'manager'
+  | 'gerente'
+  | 'vendedor'
+  | 'user'
+  | 'suporte'
+  | 'financeiro'
+  | string;
+  permissoes?: string[];
+  permissions?: string[];
+  roles?: string[];
   avatar_url?: string;
+  configuracoes?: {
+    tema?: string;
+    notificacoes?: {
+      email?: boolean;
+      push?: boolean;
+    };
+    seguranca?: {
+      mfa_login_habilitado?: boolean;
+    };
+    mfa_login_habilitado?: boolean;
+  };
   idioma_preferido: string;
+  ultimo_login?: string | Date | null;
+  created_at?: string | Date | null;
+  updated_at?: string | Date | null;
   empresa: {
     id: string;
     nome: string;
@@ -63,18 +89,33 @@ export interface LoginRequest {
   senha: string;
 }
 
+export interface LoginSuccessData {
+  access_token: string;
+  refresh_token: string;
+  user: User;
+}
+
+export interface TrocarSenhaActionData {
+  userId: string;
+  email: string;
+  nome: string;
+}
+
+export interface MfaRequiredActionData {
+  challengeId: string;
+  email: string;
+  expiresInSeconds: number;
+  canResendAfterSeconds: number;
+  deliveryChannel?: 'email' | 'dev_fallback';
+  devCode?: string;
+}
+
 export interface LoginResponse {
   success: boolean;
-  action?: 'TROCAR_SENHA'; // ✅ Ação de trocar senha (primeiro acesso)
+  action?: 'TROCAR_SENHA' | 'MFA_REQUIRED';
   data:
-  | {
-    access_token: string;
-    user: User;
-  }
-  | {
-    userId: string;
-    email: string;
-    nome: string;
-  }; // ✅ Data pode ser token+user OU dados para trocar senha
+  | LoginSuccessData
+  | TrocarSenhaActionData
+  | MfaRequiredActionData;
   message: string;
 }

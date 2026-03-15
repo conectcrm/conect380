@@ -24,6 +24,10 @@ COPY frontend-web/ ./
 # Argumentos de build (podem ser substituídos)
 ARG REACT_APP_API_URL=http://localhost:3500
 ENV REACT_APP_API_URL=$REACT_APP_API_URL
+ARG REACT_APP_WS_URL=http://localhost:3500
+ENV REACT_APP_WS_URL=$REACT_APP_WS_URL
+ARG REACT_APP_WEBSOCKET_URL=
+ENV REACT_APP_WEBSOCKET_URL=$REACT_APP_WEBSOCKET_URL
 
 # Build de produção otimizado
 RUN npm run build
@@ -44,7 +48,7 @@ EXPOSE 80
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://localhost/ || exit 1
+  CMD wget --quiet --tries=1 --spider http://127.0.0.1/health || exit 1
 
 # Nginx roda automaticamente
 CMD ["nginx", "-g", "daemon off;"]

@@ -11,6 +11,7 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  Req,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { LeadsService } from './leads.service';
@@ -22,13 +23,18 @@ import {
   LeadFiltros,
 } from './dto/lead.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Public } from '../auth/decorators/public.decorator';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { Permission } from '../../common/permissions/permissions.constants';
 import { EmpresaId, SkipEmpresaValidation } from '../../common/decorators/empresa.decorator';
+import { CurrentUser } from '../../common/decorators/user.decorator';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { StatusLead, OrigemLead } from './lead.entity';
 
 @Controller('leads')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
 export class LeadsController {
   constructor(private readonly leadsService: LeadsService) {}
 
@@ -36,23 +42,35 @@ export class LeadsController {
    * Capturar lead de formulário público (SEM autenticação)
    */
   @Post('capture')
+  @Public()
   @SkipEmpresaValidation()
-  capturePublic(@Body() dto: CaptureLeadDto) {
-    return this.leadsService.captureFromPublic(dto);
+  capturePublic(@Body() dto: CaptureLeadDto, @Req() req: any) {
+    const hostHeader = req?.headers?.['x-forwarded-host'] || req?.headers?.host;
+    return this.leadsService.captureFromPublic(dto, {
+      host: Array.isArray(hostHeader) ? hostHeader[0] : hostHeader,
+      query: (req?.query || {}) as Record<string, unknown>,
+    });
   }
 
   /**
    * Criar novo lead (COM autenticação)
    */
   @Post()
-  create(@Body() createLeadDto: CreateLeadDto, @EmpresaId() empresaId: string) {
-    return this.leadsService.create(createLeadDto, empresaId);
+  @Permissions(Permission.CRM_LEADS_CREATE)
+  create(
+    @Body() createLeadDto: CreateLeadDto,
+    @EmpresaId() empresaId: string,
+    @CurrentUser() user: { id?: string; sub?: string },
+  ) {
+    const actorUserId = user?.id || user?.sub;
+    return this.leadsService.create(createLeadDto, empresaId, actorUserId);
   }
 
   /**
    * Listar todos os leads com filtros
    */
   @Get()
+  @Permissions(Permission.CRM_LEADS_READ)
   findAll(
     @EmpresaId() empresaId: string,
     @Query() pagination: PaginationDto,
@@ -81,6 +99,7 @@ export class LeadsController {
    * Obter estatísticas de leads
    */
   @Get('estatisticas')
+  @Permissions(Permission.CRM_LEADS_READ)
   getEstatisticas(@EmpresaId() empresaId: string) {
     return this.leadsService.getEstatisticas(empresaId);
   }
@@ -89,6 +108,7 @@ export class LeadsController {
    * Buscar lead por ID
    */
   @Get(':id')
+  @Permissions(Permission.CRM_LEADS_READ)
   findOne(@Param('id') id: string, @EmpresaId() empresaId: string) {
     return this.leadsService.findOne(id, empresaId);
   }
@@ -97,6 +117,7 @@ export class LeadsController {
    * Atualizar lead
    */
   @Patch(':id')
+  @Permissions(Permission.CRM_LEADS_UPDATE)
   update(
     @Param('id') id: string,
     @Body() updateLeadDto: UpdateLeadDto,
@@ -109,6 +130,7 @@ export class LeadsController {
    * Deletar lead
    */
   @Delete(':id')
+  @Permissions(Permission.CRM_LEADS_DELETE)
   remove(@Param('id') id: string, @EmpresaId() empresaId: string) {
     return this.leadsService.remove(id, empresaId);
   }
@@ -117,18 +139,27 @@ export class LeadsController {
    * Converter lead em oportunidade
    */
   @Post(':id/converter')
+  @Permissions(Permission.CRM_LEADS_UPDATE)
   converter(
     @Param('id') id: string,
     @Body() convertLeadDto: ConvertLeadDto,
     @EmpresaId() empresaId: string,
+    @CurrentUser() user: { id?: string; sub?: string },
   ) {
-    return this.leadsService.converterParaOportunidade(id, convertLeadDto, empresaId);
+    const actorUserId = user?.id || user?.sub;
+    return this.leadsService.converterParaOportunidade(
+      id,
+      convertLeadDto,
+      empresaId,
+      actorUserId,
+    );
   }
 
   /**
    * Importar leads de arquivo CSV
    */
   @Post('import')
+  @Permissions(Permission.CRM_LEADS_CREATE)
   @UseInterceptors(FileInterceptor('file'))
   async importCsv(@UploadedFile() file: Express.Multer.File, @EmpresaId() empresaId: string) {
     if (!file) {

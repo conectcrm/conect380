@@ -13,152 +13,219 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.4;
-            color: #333;
-            background: #fff;
-            font-size: 14px;
+            color: #0f172a;
+            background: #ffffff;
+            line-height: 1.45;
+            font-size: 12px;
         }
 
         .container {
             max-width: 210mm;
             margin: 0 auto;
-            padding: 15px;
+            padding: 16px;
         }
 
-        /* Header */
         .header {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            padding: 15px 0;
+            gap: 16px;
+            padding-bottom: 14px;
             border-bottom: 2px solid #159A9C;
-            margin-bottom: 20px;
         }
 
-        .logo-section {
-            flex: 1;
-        }
-
-        .company-logo {
-            max-height: 60px;
-            max-width: 180px;
-        }
-
-        .company-info {
-            margin-top: 8px;
-            font-size: 11px;
-            color: #666;
-            line-height: 1.3;
-        }
-
-        .proposal-info {
-            text-align: right;
-            flex: 1;
-        }
-
-        .proposal-number {
-            font-size: 20px;
-            font-weight: bold;
-            color: #159A9C;
-            margin-bottom: 3px;
-        }
-
-        .proposal-date {
-            font-size: 12px;
-            color: #666;
-        }
-
-        /* Title Section */
-        .title-section {
-            text-align: center;
-            margin: 20px 0;
-            padding: 15px;
-            background: linear-gradient(135deg, #159A9C, #127577);
-            color: white;
-            border-radius: 6px;
-        }
-
-        .main-title {
+        .company-name {
             font-size: 22px;
-            font-weight: bold;
-            margin-bottom: 5px;
+            font-weight: 700;
+            color: #0b3045;
+            margin-bottom: 4px;
         }
 
-        .subtitle {
+        .company-details {
+            color: #475569;
+            font-size: 11px;
+            line-height: 1.35;
+        }
+
+        .header-right {
+            min-width: 240px;
+            text-align: right;
+        }
+
+        .doc-title {
+            color: #0b3045;
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+        }
+
+        .doc-number {
+            margin-top: 2px;
+            color: #159A9C;
             font-size: 14px;
-            opacity: 0.9;
+            font-weight: 700;
         }
 
-        /* Client Info */
-        .client-section {
-            display: flex;
-            gap: 15px;
-            margin: 20px 0;
+        .status-chip {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
         }
 
-        .client-info, .vendor-info {
-            flex: 1;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            background: #f9f9f9;
+        .status-muted {
+            background: #e2e8f0;
+            color: #334155;
+        }
+
+        .status-info {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .status-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .status-danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        .meta-card {
+            border: 1px solid #dbe3ea;
+            border-radius: 8px;
+            padding: 10px;
+            background: #f8fafc;
+        }
+
+        .meta-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.35px;
+            color: #64748b;
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+
+        .meta-value {
+            color: #0b3045;
+            font-size: 12px;
+            font-weight: 600;
+            word-break: break-word;
+        }
+
+        .section {
+            margin-top: 16px;
         }
 
         .section-title {
-            font-size: 14px;
-            font-weight: bold;
-            color: #159A9C;
-            margin-bottom: 10px;
-            border-bottom: 1px solid #159A9C;
-            padding-bottom: 3px;
-        }
-
-        .info-row {
-            display: flex;
-            margin: 5px 0;
             font-size: 12px;
+            font-weight: 700;
+            color: #0b3045;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.35px;
         }
 
-        .info-label {
-            font-weight: 600;
-            min-width: 90px;
-            color: #555;
+        .overview-box {
+            border: 1px solid #dbe3ea;
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 12px;
+            white-space: pre-line;
+            color: #334155;
         }
 
-        .info-value {
-            flex: 1;
+        .parties-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
         }
 
-        /* Products/Services Table */
-        .products-section {
-            margin: 20px 0;
+        .party-card {
+            border: 1px solid #dbe3ea;
+            border-radius: 8px;
+            background: #ffffff;
+            padding: 10px;
+        }
+
+        .party-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #159A9C;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.35px;
+        }
+
+        .party-line {
+            margin: 2px 0;
+            color: #334155;
+            word-break: break-word;
+        }
+
+        .party-line strong {
+            color: #0f172a;
         }
 
         .products-table {
             width: 100%;
             border-collapse: collapse;
-            margin: 15px 0;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            font-size: 12px;
-        }
-
-        .products-table th {
-            background: #159A9C;
-            color: white;
-            padding: 10px 8px;
-            text-align: left;
-            font-weight: 600;
+            border: 1px solid #dbe3ea;
+            border-radius: 8px;
+            overflow: hidden;
             font-size: 11px;
         }
 
-        .products-table td {
+        .products-table thead th {
+            background: #159A9C;
+            color: #ffffff;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.35px;
             padding: 8px;
-            border-bottom: 1px solid #ddd;
-            vertical-align: top;
+            text-align: left;
         }
 
-        .products-table tr:nth-child(even) {
-            background: #f9f9f9;
+        .products-table td {
+            border-top: 1px solid #e2e8f0;
+            padding: 8px;
+            vertical-align: top;
+            color: #334155;
+        }
+
+        .products-table tbody tr:nth-child(even) {
+            background: #f8fafc;
+        }
+
+        .item-name {
+            color: #0f172a;
+            font-weight: 600;
+            margin-bottom: 3px;
+        }
+
+        .item-description {
+            color: #64748b;
+            white-space: pre-line;
+            line-height: 1.35;
         }
 
         .text-center {
@@ -171,330 +238,198 @@
 
         .currency {
             font-weight: 600;
-            color: #159A9C;
+            color: #0b3045;
         }
 
-        /* Product Description */
-        .product-name {
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 3px;
+        .summary-wrapper {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 12px;
         }
 
-        .product-desc {
-            font-size: 10px;
-            color: #666;
-            line-height: 1.3;
-        }
-
-        /* Totals Section */
-        .totals-section {
-            margin: 20px 0;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 6px;
-            border-left: 3px solid #159A9C;
-        }
-
-        .totals-table {
+        .summary-table {
             width: 100%;
-            max-width: 350px;
-            margin-left: auto;
-            font-size: 12px;
-        }
-
-        .totals-table td {
-            padding: 5px 10px;
-            border-bottom: 1px solid #ddd;
-        }
-
-        .total-final {
-            font-size: 16px;
-            font-weight: bold;
-            color: #159A9C;
-            border-top: 2px solid #159A9C;
-            background: white;
-        }
-
-        /* Terms Section */
-        .terms-section {
-            margin: 20px 0;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-        }
-
-        .terms-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin: 15px 0;
-        }
-
-        .term-item {
-            padding: 12px;
-            background: #f9f9f9;
-            border-radius: 4px;
-        }
-
-        .term-label {
-            font-weight: 600;
-            color: #159A9C;
-            margin-bottom: 3px;
+            max-width: 360px;
+            border: 1px solid #dbe3ea;
+            border-radius: 8px;
+            overflow: hidden;
             font-size: 11px;
         }
 
-        .term-value {
-            font-size: 12px;
+        .summary-table td {
+            padding: 7px 10px;
+            border-top: 1px solid #e2e8f0;
         }
 
-        /* Conditions */
-        .conditions-section {
-            margin: 20px 0;
+        .summary-table tr:first-child td {
+            border-top: none;
+        }
+
+        .summary-table tr.total-row td {
+            background: #ecfeff;
+            color: #0b3045;
+            font-size: 13px;
+            font-weight: 700;
+            border-top: 2px solid #159A9C;
+        }
+
+        .conditions-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .condition-card {
+            border: 1px solid #dbe3ea;
+            border-radius: 8px;
+            background: #f8fafc;
+            padding: 10px;
+        }
+
+        .condition-label {
+            color: #64748b;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.35px;
+            margin-bottom: 3px;
+            font-weight: 600;
+        }
+
+        .condition-value {
+            color: #0f172a;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: pre-line;
         }
 
         .conditions-list {
+            margin-top: 8px;
             list-style: none;
-            padding: 0;
         }
 
         .conditions-list li {
-            padding: 6px 0;
-            border-bottom: 1px solid #eee;
+            margin: 0 0 6px 0;
+            padding-left: 14px;
             position: relative;
-            padding-left: 20px;
+            color: #334155;
             font-size: 11px;
+            line-height: 1.35;
         }
 
-        .conditions-list li:before {
-            content: "✓";
+        .conditions-list li::before {
+            content: "•";
             position: absolute;
             left: 0;
+            top: 0;
             color: #159A9C;
-            font-weight: bold;
+            font-weight: 700;
         }
 
-        /* Signature Section */
-        .signature-section {
-            margin: 30px 0;
-            padding: 20px 0;
-            border-top: 2px solid #159A9C;
-        }
-
-        .signatures {
-            display: flex;
-            justify-content: space-between;
-            gap: 30px;
-            margin-top: 20px;
-        }
-
-        .signature-box {
-            flex: 1;
-            text-align: center;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            background: #f9f9f9;
-        }
-
-        .signature-line {
-            border-top: 1px solid #333;
-            margin: 30px 15px 10px;
-            position: relative;
-        }
-
-        .signature-label {
-            font-weight: 600;
-            margin-bottom: 5px;
-            font-size: 11px;
-        }
-
-        .signature-info {
-            font-size: 10px;
-            color: #666;
-        }
-
-        /* Footer */
         .footer {
-            margin-top: 30px;
-            padding: 15px 0;
-            border-top: 1px solid #ddd;
-            text-align: center;
+            margin-top: 20px;
+            border-top: 1px solid #dbe3ea;
+            padding-top: 8px;
+            color: #64748b;
             font-size: 10px;
-            color: #666;
+            text-align: right;
         }
 
-        /* Status Badge */
-        .status-badge {
-            display: inline-block;
-            padding: 3px 10px;
-            border-radius: 15px;
-            font-size: 10px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .status-draft {
-            background: #ffeaa7;
-            color: #d63031;
-        }
-
-        .status-sent {
-            background: #74b9ff;
-            color: #0984e3;
-        }
-
-        .status-approved {
-            background: #00b894;
-            color: white;
-        }
-
-        .status-rejected {
-            background: #e17055;
-            color: white;
-        }
-
-        /* Responsive */
         @media print {
             .container {
-                max-width: none;
                 margin: 0;
-                padding: 15px;
-            }
-            
-            .header {
-                margin-bottom: 20px;
-            }
-            
-            .signature-section {
-                margin: 30px 0;
+                max-width: none;
             }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
         <div class="header">
-            <div class="logo-section">
+            <div>
                 {{#if empresa.logo}}
-                <img src="{{empresa.logo}}" alt="{{empresa.nome}}" class="company-logo">
-                {{else}}
-                <div style="font-size: 24px; font-weight: bold; color: #159A9C;">{{empresa.nome}}</div>
+                <img src="{{empresa.logo}}" alt="{{empresa.nome}}" style="max-height: 44px; max-width: 180px; margin-bottom: 4px;">
                 {{/if}}
-                <div class="company-info">
-                    <div>{{empresa.endereco}}</div>
-                    <div>{{empresa.cidade}}, {{empresa.estado}} - {{empresa.cep}}</div>
-                    <div>{{empresa.telefone}} | {{empresa.email}}</div>
+                <div class="company-name">{{empresa.nome}}</div>
+                <div class="company-details">
+                    {{#if empresa.endereco}}<div>{{empresa.endereco}}</div>{{/if}}
+                    {{#if empresa.cidade}}<div>{{empresa.cidade}}{{#if empresa.estado}} - {{empresa.estado}}{{/if}}{{#if empresa.cep}} - {{empresa.cep}}{{/if}}</div>{{/if}}
+                    {{#if empresa.telefone}}<div>{{formatPhone empresa.telefone}}</div>{{/if}}
+                    {{#if empresa.email}}<div>{{empresa.email}}</div>{{/if}}
                     {{#if empresa.cnpj}}<div>CNPJ: {{empresa.cnpj}}</div>{{/if}}
                 </div>
             </div>
-            <div class="proposal-info">
-                <div class="proposal-number">PROPOSTA Nº {{numeroProposta}}</div>
-                <div class="proposal-date">{{dataEmissao}}</div>
-                <div style="margin-top: 10px;">
-                    <span class="status-badge status-{{status}}">{{statusText}}</span>
-                </div>
+            <div class="header-right">
+                <div class="doc-title">Proposta Comercial</div>
+                <div class="doc-number">#{{numeroProposta}}</div>
+                <span class="status-chip {{statusClass}}">{{statusText}}</span>
             </div>
         </div>
 
-        <!-- Title Section -->
-        <div class="title-section">
-            <div class="main-title">PROPOSTA COMERCIAL</div>
-            <div class="subtitle">{{titulo}}</div>
-        </div>
-
-        <!-- Client and Vendor Info -->
-        <div class="client-section">
-            <div class="client-info">
-                <div class="section-title">DADOS DO CLIENTE</div>
-                <div class="info-row">
-                    <span class="info-label">Nome/Empresa:</span>
-                    <span class="info-value">{{cliente.nome}}</span>
-                </div>
-                {{#if cliente.empresa}}
-                <div class="info-row">
-                    <span class="info-label">Empresa:</span>
-                    <span class="info-value">{{cliente.empresa}}</span>
-                </div>
-                {{/if}}
-                <div class="info-row">
-                    <span class="info-label">E-mail:</span>
-                    <span class="info-value">{{cliente.email}}</span>
-                </div>
-                {{#if cliente.telefone}}
-                <div class="info-row">
-                    <span class="info-label">Telefone:</span>
-                    <span class="info-value">{{cliente.telefone}}</span>
-                </div>
-                {{/if}}
-                {{#if cliente.documento}}
-                <div class="info-row">
-                    <span class="info-label">{{cliente.tipoDocumento}}:</span>
-                    <span class="info-value">{{cliente.documento}}</span>
-                </div>
-                {{/if}}
-                {{#if cliente.endereco}}
-                <div class="info-row">
-                    <span class="info-label">Endereço:</span>
-                    <span class="info-value">{{cliente.endereco}}</span>
-                </div>
-                {{/if}}
+        <div class="meta-grid">
+            <div class="meta-card">
+                <div class="meta-label">Emissão</div>
+                <div class="meta-value">{{dataEmissao}}</div>
             </div>
-
-            <div class="vendor-info">
-                <div class="section-title">DADOS DO VENDEDOR</div>
-                <div class="info-row">
-                    <span class="info-label">Nome:</span>
-                    <span class="info-value">{{vendedor.nome}}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">E-mail:</span>
-                    <span class="info-value">{{vendedor.email}}</span>
-                </div>
-                {{#if vendedor.telefone}}
-                <div class="info-row">
-                    <span class="info-label">Telefone:</span>
-                    <span class="info-value">{{vendedor.telefone}}</span>
-                </div>
-                {{/if}}
-                {{#if vendedor.cargo}}
-                <div class="info-row">
-                    <span class="info-label">Cargo:</span>
-                    <span class="info-value">{{vendedor.cargo}}</span>
-                </div>
-                {{/if}}
-                <div class="info-row">
-                    <span class="info-label">Data da Proposta:</span>
-                    <span class="info-value">{{dataEmissao}}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Validade:</span>
-                    <span class="info-value">{{dataValidade}}</span>
-                </div>
+            <div class="meta-card">
+                <div class="meta-label">Validade</div>
+                <div class="meta-value">{{dataValidade}}</div>
+            </div>
+            <div class="meta-card">
+                <div class="meta-label">Forma de pagamento</div>
+                <div class="meta-value">{{formaPagamento}}</div>
+            </div>
+            <div class="meta-card">
+                <div class="meta-label">Valor total</div>
+                <div class="meta-value">{{formatarMoeda valorTotal}}</div>
             </div>
         </div>
 
-        <!-- Description -->
-        {{#if descricao}}
-        <div class="terms-section">
-            <div class="section-title">DESCRIÇÃO DA PROPOSTA</div>
-            <p style="line-height: 1.8; color: #555;">{{descricao}}</p>
+        <div class="section">
+            <div class="section-title">Título da proposta</div>
+            <div class="overview-box">{{titulo}}</div>
+        </div>
+
+        {{#if temDescricao}}
+        <div class="section">
+            <div class="section-title">Escopo</div>
+            <div class="overview-box">{{descricao}}</div>
         </div>
         {{/if}}
 
-        <!-- Products/Services -->
-        <div class="products-section">
-            <div class="section-title">PRODUTOS/SERVIÇOS</div>
+        <div class="section">
+            <div class="section-title">Partes envolvidas</div>
+            <div class="parties-grid">
+                <div class="party-card">
+                    <div class="party-title">Cliente</div>
+                    <div class="party-line"><strong>Nome:</strong> {{cliente.nome}}</div>
+                    {{#if cliente.empresa}}<div class="party-line"><strong>Empresa:</strong> {{cliente.empresa}}</div>{{/if}}
+                    {{#if cliente.email}}<div class="party-line"><strong>E-mail:</strong> {{cliente.email}}</div>{{/if}}
+                    {{#if cliente.telefone}}<div class="party-line"><strong>Telefone:</strong> {{formatPhone cliente.telefone}}</div>{{/if}}
+                    {{#if cliente.documento}}<div class="party-line"><strong>{{cliente.tipoDocumento}}:</strong> {{cliente.documento}}</div>{{/if}}
+                    {{#if cliente.endereco}}<div class="party-line"><strong>Endereço:</strong> {{cliente.endereco}}</div>{{/if}}
+                </div>
+                <div class="party-card">
+                    <div class="party-title">Responsável comercial</div>
+                    <div class="party-line"><strong>Nome:</strong> {{vendedor.nome}}</div>
+                    {{#if vendedor.email}}<div class="party-line"><strong>E-mail:</strong> {{vendedor.email}}</div>{{/if}}
+                    {{#if vendedor.telefone}}<div class="party-line"><strong>Telefone:</strong> {{formatPhone vendedor.telefone}}</div>{{/if}}
+                    {{#if vendedor.cargo}}<div class="party-line"><strong>Cargo:</strong> {{vendedor.cargo}}</div>{{/if}}
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Itens da proposta</div>
             <table class="products-table">
                 <thead>
                     <tr>
-                        <th style="width: 5%;">Item</th>
-                        <th style="width: 40%;">Descrição</th>
-                        <th style="width: 10%;" class="text-center">Qtd</th>
-                        <th style="width: 15%;" class="text-right">Valor Unit.</th>
-                        <th style="width: 10%;" class="text-center">Desconto</th>
-                        <th style="width: 20%;" class="text-right">Valor Total</th>
+                        <th style="width: 5%;" class="text-center">Item</th>
+                        <th style="width: 36%;">Descrição</th>
+                        <th style="width: 9%;" class="text-center">Qtd.</th>
+                        <th style="width: 8%;" class="text-center">Un.</th>
+                        <th style="width: 14%;" class="text-right">Valor unit.</th>
+                        <th style="width: 10%;" class="text-right">Desc.</th>
+                        <th style="width: 18%;" class="text-right">Total</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -502,122 +437,88 @@
                     <tr>
                         <td class="text-center">{{add @index 1}}</td>
                         <td>
-                            <div class="product-name">{{nome}}</div>
-                            {{#if descricao}}<div class="product-desc">{{descricao}}</div>{{/if}}
+                            <div class="item-name">{{nome}}</div>
+                            {{#if descricao}}<div class="item-description">{{descricao}}</div>{{/if}}
                         </td>
                         <td class="text-center">{{quantidade}}</td>
+                        <td class="text-center">{{unidade}}</td>
                         <td class="text-right currency">{{formatarMoeda valorUnitario}}</td>
-                        <td class="text-center">{{#if desconto}}{{desconto}}%{{else}}-{{/if}}</td>
+                        <td class="text-right">{{#if desconto}}{{desconto}}%{{else}}-{{/if}}</td>
                         <td class="text-right currency">{{formatarMoeda valorTotal}}</td>
                     </tr>
                     {{/each}}
                 </tbody>
             </table>
-        </div>
 
-        <!-- Totals -->
-        <div class="totals-section">
-            <div class="section-title">RESUMO FINANCEIRO</div>
-            <table class="totals-table">
-                <tr>
-                    <td>Subtotal:</td>
-                    <td class="text-right currency">{{formatarMoeda subtotal}}</td>
-                </tr>
-                {{#if descontoGeral}}
-                <tr>
-                    <td>Desconto Geral ({{percentualDesconto}}%):</td>
-                    <td class="text-right currency">- {{formatarMoeda descontoGeral}}</td>
-                </tr>
-                {{/if}}
-                {{#if impostos}}
-                <tr>
-                    <td>Impostos:</td>
-                    <td class="text-right currency">{{formatarMoeda impostos}}</td>
-                </tr>
-                {{/if}}
-                <tr class="total-final">
-                    <td><strong>VALOR TOTAL:</strong></td>
-                    <td class="text-right"><strong>{{formatarMoeda valorTotal}}</strong></td>
-                </tr>
-            </table>
-        </div>
-
-        <!-- Terms and Conditions -->
-        <div class="terms-section">
-            <div class="section-title">CONDIÇÕES COMERCIAIS</div>
-            <div class="terms-grid">
-                <div class="term-item">
-                    <div class="term-label">Forma de Pagamento</div>
-                    <div class="term-value">{{formaPagamento}}</div>
-                </div>
-                <div class="term-item">
-                    <div class="term-label">Prazo de Entrega</div>
-                    <div class="term-value">{{prazoEntrega}}</div>
-                </div>
-                <div class="term-item">
-                    <div class="term-label">Garantia</div>
-                    <div class="term-value">{{garantia}}</div>
-                </div>
-                <div class="term-item">
-                    <div class="term-label">Validade da Proposta</div>
-                    <div class="term-value">{{validadeProposta}}</div>
-                </div>
+            <div class="summary-wrapper">
+                <table class="summary-table">
+                    <tr>
+                        <td>Subtotal</td>
+                        <td class="text-right currency">{{formatarMoeda subtotal}}</td>
+                    </tr>
+                    {{#if temDescontoGeral}}
+                    <tr>
+                        <td>Desconto global ({{percentualDesconto}}%)</td>
+                        <td class="text-right currency">- {{formatarMoeda descontoGeral}}</td>
+                    </tr>
+                    {{/if}}
+                    {{#if temImpostos}}
+                    <tr>
+                        <td>Impostos</td>
+                        <td class="text-right currency">{{formatarMoeda impostos}}</td>
+                    </tr>
+                    {{/if}}
+                    <tr class="total-row">
+                        <td>Valor total</td>
+                        <td class="text-right">{{formatarMoeda valorTotal}}</td>
+                    </tr>
+                </table>
             </div>
         </div>
 
-        <!-- Additional Conditions -->
-        <div class="conditions-section">
-            <div class="section-title">CONDIÇÕES GERAIS</div>
+        <div class="section">
+            <div class="section-title">Condições comerciais</div>
+            <div class="conditions-grid">
+                <div class="condition-card">
+                    <div class="condition-label">Pagamento</div>
+                    <div class="condition-value">{{formaPagamento}}</div>
+                </div>
+                <div class="condition-card">
+                    <div class="condition-label">Validade da proposta</div>
+                    <div class="condition-value">{{validadeProposta}}</div>
+                </div>
+                {{#if temPrazoEntrega}}
+                <div class="condition-card">
+                    <div class="condition-label">Prazo de entrega</div>
+                    <div class="condition-value">{{prazoEntrega}}</div>
+                </div>
+                {{/if}}
+                {{#if temGarantia}}
+                <div class="condition-card">
+                    <div class="condition-label">Garantia</div>
+                    <div class="condition-value">{{garantia}}</div>
+                </div>
+                {{/if}}
+            </div>
+
+            {{#if temCondicoesGerais}}
             <ul class="conditions-list">
                 {{#each condicoesGerais}}
                 <li>{{this}}</li>
                 {{/each}}
             </ul>
+            {{/if}}
         </div>
 
-        {{#if observacoes}}
-        <div class="terms-section">
-            <div class="section-title">OBSERVAÇÕES</div>
-            <p style="line-height: 1.8; color: #555;">{{observacoes}}</p>
+        {{#if temObservacoes}}
+        <div class="section">
+            <div class="section-title">Observações</div>
+            <div class="overview-box">{{observacoes}}</div>
         </div>
         {{/if}}
 
-        <!-- Signature Section -->
-        <div class="signature-section">
-            <div class="section-title">ACEITE DA PROPOSTA</div>
-            <p style="margin: 20px 0; text-align: center; color: #666;">
-                Ao assinar este documento, o cliente declara estar de acordo com todos os termos e condições estabelecidos nesta proposta.
-            </p>
-            
-            <div class="signatures">
-                <div class="signature-box">
-                    <div class="signature-label">CLIENTE</div>
-                    <div class="signature-line"></div>
-                    <div class="signature-info">
-                        <div><strong>{{cliente.nome}}</strong></div>
-                        {{#if cliente.empresa}}<div>{{cliente.empresa}}</div>{{/if}}
-                        {{#if cliente.documento}}<div>{{cliente.tipoDocumento}}: {{cliente.documento}}</div>{{/if}}
-                        <div>Data: ___/___/______</div>
-                    </div>
-                </div>
-
-                <div class="signature-box">
-                    <div class="signature-label">VENDEDOR</div>
-                    <div class="signature-line"></div>
-                    <div class="signature-info">
-                        <div><strong>{{vendedor.nome}}</strong></div>
-                        <div>{{empresa.nome}}</div>
-                        {{#if vendedor.cargo}}<div>{{vendedor.cargo}}</div>{{/if}}
-                        <div>Data: ___/___/______</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Footer -->
         <div class="footer">
-            <p>Este documento foi gerado automaticamente pelo sistema {{empresa.nome}} em {{dataGeracao}}.</p>
-            <p>Para dúvidas ou esclarecimentos, entre em contato conosco através dos canais informados acima.</p>
+            Documento gerado automaticamente em {{dataGeracao}} às {{horaGeracao}}.
         </div>
     </div>
 </body>

@@ -49,19 +49,65 @@ export const BaseModal: React.FC<BaseModalProps> = ({
   headerClassName = '',
   contentClassName = '',
 }) => {
+  const titleId = React.useId();
+  const subtitleId = React.useId();
+
+  const handleKeyDown = React.useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    },
+    [onClose],
+  );
+
+  React.useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen, handleKeyDown]);
+
   if (!isOpen) {
     return null;
   }
 
   return (
-    <div className={ModalStyles.overlay}>
-      <div className={`${ModalStyles.container[size]} ${className}`}>
+    <div
+      className={ModalStyles.overlay}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        className={`${ModalStyles.container[size]} ${className}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={subtitle ? subtitleId : undefined}
+      >
         {/* Header do Modal */}
         <div className={`${ModalStyles.header.container} ${headerClassName}`}>
           <div className={ModalStyles.header.content}>
             <div>
-              <h2 className={ModalStyles.header.title}>{title}</h2>
-              {subtitle && <p className={ModalStyles.header.subtitle}>{subtitle}</p>}
+              <h2 id={titleId} className={ModalStyles.header.title}>
+                {title}
+              </h2>
+              {subtitle && (
+                <p id={subtitleId} className={ModalStyles.header.subtitle}>
+                  {subtitle}
+                </p>
+              )}
             </div>
             <button onClick={onClose} className={ModalStyles.header.closeButton} type="button">
               <X className="h-5 w-5" />

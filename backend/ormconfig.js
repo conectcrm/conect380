@@ -22,8 +22,8 @@ const AppDataSource = new DataSource({
   password: process.env.DATABASE_PASSWORD || 'postgres',
   database: process.env.DATABASE_NAME || 'conectcrm',
   entities: useTsMigrations ? ['src/**/*.entity.ts'] : ['dist/**/*.entity.js'],
-  // Ajustado caminho das migrations (compilam para dist/src/migrations)
-  migrations: useTsMigrations ? ['src/migrations/*.ts'] : ['dist/src/migrations/*.js'],
+  // Ajustado caminho das migrations (compilam para dist/migrations)
+  migrations: useTsMigrations ? ['src/migrations/*.ts'] : ['dist/migrations/*.js'],
   migrationsTableName: 'migrations',
   synchronize: false,
   logging: false, // Desabilitar logs verbosos em produção

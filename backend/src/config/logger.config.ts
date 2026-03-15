@@ -238,6 +238,87 @@ export class SecurityLogger {
       timestamp: new Date().toISOString(),
     });
   }
+
+  mfaChallengeIssued(userId: string, username: string, ip: string, challengeId: string) {
+    this.logger.warn('Desafio MFA emitido', {
+      event: 'mfa_challenge_issued',
+      userId,
+      username,
+      ip,
+      challengeId,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  mfaChallengeFailed(userId: string, ip: string, reason: string, challengeId?: string) {
+    this.logger.warn('Validacao MFA falhou', {
+      event: 'mfa_challenge_failed',
+      userId,
+      ip,
+      reason,
+      challengeId,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  mfaChallengeVerified(userId: string, ip: string, challengeId: string) {
+    this.logger.warn('Validacao MFA concluida', {
+      event: 'mfa_challenge_verified',
+      userId,
+      ip,
+      challengeId,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  adminSessionRefresh(userId: string, role: string, ip: string) {
+    this.logger.warn('Refresh de sessao administrativa', {
+      event: 'admin_session_refresh',
+      userId,
+      role,
+      ip,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  adminSessionLogout(userId: string, role: string, ip: string, reason?: string) {
+    this.logger.warn('Logout de sessao administrativa', {
+      event: 'admin_session_logout',
+      userId,
+      role,
+      ip,
+      reason: reason || null,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  loginLockoutTriggered(
+    identity: string,
+    ip: string,
+    lockedUntil: Date,
+    lockoutLevel: number,
+    role?: string,
+  ) {
+    this.logger.warn('Bloqueio progressivo de login acionado', {
+      event: 'login_lockout_triggered',
+      identity,
+      ip,
+      lockedUntil: lockedUntil.toISOString(),
+      lockoutLevel,
+      role: role || null,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  loginLockoutUnlocked(identity: string, actorId: string, reason?: string) {
+    this.logger.warn('Bloqueio de login removido manualmente', {
+      event: 'login_lockout_unlocked',
+      identity,
+      actorId,
+      reason: reason || null,
+      timestamp: new Date().toISOString(),
+    });
+  }
 }
 
 export const securityLogger = new SecurityLogger();

@@ -7,13 +7,18 @@ on:
   workflow_dispatch:
     inputs:
       override_freeze:
-        description: 'Override deploy freeze (requires CTO approval)'
+        description: "Override deploy freeze (requires CTO approval)"
+        required: false
+        type: boolean
+        default: false
+      override_misconfigured:
+        description: "Override when Prometheus URL is unavailable/misconfigured (manual deploy only)"
         required: false
         type: boolean
         default: false
 
 env:
-  # Importante: sem fallback. Se não existir secret, o workflow deve reportar misconfiguration e não falhar.
+  # No fallback by design. If secret is missing, workflow marks as MISCONFIGURED.
   PROMETHEUS_URL: ${{ secrets.PROMETHEUS_URL }}
 
 jobs:
@@ -24,106 +29,124 @@ jobs:
       can_deploy: ${{ steps.check.outputs.can_deploy }}
       budget_status: ${{ steps.check.outputs.status }}
       budget_remaining: ${{ steps.check.outputs.remaining }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      
+
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y curl jq bc
-      
+
       - name: Check error budget
         id: check
         env:
           OVERRIDE_DEPLOY: ${{ github.event.inputs.override_freeze }}
           OVERRIDE_DEPLOY_FREEZE: ${{ github.event.inputs.override_freeze }}
+          OVERRIDE_DEPLOY_MISCONFIGURED: ${{ github.event.inputs.override_misconfigured }}
         run: |
-          # Se PROMETHEUS_URL não estiver configurado, não falhar o workflow.
-          # Apenas bloqueia o deploy e registra o motivo.
+          # Missing Prometheus URL: block by default, allow only explicit manual override.
           if [ -z "${PROMETHEUS_URL:-}" ]; then
-            echo "can_deploy=false" >> $GITHUB_OUTPUT
-            echo "status=MISCONFIGURED" >> $GITHUB_OUTPUT
-            echo "remaining=" >> $GITHUB_OUTPUT
-            echo "❌ PROMETHEUS_URL não configurado (GitHub Secret ausente)." >> $GITHUB_STEP_SUMMARY
-            echo "➡️ Configure o secret PROMETHEUS_URL ou use um runner self-hosted na mesma rede do Prometheus." >> $GITHUB_STEP_SUMMARY
+            if [ "${OVERRIDE_DEPLOY_MISCONFIGURED:-false}" = "true" ]; then
+              echo "can_deploy=true" >> "$GITHUB_OUTPUT"
+              echo "status=MISCONFIGURED_OVERRIDE" >> "$GITHUB_OUTPUT"
+              echo "remaining=" >> "$GITHUB_OUTPUT"
+              echo "⚠️ PROMETHEUS_URL not configured. Manual override accepted." >> "$GITHUB_STEP_SUMMARY"
+              echo "👤 Actor: ${{ github.actor }}" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "can_deploy=false" >> "$GITHUB_OUTPUT"
+              echo "status=MISCONFIGURED" >> "$GITHUB_OUTPUT"
+              echo "remaining=" >> "$GITHUB_OUTPUT"
+              echo "❌ PROMETHEUS_URL not configured." >> "$GITHUB_STEP_SUMMARY"
+              echo "➡️ Configure repository secret PROMETHEUS_URL or run with self-hosted runner in the same network." >> "$GITHUB_STEP_SUMMARY"
+            fi
             exit 0
           fi
 
           chmod +x scripts/can-deploy.sh
           chmod +x scripts/check-error-budget.sh
-          
-          # Executar verificação
-          if ./scripts/can-deploy.sh; then
-            echo "can_deploy=true" >> $GITHUB_OUTPUT
-            echo "status=NORMAL" >> $GITHUB_OUTPUT
-            echo "✅ Deploy permitido" >> $GITHUB_STEP_SUMMARY
-          else
-            EXIT_CODE=$?
-            echo "can_deploy=false" >> $GITHUB_OUTPUT
-            echo "❌ Deploy bloqueado (exit code: $EXIT_CODE)" >> $GITHUB_STEP_SUMMARY
-            
-            # Ler status do JSON
-            if [ -f /tmp/error-budget-status.json ]; then
-              STATUS=$(jq -r '.error_budget.status' /tmp/error-budget-status.json)
-              REMAINING=$(jq -r '.error_budget.remaining_percent' /tmp/error-budget-status.json)
-              echo "status=$STATUS" >> $GITHUB_OUTPUT
-              echo "remaining=$REMAINING" >> $GITHUB_OUTPUT
-              
-              echo "### Error Budget Status: $STATUS" >> $GITHUB_STEP_SUMMARY
-              echo "Budget Remaining: $REMAINING%" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "status=UNKNOWN" >> $GITHUB_OUTPUT
-              echo "remaining=" >> $GITHUB_OUTPUT
-            fi
 
-            # Não falhar o job — apenas bloquear as etapas seguintes.
+          if ./scripts/can-deploy.sh; then
+            echo "can_deploy=true" >> "$GITHUB_OUTPUT"
+            echo "status=NORMAL" >> "$GITHUB_OUTPUT"
+            echo "remaining=" >> "$GITHUB_OUTPUT"
+            echo "✅ Deploy allowed by error budget policy." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-      
+
+          EXIT_CODE=$?
+          echo "can_deploy=false" >> "$GITHUB_OUTPUT"
+          echo "❌ Deploy blocked (exit code: $EXIT_CODE)." >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -f /tmp/error-budget-status.json ]; then
+            STATUS=$(jq -r '.error_budget.status // "UNKNOWN"' /tmp/error-budget-status.json)
+            REMAINING=$(jq -r '.error_budget.remaining_percent // ""' /tmp/error-budget-status.json)
+            echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+            echo "remaining=$REMAINING" >> "$GITHUB_OUTPUT"
+            echo "### Error Budget Status: $STATUS" >> "$GITHUB_STEP_SUMMARY"
+            if [ -n "$REMAINING" ]; then
+              echo "Budget Remaining: $REMAINING%" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          else
+            echo "status=UNKNOWN" >> "$GITHUB_OUTPUT"
+            echo "remaining=" >> "$GITHUB_OUTPUT"
+          fi
+
+          # Exit code 99 usually means Prometheus check infra issue.
+          if [ "$EXIT_CODE" -eq 99 ] && [ "${OVERRIDE_DEPLOY_MISCONFIGURED:-false}" = "true" ]; then
+            echo "can_deploy=true" >> "$GITHUB_OUTPUT"
+            echo "status=MISCONFIGURED_OVERRIDE" >> "$GITHUB_OUTPUT"
+            echo "⚠️ Error budget check unavailable (exit 99). Manual override accepted." >> "$GITHUB_STEP_SUMMARY"
+            echo "👤 Actor: ${{ github.actor }}" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          # Keep job green; gating happens through outputs.
+          exit 0
+
       - name: Upload error budget status
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: error-budget-status
           path: /tmp/error-budget-status.json
-  
+          if-no-files-found: ignore
+
   build:
     name: Build
     runs-on: ubuntu-latest
     needs: check-error-budget
     if: needs.check-error-budget.outputs.can_deploy == 'true'
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '22.16.0'
-          cache: 'npm'
+          node-version: "22.16.0"
+          cache: npm
           cache-dependency-path: backend/package-lock.json
-      
+
       - name: Install dependencies
         working-directory: backend
         run: npm ci
-      
+
       - name: Run tests
         working-directory: backend
         run: npm test
-      
+
       - name: Build
         working-directory: backend
         run: npm run build
-      
+
       - name: Upload build artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: backend-build
           path: backend/dist
-  
+
   deploy:
     name: Deploy to Production
     runs-on: ubuntu-latest
@@ -132,94 +155,54 @@ jobs:
     environment:
       name: production
       url: https://conectcrm.com
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      
+
       - name: Download build artifact
         uses: actions/download-artifact@v3
         with:
           name: backend-build
           path: backend/dist
-      
+
       - name: Deploy to production
         run: |
-          echo "🚀 Deploying to production..."
-          # Adicionar comandos de deploy aqui
-          # Ex: scp, rsync, kubectl, docker push, etc.
-      
+          echo "Deploying to production..."
+          # Add deployment commands here (scp/rsync/kubectl/docker/etc)
+
       - name: Notify success
         if: success()
         run: |
-          echo "✅ Deploy completed successfully"
+          echo "Deploy completed successfully"
           echo "Error Budget Status: ${{ needs.check-error-budget.outputs.budget_status }}"
           echo "Budget Remaining: ${{ needs.check-error-budget.outputs.budget_remaining }}%"
-      
+
       - name: Log deploy freeze override
         if: github.event.inputs.override_freeze == 'true'
         run: |
-          echo "⚠️  DEPLOY FREEZE WAS OVERRIDDEN"
+          echo "DEPLOY FREEZE WAS OVERRIDDEN"
           echo "Approver: ${{ github.actor }}"
           echo "Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           echo "Commit: ${{ github.sha }}"
-          # Enviar para sistema de auditoria
-  
+
+      - name: Log misconfigured override
+        if: github.event.inputs.override_misconfigured == 'true'
+        run: |
+          echo "MISCONFIGURED ERROR-BUDGET CHECK WAS OVERRIDDEN"
+          echo "Approver: ${{ github.actor }}"
+          echo "Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          echo "Commit: ${{ github.sha }}"
+
   notify-blocked:
     name: Notify Deploy Blocked
     runs-on: ubuntu-latest
     needs: check-error-budget
     if: needs.check-error-budget.outputs.can_deploy != 'true'
-    
+
     steps:
       - name: Notify team
         run: |
-          echo "🚫 Deploy bloqueado devido ao error budget"
+          echo "Deploy blocked by error budget gate"
           echo "Status: ${{ needs.check-error-budget.outputs.budget_status }}"
           echo "Budget Remaining: ${{ needs.check-error-budget.outputs.budget_remaining }}%"
-          
-          # Enviar notificação para Slack
-          # curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
-          #   -H 'Content-Type: application/json' \
-          #   -d '{
-          #     "text": "🚫 Deploy bloqueado",
-          #     "blocks": [
-          #       {
-          #         "type": "section",
-          #         "text": {
-          #           "type": "mrkdwn",
-          #           "text": "*Deploy Bloqueado*\nError Budget: ${{ needs.check-error-budget.outputs.budget_remaining }}%\nStatus: ${{ needs.check-error-budget.outputs.budget_status }}"
-          #         }
-          #       }
-          #     ]
-          #   }'
-      
-      - name: Comment on PR
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v6
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `## 🚫 Deploy Bloqueado
-              
-              **Motivo**: Error budget muito baixo
-              
-              **Status**: ${{ needs.check-error-budget.outputs.budget_status }}
-              **Budget Remaining**: ${{ needs.check-error-budget.outputs.budget_remaining }}%
-              
-              ### Ações necessárias:
-              
-              ${
-                needs.check-error-budget.outputs.budget_status === 'FREEZE'
-                  ? '- ❌ Deploy FREEZE ativo\n- ⚠️ Apenas correções críticas de segurança/disponibilidade\n- 📝 Aprovação do CTO obrigatória'
-                  : needs.check-error-budget.outputs.budget_status === 'WARNING'
-                  ? '- ⚠️ Modo de confiabilidade ativo\n- 🔧 Apenas correções de emergência\n- 📋 Revisar todas as mudanças cuidadosamente'
-                  : '- 🔍 Investigar causa do consumo de error budget\n- 📊 Analisar métricas de SLO\n- 🛠️ Implementar melhorias de confiabilidade'
-              }
-              
-              [Ver Dashboard de Error Budget](https://grafana.conectcrm.com/d/error-budget-slo)
-              `
-            })

@@ -1051,7 +1051,17 @@ export class MensagemService {
    */
   async enviar(dados: any, arquivos?: Express.Multer.File[], empresaId?: string): Promise<Mensagem> {
     this.logger.log(`📤 Enviando mensagem para ticket ${dados.ticketId}`);
-    this.logger.debug(`📋 Dados recebidos: ${JSON.stringify(dados)}`);
+    this.logger.debug(
+      `Dados recebidos (resumo): ${JSON.stringify({
+        keys: dados ? Object.keys(dados) : [],
+        ticketId: dados?.ticketId || null,
+        remetente: dados?.remetente || null,
+        tipo: dados?.tipo || null,
+        conteudoLength: typeof dados?.conteudo === 'string' ? dados.conteudo.length : 0,
+        hasMidia: Boolean(dados?.midia),
+        duracaoAudio: dados?.duracaoAudio ?? dados?.duracao ?? null,
+      })}`,
+    );
 
     const conteudoBruto = typeof dados.conteudo === 'string' ? dados.conteudo : '';
     const conteudoNormalizado = conteudoBruto.trim();

@@ -25,6 +25,7 @@ import {
   AlgoritmoDistribuicao,
 } from '../services/distribuicaoAvancadaService';
 import api from '../services/api';
+import { useGlobalConfirmation } from '../contexts/GlobalConfirmationContext';
 
 interface Fila {
   id: string;
@@ -33,6 +34,7 @@ interface Fila {
 }
 
 const ConfiguracaoDistribuicaoPage: React.FC = () => {
+  const { confirm } = useGlobalConfirmation();
   // Estados principais
   const [configuracoes, setConfiguracoes] = useState<DistribuicaoConfig[]>([]);
   const [filas, setFilas] = useState<Fila[]>([]);
@@ -132,7 +134,7 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Deseja realmente deletar esta configuração?')) {
+    if (!(await confirm('Deseja realmente deletar esta configuração?'))) {
       return;
     }
 

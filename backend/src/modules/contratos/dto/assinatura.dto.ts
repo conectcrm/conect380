@@ -11,8 +11,9 @@ import {
 import { TipoAssinatura } from '../entities/assinatura-contrato.entity';
 
 export class CreateAssinaturaDto {
+  @IsOptional()
   @IsNumber()
-  contratoId: number;
+  contratoId?: number;
 
   @IsUUID('4')
   usuarioId: string;

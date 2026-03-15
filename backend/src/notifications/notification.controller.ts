@@ -1,6 +1,8 @@
 import {
   Controller,
   Get,
+  Post,
+  Body,
   Put,
   Delete,
   Param,
@@ -9,16 +11,62 @@ import {
   Request,
   HttpStatus,
   HttpCode,
+  ForbiddenException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../modules/auth/jwt-auth.guard';
 import { NotificationService } from './notification.service';
-import { NotificationResponseDto } from './dto/notification.dto';
+import { CreateNotificationDto, NotificationResponseDto } from './dto/notification.dto';
 import { EmpresaGuard } from '../common/guards/empresa.guard';
+import { UserRole } from '../modules/users/user.entity';
 
 @Controller('notifications')
 @UseGuards(JwtAuthGuard, EmpresaGuard)
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
+
+  /**
+   * POST /notifications
+   * Cria notificação manual (self-service para o próprio usuário e admin para outros da mesma empresa)
+   */
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  async create(
+    @Body() payload: CreateNotificationDto,
+    @Request() req,
+  ): Promise<NotificationResponseDto> {
+    const actorId = req.user.id;
+    const actorRole = req.user.role as UserRole;
+    const canNotifyOthers =
+      actorRole === UserRole.SUPERADMIN ||
+      actorRole === UserRole.ADMIN ||
+      actorRole === UserRole.GERENTE;
+
+    if (!canNotifyOthers && payload.userId !== actorId) {
+      throw new ForbiddenException(
+        'Você só pode criar notificações para o próprio usuário com este perfil.',
+      );
+    }
+
+    const targetUserId = canNotifyOthers ? payload.userId : actorId;
+
+    const notification = await this.notificationService.create({
+      ...payload,
+      userId: targetUserId,
+      empresaId: req.user.empresa_id,
+    });
+
+    return {
+      id: notification.id,
+      userId: notification.userId,
+      type: notification.type,
+      title: notification.title,
+      message: notification.message,
+      read: notification.read,
+      data: notification.data,
+      createdAt: notification.createdAt,
+      readAt: notification.readAt,
+    };
+  }
 
   /**
    * GET /notifications

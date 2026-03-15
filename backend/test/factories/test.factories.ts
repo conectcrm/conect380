@@ -122,7 +122,7 @@ export async function createTestUsuario(
     email: `usuario-${uniqueId}@teste.com`,
     senha: '$2b$10$hashedpassword', // Hash fictício BCrypt
     empresa_id: empresaId, // ⚠️ Campo é empresa_id (snake_case)
-    role: UserRole.USER, // ⚠️ Usar enum
+    role: UserRole.SUPORTE, // ⚠️ Usar enum
     ativo: true,
     ...override,
   });

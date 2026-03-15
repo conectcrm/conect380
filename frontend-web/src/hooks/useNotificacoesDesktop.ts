@@ -1,5 +1,44 @@
 import { useEffect, useRef, useCallback } from 'react';
 
+const BRANDING_CACHE_KEY = 'conect_system_branding_cache_v1';
+const DEFAULT_NOTIFICATION_ICON = '/brand/conect360-logo-icon.svg';
+
+const resolveRuntimeAssetUrl = (url: string): string => {
+  if (!url) {
+    return url;
+  }
+
+  if (
+    url.startsWith('data:') ||
+    url.startsWith('blob:') ||
+    url.startsWith('http://') ||
+    url.startsWith('https://')
+  ) {
+    return url;
+  }
+
+  if (url.startsWith('/')) {
+    const basePath = process.env.PUBLIC_URL || '';
+    return `${basePath}${url}`;
+  }
+
+  return url;
+};
+
+const getCachedBrandingIcon = (): string => {
+  try {
+    const raw = localStorage.getItem(BRANDING_CACHE_KEY);
+    if (!raw) {
+      return resolveRuntimeAssetUrl(DEFAULT_NOTIFICATION_ICON);
+    }
+
+    const parsed = JSON.parse(raw) as { logoIconUrl?: string };
+    return resolveRuntimeAssetUrl(parsed.logoIconUrl || DEFAULT_NOTIFICATION_ICON);
+  } catch {
+    return resolveRuntimeAssetUrl(DEFAULT_NOTIFICATION_ICON);
+  }
+};
+
 // ===== INTERFACES =====
 
 export interface NotificacaoDesktopOptions {
@@ -134,10 +173,11 @@ export function useNotificacoesDesktop(): UseNotificacoesDesktopReturn {
 
       try {
         // Criar notificação
+        const runtimeBrandIcon = getCachedBrandingIcon();
         const notificacao = new Notification(options.titulo, {
           body: options.corpo,
-          icon: options.icone || '/logo192.png',
-          badge: '/logo192.png',
+          icon: options.icone || runtimeBrandIcon,
+          badge: runtimeBrandIcon,
           tag: options.tag,
           requireInteraction: options.requireInteraction ?? false,
           silent: options.silent ?? false,

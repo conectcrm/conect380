@@ -2,10 +2,14 @@ import { Logger, Controller, Get, Param, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permission } from '../../../common/permissions/permissions.constants';
 import { TiposServicoService } from '../services/tipos-servico.service';
 
 @Controller('atendimento/tipos-servico')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.ATENDIMENTO_SLA_MANAGE)
 export class TiposServicoController {
   private readonly logger = new Logger(TiposServicoController.name);
   constructor(private readonly tiposService: TiposServicoService) {}

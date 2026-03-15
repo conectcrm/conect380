@@ -20,6 +20,7 @@ import {
 import { BackToNucleus } from '../components/navigation/BackToNucleus';
 import { statusService, type StatusCustomizado } from '../services/statusService';
 import { niveisService, type NivelAtendimento } from '../services/niveisService';
+import { useGlobalConfirmation } from '../contexts/GlobalConfirmationContext';
 
 interface CreateStatusDto {
   nivelAtendimentoId: string;
@@ -32,6 +33,7 @@ interface CreateStatusDto {
 }
 
 const GestaoStatusCustomizadosPage: React.FC = () => {
+  const { confirm } = useGlobalConfirmation();
   // Estados principais
   const [status, setStatus] = useState<StatusCustomizado[]>([]);
   const [niveis, setNiveis] = useState<NivelAtendimento[]>([]);
@@ -148,7 +150,11 @@ const GestaoStatusCustomizadosPage: React.FC = () => {
   };
 
   const handleDelete = async (id: string, nome: string) => {
-    if (!window.confirm(`Tem certeza que deseja excluir o status "${nome}"? Esta ação não pode ser desfeita.`)) {
+    if (
+      !(await confirm(
+        `Tem certeza que deseja excluir o status "${nome}"? Esta ação não pode ser desfeita.`,
+      ))
+    ) {
       return;
     }
 

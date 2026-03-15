@@ -16,6 +16,9 @@ import { Logger,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { Permission } from '../../common/permissions/permissions.constants';
 import { EmpresaId } from '../../common/decorators/empresa.decorator';
 import { FaturamentoService } from './services/faturamento.service';
 import { PagamentoService } from './services/pagamento.service';
@@ -26,9 +29,10 @@ import { CreatePlanoCobrancaDto, UpdatePlanoCobrancaDto } from './dto/plano-cobr
 import { StatusFatura } from './entities/fatura.entity';
 import { StatusPagamento } from './entities/pagamento.entity';
 import { StatusPlanoCobranca } from './entities/plano-cobranca.entity';
+import { EnvioFaturaEmailOpcoes } from './services/faturamento.service';
 
 @Controller('faturamento')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
 export class FaturamentoController {
   private readonly logger = new Logger(FaturamentoController.name);
   constructor(
@@ -40,6 +44,7 @@ export class FaturamentoController {
   // ==================== FATURAS ====================
 
   @Post('faturas')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
   async criarFatura(@Body() createFaturaDto: CreateFaturaDto, @EmpresaId() empresaId: string) {
     try {
       const fatura = await this.faturamentoService.criarFatura(createFaturaDto, empresaId);
@@ -54,6 +59,7 @@ export class FaturamentoController {
   }
 
   @Post('faturas/automatica')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
   async gerarFaturaAutomatica(
     @Body() gerarFaturaDto: GerarFaturaAutomaticaDto,
     @EmpresaId() empresaId: string,
@@ -71,25 +77,31 @@ export class FaturamentoController {
   }
 
   @Get('faturas')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_READ)
   async buscarFaturas(
     @EmpresaId() empresaId: string,
     @Query('status') status?: StatusFatura,
-    @Query('clienteId') clienteId?: number,
+    @Query('clienteId') clienteId?: string,
     @Query('contratoId') contratoId?: number,
     @Query('dataInicio') dataInicio?: string,
     @Query('dataFim') dataFim?: string,
+    @Query('periodoCampo') periodoCampo?: 'emissao' | 'vencimento',
     @Query('q') q?: string,
     @Query('page') page = '1',
     @Query('pageSize') pageSize = '10',
     @Query('sortBy') sortBy: 'createdAt' | 'dataVencimento' | 'valorTotal' | 'numero' = 'createdAt',
     @Query('sortOrder') sortOrder: 'ASC' | 'DESC' = 'DESC',
   ) {
+    const periodoCampoFiltro: 'emissao' | 'vencimento' =
+      periodoCampo === 'vencimento' ? 'vencimento' : 'emissao';
+
     const filtros = {
       status,
-      clienteId: clienteId ? Number(clienteId) : undefined,
+      clienteId: clienteId?.trim() || undefined,
       contratoId: contratoId ? Number(contratoId) : undefined,
       dataInicio: dataInicio ? new Date(dataInicio) : undefined,
       dataFim: dataFim ? new Date(dataFim) : undefined,
+      periodoCampo: periodoCampoFiltro,
       q,
     };
 
@@ -100,6 +112,7 @@ export class FaturamentoController {
       Number(pageSize) || 10,
       sortBy,
       sortOrder,
+      filtros,
     );
 
     return {
@@ -115,25 +128,31 @@ export class FaturamentoController {
   }
 
   @Get('faturas/paginadas')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_READ)
   async buscarFaturasPaginadas(
     @EmpresaId() empresaId: string,
     @Query('status') status?: StatusFatura,
-    @Query('clienteId') clienteId?: number,
+    @Query('clienteId') clienteId?: string,
     @Query('contratoId') contratoId?: number,
     @Query('dataInicio') dataInicio?: string,
     @Query('dataFim') dataFim?: string,
+    @Query('periodoCampo') periodoCampo?: 'emissao' | 'vencimento',
     @Query('q') q?: string,
     @Query('page') page = '1',
     @Query('pageSize') pageSize = '10',
     @Query('sortBy') sortBy: 'createdAt' | 'dataVencimento' | 'valorTotal' | 'numero' = 'createdAt',
     @Query('sortOrder') sortOrder: 'ASC' | 'DESC' = 'DESC',
   ) {
+    const periodoCampoFiltro: 'emissao' | 'vencimento' =
+      periodoCampo === 'vencimento' ? 'vencimento' : 'emissao';
+
     const filtros = {
       status,
-      clienteId: clienteId ? Number(clienteId) : undefined,
+      clienteId: clienteId?.trim() || undefined,
       contratoId: contratoId ? Number(contratoId) : undefined,
       dataInicio: dataInicio ? new Date(dataInicio) : undefined,
       dataFim: dataFim ? new Date(dataFim) : undefined,
+      periodoCampo: periodoCampoFiltro,
       q,
     };
 
@@ -143,6 +162,7 @@ export class FaturamentoController {
       Number(pageSize) || 10,
       sortBy,
       sortOrder,
+      filtros,
     );
 
     return {
@@ -160,6 +180,7 @@ export class FaturamentoController {
   }
 
   @Get('faturas/:id')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_READ)
   async buscarFaturaPorId(@Param('id', ParseIntPipe) id: number, @EmpresaId() empresaId: string) {
     const fatura = await this.faturamentoService.buscarFaturaPorId(id, empresaId);
 
@@ -171,6 +192,7 @@ export class FaturamentoController {
   }
 
   @Get('faturas/numero/:numero')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_READ)
   async buscarFaturaPorNumero(@Param('numero') numero: string, @EmpresaId() empresaId: string) {
     const fatura = await this.faturamentoService.buscarFaturaPorNumero(numero, empresaId);
 
@@ -182,6 +204,7 @@ export class FaturamentoController {
   }
 
   @Put('faturas/:id')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
   async atualizarFatura(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateFaturaDto: UpdateFaturaDto,
@@ -197,6 +220,7 @@ export class FaturamentoController {
   }
 
   @Put('faturas/:id/pagar')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
   async marcarComoPaga(
     @Param('id', ParseIntPipe) id: number,
     @Body('valorPago') valorPago: number,
@@ -212,6 +236,7 @@ export class FaturamentoController {
   }
 
   @Put('faturas/:id/cancelar')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
   async cancelarFatura(
     @Param('id', ParseIntPipe) id: number,
     @EmpresaId() empresaId: string,
@@ -227,20 +252,30 @@ export class FaturamentoController {
   }
 
   @Post('faturas/:id/enviar-email')
+  @HttpCode(HttpStatus.OK)
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
   async enviarFaturaPorEmail(
     @Param('id', ParseIntPipe) id: number,
     @EmpresaId() empresaId: string,
+    @Body() envio?: EnvioFaturaEmailOpcoes,
   ) {
-    const sucesso = await this.faturamentoService.enviarFaturaPorEmail(id, empresaId);
+    const resultado = await this.faturamentoService.enviarFaturaPorEmail(id, empresaId, envio);
+
+    const message = resultado.enviado
+      ? resultado.simulado
+        ? `Envio de email simulado (${resultado.motivo || 'motivo_desconhecido'})`
+        : 'Fatura enviada por email'
+      : 'Erro ao enviar fatura';
 
     return {
       status: HttpStatus.OK,
-      message: sucesso ? 'Fatura enviada por email' : 'Erro ao enviar fatura',
-      data: { enviado: sucesso },
+      message,
+      data: resultado,
     };
   }
 
   @Delete('faturas/:id')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
   async excluirFatura(@Param('id', ParseIntPipe) id: number, @EmpresaId() empresaId: string) {
     this.logger.log(`🔍 [CONTROLLER] DELETE /faturamento/faturas/${id} - Iniciando exclusão`);
 
@@ -264,6 +299,7 @@ export class FaturamentoController {
   // ==================== PAGAMENTOS ====================
 
   @Post('pagamentos')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   async criarPagamento(
     @Body() createPagamentoDto: CreatePagamentoDto,
     @EmpresaId() empresaId: string,
@@ -284,6 +320,7 @@ export class FaturamentoController {
   }
 
   @Post('pagamentos/processar')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   @HttpCode(HttpStatus.OK)
   async processarPagamento(
     @Body() processarPagamentoDto: ProcessarPagamentoDto,
@@ -307,7 +344,22 @@ export class FaturamentoController {
     }
   }
 
+  @Get('auditoria/correlacao/:correlationId')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_READ)
+  async obterTrilhaCorrelacao(
+    @Param('correlationId') correlationId: string,
+    @EmpresaId() empresaId: string,
+  ) {
+    const trilha = await this.pagamentoService.obterTrilhaPorCorrelacao(correlationId, empresaId);
+    return {
+      status: HttpStatus.OK,
+      message: 'Trilha de correlacao recuperada com sucesso',
+      data: trilha,
+    };
+  }
+
   @Get('pagamentos')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_READ)
   async buscarPagamentos(
     @EmpresaId() empresaId: string,
     @Query('faturaId') faturaId?: number,
@@ -337,6 +389,7 @@ export class FaturamentoController {
   }
 
   @Get('pagamentos/:id')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_READ)
   async buscarPagamentoPorId(
     @Param('id', ParseIntPipe) id: number,
     @EmpresaId() empresaId: string,
@@ -351,6 +404,7 @@ export class FaturamentoController {
   }
 
   @Get('pagamentos/transacao/:transacaoId')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_READ)
   async buscarPagamentoPorTransacao(
     @Param('transacaoId') transacaoId: string,
     @EmpresaId() empresaId: string,
@@ -368,6 +422,7 @@ export class FaturamentoController {
   }
 
   @Put('pagamentos/:id')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   async atualizarPagamento(
     @Param('id', ParseIntPipe) id: number,
     @Body() updatePagamentoDto: UpdatePagamentoDto,
@@ -394,6 +449,7 @@ export class FaturamentoController {
   }
 
   @Post('pagamentos/:id/estornar')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   async estornarPagamento(
     @Param('id', ParseIntPipe) id: number,
     @Body('motivo') motivo: string,
@@ -409,6 +465,7 @@ export class FaturamentoController {
   }
 
   @Get('pagamentos/estatisticas')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_READ)
   async obterEstatisticasPagamentos(
     @EmpresaId() empresaId: string,
     @Query('dataInicio') dataInicio?: string,
@@ -436,6 +493,7 @@ export class FaturamentoController {
   // ==================== PLANOS DE COBRANÇA ====================
 
   @Post('planos-cobranca')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
   async criarPlanoCobranca(
     @Body() createPlanoDto: CreatePlanoCobrancaDto,
     @EmpresaId() empresaId: string,
@@ -453,6 +511,7 @@ export class FaturamentoController {
   }
 
   @Get('planos-cobranca')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_READ)
   async buscarPlanosCobranca(
     @EmpresaId() empresaId: string,
     @Query('status') status?: StatusPlanoCobranca,
@@ -471,6 +530,7 @@ export class FaturamentoController {
   }
 
   @Get('planos-cobranca/:id')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_READ)
   async buscarPlanoPorId(@Param('id', ParseIntPipe) id: number, @EmpresaId() empresaId: string) {
     const plano = await this.cobrancaService.buscarPlanoPorId(id, empresaId);
 
@@ -482,6 +542,7 @@ export class FaturamentoController {
   }
 
   @Get('planos-cobranca/codigo/:codigo')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_READ)
   async buscarPlanoPorCodigo(@Param('codigo') codigo: string, @EmpresaId() empresaId: string) {
     const plano = await this.cobrancaService.buscarPlanoPorCodigo(codigo, empresaId);
 
@@ -493,6 +554,7 @@ export class FaturamentoController {
   }
 
   @Put('planos-cobranca/:id')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
   async atualizarPlanoCobranca(
     @Param('id', ParseIntPipe) id: number,
     @Body() updatePlanoDto: UpdatePlanoCobrancaDto,
@@ -508,6 +570,7 @@ export class FaturamentoController {
   }
 
   @Put('planos-cobranca/:id/pausar')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
   async pausarPlanoCobranca(@Param('id', ParseIntPipe) id: number, @EmpresaId() empresaId: string) {
     const plano = await this.cobrancaService.pausarPlanoCobranca(id, empresaId);
 
@@ -519,6 +582,7 @@ export class FaturamentoController {
   }
 
   @Put('planos-cobranca/:id/reativar')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
   async reativarPlanoCobranca(
     @Param('id', ParseIntPipe) id: number,
     @EmpresaId() empresaId: string,
@@ -533,6 +597,7 @@ export class FaturamentoController {
   }
 
   @Put('planos-cobranca/:id/cancelar')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
   async cancelarPlanoCobranca(
     @Param('id', ParseIntPipe) id: number,
     @EmpresaId() empresaId: string,
@@ -548,6 +613,7 @@ export class FaturamentoController {
   }
 
   @Post('planos-cobranca/:id/gerar-fatura')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
   async gerarFaturaRecorrente(@Param('id', ParseIntPipe) id: number, @EmpresaId() empresaId: string) {
     try {
       const plano = await this.cobrancaService.buscarPlanoPorId(id, empresaId);
@@ -566,6 +632,7 @@ export class FaturamentoController {
   // ==================== UTILITÁRIOS ====================
 
   @Post('processar-cobrancas-recorrentes')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
   async processarCobrancasRecorrentes(@EmpresaId() empresaId: string) {
     await this.cobrancaService.processarCobrancasRecorrentes(empresaId);
 
@@ -576,6 +643,7 @@ export class FaturamentoController {
   }
 
   @Post('verificar-faturas-vencidas')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
   async verificarFaturasVencidas() {
     await this.faturamentoService.verificarFaturasVencidas();
 
@@ -586,6 +654,7 @@ export class FaturamentoController {
   }
 
   @Post('enviar-lembretes-vencimento')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
   async enviarLembreteVencimento(@EmpresaId() empresaId: string) {
     await this.cobrancaService.enviarLembreteVencimento(empresaId);
 

@@ -75,7 +75,11 @@ export class DistribuicaoService {
     }
 
     // 3. Buscar atendente disponível usando algoritmo configurado
-    const atendenteId = await this.calcularProximoAtendente(fila.id, fila.estrategiaDistribuicao, empresaId);
+    const atendenteId = await this.calcularProximoAtendente(
+      fila.id,
+      fila.estrategiaDistribuicao,
+      empresaId,
+    );
 
     if (!atendenteId) {
       this.logger.warn(`Nenhum atendente disponível na fila ${fila.nome}`);
@@ -153,7 +157,11 @@ export class DistribuicaoService {
 
     switch (estrategia) {
       case EstrategiaDistribuicao.ROUND_ROBIN:
-        atendenteEscolhido = await this.algoritmoRoundRobin(atendentesDisponiveis, filaId, empresaId);
+        atendenteEscolhido = await this.algoritmoRoundRobin(
+          atendentesDisponiveis,
+          filaId,
+          empresaId,
+        );
         break;
 
       case EstrategiaDistribuicao.MENOR_CARGA:
@@ -182,7 +190,10 @@ export class DistribuicaoService {
    * - Atendente está ativo na fila (FilaAtendente.ativo = true)
    * - Atendente não atingiu capacidade máxima
    */
-  private async buscarAtendentesDisponiveis(filaId: string, empresaId: string): Promise<FilaAtendente[]> {
+  private async buscarAtendentesDisponiveis(
+    filaId: string,
+    empresaId: string,
+  ): Promise<FilaAtendente[]> {
     // Buscar todos atendentes da fila
     const filasAtendentes = await this.filaAtendenteRepository.find({
       where: { filaId, empresaId, ativo: true },
@@ -255,15 +266,18 @@ export class DistribuicaoService {
    * 2. Retorna o que tem menos
    * 3. Em caso de empate, usa prioridade
    */
-  private async algoritmoMenorCarga(atendentes: FilaAtendente[], empresaId: string): Promise<FilaAtendente> {
+  private async algoritmoMenorCarga(
+    atendentes: FilaAtendente[],
+    empresaId: string,
+  ): Promise<FilaAtendente> {
     const atendentesComCarga = await Promise.all(
       atendentes.map(async (atendente) => {
         const carga = await this.ticketRepository.count({
           where: {
-              atendenteId: atendente.atendenteId,
-              empresaId,
-              status: StatusTicket.EM_ATENDIMENTO,
-            },
+            atendenteId: atendente.atendenteId,
+            empresaId,
+            status: StatusTicket.EM_ATENDIMENTO,
+          },
         });
 
         return { atendente, carga };
@@ -289,15 +303,18 @@ export class DistribuicaoService {
    * 2. Retorna o de maior prioridade
    * 3. Em caso de empate, usa menor carga
    */
-  private async algoritmoPrioridade(atendentes: FilaAtendente[], empresaId: string): Promise<FilaAtendente> {
+  private async algoritmoPrioridade(
+    atendentes: FilaAtendente[],
+    empresaId: string,
+  ): Promise<FilaAtendente> {
     const atendentesComCarga = await Promise.all(
       atendentes.map(async (atendente) => {
         const carga = await this.ticketRepository.count({
           where: {
-              atendenteId: atendente.atendenteId,
-              empresaId,
-              status: StatusTicket.EM_ATENDIMENTO,
-            },
+            atendenteId: atendente.atendenteId,
+            empresaId,
+            status: StatusTicket.EM_ATENDIMENTO,
+          },
         });
 
         return { atendente, carga };
@@ -322,18 +339,17 @@ export class DistribuicaoService {
    * @returns Estatísticas de tickets e filas
    */
   async buscarEstatisticas(empresaId: string) {
-    this.logger.log(`📊 Buscando estatísticas de distribuição - Empresa: ${empresaId}`);
+    this.logger.log(`Buscando estatisticas de distribuicao - Empresa: ${empresaId}`);
 
-    // Total de tickets aguardando distribuição
-    const totalAguardando = await this.ticketRepository.count({
-      where: {
-        empresaId,
-        status: StatusTicket.AGUARDANDO_CLIENTE,
-        atendenteId: null,
-      },
-    });
+    const totalAguardando = await this.ticketRepository
+      .createQueryBuilder('ticket')
+      .where('ticket.empresaId = :empresaId', { empresaId })
+      .andWhere('ticket.atendenteId IS NULL')
+      .andWhere('ticket.status IN (:...status)', {
+        status: [StatusTicket.FILA, StatusTicket.AGUARDANDO_CLIENTE],
+      })
+      .getCount();
 
-    // Total de tickets em atendimento
     const totalEmAtendimento = await this.ticketRepository.count({
       where: {
         empresaId,
@@ -341,32 +357,90 @@ export class DistribuicaoService {
       },
     });
 
-    // Total de tickets finalizados
-    const totalFinalizados = await this.ticketRepository.count({
-      where: {
-        empresaId,
-        status: StatusTicket.ENCERRADO,
-      },
+    const totalFinalizados = await this.ticketRepository
+      .createQueryBuilder('ticket')
+      .where('ticket.empresaId = :empresaId', { empresaId })
+      .andWhere('ticket.status IN (:...status)', {
+        status: [StatusTicket.ENCERRADO, StatusTicket.CONCLUIDO],
+      })
+      .getCount();
+
+    const atendentesDisponiveisRaw = await this.filaAtendenteRepository
+      .createQueryBuilder('fa')
+      .select('COUNT(DISTINCT fa.atendenteId)', 'count')
+      .where('fa.empresaId = :empresaId', { empresaId })
+      .andWhere('fa.ativo = :ativo', { ativo: true })
+      .getRawOne<{ count?: string }>();
+
+    const atendentesDisponiveis = Number(atendentesDisponiveisRaw?.count || 0);
+
+    const distribuicaoRaw = await this.ticketRepository
+      .createQueryBuilder('ticket')
+      .select('ticket.atendenteId', 'atendenteId')
+      .addSelect('COUNT(*)', 'quantidade')
+      .where('ticket.empresaId = :empresaId', { empresaId })
+      .andWhere('ticket.status = :status', { status: StatusTicket.EM_ATENDIMENTO })
+      .andWhere('ticket.atendenteId IS NOT NULL')
+      .groupBy('ticket.atendenteId')
+      .orderBy('COUNT(*)', 'DESC')
+      .getRawMany<{ atendenteId: string; quantidade: string }>();
+
+    const atendenteIds = distribuicaoRaw.map((item) => item.atendenteId);
+    const atendentes = atendenteIds.length
+      ? await this.userRepository.find({
+          where: { empresa_id: empresaId },
+          select: ['id', 'nome'],
+        })
+      : [];
+
+    const nomesAtendentes = new Map(
+      atendentes
+        .filter((atendente) => atendenteIds.includes(atendente.id))
+        .map((atendente) => [atendente.id, atendente.nome]),
+    );
+
+    const totalDistribuidos = totalEmAtendimento + totalFinalizados;
+    const totalConsiderado = totalDistribuidos + totalAguardando;
+    const taxaDistribuicao =
+      totalConsiderado > 0 ? Number(((totalDistribuidos / totalConsiderado) * 100).toFixed(1)) : 0;
+
+    const distribuicaoPorAtendente = distribuicaoRaw.map((item) => {
+      const quantidade = Number(item.quantidade || 0);
+      const percentual =
+        totalEmAtendimento > 0 ? Number(((quantidade / totalEmAtendimento) * 100).toFixed(1)) : 0;
+
+      return {
+        atendenteId: item.atendenteId,
+        atendenteNome:
+          nomesAtendentes.get(item.atendenteId) || `Atendente ${item.atendenteId.substring(0, 8)}`,
+        quantidade,
+        percentual,
+      };
     });
 
-    // Atendentes disponíveis
-    const atendentesDisponiveis = await this.filaAtendenteRepository.count({
-      where: {
-         ativo: true,
-         empresaId,
-       },
-    });
+    const atendenteComMaisTickets =
+      distribuicaoPorAtendente.length > 0
+        ? {
+            nome: distribuicaoPorAtendente[0].atendenteNome,
+            quantidade: distribuicaoPorAtendente[0].quantidade,
+          }
+        : null;
 
     return {
       totalAguardando,
       totalEmAtendimento,
       totalFinalizados,
       atendentesDisponiveis,
+      totalDistribuidos,
+      totalPendentes: totalAguardando,
+      taxaDistribuicao,
+      atendenteComMaisTickets,
+      distribuicaoPorAtendente,
     };
   }
 
   /**
-   * Lista todas as filas disponíveis para configuração
+   * Lista todas as filas disponiveis para configuracao
    *
    * @param empresaId - ID da empresa
    * @returns Lista de filas
@@ -470,4 +544,3 @@ export class DistribuicaoService {
     };
   }
 }
-

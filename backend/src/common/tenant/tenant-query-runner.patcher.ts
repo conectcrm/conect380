@@ -61,7 +61,13 @@ export class TenantQueryRunnerPatcher implements OnModuleInit {
         await this.applyTenantContext(runner, originalQuery);
       }
 
-      return (originalQuery as any)(query, parameters, useStructuredResult);
+      // Preserve QueryRunner.query arity: passing an explicit third argument (even undefined)
+      // can change how TypeORM/driver shapes UPDATE ... RETURNING results.
+      if (typeof useStructuredResult === 'boolean') {
+        return (originalQuery as any)(query, parameters, useStructuredResult);
+      }
+
+      return (originalQuery as any)(query, parameters);
     };
 
     runner.release = async () => {

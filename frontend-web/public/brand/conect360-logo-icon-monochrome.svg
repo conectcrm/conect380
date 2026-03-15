@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc" shape-rendering="geometricPrecision">
+  <title id="title">Conect360 Icon Mono</title>
+  <desc id="desc">Icone monocromatico do Conect360.</desc>
+  <path d="M128 10 L204 54 Q214 60 214 72 L214 184 Q214 196 204 202 L128 246 Q118 252 108 246 L32 202 Q22 196 22 184 L22 72 Q22 60 32 54 L108 10 Q118 4 128 10 Z" fill="#002333"/>
+  <path d="M97 86 L97 170 L171 128 Z" fill="#FFFFFF" stroke="#002333" stroke-width="8" stroke-linejoin="round"/>
+</svg>

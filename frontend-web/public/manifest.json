@@ -1,15 +1,16 @@
 {
-  "short_name": "Conect CRM",
-  "name": "Conect CRM - Sistema de Gestão",
+  "short_name": "Conect360",
+  "name": "Conect360 - Plataforma SaaS",
   "icons": [
     {
-      "src": "favicon.ico",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
+      "src": "brand/conect360-logo-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
     }
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#159A9C",
+  "background_color": "#FFFFFF"
 }

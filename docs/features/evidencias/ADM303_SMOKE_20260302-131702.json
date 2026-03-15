@@ -1,0 +1,96 @@
+﻿{
+    "started_at":  "2026-03-02T13:17:02",
+    "finished_at":  "2026-03-02T13:17:03",
+    "base_url":  "http://localhost:3001",
+    "requester_email":  "admin@conect360.com.br",
+    "approver_email":  "smoke.approver@conectsuite.com.br",
+    "target_email":  "smoke.target.manager@conectsuite.com.br",
+    "target_user_id":  "fb2dd220-98be-4d8a-a6ef-7dc970784b0b",
+    "request_id":  "282779ca-0990-46bd-a954-dca1f481fbb6",
+    "permission":  "admin.empresas.manage",
+    "duration_minutes":  20,
+    "target_companies_status_before":  403,
+    "target_companies_status_after_approve":  200,
+    "target_companies_status_after_revoke":  403,
+    "dry_run":  false,
+    "results":  [
+                    {
+                        "Step":  "Login requester",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T13:17:02"
+                    },
+                    {
+                        "Step":  "Login approver",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T13:17:02"
+                    },
+                    {
+                        "Step":  "Login target",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T13:17:02"
+                    },
+                    {
+                        "Step":  "Resolver target_user_id pelo admin-bff/users",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T13:17:02"
+                    },
+                    {
+                        "Step":  "Validar acesso alvo antes do break-glass (esperado 403)",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T13:17:03"
+                    },
+                    {
+                        "Step":  "Criar solicitacao break-glass",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T13:17:03"
+                    },
+                    {
+                        "Step":  "Aprovar solicitacao break-glass com segundo responsavel",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T13:17:03"
+                    },
+                    {
+                        "Step":  "Validar listagem de break-glass ativo",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T13:17:03"
+                    },
+                    {
+                        "Step":  "Validar acesso alvo durante vigencia (esperado 200)",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T13:17:03"
+                    },
+                    {
+                        "Step":  "Revogar acesso break-glass ativo",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T13:17:03"
+                    },
+                    {
+                        "Step":  "Validar remocao de break-glass ativo",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T13:17:03"
+                    },
+                    {
+                        "Step":  "Validar acesso alvo apos revogacao (esperado 403)",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T13:17:03"
+                    },
+                    {
+                        "Step":  "Validar trilha de auditoria admin_break_glass",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T13:17:03"
+                    }
+                ]
+}

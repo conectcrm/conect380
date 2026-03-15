@@ -1,27 +1,27 @@
-# ========================================
-# Script de Verificação de Migrations
-# ========================================
-# Uso: ./check-production-migrations.ps1
+# Production migration presence check.
+# Usage: powershell -File .\scripts\check-production-migrations.ps1
 
 param(
   [string]$Environment = "production"
 )
 
-Write-Host "🔍 Verificando Migrations - Ambiente: $Environment" -ForegroundColor Yellow
-Write-Host "═══════════════════════════════════════════════════" -ForegroundColor DarkGray
-Write-Host ""
+$ErrorActionPreference = "Stop"
 
-# Verificar se está no diretório correto
+function Write-Rule {
+  Write-Host ("-" * 68) -ForegroundColor DarkGray
+}
+
+Write-Host ("[check-migrations] Environment: {0}" -f $Environment) -ForegroundColor Yellow
+Write-Rule
+
 if (-not (Test-Path "backend/src/migrations")) {
-  Write-Host "❌ Erro: Execute este script da raiz do projeto!" -ForegroundColor Red
+  Write-Host "[FAIL] Run this script from repository root." -ForegroundColor Red
   exit 1
 }
 
-# Contar migrations existentes
-$totalMigrations = (Get-ChildItem "backend/src/migrations/*.ts").Count
-Write-Host "📦 Total de migrations no projeto: $totalMigrations" -ForegroundColor Cyan
+$totalMigrations = (Get-ChildItem "backend/src/migrations/*.ts" -ErrorAction SilentlyContinue).Count
+Write-Host ("[INFO] Total migrations found: {0}" -f $totalMigrations) -ForegroundColor Cyan
 
-# Migrations críticas que DEVEM estar em produção
 $criticalMigrations = @(
   "1728518400000-CreateAtendimentoTables.ts",
   "1744690800000-CreateContatosTable.ts",
@@ -42,60 +42,43 @@ $criticalMigrations = @(
 )
 
 Write-Host ""
-Write-Host "⚠️  MIGRATIONS CRÍTICAS PARA PRODUÇÃO:" -ForegroundColor Yellow
-Write-Host "═══════════════════════════════════════════════════" -ForegroundColor DarkGray
+Write-Host "[INFO] Critical migrations required:" -ForegroundColor Yellow
+Write-Rule
 
-$missing = @()
+$missing = New-Object System.Collections.Generic.List[string]
+
 foreach ($migration in $criticalMigrations) {
-  $exists = Test-Path "backend/src/migrations/$migration"
-    
-  if ($exists) {
-    Write-Host "   ✅ $migration" -ForegroundColor Green
+  $path = "backend/src/migrations/$migration"
+  if (Test-Path $path) {
+    Write-Host ("  [OK] {0}" -f $migration) -ForegroundColor Green
   }
   else {
-    Write-Host "   ❌ $migration (FALTANDO!)" -ForegroundColor Red
-    $missing += $migration
+    Write-Host ("  [MISSING] {0}" -f $migration) -ForegroundColor Red
+    $missing.Add($migration)
   }
 }
 
 Write-Host ""
-Write-Host "═══════════════════════════════════════════════════" -ForegroundColor DarkGray
+Write-Rule
 
 if ($missing.Count -gt 0) {
-  Write-Host ""
-  Write-Host "🚨 ATENÇÃO: $($missing.Count) migrations críticas estão faltando!" -ForegroundColor Red
-  Write-Host ""
-  Write-Host "Migrations faltando:" -ForegroundColor Yellow
-  foreach ($m in $missing) {
-    Write-Host "   • $m" -ForegroundColor Red
+  Write-Host ("[FAIL] Missing {0} critical migrations." -f $missing.Count) -ForegroundColor Red
+  foreach ($item in $missing) {
+    Write-Host ("  - {0}" -f $item) -ForegroundColor Red
   }
-  Write-Host ""
-  Write-Host "⚠️  NÃO FAÇA DEPLOY PARA PRODUÇÃO ATÉ RESOLVER ISSO!" -ForegroundColor Red
   exit 1
 }
-else {
-  Write-Host ""
-  Write-Host "✅ Todas as migrations críticas estão presentes!" -ForegroundColor Green
-  Write-Host ""
-  Write-Host "📋 Próximos passos:" -ForegroundColor Yellow
-  Write-Host "   1. Configurar .env.production" -ForegroundColor Cyan
-  Write-Host "   2. Criar backup do banco de produção" -ForegroundColor Cyan
-  Write-Host "   3. Executar: npm run migration:run" -ForegroundColor Cyan
-  Write-Host "   4. Validar estrutura do banco" -ForegroundColor Cyan
-  Write-Host "   5. Aplicar seed data" -ForegroundColor Cyan
-  Write-Host ""
-}
 
-# Verificar se há arquivo .env.production
+Write-Host "[OK] All critical migrations are present." -ForegroundColor Green
+
 if (Test-Path "backend/.env.production") {
-  Write-Host "✅ Arquivo .env.production encontrado" -ForegroundColor Green
+  Write-Host "[OK] backend/.env.production found." -ForegroundColor Green
 }
 else {
-  Write-Host "⚠️  Arquivo .env.production NÃO encontrado!" -ForegroundColor Yellow
-  Write-Host "   Copie de: backend/.env.production.example" -ForegroundColor Cyan
+  Write-Host "[WARN] backend/.env.production not found." -ForegroundColor Yellow
+  Write-Host "       Copy from backend/.env.production.example and set real values." -ForegroundColor White
 }
 
 Write-Host ""
-Write-Host "═══════════════════════════════════════════════════" -ForegroundColor DarkGray
-Write-Host "✅ Verificação concluída!" -ForegroundColor Green
-Write-Host ""
+Write-Host "[check-migrations] Completed." -ForegroundColor Green
+exit 0

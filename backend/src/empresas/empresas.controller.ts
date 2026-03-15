@@ -12,29 +12,60 @@ import {
   Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { EmpresasService } from './empresas.service';
 import { CreateEmpresaDto, VerificarEmailDto } from './dto/empresas.dto';
+import { Permissions } from '../common/decorators/permissions.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
+import { PermissionsGuard } from '../common/guards/permissions.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Permission } from '../common/permissions/permissions.constants';
 import { JwtAuthGuard } from '../modules/auth/jwt-auth.guard';
+import { UserRole } from '../modules/users/user.entity';
 
 @ApiTags('empresas')
 @Controller('empresas')
 export class EmpresasController {
   constructor(private readonly empresasService: EmpresasService) {}
 
+  private extractRequestIp(req: any): string | null {
+    const forwardedFor = req?.headers?.['x-forwarded-for'];
+
+    if (typeof forwardedFor === 'string' && forwardedFor.trim()) {
+      return forwardedFor.split(',')[0]?.trim() || null;
+    }
+
+    if (Array.isArray(forwardedFor) && forwardedFor.length > 0) {
+      return String(forwardedFor[0]).trim() || null;
+    }
+
+    return req?.ip || req?.socket?.remoteAddress || null;
+  }
+
+  private extractUserAgent(req: any): string | null {
+    const userAgent = req?.headers?.['user-agent'];
+    return typeof userAgent === 'string' && userAgent.trim() ? userAgent.trim() : null;
+  }
+
+
   @Post('registro')
+  @Throttle({ default: { limit: 3, ttl: 60 * 60 * 1000 } })
   @ApiOperation({ summary: 'Registrar nova empresa' })
   @ApiResponse({ status: 201, description: 'Empresa registrada com sucesso' })
-  @ApiResponse({ status: 400, description: 'Dados invÃ¡lidos' })
-  @ApiResponse({ status: 409, description: 'Empresa jÃ¡ existe' })
-  async registrarEmpresa(@Body() createEmpresaDto: CreateEmpresaDto) {
-    process.stdout.write('\nðŸŽ¯ [CONTROLLER] POST /empresas/registro chamado\n');
-    process.stdout.write(`ðŸ“¦ [CONTROLLER] Plano: ${createEmpresaDto.plano}\n`);
+  @ApiResponse({ status: 400, description: 'Dados inválidos' })
+  @ApiResponse({ status: 409, description: 'Empresa já existe' })
+  async registrarEmpresa(@Body() createEmpresaDto: CreateEmpresaDto, @Request() req: any) {
 
     try {
-      const empresa = await this.empresasService.registrarEmpresa(createEmpresaDto);
+      const empresa = await this.empresasService.registrarEmpresa(createEmpresaDto, {
+        ip: this.extractRequestIp(req),
+        userAgent: this.extractUserAgent(req),
+      });
       return {
         success: true,
-        message: 'Empresa registrada com sucesso. Verifique seu email para ativar a conta.',
+        message: empresa.email_verificado
+          ? 'Empresa registrada com sucesso.'
+          : 'Empresa registrada com sucesso. Verifique seu email para ativar a conta.',
         data: empresa,
       };
     } catch (error) {
@@ -46,35 +77,44 @@ export class EmpresasController {
   }
 
   @Get('verificar-cnpj/:cnpj')
+  @Throttle({ default: { limit: 20, ttl: 60 * 1000 } })
   @ApiOperation({ summary: 'Verificar disponibilidade de CNPJ' })
   async verificarCNPJ(@Param('cnpj') cnpj: string) {
     try {
       const disponivel = await this.empresasService.verificarCNPJDisponivel(cnpj);
       return {
         disponivel,
-        message: disponivel ? 'CNPJ disponÃ­vel' : 'CNPJ jÃ¡ cadastrado',
+        message: disponivel ? 'CNPJ disponível' : 'CNPJ já cadastrado',
       };
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
       throw new HttpException('Erro ao verificar CNPJ', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
   @Get('verificar-email/:email')
+  @Throttle({ default: { limit: 20, ttl: 60 * 1000 } })
   @ApiOperation({ summary: 'Verificar disponibilidade de email' })
   async verificarEmail(@Param('email') email: string) {
     try {
       const disponivel = await this.empresasService.verificarEmailDisponivel(email);
       return {
         disponivel,
-        message: disponivel ? 'Email disponÃ­vel' : 'Email jÃ¡ cadastrado',
+        message: disponivel ? 'Email disponível' : 'Email já cadastrado',
       };
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
       throw new HttpException('Erro ao verificar email', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
   @Post('verificar-email')
-  @ApiOperation({ summary: 'Verificar email de ativaÃ§Ã£o' })
+  @Throttle({ default: { limit: 10, ttl: 60 * 1000 } })
+  @ApiOperation({ summary: 'Verificar email de ativação' })
   async verificarEmailAtivacao(@Body() verificarEmailDto: VerificarEmailDto) {
     try {
       const resultado = await this.empresasService.verificarEmailAtivacao(verificarEmailDto.token);
@@ -85,20 +125,21 @@ export class EmpresasController {
       };
     } catch (error) {
       throw new HttpException(
-        error.message || 'Token invÃ¡lido ou expirado',
+        error.message || 'Token inválido ou expirado',
         HttpStatus.BAD_REQUEST,
       );
     }
   }
 
   @Post('reenviar-ativacao')
-  @ApiOperation({ summary: 'Reenviar email de ativaÃ§Ã£o' })
+  @Throttle({ default: { limit: 3, ttl: 5 * 60 * 1000 } })
+  @ApiOperation({ summary: 'Reenviar email de ativação' })
   async reenviarEmailAtivacao(@Body() body: { email: string }) {
     try {
       await this.empresasService.reenviarEmailAtivacao(body.email);
       return {
         success: true,
-        message: 'Email de ativaÃ§Ã£o reenviado com sucesso!',
+        message: 'Email de ativação reenviado com sucesso!',
       };
     } catch (error) {
       throw new HttpException(error.message || 'Erro ao reenviar email', HttpStatus.BAD_REQUEST);
@@ -106,12 +147,12 @@ export class EmpresasController {
   }
 
   @Get('subdominio/:subdominio')
-  @ApiOperation({ summary: 'Obter empresa por subdomÃ­nio' })
+  @ApiOperation({ summary: 'Obter empresa por subdomínio' })
   async obterEmpresaPorSubdominio(@Param('subdominio') subdominio: string) {
     try {
       const empresa = await this.empresasService.obterPorSubdominio(subdominio);
       if (!empresa) {
-        throw new HttpException('Empresa nÃ£o encontrada', HttpStatus.NOT_FOUND);
+        throw new HttpException('Empresa não encontrada', HttpStatus.NOT_FOUND);
       }
       return empresa;
     } catch (error) {
@@ -128,7 +169,7 @@ export class EmpresasController {
     try {
       const empresa = await this.empresasService.obterPorId(id);
       if (!empresa) {
-        throw new HttpException('Empresa nÃ£o encontrada', HttpStatus.NOT_FOUND);
+        throw new HttpException('Empresa não encontrada', HttpStatus.NOT_FOUND);
       }
       return empresa;
     } catch (error) {
@@ -140,7 +181,9 @@ export class EmpresasController {
   }
 
   @Put(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
+  @Permissions(Permission.CONFIG_EMPRESA_UPDATE)
   @ApiOperation({ summary: 'Atualizar dados da empresa' })
   async atualizarEmpresa(
     @Request() req,
@@ -168,7 +211,7 @@ export class EmpresasController {
   }
 
   @Get('planos')
-  @ApiOperation({ summary: 'Listar planos disponÃ­veis' })
+  @ApiOperation({ summary: 'Listar planos disponíveis' })
   async listarPlanos() {
     try {
       const planos = await this.empresasService.listarPlanos();
@@ -231,8 +274,8 @@ export class MinhasEmpresasController {
 
     if (plano === 'professional' || plano === 'business' || plano === 'pro') {
       return {
-        id: 'professional',
-        nome: 'Professional',
+        id: 'business',
+        nome: 'Business',
         preco: Number(valorMensal ?? 0),
         features: [],
         limitesUsuarios,

@@ -20,9 +20,13 @@ import {
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { Permission } from '../../../common/permissions/permissions.constants';
 
 @Controller('pagamentos/gateways/configuracoes')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.FINANCEIRO_PAGAMENTOS_READ)
 export class ConfiguracaoGatewayController {
   constructor(private readonly configuracaoGatewayService: ConfiguracaoGatewayService) {}
 
@@ -41,6 +45,7 @@ export class ConfiguracaoGatewayController {
   }
 
   @Post()
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   async criar(
     @EmpresaId() empresaId: string,
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
@@ -50,6 +55,7 @@ export class ConfiguracaoGatewayController {
   }
 
   @Patch(':id')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   async atualizar(
     @EmpresaId() empresaId: string,
     @Param('id', ParseUUIDPipe) id: string,
@@ -60,6 +66,7 @@ export class ConfiguracaoGatewayController {
   }
 
   @Delete(':id')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   async remover(@EmpresaId() empresaId: string, @Param('id', ParseUUIDPipe) id: string) {
     await this.configuracaoGatewayService.remove(id, empresaId);
     return { message: 'Configuração removida com sucesso' };

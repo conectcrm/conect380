@@ -3,6 +3,14 @@
 **Data**: 19/01/2026
 **Objetivo**: identificar documentos desatualizados, legados ou fora de escopo e orientar correções.
 
+## Atualização 2026-03
+
+- Esta auditoria deve ser lida em conjunto com [MATRIZ_COBERTURA_REQUISITOS_2026-03.md](MATRIZ_COBERTURA_REQUISITOS_2026-03.md) e [PLANO_SANEAMENTO_DOCUMENTACAO_2026-03.md](PLANO_SANEAMENTO_DOCUMENTACAO_2026-03.md).
+- Após as correções recentes, os principais índices já foram rotulados com melhor clareza de escopo.
+- O risco principal deixou de ser "índice errado como documento principal" e passou a ser "documento setorial ou de implementação sendo usado como contrato funcional futuro".
+- As lacunas mais críticas de contrato-base foram reduzidas com a publicação de contratos e backlogs para assinatura eletrônica, e-mail omnichannel, inbound/threading de email, NFSe fase 1 e sincronização externa de calendário.
+- O risco remanescente está mais concentrado em homologação, decisões de provider e fases seguintes ainda não contratadas.
+
 ---
 
 ## 1) Resultado Executivo
@@ -17,12 +25,20 @@
 ### 🟡 Válidos, mas precisam rotulagem de escopo
 
 - [backend/INDICE_DOCUMENTACAO.md](../../backend/INDICE_DOCUMENTACAO.md)
-  - **Problema**: índice de subsistema (WhatsApp/Tickets) pode parecer “documento principal”.
-  - **Ação recomendada**: inserir aviso no topo: “documentação do subsistema de tickets/WhatsApp”.
+  - **Status**: corrigido.
+  - **Observação**: manter o aviso de subsistema e os links para os índices gerais.
 
 - [QUICKSTART.md](../../QUICKSTART.md)
-  - **Problema**: ainda contém trechos e links que podem soar como “produto omnichannel”.
-  - **Ação recomendada**: manter como quickstart do projeto, mas rotular explicitamente quando estiver descrevendo o módulo Atendimento (Omnichannel).
+  - **Status**: corrigido.
+  - **Observação**: manter o quickstart estritamente como guia de setup, sem tratá-lo como mapa de maturidade funcional.
+
+- [docs/ROADMAP_OMNICHANNEL.md](../ROADMAP_OMNICHANNEL.md)
+  - **Problema**: roadmap setorial pode ser interpretado como planejamento oficial do produto inteiro.
+  - **Ação recomendada**: manter banner explícito de escopo do módulo Atendimento (Omnichannel) e apontar para a matriz de cobertura.
+
+- [docs/implementation/AGENDA_INTEGRADA_NOTIFICACOES.md](../implementation/AGENDA_INTEGRADA_NOTIFICACOES.md)
+  - **Problema**: registro de implementação pode ser lido como contrato funcional fechado da Agenda.
+  - **Ação recomendada**: rotular como evidência técnica/histórica, não como especificação futura.
 
 ### 🔴 Desatualizados / Legado
 
@@ -51,14 +67,14 @@
 
 ## 3) Itens de Risco (Desalinhamentos)
 
-1. **Entrypoints com trechos “omnichannel-only”**
+1. **Documentos setoriais lidos como contrato global**
 
-- Alguns documentos de entrada (especialmente [QUICKSTART.md](../../QUICKSTART.md) e o README raiz) ainda têm trechos e links que parecem “produto omnichannel”.
-- Risco: novos devs interpretarem o Conect360 como Zendesk‑like, em vez de suite all‑in‑one.
+- Mesmo após ajustes nos entrypoints, ainda existe risco de roadmap de módulo ou nota de implementação serem tratados como requisitos oficiais do produto.
+- Risco: agentes e novos devs implementarem backlog futuro com base em texto narrativo local, sem checar contratos atuais em [docs/features](../features) e na matriz de cobertura.
 
-2. **Índice do backend sem aviso de escopo**
-   - [backend/INDICE_DOCUMENTACAO.md](../../backend/INDICE_DOCUMENTACAO.md) pode ser lido como “documentação oficial”.
-   - Risco: foco excessivo em WhatsApp/Tickets ao iniciar tarefas gerais.
+2. **Lacunas reais de requisitos ainda não fechadas**
+  - Ainda faltam principalmente artefatos de homologação, evidências operacionais e decisões de provider/arquitetura em fiscal, assinatura, sincronização externa e canal email.
+  - Risco: implementação futura avançar para rollout sem validação suficiente ou tratar backlog de fase seguinte como contrato pronto.
 
 ---
 
@@ -79,12 +95,12 @@ Referência da análise que motivou o arquivamento:
 
 ### Prioridade Alta
 
-1. **Rotular escopo** no topo de [backend/INDICE_DOCUMENTACAO.md](../../backend/INDICE_DOCUMENTACAO.md).
-2. **Ajustar QUICKSTART** para remover frases finais “Omnichannel” e deixar links do módulo com rótulo de escopo.
+1. **Manter e propagar banners de escopo** em documentos setoriais ainda relevantes, especialmente [docs/ROADMAP_OMNICHANNEL.md](../ROADMAP_OMNICHANNEL.md) e docs do módulo Atendimento.
+2. **Separar evidência técnica de contrato funcional** em documentos de implementação, especialmente Agenda e integrações.
 
 ### Prioridade Média
 
-3. Criar um “Mapa de Módulos Técnicos” (backend) vs “Módulos de Produto” (visão 8 módulos).
+3. Formalizar checklists de homologação e contratos de fase seguinte nas frentes com cobertura parcial, conforme [MATRIZ_COBERTURA_REQUISITOS_2026-03.md](MATRIZ_COBERTURA_REQUISITOS_2026-03.md).
 
 ---
 
@@ -129,3 +145,4 @@ Referência da análise que motivou o arquivamento:
 
 - Esta auditoria não altera código ou documentação; apenas aponta inconsistências.
 - Todas as recomendações respeitam a visão oficial em [VISAO_SISTEMA_2025.md](../../VISAO_SISTEMA_2025.md).
+- Após 2026-03, parte desta auditoria passou a registrar também o status de saneamento já executado, para evitar recomendações duplicadas.

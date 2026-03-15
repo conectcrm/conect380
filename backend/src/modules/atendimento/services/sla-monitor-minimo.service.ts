@@ -23,8 +23,11 @@ export class SlaMonitorMinimoService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(SlaMonitorMinimoService.name);
   private intervalId: NodeJS.Timeout | null = null;
   private readonly policy: ChannelPolicyKey = 'sla-alert';
+  private readonly nodeEnv = (process.env.NODE_ENV || '').toLowerCase();
   private readonly enabled =
-    process.env.SLA_MONITOR_ENABLED !== 'false' && process.env.NODE_ENV !== 'test';
+    this.nodeEnv !== 'test' &&
+    (process.env.SLA_MONITOR_ENABLED === 'true' ||
+      (process.env.SLA_MONITOR_ENABLED !== 'false' && this.nodeEnv !== 'development'));
   private readonly intervalMs = Number(process.env.SLA_MONITOR_INTERVAL_MS ?? 60_000); // 1 min padrão
   private readonly batchSize = Number(process.env.SLA_MONITOR_BATCH ?? 500);
   private readonly warningThreshold = Number(process.env.SLA_WARNING_THRESHOLD ?? 0.7);
@@ -45,7 +48,7 @@ export class SlaMonitorMinimoService implements OnModuleInit, OnModuleDestroy {
   onModuleInit() {
     if (!this.enabled) {
       this.logger.log(
-        '⏸️ SLA monitor desabilitado (SLA_MONITOR_ENABLED=false ou ambiente de teste)',
+        '⏸️ SLA monitor desabilitado (defina SLA_MONITOR_ENABLED=true para habilitar em desenvolvimento)',
       );
       return;
     }
@@ -234,6 +237,7 @@ export class SlaMonitorMinimoService implements OnModuleInit, OnModuleDestroy {
       targets: {
         phone: this.adminPhone,
         userId: this.adminUserId,
+        empresaId: ticket.empresaId,
       },
       message,
       context: {

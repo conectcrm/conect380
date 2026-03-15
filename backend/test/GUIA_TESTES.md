@@ -78,6 +78,37 @@ cd backend
 npm run test:e2e -- multi-tenancy.e2e-spec
 ```
 
+### 3.3. Padrão de Bootstrap E2E (recomendado para novos testes)
+
+Para reduzir flakiness e ruído nos testes E2E:
+
+- Use `createE2EApp(...)` em `backend/test/_support/e2e-app.helper.ts`
+  - logger do Nest silencioso por padrão em teste
+  - `ValidationPipe` padrão (`whitelist`, `transform`)
+- Para specs sem pipe global:
+  - `createE2EApp(moduleFixture, { validationPipe: false })`
+- Para evitar corrida de schema/TypeORM quando várias suítes sobem em paralelo:
+  - envolva `compile()` com `withE2EBootstrapLock(...)`
+
+Exemplo:
+
+```typescript
+const moduleFixture = await withE2EBootstrapLock(() =>
+  Test.createTestingModule({ imports: [AppModule] }).compile(),
+);
+
+const app = await createE2EApp(moduleFixture);
+```
+
+Flags úteis (definidas em `test/setup-e2e-env.ts`, mas sobrescrevíveis):
+
+- `NEST_LOGS_IN_TEST=false`
+- `HTTP_LOG_REQUESTS_IN_TEST=false`
+- `HTTP_LOG_EXPECTED_ERRORS_IN_TEST=false`
+- `HTTP_LOG_UNIMPLEMENTED_IN_TEST=false`
+- `CACHE_LOGS_IN_TEST=false`
+- `E2E_BOOTSTRAP_LOCK_IN_TEST=true`
+
 **Resultado esperado**:
 ```
  PASS  test/multi-tenancy.e2e-spec.ts

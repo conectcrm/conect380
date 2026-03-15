@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { BackToNucleus } from '../components/navigation/BackToNucleus';
 import { niveisService, type NivelAtendimento } from '../services/niveisService';
+import { useGlobalConfirmation } from '../contexts/GlobalConfirmationContext';
 
 interface CreateNivelDto {
   codigo: string;
@@ -29,6 +30,7 @@ interface CreateNivelDto {
 }
 
 const GestaoNiveisAtendimentoPage: React.FC = () => {
+  const { confirm } = useGlobalConfirmation();
   // Estados principais
   const [niveis, setNiveis] = useState<NivelAtendimento[]>([]);
   const [loading, setLoading] = useState(true);
@@ -141,7 +143,11 @@ const GestaoNiveisAtendimentoPage: React.FC = () => {
   };
 
   const handleDelete = async (id: string, codigo: string) => {
-    if (!window.confirm(`Tem certeza que deseja excluir o nível "${codigo}"? Esta ação não pode ser desfeita.`)) {
+    if (
+      !(await confirm(
+        `Tem certeza que deseja excluir o nível "${codigo}"? Esta ação não pode ser desfeita.`,
+      ))
+    ) {
       return;
     }
 

@@ -52,6 +52,19 @@ export const BaseModal: React.FC<BaseModalProps> = ({
   overlayClassName = '',
   modalClassName = '',
 }) => {
+  const maxWidthValues: Record<NonNullable<BaseModalProps['maxWidth']>, string> = {
+    sm: '24rem',
+    md: '28rem',
+    lg: '32rem',
+    xl: '36rem',
+    '2xl': '42rem',
+    '3xl': '48rem',
+    '4xl': '56rem',
+    '5xl': '64rem',
+    '6xl': '72rem',
+    '7xl': '80rem',
+  };
+
   const handleKeyDown = React.useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -75,19 +88,6 @@ export const BaseModal: React.FC<BaseModalProps> = ({
 
   if (!isOpen) return null;
 
-  const maxWidthClasses = {
-    sm: 'max-w-sm',
-    md: 'max-w-md',
-    lg: 'max-w-lg',
-    xl: 'max-w-xl',
-    '2xl': 'max-w-2xl',
-    '3xl': 'max-w-3xl',
-    '4xl': 'max-w-4xl',
-    '5xl': 'max-w-5xl',
-    '6xl': 'max-w-6xl',
-    '7xl': 'max-w-7xl',
-  };
-
   const handleOverlayClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
       onClose();
@@ -101,13 +101,13 @@ export const BaseModal: React.FC<BaseModalProps> = ({
     >
       <div
         className={`
-          relative w-full ${maxWidthClasses[maxWidth]} 
+          relative w-full
           bg-white rounded-xl shadow-2xl 
           transform transition-all duration-300 scale-100
           border border-gray-200
           ${modalClassName}
         `}
-        style={{ maxHeight: '90vh' }}
+        style={{ maxHeight: '90vh', maxWidth: maxWidthValues[maxWidth] }}
       >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-[#159A9C] to-[#1BB5B8]">

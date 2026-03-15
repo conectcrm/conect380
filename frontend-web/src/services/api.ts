@@ -98,7 +98,7 @@ api.interceptors.request.use(
     }
 
     // Debug específico para requisições de eventos
-    if (config.url?.includes('/eventos')) {
+    if (DEBUG && config.url?.includes('/eventos')) {
       console.log('📅 [FRONTEND] Enviando requisição para eventos:', {
         method: config.method?.toUpperCase(),
         url: config.url,
@@ -110,7 +110,7 @@ api.interceptors.request.use(
     }
 
     // Debug específico para requisições de contratos
-    if (config.url?.includes('/contratos')) {
+    if (DEBUG && config.url?.includes('/contratos')) {
       console.log('📋 [FRONTEND] Enviando requisição para contratos:', {
         method: config.method?.toUpperCase(),
         url: config.url,
@@ -122,7 +122,7 @@ api.interceptors.request.use(
     }
 
     // Debug específico para requisições de faturamento
-    if (config.url?.includes('/faturamento')) {
+    if (DEBUG && config.url?.includes('/faturamento')) {
       console.log('💰 [FRONTEND] Enviando requisição para faturamento:', {
         method: config.method?.toUpperCase(),
         url: config.url,
@@ -146,6 +146,40 @@ let failedQueue: Array<{
   resolve: (value?: unknown) => void;
   reject: (reason?: any) => void;
 }> = [];
+
+const SESSION_EXPIRED_STORAGE_KEY = 'sessionExpired';
+const SESSION_EXPIRED_REASON_STORAGE_KEY = 'sessionExpiredReason';
+const SESSION_EXPIRED_MESSAGE_STORAGE_KEY = 'sessionExpiredMessage';
+
+const resolveAuthErrorDetails = (
+  error: any,
+): { code: string | null; message: string | null } => {
+  const data = error?.response?.data;
+  if (!data || typeof data !== 'object') {
+    return { code: null, message: null };
+  }
+
+  const directCode = typeof data.code === 'string' ? data.code : null;
+  const directMessage = typeof data.message === 'string' ? data.message : null;
+
+  if (directCode || directMessage) {
+    return { code: directCode, message: directMessage };
+  }
+
+  if (data.message && typeof data.message === 'object') {
+    const nestedCode = typeof data.message.code === 'string' ? data.message.code : null;
+    const nestedMessage = typeof data.message.message === 'string' ? data.message.message : null;
+    return { code: nestedCode, message: nestedMessage };
+  }
+
+  return { code: null, message: null };
+};
+
+const saveSessionExpiredState = (reason: string, message: string) => {
+  localStorage.setItem(SESSION_EXPIRED_STORAGE_KEY, 'true');
+  localStorage.setItem(SESSION_EXPIRED_REASON_STORAGE_KEY, reason);
+  localStorage.setItem(SESSION_EXPIRED_MESSAGE_STORAGE_KEY, message);
+};
 
 const processQueue = (error: any = null, token: string | null = null) => {
   failedQueue.forEach((prom) => {
@@ -173,7 +207,7 @@ api.interceptors.response.use(
     }
 
     // Debug específico para respostas de contratos
-    if (response.config.url?.includes('/contratos')) {
+    if (DEBUG && response.config.url?.includes('/contratos')) {
       console.log('✅ [FRONTEND] Resposta de contratos recebida:', {
         status: response.status,
         data: response.data,
@@ -183,7 +217,7 @@ api.interceptors.response.use(
     }
 
     // Debug específico para respostas de faturamento
-    if (response.config.url?.includes('/faturamento')) {
+    if (DEBUG && response.config.url?.includes('/faturamento')) {
       console.log('✅ [FRONTEND] Resposta de faturamento recebida:', {
         status: response.status,
         data: response.data,
@@ -223,7 +257,7 @@ api.interceptors.response.use(
     }
 
     // Debug específico para erros de faturamento
-    if (error.config?.url?.includes('/faturamento')) {
+    if (DEBUG && error.config?.url?.includes('/faturamento')) {
       console.error('❌ [FRONTEND] Erro na requisição de faturamento:', {
         status: error.response?.status,
         statusText: error.response?.statusText,
@@ -269,25 +303,27 @@ api.interceptors.response.use(
       try {
         console.log('🔄 [API] Tentando renovar token automaticamente...');
 
-        // ⚠️ IMPORTANTE: O endpoint /auth/refresh REQUER autenticação (JWT Guard)
-        // Então precisamos enviar o token antigo (mesmo expirado) para o backend verificar
-        const oldToken = localStorage.getItem('authToken');
+        const currentRefreshToken = localStorage.getItem('refreshToken');
+        if (!currentRefreshToken) {
+          throw new Error('Refresh token ausente');
+        }
 
         const refreshResponse = await apiPublic.post(
           '/auth/refresh',
-          {},
-          {
-            headers: {
-              Authorization: `Bearer ${oldToken}`,
-            },
-          }
+          { refreshToken: currentRefreshToken },
         );
 
-        if (refreshResponse.data?.success && refreshResponse.data?.data?.access_token) {
+        if (
+          refreshResponse.data?.success &&
+          refreshResponse.data?.data?.access_token &&
+          refreshResponse.data?.data?.refresh_token
+        ) {
           const newToken = refreshResponse.data.data.access_token;
+          const newRefreshToken = refreshResponse.data.data.refresh_token;
 
-          // Salvar novo token
+          // Salvar novos tokens
           localStorage.setItem('authToken', newToken);
+          localStorage.setItem('refreshToken', newRefreshToken);
 
           console.log('✅ [API] Token renovado com sucesso!');
 
@@ -316,10 +352,24 @@ api.interceptors.response.use(
         console.warn('⚠️ [API] Token expirado e não pôde ser renovado - Limpando sessão...');
 
         localStorage.removeItem('authToken');
+        localStorage.removeItem('refreshToken');
         localStorage.removeItem('user_data');
         localStorage.removeItem('empresaAtiva');
         localStorage.removeItem('selectedProfileId');
-        localStorage.setItem('sessionExpired', 'true');
+
+        const authError = resolveAuthErrorDetails(refreshError);
+        if (authError.code === 'CONCURRENT_LOGIN') {
+          saveSessionExpiredState(
+            'concurrent_login',
+            authError.message ||
+              'Sua sessao foi encerrada porque sua conta foi acessada em outro dispositivo.',
+          );
+        } else {
+          saveSessionExpiredState(
+            'expired',
+            'Sua sessao expirou. Por favor, faca login novamente.',
+          );
+        }
 
         setTimeout(() => {
           window.location.href = '/login';

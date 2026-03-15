@@ -16,6 +16,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
 import { KPICard } from '../../../components/common/KPICard';
+import { useGlobalConfirmation } from '../../../contexts/GlobalConfirmationContext';
 import {
   fluxoService,
   FluxoTriagem,
@@ -169,6 +170,7 @@ interface GestaoFluxosPageProps {
 }
 
 const GestaoFluxosPage: React.FC<GestaoFluxosPageProps> = ({ hideBackButton = false }) => {
+  const { confirm } = useGlobalConfirmation();
   const navigate = useNavigate();
   const [fluxos, setFluxos] = useState<FluxoTriagem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -319,7 +321,7 @@ const GestaoFluxosPage: React.FC<GestaoFluxosPageProps> = ({ hideBackButton = fa
   };
 
   const handleExcluir = async (fluxo: FluxoTriagem): Promise<void> => {
-    if (!window.confirm(`Deseja realmente excluir o fluxo "${fluxo.nome}"?`)) {
+    if (!(await confirm(`Deseja realmente excluir o fluxo "${fluxo.nome}"?`))) {
       return;
     }
 

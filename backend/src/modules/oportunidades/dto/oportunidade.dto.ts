@@ -12,6 +12,7 @@ import {
   MinLength,
   IsEmail,
   Matches,
+  IsBoolean,
   ValidatorConstraint,
   ValidatorConstraintInterface,
   ValidationArguments,
@@ -21,6 +22,8 @@ import {
   EstagioOportunidade,
   PrioridadeOportunidade,
   OrigemOportunidade,
+  MotivoPerdaOportunidade,
+  LifecycleStatusOportunidade,
 } from '../oportunidade.entity';
 
 // ✅ Validação customizada: Exige cliente_id OU nomeContato
@@ -189,6 +192,31 @@ export class UpdateEstagioDto {
   @IsOptional()
   @IsDateString()
   dataFechamentoReal?: string;
+
+  @IsOptional()
+  @IsEnum(MotivoPerdaOportunidade)
+  motivoPerda?: MotivoPerdaOportunidade;
+
+  @IsOptional()
+  @IsString()
+  motivoPerdaDetalhes?: string;
+
+  @IsOptional()
+  @IsString()
+  concorrenteNome?: string;
+
+  @IsOptional()
+  @IsDateString()
+  dataRevisao?: string;
+}
+
+export enum LifecycleViewOportunidade {
+  OPEN = 'open',
+  CLOSED = 'closed',
+  ARCHIVED = 'archived',
+  DELETED = 'deleted',
+  ALL_ACTIVE = 'all_active',
+  ALL = 'all',
 }
 
 export class MetricasQueryDto {
@@ -199,4 +227,105 @@ export class MetricasQueryDto {
   @IsOptional()
   @IsDateString()
   dataFim?: string;
+
+  @IsOptional()
+  @IsEnum(LifecycleStatusOportunidade)
+  lifecycle_status?: LifecycleStatusOportunidade;
+
+  @IsOptional()
+  @IsEnum(LifecycleViewOportunidade)
+  lifecycle_view?: LifecycleViewOportunidade;
+
+  @IsOptional()
+  @IsString()
+  include_deleted?: string | boolean;
+}
+
+export class OportunidadesListQueryDto {
+  @IsOptional()
+  @IsEnum(EstagioOportunidade)
+  estagio?: EstagioOportunidade;
+
+  @IsOptional()
+  @IsString()
+  responsavel_id?: string;
+
+  @IsOptional()
+  @IsString()
+  cliente_id?: string;
+
+  @IsOptional()
+  @IsDateString()
+  dataInicio?: string;
+
+  @IsOptional()
+  @IsDateString()
+  dataFim?: string;
+
+  @IsOptional()
+  @IsEnum(LifecycleStatusOportunidade)
+  lifecycle_status?: LifecycleStatusOportunidade;
+
+  @IsOptional()
+  @IsEnum(LifecycleViewOportunidade)
+  lifecycle_view?: LifecycleViewOportunidade;
+
+  @IsOptional()
+  @IsString()
+  include_deleted?: string | boolean;
+}
+
+export class LifecycleTransitionDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  motivo?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1200)
+  comentario?: string;
+}
+
+export class UpdateLifecycleFeatureFlagDto {
+  @IsBoolean()
+  enabled: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  rolloutPercentage?: number;
+}
+
+export class StaleDealsQueryDto {
+  @IsOptional()
+  @IsString()
+  threshold_days?: string;
+
+  @IsOptional()
+  @IsString()
+  limit?: string;
+}
+
+export class UpdateStalePolicyDto {
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(7)
+  @Max(120)
+  thresholdDays?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  autoArchiveEnabled?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(7)
+  @Max(365)
+  autoArchiveAfterDays?: number;
 }

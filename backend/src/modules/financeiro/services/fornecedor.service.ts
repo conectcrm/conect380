@@ -261,10 +261,10 @@ export class FornecedorService {
       throw new NotFoundException('Fornecedor não encontrado');
     }
 
-    // Remove apenas contas com status 'PAGO' ou 'FINALIZADO'
+    // Remove apenas contas efetivamente pagas
     const contasRemovidasResult = await this.contaPagarRepository.delete({
       fornecedor: { id: id },
-      status: In(['PAGO', 'FINALIZADO', 'QUITADO']),
+      status: In(['paga']),
     });
 
     return {

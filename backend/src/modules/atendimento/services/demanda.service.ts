@@ -330,7 +330,16 @@ export class DemandaService {
         `⚠️ [DEPRECATED] DemandaService.converterTicketEmDemanda() - Use TicketService.atualizar(ticketId, { tipo: 'demanda', titulo, descricao })`,
       );
       this.logger.log(`🎫➡️📋 Convertendo ticket ${ticketId} em demanda`);
-      this.logger.log(`Autor: ${autorId}, DTO: ${JSON.stringify(dto)}`);
+      this.logger.log(
+        `Conversao ticket->demanda (resumo): ${JSON.stringify({
+          autorId,
+          keys: dto ? Object.keys(dto) : [],
+          titulo: dto?.titulo ? String(dto.titulo).slice(0, 80) : null,
+          prioridade: (dto as any)?.prioridade ?? null,
+          prazo: (dto as any)?.prazo ?? null,
+          hasDescricao: Boolean((dto as any)?.descricao),
+        })}`,
+      );
 
       // 1. Buscar ticket com relações
       const ticket = await this.ticketRepository.findOne({

@@ -1,0 +1,13 @@
+# Workspace Guardrails
+
+- `c:\Projetos\conect360` is the primary running workspace. Do not use this directory for clean PR extraction, `origin/main` cherry-pick chains, or rebases against `origin/main`.
+- Never run `git switch`, `git checkout`, or `git rebase origin/main` here when the user is validating the live system from this workspace.
+- If work must be based on `origin/main`, create an isolated worktree instead:
+  `npm run branch:worktree:new -- -BranchName feat/guardian-ajuste-x`
+- Prefer running the user-facing system from the dedicated runtime clone:
+  `npm run runtime:prepare`
+  `npm run runtime:deps:install`
+  `npm run runtime:start:all`
+  `npm run runtime:start:guardian-web`
+- Keep the primary workspace on the active system branch that the user is validating.
+- Before risky git work, run `npm run branch:health`. If the branch is far from `origin/main`, move the work to an isolated worktree instead of trying to "clean" the active checkout.

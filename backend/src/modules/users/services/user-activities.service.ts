@@ -15,17 +15,53 @@ export class UserActivitiesService {
     private readonly userRepository: Repository<User>,
   ) {}
 
-  async listarAtividades(empresaId: string, limit: number = 20): Promise<any[]> {
+  async listarAtividades(
+    empresaId: string,
+    filters: {
+      limit?: number;
+      usuarioId?: string;
+      tipo?: AtividadeTipo;
+      dataInicio?: string;
+      dataFim?: string;
+    } = {},
+  ): Promise<any[]> {
     try {
       this.logger.log(`Listando atividades recentes para empresa ${empresaId}`);
 
-      // Buscar atividades mais recentes para a empresa
-      const atividades = await this.userActivityRepository.find({
-        where: { empresaId },
-        order: { createdAt: 'DESC' },
-        take: limit,
-        relations: ['usuario'],
-      });
+      const requestedLimit =
+        typeof filters.limit === 'number' && Number.isFinite(filters.limit) ? filters.limit : 20;
+      const limit = Math.max(1, Math.min(200, Math.trunc(requestedLimit)));
+
+      const query = this.userActivityRepository
+        .createQueryBuilder('activity')
+        .leftJoinAndSelect('activity.usuario', 'usuario')
+        .where('activity.empresaId = :empresaId', { empresaId })
+        .orderBy('activity.createdAt', 'DESC')
+        .take(limit);
+
+      if (filters.usuarioId) {
+        query.andWhere('activity.usuarioId = :usuarioId', { usuarioId: filters.usuarioId });
+      }
+
+      if (filters.tipo) {
+        query.andWhere('activity.tipo = :tipo', { tipo: filters.tipo });
+      }
+
+      if (filters.dataInicio) {
+        const parsed = new Date(filters.dataInicio);
+        if (!Number.isNaN(parsed.getTime())) {
+          query.andWhere('activity.createdAt >= :dataInicio', { dataInicio: parsed.toISOString() });
+        }
+      }
+
+      if (filters.dataFim) {
+        const parsed = new Date(filters.dataFim);
+        if (!Number.isNaN(parsed.getTime())) {
+          query.andWhere('activity.createdAt <= :dataFim', { dataFim: parsed.toISOString() });
+        }
+      }
+
+      const atividades = await query.getMany();
 
       // Transformar para o formato esperado pelo frontend
       return atividades.map((atividade) => ({

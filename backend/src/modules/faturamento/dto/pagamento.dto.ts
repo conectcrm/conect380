@@ -70,4 +70,12 @@ export class ProcessarPagamentoDto {
   @IsOptional()
   @IsObject()
   webhookData?: any;
+
+  @IsOptional()
+  @IsString()
+  correlationId?: string;
+
+  @IsOptional()
+  @IsString()
+  origemId?: string;
 }

@@ -1,0 +1,9 @@
+IssueId,Summary,Priority,Owner,TargetSprint,SuccessMetric,Status
+GDN-505A,Consolidar job diario unico para execucao dos checks 506-509,High,DevOps,SPR-6-2026-05-07_13,Execucao automatica diaria com evidencias publicadas sem falha por 14 dias,todo
+GDN-505B,Criar dashboard executivo de go-live e risco operacional,High,Operations,SPR-6-2026-05-07_13,Dashboard com KPIs de latencia billing auditoria e incidentes atualizado diariamente,todo
+GDN-505C,Automatizar alerta de drift das flags de transicao legado,High,SRE,SPR-6-2026-05-07_13,Alerta P1 emitido em ate 5 min para divergencia de modo legado,todo
+GDN-505D,Reforcar runbook N1/N2/N3 com casos de billing em producao,Medium,Support,SPR-6-2026-05-07_13,Runbook revisado e aprovado com simulacao concluida por N1 N2 N3,todo
+GDN-505E,Implementar relatorio semanal de consistencia financeira automatizado,High,Finance,SPR-6-2026-05-07_13,Relatorio semanal gerado automaticamente com reconciliacao sem divergencia critica,todo
+GDN-505F,Padronizar pacote de evidencias por sprint com indice unificado,Medium,PMO,SPR-6-2026-05-07_13,Indice unico de evidencias publicado ate D+1 de cada sprint,todo
+GDN-505G,Adicionar check de expiracao de credenciais operacionais criticas,Medium,Security,SPR-6-2026-05-07_13,Check preventivo sem credencial vencida em execucao diaria,todo
+GDN-505H,Planejar desligamento definitivo de qualquer endpoint admin legado restante,High,Backend,SPR-7-2026-05-14_20,Zero endpoint funcional legado utilizado por operacao por 30 dias,todo

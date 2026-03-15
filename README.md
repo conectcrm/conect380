@@ -59,6 +59,12 @@ Conect360 é uma **suite CRM all-in-one** desenvolvida para PMEs brasileiras, qu
 
 ## ✨ Módulos do Sistema
 
+Observacao importante:
+
+1. a lista abaixo combina capacidades implementadas, capacidades parcialmente consolidadas e roadmap de produto;
+2. para saber o que ja possui requisito formal vigente por modulo, consulte `docs/handbook/MATRIZ_COBERTURA_REQUISITOS_2026-03.md`;
+3. itens marcados como `roadmap` ou sem contrato funcional vigente nao devem ser tratados como prontos para implementacao sem refinamento adicional.
+
 ### 1️⃣ Módulo CRM & Vendas
 
 - **Pipeline Visual (Kanban)** - Gestão de oportunidades com drag & drop
@@ -122,7 +128,7 @@ Conect360 é uma **suite CRM all-in-one** desenvolvida para PMEs brasileiras, qu
 ### 7️⃣ Módulo Calendário & Agenda
 
 - **Agendamentos** - Reuniões e follow-ups
-- **Sincronização Google Calendar** - Integração nativa
+- **Sincronização Google Calendar** - roadmap de integração externa
 - **Notificações Automáticas** - Lembretes por email/WhatsApp
 - **Agenda de Equipe** - Visualização compartilhada
 
@@ -133,6 +139,14 @@ Conect360 é uma **suite CRM all-in-one** desenvolvida para PMEs brasileiras, qu
 - **Métricas de Atendimento** - SLA, tempo médio, satisfação
 - **Forecast** - Previsão de receita e demanda
 - **Relatórios Customizados** - Exportação CSV/PDF (roadmap)
+
+### Estado de maturidade documental
+
+Como regra prática:
+
+1. Clientes 360, oportunidades/lifecycle, financeiro operacional/pagamentos e Guardian possuem documentação de requisito mais madura;
+2. agenda, analytics, contratos, atendimento omnichannel amplo e automação/IA ainda exigem maior consolidação documental para futuras evoluções;
+3. NFe/NFSe, assinatura eletrônica, sincronização externa de calendário e canal email omnichannel ainda precisam de requisito formal vigente antes de novas implementações guiadas por IA.
 
 ---
 
@@ -211,6 +225,40 @@ npm run migration:run
 # Iniciar em desenvolvimento
 npm run start:dev
 ```
+
+#### Gateways de pagamento (feature gate por ambiente)
+
+Os endpoints de gateway (`/pagamentos/gateways/*`) ficam em **modo default deny em producao**.
+
+Matriz de rollout do Fluxo de Vendas (GO Core / GO Full):
+
+- `docs/features/FLUXO_VENDAS_RELEASE_FLAGS.md`
+- Guardrail automatico (baseline GO Core): `npm run validate:release:vendas:core`
+- Guardrail automatico (baseline GO Full): `npm run validate:release:vendas:full`
+- Preflight completo GO Core: `npm run preflight:go-live:vendas:core`
+- Preflight completo GO Full: `npm run preflight:go-live:vendas:full`
+- Validacao GO Full (arquivo real de deploy):
+  `node scripts/ci/validate-sales-release-mode.mjs --mode full --frontend-env frontend-web/.env --backend-env backend/.env.production`
+
+- Sem configuracao explicita, o backend retorna `501 Not Implemented` para providers nao habilitados
+- Isso evita expor integracoes "fantasma" (ex.: service vazio) em ambiente produtivo
+
+Variaveis de ambiente (backend):
+
+```bash
+# Lista permitida de providers (separados por virgula)
+# Valores aceitos: stripe, mercado_pago, pagseguro
+PAGAMENTOS_GATEWAY_ENABLED_PROVIDERS=stripe,mercado_pago
+
+# Bypass global (usar apenas em dev/homologacao)
+PAGAMENTOS_GATEWAY_ALLOW_UNIMPLEMENTED=false
+```
+
+Comportamento:
+
+- `NODE_ENV=production` + lista vazia: bloqueia providers (501)
+- `NODE_ENV=test` + lista vazia: liberado para compatibilidade da suite automatizada
+- `PAGAMENTOS_GATEWAY_ALLOW_UNIMPLEMENTED=true`: libera todos os providers (nao usar em producao)
 
 **Portas**:
 
@@ -364,6 +412,18 @@ npm run test:e2e
 npm run test:cov
 ```
 
+#### Padrão E2E (Backend)
+
+- Use `createE2EApp(...)` de `backend/test/_support/e2e-app.helper.ts` para bootstrap de app de teste.
+- O helper centraliza:
+  - logger silencioso em teste (`NEST_LOGS_IN_TEST=false` por padrão)
+  - `ValidationPipe` padrão (`whitelist + transform`)
+  - lock de bootstrap E2E para reduzir flake por corrida de schema (`E2E_BOOTSTRAP_LOCK_IN_TEST=true`)
+- Para suites que **não** precisam de pipes globais, use:
+  - `createE2EApp(moduleFixture, { validationPipe: false })`
+- Para bootstrap manual com `Test.createTestingModule(...).compile()`, envolva com:
+  - `withE2EBootstrapLock(() => Test.createTestingModule(...).compile())`
+
 ### Frontend
 
 ```bash
@@ -487,7 +547,7 @@ npm run cypress:open
 ### 📖 Documentação de Features
 
 - **[SISTEMA_WHATSAPP_CONCLUIDO.md](docs/archive/2025/SISTEMA_WHATSAPP_CONCLUIDO.md)** - Integração WhatsApp
-- **[CHAT_REALTIME_README.md](CHAT_REALTIME_README.md)** - WebSocket e tempo real
+- **[FRONTEND_CHAT_REALTIME.md](frontend-web/docs/FRONTEND_CHAT_REALTIME.md)** - WebSocket e tempo real
 - **[CONSOLIDACAO_CONSTRUTOR_VISUAL.md](docs/archive/2025/CONSOLIDACAO_CONSTRUTOR_VISUAL.md)** - Editor de fluxos
 - **[MISSAO_CUMPRIDA_ATENDIMENTO.md](docs/archive/2025/MISSAO_CUMPRIDA_ATENDIMENTO.md)** - Sistema de atendimento completo
 

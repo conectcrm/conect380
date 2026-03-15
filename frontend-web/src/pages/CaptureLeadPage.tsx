@@ -33,6 +33,33 @@ const CaptureLeadPage: React.FC = () => {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const resolveTenantRouting = (): Pick<
+    CaptureLeadDto,
+    'empresa_id' | 'empresa_slug' | 'empresa_subdominio'
+  > => {
+    const params = new URLSearchParams(window.location.search);
+    const empresaId = params.get('empresa_id') || params.get('empresaId') || '';
+    const empresaSlug = params.get('empresa_slug') || params.get('empresaSlug') || params.get('slug') || '';
+    let empresaSubdominio =
+      params.get('empresa_subdominio') || params.get('empresaSubdominio') || params.get('subdominio') || '';
+
+    if (!empresaSubdominio) {
+      const host = window.location.hostname.toLowerCase();
+      if (host && host !== 'localhost' && host !== '127.0.0.1') {
+        const hostParts = host.split('.');
+        if (hostParts.length >= 3 && hostParts[0] !== 'www') {
+          empresaSubdominio = hostParts[0];
+        }
+      }
+    }
+
+    return {
+      empresa_id: empresaId || undefined,
+      empresa_slug: empresaSlug || undefined,
+      empresa_subdominio: empresaSubdominio || undefined,
+    };
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -59,7 +86,10 @@ const CaptureLeadPage: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      await leadsService.capturarPublico(formData);
+      await leadsService.capturarPublico({
+        ...formData,
+        ...resolveTenantRouting(),
+      });
 
       setSuccess(true);
       setFormData({

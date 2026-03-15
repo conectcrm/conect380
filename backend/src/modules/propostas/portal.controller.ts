@@ -1,14 +1,91 @@
-import { Logger, Controller, Put, Param, Body, HttpStatus, HttpException, Get, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpException,
+  HttpStatus,
+  Logger,
+  Param,
+  Post,
+  Put,
+} from '@nestjs/common';
 import { PortalService } from './portal.service';
 
 @Controller('api/portal')
 export class PortalController {
   private readonly logger = new Logger(PortalController.name);
+
   constructor(private readonly portalService: PortalService) {}
 
-  /**
-   * Atualiza o status de uma proposta via token do portal
-   */
+  private resolveErrorMessage(error: unknown, fallbackMessage: string): string {
+    if (error instanceof HttpException) {
+      const response = error.getResponse();
+
+      if (typeof response === 'string' && response.trim()) {
+        return response;
+      }
+
+      if (response && typeof response === 'object') {
+        const responseRecord = response as Record<string, unknown>;
+        const responseMessage = responseRecord.message;
+
+        if (Array.isArray(responseMessage)) {
+          const joined = responseMessage
+            .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+            .join('. ');
+
+          if (joined) {
+            return joined;
+          }
+        }
+
+        if (typeof responseMessage === 'string' && responseMessage.trim()) {
+          return responseMessage;
+        }
+      }
+    }
+
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'message' in error &&
+      typeof (error as { message?: unknown }).message === 'string'
+    ) {
+      const message = (error as { message: string }).message.trim();
+      if (message) {
+        return message;
+      }
+    }
+
+    return fallbackMessage;
+  }
+
+  private maskToken(token?: string): string {
+    if (!token) return '[token]';
+    return token.length <= 8 ? `${token.slice(0, 2)}***` : `${token.slice(0, 4)}...${token.slice(-4)}`;
+  }
+
+  private resolvePortalErrorStatus(error: unknown): HttpStatus {
+    const message = this.resolveErrorMessage(error, '').toLowerCase();
+    if (
+      message.includes('transicao de status invalida') ||
+      message.includes('exige aprovacao interna')
+    ) {
+      return HttpStatus.BAD_REQUEST;
+    }
+
+    if (
+      message.includes('token invalido') ||
+      message.includes('token expirado') ||
+      message.includes('expirado') ||
+      message.includes('proposta nao encontrada')
+    ) {
+      return HttpStatus.NOT_FOUND;
+    }
+
+    return HttpStatus.INTERNAL_SERVER_ERROR;
+  }
+
   @Put('proposta/:token/status')
   async atualizarStatusPorToken(
     @Param('token') token: string,
@@ -21,15 +98,15 @@ export class PortalController {
     },
   ) {
     try {
-      this.logger.log(`📝 Portal: Atualizando status via token ${token} para: ${updateData.status}`);
+      this.logger.log(
+        `Portal: Atualizando status via token ${this.maskToken(token)} para: ${updateData.status}`,
+      );
 
       const resultado = await this.portalService.atualizarStatusPorToken(token, updateData.status, {
         timestamp: updateData.timestamp,
         ip: updateData.ip,
         userAgent: updateData.userAgent,
       });
-
-      this.logger.log('✅ Portal: Status atualizado com sucesso');
 
       return {
         success: true,
@@ -38,22 +115,20 @@ export class PortalController {
         timestamp: new Date().toISOString(),
       };
     } catch (error) {
-      this.logger.error('❌ Portal: Erro ao atualizar status:', error);
+      this.logger.error('Portal: Erro ao atualizar status', error);
+      const statusCode = this.resolvePortalErrorStatus(error);
 
       throw new HttpException(
         {
           success: false,
           message: 'Erro ao atualizar status via portal',
-          error: error.message,
+          error: this.resolveErrorMessage(error, 'Falha ao atualizar status via portal'),
         },
-        HttpStatus.INTERNAL_SERVER_ERROR,
+        statusCode,
       );
     }
   }
 
-  /**
-   * Obtém uma proposta por token do portal
-   */
   @Get('proposta/:token')
   async obterPropostaPorToken(@Param('token') token: string) {
     try {
@@ -63,7 +138,7 @@ export class PortalController {
         throw new HttpException(
           {
             success: false,
-            message: 'Token inválido ou proposta não encontrada',
+            message: 'Token invalido ou proposta nao encontrada',
           },
           HttpStatus.NOT_FOUND,
         );
@@ -78,20 +153,19 @@ export class PortalController {
         throw error;
       }
 
+      const statusCode = this.resolvePortalErrorStatus(error);
+
       throw new HttpException(
         {
           success: false,
           message: 'Erro ao buscar proposta via portal',
-          error: error.message,
+          error: this.resolveErrorMessage(error, 'Falha ao buscar proposta via portal'),
         },
-        HttpStatus.INTERNAL_SERVER_ERROR,
+        statusCode,
       );
     }
   }
 
-  /**
-   * Registra visualização da proposta
-   */
   @Put('proposta/:token/view')
   async registrarVisualizacao(
     @Param('token') token: string,
@@ -107,22 +181,18 @@ export class PortalController {
 
       return {
         success: true,
-        message: 'Visualização registrada',
+        message: 'Visualizacao registrada',
       };
     } catch (error) {
-      this.logger.error('❌ Portal: Erro ao registrar visualização:', error);
-
+      this.logger.error('Portal: Erro ao registrar visualizacao', error);
       return {
         success: false,
-        message: 'Erro ao registrar visualização',
-        error: error.message,
+        message: 'Erro ao registrar visualizacao',
+        error: this.resolveErrorMessage(error, 'Falha ao registrar visualizacao'),
       };
     }
   }
 
-  /**
-   * Registra uma ação específica do cliente
-   */
   @Post('proposta/:token/acao')
   async registrarAcao(
     @Param('token') token: string,
@@ -136,7 +206,9 @@ export class PortalController {
     },
   ) {
     try {
-      this.logger.log(`📊 Portal: Registrando ação "${acaoData.acao}" para token ${token}`);
+      this.logger.log(
+        `Portal: Registrando acao "${acaoData.acao}" para token ${this.maskToken(token)}`,
+      );
 
       const resultado = await this.portalService.registrarAcaoCliente(token, acaoData.acao, {
         timestamp: acaoData.timestamp,
@@ -153,15 +225,15 @@ export class PortalController {
         timestamp: new Date().toISOString(),
       };
     } catch (error) {
-      this.logger.error('❌ Portal: Erro ao registrar ação:', error);
-
+      this.logger.error('Portal: Erro ao registrar acao', error);
+      const statusCode = this.resolvePortalErrorStatus(error);
       throw new HttpException(
         {
           success: false,
-          message: 'Erro ao registrar ação',
-          error: error.message,
+          message: 'Erro ao registrar acao',
+          error: this.resolveErrorMessage(error, 'Falha ao registrar acao'),
         },
-        HttpStatus.INTERNAL_SERVER_ERROR,
+        statusCode,
       );
     }
   }

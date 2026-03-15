@@ -25,7 +25,8 @@ import {
   XCircle,
 } from 'lucide-react';
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
-import toast from 'react-hot-toast';
+import { useGlobalConfirmation } from '../../../contexts/GlobalConfirmationContext';
+import { toastService } from '../../../services/toastService';
 
 // Tipos locais
 interface DashboardCards {
@@ -36,6 +37,7 @@ interface DashboardCards {
 }
 
 function DepartamentosPage() {
+  const { confirm } = useGlobalConfirmation();
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [modalCadastroAberto, setModalCadastroAberto] = useState(false);
@@ -93,7 +95,7 @@ function DepartamentosPage() {
       calcularDashboard(dados);
     } catch (error) {
       console.error('Erro ao carregar departamentos:', error);
-      toast.error('Erro ao carregar departamentos');
+      toastService.error('Erro ao carregar departamentos');
     } finally {
       setCarregando(false);
     }
@@ -132,19 +134,21 @@ function DepartamentosPage() {
 
   const handleSalvarDepartamento = () => {
     carregarDepartamentos();
-    toast.success('Departamento salvo com sucesso!');
+    toastService.success('Departamento salvo com sucesso!');
   };
 
   const excluirDepartamento = async (id: string) => {
-    if (window.confirm('Tem certeza que deseja excluir este departamento?')) {
-      try {
-        await departamentoService.remover(id);
-        carregarDepartamentos();
-        toast.success('Departamento excluído com sucesso!');
-      } catch (error) {
-        console.error('Erro ao excluir departamento:', error);
-        toast.error('Erro ao excluir departamento');
-      }
+    if (!(await confirm('Tem certeza que deseja excluir este departamento?'))) {
+      return;
+    }
+
+    try {
+      await departamentoService.remover(id);
+      carregarDepartamentos();
+      toastService.success('Departamento excluído com sucesso!');
+    } catch (error) {
+      console.error('Erro ao excluir departamento:', error);
+      toastService.error('Erro ao excluir departamento');
     }
   };
 
@@ -152,10 +156,10 @@ function DepartamentosPage() {
     try {
       await departamentoService.alterarStatus(id, ativo);
       carregarDepartamentos();
-      toast.success(`Departamento ${ativo ? 'ativado' : 'desativado'} com sucesso!`);
+      toastService.success(`Departamento ${ativo ? 'ativado' : 'desativado'} com sucesso!`);
     } catch (error) {
       console.error('Erro ao alterar status:', error);
-      toast.error('Erro ao alterar status do departamento');
+      toastService.error('Erro ao alterar status do departamento');
     }
   };
 

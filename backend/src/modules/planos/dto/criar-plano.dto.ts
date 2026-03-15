@@ -1,4 +1,13 @@
-import { IsString, IsNumber, IsBoolean, IsOptional, Min, Max } from 'class-validator';
+import {
+  ArrayNotEmpty,
+  IsArray,
+  IsBoolean,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+} from 'class-validator';
 
 export class CriarPlanoDto {
   @IsString()
@@ -47,6 +56,8 @@ export class CriarPlanoDto {
   @IsNumber()
   ordem?: number;
 
-  @IsOptional()
-  modulosInclusos?: string[]; // IDs dos módulos
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsUUID('all', { each: true })
+  modulosInclusos: string[]; // IDs dos modulos
 }

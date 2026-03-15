@@ -9,7 +9,7 @@ import {
   IsArray,
 } from 'class-validator';
 import { PartialType } from '@nestjs/mapped-types';
-import { AgendaPrioridade, AgendaStatus } from '../agenda-evento.entity';
+import { AgendaAttendeeRsvpStatus, AgendaPrioridade, AgendaStatus } from '../agenda-evento.entity';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 
 export class CreateAgendaEventoDto {
@@ -60,6 +60,11 @@ export class CreateAgendaEventoDto {
 }
 
 export class UpdateAgendaEventoDto extends PartialType(CreateAgendaEventoDto) {}
+
+export class UpdateAgendaEventoRsvpDto {
+  @IsEnum(AgendaAttendeeRsvpStatus)
+  resposta: AgendaAttendeeRsvpStatus;
+}
 
 export class AgendaEventoFiltroDto extends PaginationDto {
   @IsEnum(AgendaStatus)

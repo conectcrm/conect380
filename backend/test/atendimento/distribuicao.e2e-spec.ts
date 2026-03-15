@@ -16,6 +16,7 @@ import {
 } from '../factories/test.factories';
 import { getMockProviders } from '../mocks/external-services.mock';
 import { TicketService } from '../../src/modules/atendimento/services/ticket.service';
+import { createE2EApp, withE2EBootstrapLock } from '../_support/e2e-app.helper';
 
 /**
  * 🧪 E2E Test: Distribuição de Tickets
@@ -32,7 +33,7 @@ describe('Distribuição E2E - Atribuição de Tickets', () => {
   let ticketService: TicketService;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
+    const moduleFixture: TestingModule = await withE2EBootstrapLock(() => Test.createTestingModule({
       imports: [
         TypeOrmModule.forRoot(testDatabaseConfig),
         WinstonModule.forRoot({
@@ -43,10 +44,9 @@ describe('Distribuição E2E - Atribuição de Tickets', () => {
         AtendimentoModule,
       ],
       providers: [...getMockProviders()],
-    }).compile();
+    }).compile());
 
-    app = moduleFixture.createNestApplication();
-    await app.init();
+    app = await createE2EApp(moduleFixture, { validationPipe: false });
 
     ticketService = app.get(TicketService);
   });
@@ -275,3 +275,5 @@ describe('Distribuição E2E - Atribuição de Tickets', () => {
     });
   });
 });
+
+

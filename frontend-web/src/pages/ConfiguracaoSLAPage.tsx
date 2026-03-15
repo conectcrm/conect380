@@ -18,8 +18,10 @@ import slaService, {
   UpdateSlaConfigDto,
   HorarioFuncionamento,
 } from '../services/slaService';
+import { useGlobalConfirmation } from '../contexts/GlobalConfirmationContext';
 
 const ConfiguracaoSLAPage: React.FC = () => {
+  const { confirm } = useGlobalConfirmation();
   const [configs, setConfigs] = useState<SlaConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -196,7 +198,7 @@ const ConfiguracaoSLAPage: React.FC = () => {
 
   // Deletar
   const handleDeletar = async (id: string) => {
-    if (!window.confirm('Tem certeza que deseja deletar esta configuração SLA?')) {
+    if (!(await confirm('Tem certeza que deseja deletar esta configuração SLA?'))) {
       return;
     }
 

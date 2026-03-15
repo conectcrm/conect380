@@ -1,0 +1,96 @@
+﻿{
+    "started_at":  "2026-03-02T14:58:15",
+    "finished_at":  "2026-03-02T14:58:16",
+    "base_url":  "http://localhost:3001",
+    "requester_email":  "admin@conect360.com.br",
+    "approver_email":  "smoke.approver.20260302145801@conectcrm.local",
+    "target_email":  "smoke.target.20260302145724@conectcrm.local",
+    "target_user_id":  "1f69d04c-7e1d-454e-9a2c-5236e77d5a58",
+    "request_id":  "61eceb2a-e963-4a7b-88b4-a02a12ec630d",
+    "permission":  "admin.empresas.manage",
+    "duration_minutes":  20,
+    "target_companies_status_before":  403,
+    "target_companies_status_after_approve":  403,
+    "target_companies_status_after_revoke":  403,
+    "dry_run":  false,
+    "results":  [
+                    {
+                        "Step":  "Login requester",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T14:58:15"
+                    },
+                    {
+                        "Step":  "Login approver",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T14:58:15"
+                    },
+                    {
+                        "Step":  "Login target",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T14:58:16"
+                    },
+                    {
+                        "Step":  "Resolver target_user_id pelo admin-bff/users",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T14:58:16"
+                    },
+                    {
+                        "Step":  "Validar acesso alvo antes do break-glass (esperado 403)",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T14:58:16"
+                    },
+                    {
+                        "Step":  "Criar solicitacao break-glass",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T14:58:16"
+                    },
+                    {
+                        "Step":  "Aprovar solicitacao break-glass com segundo responsavel",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T14:58:16"
+                    },
+                    {
+                        "Step":  "Validar listagem de break-glass ativo",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T14:58:16"
+                    },
+                    {
+                        "Step":  "Validar acesso alvo durante vigencia (esperado 200)",
+                        "Status":  "FAIL",
+                        "Details":  "Acesso alvo nao foi elevado apos aprovacao (status=403).",
+                        "Timestamp":  "2026-03-02T14:58:16"
+                    },
+                    {
+                        "Step":  "Revogar acesso break-glass ativo",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T14:58:16"
+                    },
+                    {
+                        "Step":  "Validar remocao de break-glass ativo",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T14:58:16"
+                    },
+                    {
+                        "Step":  "Validar acesso alvo apos revogacao (esperado 403)",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T14:58:16"
+                    },
+                    {
+                        "Step":  "Validar trilha de auditoria admin_break_glass",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T14:58:16"
+                    }
+                ]
+}

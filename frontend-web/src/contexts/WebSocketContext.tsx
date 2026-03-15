@@ -1,5 +1,5 @@
 /**
- * 🔌 WebSocketContext - Contexto Global para Gerenciamento de WebSocket
+ * xR WebSocketContext - Contexto Global para Gerenciamento de WebSocket
  *
  * Funcionalidades:
  * - Conexão WebSocket única em toda aplicação (Singleton)
@@ -12,7 +12,7 @@
  * - Use hook useWebSocketStatus() em qualquer componente
  */
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 import { resolveSocketBaseUrl } from '../utils/network';
@@ -39,9 +39,9 @@ const SOCKET_BASE_URL = resolveSocketBaseUrl({
   envUrl: process.env.REACT_APP_WEBSOCKET_URL || process.env.REACT_APP_WS_URL,
   onEnvIgnored: ({ envUrl, currentHost }) => {
     console.warn(
-      '⚠️ [WebSocketContext] Ignorando URL de WebSocket local em acesso via rede:',
+      'a️ [WebSocketContext] Ignorando URL de WebSocket local em acesso via rede:',
       envUrl,
-      '→ host atual',
+      '  host atual',
       currentHost,
     );
   },
@@ -55,19 +55,32 @@ const AUTH_TOKEN_EVENT_NAME = 'authTokenChanged';
 const EMPRESA_EVENT_NAME = 'empresaAtivaChanged';
 const DEBUG = process.env.REACT_APP_DEBUG_WS === 'true';
 
-// 🔒 SINGLETON: Garantir apenas 1 instância WebSocket
+// x SINGLETON: Garantir apenas 1 instância WebSocket
 let globalSocket: Socket | null = null;
+let providerInstanceCount = 0;
+let globalCleanupTimer: number | null = null;
 
 export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }) => {
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { isAuthenticated } = useAuth();
+  const connectingRef = useRef(false);
+  const reconnectTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    connectingRef.current = connecting;
+  }, [connecting]);
 
   const connect = () => {
+    if (globalCleanupTimer) {
+      window.clearTimeout(globalCleanupTimer);
+      globalCleanupTimer = null;
+    }
+
     // Se já está conectado, não fazer nada
     if (globalSocket?.connected) {
-      if (DEBUG) console.log('♻️ [WebSocketContext] WebSocket já conectado');
+      if (DEBUG) console.log('"️ [WebSocketContext] WebSocket já conectado');
       return;
     }
 
@@ -84,12 +97,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
       const token = localStorage.getItem(TOKEN_STORAGE_KEY);
 
       if (!token) {
-        console.warn('⚠️ [WebSocketContext] Token não encontrado - aguardando login');
+        console.warn('a️ [WebSocketContext] Token não encontrado - aguardando login');
         setConnecting(false);
         return;
       }
 
-      if (DEBUG) console.log('🔌 [WebSocketContext] Conectando ao WebSocket:', WEBSOCKET_URL);
+      if (DEBUG) console.log('xR [WebSocketContext] Conectando ao WebSocket:', WEBSOCKET_URL);
 
       const socket = io(WEBSOCKET_URL, {
         auth: { token },
@@ -103,7 +116,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
       // Event: connect
       socket.on('connect', () => {
-        if (DEBUG) console.log('✅ [WebSocketContext] WebSocket conectado! ID:', socket.id);
+        if (DEBUG) console.log('S& [WebSocketContext] WebSocket conectado! ID:', socket.id);
         setConnected(true);
         setConnecting(false);
         setError(null);
@@ -111,7 +124,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
       // Event: disconnect
       socket.on('disconnect', (reason) => {
-        if (DEBUG) console.log('🔴 [WebSocketContext] WebSocket desconectado. Razão:', reason);
+        if (DEBUG) console.log('x [WebSocketContext] WebSocket desconectado. Razão:', reason);
         setConnected(false);
         setConnecting(false);
 
@@ -123,7 +136,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
       // Event: connect_error
       socket.on('connect_error', (err) => {
-        console.error('❌ [WebSocketContext] Erro de conexão:', err.message);
+        console.error('R [WebSocketContext] Erro de conexão:', err.message);
         setError(err.message);
         setConnected(false);
         setConnecting(false);
@@ -131,34 +144,48 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
       // Event: error
       socket.on('error', (err) => {
-        console.error('❌ [WebSocketContext] Erro:', err);
+        console.error('R [WebSocketContext] Erro:', err);
         setError(typeof err === 'string' ? err : 'Erro desconhecido');
       });
 
       // Event: reconnect_attempt
       socket.io.on('reconnect_attempt', (attempt) => {
-        if (DEBUG) console.log(`🔄 [WebSocketContext] Tentativa de reconexão #${attempt}`);
+        if (DEBUG) console.log(`x [WebSocketContext] Tentativa de reconexão #${attempt}`);
         setConnecting(true);
         setError(null);
       });
 
       // Event: reconnect_failed
       socket.io.on('reconnect_failed', () => {
-        console.error('❌ [WebSocketContext] Falha ao reconectar após múltiplas tentativas');
+        console.error('R [WebSocketContext] Falha ao reconectar após múltiplas tentativas');
         setError('Falha ao conectar. Verifique sua conexão.');
         setConnecting(false);
       });
 
       globalSocket = socket;
     } catch (err) {
-      console.error('❌ [WebSocketContext] Erro ao criar socket:', err);
+      console.error('R [WebSocketContext] Erro ao criar socket:', err);
       setError('Erro ao criar conexão');
       setConnecting(false);
     }
   };
 
   const reconnect = () => {
-    if (DEBUG) console.log('🔄 [WebSocketContext] Reconectando manualmente...');
+    if (connectingRef.current) {
+      if (DEBUG) {
+        console.log('[WebSocketContext] Reconexao adiada (handshake em progresso)');
+      }
+      if (reconnectTimeoutRef.current) {
+        window.clearTimeout(reconnectTimeoutRef.current);
+      }
+      reconnectTimeoutRef.current = window.setTimeout(() => {
+        reconnectTimeoutRef.current = null;
+        reconnect();
+      }, 700);
+      return;
+    }
+
+    if (DEBUG) console.log('x [WebSocketContext] Reconectando manualmente...');
 
     if (globalSocket) {
       globalSocket.disconnect();
@@ -170,14 +197,14 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     setError(null);
 
     // Aguardar 500ms antes de reconectar
-    setTimeout(() => connect(), 500);
+    window.setTimeout(() => connect(), 500);
   };
 
   useEffect(() => {
     if (isAuthenticated) {
       connect();
     } else if (globalSocket) {
-      if (DEBUG) console.log('🔌 [WebSocketContext] Finalizando conexão por logout');
+      if (DEBUG) console.log('xR [WebSocketContext] Finalizando conexão por logout');
       globalSocket.disconnect();
       globalSocket = null;
       setConnected(false);
@@ -187,13 +214,25 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
   }, [isAuthenticated]);
 
   useEffect(() => {
+    providerInstanceCount += 1;
+    if (globalCleanupTimer) {
+      window.clearTimeout(globalCleanupTimer);
+      globalCleanupTimer = null;
+    }
+
+    return () => {
+      providerInstanceCount = Math.max(0, providerInstanceCount - 1);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isAuthenticated || typeof window === 'undefined') {
       return;
     }
 
     const handleRealtimeContextChange = () => {
       if (DEBUG) {
-        console.log('🔄 [WebSocketContext] Contexto alterado, forçando reconexão do socket');
+        console.log('x [WebSocketContext] Contexto alterado, forçando reconexão do socket');
       }
       reconnect();
     };
@@ -204,26 +243,42 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     return () => {
       window.removeEventListener(AUTH_TOKEN_EVENT_NAME, handleRealtimeContextChange);
       window.removeEventListener(EMPRESA_EVENT_NAME, handleRealtimeContextChange);
+      if (reconnectTimeoutRef.current) {
+        window.clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
     };
   }, [isAuthenticated]);
 
   // Cleanup ao desmontar
   useEffect(
     () => () => {
-      // ✅ Delay pequeno para evitar desconexão prematura no StrictMode
-      setTimeout(() => {
+      // S& Delay pequeno para evitar desconexão prematura no StrictMode
+      if (globalCleanupTimer) {
+        window.clearTimeout(globalCleanupTimer);
+      }
+      globalCleanupTimer = window.setTimeout(() => {
+        if (providerInstanceCount > 0) {
+          globalCleanupTimer = null;
+          return;
+        }
         if (globalSocket) {
           try {
-            if (DEBUG) console.log('🔌 [WebSocketContext] Desconectando WebSocket');
-            // ✅ Verificar se está conectado antes de desconectar
-            if (globalSocket.connected || globalSocket.active) {
+            if (DEBUG) console.log('xR [WebSocketContext] Desconectando WebSocket');
+            // S& Verificar se está conectado antes de desconectar
+            if (globalSocket.connected) {
               globalSocket.disconnect();
             }
           } catch (err) {
-            // ✅ Ignorar erros no cleanup (esperado em React StrictMode)
+            // S& Ignorar erros no cleanup (esperado em React StrictMode)
             // Não logar - erro esperado no desenvolvimento
           } finally {
             globalSocket = null;
+            if (reconnectTimeoutRef.current) {
+              window.clearTimeout(reconnectTimeoutRef.current);
+              reconnectTimeoutRef.current = null;
+            }
+            globalCleanupTimer = null;
           }
         }
       }, 100);

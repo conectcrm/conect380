@@ -331,7 +331,7 @@
         "opcoes": [
           {
             "id": "detalhes_confirmar",
-            "texto": "� Está correto",
+            "texto": "✅ Está correto",
             "valor": "confirmar",
             "proximaEtapa": "mensagem-pre-transferencia"
           },

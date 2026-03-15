@@ -58,7 +58,7 @@ export class AtendenteService {
         senha: senhaHash,
         telefone: dto.telefone || null,
         empresa_id: empresaId,
-        role: UserRole.USER,
+        role: UserRole.SUPORTE,
         ativo: false, // ⚡ Força troca de senha no primeiro login
       });
 

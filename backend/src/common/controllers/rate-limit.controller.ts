@@ -134,10 +134,17 @@ export class RateLimitController {
     },
   })
   async getHealth() {
+    const nodeEnv = process.env.NODE_ENV || null;
+    const assumedEnv = String(process.env.NODE_ENV || 'development').toLowerCase();
+    const isDevelopment = assumedEnv === 'development';
+
     return {
       status: 'healthy',
       active: true,
       message: 'Rate limiting is operational',
+      nodeEnv,
+      assumedEnv,
+      isDevelopment,
       timestamp: new Date().toISOString(),
     };
   }

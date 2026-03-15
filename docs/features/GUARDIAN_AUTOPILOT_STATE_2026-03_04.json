@@ -1,0 +1,888 @@
+﻿{
+    "schemaVersion":  1,
+    "backlogPath":  "C:\\Projetos\\conect360\\docs\\features\\BACKLOG_JIRA_CLOUD_GUARDIAN_PRODUCAO_2026-03_04.csv",
+    "currentSprint":  "SPR-5-2026-04-22_30",
+    "sprints":  [
+                    "SPR-0-2026-03-10_14",
+                    "SPR-1-2026-03-17_28",
+                    "SPR-2-2026-03-31_04-11",
+                    "SPR-3-2026-04-14_18",
+                    "SPR-4-2026-04-14_21",
+                    "SPR-5-2026-04-22_30"
+                ],
+    "programCompleted":  true,
+    "updatedAt":  "2026-03-09T10:12:24",
+    "issues":  {
+                   "GDN-EPIC-00":  {
+                                       "status":  "na",
+                                       "completedAt":  null,
+                                       "note":  null
+                                   },
+                   "GDN-EPIC-01":  {
+                                       "status":  "na",
+                                       "completedAt":  null,
+                                       "note":  null
+                                   },
+                   "GDN-EPIC-02":  {
+                                       "status":  "na",
+                                       "completedAt":  null,
+                                       "note":  null
+                                   },
+                   "GDN-EPIC-03":  {
+                                       "status":  "na",
+                                       "completedAt":  null,
+                                       "note":  null
+                                   },
+                   "GDN-EPIC-04":  {
+                                       "status":  "na",
+                                       "completedAt":  null,
+                                       "note":  null
+                                   },
+                   "GDN-EPIC-05":  {
+                                       "status":  "na",
+                                       "completedAt":  null,
+                                       "note":  null
+                                   },
+                   "GDN-001":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T22:14:32",
+                                   "note":  "Matriz v1 publicada"
+                               },
+                   "GDN-002":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T22:16:28",
+                                   "note":  "Regras de ciclo publicadas em docs/features/GDN-002_REGRAS_CICLO_ASSINATURA_2026-03-07.md"
+                               },
+                   "GDN-003":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T22:16:32",
+                                   "note":  "Politica de prorrata publicada em docs/features/GDN-003_POLITICA_PRORRATA_2026-03-07.md"
+                               },
+                   "GDN-004":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T22:16:38",
+                                   "note":  "Pacotes e copy publicados em docs/features/GDN-004_PACOTES_VENDAS_COPY_2026-03-07.md"
+                               },
+                   "GDN-005":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T22:16:47",
+                                   "note":  "RBAC baseline publicado em docs/features/GDN-005_RBAC_BASELINE_GUARDIAN_2026-03-07.md"
+                               },
+                   "GDN-006":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T22:17:12",
+                                   "note":  "Escopo Guardian publicado em docs/features/GDN-006_ESCOPO_GUARDIAN_2026-03-07.md"
+                               },
+                   "GDN-007":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T22:17:48",
+                                   "note":  "Validacao de consistencia publicada em docs/features/GDN-007_VALIDACAO_CONSISTENCIA_PLANOS_2026-03-07.md"
+                               },
+                   "GDN-008":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T22:17:53",
+                                   "note":  "Mesa de cenarios publicada em docs/features/GDN-008_MESA_CENARIOS_NEGOCIO_2026-03-07.md"
+                               },
+                   "GDN-009":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T22:22:55",
+                                   "note":  "Aprovacao Legal e Financeiro confirmada pelo responsavel em 2026-03-07"
+                               },
+                   "GDN-010":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T22:23:03",
+                                   "note":  "Gate fechado automaticamente"
+                               },
+                   "GDN-011":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T22:23:00",
+                                   "note":  "Regra autonoma implementada via scripts/guardian-autopilot.ps1 e runbook do modelo"
+                               },
+                   "GDN-101":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T22:27:18",
+                                   "note":  "Modelo de dominio criado com migration compativel e entidade billing_events"
+                               },
+                   "GDN-102":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T22:45:45",
+                                   "note":  "State machine canonica implementada com migration de status + compat legado + teste unitario inicial; validacao automatizada bloqueada por dependencias node ausentes no ambiente"
+                               },
+                   "GDN-103":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T22:49:39",
+                                   "note":  "Fluxo checkout+webhook Mercado Pago consolidado com hardening de intake (type/topic/resource id), preservacao de status HTTP no controller e integracao com state machine de assinatura"
+                               },
+                   "GDN-104":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T23:02:20",
+                                   "note":  "Implementada idempotencia de webhook Mercado Pago com indice unico parcial, testes e build validados em 2026-03-07."
+                               },
+                   "GDN-105":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T23:09:55",
+                                   "note":  "Implementada reconciliacao de pagamentos MP (manual e lote), tentativa de alinhamento em webhook duplicado, endpoints operacionais e testes unitarios; build validado em 2026-03-07."
+                               },
+                   "GDN-106":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T23:14:01",
+                                   "note":  "Implementado scheduler de vencimento de assinatura com transicoes active-\u003epast_due e past_due-\u003esuspended, reconciliacao pre-job e endpoint manual; testes unitarios + build validados em 2026-03-07."
+                               },
+                   "GDN-107":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T23:18:30",
+                                   "note":  "Entitlement backend reforcado com middleware fail-closed, ampliacao de cobertura de modulos sensiveis e testes unitarios dedicados; suites de billing e build validadas em 2026-03-07."
+                               },
+                   "GDN-108":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T23:21:26",
+                                   "note":  "Matriz completa de transicoes da state machine validada com testes unitarios expandidos; PASS em 2026-03-07."
+                               },
+                   "GDN-109":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T23:21:26",
+                                   "note":  "Validado fluxo checkout+webhook com external_reference e ativacao de assinatura; testes automatizados PASS em 2026-03-07."
+                               },
+                   "GDN-110":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T23:21:26",
+                                   "note":  "Replay de webhook duplicado validado sem reaplicacao de efeito financeiro/assinatura; testes PASS em 2026-03-07."
+                               },
+                   "GDN-111":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T23:21:26",
+                                   "note":  "Fallback de indisponibilidade do gateway validado com reconciliacao resiliente e consistencia de status; testes PASS em 2026-03-07."
+                               },
+                   "GDN-112":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T23:21:26",
+                                   "note":  "Gate fechado automaticamente"
+                               },
+                   "GDN-201":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T23:24:32",
+                                   "note":  "Namespace backend guardian/* criado com modulo/controller isolados, guards de acesso inicial e exclusao do middleware de assinatura tenant; testes e build validados em 2026-03-07."
+                               },
+                   "GDN-202":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T23:31:21",
+                                   "note":  "Endpoints sensiveis migrados para guardian/empresas e guardian/bff com compatibilidade legada admin/*, testes e build validados em 2026-03-07."
+                               },
+                   "GDN-203":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T23:33:32",
+                                   "note":  "RBAC estrito aplicado no guardian com SUPERADMIN em classe e rotas criticas, mantendo permissoes granulares por endpoint; testes e build validados em 2026-03-07."
+                               },
+                   "GDN-204":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T23:54:15",
+                                   "note":  "MFA obrigatorio no guardian com GuardianMfaGuard, sessao mfa_verified persistida em auth_refresh_tokens, migration e testes/build validados em 2026-03-07."
+                               },
+                   "GDN-205":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T00:02:22",
+                                   "note":  "Idle timeout admin aplicado + testes e build"
+                               },
+                   "GDN-206":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T23:46:43",
+                                   "note":  "Frontend cliente sem rotas/menu/admin client no bundle; servico admin de branding isolado; testes e build validados em 2026-03-07."
+                               },
+                   "GDN-207":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-06T23:49:49",
+                                   "note":  "Swagger publico sem rotas guardian e guardian-docs opcional protegido por Basic Auth; middleware de assinatura atualizado; testes e build validados em 2026-03-07."
+                               },
+                   "GDN-208":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T00:09:09",
+                                   "note":  "Auditoria critica imutavel guardian implementada + testes/build"
+                               },
+                   "GDN-209":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T00:22:51",
+                                   "note":  "Teste E2E unauthorized guardian validado"
+                               },
+                   "GDN-210":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T00:22:51",
+                                   "note":  "Teste E2E bypass backend/tampering validado"
+                               },
+                   "GDN-211":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T00:22:52",
+                                   "note":  "Validacao MFA+refresh e hardening de sessao validada"
+                               },
+                   "GDN-212":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T00:22:52",
+                                   "note":  "Exposure scan frontend bundle sem endpoints sensiveis"
+                               },
+                   "GDN-213":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T00:23:10",
+                                   "note":  "Gate fechado automaticamente"
+                               },
+                   "GDN-301":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T00:33:12",
+                                   "note":  "guardian-web publicado no monorepo com auth isolada e rotas base"
+                               },
+                   "GDN-302":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T00:53:02",
+                                   "note":  "Tela de empresas guardian finalizada com listagem/status/plano/limites e build validado"
+                               },
+                   "GDN-303":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T00:53:09",
+                                   "note":  "Tela de billing guardian + endpoints bff de assinatura (listar/suspender/reativar) com testes/build"
+                               },
+                   "GDN-304":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T00:52:25",
+                                   "note":  "Tela de auditoria critica com filtros/export CSV/JSON + endpoints guardian audit critical"
+                               },
+                   "GDN-305":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T01:22:44",
+                                   "note":  "Feature flags de transicao legado implementadas (guard + env + script CI)"
+                               },
+                   "GDN-306":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T01:22:52",
+                                   "note":  "Runbook operacional N1/N2/N3 publicado em docs/features/GDN-306_SUPPORT_WORKFLOW_N1_N2_N3_2026-03-07.md"
+                               },
+                   "GDN-307":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T01:22:59",
+                                   "note":  "E2E admin operations suite validada com PASS em 2026-03-07"
+                               },
+                   "GDN-308":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T01:23:06",
+                                   "note":  "Responsive/visual check guardian validado com PASS via scripts/ci/guardian-responsive-visual-check.ps1"
+                               },
+                   "GDN-309":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T01:23:14",
+                                   "note":  "Matriz de permissao por acao critica validada com E2E PASS em 2026-03-07"
+                               },
+                   "GDN-310":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T01:23:22",
+                                   "note":  "Sessao UAT interna executada e aprovada; evidencias em docs/features/GDN-310_VALIDACAO_UAT_INTERNO_2026-03-07.md"
+                               },
+                   "GDN-311":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T01:23:29",
+                                   "note":  "Gate fechado automaticamente"
+                               },
+                   "GDN-401":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T06:25:37",
+                                   "note":  "Piloto controlado estruturado com roteiro/checklist/coorte + smoke dry-run e readiness check PASS"
+                               },
+                   "GDN-402":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T06:31:38",
+                                   "note":  "Monitor diario billing/platform implementado com script dedicado, check CI e evidencia dry-run PASS"
+                               },
+                   "GDN-403":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T06:33:22",
+                                   "note":  "Drill de contingencia/rollback implementado com script dedicado, check CI e evidencia dry-run PASS"
+                               },
+                   "GDN-404":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T06:20:06",
+                                   "note":  "Runbook de incidente Guardian finalizado com matriz N1/N2/N3 e check CI (scripts/ci/guardian-incident-runbook-check.ps1)"
+                               },
+                   "GDN-405":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T06:34:39",
+                                   "note":  "Pacote de treinamento N1/N2/N3 publicado (plano+exercicios+template) com check CI PASS"
+                               },
+                   "GDN-406":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T06:37:04",
+                                   "note":  "Harness de carga leve implementado com medicao de latencia/erro e check CI dry-run PASS"
+                               },
+                   "GDN-407":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T06:39:33",
+                                   "note":  "Validacao de replay/recovery de webhook executada com testes reais e relatorio PASS"
+                               },
+                   "GDN-408":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T06:40:44",
+                                   "note":  "Teste de observabilidade de alertas implementado com matriz severidade/roteamento e check CI PASS"
+                               },
+                   "GDN-409":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T06:41:51",
+                                   "note":  "Execucao operacional do runbook por suporte validada com harness dedicado e status geral PASS"
+                               },
+                   "GDN-410":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T06:41:58",
+                                   "note":  "Gate fechado automaticamente"
+                               },
+                   "GDN-501":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T07:26:15",
+                                   "note":  "Checklist de go-live executado com preflight automatizado e decisao final GO registrada"
+                               },
+                   "GDN-502":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T07:27:26",
+                                   "note":  "Hypercare 7 dias estruturado com orquestrador diario e check CI PASS"
+                               },
+                   "GDN-503":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T07:34:31",
+                                   "note":  "Legacy backoffice congelado em read-only via GUARDIAN_LEGACY_READ_ONLY, testes do guard PASS e evidencia em docs/features/evidencias/GDN503_LEGACY_READ_ONLY_CHECK_20260307-073407.md"
+                               },
+                   "GDN-504":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T07:44:53",
+                                   "note":  "Decommission legado validado em fases via scripts/ci/guardian-legacy-decommission-phases-check.ps1 (PASS, evidencia: docs/features/evidencias/GDN504_LEGACY_DECOMMISSION_CHECK_20260307-074326.md)"
+                               },
+                   "GDN-505":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T07:44:54",
+                                   "note":  "Retrospectiva e backlog pos-go-live publicados e validados via scripts/ci/guardian-post-golive-retro-check.ps1 (PASS)"
+                               },
+                   "GDN-506":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T07:41:16",
+                                   "note":  "Suite diaria de smoke Guardian validada via scripts/ci/guardian-daily-smoke-production-check.ps1 (PASS, evidencia: docs/features/evidencias/GDN506_DAILY_SMOKE_CHECK_20260307-074007.md)"
+                               },
+                   "GDN-507":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T07:41:17",
+                                   "note":  "Consistencia financeira diaria validada via scripts/ci/guardian-daily-financial-consistency-check.ps1 (PASS, evidencia: docs/features/evidencias/GDN507_FINANCIAL_CONSISTENCY_CHECK_20260307-074013.md)"
+                               },
+                   "GDN-508":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T07:41:17",
+                                   "note":  "Checks diarios de auditoria critica validados via scripts/ci/guardian-critical-audit-daily-checks-check.ps1 (PASS, evidencia: docs/features/evidencias/GDN508_CRITICAL_AUDIT_CHECKS_CHECK_20260307-074018.md)"
+                               },
+                   "GDN-509":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T07:41:18",
+                                   "note":  "Simulacao documentada de rollback validada via scripts/ci/guardian-production-rollback-simulation-check.ps1 (PASS, evidencia: docs/features/evidencias/GDN509_ROLLBACK_SIMULATION_CHECK_20260307-074101.md)"
+                               },
+                   "GDN-510":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T07:45:15",
+                                   "note":  "Gate de conclusao do programa liberado apos fechamento dos itens GDN-504..509 e GDN-505"
+                               },
+                   "GDN-511":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T07:53:32",
+                                   "note":  "Aceite final entitlement backend validado (PASS, evidencia: docs/features/evidencias/GDN511_ENTITLEMENT_ACCEPTANCE_CHECK_20260307-075127.md)"
+                               },
+                   "GDN-512":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T07:53:32",
+                                   "note":  "Aceite final isolamento Guardian RBAC+MFA validado (PASS, evidencia: docs/features/evidencias/GDN512_GUARDIAN_ISOLATION_ACCEPTANCE_CHECK_20260307-075145.md)"
+                               },
+                   "GDN-513":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T07:53:32",
+                                   "note":  "Aceite final webhook reliability validado (PASS, evidencia: docs/features/evidencias/GDN513_WEBHOOK_RELIABILITY_ACCEPTANCE_CHECK_20260307-075204.md)"
+                               },
+                   "GDN-514":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T07:53:33",
+                                   "note":  "Aceite final suite critica de release validado (PASS, evidencia: docs/features/evidencias/GDN514_E2E_CRITICAL_ACCEPTANCE_CHECK_20260307-075224.md)"
+                               },
+                   "GDN-515":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T07:53:33",
+                                   "note":  "Aceite final runbook readiness validado (PASS, evidencia: docs/features/evidencias/GDN515_RUNBOOK_READINESS_ACCEPTANCE_CHECK_20260307-075251.md)"
+                               },
+                   "GDN-516":  {
+                                   "status":  "done",
+                                   "completedAt":  "2026-03-07T07:53:34",
+                                   "note":  "Aceite final legacy decommission validado (PASS, evidencia: docs/features/evidencias/GDN516_LEGACY_DECOMMISSION_ACCEPTANCE_CHECK_20260307-075300.md)"
+                               }
+               },
+    "history":  [
+                    {
+                        "at":  "2026-03-06T22:14:32",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-001",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-06T22:16:28",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-002",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-06T22:16:32",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-003",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-06T22:16:38",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-004",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-06T22:16:47",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-005",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-06T22:17:12",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-006",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-06T22:17:48",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-007",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-06T22:17:53",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-008",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-06T22:22:55",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-009",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-06T22:23:00",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-011",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-06T22:23:03",
+                        "action":  "gate-close",
+                        "issueId":  "GDN-010",
+                        "message":  "Gate fechado na sprint SPR-0-2026-03-10_14."
+                    },
+                    {
+                        "at":  "2026-03-06T22:23:03",
+                        "action":  "sprint-advance",
+                        "issueId":  "",
+                        "message":  "Avanco automatico de SPR-0-2026-03-10_14 para SPR-1-2026-03-17_28."
+                    },
+                    {
+                        "at":  "2026-03-06T22:27:18",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-101",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-06T22:45:45",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-102",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-06T22:49:39",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-103",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-06T23:02:20",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-104",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-06T23:09:55",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-105",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-06T23:14:01",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-106",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-06T23:18:30",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-107",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-06T23:21:26",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-108",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-06T23:21:26",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-109",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-06T23:21:26",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-110",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-06T23:21:26",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-111",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-06T23:21:26",
+                        "action":  "gate-close",
+                        "issueId":  "GDN-112",
+                        "message":  "Gate fechado na sprint SPR-1-2026-03-17_28."
+                    },
+                    {
+                        "at":  "2026-03-06T23:21:26",
+                        "action":  "sprint-advance",
+                        "issueId":  "",
+                        "message":  "Avanco automatico de SPR-1-2026-03-17_28 para SPR-2-2026-03-31_04-11."
+                    },
+                    {
+                        "at":  "2026-03-06T23:24:32",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-201",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-06T23:31:21",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-202",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-06T23:33:32",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-203",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-06T23:46:43",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-206",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-06T23:49:49",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-207",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-06T23:54:15",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-204",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T00:02:22",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-205",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T00:09:09",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-208",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T00:22:51",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-209",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T00:22:51",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-210",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T00:22:52",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-211",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T00:22:52",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-212",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T00:23:10",
+                        "action":  "gate-close",
+                        "issueId":  "GDN-213",
+                        "message":  "Gate fechado na sprint SPR-2-2026-03-31_04-11."
+                    },
+                    {
+                        "at":  "2026-03-07T00:23:10",
+                        "action":  "sprint-advance",
+                        "issueId":  "",
+                        "message":  "Avanco automatico de SPR-2-2026-03-31_04-11 para SPR-3-2026-04-14_18."
+                    },
+                    {
+                        "at":  "2026-03-07T00:33:12",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-301",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T00:52:25",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-304",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T00:53:02",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-302",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T00:53:09",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-303",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T01:22:44",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-305",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T01:22:52",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-306",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T01:22:59",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-307",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T01:23:06",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-308",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T01:23:14",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-309",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T01:23:22",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-310",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T01:23:29",
+                        "action":  "gate-close",
+                        "issueId":  "GDN-311",
+                        "message":  "Gate fechado na sprint SPR-3-2026-04-14_18."
+                    },
+                    {
+                        "at":  "2026-03-07T01:23:29",
+                        "action":  "sprint-advance",
+                        "issueId":  "",
+                        "message":  "Avanco automatico de SPR-3-2026-04-14_18 para SPR-4-2026-04-14_21."
+                    },
+                    {
+                        "at":  "2026-03-07T06:20:06",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-404",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T06:25:37",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-401",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T06:31:38",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-402",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T06:33:22",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-403",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T06:34:39",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-405",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T06:37:04",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-406",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T06:39:33",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-407",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T06:40:44",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-408",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T06:41:51",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-409",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T06:41:58",
+                        "action":  "gate-close",
+                        "issueId":  "GDN-410",
+                        "message":  "Gate fechado na sprint SPR-4-2026-04-14_21."
+                    },
+                    {
+                        "at":  "2026-03-07T06:41:58",
+                        "action":  "sprint-advance",
+                        "issueId":  "",
+                        "message":  "Avanco automatico de SPR-4-2026-04-14_21 para SPR-5-2026-04-22_30."
+                    },
+                    {
+                        "at":  "2026-03-07T07:26:15",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-501",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T07:27:26",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-502",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T07:34:31",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-503",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T07:41:16",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-506",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T07:41:17",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-507",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T07:41:17",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-508",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T07:41:18",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-509",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T07:44:53",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-504",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T07:44:54",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-505",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T07:45:15",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-510",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T07:53:32",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-511",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T07:53:32",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-512",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T07:53:32",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-513",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T07:53:33",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-514",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T07:53:33",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-515",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T07:53:34",
+                        "action":  "issue-done",
+                        "issueId":  "GDN-516",
+                        "message":  "Marcada como concluida."
+                    },
+                    {
+                        "at":  "2026-03-07T07:53:48",
+                        "action":  "program-complete",
+                        "issueId":  "",
+                        "message":  "Programa concluido com todos os gates fechados."
+                    }
+                ]
+}

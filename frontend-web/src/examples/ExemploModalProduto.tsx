@@ -8,12 +8,12 @@ import { ModalCadastroProduto } from '../components/modals/ModalCadastroProdutoL
 interface ProdutoFormData {
   id?: number;
   nome: string;
-  tipoItem: 'produto' | 'servico' | 'licenca' | 'modulo' | 'aplicativo';
+  tipoItem: 'produto' | 'servico' | 'licenca' | 'modulo' | 'plano' | 'aplicativo';
   categoria: string;
   precoUnitario: number;
   frequencia: 'unico' | 'mensal' | 'anual';
   unidadeMedida: 'unidade' | 'saca' | 'hectare' | 'pacote' | 'licenca';
-  status: boolean;
+  status: 'ativo' | 'inativo' | 'descontinuado';
   descricao?: string;
   tags?: string[];
   variacoes?: string[];
@@ -42,7 +42,12 @@ export const ExemploModalProduto: React.FC = () => {
       precoUnitario: data.preco || data.precoUnitario || 0,
       frequencia: data.frequencia || 'unico',
       unidadeMedida: data.unidadeMedida || 'unidade',
-      status: data.status === 'ativo' || data.status === true,
+      status:
+        data.status === true
+          ? 'ativo'
+          : data.status === false
+            ? 'inativo'
+            : data.status || 'ativo',
       descricao: data.descricao || '',
       tags: data.tags || [],
       variacoes: data.variacoes || [],

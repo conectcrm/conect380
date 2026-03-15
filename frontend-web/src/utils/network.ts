@@ -30,6 +30,14 @@ const normalizePort = (port?: string | number | null) => {
   return asString ? `:${asString}` : '';
 };
 
+const derivePublicApiHost = (host: string) => {
+  const withoutWww = host.startsWith('www.') ? host.slice(4) : host;
+  if (withoutWww.startsWith('api.')) {
+    return withoutWww;
+  }
+  return `api.${withoutWww}`;
+};
+
 const buildUrl = (
   protocol: 'http' | 'https' | 'ws' | 'wss',
   host: string,
@@ -108,17 +116,20 @@ const resolveHostAwareBaseUrl = ({
   const isSecureContext = preferSecure ?? location.protocol === 'https:';
   const protocol =
     family === 'http' ? (isSecureContext ? 'https' : 'http') : isSecureContext ? 'wss' : 'ws';
+  const localPort = port === undefined ? DEFAULT_API_PORT : port;
+  const publicPort = port === undefined ? null : port;
 
   if (isLoopbackHost(currentHost)) {
-    return buildUrl(protocol, 'localhost', port ?? DEFAULT_API_PORT, path);
+    return buildUrl(protocol, 'localhost', localPort, path);
   }
 
   if (isPrivateNetworkHost(currentHost)) {
     const privateProtocol = family === 'http' ? 'http' : 'ws';
-    return buildUrl(privateProtocol, currentHost, port ?? DEFAULT_API_PORT, path);
+    return buildUrl(privateProtocol, currentHost, localPort, path);
   }
 
-  return buildUrl(protocol, currentHost, port ?? DEFAULT_API_PORT, path);
+  const publicHost = derivePublicApiHost(currentHost);
+  return buildUrl(protocol, publicHost, publicPort, path);
 };
 
 interface ApiBaseUrlOptions {
@@ -152,7 +163,7 @@ export const resolveSocketBaseUrl = (options?: SocketBaseUrlOptions): string => 
     envUrl: options?.envUrl,
     family: options?.useWebSocketScheme ? 'ws' : 'http',
     path: options?.path,
-    port: options?.port ?? DEFAULT_API_PORT,
+    port: options?.port,
     preferSecure: options?.preferSecure,
     onEnvIgnored: options?.onEnvIgnored,
   });

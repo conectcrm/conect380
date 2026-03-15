@@ -20,6 +20,109 @@ export class EmpresaModuloService {
     private readonly empresaModuloRepository: Repository<EmpresaModulo>,
   ) {}
 
+  private normalizeModuloCode(value: string): string {
+    return String(value || '')
+      .trim()
+      .toUpperCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^A-Z0-9]+/g, '_');
+  }
+
+  private mapearPlanoCodigoParaEnum(plano?: string | null): PlanoEnum | null {
+    const normalized = String(plano || '').trim().toUpperCase();
+    if (!normalized) {
+      return null;
+    }
+
+    const aliases: Record<string, PlanoEnum> = {
+      STARTER: PlanoEnum.STARTER,
+      BASIC: PlanoEnum.STARTER,
+      BASICO: PlanoEnum.STARTER,
+      BUSINESS: PlanoEnum.BUSINESS,
+      PROFESSIONAL: PlanoEnum.BUSINESS,
+      PRO: PlanoEnum.BUSINESS,
+      ENTERPRISE: PlanoEnum.ENTERPRISE,
+      PREMIUM: PlanoEnum.ENTERPRISE,
+      EMPRESARIAL: PlanoEnum.ENTERPRISE,
+    };
+
+    return aliases[normalized] || null;
+  }
+
+  async sincronizarModulosPlano(
+    empresa_id: string,
+    modulosCodigos: string[],
+    planoCodigo?: string | null,
+  ): Promise<void> {
+    const codigosNormalizados = Array.from(
+      new Set(
+        (modulosCodigos || [])
+          .map((codigo) => this.normalizeModuloCode(codigo))
+          .filter(Boolean),
+      ),
+    );
+
+    if (codigosNormalizados.length === 0) {
+      throw new BadRequestException('Plano sem modulos validos para sincronizacao');
+    }
+
+    const planoEnum = this.mapearPlanoCodigoParaEnum(planoCodigo);
+    const existentes = await this.empresaModuloRepository.find({
+      where: { empresaId: empresa_id },
+    });
+
+    const existentesPorCodigo = new Map<string, EmpresaModulo>();
+    for (const registro of existentes) {
+      const codigoNormalizado = this.normalizeModuloCode(String(registro.modulo || ''));
+      if (codigoNormalizado) {
+        existentesPorCodigo.set(codigoNormalizado, registro);
+      }
+    }
+
+    for (const codigo of codigosNormalizados) {
+      const existente = existentesPorCodigo.get(codigo);
+
+      if (existente) {
+        const precisaAtualizar =
+          !existente.ativo ||
+          existente.plano !== (planoEnum ?? existente.plano) ||
+          Boolean(existente.data_expiracao);
+
+        if (precisaAtualizar) {
+          await this.empresaModuloRepository.update(existente.id, {
+            ativo: true,
+            data_ativacao: new Date(),
+            data_expiracao: null,
+            plano: planoEnum ?? existente.plano,
+          });
+        }
+        continue;
+      }
+
+      const novoModulo = this.empresaModuloRepository.create({
+        empresaId: empresa_id,
+        modulo: codigo as ModuloEnum,
+        ativo: true,
+        data_ativacao: new Date(),
+        data_expiracao: null,
+        plano: planoEnum,
+      });
+      await this.empresaModuloRepository.save(novoModulo);
+    }
+
+    for (const registro of existentes) {
+      const codigoRegistro = this.normalizeModuloCode(String(registro.modulo || ''));
+      if (registro.ativo && !codigosNormalizados.includes(codigoRegistro)) {
+        await this.empresaModuloRepository.update(registro.id, { ativo: false });
+      }
+    }
+
+    this.logger.log(
+      `Sincronizacao de modulos concluida para empresa ${empresa_id}: ${codigosNormalizados.join(', ')}`,
+    );
+  }
+
   /**
    * Verifica se empresa tem módulo ativo
    * @param empresa_id ID da empresa
@@ -211,26 +314,9 @@ export class EmpresaModuloService {
       return;
     }
 
-    // Ativar módulos do plano
-    for (const modulo of modulos) {
-      await this.ativar(empresa_id, { modulo, ativo: true, plano });
-    }
+    await this.sincronizarModulosPlano(empresa_id, modulos, plano);
 
     this.logger.log(`Plano ${plano} ativado para empresa ${empresa_id}: ${modulos.length} módulos`);
-
-    // Desativar módulos que não estão no plano
-    const todosModulos = Object.values(ModuloEnum);
-    for (const modulo of todosModulos) {
-      if (!modulos.includes(modulo)) {
-        try {
-          await this.desativar(empresa_id, modulo);
-        } catch (error) {
-          // Ignora se módulo não existe
-        }
-      }
-    }
-
-    console.log(`  ✅ [EmpresaModuloService] ativarPlano() concluído\n`);
   }
 
   /**

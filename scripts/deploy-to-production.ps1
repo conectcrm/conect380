@@ -1,6 +1,8 @@
 #!/usr/bin/env pwsh
-# Script PowerShell para executar todo o processo de deploy em produção
-# Uso: .\scripts\deploy-to-production.ps1
+# Deploy helper for production rollout.
+# Usage:
+#   .\scripts\deploy-to-production.ps1
+#   .\scripts\deploy-to-production.ps1 -DryRun -Force
 
 param(
   [switch]$SkipBackup,
@@ -13,276 +15,233 @@ $ErrorActionPreference = "Stop"
 function Write-Header {
   param([string]$Text)
   Write-Host ""
-  Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor DarkCyan
-  Write-Host "  $Text" -ForegroundColor Yellow
-  Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor DarkCyan
+  Write-Host ("=" * 72) -ForegroundColor DarkCyan
+  Write-Host ("  {0}" -f $Text) -ForegroundColor Yellow
+  Write-Host ("=" * 72) -ForegroundColor DarkCyan
   Write-Host ""
 }
 
 function Write-Step {
   param([string]$Text)
-  Write-Host "📋 $Text" -ForegroundColor Cyan
+  Write-Host ("[STEP] {0}" -f $Text) -ForegroundColor Cyan
 }
 
 function Write-Success {
   param([string]$Text)
-  Write-Host "✅ $Text" -ForegroundColor Green
+  Write-Host ("[OK] {0}" -f $Text) -ForegroundColor Green
 }
 
-function Write-Warning {
+function Write-Warn {
   param([string]$Text)
-  Write-Host "⚠️  $Text" -ForegroundColor Yellow
+  Write-Host ("[WARN] {0}" -f $Text) -ForegroundColor Yellow
 }
 
-function Write-Error-Message {
+function Write-Fail {
   param([string]$Text)
-  Write-Host "❌ $Text" -ForegroundColor Red
+  Write-Host ("[FAIL] {0}" -f $Text) -ForegroundColor Red
 }
 
 function Confirm-Action {
   param([string]$Message)
-    
-  if ($Force) {
+
+  if ($Force -or $DryRun) {
     return $true
   }
-    
-  $response = Read-Host "$Message (s/N)"
+
+  $response = Read-Host ("{0} (s/N)" -f $Message)
   return $response -eq "s" -or $response -eq "S"
 }
 
-# ═══════════════════════════════════════════════════════════════
-# INÍCIO DO SCRIPT
-# ═══════════════════════════════════════════════════════════════
+function Invoke-Step {
+  param(
+    [string]$Description,
+    [scriptblock]$Action
+  )
 
-Write-Header "🚀 DEPLOY PARA PRODUÇÃO - ConectCRM"
-
-if ($DryRun) {
-  Write-Warning "Modo DRY RUN - Nenhuma alteração será feita"
-  Write-Host ""
+  Write-Step $Description
+  & $Action
 }
 
-# ═══════════════════════════════════════════════════════════════
-# PASSO 1: Verificações Pré-Deploy
-# ═══════════════════════════════════════════════════════════════
+function Assert-Exists {
+  param(
+    [string]$Path,
+    [string]$Message
+  )
 
-Write-Header "PASSO 1: Verificações Pré-Deploy"
-
-Write-Step "Verificando migrations críticas..."
-.\scripts\check-production-migrations.ps1
-if ($LASTEXITCODE -ne 0) {
-  Write-Error-Message "Migrations incompletas! Resolva antes de continuar."
-  exit 1
-}
-
-Write-Step "Verificando arquivo .env.production..."
-if (-not (Test-Path "backend\.env.production")) {
-  Write-Error-Message "Arquivo backend\.env.production não encontrado!"
-  Write-Host ""
-  Write-Host "Crie o arquivo copiando do template:"
-  Write-Host "  cp backend\.env.production.example backend\.env.production" -ForegroundColor White
-  Write-Host ""
-  exit 1
-}
-Write-Success "Arquivo .env.production encontrado"
-
-Write-Step "Verificando seed data SQL..."
-if (-not (Test-Path "backend\seed-production-data.sql")) {
-  Write-Error-Message "Arquivo seed-production-data.sql não encontrado!"
-  exit 1
-}
-Write-Success "Script SQL encontrado"
-
-Write-Host ""
-
-# ═══════════════════════════════════════════════════════════════
-# PASSO 2: Teste de Conexão
-# ═══════════════════════════════════════════════════════════════
-
-Write-Header "PASSO 2: Teste de Conexão com Banco"
-
-if (-not $DryRun) {
-  Write-Step "Testando conexão com banco de produção..."
-  Set-Location backend
-  node scripts\test-db-connection.js
-  if ($LASTEXITCODE -ne 0) {
-    Write-Error-Message "Falha na conexão com banco!"
-    Set-Location ..
+  if (-not (Test-Path $Path)) {
+    Write-Fail $Message
     exit 1
   }
-  Set-Location ..
-  Write-Success "Conexão OK"
 }
 
-Write-Host ""
+Write-Header "DEPLOY PARA PRODUCAO - Conect360"
 
-# ═══════════════════════════════════════════════════════════════
-# PASSO 3: Backup
-# ═══════════════════════════════════════════════════════════════
+if ($DryRun) {
+  Write-Warn "DryRun ativo. Nenhuma alteracao de banco sera aplicada."
+}
+
+Write-Header "PASSO 1 - PRECHECKS"
+
+Invoke-Step "Validar migrations criticas" {
+  & .\scripts\check-production-migrations.ps1
+  if ($LASTEXITCODE -ne 0) {
+    Write-Fail "Migrations incompletas. Corrija antes do deploy."
+    exit 1
+  }
+}
+
+if (Test-Path "backend\.env.production") {
+  Write-Success "backend\.env.production encontrado"
+}
+elseif ($DryRun) {
+  Write-Warn "DryRun: backend\.env.production ausente (bloqueia apenas deploy real)."
+}
+else {
+  Write-Fail "Arquivo backend\.env.production nao encontrado."
+  exit 1
+}
+
+if (Test-Path "backend\seed-production-data.sql") {
+  Write-Success "backend\seed-production-data.sql encontrado"
+}
+elseif ($DryRun) {
+  Write-Warn "DryRun: backend\seed-production-data.sql ausente (verificar no go-live real)."
+}
+else {
+  Write-Fail "Arquivo backend\seed-production-data.sql nao encontrado."
+  exit 1
+}
+
+Write-Header "PASSO 2 - CONEXAO COM BANCO"
+
+if (-not $DryRun) {
+  Invoke-Step "Testar conexao do backend com banco de producao" {
+    Push-Location backend
+    try {
+      node scripts\test-db-connection.js
+      if ($LASTEXITCODE -ne 0) {
+        Write-Fail "Falha na conexao com banco."
+        exit 1
+      }
+    }
+    finally {
+      Pop-Location
+    }
+  }
+  Write-Success "Conexao com banco validada"
+}
+else {
+  Write-Warn "DryRun: teste de conexao ignorado."
+}
 
 if (-not $SkipBackup) {
-  Write-Header "PASSO 3: Backup do Banco"
-    
-  Write-Warning "IMPORTANTE: Crie um backup/snapshot do banco ANTES de continuar!"
+  Write-Header "PASSO 3 - BACKUP"
+  Write-Warn "Crie backup/snapshot ANTES de continuar."
   Write-Host ""
-  Write-Host "Para AWS RDS:" -ForegroundColor Cyan
+  Write-Host "AWS RDS exemplo:" -ForegroundColor Cyan
   Write-Host "  aws rds create-db-snapshot --db-instance-identifier conectcrm-production --db-snapshot-identifier backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')" -ForegroundColor White
   Write-Host ""
-  Write-Host "Para PostgreSQL local:" -ForegroundColor Cyan
+  Write-Host "PostgreSQL exemplo:" -ForegroundColor Cyan
   Write-Host "  pg_dump -h HOST -U USER -d conectcrm_production -F c -f backup_$(Get-Date -Format 'yyyyMMdd_HHmmss').dump" -ForegroundColor White
   Write-Host ""
-    
-  if (-not (Confirm-Action "Backup foi criado?")) {
-    Write-Warning "Deploy cancelado pelo usuário"
+
+  if (-not (Confirm-Action "Backup concluido")) {
+    Write-Warn "Deploy cancelado pelo usuario."
     exit 0
   }
-    
   Write-Success "Backup confirmado"
-  Write-Host ""
 }
 
-# ═══════════════════════════════════════════════════════════════
-# PASSO 4: Executar Migrations
-# ═══════════════════════════════════════════════════════════════
+Write-Header "PASSO 4 - MIGRATIONS"
 
-Write-Header "PASSO 4: Executar Migrations"
-
-if (-not (Confirm-Action "Executar migrations em PRODUÇÃO?")) {
-  Write-Warning "Deploy cancelado pelo usuário"
+if (-not (Confirm-Action "Executar migrations em PRODUCAO")) {
+  Write-Warn "Deploy cancelado pelo usuario."
   exit 0
 }
 
 if (-not $DryRun) {
-  Write-Step "Definindo ambiente de produção..."
-  $env:NODE_ENV = "production"
-    
-  Write-Step "Executando migrations..."
-  Set-Location backend
-  npm run migration:run
-  if ($LASTEXITCODE -ne 0) {
-    Write-Error-Message "Erro ao executar migrations!"
-    Set-Location ..
-        
-    Write-Host ""
-    Write-Warning "Para reverter:"
-    Write-Host "  cd backend && npm run migration:revert" -ForegroundColor White
-    Write-Host ""
-    exit 1
+  Invoke-Step "Executar migrations" {
+    $env:NODE_ENV = "production"
+    Push-Location backend
+    try {
+      npm run migration:run
+      if ($LASTEXITCODE -ne 0) {
+        Write-Fail "Falha ao executar migrations."
+        Write-Host "Rollback sugerido: cd backend; npm run migration:revert" -ForegroundColor White
+        exit 1
+      }
+    }
+    finally {
+      Pop-Location
+    }
   }
-  Set-Location ..
-  Write-Success "Migrations executadas com sucesso"
-}
-
-Write-Host ""
-
-# ═══════════════════════════════════════════════════════════════
-# PASSO 5: Aplicar Seed Data
-# ═══════════════════════════════════════════════════════════════
-
-Write-Header "PASSO 5: Aplicar Seed Data"
-
-if (-not (Confirm-Action "Aplicar dados iniciais (seed data)?")) {
-  Write-Warning "Seed data ignorado"
+  Write-Success "Migrations aplicadas"
 }
 else {
+  Write-Warn "DryRun: migrations nao executadas."
+}
+
+Write-Header "PASSO 5 - SEED"
+
+if (Confirm-Action "Aplicar seed data") {
   if (-not $DryRun) {
-    Write-Step "Aplicando seed data..."
-        
-    # Verificar se psql está disponível
-    $psqlAvailable = Get-Command psql -ErrorAction SilentlyContinue
-        
-    if ($psqlAvailable) {
-      # Usar psql se disponível
-      Write-Host "Usando psql..." -ForegroundColor DarkGray
-      # Usuário deve executar manualmente com credenciais
-      Write-Warning "Execute manualmente:"
-      Write-Host "  psql -h HOST -U USER -d conectcrm_production < backend\seed-production-data.sql" -ForegroundColor White
+    $psql = Get-Command psql -ErrorAction SilentlyContinue
+
+    if ($psql) {
+      Write-Warn "psql encontrado. Execute com credenciais de producao:"
+      Write-Host '  psql -h HOST -U USER -d conectcrm_production -f backend\seed-production-data.sql' -ForegroundColor White
     }
     else {
-      # Usar Node.js como fallback
-      Write-Host "psql não encontrado, usando Node.js..." -ForegroundColor DarkGray
-      Set-Location backend
-            
-      $seedScript = @"
-const fs = require('fs');
-const { Client } = require('pg');
-const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '.env.production') });
-
-const client = new Client({
-  host: process.env.DATABASE_HOST,
-  port: parseInt(process.env.DATABASE_PORT || '5432'),
-  user: process.env.DATABASE_USERNAME,
-  password: process.env.DATABASE_PASSWORD,
-  database: process.env.DATABASE_NAME,
-  ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false,
-});
-
-client.connect().then(() => {
-  const sql = fs.readFileSync('seed-production-data.sql', 'utf8');
-  return client.query(sql);
-}).then(() => {
-  console.log('✅ Seed data aplicado com sucesso!');
-  return client.end();
-}).catch((err) => {
-  console.error('❌ Erro:', err.message);
-  client.end();
-  process.exit(1);
-});
-"@
-            
-      $seedScript | Out-File -FilePath "temp-seed.js" -Encoding UTF8
-      node temp-seed.js
-      Remove-Item temp-seed.js -Force
-            
-      Set-Location ..
+      Write-Warn "psql nao encontrado. Seed deve ser aplicado manualmente."
+      Write-Host '  Use um cliente SQL e rode backend\seed-production-data.sql no banco alvo.' -ForegroundColor White
     }
-        
-    Write-Success "Seed data processado"
+
+    Write-Success "Passo de seed orientado"
   }
-}
-
-Write-Host ""
-
-# ═══════════════════════════════════════════════════════════════
-# PASSO 6: Criar Usuário Admin
-# ═══════════════════════════════════════════════════════════════
-
-Write-Header "PASSO 6: Criar Usuário Admin"
-
-if (-not (Confirm-Action "Criar usuário admin?")) {
-  Write-Warning "Criação de admin ignorada"
+  else {
+    Write-Warn "DryRun: seed nao aplicado."
+  }
 }
 else {
-  if (-not $DryRun) {
-    Set-Location backend
-    node scripts\create-admin-user.js
-    Set-Location ..
-  }
+  Write-Warn "Seed ignorado."
 }
 
+Write-Header "PASSO 6 - ADMIN"
+
+if (Confirm-Action "Executar script de criacao/ajuste de admin") {
+  if (-not $DryRun) {
+    Push-Location backend
+    try {
+      node scripts\create-admin-user.js
+      if ($LASTEXITCODE -ne 0) {
+        Write-Fail "Falha ao executar create-admin-user.js"
+        exit 1
+      }
+    }
+    finally {
+      Pop-Location
+    }
+  }
+  else {
+    Write-Warn "DryRun: script de admin nao executado."
+  }
+}
+else {
+  Write-Warn "Passo de admin ignorado."
+}
+
+Write-Header "PASSO 7 - CHECKLIST FINAL"
+Write-Host "  [ ] Migrations aplicadas sem erro" -ForegroundColor White
+Write-Host "  [ ] Seed aplicado (se necessario)" -ForegroundColor White
+Write-Host "  [ ] Admin validado" -ForegroundColor White
+Write-Host "  [ ] Backend sobe sem erro" -ForegroundColor White
+Write-Host "  [ ] Login funcional" -ForegroundColor White
 Write-Host ""
 
-# ═══════════════════════════════════════════════════════════════
-# PASSO 7: Validação Final
-# ═══════════════════════════════════════════════════════════════
-
-Write-Header "PASSO 7: Validação Final"
-
-Write-Step "Checklist de validação:"
-Write-Host "  [ ] Migrations executadas sem erros" -ForegroundColor White
-Write-Host "  [ ] Seed data aplicado" -ForegroundColor White
-Write-Host "  [ ] Usuário admin criado" -ForegroundColor White
-Write-Host "  [ ] Backend inicia sem erros" -ForegroundColor White
-Write-Host "  [ ] Login funciona" -ForegroundColor White
+Write-Success "Fluxo de deploy finalizado."
 Write-Host ""
-
-Write-Success "Deploy em produção concluído!"
-Write-Host ""
-Write-Host "🚀 Próximos passos:" -ForegroundColor Yellow
-Write-Host "   1. Inicie o backend: cd backend && npm run start:prod" -ForegroundColor White
-Write-Host "   2. Teste o login via API" -ForegroundColor White
-Write-Host "   3. Verifique os logs" -ForegroundColor White
-Write-Host "   4. Deploy do frontend" -ForegroundColor White
-Write-Host ""
-Write-Host "📖 Documentação completa: ESTRATEGIA_DEPLOY_PRODUCAO.md" -ForegroundColor Cyan
+Write-Host "Proximos passos operacionais:" -ForegroundColor Yellow
+Write-Host "  1. cd backend; npm run start:prod" -ForegroundColor White
+Write-Host "  2. validar /health e /auth/login" -ForegroundColor White
+Write-Host "  3. publicar frontend no ambiente alvo" -ForegroundColor White
 Write-Host ""
