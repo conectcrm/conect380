@@ -2,6 +2,7 @@ import {
   propostasService as sharedPropostasService,
   Proposta as PropostaBasica,
 } from '../../../services/propostasService';
+import { authService } from '../../../services/authService';
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -212,6 +213,73 @@ class PropostasService {
       return max;
     }
     return rounded;
+  }
+
+  private mapRoleToVendedorTipo(role: unknown): Vendedor['tipo'] {
+    const normalizedRole = typeof role === 'string' ? role.trim().toLowerCase() : '';
+
+    if (normalizedRole === 'admin' || normalizedRole === 'superadmin') {
+      return 'admin';
+    }
+
+    if (normalizedRole === 'gerente' || normalizedRole === 'manager') {
+      return 'gerente';
+    }
+
+    return 'vendedor';
+  }
+
+  private getVendedorLogadoFallback(): Vendedor | null {
+    try {
+      const user = authService.getUser();
+      if (!user) {
+        return null;
+      }
+
+      const id = typeof user.id === 'string' ? user.id.trim() : '';
+      const nome = typeof user.nome === 'string' ? user.nome.trim() : '';
+
+      if (!id || !nome) {
+        return null;
+      }
+
+      return {
+        id,
+        nome,
+        email: typeof user.email === 'string' ? user.email : '',
+        telefone: typeof user.telefone === 'string' ? user.telefone : '',
+        tipo: this.mapRoleToVendedorTipo(user.role),
+        ativo: true,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private mergeVendedoresComFallback(vendedores: Vendedor[]): Vendedor[] {
+    const base = Array.isArray(vendedores) ? vendedores.filter((item) => !!item?.id) : [];
+    const vendedorFallback = this.getVendedorLogadoFallback();
+
+    if (!vendedorFallback) {
+      return base;
+    }
+
+    const existingIndex = base.findIndex((item) => item.id === vendedorFallback.id);
+    if (existingIndex === -1) {
+      return [vendedorFallback, ...base];
+    }
+
+    const merged = [...base];
+    const existing = merged[existingIndex];
+    merged[existingIndex] = {
+      ...existing,
+      nome: existing.nome || vendedorFallback.nome,
+      email: existing.email || vendedorFallback.email,
+      telefone: existing.telefone || vendedorFallback.telefone,
+      ativo: true,
+    };
+
+    return merged;
   }
 
   private isComboItem(item: unknown): boolean {
@@ -745,11 +813,13 @@ class PropostasService {
             ativo: true, // Já filtrado, então todos são ativos
           }));
 
+        const vendedoresComFallback = this.mergeVendedoresComFallback(vendedoresFormatados);
+
         // Atualizar cache
-        this.vendedoresCache = vendedoresFormatados;
+        this.vendedoresCache = vendedoresComFallback;
         this.vendedoresCacheTimestamp = Date.now();
 
-        return vendedoresFormatados;
+        return vendedoresComFallback;
       }
     } catch (error) {
       console.error('❌ Erro ao carregar vendedores do backend:', error);
@@ -758,9 +828,9 @@ class PropostasService {
     }
 
     // Sem fallback mock: manter somente dados reais
-    this.vendedoresCache = [];
+    this.vendedoresCache = this.mergeVendedoresComFallback([]);
     this.vendedoresCacheTimestamp = Date.now();
-    return [];
+    return this.vendedoresCache;
   }
 
   // Gerar título automático para proposta
@@ -1281,9 +1351,15 @@ class PropostasService {
         setTimeout(() => reject(new Error('Timeout ao obter vendedor atual')), 3000);
       });
 
+      const vendedorLogado = this.getVendedorLogadoFallback();
       const vendedores = await Promise.race([this.obterVendedores(), timeoutPromise]);
+      const vendedoresComFallback = this.mergeVendedoresComFallback(vendedores);
 
-      const vendedorAtual = vendedores.length > 0 ? vendedores[0] : null;
+      const vendedorAtual = vendedorLogado
+        ? vendedoresComFallback.find((item) => item.id === vendedorLogado.id) || vendedorLogado
+        : vendedoresComFallback.length > 0
+          ? vendedoresComFallback[0]
+          : null;
 
       // Atualizar cache do vendedor atual
       this.vendedorAtualCache = vendedorAtual;
@@ -1292,7 +1368,7 @@ class PropostasService {
       return vendedorAtual;
     } catch (error) {
       console.error('❌ Erro ao obter vendedor atual:', error);
-      return null;
+      return this.getVendedorLogadoFallback();
     }
   }
 

@@ -56,7 +56,7 @@ import {
 } from 'lucide-react';
 import { oportunidadesService } from '../services/oportunidadesService';
 import usuariosService from '../services/usuariosService';
-import { Usuario } from '../types/usuarios';
+import { Usuario, UserRole } from '../types/usuarios';
 import {
   Oportunidade,
   NovaOportunidade,
@@ -313,6 +313,69 @@ const PipelinePage: React.FC = () => {
   const [openListActionsMenuId, setOpenListActionsMenuId] = useState<string | null>(null);
   const canManageStalePolicy = userHasPermission(user as any, 'config.automacoes.manage');
   const showPipelineWorkspace = !lifecycleFeatureEnabled || workspaceTab === 'pipeline';
+
+  const mapRoleToUserRole = (role?: string): UserRole => {
+    const normalizedRole = (role || '').trim().toLowerCase();
+
+    if (normalizedRole === 'superadmin') return UserRole.SUPERADMIN;
+    if (normalizedRole === 'admin') return UserRole.ADMIN;
+    if (normalizedRole === 'gerente' || normalizedRole === 'manager') return UserRole.GERENTE;
+    if (normalizedRole === 'suporte') return UserRole.SUPORTE;
+    if (normalizedRole === 'financeiro') return UserRole.FINANCEIRO;
+    return UserRole.VENDEDOR;
+  };
+
+  const getUsuarioLogadoFallback = useCallback((): Usuario | null => {
+    if (!user) return null;
+
+    const id = typeof user.id === 'string' ? user.id.trim() : '';
+    const nome = typeof user.nome === 'string' ? user.nome.trim() : '';
+
+    if (!id || !nome) return null;
+
+    const now = new Date();
+
+    return {
+      id,
+      nome,
+      email: typeof user.email === 'string' ? user.email : '',
+      telefone: typeof user.telefone === 'string' ? user.telefone : '',
+      role: mapRoleToUserRole(user.role),
+      permissoes: Array.isArray(user.permissoes)
+        ? user.permissoes
+        : Array.isArray(user.permissions)
+          ? user.permissions
+          : [],
+      empresa_id: user.empresa?.id || '',
+      avatar_url: user.avatar_url || null,
+      idioma_preferido: user.idioma_preferido || 'pt-BR',
+      configuracoes: user.configuracoes,
+      ativo: true,
+      deve_trocar_senha: false,
+      created_at: now,
+      updated_at: now,
+      empresa: user.empresa
+        ? {
+            id: user.empresa.id,
+            nome: user.empresa.nome,
+            slug: user.empresa.slug,
+          }
+        : undefined,
+    };
+  }, [user]);
+
+  const mergeUsuariosComFallback = useCallback(
+    (lista: Usuario[]): Usuario[] => {
+      const base = Array.isArray(lista) ? lista.filter((item) => !!item?.id) : [];
+      const usuarioFallback = getUsuarioLogadoFallback();
+
+      if (!usuarioFallback) return base;
+      if (base.some((item) => item.id === usuarioFallback.id)) return base;
+
+      return [usuarioFallback, ...base];
+    },
+    [getUsuarioLogadoFallback],
+  );
 
   useEffect(() => {
     if (visualizacao !== 'kanban' && kanbanExpanded) {
@@ -603,10 +666,17 @@ const PipelinePage: React.FC = () => {
     try {
       setLoadingUsuarios(true);
       const response = await usuariosService.listarUsuarios({ ativo: true });
-      return response.usuarios || [];
+      return mergeUsuariosComFallback(response.usuarios || []);
     } catch (err) {
+      const status = (err as any)?.response?.status;
+      if (status === 401 || status === 403) {
+        console.warn(
+          '[Pipeline] Usuário sem permissão para listar usuários; aplicando fallback do usuário logado.',
+        );
+      }
       console.error('Erro ao carregar usuários:', err);
-      return [];
+      const usuarioFallback = getUsuarioLogadoFallback();
+      return usuarioFallback ? [usuarioFallback] : [];
     } finally {
       setLoadingUsuarios(false);
     }
