@@ -35,7 +35,6 @@ import { clientesService, Cliente as ClienteService } from '../../services/clien
 import { gerarTokenNumerico } from '../../utils/tokenUtils';
 import { matchesLocalSearchTerm, normalizeSearchValue } from '../../utils/localSearch';
 import { BadgeProdutoSoftware } from '../common/BadgeProdutoSoftware';
-import { getCatalogoFeaturesConfig } from '../../config/catalogoFeaturesFlags';
 
 // Novos componentes otimizados
 import ClienteSearchOptimizedV2 from '../search/ClienteSearchOptimizedV2';
@@ -408,7 +407,6 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
 }) => {
   // Hook de internacionalização
   const { t } = useI18n();
-  const catalogoFeatures = useMemo(() => getCatalogoFeaturesConfig(), []);
   const isEditMode = Boolean(propostaInicial?.id);
 
   // Estados principais
@@ -769,21 +767,16 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
   const produtosFiltrados = useMemo(() => {
     let filtered = produtosDisponiveis;
     const normalizedBuscarProduto = normalizeSearchValue(buscarProduto);
-
-    if (!catalogoFeatures.combosEnabled) {
-      filtered = filtered.filter((p) => p.tipo !== 'combo');
-    }
+    filtered = filtered.filter((p) => p.tipo !== 'combo');
 
     filtered = filtered.filter(
-      (p) => p.tipo === 'combo' || (p.status || 'ativo') !== 'descontinuado',
+      (p) => (p.status || 'ativo') !== 'descontinuado',
     );
 
     if (nichoSelecionado !== 'geral') {
       const tiposPermitidos = new Set(nichoSelecionadoConfig.tiposRecomendados);
       filtered = filtered.filter(
-        (p) =>
-          p.tipo === 'combo' ||
-          (p.tipoItem ? tiposPermitidos.has(p.tipoItem as TipoItemCatalogo) : false),
+        (p) => (p.tipoItem ? tiposPermitidos.has(p.tipoItem as TipoItemCatalogo) : false),
       );
     }
 
@@ -796,11 +789,8 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
     }
 
     if (tipoSelecionado) {
-      // "Tipo" no picker significa: itens avulsos vs combos.
       // Produtos de software também devem aparecer quando "Produtos" estiver selecionado.
-      if (tipoSelecionado === 'combo') {
-        filtered = filtered.filter((p) => p.tipo === 'combo');
-      } else if (tipoSelecionado === 'produto') {
+      if (tipoSelecionado === 'produto') {
         filtered = filtered.filter((p) => p.tipo !== 'combo');
       }
     }
@@ -818,7 +808,6 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
     nichoSelecionadoConfig.tiposRecomendados,
     tipoItemSelecionado,
     tipoSelecionado,
-    catalogoFeatures.combosEnabled,
   ]);
 
   // Categorias únicas
@@ -828,7 +817,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
 
   // Funções auxiliares
   const handleAdicionarProduto = (produto: Produto) => {
-    if (produto.tipo !== 'combo' && produto.status === 'descontinuado') {
+    if (produto.status === 'descontinuado') {
       toast.error('Item descontinuado não pode ser adicionado em novas propostas.');
       return;
     }
@@ -846,7 +835,7 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
 
     if (comboContemItemDescontinuado(produto)) {
       toast.success(
-        `${produto.nome} adicionado. Itens descontinuados no combo serão preservados por snapshot.`,
+        `${produto.nome} adicionado. Itens descontinuados no item composto serão preservados por snapshot.`,
       );
       return;
     }
@@ -1407,19 +1396,12 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                         <select
                           value={tipoSelecionado}
                           onChange={(e) => {
-                            const nextTipo = e.target.value;
-                            setTipoSelecionado(nextTipo);
-                            if (nextTipo === 'combo') {
-                              setTipoItemSelecionado('');
-                            }
+                            setTipoSelecionado(e.target.value);
                           }}
                           className={fieldClass}
                         >
                           <option value="">Todos os tipos</option>
                           <option value="produto">Produtos</option>
-                          {catalogoFeatures.combosEnabled && (
-                            <option value="combo">Combos</option>
-                          )}
                         </select>
                       </div>
 
@@ -1436,7 +1418,6 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                             )
                           }
                           className={fieldClass}
-                          disabled={tipoSelecionado === 'combo'}
                         >
                           <option value="">Todos os itens</option>
                           {tiposItemDisponiveis.map((tipoItem) => (
@@ -1523,14 +1504,6 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                         <span>
                           {produtosFiltrados.filter((p) => p.tipo !== 'combo').length} produtos
                         </span>
-                        {catalogoFeatures.combosEnabled && (
-                          <>
-                            <span>|</span>
-                            <span>
-                              {produtosFiltrados.filter((p) => p.tipo === 'combo').length} combos
-                            </span>
-                          </>
-                        )}
                       </div>
                       {(nichoSelecionado !== 'geral' ||
                         tipoSelecionado ||
@@ -1588,12 +1561,6 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                                 <div className="product-name font-medium text-gray-900">
                                   {produto.nome}
                                 </div>
-                                {catalogoFeatures.combosEnabled && produto.tipo === 'combo' && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-[#159A9C]/10 text-[#159A9C] text-xs rounded-full font-medium">
-                                    <Package className="w-3 h-3" />
-                                    COMBO
-                                  </span>
-                                )}
                                 {produto.tipoItem && (
                                   <BadgeProdutoSoftware
                                     tipoItem={produto.tipoItem}
@@ -1615,16 +1582,6 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                                     currency: 'BRL',
                                   }).format(produto.preco)}
                                 </div>
-                                {catalogoFeatures.combosEnabled &&
-                                  produto.tipo === 'combo' &&
-                                  produto.precoOriginal && (
-                                  <div className="text-sm text-gray-500 line-through">
-                                    {new Intl.NumberFormat('pt-BR', {
-                                      style: 'currency',
-                                      currency: 'BRL',
-                                    }).format(produto.precoOriginal)}
-                                  </div>
-                                )}
                                 {isProdutoSoftware(produto) && produto.periodicidadeLicenca && (
                                   <div className="text-xs text-[#159A9C]">
                                     / {produto.periodicidadeLicenca}
@@ -1670,13 +1627,6 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                                     {produto.subcategoria}
                                   </span>
                                 )}
-                                {catalogoFeatures.combosEnabled &&
-                                  produto.tipo === 'combo' &&
-                                  produto.desconto && (
-                                  <span className="px-2 py-1 bg-[#159A9C]/10 text-[#159A9C] text-xs rounded font-medium">
-                                    -{produto.desconto.toFixed(1)}%
-                                  </span>
-                                )}
                                 {isProdutoSoftware(produto) && produto.tipoLicenciamento && (
                                   <span className="px-2 py-1 bg-[#159A9C]/10 text-[#159A9C] text-xs rounded">
                                     {produto.tipoLicenciamento}
@@ -1714,13 +1664,6 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                                 <h5 className="font-medium text-gray-900">
                                   {produtoAtual.produto.nome}
                                 </h5>
-                                {catalogoFeatures.combosEnabled &&
-                                  produtoAtual.produto.tipo === 'combo' && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-[#159A9C]/10 text-[#159A9C] text-xs rounded-full font-medium">
-                                    <Package className="w-3 h-3" />
-                                    COMBO
-                                  </span>
-                                )}
                               </div>
                               <p className="text-sm text-gray-600 mb-3">
                                 {produtoAtual.produto.descricao}

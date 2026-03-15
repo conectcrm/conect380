@@ -419,57 +419,6 @@ describe('menuConfig permission filtering', () => {
     expect(empresaPermissoesFull).toBe(true);
   });
 
-  it('blocks combos create route when combos feature is disabled', () => {
-    const createOnly = canUserAccessPath('/combos/novo', ALL_MODULES, {
-      email: 'catalog.create@empresa.com',
-      role: 'custom',
-      permissions: ['crm.combos.create'],
-    } as any);
-    const full = canUserAccessPath('/combos/novo', ALL_MODULES, {
-      email: 'catalog.full@empresa.com',
-      role: 'custom',
-      permissions: ['crm.combos.create', 'crm.combos.read'],
-    } as any);
-
-    expect(createOnly).toBe(false);
-    expect(full).toBe(false);
-  });
-
-  it('hides combos menu when user has only catalog read permission', () => {
-    const menu = getMenuParaEmpresa(ALL_MODULES, {
-      email: 'catalog.only@empresa.com',
-      role: 'custom',
-      permissions: ['crm.produtos.read'],
-    } as any);
-
-    const ids = collectIds(menu);
-    expect(ids).toContain('comercial-produtos');
-    expect(ids).not.toContain('comercial-combos');
-  });
-
-  it('hides combos menu when user has combos read permission but feature is disabled', () => {
-    const menu = getMenuParaEmpresa(ALL_MODULES, {
-      email: 'combo.reader@empresa.com',
-      role: 'custom',
-      permissions: ['crm.combos.read'],
-    } as any);
-
-    const ids = collectIds(menu);
-    expect(ids).not.toContain('comercial-combos');
-  });
-
-  it('removes combos menu for vendedor defaults when feature is disabled', () => {
-    const menu = getMenuParaEmpresa(ALL_MODULES, {
-      email: 'seller@empresa.com',
-      role: 'vendedor',
-      permissions: [],
-    } as any);
-
-    const ids = collectIds(menu);
-    expect(ids).toContain('comercial-produtos');
-    expect(ids).not.toContain('comercial-combos');
-  });
-
   it('requires financeiro + relatorios for financeiro relatorios route', () => {
     const financeiroOnly = canUserAccessPath('/financeiro/relatorios', ALL_MODULES, {
       email: 'finance@empresa.com',

@@ -51,7 +51,7 @@ const BLOCKED_COMMERCIAL_INFO: MvpBlockedRouteInfo = {
   features: [
     'Cotacoes avancadas',
     'Aprovacoes comerciais',
-    'Fluxo legado de combos',
+    'Fluxo legado de catalogo',
     'Agenda comercial expandida',
   ],
 };
@@ -102,8 +102,6 @@ const BLOCKED_ROUTE_RULES: MvpBlockedRouteRule[] = [
   { prefix: '/orcamentos', info: BLOCKED_COMMERCIAL_INFO },
   { prefix: '/aprovacoes/pendentes', info: BLOCKED_COMMERCIAL_INFO },
   { prefix: '/vendas/aprovacoes', info: BLOCKED_COMMERCIAL_INFO },
-  { prefix: '/combos', info: BLOCKED_COMMERCIAL_INFO },
-  { prefix: '/vendas/combos', info: BLOCKED_COMMERCIAL_INFO },
 ];
 
 const MVP_ALLOWED_ROUTE_PREFIXES: string[] = [

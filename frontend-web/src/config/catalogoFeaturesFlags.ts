@@ -1,5 +1,4 @@
 export type CatalogoFeaturesConfig = {
-  combosEnabled: boolean;
   categoriasAvancadasEnabled: boolean;
   catalogApiEnabled: boolean;
   catalogApiTenantAllowlist: string[];
@@ -25,9 +24,6 @@ const parseTenantAllowlist = (value: string | undefined): string[] => {
 };
 
 export const getCatalogoFeaturesConfig = (): CatalogoFeaturesConfig => {
-  // Combos permanecem apenas por compatibilidade com fluxos legados.
-  // O catalogo principal deve evoluir com itens hierarquicos, nao com pacotes pre-definidos.
-  const combosEnabled = parseBooleanFlag(process.env.REACT_APP_CATALOGO_COMBOS_ENABLED, false);
   const categoriasAvancadasEnabled = parseBooleanFlag(
     process.env.REACT_APP_CATALOGO_CATEGORIAS_AVANCADAS_ENABLED,
     true,
@@ -38,7 +34,6 @@ export const getCatalogoFeaturesConfig = (): CatalogoFeaturesConfig => {
   );
 
   return {
-    combosEnabled,
     categoriasAvancadasEnabled,
     catalogApiEnabled,
     catalogApiTenantAllowlist,

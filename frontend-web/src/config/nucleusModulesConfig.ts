@@ -15,7 +15,6 @@ import {
   Calendar,
   Zap,
   Globe,
-  PackageOpen,
   Target,
   Home,
   ListChecks,
@@ -173,13 +172,6 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
         menuId: 'comercial-produtos',
         description:
           'Cat?logo de produtos e servi?os com pre?os din?micos e configura??es personalizadas.',
-      },
-      {
-        menuId: 'comercial-combos',
-        description: 'Fluxo legado de combos e pacotes, mantido apenas para compatibilidade controlada.',
-        icon: PackageOpen,
-        badge: 'Legado',
-        badgeColor: 'yellow',
       },
       {
         menuId: 'comercial-leads',

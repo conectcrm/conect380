@@ -15,7 +15,6 @@ import {
   Shield,
   Database,
   UserCog,
-  Archive,
   Car,
   Phone,
   Zap,
@@ -34,11 +33,8 @@ import {
   Tag,
 } from 'lucide-react';
 import { isMenuItemAllowedInMvp } from './mvpScope';
-import { getCatalogoFeaturesConfig } from './catalogoFeaturesFlags';
 import { isOmnichannelEnabled } from './featureFlags';
 import type { User } from '../types';
-
-const catalogoFeatures = getCatalogoFeaturesConfig();
 
 export interface MenuConfig {
   id: string;
@@ -136,10 +132,6 @@ const ALL_PERMISSION_VALUES: string[] = [
   'crm.produtos.create',
   'crm.produtos.update',
   'crm.produtos.delete',
-  'crm.combos.read',
-  'crm.combos.create',
-  'crm.combos.update',
-  'crm.combos.delete',
   'crm.agenda.read',
   'crm.agenda.create',
   'crm.agenda.update',
@@ -201,10 +193,6 @@ const CRM_FULL_PERMISSIONS = [
   'crm.produtos.create',
   'crm.produtos.update',
   'crm.produtos.delete',
-  'crm.combos.read',
-  'crm.combos.create',
-  'crm.combos.update',
-  'crm.combos.delete',
   'crm.agenda.read',
   'crm.agenda.create',
   'crm.agenda.update',
@@ -249,7 +237,6 @@ const VENDEDOR_CRM_PERMISSIONS = [
   'crm.oportunidades.create',
   'crm.oportunidades.update',
   'crm.produtos.read',
-  'crm.combos.read',
   'crm.agenda.read',
   'crm.agenda.create',
   'crm.agenda.update',
@@ -681,7 +668,6 @@ export const menuConfig: MenuConfig[] = [
       'crm.oportunidades.read',
       'comercial.propostas.read',
       'crm.produtos.read',
-      ...(catalogoFeatures.combosEnabled ? (['crm.combos.read'] as const) : []),
     ],
     requiredModule: 'CRM', //  Requer licenca CRM (base para comercial)
     section: 'Opera\u00e7\u00f5es',
@@ -785,21 +771,6 @@ export const menuConfig: MenuConfig[] = [
         requiredModule: 'VENDAS',
         group: 'Cat\u00e1logo',
       },
-      ...(catalogoFeatures.combosEnabled
-        ? [
-            {
-              id: 'comercial-combos',
-              title: 'Combos (legado)',
-              shortTitle: 'Legado',
-              icon: Archive,
-              href: '/vendas/combos',
-              color: 'blue',
-              permissions: ['crm.combos.read'],
-              requiredModule: 'VENDAS',
-              group: 'Cat\u00e1logo',
-            } satisfies MenuConfig,
-          ]
-        : []),
     ],
   },
   {
@@ -1076,30 +1047,6 @@ const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
     pattern: '/vendas/veiculos',
     permissions: ['crm.produtos.read'],
   },
-  ...(catalogoFeatures.combosEnabled
-    ? ([
-        {
-          pattern: '/combos/novo',
-          permissions: ['crm.combos.create', 'crm.combos.read'],
-          match: 'all',
-        },
-        {
-          pattern: '/vendas/combos/novo',
-          permissions: ['crm.combos.create', 'crm.combos.read'],
-          match: 'all',
-        },
-        {
-          pattern: '/combos/:id/editar',
-          permissions: ['crm.combos.update', 'crm.combos.read'],
-          match: 'all',
-        },
-        {
-          pattern: '/vendas/combos/:id/editar',
-          permissions: ['crm.combos.update', 'crm.combos.read'],
-          match: 'all',
-        },
-      ] satisfies RoutePermissionRule[])
-    : []),
   { pattern: '/financeiro', permissions: ['financeiro.faturamento.read', 'financeiro.pagamentos.read'] },
   { pattern: '/financeiro/faturamento', permissions: ['financeiro.faturamento.read'] },
   { pattern: '/financeiro/contas-pagar', permissions: ['financeiro.pagamentos.read'] },
@@ -1162,7 +1109,6 @@ const ROUTE_PATH_ALIASES: Record<string, string[]> = {
   '/produtos': ['/vendas/produtos'],
   '/produtos/categorias': ['/vendas/produtos'],
   '/veiculos': ['/vendas/veiculos'],
-  ...(catalogoFeatures.combosEnabled ? { '/combos': ['/vendas/combos'] } : {}),
   '/agenda': ['/crm/agenda'],
   '/billing': ['/billing/assinaturas'],
   '/assinaturas': ['/billing/assinaturas'],
@@ -1376,7 +1322,6 @@ const ALL_PROTECTED_ROUTE_PREFIXES: string[] = (() => {
   return Array.from(all);
 })();
 
-const COMBOS_ROUTE_PREFIXES = ['/combos', '/vendas/combos'];
 const BLOCKED_LEGACY_ROUTE_PREFIXES = ['/admin'];
 
 export const canUserAccessPath = (
@@ -1392,13 +1337,6 @@ export const canUserAccessPath = (
   if (
     BLOCKED_LEGACY_ROUTE_PREFIXES.some((prefix) => isPathMatch(normalizedPath, prefix)) ||
     isBlockedLegacyNucleusAdministrationPath
-  ) {
-    return false;
-  }
-
-  if (
-    !catalogoFeatures.combosEnabled &&
-    COMBOS_ROUTE_PREFIXES.some((prefix) => isPathMatch(normalizedPath, prefix))
   ) {
     return false;
   }

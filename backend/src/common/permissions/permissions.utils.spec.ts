@@ -18,8 +18,6 @@ describe('permissions.utils', () => {
 
       expect(vendedorPerms.has(Permission.CRM_CLIENTES_READ)).toBe(true);
       expect(vendedorPerms.has(Permission.COMERCIAL_PROPOSTAS_CREATE)).toBe(true);
-      expect(vendedorPerms.has(Permission.CRM_COMBOS_READ)).toBe(true);
-      expect(vendedorPerms.has(Permission.CRM_COMBOS_CREATE)).toBe(false);
       expect(vendedorPerms.has(Permission.USERS_CREATE)).toBe(false);
       expect(vendedorPerms.has(Permission.ADMIN_EMPRESAS_MANAGE)).toBe(false);
     });

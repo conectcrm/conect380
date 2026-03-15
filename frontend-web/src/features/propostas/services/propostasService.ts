@@ -2,9 +2,6 @@ import {
   propostasService as sharedPropostasService,
   Proposta as PropostaBasica,
 } from '../../../services/propostasService';
-import { getCatalogoFeaturesConfig } from '../../../config/catalogoFeaturesFlags';
-
-const catalogoFeatures = getCatalogoFeaturesConfig();
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -432,46 +429,7 @@ class PropostasService {
             }))
         : [];
 
-      let itensCombo: Produto[] = [];
-      // Compatibilidade legada: combos ficam desligados por padrão e não devem mais orientar a evolução do catálogo.
-      if (catalogoFeatures.combosEnabled) {
-        try {
-          const { combosService } = await import('../../../services/combosService');
-          const combos = await combosService.listarCombos();
-
-          itensCombo = (Array.isArray(combos) ? combos : [])
-            .filter((combo) => combo.status === 'ativo')
-            .map((combo) => ({
-              id: combo.id,
-              nome: combo.nome,
-              preco: Number(combo.precoCombo || 0),
-              categoria: combo.categoria || 'Combo',
-              descricao: combo.descricao || '',
-              unidade: 'combo',
-              tipo: 'combo',
-              status: combo.status,
-              precoOriginal: Number(combo.precoOriginal || 0),
-              desconto: Number(combo.desconto || 0),
-              produtosCombo: (combo.produtos || []).map((item) => ({
-                id: item.produto.id,
-                nome: item.produto.nome,
-                preco: Number(item.produto.preco || 0),
-                categoria: item.produto.categoria || 'Geral',
-                subcategoria: (item.produto as any).subcategoria,
-                configuracao: (item.produto as any).configuracao,
-                descricao: item.produto.descricao,
-                unidade: item.produto.unidade || 'unidade',
-                tipo: (item.produto as any).configuracao || item.produto.tipo || 'produto',
-                tipoItem: item.produto.tipo as Produto['tipoItem'],
-                status: item.produto.status || 'ativo',
-              })),
-            }));
-        } catch (comboError) {
-          console.warn('⚠️ Não foi possível carregar combos para propostas:', comboError);
-        }
-      }
-
-      const produtosFormatados: Produto[] = [...itensCatalogo, ...itensCombo];
+      const produtosFormatados: Produto[] = [...itensCatalogo];
 
       if (produtosFormatados.length > 0) {
         // Atualizar cache
@@ -1400,4 +1358,3 @@ class PropostasService {
 
 export const propostasService = new PropostasService();
 export type { PropostaCompleta, PropostaFormData, Cliente, Vendedor, Produto, ProdutoProposta };
-

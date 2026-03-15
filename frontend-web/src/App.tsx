@@ -38,7 +38,6 @@ import Conect360Logo from './components/ui/Conect360Logo';
 import ScrollToTop from './components/common/ScrollToTop';
 import { useAuth } from './hooks/useAuth';
 import { getMvpBlockedRouteInfo } from './config/mvpScope';
-import { getCatalogoFeaturesConfig } from './config/catalogoFeaturesFlags';
 import { isOmnichannelEnabled } from './config/featureFlags';
 import { buildGuardianUrl } from './utils/guardianPortal';
 // Demandas agora sao Tickets - imports removidos (apenas redirects mantidos)
@@ -116,8 +115,6 @@ const CategoriasProdutosPage = React.lazy(
 const VehicleInventoryPage = React.lazy(
   () => import('./features/veiculos/VehicleInventoryPage'),
 );
-const CombosPage = React.lazy(() => import('./features/combos/CombosPage'));
-const NovoComboPage = React.lazy(() => import('./features/combos/NovoComboPage'));
 
 const ContasPagarPage = React.lazy(() => import('./pages/gestao/financeiro/ContasPagarPage'));
 const FornecedoresPage = React.lazy(
@@ -178,8 +175,6 @@ const MetasConfiguracao = React.lazy(() => import('./pages/configuracoes/MetasCo
 const ConfiguracaoEmpresaPage = React.lazy(
   () => import('./pages/empresas/ConfiguracaoEmpresaPage'),
 );
-
-const catalogoFeatures = getCatalogoFeaturesConfig();
 
 type GuardianLegacyRedirectProps = {
   path: string;
@@ -792,35 +787,6 @@ const AppRoutes: React.FC = () => {
                     path="/produtos/categorias"
                     element={protegerRota(ModuloEnum.VENDAS, <CategoriasProdutosPage />)}
                   />
-                  {catalogoFeatures.combosEnabled && (
-                    <>
-                      {/* Rotas dos Combos - Protegidas */}
-                      <Route
-                        path="/combos"
-                        element={protegerRota(ModuloEnum.VENDAS, <CombosPage />)}
-                      />
-                      <Route
-                        path="/vendas/combos"
-                        element={protegerRota(ModuloEnum.VENDAS, <CombosPage />)}
-                      />
-                      <Route
-                        path="/combos/novo"
-                        element={protegerRota(ModuloEnum.VENDAS, <NovoComboPage />)}
-                      />
-                      <Route
-                        path="/vendas/combos/novo"
-                        element={protegerRota(ModuloEnum.VENDAS, <NovoComboPage />)}
-                      />
-                      <Route
-                        path="/combos/:id/editar"
-                        element={protegerRota(ModuloEnum.VENDAS, <NovoComboPage />)}
-                      />
-                      <Route
-                        path="/vendas/combos/:id/editar"
-                        element={protegerRota(ModuloEnum.VENDAS, <NovoComboPage />)}
-                      />
-                    </>
-                  )}
                   <Route path="/agenda" element={protegerRota(ModuloEnum.CRM, <AgendaPage />)} />
                   <Route
                     path="/agenda/eventos/:id"

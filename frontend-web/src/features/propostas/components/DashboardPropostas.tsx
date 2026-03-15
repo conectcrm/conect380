@@ -433,7 +433,7 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({
       </div>
 
       <SectionCard className="p-4 sm:p-5">
-        <h3 className="text-base font-semibold text-[#19384C]">Uso de catalogo: itens avulsos x combos</h3>
+        <h3 className="text-base font-semibold text-[#19384C]">Uso de catalogo: itens avulsos x itens compostos</h3>
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className={`${shellTokens.card} p-3`}>
             <div className="flex items-center justify-between gap-3">
@@ -453,7 +453,7 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({
           <div className={`${shellTokens.card} p-3`}>
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-[#607B89]">Combos</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#607B89]">Itens compostos</p>
                 <p className="mt-1 text-xl font-semibold text-[#19384C]">{usoItensVsCombos.combos}</p>
               </div>
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#818CF8]/15">
@@ -472,7 +472,7 @@ export const DashboardPropostas: React.FC<DashboardPropostasProps> = ({
             <p className="mt-1">{usoItensVsCombos.propostasComItensAvulsos}</p>
           </div>
           <div className={`${shellTokens.card} p-3`}>
-            <p className="font-semibold text-[#244455]">Propostas com combo</p>
+            <p className="font-semibold text-[#244455]">Propostas com item composto</p>
             <p className="mt-1">{usoItensVsCombos.propostasComCombos}</p>
           </div>
           <div className={`${shellTokens.card} p-3`}>
