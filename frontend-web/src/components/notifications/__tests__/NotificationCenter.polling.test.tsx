@@ -68,14 +68,16 @@ const renderWithProviders = () =>
 
 describe('NotificationCenter polling sync', () => {
   beforeEach(() => {
-    jest.useFakeTimers();
     jest.clearAllMocks();
     localStorage.clear();
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'visible',
+    });
   });
 
   afterEach(() => {
-    jest.clearAllTimers();
-    jest.useRealTimers();
+    // noop
   });
 
   it('keeps a single notification entry for repeated API payloads with the same id', async () => {
@@ -113,7 +115,7 @@ describe('NotificationCenter polling sync', () => {
     expect(screen.getByTestId('first-notification-message')).toHaveTextContent('Primeira versao');
 
     await act(async () => {
-      jest.advanceTimersByTime(30000);
+      document.dispatchEvent(new Event('visibilitychange'));
     });
 
     await waitFor(() => expect(mockedNotificationService.listar).toHaveBeenCalledTimes(2));
@@ -161,7 +163,7 @@ describe('NotificationCenter polling sync', () => {
     await waitFor(() => expect(screen.getByTestId('first-notification-read')).toHaveTextContent('read'));
 
     await act(async () => {
-      jest.advanceTimersByTime(30000);
+      document.dispatchEvent(new Event('visibilitychange'));
     });
 
     await waitFor(() => expect(mockedNotificationService.listar).toHaveBeenCalledTimes(2));

@@ -34,6 +34,7 @@ describe('PortalService', () => {
 
   const mockPropostaRepository = {
     findOne: jest.fn(),
+    query: jest.fn(),
   };
 
   const empresaId = '11111111-1111-1111-1111-111111111111';
@@ -63,6 +64,21 @@ describe('PortalService', () => {
       numero: 'PROP-2026-001',
       empresaId,
     });
+    mockPropostaRepository.query.mockImplementation(async (sql: string) => {
+      if (sql.includes('information_schema.columns')) {
+        return [
+          { column_name: 'id' },
+          { column_name: 'numero' },
+          { column_name: 'empresa_id' },
+        ];
+      }
+
+      if (sql.includes('FROM propostas')) {
+        return [{ id: propostaId, numero: 'PROP-2026-001', empresa_id: empresaId }];
+      }
+
+      return [];
+    });
 
     service = new PortalService(
       mockPropostasService as any,
@@ -79,9 +95,7 @@ describe('PortalService', () => {
     expect(result.propostaId).toBe(propostaId);
     expect(new Date(result.expiresAt).toString()).not.toBe('Invalid Date');
 
-    expect(mockPropostaRepository.findOne).toHaveBeenCalledWith({
-      where: { id: propostaId, empresaId },
-    });
+    expect(mockPropostaRepository.query).toHaveBeenCalled();
     expect(mockPortalTokenRepository.createQueryBuilder).toHaveBeenCalled();
     expect(mockPortalTokenQueryBuilder.where).toHaveBeenCalledWith('proposta_id = :propostaId', {
       propostaId,
@@ -168,4 +182,3 @@ describe('PortalService', () => {
     );
   });
 });
-

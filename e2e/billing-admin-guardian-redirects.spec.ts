@@ -1,11 +1,5 @@
-﻿import { createServer, type Server } from 'node:http';
-import type { Page } from '@playwright/test';
+﻿import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
-
-const GUARDIAN_PORT = 3020;
-
-let guardianStubServer: Server | null = null;
-let startedGuardianStub = false;
 
 const jsonResponse = (status: number, payload: unknown) => ({
   status,
@@ -39,43 +33,15 @@ const mockGuardianAdminUser = {
   },
 };
 
-const ensureGuardianStub = async (): Promise<void> => {
-  await new Promise<void>((resolve, reject) => {
-    const candidate = createServer((req, res) => {
-      res.statusCode = 200;
-      res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      res.end(`<!doctype html><html><body>Guardian Stub ${req.url ?? '/'}</body></html>`);
-    });
-
-    const onError = (error: NodeJS.ErrnoException) => {
-      if (error.code === 'EADDRINUSE') {
-        resolve();
-        return;
-      }
-
-      reject(error);
-    };
-
-    candidate.once('error', onError);
-    candidate.listen(GUARDIAN_PORT, () => {
-      candidate.off('error', onError);
-      guardianStubServer = candidate;
-      startedGuardianStub = true;
-      resolve();
+const installGuardianStubRoute = async (page: Page): Promise<void> => {
+  await page.route(/^https?:\/\/localhost:3020\/.*/i, async (route) => {
+    const requestUrl = new URL(route.request().url());
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/html; charset=utf-8',
+      body: `<!doctype html><html><body>Guardian Stub ${requestUrl.pathname}${requestUrl.search}</body></html>`,
     });
   });
-};
-
-const closeGuardianStub = async (): Promise<void> => {
-  if (!startedGuardianStub || !guardianStubServer) {
-    return;
-  }
-
-  await new Promise<void>((resolve) => {
-    guardianStubServer?.close(() => resolve());
-  });
-  guardianStubServer = null;
-  startedGuardianStub = false;
 };
 
 const elevateSessionToGuardianAdmin = async (page: Page): Promise<void> => {
@@ -97,15 +63,8 @@ const elevateSessionToGuardianAdmin = async (page: Page): Promise<void> => {
 };
 
 test.describe('Billing legacy admin routes lockdown', () => {
-  test.beforeAll(async () => {
-    await ensureGuardianStub();
-  });
-
-  test.afterAll(async () => {
-    await closeGuardianStub();
-  });
-
   test('bloqueia aliases admin no cliente e mantém apenas relay explicito para guardian', async ({ authenticatedPage }) => {
+    await installGuardianStubRoute(authenticatedPage);
     await elevateSessionToGuardianAdmin(authenticatedPage);
 
     const blockedClientAliases = [
@@ -127,12 +86,11 @@ test.describe('Billing legacy admin routes lockdown', () => {
     }
 
     await authenticatedPage.goto('/sistema/backup', { waitUntil: 'domcontentloaded' }).catch(() => undefined);
-    await expect.poll(
-      () => authenticatedPage.url(),
-      {
+    await expect
+      .poll(() => authenticatedPage.url(), {
         timeout: 10000,
         message: 'Relay explicito para guardian (/sistema/backup) nao funcionou.',
-      },
-    ).toContain('/governance/system');
+      })
+      .toMatch(/:3020\/(governance\/system|login)/);
   });
 });

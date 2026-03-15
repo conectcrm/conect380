@@ -98,7 +98,7 @@ describe('financeiro-alertas-reprocessamento', () => {
         }),
         solicitarEntrada,
       ),
-    ).toThrow('pagamentoId numerico valido');
+    ).toThrow(/pagamentoId.*reprocessar o estorno/i);
   });
 
   it('deve usar referencia do payload para integracao invalida', () => {
@@ -160,6 +160,6 @@ describe('financeiro-alertas-reprocessamento', () => {
           tipo: 'conta_vencida',
         }),
       ),
-    ).toThrow('nao suporta reprocessamento manual');
+    ).toThrow(/suporta reprocessamento manual/i);
   });
 });

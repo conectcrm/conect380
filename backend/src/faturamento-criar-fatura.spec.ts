@@ -73,6 +73,10 @@ function createInMemoryRepository<T extends { id?: any }>() {
         }),
       }),
     }),
+    query: async () => [],
+    manager: {
+      query: async () => [],
+    },
     _all: () => data,
   };
 }
@@ -82,6 +86,7 @@ const faturaRepo = createInMemoryRepository<Fatura>();
 const itemRepo = createInMemoryRepository<ItemFatura>();
 const contratoRepo = createInMemoryRepository<Contrato>();
 const clienteRepo = createInMemoryRepository<any>();
+const propostasServiceMock = {};
 
 describe('FaturamentoService - criar fatura (unitário sem TypeORM)', () => {
   let service: FaturamentoService;
@@ -92,6 +97,7 @@ describe('FaturamentoService - criar fatura (unitário sem TypeORM)', () => {
       itemRepo as any,
       contratoRepo as any,
       clienteRepo as any,
+      propostasServiceMock as any,
       new EmailMock() as any,
     );
   });
