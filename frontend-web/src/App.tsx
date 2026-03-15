@@ -36,6 +36,7 @@ import Conect360Logo from './components/ui/Conect360Logo';
 // ETAPA 3: Páginas Consolidadas com Abas
 // Importar novas páginas do sistema de empresas
 import ScrollToTop from './components/common/ScrollToTop';
+import GlobalModalScrollLock from './components/common/GlobalModalScrollLock';
 import { useAuth } from './hooks/useAuth';
 import { getMvpBlockedRouteInfo } from './config/mvpScope';
 import { isOmnichannelEnabled } from './config/featureFlags';
@@ -1006,6 +1007,7 @@ const App: React.FC = () => {
                                 v7_relativeSplatPath: true,
                               }}
                             >
+                              <GlobalModalScrollLock />
                               <ScrollToTop />
                               <div className="App">
                                 <Suspense

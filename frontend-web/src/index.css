@@ -9,6 +9,16 @@
 @import './styles/fix-input-visibility.css';
 @import './styles/global-improvements.css';
 
+html.modal-scroll-lock,
+body.modal-scroll-lock {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
+body.modal-scroll-lock {
+  padding-right: var(--modal-scroll-lock-padding-right, 0px);
+}
+
 /* Estilos globais modernos */
 body {
   margin: 0;
