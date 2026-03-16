@@ -110,6 +110,12 @@ async function ensureE2EDatabaseCompatibility(app: INestApplication): Promise<vo
       ALTER TABLE "empresas"
       ADD COLUMN IF NOT EXISTS "data_expiracao" TIMESTAMP
     `);
+
+    // Compatibilidade com schema legado de propostas nas suites de vendas E2E.
+    await dataSource.query(`
+      ALTER TABLE "propostas"
+      ADD COLUMN IF NOT EXISTS "oportunidade_id" UUID
+    `);
   } catch {
     // Best effort: nao bloquear bootstrap de testes por ajuste de compatibilidade.
   }

@@ -299,6 +299,20 @@ export class OportunidadesController {
     @Request() req,
   ) {
     const oportunidade = await this.oportunidadesService.findOne(id, empresaId);
+    const valorOportunidade = Number(oportunidade.valor || 0);
+    const produtosIniciais =
+      valorOportunidade > 0
+        ? [
+            {
+              id: `opp-${String(oportunidade.id)}`,
+              nome: oportunidade.titulo || `Item da oportunidade ${oportunidade.id}`,
+              precoUnitario: valorOportunidade,
+              quantidade: 1,
+              desconto: 0,
+              subtotal: valorOportunidade,
+            },
+          ]
+        : [];
 
     const clientePayload = {
       id: oportunidade.cliente_id || null,
@@ -320,6 +334,7 @@ export class OportunidadesController {
         oportunidadeId: id,
         valor: Number(oportunidade.valor || 0),
         total: Number(oportunidade.valor || 0),
+        produtos: produtosIniciais,
         status: 'rascunho',
         source: 'oportunidade',
         observacoes: '',

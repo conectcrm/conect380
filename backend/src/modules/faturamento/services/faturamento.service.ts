@@ -820,12 +820,20 @@ export class FaturamentoService {
         FROM information_schema.columns
         WHERE table_schema = 'public'
           AND table_name = 'propostas'
-          AND column_name = 'cliente'
-        LIMIT 1
       `,
     );
 
-    this.propostaRelationEnabled = Array.isArray(rows) && rows.length > 0;
+    const availableColumns = new Set(
+      (Array.isArray(rows) ? rows : [])
+        .map((row) => String(row?.column_name || '').trim())
+        .filter(Boolean),
+    );
+
+    const hasClienteJson = availableColumns.has('cliente');
+    const hasOportunidadeLink =
+      availableColumns.has('oportunidade_id') || availableColumns.has('oportunidadeId');
+
+    this.propostaRelationEnabled = hasClienteJson && hasOportunidadeLink;
     return this.propostaRelationEnabled;
   }
 

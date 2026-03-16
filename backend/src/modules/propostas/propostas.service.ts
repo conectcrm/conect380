@@ -264,7 +264,10 @@ export interface Proposta {
 export class PropostasService {
   private readonly logger = new Logger(PropostasService.name);
   private contadorId = 1;
+  private contadorInicializado = false;
+  private contadorInitPromise: Promise<void>;
   private tableColumnsCache = new Map<string, Set<string>>();
+  private tableColumnTypeCache = new Map<string, string | null>();
   private readonly APROVACAO_DESCONTO_PADRAO = 10;
   private readonly MAX_HISTORICO_EVENTOS = 200;
   private readonly MAX_VERSOES = 50;
@@ -284,7 +287,7 @@ export class PropostasService {
     private readonly oportunidadesService: OportunidadesService,
   ) {
     // Inicializar contador baseado nas propostas existentes
-    this.inicializarContador();
+    this.contadorInitPromise = this.inicializarContador();
   }
 
   private resolveErrorMessage(error: unknown, fallbackMessage: string): string {
@@ -366,8 +369,8 @@ export class PropostasService {
           } AS proposta_principal_id
         FROM propostas p
         LEFT JOIN oportunidades o
-          ON o.id = p.oportunidade_id
-         AND o.empresa_id = p.empresa_id
+          ON o.id::text = p.oportunidade_id::text
+         AND o.empresa_id::text = p.empresa_id::text
         WHERE p.id::text = ANY($1::text[])
         ${empresaFilter}
       `,
@@ -502,8 +505,8 @@ export class PropostasService {
           } AS proposta_principal_id
         FROM propostas p
         LEFT JOIN oportunidades o
-          ON o.id = p.oportunidade_id
-         AND o.empresa_id = p.empresa_id
+          ON o.id::text = p.oportunidade_id::text
+         AND o.empresa_id::text = p.empresa_id::text
         WHERE p.id = $1
         ${empresaFilter}
         LIMIT 1
@@ -995,33 +998,47 @@ export class PropostasService {
 
   private async inicializarContador() {
     try {
-      // Importante: nao usar findOne() aqui.
-      // Em ambientes com schema legado, o entity atual pode conter colunas ainda nao existentes
-      // (ex.: cliente/produtos em JSONB). Entao buscamos apenas o campo `numero`.
       const anoAtual = this.getAnoPropostaAtual();
-      const prefixoAnoAtual = `PROP-${anoAtual}-%`;
-      const ultima = await this.propostaRepository
-        .createQueryBuilder('p')
-        .select('p.numero', 'numero')
-        .where('p.numero LIKE :prefixoAnoAtual', { prefixoAnoAtual })
-        .orderBy('p.numero', 'DESC')
-        .limit(1)
-        .getRawOne<{ numero?: string }>();
+      const regexAnoAtual = `^PROP-${anoAtual}-(\\d+)$`;
+      const rowsRaw = await this.propostaRepository.query(
+        `
+          SELECT COALESCE(MAX((regexp_match(numero, $1))[1]::int), 0) AS max_sequencia
+          FROM propostas
+          WHERE numero ~ $1
+        `,
+        [regexAnoAtual],
+      );
 
-      if (ultima?.numero) {
-        const sequenciaAtual = this.extrairSequenciaNumeroProposta(ultima.numero, anoAtual);
-        if (sequenciaAtual > 0) {
-          this.contadorId = sequenciaAtual + 1;
-          return;
-        }
-      }
-
-      this.contadorId = 1;
+      const rows = this.extractQueryRows<{ max_sequencia?: number | string }>(rowsRaw);
+      const sequenciaAtual = Number(rows?.[0]?.max_sequencia ?? 0);
+      this.contadorId = Number.isFinite(sequenciaAtual) && sequenciaAtual > 0 ? sequenciaAtual + 1 : 1;
+      this.contadorInicializado = true;
     } catch (error) {
+      this.contadorId = 1;
+      this.contadorInicializado = false;
       this.logger.warn(
         `Erro ao inicializar contador de propostas: ${this.resolveErrorMessage(error, 'falha desconhecida')}`,
       );
     }
+  }
+
+  private async ensureContadorInicializado(): Promise<void> {
+    if (this.contadorInicializado) {
+      return;
+    }
+
+    try {
+      await this.contadorInitPromise;
+    } catch {
+      // Recarrega abaixo para manter resiliancia.
+    }
+
+    if (this.contadorInicializado) {
+      return;
+    }
+
+    this.contadorInitPromise = this.inicializarContador();
+    await this.contadorInitPromise;
   }
 
   private async getTableColumns(tableName: string): Promise<Set<string>> {
@@ -1068,6 +1085,62 @@ export class PropostasService {
     }
 
     return [];
+  }
+
+  private async getTableColumnType(
+    tableName: string,
+    columnName: string,
+  ): Promise<string | null> {
+    const cacheKey = `${tableName}.${columnName}`;
+    if (this.tableColumnTypeCache.has(cacheKey)) {
+      return this.tableColumnTypeCache.get(cacheKey) ?? null;
+    }
+
+    const rowsRaw = await this.propostaRepository.query(
+      `
+        SELECT data_type, udt_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = $1
+          AND column_name = $2
+        LIMIT 1
+      `,
+      [tableName, columnName],
+    );
+
+    const rows = this.extractQueryRows<{ data_type?: string; udt_name?: string }>(rowsRaw);
+    const dataType = String(rows?.[0]?.udt_name || rows?.[0]?.data_type || '').trim().toLowerCase();
+    const normalized = dataType.length > 0 ? dataType : null;
+    this.tableColumnTypeCache.set(cacheKey, normalized);
+    return normalized;
+  }
+
+  private async normalizeOportunidadeIdForPersistence(
+    oportunidadeId: string | null,
+  ): Promise<string | null> {
+    if (!oportunidadeId) {
+      return null;
+    }
+
+    const columnType = await this.getTableColumnType('propostas', 'oportunidade_id');
+    if (!columnType) {
+      return oportunidadeId;
+    }
+
+    if (columnType.includes('uuid')) {
+      return isUUID(oportunidadeId) ? oportunidadeId : null;
+    }
+
+    if (
+      columnType.includes('int') ||
+      columnType.includes('numeric') ||
+      columnType.includes('decimal')
+    ) {
+      const trimmed = oportunidadeId.trim();
+      return /^-?\d+$/.test(trimmed) ? trimmed : null;
+    }
+
+    return oportunidadeId;
   }
 
   private isLegacyPropostasSchema(columns: Set<string>): boolean {
@@ -2296,6 +2369,7 @@ export class PropostasService {
    */
   async criarProposta(dadosProposta: Partial<Proposta>, empresaId?: string): Promise<Proposta> {
     try {
+      await this.ensureContadorInicializado();
       const numero = this.gerarNumero();
       this.contadorId++;
       const empresaIdProposta =
@@ -2405,6 +2479,9 @@ export class PropostasService {
       const oportunidadeId = this.normalizeOportunidadeId(
         (dadosProposta as any).oportunidadeId ?? (dadosProposta as any).oportunidade_id,
       );
+      const oportunidadeIdPersistido = propostaColumns.has('oportunidade_id')
+        ? await this.normalizeOportunidadeIdForPersistence(oportunidadeId)
+        : null;
       const observacoesComFluxo = this.mergeLegacyFlowMetadata(undefined, {
         observacoes: dadosProposta.observacoes,
         fluxoStatus,
@@ -2432,7 +2509,7 @@ export class PropostasService {
         if (propostaColumns.has('oportunidade_id')) {
           insertColumns.push('oportunidade_id');
           insertValues.push(
-            oportunidadeId ??
+            oportunidadeIdPersistido ??
               (await this.ensureLegacyOportunidadeId(empresaIdProposta, titulo, valor, vendedorId)),
           );
         }
@@ -2486,7 +2563,7 @@ export class PropostasService {
           rows?.[0],
           {
             cliente: clienteProcessado,
-            oportunidadeId,
+            oportunidadeId: oportunidadeIdPersistido,
             produtos: dadosProposta.produtos || [],
             subtotal: dadosProposta.subtotal || 0,
             descontoGlobal: dadosProposta.descontoGlobal || 0,
@@ -2505,10 +2582,10 @@ export class PropostasService {
           typeof dadosProposta.cliente === 'string' ? dadosProposta.cliente : clienteProcessado?.nome,
         );
 
-        if (oportunidadeId) {
+        if (oportunidadeIdPersistido) {
           const vinculadaComoPrincipal = await this.maybeAssignPropostaPrincipalOnCreate(
             String(propostaCriada.id || ''),
-            oportunidadeId,
+            oportunidadeIdPersistido,
             empresaIdProposta,
             {
               force: (dadosProposta.source || '').toString().trim().toLowerCase() === 'oportunidade',
@@ -2560,7 +2637,7 @@ export class PropostasService {
           ? new Date(dadosProposta.dataVencimento)
           : new Date(dataVencimentoCalculada),
         source: dadosProposta.source || 'api',
-        oportunidade_id: propostaColumns.has('oportunidade_id') ? oportunidadeId : undefined,
+        oportunidade_id: propostaColumns.has('oportunidade_id') ? oportunidadeIdPersistido : undefined,
         vendedor_id: vendedorId,
         emailDetails: emailDetailsIniciais as any,
       });
@@ -2584,10 +2661,10 @@ export class PropostasService {
       const propostaSalva = await this.propostaRepository.save(novaProposta);
       this.logger.log(`Proposta criada no banco: ${propostaSalva.id} - ${propostaSalva.numero}`);
 
-      if (oportunidadeId) {
+      if (oportunidadeIdPersistido) {
         const vinculadaComoPrincipal = await this.maybeAssignPropostaPrincipalOnCreate(
           propostaSalva.id,
-          oportunidadeId,
+          oportunidadeIdPersistido,
           empresaIdProposta,
           {
             force: (dadosProposta.source || '').toString().trim().toLowerCase() === 'oportunidade',

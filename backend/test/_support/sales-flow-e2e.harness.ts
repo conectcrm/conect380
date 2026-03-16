@@ -174,6 +174,7 @@ export class SalesFlowE2EHarness {
   async criarEmpresasEUsuarios() {
     this.empresaAId = await this.criarEmpresa('A');
     this.empresaBId = await this.criarEmpresa('B');
+    await this.marcarEmpresasComoPlatformOwner([this.empresaAId, this.empresaBId]);
 
     const senhaHash = await bcrypt.hash(this.testPassword, 10);
 
@@ -194,6 +195,29 @@ export class SalesFlowE2EHarness {
 
     this.clienteEmpresaAId = await this.criarClienteTeste(this.empresaAId, 'A');
     this.clienteEmpresaBId = await this.criarClienteTeste(this.empresaBId, 'B');
+  }
+
+  private async marcarEmpresasComoPlatformOwner(empresaIds: string[]): Promise<void> {
+    if (!empresaIds.length) {
+      return;
+    }
+
+    const hasConfiguracoesColumn = await this.hasTableColumn('empresas', 'configuracoes');
+    if (!hasConfiguracoesColumn) {
+      return;
+    }
+
+    await this.dataSource.query(
+      `
+        UPDATE empresas
+        SET configuracoes = (
+          COALESCE(configuracoes::jsonb, '{}'::jsonb)
+          || '{"isPlatformOwner": true, "billingExempt": true, "billingMonitorOnly": true, "fullModuleAccess": true}'::jsonb
+        )::json
+        WHERE id = ANY($1::uuid[])
+      `,
+      [empresaIds],
+    );
   }
 
   async criarClienteTeste(empresaId: string, label: 'A' | 'B'): Promise<string> {
@@ -295,12 +319,22 @@ export class SalesFlowE2EHarness {
   }
 
   async criarPropostaViaApi(token: string, titulo: string): Promise<string> {
+    const valorBase = 2500;
     const payload = {
       titulo,
       cliente: `Cliente Portal ${this.runId}`,
-      valor: 2500,
-      total: 2500,
-      produtos: [],
+      valor: valorBase,
+      total: valorBase,
+      produtos: [
+        {
+          id: `item-${this.runId}`,
+          nome: `Servico E2E ${this.runId}`,
+          precoUnitario: valorBase,
+          quantidade: 1,
+          desconto: 0,
+          subtotal: valorBase,
+        },
+      ],
     };
 
     for (let tentativa = 1; tentativa <= 3; tentativa++) {

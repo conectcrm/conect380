@@ -16,6 +16,7 @@ RUN npm ci --legacy-peer-deps
 
 # Copiar código fonte
 COPY src ./src
+COPY scripts/start-prod.js ./scripts/start-prod.js
 COPY ormconfig.js ./
 
 # Build da aplicação
@@ -42,6 +43,7 @@ COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
 
 # Copiar build
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
+COPY --from=builder --chown=nestjs:nodejs /app/scripts/start-prod.js ./scripts/start-prod.js
 COPY --from=builder --chown=nestjs:nodejs /app/package*.json ./
 COPY --from=builder --chown=nestjs:nodejs /app/ormconfig.js ./
 
@@ -63,4 +65,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
 ENTRYPOINT ["dumb-init", "--"]
 
 # Executar aplicação
-CMD ["node", "dist/main.js"]
+CMD ["node", "scripts/start-prod.js"]

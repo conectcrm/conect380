@@ -228,6 +228,21 @@ describe('Multi-Tenancy Isolation (E2E)', () => {
     empresa1Id = empresas[0].id;
     empresa2Id = empresas[1].id;
 
+    // JwtStrategy exige assinatura ativa para tenants comuns.
+    // Nos tenants efêmeros de E2E, marcamos como platform owner para
+    // evitar dependência de catálogo/checkout e focar no isolamento multi-tenant.
+    await dataSource.query(
+      `
+        UPDATE empresas
+        SET configuracoes = (
+          COALESCE(configuracoes::jsonb, '{}'::jsonb)
+          || '{"isPlatformOwner": true, "billingExempt": true, "billingMonitorOnly": true, "fullModuleAccess": true}'::jsonb
+        )::json
+        WHERE id = ANY($1::uuid[])
+      `,
+      [[empresa1Id, empresa2Id]],
+    );
+
     const senhaHash = await bcrypt.hash(TEST_PASSWORD, 10);
     const permissaoOperacionalE2E = ALL_PERMISSIONS.join(',');
     const permissaoColumnRows = await dataSource.query(
@@ -1207,4 +1222,3 @@ describe('Multi-Tenancy Isolation (E2E)', () => {
     });
   });
 });
-
