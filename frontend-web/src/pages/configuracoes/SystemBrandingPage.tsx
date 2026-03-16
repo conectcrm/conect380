@@ -10,7 +10,6 @@ import {
   Upload,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { BackToNucleus } from '../../components/navigation/BackToNucleus';
 import Conect360Logo from '../../components/ui/Conect360Logo';
 import { systemBrandingUrlResolver, useSystemBranding } from '../../contexts/SystemBrandingContext';
 import systemBrandingService, {
@@ -230,12 +229,6 @@ const SystemBrandingPage: React.FC = () => {
 
   return (
     <div className="space-y-4 pt-1 sm:pt-2">
-      <BackToNucleus
-        nucleusName="Administracao"
-        nucleusPath="/dashboard"
-        currentModuleName="Branding Global"
-      />
-
       <section className="rounded-2xl border border-[#D6E3E8] bg-white p-4 shadow-[0_24px_48px_-42px_rgba(6,35,52,0.55)] sm:p-5">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0 flex-1">

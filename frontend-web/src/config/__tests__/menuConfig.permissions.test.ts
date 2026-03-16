@@ -99,7 +99,7 @@ describe('menuConfig permission filtering', () => {
     const ids = collectIds(menu);
     expect(ids).toContain('administracao');
     expect(ids).toContain('admin-sistema');
-    expect(ids).toContain('configuracoes-branding');
+    expect(ids).not.toContain('configuracoes-branding');
   });
 
   it('treats owner legacy role alias as privileged for admin menu', () => {
