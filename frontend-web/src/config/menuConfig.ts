@@ -31,6 +31,7 @@ import {
   Layers,
   ListChecks,
   Tag,
+  Palette,
 } from 'lucide-react';
 import { isMenuItemAllowedInMvp } from './mvpScope';
 import { isOmnichannelEnabled } from './featureFlags';
@@ -349,6 +350,10 @@ const ROLE_ALIASES: Record<string, string> = {
   manager: 'gerente',
   gestor: 'gerente',
   administrador: 'admin',
+  super_admin: 'superadmin',
+  owner: 'superadmin',
+  proprietario: 'superadmin',
+  proprietário: 'superadmin',
   user: 'suporte',
   usuario: 'suporte',
   operacional: 'suporte',
@@ -488,7 +493,10 @@ const hasRequiredPermission = (resolvedPermissions: Set<string>, requiredPermiss
   return resolvedPermissions.has(normalizedRequired);
 };
 
-const isAdminLike = (user?: PermissionAwareUser | null): boolean => {
+const isAdminLike = (
+  user: PermissionAwareUser | null | undefined,
+  resolvedPermissions?: Set<string>,
+): boolean => {
   if (!user) {
     return false;
   }
@@ -501,10 +509,15 @@ const isAdminLike = (user?: PermissionAwareUser | null): boolean => {
 
   const hasPrivilegedRole = roleInputs.some((role) => {
     const normalizedRole = normalizeRole(role);
-    return normalizedRole === 'superadmin' || normalizedRole === 'admin' || normalizedRole === 'gerente';
+    return normalizedRole === 'superadmin' || normalizedRole === 'admin';
   });
 
   if (hasPrivilegedRole) {
+    return true;
+  }
+
+  const permissions = resolvedPermissions ?? resolveUserPermissions(user);
+  if (permissions.has('admin.empresas.manage')) {
     return true;
   }
 
@@ -572,9 +585,11 @@ const filterMenuByPermissions = (
     return items;
   }
 
+  const resolvedPermissions = resolveUserPermissions(user);
+
   const context: PermissionFilterContext = {
-    resolvedPermissions: resolveUserPermissions(user),
-    isAdmin: isAdminLike(user),
+    resolvedPermissions,
+    isAdmin: isAdminLike(user, resolvedPermissions),
   };
 
   return filterMenuByPermissionsInternal(items, context);
@@ -944,6 +959,16 @@ export const menuConfig: MenuConfig[] = [
         group: 'Governan\u00e7a',
       },
       {
+        id: 'configuracoes-branding',
+        title: 'Branding Global',
+        shortTitle: 'Branding',
+        icon: Palette,
+        href: '/configuracoes/sistema',
+        color: 'purple',
+        permissions: ['admin.empresas.manage'],
+        group: 'Governan\u00e7a',
+      },
+      {
         id: 'configuracoes-tickets',
         title: 'Tickets',
         icon: Settings,
@@ -979,6 +1004,47 @@ export const menuConfig: MenuConfig[] = [
             permissions: ['atendimento.filas.manage'],
           },
         ],
+      },
+    ],
+  },
+  {
+    id: 'administracao',
+    title: 'Administra\u00e7\u00e3o',
+    shortTitle: 'Admin',
+    icon: Building2,
+    color: 'blue',
+    adminOnly: true,
+    section: 'Administra\u00e7\u00e3o',
+    children: [
+      {
+        id: 'admin-empresas',
+        title: 'Gest\u00e3o de Empresas',
+        shortTitle: 'Empresas',
+        icon: Users,
+        href: '/empresas/minhas',
+        color: 'blue',
+        permissions: ['admin.empresas.manage'],
+        group: 'Governan\u00e7a',
+      },
+      {
+        id: 'admin-usuarios',
+        title: 'Usu\u00e1rios do Sistema',
+        shortTitle: 'Usu\u00e1rios',
+        icon: UserCog,
+        href: '/configuracoes/usuarios',
+        color: 'blue',
+        permissions: ['users.read'],
+        group: 'Governan\u00e7a',
+      },
+      {
+        id: 'admin-sistema',
+        title: 'Branding Global',
+        shortTitle: 'Branding',
+        icon: Palette,
+        href: '/configuracoes/sistema',
+        color: 'blue',
+        permissions: ['admin.empresas.manage'],
+        group: 'Governan\u00e7a',
       },
     ],
   },

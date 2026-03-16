@@ -27,9 +27,10 @@ import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { Permission } from '../../../common/permissions/permissions.constants';
 import { UserRole } from '../../users/user.entity';
 import { LegacyAdminTransitionGuard } from '../guards/legacy-admin-transition.guard';
+import { PlatformOwnerGuard } from '../../../common/guards/platform-owner.guard';
 
 @Controller('admin/empresas')
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, LegacyAdminTransitionGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, PlatformOwnerGuard, LegacyAdminTransitionGuard)
 @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
 @Permissions(Permission.ADMIN_EMPRESAS_MANAGE)
 export class AdminEmpresasController {

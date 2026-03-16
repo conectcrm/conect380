@@ -10,6 +10,7 @@ import {
   WalletCards,
   LockKeyhole,
   Fingerprint,
+  Palette,
 } from 'lucide-react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useState } from 'react';
@@ -51,6 +52,12 @@ const menuItems = [
     label: 'Sistema',
     description: 'Break-glass, aprovacao e revogacao sensiveis',
     icon: Settings2,
+  },
+  {
+    to: '/governance/branding',
+    label: 'Branding',
+    description: 'Identidade visual global e banner de manutencao',
+    icon: Palette,
   },
 ];
 

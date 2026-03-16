@@ -8,6 +8,7 @@ import { CompaniesGovernancePage } from './pages/CompaniesGovernancePage';
 import { BillingGovernancePage } from './pages/BillingGovernancePage';
 import { AuditGovernancePage } from './pages/AuditGovernancePage';
 import { SystemGovernancePage } from './pages/SystemGovernancePage';
+import { BrandingGovernancePage } from './pages/BrandingGovernancePage';
 
 const App = () => {
   return (
@@ -27,6 +28,7 @@ const App = () => {
         <Route path="governance/billing" element={<BillingGovernancePage />} />
         <Route path="governance/audit" element={<AuditGovernancePage />} />
         <Route path="governance/system" element={<SystemGovernancePage />} />
+        <Route path="governance/branding" element={<BrandingGovernancePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

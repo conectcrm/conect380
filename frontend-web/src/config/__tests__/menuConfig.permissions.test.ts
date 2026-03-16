@@ -89,6 +89,31 @@ describe('menuConfig permission filtering', () => {
     expect(ids).not.toContain('admin-usuarios');
   });
 
+  it('keeps administracao branch for explicit admin manage permission even with custom role', () => {
+    const menu = getMenuParaEmpresa(ALL_MODULES, {
+      email: 'owner@empresa.com',
+      role: 'custom',
+      permissions: ['admin.empresas.manage'],
+    } as any);
+
+    const ids = collectIds(menu);
+    expect(ids).toContain('administracao');
+    expect(ids).toContain('admin-sistema');
+    expect(ids).toContain('configuracoes-branding');
+  });
+
+  it('treats owner legacy role alias as privileged for admin menu', () => {
+    const menu = getMenuParaEmpresa(ALL_MODULES, {
+      email: 'dono@empresa.com',
+      role: 'owner',
+      permissions: ['admin.empresas.manage'],
+    } as any);
+
+    const ids = collectIds(menu);
+    expect(ids).toContain('administracao');
+    expect(ids).toContain('admin-sistema');
+  });
+
   it('keeps compatibility without user context (no permission pruning)', () => {
     const menu = getMenuParaEmpresa(['ATENDIMENTO']);
     const ids = collectIds(menu);

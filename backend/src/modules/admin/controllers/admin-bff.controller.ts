@@ -25,9 +25,17 @@ import { FilterEmpresasAdminDto } from '../dto/filter-empresas-admin.dto';
 import { AdminBffAuditInterceptor } from '../interceptors/admin-bff-audit.interceptor';
 import { AdminBffService } from '../services/admin-bff.service';
 import { LegacyAdminTransitionGuard } from '../guards/legacy-admin-transition.guard';
+import { PlatformOwnerGuard } from '../../../common/guards/platform-owner.guard';
 
 @Controller('admin/bff')
-@UseGuards(JwtAuthGuard, EmpresaGuard, RolesGuard, PermissionsGuard, LegacyAdminTransitionGuard)
+@UseGuards(
+  JwtAuthGuard,
+  EmpresaGuard,
+  RolesGuard,
+  PermissionsGuard,
+  PlatformOwnerGuard,
+  LegacyAdminTransitionGuard,
+)
 @UseInterceptors(AdminBffAuditInterceptor)
 @Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
 @Permissions(Permission.USERS_READ)

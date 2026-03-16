@@ -10,6 +10,9 @@ import { Repository } from 'typeorm';
 import { EmpresaModulo, ModuloEnum, PlanoEnum } from '../entities/empresa-modulo.entity';
 import { CreateEmpresaModuloDto } from '../dto/create-empresa-modulo.dto';
 import { UpdateEmpresaModuloDto } from '../dto/update-empresa-modulo.dto';
+import { TenantBillingPolicyService } from '../../planos/tenant-billing-policy.service';
+
+const ALL_PLATFORM_MODULES = Object.values(ModuloEnum) as ModuloEnum[];
 
 @Injectable()
 export class EmpresaModuloService {
@@ -18,7 +21,24 @@ export class EmpresaModuloService {
   constructor(
     @InjectRepository(EmpresaModulo)
     private readonly empresaModuloRepository: Repository<EmpresaModulo>,
+    private readonly tenantBillingPolicyService: TenantBillingPolicyService,
   ) {}
+
+  private async tenantHasFullModuleAccess(empresaId: string): Promise<boolean> {
+    if (!empresaId) {
+      return false;
+    }
+
+    try {
+      const policy = await this.tenantBillingPolicyService.resolveForEmpresa(empresaId);
+      return Boolean(policy.fullModuleAccess);
+    } catch (error) {
+      this.logger.warn(
+        `Nao foi possivel resolver politica de modulos para empresa ${empresaId}: ${(error as Error).message}`,
+      );
+      return false;
+    }
+  }
 
   private normalizeModuloCode(value: string): string {
     return String(value || '')
@@ -131,6 +151,11 @@ export class EmpresaModuloService {
    */
   async isModuloAtivo(empresa_id: string, modulo: ModuloEnum): Promise<boolean> {
     try {
+      const hasFullModuleAccess = await this.tenantHasFullModuleAccess(empresa_id);
+      if (hasFullModuleAccess) {
+        return true;
+      }
+
       const registro = await this.empresaModuloRepository.findOne({
         where: { empresaId: empresa_id, modulo, ativo: true },
       });
@@ -159,19 +184,20 @@ export class EmpresaModuloService {
    */
   async listarModulosAtivos(empresa_id: string): Promise<ModuloEnum[]> {
     try {
+      const hasFullModuleAccess = await this.tenantHasFullModuleAccess(empresa_id);
+      if (hasFullModuleAccess) {
+        return [...ALL_PLATFORM_MODULES];
+      }
+
       const modulos = await this.empresaModuloRepository.find({
         where: { empresaId: empresa_id, ativo: true },
-        select: ['modulo'],
+        select: ['id', 'modulo', 'data_expiracao'],
       });
 
       // Filtrar expirados
       const modulosValidos: ModuloEnum[] = [];
-      for (const m of modulos) {
-        const registro = await this.empresaModuloRepository.findOne({
-          where: { empresaId: empresa_id, modulo: m.modulo },
-        });
-
-        if (registro && registro.data_expiracao) {
+      for (const registro of modulos) {
+        if (registro.data_expiracao) {
           const agora = new Date();
           if (agora > registro.data_expiracao) {
             await this.empresaModuloRepository.update(registro.id, { ativo: false });
@@ -179,7 +205,7 @@ export class EmpresaModuloService {
           }
         }
 
-        modulosValidos.push(m.modulo);
+        modulosValidos.push(registro.modulo);
       }
 
       return modulosValidos;

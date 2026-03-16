@@ -1,5 +1,5 @@
 ﻿import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import React, { Suspense, useEffect } from 'react';
+import React, { Suspense } from 'react';
 import { Toaster } from 'react-hot-toast';
 import {
   Navigate,
@@ -7,7 +7,6 @@ import {
   BrowserRouter as Router,
   Routes,
   useLocation,
-  useParams,
 } from 'react-router-dom';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import PermissionPathGuard from './components/licensing/PermissionPathGuard';
@@ -41,7 +40,6 @@ import GlobalModalScrollLock from './components/common/GlobalModalScrollLock';
 import { useAuth } from './hooks/useAuth';
 import { getMvpBlockedRouteInfo } from './config/mvpScope';
 import { isOmnichannelEnabled } from './config/featureFlags';
-import { buildGuardianUrl } from './utils/guardianPortal';
 // Demandas agora sao Tickets - imports removidos (apenas redirects mantidos)
 // Sprint 2 - Fase 3e: Admin Console Tickets Configuráveis
 // (code splitting) imports estáticos removidos
@@ -177,83 +175,10 @@ const MetasConfiguracao = React.lazy(() => import('./pages/configuracoes/MetasCo
 const ConfiguracaoEmpresaPage = React.lazy(
   () => import('./pages/empresas/ConfiguracaoEmpresaPage'),
 );
-
-type GuardianLegacyRedirectProps = {
-  path: string;
-  query?: Record<string, string | undefined>;
-};
-
-const GuardianLegacyRedirect: React.FC<GuardianLegacyRedirectProps> = ({ path, query }) => {
-  const targetUrl = buildGuardianUrl(path, query);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.location.replace(targetUrl);
-    }
-  }, [targetUrl]);
-
-  return (
-    <div className="min-h-[200px] w-full rounded-xl border border-[#D8E4E8] bg-white p-6 text-sm text-[#456270]">
-      Redirecionando para o painel Guardian...
-    </div>
-  );
-};
-
-const LegacyEmpresasMinhasRedirect: React.FC = () => {
-  return <GuardianLegacyRedirect path="/governance/companies" />;
-};
-
-const LegacyAdminEmpresasRedirect: React.FC = () => {
-  return <GuardianLegacyRedirect path="/governance/companies" />;
-};
-
-const LegacyAdminEmpresaDetailRedirect: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
-  return (
-    <GuardianLegacyRedirect
-      path="/governance/companies"
-      query={id ? { empresaId: id } : undefined}
-    />
-  );
-};
-
-const LegacyAdminUsersRedirect: React.FC = () => {
-  return <GuardianLegacyRedirect path="/governance/users" />;
-};
-
-const LegacyAdminSystemRedirect: React.FC = () => {
-  return <GuardianLegacyRedirect path="/governance/system" />;
-};
-
-const LegacyEmpresaConfiguracaoRedirect: React.FC = () => {
-  const { empresaId } = useParams<{ empresaId: string }>();
-  return (
-    <GuardianLegacyRedirect
-      path="/governance/companies"
-      query={empresaId ? { empresaId } : undefined}
-    />
-  );
-};
-
-const LegacyEmpresaPermissoesRedirect: React.FC = () => {
-  const { empresaId } = useParams<{ empresaId: string }>();
-  return (
-    <GuardianLegacyRedirect
-      path="/governance/users"
-      query={empresaId ? { empresaId } : undefined}
-    />
-  );
-};
-
-const EmpresaBackupLegacyRedirect: React.FC = () => {
-  const { empresaId } = useParams<{ empresaId: string }>();
-  return (
-    <GuardianLegacyRedirect
-      path="/governance/system"
-      query={empresaId ? { empresaId } : undefined}
-    />
-  );
-};
+const MinhasEmpresasPage = React.lazy(() =>
+  import('./features/empresas/MinhasEmpresasPage').then((m) => ({ default: m.MinhasEmpresasPage })),
+);
+const SystemBrandingPage = React.lazy(() => import('./pages/configuracoes/SystemBrandingPage'));
 
 // Componente principal de rotas
 const AppRoutes: React.FC = () => {
@@ -421,22 +346,22 @@ const AppRoutes: React.FC = () => {
                     element={protegerRota(ModuloEnum.ATENDIMENTO, <FluxoBuilderPage />)}
                   />
                   {/* Gerenciamento de Empresas do Usuário */}
-                  <Route path="/empresas/minhas" element={<LegacyEmpresasMinhasRedirect />} />
+                  <Route path="/empresas/minhas" element={<MinhasEmpresasPage />} />
                   <Route
                     path="/empresas/:empresaId/configuracoes"
-                    element={<LegacyEmpresaConfiguracaoRedirect />}
+                    element={<Navigate to="/configuracoes/empresa" replace />}
                   />
                   <Route
                     path="/empresas/:empresaId/relatorios"
-                    element={<LegacyEmpresaConfiguracaoRedirect />}
+                    element={<Navigate to="/dashboard" replace />}
                   />
                   <Route
                     path="/empresas/:empresaId/permissoes"
-                    element={<LegacyEmpresaPermissoesRedirect />}
+                    element={<Navigate to="/configuracoes/usuarios" replace />}
                   />
                   <Route
                     path="/empresas/:empresaId/backup"
-                    element={<EmpresaBackupLegacyRedirect />}
+                    element={<Navigate to="/configuracoes/empresa?tab=backup" replace />}
                   />
                   {/* Configurações globais da empresa ativa - Padrão consolidado */}
                   <Route path="/configuracoes/usuarios" element={<GestaoUsuariosPage />} />
@@ -450,7 +375,7 @@ const AppRoutes: React.FC = () => {
                   <Route path="/configuracoes/departamentos" element={<DepartamentosPage />} />
                   <Route
                     path="/configuracoes/sistema"
-                    element={<Navigate to="/configuracoes/empresa" replace />}
+                    element={<SystemBrandingPage />}
                   />
                   <Route
                     path="/configuracoes/seguranca"
@@ -540,6 +465,10 @@ const AppRoutes: React.FC = () => {
                     path="/gestao/empresas"
                     element={<Navigate to="/empresas/minhas" replace />}
                   />{' '}
+                  <Route path="/admin/empresas" element={<MinhasEmpresasPage />} />
+                  <Route path="/admin/empresas/:id" element={<Navigate to="/empresas/minhas" replace />} />
+                  <Route path="/admin/usuarios" element={<GestaoUsuariosPage />} />
+                  <Route path="/admin/sistema" element={<SystemBrandingPage />} />
                   {/* Redirect legado para rota operacional */}
                   <Route
                     path="/nuclei/configuracoes/empresas"
@@ -592,7 +521,7 @@ const AppRoutes: React.FC = () => {
                   />
                   <Route
                     path="/sistema/backup"
-                    element={<GuardianLegacyRedirect path="/governance/system" />}
+                    element={<Navigate to="/configuracoes/empresa?tab=backup" replace />}
                   />
                   {/* Atendimento Omnichannel - Protegido */}
                   <Route

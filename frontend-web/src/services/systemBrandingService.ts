@@ -1,4 +1,4 @@
-import { apiPublic } from './api';
+import { api, apiPublic } from './api';
 
 export type SystemMaintenanceSeverity = 'info' | 'warning' | 'critical';
 
@@ -57,6 +57,20 @@ export const DEFAULT_SYSTEM_BRANDING: SystemBrandingEffectiveConfig = {
   },
 };
 
+const EMPTY_ADMIN_BRANDING_DATA: SystemBrandingAdminData = {
+  logoFullUrl: null,
+  logoFullLightUrl: null,
+  logoIconUrl: null,
+  loadingLogoUrl: null,
+  faviconUrl: null,
+  maintenanceEnabled: false,
+  maintenanceTitle: null,
+  maintenanceMessage: null,
+  maintenanceStartsAt: null,
+  maintenanceExpectedEndAt: null,
+  maintenanceSeverity: 'warning',
+};
+
 const normalizeBranding = (
   payload: Partial<SystemBrandingEffectiveConfig> | null | undefined,
 ): SystemBrandingEffectiveConfig => {
@@ -76,10 +90,73 @@ const normalizeBranding = (
   };
 };
 
+const isAdminBrandingResponse = (payload: unknown): payload is SystemBrandingAdminResponse => {
+  if (!payload || typeof payload !== 'object') {
+    return false;
+  }
+
+  const candidate = payload as Partial<SystemBrandingAdminResponse>;
+  return Boolean(candidate.data) && Boolean(candidate.effective) && Boolean(candidate.defaults);
+};
+
+const normalizeAdminBrandingResponse = (
+  payload: SystemBrandingAdminResponse | { data?: SystemBrandingAdminResponse } | null | undefined,
+): SystemBrandingAdminResponse => {
+  const raw = isAdminBrandingResponse(payload)
+    ? payload
+    : isAdminBrandingResponse((payload as { data?: unknown } | null | undefined)?.data)
+      ? ((payload as { data?: SystemBrandingAdminResponse }).data as SystemBrandingAdminResponse)
+      : null;
+
+  if (!raw) {
+    return {
+      data: { ...EMPTY_ADMIN_BRANDING_DATA },
+      effective: normalizeBranding(DEFAULT_SYSTEM_BRANDING),
+      defaults: normalizeBranding(DEFAULT_SYSTEM_BRANDING),
+      updatedAt: null,
+    };
+  }
+
+  return {
+    data: {
+      ...EMPTY_ADMIN_BRANDING_DATA,
+      ...raw.data,
+      maintenanceEnabled:
+        typeof raw.data?.maintenanceEnabled === 'boolean'
+          ? raw.data.maintenanceEnabled
+          : EMPTY_ADMIN_BRANDING_DATA.maintenanceEnabled,
+      maintenanceSeverity:
+        raw.data?.maintenanceSeverity || EMPTY_ADMIN_BRANDING_DATA.maintenanceSeverity,
+    },
+    effective: normalizeBranding(raw.effective),
+    defaults: normalizeBranding(raw.defaults),
+    updatedAt: raw.updatedAt ?? null,
+  };
+};
+
 export const systemBrandingService = {
   async getPublicBranding(): Promise<SystemBrandingEffectiveConfig> {
     const response = await apiPublic.get<SystemBrandingEffectiveConfig>('/system-branding/public');
     return normalizeBranding(response.data);
+  },
+
+  async getAdminBranding(): Promise<SystemBrandingAdminResponse> {
+    const response = await api.get<SystemBrandingAdminResponse | { data?: SystemBrandingAdminResponse }>(
+      '/admin/system-branding',
+    );
+
+    return normalizeAdminBrandingResponse(response.data);
+  },
+
+  async updateBranding(
+    payload: Partial<SystemBrandingAdminData>,
+  ): Promise<SystemBrandingAdminResponse> {
+    const response = await api.put<SystemBrandingAdminResponse | { data?: SystemBrandingAdminResponse }>(
+      '/admin/system-branding',
+      payload,
+    );
+
+    return normalizeAdminBrandingResponse(response.data);
   },
 
   normalizeBranding,

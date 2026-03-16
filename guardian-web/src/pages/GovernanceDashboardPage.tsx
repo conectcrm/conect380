@@ -2,6 +2,7 @@ import {
   ArrowRight,
   Building2,
   ClipboardList,
+  Palette,
   Settings2,
   ShieldCheck,
   Users,
@@ -55,6 +56,12 @@ const quickActions = [
     label: 'Sistema',
     description: 'Aprovar, auditar e revogar break-glass do ecossistema.',
     icon: Settings2,
+  },
+  {
+    to: '/governance/branding',
+    label: 'Branding',
+    description: 'Gerenciar logos globais, favicon e banner de manutencao.',
+    icon: Palette,
   },
 ];
 

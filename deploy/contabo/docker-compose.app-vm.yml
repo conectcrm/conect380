@@ -52,6 +52,7 @@ services:
         REACT_APP_API_URL: ${REACT_APP_API_URL}
         REACT_APP_WS_URL: ${REACT_APP_WS_URL}
         REACT_APP_WEBSOCKET_URL: ${REACT_APP_WEBSOCKET_URL:-}
+        REACT_APP_GUARDIAN_WEB_URL: ${REACT_APP_GUARDIAN_WEB_URL:-https://guardian.conect360.com}
     container_name: conect360-frontend
     restart: unless-stopped
     ports:
@@ -61,6 +62,25 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - conect360-network
+
+  guardian-web:
+    build:
+      context: ../..
+      dockerfile: guardian-web/Dockerfile
+      args:
+        VITE_GUARDIAN_API_URL: ${VITE_GUARDIAN_API_URL:-https://api.conect360.com}
+    container_name: conect360-guardian-web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3020:80"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/"]
       interval: 30s
       timeout: 5s
       retries: 5

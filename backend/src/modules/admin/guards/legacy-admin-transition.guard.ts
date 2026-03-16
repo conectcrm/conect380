@@ -20,7 +20,7 @@ export class LegacyAdminTransitionGuard implements CanActivate {
   constructor() {
     this.mode = this.parseMode(process.env.GUARDIAN_LEGACY_TRANSITION_MODE);
     this.canaryPercent = this.parseCanaryPercent(process.env.GUARDIAN_LEGACY_CANARY_PERCENT);
-    this.legacyReadOnly = this.parseBooleanFlag(process.env.GUARDIAN_LEGACY_READ_ONLY, true);
+    this.legacyReadOnly = this.parseBooleanFlag(process.env.GUARDIAN_LEGACY_READ_ONLY, false);
   }
 
   canActivate(context: ExecutionContext): boolean {
@@ -176,7 +176,7 @@ export class LegacyAdminTransitionGuard implements CanActivate {
   }
 
   private parseMode(modeValue: string | undefined): LegacyTransitionMode {
-    const normalized = (modeValue || 'guardian_only').trim().toLowerCase();
+    const normalized = (modeValue || 'legacy').trim().toLowerCase();
     if (
       normalized === 'legacy' ||
       normalized === 'dual' ||
@@ -186,7 +186,7 @@ export class LegacyAdminTransitionGuard implements CanActivate {
       return normalized;
     }
 
-    return 'guardian_only';
+    return 'legacy';
   }
 
   private parseCanaryPercent(rawValue: string | undefined): number {
