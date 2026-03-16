@@ -93,25 +93,24 @@ Domain mapping:
    curl -I http://127.0.0.1:3020
    ```
 
-## 3) Nginx on App VM
+## 3) Nginx on App VM and API VM
 
-1. Install host config:
+1. App VM (`conect360.com`, `www.conect360.com`, `guardian.conect360.com`):
    ```bash
-   sudo cp deploy/contabo/nginx.app-api.conf /etc/nginx/sites-available/conect360
-   sudo ln -s /etc/nginx/sites-available/conect360 /etc/nginx/sites-enabled/conect360
+   sudo cp deploy/contabo/nginx.app-only.conf /etc/nginx/sites-available/conect360-app
+   sudo ln -s /etc/nginx/sites-available/conect360-app /etc/nginx/sites-enabled/conect360-app
    sudo nginx -t
    sudo systemctl reload nginx
+   sudo certbot --nginx -d conect360.com -d www.conect360.com -d guardian.conect360.com
    ```
 
-2. Replace domains in `nginx.app-api.conf` before copying:
-   - `app.seudominio.com`
-   - `www.app.seudominio.com`
-   - `api.seudominio.com`
-   - `guardian.seudominio.com`
-
-3. Issue TLS certs:
+2. API VM (`api.conect360.com`):
    ```bash
-   sudo certbot --nginx -d app.seudominio.com -d www.app.seudominio.com -d api.seudominio.com -d guardian.seudominio.com
+   sudo cp deploy/contabo/nginx.api-only.conf /etc/nginx/sites-available/conect360-api
+   sudo ln -s /etc/nginx/sites-available/conect360-api /etc/nginx/sites-enabled/conect360-api
+   sudo nginx -t
+   sudo systemctl reload nginx
+   sudo certbot --nginx -d api.conect360.com
    ```
 
 ## 4) Firewall on App VM
