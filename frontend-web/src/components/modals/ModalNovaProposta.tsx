@@ -902,8 +902,9 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
     });
 
   const selecionarConteudoNumericoAoFocar = (event: React.FocusEvent<HTMLInputElement>) => {
+    const input = event.currentTarget;
     window.requestAnimationFrame(() => {
-      event.currentTarget.select();
+      input?.select();
     });
   };
 

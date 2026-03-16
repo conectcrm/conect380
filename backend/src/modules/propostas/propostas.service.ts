@@ -268,6 +268,7 @@ export class PropostasService {
   private contadorInitPromise: Promise<void>;
   private tableColumnsCache = new Map<string, Set<string>>();
   private tableColumnTypeCache = new Map<string, string | null>();
+  private tableColumnNullableCache = new Map<string, boolean | null>();
   private readonly APROVACAO_DESCONTO_PADRAO = 10;
   private readonly MAX_HISTORICO_EVENTOS = 200;
   private readonly MAX_VERSOES = 50;
@@ -1141,6 +1142,39 @@ export class PropostasService {
     }
 
     return oportunidadeId;
+  }
+
+  private async isTableColumnNullable(
+    tableName: string,
+    columnName: string,
+  ): Promise<boolean | null> {
+    const cacheKey = `${tableName}.${columnName}`;
+    if (this.tableColumnNullableCache.has(cacheKey)) {
+      return this.tableColumnNullableCache.get(cacheKey) ?? null;
+    }
+
+    const rowsRaw = await this.propostaRepository.query(
+      `
+        SELECT is_nullable
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = $1
+          AND column_name = $2
+        LIMIT 1
+      `,
+      [tableName, columnName],
+    );
+
+    const rows = this.extractQueryRows<{ is_nullable?: string }>(rowsRaw);
+    const rawValue = String(rows?.[0]?.is_nullable || '')
+      .trim()
+      .toUpperCase();
+
+    const nullable =
+      rawValue === 'YES' ? true : rawValue === 'NO' ? false : null;
+
+    this.tableColumnNullableCache.set(cacheKey, nullable);
+    return nullable;
   }
 
   private isLegacyPropostasSchema(columns: Set<string>): boolean {
@@ -2479,9 +2513,36 @@ export class PropostasService {
       const oportunidadeId = this.normalizeOportunidadeId(
         (dadosProposta as any).oportunidadeId ?? (dadosProposta as any).oportunidade_id,
       );
-      const oportunidadeIdPersistido = propostaColumns.has('oportunidade_id')
+      let oportunidadeIdPersistido = propostaColumns.has('oportunidade_id')
         ? await this.normalizeOportunidadeIdForPersistence(oportunidadeId)
         : null;
+
+      if (
+        propostaColumns.has('oportunidade_id') &&
+        !oportunidadeIdPersistido &&
+        empresaIdProposta
+      ) {
+        const oportunidadeNullable = await this.isTableColumnNullable(
+          'propostas',
+          'oportunidade_id',
+        );
+
+        if (oportunidadeNullable === false) {
+          const tituloFallback = dadosProposta.titulo || `Proposta ${numero}`;
+          const valorFallback = Number(dadosProposta.valor || dadosProposta.total || 0);
+
+          oportunidadeIdPersistido = await this.ensureLegacyOportunidadeId(
+            empresaIdProposta,
+            tituloFallback,
+            valorFallback,
+            vendedorId,
+          );
+
+          this.logger.warn(
+            `oportunidade_id obrigatoria detectada no schema. Oportunidade fallback criada automaticamente para proposta ${numero}.`,
+          );
+        }
+      }
       const observacoesComFluxo = this.mergeLegacyFlowMetadata(undefined, {
         observacoes: dadosProposta.observacoes,
         fluxoStatus,
