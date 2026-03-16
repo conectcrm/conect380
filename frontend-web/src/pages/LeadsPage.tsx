@@ -1126,7 +1126,7 @@ const LeadsPage: React.FC = () => {
         )}
       </SectionCard>
 
-      <div className="mx-auto max-w-[1760px] space-y-6">
+      <div className="w-full space-y-6">
         <FiltersBar className="p-4">
           <div className="flex w-full flex-col gap-4">
             <div className="flex w-full flex-col gap-3 xl:flex-row xl:items-end">
@@ -1464,10 +1464,10 @@ const LeadsPage: React.FC = () => {
 
         {/* Grid de Cards */}
         <div
-          className={`grid grid-cols-1 gap-3 ${
+          className={`grid gap-3 ${
             isDetailedCardView
-              ? 'md:grid-cols-2 xl:grid-cols-2'
-              : 'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
+              ? 'grid-cols-[repeat(auto-fill,minmax(340px,1fr))]'
+              : 'grid-cols-[repeat(auto-fill,minmax(280px,1fr))]'
           }`}
         >
           {leadsFiltrados.map((lead) => (
