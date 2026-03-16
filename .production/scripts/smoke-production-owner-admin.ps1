@@ -280,7 +280,15 @@ if (-not $SkipAuthChecks) {
     }
 
     $response = Invoke-JsonRequest -Method "GET" -Url "$normalizedApiBase/admin/system-branding" -Headers $headers -ExpectedStatusCodes @(200)
-    if ($null -eq $response.Body -or $response.Body.success -ne $true) {
+    if ($null -eq $response.Body) {
+      throw "Resposta vazia em admin/system-branding"
+    }
+
+    $propertyNames = @($response.Body.PSObject.Properties.Name)
+    $hasSuccess = ($propertyNames -contains "success") -and ($response.Body.success -eq $true)
+    $hasData = ($propertyNames -contains "data") -and ($null -ne $response.Body.data)
+
+    if (-not ($hasSuccess -or $hasData)) {
       throw "Resposta invalida em admin/system-branding"
     }
   }
