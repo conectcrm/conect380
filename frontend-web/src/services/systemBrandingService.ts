@@ -41,6 +41,13 @@ export interface SystemBrandingAdminResponse {
   updatedAt: string | null;
 }
 
+export type BrandingAssetKind =
+  | 'logo-full'
+  | 'logo-full-light'
+  | 'logo-icon'
+  | 'loading-logo'
+  | 'favicon';
+
 export const DEFAULT_SYSTEM_BRANDING: SystemBrandingEffectiveConfig = {
   logoFullUrl: '',
   logoFullLightUrl: '',
@@ -157,6 +164,23 @@ export const systemBrandingService = {
     );
 
     return normalizeAdminBrandingResponse(response.data);
+  },
+
+  async uploadBrandingAsset(
+    kind: BrandingAssetKind,
+    file: File,
+  ): Promise<SystemBrandingAdminResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await api.post(`/admin/system-branding/assets/${kind}`, formData);
+    const payload =
+      (response.data as any)?.data?.branding ??
+      (response.data as any)?.branding ??
+      (response.data as any)?.data ??
+      response.data;
+
+    return normalizeAdminBrandingResponse(payload);
   },
 
   normalizeBranding,

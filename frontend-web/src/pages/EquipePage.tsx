@@ -111,11 +111,11 @@ const EquipePage: React.FC = () => {
         )}
 
         {activeTab === 'filas' && (
-          <GestaoFilasPage />
+          <GestaoFilasPage hideBackButton={true} />
         )}
 
         {activeTab === 'skills' && (
-          <GestaoSkillsPage />
+          <GestaoSkillsPage hideBackButton={true} />
         )}
       </div>
     </div>

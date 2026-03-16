@@ -360,6 +360,10 @@ const AppRoutes: React.FC = () => {
                     element={<Navigate to="/configuracoes/usuarios" replace />}
                   />
                   <Route
+                    path="/empresas/:empresaId/usuarios"
+                    element={<Navigate to="/configuracoes/usuarios" replace />}
+                  />
+                  <Route
                     path="/empresas/:empresaId/backup"
                     element={<Navigate to="/configuracoes/empresa?tab=backup" replace />}
                   />

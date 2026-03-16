@@ -19,7 +19,7 @@ import {
   Key,
   Shield,
 } from 'lucide-react';
-import { BackToNucleus } from '../../components/navigation/BackToNucleus';
+import { SectionCard } from '../../components/layout-v2';
 
 interface IntegracaoConfig {
   id: string;
@@ -372,7 +372,7 @@ const IntegracoesPage: React.FC = () => {
 
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch('/api/atendimento/canais/testar-mensagem', {
+      const response = await fetch('/api/atendimento/canais/validar-mensagem', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -479,30 +479,24 @@ const IntegracoesPage: React.FC = () => {
 
   if (loading && !whatsappConfig.api_token) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b px-6 py-4">
-          <BackToNucleus nucleusName="Configurações" nucleusPath="/nuclei/configuracoes" />
-        </div>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="w-8 h-8 animate-spin text-[#159A9C]" />
-          <span className="ml-2 text-gray-600">Carregando configurações...</span>
+      <div className="space-y-4 pt-1 sm:pt-2">
+        <div className="px-2 sm:px-0">
+          <SectionCard className="flex h-64 items-center justify-center">
+            <Loader2 className="w-8 h-8 animate-spin text-[#159A9C]" />
+            <span className="ml-2 text-gray-600">Carregando configurações...</span>
+          </SectionCard>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header com BackToNucleus */}
-      <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus nucleusName="Configurações" nucleusPath="/nuclei/configuracoes" />
-      </div>
-
+    <div className="space-y-4 pt-1 sm:pt-2">
       {/* Conteúdo */}
-      <div className="p-6">
+      <div className="px-2 sm:px-0">
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Header da Página */}
-          <div className="bg-white rounded-lg shadow-sm border">
+          <SectionCard>
             <div className="px-6 py-6">
               <div className="flex flex-col sm:flex-row justify-between items-start">
                 <div>
@@ -525,10 +519,10 @@ const IntegracoesPage: React.FC = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </SectionCard>
 
           {/* WhatsApp Business API */}
-          <div className="bg-white rounded-lg shadow-sm border">
+          <SectionCard>
             <div className="px-6 py-6">
               <div className="flex items-center gap-3 mb-4">
                 <MessageSquare className="w-6 h-6 text-green-500" />
@@ -797,10 +791,10 @@ const IntegracoesPage: React.FC = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </SectionCard>
 
           {/* OpenAI */}
-          <div className="bg-white rounded-lg shadow-sm border">
+          <SectionCard>
             <div className="px-6 py-6">
               <div className="flex items-center gap-3 mb-4">
                 <Bot className="w-6 h-6 text-blue-500" />
@@ -951,10 +945,10 @@ const IntegracoesPage: React.FC = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </SectionCard>
 
           {/* Anthropic Claude */}
-          <div className="bg-white rounded-lg shadow-sm border">
+          <SectionCard>
             <div className="px-6 py-6">
               <div className="flex items-center gap-3 mb-4">
                 <Bot className="w-6 h-6 text-purple-500" />
@@ -1087,10 +1081,10 @@ const IntegracoesPage: React.FC = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </SectionCard>
 
           {/* Telegram Bot */}
-          <div className="bg-white rounded-lg shadow-sm border">
+          <SectionCard>
             <div className="px-6 py-6">
               <div className="flex items-center gap-3 mb-4">
                 <Send className="w-6 h-6 text-cyan-500" />
@@ -1165,10 +1159,10 @@ const IntegracoesPage: React.FC = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </SectionCard>
 
           {/* Twilio (SMS + WhatsApp) */}
-          <div className="bg-white rounded-lg shadow-sm border">
+          <SectionCard>
             <div className="px-6 py-6">
               <div className="flex items-center gap-3 mb-4">
                 <MessageSquare className="w-6 h-6 text-red-500" />
@@ -1276,7 +1270,7 @@ const IntegracoesPage: React.FC = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </SectionCard>
 
           {/* Aviso de Segurança */}
           <div className="bg-amber-50 border border-amber-200 rounded-lg shadow-sm">

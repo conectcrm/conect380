@@ -27,6 +27,7 @@ import {
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
 import { useGlobalConfirmation } from '../../../contexts/GlobalConfirmationContext';
 import { toastService } from '../../../services/toastService';
+import { SectionCard } from '../../../components/layout-v2';
 
 // Tipos locais
 interface DashboardCards {
@@ -192,16 +193,18 @@ function DepartamentosPage() {
   const mostrarAcoesMassa = departamentosSelecionados.length > 0;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="space-y-4 pt-1 sm:pt-2">
       {/* Header */}
-      <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus nucleusName="Configurações" nucleusPath="/nuclei/configuracoes" />
+      <div className="px-2 sm:px-0">
+        <SectionCard className="px-4 py-3">
+          <BackToNucleus nucleusName="Configurações" nucleusPath="/nuclei/configuracoes" />
+        </SectionCard>
       </div>
 
-      <div className="p-6">
+      <div className="px-2 sm:px-0">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
-          <div className="bg-white rounded-lg shadow-sm border mb-6">
+          <SectionCard className="mb-6">
             <div className="px-6 py-6">
               <div className="flex flex-col sm:flex-row justify-between items-start">
                 <div>
@@ -229,7 +232,7 @@ function DepartamentosPage() {
                 </div>
               </div>
             </div>
-          </div>
+          </SectionCard>
 
           {/* Dashboard Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
@@ -303,7 +306,7 @@ function DepartamentosPage() {
           </div>
 
           {/* Filtros e Busca */}
-          <div className="bg-white rounded-lg shadow-sm border mb-6 p-6">
+          <SectionCard className="mb-6 p-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {/* Busca */}
               <div className="md:col-span-2">
@@ -383,10 +386,10 @@ function DepartamentosPage() {
                 </div>
               </div>
             )}
-          </div>
+          </SectionCard>
 
           {/* Lista de Departamentos */}
-          <div className="bg-white rounded-lg shadow-sm border">
+          <SectionCard>
             {carregando ? (
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#159A9C]"></div>
@@ -542,7 +545,7 @@ function DepartamentosPage() {
                 ))}
               </div>
             )}
-          </div>
+          </SectionCard>
         </div>
       </div>
 

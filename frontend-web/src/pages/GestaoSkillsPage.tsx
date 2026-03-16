@@ -24,8 +24,13 @@ import {
   CreateAtendenteSkillDto,
 } from '../services/distribuicaoAvancadaService';
 import { useGlobalConfirmation } from '../contexts/GlobalConfirmationContext';
+import { FiltersBar, InlineStats, PageHeader, SectionCard } from '../components/layout-v2';
 
-const GestaoSkillsPage: React.FC = () => {
+interface GestaoSkillsPageProps {
+  hideBackButton?: boolean;
+}
+
+const GestaoSkillsPage: React.FC<GestaoSkillsPageProps> = ({ hideBackButton = false }) => {
   const { confirm } = useGlobalConfirmation();
   // Estados
   const [skills, setSkills] = useState<AtendenteSkill[]>([]);
@@ -190,38 +195,60 @@ const GestaoSkillsPage: React.FC = () => {
     {} as Record<string, { atendente: any; skills: AtendenteSkill[] }>,
   );
 
+  const totalSkills = skills.length;
+  const totalAtendentesComSkill = Object.keys(skillsPorAtendente).length;
+  const totalSkillsAtivas = skills.filter((skill) => skill.ativo).length;
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="space-y-4 pt-1 sm:pt-2">
       {/* Header com BackToNucleus */}
-      <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus nucleusName="Atendimento" nucleusPath="/atendimento" />
-      </div>
+      {!hideBackButton && (
+        <div className="px-2 sm:px-0">
+          <SectionCard className="px-4 py-3">
+            <BackToNucleus nucleusName="Atendimento" nucleusPath="/atendimento" />
+          </SectionCard>
+        </div>
+      )}
 
       {/* Container principal */}
-      <div className="p-6">
+      <div className="px-2 sm:px-0">
         <div className="max-w-7xl mx-auto">
           {/* Header da página */}
-          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-[#002333] flex items-center gap-3">
-                  <Award className="h-8 w-8 text-[#159A9C]" />
-                  Gestão de Skills
-                </h1>
-                <p className="text-[#002333]/70 mt-2">
-                  Gerenciar habilidades e competências dos atendentes
-                </p>
-              </div>
-              <button
-                onClick={handleNovo}
-                disabled={loading}
-                className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm font-medium"
-              >
-                <Plus className="h-4 w-4" />
-                Nova Skill
-              </button>
-            </div>
-          </div>
+          <SectionCard className="mb-6 space-y-4 p-4 sm:p-5">
+            <PageHeader
+              title={
+                <span className="inline-flex items-center gap-2">
+                  <Award className="h-5 w-5 text-[#159A9C]" />
+                  <span>Gestão de Skills</span>
+                </span>
+              }
+              description="Gerencie habilidades e competências dos atendentes."
+              actions={
+                <button
+                  onClick={handleNovo}
+                  disabled={loading}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Plus className="h-4 w-4" />
+                  Nova Skill
+                </button>
+              }
+            />
+            {!loading && (
+              <InlineStats
+                compact
+                stats={[
+                  { label: 'Total de skills', value: String(totalSkills), tone: 'neutral' },
+                  { label: 'Skills ativas', value: String(totalSkillsAtivas), tone: 'accent' },
+                  {
+                    label: 'Atendentes com skills',
+                    value: String(totalAtendentesComSkill),
+                    tone: 'warning',
+                  },
+                ]}
+              />
+            )}
+          </SectionCard>
 
           {/* Mensagem de erro */}
           {error && (
@@ -238,28 +265,31 @@ const GestaoSkillsPage: React.FC = () => {
           )}
 
           {/* Barra de busca e ações */}
-          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-[#B4BEC9]" />
-                <input
-                  type="text"
-                  placeholder="Buscar por skill ou atendente..."
-                  value={busca}
-                  onChange={(e) => setBusca(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-[#B4BEC9] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C] focus:border-transparent"
-                />
+          <FiltersBar className="mb-6 p-4">
+            <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-end">
+              <div className="w-full sm:flex-1">
+                <label className="mb-2 block text-sm font-medium text-[#385A6A]">Buscar skills</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
+                  <input
+                    type="text"
+                    placeholder="Buscar por skill ou atendente..."
+                    value={busca}
+                    onChange={(e) => setBusca(e.target.value)}
+                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                  />
+                </div>
               </div>
               <button
                 onClick={carregarDados}
                 disabled={loading}
-                className="px-4 py-2 bg-white text-[#002333] border border-[#B4BEC9] rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm font-medium"
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                 Atualizar
               </button>
             </div>
-          </div>
+          </FiltersBar>
 
           {/* Loading State */}
           {loading && skills.length === 0 ? (
@@ -269,7 +299,7 @@ const GestaoSkillsPage: React.FC = () => {
             </div>
           ) : Object.keys(skillsPorAtendente).length === 0 ? (
             /* Empty State */
-            <div className="bg-white rounded-lg shadow-sm border p-12 text-center">
+            <SectionCard className="p-12 text-center">
               <Award className="h-16 w-16 text-[#B4BEC9] mx-auto mb-4" />
               <h2 className="text-xl font-semibold text-[#002333] mb-2">
                 Nenhuma skill cadastrada
@@ -285,14 +315,14 @@ const GestaoSkillsPage: React.FC = () => {
                 <Plus className="h-4 w-4" />
                 Adicionar Primeira Skill
               </button>
-            </div>
+            </SectionCard>
           ) : (
             /* Grid de Atendentes com Skills */
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {Object.entries(skillsPorAtendente).map(([atendenteId, { atendente, skills }]) => (
-                <div
+                <SectionCard
                   key={atendenteId}
-                  className="bg-white rounded-lg shadow-sm border hover:shadow-lg transition-shadow"
+                  className="hover:shadow-lg transition-shadow"
                 >
                   {/* Header do Card - Atendente */}
                   <div className="p-6 border-b bg-gradient-to-r from-[#159A9C]/5 to-transparent">
@@ -350,7 +380,7 @@ const GestaoSkillsPage: React.FC = () => {
                       </div>
                     ))}
                   </div>
-                </div>
+                </SectionCard>
               ))}
             </div>
           )}

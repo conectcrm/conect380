@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEmpresas } from '../../contexts/EmpresaContextAPIReal';
-import { BackToNucleus } from '../../components/navigation/BackToNucleus';
 import { ModalNovaEmpresa } from './components/ModalNovaEmpresa';
 import {
   Building2,
@@ -24,6 +23,14 @@ export const MinhasEmpresasPage: React.FC = () => {
 
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showAddEmpresa, setShowAddEmpresa] = useState(false);
+  const totalUsuariosAtivos = empresas.reduce(
+    (total, empresa) => total + (empresa.estatisticas?.usuariosAtivos ?? 0),
+    0,
+  );
+  const totalClientes = empresas.reduce(
+    (total, empresa) => total + (empresa.estatisticas?.clientesCadastrados ?? 0),
+    0,
+  );
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -107,10 +114,6 @@ export const MinhasEmpresasPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus nucleusName="Dashboard" nucleusPath="/dashboard" currentModuleName="Minhas Empresas" />
-      </div>
-
       <div className="p-6">
         <div className="max-w-7xl mx-auto">
           <div className="bg-white rounded-lg shadow-sm border mb-6 p-6">
@@ -119,7 +122,10 @@ export const MinhasEmpresasPage: React.FC = () => {
                 <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
                   <Building2 className="h-6 w-6 text-[#159A9C]" />
                 </div>
-                <p className="text-sm text-[#002333]/70">Gerencie e alterne entre suas empresas</p>
+                <div>
+                  <h1 className="text-3xl font-bold tracking-tight text-[#002333]">Minhas Empresas</h1>
+                  <p className="text-sm text-[#002333]/70">Gerencie e alterne entre suas empresas</p>
+                </div>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3">
@@ -191,8 +197,8 @@ export const MinhasEmpresasPage: React.FC = () => {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">Usuários ativos</p>
-                  <p className="mt-2 text-3xl font-bold text-[#002333]">—</p>
-                  <p className="mt-3 text-sm text-[#002333]/70">Indicador ainda indisponível nesta versão.</p>
+                  <p className="mt-2 text-3xl font-bold text-[#002333]">{totalUsuariosAtivos}</p>
+                  <p className="mt-3 text-sm text-[#002333]/70">{totalClientes} clientes cadastrados no total.</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
                   <Users className="h-6 w-6 text-[#159A9C]" />
@@ -266,11 +272,15 @@ export const MinhasEmpresasPage: React.FC = () => {
                 <div className="p-6 border-b border-gray-100">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="text-center">
-                      <p className="text-xl font-bold text-gray-900">—</p>
+                      <p className="text-xl font-bold text-gray-900">
+                        {empresa.estatisticas?.usuariosAtivos ?? 0}
+                      </p>
                       <p className="text-xs text-gray-600">Usuários Ativos</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-xl font-bold text-gray-900">—</p>
+                      <p className="text-xl font-bold text-gray-900">
+                        {empresa.estatisticas?.clientesCadastrados ?? 0}
+                      </p>
                       <p className="text-xs text-gray-600">Clientes</p>
                     </div>
                   </div>
@@ -408,8 +418,12 @@ export const MinhasEmpresasPage: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm">
-                          <p className="font-medium text-gray-900">—</p>
-                          <p className="text-gray-600">Indisponível nesta versão</p>
+                          <p className="font-medium text-gray-900">
+                            {empresa.estatisticas?.usuariosAtivos ?? 0}
+                          </p>
+                          <p className="text-gray-600">
+                            {empresa.estatisticas?.clientesCadastrados ?? 0} clientes
+                          </p>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -460,3 +474,4 @@ export const MinhasEmpresasPage: React.FC = () => {
     </div>
   );
 };
+

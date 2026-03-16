@@ -25,6 +25,7 @@ import {
 import { BackToNucleus } from '../components/navigation/BackToNucleus';
 import { tiposService, type TipoServico } from '../services/tiposService';
 import { useGlobalConfirmation } from '../contexts/GlobalConfirmationContext';
+import { SectionCard } from '../components/layout-v2';
 
 interface CreateTipoDto {
   nome: string;
@@ -214,19 +215,21 @@ const GestaoTiposServicoPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="space-y-4 pt-1 sm:pt-2">
       {/* Header com Breadcrumb */}
-      <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus
-          nucleusName="Configurações"
-          nucleusPath="/nuclei/configuracoes"
-        />
+      <div className="px-2 sm:px-0">
+        <SectionCard className="px-4 py-3">
+          <BackToNucleus
+            nucleusName="Configurações"
+            nucleusPath="/nuclei/configuracoes"
+          />
+        </SectionCard>
       </div>
 
-      <div className="p-6">
+      <div className="px-2 sm:px-0">
         <div className="max-w-7xl mx-auto">
           {/* Header da Página */}
-          <div className="bg-white rounded-lg shadow-sm border mb-6">
+          <SectionCard className="mb-6">
             <div className="px-6 py-6">
               <div className="flex flex-col sm:flex-row justify-between items-start">
                 <div>
@@ -261,7 +264,7 @@ const GestaoTiposServicoPage: React.FC = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </SectionCard>
 
           {/* Dashboard Cards (KPI Cards) */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -341,7 +344,7 @@ const GestaoTiposServicoPage: React.FC = () => {
           </div>
 
           {/* Barra de Busca */}
-          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+          <SectionCard className="p-6 mb-6">
             <div className="flex flex-col sm:flex-row gap-4 items-end">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -359,7 +362,7 @@ const GestaoTiposServicoPage: React.FC = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </SectionCard>
 
           {/* Error Alert */}
           {error && (
@@ -370,7 +373,7 @@ const GestaoTiposServicoPage: React.FC = () => {
 
           {/* Estado Vazio */}
           {!loading && tiposOrdenados.length === 0 && (
-            <div className="bg-white rounded-lg shadow-sm border">
+            <SectionCard>
               <div className="text-center py-12 px-6">
                 <Tag className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
@@ -391,15 +394,15 @@ const GestaoTiposServicoPage: React.FC = () => {
                   </button>
                 )}
               </div>
-            </div>
+            </SectionCard>
           )}
 
           {/* Grid de Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {tiposOrdenados.map((tipo) => (
-              <div
+              <SectionCard
                 key={tipo.id}
-                className="bg-white rounded-lg shadow-sm border hover:shadow-lg transition-shadow duration-300"
+                className="hover:shadow-lg transition-shadow duration-300"
               >
                 <div className="p-6">
                   {/* Header do Card */}
@@ -459,7 +462,7 @@ const GestaoTiposServicoPage: React.FC = () => {
                     <span className="text-sm font-semibold text-gray-900">#{tipo.ordem}</span>
                   </div>
                 </div>
-              </div>
+              </SectionCard>
             ))}
           </div>
         </div>

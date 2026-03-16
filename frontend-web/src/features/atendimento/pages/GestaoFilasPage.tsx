@@ -32,7 +32,11 @@ import {
   EstrategiaDistribuicao,
 } from '../../../services/filaService';
 
-const GestaoFilasPage: React.FC = () => {
+interface GestaoFilasPageProps {
+  hideBackButton?: boolean;
+}
+
+const GestaoFilasPage: React.FC<GestaoFilasPageProps> = ({ hideBackButton = false }) => {
   const { confirm } = useGlobalConfirmation();
   const { user } = useAuth();
   // ⚠️ Obter empresaId do JWT token
@@ -223,10 +227,11 @@ const GestaoFilasPage: React.FC = () => {
   if (!empresaId) {
     return (
       <div className="min-h-screen bg-gray-50">
-        {/* Header com BackToNucleus */}
-        <div className="bg-white border-b px-6 py-4">
-          <BackToNucleus nucleusName="Atendimento" nucleusPath="/atendimento" />
-        </div>
+        {!hideBackButton && (
+          <div className="bg-white border-b px-6 py-4">
+            <BackToNucleus nucleusName="Atendimento" nucleusPath="/atendimento" />
+          </div>
+        )}
 
         {/* Aviso de Empresa Não Selecionada */}
         <div className="p-6">
@@ -266,10 +271,11 @@ const GestaoFilasPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header com BackToNucleus */}
-      <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus nucleusName="Atendimento" nucleusPath="/atendimento" />
-      </div>
+      {!hideBackButton && (
+        <div className="bg-white border-b px-6 py-4">
+          <BackToNucleus nucleusName="Atendimento" nucleusPath="/atendimento" />
+        </div>
+      )}
 
       {/* Container Principal */}
       <div className="p-6">

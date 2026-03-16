@@ -77,7 +77,7 @@ export const statusService = {
    * Atualiza um status existente - Admin Console
    */
   atualizar: async (id: string, dados: Partial<StatusCustomizado>): Promise<StatusCustomizado> => {
-    const response = await api.patch(`/configuracoes-tickets/status-customizados/${id}`, dados);
+    const response = await api.put(`/configuracoes-tickets/status-customizados/${id}`, dados);
     return response.data;
   },
 

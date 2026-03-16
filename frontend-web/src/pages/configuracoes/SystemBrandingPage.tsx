@@ -14,6 +14,7 @@ import { BackToNucleus } from '../../components/navigation/BackToNucleus';
 import Conect360Logo from '../../components/ui/Conect360Logo';
 import { systemBrandingUrlResolver, useSystemBranding } from '../../contexts/SystemBrandingContext';
 import systemBrandingService, {
+  type BrandingAssetKind,
   type SystemBrandingAdminData,
   type SystemBrandingEffectiveConfig,
 } from '../../services/systemBrandingService';
@@ -26,7 +27,6 @@ interface BrandingFieldMeta {
   field: BrandingField;
   label: string;
   helpText: string;
-  maxDimension: number;
 }
 
 const BRANDING_FIELDS: BrandingFieldMeta[] = [
@@ -35,32 +35,27 @@ const BRANDING_FIELDS: BrandingFieldMeta[] = [
     label: 'Logo principal (fundo claro)',
     helpText:
       'Usada no header, sidebar expandida e login mobile. Se a logo de fundo escuro ficar vazia, esta sera usada no login desktop.',
-    maxDimension: 1800,
   },
   {
     field: 'logoFullLightUrl',
     label: 'Logo para fundo escuro (Login desktop)',
     helpText: 'Versao recomendada para a coluna escura da tela de login.',
-    maxDimension: 1800,
   },
   {
     field: 'logoIconUrl',
     label: 'Logo icone',
     helpText: 'Usada no menu colapsado, favicon fallback e notificacoes.',
-    maxDimension: 800,
   },
   {
     field: 'loadingLogoUrl',
     label: 'Logo do loading inicial',
     helpText:
       'Usada na tela de carregamento inicial do sistema. Se ficar vazia, usa a logo icone como fallback.',
-    maxDimension: 800,
   },
   {
     field: 'faviconUrl',
     label: 'Favicon',
     helpText: 'Icone da aba do navegador (aceita PNG, SVG e ICO).',
-    maxDimension: 256,
   },
 ];
 
@@ -72,43 +67,15 @@ const EMPTY_FORM: BrandingFormData = {
   faviconUrl: null,
 };
 
-const readAsDataUrl = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error('Nao foi possivel ler o arquivo.'));
-    reader.readAsDataURL(file);
-  });
-
-const processImageFile = async (file: File, maxDimension: number): Promise<string> => {
-  if (file.type === 'image/svg+xml') {
-    return readAsDataUrl(file);
-  }
-
-  const dataUrl = await readAsDataUrl(file);
-  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('Nao foi possivel carregar a imagem selecionada.'));
-    img.src = dataUrl;
-  });
-
-  const scaleFactor = Math.min(1, maxDimension / Math.max(image.width, image.height));
-  const width = Math.max(1, Math.round(image.width * scaleFactor));
-  const height = Math.max(1, Math.round(image.height * scaleFactor));
-
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-
-  const context = canvas.getContext('2d');
-  if (!context) {
-    throw new Error('Nao foi possivel processar a imagem.');
-  }
-
-  context.drawImage(image, 0, 0, width, height);
-  return canvas.toDataURL('image/png', 0.92);
+const BRANDING_FIELD_TO_ASSET_KIND: Record<BrandingField, BrandingAssetKind> = {
+  logoFullUrl: 'logo-full',
+  logoFullLightUrl: 'logo-full-light',
+  logoIconUrl: 'logo-icon',
+  loadingLogoUrl: 'loading-logo',
+  faviconUrl: 'favicon',
 };
+
+const MAX_UPLOAD_FILE_SIZE = 5 * 1024 * 1024;
 
 const formatUpdatedAt = (value: string | null): string => {
   if (!value) {
@@ -162,7 +129,6 @@ const SystemBrandingPage: React.FC = () => {
   const handleUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
     field: BrandingField,
-    maxDimension: number,
   ) => {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -175,21 +141,22 @@ const SystemBrandingPage: React.FC = () => {
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error('A imagem deve ter no maximo 10MB.');
+    if (file.size > MAX_UPLOAD_FILE_SIZE) {
+      toast.error('A imagem deve ter no maximo 5MB.');
       return;
     }
 
     setUploadingField(field);
     try {
-      const processedImage = await processImageFile(file, maxDimension);
-      setFormData((current) => ({
-        ...current,
-        [field]: processedImage,
-      }));
-      toast.success('Imagem carregada com sucesso.');
+      const kind = BRANDING_FIELD_TO_ASSET_KIND[field];
+      const response = await systemBrandingService.uploadBrandingAsset(kind, file);
+      setFormData(pickFormData(response.data));
+      setEffectiveData(response.effective);
+      setUpdatedAt(response.updatedAt);
+      await refreshBranding();
+      toast.success('Imagem carregada e aplicada com sucesso.');
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Falha ao processar a imagem.'));
+      toast.error(getErrorMessage(error, 'Falha ao enviar a imagem.'));
     } finally {
       setUploadingField(null);
     }
@@ -380,7 +347,7 @@ const SystemBrandingPage: React.FC = () => {
                       type="file"
                       accept="image/*"
                       className="hidden"
-                      onChange={(event) => void handleUpload(event, fieldMeta.field, fieldMeta.maxDimension)}
+                      onChange={(event) => void handleUpload(event, fieldMeta.field)}
                     />
                     <label
                       htmlFor={inputId}

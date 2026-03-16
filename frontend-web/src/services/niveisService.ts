@@ -59,7 +59,7 @@ export const niveisService = {
    * Atualiza um nível existente - Admin Console
    */
   atualizar: async (id: string, dados: Partial<NivelAtendimento>): Promise<NivelAtendimento> => {
-    const response = await api.patch(`/configuracoes-tickets/niveis-atendimento/${id}`, dados);
+    const response = await api.put(`/configuracoes-tickets/niveis-atendimento/${id}`, dados);
     return response.data;
   },
 
