@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 
 const BRANDING_CACHE_KEY = 'conect_system_branding_cache_v1';
-const DEFAULT_NOTIFICATION_ICON = '/brand/conect360-logo-icon.svg';
+const DEFAULT_NOTIFICATION_ICON = '/favicon.svg';
 
 const resolveRuntimeAssetUrl = (url: string): string => {
   if (!url) {
@@ -32,8 +32,8 @@ const getCachedBrandingIcon = (): string => {
       return resolveRuntimeAssetUrl(DEFAULT_NOTIFICATION_ICON);
     }
 
-    const parsed = JSON.parse(raw) as { logoIconUrl?: string };
-    return resolveRuntimeAssetUrl(parsed.logoIconUrl || DEFAULT_NOTIFICATION_ICON);
+    const parsed = JSON.parse(raw) as { logoIconUrl?: string; faviconUrl?: string };
+    return resolveRuntimeAssetUrl(parsed.logoIconUrl || parsed.faviconUrl || DEFAULT_NOTIFICATION_ICON);
   } catch {
     return resolveRuntimeAssetUrl(DEFAULT_NOTIFICATION_ICON);
   }

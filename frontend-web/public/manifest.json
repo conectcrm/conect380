@@ -3,7 +3,7 @@
   "name": "Conect360 - Plataforma SaaS",
   "icons": [
     {
-      "src": "brand/conect360-logo-icon.svg",
+      "src": "favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"

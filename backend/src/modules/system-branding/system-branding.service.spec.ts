@@ -28,7 +28,7 @@ describe('SystemBrandingService', () => {
 
     const result = await service.getPublicBranding();
 
-    expect(result.logoFullUrl).toBe('/brand/conect360-logo-horizontal.svg');
+    expect(result.logoFullUrl).toBe('');
     expect(result.maintenanceBanner.enabled).toBe(false);
     expect(result.maintenanceBanner.title).toBe('Manutencao programada');
   });

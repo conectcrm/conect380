@@ -37,6 +37,10 @@ const resolveAssetUrl = (url: string): string => {
 };
 
 const applyFavicon = (faviconUrl: string): void => {
+  if (!faviconUrl || !faviconUrl.trim()) {
+    return;
+  }
+
   const href = resolveAssetUrl(faviconUrl);
   const head = document.head;
   const lowerHref = href.toLowerCase();

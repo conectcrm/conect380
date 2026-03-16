@@ -33,16 +33,11 @@ const dynamicVariantMap: Record<Conect360LogoDynamicVariant, Conect360LogoDynami
   loading: 'loadingLogoUrl',
 };
 
-const staticVariantPathMap: Record<'mono' | 'icon-mono', string> = {
-  mono: '/brand/conect360-logo-monochrome.svg',
-  'icon-mono': '/brand/conect360-logo-icon-monochrome.svg',
-};
-
 const Conect360Logo: React.FC<Conect360LogoProps> = ({
   variant = 'full',
   size = 'md',
   className = '',
-  alt = 'Conect360',
+  alt = 'Logo',
 }) => {
   const { branding } = useSystemBranding();
 
@@ -50,18 +45,27 @@ const Conect360Logo: React.FC<Conect360LogoProps> = ({
     variant === 'full' || variant === 'full-light' || variant === 'icon' || variant === 'loading'
       ? dynamicVariantMap[variant]
       : null;
+  const fallbackField: Conect360LogoDynamicField =
+    variant === 'icon' || variant === 'loading' || variant === 'icon-mono'
+      ? 'logoIconUrl'
+      : 'logoFullUrl';
 
-  const staticSrc =
-    variant === 'mono' || variant === 'icon-mono'
-      ? staticVariantPathMap[variant]
-      : '/brand/conect360-logo-horizontal.svg';
-
-  const src = dynamicField
-    ? systemBrandingUrlResolver(branding[dynamicField])
-    : systemBrandingUrlResolver(staticSrc);
+  const preferred = dynamicField ? branding[dynamicField] : '';
+  const fallback = branding[fallbackField];
+  const src = systemBrandingUrlResolver(preferred || fallback || '');
 
   const sizeClass = sizeClassMap[size];
   const widthClass = 'w-auto';
+
+  if (!src) {
+    return (
+      <span
+        className={`${sizeClass} ${widthClass} inline-flex items-center font-semibold text-[#1D3E4F] ${className}`.trim()}
+      >
+        CRM
+      </span>
+    );
+  }
 
   return (
     <img

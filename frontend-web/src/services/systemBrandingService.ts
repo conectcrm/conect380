@@ -42,10 +42,10 @@ export interface SystemBrandingAdminResponse {
 }
 
 export const DEFAULT_SYSTEM_BRANDING: SystemBrandingEffectiveConfig = {
-  logoFullUrl: '/brand/conect360-logo-horizontal.svg',
-  logoFullLightUrl: '/brand/conect360-logo-horizontal-light.svg',
-  logoIconUrl: '/brand/conect360-logo-icon.svg',
-  loadingLogoUrl: '/brand/conect360-logo-icon.svg',
+  logoFullUrl: '',
+  logoFullLightUrl: '',
+  logoIconUrl: '',
+  loadingLogoUrl: '',
   faviconUrl: '/favicon.svg',
   maintenanceBanner: {
     enabled: false,

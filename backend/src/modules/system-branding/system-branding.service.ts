@@ -51,10 +51,10 @@ const BRANDING_MIGRATION_HINT =
   'Execute as migracoes pendentes do backend para habilitar o branding completo.';
 
 const DEFAULT_SYSTEM_BRANDING: SystemBrandingEffectiveConfig = {
-  logoFullUrl: '/brand/conect360-logo-horizontal.svg',
-  logoFullLightUrl: '/brand/conect360-logo-horizontal-light.svg',
-  logoIconUrl: '/brand/conect360-logo-icon.svg',
-  loadingLogoUrl: '/brand/conect360-logo-icon.svg',
+  logoFullUrl: '',
+  logoFullLightUrl: '',
+  logoIconUrl: '',
+  loadingLogoUrl: '',
   faviconUrl: '/favicon.svg',
   maintenanceBanner: {
     enabled: false,
