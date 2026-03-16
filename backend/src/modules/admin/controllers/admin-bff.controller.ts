@@ -37,7 +37,7 @@ import { PlatformOwnerGuard } from '../../../common/guards/platform-owner.guard'
   LegacyAdminTransitionGuard,
 )
 @UseInterceptors(AdminBffAuditInterceptor)
-@Roles(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.GERENTE)
+@Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
 @Permissions(Permission.USERS_READ)
 export class AdminBffController {
   constructor(private readonly adminBffService: AdminBffService) {}
