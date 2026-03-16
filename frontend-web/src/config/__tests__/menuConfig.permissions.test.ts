@@ -102,6 +102,18 @@ describe('menuConfig permission filtering', () => {
     expect(ids).not.toContain('configuracoes-branding');
   });
 
+  it('removes duplicated usuarios entry from configuracoes when admin menu is available', () => {
+    const menu = getMenuParaEmpresa(ALL_MODULES, {
+      email: 'admin@empresa.com',
+      role: 'admin',
+      permissions: [],
+    } as any);
+
+    const ids = collectIds(menu);
+    expect(ids).toContain('admin-usuarios');
+    expect(ids).not.toContain('configuracoes-usuarios');
+  });
+
   it('treats owner legacy role alias as privileged for admin menu', () => {
     const menu = getMenuParaEmpresa(ALL_MODULES, {
       email: 'dono@empresa.com',

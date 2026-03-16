@@ -56,7 +56,7 @@ import {
   STATUS_ATENDENTE_COLORS,
 } from '../../../types/usuarios';
 
-type AbaAtiva = 'todos' | 'atendentes';
+type AbaAtiva = 'todos' | 'atendentes' | 'governanca';
 
 type ConfirmDialogState = {
   open: boolean;
@@ -1430,6 +1430,7 @@ const GestaoUsuariosPage: React.FC = () => {
   const modalCheckboxClass =
     'h-4 w-4 rounded border-gray-300 text-[#159A9C] focus:ring-[#159A9C]';
   const desktopCellPaddingClass = tableDensity === 'compact' ? 'px-6 py-2.5' : 'px-6 py-4';
+  const mostrarListaUsuarios = abaAtiva !== 'governanca';
 
   return (
     <div className="space-y-4 pt-1 sm:pt-2">
@@ -1496,15 +1497,34 @@ const GestaoUsuariosPage: React.FC = () => {
             >
               Atendentes
             </button>
+            {canViewAccessApprovals ? (
+              <button
+                type="button"
+                onClick={() => setAbaAtiva('governanca')}
+                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                  abaAtiva === 'governanca'
+                    ? 'bg-[#159A9C] text-white shadow-sm'
+                    : 'border border-[#D3E0E5] bg-white text-[#4F6C7B] hover:bg-[#F3F8FA]'
+                }`}
+              >
+                Governanca de acessos
+              </button>
+            ) : null}
 
             {abaAtiva === 'atendentes' ? (
               <span className="rounded-full border border-[#D6E5EA] bg-[#F6FBFC] px-3 py-1 text-xs font-medium text-[#607B89]">
                 Filtro de atendimento ativo
               </span>
             ) : null}
+            {abaAtiva === 'governanca' ? (
+              <span className="rounded-full border border-[#D6E5EA] bg-[#F6FBFC] px-3 py-1 text-xs font-medium text-[#607B89]">
+                Fluxo de recertificacao e aprovacoes sensiveis
+              </span>
+            ) : null}
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {mostrarListaUsuarios ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8AA0AB]" />
               <input
@@ -1569,9 +1589,11 @@ const GestaoUsuariosPage: React.FC = () => {
                 </button>
               )}
             </div>
-          </div>
+            </div>
+          ) : null}
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          {mostrarListaUsuarios ? (
+            <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-xs text-[#6A8795]">
               Exibindo {usuariosFiltrados.length} de {totalUsuarios} usuarios.
             </p>
@@ -1591,9 +1613,10 @@ const GestaoUsuariosPage: React.FC = () => {
                 Limpar filtros
               </button>
             ) : null}
-          </div>
+            </div>
+          ) : null}
 
-          {filtrosAtivos ? (
+          {mostrarListaUsuarios && filtrosAtivos ? (
             <div className="flex flex-wrap items-center gap-2">
               {busca ? (
                 <span className="inline-flex items-center gap-1 rounded-full border border-[#D8E6EA] bg-[#F7FBFC] px-3 py-1 text-xs text-[#4F6C7B]">
@@ -1627,7 +1650,7 @@ const GestaoUsuariosPage: React.FC = () => {
         </div>
       </FiltersBar>
 
-      {canViewAccessApprovals ? (
+      {canViewAccessApprovals && abaAtiva === 'governanca' ? (
         <SectionCard className="p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -1731,7 +1754,7 @@ const GestaoUsuariosPage: React.FC = () => {
         </SectionCard>
       ) : null}
 
-      {canViewAccessApprovals ? (
+      {canViewAccessApprovals && abaAtiva === 'governanca' ? (
         <SectionCard className="p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -1868,7 +1891,7 @@ const GestaoUsuariosPage: React.FC = () => {
         </SectionCard>
       ) : null}
 
-      {usuariosSelecionados.length > 0 && (
+      {mostrarListaUsuarios && usuariosSelecionados.length > 0 && (
         <SectionCard className="p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-[#607B89]">
@@ -1898,9 +1921,9 @@ const GestaoUsuariosPage: React.FC = () => {
         </SectionCard>
       )}
 
-      {loading && <LoadingSkeleton lines={8} />}
+      {mostrarListaUsuarios && loading && <LoadingSkeleton lines={8} />}
 
-      {!loading && error && (
+      {mostrarListaUsuarios && !loading && error && (
         <EmptyState
           icon={<AlertCircle className="h-5 w-5" />}
           title="Erro ao carregar usuarios"
@@ -1917,7 +1940,7 @@ const GestaoUsuariosPage: React.FC = () => {
         />
       )}
 
-      {!loading && !error && usuariosFiltrados.length === 0 && (
+      {mostrarListaUsuarios && !loading && !error && usuariosFiltrados.length === 0 && (
         <EmptyState
           icon={<Users className="h-5 w-5" />}
           title={filtrosAtivos ? 'Nenhum usuario encontrado' : 'Nenhum usuario cadastrado'}
@@ -1940,7 +1963,7 @@ const GestaoUsuariosPage: React.FC = () => {
         />
       )}
 
-      {!loading && !error && usuariosFiltrados.length > 0 && (
+      {mostrarListaUsuarios && !loading && !error && usuariosFiltrados.length > 0 && (
         <DataTableCard>
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E4EDF1] bg-[#FBFDFE] px-4 py-3">
             <div className="text-sm text-[#607B89]">

@@ -592,7 +592,24 @@ const filterMenuByPermissions = (
     isAdmin: isAdminLike(user, resolvedPermissions),
   };
 
-  return filterMenuByPermissionsInternal(items, context);
+  const filteredMenu = filterMenuByPermissionsInternal(items, context);
+
+  // Evita duplicidade visual para perfis administrativos:
+  // "Usuarios" fica centralizado em Administracao.
+  if (!context.isAdmin) {
+    return filteredMenu;
+  }
+
+  return filteredMenu.map((item) => {
+    if (item.id !== 'configuracoes' || !Array.isArray(item.children)) {
+      return item;
+    }
+
+    return {
+      ...item,
+      children: item.children.filter((child) => child.id !== 'configuracoes-usuarios'),
+    };
+  });
 };
 
 const atendimentoChildren: MenuConfig[] = [
