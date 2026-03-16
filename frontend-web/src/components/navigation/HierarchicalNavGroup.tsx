@@ -83,12 +83,21 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
   const submenuPanelRef = useRef<HTMLDivElement>(null);
 
   // Verificação se é admin
+  const normalizedRole = typeof user?.role === 'string' ? user.role.trim().toLowerCase() : '';
+  const normalizedPermissionSet = useMemo(() => {
+    const fromPermissions = Array.isArray(user?.permissions) ? user.permissions : [];
+    const fromPermissoes = Array.isArray(user?.permissoes) ? user.permissoes : [];
+    return new Set(
+      [...fromPermissions, ...fromPermissoes]
+        .filter((permission): permission is string => typeof permission === 'string')
+        .map((permission) => permission.trim().toLowerCase())
+        .filter(Boolean),
+    );
+  }, [user?.permissions, user?.permissoes]);
   const isAdmin =
-    user?.role === 'superadmin' ||
-    user?.role === 'admin' ||
-    user?.role === 'manager' ||
-    user?.role === 'gerente' ||
-    user?.email?.includes('admin');
+    normalizedRole === 'superadmin' ||
+    normalizedRole === 'admin' ||
+    normalizedPermissionSet.has('admin.empresas.manage');
 
   // Fechar painel ao clicar fora
   useEffect(() => {

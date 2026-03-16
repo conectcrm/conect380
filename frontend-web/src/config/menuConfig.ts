@@ -521,7 +521,7 @@ const isAdminLike = (
     return true;
   }
 
-  return typeof user.email === 'string' && user.email.toLowerCase().includes('admin');
+  return false;
 };
 
 type PermissionFilterContext = {
