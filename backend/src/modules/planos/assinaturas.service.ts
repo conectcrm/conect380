@@ -480,7 +480,40 @@ export class AssinaturasService {
     storageDisponivel: number;
   }> {
     const policy = await this.obterPoliticaTenant(empresaId);
-    const assinatura = await this.buscarAssinaturaObrigatoria(empresaId, { includePlano: true });
+    const assinatura = await this.buscarAssinaturaMaisRecente(empresaId, { includePlano: true });
+    if (!assinatura) {
+      if (!policy.billingExempt) {
+        throw new NotFoundException(`Assinatura para empresa ${empresaId} nao encontrada`);
+      }
+
+      const [usuariosAtivos, clientesCadastrados] = await Promise.all([
+        this.userRepository.count({
+          where: {
+            empresa_id: empresaId,
+            ativo: true,
+          },
+        }),
+        this.clienteRepository.count({
+          where: {
+            empresaId,
+            ativo: true,
+          },
+        }),
+      ]);
+
+      return {
+        usuariosAtivos,
+        limiteUsuarios: -1,
+        clientesCadastrados,
+        limiteClientes: -1,
+        storageUtilizado: 0,
+        limiteStorage: -1,
+        podeAdicionarUsuario: true,
+        podeAdicionarCliente: true,
+        storageDisponivel: -1,
+      };
+    }
+
     const currentStatus = toCanonicalAssinaturaStatus(assinatura.status);
     if (!policy.billingExempt && currentStatus === 'canceled') {
       throw new NotFoundException(`Assinatura ativa para empresa ${empresaId} nao encontrada`);
