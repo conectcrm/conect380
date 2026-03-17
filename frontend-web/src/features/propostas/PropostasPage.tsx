@@ -300,7 +300,26 @@ const actionSecondaryButtonClass =
   'inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-60';
 const viewToggleBaseClass =
   'inline-flex h-8 items-center justify-center rounded-md px-3 text-sm font-medium transition-colors';
+const PROPOSTAS_VIEW_MODE_STORAGE_KEY = 'conect360:propostas:view-mode';
 const MOTIVOS_PERDA_STORAGE_KEY = 'conect360:propostas:motivos-perda';
+type PropostasViewMode = 'table' | 'cards' | 'dashboard';
+
+const loadPersistedPropostasViewMode = (): PropostasViewMode => {
+  if (typeof window === 'undefined') {
+    return 'dashboard';
+  }
+
+  try {
+    const raw = window.localStorage.getItem(PROPOSTAS_VIEW_MODE_STORAGE_KEY);
+    if (raw === 'table' || raw === 'cards' || raw === 'dashboard') {
+      return raw;
+    }
+  } catch {
+    // Ignorar falhas de storage (modo privado / políticas do navegador)
+  }
+
+  return 'dashboard';
+};
 
 type MotivoPerdaMap = Record<
   string,
@@ -353,7 +372,7 @@ const PropostasPage: React.FC = () => {
     'data_criacao',
   );
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [viewMode, setViewMode] = useState<'table' | 'cards' | 'dashboard'>('dashboard'); // Novo modo dashboard
+  const [viewMode, setViewMode] = useState<PropostasViewMode>(loadPersistedPropostasViewMode);
   const [filtrosAvancados, setFiltrosAvancados] = useState<any>({});
   const [loadError, setLoadError] = useState<string | null>(null);
   const [motivosPerda, setMotivosPerda] = useState<MotivoPerdaMap>(() => {
@@ -397,6 +416,27 @@ const PropostasPage: React.FC = () => {
     }
   }, [viewMode, propostasSelecionadas.length]);
 
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return;
+    }
+
+    if (showWizardModal || showViewModal || showMotivoPerdaModal) {
+      return;
+    }
+
+    const html = document.documentElement;
+    const body = document.body;
+    html.classList.remove('modal-scroll-lock');
+    body.classList.remove('modal-scroll-lock');
+    html.style.removeProperty('--modal-scroll-lock-padding-right');
+    body.style.removeProperty('--modal-scroll-lock-padding-right');
+
+    if (body.style.overflow === 'hidden') {
+      body.style.overflow = '';
+    }
+  }, [showWizardModal, showViewModal, showMotivoPerdaModal]);
+
   // Função para mostrar notificações
   const showNotification = useCallback((message: string, type: 'success' | 'error') => {
     if (type === 'success') {
@@ -406,6 +446,18 @@ const PropostasPage: React.FC = () => {
 
     toastService.error(message);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(PROPOSTAS_VIEW_MODE_STORAGE_KEY, viewMode);
+    } catch {
+      // Falha silenciosa para nao interromper a UX em ambientes sem storage disponivel.
+    }
+  }, [viewMode]);
 
   useEffect(() => {
     try {
@@ -2793,9 +2845,6 @@ const PropostasPage: React.FC = () => {
                                 ))}
                             </div>
                           </th>
-                          <th className="col-hide-mobile px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[#607B89]">
-                            Motivo perda
-                          </th>
                           <th
                             className="cursor-pointer px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-[#607B89] hover:bg-[#EEF5F7]"
                             onClick={() => {
@@ -2951,27 +3000,22 @@ const PropostasPage: React.FC = () => {
                                   <div className="subinfo">
                                     <span>{safeRender(proposta.probabilidade)}% de chance</span>
                                   </div>
+
+                                  {safeRender(proposta.status) === 'rejeitada' && (
+                                    <div className="rounded-md border border-[#FECACA] bg-[#FEF2F2] px-2 py-1.5">
+                                      <p className="line-clamp-1 text-xs text-[#7F1D1D]">
+                                        Motivo: {getMotivoPerda(proposta) || 'Nao informado'}
+                                      </p>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRegistrarMotivoPerda(proposta)}
+                                        className="mt-1 inline-flex text-xs font-semibold text-[#B91C1C] hover:text-[#991B1B]"
+                                      >
+                                        {getMotivoPerda(proposta) ? 'Editar motivo' : 'Informar motivo'}
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
-                              </td>
-                              <td className="px-6 py-4 col-hide-mobile" data-label="Motivo perda">
-                                {safeRender(proposta.status) === 'rejeitada' ? (
-                                  <div className="max-w-[280px] space-y-2">
-                                    <p className="line-clamp-2 text-sm text-[#7F1D1D]">
-                                      {getMotivoPerda(proposta) || 'Nao informado'}
-                                    </p>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleRegistrarMotivoPerda(proposta)}
-                                      className="inline-flex text-xs font-semibold text-[#B91C1C] hover:text-[#991B1B]"
-                                    >
-                                      {getMotivoPerda(proposta)
-                                        ? 'Editar motivo'
-                                        : 'Informar motivo'}
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <span className="text-xs text-[#94A3B8]">-</span>
-                                )}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap" data-label="Valor">
                                 <div className="valor-proposta text-sm font-medium">

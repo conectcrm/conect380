@@ -1,4 +1,5 @@
 import { OportunidadesController } from './oportunidades.controller';
+import { EstagioOportunidade, LifecycleStatusOportunidade } from './oportunidade.entity';
 
 describe('OportunidadesController (stale)', () => {
   const oportunidadesService = {
@@ -6,9 +7,16 @@ describe('OportunidadesController (stale)', () => {
     setStalePolicy: jest.fn(),
     listarOportunidadesParadas: jest.fn(),
     processarAutoArquivamentoStale: jest.fn(),
+    findOne: jest.fn(),
+    getSalesFeatureFlags: jest.fn(),
+    listarItensPreliminares: jest.fn(),
+    mapearItensPreliminaresParaProdutosProposta: jest.fn(),
+    createAtividade: jest.fn(),
   };
 
-  const propostasService = {} as any;
+  const propostasService = {
+    criarProposta: jest.fn(),
+  } as any;
   const controller = new OportunidadesController(
     oportunidadesService as any,
     propostasService,
@@ -115,6 +123,68 @@ describe('OportunidadesController (stale)', () => {
     expect(oportunidadesService.processarAutoArquivamentoStale).toHaveBeenCalledWith('empresa-7', {
       dryRun: false,
       trigger: 'manual',
+    });
+  });
+
+  describe('gerarProposta', () => {
+    it('bloqueia quando oportunidade nao esta aberta no lifecycle', async () => {
+      oportunidadesService.findOne.mockResolvedValue({
+        id: 'opp-1',
+        estagio: EstagioOportunidade.FECHAMENTO,
+        lifecycle_status: LifecycleStatusOportunidade.WON,
+      });
+
+      await expect(
+        controller.gerarProposta('opp-1', 'empresa-8', { user: { id: 'user-1' } } as any),
+      ).rejects.toThrow('Rascunho de proposta disponivel apenas para oportunidades abertas.');
+    });
+
+    it('bloqueia quando estagio nao permite gerar rascunho de proposta', async () => {
+      oportunidadesService.findOne.mockResolvedValue({
+        id: 'opp-2',
+        estagio: EstagioOportunidade.LEADS,
+        lifecycle_status: LifecycleStatusOportunidade.OPEN,
+      });
+
+      await expect(
+        controller.gerarProposta('opp-2', 'empresa-9', { user: { id: 'user-2' } } as any),
+      ).rejects.toThrow(
+        'Rascunho de proposta disponivel apenas nos estagios Proposta, Negociacao ou Fechamento.',
+      );
+    });
+
+    it('gera proposta quando oportunidade aberta esta em estagio permitido', async () => {
+      oportunidadesService.findOne.mockResolvedValue({
+        id: 'opp-3',
+        titulo: 'Novo servidor',
+        valor: 1000,
+        estagio: EstagioOportunidade.PROPOSTA,
+        lifecycle_status: LifecycleStatusOportunidade.OPEN,
+        nomeContato: 'Cliente Teste',
+        emailContato: 'cliente@teste.com',
+        telefoneContato: '+5511999999999',
+        empresaContato: 'Empresa Teste',
+        cliente_id: null,
+      });
+      oportunidadesService.getSalesFeatureFlags.mockResolvedValue({
+        pipelineDraftWithoutPlaceholder: { enabled: true },
+        opportunityPreliminaryItems: { enabled: false },
+      });
+      propostasService.criarProposta.mockResolvedValue({
+        id: 'prop-1',
+        numero: 'PROP-001',
+      });
+
+      const result = await controller.gerarProposta('opp-3', 'empresa-10', {
+        user: { id: 'user-3' },
+      } as any);
+
+      expect(propostasService.criarProposta).toHaveBeenCalled();
+      expect(result).toEqual({
+        success: true,
+        message: 'Rascunho de proposta criado com sucesso',
+        proposta: { id: 'prop-1', numero: 'PROP-001' },
+      });
     });
   });
 });

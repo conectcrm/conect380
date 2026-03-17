@@ -154,6 +154,67 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
     telefoneContato: '',
     empresaContato: '',
   });
+  const [initialFormSnapshot, setInitialFormSnapshot] = useState('');
+
+  const normalizeTextValue = (value?: string): string => String(value || '').trim();
+
+  const normalizeDateValue = (value?: string | Date): string => {
+    if (!value) {
+      return '';
+    }
+
+    if (value instanceof Date) {
+      if (Number.isNaN(value.getTime())) {
+        return '';
+      }
+
+      return value.toISOString().split('T')[0];
+    }
+
+    const raw = String(value).trim();
+    if (!raw) {
+      return '';
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      return raw;
+    }
+
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) {
+      return '';
+    }
+
+    return parsed.toISOString().split('T')[0];
+  };
+
+  const normalizeTagsValue = (tags?: string[]): string[] => {
+    const normalized = (tags || [])
+      .map((tag) => normalizeTextValue(tag).toLowerCase())
+      .filter(Boolean);
+
+    return Array.from(new Set(normalized)).sort();
+  };
+
+  const buildFormSnapshot = (data: NovaOportunidade): string => {
+    return JSON.stringify({
+      titulo: normalizeTextValue(data.titulo),
+      descricao: normalizeTextValue(data.descricao),
+      valor: Number(data.valor || 0),
+      probabilidade: Number(data.probabilidade || 0),
+      estagio: data.estagio,
+      prioridade: data.prioridade,
+      origem: data.origem,
+      tags: normalizeTagsValue(data.tags),
+      dataFechamentoEsperado: normalizeDateValue(data.dataFechamentoEsperado),
+      responsavel_id: normalizeTextValue(data.responsavel_id),
+      cliente_id: normalizeTextValue(data.cliente_id),
+      nomeContato: normalizeTextValue(data.nomeContato),
+      emailContato: normalizeTextValue(data.emailContato).toLowerCase(),
+      telefoneContato: normalizeTextValue(data.telefoneContato),
+      empresaContato: normalizeTextValue(data.empresaContato),
+    });
+  };
 
   // Carregar clientes ao abrir o modal
   useEffect(() => {
@@ -191,10 +252,13 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
 
   // Resetar formulário quando o modal abre/fecha
   useEffect(() => {
-    if (isOpen) {
-      if (oportunidade) {
-        // Modo edição: preencher com dados existentes
-        setFormData({
+    if (!isOpen) {
+      return;
+    }
+
+    const nextFormData: NovaOportunidade = oportunidade
+      ? {
+          // Modo edição: preencher com dados existentes
           titulo: oportunidade.titulo,
           descricao: oportunidade.descricao || '',
           valor: Number(oportunidade.valor),
@@ -212,10 +276,9 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
           emailContato: oportunidade.emailContato || '',
           telefoneContato: oportunidade.telefoneContato || '',
           empresaContato: oportunidade.empresaContato || '',
-        });
-      } else {
-        // Modo criação: valores padrão
-        setFormData({
+        }
+      : {
+          // Modo criação: valores padrão
           titulo: '',
           descricao: '',
           valor: 0,
@@ -231,25 +294,40 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
           emailContato: '',
           telefoneContato: '',
           empresaContato: '',
-        });
-      }
-      setErrors([]);
-      setActiveTab('detalhes');
-    }
+        };
+
+    setFormData(nextFormData);
+    setInitialFormSnapshot(buildFormSnapshot(nextFormData));
+    setErrors([]);
+    setActiveTab('detalhes');
   }, [isOpen, oportunidade, estagioInicial, user]);
 
   useEffect(() => {
-    if (!isOpen || oportunidade) {
+    if (!isOpen || oportunidade || !user?.id) {
       return;
     }
 
-    if (user?.id) {
-      setFormData((prev) => ({
+    setFormData((prev) => {
+      if (prev.responsavel_id) {
+        return prev;
+      }
+
+      const next = {
         ...prev,
-        responsavel_id: prev.responsavel_id || user.id,
-      }));
-    }
-  }, [isOpen, oportunidade, user]);
+        responsavel_id: user.id,
+      };
+
+      setInitialFormSnapshot((prevSnapshot) => {
+        const currentSnapshot = buildFormSnapshot(prev);
+        if (prevSnapshot !== currentSnapshot) {
+          return prevSnapshot;
+        }
+        return buildFormSnapshot(next);
+      });
+
+      return next;
+    });
+  }, [isOpen, oportunidade, user?.id]);
 
   const estagiosDisponiveis = useMemo(() => {
     const todosEstagios = Object.entries(ESTAGIOS_LABELS) as Array<
@@ -367,10 +445,25 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
   };
 
   const isValidPhone = (phone: string): boolean => {
-    // Remove caracteres não numéricos
-    const cleanPhone = phone.replace(/\D/g, '');
-    // Aceita telefones com 10 ou 11 dígitos (com ou sem DDD)
-    return cleanPhone.length >= 10 && cleanPhone.length <= 11;
+    const trimmed = phone.trim();
+    if (!trimmed) {
+      return true;
+    }
+
+    // Alinhado ao backend: permite números e símbolos de telefone
+    if (!/^[0-9+\-() ]+$/.test(trimmed)) {
+      return false;
+    }
+
+    // Se houver "+", precisa estar apenas no início e aparecer uma única vez
+    const plusMatches = trimmed.match(/\+/g) || [];
+    if (plusMatches.length > 1 || (plusMatches.length === 1 && !trimmed.startsWith('+'))) {
+      return false;
+    }
+
+    // Aceita formato nacional e internacional (E.164 até 15 dígitos)
+    const cleanPhone = trimmed.replace(/\D/g, '');
+    return cleanPhone.length >= 8 && cleanPhone.length <= 15;
   };
 
   // ========================================
@@ -383,7 +476,24 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     // Limpar erro do campo específico quando usuário começa a digitar
-    setErrors((prev) => prev.filter((err) => err.field !== name));
+    setErrors((prev) =>
+      prev.filter((err) => {
+        if (err.field === name) {
+          return false;
+        }
+
+        if (
+          err.field === 'contato' &&
+          ['cliente_id', 'nomeContato', 'emailContato', 'telefoneContato', 'empresaContato'].includes(
+            name,
+          )
+        ) {
+          return false;
+        }
+
+        return true;
+      }),
+    );
   };
 
   const handleNumberChange = (name: string, value: string) => {
@@ -516,10 +626,9 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
     if (loading) return; // Não permitir fechar enquanto está salvando
 
     // Verificar se há mudanças não salvas
-    const hasChanges = oportunidade
-      ? formData.titulo !== oportunidade.titulo ||
-        formData.descricao !== (oportunidade.descricao || '') ||
-        formData.valor !== Number(oportunidade.valor)
+    const currentSnapshot = buildFormSnapshot(formData);
+    const hasChanges = initialFormSnapshot
+      ? currentSnapshot !== initialFormSnapshot
       : formData.titulo.trim() !== '' || formData.descricao.trim() !== '';
 
     if (hasChanges) {
@@ -1052,9 +1161,9 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
                 </div>
 
                 {/* Informações de Contato */}
-                <div className="bg-blue-50/50 rounded-lg p-6 border border-blue-100">
+                <div className="bg-[#DEEFE7]/20 rounded-lg p-6 border border-[#DEEFE7]">
                   <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
-                    <User className="h-5 w-5 text-blue-600" />
+                    <User className="h-5 w-5 text-[#159A9C]" />
                     Informações de Contato
                   </h3>
 
@@ -1216,18 +1325,32 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
                           name="telefoneContato"
                           value={formData.telefoneContato}
                           onChange={handleChange}
-                          placeholder="(11) 98765-4321"
+                          inputMode="tel"
+                          autoComplete="tel"
+                          maxLength={20}
+                          placeholder="+55 11 98765-4321"
                           className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm ${
                             getFieldError('telefoneContato')
                               ? 'border-red-300 bg-red-50'
                               : 'border-[#B4BEC9] bg-white'
                           }`}
+                          aria-invalid={Boolean(getFieldError('telefoneContato'))}
+                          aria-describedby={
+                            getFieldError('telefoneContato')
+                              ? 'oportunidade-telefone-error'
+                              : 'oportunidade-telefone-help'
+                          }
                           disabled={loading}
                         />
                       </div>
                       {getFieldError('telefoneContato') && (
-                        <p className="mt-1 text-xs text-red-600">
+                        <p id="oportunidade-telefone-error" className="mt-1 text-xs text-red-600">
                           {getFieldError('telefoneContato')}
+                        </p>
+                      )}
+                      {!getFieldError('telefoneContato') && (
+                        <p id="oportunidade-telefone-help" className="mt-1 text-xs text-[#002333]/60">
+                          Aceita formato nacional e internacional (ex.: +55 11 98765-4321)
                         </p>
                       )}
                     </div>
@@ -1256,9 +1379,9 @@ const ModalOportunidadeRefatorado: React.FC<ModalOportunidadeProps> = ({
                 </div>
 
                 {/* Responsável */}
-                <div className="bg-purple-50/50 rounded-lg p-6 border border-purple-100">
+                <div className="bg-[#F6FAFB] rounded-lg p-6 border border-[#DEEFE7]">
                   <h3 className="text-lg font-semibold text-[#002333] mb-4 flex items-center gap-2">
-                    <User className="h-5 w-5 text-purple-600" />
+                    <User className="h-5 w-5 text-[#159A9C]" />
                     Atribuição
                   </h3>
 

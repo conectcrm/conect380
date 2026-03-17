@@ -1,5 +1,3 @@
-import { useMemo } from 'react';
-
 interface Produto {
   id: string;
   nome: string;
@@ -33,37 +31,36 @@ export const useCalculosProposta = (
     return Number.isFinite(parsed) ? parsed : fallback;
   };
 
-  const totais = useMemo((): TotaisProposta => {
-    // Sempre recalcula com base em preco x quantidade - desconto para evitar subtotal stale.
-    const subtotal = produtos.reduce((acc, item) => {
-      const quantidade = Math.max(1, toFiniteNumber(item.quantidade, 1));
-      const preco = Math.max(0, toFiniteNumber(item.produto?.preco, 0));
-      const descontoItem = Math.min(100, Math.max(0, toFiniteNumber(item.desconto, 0)));
-      const subtotalItem = preco * quantidade * (1 - descontoItem / 100);
-      return acc + subtotalItem;
-    }, 0);
+  // Recalcular sempre com base em preço x quantidade - desconto.
+  // Evita totais "congelados" quando o formulário atualiza itens sem trocar a referência do array.
+  const subtotal = produtos.reduce((acc, item) => {
+    const quantidade = Math.max(1, toFiniteNumber(item.quantidade, 1));
+    const preco = Math.max(0, toFiniteNumber(item.produto?.preco, 0));
+    const descontoItem = Math.min(100, Math.max(0, toFiniteNumber(item.desconto, 0)));
+    const subtotalItem = preco * quantidade * (1 - descontoItem / 100);
+    return acc + subtotalItem;
+  }, 0);
 
-    // Calcular desconto global
-    const descontoGlobalPercentual = Math.min(100, Math.max(0, toFiniteNumber(descontoGlobal, 0)));
-    const desconto = subtotal * (descontoGlobalPercentual / 100);
+  // Calcular desconto global
+  const descontoGlobalPercentual = Math.min(100, Math.max(0, toFiniteNumber(descontoGlobal, 0)));
+  const desconto = subtotal * (descontoGlobalPercentual / 100);
 
-    // Subtotal com desconto
-    const subtotalComDesconto = subtotal - desconto;
+  // Subtotal com desconto
+  const subtotalComDesconto = subtotal - desconto;
 
-    // Calcular impostos sobre o valor com desconto
-    const impostoPercentual = Math.min(100, Math.max(0, toFiniteNumber(percentualImpostos, 0)));
-    const impostos = subtotalComDesconto * (impostoPercentual / 100);
+  // Calcular impostos sobre o valor com desconto
+  const impostoPercentual = Math.min(100, Math.max(0, toFiniteNumber(percentualImpostos, 0)));
+  const impostos = subtotalComDesconto * (impostoPercentual / 100);
 
-    // Total final
-    const total = subtotalComDesconto + impostos;
+  // Total final
+  const total = subtotalComDesconto + impostos;
 
-    return {
-      subtotal,
-      desconto,
-      impostos,
-      total,
-    };
-  }, [produtos, descontoGlobal, percentualImpostos]);
+  const totais: TotaisProposta = {
+    subtotal,
+    desconto,
+    impostos,
+    total,
+  };
 
   const calcularSubtotalProduto = (
     produto: Produto,

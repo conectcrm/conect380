@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   Post,
@@ -387,6 +388,32 @@ export class OportunidadesController {
     @Request() req,
   ) {
     const oportunidade = await this.oportunidadesService.findOne(id, empresaId);
+    const lifecycleStatus =
+      oportunidade.lifecycle_status ||
+      (oportunidade.estagio === EstagioOportunidade.GANHO
+        ? LifecycleStatusOportunidade.WON
+        : oportunidade.estagio === EstagioOportunidade.PERDIDO
+          ? LifecycleStatusOportunidade.LOST
+          : LifecycleStatusOportunidade.OPEN);
+
+    if (lifecycleStatus !== LifecycleStatusOportunidade.OPEN) {
+      throw new BadRequestException(
+        'Rascunho de proposta disponivel apenas para oportunidades abertas.',
+      );
+    }
+
+    const estagiosPermitidosParaRascunho = new Set<EstagioOportunidade>([
+      EstagioOportunidade.PROPOSTA,
+      EstagioOportunidade.NEGOCIACAO,
+      EstagioOportunidade.FECHAMENTO,
+    ]);
+
+    if (!estagiosPermitidosParaRascunho.has(oportunidade.estagio)) {
+      throw new BadRequestException(
+        'Rascunho de proposta disponivel apenas nos estagios Proposta, Negociacao ou Fechamento.',
+      );
+    }
+
     const salesFeatureFlags = await this.oportunidadesService.getSalesFeatureFlags(empresaId);
     const allowPreliminaryItems = salesFeatureFlags.opportunityPreliminaryItems.enabled;
     const draftWithoutPlaceholder = salesFeatureFlags.pipelineDraftWithoutPlaceholder.enabled;
