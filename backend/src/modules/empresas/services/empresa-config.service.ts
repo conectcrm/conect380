@@ -380,6 +380,8 @@ export class EmpresaConfigService {
     config.aprovacaoNovoUsuario = false;
     config.conviteExpiracaoHoras = 48;
     config.alcadaAprovacaoFinanceira = null;
+    config.comercialLimiteDescontoPercentual = 10;
+    config.comercialAprovacaoInternaHabilitada = true;
 
     // Email/SMTP
     config.emailsHabilitados = true;

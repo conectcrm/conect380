@@ -44,6 +44,7 @@ export enum Permission {
   COMERCIAL_PROPOSTAS_UPDATE = 'comercial.propostas.update',
   COMERCIAL_PROPOSTAS_DELETE = 'comercial.propostas.delete',
   COMERCIAL_PROPOSTAS_SEND = 'comercial.propostas.send',
+  COMERCIAL_PROPOSTAS_APPROVE_OVERRIDE = 'comercial.propostas.approve.override',
 
   ATENDIMENTO_CHATS_READ = 'atendimento.chats.read',
   ATENDIMENTO_CHATS_REPLY = 'atendimento.chats.reply',
@@ -113,6 +114,7 @@ const COMERCIAL_FULL_PERMISSIONS: Permission[] = [
   Permission.COMERCIAL_PROPOSTAS_UPDATE,
   Permission.COMERCIAL_PROPOSTAS_DELETE,
   Permission.COMERCIAL_PROPOSTAS_SEND,
+  Permission.COMERCIAL_PROPOSTAS_APPROVE_OVERRIDE,
 ];
 
 const ATENDIMENTO_MANAGER_PERMISSIONS: Permission[] = [
@@ -380,6 +382,10 @@ export const PERMISSION_CATALOG_GROUPS: PermissionCatalogGroup[] = [
       { value: Permission.COMERCIAL_PROPOSTAS_UPDATE, label: 'Propostas: editar' },
       { value: Permission.COMERCIAL_PROPOSTAS_DELETE, label: 'Propostas: excluir' },
       { value: Permission.COMERCIAL_PROPOSTAS_SEND, label: 'Propostas: enviar' },
+      {
+        value: Permission.COMERCIAL_PROPOSTAS_APPROVE_OVERRIDE,
+        label: 'Propostas: override aprovar rascunho',
+      },
     ],
   },
   {

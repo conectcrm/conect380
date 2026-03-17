@@ -5,6 +5,7 @@ import { OportunidadesController } from './oportunidades.controller';
 import { Oportunidade } from './oportunidade.entity';
 import { Atividade } from './atividade.entity';
 import { OportunidadeStageEvent } from './oportunidade-stage-event.entity';
+import { OportunidadeItemPreliminar } from './oportunidade-item-preliminar.entity';
 import { DashboardV2Module } from '../dashboard-v2/dashboard-v2.module';
 import { PropostasModule } from '../propostas/propostas.module';
 import { FeatureFlagTenant } from '../dashboard-v2/entities/feature-flag-tenant.entity';
@@ -20,6 +21,7 @@ import { NotificationModule } from '../../notifications/notification.module';
       Oportunidade,
       Atividade,
       OportunidadeStageEvent,
+      OportunidadeItemPreliminar,
       FeatureFlagTenant,
       Empresa,
       Lead,

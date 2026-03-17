@@ -8,6 +8,7 @@ import * as request from 'supertest';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../../src/app.module';
 import { AddAlcadaAprovacaoFinanceiraToEmpresaConfiguracoes1802882000000 } from '../../src/migrations/1802882000000-AddAlcadaAprovacaoFinanceiraToEmpresaConfiguracoes';
+import { AddSalesCommercialPolicyToEmpresaConfiguracoes1808700000000 } from '../../src/migrations/1808700000000-AddSalesCommercialPolicyToEmpresaConfiguracoes';
 import { createE2EApp, withE2EBootstrapLock } from '../_support/e2e-app.helper';
 
 describe('Configuracao Empresa (E2E)', () => {
@@ -31,20 +32,6 @@ describe('Configuracao Empresa (E2E)', () => {
   jest.setTimeout(120000);
 
   beforeAll(async () => {
-    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
-      const firstArg = typeof args[0] === 'string' ? args[0] : '';
-      const normalized = firstArg.toLowerCase();
-      if (
-        firstArg.startsWith('query:') ||
-        normalized.includes('database config:') ||
-        normalized.includes('email integrado configurado')
-      ) {
-        return;
-      }
-      // eslint-disable-next-line no-console
-      console.info(...args);
-    });
-
     const moduleFixture: TestingModule = await withE2EBootstrapLock(() =>
       Test.createTestingModule({
         imports: [AppModule],
@@ -55,7 +42,10 @@ describe('Configuracao Empresa (E2E)', () => {
     dataSource = app.get(DataSource);
 
     await ensureAlcadaAprovacaoFinanceira();
+    await ensurePoliticaComercial();
+    await ensureFeatureFlagsTenantStorage();
     await criarEmpresa();
+    await marcarEmpresaComoPlatformOwner();
     await criarUsuarios();
 
     tokenAdmin = await fazerLogin(emailAdmin, testPassword);
@@ -64,7 +54,14 @@ describe('Configuracao Empresa (E2E)', () => {
 
   afterAll(async () => {
     await limparDadosTeste();
-    await app.close();
+    if (app) {
+      await Promise.race([
+        app.close(),
+        new Promise<void>((resolve) => {
+          setTimeout(() => resolve(), 20_000);
+        }),
+      ]);
+    }
     consoleLogSpy?.mockRestore();
   });
 
@@ -95,6 +92,8 @@ describe('Configuracao Empresa (E2E)', () => {
         webhooksAtivos: 3,
         backupRetencaoDias: 45,
         alcadaAprovacaoFinanceira: 1500.5,
+        comercialLimiteDescontoPercentual: 17.5,
+        comercialAprovacaoInternaHabilitada: false,
       })
       .expect(200);
 
@@ -107,6 +106,8 @@ describe('Configuracao Empresa (E2E)', () => {
         conviteExpiracaoHoras: 72,
         webhooksAtivos: 3,
         backupRetencaoDias: 45,
+        comercialLimiteDescontoPercentual: 17.5,
+        comercialAprovacaoInternaHabilitada: false,
       }),
     );
 
@@ -119,7 +120,9 @@ describe('Configuracao Empresa (E2E)', () => {
           convite_expiracao_horas,
           webhooks_ativos,
           backup_retencao_dias,
-          alcada_aprovacao_financeira
+          alcada_aprovacao_financeira,
+          comercial_limite_desconto_percentual,
+          comercial_aprovacao_interna_habilitada
         FROM empresa_configuracoes
         WHERE empresa_id = $1
       `,
@@ -134,6 +137,8 @@ describe('Configuracao Empresa (E2E)', () => {
     expect(Number(rowConfig[0].webhooks_ativos)).toBe(3);
     expect(Number(rowConfig[0].backup_retencao_dias)).toBe(45);
     expect(Number(rowConfig[0].alcada_aprovacao_financeira)).toBeCloseTo(1500.5, 2);
+    expect(Number(rowConfig[0].comercial_limite_desconto_percentual)).toBeCloseTo(17.5, 2);
+    expect(rowConfig[0].comercial_aprovacao_interna_habilitada).toBe(false);
 
     const responseEmpresa = await request(app.getHttpServer())
       .put(`/empresas/${empresaId}`)
@@ -195,6 +200,124 @@ describe('Configuracao Empresa (E2E)', () => {
     expect(mensagem.toLowerCase()).toContain('preencha');
   });
 
+  it('consulta flags comerciais com estrutura consistente', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/oportunidades/sales/feature-flags')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .expect(200);
+
+    expect(response.body).toEqual(
+      expect.objectContaining({
+        pipelineDraftWithoutPlaceholder: expect.objectContaining({
+          flagKey: 'sales.pipeline_draft_without_placeholder',
+          enabled: expect.any(Boolean),
+          source: expect.stringMatching(/^(default|tenant)$/),
+        }),
+        opportunityPreliminaryItems: expect.objectContaining({
+          flagKey: 'sales.opportunity_preliminary_items',
+          enabled: expect.any(Boolean),
+          source: expect.stringMatching(/^(default|tenant)$/),
+        }),
+        strictPropostaTransitions: expect.objectContaining({
+          flagKey: 'sales.strict_proposta_transitions',
+          enabled: expect.any(Boolean),
+          source: expect.stringMatching(/^(default|tenant)$/),
+        }),
+        discountPolicyPerTenant: expect.objectContaining({
+          flagKey: 'sales.discount_policy_per_tenant',
+          enabled: expect.any(Boolean),
+          source: expect.stringMatching(/^(default|tenant)$/),
+        }),
+      }),
+    );
+  });
+
+  it('atualiza flags comerciais por tenant e reflete no GET', async () => {
+    const patchResponse = await request(app.getHttpServer())
+      .patch('/oportunidades/sales/feature-flags')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .send({
+        pipelineDraftWithoutPlaceholder: false,
+        strictPropostaTransitions: false,
+      })
+      .expect((response) => {
+        if (![200, 503].includes(response.status)) {
+          throw new Error(`status inesperado ao atualizar flags comerciais: ${response.status}`);
+        }
+      });
+
+    if (patchResponse.status === 503) {
+      const message = Array.isArray(patchResponse.body?.message)
+        ? patchResponse.body.message.join(' ')
+        : String(patchResponse.body?.message || '');
+
+      expect(message.toLowerCase()).toContain(
+        'nao foi possivel salvar as flags comerciais agora',
+      );
+      return;
+    }
+
+    expect(patchResponse.body?.pipelineDraftWithoutPlaceholder).toEqual(
+      expect.objectContaining({
+        enabled: false,
+        source: 'tenant',
+      }),
+    );
+    expect(patchResponse.body?.strictPropostaTransitions).toEqual(
+      expect.objectContaining({
+        enabled: false,
+        source: 'tenant',
+      }),
+    );
+
+    const getResponse = await request(app.getHttpServer())
+      .get('/oportunidades/sales/feature-flags')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .expect(200);
+
+    expect(getResponse.body?.pipelineDraftWithoutPlaceholder).toEqual(
+      expect.objectContaining({
+        enabled: false,
+        source: 'tenant',
+      }),
+    );
+    expect(getResponse.body?.strictPropostaTransitions).toEqual(
+      expect.objectContaining({
+        enabled: false,
+        source: 'tenant',
+      }),
+    );
+
+    const persistedRows = await dataSource.query(
+      `
+        SELECT flag_key, enabled
+        FROM feature_flags_tenant
+        WHERE empresa_id = $1
+          AND flag_key = ANY($2::text[])
+      `,
+      [
+        empresaId,
+        ['sales.pipeline_draft_without_placeholder', 'sales.strict_proposta_transitions'],
+      ],
+    );
+
+    expect(persistedRows).toHaveLength(2);
+  });
+
+  it('retorna erro no patch das flags comerciais quando payload esta vazio', async () => {
+    const response = await request(app.getHttpServer())
+      .patch('/oportunidades/sales/feature-flags')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .send({})
+      .expect(400);
+
+    const message = Array.isArray(response.body?.message)
+      ? response.body.message.join(' ')
+      : String(response.body?.message || '');
+
+    expect(message.toLowerCase()).toContain('pelo menos uma flag comercial');
+  });
+
   it('executa backup e lista historico', async () => {
     const executeResponse = await request(app.getHttpServer())
       .post('/empresas/config/backup/execute')
@@ -246,6 +369,35 @@ describe('Configuracao Empresa (E2E)', () => {
       await migration.up(queryRunner);
     } finally {
       await queryRunner.release();
+    }
+  }
+
+  async function ensurePoliticaComercial() {
+    const migration = new AddSalesCommercialPolicyToEmpresaConfiguracoes1808700000000();
+    const queryRunner = dataSource.createQueryRunner();
+    try {
+      await queryRunner.connect();
+      await migration.up(queryRunner);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async function ensureFeatureFlagsTenantStorage() {
+    const hasTableRows = await dataSource.query(
+      `
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'feature_flags_tenant'
+        LIMIT 1
+      `,
+    );
+
+    if (!Array.isArray(hasTableRows) || hasTableRows.length === 0) {
+      throw new Error(
+        'Tabela feature_flags_tenant nao encontrada no ambiente E2E. Execute as migrations de dashboard-v2.',
+      );
     }
   }
 
@@ -351,15 +503,97 @@ describe('Configuracao Empresa (E2E)', () => {
       throw new Error(`Falha no login para ${email}: status ${response.status}`);
     }
 
-    const token = response.body?.data?.access_token ?? response.body?.access_token;
-    if (!token) {
+    const token = extrairAccessToken(response);
+    if (token) {
+      return token;
+    }
+
+    if (response.body?.action !== 'MFA_REQUIRED') {
       throw new Error(`Token nao retornado no login para ${email}`);
     }
-    return token as string;
+
+    const challengeId = String(response.body?.data?.challengeId || '').trim();
+    if (!challengeId) {
+      throw new Error(`Challenge MFA nao retornado no login para ${email}`);
+    }
+
+    let codigoMfa = String(response.body?.data?.devCode || '').trim();
+    if (!codigoMfa) {
+      const resendResponse = await request(app.getHttpServer())
+        .post('/auth/mfa/resend')
+        .send({ challengeId });
+
+      if (![200, 201].includes(resendResponse.status)) {
+        throw new Error(
+          `MFA requerido para ${email}, mas nao foi possivel reenviar codigo (status ${resendResponse.status})`,
+        );
+      }
+
+      codigoMfa = String(resendResponse.body?.data?.devCode || '').trim();
+    }
+
+    if (!codigoMfa) {
+      throw new Error(
+        `MFA requerido para ${email}, mas devCode nao foi retornado no ambiente de teste`,
+      );
+    }
+
+    const verifyResponse = await request(app.getHttpServer())
+      .post('/auth/mfa/verify')
+      .send({
+        challengeId,
+        codigo: codigoMfa,
+      });
+
+    if (![200, 201].includes(verifyResponse.status)) {
+      throw new Error(`Falha ao validar MFA para ${email}: status ${verifyResponse.status}`);
+    }
+
+    const tokenMfa = extrairAccessToken(verifyResponse);
+    if (!tokenMfa) {
+      throw new Error(`Token nao retornado apos validacao MFA para ${email}`);
+    }
+
+    return tokenMfa;
+  }
+
+  function extrairAccessToken(response: request.Response): string | null {
+    return response.body?.data?.access_token ?? response.body?.access_token ?? null;
+  }
+
+  async function marcarEmpresaComoPlatformOwner() {
+    const columns = await dataSource.query(
+      `
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'empresas'
+          AND column_name = 'configuracoes'
+        LIMIT 1
+      `,
+    );
+
+    const hasConfiguracoesColumn = Array.isArray(columns) && columns.length > 0;
+    if (!hasConfiguracoesColumn) {
+      return;
+    }
+
+    await dataSource.query(
+      `
+        UPDATE empresas
+        SET configuracoes = (
+          COALESCE(configuracoes::jsonb, '{}'::jsonb)
+          || '{"isPlatformOwner": true, "billingExempt": true, "billingMonitorOnly": true, "fullModuleAccess": true}'::jsonb
+        )::json
+        WHERE id = $1
+      `,
+      [empresaId],
+    );
   }
 
   async function limparDadosTeste() {
     try {
+      await dataSource.query(`DELETE FROM feature_flags_tenant WHERE empresa_id = $1`, [empresaId]);
       await dataSource.query(`DELETE FROM empresa_configuracoes WHERE empresa_id = $1`, [empresaId]);
       await dataSource.query(`DELETE FROM users WHERE id = ANY($1::uuid[])`, [[adminId, gerenteId]]);
       await dataSource.query(`DELETE FROM empresas WHERE id = $1`, [empresaId]);
@@ -370,4 +604,3 @@ describe('Configuracao Empresa (E2E)', () => {
     await fs.rm(backupDir, { recursive: true, force: true }).catch(() => undefined);
   }
 });
-

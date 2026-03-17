@@ -31,6 +31,7 @@ import {
   PropostaCompleta,
   Vendedor,
 } from '../../features/propostas/services/propostasService';
+import { MENSAGEM_PROPOSTA_SEM_ITENS } from '../../features/propostas/utils/propostaItens';
 import { clientesService, Cliente as ClienteService } from '../../services/clientesService';
 import { gerarTokenNumerico } from '../../utils/tokenUtils';
 import { matchesLocalSearchTerm, normalizeSearchValue } from '../../utils/localSearch';
@@ -502,6 +503,9 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
   const watchedDescontoGlobal = watch('descontoGlobal');
   const watchedImpostos = watch('impostos');
   const watchedFormaPagamento = watch('formaPagamento');
+  const rascunhoPipelineSemItens =
+    Boolean(contextMessage && contextMessage.toLowerCase().includes('rascunho criado')) &&
+    produtos.length === 0;
 
   // Memoização do vendedor para evitar re-renders
   const vendedorMemoized = useMemo(() => watchedVendedor, [watchedVendedor?.id]);
@@ -1125,7 +1129,9 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                 {isEditMode ? 'Editar Rascunho de Proposta' : 'Nova Proposta'}
               </h2>
               {contextMessage && (
-                <p className="mt-1 text-sm text-[#607B89]">{contextMessage}</p>
+                <div className="mt-2 rounded-md border border-[#F4D58D] bg-[#FFF7ED] px-3 py-2">
+                  <p className="text-sm text-[#92400E]">{contextMessage}</p>
+                </div>
               )}
             </div>
             <button
@@ -1650,8 +1656,31 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
                 <div>
                   <h4 className="font-medium text-gray-900 mb-3">Produtos Adicionados</h4>
                   {produtos.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
-                      Nenhum produto adicionado. Clique em "Adicionar Produto" para começar.
+                    <div
+                      className={`rounded-lg border px-4 py-5 ${
+                        rascunhoPipelineSemItens
+                          ? 'border-[#F4D58D] bg-[#FFF7ED]'
+                          : 'border-[#DCE7EB] bg-gray-50'
+                      }`}
+                    >
+                      <p
+                        className={`text-sm font-medium ${
+                          rascunhoPipelineSemItens ? 'text-[#92400E]' : 'text-[#244455]'
+                        }`}
+                      >
+                        {rascunhoPipelineSemItens
+                          ? 'Rascunho sem itens comerciais.'
+                          : 'Nenhum produto adicionado ainda.'}
+                      </p>
+                      <p
+                        className={`mt-1 text-sm ${
+                          rascunhoPipelineSemItens ? 'text-[#92400E]' : 'text-[#607B89]'
+                        }`}
+                      >
+                        {rascunhoPipelineSemItens
+                          ? `${MENSAGEM_PROPOSTA_SEM_ITENS} Clique em "Adicionar Produto" para continuar.`
+                          : 'Clique em "Adicionar Produto" para comecar.'}
+                      </p>
                     </div>
                   ) : (
                     <div className="space-y-3">

@@ -13,6 +13,7 @@ import { Produto } from '../modules/produtos/produto.entity';
 import { Oportunidade } from '../modules/oportunidades/oportunidade.entity';
 import { Atividade } from '../modules/oportunidades/atividade.entity';
 import { OportunidadeStageEvent } from '../modules/oportunidades/oportunidade-stage-event.entity';
+import { OportunidadeItemPreliminar } from '../modules/oportunidades/oportunidade-item-preliminar.entity';
 import { Proposta } from '../modules/propostas/proposta.entity';
 import { PropostaPortalToken } from '../modules/propostas/proposta-portal-token.entity';
 import { DashboardPipelineSnapshotDaily } from '../modules/dashboard-v2/entities/dashboard-pipeline-snapshot-daily.entity';
@@ -121,6 +122,7 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         Oportunidade,
         Atividade,
         OportunidadeStageEvent,
+        OportunidadeItemPreliminar,
         Proposta,
         PropostaPortalToken,
         DashboardPipelineSnapshotDaily,

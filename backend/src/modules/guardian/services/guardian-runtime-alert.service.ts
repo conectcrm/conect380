@@ -13,6 +13,11 @@ const SYSTEM_ACTOR_ID = '00000000-0000-0000-0000-000000000000';
 @Injectable()
 export class GuardianRuntimeAlertService implements OnModuleInit {
   private readonly logger = new Logger(GuardianRuntimeAlertService.name);
+  private readonly nodeEnv = String(process.env.NODE_ENV || '').trim().toLowerCase();
+  private readonly appEnv = String(process.env.APP_ENV || '').trim().toLowerCase();
+  private readonly runInTest = String(process.env.GUARDIAN_RUNTIME_ALERT_RUN_IN_TEST || '')
+    .trim()
+    .toLowerCase() === 'true';
 
   constructor(
     private readonly guardianCapabilitiesService: GuardianCapabilitiesService,
@@ -22,6 +27,11 @@ export class GuardianRuntimeAlertService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
+    const isTestRuntime = this.nodeEnv === 'test' || this.appEnv === 'test';
+    if (isTestRuntime && !this.runInTest) {
+      return;
+    }
+
     await this.syncRuntimePolicy();
   }
 

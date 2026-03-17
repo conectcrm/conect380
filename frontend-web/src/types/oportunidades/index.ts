@@ -223,6 +223,26 @@ export interface LifecycleFeatureFlagDecision {
   rolloutPercentage: number;
 }
 
+export interface SalesFeatureFlagDecisionItem {
+  flagKey: string;
+  enabled: boolean;
+  source: 'tenant' | 'default';
+}
+
+export interface SalesFeatureFlagsDecision {
+  pipelineDraftWithoutPlaceholder: SalesFeatureFlagDecisionItem;
+  opportunityPreliminaryItems: SalesFeatureFlagDecisionItem;
+  strictPropostaTransitions: SalesFeatureFlagDecisionItem;
+  discountPolicyPerTenant: SalesFeatureFlagDecisionItem;
+}
+
+export interface UpdateSalesFeatureFlagsPayload {
+  pipelineDraftWithoutPlaceholder?: boolean;
+  opportunityPreliminaryItems?: boolean;
+  strictPropostaTransitions?: boolean;
+  discountPolicyPerTenant?: boolean;
+}
+
 export interface StalePolicyDecision {
   enabled: boolean;
   thresholdDays: number;

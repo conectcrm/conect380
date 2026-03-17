@@ -23,11 +23,13 @@ import {
   ConfiguracoesEmpresa,
   empresaConfigService,
 } from '../../services/empresaConfigService';
+import { oportunidadesService } from '../../services/oportunidadesService';
 import { empresaService, EmpresaResponse } from '../../services/empresaService';
 import { useAuth } from '../../hooks/useAuth';
 import { useGlobalConfirmation } from '../../contexts/GlobalConfirmationContext';
 import { userHasPermission } from '../../config/menuConfig';
 import { toastService } from '../../services/toastService';
+import { SalesFeatureFlagsDecision } from '../../types/oportunidades/index';
 
 const EMPRESA_CONFIG_TABS = [
   { id: 'geral', label: 'Geral', icon: Settings },
@@ -38,6 +40,29 @@ const EMPRESA_CONFIG_TABS = [
 ] as const;
 
 type EmpresaConfigTabId = (typeof EMPRESA_CONFIG_TABS)[number]['id'];
+
+type SalesFeatureFlagsForm = {
+  pipelineDraftWithoutPlaceholder: boolean;
+  opportunityPreliminaryItems: boolean;
+  strictPropostaTransitions: boolean;
+  discountPolicyPerTenant: boolean;
+};
+
+const DEFAULT_SALES_FEATURE_FLAGS_FORM: SalesFeatureFlagsForm = {
+  pipelineDraftWithoutPlaceholder: true,
+  opportunityPreliminaryItems: true,
+  strictPropostaTransitions: true,
+  discountPolicyPerTenant: true,
+};
+
+const mapSalesFeatureFlagsDecisionToForm = (
+  decision?: SalesFeatureFlagsDecision | null,
+): SalesFeatureFlagsForm => ({
+  pipelineDraftWithoutPlaceholder: Boolean(decision?.pipelineDraftWithoutPlaceholder?.enabled),
+  opportunityPreliminaryItems: Boolean(decision?.opportunityPreliminaryItems?.enabled),
+  strictPropostaTransitions: Boolean(decision?.strictPropostaTransitions?.enabled),
+  discountPolicyPerTenant: Boolean(decision?.discountPolicyPerTenant?.enabled),
+});
 
 const isValidEmpresaConfigTab = (tab: string | null): tab is EmpresaConfigTabId =>
   Boolean(tab && EMPRESA_CONFIG_TABS.some((item) => item.id === tab));
@@ -54,6 +79,10 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [formData, setFormData] = useState<Partial<ConfiguracoesEmpresa>>({});
+  const [salesFlagsForm, setSalesFlagsForm] = useState<SalesFeatureFlagsForm>(
+    DEFAULT_SALES_FEATURE_FLAGS_FORM,
+  );
+  const [salesFlagsLoaded, setSalesFlagsLoaded] = useState(false);
   const [empresaData, setEmpresaData] = useState<Partial<EmpresaResponse>>({});
   const [testingSMTP, setTestingSMTP] = useState(false);
   const [smtpTestResult, setSMTPTestResult] = useState<{
@@ -111,10 +140,11 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      const [configData, empresaInfo, snapshots] = await Promise.all([
+      const [configData, empresaInfo, snapshots, salesFeatureFlagsData] = await Promise.all([
         empresaConfigService.getConfig(),
         empresaService.obterEmpresaPorId(empresaId),
         empresaConfigService.getBackupHistory().catch(() => [] as BackupSnapshotInfo[]),
+        oportunidadesService.obterSalesFeatureFlags().catch(() => null),
       ]);
 
       setConfig(configData);
@@ -122,6 +152,13 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
       setEmpresa(empresaInfo);
       setEmpresaData(empresaInfo);
       setBackupHistory(snapshots);
+      if (salesFeatureFlagsData) {
+        setSalesFlagsForm(mapSalesFeatureFlagsDecisionToForm(salesFeatureFlagsData));
+        setSalesFlagsLoaded(true);
+      } else {
+        setSalesFlagsForm(DEFAULT_SALES_FEATURE_FLAGS_FORM);
+        setSalesFlagsLoaded(false);
+      }
     } catch (err: unknown) {
       console.error('Erro ao carregar:', err);
       setError(err instanceof Error ? err.message : 'Erro ao carregar');
@@ -135,6 +172,18 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
       return;
     }
     setFormData((prev) => ({ ...prev, [field]: value }));
+    setHasChanges(true);
+  };
+
+  const handleSalesFlagChange = (field: keyof SalesFeatureFlagsForm, value: boolean) => {
+    if (!canUpdateConfig || !salesFlagsLoaded) {
+      return;
+    }
+
+    setSalesFlagsForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
     setHasChanges(true);
   };
 
@@ -174,6 +223,12 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
       const updatedConfig = await empresaConfigService.updateConfig(formData);
       setConfig(updatedConfig);
       setFormData(updatedConfig);
+      if (salesFlagsLoaded) {
+        const updatedSalesFlags = await oportunidadesService.atualizarSalesFeatureFlags(
+          salesFlagsForm,
+        );
+        setSalesFlagsForm(mapSalesFeatureFlagsDecisionToForm(updatedSalesFlags));
+      }
 
       const updatedEmpresa = await empresaService.atualizarEmpresa(empresaId, empresaData);
       setEmpresa(updatedEmpresa);
@@ -216,6 +271,12 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
       const reset = await empresaConfigService.resetConfig();
       setConfig(reset);
       setFormData(reset);
+      if (salesFlagsLoaded) {
+        const currentSalesFlags = await oportunidadesService.obterSalesFeatureFlags().catch(() => null);
+        if (currentSalesFlags) {
+          setSalesFlagsForm(mapSalesFeatureFlagsDecisionToForm(currentSalesFlags));
+        }
+      }
       setHasChanges(false);
       toastService.success('Configurações restauradas!');
     } catch (err: unknown) {
@@ -960,11 +1021,161 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                       </p>
                     </div>
 
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Limite de desconto comercial (%)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        value={formData.comercialLimiteDescontoPercentual ?? 10}
+                        onChange={(e) =>
+                          handleInputChange(
+                            'comercialLimiteDescontoPercentual',
+                            Number(e.target.value || 0),
+                          )
+                        }
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Descontos acima deste percentual exigem governanca interna da proposta.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Aprovacao interna comercial habilitada
+                        </label>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Quando ativo, propostas acima da alcada de desconto ficam pendentes ate
+                          decisao interna.
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={formData.comercialAprovacaoInternaHabilitada ?? true}
+                        onChange={(e) =>
+                          handleInputChange(
+                            'comercialAprovacaoInternaHabilitada',
+                            e.target.checked,
+                          )
+                        }
+                        className="h-5 w-5 text-[#159A9C] rounded focus:ring-[#159A9C] cursor-pointer"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2 rounded-lg border border-[#DCE6EA] bg-[#F8FBFC] p-4">
+                      <p className="text-sm font-medium text-[#244455]">
+                        Rollout comercial por tenant
+                      </p>
+                      <p className="mt-1 text-xs text-[#607B89]">
+                        Controle fino de comportamento do pipeline e proposta por empresa, sem
+                        depender de deploy.
+                      </p>
+
+                      {!salesFlagsLoaded ? (
+                        <p className="mt-3 text-xs text-amber-700">
+                          Nao foi possivel carregar os feature flags comerciais para esta empresa.
+                        </p>
+                      ) : (
+                        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-3">
+                            <div>
+                              <p className="text-sm font-medium text-gray-700">
+                                Rascunho sem placeholder
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                Evita item generico automatico ao gerar proposta pelo pipeline.
+                              </p>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={salesFlagsForm.pipelineDraftWithoutPlaceholder}
+                              onChange={(e) =>
+                                handleSalesFlagChange(
+                                  'pipelineDraftWithoutPlaceholder',
+                                  e.target.checked,
+                                )
+                              }
+                              disabled={!canUpdateConfig}
+                              className="h-5 w-5 text-[#159A9C] rounded focus:ring-[#159A9C] cursor-pointer"
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-3">
+                            <div>
+                              <p className="text-sm font-medium text-gray-700">
+                                Itens preliminares na oportunidade
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                Habilita CRUD e copia de itens preliminares para o rascunho.
+                              </p>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={salesFlagsForm.opportunityPreliminaryItems}
+                              onChange={(e) =>
+                                handleSalesFlagChange('opportunityPreliminaryItems', e.target.checked)
+                              }
+                              disabled={!canUpdateConfig}
+                              className="h-5 w-5 text-[#159A9C] rounded focus:ring-[#159A9C] cursor-pointer"
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-3">
+                            <div>
+                              <p className="text-sm font-medium text-gray-700">
+                                Transicoes estritas da proposta
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                Bloqueia rascunho para aprovada sem envio e sem override.
+                              </p>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={salesFlagsForm.strictPropostaTransitions}
+                              onChange={(e) =>
+                                handleSalesFlagChange('strictPropostaTransitions', e.target.checked)
+                              }
+                              disabled={!canUpdateConfig}
+                              className="h-5 w-5 text-[#159A9C] rounded focus:ring-[#159A9C] cursor-pointer"
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-3">
+                            <div>
+                              <p className="text-sm font-medium text-gray-700">
+                                Politica de desconto por empresa
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                Aplica alcada comercial do tenant em vez do padrao global.
+                              </p>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={salesFlagsForm.discountPolicyPerTenant}
+                              onChange={(e) =>
+                                handleSalesFlagChange('discountPolicyPerTenant', e.target.checked)
+                              }
+                              disabled={!canUpdateConfig}
+                              className="h-5 w-5 text-[#159A9C] rounded focus:ring-[#159A9C] cursor-pointer"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                     {/* Card Informativo */}
                     <div className="flex items-start gap-3 p-4 bg-[#DEEFE7] rounded-lg border border-[#B4BEC9]">
                       <Info className="h-5 w-5 text-[#159A9C] flex-shrink-0 mt-0.5" />
                       <div>
                         <p className="text-sm font-medium text-[#002333]">Escopo desta aba</p>
+                        <p className="text-[11px] text-[#0F4C5C] mt-1">
+                          Inclui tambem governanca comercial de descontos em propostas.
+                        </p>
                         <p className="text-xs text-[#002333] mt-1">
                           Esta aba controla regras operacionais entre módulos: governança de acessos
                           (dupla aprovação) e aprovação financeira por alçada. Limites de usuários e

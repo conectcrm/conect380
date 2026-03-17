@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsDateString,
   IsArray,
+  IsNotEmpty,
   Min,
   Max,
   IsUUID,
@@ -210,6 +211,107 @@ export class UpdateEstagioDto {
   dataRevisao?: string;
 }
 
+export class CreateOportunidadeItemPreliminarDto {
+  @IsOptional()
+  @IsUUID('4')
+  produto_id?: string | null;
+
+  @IsOptional()
+  @IsUUID('4')
+  catalog_item_id?: string | null;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  nome_snapshot: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  sku_snapshot?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  descricao_snapshot?: string;
+
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  preco_unitario_estimado: number;
+
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0.001)
+  quantidade_estimada: number;
+
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(100)
+  desconto_percentual?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  origem?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  ordem?: number;
+}
+
+export class UpdateOportunidadeItemPreliminarDto {
+  @IsOptional()
+  @IsUUID('4')
+  produto_id?: string | null;
+
+  @IsOptional()
+  @IsUUID('4')
+  catalog_item_id?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  nome_snapshot?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  sku_snapshot?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  descricao_snapshot?: string | null;
+
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  preco_unitario_estimado?: number;
+
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0.001)
+  quantidade_estimada?: number;
+
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(100)
+  desconto_percentual?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  origem?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  ordem?: number;
+}
+
 export enum LifecycleViewOportunidade {
   OPEN = 'open',
   CLOSED = 'closed',
@@ -328,4 +430,22 @@ export class UpdateStalePolicyDto {
   @Min(7)
   @Max(365)
   autoArchiveAfterDays?: number;
+}
+
+export class UpdateSalesFeatureFlagsDto {
+  @IsOptional()
+  @IsBoolean()
+  pipelineDraftWithoutPlaceholder?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  opportunityPreliminaryItems?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  strictPropostaTransitions?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  discountPolicyPerTenant?: boolean;
 }

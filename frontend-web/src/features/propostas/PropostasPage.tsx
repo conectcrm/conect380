@@ -796,7 +796,7 @@ const PropostasPage: React.FC = () => {
         setSelectedPropostaForEdit(propostaCompleta);
         setWizardContextMessage(
           options?.fromPipeline && !propostaPossuiItensComerciais(propostaCompleta)
-            ? `Rascunho criado a partir da oportunidade. ${MENSAGEM_PROPOSTA_SEM_ITENS}`
+            ? `Rascunho criado a partir da oportunidade. Este rascunho ainda nao possui itens comerciais. ${MENSAGEM_PROPOSTA_SEM_ITENS}`
             : null,
         );
         setShowViewModal(false);

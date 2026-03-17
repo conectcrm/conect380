@@ -10,6 +10,8 @@ import {
   DadosKanban,
   EstagioOportunidade,
   LifecycleFeatureFlagDecision,
+  SalesFeatureFlagsDecision,
+  UpdateSalesFeatureFlagsPayload,
   LifecycleStatusOportunidade,
   LifecycleViewOportunidade,
   OportunidadeHistoricoEstagioItem,
@@ -176,6 +178,18 @@ class OportunidadesService {
 
   async obterLifecycleFeatureFlag(): Promise<LifecycleFeatureFlagDecision> {
     const response = await api.get(this.getUrl('/lifecycle/feature-flag'));
+    return response.data;
+  }
+
+  async obterSalesFeatureFlags(): Promise<SalesFeatureFlagsDecision> {
+    const response = await api.get(this.getUrl('/sales/feature-flags'));
+    return response.data;
+  }
+
+  async atualizarSalesFeatureFlags(
+    payload: UpdateSalesFeatureFlagsPayload,
+  ): Promise<SalesFeatureFlagsDecision> {
+    const response = await api.patch(this.getUrl('/sales/feature-flags'), payload);
     return response.data;
   }
 

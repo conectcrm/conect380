@@ -1,4 +1,11 @@
-import { BadRequestException, forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { isUUID } from 'class-validator';
 import { In, Like, Repository } from 'typeorm';
@@ -12,7 +19,11 @@ import {
   EstagioOportunidade,
   LifecycleStatusOportunidade,
 } from '../oportunidades/oportunidade.entity';
-import { OportunidadesService } from '../oportunidades/oportunidades.service';
+import {
+  OportunidadesService,
+  SalesFeatureFlagName,
+} from '../oportunidades/oportunidades.service';
+import { Permission } from '../../common/permissions/permissions.constants';
 
 type SalesFlowStatus =
   | 'rascunho'
@@ -105,7 +116,7 @@ const OPORTUNIDADE_SYNC_FORWARD_ORDER: readonly EstagioOportunidade[] = [
 ];
 
 const FLOW_STATUS_TRANSITIONS: Record<SalesFlowStatus, readonly SalesFlowStatus[]> = {
-  rascunho: ['enviada', 'aprovada', 'rejeitada', 'expirada'],
+  rascunho: ['enviada', 'rejeitada', 'expirada'],
   enviada: ['visualizada', 'negociacao', 'aprovada', 'rejeitada', 'expirada'],
   visualizada: ['negociacao', 'aprovada', 'rejeitada', 'expirada'],
   negociacao: ['aprovada', 'rejeitada', 'expirada', 'visualizada'],
@@ -182,6 +193,18 @@ interface PropostaLembrete {
   observacoes?: string;
   origem?: string;
 }
+
+type PropostaStatusTransitionContext = {
+  actorUserId?: string;
+  actorPermissions?: string[];
+  allowDirectApprovalOverride?: boolean;
+  overrideReason?: string;
+};
+
+type PropostaCommercialPolicy = {
+  limiteDescontoPercentual: number;
+  aprovacaoInternaHabilitada: boolean;
+};
 
 export interface Proposta {
   id: string;
@@ -270,8 +293,20 @@ export class PropostasService {
   private tableColumnTypeCache = new Map<string, string | null>();
   private tableColumnNullableCache = new Map<string, boolean | null>();
   private readonly APROVACAO_DESCONTO_PADRAO = 10;
+  private readonly APROVACAO_INTERNA_HABILITADA_PADRAO = true;
   private readonly MAX_HISTORICO_EVENTOS = 200;
   private readonly MAX_VERSOES = 50;
+  private readonly COMMERCIAL_POLICY_CACHE_TTL_MS = Math.max(
+    0,
+    Number(process.env.PROPOSTAS_COMMERCIAL_POLICY_CACHE_TTL_MS || 0),
+  );
+  private commercialPolicyCache = new Map<
+    string,
+    {
+      expiresAt: number;
+      policy: PropostaCommercialPolicy;
+    }
+  >();
 
   constructor(
     @InjectRepository(PropostaEntity)
@@ -1255,6 +1290,21 @@ export class PropostasService {
     return FLOW_STATUS_TRANSITIONS[currentStatus] || [];
   }
 
+  private getAllowedStatusTransitionsByPolicy(
+    currentStatus: SalesFlowStatus,
+    strictTransitionsEnabled: boolean,
+  ): readonly SalesFlowStatus[] {
+    const baseTransitions = [...this.getAllowedStatusTransitions(currentStatus)];
+
+    if (!strictTransitionsEnabled && currentStatus === 'rascunho') {
+      if (!baseTransitions.includes('aprovada')) {
+        baseTransitions.push('aprovada');
+      }
+    }
+
+    return baseTransitions;
+  }
+
   private isStatusTransitionAllowed(
     currentStatus: SalesFlowStatus,
     nextStatus: SalesFlowStatus,
@@ -1264,6 +1314,73 @@ export class PropostasService {
     }
 
     return this.getAllowedStatusTransitions(currentStatus).includes(nextStatus);
+  }
+
+  private isStatusTransitionAllowedByPolicy(
+    currentStatus: SalesFlowStatus,
+    nextStatus: SalesFlowStatus,
+    strictTransitionsEnabled: boolean,
+  ): boolean {
+    if (currentStatus === nextStatus) {
+      return true;
+    }
+
+    return this.getAllowedStatusTransitionsByPolicy(currentStatus, strictTransitionsEnabled).includes(
+      nextStatus,
+    );
+  }
+
+  private isDirectDraftApprovalTransition(
+    currentStatus: SalesFlowStatus,
+    nextStatus: SalesFlowStatus,
+  ): boolean {
+    return currentStatus === 'rascunho' && nextStatus === 'aprovada';
+  }
+
+  private normalizeOverrideReason(value: unknown): string | null {
+    const normalized = String(value || '').trim();
+    return normalized.length > 0 ? normalized : null;
+  }
+
+  private hasPermission(
+    actorPermissions: unknown,
+    targetPermission: Permission,
+  ): boolean {
+    if (!Array.isArray(actorPermissions) || actorPermissions.length === 0) {
+      return false;
+    }
+
+    return actorPermissions.some(
+      (permission) =>
+        typeof permission === 'string' &&
+        permission.trim().toLowerCase() === targetPermission.toLowerCase(),
+    );
+  }
+
+  private async resolveSalesFeatureFlag(
+    empresaId: string | undefined,
+    flagName: SalesFeatureFlagName,
+    fallback: boolean,
+  ): Promise<boolean> {
+    try {
+      return await this.oportunidadesService.isSalesFeatureEnabledForTenant(empresaId, flagName);
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao resolver feature flag ${flagName}. Aplicando fallback=${fallback}. Motivo: ${this.resolveErrorMessage(
+          error,
+          'erro desconhecido',
+        )}`,
+      );
+      return fallback;
+    }
+  }
+
+  private async isStrictPropostaTransitionsEnabled(empresaId?: string): Promise<boolean> {
+    return this.resolveSalesFeatureFlag(empresaId, 'strictPropostaTransitions', true);
+  }
+
+  private async isDiscountPolicyPerTenantEnabled(empresaId?: string): Promise<boolean> {
+    return this.resolveSalesFeatureFlag(empresaId, 'discountPolicyPerTenant', true);
   }
 
   private mapFlowStatusToDatabaseStatus(status: SalesFlowStatus, legacySchema: boolean): string {
@@ -1578,13 +1695,131 @@ export class PropostasService {
     return Math.max(descontoGlobalPercentual, ...descontosProdutos, 0);
   }
 
+  private getDefaultCommercialPolicy(): PropostaCommercialPolicy {
+    return {
+      limiteDescontoPercentual: this.APROVACAO_DESCONTO_PADRAO,
+      aprovacaoInternaHabilitada: this.APROVACAO_INTERNA_HABILITADA_PADRAO,
+    };
+  }
+
+  private normalizeCommercialDiscountLimit(value: unknown): number {
+    const normalized = this.toFiniteNumber(value, this.APROVACAO_DESCONTO_PADRAO);
+    return Math.max(0, Math.min(100, normalized));
+  }
+
+  private normalizeCommercialApprovalToggle(value: unknown): boolean {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === 'true' || normalized === '1') {
+        return true;
+      }
+      if (normalized === 'false' || normalized === '0') {
+        return false;
+      }
+    }
+
+    return this.APROVACAO_INTERNA_HABILITADA_PADRAO;
+  }
+
+  private async resolveCommercialPolicy(empresaId?: string): Promise<PropostaCommercialPolicy> {
+    const defaultPolicy = this.getDefaultCommercialPolicy();
+    const normalizedEmpresaId = String(empresaId || '').trim();
+    if (!normalizedEmpresaId) {
+      return defaultPolicy;
+    }
+
+    const discountPolicyPerTenantEnabled =
+      await this.isDiscountPolicyPerTenantEnabled(normalizedEmpresaId);
+    if (!discountPolicyPerTenantEnabled) {
+      return defaultPolicy;
+    }
+
+    if (this.COMMERCIAL_POLICY_CACHE_TTL_MS > 0) {
+      const cached = this.commercialPolicyCache.get(normalizedEmpresaId);
+      if (cached && cached.expiresAt > Date.now()) {
+        return cached.policy;
+      }
+    }
+
+    try {
+      const configColumns = await this.getTableColumns('empresa_configuracoes');
+      if (
+        !configColumns.has('comercial_limite_desconto_percentual') ||
+        !configColumns.has('comercial_aprovacao_interna_habilitada')
+      ) {
+        return defaultPolicy;
+      }
+
+      const rows = await this.propostaRepository.query(
+        `
+          SELECT
+            comercial_limite_desconto_percentual,
+            comercial_aprovacao_interna_habilitada
+          FROM empresa_configuracoes
+          WHERE empresa_id = $1
+          LIMIT 1
+        `,
+        [normalizedEmpresaId],
+      );
+
+      const row = this.extractQueryRows<Record<string, unknown>>(rows)?.[0];
+      if (!row) {
+        return defaultPolicy;
+      }
+
+      const policy: PropostaCommercialPolicy = {
+        limiteDescontoPercentual: this.normalizeCommercialDiscountLimit(
+          row.comercial_limite_desconto_percentual,
+        ),
+        aprovacaoInternaHabilitada: this.normalizeCommercialApprovalToggle(
+          row.comercial_aprovacao_interna_habilitada,
+        ),
+      };
+
+      if (this.COMMERCIAL_POLICY_CACHE_TTL_MS > 0) {
+        this.commercialPolicyCache.set(normalizedEmpresaId, {
+          expiresAt: Date.now() + this.COMMERCIAL_POLICY_CACHE_TTL_MS,
+          policy,
+        });
+      }
+
+      return policy;
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao carregar politica comercial da empresa ${normalizedEmpresaId}. Aplicando padrao. Motivo: ${this.resolveErrorMessage(error, 'erro desconhecido')}`,
+      );
+      return defaultPolicy;
+    }
+  }
+
   private calcularAprovacaoInterna(
     descontoGlobal?: unknown,
     produtos?: unknown,
     atual?: PropostaAprovacaoInterna | null,
+    policy?: PropostaCommercialPolicy | null,
   ): PropostaAprovacaoInterna {
-    const limiteDesconto = this.APROVACAO_DESCONTO_PADRAO;
+    const resolvedPolicy = policy || this.getDefaultCommercialPolicy();
+    const limiteDesconto = this.normalizeCommercialDiscountLimit(
+      resolvedPolicy.limiteDescontoPercentual,
+    );
     const descontoDetectado = this.getMaxDescontoPercentual(descontoGlobal, produtos);
+    const aprovacaoInternaHabilitada = this.normalizeCommercialApprovalToggle(
+      resolvedPolicy.aprovacaoInternaHabilitada,
+    );
+
+    if (!aprovacaoInternaHabilitada) {
+      return {
+        obrigatoria: false,
+        status: 'nao_requer',
+        limiteDesconto,
+        descontoDetectado,
+      };
+    }
+
     const obrigatoria = descontoDetectado > limiteDesconto;
     const motivo = obrigatoria
       ? `Desconto de ${descontoDetectado.toFixed(2)}% acima do limite de ${limiteDesconto.toFixed(2)}%`
@@ -2408,6 +2643,7 @@ export class PropostasService {
       this.contadorId++;
       const empresaIdProposta =
         empresaId ?? (dadosProposta as any).empresaId ?? (dadosProposta as any).empresa_id;
+      const commercialPolicy = await this.resolveCommercialPolicy(empresaIdProposta);
 
       const vendedorId = await this.resolveVendedorIdFromPayload(
         dadosProposta.vendedor,
@@ -2675,6 +2911,7 @@ export class PropostasService {
           dadosProposta.descontoGlobal,
           dadosProposta.produtos,
           null,
+          commercialPolicy,
         ) as any,
       };
 
@@ -2757,6 +2994,7 @@ export class PropostasService {
     empresaId?: string,
   ): Promise<Proposta> {
     try {
+      const commercialPolicy = await this.resolveCommercialPolicy(empresaId);
       const propostaColumns = await this.getTableColumns('propostas');
       const legacySchema = this.isLegacyPropostasSchema(propostaColumns);
       if (legacySchema) {
@@ -2995,6 +3233,7 @@ export class PropostasService {
         proposta.descontoGlobal,
         proposta.produtos,
         this.parseAprovacaoInterna(detalhesAtualizados),
+        commercialPolicy,
       );
       detalhesAtualizados = this.appendHistoricoEvento(
         detalhesAtualizados,
@@ -3086,10 +3325,27 @@ export class PropostasService {
     motivoPerda?: string,
     empresaId?: string,
     metadata?: Record<string, unknown>,
+    transitionContext?: PropostaStatusTransitionContext,
   ): Promise<Proposta> {
     try {
       const fluxoStatus = this.normalizeStatusInput(status);
       const motivoPerdaLimpo = this.sanitizeMotivoPerda(motivoPerda);
+      const strictTransitionsEnabled = await this.isStrictPropostaTransitionsEnabled(empresaId);
+      const commercialPolicy = await this.resolveCommercialPolicy(empresaId);
+      const requestedDirectDraftApprovalOverride = Boolean(
+        transitionContext?.allowDirectApprovalOverride,
+      );
+      const hasDirectDraftApprovalPermission = this.hasPermission(
+        transitionContext?.actorPermissions,
+        Permission.COMERCIAL_PROPOSTAS_APPROVE_OVERRIDE,
+      );
+      const directDraftApprovalOverrideReason = this.normalizeOverrideReason(
+        transitionContext?.overrideReason,
+      );
+      const canDirectDraftApprovalOverride =
+        requestedDirectDraftApprovalOverride &&
+        hasDirectDraftApprovalPermission &&
+        Boolean(directDraftApprovalOverrideReason);
       this.logger.debug(
         `atualizarStatus chamado: ${JSON.stringify({
           propostaId,
@@ -3099,6 +3355,7 @@ export class PropostasService {
           source: source || null,
           hasObservacoes: Boolean(observacoes),
           hasMotivoPerda: Boolean(motivoPerdaLimpo),
+          strictTransitionsEnabled,
         })}`,
       );
 
@@ -3110,19 +3367,69 @@ export class PropostasService {
           throw new Error(this.buildPropostaNotFoundMessage(propostaId));
         }
 
-        if (!this.isStatusTransitionAllowed(propostaAtual.status, fluxoStatus)) {
-          const allowed = this.getAllowedStatusTransitions(propostaAtual.status);
+        const isDirectDraftApproval = this.isDirectDraftApprovalTransition(
+          propostaAtual.status,
+          fluxoStatus,
+        );
+        const directDraftApprovalGoverned = strictTransitionsEnabled && isDirectDraftApproval;
+
+        if (directDraftApprovalGoverned && !canDirectDraftApprovalOverride) {
+          if (requestedDirectDraftApprovalOverride && !hasDirectDraftApprovalPermission) {
+            throw new ForbiddenException(
+              'Sem permissao para override de aprovacao direta de rascunho.',
+            );
+          }
+
+          if (requestedDirectDraftApprovalOverride && !directDraftApprovalOverrideReason) {
+            throw new BadRequestException(
+              'Informe overrideReason para aprovar proposta direto de rascunho.',
+            );
+          }
+
+          throw new BadRequestException(
+            'Transicao bloqueada por politica comercial: envie a proposta antes de aprovar.',
+          );
+        }
+
+        const transitionAllowed =
+          this.isStatusTransitionAllowedByPolicy(
+            propostaAtual.status,
+            fluxoStatus,
+            strictTransitionsEnabled,
+          ) ||
+          (directDraftApprovalGoverned && canDirectDraftApprovalOverride);
+        if (!transitionAllowed) {
+          const allowed = this.getAllowedStatusTransitionsByPolicy(
+            propostaAtual.status,
+            strictTransitionsEnabled,
+          );
           throw new BadRequestException(
             `Transicao de status invalida: ${propostaAtual.status} -> ${fluxoStatus}. ` +
               `Permitidos: ${allowed.join(', ') || 'nenhum'}`,
           );
         }
 
+        const observacoesOverride =
+          directDraftApprovalGoverned && canDirectDraftApprovalOverride
+            ? `Override aprovado para rascunho -> aprovada por ${transitionContext?.actorUserId || 'usuario-sem-id'}. Motivo: ${directDraftApprovalOverrideReason}`
+            : '';
         const observacoesComFluxo = this.mergeLegacyFlowMetadata(propostaAtual.observacoes, {
-          observacoes,
+          observacoes: [observacoes, observacoesOverride].filter(Boolean).join('\n') || observacoes,
           fluxoStatus,
           motivoPerda,
         });
+
+        const metadataComOverride =
+          directDraftApprovalGoverned && canDirectDraftApprovalOverride
+            ? {
+                ...(metadata || {}),
+                directDraftApprovalOverride: {
+                  actorUserId: transitionContext?.actorUserId || null,
+                  overrideReason: directDraftApprovalOverrideReason,
+                  permission: Permission.COMERCIAL_PROPOSTAS_APPROVE_OVERRIDE,
+                },
+              }
+            : metadata;
 
         const propostaAtualizada = await this.atualizarProposta(
           propostaId,
@@ -3134,6 +3441,27 @@ export class PropostasService {
           },
           empresaId,
         );
+
+        if (directDraftApprovalGoverned && canDirectDraftApprovalOverride) {
+          const propostaPersistida = await this.propostaRepository.findOne({
+            where: empresaId ? { id: propostaId, empresaId } : { id: propostaId },
+          });
+          if (propostaPersistida) {
+            let emailDetailsLegacy = this.toObjectRecord(propostaPersistida.emailDetails);
+            emailDetailsLegacy = this.appendHistoricoEvento(
+              emailDetailsLegacy,
+              'override_aprovacao_rascunho',
+              {
+                origem: source || 'api',
+                status: fluxoStatus,
+                detalhes: 'Override aplicado para permitir aprovacao direta de rascunho.',
+                metadata: metadataComOverride || undefined,
+              },
+            );
+            propostaPersistida.emailDetails = emailDetailsLegacy as any;
+            await this.propostaRepository.save(propostaPersistida);
+          }
+        }
         this.logger.log(
           `Status da proposta ${propostaId} atualizado para: ${fluxoStatus} (legacy mode)`,
         );
@@ -3152,8 +3480,40 @@ export class PropostasService {
       const statusAnterior =
         this.extractFlowStatusFromEmailDetails(proposta.emailDetails) ||
         this.mapDatabaseStatusToFlowStatus(proposta.status);
-      if (!this.isStatusTransitionAllowed(statusAnterior, fluxoStatus)) {
-        const allowed = this.getAllowedStatusTransitions(statusAnterior);
+      const isDirectDraftApproval = this.isDirectDraftApprovalTransition(
+        statusAnterior,
+        fluxoStatus,
+      );
+      const directDraftApprovalGoverned = strictTransitionsEnabled && isDirectDraftApproval;
+
+      if (directDraftApprovalGoverned && !canDirectDraftApprovalOverride) {
+        if (requestedDirectDraftApprovalOverride && !hasDirectDraftApprovalPermission) {
+          throw new ForbiddenException('Sem permissao para override de aprovacao direta de rascunho.');
+        }
+
+        if (requestedDirectDraftApprovalOverride && !directDraftApprovalOverrideReason) {
+          throw new BadRequestException(
+            'Informe overrideReason para aprovar proposta direto de rascunho.',
+          );
+        }
+
+        throw new BadRequestException(
+          'Transicao bloqueada por politica comercial: envie a proposta antes de aprovar.',
+        );
+      }
+
+      const transitionAllowed =
+        this.isStatusTransitionAllowedByPolicy(
+          statusAnterior,
+          fluxoStatus,
+          strictTransitionsEnabled,
+        ) ||
+        (directDraftApprovalGoverned && canDirectDraftApprovalOverride);
+      if (!transitionAllowed) {
+        const allowed = this.getAllowedStatusTransitionsByPolicy(
+          statusAnterior,
+          strictTransitionsEnabled,
+        );
         throw new BadRequestException(
           `Transicao de status invalida: ${statusAnterior} -> ${fluxoStatus}. ` +
             `Permitidos: ${allowed.join(', ') || 'nenhum'}`,
@@ -3175,10 +3535,26 @@ export class PropostasService {
         ...(proposta.emailDetails || {}),
         fluxoStatus,
       } as Record<string, unknown>;
+
+      if (directDraftApprovalGoverned && canDirectDraftApprovalOverride) {
+        emailDetails = this.appendHistoricoEvento(emailDetails, 'override_aprovacao_rascunho', {
+          origem: source || 'api',
+          status: statusAnterior,
+          detalhes: 'Override aplicado para permitir aprovacao direta de rascunho.',
+          metadata: {
+            actorUserId: transitionContext?.actorUserId || null,
+            overrideReason: directDraftApprovalOverrideReason,
+            permission: Permission.COMERCIAL_PROPOSTAS_APPROVE_OVERRIDE,
+            ...(metadata || {}),
+          },
+        });
+      }
+
       emailDetails.aprovacaoInterna = this.calcularAprovacaoInterna(
         proposta.descontoGlobal,
         proposta.produtos,
         this.parseAprovacaoInterna(emailDetails),
+        commercialPolicy,
       );
       const aprovacaoInterna = this.parseAprovacaoInterna(emailDetails);
 
@@ -3187,6 +3563,9 @@ export class PropostasService {
         aprovacaoInterna?.obrigatoria &&
         aprovacaoInterna.status !== 'aprovada'
       ) {
+        // Mantem o fluxo exibido no status anterior quando a aprovacao interna bloqueia
+        // a transicao comercial. Sem isso, o frontend pode refletir "aprovada" indevidamente.
+        emailDetails.fluxoStatus = statusAnterior;
         emailDetails.aprovacaoInterna = {
           ...aprovacaoInterna,
           status: 'pendente',
@@ -3209,7 +3588,7 @@ export class PropostasService {
         proposta.emailDetails = emailDetails as any;
         if (source) proposta.source = source;
         await this.propostaRepository.save(proposta);
-        throw new Error(
+        throw new BadRequestException(
           'Proposta exige aprovacao interna por alcada antes de ser marcada como aprovada.',
         );
       }
@@ -3232,7 +3611,17 @@ export class PropostasService {
         origem: source || 'api',
         status: fluxoStatus,
         detalhes: `Status alterado de "${statusAnterior}" para "${fluxoStatus}"`,
-        metadata: metadata || undefined,
+        metadata:
+          directDraftApprovalGoverned && canDirectDraftApprovalOverride
+            ? {
+                ...(metadata || {}),
+                directDraftApprovalOverride: {
+                  actorUserId: transitionContext?.actorUserId || null,
+                  overrideReason: directDraftApprovalOverrideReason,
+                  permission: Permission.COMERCIAL_PROPOSTAS_APPROVE_OVERRIDE,
+                },
+              }
+            : metadata || undefined,
       });
 
       proposta.emailDetails = emailDetails as any;
@@ -3829,11 +4218,13 @@ export class PropostasService {
       throw new Error(this.buildPropostaNotFoundMessage(propostaId));
     }
 
-    if (proposta.aprovacaoInterna) {
-      return proposta.aprovacaoInterna;
-    }
-
-    return this.calcularAprovacaoInterna(proposta.descontoGlobal, proposta.produtos, null);
+    const commercialPolicy = await this.resolveCommercialPolicy(empresaId);
+    return this.calcularAprovacaoInterna(
+      proposta.descontoGlobal,
+      proposta.produtos,
+      proposta.aprovacaoInterna || this.parseAprovacaoInterna(proposta.emailDetails),
+      commercialPolicy,
+    );
   }
 
   async solicitarAprovacaoInterna(
@@ -3853,10 +4244,12 @@ export class PropostasService {
       throw new Error(this.buildPropostaNotFoundMessage(propostaId));
     }
 
+    const commercialPolicy = await this.resolveCommercialPolicy(empresaId);
     const aprovacaoBase = this.calcularAprovacaoInterna(
       proposta.descontoGlobal,
       proposta.produtos,
       this.parseAprovacaoInterna(proposta.emailDetails),
+      commercialPolicy,
     );
 
     if (!aprovacaoBase.obrigatoria) {
@@ -3922,10 +4315,12 @@ export class PropostasService {
       throw new Error(this.buildPropostaNotFoundMessage(propostaId));
     }
 
+    const commercialPolicy = await this.resolveCommercialPolicy(empresaId);
     const aprovacaoBase = this.calcularAprovacaoInterna(
       proposta.descontoGlobal,
       proposta.produtos,
       this.parseAprovacaoInterna(proposta.emailDetails),
+      commercialPolicy,
     );
 
     if (!aprovacaoBase.obrigatoria) {

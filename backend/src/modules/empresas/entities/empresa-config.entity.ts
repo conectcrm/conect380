@@ -216,6 +216,21 @@ export class EmpresaConfig {
   })
   alcadaAprovacaoFinanceira: number | null;
 
+  @Column({
+    name: 'comercial_limite_desconto_percentual',
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    default: 10,
+  })
+  comercialLimiteDescontoPercentual: number;
+
+  @Column({
+    name: 'comercial_aprovacao_interna_habilitada',
+    default: true,
+  })
+  comercialAprovacaoInternaHabilitada: boolean;
+
   // Configurações de Email/SMTP
   @Column({ name: 'emails_habilitados', default: true })
   emailsHabilitados: boolean;

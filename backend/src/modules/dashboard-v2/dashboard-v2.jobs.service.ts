@@ -20,10 +20,19 @@ type DailyReprocessPayload = {
 @Injectable()
 export class DashboardV2JobsService {
   private readonly logger = new Logger(DashboardV2JobsService.name);
+  private readonly stageEventRecomputeEnabled =
+    process.env.DASHBOARD_V2_STAGE_EVENT_RECOMPUTE_ENABLED !== 'false';
+  private readonly dailyReprocessQueueEnabled =
+    process.env.DASHBOARD_V2_DAILY_REPROCESS_QUEUE_ENABLED !== 'false';
 
   constructor(@InjectQueue(DASHBOARD_V2_QUEUE) private readonly queue: Queue) {}
 
   async enqueueStageEventRecompute(payload: StageEventRecomputePayload): Promise<void> {
+    if (!this.stageEventRecomputeEnabled) {
+      this.logger.debug('enqueueStageEventRecompute ignorado (feature flag desabilitada)');
+      return;
+    }
+
     const jobId = `${DashboardV2JobName.RECOMPUTE_STAGE_EVENT}:${payload.empresaId}:${payload.oportunidadeId || 'na'}:${payload.changedAt || 'now'}`;
 
     await this.queue.add(DashboardV2JobName.RECOMPUTE_STAGE_EVENT, payload, {
@@ -37,6 +46,11 @@ export class DashboardV2JobsService {
   }
 
   async enqueueDailyReprocess(payload: DailyReprocessPayload): Promise<void> {
+    if (!this.dailyReprocessQueueEnabled) {
+      this.logger.debug('enqueueDailyReprocess ignorado (feature flag desabilitada)');
+      return;
+    }
+
     const target = payload.dateKey || new Date().toISOString().slice(0, 10);
     const scope = payload.empresaId || 'all';
     const jobId = `${DashboardV2JobName.REPROCESS_DAILY}:${scope}:${target}`;

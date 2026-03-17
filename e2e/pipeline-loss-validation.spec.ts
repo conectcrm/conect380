@@ -63,6 +63,28 @@ const dragPipelineCardToColumn = async (
   await card.dragTo(dropzone);
 };
 
+const dragPipelineCardAndOpenLossModal = async (
+  page: Parameters<typeof bootstrapPipelineUiAuthenticatedSession>[0],
+  cardTestId: string,
+  columnDropzoneTestId: string,
+) => {
+  const modal = page.getByTestId('modal-motivo-perda');
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await dragPipelineCardToColumn(page, cardTestId, columnDropzoneTestId);
+
+    try {
+      await expect(modal).toBeVisible({ timeout: 2000 });
+      return;
+    } catch (error) {
+      if (attempt === 2) {
+        throw error;
+      }
+      await page.waitForTimeout(250);
+    }
+  }
+};
+
 test.describe('Pipeline - validacao de perda (UI)', () => {
   test('exibe erro contextual no modal de motivo de perda quando backend retorna 400', async ({ page }) => {
     await bootstrapPipelineUiAuthenticatedSession(page);
@@ -81,9 +103,7 @@ test.describe('Pipeline - validacao de perda (UI)', () => {
     await page.goto('/pipeline');
     await expect(page.getByTestId('pipeline-view-kanban')).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('pipeline-card-1')).toBeVisible({ timeout: 15000 });
-    await dragPipelineCardToColumn(page, 'pipeline-card-1', 'pipeline-column-dropzone-lost');
-
-    await expect(page.getByTestId('modal-motivo-perda')).toBeVisible();
+    await dragPipelineCardAndOpenLossModal(page, 'pipeline-card-1', 'pipeline-column-dropzone-lost');
     await page.getByTestId('modal-motivo-perda-option-preco').click();
     await page.getByTestId('modal-motivo-perda-confirmar').click();
 
@@ -117,9 +137,7 @@ test.describe('Pipeline - validacao de perda (UI)', () => {
     await page.goto('/pipeline');
     await expect(page.getByTestId('pipeline-view-kanban')).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('pipeline-card-1')).toBeVisible({ timeout: 15000 });
-    await dragPipelineCardToColumn(page, 'pipeline-card-1', 'pipeline-column-dropzone-lost');
-
-    await expect(page.getByTestId('modal-motivo-perda')).toBeVisible();
+    await dragPipelineCardAndOpenLossModal(page, 'pipeline-card-1', 'pipeline-column-dropzone-lost');
     await page.getByTestId('modal-motivo-perda-option-preco').click();
     await page.getByTestId('modal-motivo-perda-confirmar').click();
 

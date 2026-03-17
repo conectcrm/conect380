@@ -1,4 +1,11 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import {
@@ -13,10 +20,12 @@ import { DashboardV2JobsService } from '../dashboard-v2/dashboard-v2.jobs.servic
 import { Lead, OrigemLead, StatusLead } from '../leads/lead.entity';
 import {
   CreateOportunidadeDto,
+  CreateOportunidadeItemPreliminarDto,
   LifecycleTransitionDto,
   LifecycleViewOportunidade,
   MetricasQueryDto,
   OportunidadesListQueryDto,
+  UpdateOportunidadeItemPreliminarDto,
   UpdateOportunidadeDto,
   UpdateEstagioDto,
 } from './dto/oportunidade.dto';
@@ -26,6 +35,7 @@ import { User, UserRole } from '../users/user.entity';
 import { NotificationService } from '../../notifications/notification.service';
 import { NotificationType } from '../../notifications/entities/notification.entity';
 import { createHash } from 'crypto';
+import { OportunidadeItemPreliminar } from './oportunidade-item-preliminar.entity';
 
 const ALL_OPORTUNIDADE_STAGES = new Set<string>([
   EstagioOportunidade.LEADS,
@@ -59,11 +69,43 @@ const LEGACY_DB_STAGE_VALUES = new Set<string>([
 const OPORTUNIDADES_LIFECYCLE_FLAG_KEY = 'crm_oportunidades_lifecycle_v1';
 const OPORTUNIDADES_STALE_POLICY_FLAG_KEY = 'crm_oportunidades_stale_policy_v1';
 const OPORTUNIDADES_STALE_AUTO_ARCHIVE_FLAG_KEY = 'crm_oportunidades_stale_auto_archive_v1';
+const SALES_PIPELINE_DRAFT_WITHOUT_PLACEHOLDER_FLAG_KEY =
+  'sales.pipeline_draft_without_placeholder';
+const SALES_OPPORTUNITY_PRELIMINARY_ITEMS_FLAG_KEY = 'sales.opportunity_preliminary_items';
+const SALES_STRICT_PROPOSTA_TRANSITIONS_FLAG_KEY = 'sales.strict_proposta_transitions';
+const SALES_DISCOUNT_POLICY_PER_TENANT_FLAG_KEY = 'sales.discount_policy_per_tenant';
 const STALE_DEFAULT_THRESHOLD_DAYS = 30;
 const STALE_DEFAULT_AUTO_ARCHIVE_DAYS = 60;
 const STALE_MIN_DAYS = 7;
 const STALE_MAX_DAYS = 365;
 const STALE_DEFAULT_SCAN_LIMIT = 300;
+
+const SALES_FEATURE_FLAG_KEY_MAP = {
+  pipelineDraftWithoutPlaceholder: SALES_PIPELINE_DRAFT_WITHOUT_PLACEHOLDER_FLAG_KEY,
+  opportunityPreliminaryItems: SALES_OPPORTUNITY_PRELIMINARY_ITEMS_FLAG_KEY,
+  strictPropostaTransitions: SALES_STRICT_PROPOSTA_TRANSITIONS_FLAG_KEY,
+  discountPolicyPerTenant: SALES_DISCOUNT_POLICY_PER_TENANT_FLAG_KEY,
+} as const;
+
+const SALES_FEATURE_DEFAULT_ENV_BY_NAME = {
+  pipelineDraftWithoutPlaceholder: 'SALES_PIPELINE_DRAFT_WITHOUT_PLACEHOLDER_DEFAULT',
+  opportunityPreliminaryItems: 'SALES_OPPORTUNITY_PRELIMINARY_ITEMS_DEFAULT',
+  strictPropostaTransitions: 'SALES_STRICT_PROPOSTA_TRANSITIONS_DEFAULT',
+  discountPolicyPerTenant: 'SALES_DISCOUNT_POLICY_PER_TENANT_DEFAULT',
+} as const;
+
+const SALES_FEATURE_DEFAULT_FALLBACK = {
+  pipelineDraftWithoutPlaceholder: true,
+  opportunityPreliminaryItems: true,
+  strictPropostaTransitions: true,
+  discountPolicyPerTenant: true,
+} as const;
+
+export type SalesFeatureFlagName = keyof typeof SALES_FEATURE_FLAG_KEY_MAP;
+type SalesFeatureFlagKey = (typeof SALES_FEATURE_FLAG_KEY_MAP)[SalesFeatureFlagName];
+const SALES_FEATURE_FLAG_NAME_LIST = Object.keys(
+  SALES_FEATURE_FLAG_KEY_MAP,
+) as SalesFeatureFlagName[];
 const ALL_OPORTUNIDADE_LIFECYCLE_STATUSES = new Set<string>([
   LifecycleStatusOportunidade.OPEN,
   LifecycleStatusOportunidade.WON,
@@ -113,6 +155,11 @@ type LifecycleFlagDecision = {
 };
 
 type TenantFlagSource = 'tenant' | 'default';
+type TenantFlagConfig = {
+  source: TenantFlagSource;
+  enabled: boolean;
+  numericValue: number | null;
+};
 
 type StalePolicyDecision = {
   enabled: boolean;
@@ -121,6 +168,19 @@ type StalePolicyDecision = {
   autoArchiveEnabled: boolean;
   autoArchiveAfterDays: number;
   autoArchiveSource: TenantFlagSource;
+};
+
+type SalesFeatureFlagDecisionItem = {
+  flagKey: SalesFeatureFlagKey;
+  enabled: boolean;
+  source: TenantFlagSource;
+};
+
+export type SalesFeatureFlagsDecision = {
+  pipelineDraftWithoutPlaceholder: SalesFeatureFlagDecisionItem;
+  opportunityPreliminaryItems: SalesFeatureFlagDecisionItem;
+  strictPropostaTransitions: SalesFeatureFlagDecisionItem;
+  discountPolicyPerTenant: SalesFeatureFlagDecisionItem;
 };
 
 type StaleOpportunitySnapshot = {
@@ -410,6 +470,39 @@ type OportunidadeHistoricoEstagioItem = {
   };
 };
 
+type OportunidadeItemPreliminarPayload = {
+  id: string;
+  empresa_id: string;
+  oportunidade_id: string;
+  produto_id: string | null;
+  catalog_item_id: string | null;
+  nome_snapshot: string;
+  sku_snapshot: string | null;
+  descricao_snapshot: string | null;
+  preco_unitario_estimado: number;
+  quantidade_estimada: number;
+  desconto_percentual: number;
+  subtotal_estimado: number;
+  origem: string;
+  ordem: number;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+type OportunidadePreliminarItemAsPropostaProduto = {
+  id: string;
+  itemPreliminarId: string;
+  produtoId?: string;
+  catalogItemId?: string;
+  nome: string;
+  descricao?: string;
+  precoUnitario: number;
+  quantidade: number;
+  desconto: number;
+  subtotal: number;
+  origem: string;
+};
+
 type TableColumnMetadata = {
   columnName: string;
   dataType: string;
@@ -439,6 +532,7 @@ export class OportunidadesService {
   private enumValuesCache = new Map<string, Set<string>>();
   private stageEventsTableAvailable?: boolean;
   private featureFlagsTableAvailable?: boolean;
+  private itensPreliminaresTableAvailable?: boolean;
 
   private readonly canonicalStageOrder: EstagioOportunidade[] = [
     EstagioOportunidade.LEADS,
@@ -461,6 +555,8 @@ export class OportunidadesService {
     private atividadeRepository: Repository<Atividade>,
     @InjectRepository(OportunidadeStageEvent)
     private stageEventRepository: Repository<OportunidadeStageEvent>,
+    @InjectRepository(OportunidadeItemPreliminar)
+    private readonly oportunidadeItemPreliminarRepository: Repository<OportunidadeItemPreliminar>,
     @InjectRepository(FeatureFlagTenant)
     private readonly featureFlagRepository: Repository<FeatureFlagTenant>,
     @InjectRepository(Lead)
@@ -635,6 +731,94 @@ export class OportunidadesService {
     }
 
     return false;
+  }
+
+  private getFeatureFlagQueryTimeoutMs(): number {
+    const parsed = Number(process.env.FEATURE_FLAGS_QUERY_TIMEOUT_MS || 5000);
+    if (!Number.isFinite(parsed)) {
+      return 5000;
+    }
+
+    return Math.min(Math.max(Math.floor(parsed), 1000), 60000);
+  }
+
+  private withTimeout<T>(
+    promise: Promise<T>,
+    timeoutMs: number,
+    timeoutMessage: string,
+  ): Promise<T> {
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+      return promise;
+    }
+
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(timeoutMessage));
+      }, timeoutMs);
+
+      promise
+        .then((value) => {
+          clearTimeout(timer);
+          resolve(value);
+        })
+        .catch((error) => {
+          clearTimeout(timer);
+          reject(error);
+        });
+    });
+  }
+
+  private isFeatureFlagTimeoutError(error: unknown): boolean {
+    const message = String((error as any)?.message || '');
+    if (!message) {
+      return false;
+    }
+
+    return (
+      message.includes('Timeout ao persistir feature flag') ||
+      message.includes('Timeout ao consultar feature flag') ||
+      message.includes('Timeout ao consultar feature flags comerciais')
+    );
+  }
+
+  private resolveBooleanEnvFlag(envName: string, fallback: boolean): boolean {
+    const rawValue = process.env[envName];
+    if (rawValue === undefined || rawValue === null || String(rawValue).trim().length === 0) {
+      return fallback;
+    }
+
+    return this.parseBooleanFlag(rawValue);
+  }
+
+  private getSalesFeatureDefaultByName(flagName: SalesFeatureFlagName): boolean {
+    return this.resolveBooleanEnvFlag(
+      SALES_FEATURE_DEFAULT_ENV_BY_NAME[flagName],
+      SALES_FEATURE_DEFAULT_FALLBACK[flagName],
+    );
+  }
+
+  private toSalesFeatureDecision(
+    flagName: SalesFeatureFlagName,
+    tenantFlag: {
+      source: TenantFlagSource;
+      enabled: boolean;
+      numericValue: number | null;
+    },
+  ): SalesFeatureFlagDecisionItem {
+    const flagKey = SALES_FEATURE_FLAG_KEY_MAP[flagName];
+    if (tenantFlag.source === 'tenant') {
+      return {
+        flagKey,
+        enabled: tenantFlag.enabled,
+        source: 'tenant',
+      };
+    }
+
+    return {
+      flagKey,
+      enabled: this.getSalesFeatureDefaultByName(flagName),
+      source: 'default',
+    };
   }
 
   private parseDateInput(value?: string | null): Date | null {
@@ -1474,12 +1658,24 @@ export class OportunidadesService {
       return this.featureFlagsTableAvailable;
     }
 
-    const columns = await this.getTableColumns('feature_flags_tenant');
-    this.featureFlagsTableAvailable =
-      columns.has('empresa_id') &&
-      columns.has('flag_key') &&
-      columns.has('enabled') &&
-      columns.has('rollout_percentage');
+    try {
+      const columns = await this.withTimeout(
+        this.getTableColumns('feature_flags_tenant'),
+        this.getFeatureFlagQueryTimeoutMs(),
+        'Timeout ao verificar metadata da tabela de feature flags',
+      );
+
+      this.featureFlagsTableAvailable =
+        columns.has('empresa_id') &&
+        columns.has('flag_key') &&
+        columns.has('enabled') &&
+        columns.has('rollout_percentage');
+    } catch (error: any) {
+      this.logger.warn(
+        `Falha ao verificar disponibilidade da tabela de feature flags: ${error?.message || error}`,
+      );
+      this.featureFlagsTableAvailable = false;
+    }
 
     return this.featureFlagsTableAvailable;
   }
@@ -1496,12 +1692,16 @@ export class OportunidadesService {
     }
 
     try {
-      const flag = await this.featureFlagRepository.findOne({
-        where: {
-          empresa_id: empresaId,
-          flag_key: OPORTUNIDADES_LIFECYCLE_FLAG_KEY,
-        },
-      });
+      const flag = await this.withTimeout(
+        this.featureFlagRepository.findOne({
+          where: {
+            empresa_id: empresaId,
+            flag_key: OPORTUNIDADES_LIFECYCLE_FLAG_KEY,
+          },
+        }),
+        this.getFeatureFlagQueryTimeoutMs(),
+        `Timeout ao consultar feature flag ${OPORTUNIDADES_LIFECYCLE_FLAG_KEY}`,
+      );
 
       if (!flag) {
         return {
@@ -1639,6 +1839,56 @@ export class OportunidadesService {
     }
 
     return this.stageEventsTableAvailable;
+  }
+
+  private async isItensPreliminaresTableAvailable(): Promise<boolean> {
+    if (this.itensPreliminaresTableAvailable !== undefined) {
+      return this.itensPreliminaresTableAvailable;
+    }
+
+    try {
+      const columns = await this.getTableColumns('oportunidade_itens_preliminares');
+      this.itensPreliminaresTableAvailable =
+        columns.has('empresa_id') &&
+        columns.has('oportunidade_id') &&
+        columns.has('nome_snapshot') &&
+        columns.has('preco_unitario_estimado') &&
+        columns.has('quantidade_estimada');
+    } catch {
+      this.itensPreliminaresTableAvailable = false;
+    }
+
+    if (!this.itensPreliminaresTableAvailable) {
+      this.logger.warn(
+        'Tabela "oportunidade_itens_preliminares" indisponivel. Fluxo segue sem pre-preenchimento de proposta.',
+      );
+    }
+
+    return this.itensPreliminaresTableAvailable;
+  }
+
+  private async assertItensPreliminaresTableAvailable(): Promise<void> {
+    if (await this.isItensPreliminaresTableAvailable()) {
+      return;
+    }
+
+    throw new BadRequestException(
+      'Itens preliminares indisponiveis neste ambiente. Execute as migrations pendentes.',
+    );
+  }
+
+  private async isOpportunityPreliminaryItemsFeatureEnabled(empresaId: string): Promise<boolean> {
+    return this.isSalesFeatureEnabledForTenant(empresaId, 'opportunityPreliminaryItems');
+  }
+
+  private async assertOpportunityPreliminaryItemsFeatureEnabled(empresaId: string): Promise<void> {
+    if (await this.isOpportunityPreliminaryItemsFeatureEnabled(empresaId)) {
+      return;
+    }
+
+    throw new BadRequestException(
+      'Itens preliminares desabilitados para esta empresa. Ative a feature flag sales.opportunity_preliminary_items.',
+    );
   }
 
   private async createStageEvent(params: {
@@ -2451,25 +2701,135 @@ export class OportunidadesService {
 
     const rolloutPercentage = Math.max(0, Math.min(100, Number(input.rolloutPercentage || 0)));
 
-    await this.featureFlagRepository
-      .createQueryBuilder()
-      .insert()
-      .into(FeatureFlagTenant)
-      .values({
-        empresa_id: input.empresaId,
-        flag_key: OPORTUNIDADES_LIFECYCLE_FLAG_KEY,
-        enabled: input.enabled,
-        rollout_percentage: rolloutPercentage,
-        updated_by: input.updatedBy || null,
-        updated_at: new Date(),
-      })
-      .orUpdate(
-        ['enabled', 'rollout_percentage', 'updated_by', 'updated_at'],
-        ['empresa_id', 'flag_key'],
-      )
-      .execute();
+    try {
+      await this.withTimeout(
+        this.featureFlagRepository
+          .createQueryBuilder()
+          .insert()
+          .into(FeatureFlagTenant)
+          .values({
+            empresa_id: input.empresaId,
+            flag_key: OPORTUNIDADES_LIFECYCLE_FLAG_KEY,
+            enabled: input.enabled,
+            rollout_percentage: rolloutPercentage,
+            updated_by: input.updatedBy || null,
+            updated_at: new Date(),
+          })
+          .orUpdate(
+            ['enabled', 'rollout_percentage', 'updated_by', 'updated_at'],
+            ['empresa_id', 'flag_key'],
+          )
+          .execute(),
+        this.getFeatureFlagQueryTimeoutMs(),
+        `Timeout ao persistir feature flag ${OPORTUNIDADES_LIFECYCLE_FLAG_KEY}`,
+      );
+    } catch (error) {
+      if (this.isFeatureFlagTimeoutError(error)) {
+        throw new ServiceUnavailableException(
+          'Nao foi possivel salvar a configuracao de lifecycle agora. Tente novamente em instantes.',
+        );
+      }
+      throw error;
+    }
 
     return this.resolveLifecycleFeatureFlagDecision(input.empresaId);
+  }
+
+  async getSalesFeatureFlags(empresaId: string): Promise<SalesFeatureFlagsDecision> {
+    const normalizedEmpresaId = String(empresaId || '').trim();
+    const decisions: Partial<SalesFeatureFlagsDecision> = {};
+    const flagKeys = SALES_FEATURE_FLAG_NAME_LIST.map((flagName) => SALES_FEATURE_FLAG_KEY_MAP[flagName]);
+    const tenantFlagsByKey = normalizedEmpresaId
+      ? await this.resolveTenantFlagConfigs(normalizedEmpresaId, flagKeys)
+      : new Map<string, TenantFlagConfig>();
+
+    for (const flagName of SALES_FEATURE_FLAG_NAME_LIST) {
+      const flagKey = SALES_FEATURE_FLAG_KEY_MAP[flagName];
+      const tenantFlag = tenantFlagsByKey.get(flagKey) || this.buildDefaultTenantFlagConfig();
+
+      decisions[flagName] = this.toSalesFeatureDecision(flagName, tenantFlag);
+    }
+
+    return decisions as SalesFeatureFlagsDecision;
+  }
+
+  async isSalesFeatureEnabledForTenant(
+    empresaId: string | null | undefined,
+    flagName: SalesFeatureFlagName,
+  ): Promise<boolean> {
+    const normalizedEmpresaId = String(empresaId || '').trim();
+    if (!normalizedEmpresaId) {
+      return this.getSalesFeatureDefaultByName(flagName);
+    }
+
+    const tenantFlag = await this.resolveTenantFlagConfig(
+      normalizedEmpresaId,
+      SALES_FEATURE_FLAG_KEY_MAP[flagName],
+    );
+    return this.toSalesFeatureDecision(flagName, tenantFlag).enabled;
+  }
+
+  async setSalesFeatureFlags(input: {
+    empresaId: string;
+    pipelineDraftWithoutPlaceholder?: boolean;
+    opportunityPreliminaryItems?: boolean;
+    strictPropostaTransitions?: boolean;
+    discountPolicyPerTenant?: boolean;
+    updatedBy?: string | null;
+  }): Promise<SalesFeatureFlagsDecision> {
+    if (!(await this.isFeatureFlagsTableAvailable())) {
+      throw new BadRequestException(
+        'Tabela de feature flags indisponivel. Execute as migrations antes de configurar as flags comerciais.',
+      );
+    }
+
+    const updates: Array<{
+      flagName: SalesFeatureFlagName;
+      enabled: boolean;
+    }> = [];
+
+    const queueUpdate = (flagName: SalesFeatureFlagName, enabled?: boolean) => {
+      if (enabled === undefined) {
+        return;
+      }
+
+      updates.push({
+        flagName,
+        enabled: Boolean(enabled),
+      });
+    };
+
+    queueUpdate('pipelineDraftWithoutPlaceholder', input.pipelineDraftWithoutPlaceholder);
+    queueUpdate('opportunityPreliminaryItems', input.opportunityPreliminaryItems);
+    queueUpdate('strictPropostaTransitions', input.strictPropostaTransitions);
+    queueUpdate('discountPolicyPerTenant', input.discountPolicyPerTenant);
+
+    if (updates.length === 0) {
+      throw new BadRequestException(
+        'Informe pelo menos uma flag comercial para atualizar.',
+      );
+    }
+
+    try {
+      for (const update of updates) {
+        await this.upsertTenantFlagConfig({
+          empresaId: input.empresaId,
+          flagKey: SALES_FEATURE_FLAG_KEY_MAP[update.flagName],
+          enabled: update.enabled,
+          numericValue: 0,
+          updatedBy: input.updatedBy || null,
+        });
+      }
+    } catch (error) {
+      if (this.isFeatureFlagTimeoutError(error)) {
+        throw new ServiceUnavailableException(
+          'Nao foi possivel salvar as flags comerciais agora. Tente novamente em instantes.',
+        );
+      }
+      throw error;
+    }
+
+    return this.getSalesFeatureFlags(input.empresaId);
   }
 
   private getDefaultStalePolicyEnabled(): boolean {
@@ -2512,52 +2872,78 @@ export class OportunidadesService {
     return this.normalizeStaleQueryLimit(limit ?? fallback);
   }
 
-  private async resolveTenantFlagConfig(empresaId: string, flagKey: string): Promise<{
-    source: TenantFlagSource;
-    enabled: boolean;
-    numericValue: number | null;
-  }> {
+  private buildDefaultTenantFlagConfig(): TenantFlagConfig {
+    return {
+      source: 'default',
+      enabled: false,
+      numericValue: null,
+    };
+  }
+
+  private async resolveTenantFlagConfigs(
+    empresaId: string,
+    flagKeys: string[],
+  ): Promise<Map<string, TenantFlagConfig>> {
+    const normalizedKeys = Array.from(
+      new Set(
+        flagKeys
+          .map((flagKey) => String(flagKey || '').trim())
+          .filter((flagKey) => flagKey.length > 0),
+      ),
+    );
+
+    const fallbackByKey = new Map<string, TenantFlagConfig>();
+    for (const flagKey of normalizedKeys) {
+      fallbackByKey.set(flagKey, this.buildDefaultTenantFlagConfig());
+    }
+
+    if (!normalizedKeys.length) {
+      return fallbackByKey;
+    }
+
     if (!(await this.isFeatureFlagsTableAvailable())) {
-      return {
-        source: 'default',
-        enabled: false,
-        numericValue: null,
-      };
+      return fallbackByKey;
     }
 
     try {
-      const flag = await this.featureFlagRepository.findOne({
-        where: {
-          empresa_id: empresaId,
-          flag_key: flagKey,
-        },
-      });
+      const flags = await this.withTimeout(
+        this.featureFlagRepository.find({
+          where: {
+            empresa_id: empresaId,
+            flag_key: In(normalizedKeys),
+          },
+        }),
+        this.getFeatureFlagQueryTimeoutMs(),
+        `Timeout ao consultar feature flags comerciais (${normalizedKeys.length})`,
+      );
 
-      if (!flag) {
-        return {
-          source: 'default',
-          enabled: false,
-          numericValue: null,
-        };
+      for (const flag of flags) {
+        const flagKey = String(flag.flag_key || '').trim();
+        if (!flagKey || !fallbackByKey.has(flagKey)) {
+          continue;
+        }
+
+        fallbackByKey.set(flagKey, {
+          source: 'tenant',
+          enabled: Boolean(flag.enabled),
+          numericValue: Number.isFinite(Number(flag.rollout_percentage))
+            ? Number(flag.rollout_percentage)
+            : null,
+        });
       }
 
-      return {
-        source: 'tenant',
-        enabled: Boolean(flag.enabled),
-        numericValue: Number.isFinite(Number(flag.rollout_percentage))
-          ? Number(flag.rollout_percentage)
-          : null,
-      };
+      return fallbackByKey;
     } catch (error: any) {
       this.logger.warn(
-        `Falha ao resolver configuracao de flag ${flagKey}: ${error?.message || error}`,
+        `Falha ao resolver configuracao das flags comerciais: ${error?.message || error}`,
       );
-      return {
-        source: 'default',
-        enabled: false,
-        numericValue: null,
-      };
+      return fallbackByKey;
     }
+  }
+
+  private async resolveTenantFlagConfig(empresaId: string, flagKey: string): Promise<TenantFlagConfig> {
+    const configs = await this.resolveTenantFlagConfigs(empresaId, [flagKey]);
+    return configs.get(flagKey) || this.buildDefaultTenantFlagConfig();
   }
 
   private async upsertTenantFlagConfig(input: {
@@ -2567,23 +2953,41 @@ export class OportunidadesService {
     numericValue: number;
     updatedBy?: string | null;
   }): Promise<void> {
-    await this.featureFlagRepository
-      .createQueryBuilder()
-      .insert()
-      .into(FeatureFlagTenant)
-      .values({
-        empresa_id: input.empresaId,
-        flag_key: input.flagKey,
-        enabled: input.enabled,
-        rollout_percentage: Math.max(0, Math.floor(Number(input.numericValue) || 0)),
-        updated_by: input.updatedBy || null,
-        updated_at: new Date(),
-      })
-      .orUpdate(
-        ['enabled', 'rollout_percentage', 'updated_by', 'updated_at'],
-        ['empresa_id', 'flag_key'],
+    const sql = `
+      INSERT INTO feature_flags_tenant (
+        empresa_id,
+        flag_key,
+        enabled,
+        rollout_percentage,
+        updated_by,
+        updated_at
       )
-      .execute();
+      VALUES ($1, $2, $3, $4, $5, NOW())
+      ON CONFLICT (empresa_id, flag_key)
+      DO UPDATE SET
+        enabled = EXCLUDED.enabled,
+        rollout_percentage = EXCLUDED.rollout_percentage,
+        updated_by = EXCLUDED.updated_by,
+        updated_at = EXCLUDED.updated_at
+    `;
+
+    const params = [
+      input.empresaId,
+      input.flagKey,
+      input.enabled,
+      Math.max(0, Math.floor(Number(input.numericValue) || 0)),
+      input.updatedBy || null,
+    ];
+
+    try {
+      await this.withTimeout(
+        this.featureFlagRepository.query(sql, params),
+        this.getFeatureFlagQueryTimeoutMs(),
+        `Timeout ao persistir feature flag ${input.flagKey}`,
+      );
+    } catch (error) {
+      throw error;
+    }
   }
 
   async getStalePolicy(empresaId: string): Promise<StalePolicyDecision> {
@@ -2644,22 +3048,31 @@ export class OportunidadesService {
       thresholdDays,
     );
 
-    await Promise.all([
-      this.upsertTenantFlagConfig({
-        empresaId: input.empresaId,
-        flagKey: OPORTUNIDADES_STALE_POLICY_FLAG_KEY,
-        enabled,
-        numericValue: thresholdDays,
-        updatedBy: input.updatedBy || null,
-      }),
-      this.upsertTenantFlagConfig({
-        empresaId: input.empresaId,
-        flagKey: OPORTUNIDADES_STALE_AUTO_ARCHIVE_FLAG_KEY,
-        enabled: autoArchiveEnabled,
-        numericValue: autoArchiveAfterDays,
-        updatedBy: input.updatedBy || null,
-      }),
-    ]);
+    try {
+      await Promise.all([
+        this.upsertTenantFlagConfig({
+          empresaId: input.empresaId,
+          flagKey: OPORTUNIDADES_STALE_POLICY_FLAG_KEY,
+          enabled,
+          numericValue: thresholdDays,
+          updatedBy: input.updatedBy || null,
+        }),
+        this.upsertTenantFlagConfig({
+          empresaId: input.empresaId,
+          flagKey: OPORTUNIDADES_STALE_AUTO_ARCHIVE_FLAG_KEY,
+          enabled: autoArchiveEnabled,
+          numericValue: autoArchiveAfterDays,
+          updatedBy: input.updatedBy || null,
+        }),
+      ]);
+    } catch (error) {
+      if (this.isFeatureFlagTimeoutError(error)) {
+        throw new ServiceUnavailableException(
+          'Nao foi possivel salvar a politica de stale deals agora. Tente novamente em instantes.',
+        );
+      }
+      throw error;
+    }
 
     return this.getStalePolicy(input.empresaId);
   }
@@ -3291,6 +3704,319 @@ export class OportunidadesService {
     );
 
     return this.findOne(id, empresaId, { include_deleted: true });
+  }
+
+  private toFiniteNumber(value: unknown, fallback = 0): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  private normalizeItemPreliminarCurrency(value: unknown, fallback = 0): number {
+    const normalized = this.toFiniteNumber(value, fallback);
+    if (normalized < 0) {
+      return 0;
+    }
+    return Number(normalized.toFixed(2));
+  }
+
+  private normalizeItemPreliminarQuantity(value: unknown, fallback = 1): number {
+    const normalized = this.toFiniteNumber(value, fallback);
+    const safe = normalized > 0 ? normalized : fallback;
+    return Number(safe.toFixed(3));
+  }
+
+  private normalizeItemPreliminarDiscount(value: unknown, fallback = 0): number {
+    const normalized = this.toFiniteNumber(value, fallback);
+    const clamped = Math.min(Math.max(normalized, 0), 100);
+    return Number(clamped.toFixed(2));
+  }
+
+  private normalizeItemPreliminarOrder(value: unknown, fallback = 0): number {
+    const normalized = Math.floor(this.toFiniteNumber(value, fallback));
+    return normalized >= 0 ? normalized : fallback;
+  }
+
+  private calculateItemPreliminarSubtotal(
+    precoUnitario: number,
+    quantidade: number,
+    descontoPercentual: number,
+  ): number {
+    const bruto = precoUnitario * quantidade;
+    const desconto = bruto * (descontoPercentual / 100);
+    const liquido = Math.max(bruto - desconto, 0);
+    return Number(liquido.toFixed(2));
+  }
+
+  private mapItemPreliminarEntityToPayload(
+    item: OportunidadeItemPreliminar,
+  ): OportunidadeItemPreliminarPayload {
+    return {
+      id: String(item.id),
+      empresa_id: item.empresa_id,
+      oportunidade_id: String(item.oportunidade_id),
+      produto_id: item.produto_id || null,
+      catalog_item_id: item.catalog_item_id || null,
+      nome_snapshot: item.nome_snapshot,
+      sku_snapshot: item.sku_snapshot || null,
+      descricao_snapshot: item.descricao_snapshot || null,
+      preco_unitario_estimado: this.normalizeItemPreliminarCurrency(item.preco_unitario_estimado, 0),
+      quantidade_estimada: this.normalizeItemPreliminarQuantity(item.quantidade_estimada, 1),
+      desconto_percentual: this.normalizeItemPreliminarDiscount(item.desconto_percentual, 0),
+      subtotal_estimado: this.normalizeItemPreliminarCurrency(item.subtotal_estimado, 0),
+      origem: String(item.origem || 'manual'),
+      ordem: this.normalizeItemPreliminarOrder(item.ordem, 0),
+      created_at: this.toIsoStringOrNull(item.created_at),
+      updated_at: this.toIsoStringOrNull(item.updated_at),
+    };
+  }
+
+  private async resolveCanonicalOportunidadeId(
+    oportunidadeId: string,
+    empresaId: string,
+  ): Promise<string> {
+    const oportunidade = await this.findOne(oportunidadeId, empresaId);
+    return String(oportunidade.id);
+  }
+
+  private async resolveNextItemPreliminarOrder(
+    empresaId: string,
+    oportunidadeId: string,
+  ): Promise<number> {
+    const rows = await this.oportunidadeItemPreliminarRepository.query(
+      `
+        SELECT COALESCE(MAX(ordem), -1)::int AS max_ordem
+        FROM oportunidade_itens_preliminares
+        WHERE empresa_id = $1
+          AND oportunidade_id = $2
+      `,
+      [empresaId, oportunidadeId],
+    );
+
+    const currentMax = this.toFiniteNumber(rows?.[0]?.max_ordem, -1);
+    return Math.max(Math.floor(currentMax) + 1, 0);
+  }
+
+  private async findItemPreliminarOrThrow(
+    itemId: string,
+    empresaId: string,
+    oportunidadeId: string,
+  ): Promise<OportunidadeItemPreliminar> {
+    const item = await this.oportunidadeItemPreliminarRepository.findOne({
+      where: {
+        id: itemId,
+        empresa_id: empresaId,
+        oportunidade_id: oportunidadeId,
+      },
+    });
+
+    if (!item) {
+      throw new NotFoundException('Item preliminar nao encontrado para esta oportunidade');
+    }
+
+    return item;
+  }
+
+  async listarItensPreliminares(
+    oportunidadeId: string,
+    empresaId: string,
+  ): Promise<OportunidadeItemPreliminarPayload[]> {
+    const canonicalOportunidadeId = await this.resolveCanonicalOportunidadeId(
+      oportunidadeId,
+      empresaId,
+    );
+    if (!(await this.isOpportunityPreliminaryItemsFeatureEnabled(empresaId))) {
+      return [];
+    }
+    if (!(await this.isItensPreliminaresTableAvailable())) {
+      return [];
+    }
+
+    const itens = await this.oportunidadeItemPreliminarRepository.find({
+      where: {
+        empresa_id: empresaId,
+        oportunidade_id: canonicalOportunidadeId,
+      },
+      order: {
+        ordem: 'ASC',
+        created_at: 'ASC',
+      },
+    });
+
+    return itens.map((item) => this.mapItemPreliminarEntityToPayload(item));
+  }
+
+  async criarItemPreliminar(
+    oportunidadeId: string,
+    createDto: CreateOportunidadeItemPreliminarDto,
+    empresaId: string,
+  ): Promise<OportunidadeItemPreliminarPayload> {
+    await this.assertOpportunityPreliminaryItemsFeatureEnabled(empresaId);
+    const canonicalOportunidadeId = await this.resolveCanonicalOportunidadeId(
+      oportunidadeId,
+      empresaId,
+    );
+    await this.assertItensPreliminaresTableAvailable();
+    const nomeSnapshot = String(createDto.nome_snapshot || '').trim();
+    if (!nomeSnapshot) {
+      throw new BadRequestException('nome_snapshot e obrigatorio para criar item preliminar');
+    }
+
+    const precoUnitario = this.normalizeItemPreliminarCurrency(createDto.preco_unitario_estimado, 0);
+    const quantidade = this.normalizeItemPreliminarQuantity(createDto.quantidade_estimada, 1);
+    const descontoPercentual = this.normalizeItemPreliminarDiscount(
+      createDto.desconto_percentual,
+      0,
+    );
+    const subtotalEstimado = this.calculateItemPreliminarSubtotal(
+      precoUnitario,
+      quantidade,
+      descontoPercentual,
+    );
+
+    const ordem =
+      createDto.ordem !== undefined
+        ? this.normalizeItemPreliminarOrder(createDto.ordem, 0)
+        : await this.resolveNextItemPreliminarOrder(empresaId, canonicalOportunidadeId);
+
+    const item = this.oportunidadeItemPreliminarRepository.create({
+      empresa_id: empresaId,
+      oportunidade_id: canonicalOportunidadeId,
+      produto_id: createDto.produto_id || null,
+      catalog_item_id: createDto.catalog_item_id || null,
+      nome_snapshot: nomeSnapshot,
+      sku_snapshot: createDto.sku_snapshot?.trim() || null,
+      descricao_snapshot: createDto.descricao_snapshot?.trim() || null,
+      preco_unitario_estimado: precoUnitario,
+      quantidade_estimada: quantidade,
+      desconto_percentual: descontoPercentual,
+      subtotal_estimado: subtotalEstimado,
+      origem: String(createDto.origem || 'manual').trim() || 'manual',
+      ordem,
+    });
+
+    const saved = await this.oportunidadeItemPreliminarRepository.save(item);
+    return this.mapItemPreliminarEntityToPayload(saved);
+  }
+
+  async atualizarItemPreliminar(
+    oportunidadeId: string,
+    itemId: string,
+    updateDto: UpdateOportunidadeItemPreliminarDto,
+    empresaId: string,
+  ): Promise<OportunidadeItemPreliminarPayload> {
+    await this.assertOpportunityPreliminaryItemsFeatureEnabled(empresaId);
+    const canonicalOportunidadeId = await this.resolveCanonicalOportunidadeId(
+      oportunidadeId,
+      empresaId,
+    );
+    await this.assertItensPreliminaresTableAvailable();
+    const item = await this.findItemPreliminarOrThrow(itemId, empresaId, canonicalOportunidadeId);
+
+    if (updateDto.produto_id !== undefined) {
+      item.produto_id = updateDto.produto_id || null;
+    }
+
+    if (updateDto.catalog_item_id !== undefined) {
+      item.catalog_item_id = updateDto.catalog_item_id || null;
+    }
+
+    if (updateDto.nome_snapshot !== undefined) {
+      const nomeSnapshot = String(updateDto.nome_snapshot || '').trim();
+      if (!nomeSnapshot) {
+        throw new BadRequestException('nome_snapshot nao pode ser vazio');
+      }
+      item.nome_snapshot = nomeSnapshot;
+    }
+
+    if (updateDto.sku_snapshot !== undefined) {
+      item.sku_snapshot = updateDto.sku_snapshot?.trim() || null;
+    }
+
+    if (updateDto.descricao_snapshot !== undefined) {
+      item.descricao_snapshot = updateDto.descricao_snapshot?.trim() || null;
+    }
+
+    if (updateDto.origem !== undefined) {
+      item.origem = String(updateDto.origem || 'manual').trim() || 'manual';
+    }
+
+    if (updateDto.ordem !== undefined) {
+      item.ordem = this.normalizeItemPreliminarOrder(updateDto.ordem, item.ordem || 0);
+    }
+
+    const precoUnitario = this.normalizeItemPreliminarCurrency(
+      updateDto.preco_unitario_estimado ?? item.preco_unitario_estimado,
+      0,
+    );
+    const quantidade = this.normalizeItemPreliminarQuantity(
+      updateDto.quantidade_estimada ?? item.quantidade_estimada,
+      1,
+    );
+    const descontoPercentual = this.normalizeItemPreliminarDiscount(
+      updateDto.desconto_percentual ?? item.desconto_percentual,
+      0,
+    );
+
+    item.preco_unitario_estimado = precoUnitario;
+    item.quantidade_estimada = quantidade;
+    item.desconto_percentual = descontoPercentual;
+    item.subtotal_estimado = this.calculateItemPreliminarSubtotal(
+      precoUnitario,
+      quantidade,
+      descontoPercentual,
+    );
+
+    const saved = await this.oportunidadeItemPreliminarRepository.save(item);
+    return this.mapItemPreliminarEntityToPayload(saved);
+  }
+
+  async removerItemPreliminar(
+    oportunidadeId: string,
+    itemId: string,
+    empresaId: string,
+  ): Promise<{ success: true; message: string; id: string }> {
+    await this.assertOpportunityPreliminaryItemsFeatureEnabled(empresaId);
+    const canonicalOportunidadeId = await this.resolveCanonicalOportunidadeId(
+      oportunidadeId,
+      empresaId,
+    );
+    await this.assertItensPreliminaresTableAvailable();
+    const item = await this.findItemPreliminarOrThrow(itemId, empresaId, canonicalOportunidadeId);
+    await this.oportunidadeItemPreliminarRepository.remove(item);
+
+    return {
+      success: true,
+      message: 'Item preliminar removido com sucesso',
+      id: itemId,
+    };
+  }
+
+  mapearItensPreliminaresParaProdutosProposta(
+    itensPreliminares: OportunidadeItemPreliminarPayload[],
+  ): OportunidadePreliminarItemAsPropostaProduto[] {
+    if (!Array.isArray(itensPreliminares) || itensPreliminares.length === 0) {
+      return [];
+    }
+
+    return itensPreliminares.map((item) => ({
+      id: item.id,
+      itemPreliminarId: item.id,
+      produtoId: item.produto_id || undefined,
+      catalogItemId: item.catalog_item_id || undefined,
+      nome: item.nome_snapshot,
+      descricao: item.descricao_snapshot || undefined,
+      precoUnitario: this.normalizeItemPreliminarCurrency(item.preco_unitario_estimado, 0),
+      quantidade: this.normalizeItemPreliminarQuantity(item.quantidade_estimada, 1),
+      desconto: this.normalizeItemPreliminarDiscount(item.desconto_percentual, 0),
+      subtotal: Number.isFinite(Number(item.subtotal_estimado))
+        ? this.normalizeItemPreliminarCurrency(item.subtotal_estimado, 0)
+        : this.calculateItemPreliminarSubtotal(
+            this.normalizeItemPreliminarCurrency(item.preco_unitario_estimado, 0),
+            this.normalizeItemPreliminarQuantity(item.quantidade_estimada, 1),
+            this.normalizeItemPreliminarDiscount(item.desconto_percentual, 0),
+          ),
+      origem: 'oportunidade_item_preliminar',
+    }));
   }
 
   async createAtividade(

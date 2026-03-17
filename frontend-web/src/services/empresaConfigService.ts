@@ -48,6 +48,8 @@ export interface ConfiguracoesEmpresa {
   aprovacaoNovoUsuario: boolean;
   conviteExpiracaoHoras: number;
   alcadaAprovacaoFinanceira?: number | null;
+  comercialLimiteDescontoPercentual: number;
+  comercialAprovacaoInternaHabilitada: boolean;
 
   // Email/SMTP
   emailsHabilitados: boolean;
@@ -101,6 +103,8 @@ export interface UpdateEmpresaConfigDto {
   aprovacaoNovoUsuario?: boolean;
   conviteExpiracaoHoras?: number;
   alcadaAprovacaoFinanceira?: number | null;
+  comercialLimiteDescontoPercentual?: number;
+  comercialAprovacaoInternaHabilitada?: boolean;
 
   // Email/SMTP
   emailsHabilitados?: boolean;

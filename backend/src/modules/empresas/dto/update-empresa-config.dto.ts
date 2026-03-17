@@ -86,6 +86,17 @@ export class UpdateEmpresaConfigDto {
   @Min(0)
   alcadaAprovacaoFinanceira?: number;
 
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(100)
+  comercialLimiteDescontoPercentual?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  comercialAprovacaoInternaHabilitada?: boolean;
+
   // Email/SMTP
   @IsOptional()
   @IsBoolean()

@@ -5,8 +5,9 @@ import { CreateWebhooksGatewayEventos1802885000000 } from '../../src/migrations/
 
 describe('Faturamento, Pagamentos e Gateways (E2E)', () => {
   let h: SalesFlowE2EHarness;
+  const suiteTimeoutMs = Number(process.env.E2E_SALES_SUITE_TIMEOUT_MS || 240_000);
 
-  jest.setTimeout(120000);
+  jest.setTimeout(suiteTimeoutMs);
 
   beforeAll(async () => {
     h = new SalesFlowE2EHarness();

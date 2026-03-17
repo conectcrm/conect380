@@ -271,6 +271,28 @@ export class AtualizarStatusDto {
   @IsOptional()
   @IsString()
   motivoPerda?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === '' || value === null || value === undefined) {
+      return undefined;
+    }
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === 'true' || normalized === '1') return true;
+      if (normalized === 'false' || normalized === '0') return false;
+    }
+    return value;
+  })
+  @IsBoolean()
+  forceDirectApproval?: boolean;
+
+  @IsOptional()
+  @IsString()
+  overrideReason?: string;
 }
 
 export interface PropostaResponseDto {

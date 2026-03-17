@@ -19,9 +19,12 @@ import {
   LifecycleViewOportunidade,
   MetricasQueryDto,
   OportunidadesListQueryDto,
+  CreateOportunidadeItemPreliminarDto,
   StaleDealsQueryDto,
+  UpdateOportunidadeItemPreliminarDto,
   UpdateLifecycleFeatureFlagDto,
   UpdateStalePolicyDto,
+  UpdateSalesFeatureFlagsDto,
 } from './dto/oportunidade.dto';
 import { CreateAtividadeDto } from './dto/atividade.dto';
 import { TipoAtividade } from './atividade.entity';
@@ -42,6 +45,33 @@ export class OportunidadesController {
     private readonly oportunidadesService: OportunidadesService,
     private readonly propostasService: PropostasService,
   ) {}
+
+  private buildLegacyPlaceholderProdutoFromOportunidade(
+    oportunidade: Partial<{
+      id: string | number;
+      titulo: string;
+      valor: number;
+    }>,
+  ) {
+    const oportunidadeId = String(oportunidade?.id || '').trim();
+    const nomeItem = String(oportunidade?.titulo || '').trim() || 'Item inicial da oportunidade';
+    const valorBase = Number.isFinite(Number(oportunidade?.valor))
+      ? Math.max(0, Number(oportunidade?.valor))
+      : 0;
+    const placeholderId = `placeholder-opp-${oportunidadeId || Date.now()}`;
+
+    return {
+      id: placeholderId,
+      itemPreliminarId: placeholderId,
+      nome: nomeItem,
+      descricao: 'Item gerado automaticamente a partir do valor da oportunidade.',
+      precoUnitario: valorBase,
+      quantidade: 1,
+      desconto: 0,
+      subtotal: valorBase,
+      origem: 'oportunidade_placeholder',
+    };
+  }
 
   @Post()
   @Permissions(Permission.CRM_OPORTUNIDADES_CREATE)
@@ -143,6 +173,28 @@ export class OportunidadesController {
     });
   }
 
+  @Get('sales/feature-flags')
+  getSalesFeatureFlags(@EmpresaId() empresaId: string) {
+    return this.oportunidadesService.getSalesFeatureFlags(empresaId);
+  }
+
+  @Patch('sales/feature-flags')
+  @Permissions(Permission.CONFIG_AUTOMACOES_MANAGE)
+  setSalesFeatureFlags(
+    @EmpresaId() empresaId: string,
+    @Body() body: UpdateSalesFeatureFlagsDto,
+    @Request() req,
+  ) {
+    return this.oportunidadesService.setSalesFeatureFlags({
+      empresaId,
+      pipelineDraftWithoutPlaceholder: body.pipelineDraftWithoutPlaceholder,
+      opportunityPreliminaryItems: body.opportunityPreliminaryItems,
+      strictPropostaTransitions: body.strictPropostaTransitions,
+      discountPolicyPerTenant: body.discountPolicyPerTenant,
+      updatedBy: req.user?.id || null,
+    });
+  }
+
   @Get('stale')
   listStaleDeals(@EmpresaId() empresaId: string, @Query() queryDto?: StaleDealsQueryDto) {
     const parsedThresholdDays = queryDto?.threshold_days ? Number(queryDto.threshold_days) : undefined;
@@ -183,6 +235,42 @@ export class OportunidadesController {
       vendedorId,
       limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
     });
+  }
+
+  @Get(':id/itens-preliminares')
+  listarItensPreliminares(@Param('id') id: string, @EmpresaId() empresaId: string) {
+    return this.oportunidadesService.listarItensPreliminares(id, empresaId);
+  }
+
+  @Post(':id/itens-preliminares')
+  @Permissions(Permission.CRM_OPORTUNIDADES_UPDATE)
+  createItemPreliminar(
+    @Param('id') id: string,
+    @Body() createDto: CreateOportunidadeItemPreliminarDto,
+    @EmpresaId() empresaId: string,
+  ) {
+    return this.oportunidadesService.criarItemPreliminar(id, createDto, empresaId);
+  }
+
+  @Patch(':id/itens-preliminares/:itemId')
+  @Permissions(Permission.CRM_OPORTUNIDADES_UPDATE)
+  updateItemPreliminar(
+    @Param('id') id: string,
+    @Param('itemId') itemId: string,
+    @Body() updateDto: UpdateOportunidadeItemPreliminarDto,
+    @EmpresaId() empresaId: string,
+  ) {
+    return this.oportunidadesService.atualizarItemPreliminar(id, itemId, updateDto, empresaId);
+  }
+
+  @Delete(':id/itens-preliminares/:itemId')
+  @Permissions(Permission.CRM_OPORTUNIDADES_UPDATE)
+  removeItemPreliminar(
+    @Param('id') id: string,
+    @Param('itemId') itemId: string,
+    @EmpresaId() empresaId: string,
+  ) {
+    return this.oportunidadesService.removerItemPreliminar(id, itemId, empresaId);
   }
 
   @Get(':id')
@@ -299,20 +387,27 @@ export class OportunidadesController {
     @Request() req,
   ) {
     const oportunidade = await this.oportunidadesService.findOne(id, empresaId);
-    const valorOportunidade = Number(oportunidade.valor || 0);
-    const produtosIniciais =
-      valorOportunidade > 0
-        ? [
-            {
-              id: `opp-${String(oportunidade.id)}`,
-              nome: oportunidade.titulo || `Item da oportunidade ${oportunidade.id}`,
-              precoUnitario: valorOportunidade,
-              quantidade: 1,
-              desconto: 0,
-              subtotal: valorOportunidade,
-            },
-          ]
-        : [];
+    const salesFeatureFlags = await this.oportunidadesService.getSalesFeatureFlags(empresaId);
+    const allowPreliminaryItems = salesFeatureFlags.opportunityPreliminaryItems.enabled;
+    const draftWithoutPlaceholder = salesFeatureFlags.pipelineDraftWithoutPlaceholder.enabled;
+
+    const itensPreliminares = allowPreliminaryItems
+      ? await this.oportunidadesService.listarItensPreliminares(id, empresaId)
+      : [];
+    const produtosPreliminares = allowPreliminaryItems
+      ? this.oportunidadesService.mapearItensPreliminaresParaProdutosProposta(itensPreliminares)
+      : [];
+
+    const produtosBase = [...produtosPreliminares];
+    if (!draftWithoutPlaceholder && produtosBase.length === 0) {
+      produtosBase.push(this.buildLegacyPlaceholderProdutoFromOportunidade(oportunidade));
+    }
+
+    const subtotalPreliminar = produtosBase.reduce(
+      (total, item) => total + Number(item.subtotal || 0),
+      0,
+    );
+    const valorBase = subtotalPreliminar > 0 ? subtotalPreliminar : Number(oportunidade.valor || 0);
 
     const clientePayload = {
       id: oportunidade.cliente_id || null,
@@ -331,13 +426,16 @@ export class OportunidadesController {
       {
         titulo: oportunidade.titulo || `Proposta da oportunidade ${oportunidade.id}`,
         cliente: clientePayload,
-        oportunidadeId: id,
-        valor: Number(oportunidade.valor || 0),
-        total: Number(oportunidade.valor || 0),
-        produtos: produtosIniciais,
+        oportunidadeId: String(oportunidade.id),
+        subtotal: valorBase,
+        valor: valorBase,
+        total: valorBase,
+        produtos: produtosBase,
         status: 'rascunho',
         source: 'oportunidade',
-        observacoes: '',
+        observacoes: draftWithoutPlaceholder
+          ? ''
+          : `Gerada automaticamente a partir da oportunidade ${String(oportunidade.id || '')}`,
       } as any,
       empresaId,
     );
@@ -358,7 +456,7 @@ export class OportunidadesController {
 
     return {
       success: true,
-      message: 'Proposta gerada com sucesso',
+      message: 'Rascunho de proposta criado com sucesso',
       proposta,
     };
   }

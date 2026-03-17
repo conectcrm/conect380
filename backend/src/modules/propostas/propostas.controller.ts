@@ -3,6 +3,7 @@ import { Logger,
   Put,
   Param,
   Body,
+  Request,
   HttpStatus,
   HttpException,
   Get,
@@ -444,6 +445,7 @@ export class PropostasController {
     @EmpresaId() empresaId: string,
     @Param('id') propostaId: string,
     @Body() updateData: AtualizarStatusDto,
+    @Request() req: any,
   ): Promise<PropostaResponseDto> {
     try {
       this.logger.log(`[PROPOSTAS] Atualizando status da proposta ${propostaId} para: ${updateData.status}`);
@@ -455,6 +457,13 @@ export class PropostasController {
         updateData.observacoes,
         updateData.motivoPerda,
         empresaId,
+        undefined,
+        {
+          actorUserId: req?.user?.id,
+          actorPermissions: Array.isArray(req?.user?.permissions) ? req.user.permissions : [],
+          allowDirectApprovalOverride: Boolean(updateData.forceDirectApproval),
+          overrideReason: updateData.overrideReason,
+        },
       );
 
       this.logger.log('[PROPOSTAS] Status atualizado com sucesso');

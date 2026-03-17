@@ -268,10 +268,14 @@ test.describe('Pipeline -> propostas (rascunho)', () => {
     await expect(
       page.getByText('Rascunho criado a partir da oportunidade.', { exact: false }),
     ).toBeVisible();
+    await expect(
+      page.getByText('Este rascunho ainda nao possui itens comerciais.', { exact: false }),
+    ).toBeVisible();
     await expect(page.locator('textarea').first()).toHaveValue('');
 
     await page.getByRole('button', { name: 'Próximo' }).click();
     await expect(page.getByText('Produtos Adicionados')).toBeVisible();
+    await expect(page.getByText('Rascunho sem itens comerciais.')).toBeVisible();
 
     await page.getByRole('button', { name: 'Adicionar Produto' }).click();
     await expect(page.getByText(PRODUTO_BASE.nome)).toBeVisible();
