@@ -17,6 +17,8 @@ dist/
 .env.production
 # Contabo deploy runtime env (keep local only)
 deploy/contabo/.env.app-vm
+deploy/contabo/deploy-profile.local.psd1
+deploy/contabo/deploy-profile.*.local.psd1
 # Mas permitir .example
 !.env*.example
 
@@ -161,6 +163,7 @@ scripts/*.env
 
 # Artefatos gerados/local-only (não versionar)
 .production/pilot-runs/
+.production/deploy-jobs/
 backend/test/tmp-*
 tmp-*.json
 

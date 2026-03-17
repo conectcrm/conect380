@@ -137,3 +137,158 @@ Then validate in UI:
 - pipeline load
 - create opportunity
 - notification bell and websocket updates
+
+## 6) Automated deploy scripts (PowerShell)
+
+The repo includes deploy scripts for the split setup:
+- API VM (`backend + redis`)
+- APP VM (`frontend + guardian-web`)
+
+Scripts:
+- `deploy/contabo/deploy-prod.ps1`
+- `deploy/contabo/rollback-prod.ps1`
+- `deploy/contabo/smoke-prod.ps1`
+- `deploy/contabo/deploy-prod.bat`
+- `deploy/contabo/rollback-prod.bat`
+- `deploy/contabo/smoke-prod.bat`
+
+For Windows operation, prefer `.bat` wrappers. They call the corresponding `.ps1` script with the local profile automatically.
+
+### 6.1 Prepare deploy profile
+
+Create a local profile (ignored by git):
+
+```powershell
+Copy-Item deploy/contabo/deploy-profile.example.psd1 deploy/contabo/deploy-profile.local.psd1
+```
+
+Fill at least:
+- `ApiVm.Host`, `AppVm.Host`
+- `SshUser` / optional `SshKeyPath`
+- `RuntimeEnvRemoteRelativePath` (default `shared/.env.app-vm`)
+
+### 6.2 Dry-run (recommended first)
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File deploy/contabo/deploy-prod.ps1 `
+  -ProfilePath deploy/contabo/deploy-profile.local.psd1 `
+  -AllowDirtyWorktree
+```
+
+Equivalent `.bat`:
+
+```bat
+deploy\contabo\deploy-prod.bat -AllowDirtyWorktree
+```
+
+### 6.3 Execute deploy
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File deploy/contabo/deploy-prod.ps1 `
+  -ProfilePath deploy/contabo/deploy-profile.local.psd1 `
+  -Execute `
+  -UploadRuntimeEnv
+```
+
+Equivalent `.bat`:
+
+```bat
+deploy\contabo\deploy-prod.bat -Execute -UploadRuntimeEnv
+```
+
+Notes:
+- `-UploadRuntimeEnv` pushes local `deploy/contabo/.env.app-vm` to both VMs.
+- If you keep env already on server, omit `-UploadRuntimeEnv`.
+- Migrations run on API VM by default. Use `-SkipMigrations` only if needed.
+
+### 6.3.1 Async mode (recommended on Windows)
+
+If your terminal appears to "hang" after deploy completion, use async mode:
+
+1) Start deploy in background:
+
+```bat
+deploy\contabo\deploy-prod.bat start -Execute -UploadRuntimeEnv
+```
+
+2) Check status/logs:
+
+```bat
+deploy\contabo\deploy-prod.bat status
+```
+
+3) Wait until finish (with periodic polling):
+
+```bat
+deploy\contabo\deploy-prod.bat wait
+```
+
+You can pass a specific operation id in `status`/`wait`:
+
+```bat
+deploy\contabo\deploy-prod.bat status deploy-YYYYMMDD-HHMMSS-1234
+deploy\contabo\deploy-prod.bat wait deploy-YYYYMMDD-HHMMSS-1234
+```
+
+PowerShell equivalents:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File deploy/contabo/deploy-prod.ps1 `
+  -Mode start `
+  -ProfilePath deploy/contabo/deploy-profile.local.psd1 `
+  -Execute `
+  -UploadRuntimeEnv
+
+powershell -NoProfile -ExecutionPolicy Bypass -File deploy/contabo/deploy-prod.ps1 -Mode status
+powershell -NoProfile -ExecutionPolicy Bypass -File deploy/contabo/deploy-prod.ps1 -Mode wait
+```
+
+### 6.4 Run smoke after deploy
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File deploy/contabo/smoke-prod.ps1 `
+  -ProfilePath deploy/contabo/deploy-profile.local.psd1 `
+  -SuperAdminEmail "conectcrm@gmail.com" `
+  -SuperAdminPassword "SUA_SENHA" `
+  -SuperAdminMfaCode "123456" `
+  -ExpectedOwnerEmpresaId "SEU_OWNER_EMPRESA_ID"
+```
+
+Equivalent `.bat`:
+
+```bat
+deploy\contabo\smoke-prod.bat
+```
+
+### 6.5 Rollback
+
+Rollback to previous release registered on each VM:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File deploy/contabo/rollback-prod.ps1 `
+  -ProfilePath deploy/contabo/deploy-profile.local.psd1 `
+  -Execute
+```
+
+Rollback to a specific release id:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File deploy/contabo/rollback-prod.ps1 `
+  -ProfilePath deploy/contabo/deploy-profile.local.psd1 `
+  -TargetReleaseId "rel-YYYYMMDD-HHMMSS-abcdef" `
+  -Execute
+```
+
+Equivalent `.bat`:
+
+```bat
+deploy\contabo\rollback-prod.bat -Execute
+deploy\contabo\rollback-prod.bat -TargetReleaseId "rel-YYYYMMDD-HHMMSS-abcdef" -Execute
+```
+
+### 6.6 Safety behavior
+
+- Dry-run by default (requires `-Execute` to apply changes).
+- Health checks are enforced per VM.
+- Automatic best-effort rollback is attempted if deploy fails.
+- Keeps release history under `<RemoteRoot>/.deploy/history.log`.
