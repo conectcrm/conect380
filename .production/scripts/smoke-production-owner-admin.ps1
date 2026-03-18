@@ -27,21 +27,89 @@ function Add-Result {
   }
 }
 
+function Get-HttpStatusCodeFromError {
+  param(
+    [Parameter(Mandatory = $true)]$ErrorRecord
+  )
+
+  $candidateMessages = @(
+    [string]$ErrorRecord.Exception.Message,
+    [string]$ErrorRecord.ErrorDetails.Message,
+    [string]$ErrorRecord.ToString()
+  ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+
+  foreach ($message in $candidateMessages) {
+    if ($message -match 'Status inesperado em .*: (?<status>\d{3})') {
+      return [int]$Matches.status
+    }
+
+    if ($message -match 'status code does not indicate success:\s*(?<status>\d{3})') {
+      return [int]$Matches.status
+    }
+  }
+
+  return $null
+}
+
+function Test-IsTransientNetworkError {
+  param(
+    [Parameter(Mandatory = $true)]$ErrorRecord
+  )
+
+  $message = @(
+    [string]$ErrorRecord.Exception.Message,
+    [string]$ErrorRecord.ErrorDetails.Message,
+    [string]$ErrorRecord.ToString()
+  ) -join ' '
+
+  if ([string]::IsNullOrWhiteSpace($message)) {
+    return $false
+  }
+
+  return $message -match 'timed out|timeout|temporarily unavailable|connection was closed|connection reset|connection refused|name resolution'
+}
+
 function Run-Step {
   param(
     [string]$Name,
-    [scriptblock]$Action
+    [scriptblock]$Action,
+    [int]$MaxAttempts = 1,
+    [int[]]$RetryableStatusCodes = @(429, 500, 502, 503, 504),
+    [int]$BaseRetryDelaySeconds = 2
   )
 
   Write-Host ""
   Write-Host ">> $Name"
 
-  try {
-    & $Action
-    Add-Result -Step $Name -Status "PASS"
-  }
-  catch {
-    Add-Result -Step $Name -Status "FAIL" -Details $_.Exception.Message
+  $attempts = [Math]::Max(1, $MaxAttempts)
+
+  for ($attempt = 1; $attempt -le $attempts; $attempt++) {
+    try {
+      & $Action
+      Add-Result -Step $Name -Status "PASS"
+      return
+    }
+    catch {
+      $statusCode = Get-HttpStatusCodeFromError -ErrorRecord $_
+      $isTransientNetworkError = Test-IsTransientNetworkError -ErrorRecord $_
+      $retryableStatus = $null -ne $statusCode -and ($RetryableStatusCodes -contains $statusCode)
+      $shouldRetry = $attempt -lt $attempts -and ($retryableStatus -or $isTransientNetworkError)
+
+      if ($shouldRetry) {
+        $delaySeconds = [Math]::Max(1, $BaseRetryDelaySeconds * $attempt)
+        if ($null -ne $statusCode) {
+          Write-Host "Falha transiente em '$Name' (status $statusCode). Tentando novamente em $delaySeconds s..." -ForegroundColor Yellow
+        }
+        else {
+          Write-Host "Falha transiente em '$Name'. Tentando novamente em $delaySeconds s..." -ForegroundColor Yellow
+        }
+        Start-Sleep -Seconds $delaySeconds
+        continue
+      }
+
+      Add-Result -Step $Name -Status "FAIL" -Details $_.Exception.Message
+      return
+    }
   }
 }
 
@@ -217,7 +285,7 @@ Run-Step -Name "Branding publico" -Action {
 }
 
 if (-not $SkipAuthChecks) {
-  Run-Step -Name "Login superadmin" -Action {
+  Run-Step -Name "Login superadmin" -MaxAttempts 3 -Action {
     Require-String -Name "SuperAdminEmail" -Value $SuperAdminEmail
     Require-String -Name "SuperAdminPassword" -Value $SuperAdminPassword
 
@@ -270,7 +338,7 @@ if (-not $SkipAuthChecks) {
     }
   }
 
-  Run-Step -Name "Admin branding autenticado" -Action {
+  Run-Step -Name "Admin branding autenticado" -MaxAttempts 4 -Action {
     if ([string]::IsNullOrWhiteSpace($script:accessToken)) {
       throw "Token ausente para rota admin/system-branding"
     }
@@ -310,7 +378,7 @@ if (-not $SkipAuthChecks) {
     }
   }
 
-  Run-Step -Name "Admin bff companies autenticado" -Action {
+  Run-Step -Name "Admin bff companies autenticado" -MaxAttempts 3 -Action {
     if ([string]::IsNullOrWhiteSpace($script:accessToken)) {
       throw "Token ausente para rota admin/bff/companies"
     }
