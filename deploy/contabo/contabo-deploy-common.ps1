@@ -79,7 +79,14 @@ function Resolve-ProfileVm {
     $user = 'root'
   }
 
-  $port = if ($VmData.PSObject.Properties.Name -contains 'Port' -and $VmData.Port) { [int]$VmData.Port } else { $DefaultPort }
+  $hasPort = if ($VmData -is [System.Collections.IDictionary]) {
+    $VmData.Contains('Port')
+  }
+  else {
+    $VmData.PSObject.Properties.Name -contains 'Port'
+  }
+
+  $port = if ($hasPort -and $VmData.Port) { [int]$VmData.Port } else { $DefaultPort }
   if ($port -le 0) {
     $port = 22
   }

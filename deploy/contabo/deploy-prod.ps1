@@ -389,6 +389,20 @@ function Get-TextValue {
   return $Fallback
 }
 
+function Has-OptionalProperty {
+  param(
+    $Object,
+    [Parameter(Mandatory = $true)][string]$PropertyName
+  )
+
+  if ($null -eq $Object) { return $false }
+  if ($Object -is [System.Collections.IDictionary]) {
+    return $Object.Contains($PropertyName)
+  }
+
+  return $Object.PSObject.Properties.Name -contains $PropertyName
+}
+
 function Get-OptionalPropertyValue {
   param(
     $Object,
@@ -397,7 +411,11 @@ function Get-OptionalPropertyValue {
   )
 
   if ($null -eq $Object) { return $Fallback }
-  if ($Object.PSObject.Properties.Name -contains $PropertyName) {
+  if (Has-OptionalProperty -Object $Object -PropertyName $PropertyName) {
+    if ($Object -is [System.Collections.IDictionary]) {
+      return [string]$Object[$PropertyName]
+    }
+
     return [string]$Object.$PropertyName
   }
   return $Fallback
@@ -641,7 +659,7 @@ $resolvedProfilePath = Resolve-ProfilePath -ScriptRoot $scriptRoot -ProfilePath 
 $profile = Load-ContaboProfile -ProfilePath $resolvedProfilePath -ProfileName $ProfileName
 
 $defaultSshUser = Get-TextValue -Primary (Get-OptionalPropertyValue -Object $profile -PropertyName 'SshUser') -Fallback 'root'
-$defaultSshPort = if ($profile.PSObject.Properties.Name -contains 'SshPort' -and $profile.SshPort) { [int]$profile.SshPort } else { 22 }
+$defaultSshPort = if ((Has-OptionalProperty -Object $profile -PropertyName 'SshPort') -and $profile.SshPort) { [int]$profile.SshPort } else { 22 }
 $defaultRemoteRoot = Get-TextValue -Primary (Get-OptionalPropertyValue -Object $profile -PropertyName 'RemoteRoot') -Fallback '/opt/conect360'
 $sshKeyPath = Get-TextValue -Primary (Get-OptionalPropertyValue -Object $profile -PropertyName 'SshKeyPath') -Fallback ''
 
@@ -662,29 +680,31 @@ if ([string]::IsNullOrWhiteSpace($resolvedTargetRef)) {
   $resolvedTargetRef = 'HEAD'
 }
 
-$apiBaseUrl = if ($profile.PSObject.Properties.Name -contains 'Urls') { Get-TextValue -Primary (Get-OptionalPropertyValue -Object $profile.Urls -PropertyName 'Api') -Fallback 'https://api.conect360.com' } else { 'https://api.conect360.com' }
-$appBaseUrl = if ($profile.PSObject.Properties.Name -contains 'Urls') { Get-TextValue -Primary (Get-OptionalPropertyValue -Object $profile.Urls -PropertyName 'App') -Fallback 'https://conect360.com' } else { 'https://conect360.com' }
-$guardianBaseUrl = if ($profile.PSObject.Properties.Name -contains 'Urls') { Get-TextValue -Primary (Get-OptionalPropertyValue -Object $profile.Urls -PropertyName 'Guardian') -Fallback 'https://guardian.conect360.com' } else { 'https://guardian.conect360.com' }
+$urlProfile = if (Has-OptionalProperty -Object $profile -PropertyName 'Urls') { $profile.Urls } else { $null }
+$apiBaseUrl = Get-TextValue -Primary (Get-OptionalPropertyValue -Object $urlProfile -PropertyName 'Api') -Fallback 'https://api.conect360.com'
+$appBaseUrl = Get-TextValue -Primary (Get-OptionalPropertyValue -Object $urlProfile -PropertyName 'App') -Fallback 'https://conect360.com'
+$guardianBaseUrl = Get-TextValue -Primary (Get-OptionalPropertyValue -Object $urlProfile -PropertyName 'Guardian') -Fallback 'https://guardian.conect360.com'
 
 $smokeEnabledByProfile = $false
-if ($profile.PSObject.Properties.Name -contains 'Smoke' -and $null -ne $profile.Smoke) {
-  if ($profile.Smoke.PSObject.Properties.Name -contains 'Enabled') {
-    $smokeEnabledByProfile = [bool]$profile.Smoke.Enabled
+$smokeProfile = if (Has-OptionalProperty -Object $profile -PropertyName 'Smoke') { $profile.Smoke } else { $null }
+if ($null -ne $smokeProfile) {
+  if (Has-OptionalProperty -Object $smokeProfile -PropertyName 'Enabled') {
+    $smokeEnabledByProfile = [bool]$smokeProfile.Enabled
   }
 }
 $shouldRunSmoke = $RunSmoke -or $smokeEnabledByProfile
 
-if ([string]::IsNullOrWhiteSpace($SuperAdminEmail) -and $profile.PSObject.Properties.Name -contains 'Smoke') {
-  $SuperAdminEmail = [string]$profile.Smoke.SuperAdminEmail
+if ([string]::IsNullOrWhiteSpace($SuperAdminEmail) -and $null -ne $smokeProfile) {
+  $SuperAdminEmail = [string]$smokeProfile.SuperAdminEmail
 }
-if ([string]::IsNullOrWhiteSpace($SuperAdminPassword) -and $profile.PSObject.Properties.Name -contains 'Smoke') {
-  $SuperAdminPassword = [string]$profile.Smoke.SuperAdminPassword
+if ([string]::IsNullOrWhiteSpace($SuperAdminPassword) -and $null -ne $smokeProfile) {
+  $SuperAdminPassword = [string]$smokeProfile.SuperAdminPassword
 }
-if ([string]::IsNullOrWhiteSpace($SuperAdminMfaCode) -and $profile.PSObject.Properties.Name -contains 'Smoke') {
-  $SuperAdminMfaCode = [string]$profile.Smoke.SuperAdminMfaCode
+if ([string]::IsNullOrWhiteSpace($SuperAdminMfaCode) -and $null -ne $smokeProfile) {
+  $SuperAdminMfaCode = [string]$smokeProfile.SuperAdminMfaCode
 }
-if ([string]::IsNullOrWhiteSpace($ExpectedOwnerEmpresaId) -and $profile.PSObject.Properties.Name -contains 'Smoke') {
-  $ExpectedOwnerEmpresaId = [string]$profile.Smoke.ExpectedOwnerEmpresaId
+if ([string]::IsNullOrWhiteSpace($ExpectedOwnerEmpresaId) -and $null -ne $smokeProfile) {
+  $ExpectedOwnerEmpresaId = [string]$smokeProfile.ExpectedOwnerEmpresaId
 }
 
 Write-Step "Validar pre-requisitos locais"

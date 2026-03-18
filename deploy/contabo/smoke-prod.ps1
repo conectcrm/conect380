@@ -23,6 +23,20 @@ function Get-TextValue {
   return $Fallback
 }
 
+function Has-OptionalProperty {
+  param(
+    $Object,
+    [Parameter(Mandatory = $true)][string]$PropertyName
+  )
+
+  if ($null -eq $Object) { return $false }
+  if ($Object -is [System.Collections.IDictionary]) {
+    return $Object.Contains($PropertyName)
+  }
+
+  return $Object.PSObject.Properties.Name -contains $PropertyName
+}
+
 function Get-OptionalPropertyValue {
   param(
     $Object,
@@ -31,7 +45,11 @@ function Get-OptionalPropertyValue {
   )
 
   if ($null -eq $Object) { return $Fallback }
-  if ($Object.PSObject.Properties.Name -contains $PropertyName) {
+  if (Has-OptionalProperty -Object $Object -PropertyName $PropertyName) {
+    if ($Object -is [System.Collections.IDictionary]) {
+      return [string]$Object[$PropertyName]
+    }
+
     return [string]$Object.$PropertyName
   }
   return $Fallback
@@ -41,22 +59,24 @@ $repoRoot = Get-RepositoryRoot -ScriptRoot $scriptRoot
 $resolvedProfilePath = Resolve-ProfilePath -ScriptRoot $scriptRoot -ProfilePath $ProfilePath
 $profile = Load-ContaboProfile -ProfilePath $resolvedProfilePath -ProfileName $ProfileName
 
-$urlProfile = if ($profile.PSObject.Properties.Name -contains 'Urls') { $profile.Urls } else { $null }
+$urlProfile = if (Has-OptionalProperty -Object $profile -PropertyName 'Urls') { $profile.Urls } else { $null }
 $resolvedApiBaseUrl = Get-TextValue -Primary $ApiBaseUrl -Fallback (Get-TextValue -Primary (Get-OptionalPropertyValue -Object $urlProfile -PropertyName 'Api') -Fallback 'https://api.conect360.com')
 $resolvedAppBaseUrl = Get-TextValue -Primary $AppBaseUrl -Fallback (Get-TextValue -Primary (Get-OptionalPropertyValue -Object $urlProfile -PropertyName 'App') -Fallback 'https://conect360.com')
 $resolvedGuardianBaseUrl = Get-TextValue -Primary $GuardianBaseUrl -Fallback (Get-TextValue -Primary (Get-OptionalPropertyValue -Object $urlProfile -PropertyName 'Guardian') -Fallback 'https://guardian.conect360.com')
 
-if ([string]::IsNullOrWhiteSpace($SuperAdminEmail) -and $profile.PSObject.Properties.Name -contains 'Smoke') {
-  $SuperAdminEmail = [string]$profile.Smoke.SuperAdminEmail
+$smokeProfile = if (Has-OptionalProperty -Object $profile -PropertyName 'Smoke') { $profile.Smoke } else { $null }
+
+if ([string]::IsNullOrWhiteSpace($SuperAdminEmail) -and $null -ne $smokeProfile) {
+  $SuperAdminEmail = [string]$smokeProfile.SuperAdminEmail
 }
-if ([string]::IsNullOrWhiteSpace($SuperAdminPassword) -and $profile.PSObject.Properties.Name -contains 'Smoke') {
-  $SuperAdminPassword = [string]$profile.Smoke.SuperAdminPassword
+if ([string]::IsNullOrWhiteSpace($SuperAdminPassword) -and $null -ne $smokeProfile) {
+  $SuperAdminPassword = [string]$smokeProfile.SuperAdminPassword
 }
-if ([string]::IsNullOrWhiteSpace($SuperAdminMfaCode) -and $profile.PSObject.Properties.Name -contains 'Smoke') {
-  $SuperAdminMfaCode = [string]$profile.Smoke.SuperAdminMfaCode
+if ([string]::IsNullOrWhiteSpace($SuperAdminMfaCode) -and $null -ne $smokeProfile) {
+  $SuperAdminMfaCode = [string]$smokeProfile.SuperAdminMfaCode
 }
-if ([string]::IsNullOrWhiteSpace($ExpectedOwnerEmpresaId) -and $profile.PSObject.Properties.Name -contains 'Smoke') {
-  $ExpectedOwnerEmpresaId = [string]$profile.Smoke.ExpectedOwnerEmpresaId
+if ([string]::IsNullOrWhiteSpace($ExpectedOwnerEmpresaId) -and $null -ne $smokeProfile) {
+  $ExpectedOwnerEmpresaId = [string]$smokeProfile.ExpectedOwnerEmpresaId
 }
 
 $smokeScriptPath = Join-Path $repoRoot '.production\scripts\smoke-production-owner-admin.ps1'
