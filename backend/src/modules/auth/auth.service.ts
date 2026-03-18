@@ -1219,6 +1219,13 @@ export class AuthService {
       return;
     }
 
+    if (!this.mailService.isGlobalSmtpReady()) {
+      this.logger.error(
+        `Canal SMTP global indisponivel para recuperacao de senha. Solicitacao ignorada para ${this.maskEmail(user.email)}.`,
+      );
+      return;
+    }
+
     await this.passwordResetTokenRepository.update(
       { user_id: user.id, used_at: IsNull() },
       { used_at: new Date() },
@@ -1235,7 +1242,7 @@ export class AuthService {
       user_agent: metadata?.userAgent ?? null,
     });
 
-    await this.passwordResetTokenRepository.save(resetToken);
+    const savedResetToken = await this.passwordResetTokenRepository.save(resetToken);
 
     const frontendBaseUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(
       /\/$/,
@@ -1245,13 +1252,33 @@ export class AuthService {
 
     const expiracaoHoras = Math.max(1, Math.ceil(RESET_TOKEN_EXPIRATION_MINUTES / 60));
 
-    await this.mailService.enviarEmailRecuperacaoSenha({
-      to: user.email,
-      usuario: user.nome,
-      empresa: user.empresa?.nome,
-      resetLink,
-      expiracaoHoras,
-    });
+    try {
+      await this.mailService.enviarEmailRecuperacaoSenha({
+        to: user.email,
+        usuario: user.nome,
+        empresa: user.empresa?.nome,
+        resetLink,
+        expiracaoHoras,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Falha ao enviar e-mail de recuperacao para ${this.maskEmail(user.email)}. Solicitacao sera mantida como sucesso para o cliente.`,
+        error instanceof Error ? error.stack : String(error),
+      );
+
+      try {
+        await this.passwordResetTokenRepository.update(
+          { id: savedResetToken.id, used_at: IsNull() },
+          { used_at: new Date() },
+        );
+      } catch (invalidateError) {
+        this.logger.warn(
+          `Nao foi possivel invalidar token de recuperacao apos falha de e-mail para ${this.maskEmail(user.email)}: ${
+            invalidateError instanceof Error ? invalidateError.message : String(invalidateError)
+          }`,
+        );
+      }
+    }
   }
 
   async resetarSenhaComToken(token: string, senhaNova: string) {

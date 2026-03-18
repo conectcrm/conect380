@@ -14,18 +14,63 @@ export class MailService {
     return `${local.slice(0, 2)}***@${domain}`;
   }
 
-  constructor() {
-    const smtpPassword = process.env.SMTP_PASS || process.env.SMTP_PASSWORD;
+  private resolveGlobalSmtpUser(): string {
+    return String(process.env.SMTP_USER || '').trim();
+  }
 
-    this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: false,
+  private resolveGlobalSmtpPassword(): string {
+    return String(process.env.SMTP_PASS || process.env.SMTP_PASSWORD || '').trim();
+  }
+
+  private resolveGlobalSmtpHost(): string {
+    const host = String(process.env.SMTP_HOST || 'smtp.gmail.com').trim();
+    return host || 'smtp.gmail.com';
+  }
+
+  private resolveGlobalSmtpPort(): number {
+    const parsed = parseInt(String(process.env.SMTP_PORT || '587'), 10);
+    if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 65535) {
+      return 587;
+    }
+    return parsed;
+  }
+
+  public isGlobalSmtpReady(): boolean {
+    return Boolean(this.resolveGlobalSmtpUser() && this.resolveGlobalSmtpPassword());
+  }
+
+  private ensureGlobalSmtpReadyForAuth(flow: 'forgot_password' | 'mfa_login'): void {
+    if (this.isGlobalSmtpReady()) {
+      return;
+    }
+
+    this.logger.error(
+      `SMTP global nao configurado para fluxo critico de autenticacao (${flow}). Defina SMTP_USER e SMTP_PASS/SMTP_PASSWORD.`,
+    );
+    throw new Error('SMTP global nao configurado para autenticacao');
+  }
+
+  private createTransporterFromGlobalEnv(): nodemailer.Transporter {
+    const smtpPort = this.resolveGlobalSmtpPort();
+    return nodemailer.createTransport({
+      host: this.resolveGlobalSmtpHost(),
+      port: smtpPort,
+      secure: smtpPort === 465,
       auth: {
-        user: process.env.SMTP_USER,
-        pass: smtpPassword,
+        user: this.resolveGlobalSmtpUser() || undefined,
+        pass: this.resolveGlobalSmtpPassword() || undefined,
       },
     });
+  }
+
+  constructor() {
+    this.transporter = this.createTransporterFromGlobalEnv();
+
+    if (!this.isGlobalSmtpReady()) {
+      this.logger.warn(
+        'SMTP global incompleto no bootstrap. Fluxos de autenticacao por e-mail (MFA/recuperacao) ficarao indisponiveis ate configurar SMTP_USER e SMTP_PASS/SMTP_PASSWORD.',
+      );
+    }
   }
 
   async enviarEmailVerificacao(dados: {
@@ -227,6 +272,8 @@ export class MailService {
     resetLink: string;
     expiracaoHoras: number;
   }): Promise<void> {
+    this.ensureGlobalSmtpReadyForAuth('forgot_password');
+
     const { to, usuario, empresa, resetLink, expiracaoHoras } = dados;
 
     const htmlContent = `
@@ -310,6 +357,8 @@ export class MailService {
     codigo: string;
     expiracaoMinutos: number;
   }): Promise<void> {
+    this.ensureGlobalSmtpReadyForAuth('mfa_login');
+
     const { to, usuario, codigo, expiracaoMinutos } = dados;
 
     const htmlContent = `

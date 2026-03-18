@@ -72,12 +72,27 @@ export class EmailIntegradoService {
   }
 
   private setupTransporter() {
-    // Configuracao Gmail SMTP
+    const user = this.resolveEnvSmtpUser();
+    const pass = this.resolveEnvSmtpPassword();
+    const host = this.resolveEnvSmtpHost();
+
+    if (host && user && pass) {
+      this.transporter = this.buildTransporterFromSmtpConfig(
+        host,
+        this.resolveEnvSmtpPort(),
+        user,
+        pass,
+      );
+      this.log('Servico de email integrado configurado com SMTP global');
+      return;
+    }
+
+    // Fallback historico para ambientes que ainda usam Gmail service.
     this.transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
-        user: process.env.GMAIL_USER || process.env.SMTP_USER,
-        pass: process.env.GMAIL_PASSWORD || process.env.SMTP_PASS,
+        user: user || undefined,
+        pass: pass || undefined,
       },
     });
 
@@ -90,9 +105,31 @@ export class EmailIntegradoService {
   }
 
   private hasEnvSmtpConfig(): boolean {
-    const user = process.env.GMAIL_USER || process.env.SMTP_USER;
-    const pass = process.env.GMAIL_PASSWORD || process.env.SMTP_PASS;
+    const user = this.resolveEnvSmtpUser();
+    const pass = this.resolveEnvSmtpPassword();
     return Boolean(user && pass);
+  }
+
+  private resolveEnvSmtpUser(): string {
+    return String(process.env.GMAIL_USER || process.env.SMTP_USER || '').trim();
+  }
+
+  private resolveEnvSmtpPassword(): string {
+    return String(
+      process.env.GMAIL_PASSWORD || process.env.SMTP_PASS || process.env.SMTP_PASSWORD || '',
+    ).trim();
+  }
+
+  private resolveEnvSmtpHost(): string {
+    return String(process.env.SMTP_HOST || '').trim();
+  }
+
+  private resolveEnvSmtpPort(): number {
+    const parsed = parseInt(String(process.env.SMTP_PORT || '587'), 10);
+    if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 65535) {
+      return 587;
+    }
+    return parsed;
   }
 
   private buildTransporterFromSmtpConfig(
@@ -163,7 +200,7 @@ export class EmailIntegradoService {
       }
     }
 
-    const envUser = process.env.GMAIL_USER || process.env.SMTP_USER;
+    const envUser = this.resolveEnvSmtpUser();
 
     return {
       transporter: this.transporter,
@@ -296,7 +333,9 @@ export class EmailIntegradoService {
       }
 
       if (!transportContext.smtpConfigured) {
-        this.error('SMTP nao configurado. Defina GMAIL_USER/GMAIL_PASSWORD ou SMTP_USER/SMTP_PASS.');
+        this.error(
+          'SMTP nao configurado. Defina GMAIL_USER/GMAIL_PASSWORD ou SMTP_USER/SMTP_PASS (ou SMTP_PASSWORD).',
+        );
         return false;
       }
 
@@ -409,7 +448,9 @@ export class EmailIntegradoService {
       }
 
       if (!transportContext.smtpConfigured) {
-        this.error('SMTP nao configurado. Defina GMAIL_USER/GMAIL_PASSWORD ou SMTP_USER/SMTP_PASS.');
+        this.error(
+          'SMTP nao configurado. Defina GMAIL_USER/GMAIL_PASSWORD ou SMTP_USER/SMTP_PASS (ou SMTP_PASSWORD).',
+        );
         return {
           sucesso: false,
           simulado: false,
