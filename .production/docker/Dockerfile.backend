@@ -13,6 +13,8 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+
 # Copiar arquivos de dependências
 COPY backend/package*.json ./
 COPY backend/tsconfig*.json ./
@@ -38,7 +40,11 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Instalar dumb-init para gerenciamento correto de processos
-RUN apk add --no-cache dumb-init curl
+RUN apk add --no-cache dumb-init curl chromium nss freetype harfbuzz ca-certificates ttf-freefont
+
+ENV PUPPETEER_SKIP_DOWNLOAD=true \
+  PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
+  CHROME_PATH=/usr/bin/chromium-browser
 
 # Criar usuário não-root (segurança)
 RUN addgroup -g 1001 -S nodejs && \

@@ -35,6 +35,8 @@ import {
 } from '../../../services/faturamentoService';
 import { propostasService as propostasApiService } from '../../../services/propostasService';
 import { authService } from '../../../services/authService';
+import { empresaConfigService } from '../../../services/empresaConfigService';
+import { minhasEmpresasService } from '../../../services/minhasEmpresasService';
 import { useNavigate } from 'react-router-dom';
 import ModalEnviarWhatsApp from '../../../components/whatsapp/ModalEnviarWhatsApp';
 import { triggerSalesCelebration } from '../../../components/feedback/SalesCelebrationHost';
@@ -53,20 +55,80 @@ type ClienteContatoData = {
   empresa?: string;
 };
 
+type EmpresaPdfData = {
+  nome: string;
+  email?: string;
+  telefone?: string;
+  cnpj?: string;
+  endereco?: string;
+  cidade?: string;
+  estado?: string;
+  cep?: string;
+  logo?: string;
+};
+
 const CLIENTE_DETAILS_TTL = 5 * 60 * 1000; // 5 minutos
 const CLIENTE_DETAILS_COOLDOWN_TTL = 30 * 1000; // Evita loop de erros
 const CLIENTE_DETAILS_MIN_INTERVAL_MS = 300; // Debounce/throttle curto entre buscas
+const EMPRESA_DETAILS_TTL = 5 * 60 * 1000; // 5 minutos
 const AUTOMACAO_FLUXO_MENSAGEM =
   'Automacao de contrato/fatura ainda indisponivel nesta versao. Use os modulos de Contratos e Faturamento.';
+const OBSERVACOES_OPERACIONAIS_REGEX = [
+  /^proposta enviada por e-?mail/i,
+  /^proposta enviada via e-?mail/i,
+  /^proposta enviada por whatsapp/i,
+  /^status alterado /i,
+  /^solicitacao automatica /i,
+  /^gerada automaticamente /i,
+];
 const clienteDetailsCache = new Map<
   string,
   { data: ClienteContatoData | null; expiresAt: number }
 >();
 const clienteDetailsPending = new Map<string, Promise<ClienteContatoData | null>>();
+const empresaDetailsCache = new Map<string, { data: EmpresaPdfData; expiresAt: number }>();
+const empresaDetailsPending = new Map<string, Promise<EmpresaPdfData>>();
 let lastClienteLookupAt = 0;
 
 const normalizarNomeCliente = (nome: string) => nome.trim().toLowerCase();
 const normalizarDocumento = (value: unknown) => String(value || '').replace(/\D/g, '');
+const DATA_ISO_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const DATA_BR_REGEX = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+
+const formatarDataLocalIso = (date: Date): string => {
+  const ano = date.getFullYear();
+  const mes = String(date.getMonth() + 1).padStart(2, '0');
+  const dia = String(date.getDate()).padStart(2, '0');
+  return `${ano}-${mes}-${dia}`;
+};
+
+const normalizarDataIsoSemTimezone = (value: unknown, fallback: Date): string => {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return formatarDataLocalIso(value);
+  }
+
+  const text = String(value || '').trim();
+  if (!text) {
+    return formatarDataLocalIso(fallback);
+  }
+
+  if (DATA_ISO_REGEX.test(text)) {
+    return text;
+  }
+
+  const matchBr = text.match(DATA_BR_REGEX);
+  if (matchBr) {
+    const [, dia, mes, ano] = matchBr;
+    return `${ano}-${mes}-${dia}`;
+  }
+
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) {
+    return formatarDataLocalIso(fallback);
+  }
+
+  return formatarDataLocalIso(parsed);
+};
 
 const armazenarNoCache = (nome: string, data: ClienteContatoData | null, ttl: number) => {
   const normalizado = normalizarNomeCliente(nome);
@@ -199,6 +261,102 @@ const buscarClienteComCache = async (nome: string): Promise<ClienteContatoData |
   return promessa;
 };
 
+const toTextoNaoVazio = (value: unknown): string | undefined => {
+  const text = String(value || '').trim();
+  return text || undefined;
+};
+
+const normalizarLogoEmpresaPdf = (value: unknown): string | undefined => {
+  const logo = String(value || '').trim();
+  if (!logo) {
+    return undefined;
+  }
+
+  if (logo.startsWith('data:image/')) {
+    return logo;
+  }
+
+  if (/^https?:\/\//i.test(logo)) {
+    return logo;
+  }
+
+  if (logo.startsWith('/') && typeof window !== 'undefined') {
+    return `${window.location.origin}${logo}`;
+  }
+
+  if (typeof window !== 'undefined' && /^\.?\/?[\w\-./]+$/.test(logo) && /[/.]/.test(logo)) {
+    const caminhoNormalizado = logo.replace(/^\.?\//, '');
+    return `${window.location.origin}/${caminhoNormalizado}`;
+  }
+
+  return undefined;
+};
+
+const formatarEnderecoEmpresaPdf = (
+  enderecoRaw: unknown,
+): { endereco?: string; cidade?: string; estado?: string; cep?: string } => {
+  if (!enderecoRaw) {
+    return {};
+  }
+
+  if (typeof enderecoRaw === 'string') {
+    return { endereco: toTextoNaoVazio(enderecoRaw) };
+  }
+
+  if (typeof enderecoRaw !== 'object') {
+    return {};
+  }
+
+  const enderecoObj = enderecoRaw as Record<string, unknown>;
+  const rua = toTextoNaoVazio(enderecoObj.rua);
+  const numero = toTextoNaoVazio(enderecoObj.numero);
+  const complemento = toTextoNaoVazio(enderecoObj.complemento);
+  const bairro = toTextoNaoVazio(enderecoObj.bairro);
+  const cidade = toTextoNaoVazio(enderecoObj.cidade);
+  const estado = toTextoNaoVazio(enderecoObj.estado);
+  const cep = toTextoNaoVazio(enderecoObj.cep);
+
+  const partesEndereco = [rua, numero, complemento, bairro].filter(
+    (item): item is string => Boolean(item),
+  );
+
+  return {
+    endereco: partesEndereco.length > 0 ? partesEndereco.join(', ') : undefined,
+    cidade,
+    estado,
+    cep,
+  };
+};
+
+const armazenarEmpresaNoCache = (key: string, data: EmpresaPdfData) => {
+  empresaDetailsCache.set(key, {
+    data,
+    expiresAt: Date.now() + EMPRESA_DETAILS_TTL,
+  });
+};
+
+const obterEmpresaNoCache = (key: string): EmpresaPdfData | undefined => {
+  const cache = empresaDetailsCache.get(key);
+  if (!cache) {
+    return undefined;
+  }
+  if (cache.expiresAt < Date.now()) {
+    empresaDetailsCache.delete(key);
+    return undefined;
+  }
+  return cache.data;
+};
+
+const montarEnderecoEmpresaLinha = (empresa: EmpresaPdfData): string => {
+  const cidadeEstado = [empresa.cidade, empresa.estado].filter(
+    (value): value is string => Boolean(value && value.trim()),
+  );
+  const partes = [empresa.endereco, cidadeEstado.join(' - ') || undefined, empresa.cep].filter(
+    (value): value is string => Boolean(value && value.trim()),
+  );
+  return partes.join(' | ');
+};
+
 // Tipo uniao para aceitar tanto PropostaCompleta quanto o formato da UI
 type PropostaUI = {
   id: string;
@@ -286,6 +444,9 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   } | null>(null);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [propostaPdfBuffer, setPropostaPdfBuffer] = useState<Uint8Array | null>(null);
+  const [empresaNomeExibicao, setEmpresaNomeExibicao] = useState(
+    () => toTextoNaoVazio(authService.getUser()?.empresa?.nome) || 'Sua empresa',
+  );
 
   // NOVOS ESTADOS PARA AUTOMACAO
   const [gerandoContrato, setGerandoContrato] = useState(false);
@@ -463,6 +624,93 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     return dadosResolvidos;
   };
 
+  const getEmpresaDataPdf = async (): Promise<EmpresaPdfData> => {
+    const usuarioLogado = authService.getUser();
+    const empresaId = String(
+      usuarioLogado?.empresa?.id || localStorage.getItem('empresaAtiva') || '',
+    ).trim();
+    const cacheKey = empresaId || 'empresa-default';
+
+    const cache = obterEmpresaNoCache(cacheKey);
+    if (cache) {
+      return cache;
+    }
+
+    const pending = empresaDetailsPending.get(cacheKey);
+    if (pending) {
+      return pending;
+    }
+
+    const promise = (async () => {
+      const empresaData: EmpresaPdfData = {
+        nome: toTextoNaoVazio(usuarioLogado?.empresa?.nome) || 'Sua empresa',
+        cnpj: toTextoNaoVazio(usuarioLogado?.empresa?.cnpj),
+      };
+
+      try {
+        const config = (await empresaConfigService.getConfig()) as Record<string, any>;
+        const geral = (config?.geral || {}) as Record<string, any>;
+
+        const logoConfig =
+          config?.logoUrl || config?.logo || geral?.logoUrl || geral?.logo;
+        const emailConfig = config?.email || geral?.email || config?.smtpUsuario;
+        const telefoneConfig = config?.telefone || geral?.telefone || config?.whatsappNumero;
+        const enderecoConfig = config?.endereco || geral?.endereco;
+        const cidadeConfig = config?.cidade || geral?.cidade;
+        const estadoConfig = config?.estado || geral?.estado;
+        const cepConfig = config?.cep || geral?.cep;
+        const nomeConfig = config?.nome || geral?.nome;
+
+        if (toTextoNaoVazio(nomeConfig)) {
+          empresaData.nome = toTextoNaoVazio(nomeConfig) || empresaData.nome;
+        }
+
+        empresaData.logo = normalizarLogoEmpresaPdf(logoConfig) || empresaData.logo;
+        empresaData.email = toTextoNaoVazio(emailConfig) || empresaData.email;
+        empresaData.telefone = toTextoNaoVazio(telefoneConfig) || empresaData.telefone;
+        empresaData.endereco = toTextoNaoVazio(enderecoConfig) || empresaData.endereco;
+        empresaData.cidade = toTextoNaoVazio(cidadeConfig) || empresaData.cidade;
+        empresaData.estado = toTextoNaoVazio(estadoConfig) || empresaData.estado;
+        empresaData.cep = toTextoNaoVazio(cepConfig) || empresaData.cep;
+      } catch {
+        // Mantem fallback local quando config da empresa nao estiver disponivel.
+      }
+
+      if (empresaId) {
+        try {
+          const empresaCompleta = await minhasEmpresasService.getEmpresaById(empresaId);
+          const enderecoDetalhado = formatarEnderecoEmpresaPdf(empresaCompleta?.endereco);
+          const logoDetalhe = normalizarLogoEmpresaPdf(
+            (empresaCompleta as any)?.configuracoes?.geral?.logo ||
+              (empresaCompleta as any)?.configuracoes?.logo,
+          );
+
+          empresaData.nome = toTextoNaoVazio(empresaCompleta?.nome) || empresaData.nome;
+          empresaData.cnpj = toTextoNaoVazio(empresaCompleta?.cnpj) || empresaData.cnpj;
+          empresaData.email = toTextoNaoVazio(empresaCompleta?.email) || empresaData.email;
+          empresaData.telefone = toTextoNaoVazio(empresaCompleta?.telefone) || empresaData.telefone;
+          empresaData.endereco = enderecoDetalhado.endereco || empresaData.endereco;
+          empresaData.cidade = enderecoDetalhado.cidade || empresaData.cidade;
+          empresaData.estado = enderecoDetalhado.estado || empresaData.estado;
+          empresaData.cep = enderecoDetalhado.cep || empresaData.cep;
+          empresaData.logo = logoDetalhe || empresaData.logo;
+        } catch {
+          // Mantem dados ja obtidos; sem bloquear geracao do PDF.
+        }
+      }
+
+      armazenarEmpresaNoCache(cacheKey, empresaData);
+      return empresaData;
+    })();
+
+    empresaDetailsPending.set(cacheKey, promise);
+    try {
+      return await promise;
+    } finally {
+      empresaDetailsPending.delete(cacheKey);
+    }
+  };
+
   // Funcao para extrair dados da proposta independente do formato
   const getPropostaData = (fonte?: PropostaCompleta | PropostaUI) => {
     const propostaAtual = fonte || proposta;
@@ -473,8 +721,8 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         numero: propostaAtual.numero || 'N/A',
         total: propostaAtual.total || 0,
         dataValidade: propostaAtual.dataValidade
-          ? propostaAtual.dataValidade.toISOString().split('T')[0]
-          : new Date().toISOString().split('T')[0],
+          ? normalizarDataIsoSemTimezone(propostaAtual.dataValidade, new Date())
+          : normalizarDataIsoSemTimezone(undefined, new Date()),
         titulo: propostaAtual.titulo || 'Proposta comercial',
         status: propostaAtual.status || 'rascunho',
       };
@@ -483,7 +731,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         id: propostaAtual.id || null,
         numero: propostaAtual.numero || 'N/A',
         total: (propostaAtual as any).valor || 0,
-        dataValidade: propostaAtual.data_vencimento || new Date().toISOString().split('T')[0],
+        dataValidade: normalizarDataIsoSemTimezone(propostaAtual.data_vencimento, new Date()),
         titulo: propostaAtual.titulo || 'Proposta comercial',
         status: propostaAtual.status || 'rascunho',
       };
@@ -579,11 +827,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   };
 
   const formatarDataIso = (value: unknown, fallback: Date) => {
-    const parsed = value ? new Date(String(value)) : fallback;
-    if (Number.isNaN(parsed.getTime())) {
-      return fallback.toISOString().split('T')[0];
-    }
-    return parsed.toISOString().split('T')[0];
+    return normalizarDataIsoSemTimezone(value, fallback);
   };
 
   const normalizarTextoComparacao = (value: unknown) =>
@@ -694,24 +938,33 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
   const descreverFormaPagamentoPdf = (formaPagamento: unknown, parcelas?: unknown) => {
     const normalized = String(formaPagamento || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
       .trim()
       .toLowerCase();
+    const normalizedKey = normalized.replace(/[^a-z0-9]/g, '');
     const numeroParcelas = Number(parcelas || 0);
 
-    if (normalized === 'avista' || normalized === 'a_vista' || normalized === 'a-vista') {
-        return 'A vista';
+    if (
+      ['avista', 'aovista', 'pagamentoavista'].includes(normalizedKey) ||
+      normalized.includes('a vista')
+    ) {
+      return 'A vista';
     }
-    if (normalized === 'boleto') {
-        return 'Boleto bancario';
+    if (['boleto', 'boletobancario'].includes(normalizedKey)) {
+      return 'Boleto bancario';
     }
-    if (normalized === 'cartao' || normalized === 'cartao_credito') {
-        return 'Cartao de credito';
+    if (
+      ['cartao', 'cartaocredito', 'creditcard', 'cartaodecredito'].includes(normalizedKey) ||
+      normalized.includes('cartao')
+    ) {
+      return 'Cartao de credito';
     }
-    if (normalized === 'pix') {
+    if (normalizedKey === 'pix') {
       return 'PIX';
     }
-    if (normalized === 'parcelado') {
-      return numeroParcelas > 0 ? `Parcelado em ate ${numeroParcelas}x` : 'Parcelado';
+    if (['parcelado', 'parcelamento', 'parcelas', 'parceladoem'].includes(normalizedKey)) {
+      return numeroParcelas > 1 ? `Parcelado em ate ${numeroParcelas}x` : 'Parcelado';
     }
 
     return 'Conforme negociacao comercial';
@@ -733,6 +986,14 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     if (!propostaPossuiItensComerciais(fonteProposta)) {
       throw new Error(MENSAGEM_PROPOSTA_SEM_ITENS);
     }
+
+    const roundMoney = (value: unknown) => {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) {
+        return 0;
+      }
+      return Math.round((numeric + Number.EPSILON) * 100) / 100;
+    };
 
     const itens = itensOriginais.map((item: any, index: number) => {
       const produto = item?.produto && typeof item.produto === 'object' ? item.produto : item;
@@ -778,20 +1039,53 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           String(produto?.unidade || item?.unidade || item?.unidadeMedida || 'un').trim() || 'un',
         valorUnitario,
         desconto,
-        valorTotal: Number.isFinite(valorTotal) ? valorTotal : valorTotalCalculado,
+        valorTotal: roundMoney(Number.isFinite(valorTotal) ? valorTotal : valorTotalCalculado),
       };
     });
 
-    const subtotalCalculado = itens.reduce((sum, item) => sum + Number(item.valorTotal || 0), 0);
-    const subtotal = Number(fonteProposta?.subtotal ?? subtotalCalculado);
-    const descontoGeral = Number(fonteProposta?.descontoGlobal ?? 0);
-    const impostos = Number(fonteProposta?.impostos ?? 0);
-    const valorTotal = Number(
+    const clampPercent = (value: unknown) => {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) {
+        return 0;
+      }
+      return Math.min(100, Math.max(0, numeric));
+    };
+
+    const subtotalCalculado = roundMoney(
+      itens.reduce((sum, item) => sum + Number(item.valorTotal || 0), 0),
+    );
+    const descontoRaw = Number(
+      fonteProposta?.descontoGlobal ?? fonteProposta?.percentualDesconto ?? 0,
+    );
+    const impostosRaw = Number(
+      fonteProposta?.impostos ?? fonteProposta?.percentualImpostos ?? 0,
+    );
+
+    const descontoGeral =
+      Number.isFinite(descontoRaw) && descontoRaw > 100
+        ? roundMoney(Math.max(0, descontoRaw))
+        : roundMoney(subtotalCalculado * (clampPercent(descontoRaw) / 100));
+    const subtotalPosDesconto = roundMoney(Math.max(0, subtotalCalculado - descontoGeral));
+    let impostos =
+      Number.isFinite(impostosRaw) && impostosRaw > 100
+        ? roundMoney(Math.max(0, impostosRaw))
+        : roundMoney(subtotalPosDesconto * (clampPercent(impostosRaw) / 100));
+
+    const valorTotalEsperado = roundMoney(
       fonteProposta?.total ??
         propostaData.total ??
         fonteProposta?.valor ??
-        subtotal - descontoGeral + impostos,
+        subtotalPosDesconto + impostos,
     );
+    let valorTotal = roundMoney(subtotalPosDesconto + impostos);
+    const deltaTotal = roundMoney(valorTotalEsperado - valorTotal);
+
+    if (Math.abs(deltaTotal) >= 0.01) {
+      impostos = roundMoney(Math.max(0, impostos + deltaTotal));
+      valorTotal = roundMoney(subtotalPosDesconto + impostos);
+    }
+
+    const subtotal = subtotalCalculado;
     const validadeDias = Number(fonteProposta?.validadeDias || 30);
 
     const dataEmissaoFonte =
@@ -843,7 +1137,45 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     const observacoesNormalizada = normalizarTextoComparacao(observacoesRaw);
     const descricaoFinal =
       descricaoRaw && descricaoNormalizada !== observacoesNormalizada ? descricaoRaw : undefined;
-    const observacoesFinal = observacoesRaw || undefined;
+    const observacoesFiltradas = observacoesRaw
+      .split(/\r?\n/)
+      .map((linha) => linha.trim())
+      .filter((linha) => linha.length > 0)
+      .filter(
+        (linha) =>
+          !OBSERVACOES_OPERACIONAIS_REGEX.some((regex) =>
+            regex.test(normalizarTextoComparacao(linha)),
+          ),
+      );
+    const observacoesFinal =
+      observacoesFiltradas.length > 0 ? observacoesFiltradas.join('\n') : undefined;
+    const empresaPdf = await getEmpresaDataPdf();
+    const documentoClienteRaw = String(
+      clienteFonte?.documento || (cliente as any)?.documento || '',
+    ).trim();
+    const documentoClienteNormalizado = normalizarDocumento(documentoClienteRaw);
+    const tipoDocumentoCliente =
+      documentoClienteNormalizado.length === 11
+        ? 'CPF'
+        : documentoClienteNormalizado.length === 14
+          ? 'CNPJ'
+          : documentoClienteRaw
+            ? 'Documento'
+            : undefined;
+    const vendedorNomeFallback =
+      String(
+        vendedorFonte?.nome ||
+          fonteProposta?.vendedor ||
+          fonteProposta?.vendedorNome ||
+          (proposta as any)?.vendedor ||
+          '',
+      ).trim() || 'Equipe comercial';
+    const vendedorEmailFallback =
+      String(
+        vendedorFonte?.email || (proposta as any)?.vendedorEmail || '',
+      ).trim() ||
+      empresaPdf.email ||
+      'comercial@empresa.com';
 
     return {
       numeroProposta: propostaData.numero,
@@ -854,25 +1186,31 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       dataEmissao: dataEmissaoIso,
       dataValidade: dataValidadeIso,
       empresa: {
-        nome: 'ConectCRM',
+        nome: empresaPdf.nome || 'Sua empresa',
+        cnpj: empresaPdf.cnpj,
+        email: empresaPdf.email,
+        telefone: empresaPdf.telefone,
+        endereco: empresaPdf.endereco,
+        cidade: empresaPdf.cidade,
+        estado: empresaPdf.estado,
+        cep: empresaPdf.cep,
+        logo: empresaPdf.logo,
       },
       cliente: {
         nome: String(clienteFonte?.nome || cliente.nome || '').trim() || 'Cliente',
         email: String(clienteFonte?.email || cliente.email || '').trim(),
         telefone: formatarTelefoneBr(clienteFonte?.telefone || cliente.telefone),
         empresa: String(clienteFonte?.empresa || (cliente as any)?.empresa || '').trim() || undefined,
+        documento: documentoClienteRaw || undefined,
+        tipoDocumento: tipoDocumentoCliente,
       },
       vendedor: {
-        nome:
-          String(vendedorFonte?.nome || fonteProposta?.vendedor || '').trim() ||
-          'Equipe comercial',
-        email:
-          String(vendedorFonte?.email || '').trim() ||
-          'comercial@conectcrm.com',
+        nome: vendedorNomeFallback,
+        email: vendedorEmailFallback,
         telefone: formatarTelefoneBr(vendedorFonte?.telefone),
       },
       itens,
-      subtotal: Number.isFinite(subtotal) ? subtotal : subtotalCalculado,
+      subtotal: subtotal,
       descontoGeral: Number.isFinite(descontoGeral) ? descontoGeral : 0,
       percentualDesconto:
         subtotal > 0 && Number.isFinite(descontoGeral) ? (descontoGeral / subtotal) * 100 : 0,
@@ -2107,6 +2445,31 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         throw new Error('Proposta sem ID para gerar token do portal');
       }
       const token = await portalClienteService.gerarTokenPublico(String(propostaId));
+      const empresaData = await getEmpresaDataPdf();
+      const usuarioLogado = authService.getUser();
+      const vendedorPayload = {
+        nome:
+          String(
+            (proposta as any)?.vendedor?.nome ||
+              (proposta as any)?.vendedorNome ||
+              (proposta as any)?.vendedor ||
+              usuarioLogado?.nome ||
+              '',
+          ).trim() || 'Equipe comercial',
+        email:
+          String(
+            (proposta as any)?.vendedor?.email ||
+              (proposta as any)?.vendedorEmail ||
+              usuarioLogado?.email ||
+              empresaData.email ||
+              '',
+          ).trim() || 'comercial@empresa.com',
+        telefone:
+          formatarTelefoneBr(
+            (proposta as any)?.vendedor?.telefone || usuarioLogado?.telefone || empresaData.telefone,
+          ) || '',
+      };
+      const empresaEndereco = montarEnderecoEmpresaLinha(empresaData);
 
       const emailData = {
         cliente: {
@@ -2121,15 +2484,15 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           token: token,
         },
         vendedor: {
-          nome: 'Vendedor',
-          email: 'vendedor@conectcrm.com',
-          telefone: '(62) 99668-9991',
+          nome: vendedorPayload.nome,
+          email: vendedorPayload.email,
+          telefone: vendedorPayload.telefone,
         },
         empresa: {
-          nome: 'ConectCRM',
-          email: 'conectcrm@gmail.com',
-          telefone: '(62) 99668-9991',
-          endereco: 'Goiania/GO',
+          nome: empresaData.nome || toTextoNaoVazio(usuarioLogado?.empresa?.nome) || 'Sua empresa',
+          email: empresaData.email || vendedorPayload.email,
+          telefone: formatarTelefoneBr(empresaData.telefone) || vendedorPayload.telefone,
+          endereco: empresaEndereco || 'Nao informado',
         },
         portalUrl: `${window.location.origin}/portal`,
       };
@@ -2167,6 +2530,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     }
 
     const dadosPDF = await montarDadosPdfProposta();
+    setEmpresaNomeExibicao(dadosPDF.empresa.nome || 'Sua empresa');
 
     // Gerar PDF para anexar
     try {
@@ -2226,12 +2590,14 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     }
     const token = await portalClienteService.gerarTokenPublico(String(propostaId));
     const clienteData = await getClienteData();
+    const empresaData = await getEmpresaDataPdf();
     const shareUrl = `${window.location.origin}/portal/${propostaData.numero}/${token}`;
+    const nomeEmpresaShare = empresaData.nome || empresaNomeExibicao;
 
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `Proposta ${propostaData.numero} - ConectCRM`,
+          title: `Proposta ${propostaData.numero} - ${nomeEmpresaShare}`,
           text: `Proposta comercial para ${clienteData.nome}`,
           url: shareUrl,
         });
@@ -2572,7 +2938,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
             },
             valorTotal: getPropostaData().total,
             empresa: {
-              nome: 'ConectCRM',
+              nome: empresaNomeExibicao,
             },
           }}
           pdfBuffer={propostaPdfBuffer}

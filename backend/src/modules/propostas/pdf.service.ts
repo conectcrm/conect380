@@ -137,9 +137,11 @@ export class PdfService {
   }
 
   private async htmlParaPdf(html: string): Promise<Buffer> {
+    const executablePath = this.resolveBrowserExecutablePath();
     const browser = await puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      executablePath,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
     });
 
     try {
@@ -161,6 +163,28 @@ export class PdfService {
     } finally {
       await browser.close();
     }
+  }
+
+  private resolveBrowserExecutablePath(): string | undefined {
+    const candidates = [
+      process.env.PUPPETEER_EXECUTABLE_PATH,
+      process.env.CHROME_PATH,
+      '/usr/bin/chromium-browser',
+      '/usr/bin/chromium',
+      '/usr/lib/chromium/chrome',
+      '/usr/bin/google-chrome-stable',
+      '/usr/bin/google-chrome',
+    ]
+      .map((value) => String(value || '').trim())
+      .filter((value) => value.length > 0);
+
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+
+    return undefined;
   }
 
   private async processarDados(dados: any) {
