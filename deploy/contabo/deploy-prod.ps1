@@ -547,14 +547,23 @@ if [ "`$role" = "api" ]; then
   fi
   wait_http http://127.0.0.1:3500/health 120 3 conect360-backend
 else
-  if [ "`$no_cache" = "1" ]; then
-    compose build --no-cache frontend guardian-web
+  app_services="frontend"
+  if [ -d "guardian-web" ] && [ -f "guardian-web/Dockerfile" ]; then
+    app_services="frontend guardian-web"
   else
-    compose build frontend guardian-web
+    echo "guardian-web ausente no release; mantendo container atual sem rebuild/restart." >&2
   fi
-  compose up -d --no-deps frontend guardian-web
+
+  if [ "`$no_cache" = "1" ]; then
+    compose build --no-cache `$app_services
+  else
+    compose build `$app_services
+  fi
+  compose up -d --no-deps `$app_services
   wait_http http://127.0.0.1:3000/health 80 3
-  wait_http http://127.0.0.1:3020/ 80 3
+  case " `$app_services " in
+    *" guardian-web "*) wait_http http://127.0.0.1:3020/ 80 3 ;;
+  esac
 fi
 
 ls -1dt "`$remote_root/releases"/* 2>/dev/null | tail -n +6 | xargs -r rm -rf
@@ -660,14 +669,23 @@ if [ "`$role" = "api" ]; then
   compose up -d redis backend
   wait_http http://127.0.0.1:3500/health 120 3 conect360-backend
 else
-  if [ "`$no_cache" = "1" ]; then
-    compose build --no-cache frontend guardian-web
+  app_services="frontend"
+  if [ -d "guardian-web" ] && [ -f "guardian-web/Dockerfile" ]; then
+    app_services="frontend guardian-web"
   else
-    compose build frontend guardian-web
+    echo "guardian-web ausente no release; mantendo container atual sem rebuild/restart." >&2
   fi
-  compose up -d --no-deps frontend guardian-web
+
+  if [ "`$no_cache" = "1" ]; then
+    compose build --no-cache `$app_services
+  else
+    compose build `$app_services
+  fi
+  compose up -d --no-deps `$app_services
   wait_http http://127.0.0.1:3000/health 80 3
-  wait_http http://127.0.0.1:3020/ 80 3
+  case " `$app_services " in
+    *" guardian-web "*) wait_http http://127.0.0.1:3020/ 80 3 ;;
+  esac
 fi
 "@
 
