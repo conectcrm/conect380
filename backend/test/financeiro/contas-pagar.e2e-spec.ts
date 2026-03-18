@@ -25,9 +25,33 @@ type ContaPagarApi = {
   comprovantePagamento?: string;
 };
 
+function formatDateUtc(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function addMonthsUtc(date: Date, months: number): Date {
+  const next = new Date(date.getTime());
+  next.setUTCMonth(next.getUTCMonth() + months);
+  return next;
+}
+
 describe('ContasPagar (E2E)', () => {
   const runId = Date.now().toString();
   const testPassword = 'senha123';
+  const now = new Date();
+
+  const recorrenciaDataEmissao = formatDateUtc(
+    new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)),
+  );
+  const recorrenciaPrimeiroVencimento = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 10),
+  );
+  const pagamentoDataVencimento = formatDateUtc(
+    new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 20)),
+  );
+  const vendedorSemPermissaoDataVencimento = formatDateUtc(
+    new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 25)),
+  );
 
   const empresaId = randomUUID();
   const superadminId = randomUUID();
@@ -97,6 +121,8 @@ describe('ContasPagar (E2E)', () => {
 
   it('deve criar conta recorrente em serie e persistir anexos/tags', async () => {
     const descricao = `Conta recorrente e2e ${runId}`;
+    const segundoVencimento = addMonthsUtc(recorrenciaPrimeiroVencimento, 1);
+    const terceiroVencimento = addMonthsUtc(recorrenciaPrimeiroVencimento, 2);
 
     const response = await request(app.getHttpServer())
       .post('/contas-pagar')
@@ -105,8 +131,8 @@ describe('ContasPagar (E2E)', () => {
         fornecedorId,
         descricao,
         numeroDocumento: `NF-E2E-${runId.slice(-6)}`,
-        dataEmissao: '2026-02-01',
-        dataVencimento: '2026-03-10',
+        dataEmissao: recorrenciaDataEmissao,
+        dataVencimento: formatDateUtc(recorrenciaPrimeiroVencimento),
         valorOriginal: 1200,
         valorDesconto: 100,
         categoria: 'fornecedores',
@@ -157,9 +183,9 @@ describe('ContasPagar (E2E)', () => {
       `NF-E2E-${runId.slice(-6)}-02/03`,
       `NF-E2E-${runId.slice(-6)}-03/03`,
     ]);
-    expect(rows[0].data_vencimento_fmt).toBe('2026-03-10');
-    expect(rows[1].data_vencimento_fmt).toBe('2026-04-10');
-    expect(rows[2].data_vencimento_fmt).toBe('2026-05-10');
+    expect(rows[0].data_vencimento_fmt).toBe(formatDateUtc(recorrenciaPrimeiroVencimento));
+    expect(rows[1].data_vencimento_fmt).toBe(formatDateUtc(segundoVencimento));
+    expect(rows[2].data_vencimento_fmt).toBe(formatDateUtc(terceiroVencimento));
     expect(Number(rows[0].valor_total)).toBeCloseTo(1100, 2);
     expect(Number(rows[0].valor_restante)).toBeCloseTo(1100, 2);
 
@@ -187,7 +213,7 @@ describe('ContasPagar (E2E)', () => {
       .send({
         fornecedorId,
         descricao,
-        dataVencimento: '2026-03-20',
+        dataVencimento: pagamentoDataVencimento,
         valorOriginal: 350,
         categoria: 'fornecedores',
         prioridade: 'media',
@@ -238,7 +264,7 @@ describe('ContasPagar (E2E)', () => {
       .send({
         fornecedorId,
         descricao: `Conta negada ${runId}`,
-        dataVencimento: '2026-03-25',
+        dataVencimento: vendedorSemPermissaoDataVencimento,
         valorOriginal: 10,
       })
       .expect(403);
@@ -397,6 +423,5 @@ describe('ContasPagar (E2E)', () => {
     return value;
   }
 });
-
 
 
