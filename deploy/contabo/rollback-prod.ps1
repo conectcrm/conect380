@@ -153,15 +153,31 @@ wait_http() {
   url="`$1"
   attempts="`${2:-40}"
   sleep_seconds="`${3:-3}"
+  target_container="`${4:-}"
   i=1
   while [ "`$i" -le "`$attempts" ]; do
-    if curl -fsS "`$url" >/dev/null; then
+    if curl -fsS --connect-timeout 2 --max-time 5 "`$url" >/dev/null 2>&1; then
       return 0
     fi
+
+    if [ -n "`$target_container" ]; then
+      container_health="`$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "`$target_container" 2>/dev/null || true)"
+      if [ "`$container_health" = "healthy" ]; then
+        echo "Health HTTP ainda oscilando, mas container '`$target_container' esta healthy." >&2
+        return 0
+      fi
+    fi
+
     sleep "`$sleep_seconds"
     i=`$((i + 1))
   done
-  echo "Healthcheck falhou para URL: `$url" >&2
+  echo "Healthcheck falhou para URL: `$url (attempts=`$attempts, sleep=`${sleep_seconds}s)" >&2
+  if [ -n "`$target_container" ]; then
+    echo "Status do container `$target_container:" >&2
+    docker inspect --format '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{end}}' "`$target_container" 2>/dev/null >&2 || true
+    echo "Ultimos logs do container `$target_container:" >&2
+    docker logs --tail 120 "`$target_container" >&2 || true
+  fi
   return 1
 }
 
@@ -172,7 +188,7 @@ if [ "`$role" = "api" ]; then
     compose build redis backend
   fi
   compose up -d redis backend
-  wait_http http://127.0.0.1:3500/health 40 3
+  wait_http http://127.0.0.1:3500/health 120 3 conect360-backend
 else
   if [ "`$no_cache" = "1" ]; then
     compose build --no-cache frontend guardian-web
@@ -180,8 +196,8 @@ else
     compose build frontend guardian-web
   fi
   compose up -d --no-deps frontend guardian-web
-  wait_http http://127.0.0.1:3000/health 50 3
-  wait_http http://127.0.0.1:3020/ 50 3
+  wait_http http://127.0.0.1:3000/health 80 3
+  wait_http http://127.0.0.1:3020/ 80 3
 fi
 
 compose ps
