@@ -9,7 +9,7 @@
 # ============================================
 # Stage 1: Build
 # ============================================
-FROM node:20-alpine AS builder
+FROM node:20-bookworm-slim AS builder
 
 WORKDIR /app
 
@@ -35,20 +35,26 @@ RUN npm prune --production --legacy-peer-deps
 # ============================================
 # Stage 2: Production
 # ============================================
-FROM node:20-alpine
+FROM node:20-bookworm-slim
 
 WORKDIR /app
 
 # Instalar dumb-init para gerenciamento correto de processos
-RUN apk add --no-cache dumb-init curl chromium nss freetype harfbuzz ca-certificates ttf-freefont
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  dumb-init \
+  curl \
+  chromium \
+  ca-certificates \
+  fonts-liberation \
+  && rm -rf /var/lib/apt/lists/*
 
 ENV PUPPETEER_SKIP_DOWNLOAD=true \
-  PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
-  CHROME_PATH=/usr/bin/chromium-browser
+  PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
+  CHROME_PATH=/usr/bin/chromium
 
 # Criar usuário não-root (segurança)
-RUN addgroup -g 1001 -S nodejs && \
-  adduser -S nestjs -u 1001
+RUN groupadd -g 1001 nodejs && \
+  useradd -u 1001 -g nodejs -m -s /usr/sbin/nologin nestjs
 
 # Copiar dependências de produção do stage anterior
 COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
