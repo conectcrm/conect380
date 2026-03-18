@@ -108,6 +108,7 @@ function Get-SshArgumentList {
     '-p', [string]$Vm.Port,
     '-o', 'StrictHostKeyChecking=no',
     '-o', 'UserKnownHostsFile=/dev/null',
+    '-o', 'LogLevel=ERROR',
     '-o', 'ConnectTimeout=15'
   )
 
@@ -128,6 +129,7 @@ function Get-ScpArgumentList {
     '-P', [string]$Vm.Port,
     '-o', 'StrictHostKeyChecking=no',
     '-o', 'UserKnownHostsFile=/dev/null',
+    '-o', 'LogLevel=ERROR',
     '-o', 'ConnectTimeout=15'
   )
 
