@@ -131,8 +131,16 @@ jobs:
           mkdir -p "$(dirname "${SSH_KEY_PATH}")"
           chmod 700 "$(dirname "${SSH_KEY_PATH}")"
 
-          printf '%s' "${CONTABO_SSH_PRIVATE_KEY}" > "${SSH_KEY_PATH}"
+          # Normaliza chave SSH para suportar segredo multiline, CRLF ou "\n" escapado.
+          ssh_key_content="${CONTABO_SSH_PRIVATE_KEY//$'\r'/}"
+          ssh_key_content="${ssh_key_content//\\n/$'\n'}"
+          printf '%s\n' "${ssh_key_content}" > "${SSH_KEY_PATH}"
           chmod 600 "${SSH_KEY_PATH}"
+
+          if ! ssh-keygen -y -f "${SSH_KEY_PATH}" >/dev/null 2>&1; then
+            echo "::error::Secret CONTABO_SSH_PRIVATE_KEY invalido (formato da chave nao reconhecido)."
+            exit 1
+          fi
 
           printf '%s' "${CONTABO_DEPLOY_PROFILE_PSD1}" > "${PROFILE_PATH}"
           sed -i '/^[[:space:]]*SshKeyPath[[:space:]]*=/d' "${PROFILE_PATH}"
