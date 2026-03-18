@@ -292,3 +292,53 @@ deploy\contabo\rollback-prod.bat -TargetReleaseId "rel-YYYYMMDD-HHMMSS-abcdef" -
 - Health checks are enforced per VM.
 - Automatic best-effort rollback is attempted if deploy fails.
 - Keeps release history under `<RemoteRoot>/.deploy/history.log`.
+
+## 7) GitHub Actions (auto deploy)
+
+There is a dedicated workflow for Contabo deploy:
+
+- `.github/workflows/deploy-contabo-production.yml`
+
+### 7.1 Required secrets (GitHub -> Settings -> Secrets and variables -> Actions)
+
+Create these repository or environment secrets:
+
+- `CONTABO_SSH_PRIVATE_KEY`: private key allowed in both VMs.
+- `CONTABO_DEPLOY_PROFILE_PSD1`: full content of `deploy/contabo/deploy-profile.local.psd1` adjusted for CI.
+- `CONTABO_RUNTIME_ENV_FILE`: full content of `deploy/contabo/.env.app-vm` (required when `upload_runtime_env=true`).
+- `CONTABO_SMOKE_SUPERADMIN_EMAIL` (optional if already in profile).
+- `CONTABO_SMOKE_SUPERADMIN_PASSWORD` (optional if already in profile).
+- `CONTABO_SMOKE_SUPERADMIN_MFA_CODE` (optional).
+- `CONTABO_SMOKE_EXPECTED_OWNER_EMPRESA_ID` (optional).
+
+Notes:
+- The workflow writes the SSH key to `/home/runner/.ssh/id_ed25519`.
+- Any `SshKeyPath` line in profile secret is removed at runtime to avoid Windows path issues in CI.
+
+### 7.2 Automatic deploy on push
+
+The workflow listens to push in `main` and `production`, but only executes when variable:
+
+- `CONTABO_AUTO_DEPLOY_ENABLED=true`
+
+is set in `Settings -> Secrets and variables -> Actions -> Variables`.
+
+This allows safe rollout: keep manual deploy until everything is validated, then enable auto deploy.
+
+### 7.3 Manual deploy (recommended for first runs)
+
+Run the workflow manually in GitHub Actions (`workflow_dispatch`) and choose:
+
+- `target_ref` (branch/tag/sha; empty uses current commit)
+- `run_smoke`
+- `upload_runtime_env`
+- `skip_migrations`
+- `no_cache_build`
+
+### 7.4 MFA guardrail
+
+When `upload_runtime_env=true`, the workflow validates:
+
+- SMTP global must be configured for auth e-mails (`SMTP_HOST`, `SMTP_USER`, and `SMTP_PASS` or `SMTP_PASSWORD`).
+
+This prevents auth outage in forgot-password/MFA caused by missing SMTP credentials.
