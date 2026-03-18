@@ -170,17 +170,19 @@ function Invoke-RemoteBash {
     $quotedArgs += (Quote-BashArgument -Value ([string]$arg))
   }
 
+  $normalizedScript = $ScriptText -replace "`r", ''
+  $scriptBytes = [System.Text.Encoding]::UTF8.GetBytes($normalizedScript)
+  $scriptBase64 = [System.Convert]::ToBase64String($scriptBytes)
+
   $remoteCommand = if ($quotedArgs.Count -gt 0) {
-    "bash -s -- $($quotedArgs -join ' ')"
+    "printf '%s' '$scriptBase64' | base64 -d | bash -s -- $($quotedArgs -join ' ')"
   }
   else {
-    'bash -s'
+    "printf '%s' '$scriptBase64' | base64 -d | bash -s"
   }
 
-  $normalizedScript = $ScriptText -replace "`r", ''
-
   if ($CaptureOutput) {
-    $output = $normalizedScript | & ssh @sshArgs $login $remoteCommand 2>&1
+    $output = & ssh @sshArgs $login $remoteCommand 2>&1
     if ($LASTEXITCODE -ne 0) {
       $text = ($output | Out-String).Trim()
       throw "Falha em comando remoto na VM '$($Vm.Name)': $text"
@@ -189,7 +191,7 @@ function Invoke-RemoteBash {
     return ($output | Out-String).Trim()
   }
 
-  $normalizedScript | & ssh @sshArgs $login $remoteCommand
+  & ssh @sshArgs $login $remoteCommand
   if ($LASTEXITCODE -ne 0) {
     throw "Falha em comando remoto na VM '$($Vm.Name)'."
   }
