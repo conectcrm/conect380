@@ -139,7 +139,7 @@ function Get-ScpArgumentList {
 }
 
 function Quote-BashArgument {
-  param([Parameter(Mandatory = $true)][string]$Value)
+  param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Value)
 
   return '"' + ($Value -replace '"', '\"') + '"'
 }
