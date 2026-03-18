@@ -150,7 +150,8 @@ function Get-ScpArgumentList {
 function Quote-BashArgument {
   param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Value)
 
-  return '"' + ($Value -replace '"', '\"') + '"'
+  # Bash-safe quoting using single quotes (works with empty strings too).
+  return "'" + ($Value -replace "'", "'\"'\"'") + "'"
 }
 
 function Invoke-RemoteBash {
