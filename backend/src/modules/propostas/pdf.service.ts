@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import * as puppeteer from 'puppeteer';
 import * as handlebars from 'handlebars';
 import * as fs from 'fs';
@@ -13,6 +13,7 @@ type PlanoComponentePdf = {
 
 @Injectable()
 export class PdfService {
+  private readonly logger = new Logger(PdfService.name);
   private readonly templatesPath: string;
   private readonly componentRoleLabels: Record<PlanoComponentePdf['componentRole'], string> = {
     included: 'Incluido',
@@ -138,31 +139,87 @@ export class PdfService {
 
   private async htmlParaPdf(html: string): Promise<Buffer> {
     const executablePath = this.resolveBrowserExecutablePath();
-    const browser = await puppeteer.launch({
-      headless: true,
-      executablePath,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-    });
 
-    try {
-      const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: 'networkidle0' });
+    let lastError: unknown = null;
+    const maxAttempts = 3;
 
-      const pdfBuffer = await page.pdf({
-        format: 'a4',
-        printBackground: true,
-        margin: {
-          top: '20px',
-          right: '20px',
-          bottom: '20px',
-          left: '20px',
-        },
-      });
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      let browser: puppeteer.Browser | null = null;
+      try {
+        browser = await puppeteer.launch({
+          headless: true,
+          executablePath,
+          pipe: true,
+          timeout: 60000,
+          protocolTimeout: 120000,
+          args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+        });
 
-      return Buffer.from(pdfBuffer);
-    } finally {
-      await browser.close();
+        const page = await browser.newPage();
+        page.setDefaultNavigationTimeout(120000);
+        page.setDefaultTimeout(120000);
+        await page.setContent(html, { waitUntil: 'domcontentloaded' });
+        await page.evaluate(async () => {
+          if ((document as any).fonts?.ready) {
+            await (document as any).fonts.ready;
+          }
+        });
+
+        const pdfBuffer = await page.pdf({
+          format: 'a4',
+          printBackground: true,
+          margin: {
+            top: '20px',
+            right: '20px',
+            bottom: '20px',
+            left: '20px',
+          },
+        });
+
+        return Buffer.from(pdfBuffer);
+      } catch (error) {
+        lastError = error;
+        const shouldRetry = attempt < maxAttempts && this.isRetryablePdfError(error);
+        if (!shouldRetry) {
+          throw error;
+        }
+
+        this.logger.warn(
+          `Falha transiente ao renderizar PDF (tentativa ${attempt}/${maxAttempts}): ${
+            (error as Error)?.message || String(error)
+          }`,
+        );
+        await this.delay(500 * attempt);
+      } finally {
+        if (browser) {
+          await browser.close().catch(() => undefined);
+        }
+      }
     }
+
+    throw lastError instanceof Error ? lastError : new Error('Falha ao gerar PDF');
+  }
+
+  private isRetryablePdfError(error: unknown): boolean {
+    const message = String((error as { message?: unknown })?.message || '').toLowerCase();
+    if (!message) {
+      return false;
+    }
+
+    return [
+      'socket hang up',
+      'target closed',
+      'session closed',
+      'browser has disconnected',
+      'econnreset',
+      'protocol error',
+      'navigation timeout',
+      'timeout',
+    ].some((snippet) => message.includes(snippet));
+  }
+
+  private async delay(ms: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   private resolveBrowserExecutablePath(): string | undefined {
