@@ -180,7 +180,8 @@ jobs:
           $ErrorActionPreference = 'Stop'
 
           $deployParams = @{
-            ProfilePath = "${{ env.PROFILE_PATH }}"
+            # deploy-prod.ps1 resolve caminhos relativos a partir de deploy/contabo
+            ProfilePath = "deploy-profile.local.psd1"
             Execute = $true
             TargetRef = "${{ steps.options.outputs.target_ref }}"
           }
