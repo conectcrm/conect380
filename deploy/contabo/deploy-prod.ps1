@@ -749,8 +749,8 @@ if (Test-Path $artifactPath) {
   Remove-Item $artifactPath -Force
 }
 git -C $repoRoot archive --format=zip --output $artifactPath $resolvedCommit
-if (-not (Test-Path $artifactPath)) {
-  throw "Falha ao gerar artifact: $artifactPath"
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path $artifactPath) -or ((Get-Item $artifactPath).Length -le 0)) {
+  throw "Falha ao gerar artifact do commit $resolvedCommit. Verifique o TargetRef informado."
 }
 
 Write-Host "Profile: $ProfileName"
