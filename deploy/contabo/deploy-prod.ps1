@@ -7,6 +7,7 @@ param(
   [switch]$SkipMigrations,
   [switch]$NoCacheBuild,
   [switch]$RunSmoke,
+  [switch]$SkipSmoke,
   [switch]$SkipSmokeAuthChecks,
   [string]$SuperAdminEmail,
   [string]$SuperAdminPassword,
@@ -742,7 +743,7 @@ if ($null -ne $smokeProfile) {
     $smokeEnabledByProfile = [bool]$smokeProfile.Enabled
   }
 }
-$shouldRunSmoke = $RunSmoke -or $smokeEnabledByProfile
+$shouldRunSmoke = (-not $SkipSmoke) -and ($RunSmoke -or $smokeEnabledByProfile)
 
 if ([string]::IsNullOrWhiteSpace($SuperAdminEmail) -and $null -ne $smokeProfile) {
   $SuperAdminEmail = [string]$smokeProfile.SuperAdminEmail
