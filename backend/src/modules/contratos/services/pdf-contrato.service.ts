@@ -9,6 +9,16 @@ import * as puppeteer from 'puppeteer';
 export class PdfContratoService {
   private readonly logger = new Logger(PdfContratoService.name);
   private readonly uploadsDir = path.join(process.cwd(), 'uploads', 'contratos');
+  private readonly browserLaunchArgs: string[] = [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-gpu',
+    '--disable-software-rasterizer',
+    '--no-zygote',
+    '--single-process',
+    '--font-render-hinting=none',
+  ];
 
   constructor() {
     this.ensureUploadsDirectory();
@@ -74,7 +84,7 @@ export class PdfContratoService {
           pipe: true,
           timeout: 60000,
           protocolTimeout: 120000,
-          args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+          args: this.browserLaunchArgs,
         });
 
         const page = await browser.newPage();

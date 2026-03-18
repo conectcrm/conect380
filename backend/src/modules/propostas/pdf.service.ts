@@ -15,6 +15,16 @@ type PlanoComponentePdf = {
 export class PdfService {
   private readonly logger = new Logger(PdfService.name);
   private readonly templatesPath: string;
+  private readonly browserLaunchArgs: string[] = [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-gpu',
+    '--disable-software-rasterizer',
+    '--no-zygote',
+    '--single-process',
+    '--font-render-hinting=none',
+  ];
   private readonly componentRoleLabels: Record<PlanoComponentePdf['componentRole'], string> = {
     included: 'Incluido',
     required: 'Obrigatorio',
@@ -152,7 +162,7 @@ export class PdfService {
           pipe: true,
           timeout: 60000,
           protocolTimeout: 120000,
-          args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+          args: this.browserLaunchArgs,
         });
 
         const page = await browser.newPage();
