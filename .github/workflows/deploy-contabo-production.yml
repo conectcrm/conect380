@@ -13,6 +13,11 @@ on:
         required: false
         default: true
         type: boolean
+      allow_non_main_target:
+        description: "Permitir target_ref fora da main (apenas emergencia)"
+        required: false
+        default: false
+        type: boolean
       upload_runtime_env:
         description: "Enviar runtime env para as VMs"
         required: false
@@ -75,12 +80,14 @@ jobs:
           if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
             TARGET_REF="${{ inputs.target_ref }}"
             RUN_SMOKE="${{ inputs.run_smoke }}"
+            ALLOW_NON_MAIN_TARGET="${{ inputs.allow_non_main_target }}"
             UPLOAD_RUNTIME_ENV="${{ inputs.upload_runtime_env }}"
             SKIP_MIGRATIONS="${{ inputs.skip_migrations }}"
             NO_CACHE_BUILD="${{ inputs.no_cache_build }}"
           else
             TARGET_REF="${GITHUB_SHA}"
             RUN_SMOKE="true"
+            ALLOW_NON_MAIN_TARGET="false"
             UPLOAD_RUNTIME_ENV="true"
             SKIP_MIGRATIONS="false"
             NO_CACHE_BUILD="false"
@@ -92,9 +99,37 @@ jobs:
 
           echo "target_ref=${TARGET_REF}" >> "${GITHUB_OUTPUT}"
           echo "run_smoke=${RUN_SMOKE}" >> "${GITHUB_OUTPUT}"
+          echo "allow_non_main_target=${ALLOW_NON_MAIN_TARGET}" >> "${GITHUB_OUTPUT}"
           echo "upload_runtime_env=${UPLOAD_RUNTIME_ENV}" >> "${GITHUB_OUTPUT}"
           echo "skip_migrations=${SKIP_MIGRATIONS}" >> "${GITHUB_OUTPUT}"
           echo "no_cache_build=${NO_CACHE_BUILD}" >> "${GITHUB_OUTPUT}"
+
+      - name: Guardrail target_ref em main
+        if: github.event_name == 'workflow_dispatch' && steps.options.outputs.allow_non_main_target != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${GITHUB_REF_NAME}" != "main" ]; then
+            echo "::error::Use o workflow da branch main para deploy em producao (branch atual: ${GITHUB_REF_NAME})."
+            echo "::error::Para excecao operacional, execute novamente com allow_non_main_target=true."
+            exit 1
+          fi
+
+          target_ref="${{ steps.options.outputs.target_ref }}"
+          if ! target_sha="$(git rev-parse "${target_ref}^{commit}" 2>/dev/null)"; then
+            echo "::error::target_ref invalido: ${target_ref}"
+            exit 1
+          fi
+
+          git fetch --no-tags --prune origin main
+          main_sha="$(git rev-parse origin/main)"
+
+          if ! git merge-base --is-ancestor "${target_sha}" "${main_sha}"; then
+            echo "::error::target_ref ${target_ref} (${target_sha}) nao pertence a historia da origin/main."
+            echo "::error::Para excecao operacional, execute novamente com allow_non_main_target=true."
+            exit 1
+          fi
 
       - name: Validate required secrets
         shell: bash
@@ -199,6 +234,9 @@ jobs:
 
           if ("${{ steps.options.outputs.run_smoke }}" -eq 'true') {
             $deployParams.RunSmoke = $true
+          }
+          else {
+            $deployParams.SkipSmoke = $true
           }
 
           if (-not [string]::IsNullOrWhiteSpace($env:SUPERADMIN_EMAIL)) {

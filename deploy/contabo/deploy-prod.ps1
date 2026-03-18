@@ -7,6 +7,7 @@ param(
   [switch]$SkipMigrations,
   [switch]$NoCacheBuild,
   [switch]$RunSmoke,
+  [switch]$SkipSmoke,
   [switch]$SkipSmokeAuthChecks,
   [string]$SuperAdminEmail,
   [string]$SuperAdminPassword,
@@ -531,14 +532,23 @@ if [ "`$role" = "api" ]; then
   fi
   wait_http http://127.0.0.1:3500/health 40 3
 else
-  if [ "`$no_cache" = "1" ]; then
-    compose build --no-cache frontend guardian-web
+  app_services="frontend"
+  if [ -d "`$release_dir/guardian-web" ]; then
+    app_services="`$app_services guardian-web"
   else
-    compose build frontend guardian-web
+    echo "guardian-web ausente no release `$release_id; deploy APP seguira somente com frontend."
   fi
-  compose up -d --no-deps frontend guardian-web
+
+  if [ "`$no_cache" = "1" ]; then
+    compose build --no-cache `$app_services
+  else
+    compose build `$app_services
+  fi
+  compose up -d --no-deps `$app_services
   wait_http http://127.0.0.1:3000/health 50 3
-  wait_http http://127.0.0.1:3020/ 50 3
+  if [[ " `$app_services " == *" guardian-web "* ]]; then
+    wait_http http://127.0.0.1:3020/ 50 3
+  fi
 fi
 
 ls -1dt "`$remote_root/releases"/* 2>/dev/null | tail -n +6 | xargs -r rm -rf
@@ -628,14 +638,23 @@ if [ "`$role" = "api" ]; then
   compose up -d redis backend
   wait_http http://127.0.0.1:3500/health 40 3
 else
-  if [ "`$no_cache" = "1" ]; then
-    compose build --no-cache frontend guardian-web
+  app_services="frontend"
+  if [ -d "`$release_dir/guardian-web" ]; then
+    app_services="`$app_services guardian-web"
   else
-    compose build frontend guardian-web
+    echo "guardian-web ausente no release alvo `$target_release; rollback APP seguira somente com frontend."
   fi
-  compose up -d --no-deps frontend guardian-web
+
+  if [ "`$no_cache" = "1" ]; then
+    compose build --no-cache `$app_services
+  else
+    compose build `$app_services
+  fi
+  compose up -d --no-deps `$app_services
   wait_http http://127.0.0.1:3000/health 50 3
-  wait_http http://127.0.0.1:3020/ 50 3
+  if [[ " `$app_services " == *" guardian-web "* ]]; then
+    wait_http http://127.0.0.1:3020/ 50 3
+  fi
 fi
 "@
 
@@ -692,7 +711,7 @@ if ($null -ne $smokeProfile) {
     $smokeEnabledByProfile = [bool]$smokeProfile.Enabled
   }
 }
-$shouldRunSmoke = $RunSmoke -or $smokeEnabledByProfile
+$shouldRunSmoke = (-not $SkipSmoke) -and ($RunSmoke -or $smokeEnabledByProfile)
 
 if ([string]::IsNullOrWhiteSpace($SuperAdminEmail) -and $null -ne $smokeProfile) {
   $SuperAdminEmail = [string]$smokeProfile.SuperAdminEmail
