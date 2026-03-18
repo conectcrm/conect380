@@ -78,6 +78,8 @@ const toCsvCell = (value: unknown): string => {
 
 const UUID_LIKE_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const AGENDA_PROFILE_SYNC_MIN_INTERVAL_MS = 60_000;
+let lastAgendaProfileSyncAt = 0;
 
 export const AgendaPage: React.FC = () => {
   // Hook de notificações
@@ -97,6 +99,7 @@ export const AgendaPage: React.FC = () => {
     getCollaborators,
   } = useCalendarEvents();
   const { user, updateUser } = useAuth();
+  const updateUserRef = React.useRef(updateUser);
 
   const { view, navigateDate, setViewType, goToToday } = useCalendarView();
 
@@ -122,13 +125,23 @@ export const AgendaPage: React.FC = () => {
   const [filterCollaborator, setFilterCollaborator] = useState<string>('');
 
   useEffect(() => {
+    updateUserRef.current = updateUser;
+  }, [updateUser]);
+
+  useEffect(() => {
+    const now = Date.now();
+    if (now - lastAgendaProfileSyncAt < AGENDA_PROFILE_SYNC_MIN_INTERVAL_MS) {
+      return;
+    }
+    lastAgendaProfileSyncAt = now;
+
     let mounted = true;
 
     const syncProfilePermissions = async () => {
       try {
         const response = await authService.getProfile();
         if (!mounted || !response?.success || !response?.data) return;
-        updateUser(response.data);
+        updateUserRef.current(response.data);
       } catch (error) {
         // Falha silenciosa: manter perfil local para não interromper a agenda.
       }
@@ -139,7 +152,7 @@ export const AgendaPage: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [updateUser]);
+  }, []);
 
   // Função para verificar conflitos de horário
   const checkEventConflicts = (newEvent: any, existingEvents: CalendarEvent[]) => {
