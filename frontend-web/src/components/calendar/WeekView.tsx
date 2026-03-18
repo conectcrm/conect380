@@ -17,10 +17,11 @@ interface WeekViewProps {
   onTimeSlotClick: (date: Date) => void;
   onDragStart: (eventId: string) => void;
   onDragEnd: () => void;
-  onDrop: (date: Date) => void;
+  onDrop: (date: Date, eventId: string) => void;
   draggedEvent: string | null;
   dropTarget: Date | null;
   daysToShow?: 1 | 7;
+  canDragEvent?: (event: CalendarEvent) => boolean;
 }
 
 export const WeekView: React.FC<WeekViewProps> = ({
@@ -34,6 +35,7 @@ export const WeekView: React.FC<WeekViewProps> = ({
   draggedEvent,
   dropTarget,
   daysToShow = 7,
+  canDragEvent,
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const visibleDays = useMemo(
@@ -64,13 +66,17 @@ export const WeekView: React.FC<WeekViewProps> = ({
     onTimeSlotClick(clickedDateTime);
   };
 
-  const handleDrop = (day: Date, timeSlot: string) => {
-    if (draggedEvent) {
-      const [hours, minutes] = timeSlot.split(':').map(Number);
-      const dropDateTime = new Date(day);
-      dropDateTime.setHours(hours, minutes, 0, 0);
-      onDrop(dropDateTime);
+  const handleDrop = (e: React.DragEvent, day: Date, timeSlot: string) => {
+    e.preventDefault();
+    const eventId = e.dataTransfer.getData('text/plain');
+    if (!eventId) {
+      return;
     }
+
+    const [hours, minutes] = timeSlot.split(':').map(Number);
+    const dropDateTime = new Date(day);
+    dropDateTime.setHours(hours, minutes, 0, 0);
+    onDrop(dropDateTime, eventId);
   };
 
   const renderEventsForDay = (day: Date) => {
@@ -102,10 +108,11 @@ export const WeekView: React.FC<WeekViewProps> = ({
                   <CalendarEventComponent
                     event={event}
                     onClick={onEventClick}
-                    onDragStart={onDragStart}
-                    onDragEnd={onDragEnd}
+                    onDragStart={canDragEvent?.(event) === false ? undefined : onDragStart}
+                    onDragEnd={canDragEvent?.(event) === false ? undefined : onDragEnd}
                     className="h-full"
                     isDragging={draggedEvent === event.id}
+                    isDraggable={canDragEvent ? canDragEvent(event) : true}
                   />
                 </div>
               </div>
@@ -191,7 +198,7 @@ export const WeekView: React.FC<WeekViewProps> = ({
                             ${isDropTarget ? 'bg-green-50 border-green-300' : ''}
                           `}
                           onClick={() => handleTimeSlotClick(day, timeSlot)}
-                          onDrop={() => handleDrop(day, timeSlot)}
+                          onDrop={(e) => handleDrop(e, day, timeSlot)}
                           onDragOver={(e) => e.preventDefault()}
                         >
                           {isToday && timeSlot === currentTimeSlot && (

@@ -22,6 +22,7 @@ interface CalendarEventComponentProps {
   compact?: boolean;
   style?: React.CSSProperties;
   isDragging?: boolean;
+  isDraggable?: boolean;
 }
 
 export const CalendarEventComponent: React.FC<CalendarEventComponentProps> = ({
@@ -33,6 +34,7 @@ export const CalendarEventComponent: React.FC<CalendarEventComponentProps> = ({
   compact = false,
   style = {},
   isDragging = false,
+  isDraggable = true,
 }) => {
   const eventColor = EVENT_COLORS[event.type];
   const priorityColor = PRIORITY_COLORS[event.priority];
@@ -68,6 +70,10 @@ export const CalendarEventComponent: React.FC<CalendarEventComponentProps> = ({
   };
 
   const handleDragStart = (e: React.DragEvent) => {
+    if (!isDraggable) {
+      return;
+    }
+
     if (onDragStart) {
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', event.id);
@@ -94,7 +100,8 @@ export const CalendarEventComponent: React.FC<CalendarEventComponentProps> = ({
     <div
       className={`
         relative rounded-lg border-l-4 bg-white shadow-sm hover:shadow-md
-        transition-all duration-200 cursor-pointer select-none group
+        transition-all duration-200 cursor-pointer select-none
+        ${isDraggable ? 'group' : ''}
         ${isDragging ? 'opacity-50 scale-95' : 'hover:scale-102'}
         ${event.priority === 'high' ? 'ring-1 ring-red-200' : ''}
         ${className}
@@ -106,7 +113,7 @@ export const CalendarEventComponent: React.FC<CalendarEventComponentProps> = ({
       onClick={handleClick}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      draggable={true}
+      draggable={isDraggable}
     >
       {/* Conteúdo principal */}
       <div className={`p-2 ${compact ? 'space-y-1' : 'space-y-2'}`}>
@@ -188,10 +195,12 @@ export const CalendarEventComponent: React.FC<CalendarEventComponentProps> = ({
       </div>
 
       {/* Indicador de drag */}
-      <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
-        <div className="w-1 h-1 bg-gray-400 rounded-full mt-1"></div>
-      </div>
+      {isDraggable ? (
+        <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+          <div className="w-1 h-1 bg-gray-400 rounded-full mt-1"></div>
+        </div>
+      ) : null}
 
       {/* Border de prioridade alta */}
       {event.priority === 'high' && (

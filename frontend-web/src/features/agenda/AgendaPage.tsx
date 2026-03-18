@@ -7,6 +7,7 @@ import { Card, FiltersBar, InlineStats, PageHeader, SectionCard } from '../../co
 import { useCalendarEvents, useCalendarView, useCalendarDragDrop } from '../../hooks/useCalendar';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { authService } from '../../services/authService';
 import { CalendarEvent } from '../../types/calendar';
 import { getMonthName, formatDate } from '../../utils/calendarUtils';
 import { buildAgendaUpcomingNotification, getAgendaSummaryNotificationId } from './agendaNotifications';
@@ -95,14 +96,9 @@ export const AgendaPage: React.FC = () => {
     duplicateEvent,
     getCollaborators,
   } = useCalendarEvents();
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
 
   const { view, navigateDate, setViewType, goToToday } = useCalendarView();
-
-  const { draggedEvent, dropTarget, startDrag, endDrag, setDrop } = useCalendarDragDrop(
-    events,
-    moveEvent,
-  );
 
   const [showEventModal, setShowEventModal] = useState(false);
   const [showEventDetailsModal, setShowEventDetailsModal] = useState(false);
@@ -115,6 +111,7 @@ export const AgendaPage: React.FC = () => {
     readBooleanPreference(AGENDA_PREFERENCES_KEYS.showStatsPanel, true),
   );
   const [showAgendaSettings, setShowAgendaSettings] = useState(false);
+  const [dragDisabledByServer, setDragDisabledByServer] = useState(false);
   const [settingsShowStatsPanel, setSettingsShowStatsPanel] = useState<boolean>(showStatsPanel);
   const [settingsOpenFiltersByDefault, setSettingsOpenFiltersByDefault] = useState<boolean>(() =>
     readBooleanPreference(AGENDA_PREFERENCES_KEYS.openFiltersByDefault, false),
@@ -123,6 +120,26 @@ export const AgendaPage: React.FC = () => {
   const [filterPriority, setFilterPriority] = useState<string>('');
   const [filterStatus, setFilterStatus] = useState<string>('');
   const [filterCollaborator, setFilterCollaborator] = useState<string>('');
+
+  useEffect(() => {
+    let mounted = true;
+
+    const syncProfilePermissions = async () => {
+      try {
+        const response = await authService.getProfile();
+        if (!mounted || !response?.success || !response?.data) return;
+        updateUser(response.data);
+      } catch (error) {
+        // Falha silenciosa: manter perfil local para não interromper a agenda.
+      }
+    };
+
+    void syncProfilePermissions();
+
+    return () => {
+      mounted = false;
+    };
+  }, [updateUser]);
 
   // Função para verificar conflitos de horário
   const checkEventConflicts = (newEvent: any, existingEvents: CalendarEvent[]) => {
@@ -176,6 +193,56 @@ export const AgendaPage: React.FC = () => {
     // Preferimos bloquear edicao a permitir alteracao indevida por convidado.
     return true;
   };
+
+  const canDragEvent = (event: CalendarEvent) =>
+    !dragDisabledByServer &&
+    canUpdateAgendaEvents &&
+    (!event.criadoPorId || (!!currentUserId && event.criadoPorId === currentUserId)) &&
+    !shouldOpenReadOnlyDetails(event);
+
+  const handleMoveEvent = React.useCallback(
+    async (eventId: string, newStart: Date, newEnd: Date) => {
+      const movedEventTitle = events.find((event) => event.id === eventId)?.title || 'Evento';
+
+      try {
+        await moveEvent(eventId, newStart, newEnd);
+        showSuccess(
+          'Evento movido',
+          `${movedEventTitle} reagendado para ${newStart.toLocaleDateString('pt-BR')} às ${newStart.toLocaleTimeString('pt-BR', {
+            hour: '2-digit',
+            minute: '2-digit',
+          })}.`,
+        );
+      } catch (error) {
+        const statusCode =
+          typeof error === 'object' && error && 'response' in error
+            ? (error as any).response?.status
+            : undefined;
+        if (statusCode !== 403) {
+          console.error('Erro ao mover evento via drag & drop:', error);
+        }
+        addNotification({
+          title: statusCode === 403 ? 'Sem permissão para mover evento' : 'Erro ao mover evento',
+          message:
+            statusCode === 403
+              ? 'Seu usuário não tem permissão para reagendar este evento.'
+              : 'Não foi possível mover o evento. Atualize a agenda e tente novamente.',
+          type: 'error',
+          priority: 'high',
+        });
+
+        if (statusCode === 403) {
+          setDragDisabledByServer(true);
+        }
+      }
+    },
+    [addNotification, events, moveEvent, showSuccess],
+  );
+
+  const { draggedEvent, dropTarget, startDrag, endDrag, setDrop } = useCalendarDragDrop(
+    events,
+    handleMoveEvent,
+  );
 
   const handleEventClick = (event: CalendarEvent) => {
     setSelectedEvent(event);
@@ -310,15 +377,8 @@ export const AgendaPage: React.FC = () => {
       });
     }
   };
-  const handleDrop = (targetDate: Date) => {
-    if (draggedEvent) {
-      // Apenas toast para feedback imediato
-      showSuccess(
-        'Evento Movido',
-        `Evento foi movido para ${targetDate.toLocaleDateString('pt-BR')}`,
-      );
-    }
-    setDrop(targetDate);
+  const handleDrop = (targetDate: Date, eventId: string) => {
+    setDrop(targetDate, eventId);
   };
 
   // Verificar eventos próximos a cada 5 minutos
@@ -882,6 +942,7 @@ export const AgendaPage: React.FC = () => {
               onDrop={handleDrop}
               draggedEvent={draggedEvent?.eventId || null}
               dropTarget={dropTarget}
+              canDragEvent={canDragEvent}
             />
           )}
           {view.type === 'week' && (
@@ -896,6 +957,7 @@ export const AgendaPage: React.FC = () => {
               draggedEvent={draggedEvent?.eventId || null}
               dropTarget={dropTarget}
               daysToShow={7}
+              canDragEvent={canDragEvent}
             />
           )}
           {view.type === 'day' && (
@@ -910,6 +972,7 @@ export const AgendaPage: React.FC = () => {
               draggedEvent={draggedEvent?.eventId || null}
               dropTarget={dropTarget}
               daysToShow={1}
+              canDragEvent={canDragEvent}
             />
           )}
         </Card>

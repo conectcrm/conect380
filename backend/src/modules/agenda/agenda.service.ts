@@ -363,7 +363,7 @@ export class AgendaService {
     actorEmail?: string,
   ): Promise<AgendaEvento> {
     try {
-      const existing = await this.findOne(id, empresaId);
+      const existing = await this.findOne(id, empresaId, actorEmail);
       const sanitized = this.sanitize(dto);
 
       if (dto.inicio) {
@@ -387,7 +387,7 @@ export class AgendaService {
       const merged = this.agendaRepository.merge(existing, sanitized);
       await this.agendaRepository.save(merged);
 
-      return this.findOne(id, empresaId);
+      return this.findOne(id, empresaId, actorEmail);
     } catch (error) {
       if (error instanceof NotFoundException || error instanceof ForbiddenException) {
         throw error;
@@ -445,8 +445,8 @@ export class AgendaService {
     return this.findOne(id, empresaId, userEmail);
   }
 
-  async remove(id: string, empresaId: string): Promise<void> {
-    const existing = await this.findOne(id, empresaId);
+  async remove(id: string, empresaId: string, actorEmail?: string): Promise<void> {
+    const existing = await this.findOne(id, empresaId, actorEmail);
     await this.agendaRepository.remove(existing);
   }
 }

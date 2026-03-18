@@ -84,7 +84,7 @@ export class AgendaController {
 
   @Delete(':id')
   @Permissions(Permission.CRM_AGENDA_DELETE)
-  remove(@Param('id') id: string, @EmpresaId() empresaId: string) {
-    return this.agendaService.remove(id, empresaId);
+  remove(@Param('id') id: string, @EmpresaId() empresaId: string, @Request() req: any) {
+    return this.agendaService.remove(id, empresaId, req.user?.email);
   }
 }

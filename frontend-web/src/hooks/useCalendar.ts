@@ -1,4 +1,5 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import axios from 'axios';
 import { CalendarEvent, CalendarView, DragData } from '../types/calendar';
 import { agendaEventosService } from '../services/agendaEventosService';
 import { useAuth } from '../contexts/AuthContext';
@@ -136,8 +137,15 @@ export const useCalendarEvents = () => {
 
         return mergedUpdatedEvent;
       } catch (error) {
-        console.error('Erro ao atualizar evento:', error);
-        setError('Não foi possível atualizar o evento');
+        const statusCode = axios.isAxiosError(error) ? error.response?.status : undefined;
+        if (statusCode !== 403) {
+          console.error('Erro ao atualizar evento:', error);
+        }
+        setError(
+          statusCode === 403
+            ? 'Sem permissão para atualizar este evento'
+            : 'Não foi possível atualizar o evento',
+        );
         throw error;
       } finally {
         setLoading(false);
@@ -369,68 +377,99 @@ export const useCalendarView = () => {
 // Hook para drag & drop
 export const useCalendarDragDrop = (
   events: CalendarEvent[],
-  onMoveEvent: (eventId: string, newStart: Date, newEnd: Date) => void,
+  onMoveEvent: (eventId: string, newStart: Date, newEnd: Date) => void | Promise<void>,
 ) => {
   const [draggedEvent, setDraggedEvent] = useState<DragData | null>(null);
   const [dropTarget, setDropTarget] = useState<Date | null>(null);
+  const draggedEventRef = useRef<DragData | null>(null);
+  const dropTargetRef = useRef<Date | null>(null);
+  const eventsRef = useRef<CalendarEvent[]>(events);
 
-  const startDrag = useCallback(
-    (eventId: string) => {
-      const event = events.find((e) => e.id === eventId);
-      if (event) {
-        setDraggedEvent({
-          eventId,
-          originalDate: event.start,
-          originalStartTime: event.start,
-          originalEndTime: event.end,
-        });
-      }
-    },
-    [events],
-  );
+  useEffect(() => {
+    eventsRef.current = events;
+  }, [events]);
 
-  const endDrag = useCallback(() => {
-    if (draggedEvent && dropTarget) {
-      const event = events.find((e) => e.id === draggedEvent.eventId);
-      if (event) {
-        const duration = event.end.getTime() - event.start.getTime();
-        const newStart = new Date(dropTarget);
-
-        // Mantém o horário original se for o mesmo dia
-        if (dropTarget.toDateString() === event.start.toDateString()) {
-          newStart.setHours(event.start.getHours(), event.start.getMinutes());
-        } else {
-          // Se for dia diferente, mantém o horário
-          newStart.setHours(event.start.getHours(), event.start.getMinutes());
-        }
-
-        const newEnd = new Date(newStart.getTime() + duration);
-
-        onMoveEvent(draggedEvent.eventId, newStart, newEnd);
-      }
-    }
-
-    // Reset states
-    setDraggedEvent(null);
-    setDropTarget(null);
-  }, [draggedEvent, dropTarget, events, onMoveEvent]);
-
-  const cancelDrag = useCallback(() => {
+  const resetDragState = useCallback(() => {
+    draggedEventRef.current = null;
+    dropTargetRef.current = null;
     setDraggedEvent(null);
     setDropTarget(null);
   }, []);
 
-  const setDrop = useCallback(
-    (date: Date) => {
-      setDropTarget(date);
-      // Chama endDrag automaticamente quando um drop target é definido
-      setTimeout(() => {
-        if (draggedEvent) {
-          endDrag();
+  const applyMove = useCallback(
+    (targetDate?: Date, draggedEventId?: string) => {
+      const currentDropTarget = targetDate ?? dropTargetRef.current;
+      const currentDraggedEventId = draggedEventId ?? draggedEventRef.current?.eventId;
+
+      if (!currentDropTarget || !currentDraggedEventId) {
+        return;
+      }
+
+      const event = eventsRef.current.find((calendarEvent) => calendarEvent.id === currentDraggedEventId);
+      if (!event) {
+        return;
+      }
+
+      const duration = event.end.getTime() - event.start.getTime();
+      const newStart = new Date(currentDropTarget);
+
+      // Mantém o horário original no novo dia selecionado.
+      newStart.setHours(event.start.getHours(), event.start.getMinutes());
+
+      const newEnd = new Date(newStart.getTime() + duration);
+
+      try {
+        const maybePromise = onMoveEvent(currentDraggedEventId, newStart, newEnd);
+        if (maybePromise && typeof (maybePromise as Promise<void>).catch === 'function') {
+          void (maybePromise as Promise<void>).catch((error) => {
+            console.error('Erro ao mover evento via drag & drop:', error);
+          });
         }
-      }, 0);
+      } catch (error) {
+        console.error('Erro ao mover evento via drag & drop:', error);
+      }
     },
-    [draggedEvent, endDrag],
+    [onMoveEvent],
+  );
+
+  const startDrag = useCallback(
+    (eventId: string) => {
+      dropTargetRef.current = null;
+      setDropTarget(null);
+
+      const event = eventsRef.current.find((calendarEvent) => calendarEvent.id === eventId);
+      if (event) {
+        const nextDraggedEvent = {
+          eventId,
+          originalDate: event.start,
+          originalStartTime: event.start,
+          originalEndTime: event.end,
+        };
+        draggedEventRef.current = nextDraggedEvent;
+        setDraggedEvent(nextDraggedEvent);
+      }
+    },
+    [],
+  );
+
+  const endDrag = useCallback(() => {
+    // O movimento deve ocorrer apenas no drop explícito.
+    // No dragend, apenas limpamos estado para evitar PATCH indevido.
+    resetDragState();
+  }, [resetDragState]);
+
+  const cancelDrag = useCallback(() => {
+    resetDragState();
+  }, [resetDragState]);
+
+  const setDrop = useCallback(
+    (date: Date, eventId?: string) => {
+      dropTargetRef.current = date;
+      setDropTarget(date);
+      applyMove(date, eventId);
+      resetDragState();
+    },
+    [applyMove, resetDragState],
   );
 
   return {
