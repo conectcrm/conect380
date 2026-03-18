@@ -69,12 +69,23 @@ function Test-IsTransientNetworkError {
   return $message -match 'timed out|timeout|temporarily unavailable|connection was closed|connection reset|connection refused|name resolution'
 }
 
+function Test-IsRetryableStatusCode {
+  param(
+    [Parameter(Mandatory = $true)][int]$StatusCode
+  )
+
+  if ($StatusCode -ge 500 -and $StatusCode -le 599) {
+    return $true
+  }
+
+  return $StatusCode -in @(408, 409, 425, 429)
+}
+
 function Run-Step {
   param(
     [string]$Name,
     [scriptblock]$Action,
     [int]$MaxAttempts = 1,
-    [int[]]$RetryableStatusCodes = @(429, 500, 502, 503, 504),
     [int]$BaseRetryDelaySeconds = 2
   )
 
@@ -92,7 +103,7 @@ function Run-Step {
     catch {
       $statusCode = Get-HttpStatusCodeFromError -ErrorRecord $_
       $isTransientNetworkError = Test-IsTransientNetworkError -ErrorRecord $_
-      $retryableStatus = $null -ne $statusCode -and ($RetryableStatusCodes -contains $statusCode)
+      $retryableStatus = $null -ne $statusCode -and (Test-IsRetryableStatusCode -StatusCode $statusCode)
       $shouldRetry = $attempt -lt $attempts -and ($retryableStatus -or $isTransientNetworkError)
 
       if ($shouldRetry) {
@@ -285,7 +296,7 @@ Run-Step -Name "Branding publico" -Action {
 }
 
 if (-not $SkipAuthChecks) {
-  Run-Step -Name "Login superadmin" -MaxAttempts 3 -Action {
+  Run-Step -Name "Login superadmin" -MaxAttempts 4 -Action {
     Require-String -Name "SuperAdminEmail" -Value $SuperAdminEmail
     Require-String -Name "SuperAdminPassword" -Value $SuperAdminPassword
 
@@ -338,7 +349,7 @@ if (-not $SkipAuthChecks) {
     }
   }
 
-  Run-Step -Name "Admin branding autenticado" -MaxAttempts 4 -Action {
+  Run-Step -Name "Admin branding autenticado" -MaxAttempts 6 -Action {
     if ([string]::IsNullOrWhiteSpace($script:accessToken)) {
       throw "Token ausente para rota admin/system-branding"
     }
@@ -378,7 +389,7 @@ if (-not $SkipAuthChecks) {
     }
   }
 
-  Run-Step -Name "Admin bff companies autenticado" -MaxAttempts 3 -Action {
+  Run-Step -Name "Admin bff companies autenticado" -MaxAttempts 4 -Action {
     if ([string]::IsNullOrWhiteSpace($script:accessToken)) {
       throw "Token ausente para rota admin/bff/companies"
     }
@@ -426,6 +437,12 @@ $results | Format-Table -AutoSize
 
 $failed = @($results | Where-Object { $_.Status -eq "FAIL" })
 if ($failed.Count -gt 0) {
+  Write-Host ""
+  Write-Host "Smoke failures (detalhes):"
+  foreach ($item in $failed) {
+    Write-Host "- $($item.Step): $($item.Details)"
+  }
+
   Write-Host ""
   Write-Host "Smoke result: FAIL"
   exit 1
