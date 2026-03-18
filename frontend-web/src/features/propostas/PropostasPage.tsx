@@ -20,7 +20,6 @@ import DashboardPropostas from './components/DashboardPropostas';
 import FiltrosAvancados from './components/FiltrosAvancados';
 import PropostaActions from './components/PropostaActions';
 import StatusFluxo from './components/StatusFluxo';
-import ModalVisualizarProposta from './components/ModalVisualizarProposta';
 import {
   propostasService as propostasFeatureService,
   type PropostaCompleta as PropostaCompletaFeature,
@@ -394,9 +393,6 @@ const PropostasPage: React.FC = () => {
   const [motivoPerdaDraft, setMotivoPerdaDraft] = useState('');
   const [propostaMotivoPerda, setPropostaMotivoPerda] = useState<any | null>(null);
   const [savingMotivoPerda, setSavingMotivoPerda] = useState(false);
-  const [showViewModal, setShowViewModal] = useState(false);
-  const [selectedPropostaForView, setSelectedPropostaForView] =
-    useState<PropostaCompletaFeature | null>(null);
   const [selectedPropostaForEdit, setSelectedPropostaForEdit] =
     useState<PropostaCompletaFeature | null>(null);
   const [wizardContextMessage, setWizardContextMessage] = useState<string | null>(null);
@@ -421,7 +417,7 @@ const PropostasPage: React.FC = () => {
       return;
     }
 
-    if (showWizardModal || showViewModal || showMotivoPerdaModal) {
+    if (showWizardModal || showMotivoPerdaModal) {
       return;
     }
 
@@ -435,7 +431,7 @@ const PropostasPage: React.FC = () => {
     if (body.style.overflow === 'hidden') {
       body.style.overflow = '';
     }
-  }, [showWizardModal, showViewModal, showMotivoPerdaModal]);
+  }, [showWizardModal, showMotivoPerdaModal]);
 
   // Função para mostrar notificações
   const showNotification = useCallback((message: string, type: 'success' | 'error') => {
@@ -821,9 +817,18 @@ const PropostasPage: React.FC = () => {
     setShowWizardModal(true);
   }, []);
 
-  const handleVisualizarProposta = useCallback((proposta: any) => {
-    void handleViewProposta(proposta);
-  }, []);
+  const handleVisualizarProposta = useCallback(
+    (proposta: any) => {
+      const propostaId = proposta?.id ? String(proposta.id).trim() : '';
+      if (!propostaId) {
+        showNotification('Proposta sem identificador para visualizacao.', 'error');
+        return;
+      }
+
+      navigate(`/vendas/propostas/${encodeURIComponent(propostaId)}`);
+    },
+    [navigate, showNotification],
+  );
 
   const handleEditProposta = useCallback(
     async (
@@ -851,7 +856,6 @@ const PropostasPage: React.FC = () => {
             ? `Rascunho criado a partir da oportunidade. Este rascunho ainda nao possui itens comerciais. ${MENSAGEM_PROPOSTA_SEM_ITENS}`
             : null,
         );
-        setShowViewModal(false);
         setShowWizardModal(true);
       } catch (error) {
         console.error('Erro ao preparar edicao da proposta:', error);
@@ -885,7 +889,14 @@ const PropostasPage: React.FC = () => {
 
       return () => clearTimeout(timer);
     }
-  }, [searchParams, propostas, location.pathname, navigate, handleEditProposta, handleVisualizarProposta]);
+  }, [
+    searchParams,
+    propostas,
+    location.pathname,
+    navigate,
+    handleEditProposta,
+    handleVisualizarProposta,
+  ]);
   // 🔄 POLLING AUTOMÁTICO DESABILITADO - Causava múltiplas requisições desnecessárias
   // useEffect(() => {
   //   const intervalo = setInterval(() => {
@@ -1156,6 +1167,19 @@ const PropostasPage: React.FC = () => {
     } else {
       setPropostasSelecionadas((prev) => prev.filter((id) => id !== propostaId));
     }
+  };
+
+  const cliqueEmElementoInterativo = (event: React.MouseEvent<HTMLElement>) => {
+    const target = event.target as HTMLElement | null;
+    if (!target) {
+      return false;
+    }
+
+    return Boolean(
+      target.closest(
+        'button, a, input, label, textarea, select, [role="button"], [data-prevent-open="true"]',
+      ),
+    );
   };
 
   // Selecionar todas as propostas visíveis
@@ -1856,82 +1880,18 @@ const PropostasPage: React.FC = () => {
     };
   };
 
-  const handleViewProposta = async (proposta: any) => {
-    try {
-      const propostaId = proposta?.id ? String(proposta.id) : null;
-      if (propostaId) {
-        const propostaCompletaReal = await propostasFeatureService.obterProposta(propostaId);
-        if (propostaCompletaReal) {
-          setSelectedPropostaForView(propostaCompletaReal);
-          setShowViewModal(true);
-          return;
-        }
+  const handleViewProposta = useCallback(
+    (proposta: any) => {
+      const propostaId = proposta?.id ? String(proposta.id).trim() : '';
+      if (!propostaId) {
+        showNotification('Proposta sem identificador para visualizacao.', 'error');
+        return;
       }
 
-      // Converter dados da proposta para o formato compatível com o modal
-      const propostaCompleta = {
-        id: proposta.id || `prop_${Date.now()}`,
-        numero: proposta.numero || 'N/A',
-        titulo: proposta.titulo || 'Proposta comercial',
-        subtotal: (proposta as any).valor || 0,
-        total: (proposta as any).valor || 0,
-        dataValidade: new Date(proposta.data_vencimento || Date.now()),
-        status: proposta.status as 'rascunho' | 'enviada' | 'aprovada' | 'rejeitada',
-        criadaEm: proposta.data_criacao || new Date().toISOString(),
-
-        // Dados básicos necessários
-        vendedor: {
-          id: `vendedor_${proposta.id}`,
-          nome: proposta.vendedor || 'Vendedor',
-          email: 'vendedor@conectcrm.com',
-          tipo: 'vendedor',
-          ativo: true,
-        },
-        cliente: {
-          id: `cliente_${proposta.id}`,
-          nome: proposta.cliente || 'Cliente não informado',
-          documento: '',
-          email:
-            proposta.cliente_contato ||
-            `${proposta.cliente?.toLowerCase().replace(/\s+/g, '.')}@email.com`,
-          telefone: proposta.cliente_telefone || '',
-          tipoPessoa: 'fisica',
-        },
-        produtos: [
-          {
-            produto: {
-              id: `produto_${proposta.id}`,
-              nome: proposta.titulo || 'Produto/Serviço',
-              preco: (proposta as any).valor || 0,
-              categoria: 'Geral',
-              unidade: 'un',
-            },
-            quantidade: 1,
-            desconto: 0,
-            subtotal: (proposta as any).valor || 0,
-          },
-        ],
-        descontoGlobal: 0,
-        impostos: 0,
-        formaPagamento: 'avista',
-        validadeDias: 30,
-        observacoes: `Esta proposta foi elaborada especialmente para ${proposta.cliente}, considerando as necessidades específicas do projeto "${proposta.titulo}". Estamos à disposição para esclarecimentos e ajustes necessários.`,
-        incluirImpostosPDF: false,
-        aprovacaoInterna: (proposta as any).aprovacaoInterna,
-        lembretes: Array.isArray((proposta as any).lembretes) ? (proposta as any).lembretes : [],
-        historicoEventos: Array.isArray((proposta as any).historicoEventos)
-          ? (proposta as any).historicoEventos
-          : [],
-        versoes: Array.isArray((proposta as any).versoes) ? (proposta as any).versoes : [],
-      } as unknown as PropostaCompletaFeature;
-
-      setSelectedPropostaForView(propostaCompleta);
-      setShowViewModal(true);
-    } catch (error) {
-      console.error('❌ Erro ao preparar visualização da proposta:', error);
-      showNotification('Erro ao preparar visualizacao da proposta. Tente novamente.', 'error');
-    }
-  };
+      navigate(`/vendas/propostas/${encodeURIComponent(propostaId)}`);
+    },
+    [navigate, showNotification],
+  );
 
   // Função de fallback para gerar HTML local quando API não estiver disponível
   const gerarHtmlLocal = (dados: DadosProposta): string => {
@@ -2601,7 +2561,13 @@ const PropostasPage: React.FC = () => {
                     return (
                       <article
                         key={propostaId}
-                        className={`${shellTokens.card} p-4 transition-colors ${propostaSelecionada ? 'border-[#159A9C]/50 bg-[#F2FBFA]' : ''}`}
+                        onClick={(event) => {
+                          if (cliqueEmElementoInterativo(event)) {
+                            return;
+                          }
+                          handleViewProposta(proposta);
+                        }}
+                        className={`${shellTokens.card} cursor-pointer p-4 transition-colors ${propostaSelecionada ? 'border-[#159A9C]/50 bg-[#F2FBFA]' : ''}`}
                       >
                         <div className="mb-3 flex items-start justify-between gap-3">
                           <div>
@@ -2708,7 +2674,6 @@ const PropostasPage: React.FC = () => {
                           </div>
                           <PropostaActions
                             proposta={proposta}
-                            onViewProposta={handleViewProposta}
                             onEditProposta={handleEditProposta}
                             onPropostaUpdated={() =>
                               carregarPropostas({ force: true, source: 'actions' })
@@ -2891,7 +2856,13 @@ const PropostasPage: React.FC = () => {
                             return (
                             <tr
                               key={proposta.id}
-                              className={`hover:bg-gray-50 ${propostasSelecionadas.includes(proposta.id?.toString() || proposta.numero) ? 'bg-[#159A9C]/10' : ''} transition-colors duration-200`}
+                              onClick={(event) => {
+                                if (cliqueEmElementoInterativo(event)) {
+                                  return;
+                                }
+                                handleViewProposta(proposta);
+                              }}
+                              className={`cursor-pointer hover:bg-gray-50 ${propostasSelecionadas.includes(proposta.id?.toString() || proposta.numero) ? 'bg-[#159A9C]/10' : ''} transition-colors duration-200`}
                             >
                               {/* Checkbox */}
                               <td className="px-6 py-4 whitespace-nowrap">
@@ -3073,7 +3044,6 @@ const PropostasPage: React.FC = () => {
                               >
                                 <PropostaActions
                                   proposta={proposta}
-                                  onViewProposta={handleViewProposta}
                                   onEditProposta={handleEditProposta}
                                   onPropostaUpdated={() =>
                                     carregarPropostas({ force: true, source: 'actions' })
@@ -3093,17 +3063,6 @@ const PropostasPage: React.FC = () => {
                   Exibindo {filteredPropostas.length} proposta(s) na visualizacao atual.
                 </div>
               </DataTableCard>
-            )}
-
-            {/* Modal de Visualização de Proposta */}
-            {selectedPropostaForView && (
-              <ModalVisualizarProposta
-                isOpen={showViewModal}
-                onClose={() => setShowViewModal(false)}
-                proposta={selectedPropostaForView}
-                onEditProposta={handleEditProposta}
-                onPropostaUpdated={() => carregarPropostas({ force: true, source: 'modal-view' })}
-              />
             )}
             {showMotivoPerdaModal && propostaMotivoPerda && (
               <BaseModal

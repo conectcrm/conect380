@@ -8,7 +8,6 @@ import {
 } from '../../../components/modals/BaseModal';
 import { toastService } from '../../../services/toastService';
 import {
-  Eye,
   Pencil,
   Mail,
   MessageSquare,
@@ -232,12 +231,10 @@ type PropostaUI = {
 
 interface PropostaActionsProps {
   proposta: PropostaCompleta | PropostaUI;
-  onViewProposta: (proposta: PropostaCompleta | PropostaUI) => void;
   onEditProposta?: (proposta: PropostaCompleta | PropostaUI) => void;
   onPropostaUpdated?: () => void;
   className?: string;
   showLabels?: boolean;
-  hideView?: boolean;
 }
 
 type PromptDialogState = {
@@ -273,12 +270,10 @@ const componentRoleLabelsPdf: Record<PlanoComponentePdf['componentRole'], string
 
 const PropostaActions: React.FC<PropostaActionsProps> = ({
   proposta,
-  onViewProposta,
   onEditProposta,
   onPropostaUpdated,
   className = '',
   showLabels = false,
-  hideView = false,
 }) => {
   const navigate = useNavigate();
   const { confirm } = useGlobalConfirmation();
@@ -505,22 +500,73 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const statusEncerradoSemAcoesComerciais = ['rejeitada', 'expirada', 'pago'].includes(
     statusFluxoAtual,
   );
+  const extrairHistoricoPayload = (response: any) => {
+    if (!response || typeof response !== 'object') {
+      return null;
+    }
+
+    if ('success' in response) {
+      return (response as any).data || null;
+    }
+
+    return response;
+  };
+  const enriquecerFonteComItens = async (fonteBase: any, propostaIdValue?: string | null) => {
+    let fonte = fonteBase;
+    const propostaIdNormalizado = String(propostaIdValue || '')
+      .trim();
+    if (!propostaIdNormalizado) {
+      return fonte;
+    }
+
+    try {
+      const propostaDetalhada = await propostasApiService.findById(propostaIdNormalizado);
+      if (propostaDetalhada) {
+        fonte = {
+          ...fonte,
+          ...propostaDetalhada,
+          cliente: (propostaDetalhada as any).cliente || fonte.cliente,
+          vendedor: (propostaDetalhada as any).vendedor || fonte.vendedor,
+        };
+      }
+    } catch (error) {
+      console.warn('Nao foi possivel validar itens detalhados da proposta:', error);
+    }
+
+    if (propostaPossuiItensComerciais(fonte)) {
+      return fonte;
+    }
+
+    try {
+      const historicoResponse = await propostasApiService.obterHistoricoProposta(propostaIdNormalizado);
+      const historicoData = extrairHistoricoPayload(historicoResponse);
+      const versoesHistorico = Array.isArray(historicoData?.versoes) ? historicoData.versoes : [];
+      if (versoesHistorico.length > 0) {
+        const ultimaVersao = versoesHistorico[versoesHistorico.length - 1];
+        fonte = {
+          ...fonte,
+          versoes: versoesHistorico,
+          snapshot: ultimaVersao?.snapshot || fonte.snapshot,
+          emailDetails: {
+            ...(fonte?.emailDetails && typeof fonte.emailDetails === 'object'
+              ? fonte.emailDetails
+              : {}),
+            versoes: versoesHistorico,
+          },
+        };
+      }
+    } catch (error) {
+      console.warn('Nao foi possivel carregar historico da proposta para validar itens:', error);
+    }
+
+    return fonte;
+  };
   const bloquearAcaoSemItens = async (acao: string) => {
     let propostaFonte: any = proposta;
     if (!propostaPossuiItensComerciais(propostaFonte)) {
       const propostaId = (proposta as any)?.id || getPropostaData().id;
       if (propostaId) {
-        try {
-          const propostaDetalhada = await propostasApiService.findById(String(propostaId));
-          if (propostaDetalhada) {
-            propostaFonte = {
-              ...propostaFonte,
-              ...propostaDetalhada,
-            };
-          }
-        } catch (error) {
-          console.warn('Nao foi possivel validar itens detalhados da proposta:', error);
-        }
+        propostaFonte = await enriquecerFonteComItens(propostaFonte, String(propostaId));
       }
     }
 
@@ -680,20 +726,8 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     let itensOriginais = extrairItensComerciaisDaProposta(fonteProposta);
 
     if (itensOriginais.length === 0 && propostaId) {
-      try {
-        const propostaDetalhada = await propostasApiService.findById(String(propostaId));
-        if (propostaDetalhada) {
-          fonteProposta = {
-            ...fonteProposta,
-            ...propostaDetalhada,
-            cliente: (propostaDetalhada as any).cliente || fonteProposta.cliente,
-            vendedor: (propostaDetalhada as any).vendedor || fonteProposta.vendedor,
-          };
-          itensOriginais = extrairItensComerciaisDaProposta(propostaDetalhada as any);
-        }
-      } catch (error) {
-        console.warn('Nao foi possivel carregar os itens detalhados da proposta para o PDF:', error);
-      }
+      fonteProposta = await enriquecerFonteComItens(fonteProposta, String(propostaId));
+      itensOriginais = extrairItensComerciaisDaProposta(fonteProposta);
     }
 
     if (!propostaPossuiItensComerciais(fonteProposta)) {
@@ -2315,19 +2349,6 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
   return (
     <div className={`flex items-center space-x-1 ${className}`}>
-      {/* Visualizar */}
-      {!hideView && (
-        <button
-          type="button"
-          onClick={() => onViewProposta(proposta)}
-          className={`${buttonClass} ${buttonThemeClass.primary}`}
-          title="Visualizar proposta"
-        >
-          <Eye className="w-4 h-4" />
-          {showLabels && <span>Visualizar</span>}
-        </button>
-      )}
-
       {onEditProposta && editavelComoRascunho && (
         <button
           type="button"

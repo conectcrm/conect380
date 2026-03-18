@@ -104,6 +104,7 @@ const GestaoTiposServicoPage = React.lazy(() => import('./pages/GestaoTiposServi
 
 const PipelinePage = React.lazy(() => import('./pages/PipelinePage'));
 const PropostasPage = React.lazy(() => import('./features/propostas/PropostasPage'));
+const PropostaDetalhePage = React.lazy(() => import('./features/propostas/PropostaDetalhePage'));
 const CotacaoPage = React.lazy(() => import('./features/comercial/pages/CotacaoPage'));
 const MinhasAprovacoesPage = React.lazy(
   () => import('./features/comercial/pages/MinhasAprovacoesPage'),
@@ -671,8 +672,16 @@ const AppRoutes: React.FC = () => {
                     element={protegerRota(ModuloEnum.VENDAS, <PropostasPage />)}
                   />
                   <Route
+                    path="/propostas/:id"
+                    element={protegerRota(ModuloEnum.VENDAS, <PropostaDetalhePage />)}
+                  />
+                  <Route
                     path="/vendas/propostas"
                     element={protegerRota(ModuloEnum.VENDAS, <PropostasPage />)}
+                  />
+                  <Route
+                    path="/vendas/propostas/:id"
+                    element={protegerRota(ModuloEnum.VENDAS, <PropostaDetalhePage />)}
                   />
                   <Route
                     path="/financeiro/cotacoes"

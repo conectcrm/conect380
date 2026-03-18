@@ -670,6 +670,20 @@ class PropostasService {
     const cliente = this.mapCliente(proposta);
     const produtos = this.mapProdutos(proposta);
     const vendedor = this.mapVendedor(proposta);
+    const criadaEmFonte =
+      propostaAny.criadaEm ||
+      propostaAny.createdAt ||
+      propostaAny.criadoEm ||
+      propostaAny.dataCriacao ||
+      propostaAny.data_criacao;
+    const atualizadaEmFonte =
+      propostaAny.atualizadaEm ||
+      propostaAny.updatedAt ||
+      propostaAny.atualizadoEm ||
+      propostaAny.dataAtualizacao ||
+      propostaAny.data_atualizacao;
+    const criadaEmDate = criadaEmFonte ? new Date(criadaEmFonte) : null;
+    const atualizadaEmDate = atualizadaEmFonte ? new Date(atualizadaEmFonte) : null;
 
     return {
       id: propostaAny.id,
@@ -720,8 +734,12 @@ class PropostasService {
         : Array.isArray(propostaAny.emailDetails?.versoes)
           ? propostaAny.emailDetails.versoes
           : [],
-      criadaEm: propostaAny.criadaEm ? new Date(propostaAny.criadaEm) : new Date(),
-      atualizadaEm: propostaAny.atualizadaEm ? new Date(propostaAny.atualizadaEm) : new Date(),
+      criadaEm:
+        criadaEmDate && Number.isFinite(criadaEmDate.getTime()) ? criadaEmDate : undefined,
+      atualizadaEm:
+        atualizadaEmDate && Number.isFinite(atualizadaEmDate.getTime())
+          ? atualizadaEmDate
+          : undefined,
     };
   }
 

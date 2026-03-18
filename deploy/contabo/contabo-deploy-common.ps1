@@ -26,6 +26,12 @@ function Resolve-ProfilePath {
       return $ProfilePath
     }
 
+    # Accept paths relative to current working directory (repo root in CI)
+    # and keep compatibility with script-root-relative paths.
+    if (Test-Path $ProfilePath) {
+      return (Resolve-Path $ProfilePath).Path
+    }
+
     return (Join-Path $ScriptRoot $ProfilePath)
   }
 

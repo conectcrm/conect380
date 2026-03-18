@@ -6,10 +6,6 @@ import { BaseModal, ModalButton } from '../../../components/modals/BaseModal';
 import { produtosService } from '../../../services/produtosService';
 import { toastService } from '../../../services/toastService';
 import {
-  MENSAGEM_PROPOSTA_SEM_ITENS,
-  propostaPossuiItensComerciais,
-} from '../utils/propostaItens';
-import {
   User,
   Calendar,
   MapPin,
@@ -26,11 +22,12 @@ import {
 } from 'lucide-react';
 
 interface ModalVisualizarPropostaProps {
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
   proposta: PropostaCompleta | null;
   onEditProposta?: (proposta: PropostaCompleta) => void;
   onPropostaUpdated?: () => void;
+  mode?: 'modal' | 'page';
 }
 
 type HistoricoResposta = {
@@ -181,6 +178,11 @@ const getStatusColor = (status?: string) => {
     aprovada: 'bg-[#16A34A]/10 text-[#166534]',
     rejeitada: 'bg-[#DC2626]/10 text-[#B91C1C]',
     expirada: 'bg-[#F97316]/15 text-[#9A3412]',
+    contrato_gerado: 'bg-[#C084FC]/15 text-[#7C3AED]',
+    contrato_assinado: 'bg-[#22C55E]/15 text-[#15803D]',
+    fatura_criada: 'bg-[#0EA5E9]/15 text-[#0C4A6E]',
+    aguardando_pagamento: 'bg-[#F59E0B]/20 text-[#92400E]',
+    pago: 'bg-[#16A34A]/20 text-[#166534]',
   };
   return statusColors[status as keyof typeof statusColors] || 'bg-[#B4BEC9]/20 text-[#244455]';
 };
@@ -489,12 +491,15 @@ const buildSnapshotItemMap = (items: SnapshotItemNormalizado[]) => {
 };
 
 const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
-  isOpen,
+  isOpen = true,
   onClose,
   proposta,
   onEditProposta,
   onPropostaUpdated,
+  mode = 'modal',
 }) => {
+  const isPageMode = mode === 'page';
+  const shouldRender = isPageMode || isOpen;
   const [historico, setHistorico] = useState<HistoricoResposta | null>(null);
   const [estatisticas, setEstatisticas] = useState<EstatisticasResposta | null>(null);
   const [loadingCiclo, setLoadingCiclo] = useState(false);
@@ -544,19 +549,19 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
   }, [propostaId]);
 
   useEffect(() => {
-    if (!isOpen || !propostaId) {
+    if (!shouldRender || !propostaId) {
       return;
     }
     void carregarDadosCiclo();
-  }, [isOpen, propostaId, carregarDadosCiclo]);
+  }, [shouldRender, propostaId, carregarDadosCiclo]);
 
   useEffect(() => {
-    if (!isOpen) {
+    if (!shouldRender) {
       setShowFollowupForm(false);
       setFollowupDias('3');
       setShowCiclo(false);
     }
-  }, [isOpen]);
+  }, [shouldRender]);
 
   useEffect(() => {
     if (!showCiclo) {
@@ -590,6 +595,11 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
     (proposta?.aprovacaoInterna as HistoricoResposta['aprovacaoInterna'] | undefined);
   const aprovacaoBadge = getAprovacaoBadge(aprovacao?.status);
   const AprovacaoIcon = aprovacaoBadge.icon;
+  const statusAtualNormalizado = String(proposta?.status || '')
+    .trim()
+    .toLowerCase();
+  const statusSemFollowup = new Set(['rascunho', 'rejeitada', 'expirada', 'pago']);
+  const podeAgendarFollowup = Boolean(propostaId) && !statusSemFollowup.has(statusAtualNormalizado);
 
   const versoesOrdenadas = useMemo(() => {
     return [...(historico?.versoes || [])].sort((a, b) => Number(b.versao || 0) - Number(a.versao || 0));
@@ -764,8 +774,6 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
   }, [historico?.log]);
 
   if (!proposta) return null;
-  const propostaSemItens = !propostaPossuiItensComerciais(proposta);
-  const propostaEditavel = String(proposta.status || '').trim().toLowerCase() === 'rascunho';
 
   const versaoSnapshotAtual = (() => {
     if (!historico?.versoes || historico.versoes.length === 0) {
@@ -889,7 +897,7 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
   })();
 
   useEffect(() => {
-    if (!isOpen) {
+    if (!shouldRender) {
       return;
     }
 
@@ -937,54 +945,39 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, missingIdsKey, nomesProdutosPorId]);
+  }, [shouldRender, missingIdsKey, nomesProdutosPorId]);
 
-  const footerContent = (
-    <div className="flex items-center justify-end">
-      <ModalButton type="button" variant="secondary" onClick={onClose}>
-        Fechar
-      </ModalButton>
-    </div>
-  );
-
-  return (
-    <BaseModal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={`Proposta #${proposta.numero}`}
-      subtitle={proposta.titulo || 'Proposta comercial'}
-      size="large"
-      footer={footerContent}
-      contentClassName="p-3 sm:p-4"
-      className="max-h-[80vh] max-w-5xl"
-    >
-      <div className="mb-4 flex items-center justify-end">
-        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusColor(proposta.status)}`}>
-          {getStatusText(proposta.status)}
-        </span>
+  const footerContent =
+    onClose && !isPageMode ? (
+      <div className="flex items-center justify-end">
+        <ModalButton type="button" variant="secondary" onClick={onClose}>
+          Fechar
+        </ModalButton>
       </div>
+    ) : undefined;
 
-      <div className="mb-4 rounded-xl border border-[#E2ECF0] bg-[#F7FBFC] p-3 sm:p-4">
+  const handleAtualizarPagina = () => {
+    void carregarDadosCiclo();
+    onPropostaUpdated?.();
+  };
+
+  const compartilharSection = (
+    <div className={`${isPageMode ? '' : 'mb-4 '}rounded-xl border border-[#E2ECF0] bg-[#F7FBFC] p-3 sm:p-4`}>
         <h4 className="mb-3 text-sm font-medium text-[#19384C]">Compartilhar proposta</h4>
-        {propostaSemItens && propostaEditavel && (
-          <div className="mb-3 rounded-lg border border-[#F4D58D] bg-[#FFF7ED] px-3 py-2 text-xs text-[#92400E]">
-            {MENSAGEM_PROPOSTA_SEM_ITENS}
-          </div>
-        )}
         <PropostaActions
           proposta={proposta}
-          onViewProposta={() => {}}
           onEditProposta={
             onEditProposta ? (propostaAtual) => onEditProposta(propostaAtual as PropostaCompleta) : undefined
           }
           onPropostaUpdated={onPropostaUpdated}
           showLabels={true}
-          hideView={true}
           className="flex-wrap"
         />
       </div>
+  );
 
-      <div className="mb-4 rounded-lg border border-[#DCE7EC] bg-[#F8FBFC] p-3 sm:p-4">
+  const cicloSection = (
+    <div className={`${isPageMode ? '' : 'mb-4 '}rounded-xl border border-[#DCE7EC] bg-[#F8FBFC] p-4`}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h4 className="text-sm font-semibold uppercase tracking-wide text-[#2B4C5F]">Ciclo comercial</h4>
@@ -1004,13 +997,13 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
 
         {!showCiclo ? (
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="rounded-md border border-[#E2ECF0] bg-white p-3">
+            <div className="rounded-lg bg-white p-3 ring-1 ring-[#E7EFF3]">
               <p className="text-xs text-[#607B89]">Criada em</p>
               <p className="mt-1 text-sm font-medium text-[#19384C]">
                 {formatDateTime(proposta.criadaEm)}
               </p>
             </div>
-            <div className="rounded-md border border-[#E2ECF0] bg-white p-3">
+            <div className="rounded-lg bg-white p-3 ring-1 ring-[#E7EFF3]">
               <p className="text-xs text-[#607B89]">Total visualizacoes</p>
               <p className="mt-1 text-sm font-medium text-[#19384C]">
                 {Number(estatisticas?.totalVisualizacoes || 0)}
@@ -1019,36 +1012,31 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
           </div>
         ) : (
           <>
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-              <button
-                type="button"
-                onClick={() => void carregarDadosCiclo()}
-                className="inline-flex h-8 items-center justify-center rounded-md border border-[#C8DAE2] bg-white px-3 text-xs font-medium text-[#244455] transition hover:bg-[#F1F7FA]"
-              >
-                Atualizar
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowFollowupForm((prev) => !prev)}
-                disabled={agendandoFollowup || !propostaId}
-                className="inline-flex h-8 items-center justify-center rounded-md bg-[#159A9C] px-3 text-xs font-medium text-white transition hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {agendandoFollowup ? (
-                  <>
-                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                    Agendando...
-                  </>
-                ) : (
-                  <>
-                    <Clock className="mr-2 h-3.5 w-3.5" />
-                    Agendar follow-up
-                  </>
-                )}
-              </button>
-            </div>
+            {podeAgendarFollowup && (
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowFollowupForm((prev) => !prev)}
+                  disabled={agendandoFollowup || !propostaId}
+                  className="inline-flex h-8 items-center justify-center rounded-md bg-[#159A9C] px-3 text-xs font-medium text-white transition hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {agendandoFollowup ? (
+                    <>
+                      <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                      Agendando...
+                    </>
+                  ) : (
+                    <>
+                      <Clock className="mr-2 h-3.5 w-3.5" />
+                      Agendar follow-up
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
 
-            {showFollowupForm && (
-              <div className="mt-3 rounded-md border border-[#E2ECF0] bg-white p-3">
+            {showFollowupForm && podeAgendarFollowup && (
+              <div className="mt-3 rounded-lg bg-white p-3 ring-1 ring-[#E7EFF3]">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                   <label className="flex flex-col gap-1 text-xs text-[#607B89]">
                     Em quantos dias?
@@ -1095,25 +1083,25 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
                 Carregando dados do ciclo...
               </div>
             ) : (
-              <>
+              <div className="mt-3 space-y-4 rounded-lg bg-[#F4FAFC] p-3 ring-1 ring-[#E2ECF0]">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-md border border-[#E2ECF0] bg-white p-3">
+                <div className="rounded-lg bg-white p-3 ring-1 ring-[#E7EFF3]">
                   <p className="text-xs text-[#607B89]">Criada em</p>
                   <p className="mt-1 text-sm font-medium text-[#19384C]">
                     {formatDateTime(historico?.criacaoEm || proposta.criadaEm)}
                   </p>
                 </div>
-                <div className="rounded-md border border-[#E2ECF0] bg-white p-3">
+                <div className="rounded-lg bg-white p-3 ring-1 ring-[#E7EFF3]">
                   <p className="text-xs text-[#607B89]">Primeiro envio</p>
                   <p className="mt-1 text-sm font-medium text-[#19384C]">{formatDateTime(historico?.envioEm)}</p>
                 </div>
-                <div className="rounded-md border border-[#E2ECF0] bg-white p-3">
+                <div className="rounded-lg bg-white p-3 ring-1 ring-[#E7EFF3]">
                   <p className="text-xs text-[#607B89]">Primeira visualizacao</p>
                   <p className="mt-1 text-sm font-medium text-[#19384C]">
                     {formatDateTime(historico?.primeiraVisualizacaoEm)}
                   </p>
                 </div>
-                <div className="rounded-md border border-[#E2ECF0] bg-white p-3">
+                <div className="rounded-lg bg-white p-3 ring-1 ring-[#E7EFF3]">
                   <p className="text-xs text-[#607B89]">Total visualizacoes</p>
                   <p className="mt-1 text-sm font-medium text-[#19384C]">
                     {Number(estatisticas?.totalVisualizacoes || 0)}
@@ -1122,7 +1110,7 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
               </div>
 
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="rounded-md border border-[#E2ECF0] bg-white p-3">
+                <div className="rounded-lg bg-white p-3 ring-1 ring-[#E7EFF3]">
                   <div className="mb-2 flex items-center gap-2">
                     <AprovacaoIcon className="h-4 w-4" />
                     <p className="text-sm font-semibold text-[#19384C]">Aprovacao interna</p>
@@ -1143,7 +1131,7 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
                   )}
                 </div>
 
-                <div className="rounded-md border border-[#E2ECF0] bg-white p-3">
+                <div className="rounded-lg bg-white p-3 ring-1 ring-[#E7EFF3]">
                   <div className="mb-2 flex items-center gap-2">
                     <Eye className="h-4 w-4 text-[#0F7B7D]" />
                     <p className="text-sm font-semibold text-[#19384C]">Rastreio de aceite</p>
@@ -1159,7 +1147,7 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
               </div>
 
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="rounded-md border border-[#E2ECF0] bg-white p-3">
+                <div className="rounded-lg bg-white p-3 ring-1 ring-[#E7EFF3]">
                   <div className="mb-2 flex items-center gap-2">
                     <History className="h-4 w-4 text-[#2B4C5F]" />
                     <p className="text-sm font-semibold text-[#19384C]">Versionamento</p>
@@ -1169,7 +1157,7 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
                   ) : (
                     <div className="max-h-36 space-y-2 overflow-y-auto pr-1">
                       {versoesOrdenadas.map((versao) => (
-                        <div key={versao.versao} className="rounded-md border border-[#EDF3F6] p-2">
+                        <div key={versao.versao} className="rounded-md bg-[#FCFDFE] p-2 ring-1 ring-[#EDF3F6]">
                           <p className="text-xs font-medium text-[#19384C]">
                             v{versao.versao} - {formatDateTime(versao.criadaEm)}
                           </p>
@@ -1185,7 +1173,7 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
                   )}
 
                   {versoesOrdenadas.length >= 2 && (
-                    <div className="mt-3 rounded-md border border-[#DCE7EC] bg-[#FAFCFD] p-2">
+                    <div className="mt-3 rounded-md bg-[#FAFCFD] p-2 ring-1 ring-[#DCE7EC]">
                       <p className="text-xs font-medium text-[#244455]">Comparar versoes</p>
                       <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <label className="flex flex-col gap-1 text-xs text-[#607B89]">
@@ -1226,7 +1214,7 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
                       </div>
 
                       {comparacaoVersoes ? (
-                        <div className="mt-2 space-y-1 rounded-md border border-[#E7EFF3] bg-white p-2 text-xs text-[#546E7A]">
+                        <div className="mt-2 space-y-1 rounded-md bg-white p-2 text-xs text-[#546E7A] ring-1 ring-[#E7EFF3]">
                           <p>
                             Total: {formatCurrency(comparacaoVersoes.totalBase)}
                             {' -> '}
@@ -1274,13 +1262,13 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
                           )}
 
                           {comparacaoVersoes.itensAlterados.length > 0 && (
-                            <div className="mt-2 rounded-md border border-[#E2ECF0] bg-[#F8FBFC] p-2">
+                            <div className="mt-2 rounded-md bg-[#F8FBFC] p-2 ring-1 ring-[#E2ECF0]">
                               <p className="text-[11px] font-semibold uppercase tracking-wide text-[#244455]">
                                 Detalhe por item ({comparacaoVersoes.totalItensAlterados})
                               </p>
                               <div className="mt-2 max-h-40 space-y-1 overflow-y-auto pr-1">
                                 {comparacaoVersoes.itensAlterados.map((item) => (
-                                  <div key={item.nome} className="rounded-md border border-[#EDF3F6] bg-white p-2">
+                                  <div key={item.nome} className="rounded-md bg-white p-2 ring-1 ring-[#EDF3F6]">
                                     <p className="text-xs font-semibold text-[#19384C]">
                                       {item.nome}{' '}
                                       {item.adicionado ? '(adicionado)' : item.removido ? '(removido)' : ''}
@@ -1325,7 +1313,7 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
                   )}
                 </div>
 
-                <div className="rounded-md border border-[#E2ECF0] bg-white p-3">
+                <div className="rounded-lg bg-white p-3 ring-1 ring-[#E7EFF3]">
                   <div className="mb-2 flex items-center gap-2">
                     <Clock className="h-4 w-4 text-[#2B4C5F]" />
                     <p className="text-sm font-semibold text-[#19384C]">Historico recente</p>
@@ -1335,7 +1323,10 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
                   ) : (
                     <div className="max-h-36 space-y-2 overflow-y-auto pr-1">
                       {ultimosEventos.map((evento, index) => (
-                        <div key={`${evento.data}-${evento.evento}-${index}`} className="rounded-md border border-[#EDF3F6] p-2">
+                        <div
+                          key={`${evento.data}-${evento.evento}-${index}`}
+                          className="rounded-md bg-[#FCFDFE] p-2 ring-1 ring-[#EDF3F6]"
+                        >
                           <p className="text-xs font-medium text-[#19384C]">{formatDateTime(evento.data)}</p>
                           <p className="text-xs text-[#546E7A]">{evento.evento}</p>
                           {evento.detalhes ? <p className="text-xs text-[#607B89]">{evento.detalhes}</p> : null}
@@ -1345,317 +1336,334 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
                   )}
                 </div>
               </div>
-              </>
+              </div>
             )}
           </>
         )}
       </div>
+  );
 
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] xl:gap-6">
-          <div className="space-y-5">
-            <section className="rounded-xl border border-[#DCE7EC] bg-white p-4">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#E2ECF0] pb-3">
-                <h4 className="text-lg font-semibold text-[#19384C]">Informacoes do cliente</h4>
-                <span className="rounded-full bg-[#F1F7FA] px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#486572]">
-                  {proposta.cliente?.tipoPessoa === 'juridica' ? 'Pessoa juridica' : 'Pessoa fisica'}
-                </span>
-              </div>
+  const informacoesFluxoSection = (
+    <div className="space-y-5">
+      <section className="rounded-xl border border-[#DCE7EC] bg-white p-4">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#E2ECF0] pb-3">
+          <h4 className="text-lg font-semibold text-[#19384C]">Informacoes do cliente</h4>
+          <span className="rounded-full bg-[#F1F7FA] px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#486572]">
+            {proposta.cliente?.tipoPessoa === 'juridica' ? 'Pessoa juridica' : 'Pessoa fisica'}
+          </span>
+        </div>
 
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <User className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-[#19384C]">
-                      {proposta.cliente?.nome || 'Nome nao informado'}
-                    </p>
-                    {proposta.cliente?.documento ? (
-                      <p className="text-xs text-[#607B89]">Documento: {proposta.cliente.documento}</p>
-                    ) : (
-                      <p className="text-xs text-[#607B89]">Documento nao informado</p>
-                    )}
-                  </div>
-                </div>
-
-                {proposta.cliente?.email && (
-                  <div className="flex items-start gap-3">
-                    <Mail className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
-                    <span className="text-sm text-[#355166]">{proposta.cliente.email}</span>
-                  </div>
-                )}
-
-                {proposta.cliente?.telefone && (
-                  <div className="flex items-start gap-3">
-                    <Phone className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
-                    <span className="text-sm text-[#355166]">{proposta.cliente.telefone}</span>
-                  </div>
-                )}
-
-                {proposta.cliente?.endereco && (
-                  <div className="flex items-start gap-3">
-                    <MapPin className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
-                    <span className="text-sm text-[#355166]">
-                      {proposta.cliente.endereco}
-                      {proposta.cliente.cidade && `, ${proposta.cliente.cidade}`}
-                      {proposta.cliente.estado && ` - ${proposta.cliente.estado}`}
-                    </span>
-                  </div>
-                )}
-
-                {!proposta.cliente?.email &&
-                  !proposta.cliente?.telefone &&
-                  !proposta.cliente?.endereco && (
-                    <div className="rounded-lg border border-dashed border-[#DCE7EC] bg-[#FAFCFD] px-3 py-2 text-xs text-[#607B89]">
-                      Cliente sem dados complementares cadastrados neste rascunho.
-                    </div>
-                  )}
-              </div>
-            </section>
-
-            <section className="rounded-xl border border-[#DCE7EC] bg-white p-4">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#E2ECF0] pb-3">
-                <h4 className="text-lg font-semibold text-[#19384C]">Produtos / Servicos</h4>
-                {itensNegociados.length > 0 && (
-                  <span className="rounded-full bg-[#F1F7FA] px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#486572]">
-                    {itensNegociados.length} item(ns)
-                  </span>
-                )}
-              </div>
-
-              {itensNegociados.length === 0 ? (
-                loadingCiclo ? (
-                  <div className="flex items-center gap-2 text-sm text-[#607B89]">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Carregando itens negociados...
-                  </div>
-                ) : (
-                  <p className="text-sm text-[#607B89]">Nenhum item informado nesta proposta.</p>
-                )
+        <div className="space-y-3">
+          <div className="flex items-start gap-3">
+            <User className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[#19384C]">
+                {proposta.cliente?.nome || 'Nome nao informado'}
+              </p>
+              {proposta.cliente?.documento ? (
+                <p className="text-xs text-[#607B89]">Documento: {proposta.cliente.documento}</p>
               ) : (
-                <div className="space-y-3">
-                  {itensNegociados.map((item, index) => {
-                    const nomeProdutoRaw = item?.nome || 'Produto/Servico';
-                    const nomeProduto =
-                      nomeProdutoRaw.startsWith('Item ') &&
-                      item.produtoId &&
-                      nomesProdutosPorId[item.produtoId]
-                        ? nomesProdutosPorId[item.produtoId]
-                        : nomeProdutoRaw;
-                    const descricaoProduto = item?.descricao || '';
-                    const precoUnit = Number(item?.precoUnitario || 0);
-                    const quantidade = Math.max(1, Number(item?.quantidade || 0));
-                    const desconto = Number(item?.desconto || 0);
-                    const subtotal = Number(item?.subtotal || 0);
-                    const composicaoDetalhes = getComposicaoDetalhes(item);
-
-                    return (
-                      <article
-                        key={`${item.produtoId || nomeProduto}-${index}`}
-                        className="rounded-lg border border-[#E2ECF0] bg-[#FBFDFD] p-3"
-                      >
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-[#19384C]">{nomeProduto}</p>
-                            {descricaoProduto ? (
-                              <p className="mt-1 text-xs text-[#607B89]">{descricaoProduto}</p>
-                            ) : null}
-                          </div>
-                          <span className="inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[#486572] shadow-sm ring-1 ring-[#DCE7EC]">
-                            x{quantidade}
-                          </span>
-                        </div>
-
-                        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                          <div className="rounded-md bg-white px-3 py-2 ring-1 ring-[#E7EFF3]">
-                            <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Qtd</p>
-                            <p className="mt-1 text-sm font-semibold text-[#19384C]">{quantidade}</p>
-                          </div>
-                          <div className="rounded-md bg-white px-3 py-2 ring-1 ring-[#E7EFF3]">
-                            <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Unitario</p>
-                            <p className="mt-1 text-sm font-semibold text-[#19384C]">
-                              {formatCurrency(precoUnit)}
-                            </p>
-                          </div>
-                          <div className="rounded-md bg-white px-3 py-2 ring-1 ring-[#E7EFF3]">
-                            <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Desconto</p>
-                            <p className="mt-1 text-sm font-semibold text-[#19384C]">{desconto}%</p>
-                          </div>
-                          <div className="rounded-md bg-white px-3 py-2 ring-1 ring-[#E7EFF3]">
-                            <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Subtotal</p>
-                            <p className="mt-1 text-sm font-semibold text-[#159A9C]">
-                              {formatCurrency(subtotal)}
-                            </p>
-                          </div>
-                        </div>
-
-                        {composicaoDetalhes.length > 0 && (
-                          <div className="mt-3 space-y-1 rounded-md border border-[#D4E2E7] bg-white px-3 py-2">
-                            {composicaoDetalhes.map((detalhe, detalheIndex) => (
-                              <p
-                                key={`${item.produtoId || nomeProduto}-comp-${detalheIndex}`}
-                                className="text-xs text-[#35538A]"
-                              >
-                                {detalhe}
-                              </p>
-                            ))}
-                            {(item.componentesPlano?.length || 0) > 3 && (
-                              <p className="text-xs font-medium text-[#607B89]">
-                                +{(item.componentesPlano?.length || 0) - 3} componente(s)
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </article>
-                    );
-                  })}
-                </div>
+                <p className="text-xs text-[#607B89]">Documento nao informado</p>
               )}
-            </section>
-
-            {proposta.observacoes && (
-              <section className="rounded-xl border border-[#DCE7EC] bg-white p-4">
-                <h4 className="mb-3 border-b border-[#E2ECF0] pb-2 text-lg font-semibold text-[#19384C]">
-                  Observacoes
-                </h4>
-                <p className="whitespace-pre-wrap text-sm text-[#355166]">{proposta.observacoes}</p>
-              </section>
-            )}
+            </div>
           </div>
 
-          <div className="space-y-5">
-            <section className="rounded-xl border border-[#DCE7EC] bg-white p-4">
-              <h4 className="mb-4 border-b border-[#E2ECF0] pb-3 text-lg font-semibold text-[#19384C]">
-                Detalhes da proposta
-              </h4>
+          {proposta.cliente?.email && (
+            <div className="flex items-start gap-3">
+              <Mail className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
+              <span className="text-sm text-[#355166]">{proposta.cliente.email}</span>
+            </div>
+          )}
 
-              <div className="rounded-lg border border-[#E2ECF0] bg-[#FBFDFD] p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[#607B89]">
-                  O que esta sendo negociado
-                </p>
-                {itensNegociados.length > 0 ? (
-                  <>
-                    <ul className="mt-2 space-y-1.5">
-                      {itensNegociados.slice(0, 4).map((item, index) => {
-                        const nomeResolvido =
-                          item.nome.startsWith('Item ') &&
-                          item.produtoId &&
-                          nomesProdutosPorId[item.produtoId]
-                            ? nomesProdutosPorId[item.produtoId]
-                            : item.nome;
-                        const composicaoDetalhes = getComposicaoDetalhes(item);
+          {proposta.cliente?.telefone && (
+            <div className="flex items-start gap-3">
+              <Phone className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
+              <span className="text-sm text-[#355166]">{proposta.cliente.telefone}</span>
+            </div>
+          )}
 
-                        return (
-                          <li
-                            key={`${item.produtoId || item.nome}-${item.quantidade}-${index}`}
-                            className="flex items-start justify-between gap-3 text-sm"
-                          >
-                            <span className="min-w-0 text-[#19384C]">
-                              {nomeResolvido}
-                              {composicaoDetalhes.length > 0 && (
-                                <span className="mt-0.5 block text-xs text-[#35538A]">
-                                  {composicaoDetalhes[0]}
-                                  {(item.componentesPlano?.length || 0) > 1
-                                    ? ` +${(item.componentesPlano?.length || 0) - 1}`
-                                    : ''}
-                                </span>
-                              )}
-                            </span>
-                            <span className="whitespace-nowrap text-[#607B89]">
-                              x{Math.max(1, item.quantidade || 1)}
-                            </span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                    {itensNegociados.length > 4 && (
-                      <p className="mt-2 text-xs text-[#607B89]">
-                        + {itensNegociados.length - 4} item(ns)
-                      </p>
-                    )}
-                  </>
-                ) : loadingCiclo ? (
-                  <div className="mt-2 flex items-center gap-2 text-sm text-[#607B89]">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Carregando itens...
+          {proposta.cliente?.endereco && (
+            <div className="flex items-start gap-3">
+              <MapPin className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
+              <span className="text-sm text-[#355166]">
+                {proposta.cliente.endereco}
+                {proposta.cliente.cidade && `, ${proposta.cliente.cidade}`}
+                {proposta.cliente.estado && ` - ${proposta.cliente.estado}`}
+              </span>
+            </div>
+          )}
+
+          {!proposta.cliente?.email && !proposta.cliente?.telefone && !proposta.cliente?.endereco && (
+            <div className="rounded-lg border border-dashed border-[#DCE7EC] bg-[#FAFCFD] px-3 py-2 text-xs text-[#607B89]">
+              Cliente sem dados complementares cadastrados neste rascunho.
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-[#DCE7EC] bg-white p-4">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#E2ECF0] pb-3">
+          <h4 className="text-lg font-semibold text-[#19384C]">Produtos / Servicos</h4>
+          {itensNegociados.length > 0 && (
+            <span className="rounded-full bg-[#F1F7FA] px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#486572]">
+              {itensNegociados.length} item(ns)
+            </span>
+          )}
+        </div>
+
+        {itensNegociados.length === 0 ? (
+          loadingCiclo ? (
+            <div className="flex items-center gap-2 text-sm text-[#607B89]">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Carregando itens negociados...
+            </div>
+          ) : (
+            <p className="text-sm text-[#607B89]">Nenhum item informado nesta proposta.</p>
+          )
+        ) : (
+          <div className="space-y-3">
+            {itensNegociados.map((item, index) => {
+              const nomeProdutoRaw = item?.nome || 'Produto/Servico';
+              const nomeProduto =
+                nomeProdutoRaw.startsWith('Item ') && item.produtoId && nomesProdutosPorId[item.produtoId]
+                  ? nomesProdutosPorId[item.produtoId]
+                  : nomeProdutoRaw;
+              const descricaoProduto = item?.descricao || '';
+              const precoUnit = Number(item?.precoUnitario || 0);
+              const quantidade = Math.max(1, Number(item?.quantidade || 0));
+              const desconto = Number(item?.desconto || 0);
+              const subtotal = Number(item?.subtotal || 0);
+              const composicaoDetalhes = getComposicaoDetalhes(item);
+
+              return (
+                <article
+                  key={`${item.produtoId || nomeProduto}-${index}`}
+                  className="rounded-lg border border-[#E2ECF0] bg-[#FBFDFD] p-3"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-[#19384C]">{nomeProduto}</p>
+                      {descricaoProduto ? <p className="mt-1 text-xs text-[#607B89]">{descricaoProduto}</p> : null}
+                    </div>
+                    <span className="inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[#486572] shadow-sm ring-1 ring-[#DCE7EC]">
+                      x{quantidade}
+                    </span>
                   </div>
-                ) : (
-                  <p className="mt-2 text-sm text-[#355166]">
-                    {proposta.titulo || 'Proposta comercial'}
-                  </p>
-                )}
-              </div>
 
-              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="rounded-md bg-[#F8FBFC] px-3 py-2 ring-1 ring-[#E7EFF3]">
-                  <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Subtotal</p>
-                  <p className="mt-1 text-sm font-semibold text-[#19384C]">
-                    {formatCurrency(subtotalProposta)}
-                  </p>
-                </div>
-                <div className="rounded-md bg-[#F8FBFC] px-3 py-2 ring-1 ring-[#E7EFF3]">
-                  <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Desconto global</p>
-                  <p className="mt-1 text-sm font-semibold text-[#19384C]">
-                    {descontoGlobalPercentual.toFixed(2)}%
-                  </p>
-                </div>
-                <div className="rounded-md bg-[#F8FBFC] px-3 py-2 ring-1 ring-[#E7EFF3]">
-                  <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Impostos</p>
-                  <p className="mt-1 text-sm font-semibold text-[#19384C]">
-                    {impostosPercentual.toFixed(2)}%
-                  </p>
-                </div>
-                <div className="rounded-md bg-[#F2FBF8] px-3 py-2 ring-1 ring-[#D5ECE3]">
-                  <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Total</p>
-                  <p className="mt-1 text-lg font-bold text-[#159A9C]">
-                    {formatCurrency(totalProposta)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="rounded-md border border-[#E2ECF0] bg-white p-3">
-                  <div className="flex items-start gap-3">
-                    <Calendar className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
-                    <div>
-                      <p className="text-sm font-medium text-[#19384C]">
-                        Valida ate: {formatDate(proposta.dataValidade)}
+                  <div className="mt-3 grid grid-cols-2 gap-3 2xl:grid-cols-4">
+                    <div className="rounded-md bg-white px-3 py-2 ring-1 ring-[#E7EFF3]">
+                      <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Qtd</p>
+                      <p className="mt-1 break-words text-sm font-semibold text-[#19384C]">{quantidade}</p>
+                    </div>
+                    <div className="rounded-md bg-white px-3 py-2 ring-1 ring-[#E7EFF3]">
+                      <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Unitario</p>
+                      <p className="mt-1 break-words text-sm font-semibold text-[#19384C]">
+                        {formatCurrency(precoUnit)}
                       </p>
-                      <p className="text-xs text-[#607B89]">
-                        Criada em: {proposta.criadaEm ? formatDate(proposta.criadaEm) : 'N/A'}
+                    </div>
+                    <div className="rounded-md bg-white px-3 py-2 ring-1 ring-[#E7EFF3]">
+                      <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Desconto</p>
+                      <p className="mt-1 break-words text-sm font-semibold text-[#19384C]">{desconto}%</p>
+                    </div>
+                    <div className="rounded-md bg-white px-3 py-2 ring-1 ring-[#E7EFF3]">
+                      <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Subtotal</p>
+                      <p className="mt-1 break-words text-sm font-semibold text-[#159A9C]">
+                        {formatCurrency(subtotal)}
                       </p>
                     </div>
                   </div>
-                </div>
 
-                <div className="rounded-md border border-[#E2ECF0] bg-white p-3">
-                  <p className="text-[11px] uppercase tracking-wide text-[#607B89]">
-                    Forma de pagamento
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-[#19384C]">
-                    {formaPagamentoDescricao}
-                  </p>
-                  {Number.isFinite(Number(proposta.parcelas)) && Number(proposta.parcelas) > 1 && (
-                    <p className="mt-1 text-xs text-[#607B89]">
-                      Parcelas: {Number(proposta.parcelas)}x
-                    </p>
+                  {composicaoDetalhes.length > 0 && (
+                    <div className="mt-3 space-y-1 rounded-md border border-[#D4E2E7] bg-white px-3 py-2">
+                      {composicaoDetalhes.map((detalhe, detalheIndex) => (
+                        <p
+                          key={`${item.produtoId || nomeProduto}-comp-${detalheIndex}`}
+                          className="text-xs text-[#35538A]"
+                        >
+                          {detalhe}
+                        </p>
+                      ))}
+                      {(item.componentesPlano?.length || 0) > 3 && (
+                        <p className="text-xs font-medium text-[#607B89]">
+                          +{(item.componentesPlano?.length || 0) - 3} componente(s)
+                        </p>
+                      )}
+                    </div>
                   )}
-                </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
-                {typeof proposta.vendedor === 'object' ? (
-                  <div className="rounded-md border border-[#E2ECF0] bg-white p-3 sm:col-span-2">
-                    <div className="flex items-start gap-3">
-                      <Building className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
-                      <div>
-                        <p className="text-sm font-medium text-[#19384C]">{proposta.vendedor.nome}</p>
-                        <p className="text-xs text-[#607B89]">Vendedor responsavel</p>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            </section>
+      {proposta.observacoes && (
+        <section className="rounded-xl border border-[#DCE7EC] bg-white p-4">
+          <h4 className="mb-3 border-b border-[#E2ECF0] pb-2 text-lg font-semibold text-[#19384C]">
+            Observacoes
+          </h4>
+          <p className="whitespace-pre-wrap text-sm text-[#355166]">{proposta.observacoes}</p>
+        </section>
+      )}
+    </div>
+  );
+
+  const dadosComerciaisSection = (
+    <div className={`space-y-5 ${isPageMode ? 'xl:sticky xl:top-4' : ''}`}>
+      <section className="rounded-xl border border-[#DCE7EC] bg-white p-4">
+        <h4 className="mb-4 border-b border-[#E2ECF0] pb-3 text-lg font-semibold text-[#19384C]">
+          Detalhes da proposta
+        </h4>
+
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="rounded-md bg-[#F8FBFC] px-3 py-2 ring-1 ring-[#E7EFF3]">
+            <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Subtotal</p>
+            <p className="mt-1 text-sm font-semibold text-[#19384C]">{formatCurrency(subtotalProposta)}</p>
+          </div>
+          <div className="rounded-md bg-[#F8FBFC] px-3 py-2 ring-1 ring-[#E7EFF3]">
+            <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Desconto global</p>
+            <p className="mt-1 text-sm font-semibold text-[#19384C]">
+              {descontoGlobalPercentual.toFixed(2)}%
+            </p>
+          </div>
+          <div className="rounded-md bg-[#F8FBFC] px-3 py-2 ring-1 ring-[#E7EFF3]">
+            <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Impostos</p>
+            <p className="mt-1 text-sm font-semibold text-[#19384C]">{impostosPercentual.toFixed(2)}%</p>
+          </div>
+          <div className="rounded-md bg-[#F2FBF8] px-3 py-2 ring-1 ring-[#D5ECE3]">
+            <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Total</p>
+            <p className="mt-1 text-lg font-bold text-[#159A9C]">{formatCurrency(totalProposta)}</p>
           </div>
         </div>
 
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="rounded-md border border-[#E2ECF0] bg-white p-3">
+            <div className="flex items-start gap-3">
+              <Calendar className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
+              <div>
+                <p className="text-sm font-medium text-[#19384C]">
+                  Valida ate: {formatDate(proposta.dataValidade)}
+                </p>
+                <p className="text-xs text-[#607B89]">
+                  Criada em: {proposta.criadaEm ? formatDate(proposta.criadaEm) : 'N/A'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-md border border-[#E2ECF0] bg-white p-3">
+            <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Forma de pagamento</p>
+            <p className="mt-1 text-sm font-semibold text-[#19384C]">{formaPagamentoDescricao}</p>
+            {Number.isFinite(Number(proposta.parcelas)) && Number(proposta.parcelas) > 1 && (
+              <p className="mt-1 text-xs text-[#607B89]">Parcelas: {Number(proposta.parcelas)}x</p>
+            )}
+          </div>
+
+          {typeof proposta.vendedor === 'object' ? (
+            <div className="rounded-md border border-[#E2ECF0] bg-white p-3 sm:col-span-2">
+              <div className="flex items-start gap-3">
+                <Building className="mt-0.5 h-4 w-4 text-[#8BA0AA]" />
+                <div>
+                  <p className="text-sm font-medium text-[#19384C]">{proposta.vendedor.nome}</p>
+                  <p className="text-xs text-[#607B89]">Vendedor responsavel</p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </section>
+    </div>
+  );
+
+  const dadosPropostaSection = (
+    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] xl:gap-6">
+      {informacoesFluxoSection}
+      {dadosComerciaisSection}
+    </div>
+  );
+
+  const detalhesConteudo = isPageMode ? (
+    <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,0.85fr)]">
+      <div className="space-y-5">
+        {cicloSection}
+        {informacoesFluxoSection}
+      </div>
+      <div className="space-y-5">
+        {compartilharSection}
+        {dadosComerciaisSection}
+      </div>
+    </div>
+  ) : (
+    <>
+      {!isPageMode && (
+        <div className="mb-4 flex items-center justify-end">
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusColor(proposta.status)}`}>
+            {getStatusText(proposta.status)}
+          </span>
+        </div>
+      )}
+      {compartilharSection}
+      {cicloSection}
+      {dadosPropostaSection}
+    </>
+  );
+
+  if (isPageMode) {
+    return (
+      <div className="space-y-4">
+        <section className="rounded-xl border border-[#D8E5EB] bg-white p-4 sm:p-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#607B89]">
+                Detalhe da proposta
+              </p>
+              <h1 className="mt-1 text-2xl font-bold text-[#19384C]">#{proposta.numero}</h1>
+              <p className="mt-1 text-sm text-[#607B89]">{proposta.titulo || 'Proposta comercial'}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusColor(
+                  proposta.status,
+                )}`}
+              >
+                {getStatusText(proposta.status)}
+              </span>
+              <button
+                type="button"
+                onClick={handleAtualizarPagina}
+                className="inline-flex h-9 items-center rounded-md border border-[#C8DAE2] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F1F7FA]"
+              >
+                Atualizar
+              </button>
+              {onClose && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="inline-flex h-9 items-center rounded-md bg-[#159A9C] px-3 text-sm font-medium text-white transition hover:bg-[#0F7B7D]"
+                >
+                  Voltar
+                </button>
+              )}
+            </div>
+          </div>
+        </section>
+        {detalhesConteudo}
+        </div>
+    );
+  }
+
+  return (
+    <BaseModal
+      isOpen={isOpen}
+      onClose={onClose || (() => {})}
+      title={`Proposta #${proposta.numero}`}
+      subtitle={proposta.titulo || 'Proposta comercial'}
+      size="large"
+      footer={footerContent}
+      contentClassName="p-3 sm:p-4"
+      className="max-h-[78vh] sm:max-h-[82vh] max-w-[58rem]"
+    >
+      {detalhesConteudo}
     </BaseModal>
   );
 };
