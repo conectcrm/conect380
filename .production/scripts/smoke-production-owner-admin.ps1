@@ -142,6 +142,12 @@ function Invoke-JsonRequest {
     Headers = @{}
   }
 
+  $invokeWebRequestCommand = Get-Command Invoke-WebRequest -ErrorAction SilentlyContinue
+  if ($null -ne $invokeWebRequestCommand -and $invokeWebRequestCommand.Parameters.ContainsKey('SkipHttpErrorCheck')) {
+    # Em pwsh (GitHub Actions), evita excecao para 4xx/5xx e permite validar status esperado no fluxo abaixo.
+    $requestParams.SkipHttpErrorCheck = $true
+  }
+
   if ($Headers) {
     $requestParams.Headers = $Headers
   }
@@ -175,16 +181,32 @@ function Invoke-JsonRequest {
       RawBody = $response.Content
     }
   }
-  catch [System.Net.WebException] {
+  catch {
     $httpResponse = $_.Exception.Response
     if ($null -eq $httpResponse) {
       throw
     }
 
     $statusCode = [int]$httpResponse.StatusCode
-    $streamReader = New-Object System.IO.StreamReader($httpResponse.GetResponseStream())
-    $rawBody = $streamReader.ReadToEnd()
-    $streamReader.Close()
+
+    $rawBody = ''
+    if ($null -ne $httpResponse -and $httpResponse.PSObject.Properties.Name -contains 'Content') {
+      try {
+        $rawBody = [string]$httpResponse.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+      }
+      catch {
+        $rawBody = ''
+      }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($rawBody) -and $null -ne $httpResponse.PSObject.Methods['GetResponseStream']) {
+      $responseStream = $httpResponse.GetResponseStream()
+      if ($null -ne $responseStream) {
+        $streamReader = New-Object System.IO.StreamReader($responseStream)
+        $rawBody = $streamReader.ReadToEnd()
+        $streamReader.Close()
+      }
+    }
 
     if ($ExpectedStatusCodes -notcontains $statusCode) {
       throw "Status inesperado em ${Url}: $statusCode (esperado: $($ExpectedStatusCodes -join ', ')). Body: $rawBody"
