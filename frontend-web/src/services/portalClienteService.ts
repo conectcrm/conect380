@@ -292,7 +292,44 @@ class PortalClienteService {
   }
 
   /**
-   * Gera dados mock para desenvolvimento quando a API não está disponível
+   * Baixa o PDF da proposta pelo endpoint publico do portal (sem exigir login)
+   */
+  async baixarPdfPublico(token: string, tipo: 'comercial' | 'simples' = 'comercial'): Promise<Blob> {
+    const endpoint = `${API_BASE_URL}/api/portal/proposta/${encodeURIComponent(token)}/pdf?tipo=${encodeURIComponent(tipo)}`;
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/pdf',
+      },
+    });
+
+    if (!response.ok) {
+      let mensagemErro = 'Nao foi possivel baixar o PDF da proposta.';
+
+      try {
+        const payload = await response.json();
+        if (typeof payload?.error === 'string' && payload.error.trim()) {
+          mensagemErro = payload.error;
+        } else if (typeof payload?.message === 'string' && payload.message.trim()) {
+          mensagemErro = payload.message;
+        }
+      } catch {
+        // Ignorar erro de parse e manter mensagem padrao
+      }
+
+      throw new Error(mensagemErro);
+    }
+
+    const blob = await response.blob();
+    if (blob.size === 0) {
+      throw new Error('PDF vazio retornado pelo servidor.');
+    }
+
+    return blob;
+  }
+
+  /**
+   * Gera dados mock para desenvolvimento quando a API nao esta disponivel
    */
   private obterPropostaMock(identificador: string): PropostaPublica | null {
     // Simular dados baseados no identificador

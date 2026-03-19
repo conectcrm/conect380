@@ -17,7 +17,6 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { portalClienteService, type PropostaPublica } from '../../services/portalClienteService';
-import { pdfPropostasService } from '../../services/pdfPropostasService';
 import { formatarTokenParaExibicao } from '../../utils/tokenUtils';
 import { StatusSyncIndicator } from './components/StatusSyncIndicator';
 import { API_BASE_URL } from '../../services/api';
@@ -326,57 +325,23 @@ const PortalClienteProposta: React.FC = () => {
   };
 
   const handleDownloadPDF = async () => {
-    if (!proposta) return;
+    if (!proposta || !tokenParaAceite) return;
 
     try {
-      const dadosPdf = {
-        numeroProposta: proposta.numero,
-        titulo: proposta.titulo || `Proposta ${proposta.numero}`,
-        descricao: proposta.condicoes.observacoes || '',
-        dataEmissao: new Date(proposta.dataEnvio).toISOString().split('T')[0],
-        dataValidade: new Date(proposta.dataValidade).toISOString().split('T')[0],
-        empresa: {
-          nome: proposta.empresa.nome,
-          endereco: proposta.empresa.endereco,
-          telefone: proposta.empresa.telefone,
-          email: proposta.empresa.email,
-          logo: proposta.empresa.logo,
-        },
-        cliente: {
-          nome: proposta.cliente.nome,
-          email: proposta.cliente.email || '',
-        },
-        vendedor: {
-          nome: proposta.vendedor.nome,
-          email: proposta.vendedor.email || '',
-          telefone: proposta.vendedor.telefone || '',
-        },
-        itens: proposta.produtos.map((produto) => ({
-          nome: produto.nome,
-          descricao: produto.descricao,
-          quantidade: Number(produto.quantidade || 0),
-          valorUnitario: Number(produto.valorUnitario || 0),
-          desconto: Number(produto.desconto || 0),
-          valorTotal: Number(produto.valorTotal || 0),
-        })),
-        subtotal: Number(proposta.subtotal || 0),
-        descontoGeral: Number(proposta.descontoGlobal || 0),
-        percentualDesconto: Number(proposta.descontoGlobal || 0),
-        impostos: Number(proposta.impostos || 0),
-        valorTotal: Number(proposta.total || proposta.valorTotal || 0),
-        formaPagamento: proposta.condicoes.formaPagamento || 'A combinar',
-        prazoEntrega: proposta.condicoes.prazoEntrega || 'A combinar',
-        garantia: proposta.condicoes.garantia || '',
-        validadeProposta: `${calcularDiasRestantes()} dias`,
-        condicoesGerais: proposta.condicoes.observacoes ? [proposta.condicoes.observacoes] : [],
-        observacoes: proposta.condicoes.observacoes || '',
-      };
-
-      await pdfPropostasService.downloadPdf('comercial', dadosPdf);
-      await registrarAcao('download_pdf', { propostaNumero: proposta.numero });
+      const pdfBlob = await portalClienteService.baixarPdfPublico(tokenParaAceite, 'comercial');
+      const fileUrl = window.URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = fileUrl;
+      link.download = `proposta-${proposta.numero || 'portal'}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(fileUrl);
     } catch (error) {
       console.error('Erro ao baixar PDF:', error);
-      setErro('Erro ao gerar PDF. Tente novamente.');
+      const message =
+        error instanceof Error && error.message ? error.message : 'Erro ao gerar PDF. Tente novamente.';
+      setErro(message);
     }
   };
 
