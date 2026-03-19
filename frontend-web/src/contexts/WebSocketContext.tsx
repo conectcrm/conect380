@@ -16,6 +16,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useRe
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 import { resolveSocketBaseUrl } from '../utils/network';
+import { apiPublic } from '../services/api';
 
 interface WebSocketContextData {
   connected: boolean;
@@ -54,6 +55,28 @@ const TOKEN_STORAGE_KEY = 'authToken';
 const AUTH_TOKEN_EVENT_NAME = 'authTokenChanged';
 const EMPRESA_EVENT_NAME = 'empresaAtivaChanged';
 const DEBUG = process.env.REACT_APP_DEBUG_WS === 'true';
+
+const parseJwtExpMs = (token: string | null): number | null => {
+  if (!token) return null;
+
+  try {
+    const payloadBase64 = token.split('.')[1];
+    if (!payloadBase64) return null;
+    const normalized = payloadBase64.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+    const payload = JSON.parse(atob(padded));
+    if (!payload?.exp || typeof payload.exp !== 'number') return null;
+    return payload.exp * 1000;
+  } catch {
+    return null;
+  }
+};
+
+const tokenExpirado = (token: string | null, margemSegundos = 5): boolean => {
+  const expMs = parseJwtExpMs(token);
+  if (!expMs) return false;
+  return Date.now() + margemSegundos * 1000 >= expMs;
+};
 
 // x SINGLETON: Garantir apenas 1 instância WebSocket
 let globalSocket: Socket | null = null;
@@ -113,6 +136,45 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
         reconnectionDelayMax: 10000,
         timeout: 10000,
       });
+      let authExpiradaNotificada = false;
+      let refreshEmAndamento = false;
+
+      const renovarTokenEReconectar = async () => {
+        if (refreshEmAndamento) return;
+        refreshEmAndamento = true;
+
+        try {
+          const refreshToken = localStorage.getItem('refreshToken');
+          if (!refreshToken) throw new Error('Refresh token ausente');
+
+          const refreshResponse = await apiPublic.post('/auth/refresh', { refreshToken });
+          const success = refreshResponse.data?.success === true;
+          const newToken = refreshResponse.data?.data?.access_token;
+          const newRefreshToken = refreshResponse.data?.data?.refresh_token;
+
+          if (!success || !newToken || !newRefreshToken) {
+            throw new Error('Resposta invalida do refresh');
+          }
+
+          localStorage.setItem('authToken', newToken);
+          localStorage.setItem('refreshToken', newRefreshToken);
+          window.dispatchEvent(new CustomEvent(AUTH_TOKEN_EVENT_NAME));
+
+          authExpiradaNotificada = false;
+          socket.auth = { token: newToken } as any;
+
+          if (!socket.connected) {
+            socket.connect();
+          }
+        } catch (refreshError) {
+          console.error('❌ [WebSocketContext] Falha ao renovar token do WebSocket:', refreshError);
+          setError('Sessao expirada. Faca login novamente.');
+          socket.io.opts.reconnection = false;
+          socket.disconnect();
+        } finally {
+          refreshEmAndamento = false;
+        }
+      };
 
       // Event: connect
       socket.on('connect', () => {
@@ -129,6 +191,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
         setConnecting(false);
 
         if (reason === 'io server disconnect') {
+          const tokenAtual = localStorage.getItem(TOKEN_STORAGE_KEY);
+          if (authExpiradaNotificada || tokenExpirado(tokenAtual)) {
+            void renovarTokenEReconectar();
+            return;
+          }
+
           // Servidor forçou desconexão, reconectar
           setTimeout(() => socket.connect(), 1000);
         }
@@ -137,9 +205,25 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
       // Event: connect_error
       socket.on('connect_error', (err) => {
         console.error('R [WebSocketContext] Erro de conexão:', err.message);
-        setError(err.message);
+        if (err.message.includes('jwt expired') || err.message.includes('TokenExpiredError')) {
+          authExpiradaNotificada = true;
+          void renovarTokenEReconectar();
+        } else {
+          setError(err.message);
+        }
         setConnected(false);
         setConnecting(false);
+      });
+
+      socket.on('auth:token-expired', () => {
+        authExpiradaNotificada = true;
+        void renovarTokenEReconectar();
+      });
+
+      socket.on('auth:token-invalid', () => {
+        setError('Token invalido para o WebSocket. Faca login novamente.');
+        socket.io.opts.reconnection = false;
+        socket.disconnect();
       });
 
       // Event: error

@@ -122,7 +122,7 @@ const FLOW_STATUS_TRANSITIONS: Record<SalesFlowStatus, readonly SalesFlowStatus[
   rascunho: ['enviada', 'rejeitada', 'expirada'],
   enviada: ['visualizada', 'negociacao', 'aprovada', 'rejeitada', 'expirada'],
   visualizada: ['negociacao', 'aprovada', 'rejeitada', 'expirada'],
-  negociacao: ['aprovada', 'rejeitada', 'expirada', 'visualizada'],
+  negociacao: ['enviada', 'aprovada', 'rejeitada', 'expirada', 'visualizada'],
   aprovada: ['contrato_gerado', 'contrato_assinado', 'fatura_criada', 'rejeitada'],
   contrato_gerado: ['contrato_assinado'],
   contrato_assinado: ['fatura_criada'],
@@ -3893,7 +3893,14 @@ export class PropostasService {
         'Atualizacao de dados da proposta',
       ) as any;
 
-      const propostaAtualizada = await this.propostaRepository.save(proposta);
+      const fluxoStatusPersistencia: SalesFlowStatus =
+        this.extractFlowStatusFromEmailDetails(proposta.emailDetails) ||
+        this.mapDatabaseStatusToFlowStatus(proposta.status);
+
+      const propostaAtualizada = await this.savePropostaWithStatusFallback(
+        proposta,
+        fluxoStatusPersistencia,
+      );
       this.logger.log(`Proposta atualizada: ${propostaAtualizada.id}`);
       await this.syncOportunidadeFromPropostaPrincipal(propostaAtualizada.id, empresaId);
       const [propostaHidratada] = await this.hydratePropostasOpportunityContext(

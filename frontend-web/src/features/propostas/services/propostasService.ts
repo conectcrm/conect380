@@ -3,6 +3,7 @@ import {
   Proposta as PropostaBasica,
 } from '../../../services/propostasService';
 import { authService } from '../../../services/authService';
+import { extrairItensComerciaisDaProposta } from '../utils/propostaItens';
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -569,11 +570,33 @@ class PropostasService {
   }
 
   private mapProdutos(proposta: PropostaBasica): ProdutoProposta[] {
-    if (!Array.isArray(proposta.produtos)) {
+    const propostaAny = proposta as any;
+    const produtosOriginais = extrairItensComerciaisDaProposta(propostaAny);
+
+    if (!Array.isArray(produtosOriginais) || produtosOriginais.length === 0) {
       return [];
     }
 
-    return proposta.produtos.map((produto: any) => {
+    return produtosOriginais.map((produto: any, index: number) => {
+      if (!produto || typeof produto !== 'object') {
+        return {
+          produto: {
+            id: `prod_${Date.now()}_${index}`,
+            nome: 'Produto',
+            preco: 0,
+            categoria: 'Geral',
+            unidade: 'unidade',
+            descricao: '',
+            tipo: 'produto',
+            status: 'ativo',
+            tipoItem: 'produto',
+          },
+          quantidade: 1,
+          desconto: 0,
+          subtotal: 0,
+        };
+      }
+
       const nestedProduto =
         produto?.produto && typeof produto.produto === 'object' ? produto.produto : null;
       const quantidadeRaw = Number(produto?.quantidade ?? nestedProduto?.quantidade ?? 1);
@@ -581,6 +604,7 @@ class PropostasService {
         Number.isFinite(quantidadeRaw) && quantidadeRaw > 0 ? quantidadeRaw : 1;
       const precoUnitarioRaw = Number(
         produto?.precoUnitario ??
+          produto?.valorUnitario ??
           produto?.preco ??
           nestedProduto?.precoUnitario ??
           nestedProduto?.preco ??
@@ -630,16 +654,28 @@ class PropostasService {
 
       return {
         produto: {
-          id: produto?.id || produto?.produtoId || nestedProduto?.id || `prod_${Date.now()}`,
+          id:
+            produto?.id ||
+            produto?.produtoId ||
+            produto?.itemId ||
+            nestedProduto?.id ||
+            `prod_${Date.now()}_${index}`,
           nome: produto?.nome || produto?.produtoNome || nestedProduto?.nome || 'Produto',
           preco: precoUnitario,
           categoria: produto?.categoria || nestedProduto?.categoria || 'Geral',
+          subcategoria: produto?.subcategoria || nestedProduto?.subcategoria || undefined,
+          tipo:
+            produto?.tipo === 'combo' || nestedProduto?.tipo === 'combo' ? 'combo' : 'produto',
           unidade: produto?.unidade || nestedProduto?.unidade || 'unidade',
           descricao: produto?.descricao || nestedProduto?.descricao || '',
-          tipo: 'produto',
           status: produto?.status || nestedProduto?.status || 'ativo',
           tipoItem,
           componentes,
+          produtosCombo: Array.isArray(produto?.produtosCombo)
+            ? produto.produtosCombo
+            : Array.isArray(nestedProduto?.produtosCombo)
+              ? nestedProduto.produtosCombo
+              : undefined,
         },
         quantidade,
         desconto: Number.isFinite(desconto) ? desconto : 0,
@@ -708,16 +744,33 @@ class PropostasService {
       (acumulado, item) => acumulado + this.toFiniteNumber(item?.subtotal, 0),
       0,
     );
-    const descontoGlobal = this.toFiniteNumber(propostaAny.descontoGlobal, 0);
-    const impostos = this.toFiniteNumber(propostaAny.impostos, 0);
-    const subtotalInformado = this.toFiniteNumber(propostaAny.subtotal, Number.NaN);
+    const descontoGlobal = this.toFiniteNumber(
+      propostaAny.descontoGlobal ?? propostaAny.desconto_global,
+      0,
+    );
+    const impostos = this.toFiniteNumber(
+      propostaAny.impostos ?? propostaAny.imposto ?? propostaAny.taxaImpostos,
+      0,
+    );
+    const subtotalInformado = this.toFiniteNumber(
+      propostaAny.subtotal ?? propostaAny.valorSubtotal,
+      Number.NaN,
+    );
     const subtotal = Number.isFinite(subtotalInformado) ? subtotalInformado : subtotalItens;
-    const totalInformado = this.toFiniteNumber(propostaAny.total ?? propostaAny.valor, Number.NaN);
+    const totalInformado = this.toFiniteNumber(
+      propostaAny.total ?? propostaAny.valor ?? propostaAny.valorTotal,
+      Number.NaN,
+    );
     const descontoPercentual = Math.min(100, Math.max(0, descontoGlobal));
     const impostosPercentual = Math.min(100, Math.max(0, impostos));
     const subtotalComDesconto = subtotal * (1 - descontoPercentual / 100);
     const totalCalculado = subtotalComDesconto * (1 + impostosPercentual / 100);
     const total = Number.isFinite(totalInformado) ? totalInformado : totalCalculado;
+    const parcelasRaw =
+      propostaAny.parcelas ?? propostaAny.qtdParcelas ?? propostaAny.qtd_parcelas;
+    const validadeDiasRaw = Number(propostaAny.validadeDias ?? propostaAny.validade_dias ?? 30);
+    const validadeDias =
+      Number.isFinite(validadeDiasRaw) && validadeDiasRaw > 0 ? validadeDiasRaw : 30;
 
     return {
       id: propostaAny.id,
@@ -739,19 +792,23 @@ class PropostasService {
       produtos,
       descontoGlobal,
       impostos,
-      formaPagamento: (propostaAny.formaPagamento as any) || 'avista',
+      formaPagamento:
+        (propostaAny.formaPagamento as any) ||
+        (propostaAny.forma_pagamento as any) ||
+        'avista',
       parcelas:
-        propostaAny.parcelas != null && propostaAny.parcelas !== ''
-          ? Number(propostaAny.parcelas)
+        parcelasRaw != null && parcelasRaw !== ''
+          ? Number(parcelasRaw)
           : undefined,
-      validadeDias: propostaAny.validadeDias ?? 30,
-      observacoes: propostaAny.observacoes || '',
-      incluirImpostosPDF: Boolean(propostaAny.incluirImpostosPDF),
+      validadeDias,
+      observacoes: propostaAny.observacoes || propostaAny.descricao || '',
+      incluirImpostosPDF:
+        propostaAny.incluirImpostosPDF ?? propostaAny.incluir_impostos_pdf ?? true,
       subtotal,
       total,
       dataValidade: propostaAny.dataVencimento
         ? new Date(propostaAny.dataVencimento)
-        : new Date(Date.now() + (propostaAny.validadeDias ?? 30) * 24 * 60 * 60 * 1000),
+        : new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000),
       aprovacaoInterna: propostaAny.aprovacaoInterna || propostaAny.emailDetails?.aprovacaoInterna,
       lembretes: Array.isArray(propostaAny.lembretes)
         ? propostaAny.lembretes
@@ -773,6 +830,10 @@ class PropostasService {
       atualizadaEm:
         atualizadaEmDate && Number.isFinite(atualizadaEmDate.getTime())
           ? atualizadaEmDate
+          : undefined,
+      tokenPortal:
+        typeof propostaAny.tokenPortal === 'string' && propostaAny.tokenPortal.trim()
+          ? propostaAny.tokenPortal.trim()
           : undefined,
     };
   }

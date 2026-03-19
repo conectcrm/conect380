@@ -590,7 +590,7 @@ const PortalClienteProposta: React.FC = () => {
     Number.isFinite(divergenciaSubtotal) &&
     Math.abs(divergenciaSubtotal) > 0.01;
 
-  const statusesComAceite = new Set(['enviada', 'visualizada', 'negociacao']);
+  const statusesComAceite = new Set(['enviada', 'visualizada']);
   const podeAceitar = statusesComAceite.has(String(proposta.status || '').toLowerCase()) && diasRestantes > 0;
   const negociacaoAtiva = String(proposta.status || '').toLowerCase() === 'negociacao';
 

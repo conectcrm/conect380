@@ -850,12 +850,32 @@ const PropostasPage: React.FC = () => {
           return;
         }
 
-        setSelectedPropostaForEdit(propostaCompleta);
-        setWizardContextMessage(
-          options?.fromPipeline && !propostaPossuiItensComerciais(propostaCompleta)
+        const itensComerciais = extrairItensComerciaisDaProposta(propostaCompleta as any);
+        const possuiProdutosNormalizados =
+          Array.isArray(propostaCompleta.produtos) && propostaCompleta.produtos.length > 0;
+        const propostaParaEdicao =
+          !possuiProdutosNormalizados &&
+          Array.isArray(itensComerciais) &&
+          itensComerciais.length > 0
+            ? ({
+                ...propostaCompleta,
+                produtos: itensComerciais as any,
+              } as PropostaCompletaFeature)
+            : propostaCompleta;
+        const statusAtual = String(propostaParaEdicao.status || '')
+          .trim()
+          .toLowerCase();
+        const mensagemPipeline =
+          options?.fromPipeline && !propostaPossuiItensComerciais(propostaParaEdicao)
             ? `Rascunho criado a partir da oportunidade. Este rascunho ainda nao possui itens comerciais. ${MENSAGEM_PROPOSTA_SEM_ITENS}`
-            : null,
-        );
+            : null;
+        const mensagemNegociacao =
+          statusAtual === 'negociacao'
+            ? 'Modo negociacao: ajuste os itens solicitados pelo cliente e reenviar proposta quando finalizar.'
+            : null;
+
+        setSelectedPropostaForEdit(propostaParaEdicao);
+        setWizardContextMessage(mensagemPipeline || mensagemNegociacao);
         setShowWizardModal(true);
       } catch (error) {
         console.error('Erro ao preparar edicao da proposta:', error);

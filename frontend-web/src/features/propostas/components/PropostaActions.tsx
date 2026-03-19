@@ -746,7 +746,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const oportunidadeVinculada = (proposta as any)?.oportunidade;
   const ehPropostaPrincipal = Boolean((proposta as any)?.isPropostaPrincipal);
   const podeDefinirComoPrincipal = Boolean(oportunidadeVinculada?.id) && !ehPropostaPrincipal;
-  const editavelComoRascunho = statusFluxoAtual === 'rascunho';
+  const editavelNoFluxo = ['rascunho', 'negociacao'].includes(statusFluxoAtual);
   const statusEncerradoSemAcoesComerciais = ['rejeitada', 'expirada', 'pago'].includes(
     statusFluxoAtual,
   );
@@ -2078,66 +2078,22 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
           break;
 
         case 'negociacao': {
-          const aprovar = await confirm({
-            title: 'Encerrar negociacao da proposta',
+          const confirmarReenvio = await confirm({
+            title: 'Reenviar proposta ao cliente',
             message:
-              'Confirme para aprovar a proposta agora. Se preferir rejeitar, use cancelar e confirme a rejeicao na etapa seguinte.',
-            confirmText: 'Aprovar proposta',
-            cancelText: 'Rejeitar proposta',
+              'Esta acao envia novamente a proposta atualizada para o cliente por e-mail. Se precisar revisar algo antes, use o botao "Editar".',
+            confirmText: 'Reenviar agora',
+            cancelText: 'Cancelar',
             icon: 'info',
             confirmButtonClass: 'bg-[#159A9C] hover:bg-[#0F7B7D] focus:ring-[#159A9C]',
           });
 
-          if (aprovar) {
-            if (await bloquearAcaoSemItens('Aprovacao bloqueada')) {
-              return;
-            }
-            await sincronizarStatusProposta('aprovada', {
-              source: 'fluxo-avanco',
-              observacoes: 'Proposta aprovada durante o fluxo de negociacao.',
-            });
-            toastService.success('Proposta marcada como aprovada.');
-            onPropostaUpdated?.();
+          if (!confirmarReenvio) {
+            toastService.info('Reenvio cancelado.');
             break;
           }
 
-          const confirmarRejeicao = await confirm({
-            title: 'Confirmar rejeicao da proposta',
-            message: 'A proposta sera marcada como rejeitada. Deseja continuar?',
-            confirmText: 'Sim, rejeitar',
-            cancelText: 'Voltar',
-            icon: 'warning',
-            confirmButtonClass: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
-          });
-
-          if (!confirmarRejeicao) {
-            toastService.info('Negociacao mantida sem alteracoes.');
-            break;
-          }
-
-          const motivoPerda = await askForInput({
-            title: 'Registrar motivo da perda',
-            message: 'Se quiser, descreva o motivo da rejeicao para manter o historico comercial mais completo.',
-            placeholder: 'Cliente optou por outra proposta',
-            confirmText: 'Rejeitar proposta',
-            cancelText: 'Cancelar',
-            defaultValue: 'Cliente optou por outra proposta',
-            multiline: true,
-            confirmVariant: 'danger',
-          });
-
-          if (motivoPerda === null) {
-            toastService.info('Rejeicao cancelada.');
-            break;
-          }
-
-          await sincronizarStatusProposta('rejeitada', {
-            source: 'fluxo-avanco',
-            motivoPerda: motivoPerda || undefined,
-            observacoes: 'Proposta rejeitada durante o fluxo de negociacao.',
-          });
-          toastService.success('Proposta marcada como rejeitada.');
-          onPropostaUpdated?.();
+          await handleSendEmail();
           break;
         }
 
@@ -2693,8 +2649,8 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         };
       case 'negociacao':
         return {
-          label: 'Decidir negociacao',
-          title: 'Aprovar ou rejeitar a proposta para encerrar a negociacao',
+          label: 'Reenviar proposta',
+          title: 'Reenviar proposta atualizada por email ao cliente',
         };
       case 'aprovada':
         return {
@@ -2734,12 +2690,12 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
   return (
     <div className={`flex items-center space-x-1 ${className}`}>
-      {exibirAcoesFluxo && onEditProposta && editavelComoRascunho && (
+      {exibirAcoesFluxo && onEditProposta && editavelNoFluxo && (
         <button
           type="button"
           onClick={() => onEditProposta(proposta)}
           className={`${buttonClass} ${buttonThemeClass.neutral}`}
-          title="Editar rascunho"
+          title={statusFluxoAtual === 'negociacao' ? 'Editar proposta em negociacao' : 'Editar rascunho'}
         >
           <Pencil className="w-4 h-4" />
           {showLabels && <span>Editar</span>}
