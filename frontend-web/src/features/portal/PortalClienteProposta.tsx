@@ -10,6 +10,7 @@ import {
   XCircle,
   Download,
   FileText,
+  MessageSquare,
   Building,
   Package,
   Shield,
@@ -43,6 +44,9 @@ const PortalClienteProposta: React.FC = () => {
   const [erro, setErro] = useState<string | null>(null);
   const [aceiteRealizado, setAceiteRealizado] = useState(false);
   const [showConfirmReject, setShowConfirmReject] = useState(false);
+  const [showSolicitarAjustes, setShowSolicitarAjustes] = useState(false);
+  const [motivoAjustes, setMotivoAjustes] = useState('');
+  const [processandoNegociacao, setProcessandoNegociacao] = useState(false);
   const [tempoVisualizacao, setTempoVisualizacao] = useState<number>(0);
 
   useEffect(() => {
@@ -297,6 +301,50 @@ const PortalClienteProposta: React.FC = () => {
     setShowConfirmReject(true);
   };
 
+  const handleSolicitarAjustes = async () => {
+    if (!proposta || !tokenParaAceite) return;
+
+    await registrarAcao('negociacao_iniciada', {
+      statusAtual: proposta.status,
+      valorProposta: proposta.valorTotal,
+      tempoVisualizacao: tempoVisualizacao,
+    });
+
+    setMotivoAjustes('');
+    setShowSolicitarAjustes(true);
+  };
+
+  const confirmarSolicitacaoAjustes = async () => {
+    if (!proposta || !tokenParaAceite) return;
+
+    const motivoNormalizado = motivoAjustes.trim();
+    if (motivoNormalizado.length < 8) {
+      setErro('Descreva com mais detalhes o ajuste desejado (minimo de 8 caracteres).');
+      return;
+    }
+
+    try {
+      setProcessandoNegociacao(true);
+      setErro(null);
+
+      await portalClienteService.atualizarStatus(tokenParaAceite, 'negociacao', motivoNormalizado);
+
+      await registrarAcao('negociacao_solicitada', {
+        novoStatus: 'negociacao',
+        motivoAjustes: motivoNormalizado,
+      });
+
+      setProposta((prev) => (prev ? { ...prev, status: 'negociacao' } : null));
+      setShowSolicitarAjustes(false);
+      setMotivoAjustes('');
+    } catch (error) {
+      console.error('Erro ao solicitar ajustes:', error);
+      setErro('Nao foi possivel registrar a solicitacao de ajustes. Tente novamente.');
+    } finally {
+      setProcessandoNegociacao(false);
+    }
+  };
+
   const confirmarRejeicao = async () => {
     if (!proposta || !tokenParaAceite) return;
 
@@ -544,6 +592,7 @@ const PortalClienteProposta: React.FC = () => {
 
   const statusesComAceite = new Set(['enviada', 'visualizada', 'negociacao']);
   const podeAceitar = statusesComAceite.has(String(proposta.status || '').toLowerCase()) && diasRestantes > 0;
+  const negociacaoAtiva = String(proposta.status || '').toLowerCase() === 'negociacao';
 
   const primaryColor = resolvedPrimaryColor;
   const primaryTintSoft = colorWithAlpha(primaryColor, 0.1);
@@ -808,6 +857,19 @@ const PortalClienteProposta: React.FC = () => {
                     </button>
 
                     <button
+                      onClick={handleSolicitarAjustes}
+                      disabled={processandoNegociacao}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#B45309] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#92400E] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {processandoNegociacao ? (
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      ) : (
+                        <MessageSquare className="h-4 w-4" />
+                      )}
+                      {processandoNegociacao ? 'Processando...' : 'Solicitar ajustes'}
+                    </button>
+
+                    <button
                       onClick={handleRejeitarProposta}
                       className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#DC2626] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#B91C1C]"
                     >
@@ -815,6 +877,12 @@ const PortalClienteProposta: React.FC = () => {
                       Rejeitar proposta
                     </button>
                   </>
+                )}
+
+                {negociacaoAtiva && (
+                  <div className="rounded-lg border border-[#FDE68A] bg-[#FFFBEB] p-3 text-sm text-[#92400E]">
+                    Sua solicitacao de ajustes foi registrada. Nosso time comercial vai retornar com uma nova proposta.
+                  </div>
                 )}
 
                 {proposta.status === 'expirada' && (
@@ -934,6 +1002,55 @@ const PortalClienteProposta: React.FC = () => {
           </aside>
         </div>
       </main>
+
+      {showSolicitarAjustes && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B1A2B]/55 p-4">
+          <div className="w-full max-w-lg rounded-[18px] border border-[#F7C78A] bg-white p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold text-[#19384C]">Solicitar ajustes</h3>
+            <p className="mt-2 text-sm text-[#607B89]">
+              Descreva o que voce gostaria de ajustar nesta proposta para nosso time comercial revisar.
+            </p>
+
+            <div className="mt-4">
+              <label htmlFor="motivo-ajustes" className="mb-2 block text-sm font-medium text-[#355166]">
+                Motivo dos ajustes
+              </label>
+              <textarea
+                id="motivo-ajustes"
+                value={motivoAjustes}
+                onChange={(event) => setMotivoAjustes(event.target.value)}
+                rows={5}
+                maxLength={600}
+                className="w-full rounded-lg border border-[#D4E2E7] px-3 py-2 text-sm text-[#19384C] outline-none transition focus:border-[#B45309] focus:ring-2 focus:ring-[#FDE68A]"
+                placeholder="Ex.: preciso de ajuste de prazo, condicao de pagamento ou composicao dos itens..."
+              />
+              <p className="mt-1 text-right text-xs text-[#607B89]">{motivoAjustes.length}/600</p>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  if (!processandoNegociacao) {
+                    setShowSolicitarAjustes(false);
+                    setMotivoAjustes('');
+                  }
+                }}
+                disabled={processandoNegociacao}
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-[#D4E2E7] px-4 text-sm font-medium text-[#355166] transition hover:bg-[#F4F8FA] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarSolicitacaoAjustes}
+                disabled={processandoNegociacao}
+                className="inline-flex h-10 items-center justify-center rounded-lg bg-[#B45309] px-4 text-sm font-semibold text-white transition hover:bg-[#92400E] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {processandoNegociacao ? 'Enviando...' : 'Enviar solicitacao'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showConfirmReject && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B1A2B]/55 p-4">

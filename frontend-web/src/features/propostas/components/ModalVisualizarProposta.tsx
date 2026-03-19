@@ -20,6 +20,7 @@ import {
   Clock,
   Eye,
   History,
+  MessageSquare,
 } from 'lucide-react';
 
 interface ModalVisualizarPropostaProps {
@@ -37,6 +38,12 @@ type HistoricoResposta = {
   primeiraVisualizacaoEm?: string;
   decisaoEm?: string;
   statusAtual?: string;
+  ultimoMotivoAjustes?: {
+    texto: string;
+    data: string;
+    origem?: string;
+    status?: string;
+  };
   aprovacaoInterna?: {
     obrigatoria?: boolean;
     status?: 'nao_requer' | 'pendente' | 'aprovada' | 'rejeitada' | string;
@@ -74,6 +81,9 @@ type HistoricoResposta = {
     evento: string;
     detalhes: string;
     ip?: string;
+    origem?: string;
+    status?: string;
+    metadata?: Record<string, unknown>;
   }>;
 };
 
@@ -774,6 +784,46 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
       .slice(0, 8);
   }, [historico?.log]);
 
+  const ultimoMotivoAjustes = useMemo(() => {
+    const direto = historico?.ultimoMotivoAjustes;
+    if (direto?.texto) {
+      return direto;
+    }
+
+    const eventos = [...(historico?.log || [])].sort(
+      (a, b) => new Date(b.data).getTime() - new Date(a.data).getTime(),
+    );
+
+    for (const evento of eventos) {
+      const metadata = evento?.metadata;
+      const motivoMetadata =
+        metadata && typeof metadata === 'object' && typeof metadata.motivoAjustes === 'string'
+          ? metadata.motivoAjustes.trim()
+          : '';
+      if (motivoMetadata) {
+        return {
+          texto: motivoMetadata,
+          data: evento.data,
+          origem: evento.origem,
+          status: evento.status,
+        };
+      }
+
+      const detalhes = String(evento?.detalhes || '').trim();
+      const match = detalhes.match(/motivo ajustes:\s*(.+)$/i);
+      if (match?.[1]) {
+        return {
+          texto: match[1].trim(),
+          data: evento.data,
+          origem: evento.origem,
+          status: evento.status,
+        };
+      }
+    }
+
+    return undefined;
+  }, [historico?.ultimoMotivoAjustes, historico?.log]);
+
   if (!proposta) return null;
 
   const versaoSnapshotAtual = (() => {
@@ -1082,6 +1132,18 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
                 {Number(estatisticas?.totalVisualizacoes || 0)}
               </p>
             </div>
+            {ultimoMotivoAjustes?.texto && (
+              <div className="rounded-lg border border-[#F7C78A] bg-[#FFF7EB] p-3 ring-1 ring-[#FDE7C4] sm:col-span-2">
+                <div className="mb-2 flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4 text-[#B45309]" />
+                  <p className="text-sm font-semibold text-[#92400E]">Ultimo motivo de ajuste do cliente</p>
+                </div>
+                <p className="text-xs text-[#92400E]">{ultimoMotivoAjustes.texto}</p>
+                <p className="mt-1 text-[11px] text-[#A15C1A]">
+                  Registrado em {formatDateTime(ultimoMotivoAjustes.data)}
+                </p>
+              </div>
+            )}
           </div>
         ) : (
           <>
@@ -1218,6 +1280,19 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
                   <p className="mt-1 text-xs text-[#546E7A]">Decisao comercial: {formatDateTime(historico?.decisaoEm)}</p>
                 </div>
               </div>
+
+              {ultimoMotivoAjustes?.texto && (
+                <div className="rounded-lg border border-[#F7C78A] bg-[#FFF7EB] p-3 ring-1 ring-[#FDE7C4]">
+                  <div className="mb-2 flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4 text-[#B45309]" />
+                    <p className="text-sm font-semibold text-[#92400E]">Ultimo motivo de ajuste do cliente</p>
+                  </div>
+                  <p className="text-xs text-[#92400E]">{ultimoMotivoAjustes.texto}</p>
+                  <p className="mt-1 text-[11px] text-[#A15C1A]">
+                    Registrado em {formatDateTime(ultimoMotivoAjustes.data)}
+                  </p>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="rounded-lg bg-white p-3 ring-1 ring-[#E7EFF3]">

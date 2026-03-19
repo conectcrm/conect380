@@ -20,6 +20,9 @@ interface ViewData {
   ip?: string;
   userAgent?: string;
   timestamp?: string;
+  motivoAjustes?: string;
+  detalhes?: string;
+  [key: string]: unknown;
 }
 
 interface PropostaLookup {
@@ -316,6 +319,14 @@ export class PortalService {
 
     await this.registrarAcaoPortal(token, 'status_update', { novoStatus, ...metadata }, tokenData);
 
+    const motivoAjustes =
+      typeof metadata?.motivoAjustes === 'string' && metadata.motivoAjustes.trim()
+        ? metadata.motivoAjustes.trim().slice(0, 500)
+        : '';
+    const detalhesAtualizacao = motivoAjustes
+      ? `Atualizado via portal do cliente (token: ${this.maskToken(token)}) | Motivo ajustes: ${motivoAjustes}`
+      : `Atualizado via portal do cliente (token: ${this.maskToken(token)})`;
+
     let resultado;
     if (novoStatus === 'aprovada' || novoStatus === 'rejeitada') {
       resultado = await this.propostasService.atualizarStatusComValidacao(
@@ -330,9 +341,14 @@ export class PortalService {
         tokenData.propostaId,
         novoStatus,
         'portal-cliente',
-        `Atualizado via portal do cliente (token: ${this.maskToken(token)})`,
+        detalhesAtualizacao,
         undefined,
         tokenData.empresaId,
+        {
+          motivoAjustes: motivoAjustes || undefined,
+          origemPortal: 'cliente',
+          tokenMascara: this.maskToken(token),
+        },
       );
     }
 
@@ -523,6 +539,11 @@ export class PortalService {
       switch (acao) {
         case 'visualizada':
           novoStatus = 'visualizada';
+          break;
+        case 'negociacao':
+        case 'solicitar_ajustes':
+        case 'ajustes_solicitados':
+          novoStatus = 'negociacao';
           break;
         case 'aprovada':
         case 'aceita':

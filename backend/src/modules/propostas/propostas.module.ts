@@ -16,11 +16,13 @@ import { Produto } from '../produtos/produto.entity';
 import { CatalogItem } from '../catalogo/entities/catalog-item.entity';
 import { EmpresasModule } from '../../empresas/empresas.module';
 import { OportunidadesModule } from '../oportunidades/oportunidades.module';
+import { NotificationModule } from '../../notifications/notification.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Proposta, PropostaPortalToken, User, Cliente, Produto, CatalogItem]),
     EmpresasModule,
+    NotificationModule,
     forwardRef(() => OportunidadesModule),
   ],
   providers: [PdfService, PropostasService, PortalService, EmailIntegradoService],

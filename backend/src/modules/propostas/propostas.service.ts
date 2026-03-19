@@ -5,13 +5,14 @@ import {
   Inject,
   Injectable,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { isUUID } from 'class-validator';
 import { In, Like, Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
 import { Proposta as PropostaEntity } from './proposta.entity';
-import { User } from '../users/user.entity';
+import { User, UserRole } from '../users/user.entity';
 import { Cliente } from '../clientes/cliente.entity';
 import { Produto as ProdutoEntity } from '../produtos/produto.entity';
 import { CatalogItem as CatalogItemEntity } from '../catalogo/entities/catalog-item.entity';
@@ -24,6 +25,8 @@ import {
   SalesFeatureFlagName,
 } from '../oportunidades/oportunidades.service';
 import { Permission } from '../../common/permissions/permissions.constants';
+import { NotificationService } from '../../notifications/notification.service';
+import { NotificationType } from '../../notifications/entities/notification.entity';
 
 type SalesFlowStatus =
   | 'rascunho'
@@ -297,6 +300,8 @@ export class PropostasService {
   private readonly APROVACAO_INTERNA_HABILITADA_PADRAO = true;
   private readonly MAX_HISTORICO_EVENTOS = 200;
   private readonly MAX_VERSOES = 50;
+  private readonly NEGOCIACAO_FOLLOWUP_DIAS_PADRAO = 2;
+  private readonly NEGOCIACAO_FOLLOWUP_DIAS_MAXIMO = 30;
   private readonly COMMERCIAL_POLICY_CACHE_TTL_MS = Math.max(
     0,
     Number(process.env.PROPOSTAS_COMMERCIAL_POLICY_CACHE_TTL_MS || 0),
@@ -322,6 +327,8 @@ export class PropostasService {
     private catalogItemRepository: Repository<CatalogItemEntity>,
     @Inject(forwardRef(() => OportunidadesService))
     private readonly oportunidadesService: OportunidadesService,
+    @Optional()
+    private readonly notificationService?: NotificationService,
   ) {
     // Inicializar contador baseado nas propostas existentes
     this.contadorInitPromise = this.inicializarContador();
@@ -341,6 +348,301 @@ export class PropostasService {
     }
 
     return fallbackMessage;
+  }
+
+  private sanitizeMotivoAjustes(value: unknown): string | undefined {
+    const motivo = String(value || '').trim();
+    if (!motivo) {
+      return undefined;
+    }
+
+    return motivo.slice(0, 600);
+  }
+
+  private extractMotivoAjustesFromContext(
+    observacoes?: string,
+    metadata?: Record<string, unknown>,
+  ): string | undefined {
+    const fromMetadata = this.sanitizeMotivoAjustes(metadata?.motivoAjustes);
+    if (fromMetadata) {
+      return fromMetadata;
+    }
+
+    const text = String(observacoes || '').trim();
+    if (!text) {
+      return undefined;
+    }
+
+    const match = text.match(/motivo ajustes:\s*(.+)$/i);
+    if (!match || !match[1]) {
+      return undefined;
+    }
+
+    return this.sanitizeMotivoAjustes(match[1]);
+  }
+
+  private getNegociacaoFollowupDias(): number {
+    const parsed = Number(
+      process.env.PROPOSTAS_NEGOCIACAO_FOLLOWUP_DIAS || this.NEGOCIACAO_FOLLOWUP_DIAS_PADRAO,
+    );
+    if (!Number.isFinite(parsed)) {
+      return this.NEGOCIACAO_FOLLOWUP_DIAS_PADRAO;
+    }
+
+    return Math.min(this.NEGOCIACAO_FOLLOWUP_DIAS_MAXIMO, Math.max(1, Math.floor(parsed)));
+  }
+
+  private formatDateTimePtBr(value?: string): string {
+    if (!value) {
+      return '-';
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return value;
+    }
+
+    return parsed.toLocaleString('pt-BR');
+  }
+
+  private formatCurrencyPtBr(value: unknown): string {
+    const parsed = Number(value ?? 0);
+    const safe = Number.isFinite(parsed) ? parsed : 0;
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+    }).format(safe);
+  }
+
+  private async ensureNegociacaoFollowupIfNeeded(
+    proposta: PropostaEntity,
+    source?: string,
+  ): Promise<{ created: boolean; lembrete?: PropostaLembrete }> {
+    let emailDetails = this.toObjectRecord(proposta.emailDetails);
+    const lembretes = this.getLembretes(emailDetails);
+    const hasPendingNegociacaoFollowup = lembretes.some((lembrete) => {
+      const origem = String(lembrete.origem || '').toLowerCase();
+      return lembrete.status === 'agendado' && origem.includes('followup-negociacao');
+    });
+
+    if (hasPendingNegociacaoFollowup) {
+      return { created: false };
+    }
+
+    const dias = this.getNegociacaoFollowupDias();
+    const lembrete: PropostaLembrete = {
+      id: randomUUID(),
+      status: 'agendado',
+      criadoEm: new Date().toISOString(),
+      agendadoPara: new Date(Date.now() + dias * 24 * 60 * 60 * 1000).toISOString(),
+      diasApos: dias,
+      origem: 'followup-negociacao-auto',
+      observacoes: `SLA comercial: revisar proposta em negociacao em ate ${dias} dia(s).`,
+    };
+
+    emailDetails.lembretes = [...lembretes, lembrete].slice(-this.MAX_HISTORICO_EVENTOS);
+    emailDetails = this.appendHistoricoEvento(emailDetails, 'followup_negociacao_agendado', {
+      origem: source || 'api',
+      status: 'negociacao',
+      detalhes: `Follow-up automatico de negociacao agendado para ${dias} dia(s).`,
+      metadata: {
+        lembreteId: lembrete.id,
+        agendadoPara: lembrete.agendadoPara,
+        diasApos: dias,
+      },
+    });
+
+    proposta.emailDetails = emailDetails as any;
+    await this.propostaRepository.save(proposta);
+
+    return { created: true, lembrete };
+  }
+
+  private async notifyComercialTeamOnNegociacao(input: {
+    proposta: PropostaEntity;
+    empresaId?: string;
+    source?: string;
+    actorUserId?: string;
+    motivoAjustes?: string;
+    followup?: { created: boolean; lembrete?: PropostaLembrete };
+  }): Promise<void> {
+    if (!this.notificationService) {
+      return;
+    }
+
+    const empresaId = String(input.empresaId || input.proposta.empresaId || '').trim();
+    if (!empresaId) {
+      return;
+    }
+
+    try {
+      const candidateIds = new Set<string>();
+      const vendedorId = String(input.proposta.vendedor_id || '').trim();
+      if (vendedorId) {
+        candidateIds.add(vendedorId);
+      }
+
+      const gestores = await this.userRepository.find({
+        where: {
+          empresa_id: empresaId,
+          ativo: true,
+          role: In([UserRole.GERENTE, UserRole.ADMIN, UserRole.SUPERADMIN]),
+        },
+        select: ['id'],
+      });
+
+      gestores.forEach((gestor) => {
+        const gestorId = String(gestor.id || '').trim();
+        if (gestorId) {
+          candidateIds.add(gestorId);
+        }
+      });
+
+      const actorUserId = String(input.actorUserId || '').trim();
+      if (actorUserId) {
+        candidateIds.delete(actorUserId);
+      }
+
+      const candidateList = Array.from(candidateIds);
+      if (candidateList.length === 0) {
+        return;
+      }
+
+      const recipients = await this.userRepository.find({
+        where: {
+          empresa_id: empresaId,
+          ativo: true,
+          id: In(candidateList),
+        },
+        select: ['id'],
+      });
+
+      if (recipients.length === 0) {
+        return;
+      }
+
+      const actor =
+        actorUserId.length > 0
+          ? await this.userRepository.findOne({
+              where: {
+                empresa_id: empresaId,
+                id: actorUserId,
+              },
+              select: ['id', 'nome'],
+            })
+          : null;
+
+      const sourceNormalized = String(input.source || '').toLowerCase();
+      const sourceFromPortal = sourceNormalized.includes('portal');
+      const actorName = actor?.nome?.trim() || (sourceFromPortal ? 'Cliente (portal)' : 'Equipe comercial');
+      const numero = String(input.proposta.numero || input.proposta.id || '').trim();
+      const propostaRef = numero ? `#${numero}` : input.proposta.id;
+      const clienteNome = String(input.proposta.cliente?.nome || 'Cliente').trim();
+      const valor = Number(input.proposta.total ?? input.proposta.valor ?? 0);
+      const valorFormatado = this.formatCurrencyPtBr(valor);
+      const motivoAjustes = this.sanitizeMotivoAjustes(input.motivoAjustes);
+
+      const title = sourceFromPortal
+        ? 'Cliente solicitou ajustes na proposta'
+        : 'Proposta em negociacao';
+
+      const messageParts = sourceFromPortal
+        ? [`${clienteNome} solicitou ajustes na proposta ${propostaRef}.`]
+        : [`A proposta ${propostaRef} entrou em negociacao.`];
+
+      if (motivoAjustes) {
+        messageParts.push(`Motivo informado: ${motivoAjustes}.`);
+      }
+      messageParts.push(`Valor: ${valorFormatado}.`);
+
+      if (input.followup?.created && input.followup.lembrete?.agendadoPara) {
+        messageParts.push(
+          `Follow-up automatico agendado para ${this.formatDateTimePtBr(input.followup.lembrete.agendadoPara)}.`,
+        );
+      }
+
+      const message = messageParts.join(' ');
+
+      const jobs = recipients.map((recipient) =>
+        this.notificationService!.create({
+          empresaId,
+          userId: recipient.id,
+          type: NotificationType.SISTEMA,
+          title,
+          message,
+          data: {
+            category: 'comercial',
+            event: 'proposta_negociacao',
+            propostaId: input.proposta.id,
+            propostaNumero: input.proposta.numero,
+            source: input.source || 'api',
+            actorUserId: actorUserId || null,
+            actorName,
+            clienteNome,
+            valor: Number.isFinite(valor) ? valor : 0,
+            motivoAjustes: motivoAjustes || null,
+            followupAgendadoPara: input.followup?.lembrete?.agendadoPara || null,
+            followupDias: input.followup?.lembrete?.diasApos ?? null,
+          },
+        }),
+      );
+
+      const settled = await Promise.allSettled(jobs);
+      const failed = settled.filter((result) => result.status === 'rejected').length;
+      if (failed > 0) {
+        this.logger.warn(
+          `Falha ao entregar ${failed} notificacao(oes) de negociacao para proposta ${input.proposta.id}`,
+        );
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao notificar equipe comercial sobre negociacao (${input.proposta.id}): ${this.resolveErrorMessage(error, 'erro desconhecido')}`,
+      );
+    }
+  }
+
+  private async handleNegociacaoTransitionSideEffects(input: {
+    propostaId: string;
+    empresaId?: string;
+    statusAnterior: SalesFlowStatus;
+    novoStatus: SalesFlowStatus;
+    source?: string;
+    observacoes?: string;
+    metadata?: Record<string, unknown>;
+    actorUserId?: string;
+  }): Promise<void> {
+    if (input.novoStatus !== 'negociacao' || input.statusAnterior === 'negociacao') {
+      return;
+    }
+
+    try {
+      const proposta = await this.propostaRepository.findOne({
+        where: input.empresaId
+          ? { id: input.propostaId, empresaId: input.empresaId }
+          : { id: input.propostaId },
+      });
+
+      if (!proposta) {
+        return;
+      }
+
+      const followup = await this.ensureNegociacaoFollowupIfNeeded(proposta, input.source);
+      const motivoAjustes = this.extractMotivoAjustesFromContext(input.observacoes, input.metadata);
+
+      await this.notifyComercialTeamOnNegociacao({
+        proposta,
+        empresaId: input.empresaId,
+        source: input.source,
+        actorUserId: input.actorUserId,
+        motivoAjustes,
+        followup,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Falha nos efeitos de transicao para negociacao da proposta ${input.propostaId}: ${this.resolveErrorMessage(error, 'erro desconhecido')}`,
+      );
+    }
   }
 
   private normalizeOportunidadeId(value: unknown): string | null {
@@ -3806,6 +4108,16 @@ export class PropostasService {
           `Status da proposta ${propostaId} atualizado para: ${fluxoStatus} (legacy mode)`,
         );
         await this.syncOportunidadeFromPropostaPrincipal(propostaId, empresaId);
+        await this.handleNegociacaoTransitionSideEffects({
+          propostaId,
+          empresaId,
+          statusAnterior: propostaAtual.status,
+          novoStatus: fluxoStatus,
+          source,
+          observacoes,
+          metadata,
+          actorUserId: transitionContext?.actorUserId,
+        });
         return propostaAtualizada;
       }
 
@@ -3969,6 +4281,16 @@ export class PropostasService {
       const propostaAtualizada = await this.savePropostaWithStatusFallback(proposta, fluxoStatus);
       this.logger.log(`Status da proposta ${propostaId} atualizado para: ${fluxoStatus}`);
       await this.syncOportunidadeFromPropostaPrincipal(propostaAtualizada.id, empresaId);
+      await this.handleNegociacaoTransitionSideEffects({
+        propostaId: propostaAtualizada.id,
+        empresaId,
+        statusAnterior,
+        novoStatus: fluxoStatus,
+        source,
+        observacoes,
+        metadata,
+        actorUserId: transitionContext?.actorUserId,
+      });
       const [propostaHidratada] = await this.hydratePropostasOpportunityContext(
         [this.entityToInterface(propostaAtualizada)],
         empresaId,
@@ -4486,6 +4808,12 @@ export class PropostasService {
     primeiraVisualizacaoEm?: string;
     decisaoEm?: string;
     statusAtual: string;
+    ultimoMotivoAjustes?: {
+      texto: string;
+      data: string;
+      origem?: string;
+      status?: string;
+    };
     aprovacaoInterna?: PropostaAprovacaoInterna;
     versoes: PropostaVersao[];
     log: Array<{
@@ -4493,6 +4821,9 @@ export class PropostasService {
       evento: string;
       detalhes: string;
       ip?: string;
+      origem?: string;
+      status?: string;
+      metadata?: Record<string, unknown>;
     }>;
   }> {
     const proposta = await this.obterProposta(propostaId, empresaId);
@@ -4504,6 +4835,9 @@ export class PropostasService {
       .map((evento) => this.parseHistoryEvent(evento))
       .filter((evento): evento is PropostaHistoricoEvento => Boolean(evento))
       .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    const portalHistorico = (proposta.emailDetails?.portalEventos || [])
+      .map((evento) => this.parseHistoryEvent(evento))
+      .filter((evento): evento is PropostaHistoricoEvento => Boolean(evento));
 
     const envioEvento = historico.find((evento) =>
       ['proposta_enviada', 'status_alterado'].includes(String(evento.evento).toLowerCase()) &&
@@ -4516,6 +4850,15 @@ export class PropostasService {
     const decisao = historico.find((evento) =>
       evento.status === 'aprovada' || evento.status === 'rejeitada',
     );
+    const eventosComPortalOrdenados = [...historico, ...portalHistorico].sort((a, b) =>
+      b.timestamp.localeCompare(a.timestamp),
+    );
+    const eventoMotivoAjustes = eventosComPortalOrdenados.find((evento) =>
+      Boolean(this.extractMotivoAjustesFromContext(evento.detalhes, evento.metadata)),
+    );
+    const ultimoMotivoAjustesTexto = eventoMotivoAjustes
+      ? this.extractMotivoAjustesFromContext(eventoMotivoAjustes.detalhes, eventoMotivoAjustes.metadata)
+      : undefined;
 
     const versoesEnriquecidas = await Promise.all(
       (proposta.versoes || []).map(async (versao) => {
@@ -4538,6 +4881,15 @@ export class PropostasService {
       primeiraVisualizacaoEm: primeiraVisualizacao?.timestamp,
       decisaoEm: decisao?.timestamp,
       statusAtual: proposta.status,
+      ultimoMotivoAjustes:
+        eventoMotivoAjustes && ultimoMotivoAjustesTexto
+          ? {
+              texto: ultimoMotivoAjustesTexto,
+              data: eventoMotivoAjustes.timestamp,
+              origem: eventoMotivoAjustes.origem,
+              status: eventoMotivoAjustes.status,
+            }
+          : undefined,
       aprovacaoInterna: proposta.aprovacaoInterna,
       versoes: versoesEnriquecidas,
       log: historico.map((evento) => ({
@@ -4545,6 +4897,12 @@ export class PropostasService {
         evento: evento.evento,
         detalhes: evento.detalhes || '',
         ip: evento.ip,
+        origem: evento.origem,
+        status: evento.status,
+        metadata:
+          evento.metadata && typeof evento.metadata === 'object' && !Array.isArray(evento.metadata)
+            ? (evento.metadata as Record<string, unknown>)
+            : undefined,
       })),
     };
   }

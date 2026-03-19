@@ -331,6 +331,7 @@ export class PortalController {
       timestamp?: string;
       ip?: string;
       userAgent?: string;
+      motivoAjustes?: string;
     },
   ) {
     try {
@@ -342,6 +343,7 @@ export class PortalController {
         timestamp: updateData.timestamp,
         ip: updateData.ip,
         userAgent: updateData.userAgent,
+        motivoAjustes: updateData.motivoAjustes,
       });
 
       return {
