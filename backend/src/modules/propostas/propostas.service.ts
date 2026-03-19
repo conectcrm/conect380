@@ -19,6 +19,7 @@ import { CatalogItem as CatalogItemEntity } from '../catalogo/entities/catalog-i
 import {
   EstagioOportunidade,
   LifecycleStatusOportunidade,
+  MotivoPerdaOportunidade,
 } from '../oportunidades/oportunidade.entity';
 import {
   OportunidadesService,
@@ -108,6 +109,16 @@ const PROPOSTA_SYNC_STATUS_TO_STAGE: Partial<Record<SalesFlowStatus, EstagioOpor
 };
 
 const PROPOSTA_STATUS_SUGERE_PERDA = new Set<SalesFlowStatus>(['rejeitada', 'expirada']);
+const PROPOSTA_STATUS_NAO_PERMITE_CANCELAR_VENDA = new Set<SalesFlowStatus>(['pago']);
+
+const FATURA_STATUS_CONCLUIDA_OU_PARCIAL = new Set(['paga', 'parcialmente_paga']);
+const FATURA_STATUS_ATIVA_NAO_CANCELADA = new Set([
+  'pendente',
+  'enviada',
+  'vencida',
+  'parcialmente_paga',
+  'paga',
+]);
 
 const OPORTUNIDADE_SYNC_FORWARD_ORDER: readonly EstagioOportunidade[] = [
   EstagioOportunidade.LEADS,
@@ -124,9 +135,9 @@ const FLOW_STATUS_TRANSITIONS: Record<SalesFlowStatus, readonly SalesFlowStatus[
   visualizada: ['negociacao', 'aprovada', 'rejeitada', 'expirada'],
   negociacao: ['enviada', 'aprovada', 'rejeitada', 'expirada', 'visualizada'],
   aprovada: ['contrato_gerado', 'contrato_assinado', 'fatura_criada', 'rejeitada'],
-  contrato_gerado: ['contrato_assinado'],
-  contrato_assinado: ['fatura_criada'],
-  fatura_criada: ['contrato_assinado', 'aguardando_pagamento', 'pago'],
+  contrato_gerado: ['contrato_assinado', 'rejeitada'],
+  contrato_assinado: ['fatura_criada', 'rejeitada'],
+  fatura_criada: ['contrato_assinado', 'aguardando_pagamento', 'pago', 'rejeitada'],
   aguardando_pagamento: ['contrato_assinado', 'pago', 'rejeitada'],
   pago: ['aguardando_pagamento'],
   rejeitada: ['negociacao', 'enviada'],
@@ -207,6 +218,19 @@ type PropostaStatusTransitionContext = {
 type PropostaCommercialPolicy = {
   limiteDescontoPercentual: number;
   aprovacaoInternaHabilitada: boolean;
+};
+
+type CancelamentoVendaInput = {
+  motivo: string;
+  observacoes?: string;
+  source?: string;
+  actorUserId?: string;
+};
+
+type PropostaVendaBloqueios = {
+  contratosAssinados: number;
+  faturasAtivasNaoCanceladas: number;
+  faturasPagasOuParciais: number;
 };
 
 export interface Proposta {
@@ -887,6 +911,13 @@ export class PropostasService {
       }
 
       if (PROPOSTA_STATUS_SUGERE_PERDA.has(proposta.status)) {
+        await this.syncOportunidadeAsLostFromPropostaPrincipal(
+          link.oportunidadeId,
+          proposta,
+          empresaId,
+          proposta.motivoPerda,
+          'proposta-perda',
+        );
         return;
       }
 
@@ -937,6 +968,210 @@ export class PropostasService {
         `Falha ao sincronizar oportunidade pela proposta principal ${propostaId}: ${this.resolveErrorMessage(error, 'erro inesperado')}`,
       );
     }
+  }
+
+  private mapMotivoPerdaPropostaParaOportunidade(
+    motivoPerda?: string,
+  ): MotivoPerdaOportunidade {
+    const normalized = String(motivoPerda || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+
+    if (!normalized) {
+      return MotivoPerdaOportunidade.OUTRO;
+    }
+
+    if (normalized.includes('preco') || normalized.includes('valor')) {
+      return MotivoPerdaOportunidade.PRECO;
+    }
+    if (normalized.includes('concorr')) {
+      return MotivoPerdaOportunidade.CONCORRENTE;
+    }
+    if (
+      normalized.includes('timing') ||
+      normalized.includes('momento') ||
+      normalized.includes('agora nao')
+    ) {
+      return MotivoPerdaOportunidade.TIMING;
+    }
+    if (normalized.includes('orcament')) {
+      return MotivoPerdaOportunidade.ORCAMENTO;
+    }
+    if (normalized.includes('produto') || normalized.includes('funcionalidade')) {
+      return MotivoPerdaOportunidade.PRODUTO;
+    }
+    if (normalized.includes('cancelad')) {
+      return MotivoPerdaOportunidade.PROJETO_CANCELADO;
+    }
+    if (
+      normalized.includes('sem resposta') ||
+      normalized.includes('sem retorno') ||
+      normalized.includes('nao respondeu') ||
+      normalized.includes('nao responde')
+    ) {
+      return MotivoPerdaOportunidade.SEM_RESPOSTA;
+    }
+
+    return MotivoPerdaOportunidade.OUTRO;
+  }
+
+  private async syncOportunidadeAsLostFromPropostaPrincipal(
+    oportunidadeId: string,
+    proposta: Proposta,
+    empresaId: string,
+    motivoPerda?: string,
+    source: string = 'proposta-perda',
+  ): Promise<void> {
+    try {
+      const oportunidade = await this.oportunidadesService.findOne(String(oportunidadeId), empresaId);
+      const lifecycleStatus =
+        oportunidade.lifecycle_status ||
+        (oportunidade.estagio === EstagioOportunidade.GANHO
+          ? LifecycleStatusOportunidade.WON
+          : oportunidade.estagio === EstagioOportunidade.PERDIDO
+            ? LifecycleStatusOportunidade.LOST
+            : LifecycleStatusOportunidade.OPEN);
+
+      if (lifecycleStatus !== LifecycleStatusOportunidade.OPEN) {
+        return;
+      }
+
+      if (oportunidade.estagio === EstagioOportunidade.PERDIDO) {
+        return;
+      }
+
+      const motivoNormalizado = this.sanitizeMotivoPerda(motivoPerda);
+      const numeroOuId = String(proposta.numero || proposta.id || '').trim();
+      const detalheMotivo = motivoNormalizado
+        ? `Motivo informado na proposta: ${motivoNormalizado}`
+        : 'Motivo informado: nao especificado';
+
+      await this.oportunidadesService.updateEstagio(
+        String(oportunidade.id),
+        {
+          estagio: EstagioOportunidade.PERDIDO,
+          motivoPerda: this.mapMotivoPerdaPropostaParaOportunidade(motivoNormalizado),
+          motivoPerdaDetalhes: `Sincronizado automaticamente da proposta principal ${numeroOuId} (${source}). ${detalheMotivo}.`,
+        },
+        empresaId,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao sincronizar oportunidade como perdida para proposta ${proposta.id}: ${this.resolveErrorMessage(error, 'erro inesperado')}`,
+      );
+    }
+  }
+
+  private async carregarBloqueiosCancelamentoVenda(
+    propostaId: string,
+    empresaId?: string,
+  ): Promise<PropostaVendaBloqueios> {
+    const bloqueios: PropostaVendaBloqueios = {
+      contratosAssinados: 0,
+      faturasAtivasNaoCanceladas: 0,
+      faturasPagasOuParciais: 0,
+    };
+
+    try {
+      const contratoColumns = await this.getTableColumns('contratos');
+      const propostaColumn = contratoColumns.has('propostaId')
+        ? '"propostaId"'
+        : contratoColumns.has('proposta_id')
+          ? 'proposta_id'
+          : null;
+      const empresaColumn = contratoColumns.has('empresa_id')
+        ? 'empresa_id'
+        : contratoColumns.has('empresaId')
+          ? '"empresaId"'
+          : null;
+      const ativoColumn = contratoColumns.has('ativo') ? 'ativo' : null;
+
+      if (!propostaColumn) {
+        return bloqueios;
+      }
+
+      const contratoAtivoExpr = ativoColumn ? `COALESCE(c.${ativoColumn}, true) = true` : 'TRUE';
+      const contratosParams: unknown[] = [propostaId];
+      const filtroEmpresaContratos = empresaId && empresaColumn ? 'AND c.' + empresaColumn + '::text = $2::text' : '';
+      if (empresaId && empresaColumn) {
+        contratosParams.push(empresaId);
+      }
+
+      const contratosRaw = await this.propostaRepository.query(
+        `
+          SELECT COUNT(*)::int AS total
+          FROM contratos c
+          WHERE c.${propostaColumn}::text = $1::text
+            ${filtroEmpresaContratos}
+            AND ${contratoAtivoExpr}
+            AND c.status = 'assinado'
+        `,
+        contratosParams,
+      );
+      const contratosRows = this.extractQueryRows<{ total?: number | string }>(contratosRaw);
+      bloqueios.contratosAssinados = Number(contratosRows?.[0]?.total || 0);
+
+      const faturaColumns = await this.getTableColumns('faturas');
+      const contratoFaturaColumn = faturaColumns.has('contratoId')
+        ? '"contratoId"'
+        : faturaColumns.has('contrato_id')
+          ? 'contrato_id'
+          : null;
+
+      if (!contratoFaturaColumn) {
+        return bloqueios;
+      }
+
+      const faturaAtivoColumn = faturaColumns.has('ativo') ? 'ativo' : null;
+      const faturaAtivoExpr = faturaAtivoColumn ? `COALESCE(f.${faturaAtivoColumn}, true) = true` : 'TRUE';
+
+      const faturasParams: unknown[] = [propostaId];
+      const filtroEmpresaFaturas = empresaId && empresaColumn ? 'AND c.' + empresaColumn + '::text = $2::text' : '';
+      if (empresaId && empresaColumn) {
+        faturasParams.push(empresaId);
+      }
+      const idxStatusAtivos = faturasParams.push(Array.from(FATURA_STATUS_ATIVA_NAO_CANCELADA));
+      const idxStatusPagos = faturasParams.push(Array.from(FATURA_STATUS_CONCLUIDA_OU_PARCIAL));
+
+      const faturasRaw = await this.propostaRepository.query(
+        `
+          SELECT
+            COUNT(*) FILTER (
+              WHERE f.id IS NOT NULL
+                AND ${faturaAtivoExpr}
+                AND f.status = ANY($${idxStatusAtivos}::text[])
+            )::int AS faturas_ativas,
+            COUNT(*) FILTER (
+              WHERE f.id IS NOT NULL
+                AND ${faturaAtivoExpr}
+                AND f.status = ANY($${idxStatusPagos}::text[])
+            )::int AS faturas_pagas_parciais
+          FROM contratos c
+          LEFT JOIN faturas f
+            ON f.${contratoFaturaColumn}::text = c.id::text
+          WHERE c.${propostaColumn}::text = $1::text
+            ${filtroEmpresaFaturas}
+            AND ${contratoAtivoExpr}
+        `,
+        faturasParams,
+      );
+      const faturasRows = this.extractQueryRows<{
+        faturas_ativas?: number | string;
+        faturas_pagas_parciais?: number | string;
+      }>(faturasRaw);
+      bloqueios.faturasAtivasNaoCanceladas = Number(faturasRows?.[0]?.faturas_ativas || 0);
+      bloqueios.faturasPagasOuParciais = Number(
+        faturasRows?.[0]?.faturas_pagas_parciais || 0,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao consultar bloqueios de cancelamento de venda da proposta ${propostaId}: ${this.resolveErrorMessage(error, 'erro inesperado')}`,
+      );
+    }
+
+    return bloqueios;
   }
 
   private buildPropostaNotFoundMessage(propostaId: string): string {
@@ -3961,6 +4196,67 @@ export class PropostasService {
     }
 
     return propostaAtualizada;
+  }
+
+  /**
+   * Cancela comercialmente uma venda/proposta
+   */
+  async cancelarVenda(
+    propostaId: string,
+    input: CancelamentoVendaInput,
+    empresaId?: string,
+  ): Promise<Proposta> {
+    const motivoPerda = this.sanitizeMotivoPerda(input?.motivo);
+    if (!motivoPerda) {
+      throw new BadRequestException('Informe o motivo do cancelamento da venda.');
+    }
+
+    const propostaAtual = await this.obterProposta(propostaId, empresaId);
+    if (!propostaAtual) {
+      throw new BadRequestException(this.buildPropostaNotFoundMessage(propostaId));
+    }
+
+    const statusAtual = this.normalizeStatusInput(propostaAtual.status);
+    if (PROPOSTA_STATUS_NAO_PERMITE_CANCELAR_VENDA.has(statusAtual)) {
+      throw new BadRequestException(
+        'Nao e possivel cancelar uma venda com pagamento confirmado. Realize o estorno no financeiro antes de cancelar.',
+      );
+    }
+
+    const bloqueios = await this.carregarBloqueiosCancelamentoVenda(propostaId, empresaId);
+    if (bloqueios.contratosAssinados > 0) {
+      throw new BadRequestException(
+        'Nao e possivel cancelar a venda porque existe contrato assinado vinculado. Cancele o contrato primeiro.',
+      );
+    }
+
+    if (bloqueios.faturasPagasOuParciais > 0) {
+      throw new BadRequestException(
+        'Nao e possivel cancelar a venda porque existem faturas pagas/parcialmente pagas. Execute o estorno antes de cancelar.',
+      );
+    }
+
+    if (bloqueios.faturasAtivasNaoCanceladas > 0) {
+      throw new BadRequestException(
+        'Nao e possivel cancelar a venda enquanto houver faturas ativas. Cancele as faturas pendentes/enviadas antes de continuar.',
+      );
+    }
+
+    const observacoesPadrao = `Venda cancelada manualmente. Motivo: ${motivoPerda}.`;
+    const observacoes = String(input?.observacoes || '').trim() || observacoesPadrao;
+
+    return this.atualizarStatus(
+      propostaId,
+      'rejeitada',
+      input?.source || 'cancelamento-venda',
+      observacoes,
+      motivoPerda,
+      empresaId,
+      {
+        tipo: 'cancelamento_venda',
+        actorUserId: input?.actorUserId || null,
+      },
+    );
   }
 
   /**

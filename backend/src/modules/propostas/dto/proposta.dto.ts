@@ -324,6 +324,19 @@ export class AtualizarStatusDto {
   overrideReason?: string;
 }
 
+export class CancelarVendaDto {
+  @IsString()
+  motivo: string;
+
+  @IsOptional()
+  @IsString()
+  observacoes?: string;
+
+  @IsOptional()
+  @IsString()
+  source?: string;
+}
+
 export interface PropostaResponseDto {
   success: boolean;
   message?: string;

@@ -16,6 +16,7 @@ import { PropostasService, Proposta } from './propostas.service';
 import {
   AtualizarStatusDto,
   AtualizarPropostaDto,
+  CancelarVendaDto,
   PropostaResponseDto,
   CriarPropostaDto,
   PropostaDto,
@@ -519,6 +520,52 @@ export class PropostasController {
           success: false,
           message: 'Erro ao atualizar status da proposta',
           error: this.resolveErrorMessage(error, 'Falha ao atualizar status da proposta'),
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post(':id/cancelar-venda')
+  @Permissions(Permission.COMERCIAL_PROPOSTAS_UPDATE)
+  async cancelarVenda(
+    @EmpresaId() empresaId: string,
+    @Param('id') propostaId: string,
+    @Body() payload: CancelarVendaDto,
+    @Request() req: any,
+  ): Promise<PropostaResponseDto> {
+    try {
+      this.logger.log(`[PROPOSTAS] Cancelando venda da proposta ${propostaId}`);
+
+      const proposta = await this.propostasService.cancelarVenda(
+        propostaId,
+        {
+          motivo: payload?.motivo,
+          observacoes: payload?.observacoes,
+          source: payload?.source || 'cancelamento-venda',
+          actorUserId: req?.user?.id,
+        },
+        empresaId,
+      );
+
+      return {
+        success: true,
+        message: 'Venda cancelada com sucesso',
+        proposta: this.toPropostaDto(proposta),
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      this.logger.error('[PROPOSTAS] Erro ao cancelar venda:', error);
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Erro ao cancelar venda da proposta',
+          error: this.resolveErrorMessage(error, 'Falha ao cancelar venda da proposta'),
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );

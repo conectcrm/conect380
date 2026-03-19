@@ -17,6 +17,7 @@ import {
   FileText,
   CreditCard,
   ArrowRight,
+  XCircle,
   ShieldAlert,
   ShieldCheck,
   ShieldX,
@@ -454,6 +455,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const [gerandoContrato, setGerandoContrato] = useState(false);
   const [criandoFatura, setCriandoFatura] = useState(false);
   const [avancandoFluxo, setAvancandoFluxo] = useState(false);
+  const [cancelandoVenda, setCancelandoVenda] = useState(false);
   const [definindoComoPrincipal, setDefinindoComoPrincipal] = useState(false);
   const [decidindoAlcadaAprovacao, setDecidindoAlcadaAprovacao] = useState(false);
   const [decidindoAlcadaReprovacao, setDecidindoAlcadaReprovacao] = useState(false);
@@ -2245,6 +2247,78 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     }
   };
 
+  const handleCancelarVenda = async () => {
+    const propostaData = getPropostaData();
+    const propostaId = String((proposta as any)?.id || propostaData.id || '').trim();
+    if (!propostaId) {
+      toastService.error('Proposta sem identificador para cancelar a venda.');
+      return;
+    }
+
+    if (statusFluxoAtual === 'pago') {
+      toastService.error(
+        'Venda com pagamento confirmado nao pode ser cancelada direto. Realize o estorno primeiro.',
+      );
+      return;
+    }
+
+    const motivo = await askForInput({
+      title: 'Cancelar venda',
+      message:
+        'Informe o motivo do cancelamento. Esse motivo sera registrado na proposta e no pipeline.',
+      placeholder: 'Ex: cliente desistiu da proposta por prazo/custo',
+      confirmText: 'Continuar',
+      cancelText: 'Voltar',
+      required: true,
+      multiline: true,
+      confirmVariant: 'danger',
+      defaultValue: 'Cliente desistiu da proposta',
+      validate: (value) => {
+        if (!value || value.trim().length < 5) {
+          return 'Informe um motivo com pelo menos 5 caracteres.';
+        }
+        return null;
+      },
+    });
+
+    if (motivo === null) {
+      return;
+    }
+
+    const confirmarCancelamento = await confirm({
+      title: 'Confirmar cancelamento da venda',
+      message:
+        'A proposta sera movida para rejeitada e a oportunidade principal sera sincronizada para perdido quando elegivel.',
+      confirmText: 'Sim, cancelar venda',
+      cancelText: 'Manter como esta',
+      icon: 'warning',
+      confirmButtonClass: 'bg-[#DC2626] hover:bg-[#B91C1C] focus:ring-[#DC2626]',
+    });
+
+    if (!confirmarCancelamento) {
+      toastService.info('Cancelamento da venda interrompido.');
+      return;
+    }
+
+    setCancelandoVenda(true);
+    try {
+      await propostasApiService.cancelarVenda(propostaId, {
+        motivo,
+        source: 'proposta-actions-cancelamento',
+        observacoes: `Cancelamento de venda solicitado no backoffice. Motivo: ${motivo}`,
+      });
+      toastService.success('Venda cancelada com sucesso.');
+      onPropostaUpdated?.();
+    } catch (error) {
+      console.error('Erro ao cancelar venda da proposta:', error);
+      toastService.error(
+        getErrorMessage(error, 'Nao foi possivel cancelar a venda desta proposta.'),
+      );
+    } finally {
+      setCancelandoVenda(false);
+    }
+  };
+
   const handleAprovarAlcada = async () => {
     if (!possuiAprovacaoPendente) {
       return;
@@ -2625,10 +2699,15 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   const exibirAvancarFluxo = !statusEncerradoSemAcoesComerciais;
   const exibirAcoesCompartilhamento = actionScope === 'all' || actionScope === 'share';
   const exibirAcoesFluxo = actionScope === 'all' || actionScope === 'flow';
+  const exibirCancelarVenda = exibirAcoesFluxo && !statusEncerradoSemAcoesComerciais;
   const exibirSeparadorAutomacao =
     exibirAcoesCompartilhamento &&
     exibirAcoesFluxo &&
-    (possuiAprovacaoPendente || exibirGerarContrato || exibirCriarFatura || exibirAvancarFluxo);
+    (possuiAprovacaoPendente ||
+      exibirGerarContrato ||
+      exibirCriarFatura ||
+      exibirAvancarFluxo ||
+      exibirCancelarVenda);
   const getFlowActionMeta = (
     status: string,
   ): {
@@ -2879,6 +2958,24 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
             <CreditCard className="w-4 h-4" />
           )}
           {showLabels && <span>Criar Fatura</span>}
+        </button>
+      )}
+
+      {/* Cancelar venda */}
+      {exibirAcoesFluxo && exibirCancelarVenda && (
+        <button
+          type="button"
+          onClick={handleCancelarVenda}
+          disabled={cancelandoVenda}
+          className={`${buttonClass} ${buttonThemeClass.danger} disabled:opacity-50`}
+          title="Cancelar venda e registrar perda comercial"
+        >
+          {cancelandoVenda ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <XCircle className="w-4 h-4" />
+          )}
+          {showLabels && <span>Cancelar venda</span>}
         </button>
       )}
 

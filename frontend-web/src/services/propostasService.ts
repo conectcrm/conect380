@@ -501,6 +501,20 @@ class PropostasService {
     }
   }
 
+  async cancelarVenda(
+    id: string,
+    payload: { motivo: string; observacoes?: string; source?: string },
+  ): Promise<Proposta> {
+    try {
+      const response = await api.post(`${this.baseURL}/${id}/cancelar-venda`, payload);
+      this.clearCache();
+      return response.data?.proposta || response.data;
+    } catch (error) {
+      console.error('Erro ao cancelar venda da proposta:', error);
+      throw this.buildDomainError('cancelar a venda da proposta', error);
+    }
+  }
+
   async getEstatisticas(): Promise<PropostaEstatisticas> {
     try {
       try {

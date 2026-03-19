@@ -1215,6 +1215,19 @@ class PropostasService {
     }
   }
 
+  async cancelarVenda(
+    id: string,
+    payload: { motivo: string; observacoes?: string; source?: string },
+  ): Promise<PropostaCompleta | null> {
+    try {
+      const propostaAtualizada = await sharedPropostasService.cancelarVenda(id, payload);
+      return this.mapPropostaBasica(propostaAtualizada);
+    } catch (error) {
+      console.error(`Erro ao cancelar venda da proposta ${id}:`, error);
+      return null;
+    }
+  }
+
   async definirComoPrincipal(id: string): Promise<PropostaCompleta | null> {
     try {
       const propostaAtualizada = await sharedPropostasService.definirComoPrincipal(id);
