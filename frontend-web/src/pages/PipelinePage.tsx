@@ -2532,14 +2532,18 @@ const PipelinePage: React.FC = () => {
               className={
                 kanbanExpanded
                   ? 'flex gap-3 sm:gap-4 overflow-x-auto pb-3 h-full'
-                  : 'flex gap-3 sm:gap-4 overflow-x-auto pb-3 -mx-1 px-1 sm:mx-0 sm:px-0 h-[min(72vh,calc(100vh-22rem))]'
+                  : 'flex gap-3 sm:gap-4 overflow-x-auto pb-3 -mx-1 px-1 sm:mx-0 sm:px-0'
               }
             >
           {agrupadoPorEstagio.map((estagio) => (
             <div
               key={estagio.id}
               data-testid={`pipeline-column-${estagio.id}`}
-              className="flex-shrink-0 w-[min(18rem,calc(100vw-5rem))] sm:w-72 flex flex-col h-full"
+              className={
+                kanbanExpanded
+                  ? 'flex-shrink-0 w-[min(18rem,calc(100vw-5rem))] sm:w-72 flex flex-col h-full'
+                  : 'flex-shrink-0 w-[min(18rem,calc(100vw-5rem))] sm:w-72 flex flex-col self-start'
+              }
               role="region"
               aria-labelledby={`pipeline-column-title-${estagio.id}`}
             >
@@ -2598,7 +2602,11 @@ const PipelinePage: React.FC = () => {
               {/* Cards das Oportunidades */}
               <div
                 data-testid={`pipeline-column-dropzone-${estagio.id}`}
-                className="bg-[#DEEFE7]/35 rounded-b-lg p-2 space-y-2 border border-[#B4BEC9]/40 border-t-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]"
+                className={
+                  kanbanExpanded
+                    ? 'bg-[#DEEFE7]/35 rounded-b-lg p-2 space-y-2 border border-[#B4BEC9]/40 border-t-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]'
+                    : 'bg-[#DEEFE7]/35 rounded-b-lg p-2 space-y-2 border border-[#B4BEC9]/40 border-t-0'
+                }
                 onDragOver={canManipulateKanban ? handleDragOver : undefined}
                 onDrop={canManipulateKanban ? () => handleDrop(estagio.id) : undefined}
               >
