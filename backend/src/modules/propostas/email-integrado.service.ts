@@ -715,7 +715,7 @@ export class EmailIntegradoService {
             <h3>Detalhes da Proposta:</h3>
             <ul>
               <li><strong>Cliente:</strong> ${this.sanitizeHtml(this.resolveClienteNome(proposta))}</li>
-              <li><strong>Titulo:</strong> ${this.sanitizeHtml(this.resolvePropostaTitulo(proposta))}</li>
+              <li><strong>T&iacute;tulo:</strong> ${this.sanitizeHtml(this.resolvePropostaTitulo(proposta))}</li>
               <li><strong>Valor:</strong> ${this.sanitizeHtml(this.formatCurrencyBRL(this.resolvePropostaValor(proposta)))}</li>
               <li><strong>Data de Aceite:</strong> ${new Date().toLocaleString('pt-BR')}</li>
             </ul>
@@ -750,7 +750,7 @@ export class EmailIntegradoService {
             <h3>Detalhes da Proposta:</h3>
             <ul>
               <li><strong>Cliente:</strong> ${this.sanitizeHtml(this.resolveClienteNome(proposta))}</li>
-              <li><strong>Titulo:</strong> ${this.sanitizeHtml(this.resolvePropostaTitulo(proposta))}</li>
+              <li><strong>T&iacute;tulo:</strong> ${this.sanitizeHtml(this.resolvePropostaTitulo(proposta))}</li>
               <li><strong>Valor:</strong> ${this.sanitizeHtml(this.formatCurrencyBRL(this.resolvePropostaValor(proposta)))}</li>
               <li><strong>Data de Rejeicao:</strong> ${new Date().toLocaleString('pt-BR')}</li>
             </ul>
@@ -825,18 +825,18 @@ export class EmailIntegradoService {
             <div style="padding: 24px;">
               <p style="margin: 0 0 16px; font-size: 22px; font-weight: 700; color: #1d2a35;">Ol&aacute;, ${clienteNome}!</p>
               <p style="margin: 0 0 20px; font-size: 15px; color: #3d4f60; line-height: 1.6;">
-                Preparamos uma proposta personalizada para voce. Confira os detalhes e acesse o portal para avaliar.
+                Preparamos uma proposta personalizada para voc&ecirc;. Confira os detalhes e acesse o portal para avaliar.
               </p>
 
               <div style="background: #f8fbff; border: 1px solid #dce6ef; border-radius: 12px; padding: 16px;">
                 <div style="font-size: 15px; font-weight: 700; color: #1d2a35; margin-bottom: 12px;">Resumo da proposta</div>
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                   <tr>
-                    <td style="padding: 6px 0; color: #627383; font-size: 13px;">Numero</td>
+                    <td style="padding: 6px 0; color: #627383; font-size: 13px;">N&uacute;mero</td>
                     <td style="padding: 6px 0; color: #1d2a35; font-size: 14px; font-weight: 700; text-align: right;">${numero}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 6px 0; color: #627383; font-size: 13px;">Titulo</td>
+                    <td style="padding: 6px 0; color: #627383; font-size: 13px;">T&iacute;tulo</td>
                     <td style="padding: 6px 0; color: #1d2a35; font-size: 14px; font-weight: 700; text-align: right;">${titulo}</td>
                   </tr>
                   <tr>
@@ -864,13 +864,13 @@ export class EmailIntegradoService {
               </div>
 
               <div style="background: #fffbeb; border: 1px solid #f3d38c; border-radius: 10px; padding: 12px 14px; color: #744210; font-size: 13px; line-height: 1.5;">
-                Esta proposta permanece disponivel por ${validade}. Use o botao acima para revisar, aceitar ou solicitar ajustes.
+                Esta proposta permanece dispon&iacute;vel por ${validade}. Use o bot&atilde;o acima para revisar, aceitar ou solicitar ajustes.
               </div>
             </div>
 
             <div style="padding: 14px 24px; border-top: 1px solid #edf2f7; background: #fafcff;">
               <p style="margin: 0; font-size: 12px; color: #607182;">
-                Em caso de duvidas, responda este e-mail.
+                Em caso de d&uacute;vidas, responda este e-mail.
                 ${siteSafe ? ` Site: ${siteSafe}` : ''}
               </p>
             </div>
