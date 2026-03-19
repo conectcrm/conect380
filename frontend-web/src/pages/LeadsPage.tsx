@@ -1,8 +1,9 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { useNavigate } from 'react-router-dom';
+import { NumericFormat } from 'react-number-format';
 import { toastService } from '../services/toastService';
 import {
   RefreshCw,
@@ -217,10 +218,10 @@ const LeadsPage: React.FC = () => {
   // React Hook Form para modal de Conversão
   const {
     register: registerConvert,
+    control: controlConvert,
     handleSubmit: handleConvertSubmit,
     formState: { errors: convertErrors, isValid: isConvertValid },
     reset: resetConvertForm,
-    setValue: setConvertValue,
   } = useForm({
     resolver: yupResolver(convertSchema),
     mode: 'onChange',
@@ -2315,15 +2316,28 @@ const LeadsPage: React.FC = () => {
                     </label>
                     <div className="relative">
                       <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        {...registerConvert('valor_estimado')}
-                        type="number"
-                        step="0.01"
-                        className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
-                          convertErrors.valor_estimado ? 'border-red-300' : 'border-gray-300'
-                        }`}
-                        placeholder="0.00"
-                        disabled={isSubmitting}
+                      <Controller
+                        name="valor_estimado"
+                        control={controlConvert}
+                        render={({ field }) => (
+                          <NumericFormat
+                            value={field.value || ''}
+                            onValueChange={(values) => {
+                              field.onChange(values.value || '');
+                            }}
+                            thousandSeparator="."
+                            decimalSeparator=","
+                            decimalScale={2}
+                            fixedDecimalScale
+                            allowNegative={false}
+                            className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-colors ${
+                              convertErrors.valor_estimado ? 'border-red-300' : 'border-gray-300'
+                            }`}
+                            placeholder="0,00"
+                            disabled={isSubmitting}
+                            inputMode="decimal"
+                          />
+                        )}
                       />
                     </div>
                     {convertErrors.valor_estimado && (
