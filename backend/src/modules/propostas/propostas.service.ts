@@ -240,6 +240,7 @@ export interface Proposta {
   total: number;
   valor: number; // Alias para total (compatibilidade com DTO)
   formaPagamento: 'avista' | 'boleto' | 'cartao' | 'pix' | 'recorrente';
+  parcelas?: number;
   validadeDias: number;
   observacoes?: string;
   incluirImpostosPDF: boolean;
@@ -1476,6 +1477,27 @@ export class PropostasService {
     return undefined;
   }
 
+  private toJsonArrayOrEmpty(value: unknown): unknown[] {
+    if (Array.isArray(value)) {
+      return [...value];
+    }
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return [];
+      }
+      try {
+        const parsed = JSON.parse(trimmed);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+
+    return [];
+  }
+
   private parseHistoryEvent(raw: unknown): PropostaHistoricoEvento | null {
     if (!raw || typeof raw !== 'object') {
       return null;
@@ -2169,7 +2191,7 @@ export class PropostasService {
   ): Proposta {
     const valor = Number(row?.valor ?? overrides.valor ?? 0);
     const total = Number(overrides.total ?? overrides.valor ?? row?.total ?? valor);
-    const subtotal = Number(overrides.subtotal ?? total);
+    const subtotal = Number(overrides.subtotal ?? row?.subtotal ?? total);
     const descontoGlobal = Number(overrides.descontoGlobal ?? row?.descontoGlobal ?? 0);
     const impostos = Number(overrides.impostos ?? row?.impostos ?? 0);
     const criadaEmIso = this.toIsoString(
@@ -2178,9 +2200,9 @@ export class PropostasService {
     const atualizadaEmIso = this.toIsoString(
       row?.atualizado_em ?? row?.atualizadaEm ?? overrides.atualizadaEm ?? overrides.updatedAt,
     );
-    const dataVencimentoIso = row?.validade
-      ? this.toIsoString(row.validade)
-      : overrides.dataVencimento;
+    const dataVencimentoIso = this.toIsoString(
+      row?.validade ?? row?.dataVencimento ?? overrides.dataVencimento,
+    );
     const observacoesRaw =
       overrides.observacoes ??
       row?.observacoes ??
@@ -2212,12 +2234,55 @@ export class PropostasService {
       email: '',
     };
 
-    const cliente =
-      overrides.cliente && typeof overrides.cliente === 'object' ? overrides.cliente : clienteFallback;
+    const clienteFromRow = this.toJsonRecordOrUndefined(row?.cliente);
+    const clienteFromOverrides =
+      overrides.cliente && typeof overrides.cliente === 'object'
+        ? (overrides.cliente as Record<string, unknown>)
+        : undefined;
+    const clienteRaw = clienteFromOverrides || clienteFromRow;
+    const clienteNomeFallback = String(
+      row?.clienteNome || row?.cliente_nome || defaultClienteNome || 'Cliente nao informado',
+    );
+    const cliente: Proposta['cliente'] = clienteRaw
+      ? {
+          id: String(clienteRaw.id || 'cliente-legacy'),
+          nome: String(clienteRaw.nome || clienteNomeFallback),
+          email: String(clienteRaw.email || ''),
+          telefone:
+            clienteRaw.telefone !== undefined ? String(clienteRaw.telefone || '') : undefined,
+          documento:
+            clienteRaw.documento !== undefined ? String(clienteRaw.documento || '') : undefined,
+          status: clienteRaw.status !== undefined ? String(clienteRaw.status || '') : undefined,
+        }
+      : typeof row?.cliente === 'string' && String(row.cliente).trim()
+        ? {
+            id: 'cliente-legacy',
+            nome: String(row.cliente).trim(),
+            email: '',
+          }
+        : clienteFallback;
+
+    const produtosFromRow = this.toJsonArrayOrEmpty(row?.produtos);
+    const parcelas = Number(overrides.parcelas ?? row?.parcelas ?? 0);
     const produtos =
       Array.isArray(overrides.produtos) && overrides.produtos.length > 0
         ? overrides.produtos
+        : produtosFromRow.length > 0
+          ? produtosFromRow
         : produtosDaUltimaVersao;
+
+    const formaPagamento = String(
+      overrides.formaPagamento || row?.formaPagamento || row?.forma_pagamento || 'avista',
+    ).trim();
+    const validadeDias = Number(
+      overrides.validadeDias ?? row?.validadeDias ?? row?.validade_dias ?? 30,
+    );
+    const incluirImpostosPDF = Boolean(
+      overrides.incluirImpostosPDF ??
+        row?.incluirImpostosPDF ??
+        row?.incluir_impostos_pdf ??
+        false,
+    );
     const emailDetailsNormalizado = emailDetails
       ? {
           ...emailDetails,
@@ -2245,10 +2310,11 @@ export class PropostasService {
       impostos,
       total,
       valor,
-      formaPagamento: overrides.formaPagamento ?? 'avista',
-      validadeDias: overrides.validadeDias ?? 30,
+      formaPagamento: formaPagamento as any,
+      parcelas: Number.isFinite(parcelas) && parcelas > 1 ? parcelas : undefined,
+      validadeDias: Number.isFinite(validadeDias) && validadeDias > 0 ? validadeDias : 30,
       observacoes: legacyMeta.observacoesLimpa,
-      incluirImpostosPDF: overrides.incluirImpostosPDF ?? false,
+      incluirImpostosPDF,
       status: statusCalculado,
       motivoPerda,
       dataVencimento: dataVencimentoIso,
@@ -2280,6 +2346,9 @@ export class PropostasService {
     const aprovacaoInterna = this.parseAprovacaoInterna(entity.emailDetails) || undefined;
     const lembretes = this.getLembretes(entity.emailDetails);
 
+    const parcelasFromEmail = Number((entity.emailDetails as any)?.parcelas ?? 0);
+    const parcelas = Number.isFinite(parcelasFromEmail) && parcelasFromEmail > 1 ? parcelasFromEmail : undefined;
+
     return {
       id: entity.id,
       numero: entity.numero,
@@ -2293,6 +2362,7 @@ export class PropostasService {
       total: Number(entity.total),
       valor: Number(entity.valor),
       formaPagamento: entity.formaPagamento as any,
+      parcelas,
       validadeDias: entity.validadeDias,
       observacoes: entity.observacoes,
       incluirImpostosPDF: entity.incluirImpostosPDF,
@@ -2469,6 +2539,33 @@ export class PropostasService {
           : columns.has('email_details')
             ? 'p.email_details'
             : 'NULL';
+        const subtotalExpr = columns.has('subtotal') ? 'p.subtotal' : 'NULL';
+        const descontoGlobalExpr = columns.has('descontoGlobal')
+          ? 'p."descontoGlobal"'
+          : columns.has('desconto_global')
+            ? 'p.desconto_global'
+            : 'NULL';
+        const impostosExpr = columns.has('impostos') ? 'p.impostos' : 'NULL';
+        const totalExpr = columns.has('total') ? 'p.total' : 'NULL';
+        const formaPagamentoExpr = columns.has('formaPagamento')
+          ? 'p."formaPagamento"'
+          : columns.has('forma_pagamento')
+            ? 'p.forma_pagamento'
+            : 'NULL';
+        const validadeDiasExpr = columns.has('validadeDias')
+          ? 'p."validadeDias"'
+          : columns.has('validade_dias')
+            ? 'p.validade_dias'
+            : 'NULL';
+        const incluirImpostosPDFExpr = columns.has('incluirImpostosPDF')
+          ? 'p."incluirImpostosPDF"'
+          : columns.has('incluir_impostos_pdf')
+            ? 'p.incluir_impostos_pdf'
+            : 'NULL';
+        const parcelasExpr = columns.has('parcelas') ? 'p.parcelas' : 'NULL';
+        const clienteExpr = columns.has('cliente') ? 'p.cliente' : 'NULL';
+        const produtosExpr = columns.has('produtos') ? 'p.produtos' : 'NULL';
+        const sourceExpr = columns.has('source') ? 'p.source' : 'NULL';
 
         const rows: any[] = await this.propostaRepository.query(
           `
@@ -2477,6 +2574,17 @@ export class PropostasService {
               p.numero,
               p.titulo,
               p.valor,
+              ${totalExpr} AS total,
+              ${subtotalExpr} AS subtotal,
+              ${descontoGlobalExpr} AS "descontoGlobal",
+              ${impostosExpr} AS impostos,
+              ${formaPagamentoExpr} AS "formaPagamento",
+              ${validadeDiasExpr} AS "validadeDias",
+              ${incluirImpostosPDFExpr} AS "incluirImpostosPDF",
+              ${parcelasExpr} AS parcelas,
+              ${clienteExpr} AS cliente,
+              ${produtosExpr} AS produtos,
+              ${sourceExpr} AS source,
               p.status,
               ${descricaoExpr} AS descricao,
               ${validadeExpr} AS validade,
@@ -2561,6 +2669,33 @@ export class PropostasService {
           : columns.has('email_details')
             ? 'p.email_details'
             : 'NULL';
+        const subtotalExpr = columns.has('subtotal') ? 'p.subtotal' : 'NULL';
+        const descontoGlobalExpr = columns.has('descontoGlobal')
+          ? 'p."descontoGlobal"'
+          : columns.has('desconto_global')
+            ? 'p.desconto_global'
+            : 'NULL';
+        const impostosExpr = columns.has('impostos') ? 'p.impostos' : 'NULL';
+        const totalExpr = columns.has('total') ? 'p.total' : 'NULL';
+        const formaPagamentoExpr = columns.has('formaPagamento')
+          ? 'p."formaPagamento"'
+          : columns.has('forma_pagamento')
+            ? 'p.forma_pagamento'
+            : 'NULL';
+        const validadeDiasExpr = columns.has('validadeDias')
+          ? 'p."validadeDias"'
+          : columns.has('validade_dias')
+            ? 'p.validade_dias'
+            : 'NULL';
+        const incluirImpostosPDFExpr = columns.has('incluirImpostosPDF')
+          ? 'p."incluirImpostosPDF"'
+          : columns.has('incluir_impostos_pdf')
+            ? 'p.incluir_impostos_pdf'
+            : 'NULL';
+        const parcelasExpr = columns.has('parcelas') ? 'p.parcelas' : 'NULL';
+        const clienteExpr = columns.has('cliente') ? 'p.cliente' : 'NULL';
+        const produtosExpr = columns.has('produtos') ? 'p.produtos' : 'NULL';
+        const sourceExpr = columns.has('source') ? 'p.source' : 'NULL';
 
         const rows: any[] = await this.propostaRepository.query(
           `
@@ -2569,6 +2704,17 @@ export class PropostasService {
               p.numero,
               p.titulo,
               p.valor,
+              ${totalExpr} AS total,
+              ${subtotalExpr} AS subtotal,
+              ${descontoGlobalExpr} AS "descontoGlobal",
+              ${impostosExpr} AS impostos,
+              ${formaPagamentoExpr} AS "formaPagamento",
+              ${validadeDiasExpr} AS "validadeDias",
+              ${incluirImpostosPDFExpr} AS "incluirImpostosPDF",
+              ${parcelasExpr} AS parcelas,
+              ${clienteExpr} AS cliente,
+              ${produtosExpr} AS produtos,
+              ${sourceExpr} AS source,
               p.status,
               ${descricaoExpr} AS descricao,
               ${validadeExpr} AS validade,
@@ -2794,6 +2940,36 @@ export class PropostasService {
       if (legacySchema) {
         const titulo = dadosProposta.titulo || `Proposta ${numero}`;
         const valor = Number(dadosProposta.valor || dadosProposta.total || 0);
+        const subtotalCalculado = this.toFiniteNumber(dadosProposta.subtotal, valor);
+        const totalCalculado = this.toFiniteNumber(dadosProposta.total ?? dadosProposta.valor, valor);
+        const descontoGlobalCalculado = this.toFiniteNumber(dadosProposta.descontoGlobal, 0);
+        const impostosCalculados = this.toFiniteNumber(dadosProposta.impostos, 0);
+        const formaPagamentoCalculada = String(dadosProposta.formaPagamento || 'avista');
+        const parcelasCalculadas =
+          formaPagamentoCalculada === 'parcelado'
+            ? Math.max(1, Number(dadosProposta.parcelas || 1))
+            : undefined;
+        const produtosCalculados = Array.isArray(dadosProposta.produtos) ? dadosProposta.produtos : [];
+        const descontoGlobalColumn = propostaColumns.has('descontoGlobal')
+          ? 'descontoGlobal'
+          : propostaColumns.has('desconto_global')
+            ? 'desconto_global'
+            : null;
+        const formaPagamentoColumn = propostaColumns.has('formaPagamento')
+          ? 'formaPagamento'
+          : propostaColumns.has('forma_pagamento')
+            ? 'forma_pagamento'
+            : null;
+        const validadeDiasColumn = propostaColumns.has('validadeDias')
+          ? 'validadeDias'
+          : propostaColumns.has('validade_dias')
+            ? 'validade_dias'
+            : null;
+        const incluirImpostosPDFColumn = propostaColumns.has('incluirImpostosPDF')
+          ? 'incluirImpostosPDF'
+          : propostaColumns.has('incluir_impostos_pdf')
+            ? 'incluir_impostos_pdf'
+            : null;
         const insertColumns: string[] = ['empresa_id', 'numero', 'titulo', 'valor', 'status'];
         const insertValues: unknown[] = [
           empresaIdProposta,
@@ -2814,6 +2990,56 @@ export class PropostasService {
         if (propostaColumns.has('descricao')) {
           insertColumns.push('descricao');
           insertValues.push(observacoesComFluxo ?? null);
+        }
+
+        if (propostaColumns.has('subtotal')) {
+          insertColumns.push('subtotal');
+          insertValues.push(subtotalCalculado);
+        }
+
+        if (descontoGlobalColumn) {
+          insertColumns.push(descontoGlobalColumn);
+          insertValues.push(descontoGlobalCalculado);
+        }
+
+        if (propostaColumns.has('impostos')) {
+          insertColumns.push('impostos');
+          insertValues.push(impostosCalculados);
+        }
+
+        if (propostaColumns.has('total')) {
+          insertColumns.push('total');
+          insertValues.push(totalCalculado);
+        }
+
+        if (formaPagamentoColumn) {
+          insertColumns.push(formaPagamentoColumn);
+          insertValues.push(formaPagamentoCalculada);
+        }
+
+        if (validadeDiasColumn) {
+          insertColumns.push(validadeDiasColumn);
+          insertValues.push(validadeDias);
+        }
+
+        if (incluirImpostosPDFColumn) {
+          insertColumns.push(incluirImpostosPDFColumn);
+          insertValues.push(Boolean(dadosProposta.incluirImpostosPDF));
+        }
+
+        if (propostaColumns.has('produtos')) {
+          insertColumns.push('produtos');
+          insertValues.push(produtosCalculados);
+        }
+
+        if (propostaColumns.has('parcelas') && parcelasCalculadas !== undefined) {
+          insertColumns.push('parcelas');
+          insertValues.push(parcelasCalculadas);
+        }
+
+        if (propostaColumns.has('source')) {
+          insertColumns.push('source');
+          insertValues.push(dadosProposta.source || 'api');
         }
 
         if (propostaColumns.has('validade')) {
@@ -2862,12 +3088,13 @@ export class PropostasService {
             cliente: clienteProcessado,
             oportunidadeId: oportunidadeIdPersistido,
             produtos: dadosProposta.produtos || [],
-            subtotal: dadosProposta.subtotal || 0,
-            descontoGlobal: dadosProposta.descontoGlobal || 0,
-            impostos: dadosProposta.impostos || 0,
-            total: dadosProposta.total || valor,
-            valor,
+            subtotal: subtotalCalculado,
+            descontoGlobal: descontoGlobalCalculado,
+            impostos: impostosCalculados,
+            total: totalCalculado,
+            valor: totalCalculado,
             formaPagamento: dadosProposta.formaPagamento || 'avista',
+            parcelas: parcelasCalculadas,
             validadeDias,
             observacoes: observacoesComFluxo,
             incluirImpostosPDF: dadosProposta.incluirImpostosPDF || false,
@@ -2907,6 +3134,11 @@ export class PropostasService {
       const emailDetailsIniciais: Record<string, unknown> = {
         fluxoStatus,
         ...(motivoPerda ? { motivoPerda } : {}),
+        ...(String(dadosProposta.formaPagamento || '').toLowerCase() === 'parcelado' &&
+        Number.isFinite(Number(dadosProposta.parcelas)) &&
+        Number(dadosProposta.parcelas) > 1
+          ? { parcelas: Math.floor(Number(dadosProposta.parcelas)) }
+          : {}),
         aprovacaoInterna: this.calcularAprovacaoInterna(
           dadosProposta.descontoGlobal,
           dadosProposta.produtos,
@@ -3001,6 +3233,26 @@ export class PropostasService {
         const setClauses: string[] = [];
         const params: unknown[] = [];
         let idx = 1;
+        const descontoGlobalColumn = propostaColumns.has('descontoGlobal')
+          ? 'descontoGlobal'
+          : propostaColumns.has('desconto_global')
+            ? 'desconto_global'
+            : null;
+        const formaPagamentoColumn = propostaColumns.has('formaPagamento')
+          ? 'formaPagamento'
+          : propostaColumns.has('forma_pagamento')
+            ? 'forma_pagamento'
+            : null;
+        const validadeDiasColumn = propostaColumns.has('validadeDias')
+          ? 'validadeDias'
+          : propostaColumns.has('validade_dias')
+            ? 'validade_dias'
+            : null;
+        const incluirImpostosPDFColumn = propostaColumns.has('incluirImpostosPDF')
+          ? 'incluirImpostosPDF'
+          : propostaColumns.has('incluir_impostos_pdf')
+            ? 'incluir_impostos_pdf'
+            : null;
 
         if (dadosProposta.titulo !== undefined) {
           setClauses.push(`"titulo" = $${idx++}`);
@@ -3026,6 +3278,38 @@ export class PropostasService {
           params.push(valorAtualizado);
         }
 
+        if (propostaColumns.has('subtotal') && dadosProposta.subtotal !== undefined) {
+          const subtotalAtualizado = Number(dadosProposta.subtotal);
+          if (Number.isFinite(subtotalAtualizado)) {
+            setClauses.push(`"subtotal" = $${idx++}`);
+            params.push(subtotalAtualizado);
+          }
+        }
+
+        if (descontoGlobalColumn && dadosProposta.descontoGlobal !== undefined) {
+          const descontoGlobalAtualizado = Number(dadosProposta.descontoGlobal);
+          if (Number.isFinite(descontoGlobalAtualizado)) {
+            setClauses.push(`"${descontoGlobalColumn}" = $${idx++}`);
+            params.push(descontoGlobalAtualizado);
+          }
+        }
+
+        if (propostaColumns.has('impostos') && dadosProposta.impostos !== undefined) {
+          const impostosAtualizados = Number(dadosProposta.impostos);
+          if (Number.isFinite(impostosAtualizados)) {
+            setClauses.push(`"impostos" = $${idx++}`);
+            params.push(impostosAtualizados);
+          }
+        }
+
+        if (propostaColumns.has('total') && dadosProposta.total !== undefined) {
+          const totalAtualizado = Number(dadosProposta.total);
+          if (Number.isFinite(totalAtualizado)) {
+            setClauses.push(`"total" = $${idx++}`);
+            params.push(totalAtualizado);
+          }
+        }
+
         if (dadosProposta.status !== undefined) {
           setClauses.push(`"status" = $${idx++}`);
           params.push(
@@ -3049,6 +3333,37 @@ export class PropostasService {
         if (observacoesColumn && dadosProposta.observacoes !== undefined) {
           setClauses.push(`"${observacoesColumn}" = $${idx++}`);
           params.push(dadosProposta.observacoes || null);
+        }
+
+        if (formaPagamentoColumn && dadosProposta.formaPagamento !== undefined) {
+          setClauses.push(`"${formaPagamentoColumn}" = $${idx++}`);
+          params.push(String(dadosProposta.formaPagamento || 'avista'));
+        }
+
+        if (propostaColumns.has('parcelas') && dadosProposta.parcelas !== undefined) {
+          const parcelasAtualizadas = Number(dadosProposta.parcelas);
+          if (Number.isFinite(parcelasAtualizadas) && parcelasAtualizadas > 0) {
+            setClauses.push(`"parcelas" = $${idx++}`);
+            params.push(parcelasAtualizadas);
+          }
+        }
+
+        if (validadeDiasColumn && dadosProposta.validadeDias !== undefined) {
+          const validadeDiasAtualizada = Number(dadosProposta.validadeDias);
+          if (Number.isFinite(validadeDiasAtualizada) && validadeDiasAtualizada > 0) {
+            setClauses.push(`"${validadeDiasColumn}" = $${idx++}`);
+            params.push(validadeDiasAtualizada);
+          }
+        }
+
+        if (incluirImpostosPDFColumn && dadosProposta.incluirImpostosPDF !== undefined) {
+          setClauses.push(`"${incluirImpostosPDFColumn}" = $${idx++}`);
+          params.push(Boolean(dadosProposta.incluirImpostosPDF));
+        }
+
+        if (propostaColumns.has('produtos') && dadosProposta.produtos !== undefined) {
+          setClauses.push(`"produtos" = $${idx++}`);
+          params.push(Array.isArray(dadosProposta.produtos) ? dadosProposta.produtos : []);
         }
 
         const validadeColumn = propostaColumns.has('validade')
@@ -3164,6 +3479,31 @@ export class PropostasService {
 
       if (dadosProposta.formaPagamento !== undefined) {
         proposta.formaPagamento = dadosProposta.formaPagamento as any;
+      }
+
+      if (dadosProposta.parcelas !== undefined) {
+        const detalhesParcelas = {
+          ...(proposta.emailDetails || {}),
+        } as Record<string, unknown>;
+        const parcelasNormalizadas = Number(dadosProposta.parcelas);
+        if (
+          String(proposta.formaPagamento || '').toLowerCase() === 'parcelado' &&
+          Number.isFinite(parcelasNormalizadas) &&
+          parcelasNormalizadas > 1
+        ) {
+          detalhesParcelas.parcelas = Math.floor(parcelasNormalizadas);
+        } else {
+          delete detalhesParcelas.parcelas;
+        }
+        proposta.emailDetails = detalhesParcelas as any;
+      } else if (String(proposta.formaPagamento || '').toLowerCase() !== 'parcelado') {
+        const detalhesParcelas = {
+          ...(proposta.emailDetails || {}),
+        } as Record<string, unknown>;
+        if ('parcelas' in detalhesParcelas) {
+          delete detalhesParcelas.parcelas;
+          proposta.emailDetails = detalhesParcelas as any;
+        }
       }
 
       if (dadosProposta.validadeDias !== undefined) {

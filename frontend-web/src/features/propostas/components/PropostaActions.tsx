@@ -393,6 +393,7 @@ interface PropostaActionsProps {
   onPropostaUpdated?: () => void;
   className?: string;
   showLabels?: boolean;
+  actionScope?: 'all' | 'share' | 'flow';
 }
 
 type PromptDialogState = {
@@ -432,6 +433,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
   onPropostaUpdated,
   className = '',
   showLabels = false,
+  actionScope = 'all',
 }) => {
   const navigate = useNavigate();
   const { confirm } = useGlobalConfirmation();
@@ -2646,14 +2648,18 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
     accent: 'text-[#7C3AED] hover:bg-[#F5F3FF] hover:text-[#6D28D9]',
   } as const;
   const pagamentoControladoNoFinanceiro = statusFluxoAtual === 'aguardando_pagamento';
-  const exibirEmailDireto = !editavelComoRascunho && !statusEncerradoSemAcoesComerciais;
+  const exibirEmailDireto = !statusEncerradoSemAcoesComerciais;
   const exibirWhatsApp = !statusEncerradoSemAcoesComerciais;
   const exibirCompartilhar = !statusEncerradoSemAcoesComerciais;
   const exibirGerarContrato = podeGerarContrato();
   const exibirCriarFatura = podeCriarFatura();
   const exibirAvancarFluxo = !statusEncerradoSemAcoesComerciais;
+  const exibirAcoesCompartilhamento = actionScope === 'all' || actionScope === 'share';
+  const exibirAcoesFluxo = actionScope === 'all' || actionScope === 'flow';
   const exibirSeparadorAutomacao =
-    possuiAprovacaoPendente || exibirGerarContrato || exibirCriarFatura || exibirAvancarFluxo;
+    exibirAcoesCompartilhamento &&
+    exibirAcoesFluxo &&
+    (possuiAprovacaoPendente || exibirGerarContrato || exibirCriarFatura || exibirAvancarFluxo);
   const getFlowActionMeta = (
     status: string,
   ): {
@@ -2715,7 +2721,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
 
   return (
     <div className={`flex items-center space-x-1 ${className}`}>
-      {onEditProposta && editavelComoRascunho && (
+      {exibirAcoesFluxo && onEditProposta && editavelComoRascunho && (
         <button
           type="button"
           onClick={() => onEditProposta(proposta)}
@@ -2727,7 +2733,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         </button>
       )}
 
-      {podeDefinirComoPrincipal && (
+      {exibirAcoesFluxo && podeDefinirComoPrincipal && (
         <button
           type="button"
           onClick={handleDefinirComoPrincipal}
@@ -2745,7 +2751,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       )}
 
       {/* Email */}
-      {exibirEmailDireto && (
+      {exibirAcoesCompartilhamento && exibirEmailDireto && (
         <button
           type="button"
           onClick={handleSendEmail}
@@ -2763,7 +2769,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       )}
 
       {/* WhatsApp */}
-      {exibirWhatsApp && (
+      {exibirAcoesCompartilhamento && exibirWhatsApp && (
         <button
           type="button"
           onClick={handleSendWhatsApp}
@@ -2781,23 +2787,25 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       )}
 
       {/* Download PDF */}
-      <button
-        type="button"
-        onClick={handleDownloadPdf}
-        disabled={downloadingPdf}
-        className={`${buttonClass} ${buttonThemeClass.danger} disabled:opacity-50`}
-        title="Baixar PDF"
-      >
-        {downloadingPdf ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
-        ) : (
-          <Download className="w-4 h-4" />
-        )}
-        {showLabels && <span>PDF</span>}
-      </button>
+      {exibirAcoesCompartilhamento && (
+        <button
+          type="button"
+          onClick={handleDownloadPdf}
+          disabled={downloadingPdf}
+          className={`${buttonClass} ${buttonThemeClass.danger} disabled:opacity-50`}
+          title="Baixar PDF"
+        >
+          {downloadingPdf ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Download className="w-4 h-4" />
+          )}
+          {showLabels && <span>PDF</span>}
+        </button>
+      )}
 
       {/* Compartilhar */}
-      {exibirCompartilhar && (
+      {exibirAcoesCompartilhamento && exibirCompartilhar && (
         <button
           type="button"
           onClick={handleShare}
@@ -2812,7 +2820,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       {/* SEPARADOR VISUAL */}
       {exibirSeparadorAutomacao && <div className="mx-2 h-6 w-px bg-[#D4E2E7]"></div>}
       {/* Decisao de alcada */}
-      {possuiAprovacaoPendente && (
+      {exibirAcoesFluxo && possuiAprovacaoPendente && (
         <>
           <span
             className={`${buttonClass} cursor-default border border-[#F4D58D] bg-[#FFF7ED] text-[#92400E]`}
@@ -2860,7 +2868,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       {/* NOVOS BOTOES DE AUTOMACAO */}
 
       {/* Gerar Contrato */}
-      {exibirGerarContrato && (
+      {exibirAcoesFluxo && exibirGerarContrato && (
         <button
           type="button"
           onClick={handleGerarContrato}
@@ -2882,7 +2890,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       )}
 
       {/* Criar Fatura */}
-      {exibirCriarFatura && (
+      {exibirAcoesFluxo && exibirCriarFatura && (
         <button
           type="button"
           onClick={() => {
@@ -2906,7 +2914,7 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
       )}
 
       {/* Avancar Fluxo */}
-      {exibirAvancarFluxo && (
+      {exibirAcoesFluxo && exibirAvancarFluxo && (
         <button
           type="button"
           onClick={handleAvancarFluxo}

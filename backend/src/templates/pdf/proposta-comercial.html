@@ -384,10 +384,12 @@
             </div>
         </div>
 
+        {{#if temTituloPersonalizado}}
         <div class="section">
             <div class="section-title">Título da proposta</div>
             <div class="overview-box">{{titulo}}</div>
         </div>
+        {{/if}}
 
         {{#if temDescricao}}
         <div class="section">
@@ -456,15 +458,27 @@
                         <td>Subtotal</td>
                         <td class="text-right currency">{{formatarMoeda subtotal}}</td>
                     </tr>
+                    {{#if temDescontoItens}}
+                    <tr>
+                        <td>Desconto por itens</td>
+                        <td class="text-right currency">- {{formatarMoeda descontoItens}}</td>
+                    </tr>
+                    {{/if}}
                     {{#if temDescontoGeral}}
                     <tr>
-                        <td>Desconto global ({{percentualDesconto}}%)</td>
+                        <td>Desconto global ({{formatarPercentual percentualDesconto}}%)</td>
                         <td class="text-right currency">- {{formatarMoeda descontoGeral}}</td>
+                    </tr>
+                    {{/if}}
+                    {{#if temTotalDescontos}}
+                    <tr>
+                        <td>Total de descontos</td>
+                        <td class="text-right currency">- {{formatarMoeda totalDescontos}}</td>
                     </tr>
                     {{/if}}
                     {{#if temImpostos}}
                     <tr>
-                        <td>Impostos</td>
+                        <td>Impostos ({{formatarPercentual percentualImpostos}}%)</td>
                         <td class="text-right currency">{{formatarMoeda impostos}}</td>
                     </tr>
                     {{/if}}
@@ -518,7 +532,7 @@
         {{/if}}
 
         <div class="footer">
-            Documento gerado automaticamente em {{dataGeracao}} às {{horaGeracao}}.
+            Documento gerado automaticamente em {{dataGeracao}} às {{horaGeracao}} • Gerado por Conect360.
         </div>
     </div>
 </body>

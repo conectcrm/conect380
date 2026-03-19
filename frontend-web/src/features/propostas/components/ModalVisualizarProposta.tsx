@@ -13,6 +13,7 @@ import {
   Mail,
   Building,
   Loader2,
+  AlertTriangle,
   ShieldCheck,
   ShieldAlert,
   ShieldX,
@@ -510,6 +511,7 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
   const [versaoAtualSelecionada, setVersaoAtualSelecionada] = useState<number | null>(null);
   const [versaoBaseSelecionada, setVersaoBaseSelecionada] = useState<number | null>(null);
   const [nomesProdutosPorId, setNomesProdutosPorId] = useState<Record<string, string>>({});
+  const [recalculandoTotais, setRecalculandoTotais] = useState(false);
 
   const propostaId = proposta?.id ? String(proposta.id) : null;
 
@@ -793,27 +795,59 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
     if (itensDaProposta.length > 0) {
       return itensDaProposta
         .map((item) => {
-          const produto = item?.produto ?? null;
+          const rawItem = item as unknown as Record<string, unknown>;
+          const produto = rawItem?.produto && typeof rawItem.produto === 'object' ? rawItem.produto : null;
+          const quantidade = Number(rawItem?.quantidade ?? 0);
+          const precoUnitario = Number(
+            rawItem?.precoUnitario ??
+              rawItem?.preco ??
+              (produto as any)?.precoUnitario ??
+              (produto as any)?.preco ??
+              0,
+          );
+          const desconto = Number(rawItem?.desconto ?? 0);
+          const subtotalCalculado = quantidade * precoUnitario * (1 - desconto / 100);
+          const subtotalInformado = Number(rawItem?.subtotal ?? rawItem?.valorTotal);
 
           const componentesPlano = normalizePlanoComponentes(
-            (item as unknown as Record<string, unknown>)?.componentesPlano ??
-              (item as unknown as Record<string, unknown>)?.componentes ??
+            rawItem?.componentesPlano ??
+              rawItem?.componentes ??
               (produto as any)?.componentes,
           );
 
           return {
-            produtoId: String((produto as any)?.id || ''),
-            nome: typeof (produto as any)?.nome === 'string' ? String((produto as any).nome) : '',
+            produtoId: String(
+              (rawItem?.produtoId as string) ||
+                (rawItem?.id as string) ||
+                (produto as any)?.id ||
+                '',
+            ),
+            nome:
+              typeof rawItem?.nome === 'string'
+                ? String(rawItem.nome)
+                : typeof rawItem?.produtoNome === 'string'
+                  ? String(rawItem.produtoNome)
+                  : typeof (produto as any)?.nome === 'string'
+                    ? String((produto as any).nome)
+                    : '',
             descricao:
-              typeof (produto as any)?.descricao === 'string'
+              typeof rawItem?.descricao === 'string'
+                ? String(rawItem.descricao)
+                : typeof (produto as any)?.descricao === 'string'
                 ? String((produto as any).descricao)
                 : '',
-            quantidade: Number(item?.quantidade || 0),
-            precoUnitario: Number((produto as any)?.preco || 0),
-            desconto: Number(item?.desconto || 0),
-            subtotal: Number(item?.subtotal || 0),
+            quantidade: Number.isFinite(quantidade) ? quantidade : 0,
+            precoUnitario: Number.isFinite(precoUnitario) ? precoUnitario : 0,
+            desconto: Number.isFinite(desconto) ? desconto : 0,
+            subtotal: Number.isFinite(subtotalInformado)
+              ? subtotalInformado
+              : Number.isFinite(subtotalCalculado)
+                ? subtotalCalculado
+                : 0,
             tipoItem:
-              typeof (produto as any)?.tipoItem === 'string'
+              typeof rawItem?.tipoItem === 'string'
+                ? String(rawItem.tipoItem)
+                : typeof (produto as any)?.tipoItem === 'string'
                 ? String((produto as any).tipoItem)
                 : undefined,
             componentesPlano,
@@ -853,7 +887,7 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
         const quantidade = Number(raw?.quantidade ?? 0);
         const precoUnitario = Number(raw?.precoUnitario ?? raw?.preco ?? nestedProduto?.preco ?? 0);
         const desconto = Number(raw?.desconto ?? 0);
-        const subtotalCalculado = quantidade * precoUnitario;
+        const subtotalCalculado = quantidade * precoUnitario * (1 - desconto / 100);
         const subtotal = Number(raw?.subtotal ?? subtotalCalculado);
         const tipoItemRaw = raw?.tipoItem ?? nestedProduto?.tipoItem ?? '';
         const componentesPlano = normalizePlanoComponentes(
@@ -878,10 +912,32 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
   const totalProposta = Number(proposta.total || 0);
   const descontoGlobalPercentual = Number(proposta.descontoGlobal || 0);
   const impostosPercentual = Number(proposta.impostos || 0);
+  const descontoGlobalNormalizado = Math.min(100, Math.max(0, descontoGlobalPercentual));
+  const impostosNormalizado = Math.min(100, Math.max(0, impostosPercentual));
   const formaPagamentoDescricao = descreverFormaPagamento(
     proposta.formaPagamento,
     proposta.parcelas,
   );
+  const subtotalItensNegociados = itensNegociados.reduce((acc, item) => acc + Number(item.subtotal || 0), 0);
+  const valorDescontoItens = itensNegociados.reduce((acc, item) => {
+    const quantidade = Math.max(0, Number(item.quantidade || 0));
+    const precoUnitario = Math.max(0, Number(item.precoUnitario || 0));
+    const descontoItemPercentual = Math.min(100, Math.max(0, Number(item.desconto || 0)));
+    return acc + quantidade * precoUnitario * (descontoItemPercentual / 100);
+  }, 0);
+  const valorDescontoGlobal = subtotalProposta * (descontoGlobalNormalizado / 100);
+  const valorTotalDescontos = valorDescontoItens + valorDescontoGlobal;
+  const baseCalculoImpostos = Math.max(0, subtotalProposta - valorDescontoGlobal);
+  const valorImpostos = baseCalculoImpostos * (impostosNormalizado / 100);
+  const divergenciaSubtotal = subtotalItensNegociados - subtotalProposta;
+  const existeDivergenciaSubtotal =
+    itensNegociados.length > 0 && Number.isFinite(divergenciaSubtotal) && Math.abs(divergenciaSubtotal) > 0.01;
+  const statusAtualDetalhe = String(proposta.status || '')
+    .trim()
+    .toLowerCase();
+  const exibirSecaoAcoesFluxo = !['rejeitada', 'expirada', 'pago'].includes(statusAtualDetalhe);
+  const tituloExibicao = proposta.titulo || 'Proposta comercial';
+  const registroCriacaoSistema = proposta.criadaEm ? formatDateTime(proposta.criadaEm) : 'N/A';
 
   const missingIdsKey = (() => {
     const missingIds = Array.from(
@@ -961,6 +1017,45 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
     onPropostaUpdated?.();
   };
 
+  const handleRecalcularTotais = async () => {
+    if (!propostaId) {
+      toastService.error('Proposta sem identificador para recalcular totais.');
+      return;
+    }
+
+    if (itensNegociados.length === 0) {
+      toastService.error('Adicione pelo menos 1 item para recalcular os totais.');
+      return;
+    }
+
+    const subtotalRecalculado = itensNegociados.reduce((acc, item) => acc + Number(item.subtotal || 0), 0);
+    const descontoPercentual = Math.max(Number(descontoGlobalPercentual || 0), 0);
+    const impostosPercentualAtual = Math.max(Number(impostosPercentual || 0), 0);
+    const valorDesconto = subtotalRecalculado * (descontoPercentual / 100);
+    const subtotalComDesconto = subtotalRecalculado - valorDesconto;
+    const valorImpostos = subtotalComDesconto * (impostosPercentualAtual / 100);
+    const totalRecalculado = Math.max(subtotalComDesconto + valorImpostos, 0);
+
+    try {
+      setRecalculandoTotais(true);
+      await propostasApiService.update(propostaId, {
+        subtotal: Number(subtotalRecalculado.toFixed(2)),
+        descontoGlobal: descontoPercentual,
+        impostos: impostosPercentualAtual,
+        total: Number(totalRecalculado.toFixed(2)),
+        valor: Number(totalRecalculado.toFixed(2)),
+      } as any);
+
+      toastService.success('Totais recalculados com base nos itens da proposta.');
+      handleAtualizarPagina();
+    } catch (error) {
+      console.error('Erro ao recalcular totais da proposta:', error);
+      toastService.error('Nao foi possivel recalcular os totais da proposta.');
+    } finally {
+      setRecalculandoTotais(false);
+    }
+  };
+
   const compartilharSection = (
     <div className={`${isPageMode ? '' : 'mb-4 '}rounded-xl border border-[#E2ECF0] bg-[#F7FBFC] p-3 sm:p-4`}>
         <h4 className="mb-3 text-sm font-medium text-[#19384C]">Compartilhar proposta</h4>
@@ -972,9 +1067,27 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
           onPropostaUpdated={onPropostaUpdated}
           showLabels={true}
           className="flex-wrap"
+          actionScope="share"
         />
       </div>
   );
+
+  const fluxoSection = exibirSecaoAcoesFluxo ? (
+    <div className={`${isPageMode ? '' : 'mb-4 '}rounded-xl border border-[#E2ECF0] bg-[#F7FBFC] p-3 sm:p-4`}>
+      <h4 className="mb-1 text-sm font-medium text-[#19384C]">Proxima etapa</h4>
+      <p className="mb-3 text-xs text-[#607B89]">Acoes comerciais e de fluxo para o estagio atual da proposta</p>
+      <PropostaActions
+        proposta={proposta}
+        onEditProposta={
+          onEditProposta ? (propostaAtual) => onEditProposta(propostaAtual as PropostaCompleta) : undefined
+        }
+        onPropostaUpdated={onPropostaUpdated}
+        showLabels={true}
+        className="flex-wrap"
+        actionScope="flow"
+      />
+    </div>
+  ) : null;
 
   const cicloSection = (
     <div className={`${isPageMode ? '' : 'mb-4 '}rounded-xl border border-[#DCE7EC] bg-[#F8FBFC] p-4`}>
@@ -998,7 +1111,7 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
         {!showCiclo ? (
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="rounded-lg bg-white p-3 ring-1 ring-[#E7EFF3]">
-              <p className="text-xs text-[#607B89]">Criada em</p>
+              <p className="text-xs text-[#607B89]">Criacao no sistema</p>
               <p className="mt-1 text-sm font-medium text-[#19384C]">
                 {formatDateTime(proposta.criadaEm)}
               </p>
@@ -1086,7 +1199,7 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
               <div className="mt-3 space-y-4 rounded-lg bg-[#F4FAFC] p-3 ring-1 ring-[#E2ECF0]">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-lg bg-white p-3 ring-1 ring-[#E7EFF3]">
-                  <p className="text-xs text-[#607B89]">Criada em</p>
+                  <p className="text-xs text-[#607B89]">Criacao no sistema</p>
                   <p className="mt-1 text-sm font-medium text-[#19384C]">
                     {formatDateTime(historico?.criacaoEm || proposta.criadaEm)}
                   </p>
@@ -1394,9 +1507,7 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
           )}
 
           {!proposta.cliente?.email && !proposta.cliente?.telefone && !proposta.cliente?.endereco && (
-            <div className="rounded-lg border border-dashed border-[#DCE7EC] bg-[#FAFCFD] px-3 py-2 text-xs text-[#607B89]">
-              Cliente sem dados complementares cadastrados neste rascunho.
-            </div>
+            <p className="text-[11px] text-[#8BA0AA]">Dados complementares do cliente ainda nao informados.</p>
           )}
         </div>
       </section>
@@ -1521,20 +1632,41 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
             <p className="mt-1 text-sm font-semibold text-[#19384C]">{formatCurrency(subtotalProposta)}</p>
           </div>
           <div className="rounded-md bg-[#F8FBFC] px-3 py-2 ring-1 ring-[#E7EFF3]">
-            <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Desconto global</p>
+            <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Descontos</p>
             <p className="mt-1 text-sm font-semibold text-[#19384C]">
               {descontoGlobalPercentual.toFixed(2)}%
+            </p>
+            <p className="mt-1 text-xs text-[#607B89]">Itens: {formatCurrency(valorDescontoItens)}</p>
+            <p className="text-xs text-[#607B89]">Global: {formatCurrency(valorDescontoGlobal)}</p>
+            <p className="text-xs font-medium text-[#355166]">
+              Total: {formatCurrency(valorTotalDescontos)}
             </p>
           </div>
           <div className="rounded-md bg-[#F8FBFC] px-3 py-2 ring-1 ring-[#E7EFF3]">
             <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Impostos</p>
             <p className="mt-1 text-sm font-semibold text-[#19384C]">{impostosPercentual.toFixed(2)}%</p>
+            <p className="mt-1 text-xs text-[#607B89]">Valor: {formatCurrency(valorImpostos)}</p>
           </div>
           <div className="rounded-md bg-[#F2FBF8] px-3 py-2 ring-1 ring-[#D5ECE3]">
             <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Total</p>
             <p className="mt-1 text-lg font-bold text-[#159A9C]">{formatCurrency(totalProposta)}</p>
           </div>
         </div>
+
+        {existeDivergenciaSubtotal && (
+          <div className="mt-4 rounded-md border border-[#F7C78A] bg-[#FFF7EB] p-3">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 text-[#B45309]" />
+              <div>
+                <p className="text-xs font-semibold text-[#92400E]">Conferencia financeira</p>
+                <p className="mt-1 text-xs text-[#92400E]">
+                  Soma dos itens: {formatCurrency(subtotalItensNegociados)} | Subtotal da proposta:{' '}
+                  {formatCurrency(subtotalProposta)} | Diferenca: {formatCurrency(divergenciaSubtotal)}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="rounded-md border border-[#E2ECF0] bg-white p-3">
@@ -1545,7 +1677,7 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
                   Valida ate: {formatDate(proposta.dataValidade)}
                 </p>
                 <p className="text-xs text-[#607B89]">
-                  Criada em: {proposta.criadaEm ? formatDate(proposta.criadaEm) : 'N/A'}
+                  Registro no sistema: {proposta.criadaEm ? formatDateTime(proposta.criadaEm) : 'N/A'}
                 </p>
               </div>
             </div>
@@ -1590,6 +1722,7 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
       </div>
       <div className="space-y-5">
         {compartilharSection}
+        {fluxoSection}
         {dadosComerciaisSection}
       </div>
     </div>
@@ -1618,7 +1751,8 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
                 Detalhe da proposta
               </p>
               <h1 className="mt-1 text-2xl font-bold text-[#19384C]">#{proposta.numero}</h1>
-              <p className="mt-1 text-sm text-[#607B89]">{proposta.titulo || 'Proposta comercial'}</p>
+              <p className="mt-1 text-sm text-[#607B89]">{tituloExibicao}</p>
+              <p className="mt-1 text-xs text-[#6D8694]">Registro no sistema: {registroCriacaoSistema}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <span
@@ -1634,6 +1768,26 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
                 className="inline-flex h-9 items-center rounded-md border border-[#C8DAE2] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F1F7FA]"
               >
                 Atualizar
+              </button>
+              <button
+                type="button"
+                onClick={handleRecalcularTotais}
+                disabled={recalculandoTotais || itensNegociados.length === 0}
+                className="inline-flex h-9 items-center rounded-md border border-[#C8DAE2] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F1F7FA] disabled:cursor-not-allowed disabled:opacity-60"
+                title={
+                  itensNegociados.length > 0
+                    ? 'Recalcular subtotal e total com base nos itens da proposta'
+                    : 'Inclua itens na proposta para recalcular os totais'
+                }
+              >
+                {recalculandoTotais ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Recalculando...
+                  </>
+                ) : (
+                  'Recalcular totais'
+                )}
               </button>
               {onClose && (
                 <button

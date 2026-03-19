@@ -36,12 +36,43 @@ export interface PropostaDto {
   titulo?: string;
   status: string;
   motivoPerda?: string;
-  cliente: string;
+  cliente:
+    | string
+    | {
+        id?: string;
+        nome?: string;
+        email?: string;
+        telefone?: string;
+        documento?: string;
+        endereco?: string;
+        cidade?: string;
+        estado?: string;
+        cep?: string;
+        tipoPessoa?: string;
+        status?: string;
+      };
+  produtos?: unknown[];
+  subtotal?: number;
+  descontoGlobal?: number;
+  impostos?: number;
+  total?: number;
   valor: number;
+  dataVencimento?: string;
+  incluirImpostosPDF?: boolean;
+  parcelas?: number;
+  validadeDias?: number;
+  observacoes?: string;
+  aprovacaoInterna?: unknown;
+  lembretes?: unknown[];
+  historicoEventos?: unknown[];
+  versoes?: unknown[];
+  emailDetails?: unknown;
+  tokenPortal?: string;
+  criadaEm?: string;
+  atualizadaEm?: string;
   createdAt: string;
   updatedAt: string;
   source?: string;
-  observacoes?: string;
   vendedor?:
     | string
     | {
@@ -52,8 +83,6 @@ export interface PropostaDto {
         ativo: boolean;
       };
   formaPagamento?: string;
-  parcelas?: number;
-  validadeDias?: number;
   oportunidade?: {
     id: string;
     titulo: string;

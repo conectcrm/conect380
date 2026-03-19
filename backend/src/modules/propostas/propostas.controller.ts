@@ -83,29 +83,62 @@ export class PropostasController {
 
   // Helper para converter Proposta para PropostaDto
   private toPropostaDto(proposta: Proposta): PropostaDto {
+    const cliente =
+      proposta?.cliente && typeof proposta.cliente === 'object'
+        ? {
+            id: proposta.cliente.id,
+            nome: proposta.cliente.nome,
+            email: proposta.cliente.email,
+            telefone: proposta.cliente.telefone,
+            documento: proposta.cliente.documento,
+            status: proposta.cliente.status,
+            endereco: (proposta.cliente as any)?.endereco,
+            cidade: (proposta.cliente as any)?.cidade,
+            estado: (proposta.cliente as any)?.estado,
+            cep: (proposta.cliente as any)?.cep,
+            tipoPessoa: (proposta.cliente as any)?.tipoPessoa,
+          }
+        : typeof proposta?.cliente === 'string'
+          ? proposta.cliente
+          : 'Cliente nao informado';
+
     return {
       id: proposta.id,
       numero: proposta.numero,
       titulo: proposta.titulo,
       status: proposta.status,
       motivoPerda: proposta.motivoPerda,
-      cliente:
-        typeof proposta.cliente === 'object' && proposta.cliente?.nome
-          ? proposta.cliente.nome
-          : typeof proposta.cliente === 'string'
-            ? proposta.cliente
-            : 'Cliente nao informado',
-      valor: proposta.valor,
+      cliente,
+      produtos: Array.isArray(proposta.produtos) ? proposta.produtos : [],
+      subtotal: Number(proposta.subtotal ?? 0),
+      descontoGlobal: Number(proposta.descontoGlobal ?? 0),
+      impostos: Number(proposta.impostos ?? 0),
+      total: Number(proposta.total ?? proposta.valor ?? 0),
+      valor: Number(proposta.valor ?? proposta.total ?? 0),
+      dataVencimento: proposta.dataVencimento,
+      incluirImpostosPDF: proposta.incluirImpostosPDF,
+      observacoes: proposta.observacoes,
       createdAt: proposta.createdAt,
       updatedAt: proposta.updatedAt,
+      criadaEm: proposta.criadaEm || proposta.createdAt,
+      atualizadaEm: proposta.atualizadaEm || proposta.updatedAt,
       source: proposta.source,
-      observacoes: proposta.observacoes,
       vendedor: proposta.vendedor,
       formaPagamento: proposta.formaPagamento,
       parcelas: (proposta as any).parcelas,
       validadeDias: proposta.validadeDias,
       oportunidade: proposta.oportunidade,
       isPropostaPrincipal: proposta.isPropostaPrincipal,
+      aprovacaoInterna: proposta.aprovacaoInterna,
+      lembretes: Array.isArray(proposta.lembretes) ? proposta.lembretes : undefined,
+      historicoEventos: Array.isArray(proposta.historicoEventos) ? proposta.historicoEventos : undefined,
+      versoes: Array.isArray(proposta.versoes) ? proposta.versoes : undefined,
+      emailDetails:
+        proposta.emailDetails && typeof proposta.emailDetails === 'object'
+          ? proposta.emailDetails
+          : undefined,
+      tokenPortal:
+        typeof (proposta as any).tokenPortal === 'string' ? String((proposta as any).tokenPortal) : undefined,
     };
   }
 

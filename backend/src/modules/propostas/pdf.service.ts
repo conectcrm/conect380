@@ -15,16 +15,6 @@ type PlanoComponentePdf = {
 export class PdfService {
   private readonly logger = new Logger(PdfService.name);
   private readonly templatesPath: string;
-  private readonly browserLaunchArgs: string[] = [
-    '--no-sandbox',
-    '--disable-setuid-sandbox',
-    '--disable-dev-shm-usage',
-    '--disable-gpu',
-    '--disable-software-rasterizer',
-    '--no-zygote',
-    '--single-process',
-    '--font-render-hinting=none',
-  ];
   private readonly componentRoleLabels: Record<PlanoComponentePdf['componentRole'], string> = {
     included: 'Incluido',
     required: 'Obrigatorio',
@@ -92,6 +82,16 @@ export class PdfService {
       return d.toLocaleDateString('pt-BR');
     });
 
+    // Helper para formatacao percentual
+    handlebars.registerHelper('formatarPercentual', (value: number) => {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) return '0,00';
+      return parsed.toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    });
+
     // Helper para formatacao de telefone
     handlebars.registerHelper('formatPhone', (phone: string) => {
       if (!phone) return '';
@@ -149,65 +149,135 @@ export class PdfService {
 
   private async htmlParaPdf(html: string): Promise<Buffer> {
     const executablePath = this.resolveBrowserExecutablePath();
+    const launchProfiles = this.buildLaunchProfiles(executablePath);
 
     let lastError: unknown = null;
-    const maxAttempts = 3;
+    for (const profile of launchProfiles) {
+      const maxAttempts = 2;
 
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      let browser: puppeteer.Browser | null = null;
-      try {
-        browser = await puppeteer.launch({
-          headless: true,
-          executablePath,
-          pipe: true,
-          timeout: 60000,
-          protocolTimeout: 120000,
-          args: this.browserLaunchArgs,
-        });
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        let browser: puppeteer.Browser | null = null;
+        try {
+          this.logger.log(
+            `Gerando PDF com perfil de browser "${profile.name}" (tentativa ${attempt}/${maxAttempts})`,
+          );
 
-        const page = await browser.newPage();
-        page.setDefaultNavigationTimeout(120000);
-        page.setDefaultTimeout(120000);
-        await page.setContent(html, { waitUntil: 'domcontentloaded' });
-        await page.evaluate(async () => {
-          if ((document as any).fonts?.ready) {
-            await (document as any).fonts.ready;
+          browser = await puppeteer.launch(profile.options);
+
+          const page = await browser.newPage();
+          page.setDefaultNavigationTimeout(120000);
+          page.setDefaultTimeout(120000);
+          await page.setContent(html, { waitUntil: 'domcontentloaded' });
+          await page.evaluate(async () => {
+            if ((document as any).fonts?.ready) {
+              await (document as any).fonts.ready;
+            }
+          });
+
+          const pdfBuffer = await page.pdf({
+            format: 'a4',
+            printBackground: true,
+            margin: {
+              top: '20px',
+              right: '20px',
+              bottom: '20px',
+              left: '20px',
+            },
+          });
+
+          return Buffer.from(pdfBuffer);
+        } catch (error) {
+          lastError = error;
+          const shouldRetry = attempt < maxAttempts && this.isRetryablePdfError(error);
+
+          this.logger.warn(
+            `Falha ao renderizar PDF com perfil "${profile.name}" (tentativa ${attempt}/${maxAttempts}): ${
+              (error as Error)?.message || String(error)
+            }`,
+          );
+
+          if (shouldRetry) {
+            await this.delay(500 * attempt);
+          } else {
+            break;
           }
-        });
-
-        const pdfBuffer = await page.pdf({
-          format: 'a4',
-          printBackground: true,
-          margin: {
-            top: '20px',
-            right: '20px',
-            bottom: '20px',
-            left: '20px',
-          },
-        });
-
-        return Buffer.from(pdfBuffer);
-      } catch (error) {
-        lastError = error;
-        const shouldRetry = attempt < maxAttempts && this.isRetryablePdfError(error);
-        if (!shouldRetry) {
-          throw error;
-        }
-
-        this.logger.warn(
-          `Falha transiente ao renderizar PDF (tentativa ${attempt}/${maxAttempts}): ${
-            (error as Error)?.message || String(error)
-          }`,
-        );
-        await this.delay(500 * attempt);
-      } finally {
-        if (browser) {
-          await browser.close().catch(() => undefined);
+        } finally {
+          if (browser) {
+            await browser.close().catch(() => undefined);
+          }
         }
       }
     }
 
-    throw lastError instanceof Error ? lastError : new Error('Falha ao gerar PDF');
+    throw lastError instanceof Error
+      ? lastError
+      : new Error('Falha ao gerar PDF em todos os perfis de browser');
+  }
+
+  private buildLaunchProfiles(executablePath?: string): Array<{
+    name: string;
+    options: NonNullable<Parameters<typeof puppeteer.launch>[0]>;
+  }> {
+    const executableOption = executablePath ? { executablePath } : {};
+    const isWindows = process.platform === 'win32';
+    const baseOptions = {
+      headless: true as const,
+      timeout: 60000,
+      protocolTimeout: 120000,
+      ...executableOption,
+    };
+
+    const stableArgs = isWindows
+      ? ['--disable-gpu', '--font-render-hinting=none']
+      : [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--font-render-hinting=none',
+        ];
+
+    const compatibilityArgs = isWindows
+      ? ['--disable-gpu']
+      : ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'];
+
+    const constrainedArgs = isWindows
+      ? ['--disable-gpu', '--no-zygote']
+      : [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--no-zygote',
+          '--single-process',
+        ];
+
+    return [
+      {
+        name: 'stable-default',
+        options: {
+          ...baseOptions,
+          pipe: false,
+          args: stableArgs,
+        },
+      },
+      {
+        name: 'compatibility-minimal',
+        options: {
+          ...baseOptions,
+          pipe: false,
+          args: compatibilityArgs,
+        },
+      },
+      {
+        name: 'constrained-legacy',
+        options: {
+          ...baseOptions,
+          pipe: true,
+          args: constrainedArgs,
+        },
+      },
+    ];
   }
 
   private isRetryablePdfError(error: unknown): boolean {
@@ -233,9 +303,17 @@ export class PdfService {
   }
 
   private resolveBrowserExecutablePath(): string | undefined {
+    const localAppData = process.env.LOCALAPPDATA || '';
     const candidates = [
       process.env.PUPPETEER_EXECUTABLE_PATH,
       process.env.CHROME_PATH,
+      process.env.BROWSER_EXECUTABLE_PATH,
+      localAppData ? path.join(localAppData, 'Google', 'Chrome', 'Application', 'chrome.exe') : '',
+      localAppData ? path.join(localAppData, 'Microsoft', 'Edge', 'Application', 'msedge.exe') : '',
+      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+      'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
       '/usr/bin/chromium-browser',
       '/usr/bin/chromium',
       '/usr/lib/chromium/chrome',
@@ -247,17 +325,22 @@ export class PdfService {
 
     for (const candidate of candidates) {
       if (fs.existsSync(candidate)) {
+        this.logger.log(`Executavel de browser para PDF detectado: ${candidate}`);
         return candidate;
       }
     }
 
+    this.logger.warn(
+      'Nenhum executavel de browser especifico encontrado para PDF. Usando resolucao padrao do Puppeteer.',
+    );
     return undefined;
   }
 
   private async processarDados(dados: any) {
     const agora = new Date();
     const numeroProposta = String(dados?.numeroProposta || dados?.numero || `PROP-${agora.getTime()}`);
-    const titulo = String(dados?.titulo || 'Proposta comercial').trim();
+    const tituloInformado = this.toNonEmptyString(dados?.titulo);
+    const titulo = tituloInformado || 'Proposta comercial';
     const statusNormalizado = String(dados?.status || 'rascunho')
       .trim()
       .toLowerCase();
@@ -272,18 +355,56 @@ export class PdfService {
     const itensOriginais = Array.isArray(dados?.itens) ? dados.itens : [];
     const itens = this.normalizarItens(itensOriginais, titulo, valorTotalEntrada);
 
-    const subtotalCalculado = itens.reduce((sum, item) => sum + this.toNumber(item.valorTotal, 0), 0);
-    const subtotal = this.toNumber(dados?.subtotal, subtotalCalculado);
-    const descontoGeral = Math.max(0, this.toNumber(dados?.descontoGeral, 0));
-    const impostos = Math.max(0, this.toNumber(dados?.impostos, 0));
-    const valorTotalCalculado = subtotal - descontoGeral + impostos;
+    const roundMoney = (value: number) =>
+      Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+
+    const subtotalCalculado = roundMoney(
+      itens.reduce((sum, item) => sum + this.toNumber(item.valorTotal, 0), 0),
+    );
+    const subtotalBrutoCalculado = roundMoney(
+      itens.reduce(
+        (sum, item) =>
+          sum + this.toNumber(item.valorUnitario, 0) * this.toNumber(item.quantidade, 0),
+        0,
+      ),
+    );
+    const descontoItensCalculado = roundMoney(
+      Math.max(0, subtotalBrutoCalculado - subtotalCalculado),
+    );
+
+    const subtotal = roundMoney(this.toNumber(dados?.subtotal, subtotalCalculado));
+    const descontoItens = roundMoney(
+      Math.max(0, this.toNumber(dados?.descontoItens, descontoItensCalculado)),
+    );
+
+    const percentualDescontoEntrada = this.toNumber(dados?.percentualDesconto, Number.NaN);
+    const descontoGeralEntrada = Math.max(0, this.toNumber(dados?.descontoGeral, 0));
+    const percentualDesconto = Number.isFinite(percentualDescontoEntrada)
+      ? Math.min(100, Math.max(0, percentualDescontoEntrada))
+      : subtotal > 0
+        ? (descontoGeralEntrada / subtotal) * 100
+        : 0;
+    const descontoGeral = Number.isFinite(percentualDescontoEntrada)
+      ? roundMoney(subtotal * (percentualDesconto / 100))
+      : roundMoney(descontoGeralEntrada);
+
+    const baseCalculoImpostos = roundMoney(Math.max(0, subtotal - descontoGeral));
+    const percentualImpostosEntrada = this.toNumber(dados?.percentualImpostos, Number.NaN);
+    const impostosEntrada = Math.max(0, this.toNumber(dados?.impostos, 0));
+    const percentualImpostos = Number.isFinite(percentualImpostosEntrada)
+      ? Math.min(100, Math.max(0, percentualImpostosEntrada))
+      : baseCalculoImpostos > 0
+        ? (impostosEntrada / baseCalculoImpostos) * 100
+        : 0;
+    const impostos = Number.isFinite(percentualImpostosEntrada)
+      ? roundMoney(baseCalculoImpostos * (percentualImpostos / 100))
+      : roundMoney(impostosEntrada);
+
+    const totalDescontos = roundMoney(descontoItens + descontoGeral);
+    const valorTotalCalculado = roundMoney(baseCalculoImpostos + impostos);
     const valorTotal = this.toNumber(
       dados?.valorTotal ?? dados?.total ?? dados?.valor,
       valorTotalCalculado,
-    );
-    const percentualDesconto = this.toNumber(
-      dados?.percentualDesconto,
-      subtotal > 0 ? (descontoGeral / subtotal) * 100 : 0,
     );
 
     const formaPagamento = this.descreverFormaPagamento(dados?.formaPagamento);
@@ -334,6 +455,11 @@ export class PdfService {
       telefone: this.toNonEmptyString(vendedorRaw?.telefone),
       cargo: this.toNonEmptyString(vendedorRaw?.cargo),
     };
+    const temTituloPersonalizado = this.deveExibirTituloProposta(
+      tituloInformado || titulo,
+      cliente.nome,
+      dataEmissao,
+    );
 
     return {
       ...dados,
@@ -351,8 +477,13 @@ export class PdfService {
       vendedor,
       itens,
       subtotal,
+      subtotalBruto: subtotalBrutoCalculado,
+      descontoItens,
       descontoGeral,
+      totalDescontos,
+      baseCalculoImpostos,
       percentualDesconto,
+      percentualImpostos,
       impostos,
       valorTotal,
       formaPagamento,
@@ -362,10 +493,13 @@ export class PdfService {
       condicoesGerais,
       observacoes,
       descricao,
+      temTituloPersonalizado,
       temDescricao: Boolean(descricao),
       temObservacoes: Boolean(observacoes),
       temCondicoesGerais: condicoesGerais.length > 0,
+      temDescontoItens: descontoItens > 0,
       temDescontoGeral: descontoGeral > 0,
+      temTotalDescontos: totalDescontos > 0,
       temImpostos: impostos > 0,
       temPrazoEntrega: Boolean(prazoEntrega),
       temGarantia: Boolean(garantia),
@@ -559,6 +693,52 @@ export class PdfService {
     }
     const text = String(value).trim();
     return text.length > 0 ? text : '';
+  }
+
+  private normalizeComparableText(value: unknown): string {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[-_|]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private deveExibirTituloProposta(titulo: string, clienteNome: string, dataEmissao: string): boolean {
+    const tituloNormalizado = this.normalizeComparableText(titulo);
+    if (!tituloNormalizado) {
+      return false;
+    }
+
+    const titulosGenericos = new Set([
+      'proposta',
+      'proposta comercial',
+      'nova proposta',
+      'nova proposta comercial',
+    ]);
+    if (titulosGenericos.has(tituloNormalizado)) {
+      return false;
+    }
+
+    const clienteNormalizado = this.normalizeComparableText(clienteNome);
+    const dataNormalizada = this.normalizeComparableText(dataEmissao);
+    const tituloPadraoClienteData = this.normalizeComparableText(`${clienteNome} ${dataEmissao}`);
+
+    if (clienteNormalizado && tituloNormalizado === clienteNormalizado) {
+      return false;
+    }
+
+    if (
+      clienteNormalizado &&
+      dataNormalizada &&
+      tituloPadraoClienteData &&
+      tituloNormalizado === tituloPadraoClienteData
+    ) {
+      return false;
+    }
+
+    return true;
   }
 
   private descreverFormaPagamento(value: unknown): string {

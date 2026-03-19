@@ -363,31 +363,60 @@ const criarValoresIniciaisProposta = (
         }
       : null,
     produtos: Array.isArray(propostaInicial.produtos)
-      ? propostaInicial.produtos.map((item) => ({
-          produto: {
-            id: item.produto.id,
-            nome: item.produto.nome,
-            preco: Number(item.produto.preco || 0),
-            categoria: item.produto.categoria || 'Geral',
-            subcategoria: item.produto.subcategoria,
-            tipo: item.produto.tipo,
-            status: item.produto.status || 'ativo',
-            descricao: item.produto.descricao || '',
-            unidade: item.produto.unidade || 'unidade',
-            tipoItem: item.produto.tipoItem,
-            tipoLicenciamento: item.produto.tipoLicenciamento,
-            periodicidadeLicenca: item.produto.periodicidadeLicenca,
-            renovacaoAutomatica: item.produto.renovacaoAutomatica,
-            quantidadeLicencas: item.produto.quantidadeLicencas,
-            componentes: item.produto.componentes,
-            precoOriginal: item.produto.precoOriginal,
-            desconto: item.produto.desconto,
-            produtosCombo: item.produto.produtosCombo,
-          },
-          quantidade: Number(item.quantidade || 1),
-          desconto: Number(item.desconto || 0),
-          subtotal: Number(item.subtotal || 0),
-        }))
+      ? propostaInicial.produtos.map((item) => {
+          const itemRaw = item as unknown as Record<string, any>;
+          const produtoBase: Record<string, any> =
+            item?.produto && typeof item.produto === 'object'
+              ? (item.produto as Record<string, any>)
+              : itemRaw;
+          const quantidade = Number(itemRaw?.quantidade ?? produtoBase?.quantidade ?? 1);
+          const quantidadeNormalizada =
+            Number.isFinite(quantidade) && quantidade > 0 ? quantidade : 1;
+          const preco = Number(
+            produtoBase?.preco ??
+              itemRaw?.precoUnitario ??
+              itemRaw?.preco ??
+              produtoBase?.precoUnitario ??
+              0,
+          );
+          const precoNormalizado = Number.isFinite(preco) && preco > 0 ? preco : 0;
+          const desconto = Number(itemRaw?.desconto ?? produtoBase?.desconto ?? 0);
+          const descontoNormalizado = Number.isFinite(desconto)
+            ? Math.min(100, Math.max(0, desconto))
+            : 0;
+          const subtotalCalculado =
+            quantidadeNormalizada * precoNormalizado * (1 - descontoNormalizado / 100);
+          const subtotalInformado = Number(itemRaw?.subtotal ?? itemRaw?.valorTotal);
+          const subtotalNormalizado = Number.isFinite(subtotalInformado)
+            ? subtotalInformado
+            : subtotalCalculado;
+
+          return {
+            produto: {
+              id: produtoBase?.id || itemRaw?.produtoId || `prod_${Date.now()}`,
+              nome: produtoBase?.nome || itemRaw?.nome || 'Produto',
+              preco: precoNormalizado,
+              categoria: produtoBase?.categoria || 'Geral',
+              subcategoria: produtoBase?.subcategoria,
+              tipo: produtoBase?.tipo,
+              status: produtoBase?.status || 'ativo',
+              descricao: produtoBase?.descricao || '',
+              unidade: produtoBase?.unidade || 'unidade',
+              tipoItem: produtoBase?.tipoItem,
+              tipoLicenciamento: produtoBase?.tipoLicenciamento,
+              periodicidadeLicenca: produtoBase?.periodicidadeLicenca,
+              renovacaoAutomatica: produtoBase?.renovacaoAutomatica,
+              quantidadeLicencas: produtoBase?.quantidadeLicencas,
+              componentes: produtoBase?.componentes,
+              precoOriginal: produtoBase?.precoOriginal,
+              desconto: descontoNormalizado,
+              produtosCombo: produtoBase?.produtosCombo,
+            },
+            quantidade: quantidadeNormalizada,
+            desconto: descontoNormalizado,
+            subtotal: subtotalNormalizado,
+          };
+        })
       : [],
     descontoGlobal: Number(propostaInicial.descontoGlobal || 0),
     impostos: Number(propostaInicial.impostos || 0),
@@ -962,15 +991,56 @@ export const ModalNovaProposta: React.FC<ModalNovaPropostaProps> = ({
   };
 
   const montarPayloadProposta = (data: PropostaFormData, options?: { tokenPortal?: string }) => {
-    const temProdutosSoftware = data.produtos?.some((produto) => isProdutoSoftware(produto.produto));
+    const produtosNormalizados = (data.produtos || []).map((item) => {
+      const quantidade = normalizarQuantidadeInput(item.quantidade);
+      const desconto = normalizarDescontoInput(item.desconto ?? item.produto?.desconto ?? 0);
+      const preco = Number(item.produto?.preco ?? 0);
+      const precoNormalizado = Number.isFinite(preco) && preco > 0 ? preco : 0;
+      const subtotal = calcularSubtotalProduto(
+        {
+          ...item.produto,
+          preco: precoNormalizado,
+        },
+        quantidade,
+        desconto,
+      );
+
+      return {
+        ...item,
+        produto: {
+          ...item.produto,
+          preco: precoNormalizado,
+        },
+        quantidade,
+        desconto,
+        subtotal,
+      };
+    });
+
+    const subtotalItens = produtosNormalizados.reduce(
+      (acumulado, item) => acumulado + Number(item.subtotal || 0),
+      0,
+    );
+    const descontoGlobalNormalizado = normalizarDescontoGlobalInput(data.descontoGlobal);
+    const impostosNormalizados = normalizarImpostosInput(data.impostos);
+    const valorDescontoGlobal = subtotalItens * (descontoGlobalNormalizado / 100);
+    const subtotalComDesconto = subtotalItens - valorDescontoGlobal;
+    const valorImpostos = subtotalComDesconto * (impostosNormalizados / 100);
+    const totalNormalizado = subtotalComDesconto + valorImpostos;
+    const temProdutosSoftware = produtosNormalizados.some((produto) =>
+      isProdutoSoftware(produto.produto),
+    );
     const validadeDias = temProdutosSoftware && !data.validadeDias ? 30 : data.validadeDias || 15;
 
     return {
       ...data,
+      produtos: produtosNormalizados,
       validadeDias,
       parcelas: data.formaPagamento === 'parcelado' ? data.parcelas : undefined,
-      subtotal: totaisCombinados.subtotal,
-      total: totaisCombinados.total,
+      descontoGlobal: descontoGlobalNormalizado,
+      impostos: impostosNormalizados,
+      subtotal: subtotalItens,
+      total: totalNormalizado,
       dataValidade: new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000),
       status: (propostaInicial?.status || 'rascunho') as PropostaCompleta['status'],
       tokenPortal: options?.tokenPortal || propostaInicial?.tokenPortal,

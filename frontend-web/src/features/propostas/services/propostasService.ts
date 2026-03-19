@@ -576,6 +576,30 @@ class PropostasService {
     return proposta.produtos.map((produto: any) => {
       const nestedProduto =
         produto?.produto && typeof produto.produto === 'object' ? produto.produto : null;
+      const quantidadeRaw = Number(produto?.quantidade ?? nestedProduto?.quantidade ?? 1);
+      const quantidade =
+        Number.isFinite(quantidadeRaw) && quantidadeRaw > 0 ? quantidadeRaw : 1;
+      const precoUnitarioRaw = Number(
+        produto?.precoUnitario ??
+          produto?.preco ??
+          nestedProduto?.precoUnitario ??
+          nestedProduto?.preco ??
+          0,
+      );
+      const precoUnitario =
+        Number.isFinite(precoUnitarioRaw) && precoUnitarioRaw > 0 ? precoUnitarioRaw : 0;
+      const descontoRaw = Number(produto?.desconto ?? nestedProduto?.desconto ?? 0);
+      const desconto = Number.isFinite(descontoRaw)
+        ? Math.min(100, Math.max(0, descontoRaw))
+        : 0;
+      const subtotalComDesconto =
+        quantidade * precoUnitario * (1 - desconto / 100);
+      const subtotalInformado =
+        produto?.subtotal ??
+        produto?.valorTotal ??
+        nestedProduto?.subtotal ??
+        nestedProduto?.valorTotal;
+      const subtotalNormalizado = Number(subtotalInformado);
       const componentes = Array.isArray(produto?.componentesPlano)
         ? (produto.componentesPlano as ProdutoComponentePlano[])
         : Array.isArray(produto?.componentes)
@@ -608,12 +632,7 @@ class PropostasService {
         produto: {
           id: produto?.id || produto?.produtoId || nestedProduto?.id || `prod_${Date.now()}`,
           nome: produto?.nome || produto?.produtoNome || nestedProduto?.nome || 'Produto',
-          preco:
-            produto?.precoUnitario ??
-            produto?.preco ??
-            nestedProduto?.precoUnitario ??
-            nestedProduto?.preco ??
-            0,
+          preco: precoUnitario,
           categoria: produto?.categoria || nestedProduto?.categoria || 'Geral',
           unidade: produto?.unidade || nestedProduto?.unidade || 'unidade',
           descricao: produto?.descricao || nestedProduto?.descricao || '',
@@ -622,12 +641,13 @@ class PropostasService {
           tipoItem,
           componentes,
         },
-        quantidade: produto?.quantidade || 1,
-        desconto: produto?.desconto || 0,
-        subtotal:
-          produto?.subtotal ||
-          (produto?.precoUnitario || produto?.preco || nestedProduto?.preco || 0) *
-            (produto?.quantidade || 1),
+        quantidade,
+        desconto: Number.isFinite(desconto) ? desconto : 0,
+        subtotal: Number.isFinite(subtotalNormalizado)
+          ? subtotalNormalizado
+          : Number.isFinite(subtotalComDesconto)
+            ? subtotalComDesconto
+            : 0,
       };
     });
   }
@@ -684,6 +704,20 @@ class PropostasService {
       propostaAny.data_atualizacao;
     const criadaEmDate = criadaEmFonte ? new Date(criadaEmFonte) : null;
     const atualizadaEmDate = atualizadaEmFonte ? new Date(atualizadaEmFonte) : null;
+    const subtotalItens = produtos.reduce(
+      (acumulado, item) => acumulado + this.toFiniteNumber(item?.subtotal, 0),
+      0,
+    );
+    const descontoGlobal = this.toFiniteNumber(propostaAny.descontoGlobal, 0);
+    const impostos = this.toFiniteNumber(propostaAny.impostos, 0);
+    const subtotalInformado = this.toFiniteNumber(propostaAny.subtotal, Number.NaN);
+    const subtotal = Number.isFinite(subtotalInformado) ? subtotalInformado : subtotalItens;
+    const totalInformado = this.toFiniteNumber(propostaAny.total ?? propostaAny.valor, Number.NaN);
+    const descontoPercentual = Math.min(100, Math.max(0, descontoGlobal));
+    const impostosPercentual = Math.min(100, Math.max(0, impostos));
+    const subtotalComDesconto = subtotal * (1 - descontoPercentual / 100);
+    const totalCalculado = subtotalComDesconto * (1 + impostosPercentual / 100);
+    const total = Number.isFinite(totalInformado) ? totalInformado : totalCalculado;
 
     return {
       id: propostaAny.id,
@@ -703,8 +737,8 @@ class PropostasService {
       cliente,
       vendedor,
       produtos,
-      descontoGlobal: propostaAny.descontoGlobal ?? 0,
-      impostos: propostaAny.impostos ?? 0,
+      descontoGlobal,
+      impostos,
       formaPagamento: (propostaAny.formaPagamento as any) || 'avista',
       parcelas:
         propostaAny.parcelas != null && propostaAny.parcelas !== ''
@@ -713,8 +747,8 @@ class PropostasService {
       validadeDias: propostaAny.validadeDias ?? 30,
       observacoes: propostaAny.observacoes || '',
       incluirImpostosPDF: Boolean(propostaAny.incluirImpostosPDF),
-      subtotal: propostaAny.subtotal ?? propostaAny.total ?? propostaAny.valor ?? 0,
-      total: propostaAny.total ?? propostaAny.valor ?? 0,
+      subtotal,
+      total,
       dataValidade: propostaAny.dataVencimento
         ? new Date(propostaAny.dataVencimento)
         : new Date(Date.now() + (propostaAny.validadeDias ?? 30) * 24 * 60 * 60 * 1000),
@@ -875,7 +909,16 @@ class PropostasService {
       (dados.produtos || []).reduce((acc, produto) => {
         const quantidade = this.toInteger(produto.quantidade, 1, { min: 1 });
         const preco = this.toFiniteNumber(produto.produto.preco, 0);
-        const descontoItem = this.toFiniteNumber(produto.desconto, 0);
+        const descontoItem = Math.min(
+          100,
+          Math.max(
+            0,
+            this.toFiniteNumber(
+              produto.desconto ?? (produto.produto as Produto | undefined)?.desconto,
+              0,
+            ),
+          ),
+        );
         return acc + quantidade * preco * (1 - descontoItem / 100);
       }, 0),
     );
@@ -929,69 +972,83 @@ class PropostasService {
       incluirImpostosPDF: dados.incluirImpostosPDF ?? false,
       status: dados.status || 'rascunho',
       produtos:
-        dados.produtos?.map((produto) => ({
-          id: produto.produto.id,
-          produtoId: produto.produto.id,
-          nome: produto.produto.nome,
-          tipo: produto.produto.tipo || 'produto',
-          status: produto.produto.status || 'ativo',
-          categoria: produto.produto.categoria || 'Geral',
-          descricao: produto.produto.descricao || '',
-          unidade: produto.produto.unidade || 'unidade',
-          tipoItem: produto.produto.tipoItem || 'produto',
-          quantidade: this.toInteger(produto.quantidade, 1, { min: 1 }),
-          precoUnitario: this.toFiniteNumber(produto.produto.preco, 0),
-          desconto: this.toFiniteNumber(produto.desconto, 0),
-          subtotal:
-            this.toInteger(produto.quantidade, 1, { min: 1 }) *
-            this.toFiniteNumber(produto.produto.preco, 0) *
-            (1 - this.toFiniteNumber(produto.desconto, 0) / 100),
-          produtosCombo:
-            produto.produto.tipo === 'combo' && Array.isArray(produto.produto.produtosCombo)
-              ? produto.produto.produtosCombo.map((itemCombo) => ({
-                  id: itemCombo.id,
-                  nome: itemCombo.nome,
-                  status: itemCombo.status || 'ativo',
-                  categoria: itemCombo.categoria || 'Geral',
-                  descricao: itemCombo.descricao || '',
-                  unidade: itemCombo.unidade || 'unidade',
-                  tipoItem: itemCombo.tipoItem || 'produto',
-                  precoUnitario: Number(itemCombo.preco || 0),
-                }))
-              : undefined,
-          componentesPlano:
-            produto.produto.tipoItem === 'plano' && Array.isArray(produto.produto.componentes)
-              ? produto.produto.componentes.map((componente) => ({
-                  childItemId: componente.childItemId,
-                  componentRole: componente.componentRole || 'included',
-                  quantity:
-                    componente.quantity === undefined || componente.quantity === null
-                      ? 1
-                      : Number(componente.quantity),
-                  sortOrder:
-                    componente.sortOrder === undefined || componente.sortOrder === null
-                      ? undefined
-                      : Number(componente.sortOrder),
-                  affectsPrice:
-                    componente.affectsPrice === undefined
-                      ? undefined
-                      : Boolean(componente.affectsPrice),
-                  isDefault:
-                    componente.isDefault === undefined ? undefined : Boolean(componente.isDefault),
-                  nome: componente.nome || '',
-                  preco:
-                    componente.preco === undefined || componente.preco === null
-                      ? undefined
-                      : Number(componente.preco),
-                  tipoItem: componente.tipoItem,
-                  status: componente.status,
-                  metadata:
-                    componente.metadata && typeof componente.metadata === 'object'
-                      ? componente.metadata
-                      : undefined,
-                }))
-              : undefined,
-        })) || [],
+        dados.produtos?.map((produto) => {
+          const quantidade = this.toInteger(produto.quantidade, 1, { min: 1 });
+          const precoUnitario = this.toFiniteNumber(produto.produto.preco, 0);
+          const descontoItem = Math.min(
+            100,
+            Math.max(
+              0,
+              this.toFiniteNumber(
+                produto.desconto ?? (produto.produto as Produto | undefined)?.desconto,
+                0,
+              ),
+            ),
+          );
+
+          return {
+            id: produto.produto.id,
+            produtoId: produto.produto.id,
+            nome: produto.produto.nome,
+            tipo: produto.produto.tipo || 'produto',
+            status: produto.produto.status || 'ativo',
+            categoria: produto.produto.categoria || 'Geral',
+            descricao: produto.produto.descricao || '',
+            unidade: produto.produto.unidade || 'unidade',
+            tipoItem: produto.produto.tipoItem || 'produto',
+            quantidade,
+            precoUnitario,
+            desconto: descontoItem,
+            subtotal: quantidade * precoUnitario * (1 - descontoItem / 100),
+            produtosCombo:
+              produto.produto.tipo === 'combo' && Array.isArray(produto.produto.produtosCombo)
+                ? produto.produto.produtosCombo.map((itemCombo) => ({
+                    id: itemCombo.id,
+                    nome: itemCombo.nome,
+                    status: itemCombo.status || 'ativo',
+                    categoria: itemCombo.categoria || 'Geral',
+                    descricao: itemCombo.descricao || '',
+                    unidade: itemCombo.unidade || 'unidade',
+                    tipoItem: itemCombo.tipoItem || 'produto',
+                    precoUnitario: Number(itemCombo.preco || 0),
+                  }))
+                : undefined,
+            componentesPlano:
+              produto.produto.tipoItem === 'plano' && Array.isArray(produto.produto.componentes)
+                ? produto.produto.componentes.map((componente) => ({
+                    childItemId: componente.childItemId,
+                    componentRole: componente.componentRole || 'included',
+                    quantity:
+                      componente.quantity === undefined || componente.quantity === null
+                        ? 1
+                        : Number(componente.quantity),
+                    sortOrder:
+                      componente.sortOrder === undefined || componente.sortOrder === null
+                        ? undefined
+                        : Number(componente.sortOrder),
+                    affectsPrice:
+                      componente.affectsPrice === undefined
+                        ? undefined
+                        : Boolean(componente.affectsPrice),
+                    isDefault:
+                      componente.isDefault === undefined
+                        ? undefined
+                        : Boolean(componente.isDefault),
+                    nome: componente.nome || '',
+                    preco:
+                      componente.preco === undefined || componente.preco === null
+                        ? undefined
+                        : Number(componente.preco),
+                    tipoItem: componente.tipoItem,
+                    status: componente.status,
+                    metadata:
+                      componente.metadata && typeof componente.metadata === 'object'
+                        ? componente.metadata
+                        : undefined,
+                  }))
+                : undefined,
+          };
+        }) || [],
     };
   }
 
