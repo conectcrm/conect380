@@ -209,6 +209,9 @@ jobs:
           if ("${{ steps.options.outputs.run_smoke }}" -eq 'true') {
             $deployParams.RunSmoke = $true
           }
+          else {
+            $deployParams.SkipSmoke = $true
+          }
 
           if (-not [string]::IsNullOrWhiteSpace($env:SUPERADMIN_EMAIL)) {
             $deployParams.SuperAdminEmail = $env:SUPERADMIN_EMAIL
