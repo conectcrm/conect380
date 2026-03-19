@@ -511,7 +511,6 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
   const [versaoAtualSelecionada, setVersaoAtualSelecionada] = useState<number | null>(null);
   const [versaoBaseSelecionada, setVersaoBaseSelecionada] = useState<number | null>(null);
   const [nomesProdutosPorId, setNomesProdutosPorId] = useState<Record<string, string>>({});
-  const [recalculandoTotais, setRecalculandoTotais] = useState(false);
 
   const propostaId = proposta?.id ? String(proposta.id) : null;
 
@@ -1015,45 +1014,6 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
   const handleAtualizarPagina = () => {
     void carregarDadosCiclo();
     onPropostaUpdated?.();
-  };
-
-  const handleRecalcularTotais = async () => {
-    if (!propostaId) {
-      toastService.error('Proposta sem identificador para recalcular totais.');
-      return;
-    }
-
-    if (itensNegociados.length === 0) {
-      toastService.error('Adicione pelo menos 1 item para recalcular os totais.');
-      return;
-    }
-
-    const subtotalRecalculado = itensNegociados.reduce((acc, item) => acc + Number(item.subtotal || 0), 0);
-    const descontoPercentual = Math.max(Number(descontoGlobalPercentual || 0), 0);
-    const impostosPercentualAtual = Math.max(Number(impostosPercentual || 0), 0);
-    const valorDesconto = subtotalRecalculado * (descontoPercentual / 100);
-    const subtotalComDesconto = subtotalRecalculado - valorDesconto;
-    const valorImpostos = subtotalComDesconto * (impostosPercentualAtual / 100);
-    const totalRecalculado = Math.max(subtotalComDesconto + valorImpostos, 0);
-
-    try {
-      setRecalculandoTotais(true);
-      await propostasApiService.update(propostaId, {
-        subtotal: Number(subtotalRecalculado.toFixed(2)),
-        descontoGlobal: descontoPercentual,
-        impostos: impostosPercentualAtual,
-        total: Number(totalRecalculado.toFixed(2)),
-        valor: Number(totalRecalculado.toFixed(2)),
-      } as any);
-
-      toastService.success('Totais recalculados com base nos itens da proposta.');
-      handleAtualizarPagina();
-    } catch (error) {
-      console.error('Erro ao recalcular totais da proposta:', error);
-      toastService.error('Nao foi possivel recalcular os totais da proposta.');
-    } finally {
-      setRecalculandoTotais(false);
-    }
   };
 
   const compartilharSection = (
@@ -1768,26 +1728,6 @@ const ModalVisualizarProposta: React.FC<ModalVisualizarPropostaProps> = ({
                 className="inline-flex h-9 items-center rounded-md border border-[#C8DAE2] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F1F7FA]"
               >
                 Atualizar
-              </button>
-              <button
-                type="button"
-                onClick={handleRecalcularTotais}
-                disabled={recalculandoTotais || itensNegociados.length === 0}
-                className="inline-flex h-9 items-center rounded-md border border-[#C8DAE2] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F1F7FA] disabled:cursor-not-allowed disabled:opacity-60"
-                title={
-                  itensNegociados.length > 0
-                    ? 'Recalcular subtotal e total com base nos itens da proposta'
-                    : 'Inclua itens na proposta para recalcular os totais'
-                }
-              >
-                {recalculandoTotais ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Recalculando...
-                  </>
-                ) : (
-                  'Recalcular totais'
-                )}
               </button>
               {onClose && (
                 <button

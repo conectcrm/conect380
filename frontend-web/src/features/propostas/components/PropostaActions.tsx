@@ -2481,8 +2481,21 @@ const PropostaActions: React.FC<PropostaActionsProps> = ({
         proposta: {
           id: String(propostaId),
           numero: propostaData.numero,
+          titulo: propostaData.titulo || 'Proposta comercial',
           valorTotal: propostaData.total,
+          valor: propostaData.total,
+          total: propostaData.total,
           dataValidade: propostaData.dataValidade,
+          formaPagamento:
+            String((proposta as any)?.formaPagamento || '').trim() || undefined,
+          validadeDias: Number((proposta as any)?.validadeDias || 0) || undefined,
+          dataEmissao:
+            String((proposta as any)?.criadaEm || (proposta as any)?.createdAt || '').trim() ||
+            undefined,
+          clienteNome: clienteData.nome || undefined,
+          vendedorNome: vendedorPayload.nome || undefined,
+          empresaNome:
+            empresaData.nome || toTextoNaoVazio(usuarioLogado?.empresa?.nome) || undefined,
           token: token,
         },
         vendedor: {

@@ -345,10 +345,15 @@ export class EmailIntegradoService {
           address: transportContext.fromAddress,
         },
         to: emailCliente,
-        subject: `Proposta ${dadosProposta.numero} - ${dadosProposta.titulo || 'Proposta Comercial'}`,
-        html: this.gerarTemplateProposta(dadosProposta, linkPortal),
+        subject: `Proposta ${this.resolvePropostaNumero(dadosProposta)} - ${this.resolvePropostaTitulo(dadosProposta)}`,
+        html: this.gerarTemplateProposta(
+          dadosProposta,
+          linkPortal,
+          await this.resolveEmailBranding(empresaId, dadosProposta),
+        ),
       };
 
+      this.log('[EMAIL TEMPLATE] proposta_email_v2');
       const result = await transportContext.transporter.sendMail(mailOptions);
       this.log('Proposta enviada por email:', result.messageId);
 
@@ -512,6 +517,189 @@ export class EmailIntegradoService {
     }
   }
 
+  private normalizeText(value: unknown): string {
+    return String(value ?? '').trim();
+  }
+
+  private sanitizeHtml(value: unknown): string {
+    return this.normalizeText(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  private toFiniteNumber(value: unknown): number | null {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return null;
+      }
+
+      const normalized = trimmed.replace(/\./g, '').replace(',', '.');
+      const numeric = Number(normalized);
+      if (Number.isFinite(numeric)) {
+        return numeric;
+      }
+
+      const fallback = Number(trimmed.replace(',', '.'));
+      return Number.isFinite(fallback) ? fallback : null;
+    }
+
+    return null;
+  }
+
+  private formatCurrencyBRL(value: unknown): string {
+    const numeric = this.toFiniteNumber(value);
+    if (numeric === null) {
+      return 'A definir';
+    }
+
+    return numeric.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    });
+  }
+
+  private formatDateBR(value: unknown): string | null {
+    if (!value) {
+      return null;
+    }
+
+    const date = value instanceof Date ? value : new Date(String(value));
+    if (Number.isNaN(date.getTime())) {
+      return null;
+    }
+
+    return date.toLocaleDateString('pt-BR');
+  }
+
+  private normalizeHexColor(value: unknown, fallback = '#159A9C'): string {
+    const color = this.normalizeText(value);
+    return /^#(?:[0-9a-fA-F]{3}){1,2}$/.test(color) ? color : fallback;
+  }
+
+  private resolvePropostaNumero(proposta: any): string {
+    return this.normalizeText(proposta?.numero || proposta?.codigo || proposta?.id) || 'N/A';
+  }
+
+  private resolvePropostaTitulo(proposta: any): string {
+    return (
+      this.normalizeText(
+        proposta?.titulo ||
+          proposta?.assunto ||
+          proposta?.nome ||
+          proposta?.descricao ||
+          proposta?.empresa?.nome,
+      ) || 'Proposta Comercial'
+    );
+  }
+
+  private resolvePropostaValor(proposta: any): unknown {
+    return proposta?.valor ?? proposta?.total ?? proposta?.valorTotal ?? proposta?.subtotal;
+  }
+
+  private resolveClienteNome(proposta: any): string {
+    const clienteObjeto = proposta?.cliente;
+    if (clienteObjeto && typeof clienteObjeto === 'object') {
+      const nomeObjeto = this.normalizeText(clienteObjeto?.nome);
+      if (nomeObjeto) {
+        return nomeObjeto;
+      }
+    }
+
+    const nome = this.normalizeText(
+      proposta?.clienteNome ||
+        proposta?.nomeCliente ||
+        (typeof clienteObjeto === 'string' ? clienteObjeto : ''),
+    );
+    return nome || 'cliente';
+  }
+
+  private resolveFormaPagamento(proposta: any): string {
+    return (
+      this.normalizeText(
+        proposta?.formaPagamento || proposta?.condicaoPagamento || proposta?.pagamento,
+      ) || 'A combinar'
+    );
+  }
+
+  private resolveValidadeTexto(proposta: any): string {
+    const dataValidade = this.formatDateBR(
+      proposta?.dataValidade || proposta?.dataVencimento || proposta?.data_vencimento,
+    );
+    if (dataValidade) {
+      return dataValidade;
+    }
+
+    const validadeDias = this.toFiniteNumber(proposta?.validadeDias);
+    if (validadeDias && validadeDias > 0) {
+      return `${Math.round(validadeDias)} dias`;
+    }
+
+    return '30 dias';
+  }
+
+  private getInitials(value: string): string {
+    const normalized = this.normalizeText(value);
+    if (!normalized) {
+      return 'CC';
+    }
+
+    const initials = normalized
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part.charAt(0).toUpperCase())
+      .join('');
+
+    return initials || 'CC';
+  }
+
+  private async resolveEmailBranding(
+    empresaId?: string,
+    proposta?: any,
+  ): Promise<{
+    empresaNome: string;
+    logoUrl: string | null;
+    corPrimaria: string;
+    site: string | null;
+  }> {
+    const fallback = {
+      empresaNome:
+        this.normalizeText(
+          proposta?.empresa?.nome || proposta?.empresaNome || process.env.EMAIL_FROM_NAME,
+        ) || 'Conect CRM',
+      logoUrl: this.normalizeText(proposta?.empresa?.logo || proposta?.logoUrl) || null,
+      corPrimaria: this.normalizeHexColor(proposta?.empresa?.corPrimaria || proposta?.corPrimaria),
+      site: this.normalizeText(proposta?.empresa?.site || proposta?.site) || null,
+    };
+
+    if (!empresaId || !this.empresaConfigService) {
+      return fallback;
+    }
+
+    try {
+      const config = await this.empresaConfigService.getByEmpresaId(empresaId);
+      return {
+        empresaNome: fallback.empresaNome,
+        logoUrl: this.normalizeText(config?.logoUrl) || fallback.logoUrl,
+        corPrimaria: this.normalizeHexColor(config?.corPrimaria || fallback.corPrimaria),
+        site: this.normalizeText(config?.site) || fallback.site,
+      };
+    } catch (error) {
+      this.warn(
+        `Falha ao carregar branding da empresa ${empresaId}: ${this.resolveErrorMessage(error, 'erro desconhecido')}`,
+      );
+      return fallback;
+    }
+  }
+
   private gerarTemplateAceitacao(proposta: any): string {
     return `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -521,14 +709,14 @@ export class EmailIntegradoService {
 
         <div style="padding: 20px; background: #f9fafb;">
           <h2>Otimas noticias!</h2>
-          <p>A proposta <strong>${proposta.numero}</strong> foi aceita pelo cliente.</p>
+          <p>A proposta <strong>${this.sanitizeHtml(this.resolvePropostaNumero(proposta))}</strong> foi aceita pelo cliente.</p>
 
           <div style="background: white; padding: 15px; border-radius: 8px; margin: 20px 0;">
             <h3>Detalhes da Proposta:</h3>
             <ul>
-              <li><strong>Cliente:</strong> ${proposta.cliente}</li>
-              <li><strong>Titulo:</strong> ${proposta.titulo}</li>
-              <li><strong>Valor:</strong> R$ ${proposta.valor?.toLocaleString('pt-BR')}</li>
+              <li><strong>Cliente:</strong> ${this.sanitizeHtml(this.resolveClienteNome(proposta))}</li>
+              <li><strong>Titulo:</strong> ${this.sanitizeHtml(this.resolvePropostaTitulo(proposta))}</li>
+              <li><strong>Valor:</strong> ${this.sanitizeHtml(this.formatCurrencyBRL(this.resolvePropostaValor(proposta)))}</li>
               <li><strong>Data de Aceite:</strong> ${new Date().toLocaleString('pt-BR')}</li>
             </ul>
           </div>
@@ -556,14 +744,14 @@ export class EmailIntegradoService {
 
         <div style="padding: 20px; background: #f9fafb;">
           <h2>Infelizmente...</h2>
-          <p>A proposta <strong>${proposta.numero}</strong> foi rejeitada pelo cliente.</p>
+          <p>A proposta <strong>${this.sanitizeHtml(this.resolvePropostaNumero(proposta))}</strong> foi rejeitada pelo cliente.</p>
 
           <div style="background: white; padding: 15px; border-radius: 8px; margin: 20px 0;">
             <h3>Detalhes da Proposta:</h3>
             <ul>
-              <li><strong>Cliente:</strong> ${proposta.cliente}</li>
-              <li><strong>Titulo:</strong> ${proposta.titulo}</li>
-              <li><strong>Valor:</strong> R$ ${proposta.valor?.toLocaleString('pt-BR')}</li>
+              <li><strong>Cliente:</strong> ${this.sanitizeHtml(this.resolveClienteNome(proposta))}</li>
+              <li><strong>Titulo:</strong> ${this.sanitizeHtml(this.resolvePropostaTitulo(proposta))}</li>
+              <li><strong>Valor:</strong> ${this.sanitizeHtml(this.formatCurrencyBRL(this.resolvePropostaValor(proposta)))}</li>
               <li><strong>Data de Rejeicao:</strong> ${new Date().toLocaleString('pt-BR')}</li>
             </ul>
           </div>
@@ -586,38 +774,106 @@ export class EmailIntegradoService {
     `;
   }
 
-  private gerarTemplateProposta(proposta: any, linkPortal: string): string {
+  private gerarTemplateProposta(
+    proposta: any,
+    linkPortal: string,
+    branding: {
+      empresaNome: string;
+      logoUrl: string | null;
+      corPrimaria: string;
+      site: string | null;
+    },
+  ): string {
+    const numero = this.sanitizeHtml(this.resolvePropostaNumero(proposta));
+    const titulo = this.sanitizeHtml(this.resolvePropostaTitulo(proposta));
+    const valor = this.sanitizeHtml(this.formatCurrencyBRL(this.resolvePropostaValor(proposta)));
+    const validade = this.sanitizeHtml(this.resolveValidadeTexto(proposta));
+    const formaPagamento = this.sanitizeHtml(this.resolveFormaPagamento(proposta));
+    const clienteNome = this.sanitizeHtml(this.resolveClienteNome(proposta));
+    const empresaNome = this.sanitizeHtml(branding.empresaNome);
+    const portalLink = this.normalizeText(linkPortal) || '#';
+    const portalLinkSafe = this.sanitizeHtml(portalLink);
+    const siteSafe = this.sanitizeHtml(branding.site || '');
+    const corPrimaria = this.normalizeHexColor(branding.corPrimaria, '#159A9C');
+    const corPrimariaSafe = this.sanitizeHtml(corPrimaria);
+    const logoUrl = this.normalizeText(branding.logoUrl || '');
+    const logoSafe = this.sanitizeHtml(logoUrl);
+    const logoHtml = logoUrl
+      ? `<img src="${logoSafe}" alt="${empresaNome}" style="max-height: 42px; max-width: 180px; display: block;" />`
+      : `<div style="width: 42px; height: 42px; border-radius: 50%; background: #e8f4f4; color: ${corPrimariaSafe}; font-weight: 700; font-size: 16px; line-height: 42px; text-align: center;">${this.sanitizeHtml(this.getInitials(branding.empresaNome))}</div>`;
+
     return `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: #2563eb; color: white; padding: 20px; text-align: center;">
-          <h1>Nova Proposta</h1>
-        </div>
+      <!-- template: proposta_email_v2 -->
+      <div style="margin: 0; padding: 0; background: #eef3f8; font-family: Arial, sans-serif;">
+        <div style="max-width: 640px; margin: 0 auto; padding: 20px 12px;">
+          <div style="background: #ffffff; border: 1px solid #dce6ef; border-radius: 14px; overflow: hidden;">
+            <div style="padding: 20px 24px; border-bottom: 1px solid #edf2f7;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td style="vertical-align: middle;">
+                    ${logoHtml}
+                  </td>
+                  <td style="text-align: right; vertical-align: middle;">
+                    <div style="font-size: 12px; color: #5b6b7a; text-transform: uppercase; letter-spacing: 0.6px;">${empresaNome}</div>
+                    <div style="font-size: 18px; font-weight: 700; color: #1d2a35; margin-top: 4px;">Nova Proposta Comercial</div>
+                  </td>
+                </tr>
+              </table>
+            </div>
+            <div style="height: 4px; background: ${corPrimariaSafe};"></div>
 
-        <div style="padding: 20px; background: #f9fafb;">
-          <h2>Ola!</h2>
-          <p>Recebemos sua solicitacao e preparamos uma proposta personalizada para voce.</p>
+            <div style="padding: 24px;">
+              <p style="margin: 0 0 16px; font-size: 22px; font-weight: 700; color: #1d2a35;">Ol&aacute;, ${clienteNome}!</p>
+              <p style="margin: 0 0 20px; font-size: 15px; color: #3d4f60; line-height: 1.6;">
+                Preparamos uma proposta personalizada para voce. Confira os detalhes e acesse o portal para avaliar.
+              </p>
 
-          <div style="background: white; padding: 15px; border-radius: 8px; margin: 20px 0;">
-            <h3>Detalhes da Proposta:</h3>
-            <ul>
-              <li><strong>Numero:</strong> ${proposta.numero}</li>
-              <li><strong>Titulo:</strong> ${proposta.titulo}</li>
-              <li><strong>Valor:</strong> R$ ${proposta.valor?.toLocaleString('pt-BR')}</li>
-            </ul>
-          </div>
+              <div style="background: #f8fbff; border: 1px solid #dce6ef; border-radius: 12px; padding: 16px;">
+                <div style="font-size: 15px; font-weight: 700; color: #1d2a35; margin-bottom: 12px;">Resumo da proposta</div>
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td style="padding: 6px 0; color: #627383; font-size: 13px;">Numero</td>
+                    <td style="padding: 6px 0; color: #1d2a35; font-size: 14px; font-weight: 700; text-align: right;">${numero}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 6px 0; color: #627383; font-size: 13px;">Titulo</td>
+                    <td style="padding: 6px 0; color: #1d2a35; font-size: 14px; font-weight: 700; text-align: right;">${titulo}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 6px 0; color: #627383; font-size: 13px;">Valor total</td>
+                    <td style="padding: 6px 0; color: #0f766e; font-size: 16px; font-weight: 700; text-align: right;">${valor}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 6px 0; color: #627383; font-size: 13px;">Validade</td>
+                    <td style="padding: 6px 0; color: #1d2a35; font-size: 14px; font-weight: 700; text-align: right;">${validade}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 6px 0; color: #627383; font-size: 13px;">Forma de pagamento</td>
+                    <td style="padding: 6px 0; color: #1d2a35; font-size: 14px; font-weight: 700; text-align: right;">${formaPagamento}</td>
+                  </tr>
+                </table>
+              </div>
 
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${linkPortal}"
-               style="background: #10b981; color: white; padding: 15px 30px;
-                      text-decoration: none; border-radius: 8px; display: inline-block;
-                      font-weight: bold;">
-              Visualizar Proposta Completa
-            </a>
-          </div>
+              <div style="text-align: center; margin: 26px 0 18px;">
+                <a href="${portalLinkSafe}"
+                   style="background: ${corPrimariaSafe}; color: #ffffff; padding: 14px 28px;
+                          text-decoration: none; border-radius: 10px; display: inline-block;
+                          font-size: 15px; font-weight: 700;">
+                  Visualizar proposta completa
+                </a>
+              </div>
 
-          <div style="background: #fef3c7; padding: 15px; border-radius: 8px; text-align: center;">
-            <p><strong>Esta proposta e valida por 30 dias</strong></p>
-            <p>Clique no botao acima para aceitar ou rejeitar a proposta.</p>
+              <div style="background: #fffbeb; border: 1px solid #f3d38c; border-radius: 10px; padding: 12px 14px; color: #744210; font-size: 13px; line-height: 1.5;">
+                Esta proposta permanece disponivel por ${validade}. Use o botao acima para revisar, aceitar ou solicitar ajustes.
+              </div>
+            </div>
+
+            <div style="padding: 14px 24px; border-top: 1px solid #edf2f7; background: #fafcff;">
+              <p style="margin: 0; font-size: 12px; color: #607182;">
+                Em caso de duvidas, responda este e-mail.
+                ${siteSafe ? ` Site: ${siteSafe}` : ''}
+              </p>
+            </div>
           </div>
         </div>
       </div>

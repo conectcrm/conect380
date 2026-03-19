@@ -33,6 +33,15 @@ export interface PropostaEmailData {
     valorTotal: number;
     dataValidade: string;
     token: string;
+    titulo?: string;
+    valor?: number;
+    total?: number;
+    formaPagamento?: string;
+    validadeDias?: number;
+    dataEmissao?: string;
+    clienteNome?: string;
+    vendedorNome?: string;
+    empresaNome?: string;
   };
   vendedor: {
     nome: string;
@@ -97,7 +106,16 @@ class EmailServiceReal {
           id: data.proposta.id || data.proposta.numero,
           numero: data.proposta.numero,
           valorTotal: data.proposta.valorTotal,
+          valor: data.proposta.valor ?? data.proposta.valorTotal,
+          total: data.proposta.total ?? data.proposta.valorTotal,
           dataValidade: data.proposta.dataValidade,
+          titulo: data.proposta.titulo,
+          formaPagamento: data.proposta.formaPagamento,
+          validadeDias: data.proposta.validadeDias,
+          dataEmissao: data.proposta.dataEmissao,
+          clienteNome: data.proposta.clienteNome,
+          vendedorNome: data.proposta.vendedorNome,
+          empresaNome: data.proposta.empresaNome,
           token: data.proposta.token,
         },
         emailCliente: data.cliente.email,

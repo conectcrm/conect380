@@ -47,14 +47,21 @@ export interface PropostaPublica {
   id: string;
   numero: string;
   titulo: string;
-  status: 'enviada' | 'visualizada' | 'aprovada' | 'rejeitada' | 'expirada';
+  status: 'rascunho' | 'enviada' | 'visualizada' | 'negociacao' | 'aprovada' | 'rejeitada' | 'expirada';
   dataEnvio: Date;
   dataValidade: Date;
+  criadaEm: Date;
+  subtotal: number;
+  descontoGlobal: number;
+  impostos: number;
+  total: number;
   valorTotal: number;
   token: string; // Token único para acesso público
   empresa: {
     nome: string;
     logo?: string;
+    corPrimaria?: string;
+    site?: string;
     endereco: string;
     telefone: string;
     email: string;
@@ -69,10 +76,13 @@ export interface PropostaPublica {
     telefone: string;
   };
   produtos: Array<{
+    id?: string;
     nome: string;
     descricao: string;
     quantidade: number;
     valorUnitario: number;
+    desconto: number;
+    subtotal: number;
     valorTotal: number;
   }>;
   condicoes: {
@@ -102,11 +112,23 @@ interface LogAcao {
 class PortalClienteService {
   private mapStatusPortal(status: unknown): PropostaPublica['status'] {
     const normalized = String(status || '').toLowerCase();
+    if (normalized === 'rascunho') return 'rascunho';
     if (normalized === 'visualizada') return 'visualizada';
+    if (normalized === 'negociacao' || normalized === 'em_negociacao') return 'negociacao';
     if (normalized === 'aprovada') return 'aprovada';
     if (normalized === 'rejeitada') return 'rejeitada';
     if (normalized === 'expirada') return 'expirada';
     return 'enviada';
+  }
+
+  private toFiniteNumber(value: unknown, fallback = 0): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  private normalizePercent(value: unknown): number {
+    const parsed = this.toFiniteNumber(value, 0);
+    return Math.min(100, Math.max(0, parsed));
   }
 
   private mapPropostaPortal(raw: any): PropostaPublica {
@@ -127,19 +149,41 @@ class PortalClienteService {
 
     const produtos = Array.isArray(raw?.produtos)
       ? raw.produtos.map((produto: any, index: number) => {
-          const quantidade = Number(produto?.quantidade ?? 1) || 1;
-          const valorUnitario = Number(produto?.valorUnitario ?? produto?.precoUnitario ?? 0) || 0;
+          const quantidade = this.toFiniteNumber(produto?.quantidade, 1) || 1;
+          const valorUnitario = this.toFiniteNumber(
+            produto?.valorUnitario ?? produto?.precoUnitario ?? produto?.preco,
+            0,
+          );
+          const desconto = this.normalizePercent(produto?.desconto);
+          const subtotalCalculado = quantidade * valorUnitario * (1 - desconto / 100);
+          const subtotal = this.toFiniteNumber(produto?.subtotal ?? produto?.valorTotal, subtotalCalculado);
           return {
+            id: typeof produto?.id === 'string' ? produto.id : undefined,
             nome: String(produto?.nome || `Item ${index + 1}`),
             descricao: String(produto?.descricao || ''),
             quantidade,
             valorUnitario,
-            valorTotal: Number(produto?.valorTotal ?? quantidade * valorUnitario) || 0,
+            desconto,
+            subtotal,
+            valorTotal: this.toFiniteNumber(produto?.valorTotal, subtotal),
           };
         })
       : [];
 
+    const subtotalItens = produtos.reduce(
+      (acc, produto) => acc + this.toFiniteNumber(produto?.subtotal, 0),
+      0,
+    );
+    const subtotal = this.toFiniteNumber(raw?.subtotal, subtotalItens);
+    const descontoGlobal = this.normalizePercent(
+      raw?.descontoGlobal ?? raw?.percentualDesconto ?? raw?.descontoGeral,
+    );
+    const impostos = this.normalizePercent(raw?.impostos ?? raw?.percentualImpostos);
+    const totalCalculado = subtotal * (1 - descontoGlobal / 100) * (1 + impostos / 100);
+    const total = this.toFiniteNumber(raw?.total ?? raw?.valor ?? raw?.valorTotal, totalCalculado);
+
     const dataEnvio = raw?.emailDetails?.sentAt || raw?.criadaEm || raw?.createdAt || new Date();
+    const criadaEm = raw?.criadaEm || raw?.createdAt || dataEnvio;
     const dataValidade =
       raw?.dataValidade ||
       raw?.dataVencimento ||
@@ -152,11 +196,28 @@ class PortalClienteService {
       status: this.mapStatusPortal(raw?.status),
       dataEnvio: new Date(dataEnvio),
       dataValidade: new Date(dataValidade),
-      valorTotal: Number(raw?.valor ?? raw?.total ?? 0) || 0,
+      criadaEm: new Date(criadaEm),
+      subtotal,
+      descontoGlobal,
+      impostos,
+      total,
+      valorTotal: total,
       token: String(raw?.token || ''),
       empresa: {
         nome: String(empresaRaw?.nome || 'Conect360'),
         logo: typeof empresaRaw?.logo === 'string' ? empresaRaw.logo : undefined,
+        corPrimaria:
+          typeof empresaRaw?.corPrimaria === 'string'
+            ? empresaRaw.corPrimaria
+            : typeof raw?.corPrimaria === 'string'
+              ? raw.corPrimaria
+              : undefined,
+        site:
+          typeof empresaRaw?.site === 'string'
+            ? empresaRaw.site
+            : typeof raw?.site === 'string'
+              ? raw.site
+              : undefined,
         endereco: String(empresaRaw?.endereco || 'Goiânia/GO'),
         telefone: String(empresaRaw?.telefone || ''),
         email: String(empresaRaw?.email || ''),
@@ -172,10 +233,15 @@ class PortalClienteService {
       },
       produtos,
       condicoes: {
-        formaPagamento: String(raw?.formaPagamento || 'A combinar'),
-        prazoEntrega: String(raw?.prazoEntrega || 'A combinar'),
-        garantia: String(raw?.garantia || 'Conforme contrato'),
-        observacoes: typeof raw?.observacoes === 'string' ? raw.observacoes : undefined,
+        formaPagamento: String(raw?.formaPagamento || raw?.condicoes?.formaPagamento || 'A combinar'),
+        prazoEntrega: String(raw?.prazoEntrega || raw?.condicoes?.prazoEntrega || 'A combinar'),
+        garantia: String(raw?.garantia || raw?.condicoes?.garantia || 'Conforme contrato'),
+        observacoes:
+          typeof raw?.observacoes === 'string'
+            ? raw.observacoes
+            : typeof raw?.condicoes?.observacoes === 'string'
+              ? raw.condicoes.observacoes
+              : undefined,
       },
     };
   }
@@ -245,6 +311,7 @@ class PortalClienteService {
         endereco: 'Goiânia/GO',
         telefone: '(62) 99668-9991',
         email: 'conectcrm@gmail.com',
+        corPrimaria: '#159A9C',
       },
       vendedor: {
         nome: 'Vendedor Demo',
@@ -253,20 +320,31 @@ class PortalClienteService {
       },
       produtos: [
         {
+          id: 'item-1',
           nome: 'Sistema CRM Premium',
           descricao: 'Solução completa de gestão de relacionamento com cliente',
           quantidade: 1,
           valorUnitario: 2500.0,
+          desconto: 0,
+          subtotal: 2500.0,
           valorTotal: 2500.0,
         },
         {
+          id: 'item-2',
           nome: 'Treinamento e Suporte',
           descricao: 'Capacitação da equipe e suporte técnico por 12 meses',
           quantidade: 1,
           valorUnitario: 800.0,
+          desconto: 0,
+          subtotal: 800.0,
           valorTotal: 800.0,
         },
       ],
+      criadaEm: new Date(),
+      subtotal: 3000.0,
+      descontoGlobal: 0,
+      impostos: 0,
+      total: 3000.0,
       valorTotal: 3000.0,
       status: 'enviada',
       dataEnvio: new Date(Date.now() - 24 * 60 * 60 * 1000), // Ontem

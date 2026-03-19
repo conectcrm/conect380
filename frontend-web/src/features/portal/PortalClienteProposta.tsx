@@ -14,53 +14,15 @@ import {
   Package,
   Shield,
   Clock,
+  AlertTriangle,
 } from 'lucide-react';
-import { portalClienteService } from '../../services/portalClienteService';
+import { portalClienteService, type PropostaPublica } from '../../services/portalClienteService';
 import { pdfPropostasService } from '../../services/pdfPropostasService';
 import { formatarTokenParaExibicao } from '../../utils/tokenUtils';
 import { StatusSyncIndicator } from './components/StatusSyncIndicator';
 import { API_BASE_URL } from '../../services/api';
 
 const PORTAL_API_BASE = `${API_BASE_URL}/api/portal`;
-
-interface PropostaPublica {
-  id: string;
-  numero: string;
-  titulo: string;
-  status: 'enviada' | 'visualizada' | 'aprovada' | 'rejeitada' | 'expirada';
-  dataEnvio: Date;
-  dataValidade: Date;
-  valorTotal: number;
-  empresa: {
-    nome: string;
-    logo?: string;
-    endereco: string;
-    telefone: string;
-    email: string;
-  };
-  cliente: {
-    nome: string;
-    email: string;
-  };
-  vendedor: {
-    nome: string;
-    email: string;
-    telefone: string;
-  };
-  produtos: Array<{
-    nome: string;
-    descricao: string;
-    quantidade: number;
-    valorUnitario: number;
-    valorTotal: number;
-  }>;
-  condicoes: {
-    formaPagamento: string;
-    prazoEntrega: string;
-    garantia: string;
-    observacoes?: string;
-  };
-}
 
 const PortalClienteProposta: React.FC = () => {
   const { propostaId, propostaNumero, token } = useParams<{
@@ -394,10 +356,14 @@ const PortalClienteProposta: React.FC = () => {
           descricao: produto.descricao,
           quantidade: Number(produto.quantidade || 0),
           valorUnitario: Number(produto.valorUnitario || 0),
+          desconto: Number(produto.desconto || 0),
           valorTotal: Number(produto.valorTotal || 0),
         })),
-        subtotal: Number(proposta.valorTotal || 0),
-        valorTotal: Number(proposta.valorTotal || 0),
+        subtotal: Number(proposta.subtotal || 0),
+        descontoGeral: Number(proposta.descontoGlobal || 0),
+        percentualDesconto: Number(proposta.descontoGlobal || 0),
+        impostos: Number(proposta.impostos || 0),
+        valorTotal: Number(proposta.total || proposta.valorTotal || 0),
         formaPagamento: proposta.condicoes.formaPagamento || 'A combinar',
         prazoEntrega: proposta.condicoes.prazoEntrega || 'A combinar',
         garantia: proposta.condicoes.garantia || '',
@@ -424,10 +390,14 @@ const PortalClienteProposta: React.FC = () => {
   };
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'rascunho':
+        return 'border border-[#D1D5DB] bg-[#F3F4F6] text-[#374151]';
       case 'enviada':
         return 'border border-[#BFDBFE] bg-[#DBEAFE] text-[#1D4ED8]';
       case 'visualizada':
         return 'border border-[#FDE68A] bg-[#FEF3C7] text-[#92400E]';
+      case 'negociacao':
+        return 'border border-[#FCD34D] bg-[#FEF3C7] text-[#92400E]';
       case 'aprovada':
         return 'border border-[#BBF7D0] bg-[#DCFCE7] text-[#166534]';
       case 'rejeitada':
@@ -441,10 +411,14 @@ const PortalClienteProposta: React.FC = () => {
 
   const getStatusText = (status: string) => {
     switch (status) {
+      case 'rascunho':
+        return 'Rascunho';
       case 'enviada':
         return 'Enviada';
       case 'visualizada':
         return 'Visualizada';
+      case 'negociacao':
+        return 'Negociacao';
       case 'aprovada':
         return 'Aprovada';
       case 'rejeitada':
@@ -469,6 +443,29 @@ const PortalClienteProposta: React.FC = () => {
       style: 'currency',
       currency: 'BRL',
     }).format(Number(valor || 0));
+
+  const formatPercent = (valor: number) => `${Number(valor || 0).toFixed(2)}%`;
+
+  const normalizeHexColor = (value?: string, fallback = '#159A9C') => {
+    const candidate = String(value || '').trim();
+    const normalized = candidate.startsWith('#') ? candidate : `#${candidate}`;
+    return /^#[0-9a-fA-F]{6}$/.test(normalized) ? normalized : fallback;
+  };
+
+  const hexToRgb = (hex: string): [number, number, number] => {
+    const sanitized = hex.replace('#', '');
+    const r = Number.parseInt(sanitized.slice(0, 2), 16);
+    const g = Number.parseInt(sanitized.slice(2, 4), 16);
+    const b = Number.parseInt(sanitized.slice(4, 6), 16);
+    return [r, g, b];
+  };
+
+  const colorWithAlpha = (hex: string, alpha: number) => {
+    const [r, g, b] = hexToRgb(hex);
+    return `rgba(${r}, ${g}, ${b}, ${Math.min(1, Math.max(0, alpha))})`;
+  };
+
+  const resolvedPrimaryColor = normalizeHexColor(proposta?.empresa?.corPrimaria, '#159A9C');
 
   if (loading) {
     return (
@@ -545,7 +542,8 @@ const PortalClienteProposta: React.FC = () => {
             <div className="mt-6">
               <button
                 onClick={handleDownloadPDF}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#159A9C] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-[#117C7E]"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium text-white transition"
+                style={{ backgroundColor: resolvedPrimaryColor }}
               >
                 <Download className="h-4 w-4" />
                 Baixar proposta
@@ -558,7 +556,33 @@ const PortalClienteProposta: React.FC = () => {
   }
 
   const diasRestantes = calcularDiasRestantes();
-  const podeAceitar = proposta.status === 'visualizada' && diasRestantes > 0;
+  const subtotalItens = proposta.produtos.reduce((acc, item) => acc + Number(item.subtotal || 0), 0);
+  const subtotalProposta = Number(proposta.subtotal || subtotalItens || 0);
+  const descontoGlobalPercentual = Math.min(100, Math.max(0, Number(proposta.descontoGlobal || 0)));
+  const impostosPercentual = Math.min(100, Math.max(0, Number(proposta.impostos || 0)));
+  const valorDescontoItens = proposta.produtos.reduce((acc, item) => {
+    const quantidade = Number(item.quantidade || 0);
+    const valorUnitario = Number(item.valorUnitario || 0);
+    const descontoItem = Math.min(100, Math.max(0, Number(item.desconto || 0)));
+    return acc + quantidade * valorUnitario * (descontoItem / 100);
+  }, 0);
+  const valorDescontoGlobal = subtotalProposta * (descontoGlobalPercentual / 100);
+  const valorTotalDescontos = valorDescontoItens + valorDescontoGlobal;
+  const baseImpostos = Math.max(0, subtotalProposta - valorDescontoGlobal);
+  const valorImpostos = baseImpostos * (impostosPercentual / 100);
+  const totalProposta = Number(proposta.total || proposta.valorTotal || 0);
+  const divergenciaSubtotal = subtotalItens - subtotalProposta;
+  const exibirDivergenciaSubtotal =
+    proposta.produtos.length > 0 &&
+    Number.isFinite(divergenciaSubtotal) &&
+    Math.abs(divergenciaSubtotal) > 0.01;
+
+  const statusesComAceite = new Set(['enviada', 'visualizada', 'negociacao']);
+  const podeAceitar = statusesComAceite.has(String(proposta.status || '').toLowerCase()) && diasRestantes > 0;
+
+  const primaryColor = resolvedPrimaryColor;
+  const primaryTintSoft = colorWithAlpha(primaryColor, 0.1);
+  const primaryTintStrong = colorWithAlpha(primaryColor, 0.16);
 
   return (
     <div className="min-h-screen bg-[#F3F6F7] text-[#1E3A4B]">
@@ -578,6 +602,9 @@ const PortalClienteProposta: React.FC = () => {
                   {proposta.empresa.nome}
                 </h1>
                 <p className="text-sm text-[#607B89]">Proposta comercial</p>
+                <p className="text-xs text-[#6D8694]">
+                  Registro no sistema: {new Date(proposta.criadaEm).toLocaleString('pt-BR')}
+                </p>
               </div>
             </div>
 
@@ -605,7 +632,7 @@ const PortalClienteProposta: React.FC = () => {
           <div className="space-y-6 lg:col-span-2">
             <section className="rounded-[18px] border border-[#DEE8EC] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)] sm:p-6">
               <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold tracking-[-0.02em] text-[#19384C]">
-                <FileText className="h-5 w-5 text-[#159A9C]" />
+                <FileText className="h-5 w-5" style={{ color: primaryColor }} />
                 Proposta {proposta.numero}
               </h2>
 
@@ -654,7 +681,7 @@ const PortalClienteProposta: React.FC = () => {
 
             <section className="rounded-[18px] border border-[#DEE8EC] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)] sm:p-6">
               <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold tracking-[-0.02em] text-[#19384C]">
-                <Package className="h-5 w-5 text-[#159A9C]" />
+                <Package className="h-5 w-5" style={{ color: primaryColor }} />
                 Produtos e servicos
               </h2>
 
@@ -668,7 +695,10 @@ const PortalClienteProposta: React.FC = () => {
                         Valor unit.
                       </th>
                       <th className="py-3 text-right text-sm font-semibold text-[#19384C]">
-                        Total
+                        Desconto
+                      </th>
+                      <th className="py-3 text-right text-sm font-semibold text-[#19384C]">
+                        Subtotal
                       </th>
                     </tr>
                   </thead>
@@ -685,22 +715,54 @@ const PortalClienteProposta: React.FC = () => {
                         <td className="py-4 text-right text-[#244455]">
                           {formatCurrency(produto.valorUnitario)}
                         </td>
+                        <td className="py-4 text-right text-[#244455]">
+                          {formatPercent(produto.desconto || 0)}
+                        </td>
                         <td className="py-4 text-right font-semibold text-[#19384C]">
-                          {formatCurrency(produto.valorTotal)}
+                          {formatCurrency(produto.subtotal || produto.valorTotal)}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
+                    <tr className="border-t border-[#D9E5EA]">
+                      <td colSpan={4} className="py-3 text-right text-sm font-medium text-[#607B89]">
+                        Subtotal:
+                      </td>
+                      <td className="py-3 text-right text-sm font-semibold text-[#19384C]">
+                        {formatCurrency(subtotalProposta)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colSpan={4} className="py-2 text-right text-sm font-medium text-[#607B89]">
+                        Desconto global:
+                      </td>
+                      <td className="py-2 text-right text-sm font-semibold text-[#B45309]">
+                        - {formatCurrency(valorDescontoGlobal)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colSpan={4} className="py-2 text-right text-sm font-medium text-[#607B89]">
+                        Desconto por item (ja aplicado no subtotal):
+                      </td>
+                      <td className="py-2 text-right text-sm font-semibold text-[#B45309]">
+                        {formatCurrency(valorDescontoItens)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colSpan={4} className="py-2 text-right text-sm font-medium text-[#607B89]">
+                        Impostos:
+                      </td>
+                      <td className="py-2 text-right text-sm font-semibold text-[#19384C]">
+                        {formatCurrency(valorImpostos)}
+                      </td>
+                    </tr>
                     <tr className="border-t-2 border-[#D9E5EA]">
-                      <td
-                        colSpan={3}
-                        className="py-4 text-right text-lg font-semibold text-[#19384C]"
-                      >
+                      <td colSpan={4} className="py-4 text-right text-lg font-semibold text-[#19384C]">
                         Total geral:
                       </td>
-                      <td className="py-4 text-right text-lg font-bold text-[#159A9C]">
-                        {formatCurrency(proposta.valorTotal)}
+                      <td className="py-4 text-right text-lg font-bold" style={{ color: primaryColor }}>
+                        {formatCurrency(totalProposta)}
                       </td>
                     </tr>
                   </tfoot>
@@ -710,7 +772,7 @@ const PortalClienteProposta: React.FC = () => {
 
             <section className="rounded-[18px] border border-[#DEE8EC] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)] sm:p-6">
               <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold tracking-[-0.02em] text-[#19384C]">
-                <Shield className="h-5 w-5 text-[#159A9C]" />
+                <Shield className="h-5 w-5" style={{ color: primaryColor }} />
                 Condicoes comerciais
               </h2>
 
@@ -758,7 +820,8 @@ const PortalClienteProposta: React.FC = () => {
               <div className="space-y-3">
                 <button
                   onClick={handleDownloadPDF}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#4B5A6C] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#3D4A5A]"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white transition"
+                  style={{ backgroundColor: primaryColor }}
                 >
                   <Download className="h-4 w-4" />
                   Baixar PDF
@@ -802,25 +865,86 @@ const PortalClienteProposta: React.FC = () => {
                   proposta.status !== 'aprovada' &&
                   proposta.status !== 'rejeitada' && (
                     <div className="rounded-lg border border-[#D4E2E7] bg-[#F8FBFC] p-3 text-sm text-[#5A768C]">
-                      A proposta sera liberada para aceite apos sincronizacao completa do status.
+                      O aceite fica disponivel quando a proposta estiver em etapa comercial ativa e
+                      dentro da validade.
                     </div>
                   )}
               </div>
             </section>
 
+            <section className="rounded-[18px] border border-[#DEE8EC] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)]">
+              <h3 className="mb-4 text-lg font-semibold tracking-[-0.01em] text-[#19384C]">
+                Detalhes financeiros
+              </h3>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-md bg-[#F8FBFC] px-3 py-2 ring-1 ring-[#E7EFF3]">
+                  <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Subtotal</p>
+                  <p className="mt-1 text-sm font-semibold text-[#19384C]">
+                    {formatCurrency(subtotalProposta)}
+                  </p>
+                </div>
+                <div className="rounded-md bg-[#F8FBFC] px-3 py-2 ring-1 ring-[#E7EFF3]">
+                  <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Descontos</p>
+                  <p className="mt-1 text-sm font-semibold text-[#19384C]">
+                    {formatPercent(descontoGlobalPercentual)}
+                  </p>
+                  <p className="mt-1 text-xs text-[#607B89]">Itens: {formatCurrency(valorDescontoItens)}</p>
+                  <p className="text-xs text-[#607B89]">Global: {formatCurrency(valorDescontoGlobal)}</p>
+                </div>
+                <div className="rounded-md bg-[#F8FBFC] px-3 py-2 ring-1 ring-[#E7EFF3]">
+                  <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Impostos</p>
+                  <p className="mt-1 text-sm font-semibold text-[#19384C]">
+                    {formatPercent(impostosPercentual)}
+                  </p>
+                  <p className="mt-1 text-xs text-[#607B89]">Valor: {formatCurrency(valorImpostos)}</p>
+                </div>
+                <div
+                  className="rounded-md px-3 py-2 ring-1"
+                  style={{ backgroundColor: primaryTintSoft, borderColor: primaryTintStrong }}
+                >
+                  <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Total</p>
+                  <p className="mt-1 text-lg font-bold" style={{ color: primaryColor }}>
+                    {formatCurrency(totalProposta)}
+                  </p>
+                </div>
+              </div>
+
+              {exibirDivergenciaSubtotal && (
+                <div className="mt-4 rounded-md border border-[#F7C78A] bg-[#FFF7EB] p-3">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 text-[#B45309]" />
+                    <div>
+                      <p className="text-xs font-semibold text-[#92400E]">Conferencia financeira</p>
+                      <p className="mt-1 text-xs text-[#92400E]">
+                        Soma dos itens: {formatCurrency(subtotalItens)} | Subtotal da proposta:{' '}
+                        {formatCurrency(subtotalProposta)} | Diferenca: {formatCurrency(divergenciaSubtotal)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </section>
+
             {tokenParaAceite && (
-              <section className="rounded-[18px] border border-[#C7DDF8] bg-[#EFF6FF] p-5 shadow-[0_16px_30px_-24px_rgba(30,64,175,0.2)]">
-                <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-[#1E3A8A]">
+              <section
+                className="rounded-[18px] border p-5 shadow-[0_16px_30px_-24px_rgba(30,64,175,0.2)]"
+                style={{ borderColor: primaryTintStrong, backgroundColor: primaryTintSoft }}
+              >
+                <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold" style={{ color: primaryColor }}>
                   <Shield className="h-5 w-5" />
                   Token de acesso
                 </h3>
                 <div className="text-center">
-                  <div className="mb-3 rounded-lg border border-[#93C5FD] bg-white p-4">
-                    <div className="break-all font-mono text-2xl font-bold tracking-[0.14em] text-[#1D4ED8]">
+                  <div
+                    className="mb-3 rounded-lg border bg-white p-4"
+                    style={{ borderColor: primaryTintStrong }}
+                  >
+                    <div className="break-all font-mono text-2xl font-bold tracking-[0.14em]" style={{ color: primaryColor }}>
                       {formatarTokenParaExibicao(tokenParaAceite)}
                     </div>
                   </div>
-                  <p className="text-xs font-medium text-[#1E40AF]">
+                  <p className="text-xs font-medium" style={{ color: primaryColor }}>
                     Codigo unico desta proposta para rastreio de acesso
                   </p>
                 </div>
@@ -829,7 +953,7 @@ const PortalClienteProposta: React.FC = () => {
 
             <section className="rounded-[18px] border border-[#DEE8EC] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)]">
               <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold tracking-[-0.01em] text-[#19384C]">
-                <Building className="h-5 w-5 text-[#159A9C]" />
+                <Building className="h-5 w-5" style={{ color: primaryColor }} />
                 Contato
               </h3>
 
