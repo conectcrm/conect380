@@ -253,23 +253,7 @@ const PortalClienteProposta: React.FC = () => {
         metodoPagamento: 'pendente',
       });
 
-      // 2. Tentar sincronizar com o CRM principal
-      try {
-        const syncResult = await portalClienteService.sincronizarComCRM(
-          identificadorProposta!,
-          'aprovada',
-        );
-
-        if (syncResult.success) {
-          console.log('✅ Status sincronizado com CRM principal');
-        } else {
-          console.log('⏳ Sincronização pendente - será realizada posteriormente');
-        }
-      } catch (syncError) {
-        console.warn('⚠️ Erro na sincronização, continuando com processo local:', syncError);
-      }
-
-      // 3. Iniciar processo de geração de contrato
+      // 2. Iniciar processo de geracao de contrato
       try {
         await iniciarGeracaoContrato(proposta);
         console.log('✅ Processo de contrato iniciado');
@@ -277,7 +261,7 @@ const PortalClienteProposta: React.FC = () => {
         console.warn('⚠️ Erro na geração de contrato, continuando:', contratoError);
       }
 
-      // 4. Atualizar estado local - SEMPRE funciona
+      // 3. Atualizar estado local - SEMPRE funciona
       setProposta((prev) => (prev ? { ...prev, status: 'aprovada' } : null));
       setAceiteRealizado(true);
       console.log('🎉 Proposta aprovada com sucesso! Verifique o CRM principal.');

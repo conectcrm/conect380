@@ -441,15 +441,15 @@ class PortalClienteService {
     novoStatus: 'aprovada' | 'rejeitada' | 'negociacao',
     motivoAjustes?: string,
   ): Promise<void> {
-    console.log('🔄 Iniciando atualização de status:', { token, novoStatus });
+    console.log('Iniciando atualizacao de status:', { token, novoStatus });
 
     try {
       const API_URL = API_BASE_URL;
       const motivoNormalizado =
         typeof motivoAjustes === 'string' && motivoAjustes.trim() ? motivoAjustes.trim() : '';
 
-      // 1. Atualizar via endpoint do portal
-      console.log('📡 Atualizando via portal endpoint...');
+      // Atualizar somente via endpoint do portal.
+      // O backend ja aplica as atualizacoes no processo principal.
       const portalResponse = await fetch(`${API_URL}/api/portal/proposta/${token}/status`, {
         method: 'PUT',
         headers: {
@@ -464,56 +464,20 @@ class PortalClienteService {
         }),
       });
 
-      // 2. Atualizar também no CRM principal usando o token como ID
-      console.log('📡 Sincronizando com CRM principal...');
-      const payloadCrm: Record<string, unknown> = {
-        status: novoStatus,
-        observacoes: motivoNormalizado
-          ? `Proposta ${novoStatus} via portal do cliente. Motivo: ${motivoNormalizado}`
-          : `Proposta ${novoStatus} via portal do cliente`,
-        fonte: 'portal',
-        dataAtualizacao: new Date().toISOString(),
-      };
-
-      if (novoStatus === 'aprovada') {
-        payloadCrm.dataAceite = new Date().toISOString();
-      }
-      if (novoStatus === 'rejeitada') {
-        payloadCrm.dataRejeicao = new Date().toISOString();
+      if (!portalResponse.ok) {
+        throw new Error('Falha ao atualizar status no endpoint do portal');
       }
 
-      const crmResponse = await fetch(`${API_URL}/propostas/${token}/status`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payloadCrm),
-      });
+      console.log('Status atualizado pelo portal');
 
-      if (portalResponse.ok && crmResponse.ok) {
-        console.log('✅ Status sincronizado com portal e CRM principal');
-        // Registrar ação
-        await this.registrarAcao(token, novoStatus, motivoNormalizado || undefined);
-
-        // Emitir evento para atualizar o grid em tempo real
-        window.dispatchEvent(
-          new CustomEvent('propostaAtualizada', {
-            detail: { propostaId: token, novoStatus, fonte: 'portal' },
-          }),
-        );
-
-        return;
-      }
-
-      if (!portalResponse.ok && !crmResponse.ok) {
-        throw new Error('Ambos endpoints falharam');
-      }
-
-      // Se pelo menos um funcionou, considerar sucesso parcial
-      console.warn('⚠️ Sincronização parcial - alguns endpoints falharam');
-      await this.registrarAcao(token, novoStatus, motivoNormalizado || undefined);
+      // Emitir evento para atualizar o grid em tempo real
+      window.dispatchEvent(
+        new CustomEvent('propostaAtualizada', {
+          detail: { propostaId: token, novoStatus, fonte: 'portal' },
+        }),
+      );
     } catch (error) {
-      console.warn('❌ Erro na API, usando fallback local:', error);
+      console.warn('Erro na API, usando fallback local:', error);
       await this.atualizarStatusLocal(token, novoStatus);
     }
   }

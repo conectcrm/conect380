@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { X, Plus, CreditCard, DollarSign, CheckCircle, Clock } from 'lucide-react';
+import { X, Plus, CreditCard, DollarSign, CheckCircle, Clock, RotateCcw } from 'lucide-react';
 import {
   faturamentoService,
   Fatura,
@@ -7,6 +7,7 @@ import {
   StatusPagamento,
 } from '../../services/faturamentoService';
 import MoneyInputNoPrefix from '../../components/inputs/MoneyInputNoPrefix';
+import ModalMotivoEstorno from './ModalMotivoEstorno';
 
 interface PagamentoHistorico {
   id: number;
@@ -14,6 +15,8 @@ interface PagamentoHistorico {
   data: string;
   metodo: string;
   status: StatusPagamento;
+  tipo?: string;
+  transacaoId?: string;
   comprovante?: string;
   observacoes?: string;
 }
@@ -25,11 +28,18 @@ interface NovoPagamentoFormulario {
   observacoes?: string;
 }
 
+interface EstornoAlvo {
+  id: number;
+  valor: number;
+  transacaoId?: string;
+}
+
 interface ModalPagamentosProps {
   isOpen: boolean;
   onClose: () => void;
   fatura: Fatura;
   onRegistrarPagamento: (pagamento: NovoPagamentoFormulario) => Promise<void>;
+  onEstornarPagamento: (pagamentoId: number, motivo: string) => Promise<void>;
 }
 
 export default function ModalPagamentos({
@@ -37,6 +47,7 @@ export default function ModalPagamentos({
   onClose,
   fatura,
   onRegistrarPagamento,
+  onEstornarPagamento,
 }: ModalPagamentosProps) {
   const [pagamentos, setPagamentos] = useState<PagamentoHistorico[]>([]);
   const [novoPagamento, setNovoPagamento] = useState<NovoPagamentoFormulario>({
@@ -47,6 +58,10 @@ export default function ModalPagamentos({
   });
   const [carregando, setCarregando] = useState(false);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
+  const [estornandoPagamentoId, setEstornandoPagamentoId] = useState<number | null>(null);
+  const [estornoAlvo, setEstornoAlvo] = useState<EstornoAlvo | null>(null);
+  const [motivoEstorno, setMotivoEstorno] = useState('');
+  const [erroEstorno, setErroEstorno] = useState<string | null>(null);
   const [erroHistorico, setErroHistorico] = useState<string | null>(null);
   const [erroFormulario, setErroFormulario] = useState<string | null>(null);
 
@@ -59,16 +74,18 @@ export default function ModalPagamentos({
         id: pagamento.id,
         valor: pagamento.valor,
         data: pagamento.dataPagamento || pagamento.criadoEm,
-        metodo: pagamento.formaPagamento,
+        metodo: pagamento.formaPagamento || pagamento.metodoPagamento || 'pix',
         status: pagamento.status,
+        tipo: pagamento.tipo,
+        transacaoId: pagamento.transacaoId,
         comprovante: pagamento.comprovante,
         observacoes: pagamento.observacoes,
       }));
       setPagamentos(historico);
     } catch (error) {
-      console.error('Erro ao carregar histórico de pagamentos:', error);
+      console.error('Erro ao carregar historico de pagamentos:', error);
       setPagamentos([]);
-      setErroHistorico('Não foi possível carregar o histórico de pagamentos desta fatura.');
+      setErroHistorico('Nao foi possivel carregar o historico de pagamentos desta fatura.');
     } finally {
       setCarregandoHistorico(false);
     }
@@ -95,7 +112,7 @@ export default function ModalPagamentos({
 
   const handleRegistrarPagamento = async () => {
     if (novoPagamento.valor <= 0 || novoPagamento.valor > valorRestante) {
-      setErroFormulario('Informe um valor válido, maior que zero e até o valor restante.');
+      setErroFormulario('Informe um valor valido, maior que zero e ate o valor restante.');
       return;
     }
 
@@ -117,6 +134,68 @@ export default function ModalPagamentos({
       setErroFormulario('Falha ao registrar pagamento. Tente novamente.');
     } finally {
       setCarregando(false);
+    }
+  };
+
+  const handleEstornarPagamento = (pagamento: PagamentoHistorico) => {
+    const podeEstornar =
+      pagamento.status === StatusPagamento.APROVADO &&
+      String(pagamento.tipo || 'pagamento').toLowerCase() !== 'estorno' &&
+      pagamento.valor > 0;
+
+    if (!podeEstornar) {
+      setErroFormulario('Este pagamento nao pode ser estornado.');
+      return;
+    }
+
+    if (!pagamento.id || pagamento.id <= 0) {
+      setErroFormulario('Pagamento invalido para estorno.');
+      return;
+    }
+
+    setErroFormulario(null);
+    setErroEstorno(null);
+    setMotivoEstorno('');
+    setEstornoAlvo({
+      id: pagamento.id,
+      valor: pagamento.valor,
+      transacaoId: pagamento.transacaoId,
+    });
+  };
+
+  const fecharModalEstorno = () => {
+    if (estornandoPagamentoId) {
+      return;
+    }
+
+    setEstornoAlvo(null);
+    setMotivoEstorno('');
+    setErroEstorno(null);
+  };
+
+  const confirmarEstorno = async () => {
+    if (!estornoAlvo || !estornoAlvo.id) {
+      return;
+    }
+
+    const motivo = motivoEstorno.trim();
+    if (!motivo) {
+      setErroEstorno('Motivo do estorno e obrigatorio.');
+      return;
+    }
+
+    setErroEstorno(null);
+    setEstornandoPagamentoId(estornoAlvo.id);
+    try {
+      await onEstornarPagamento(estornoAlvo.id, motivo);
+      setEstornoAlvo(null);
+      setMotivoEstorno('');
+      await carregarHistoricoPagamentos();
+    } catch (error) {
+      console.error('Erro ao estornar pagamento:', error);
+      setErroEstorno('Falha ao estornar pagamento. Tente novamente.');
+    } finally {
+      setEstornandoPagamentoId(null);
     }
   };
 
@@ -180,7 +259,7 @@ export default function ModalPagamentos({
           </div>
 
           <div className="mb-6">
-            <h3 className="mb-4 text-lg font-semibold text-gray-900">Histórico de pagamentos</h3>
+            <h3 className="mb-4 text-lg font-semibold text-gray-900">Historico de pagamentos</h3>
 
             {carregandoHistorico ? (
               <div className="py-8 text-center text-gray-500">Carregando pagamentos...</div>
@@ -196,41 +275,56 @@ export default function ModalPagamentos({
             ) : (
               <div className="space-y-3">
                 {pagamentos.map((pagamento) => (
-                  <div
-                    key={pagamento.id}
-                    className="flex items-center justify-between rounded-lg bg-gray-50 p-4"
-                  >
+                  <div key={pagamento.id} className="flex items-center justify-between rounded-lg bg-gray-50 p-4">
                     <div className="flex items-center gap-4">
                       <div
                         className={`h-3 w-3 rounded-full ${
-                          pagamento.status === StatusPagamento.APROVADO
-                            ? 'bg-green-500'
-                            : pagamento.status === StatusPagamento.PENDENTE
-                              ? 'bg-yellow-500'
-                              : 'bg-red-500'
+                          pagamento.tipo === 'estorno'
+                            ? 'bg-orange-500'
+                            : pagamento.status === StatusPagamento.APROVADO
+                              ? 'bg-green-500'
+                              : pagamento.status === StatusPagamento.PENDENTE
+                                ? 'bg-yellow-500'
+                                : 'bg-red-500'
                         }`}
                       />
                       <div>
                         <p className="font-medium text-gray-900">{formatarMoeda(pagamento.valor)}</p>
                         <p className="text-sm text-gray-600">
-                          {new Date(pagamento.data).toLocaleDateString('pt-BR')} •{' '}
-                          {faturamentoService.formatarFormaPagamento(
-                            pagamento.metodo as FormaPagamento,
-                          )}
+                          {new Date(pagamento.data).toLocaleDateString('pt-BR')} -{' '}
+                          {faturamentoService.formatarFormaPagamento(pagamento.metodo as FormaPagamento)}
+                          {pagamento.transacaoId ? ` - ${pagamento.transacaoId}` : ''}
                         </p>
                       </div>
                     </div>
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-medium ${
-                        pagamento.status === StatusPagamento.APROVADO
-                          ? 'bg-green-100 text-green-800'
-                          : pagamento.status === StatusPagamento.PENDENTE
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-red-100 text-red-800'
-                      }`}
-                    >
-                      {pagamento.status}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-medium ${
+                          pagamento.tipo === 'estorno'
+                            ? 'bg-orange-100 text-orange-800'
+                            : pagamento.status === StatusPagamento.APROVADO
+                              ? 'bg-green-100 text-green-800'
+                              : pagamento.status === StatusPagamento.PENDENTE
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-red-100 text-red-800'
+                        }`}
+                      >
+                        {pagamento.tipo === 'estorno' ? 'estorno' : pagamento.status}
+                      </span>
+                      {pagamento.status === StatusPagamento.APROVADO &&
+                      pagamento.tipo !== 'estorno' &&
+                      pagamento.valor > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => handleEstornarPagamento(pagamento)}
+                          disabled={estornandoPagamentoId === pagamento.id}
+                          className="inline-flex items-center gap-1 rounded-md border border-orange-300 bg-white px-2 py-1 text-xs font-medium text-orange-700 transition hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          {estornandoPagamentoId === pagamento.id ? 'Estornando...' : 'Estornar'}
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -261,7 +355,7 @@ export default function ModalPagamentos({
                     placeholder="0,00"
                   />
                   <p className="mt-1 text-xs text-gray-500">
-                    Máximo: {formatarMoeda(valorRestante)}
+                    Maximo: {formatarMoeda(valorRestante)}
                   </p>
                 </div>
 
@@ -284,7 +378,7 @@ export default function ModalPagamentos({
 
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700">
-                    Método de pagamento
+                    Metodo de pagamento
                   </label>
                   <select
                     value={novoPagamento.metodo}
@@ -297,16 +391,16 @@ export default function ModalPagamentos({
                     className="w-full rounded-lg border border-[#D4E2E7] px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-[#159A9C]"
                   >
                     <option value="pix">PIX</option>
-                    <option value="cartao_credito">Cartão de Crédito</option>
-                    <option value="cartao_debito">Cartão de Débito</option>
+                    <option value="cartao_credito">Cartao de Credito</option>
+                    <option value="cartao_debito">Cartao de Debito</option>
                     <option value="boleto">Boleto</option>
-                    <option value="transferencia">Transferência</option>
+                    <option value="transferencia">Transferencia</option>
                     <option value="dinheiro">Dinheiro</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">Observações</label>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Observacoes</label>
                   <input
                     type="text"
                     value={novoPagamento.observacoes}
@@ -317,7 +411,7 @@ export default function ModalPagamentos({
                       }))
                     }
                     className="w-full rounded-lg border border-[#D4E2E7] px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-[#159A9C]"
-                    placeholder="Observações do pagamento"
+                    placeholder="Observacoes do pagamento"
                   />
                 </div>
               </div>
@@ -352,6 +446,19 @@ export default function ModalPagamentos({
           )}
         </div>
       </div>
+
+      <ModalMotivoEstorno
+        isOpen={Boolean(estornoAlvo)}
+        pagamentoId={estornoAlvo?.id}
+        valor={estornoAlvo?.valor}
+        transacaoId={estornoAlvo?.transacaoId}
+        motivo={motivoEstorno}
+        loading={estornandoPagamentoId === estornoAlvo?.id}
+        erro={erroEstorno}
+        onMotivoChange={setMotivoEstorno}
+        onCancel={fecharModalEstorno}
+        onConfirm={() => void confirmarEstorno()}
+      />
     </div>
   );
 }

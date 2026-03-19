@@ -8,6 +8,9 @@ describe('PropostasService - cancelarVenda', () => {
     query: jest.fn().mockResolvedValue([]),
     findOne: jest.fn(),
     save: jest.fn(),
+    manager: {
+      transaction: jest.fn().mockImplementation(async (callback: any) => callback({ query: jest.fn() })),
+    },
   };
 
   const userRepository = {
@@ -66,6 +69,13 @@ describe('PropostasService - cancelarVenda', () => {
       oportunidadesService as any,
       undefined,
     );
+
+    jest
+      .spyOn(service as any, 'cancelarVinculosComerciaisParaCancelamentoVenda')
+      .mockResolvedValue({
+        contratosCancelados: 0,
+        faturasCanceladas: 0,
+      });
   });
 
   it('deve exigir motivo para cancelar venda', async () => {
@@ -99,44 +109,19 @@ describe('PropostasService - cancelarVenda', () => {
     );
   });
 
-  it('deve bloquear quando houver contrato assinado', async () => {
-    jest.spyOn(service, 'obterProposta').mockResolvedValue(baseProposta);
-    jest
-      .spyOn(service as any, 'carregarBloqueiosCancelamentoVenda')
-      .mockResolvedValue({
-        contratosAssinados: 1,
-        faturasAtivasNaoCanceladas: 0,
-        faturasPagasOuParciais: 0,
-      });
-
-    await expect(
-      service.cancelarVenda(
-        'prop-1',
-        {
-          motivo: 'Cliente desistiu',
-        },
-        'empresa-1',
-      ),
-    ).rejects.toThrow(
-      'Nao e possivel cancelar a venda porque existe contrato assinado vinculado. Cancele o contrato primeiro.',
-    );
-  });
-
   it('deve bloquear quando houver faturas pagas/parciais', async () => {
     jest.spyOn(service, 'obterProposta').mockResolvedValue(baseProposta);
-    jest
-      .spyOn(service as any, 'carregarBloqueiosCancelamentoVenda')
-      .mockResolvedValue({
-        contratosAssinados: 0,
-        faturasAtivasNaoCanceladas: 1,
-        faturasPagasOuParciais: 1,
-      });
+    jest.spyOn(service as any, 'carregarBloqueiosCancelamentoVenda').mockResolvedValue({
+      contratosAssinados: 0,
+      faturasAtivasNaoCanceladas: 1,
+      faturasPagasOuParciais: 1,
+    });
 
     await expect(
       service.cancelarVenda(
         'prop-1',
         {
-          motivo: 'Cliente sem orçamento',
+          motivo: 'Cliente sem orcamento',
         },
         'empresa-1',
       ),
@@ -145,47 +130,67 @@ describe('PropostasService - cancelarVenda', () => {
     );
   });
 
-  it('deve bloquear quando houver faturas ativas', async () => {
+  it('deve cancelar vinculos automaticamente quando houver contratos/faturas pendentes', async () => {
     jest.spyOn(service, 'obterProposta').mockResolvedValue(baseProposta);
-    jest
-      .spyOn(service as any, 'carregarBloqueiosCancelamentoVenda')
+    jest.spyOn(service as any, 'carregarBloqueiosCancelamentoVenda').mockResolvedValue({
+      contratosAssinados: 1,
+      faturasAtivasNaoCanceladas: 1,
+      faturasPagasOuParciais: 0,
+    });
+    const cancelarVinculosSpy = jest
+      .spyOn(service as any, 'cancelarVinculosComerciaisParaCancelamentoVenda')
       .mockResolvedValue({
-        contratosAssinados: 0,
-        faturasAtivasNaoCanceladas: 1,
-        faturasPagasOuParciais: 0,
+        contratosCancelados: 1,
+        faturasCanceladas: 2,
       });
+    const atualizarStatusSpy = jest.spyOn(service, 'atualizarStatus').mockResolvedValue({
+      ...baseProposta,
+      status: 'rejeitada',
+    } as any);
 
-    await expect(
-      service.cancelarVenda(
-        'prop-1',
-        {
-          motivo: 'Cliente pediu revisão sem continuidade',
-        },
-        'empresa-1',
-      ),
-    ).rejects.toThrow(
-      'Nao e possivel cancelar a venda enquanto houver faturas ativas. Cancele as faturas pendentes/enviadas antes de continuar.',
+    await service.cancelarVenda(
+      'prop-1',
+      {
+        motivo: 'Cliente solicitou cancelamento',
+      },
+      'empresa-1',
+    );
+
+    expect(cancelarVinculosSpy).toHaveBeenCalledWith(
+      'prop-1',
+      'Cliente solicitou cancelamento',
+      'empresa-1',
+      'cancelamento-venda',
+    );
+    expect(atualizarStatusSpy).toHaveBeenCalledWith(
+      'prop-1',
+      'rejeitada',
+      'cancelamento-venda',
+      expect.stringContaining('Faturas canceladas automaticamente: 2.'),
+      'Cliente solicitou cancelamento',
+      'empresa-1',
+      expect.objectContaining({
+        tipo: 'cancelamento_venda',
+        faturasCanceladasAutomaticamente: 2,
+        contratosCanceladosAutomaticamente: 1,
+      }),
     );
   });
 
   it('deve cancelar venda com sucesso quando nao houver bloqueios', async () => {
     jest.spyOn(service, 'obterProposta').mockResolvedValue(baseProposta);
-    jest
-      .spyOn(service as any, 'carregarBloqueiosCancelamentoVenda')
-      .mockResolvedValue({
-        contratosAssinados: 0,
-        faturasAtivasNaoCanceladas: 0,
-        faturasPagasOuParciais: 0,
-      });
+    jest.spyOn(service as any, 'carregarBloqueiosCancelamentoVenda').mockResolvedValue({
+      contratosAssinados: 0,
+      faturasAtivasNaoCanceladas: 0,
+      faturasPagasOuParciais: 0,
+    });
 
     const propostaAtualizada = {
       ...baseProposta,
       status: 'rejeitada',
       motivoPerda: 'Cliente desistiu por prazo',
     } as any;
-    const atualizarStatusSpy = jest
-      .spyOn(service, 'atualizarStatus')
-      .mockResolvedValue(propostaAtualizada);
+    const atualizarStatusSpy = jest.spyOn(service, 'atualizarStatus').mockResolvedValue(propostaAtualizada);
 
     const resultado = await service.cancelarVenda(
       'prop-1',
@@ -224,4 +229,3 @@ describe('PropostasService - cancelarVenda', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
-

@@ -102,11 +102,14 @@ export interface AtualizarFatura extends Partial<NovaFatura> {
 export interface Pagamento {
   id: number;
   faturaId: number;
+  tipo?: string;
   valor: number;
   dataPagamento: string;
+  metodoPagamento?: string;
   formaPagamento: FormaPagamento;
   status: StatusPagamento;
   transacaoId?: string;
+  gatewayTransacaoId?: string;
   comprovante?: string;
   observacoes?: string;
   criadoEm: string;
@@ -122,6 +125,37 @@ export interface NovoPagamento {
   comprovante?: string;
   observacoes?: string;
 }
+
+const toPagamento = (raw: any): Pagamento => {
+  const criadoEm = String(raw?.criadoEm || raw?.createdAt || new Date().toISOString());
+  const atualizadoEm = String(raw?.atualizadoEm || raw?.updatedAt || criadoEm);
+  const metodoNormalizado = String(raw?.formaPagamento || raw?.metodoPagamento || 'pix')
+    .trim()
+    .toLowerCase();
+
+  return {
+    id: Number(raw?.id || 0),
+    faturaId: Number(raw?.faturaId || raw?.fatura_id || 0),
+    tipo: String(raw?.tipo || 'pagamento'),
+    valor: Number(raw?.valor || 0),
+    dataPagamento: String(
+      raw?.dataPagamento ||
+        raw?.dataAprovacao ||
+        raw?.dataProcessamento ||
+        raw?.createdAt ||
+        criadoEm,
+    ),
+    metodoPagamento: String(raw?.metodoPagamento || metodoNormalizado),
+    formaPagamento: metodoNormalizado as FormaPagamento,
+    status: String(raw?.status || StatusPagamento.PENDENTE) as StatusPagamento,
+    transacaoId: raw?.transacaoId ? String(raw.transacaoId) : undefined,
+    gatewayTransacaoId: raw?.gatewayTransacaoId ? String(raw.gatewayTransacaoId) : undefined,
+    comprovante: raw?.comprovante ? String(raw.comprovante) : undefined,
+    observacoes: raw?.observacoes ? String(raw.observacoes) : undefined,
+    criadoEm,
+    atualizadoEm,
+  };
+};
 
 export interface EstatisticasPagamentos {
   totalPagamentos: number;
@@ -462,7 +496,9 @@ export const faturamentoService = {
         ? `/faturamento/pagamentos?faturaId=${faturaId}`
         : '/faturamento/pagamentos';
       const response = await api.get(url);
-      return response.data.data || response.data;
+      const payload = response.data.data || response.data || [];
+      const lista = Array.isArray(payload) ? payload : [];
+      return lista.map((item) => toPagamento(item));
     } catch (error) {
       console.error('Erro ao listar pagamentos:', error);
       throw error;
@@ -472,7 +508,7 @@ export const faturamentoService = {
   async criarPagamento(dadosPagamento: NovoPagamento): Promise<Pagamento> {
     try {
       const response = await api.post('/faturamento/pagamentos', dadosPagamento);
-      return response.data.data || response.data;
+      return toPagamento(response.data.data || response.data);
     } catch (error) {
       console.error('Erro ao criar pagamento:', error);
       throw error;
@@ -482,10 +518,23 @@ export const faturamentoService = {
   async processarPagamento(id: number, dadosProcessamento: any): Promise<Pagamento> {
     try {
       // O endpoint não usa o ID, mas sim o gatewayTransacaoId no body
+      void id;
       const response = await api.post(`/faturamento/pagamentos/processar`, dadosProcessamento);
-      return response.data.data || response.data;
+      return toPagamento(response.data.data || response.data);
     } catch (error) {
       console.error('Erro ao processar pagamento:', error);
+      throw error;
+    }
+  },
+
+  async estornarPagamento(id: number, motivo: string): Promise<Pagamento> {
+    try {
+      const response = await api.post(`/faturamento/pagamentos/${id}/estornar`, {
+        motivo,
+      });
+      return toPagamento(response.data.data || response.data);
+    } catch (error) {
+      console.error('Erro ao estornar pagamento:', error);
       throw error;
     }
   },

@@ -576,15 +576,15 @@ export default function FaturamentoPage() {
 
       if (reais > 0) {
         notificacao.mostrarSucesso(
-          'Emails enviados',
-          `${reais} email(s) enviado(s) com sucesso${sufixoTemplate}.`,
+          'E-mails enviados',
+          `${reais} e-mail(s) enviado(s) com sucesso${sufixoTemplate}.`,
         );
       }
 
       if (simulados > 0) {
         notificacao.mostrarAviso(
           'Envio simulado',
-          `${simulados} email(s) foram apenas simulados. Verifique o SMTP da empresa para envio real.`,
+          `${simulados} e-mail(s) foram simulados. Verifique o SMTP da empresa para envio real.`,
         );
       }
 
@@ -593,15 +593,15 @@ export default function FaturamentoPage() {
           (r): r is PromiseRejectedResult => r.status === 'rejected',
         );
         notificacao.erro.operacaoFalhou(
-          'enviar emails em lote',
-          `${falhas} envio(s) falharam. ${obterMensagemErro(primeiraFalha?.reason, 'Falha ao enviar emails.')}`,
+          'enviar e-mails em lote',
+          `${falhas} envio(s) falharam. ${obterMensagemErro(primeiraFalha?.reason, 'Falha ao enviar e-mails.')}`,
         );
       }
     } catch (error) {
       console.error('Erro ao enviar emails:', error);
       notificacao.erro.operacaoFalhou(
-        'enviar emails',
-        obterMensagemErro(error, 'Erro ao enviar emails.'),
+        'enviar e-mails',
+        obterMensagemErro(error, 'Erro ao enviar e-mails.'),
       );
     }
   };
@@ -609,7 +609,7 @@ export default function FaturamentoPage() {
   const handleExportarRelatorio = (tipo: 'pdf' | 'excel' | 'csv') => {
     try {
       if (!faturas.length) {
-        notificacao.mostrarAviso('Sem dados', 'Não há faturas para exportar.');
+        notificacao.mostrarAviso('Exportação indisponível', 'Não há faturas para exportar.');
         return;
       }
 
@@ -775,7 +775,7 @@ export default function FaturamentoPage() {
         if (sucesso > 0) {
           notificacao.mostrarSucesso(
             'Workflow executado',
-            sucesso + ' cobranca(s) enviada(s) por e-mail.',
+            sucesso + ' cobrança(s) enviada(s) por e-mail.',
           );
         }
         if (simulados > 0) {
@@ -790,7 +790,7 @@ export default function FaturamentoPage() {
             (item): item is PromiseRejectedResult => item.status === 'rejected',
           );
           notificacao.erro.operacaoFalhou(
-            'workflow de cobranca',
+            'workflow de cobrança',
             falhas +
               ' envio(s) falharam. ' +
               obterMensagemErro(primeiraFalha?.reason, 'Falha no lote.'),
@@ -802,7 +802,7 @@ export default function FaturamentoPage() {
           sucesso,
           falhas,
           mensagem:
-            'Lote de cobranca finalizado: ' +
+            'Lote de cobrança finalizado: ' +
             sucesso +
             ' envio(s) real(is), ' +
             simulados +
@@ -961,8 +961,8 @@ export default function FaturamentoPage() {
       const link = await faturamentoService.gerarLinkPagamento(id);
       navigator.clipboard.writeText(link);
       notificacao.mostrarSucesso(
-        'Link Copiado',
-        'Link de pagamento copiado para a área de transferência!',
+        'Link de pagamento copiado',
+        'O link de pagamento foi copiado para a área de transferência.',
       );
       carregarFaturas(); // Recarregar para atualizar o link
     } catch (error) {
@@ -986,13 +986,13 @@ export default function FaturamentoPage() {
         );
         return;
       }
-      notificacao.mostrarSucesso('Email Enviado', 'Fatura enviada por email com sucesso!');
+      notificacao.mostrarSucesso('E-mail enviado', 'Fatura enviada por e-mail com sucesso.');
       await carregarFaturas();
     } catch (error) {
       console.error('Erro ao enviar fatura por email:', error);
       notificacao.erro.operacaoFalhou(
-        'enviar fatura por email',
-        obterMensagemErro(error, 'Falha ao enviar fatura por email.'),
+        'enviar fatura por e-mail',
+        obterMensagemErro(error, 'Falha ao enviar fatura por e-mail.'),
       );
     }
   };
@@ -1081,11 +1081,45 @@ export default function FaturamentoPage() {
     }
   };
 
+  const estornarPagamento = async (pagamentoId: number, motivo: string) => {
+    try {
+      const pagamentoEstornado = await faturamentoService.estornarPagamento(pagamentoId, motivo);
+      notificacao.mostrarSucesso('Estorno concluído', 'Pagamento estornado com sucesso.');
+
+      await queryClient.removeQueries({ queryKey: ['faturas-paginadas'] });
+      await queryClient.invalidateQueries({ queryKey: ['faturas-paginadas'] });
+      await queryClient.refetchQueries({ queryKey: ['faturas-paginadas'] });
+      await carregarFaturas();
+
+      const faturaIdAtualizada = Number(pagamentoEstornado?.faturaId || 0);
+      if (faturaIdAtualizada > 0) {
+        try {
+          const faturaAtualizada = await faturamentoService.obterFatura(faturaIdAtualizada);
+          setFaturaDetalhes((atual) =>
+            atual && atual.id === faturaIdAtualizada ? faturaAtualizada : atual,
+          );
+          setFaturaPagamentos((atual) =>
+            atual && atual.id === faturaIdAtualizada ? faturaAtualizada : atual,
+          );
+        } catch (errorDetalhes) {
+          console.warn('Nao foi possivel atualizar os detalhes da fatura apos estorno:', errorDetalhes);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao estornar pagamento:', error);
+      notificacao.erro.operacaoFalhou(
+        'estornar pagamento',
+        obterMensagemErro(error, 'Falha ao estornar pagamento.'),
+      );
+      throw error;
+    }
+  };
+
   // Ações em massa melhoradas
   const handleAcaoMassa = async (acao: string) => {
     if (faturasSelecionadas.length === 0) {
       notificacao.mostrarAviso(
-        'Seleção Necessária',
+        'Seleção necessária',
         'Selecione pelo menos uma fatura para executar esta ação.',
       );
       return;
@@ -1141,8 +1175,8 @@ export default function FaturamentoPage() {
             setProgressoAcaoMassa(((i + 1) / faturasSelecionadasData.length) * 100);
           }
           notificacao.mostrarSucesso(
-            'Emails Enviados',
-            `${faturasSelecionadas.length} email(s) enviado(s) com sucesso!`,
+            'E-mails enviados',
+            `${faturasSelecionadas.length} e-mail(s) enviado(s) com sucesso.`,
           );
           break;
 
@@ -2743,6 +2777,7 @@ export default function FaturamentoPage() {
           isOpen={modalDetalhesAberto}
           onClose={fecharModalDetalhes}
           fatura={faturaDetalhes}
+          onEstornarPagamento={estornarPagamento}
           onEdit={() => {
             abrirModalEdicao(faturaDetalhes);
             fecharModalDetalhes();
@@ -2766,6 +2801,7 @@ export default function FaturamentoPage() {
           onClose={fecharModalPagamentos}
           fatura={faturaPagamentos}
           onRegistrarPagamento={registrarPagamento}
+          onEstornarPagamento={estornarPagamento}
         />
       )}
 

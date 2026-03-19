@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toastService } from '../services/toastService';
 import * as XLSX from 'xlsx';
@@ -47,6 +47,7 @@ import {
   RefreshCw,
   Save,
   Bookmark,
+  ArrowUp,
   Archive,
   RotateCcw,
   CheckCircle,
@@ -100,6 +101,13 @@ const localizer = dateFnsLocalizer({
 // Tipos de visualização
 type VisualizacaoPipeline = 'kanban' | 'lista' | 'calendario' | 'grafico';
 type WorkspaceTab = 'pipeline' | 'parametros';
+
+type KanbanScrollSnapshot = {
+  boardScrollLeft: number;
+  columnScrollTop: Record<string, number>;
+  windowScrollY: number;
+  expanded: boolean;
+};
 
 type EstagioConfig = {
   id: EstagioOportunidade;
@@ -230,6 +238,35 @@ const LIFECYCLE_VIEW_DESCRIPTIONS: Record<LifecycleViewOportunidade, string> = {
   [LifecycleViewOportunidade.ALL]: 'Todos os registros, incluindo lixeira.',
 };
 
+const PIPELINE_LIFECYCLE_VIEW_STORAGE_KEY = 'conectcrm-pipeline-lifecycle-view';
+const PIPELINE_PERSISTED_LIFECYCLE_VIEWS = new Set<LifecycleViewOportunidade>([
+  LifecycleViewOportunidade.OPEN,
+  LifecycleViewOportunidade.CLOSED,
+  LifecycleViewOportunidade.ARCHIVED,
+  LifecycleViewOportunidade.DELETED,
+]);
+
+const getInitialLifecycleView = (): LifecycleViewOportunidade => {
+  if (typeof window === 'undefined') {
+    return LifecycleViewOportunidade.OPEN;
+  }
+
+  try {
+    const value = localStorage.getItem(PIPELINE_LIFECYCLE_VIEW_STORAGE_KEY);
+    if (!value) {
+      return LifecycleViewOportunidade.OPEN;
+    }
+
+    if (PIPELINE_PERSISTED_LIFECYCLE_VIEWS.has(value as LifecycleViewOportunidade)) {
+      return value as LifecycleViewOportunidade;
+    }
+  } catch (err) {
+    console.warn('Nao foi possivel carregar a visualizacao da pipeline do localStorage.', err);
+  }
+
+  return LifecycleViewOportunidade.OPEN;
+};
+
 const STALE_THRESHOLD_MIN = 7;
 const STALE_THRESHOLD_MAX = 120;
 const STALE_AUTO_ARCHIVE_MIN = 7;
@@ -257,9 +294,8 @@ const PipelinePage: React.FC = () => {
   const [oportunidades, setOportunidades] = useState<Oportunidade[]>([]);
   const [estatisticas, setEstatisticas] = useState<EstatisticasOportunidades | null>(null);
   const [lifecycleFeatureEnabled, setLifecycleFeatureEnabled] = useState(false);
-  const [lifecycleView, setLifecycleView] = useState<LifecycleViewOportunidade>(
-    LifecycleViewOportunidade.OPEN,
-  );
+  const [lifecycleView, setLifecycleView] =
+    useState<LifecycleViewOportunidade>(getInitialLifecycleView);
   const [stalePolicy, setStalePolicy] = useState<StalePolicyDecision | null>(null);
   const [stalePolicyDraft, setStalePolicyDraft] = useState({
     enabled: false,
@@ -312,8 +348,70 @@ const PipelinePage: React.FC = () => {
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [openCardActionsMenuId, setOpenCardActionsMenuId] = useState<string | null>(null);
   const [openListActionsMenuId, setOpenListActionsMenuId] = useState<string | null>(null);
+  const [showBackToTop, setShowBackToTop] = useState(false);
+  const kanbanBoardRef = useRef<HTMLDivElement | null>(null);
+  const kanbanColumnScrollRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const kanbanScrollSnapshotRef = useRef<KanbanScrollSnapshot | null>(null);
   const canManageStalePolicy = userHasPermission(user as any, 'config.automacoes.manage');
   const showPipelineWorkspace = !lifecycleFeatureEnabled || workspaceTab === 'pipeline';
+
+  const captureKanbanScrollSnapshot = useCallback(() => {
+    if (visualizacao !== 'kanban') return;
+
+    const columnScrollTop: Record<string, number> = {};
+    Object.entries(kanbanColumnScrollRefs.current).forEach(([stageId, element]) => {
+      if (!element) return;
+      columnScrollTop[stageId] = element.scrollTop;
+    });
+
+    kanbanScrollSnapshotRef.current = {
+      boardScrollLeft: kanbanBoardRef.current?.scrollLeft ?? 0,
+      columnScrollTop,
+      windowScrollY: window.scrollY,
+      expanded: kanbanExpanded,
+    };
+  }, [visualizacao, kanbanExpanded]);
+
+  const restoreKanbanScrollSnapshot = useCallback(
+    ({ defer = false }: { defer?: boolean } = {}) => {
+      const snapshot = kanbanScrollSnapshotRef.current;
+      if (!snapshot || visualizacao !== 'kanban') return;
+
+      const applySnapshot = () => {
+        const board = kanbanBoardRef.current;
+        if (board) {
+          board.scrollLeft = snapshot.boardScrollLeft;
+        }
+
+        if (!kanbanExpanded) {
+          window.scrollTo({ top: snapshot.windowScrollY, behavior: 'auto' });
+        }
+
+        if (snapshot.expanded && kanbanExpanded) {
+          Object.entries(snapshot.columnScrollTop).forEach(([stageId, value]) => {
+            const element = kanbanColumnScrollRefs.current[stageId];
+            if (element) {
+              element.scrollTop = value;
+            }
+          });
+        }
+      };
+
+      if (defer) {
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(applySnapshot);
+        });
+        return;
+      }
+
+      applySnapshot();
+    },
+    [visualizacao, kanbanExpanded],
+  );
+
+  const handleVoltarAoTopo = useCallback(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
 
   const mapRoleToUserRole = (role?: string): UserRole => {
     const normalizedRole = (role || '').trim().toLowerCase();
@@ -422,6 +520,16 @@ const PipelinePage: React.FC = () => {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [kanbanExpanded]);
 
+  useEffect(() => {
+    const onScroll = () => {
+      setShowBackToTop(window.scrollY > 520);
+    };
+
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   // Estados para ordenação e paginação
   const [ordenacao, setOrdenacao] = useState<{
     campo: 'valor' | 'dataFechamentoEsperado' | 'probabilidade' | 'estagio' | 'titulo';
@@ -453,6 +561,18 @@ const PipelinePage: React.FC = () => {
       }
     }
   }, []);
+
+  useEffect(() => {
+    if (!lifecycleFeatureEnabled) {
+      return;
+    }
+
+    try {
+      localStorage.setItem(PIPELINE_LIFECYCLE_VIEW_STORAGE_KEY, lifecycleView);
+    } catch (err) {
+      console.warn('Nao foi possivel salvar a visualizacao da pipeline no localStorage.', err);
+    }
+  }, [lifecycleFeatureEnabled, lifecycleView]);
 
   const normalizeIntegerWithinRange = (value: number, min: number, max: number) => {
     const numericValue = Number(value);
@@ -690,6 +810,7 @@ const PipelinePage: React.FC = () => {
       return;
     }
 
+    captureKanbanScrollSnapshot();
     setOportunidadeEditando(null);
     setEstagioNovaOportunidade(estagio);
     setShowModal(true);
@@ -749,12 +870,14 @@ const PipelinePage: React.FC = () => {
       return;
     }
 
+    captureKanbanScrollSnapshot();
     setOportunidadeEditando(oportunidade);
     setShowModal(true);
   };
 
   // Abrir modal de detalhes
   const handleVerDetalhes = (oportunidade: Oportunidade) => {
+    captureKanbanScrollSnapshot();
     setOportunidadeDetalhes(oportunidade);
   };
 
@@ -956,6 +1079,7 @@ const PipelinePage: React.FC = () => {
     };
 
     // Abrir modal de edição com dados clonados
+    captureKanbanScrollSnapshot();
     setOportunidadeEditando(oportunidadeClonada as any);
     setShowModal(true);
     toastService.success('Oportunidade duplicada! Edite e salve para criar a cópia.');
@@ -1086,6 +1210,7 @@ const PipelinePage: React.FC = () => {
       await carregarDados();
       setShowModal(false);
       setOportunidadeEditando(null);
+      restoreKanbanScrollSnapshot({ defer: true });
       toastService.success(
         oportunidadeEditando
           ? 'Oportunidade atualizada com sucesso!'
@@ -2529,6 +2654,7 @@ const PipelinePage: React.FC = () => {
               </div>
             )}
             <div
+              ref={kanbanBoardRef}
               className={
                 kanbanExpanded
                   ? 'flex gap-3 sm:gap-4 overflow-x-auto pb-3 h-full'
@@ -2602,6 +2728,13 @@ const PipelinePage: React.FC = () => {
               {/* Cards das Oportunidades */}
               <div
                 data-testid={`pipeline-column-dropzone-${estagio.id}`}
+                ref={(element) => {
+                  if (element) {
+                    kanbanColumnScrollRefs.current[String(estagio.id)] = element;
+                    return;
+                  }
+                  delete kanbanColumnScrollRefs.current[String(estagio.id)];
+                }}
                 className={
                   kanbanExpanded
                     ? 'bg-[#DEEFE7]/35 rounded-b-lg p-2 space-y-2 border border-[#B4BEC9]/40 border-t-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]'
@@ -3851,12 +3984,26 @@ const PipelinePage: React.FC = () => {
         </>
       )}
 
+      {showBackToTop && !kanbanExpanded && (
+        <button
+          type="button"
+          onClick={handleVoltarAoTopo}
+          className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 rounded-full border border-[#B4BEC9]/70 bg-white/95 px-4 py-2 text-sm font-medium text-[#1E3A4B] shadow-lg transition-colors hover:bg-[#DEEFE7]"
+          aria-label="Voltar ao topo"
+          title="Voltar ao topo"
+        >
+          <ArrowUp className="h-4 w-4" />
+          Topo
+        </button>
+      )}
+
       {/* Modal Oportunidade Refatorado */}
       <ModalOportunidadeRefatorado
         isOpen={showModal}
         onClose={() => {
           setShowModal(false);
           setOportunidadeEditando(null);
+          restoreKanbanScrollSnapshot({ defer: true });
         }}
         onSave={handleSalvarOportunidade}
         oportunidade={oportunidadeEditando}
@@ -3915,7 +4062,10 @@ const PipelinePage: React.FC = () => {
       {/* Modal de Detalhes */}
       <ModalDetalhesOportunidade
         oportunidade={oportunidadeDetalhes}
-        onClose={() => setOportunidadeDetalhes(null)}
+        onClose={() => {
+          setOportunidadeDetalhes(null);
+          restoreKanbanScrollSnapshot({ defer: true });
+        }}
         onEditar={handleEditarOportunidade}
         onClonar={handleClonarOportunidade}
         exclusaoDireta={!lifecycleFeatureEnabled}

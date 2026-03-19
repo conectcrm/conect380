@@ -119,6 +119,7 @@ const FATURA_STATUS_ATIVA_NAO_CANCELADA = new Set([
   'parcialmente_paga',
   'paga',
 ]);
+const FATURA_STATUS_CANCELAMENTO_AUTOMATICO = new Set(['pendente', 'enviada', 'vencida']);
 
 const OPORTUNIDADE_SYNC_FORWARD_ORDER: readonly EstagioOportunidade[] = [
   EstagioOportunidade.LEADS,
@@ -231,6 +232,11 @@ type PropostaVendaBloqueios = {
   contratosAssinados: number;
   faturasAtivasNaoCanceladas: number;
   faturasPagasOuParciais: number;
+};
+
+type PropostaCancelamentoVinculosResultado = {
+  contratosCancelados: number;
+  faturasCanceladas: number;
 };
 
 export interface Proposta {
@@ -4224,39 +4230,201 @@ export class PropostasService {
     }
 
     const bloqueios = await this.carregarBloqueiosCancelamentoVenda(propostaId, empresaId);
-    if (bloqueios.contratosAssinados > 0) {
-      throw new BadRequestException(
-        'Nao e possivel cancelar a venda porque existe contrato assinado vinculado. Cancele o contrato primeiro.',
-      );
-    }
-
     if (bloqueios.faturasPagasOuParciais > 0) {
       throw new BadRequestException(
         'Nao e possivel cancelar a venda porque existem faturas pagas/parcialmente pagas. Execute o estorno antes de cancelar.',
       );
     }
 
-    if (bloqueios.faturasAtivasNaoCanceladas > 0) {
-      throw new BadRequestException(
-        'Nao e possivel cancelar a venda enquanto houver faturas ativas. Cancele as faturas pendentes/enviadas antes de continuar.',
+    const resultadoCancelamentoVinculos =
+      await this.cancelarVinculosComerciaisParaCancelamentoVenda(
+        propostaId,
+        motivoPerda,
+        empresaId,
+        input?.source || 'cancelamento-venda',
       );
-    }
 
     const observacoesPadrao = `Venda cancelada manualmente. Motivo: ${motivoPerda}.`;
     const observacoes = String(input?.observacoes || '').trim() || observacoesPadrao;
+    const observacoesAutomaticas = [
+      resultadoCancelamentoVinculos.faturasCanceladas > 0
+        ? `Faturas canceladas automaticamente: ${resultadoCancelamentoVinculos.faturasCanceladas}.`
+        : '',
+      resultadoCancelamentoVinculos.contratosCancelados > 0
+        ? `Contratos cancelados automaticamente: ${resultadoCancelamentoVinculos.contratosCancelados}.`
+        : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+    const observacoesFinais = [observacoes, observacoesAutomaticas].filter(Boolean).join(' ').trim();
 
     return this.atualizarStatus(
       propostaId,
       'rejeitada',
       input?.source || 'cancelamento-venda',
-      observacoes,
+      observacoesFinais,
       motivoPerda,
       empresaId,
       {
         tipo: 'cancelamento_venda',
+        faturasCanceladasAutomaticamente: resultadoCancelamentoVinculos.faturasCanceladas,
+        contratosCanceladosAutomaticamente: resultadoCancelamentoVinculos.contratosCancelados,
         actorUserId: input?.actorUserId || null,
       },
     );
+  }
+
+  private async cancelarVinculosComerciaisParaCancelamentoVenda(
+    propostaId: string,
+    motivoCancelamento: string,
+    empresaId?: string,
+    source?: string,
+  ): Promise<PropostaCancelamentoVinculosResultado> {
+    const resultado: PropostaCancelamentoVinculosResultado = {
+      contratosCancelados: 0,
+      faturasCanceladas: 0,
+    };
+
+    const contratoColumns = await this.getTableColumns('contratos');
+    const propostaColumn = contratoColumns.has('propostaId')
+      ? '"propostaId"'
+      : contratoColumns.has('proposta_id')
+        ? 'proposta_id'
+        : null;
+    if (!propostaColumn) {
+      return resultado;
+    }
+
+    const empresaContratoColumn = contratoColumns.has('empresa_id')
+      ? 'empresa_id'
+      : contratoColumns.has('empresaId')
+        ? '"empresaId"'
+        : null;
+    const contratoAtivoColumn = contratoColumns.has('ativo') ? 'ativo' : null;
+    const contratoObservacoesColumn = contratoColumns.has('observacoes') ? 'observacoes' : null;
+
+    const faturaColumns = await this.getTableColumns('faturas');
+    const contratoFaturaColumn = faturaColumns.has('contratoId')
+      ? '"contratoId"'
+      : faturaColumns.has('contrato_id')
+        ? 'contrato_id'
+        : null;
+    const empresaFaturaColumn = faturaColumns.has('empresa_id')
+      ? 'empresa_id'
+      : faturaColumns.has('empresaId')
+        ? '"empresaId"'
+        : null;
+    const faturaAtivoColumn = faturaColumns.has('ativo') ? 'ativo' : null;
+    const faturaObservacoesColumn = faturaColumns.has('observacoes') ? 'observacoes' : null;
+
+    const detalhesCancelamento = `Cancelado automaticamente via ${source || 'cancelamento-venda'}: ${motivoCancelamento}`;
+    const contratoAtivoExpr = contratoAtivoColumn
+      ? `COALESCE(c.${contratoAtivoColumn}, true) = true`
+      : 'TRUE';
+
+    await this.propostaRepository.manager.transaction(async (manager) => {
+      const contratoParams: unknown[] = [propostaId];
+      const filtroEmpresaContrato =
+        empresaId && empresaContratoColumn
+          ? `AND c.${empresaContratoColumn}::text = $2::text`
+          : '';
+      if (empresaId && empresaContratoColumn) {
+        contratoParams.push(empresaId);
+      }
+
+      const contratosRaw = await manager.query(
+        `
+          SELECT c.id::text AS id
+          FROM contratos c
+          WHERE c.${propostaColumn}::text = $1::text
+            ${filtroEmpresaContrato}
+            AND ${contratoAtivoExpr}
+        `,
+        contratoParams,
+      );
+      const contratosRows = this.extractQueryRows<{ id?: string }>(contratosRaw);
+      const contratoIds = Array.from(
+        new Set(
+          contratosRows
+            .map((row) => String(row?.id || '').trim())
+            .filter(Boolean),
+        ),
+      );
+
+      if (contratoIds.length === 0) {
+        return;
+      }
+
+      if (contratoFaturaColumn) {
+        const faturasParams: unknown[] = [contratoIds];
+        const idxObs = faturasParams.push(detalhesCancelamento);
+        const idxStatusCancelavel = faturasParams.push(
+          Array.from(FATURA_STATUS_CANCELAMENTO_AUTOMATICO),
+        );
+        const filtroEmpresaFatura =
+          empresaId && empresaFaturaColumn
+            ? `AND f.${empresaFaturaColumn}::text = $${faturasParams.push(empresaId)}::text`
+            : '';
+        const faturaAtivoExpr = faturaAtivoColumn
+          ? `COALESCE(f.${faturaAtivoColumn}, true) = true`
+          : 'TRUE';
+        const appendObsFatura = faturaObservacoesColumn
+          ? `, ${faturaObservacoesColumn} = CASE
+               WHEN $${idxObs}::text = '' THEN f.${faturaObservacoesColumn}
+               WHEN f.${faturaObservacoesColumn} IS NULL OR BTRIM(f.${faturaObservacoesColumn}) = '' THEN $${idxObs}::text
+               ELSE f.${faturaObservacoesColumn} || E'\\n\\n' || $${idxObs}::text
+             END`
+          : '';
+
+        const faturasRaw = await manager.query(
+          `
+            UPDATE faturas f
+            SET status = 'cancelada'
+            ${appendObsFatura}
+            WHERE f.${contratoFaturaColumn}::text = ANY($1::text[])
+              ${filtroEmpresaFatura}
+              AND ${faturaAtivoExpr}
+              AND f.status = ANY($${idxStatusCancelavel}::text[])
+            RETURNING f.id::text AS id
+          `,
+          faturasParams,
+        );
+        const faturasRows = this.extractQueryRows<{ id?: string }>(faturasRaw);
+        resultado.faturasCanceladas = faturasRows.length;
+      }
+
+      const contratosUpdateParams: unknown[] = [contratoIds, detalhesCancelamento];
+      const idxContratoStatusCancelado = contratosUpdateParams.push('cancelado');
+      const filtroEmpresaContratoUpdate =
+        empresaId && empresaContratoColumn
+          ? `AND c.${empresaContratoColumn}::text = $${contratosUpdateParams.push(empresaId)}::text`
+          : '';
+      const appendObsContrato = contratoObservacoesColumn
+        ? `, ${contratoObservacoesColumn} = CASE
+             WHEN $2::text = '' THEN c.${contratoObservacoesColumn}
+             WHEN c.${contratoObservacoesColumn} IS NULL OR BTRIM(c.${contratoObservacoesColumn}) = '' THEN $2::text
+             ELSE c.${contratoObservacoesColumn} || E'\\n\\n' || $2::text
+           END`
+        : '';
+
+      const contratosAtualizadosRaw = await manager.query(
+        `
+          UPDATE contratos c
+          SET status = 'cancelado'
+          ${appendObsContrato}
+          WHERE c.id::text = ANY($1::text[])
+            ${filtroEmpresaContratoUpdate}
+            AND ${contratoAtivoExpr}
+            AND c.status <> $${idxContratoStatusCancelado}::text
+          RETURNING c.id::text AS id
+        `,
+        contratosUpdateParams,
+      );
+      const contratosAtualizados = this.extractQueryRows<{ id?: string }>(contratosAtualizadosRaw);
+      resultado.contratosCancelados = contratosAtualizados.length;
+    });
+
+    return resultado;
   }
 
   /**
