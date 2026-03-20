@@ -21,6 +21,7 @@ import {
 import { ContaPagar } from '../entities/conta-pagar.entity';
 import { Fornecedor } from '../entities/fornecedor.entity';
 import { ContaBancaria } from '../entities/conta-bancaria.entity';
+import { CentroCusto } from '../entities/centro-custo.entity';
 import {
   ContaPagarExportacao,
   ContaPagarExportacaoFormato,
@@ -176,6 +177,8 @@ export class ContaPagarService {
     private readonly fornecedorRepository: Repository<Fornecedor>,
     @InjectRepository(ContaBancaria)
     private readonly contaBancariaRepository: Repository<ContaBancaria>,
+    @InjectRepository(CentroCusto)
+    private readonly centroCustoRepository: Repository<CentroCusto>,
     @InjectRepository(ContaPagarExportacao)
     private readonly contaPagarExportacaoRepository: Repository<ContaPagarExportacao>,
     @InjectRepository(EmpresaConfig)
@@ -310,6 +313,10 @@ export class ContaPagarService {
     if (createContaPagarDto.contaBancariaId) {
       await this.validarContaBancaria(createContaPagarDto.contaBancariaId, empresaId);
     }
+    const centroCustoId = createContaPagarDto.centroCustoId?.trim() || undefined;
+    if (centroCustoId) {
+      await this.validarCentroCusto(centroCustoId, empresaId);
+    }
 
     const valorOriginal = Number(createContaPagarDto.valorOriginal || 0);
     const valorDesconto = Number(createContaPagarDto.valorDesconto || 0);
@@ -384,7 +391,7 @@ export class ContaPagarService {
         tipoPagamento: createContaPagarDto.tipoPagamento?.trim() || undefined,
         formaPagamento: createContaPagarDto.tipoPagamento?.trim() || undefined,
         contaBancariaId: createContaPagarDto.contaBancariaId?.trim() || undefined,
-        centroCustoId: createContaPagarDto.centroCustoId?.trim() || undefined,
+        centroCustoId,
         recorrente: !!createContaPagarDto.recorrente,
         frequenciaRecorrencia: createContaPagarDto.frequenciaRecorrencia || undefined,
         necessitaAprovacao,
@@ -498,7 +505,11 @@ export class ContaPagarService {
     }
 
     if (updateContaPagarDto.centroCustoId !== undefined) {
-      conta.centroCustoId = updateContaPagarDto.centroCustoId || undefined;
+      const centroCustoId = updateContaPagarDto.centroCustoId?.trim() || undefined;
+      if (centroCustoId) {
+        await this.validarCentroCusto(centroCustoId, empresaId);
+      }
+      conta.centroCustoId = centroCustoId;
     }
 
     const valorAtual = Number(conta.valorTotal ?? conta.valor ?? 0);
@@ -1116,6 +1127,29 @@ export class ContaPagarService {
     return contaBancaria;
   }
 
+  private async validarCentroCusto(centroCustoId: string, empresaId: string): Promise<void> {
+    const idNormalizado = centroCustoId.trim();
+    if (!idNormalizado) {
+      return;
+    }
+
+    // Compatibilidade com registros legados que podem ter texto livre.
+    if (!this.isUuid(idNormalizado)) {
+      return;
+    }
+
+    const centro = await this.centroCustoRepository.findOne({
+      where: {
+        id: idNormalizado,
+        empresaId,
+      },
+    });
+
+    if (!centro) {
+      throw new BadRequestException('Centro de custo nao encontrado para a empresa ativa');
+    }
+  }
+
   private async findContaEntity(id: string, empresaId: string): Promise<ContaPagar> {
     const conta = await this.contaPagarRepository.findOne({
       where: { id, empresaId },
@@ -1237,6 +1271,12 @@ export class ContaPagarService {
       return new Date(`${raw}T12:00:00`);
     }
     return new Date(raw);
+  }
+
+  private isUuid(value: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value,
+    );
   }
 
   private parseArrayFilter(value?: string | string[]): string[] {

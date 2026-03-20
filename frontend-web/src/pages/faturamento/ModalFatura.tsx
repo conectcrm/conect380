@@ -55,6 +55,12 @@ const criarFaturaPadrao = (usuarioResponsavelId: string): NovaFatura => ({
   observacoes: '',
   percentualDesconto: 0,
   valorDesconto: 0,
+  valorImpostos: 0,
+  percentualImpostos: null,
+  diasCarenciaJuros: 0,
+  percentualJuros: 0,
+  percentualMulta: 0,
+  detalhesTributarios: undefined,
   itens: [],
 });
 
@@ -174,11 +180,34 @@ const extrairMetadadosObservacoes = (observacoes?: string): {
   }
 };
 
-const montarObservacoesComMetadados = (texto: string, metadados: MetadadosFatura): string => {
-  const textoBase = texto.trim();
-  const bloco = `${METADADOS_INICIO}\n${JSON.stringify(metadados)}\n${METADADOS_FIM}`;
+const extrairConfigTipoDosDetalhes = (
+  detalhes?: Record<string, unknown> | null,
+): ConfiguracaoTipoFatura | null => {
+  if (!detalhes || typeof detalhes !== 'object' || Array.isArray(detalhes)) {
+    return null;
+  }
 
-  return textoBase ? `${textoBase}\n\n${bloco}` : bloco;
+  const tipoRaw =
+    (detalhes.tipo as Partial<ConfiguracaoTipoFatura> | undefined) ||
+    (detalhes.configuracaoTipo as Partial<ConfiguracaoTipoFatura> | undefined);
+
+  if (!tipoRaw || typeof tipoRaw !== 'object') {
+    return null;
+  }
+
+  const periodicidade =
+    tipoRaw.periodicidadeRecorrencia &&
+    PERIODICIDADES_RECORRENCIA.includes(tipoRaw.periodicidadeRecorrencia)
+      ? tipoRaw.periodicidadeRecorrencia
+      : 'mensal';
+
+  return {
+    periodicidadeRecorrencia: periodicidade,
+    limiteCiclos:
+      tipoRaw.limiteCiclos == null ? null : Math.max(1, normalizarNumero(tipoRaw.limiteCiclos, 1)),
+    quantidadeParcelas: Math.max(2, normalizarNumero(tipoRaw.quantidadeParcelas, 2)),
+    intervaloParcelasDias: Math.max(1, normalizarNumero(tipoRaw.intervaloParcelasDias, 30)),
+  };
 };
 
 export default function ModalFatura({
@@ -250,6 +279,28 @@ export default function ModalFatura({
 
     if (fatura) {
       const { textoLimpo, metadados } = extrairMetadadosObservacoes(fatura.observacoes);
+      const configTipoEstruturada = extrairConfigTipoDosDetalhes(fatura.detalhesTributarios);
+
+      const configFinanceiraEstruturada: ConfiguracaoFinanceiraAvancada = {
+        diasCarenciaJuros: Math.max(
+          0,
+          Math.trunc(
+            normalizarNumero(fatura.diasCarenciaJuros, metadados?.financeiro?.diasCarenciaJuros || 0),
+          ),
+        ),
+        percentualJuros: Math.max(
+          0,
+          normalizarNumero(fatura.percentualJuros, metadados?.financeiro?.percentualJuros || 0),
+        ),
+        percentualMulta: Math.max(
+          0,
+          normalizarNumero(fatura.percentualMulta, metadados?.financeiro?.percentualMulta || 0),
+        ),
+        valorImpostos: Math.max(
+          0,
+          normalizarNumero(fatura.valorImpostos, metadados?.financeiro?.valorImpostos || 0),
+        ),
+      };
 
       setFormData({
         contratoId: fatura.contratoId ? String(fatura.contratoId) : '',
@@ -257,10 +308,20 @@ export default function ModalFatura({
         usuarioResponsavelId: fatura.usuarioResponsavelId || usuarioResponsavelId,
         tipo: fatura.tipo,
         dataVencimento: fatura.dataVencimento.split('T')[0],
-        formaPagamento: fatura.formaPagamento || FormaPagamento.PIX,
+        formaPagamento: fatura.formaPagamento || fatura.formaPagamentoPreferida || FormaPagamento.PIX,
         observacoes: textoLimpo || '',
         percentualDesconto: fatura.percentualDesconto || 0,
         valorDesconto: fatura.valorDesconto || 0,
+        valorImpostos: configFinanceiraEstruturada.valorImpostos,
+        percentualImpostos:
+          fatura.percentualImpostos === undefined ? null : (fatura.percentualImpostos ?? null),
+        diasCarenciaJuros: configFinanceiraEstruturada.diasCarenciaJuros,
+        percentualJuros: configFinanceiraEstruturada.percentualJuros,
+        percentualMulta: configFinanceiraEstruturada.percentualMulta,
+        detalhesTributarios:
+          fatura.detalhesTributarios && typeof fatura.detalhesTributarios === 'object'
+            ? fatura.detalhesTributarios
+            : undefined,
         itens: fatura.itens.map((item) => ({
           descricao: item.descricao,
           quantidade: item.quantidade,
@@ -295,8 +356,8 @@ export default function ModalFatura({
         setContratoSelecionado(null);
       }
 
-      setConfigTipo(metadados?.tipo ?? CONFIG_TIPO_PADRAO);
-      setConfigFinanceira(metadados?.financeiro ?? CONFIG_FINANCEIRA_PADRAO);
+      setConfigTipo(configTipoEstruturada ?? metadados?.tipo ?? CONFIG_TIPO_PADRAO);
+      setConfigFinanceira(configFinanceiraEstruturada);
     } else {
       setFormData(criarFaturaPadrao(usuarioResponsavelId));
       setClienteSelecionado(null);
@@ -528,26 +589,26 @@ export default function ModalFatura({
 
     try {
       const observacoesBase = formData.observacoes?.trim() || '';
-      const metadados: MetadadosFatura = {
-        versao: 1,
-        tipo: configTipo,
-        financeiro: configFinanceira,
-      };
-      const devePersistirMetadados =
-        formData.tipo !== TipoFatura.UNICA ||
-        configFinanceira.diasCarenciaJuros > 0 ||
-        configFinanceira.percentualJuros > 0 ||
-        configFinanceira.percentualMulta > 0 ||
-        configFinanceira.valorImpostos > 0;
-
-      const observacoesCompletas = devePersistirMetadados
-        ? montarObservacoesComMetadados(observacoesBase, metadados)
-        : observacoesBase;
+      const valorImpostos = Math.max(0, configFinanceira.valorImpostos || 0);
+      const percentualImpostosCalculado =
+        totais.total > 0 && valorImpostos > 0
+          ? Number(((valorImpostos / totais.total) * 100).toFixed(4))
+          : null;
 
       await onSave({
         ...formData,
         usuarioResponsavelId: formData.usuarioResponsavelId || usuarioResponsavelId,
-        observacoes: observacoesCompletas,
+        observacoes: observacoesBase,
+        valorImpostos,
+        percentualImpostos: percentualImpostosCalculado,
+        diasCarenciaJuros: Math.max(0, Math.trunc(configFinanceira.diasCarenciaJuros || 0)),
+        percentualJuros: Math.max(0, Math.min(100, configFinanceira.percentualJuros || 0)),
+        percentualMulta: Math.max(0, Math.min(100, configFinanceira.percentualMulta || 0)),
+        detalhesTributarios: {
+          versao: 1,
+          origem: 'modal_fatura',
+          tipo: configTipo,
+        },
         itens: formData.itens.map((item) => ({
           ...item,
           descricao: item.descricao.trim(),
@@ -1216,4 +1277,3 @@ export default function ModalFatura({
     </div>
   );
 }
-

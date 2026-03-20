@@ -276,14 +276,10 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
         icon: Building2,
       },
       {
-        id: 'centro-custos',
-        name: 'Centro de Custos',
-        description: 'Organiza??o e controle de custos por departamento, projeto ou categoria.',
-        href: '/financeiro/centro-custos',
+        menuId: 'financeiro-centro-custos',
+        description:
+          'Cadastro estruturado de centros de custo com ativacao, desativacao e uso no contas a pagar.',
         icon: Calculator,
-        badge: 'Q1 2025',
-        badgeColor: 'purple',
-        status: 'coming_soon',
       },
       {
         id: 'tesouraria',

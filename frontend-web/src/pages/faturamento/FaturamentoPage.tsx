@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -615,21 +615,49 @@ export default function FaturamentoPage() {
 
       const dataAtual = new Date().toISOString().split('T')[0];
       const nomeArquivoBase = 'relatorio_faturamento_' + dataAtual;
-      const dadosRelatorio = faturas.map((fatura) => ({
-        numero: fatura.numero,
-        cliente: obterNomeCliente(fatura.cliente, fatura.clienteId),
-        status: faturamentoService.formatarStatusFatura(fatura.status),
-        valorTotal: Number(fatura.valorTotal || 0).toFixed(2),
-        dataEmissao: new Date(fatura.dataEmissao).toLocaleDateString('pt-BR'),
-        dataVencimento: new Date(fatura.dataVencimento).toLocaleDateString('pt-BR'),
-      }));
+      const dadosRelatorio = faturas.map((fatura) => {
+        const valorTotal = Number(fatura.valorTotal || 0);
+        const valorPagoRaw = Number((fatura as any).valorPago || 0);
+        const valorPago =
+          valorPagoRaw > 0
+            ? valorPagoRaw
+            : fatura.status === StatusFatura.PAGA
+              ? valorTotal
+              : 0;
+
+        return {
+          numero: fatura.numero,
+          cliente: obterNomeCliente(fatura.cliente, fatura.clienteId),
+          status: faturamentoService.formatarStatusFatura(fatura.status),
+          responsavel:
+            (fatura as any).usuarioResponsavel?.nome ||
+            (fatura as any).usuarioResponsavel?.name ||
+            (fatura as any).usuarioResponsavelId ||
+            '-',
+          origem: faturamentoService.formatarTipoFatura(fatura.tipo),
+          valorTotal,
+          valorPago,
+          valorAberto: Math.max(valorTotal - valorPago, 0),
+          dataEmissao: new Date(fatura.dataEmissao).toLocaleDateString('pt-BR'),
+          dataVencimento: new Date(fatura.dataVencimento).toLocaleDateString('pt-BR'),
+          dataCriacao: new Date(fatura.criadoEm).toLocaleString('pt-BR'),
+          dataAtualizacao: new Date(fatura.atualizadoEm).toLocaleString('pt-BR'),
+        };
+      });
+
       const colunasExportacao: ExportColumn[] = [
-        { key: 'numero', label: 'Número' },
+        { key: 'numero', label: 'Numero' },
         { key: 'cliente', label: 'Cliente' },
         { key: 'status', label: 'Status', transform: (value: unknown) => String(value || '') },
+        { key: 'responsavel', label: 'Responsável' },
+        { key: 'origem', label: 'Origem' },
         { key: 'valorTotal', label: 'Valor Total' },
+        { key: 'valorPago', label: 'Valor Pago' },
+        { key: 'valorAberto', label: 'Valor em Aberto' },
         { key: 'dataEmissao', label: 'Data Emissão' },
         { key: 'dataVencimento', label: 'Data Vencimento' },
+        { key: 'dataCriacao', label: 'Criado em' },
+        { key: 'dataAtualizacao', label: 'Atualizado em' },
       ];
 
       if (tipo === 'csv') {
@@ -655,6 +683,13 @@ export default function FaturamentoPage() {
         fatura.numero,
         obterNomeCliente(fatura.cliente, fatura.clienteId),
         faturamentoService.formatarStatusFatura(fatura.status),
+        faturamentoService.formatarTipoFatura(fatura.tipo),
+        String(
+          (fatura as any).usuarioResponsavel?.nome ||
+            (fatura as any).usuarioResponsavel?.name ||
+            (fatura as any).usuarioResponsavelId ||
+            '-',
+        ),
         Number(fatura.valorTotal || 0).toLocaleString('pt-BR', {
           style: 'currency',
           currency: 'BRL',
@@ -664,7 +699,7 @@ export default function FaturamentoPage() {
 
       autoTable(doc, {
         startY: 38,
-        head: [['Número', 'Cliente', 'Status', 'Valor Total', 'Vencimento']],
+        head: [['Número', 'Cliente', 'Status', 'Origem', 'Responsável', 'Valor Total', 'Vencimento']],
         body: linhasTabela,
         theme: 'grid',
         headStyles: {
@@ -672,13 +707,15 @@ export default function FaturamentoPage() {
           textColor: [255, 255, 255],
           fontStyle: 'bold',
         },
-        styles: { fontSize: 8, cellPadding: 2.5 },
+        styles: { fontSize: 7, cellPadding: 2 },
         columnStyles: {
-          0: { cellWidth: 25 },
-          1: { cellWidth: 60 },
-          2: { cellWidth: 28 },
-          3: { cellWidth: 35, halign: 'right' },
-          4: { cellWidth: 30 },
+          0: { cellWidth: 20 },
+          1: { cellWidth: 45 },
+          2: { cellWidth: 22 },
+          3: { cellWidth: 20 },
+          4: { cellWidth: 35 },
+          5: { cellWidth: 28, halign: 'right' },
+          6: { cellWidth: 20 },
         },
       });
 
@@ -1189,14 +1226,60 @@ export default function FaturamentoPage() {
           }
           break;
 
-        case 'gerar-cobranca':
-          setProgressoAcaoMassa(100);
-          notificacao.mostrarAviso(
-            'Cobrança em lote indisponível',
-            'A geração de cobrança em lote ainda não está integrada ao backend.',
-          );
-          break;
+        case 'gerar-cobranca': {
+          setProgressoAcaoMassa(25);
+          const resultadoCobranca = await faturamentoService.gerarCobrancaEmLote(faturasSelecionadas);
+          setProgressoAcaoMassa(80);
 
+          if (resultadoCobranca.sucesso > 0) {
+            notificacao.mostrarSucesso(
+              'Cobrança em lote concluída',
+              `${resultadoCobranca.sucesso} cobrança(s) enviada(s) com sucesso.` +
+                (resultadoCobranca.simuladas > 0
+                  ? ` ${resultadoCobranca.simuladas} envio(s) em modo simulado.`
+                  : ''),
+            );
+          } else if (resultadoCobranca.simuladas > 0) {
+            notificacao.mostrarAviso(
+              'Cobrança em modo simulado',
+              `${resultadoCobranca.simuladas} envio(s) processado(s) em simulação. Configure SMTP para envio real.`,
+            );
+          }
+
+          if (resultadoCobranca.ignoradas > 0) {
+            notificacao.mostrarAviso(
+              'Faturas ignoradas',
+              `${resultadoCobranca.ignoradas} fatura(s) foram ignoradas por status não elegível para cobrança.`,
+            );
+          }
+
+          if (resultadoCobranca.falhas > 0) {
+            const primeiraFalha = resultadoCobranca.resultados.find(
+              (item) => !item.enviado && item.motivo !== 'status_nao_elegivel',
+            );
+            notificacao.erro.operacaoFalhou(
+              'gerar cobrança em lote',
+              `${resultadoCobranca.falhas} fatura(s) falharam.` +
+                (primeiraFalha?.detalhes ? ` ${primeiraFalha.detalhes}` : ''),
+            );
+          }
+
+          if (
+            resultadoCobranca.sucesso === 0 &&
+            resultadoCobranca.simuladas === 0 &&
+            resultadoCobranca.falhas === 0
+          ) {
+            notificacao.mostrarAviso(
+              'Sem cobranças processadas',
+              'Nenhuma fatura selecionada estava apta para geração de cobrança.',
+            );
+          }
+
+          await queryClient.invalidateQueries({ queryKey: ['faturas-paginadas'] });
+          await carregarFaturas();
+          setProgressoAcaoMassa(100);
+          break;
+        }
         case 'exportar': {
           setProgressoAcaoMassa(50);
           const csvData = faturasSelecionadasData
@@ -1338,6 +1421,55 @@ export default function FaturamentoPage() {
     { label: 'Pendente', value: formatCurrency(dashboardCards.valorTotalPendente), tone: 'warning' as const },
     { label: 'Recebido', value: formatCurrency(dashboardCards.valorTotalPago), tone: 'accent' as const },
   ];
+
+  const painelDivergencias = useMemo(() => {
+    const divergenciasItensVsTotal = faturas.reduce<Array<{ numero: string; diferenca: number }>>(
+      (acc, fatura) => {
+        const totalItens = Array.isArray(fatura.itens)
+          ? fatura.itens.reduce((sum, item) => sum + Number(item.valorTotal || 0), 0)
+          : 0;
+        const totalEsperado = Math.max(
+          totalItens - Number(fatura.valorDesconto || 0) + Number(fatura.valorImpostos || 0),
+          0,
+        );
+        const totalFatura = Number(fatura.valorTotal || 0);
+        const diferenca = Number((totalEsperado - totalFatura).toFixed(2));
+        if (Math.abs(diferenca) > 0.01) {
+          acc.push({ numero: fatura.numero, diferenca });
+        }
+        return acc;
+      },
+      [],
+    );
+
+    const pagamentosParciaisSemBaixaFinal = faturas.filter((fatura) => {
+      const total = Number(fatura.valorTotal || 0);
+      const pago = Number(fatura.valorPago || 0);
+      return fatura.status === StatusFatura.PARCIALMENTE_PAGA && pago > 0 && pago < total;
+    });
+
+    const estornosPendentesConciliacao = faturas.reduce((acc, fatura) => {
+      const pagamentos = Array.isArray(fatura.pagamentos) ? fatura.pagamentos : [];
+      const estornos = pagamentos.filter((pagamento) => {
+        const tipo = String(pagamento.tipo || '').toLowerCase();
+        const status = String(pagamento.status || '').toLowerCase();
+        const valor = Number(pagamento.valor || 0);
+        return (tipo === 'estorno' || valor < 0) && status === 'estornado';
+      });
+      return acc + estornos.length;
+    }, 0);
+
+    return {
+      itensVsTotal: divergenciasItensVsTotal.length,
+      parciaisSemBaixaFinal: pagamentosParciaisSemBaixaFinal.length,
+      estornosPendentesConciliacao: estornosPendentesConciliacao,
+      total:
+        divergenciasItensVsTotal.length +
+        pagamentosParciaisSemBaixaFinal.length +
+        estornosPendentesConciliacao,
+      primeiraDivergenciaItens: divergenciasItensVsTotal[0] || null,
+    };
+  }, [faturas]);
 
   const visoes: Array<{
     id: 'dashboard' | 'relatorios' | 'email' | 'workflows';
@@ -1515,6 +1647,75 @@ export default function FaturamentoPage() {
                         );
                       })}
               </div>
+            </SectionCard>
+
+            <SectionCard className="p-4 sm:p-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#476776]">
+                    Painel de divergencias
+                  </p>
+                  <h3 className="mt-1 text-lg font-semibold text-[#173A4D]">
+                    Validacao operacional de fechamento
+                  </h3>
+                </div>
+                <span
+                  className={`inline-flex w-fit items-center rounded-full border px-3 py-1 text-xs font-semibold ${
+                    painelDivergencias.total > 0
+                      ? 'border-[#F6D7B2] bg-[#FFF8EE] text-[#9B5A00]'
+                      : 'border-[#CFEADB] bg-[#F2FBF6] text-[#1A7A4B]'
+                  }`}
+                >
+                  {painelDivergencias.total > 0
+                    ? `${painelDivergencias.total} divergencia(s) identificada(s)`
+                    : 'Nenhuma divergencia detectada'}
+                </span>
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[#5D7A88]">
+                    Itens x total da fatura
+                  </p>
+                  <p className="mt-2 text-2xl font-bold text-[#173A4D]">{painelDivergencias.itensVsTotal}</p>
+                  <p className="mt-1 text-xs text-[#5D7A88]">Validacao de subtotal + desconto + impostos.</p>
+                </div>
+
+                <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[#5D7A88]">
+                    Estorno pendente de conciliacao
+                  </p>
+                  <p className="mt-2 text-2xl font-bold text-[#173A4D]">
+                    {painelDivergencias.estornosPendentesConciliacao}
+                  </p>
+                  <p className="mt-1 text-xs text-[#5D7A88]">
+                    Pagamentos de estorno para revisao no fluxo bancario.
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[#5D7A88]">
+                    Parcial sem baixa final
+                  </p>
+                  <p className="mt-2 text-2xl font-bold text-[#173A4D]">
+                    {painelDivergencias.parciaisSemBaixaFinal}
+                  </p>
+                  <p className="mt-1 text-xs text-[#5D7A88]">
+                    Faturas com recebimento parcial ainda abertas.
+                  </p>
+                </div>
+              </div>
+
+              {painelDivergencias.primeiraDivergenciaItens && (
+                <p className="mt-3 text-xs text-[#8A3C00]">
+                  Exemplo: fatura {painelDivergencias.primeiraDivergenciaItens.numero} com diferenca de{' '}
+                  {formatCurrency(painelDivergencias.primeiraDivergenciaItens.diferenca)} no fechamento.
+                </p>
+              )}
+
+              <p className="mt-2 text-xs text-[#5D7A88]">
+                Analise baseada nas faturas carregadas na tela atual.
+              </p>
             </SectionCard>
 
             {/* Filtros e Busca */}
@@ -2843,3 +3044,4 @@ export default function FaturamentoPage() {
     </div>
   );
 }
+

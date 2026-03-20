@@ -23,9 +23,35 @@ interface RelatoriosAvancadosProps {
 }
 
 type PeriodoRelatorio = '7dias' | '30dias' | '90dias' | '1ano';
-type TipoRelatorio = 'faturamento' | 'inadimplencia' | 'clientes' | 'produtos';
+type TipoRelatorio =
+  | 'fluxo_caixa'
+  | 'competencia_mensal'
+  | 'aging_recebiveis'
+  | 'faturamento'
+  | 'inadimplencia'
+  | 'clientes'
+  | 'produtos';
 
-const CORES_PADRAO = ['#10B981', '#3B82F6', '#8B5CF6', '#F59E0B', '#EF4444', '#14B8A6', '#334155', '#22C55E'];
+const CORES_PADRAO = [
+  '#10B981',
+  '#3B82F6',
+  '#8B5CF6',
+  '#F59E0B',
+  '#EF4444',
+  '#14B8A6',
+  '#334155',
+  '#22C55E',
+];
+
+const LABEL_TIPO_RELATORIO: Record<TipoRelatorio, string> = {
+  fluxo_caixa: 'Fluxo de caixa (realizado x previsto)',
+  competencia_mensal: 'Competência mensal',
+  aging_recebiveis: 'Aging de recebíveis',
+  faturamento: 'Faturamento por status',
+  inadimplencia: 'Inadimplência',
+  clientes: 'Top clientes',
+  produtos: 'Produtos/serviços',
+};
 
 const calcularDiasAtraso = (dataVencimento: string): number => {
   const hoje = new Date();
@@ -38,9 +64,48 @@ const calcularDiasAtraso = (dataVencimento: string): number => {
   return Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
 };
 
+const normalizarData = (value: string | Date): Date => {
+  const data = new Date(value);
+  if (Number.isNaN(data.getTime())) return new Date();
+  return data;
+};
+
+const obterValorPagoFatura = (fatura: Fatura): number => {
+  const valorTotal = Math.max(0, converterParaNumero(fatura.valorTotal));
+  const valorPagoInformado = Math.max(0, converterParaNumero((fatura as any).valorPago));
+
+  if (valorPagoInformado > 0) {
+    return Math.min(valorPagoInformado, valorTotal);
+  }
+
+  if (fatura.status === StatusFatura.PAGA) {
+    return valorTotal;
+  }
+
+  const pagamentos = Array.isArray(fatura.pagamentos) ? fatura.pagamentos : [];
+  const totalPagamentos = pagamentos.reduce((acc, pagamento) => {
+    const statusPagamento = String(pagamento.status || '').toLowerCase();
+    const tipoPagamento = String(pagamento.tipo || '').toLowerCase();
+
+    const elegivel =
+      !['cancelado', 'rejeitado', 'estornado'].includes(statusPagamento) &&
+      tipoPagamento !== 'estorno';
+
+    return elegivel ? acc + Math.max(0, converterParaNumero(pagamento.valor)) : acc;
+  }, 0);
+
+  return Math.min(totalPagamentos, valorTotal);
+};
+
+const obterValorAbertoFatura = (fatura: Fatura): number => {
+  const valorTotal = Math.max(0, converterParaNumero(fatura.valorTotal));
+  const valorPago = obterValorPagoFatura(fatura);
+  return Math.max(valorTotal - valorPago, 0);
+};
+
 export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosAvancadosProps) {
   const [periodoSelecionado, setPeriodoSelecionado] = useState<PeriodoRelatorio>('30dias');
-  const [tipoRelatorio, setTipoRelatorio] = useState<TipoRelatorio>('faturamento');
+  const [tipoRelatorio, setTipoRelatorio] = useState<TipoRelatorio>('fluxo_caixa');
   const [dadosProcessados, setDadosProcessados] = useState<RelatorioMetrica[]>([]);
 
   const filtrarPorPeriodo = (lista: Fatura[], periodo: PeriodoRelatorio): Fatura[] => {
@@ -82,6 +147,182 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
       percentual: totalGeral > 0 ? (dados.total / totalGeral) * 100 : 0,
       cor: coresStatus[status as StatusFatura] || '#0EA5E9',
     }));
+  };
+
+  const processarFluxoCaixa = (lista: Fatura[]): RelatorioMetrica[] => {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    const acumulado = lista
+      .filter((fatura) => fatura.status !== StatusFatura.CANCELADA)
+      .reduce(
+        (acc, fatura) => {
+          const valorPago = obterValorPagoFatura(fatura);
+          const valorAberto = obterValorAbertoFatura(fatura);
+
+          const vencimento = normalizarData(fatura.dataVencimento);
+          vencimento.setHours(0, 0, 0, 0);
+
+          acc.realizado += valorPago;
+
+          if (valorAberto > 0) {
+            if (vencimento < hoje) {
+              acc.previstoVencido += valorAberto;
+            } else {
+              acc.previstoAberto += valorAberto;
+            }
+          }
+
+          return acc;
+        },
+        {
+          realizado: 0,
+          previstoAberto: 0,
+          previstoVencido: 0,
+        },
+      );
+
+    const totalBase = acumulado.realizado + acumulado.previstoAberto + acumulado.previstoVencido;
+    const percentual = (valor: number) => (totalBase > 0 ? (valor / totalBase) * 100 : 0);
+
+    return [
+      {
+        label: 'Realizado (recebido)',
+        valor: acumulado.realizado,
+        percentual: percentual(acumulado.realizado),
+        cor: '#10B981',
+      },
+      {
+        label: 'Previsto em aberto',
+        valor: acumulado.previstoAberto,
+        percentual: percentual(acumulado.previstoAberto),
+        cor: '#3B82F6',
+      },
+      {
+        label: 'Previsto vencido',
+        valor: acumulado.previstoVencido,
+        percentual: percentual(acumulado.previstoVencido),
+        cor: '#F97316',
+      },
+    ];
+  };
+
+  const processarCompetenciaMensal = (lista: Fatura[]): RelatorioMetrica[] => {
+    const agrupado = lista
+      .filter((fatura) => fatura.status !== StatusFatura.CANCELADA)
+      .reduce(
+        (acc, fatura) => {
+          const dataBase = normalizarData(fatura.dataEmissao);
+          const ano = dataBase.getFullYear();
+          const mes = dataBase.getMonth() + 1;
+          const chave = `${ano}-${String(mes).padStart(2, '0')}`;
+          const label = dataBase
+            .toLocaleDateString('pt-BR', {
+              month: 'short',
+              year: '2-digit',
+            })
+            .replace('.', '');
+
+          if (!acc[chave]) {
+            acc[chave] = {
+              label: label.toUpperCase(),
+              valor: 0,
+            };
+          }
+
+          acc[chave].valor += converterParaNumero(fatura.valorTotal);
+          return acc;
+        },
+        {} as Record<string, { label: string; valor: number }>,
+      );
+
+    const entradas = Object.entries(agrupado)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-6);
+
+    const total = entradas.reduce((acc, [, item]) => acc + item.valor, 0);
+
+    return entradas.map(([, item], index) => ({
+      label: item.label,
+      valor: item.valor,
+      percentual: total > 0 ? (item.valor / total) * 100 : 0,
+      cor: CORES_PADRAO[index % CORES_PADRAO.length],
+    }));
+  };
+
+  const processarAgingRecebiveis = (lista: Fatura[]): RelatorioMetrica[] => {
+    const buckets = {
+      aVencer: 0,
+      ate30: 0,
+      de31a60: 0,
+      acima60: 0,
+    };
+
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    lista
+      .filter(
+        (fatura) =>
+          fatura.status !== StatusFatura.CANCELADA && fatura.status !== StatusFatura.PAGA,
+      )
+      .forEach((fatura) => {
+        const valorAberto = obterValorAbertoFatura(fatura);
+        if (valorAberto <= 0) return;
+
+        const dataVencimento = normalizarData(fatura.dataVencimento);
+        dataVencimento.setHours(0, 0, 0, 0);
+        const diffDias = Math.ceil(
+          (hoje.getTime() - dataVencimento.getTime()) / (1000 * 60 * 60 * 24),
+        );
+
+        if (diffDias <= 0) {
+          buckets.aVencer += valorAberto;
+          return;
+        }
+
+        if (diffDias <= 30) {
+          buckets.ate30 += valorAberto;
+          return;
+        }
+
+        if (diffDias <= 60) {
+          buckets.de31a60 += valorAberto;
+          return;
+        }
+
+        buckets.acima60 += valorAberto;
+      });
+
+    const total = buckets.aVencer + buckets.ate30 + buckets.de31a60 + buckets.acima60;
+    const percentual = (valor: number) => (total > 0 ? (valor / total) * 100 : 0);
+
+    return [
+      {
+        label: 'A vencer',
+        valor: buckets.aVencer,
+        percentual: percentual(buckets.aVencer),
+        cor: '#3B82F6',
+      },
+      {
+        label: 'Vencidas 1-30',
+        valor: buckets.ate30,
+        percentual: percentual(buckets.ate30),
+        cor: '#F59E0B',
+      },
+      {
+        label: 'Vencidas 31-60',
+        valor: buckets.de31a60,
+        percentual: percentual(buckets.de31a60),
+        cor: '#F97316',
+      },
+      {
+        label: 'Vencidas 61+',
+        valor: buckets.acima60,
+        percentual: percentual(buckets.acima60),
+        cor: '#EF4444',
+      },
+    ];
   };
 
   const processarInadimplencia = (lista: Fatura[]): RelatorioMetrica[] => {
@@ -181,14 +422,31 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
   const processarDados = () => {
     const faturasFiltradas = filtrarPorPeriodo(faturas, periodoSelecionado);
 
+    if (tipoRelatorio === 'fluxo_caixa') {
+      setDadosProcessados(processarFluxoCaixa(faturasFiltradas));
+      return;
+    }
+
+    if (tipoRelatorio === 'competencia_mensal') {
+      setDadosProcessados(processarCompetenciaMensal(faturasFiltradas));
+      return;
+    }
+
+    if (tipoRelatorio === 'aging_recebiveis') {
+      setDadosProcessados(processarAgingRecebiveis(faturasFiltradas));
+      return;
+    }
+
     if (tipoRelatorio === 'faturamento') {
       setDadosProcessados(processarFaturamento(faturasFiltradas));
       return;
     }
+
     if (tipoRelatorio === 'inadimplencia') {
       setDadosProcessados(processarInadimplencia(faturasFiltradas));
       return;
     }
+
     if (tipoRelatorio === 'clientes') {
       setDadosProcessados(processarClientes(faturasFiltradas));
       return;
@@ -205,7 +463,7 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-[#D4E2E7] bg-white p-6 shadow-sm">
-        <div className="flex flex-wrap gap-4 justify-between items-center">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap gap-4">
             <div>
               <label className="mb-2 block text-sm font-medium text-[#244455]">Período</label>
@@ -228,6 +486,9 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
                 onChange={(e) => setTipoRelatorio(e.target.value as TipoRelatorio)}
                 className="rounded-lg border border-[#D4E2E7] px-3 py-2 text-sm text-[#244455] focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
               >
+                <option value="fluxo_caixa">Fechamento: fluxo de caixa</option>
+                <option value="competencia_mensal">Fechamento: competência mensal</option>
+                <option value="aging_recebiveis">Fechamento: aging de recebíveis</option>
                 <option value="faturamento">Faturamento por status</option>
                 <option value="inadimplencia">Inadimplência</option>
                 <option value="clientes">Top clientes</option>
@@ -236,33 +497,33 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
             </div>
           </div>
 
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={processarDados}
-              className="px-4 py-2 bg-[#159A9C] text-white rounded-md hover:bg-[#117C7E] flex items-center gap-2 text-sm"
+              className="flex items-center gap-2 rounded-md bg-[#159A9C] px-4 py-2 text-sm text-white hover:bg-[#117C7E]"
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className="h-4 w-4" />
               Atualizar
             </button>
             <button
               onClick={() => onExportar('csv')}
-              className="px-4 py-2 bg-white border border-[#D4E2E7] text-[#244455] rounded-md hover:bg-[#F6FAFB] flex items-center gap-2 text-sm"
+              className="flex items-center gap-2 rounded-md border border-[#D4E2E7] bg-white px-4 py-2 text-sm text-[#244455] hover:bg-[#F6FAFB]"
             >
-              <Download className="w-4 h-4" />
+              <Download className="h-4 w-4" />
               Exportar CSV
             </button>
             <button
               onClick={() => onExportar('excel')}
-              className="px-4 py-2 bg-white border border-[#D4E2E7] text-[#244455] rounded-md hover:bg-[#F6FAFB] flex items-center gap-2 text-sm"
+              className="flex items-center gap-2 rounded-md border border-[#D4E2E7] bg-white px-4 py-2 text-sm text-[#244455] hover:bg-[#F6FAFB]"
             >
-              <Download className="w-4 h-4" />
+              <Download className="h-4 w-4" />
               Exportar Excel
             </button>
             <button
               onClick={() => onExportar('pdf')}
-              className="px-4 py-2 bg-white border border-[#D4E2E7] text-[#244455] rounded-md hover:bg-[#F6FAFB] flex items-center gap-2 text-sm"
+              className="flex items-center gap-2 rounded-md border border-[#D4E2E7] bg-white px-4 py-2 text-sm text-[#244455] hover:bg-[#F6FAFB]"
             >
-              <Download className="w-4 h-4" />
+              <Download className="h-4 w-4" />
               Exportar PDF
             </button>
           </div>
@@ -270,15 +531,17 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
       </div>
 
       <div className="rounded-2xl border border-[#D4E2E7] bg-white p-6 shadow-sm">
-        <div className="flex items-center gap-2 mb-4">
-          <PieChart className="w-5 h-5 text-[#159A9C]" />
-          <h3 className="text-lg font-medium text-[#002333]">Distribuição ({tipoRelatorio})</h3>
+        <div className="mb-4 flex items-center gap-2">
+          <PieChart className="h-5 w-5 text-[#159A9C]" />
+          <h3 className="text-lg font-medium text-[#002333]">
+            Distribuição ({LABEL_TIPO_RELATORIO[tipoRelatorio]})
+          </h3>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <div className="relative">
-            <div className="w-64 h-64 mx-auto relative">
-              <svg viewBox="0 0 100 100" className="transform -rotate-90">
+            <div className="relative mx-auto h-64 w-64">
+              <svg viewBox="0 0 100 100" className="-rotate-90 transform">
                 {dadosProcessados.map((item, index) => {
                   const offset = dadosProcessados
                     .slice(0, index)
@@ -311,9 +574,9 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
 
           <div className="space-y-3">
             {dadosProcessados.map((item) => (
-              <div key={item.label} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div key={item.label} className="flex items-center justify-between rounded-lg bg-gray-50 p-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-4 h-4 rounded" style={{ backgroundColor: item.cor }} />
+                  <div className="h-4 w-4 rounded" style={{ backgroundColor: item.cor }} />
                   <span className="text-sm font-medium text-gray-900">{item.label}</span>
                 </div>
                 <div className="text-right">
@@ -326,11 +589,11 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="rounded-2xl border border-[#D4E2E7] bg-white p-6 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-[#E8F6F6] rounded-lg flex items-center justify-center">
-              <BarChart3 className="w-6 h-6 text-[#159A9C]" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#E8F6F6]">
+              <BarChart3 className="h-6 w-6 text-[#159A9C]" />
             </div>
             <div>
               <div className="text-2xl font-bold text-gray-900">
@@ -343,8 +606,8 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
 
         <div className="rounded-2xl border border-[#D4E2E7] bg-white p-6 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <TrendingUp className="w-6 h-6 text-green-600" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-100">
+              <TrendingUp className="h-6 w-6 text-green-600" />
             </div>
             <div>
               <div className="text-2xl font-bold text-gray-900">{dadosProcessados.length}</div>
@@ -355,8 +618,8 @@ export default function RelatoriosAvancados({ faturas, onExportar }: RelatoriosA
 
         <div className="rounded-2xl border border-[#D4E2E7] bg-white p-6 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Calendar className="w-6 h-6 text-blue-600" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100">
+              <Calendar className="h-6 w-6 text-blue-600" />
             </div>
             <div>
               <div className="text-2xl font-bold text-gray-900">

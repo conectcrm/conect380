@@ -20,16 +20,22 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { Permission } from '../../common/permissions/permissions.constants';
 import { EmpresaId } from '../../common/decorators/empresa.decorator';
+import { CurrentUser } from '../../common/decorators/user.decorator';
 import { FaturamentoService } from './services/faturamento.service';
 import { PagamentoService } from './services/pagamento.service';
 import { CobrancaService } from './services/cobranca.service';
-import { CreateFaturaDto, UpdateFaturaDto, GerarFaturaAutomaticaDto } from './dto/fatura.dto';
+import {
+  CreateFaturaDto,
+  UpdateFaturaDto,
+  GerarFaturaAutomaticaDto,
+  GerarCobrancaLoteDto,
+} from './dto/fatura.dto';
 import { CreatePagamentoDto, UpdatePagamentoDto, ProcessarPagamentoDto } from './dto/pagamento.dto';
 import { CreatePlanoCobrancaDto, UpdatePlanoCobrancaDto } from './dto/plano-cobranca.dto';
 import { StatusFatura } from './entities/fatura.entity';
 import { StatusPagamento } from './entities/pagamento.entity';
 import { StatusPlanoCobranca } from './entities/plano-cobranca.entity';
-import { EnvioFaturaEmailOpcoes } from './services/faturamento.service';
+import { EnvioFaturaEmailOpcoes, ResultadoCobrancaLote } from './services/faturamento.service';
 
 @Controller('faturamento')
 @UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
@@ -209,8 +215,15 @@ export class FaturamentoController {
     @Param('id', ParseIntPipe) id: number,
     @Body() updateFaturaDto: UpdateFaturaDto,
     @EmpresaId() empresaId: string,
+    @CurrentUser() user: { id?: string; sub?: string },
   ) {
-    const fatura = await this.faturamentoService.atualizarFatura(id, updateFaturaDto, empresaId);
+    const userId = user?.id || user?.sub;
+    const fatura = await this.faturamentoService.atualizarFatura(
+      id,
+      updateFaturaDto,
+      empresaId,
+      userId,
+    );
 
     return {
       status: HttpStatus.OK,
@@ -240,9 +253,11 @@ export class FaturamentoController {
   async cancelarFatura(
     @Param('id', ParseIntPipe) id: number,
     @EmpresaId() empresaId: string,
+    @CurrentUser() user: { id?: string; sub?: string },
     @Body('motivo') motivo?: string,
   ) {
-    const fatura = await this.faturamentoService.cancelarFatura(id, empresaId, motivo);
+    const userId = user?.id || user?.sub;
+    const fatura = await this.faturamentoService.cancelarFatura(id, empresaId, motivo, userId);
 
     return {
       status: HttpStatus.OK,
@@ -274,14 +289,43 @@ export class FaturamentoController {
     };
   }
 
+  @Post('faturas/gerar-cobranca-lote')
+  @HttpCode(HttpStatus.OK)
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
+  async gerarCobrancaLote(
+    @Body() payload: GerarCobrancaLoteDto,
+    @EmpresaId() empresaId: string,
+  ) {
+    const resultado: ResultadoCobrancaLote = await this.faturamentoService.gerarCobrancaEmLote(
+      payload.faturaIds,
+      empresaId,
+    );
+
+    return {
+      status: HttpStatus.OK,
+      message:
+        `Cobranca em lote concluida: ` +
+        `${resultado.sucesso} envio(s) real(is), ` +
+        `${resultado.simuladas} simulado(s), ` +
+        `${resultado.falhas} falha(s), ` +
+        `${resultado.ignoradas} ignorada(s).`,
+      data: resultado,
+    };
+  }
+
   @Delete('faturas/:id')
   @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
-  async excluirFatura(@Param('id', ParseIntPipe) id: number, @EmpresaId() empresaId: string) {
+  async excluirFatura(
+    @Param('id', ParseIntPipe) id: number,
+    @EmpresaId() empresaId: string,
+    @CurrentUser() user: { id?: string; sub?: string },
+  ) {
     this.logger.log(`🔍 [CONTROLLER] DELETE /faturamento/faturas/${id} - Iniciando exclusão`);
 
     try {
       this.logger.log(`🔍 [CONTROLLER] Chamando excluirFatura para ID: ${id}`);
-      await this.faturamentoService.excluirFatura(id, empresaId);
+      const userId = user?.id || user?.sub;
+      await this.faturamentoService.excluirFatura(id, empresaId, userId);
 
       this.logger.log(`🔍 [CONTROLLER] Fatura ${id} excluída com sucesso`);
       return {
@@ -454,8 +498,10 @@ export class FaturamentoController {
     @Param('id', ParseIntPipe) id: number,
     @Body('motivo') motivo: string,
     @EmpresaId() empresaId: string,
+    @CurrentUser() user: { id?: string; sub?: string },
   ) {
-    const estorno = await this.pagamentoService.estornarPagamento(id, motivo, empresaId);
+    const userId = user?.id || user?.sub;
+    const estorno = await this.pagamentoService.estornarPagamento(id, motivo, empresaId, userId);
 
     return {
       status: HttpStatus.OK,

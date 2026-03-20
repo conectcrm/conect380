@@ -133,6 +133,9 @@ const AprovacoesFinanceirasPage = React.lazy(
 const ConciliacaoBancariaPage = React.lazy(
   () => import('./pages/gestao/financeiro/ConciliacaoBancariaPage'),
 );
+const CentrosCustoPage = React.lazy(
+  () => import('./pages/gestao/financeiro/CentrosCustoPage'),
+);
 
 const PerfilPage = React.lazy(() => import('./features/perfil'));
 const PortalClientePage = React.lazy(() => import('./pages/PortalClientePage'));
@@ -857,20 +860,7 @@ const AppRoutes: React.FC = () => {
                   />
                   <Route
                     path="/financeiro/centro-custos"
-                    element={
-                      <ModuleUnderConstruction
-                        moduleName="Centro de Custos"
-                        description="Organização e controle detalhado de custos"
-                        estimatedCompletion="Q1 2025"
-                        features={[
-                          'Hierarquia de centros de custo',
-                          'Rateio automático',
-                          'Análise de custos',
-                          'Orçamento vs realizado',
-                          'Relatórios por centro',
-                        ]}
-                      />
-                    }
+                    element={protegerRota(ModuloEnum.FINANCEIRO, <CentrosCustoPage />)}
                   />
                   <Route
                     path="/financeiro/tesouraria"

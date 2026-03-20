@@ -102,6 +102,7 @@ export interface ContaPagar {
   tipoPagamento?: FormaPagamento;
   contaBancariaId?: string;
   contaBancaria?: ContaBancaria;
+  centroCustoId?: string;
   comprovantePagamento?: string;
 
   // Recorrência
@@ -504,4 +505,3 @@ export const PRIORIDADE_LABELS = {
   [PrioridadePagamento.ALTA]: 'Alta',
   [PrioridadePagamento.URGENTE]: 'Urgente',
 };
-

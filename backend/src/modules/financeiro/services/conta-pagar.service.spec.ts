@@ -16,6 +16,9 @@ describe('ContaPagarService', () => {
     const contaBancariaRepository = {
       findOne: jest.fn(),
     };
+    const centroCustoRepository = {
+      findOne: jest.fn(),
+    };
     const contaPagarExportacaoRepository = {
       findOne: jest.fn(),
       save: jest.fn(async (payload) => payload),
@@ -30,6 +33,7 @@ describe('ContaPagarService', () => {
       contaPagarRepository as any,
       fornecedorRepository as any,
       contaBancariaRepository as any,
+      centroCustoRepository as any,
       contaPagarExportacaoRepository as any,
       empresaConfigRepository as any,
     );
@@ -39,6 +43,7 @@ describe('ContaPagarService', () => {
       contaPagarRepository,
       fornecedorRepository,
       contaBancariaRepository,
+      centroCustoRepository,
       contaPagarExportacaoRepository,
       empresaConfigRepository,
     };

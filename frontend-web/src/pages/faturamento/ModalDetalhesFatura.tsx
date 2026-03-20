@@ -122,10 +122,22 @@ export default function ModalDetalhesFatura({
   const statusExibicao =
     isVencida && fatura.status === StatusFatura.PENDENTE ? StatusFatura.VENCIDA : fatura.status;
   const valorTotal = toFiniteNumber(fatura.valorTotal);
-  const valorDesconto = toFiniteNumber(fatura.valorDesconto);
+  const valorDescontoGlobal = toFiniteNumber(fatura.valorDesconto);
   const valorImpostos = toFiniteNumber(fatura.valorImpostos);
-  const valorBrutoOriginal = toFiniteNumber(fatura.valorBruto);
-  const valorBrutoPorItens = Array.isArray(fatura.itens)
+  const percentualImpostos =
+    fatura.percentualImpostos === null || fatura.percentualImpostos === undefined
+      ? null
+      : toFiniteNumber(fatura.percentualImpostos);
+  const percentualJuros = toFiniteNumber(fatura.percentualJuros);
+  const percentualMulta = toFiniteNumber(fatura.percentualMulta);
+  const diasCarenciaJuros = Math.max(0, Math.trunc(toFiniteNumber(fatura.diasCarenciaJuros)));
+  const subtotalItensBruto = Array.isArray(fatura.itens)
+    ? fatura.itens.reduce(
+        (acc, item) => acc + toFiniteNumber(item.quantidade) * toFiniteNumber(item.valorUnitario),
+        0,
+      )
+    : 0;
+  const subtotalItensLiquido = Array.isArray(fatura.itens)
     ? fatura.itens.reduce((acc, item) => {
         const totalItem =
           toFiniteNumber(item.valorTotal) ||
@@ -137,12 +149,15 @@ export default function ModalDetalhesFatura({
         return acc + totalItem;
       }, 0)
     : 0;
+  const valorDescontoItens = Math.max(subtotalItensBruto - subtotalItensLiquido, 0);
+  const valorDescontoTotal = Math.max(valorDescontoItens + valorDescontoGlobal, 0);
+  const valorBrutoOriginal = toFiniteNumber(fatura.valorBruto);
   const valorBrutoExibicao =
     valorBrutoOriginal > 0
       ? valorBrutoOriginal
-      : valorBrutoPorItens > 0
-        ? valorBrutoPorItens
-        : Math.max(valorTotal + valorDesconto, 0);
+      : subtotalItensBruto > 0
+        ? subtotalItensBruto
+        : Math.max(valorTotal + valorDescontoTotal - valorImpostos, 0);
   const valorPagoCalculadoAprovado = Array.isArray(fatura.pagamentos)
     ? fatura.pagamentos.reduce((acc, pagamento) => {
         if (pagamento.status !== StatusPagamento.APROVADO) {
@@ -443,20 +458,43 @@ export default function ModalDetalhesFatura({
                       R$ {formatarValorMonetario(valorBrutoExibicao)}
                     </span>
                   </div>
-                  {valorDesconto > 0 && (
+                  {valorDescontoTotal > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Desconto:</span>
+                      <span className="text-gray-600">Descontos:</span>
                       <span className="font-medium text-red-600">
-                        - R$ {formatarValorMonetario(valorDesconto)}
+                        - R$ {formatarValorMonetario(valorDescontoTotal)}
                       </span>
+                    </div>
+                  )}
+                  {valorDescontoItens > 0 && (
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>Desconto nos itens</span>
+                      <span>- R$ {formatarValorMonetario(valorDescontoItens)}</span>
+                    </div>
+                  )}
+                  {valorDescontoGlobal > 0 && (
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>Desconto global</span>
+                      <span>- R$ {formatarValorMonetario(valorDescontoGlobal)}</span>
                     </div>
                   )}
                   {valorImpostos > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Impostos:</span>
-                      <span className="font-medium">
-                        R$ {formatarValorMonetario(valorImpostos)}
+                      <span className="text-gray-600">
+                        Impostos{percentualImpostos !== null ? ` (${percentualImpostos.toFixed(2)}%)` : ''}:
                       </span>
+                      <span className="font-medium">
+                        + R$ {formatarValorMonetario(valorImpostos)}
+                      </span>
+                    </div>
+                  )}
+                  {(percentualJuros > 0 || percentualMulta > 0) && (
+                    <div className="rounded-md border border-[#DCE8EC] bg-white/80 px-3 py-2 text-xs text-[#46616F]">
+                      <p>
+                        Juros configurado: <strong>{percentualJuros.toFixed(2)}%</strong> | Multa:{' '}
+                        <strong>{percentualMulta.toFixed(2)}%</strong>
+                      </p>
+                      <p>Carencia para juros: {diasCarenciaJuros} dia(s)</p>
                     </div>
                   )}
                   <hr className="border-gray-300" />

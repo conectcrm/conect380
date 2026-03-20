@@ -23,6 +23,7 @@ import { shellFieldTokens } from '../../../components/layout-v2';
 import {
   ContaBancaria,
   ContaPagar,
+  CentroCusto,
   NovaContaPagar,
   CategoriaContaPagar,
   FormaPagamento,
@@ -40,6 +41,9 @@ interface ModalContaPagarProps {
   contasBancarias?: ContaBancaria[];
   contasBancariasLoading?: boolean;
   contasBancariasError?: string | null;
+  centrosCusto?: CentroCusto[];
+  centrosCustoLoading?: boolean;
+  centrosCustoError?: string | null;
   onClose: () => void;
   onSave: (conta: NovaContaPagar) => Promise<void> | void;
 }
@@ -52,6 +56,9 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
   contasBancarias,
   contasBancariasLoading = false,
   contasBancariasError = null,
+  centrosCusto,
+  centrosCustoLoading = false,
+  centrosCustoError = null,
   onClose,
   onSave,
 }) => {
@@ -86,6 +93,14 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const fornecedoresDisponiveis = fornecedores ?? [];
   const contasBancariasDisponiveis = contasBancarias ?? [];
+  const centrosCustoDisponiveis = (centrosCusto ?? [])
+    .filter((item) => item && item.ativo)
+    .slice()
+    .sort((a, b) =>
+      `${a.codigo || ''} ${a.nome || ''}`.localeCompare(`${b.codigo || ''} ${b.nome || ''}`, 'pt-BR'),
+    );
+  const centroCustoAtual = String(formData.centroCustoId || '').trim();
+  const centroCustoAtualConhecido = centrosCustoDisponiveis.some((item) => item.id === centroCustoAtual);
   const fornecedorOptions = fornecedoresDisponiveis.map((fornecedor) => ({
     id: fornecedor.id,
     label: fornecedor.nome,
@@ -117,7 +132,7 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
         valorOriginal: conta.valorOriginal,
         valorDesconto: conta.valorDesconto,
         categoria: conta.categoria,
-        centroCustoId: '',
+        centroCustoId: conta.centroCustoId || '',
         tipoPagamento: conta.tipoPagamento,
         contaBancariaId: conta.contaBancariaId || '',
         observacoes: conta.observacoes || '',
@@ -856,6 +871,51 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
                 </select>
               </div>
 
+              <div className="lg:col-span-2">
+                <label className="mb-2 block text-sm font-medium text-gray-700">Centro de custo</label>
+                {centrosCustoLoading && (
+                  <div className="mb-2 rounded-lg border border-[#DCE8EC] bg-[#F8FBFC] px-3 py-2 text-xs text-[#5E7A88]">
+                    Carregando centros de custo...
+                  </div>
+                )}
+                {centrosCustoError && (
+                  <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                    {centrosCustoError}
+                  </div>
+                )}
+                {!centrosCustoLoading &&
+                  !centrosCustoError &&
+                  centrosCustoDisponiveis.length === 0 && (
+                    <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                      Nenhum centro de custo ativo cadastrado. Acesse Financeiro &gt; Centro de Custos.
+                    </div>
+                  )}
+                <div className="relative">
+                  <Building className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                  <select
+                    value={formData.centroCustoId || ''}
+                    onChange={(e) => handleInputChange('centroCustoId', e.target.value)}
+                    className={fieldWithIconClass}
+                    disabled={centrosCustoLoading}
+                  >
+                    <option value="">Nao informado</option>
+                    {centroCustoAtual && !centroCustoAtualConhecido ? (
+                      <option value={centroCustoAtual}>
+                        {centroCustoAtual} (legado)
+                      </option>
+                    ) : null}
+                    {centrosCustoDisponiveis.map((centro) => (
+                      <option key={centro.id} value={centro.id}>
+                        {centro.codigo} - {centro.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <p className="mt-1 text-xs text-[#5F7B89]">
+                  Centros carregados do cadastro financeiro da empresa.
+                </p>
+              </div>
+
               {/* Tags */}
               <div className="lg:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Tags</label>
@@ -1118,5 +1178,3 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
 };
 
 export default ModalContaPagar;
-
-

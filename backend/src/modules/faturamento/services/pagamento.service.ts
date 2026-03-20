@@ -291,7 +291,12 @@ export class PagamentoService {
     return pagamentoAtualizado;
   }
 
-  async estornarPagamento(id: number, motivo: string, empresaId: string): Promise<Pagamento> {
+  async estornarPagamento(
+    id: number,
+    motivo: string,
+    empresaId: string,
+    userId?: string,
+  ): Promise<Pagamento> {
     const pagamento = await this.buscarPagamentoPorId(id, empresaId);
 
     if (!pagamento.isAprovado()) {
@@ -308,6 +313,7 @@ export class PagamentoService {
     }
 
     // Criar registro de estorno
+    const responsavel = userId || 'sistema';
     const estorno = this.pagamentoRepository.create({
       faturaId: pagamento.faturaId,
       transacaoId: `EST-${pagamento.transacaoId}-${Date.now()}`,
@@ -318,7 +324,7 @@ export class PagamentoService {
       valorLiquido: -pagamento.valorLiquido,
       metodoPagamento: pagamento.metodoPagamento,
       gateway: pagamento.gateway,
-      observacoes: `Estorno do pagamento ${pagamento.transacaoId}: ${motivo}`,
+      observacoes: `Estorno do pagamento ${pagamento.transacaoId} por ${responsavel}: ${motivo}`,
       dataProcessamento: new Date(),
       dataAprovacao: new Date(),
       empresaId,
@@ -764,4 +770,3 @@ export class PagamentoService {
     }
   }
 }
-

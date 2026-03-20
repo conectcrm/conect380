@@ -53,7 +53,7 @@ export interface Fatura {
   numero: string;
   contratoId?: string;
   contrato?: any;
-  clienteId: number;
+  clienteId: string;
   cliente?: any;
   usuarioResponsavelId: string;
   usuarioResponsavel?: any;
@@ -65,6 +65,11 @@ export interface Fatura {
   valorDesconto: number;
   valorLiquido: number;
   valorImpostos: number;
+  percentualImpostos?: number | null;
+  diasCarenciaJuros?: number;
+  percentualJuros?: number;
+  percentualMulta?: number;
+  detalhesTributarios?: Record<string, unknown> | null;
   valorTotal: number;
   // Pode vir do backend; usado nos aggregates quando disponível
   valorPago?: number;
@@ -92,6 +97,12 @@ export interface NovaFatura {
   observacoes?: string;
   percentualDesconto?: number;
   valorDesconto?: number;
+  valorImpostos?: number;
+  percentualImpostos?: number | null;
+  diasCarenciaJuros?: number;
+  percentualJuros?: number;
+  percentualMulta?: number;
+  detalhesTributarios?: Record<string, unknown>;
   itens: Omit<ItemFatura, 'id' | 'valorTotal'>[];
 }
 
@@ -247,6 +258,27 @@ export interface EnvioFaturaEmailPayload {
   conteudo?: string;
 }
 
+export interface ResultadoCobrancaLoteItem {
+  faturaId: number;
+  numero?: string;
+  statusOriginal?: StatusFatura;
+  statusFinal?: StatusFatura;
+  enviado: boolean;
+  simulado: boolean;
+  motivo?: string;
+  detalhes?: string;
+}
+
+export interface ResultadoCobrancaLote {
+  solicitadas: number;
+  processadas: number;
+  sucesso: number;
+  simuladas: number;
+  falhas: number;
+  ignoradas: number;
+  resultados: ResultadoCobrancaLoteItem[];
+}
+
 // Serviço
 export const faturamentoService = {
   // ==================== FATURAS ====================
@@ -340,6 +372,15 @@ export const faturamentoService = {
         dataVencimento: dadosFatura.dataVencimento,
         observacoes: dadosFatura.observacoes,
         valorDesconto: dadosFatura.valorDesconto || 0,
+        valorImpostos: dadosFatura.valorImpostos || 0,
+        percentualImpostos:
+          dadosFatura.percentualImpostos === null || dadosFatura.percentualImpostos === undefined
+            ? undefined
+            : dadosFatura.percentualImpostos,
+        diasCarenciaJuros: dadosFatura.diasCarenciaJuros || 0,
+        percentualJuros: dadosFatura.percentualJuros || 0,
+        percentualMulta: dadosFatura.percentualMulta || 0,
+        detalhesTributarios: dadosFatura.detalhesTributarios,
         itens: dadosFatura.itens.map((item) => ({
           descricao: item.descricao,
           quantidade: Math.max(item.quantidade, 0.01),
@@ -394,7 +435,61 @@ export const faturamentoService = {
 
   async atualizarFatura(id: number, dadosFatura: AtualizarFatura): Promise<Fatura> {
     try {
-      const response = await api.put(`/faturamento/faturas/${id}`, dadosFatura);
+      const backendData: Record<string, unknown> = {};
+
+      if (dadosFatura.dataVencimento !== undefined) {
+        backendData.dataVencimento = dadosFatura.dataVencimento;
+      }
+
+      if (dadosFatura.observacoes !== undefined) {
+        backendData.observacoes = dadosFatura.observacoes;
+      }
+
+      if (dadosFatura.valorDesconto !== undefined) {
+        backendData.valorDesconto = dadosFatura.valorDesconto;
+      }
+
+      if (dadosFatura.valorImpostos !== undefined) {
+        backendData.valorImpostos = dadosFatura.valorImpostos;
+      }
+
+      if (dadosFatura.percentualImpostos !== undefined) {
+        backendData.percentualImpostos = dadosFatura.percentualImpostos;
+      }
+
+      if (dadosFatura.diasCarenciaJuros !== undefined) {
+        backendData.diasCarenciaJuros = dadosFatura.diasCarenciaJuros;
+      }
+
+      if (dadosFatura.percentualJuros !== undefined) {
+        backendData.percentualJuros = dadosFatura.percentualJuros;
+      }
+
+      if (dadosFatura.percentualMulta !== undefined) {
+        backendData.percentualMulta = dadosFatura.percentualMulta;
+      }
+
+      if (dadosFatura.detalhesTributarios !== undefined) {
+        backendData.detalhesTributarios = dadosFatura.detalhesTributarios;
+      }
+
+      if (dadosFatura.formaPagamento !== undefined) {
+        backendData.formaPagamentoPreferida = dadosFatura.formaPagamento;
+      }
+
+      if (dadosFatura.itens) {
+        backendData.itens = dadosFatura.itens.map((item) => ({
+          descricao: item.descricao,
+          quantidade: Math.max(Number(item.quantidade || 0), 0.01),
+          valorUnitario: Math.max(Number(item.valorUnitario || 0), 0.01),
+          unidade: item.unidade || 'un',
+          codigoProduto: item.codigoProduto || '',
+          percentualDesconto: item.percentualDesconto || 0,
+          valorDesconto: item.valorDesconto || 0,
+        }));
+      }
+
+      const response = await api.put(`/faturamento/faturas/${id}`, backendData);
       return response.data.data || response.data;
     } catch (error) {
       console.error('Erro ao atualizar fatura:', error);
@@ -460,6 +555,37 @@ export const faturamentoService = {
       return { enviado, simulado, motivo, detalhes, message };
     } catch (error) {
       console.error('Erro ao enviar fatura por email:', error);
+      throw error;
+    }
+  },
+
+  async gerarCobrancaEmLote(faturaIds: number[]): Promise<ResultadoCobrancaLote> {
+    try {
+      const response = await api.post('/faturamento/faturas/gerar-cobranca-lote', { faturaIds });
+      const responsePayload = response?.data ?? {};
+      const data = responsePayload?.data ?? {};
+      const resultadosRaw = Array.isArray(data?.resultados) ? data.resultados : [];
+
+      return {
+        solicitadas: Number(data?.solicitadas || faturaIds.length || 0),
+        processadas: Number(data?.processadas || resultadosRaw.length || 0),
+        sucesso: Number(data?.sucesso || 0),
+        simuladas: Number(data?.simuladas || 0),
+        falhas: Number(data?.falhas || 0),
+        ignoradas: Number(data?.ignoradas || 0),
+        resultados: resultadosRaw.map((item: any) => ({
+          faturaId: Number(item?.faturaId || 0),
+          numero: item?.numero ? String(item.numero) : undefined,
+          statusOriginal: item?.statusOriginal as StatusFatura | undefined,
+          statusFinal: item?.statusFinal as StatusFatura | undefined,
+          enviado: Boolean(item?.enviado),
+          simulado: Boolean(item?.simulado),
+          motivo: item?.motivo ? String(item.motivo) : undefined,
+          detalhes: item?.detalhes ? String(item.detalhes) : undefined,
+        })),
+      };
+    } catch (error) {
+      console.error('Erro ao gerar cobrança em lote:', error);
       throw error;
     }
   },

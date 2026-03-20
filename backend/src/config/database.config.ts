@@ -32,6 +32,7 @@ import { Interacao } from '../modules/interacoes/interacao.entity';
 import { Fornecedor } from '../modules/financeiro/entities/fornecedor.entity';
 import { ContaPagar } from '../modules/financeiro/entities/conta-pagar.entity';
 import { ContaBancaria } from '../modules/financeiro/entities/conta-bancaria.entity';
+import { CentroCusto } from '../modules/financeiro/entities/centro-custo.entity';
 import { AlertaOperacionalFinanceiro } from '../modules/financeiro/entities/alerta-operacional-financeiro.entity';
 import { ContaPagarExportacao } from '../modules/financeiro/entities/conta-pagar-exportacao.entity';
 import { ExtratoBancarioImportacao } from '../modules/financeiro/entities/extrato-bancario-importacao.entity';
@@ -141,6 +142,7 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         Fornecedor,
         ContaPagar,
         ContaBancaria,
+        CentroCusto,
         AlertaOperacionalFinanceiro,
         ContaPagarExportacao,
         ExtratoBancarioImportacao,

@@ -29,11 +29,13 @@ import ModalJustificativa from '../../../components/common/ModalJustificativa';
 import { useConfirmacaoInteligente } from '../../../hooks/useConfirmacaoInteligente';
 import ModalContaPagar from '../../../features/financeiro/components/ModalContaPagarNovo';
 import contaBancariaService from '../../../services/contaBancariaService';
+import centroCustoService from '../../../services/centroCustoService';
 import contasPagarService from '../../../services/contasPagarService';
 import fornecedorService from '../../../services/fornecedorService';
 import {
   CategoriaContaPagar,
   CATEGORIA_LABELS,
+  CentroCusto,
   ContaBancaria,
   ContaPagar,
   FiltrosExportacaoContasPagar,
@@ -181,6 +183,9 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
   const [erroContasBancariasCadastro, setErroContasBancariasCadastro] = useState<string | null>(
     null,
   );
+  const [centrosCustoCadastro, setCentrosCustoCadastro] = useState<CentroCusto[]>([]);
+  const [loadingCentrosCustoCadastro, setLoadingCentrosCustoCadastro] = useState(false);
+  const [erroCentrosCustoCadastro, setErroCentrosCustoCadastro] = useState<string | null>(null);
   const [resumoFinanceiro, setResumoFinanceiro] = useState<ResumoFinanceiro | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -223,6 +228,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
   useEffect(() => {
     void carregarFornecedores();
     void carregarContasBancarias();
+    void carregarCentrosCusto();
   }, []);
 
   useEffect(() => {
@@ -291,6 +297,23 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
       console.error('Erro ao carregar contas bancarias para contas a pagar:', err);
     } finally {
       setLoadingContasBancariasCadastro(false);
+    }
+  };
+
+  const carregarCentrosCusto = async () => {
+    try {
+      setLoadingCentrosCustoCadastro(true);
+      setErroCentrosCustoCadastro(null);
+      const centros = await centroCustoService.listar();
+      setCentrosCustoCadastro(centros);
+    } catch (err) {
+      setCentrosCustoCadastro([]);
+      setErroCentrosCustoCadastro(
+        'Nao foi possivel carregar centros de custo para cadastro de contas.',
+      );
+      console.error('Erro ao carregar centros de custo para contas a pagar:', err);
+    } finally {
+      setLoadingCentrosCustoCadastro(false);
     }
   };
 
@@ -565,6 +588,43 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
       );
     });
   }, [contas, termoBusca, filtroStatus, filtroCategoria]);
+
+  const centrosCustoDisponiveis = useMemo(
+    () =>
+      [...centrosCustoCadastro].sort((a, b) =>
+        `${a.codigo} ${a.nome}`.localeCompare(`${b.codigo} ${b.nome}`, 'pt-BR'),
+      ),
+    [centrosCustoCadastro],
+  );
+
+  const centrosCustoLabelById = useMemo(() => {
+    const map = new Map<string, string>();
+    centrosCustoDisponiveis.forEach((centro) => {
+      map.set(centro.id, `${centro.codigo} - ${centro.nome}`);
+    });
+    return map;
+  }, [centrosCustoDisponiveis]);
+
+  const centrosCustoExportacaoOpcoes = useMemo(() => {
+    const ids = new Set<string>();
+    centrosCustoDisponiveis.forEach((centro) => ids.add(centro.id));
+    contas.forEach((conta) => {
+      const centroCustoId = conta.centroCustoId?.trim();
+      if (centroCustoId) {
+        ids.add(centroCustoId);
+      }
+    });
+    if (centroCustoExportacaoId.trim()) {
+      ids.add(centroCustoExportacaoId.trim());
+    }
+
+    return Array.from(ids)
+      .map((id) => ({
+        id,
+        label: centrosCustoLabelById.get(id) || id,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+  }, [centrosCustoDisponiveis, contas, centroCustoExportacaoId, centrosCustoLabelById]);
 
   const hasFilters =
     termoBusca.trim().length > 0 || filtroStatus !== 'todos' || filtroCategoria !== 'todas';
@@ -1180,6 +1240,9 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
           contasBancarias={contasBancariasCadastro}
           contasBancariasLoading={loadingContasBancariasCadastro}
           contasBancariasError={erroContasBancariasCadastro}
+          centrosCusto={centrosCustoDisponiveis}
+          centrosCustoLoading={loadingCentrosCustoCadastro}
+          centrosCustoError={erroCentrosCustoCadastro}
           onClose={() => setModalContaAberto(false)}
           onSave={handleSalvarConta}
         />
@@ -1545,13 +1608,21 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-[#244455]">Centro de custo</label>
-                <input
-                  type="text"
+                <select
                   value={centroCustoExportacaoId}
                   onChange={(event) => setCentroCustoExportacaoId(event.target.value)}
                   className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
-                  placeholder="ID do centro de custo (opcional)"
-                />
+                >
+                  <option value="">Todos</option>
+                  {centrosCustoExportacaoOpcoes.map((centro) => (
+                    <option key={centro.id} value={centro.id}>
+                      {centro.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-[#65808D]">
+                  Lista combinada do cadastro de centros e dos lancamentos ja existentes.
+                </p>
               </div>
 
               <div />
@@ -1666,3 +1737,4 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
 };
 
 export default ContasPagarPage;
+

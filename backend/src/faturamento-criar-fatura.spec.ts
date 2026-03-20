@@ -9,6 +9,10 @@ class EmailMock {
   async enviarEmailGenerico() {
     return true;
   }
+
+  async enviarEmailGenericoDetalhado() {
+    return { sucesso: true, simulado: false };
+  }
 }
 
 // Repositório genérico em memória
@@ -120,6 +124,32 @@ describe('FaturamentoService - criar fatura (unitário sem TypeORM)', () => {
     expect(Number(item.valorTotal)).toBe(90); // 2 * 50 - 10
   });
 
+  it('deve persistir impostos estruturados e compor o valor total da fatura', async () => {
+    const dto: CreateFaturaDto = {
+      clienteId: 'a96cb5f6-0688-4ec1-9f29-e43f5bb8e3f2',
+      usuarioResponsavelId: 'f47ac10b-58cc-4372-a567-0e02b2c3d489',
+      tipo: 'unica' as any,
+      descricao: 'Fatura com tributacao estruturada',
+      dataVencimento: new Date().toISOString().split('T')[0],
+      itens: [{ descricao: 'Item tributavel', quantidade: 1, valorUnitario: 100 }],
+      valorDesconto: 10,
+      valorImpostos: 18,
+      percentualImpostos: 20,
+      diasCarenciaJuros: 5,
+      percentualJuros: 2,
+      percentualMulta: 1,
+      detalhesTributarios: { origem: 'teste_unitario' },
+    };
+
+    const fatura = await service.criarFatura(dto, 'empresa-teste');
+    expect(Number(fatura.valorDesconto)).toBe(10);
+    expect(Number(fatura.valorImpostos)).toBe(18);
+    expect(Number(fatura.valorTotal)).toBe(108); // (100 - 10) + 18
+    expect(Number(fatura.diasCarenciaJuros)).toBe(5);
+    expect(Number(fatura.percentualJuros)).toBe(2);
+    expect(Number(fatura.percentualMulta)).toBe(1);
+  });
+
   it('deve aplicar percentualDesconto corretamente', async () => {
     const dto: CreateFaturaDto = {
       clienteId: '876d96fa-82d2-4e8a-8c37-91ed51bf701d',
@@ -184,5 +214,56 @@ describe('FaturamentoService - criar fatura (unitário sem TypeORM)', () => {
     const fatura = await service.criarFatura(dto, 'empresa-teste');
     const totalItens = fatura.itens.reduce((acc, i) => acc + Number(i.valorTotal), 0);
     expect(Number(totalItens.toFixed(2))).toBe(330);
+  });
+  it('deve gerar cobrança em lote apenas para faturas elegíveis', async () => {
+    const empresaId = 'empresa-teste';
+    const clienteElegivelId = '0f8fad5b-d9cb-469f-a165-70867728950e';
+    const clienteIgnoradoId = '7d444840-9dc0-11d1-b245-5ffdce74fad2';
+
+    await (clienteRepo as any).save([
+      { id: clienteElegivelId, empresaId, email: 'cliente.elegivel@teste.com' },
+      { id: clienteIgnoradoId, empresaId, email: 'cliente.ignorado@teste.com' },
+    ]);
+
+    const faturaElegivel = await service.criarFatura(
+      {
+        clienteId: clienteElegivelId,
+        usuarioResponsavelId: 'e47ac10b-58cc-4372-a567-0e02b2c3d484',
+        tipo: 'unica' as any,
+        descricao: 'Fatura elegivel para cobranca',
+        dataVencimento: new Date().toISOString().split('T')[0],
+        itens: [{ descricao: 'Item elegivel', quantidade: 1, valorUnitario: 100 }],
+      },
+      empresaId,
+    );
+
+    const faturaIgnorada = await service.criarFatura(
+      {
+        clienteId: clienteIgnoradoId,
+        usuarioResponsavelId: 'f47ac10b-58cc-4372-a567-0e02b2c3d485',
+        tipo: 'unica' as any,
+        descricao: 'Fatura que sera ignorada',
+        dataVencimento: new Date().toISOString().split('T')[0],
+        itens: [{ descricao: 'Item ignorado', quantidade: 1, valorUnitario: 80 }],
+      },
+      empresaId,
+    );
+
+    const armazenadas = (faturaRepo as any)._all();
+    const registroIgnorado = armazenadas.find((item: any) => item.id === faturaIgnorada.id);
+    registroIgnorado.status = 'cancelada';
+
+    const resultado = await service.gerarCobrancaEmLote(
+      [faturaElegivel.id, faturaIgnorada.id],
+      empresaId,
+    );
+
+    expect(resultado.processadas).toBe(2);
+    expect(resultado.sucesso).toBe(1);
+    expect(resultado.ignoradas).toBe(1);
+    expect(resultado.falhas).toBe(0);
+
+    const itemIgnorado = resultado.resultados.find((item) => item.faturaId === faturaIgnorada.id);
+    expect(itemIgnorado?.motivo).toBe('status_nao_elegivel');
   });
 });
