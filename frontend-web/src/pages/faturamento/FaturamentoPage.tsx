@@ -32,9 +32,14 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
+  AmbienteDocumentoFiscal,
+  DocumentoFiscalCancelamentoPayload,
+  DocumentoFiscalPayload,
   faturamentoService,
+  DocumentoFiscalStatus,
   Fatura,
   FormaPagamento,
+  TipoDocumentoFiscal,
   NovaFatura,
   StatusFatura,
   TipoFatura,
@@ -116,6 +121,10 @@ export default function FaturamentoPage() {
   const [modalPagamentosAberto, setModalPagamentosAberto] = useState(false);
   const [faturaEdicao, setFaturaEdicao] = useState<Fatura | null>(null);
   const [faturaDetalhes, setFaturaDetalhes] = useState<Fatura | null>(null);
+  const [documentoFiscalStatus, setDocumentoFiscalStatus] = useState<DocumentoFiscalStatus | null>(
+    null,
+  );
+  const [fiscalActionLoading, setFiscalActionLoading] = useState(false);
   const [faturaPagamentos, setFaturaPagamentos] = useState<Fatura | null>(null);
   const [busca, setBusca] = useState('');
   const [filtros, setFiltros] = useState<FiltrosFatura>({ periodoCampo: 'vencimento' });
@@ -412,12 +421,15 @@ export default function FaturamentoPage() {
 
   const abrirModalDetalhes = (fatura: Fatura) => {
     setFaturaDetalhes(fatura);
+    setDocumentoFiscalStatus(null);
     setModalDetalhesAberto(true);
   };
 
   const fecharModalDetalhes = () => {
     setModalDetalhesAberto(false);
     setFaturaDetalhes(null);
+    setDocumentoFiscalStatus(null);
+    setFiscalActionLoading(false);
   };
 
   const abrirModalPagamentos = (fatura: Fatura) => {
@@ -453,6 +465,86 @@ export default function FaturamentoPage() {
       err?.message ||
       fallback
     );
+  };
+
+  const normalizarTipoDocumentoFiscal = (tipo: unknown): TipoDocumentoFiscal | undefined => {
+    const tipoNormalizado = String(tipo || '')
+      .trim()
+      .toLowerCase();
+    if (tipoNormalizado === 'nfse' || tipoNormalizado === 'nfe') {
+      return tipoNormalizado as TipoDocumentoFiscal;
+    }
+    return undefined;
+  };
+
+  const normalizarAmbienteDocumentoFiscal = (ambiente: unknown): AmbienteDocumentoFiscal => {
+    const ambienteNormalizado = String(ambiente || '')
+      .trim()
+      .toLowerCase();
+    return ambienteNormalizado === 'producao' ? 'producao' : 'homologacao';
+  };
+
+  const obterTipoDocumentoFiscalDaFatura = (fatura?: Fatura | null): TipoDocumentoFiscal | undefined => {
+    const detalhes = fatura?.detalhesTributarios;
+    if (!detalhes || typeof detalhes !== 'object' || Array.isArray(detalhes)) {
+      return undefined;
+    }
+
+    const documentoRaw = (detalhes as Record<string, unknown>).documento;
+    if (!documentoRaw || typeof documentoRaw !== 'object' || Array.isArray(documentoRaw)) {
+      return undefined;
+    }
+
+    return normalizarTipoDocumentoFiscal((documentoRaw as Record<string, unknown>).tipo);
+  };
+
+  const aplicarFaturaAtualizadaNosEstados = (faturaAtualizada: Fatura) => {
+    setFaturas((prev) =>
+      prev.map((item) => (item.id === faturaAtualizada.id ? faturaAtualizada : item)),
+    );
+    setFaturaDetalhes((atual) =>
+      atual && atual.id === faturaAtualizada.id ? faturaAtualizada : atual,
+    );
+    setFaturaPagamentos((atual) =>
+      atual && atual.id === faturaAtualizada.id ? faturaAtualizada : atual,
+    );
+  };
+
+  const sincronizarFaturaAtualizada = async (faturaId: number) => {
+    const faturaAtualizada = await faturamentoService.obterFatura(faturaId);
+    aplicarFaturaAtualizadaNosEstados(faturaAtualizada);
+    return faturaAtualizada;
+  };
+
+  const carregarStatusDocumentoFiscal = async (
+    faturaId: number,
+    options?: { silencioso?: boolean; usarLoading?: boolean },
+  ) => {
+    const silencioso = options?.silencioso ?? true;
+    const usarLoading = options?.usarLoading ?? false;
+
+    if (usarLoading) {
+      setFiscalActionLoading(true);
+    }
+
+    try {
+      const status = await faturamentoService.obterStatusDocumentoFiscal(faturaId);
+      setDocumentoFiscalStatus(status);
+      return status;
+    } catch (error) {
+      if (!silencioso) {
+        notificacao.erro.operacaoFalhou(
+          'consultar status fiscal',
+          obterMensagemErro(error, 'Falha ao consultar status do documento fiscal.'),
+        );
+      }
+      setDocumentoFiscalStatus(null);
+      return null;
+    } finally {
+      if (usarLoading) {
+        setFiscalActionLoading(false);
+      }
+    }
   };
 
   const abrirFaturaNotificacao = (faturaId: number) => {
@@ -510,6 +602,31 @@ export default function FaturamentoPage() {
       ativo = false;
     };
   }, [faturaIdParam, setSearchParams]);
+
+  useEffect(() => {
+    if (!modalDetalhesAberto || !faturaDetalhes?.id) {
+      return;
+    }
+
+    let ativo = true;
+
+    (async () => {
+      try {
+        const status = await faturamentoService.obterStatusDocumentoFiscal(faturaDetalhes.id);
+        if (ativo) {
+          setDocumentoFiscalStatus(status);
+        }
+      } catch {
+        if (ativo) {
+          setDocumentoFiscalStatus(null);
+        }
+      }
+    })();
+
+    return () => {
+      ativo = false;
+    };
+  }, [modalDetalhesAberto, faturaDetalhes?.id]);
 
   // Handlers para funcionalidades avançadas da Semana 2
   const abrirModalGateway = (fatura: Fatura) => {
@@ -985,6 +1102,121 @@ export default function FaturamentoPage() {
         'excluir fatura',
         obterMensagemErro(error, 'Erro ao excluir fatura.'),
       );
+    }
+  };
+
+  const criarRascunhoFiscal = async (id: number, payload?: DocumentoFiscalPayload) => {
+    const tipoDocumento = payload?.tipo || obterTipoDocumentoFiscalDaFatura(faturaDetalhes);
+    const ambiente = normalizarAmbienteDocumentoFiscal(
+      payload?.ambiente || documentoFiscalStatus?.ambiente,
+    );
+    const observacoes =
+      payload?.observacoes?.trim() || 'Rascunho fiscal atualizado no painel de faturamento.';
+    setFiscalActionLoading(true);
+    try {
+      const status = await faturamentoService.criarRascunhoDocumentoFiscal(id, {
+        tipo: tipoDocumento,
+        ambiente,
+        observacoes,
+      });
+      setDocumentoFiscalStatus(status);
+      await sincronizarFaturaAtualizada(id);
+      notificacao.mostrarSucesso(
+        'Rascunho fiscal atualizado',
+        'Documento fiscal preparado para emissao.',
+      );
+    } catch (error) {
+      console.error('Erro ao criar rascunho fiscal:', error);
+      notificacao.erro.operacaoFalhou(
+        'criar rascunho fiscal',
+        obterMensagemErro(error, 'Falha ao preparar rascunho do documento fiscal.'),
+      );
+    } finally {
+      setFiscalActionLoading(false);
+    }
+  };
+
+  const emitirDocumentoFiscal = async (id: number, payload?: DocumentoFiscalPayload) => {
+    const tipoDocumento = payload?.tipo || obterTipoDocumentoFiscalDaFatura(faturaDetalhes);
+    const ambiente = normalizarAmbienteDocumentoFiscal(
+      payload?.ambiente || documentoFiscalStatus?.ambiente,
+    );
+    const forcarReemissao =
+      payload?.forcarReemissao === true || documentoFiscalStatus?.status === 'emitida';
+    const observacoes =
+      payload?.observacoes?.trim() || 'Emissao fiscal solicitada no painel de faturamento.';
+    setFiscalActionLoading(true);
+    try {
+      const status = await faturamentoService.emitirDocumentoFiscal(id, {
+        tipo: tipoDocumento,
+        ambiente,
+        forcarReemissao,
+        observacoes,
+      });
+      setDocumentoFiscalStatus(status);
+      await sincronizarFaturaAtualizada(id);
+      await carregarFaturas();
+      notificacao.mostrarSucesso('Documento fiscal emitido', 'Emissao registrada com sucesso.');
+    } catch (error) {
+      console.error('Erro ao emitir documento fiscal:', error);
+      notificacao.erro.operacaoFalhou(
+        'emitir documento fiscal',
+        obterMensagemErro(error, 'Falha ao emitir documento fiscal.'),
+      );
+    } finally {
+      setFiscalActionLoading(false);
+    }
+  };
+
+  const atualizarStatusFiscal = async (id: number) => {
+    const status = await carregarStatusDocumentoFiscal(id, { silencioso: false, usarLoading: true });
+    if (!status) {
+      return;
+    }
+    try {
+      await sincronizarFaturaAtualizada(id);
+    } catch (error) {
+      console.warn('Nao foi possivel sincronizar detalhes da fatura apos consulta fiscal:', error);
+    }
+    notificacao.mostrarSucesso('Status fiscal atualizado', 'Dados fiscais sincronizados.');
+  };
+
+  const cancelarOuInutilizarDocumentoFiscal = async (
+    id: number,
+    payload: DocumentoFiscalCancelamentoPayload,
+  ) => {
+    const tipoOperacao = payload?.tipoOperacao === 'inutilizar' ? 'inutilizar' : 'cancelar';
+    const motivo = String(payload?.motivo || '').trim();
+    if (!motivo) {
+      notificacao.mostrarAviso(
+        'Motivo obrigatorio',
+        'Informe o motivo para cancelar ou inutilizar o documento fiscal.',
+      );
+      return;
+    }
+
+    setFiscalActionLoading(true);
+    try {
+      const status = await faturamentoService.cancelarOuInutilizarDocumentoFiscal(id, {
+        tipoOperacao,
+        motivo,
+        ambiente: normalizarAmbienteDocumentoFiscal(payload.ambiente || documentoFiscalStatus?.ambiente),
+      });
+      setDocumentoFiscalStatus(status);
+      await sincronizarFaturaAtualizada(id);
+      await carregarFaturas();
+      notificacao.mostrarSucesso(
+        tipoOperacao === 'cancelar' ? 'Documento fiscal cancelado' : 'Numeracao inutilizada',
+        'Status fiscal atualizado com sucesso.',
+      );
+    } catch (error) {
+      console.error('Erro ao cancelar/inutilizar documento fiscal:', error);
+      notificacao.erro.operacaoFalhou(
+        'atualizar status fiscal',
+        obterMensagemErro(error, 'Falha ao cancelar/inutilizar documento fiscal.'),
+      );
+    } finally {
+      setFiscalActionLoading(false);
     }
   };
 
@@ -2978,6 +3210,12 @@ export default function FaturamentoPage() {
           isOpen={modalDetalhesAberto}
           onClose={fecharModalDetalhes}
           fatura={faturaDetalhes}
+          documentoFiscalStatus={documentoFiscalStatus}
+          fiscalActionLoading={fiscalActionLoading}
+          onCriarRascunhoFiscal={criarRascunhoFiscal}
+          onEmitirDocumentoFiscal={emitirDocumentoFiscal}
+          onAtualizarStatusFiscal={atualizarStatusFiscal}
+          onCancelarDocumentoFiscal={cancelarOuInutilizarDocumentoFiscal}
           onEstornarPagamento={estornarPagamento}
           onEdit={() => {
             abrirModalEdicao(faturaDetalhes);

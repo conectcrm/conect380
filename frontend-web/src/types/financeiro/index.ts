@@ -19,6 +19,7 @@ export enum FormaPagamento {
   CARTAO_CREDITO = 'cartao_credito',
   CARTAO_DEBITO = 'cartao_debito',
   DINHEIRO = 'dinheiro',
+  A_COMBINAR = 'a_combinar',
   CHEQUE = 'cheque',
 }
 

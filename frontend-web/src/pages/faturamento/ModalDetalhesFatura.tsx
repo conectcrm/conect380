@@ -17,9 +17,16 @@ import {
   AlertCircle,
   XCircle,
   RotateCcw,
+  Loader2,
 } from 'lucide-react';
 import {
+  AmbienteDocumentoFiscal,
+  DocumentoFiscalCancelamentoPayload,
+  DocumentoFiscalPayload,
   Fatura,
+  DocumentoFiscalStatus,
+  OperacaoDocumentoFiscal,
+  StatusDocumentoFiscal,
   StatusFatura,
   StatusPagamento,
   faturamentoService,
@@ -42,7 +49,145 @@ interface ModalDetalhesFaturaProps {
   onSendEmail?: (id: number) => void;
   onDownloadPDF?: (id: number) => void;
   onEstornarPagamento?: (pagamentoId: number, motivo: string) => Promise<void>;
+  documentoFiscalStatus?: DocumentoFiscalStatus | null;
+  onCriarRascunhoFiscal?: (id: number, payload?: DocumentoFiscalPayload) => Promise<void> | void;
+  onEmitirDocumentoFiscal?: (id: number, payload?: DocumentoFiscalPayload) => Promise<void> | void;
+  onAtualizarStatusFiscal?: (id: number) => Promise<void> | void;
+  onCancelarDocumentoFiscal?: (
+    id: number,
+    payload: DocumentoFiscalCancelamentoPayload,
+  ) => Promise<void> | void;
+  fiscalActionLoading?: boolean;
 }
+
+type TipoDocumentoFinanceiro =
+  | 'fatura'
+  | 'recibo'
+  | 'nfse'
+  | 'nfe'
+  | 'folha_pagamento'
+  | 'outro';
+
+const TIPO_DOCUMENTO_LABELS: Record<TipoDocumentoFinanceiro, string> = {
+  fatura: 'Fatura comercial',
+  recibo: 'Recibo',
+  nfse: 'NFS-e (servico)',
+  nfe: 'NF-e (produto)',
+  folha_pagamento: 'Folha de pagamento',
+  outro: 'Outro documento',
+};
+
+interface DocumentoFinanceiroDetalhe {
+  tipo: TipoDocumentoFinanceiro;
+  modelo?: string;
+  numero?: string;
+  serie?: string;
+  chaveAcesso?: string;
+}
+
+interface TributoDetalhadoVisual {
+  codigo: string;
+  descricao: string;
+  valor: number;
+  percentual: number;
+}
+
+const STATUS_FISCAL_LABELS: Record<StatusDocumentoFiscal, string> = {
+  nao_iniciado: 'Nao iniciado',
+  rascunho: 'Rascunho',
+  pendente_emissao: 'Pendente emissao',
+  emitida: 'Emitida',
+  erro: 'Erro',
+  cancelada: 'Cancelada',
+};
+
+const STATUS_FISCAL_CLASSES: Record<StatusDocumentoFiscal, string> = {
+  nao_iniciado: 'bg-gray-100 text-gray-700 border-gray-200',
+  rascunho: 'bg-amber-100 text-amber-700 border-amber-200',
+  pendente_emissao: 'bg-blue-100 text-blue-700 border-blue-200',
+  emitida: 'bg-green-100 text-green-700 border-green-200',
+  erro: 'bg-red-100 text-red-700 border-red-200',
+  cancelada: 'bg-gray-100 text-gray-700 border-gray-200',
+};
+
+const OPERACAO_FISCAL_LABELS: Record<OperacaoDocumentoFiscal, string> = {
+  cancelar: 'Cancelar documento',
+  inutilizar: 'Inutilizar numeracao',
+};
+
+const ACAO_HISTORICO_LABELS: Record<string, string> = {
+  rascunho_criado: 'Rascunho criado',
+  documento_emitido: 'Documento emitido',
+  documento_reemitido: 'Documento reemitido',
+  documento_cancelado: 'Documento cancelado',
+  numeracao_inutilizada: 'Numeracao inutilizada',
+};
+
+const extrairDocumentoFinanceiro = (
+  detalhes?: Record<string, unknown> | null,
+): DocumentoFinanceiroDetalhe | null => {
+  if (!detalhes || typeof detalhes !== 'object' || Array.isArray(detalhes)) {
+    return null;
+  }
+
+  const documentoRaw = detalhes.documento;
+  if (!documentoRaw || typeof documentoRaw !== 'object' || Array.isArray(documentoRaw)) {
+    return null;
+  }
+
+  const documento = documentoRaw as Record<string, unknown>;
+  const tipoRaw = String(documento.tipo || 'fatura').trim().toLowerCase() as TipoDocumentoFinanceiro;
+  const tipo = Object.prototype.hasOwnProperty.call(TIPO_DOCUMENTO_LABELS, tipoRaw)
+    ? tipoRaw
+    : 'fatura';
+
+  return {
+    tipo,
+    modelo: String(documento.modelo || '').trim() || undefined,
+    numero: String(documento.numero || '').trim() || undefined,
+    serie: String(documento.serie || '').trim() || undefined,
+    chaveAcesso: String(documento.chaveAcesso || '').trim() || undefined,
+  };
+};
+
+const extrairTributosDetalhados = (
+  detalhes?: Record<string, unknown> | null,
+): TributoDetalhadoVisual[] => {
+  if (!detalhes || typeof detalhes !== 'object' || Array.isArray(detalhes)) {
+    return [];
+  }
+
+  const tributosRaw = detalhes.tributos;
+  if (!tributosRaw || typeof tributosRaw !== 'object' || Array.isArray(tributosRaw)) {
+    return [];
+  }
+
+  const itens = (tributosRaw as Record<string, unknown>).itens;
+  if (!Array.isArray(itens)) {
+    return [];
+  }
+
+  return itens
+    .map((item) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        return null;
+      }
+      const raw = item as Record<string, unknown>;
+      const codigo = String(raw.codigo || '').trim().toUpperCase();
+      const descricao = String(raw.descricao || codigo || 'Tributo').trim();
+      const valor = Number(raw.valor || 0);
+      const percentual = Number(raw.percentual || 0);
+      return {
+        codigo: codigo || descricao,
+        descricao: descricao || codigo || 'Tributo',
+        valor: Number.isFinite(valor) ? Math.max(0, valor) : 0,
+        percentual: Number.isFinite(percentual) ? Math.max(0, percentual) : 0,
+      };
+    })
+    .filter((item): item is TributoDetalhadoVisual => Boolean(item))
+    .filter((item) => item.valor > 0 || item.percentual > 0);
+};
+
 export default function ModalDetalhesFatura({
   isOpen,
   onClose,
@@ -52,11 +197,21 @@ export default function ModalDetalhesFatura({
   onSendEmail,
   onDownloadPDF,
   onEstornarPagamento,
+  documentoFiscalStatus,
+  onCriarRascunhoFiscal,
+  onEmitirDocumentoFiscal,
+  onAtualizarStatusFiscal,
+  onCancelarDocumentoFiscal,
+  fiscalActionLoading = false,
 }: ModalDetalhesFaturaProps) {
   const [estornandoPagamentoId, setEstornandoPagamentoId] = React.useState<number | null>(null);
   const [estornoAlvo, setEstornoAlvo] = React.useState<EstornoAlvo | null>(null);
   const [motivoEstorno, setMotivoEstorno] = React.useState('');
   const [erroEstorno, setErroEstorno] = React.useState<string | null>(null);
+  const [ambienteFiscal, setAmbienteFiscal] = React.useState<AmbienteDocumentoFiscal>('homologacao');
+  const [observacaoFiscal, setObservacaoFiscal] = React.useState('');
+  const [motivoOperacaoFiscal, setMotivoOperacaoFiscal] = React.useState('');
+  const [operacaoFiscal, setOperacaoFiscal] = React.useState<OperacaoDocumentoFiscal>('cancelar');
 
   React.useEffect(() => {
     if (!isOpen) {
@@ -64,7 +219,7 @@ export default function ModalDetalhesFatura({
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !estornandoPagamentoId) {
+      if (event.key === 'Escape' && !estornandoPagamentoId && !fiscalActionLoading) {
         if (estornoAlvo) {
           setEstornoAlvo(null);
           setMotivoEstorno('');
@@ -77,7 +232,23 @@ export default function ModalDetalhesFatura({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose, estornandoPagamentoId, estornoAlvo]);
+  }, [isOpen, onClose, estornandoPagamentoId, estornoAlvo, fiscalActionLoading]);
+
+  React.useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+    setObservacaoFiscal('');
+    setMotivoOperacaoFiscal('');
+    setOperacaoFiscal(documentoFiscalStatus?.status === 'emitida' ? 'cancelar' : 'inutilizar');
+  }, [isOpen, fatura?.id]);
+
+  React.useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+    setAmbienteFiscal(documentoFiscalStatus?.ambiente || 'homologacao');
+  }, [isOpen, documentoFiscalStatus?.ambiente, fatura?.id]);
 
   if (!isOpen || !fatura) return null;
 
@@ -169,6 +340,38 @@ export default function ModalDetalhesFatura({
   const valorPago = fatura.valorPago !== undefined ? toFiniteNumber(fatura.valorPago) : valorPagoCalculadoAprovado;
   const valorPendente = Math.max(valorTotal - valorPago, 0);
   const formaPagamentoAtual = fatura.formaPagamento || fatura.formaPagamentoPreferida;
+  const documentoFinanceiro = extrairDocumentoFinanceiro(fatura.detalhesTributarios);
+  const tributosDetalhados = extrairTributosDetalhados(fatura.detalhesTributarios);
+  const totalTributosDetalhados = tributosDetalhados.reduce((acc, item) => acc + item.valor, 0);
+  const ajusteManualImpostos = Math.max(valorImpostos - totalTributosDetalhados, 0);
+  const tipoDocumentoFiscalAtual =
+    documentoFiscalStatus?.tipo || (documentoFinanceiro?.tipo === 'nfse' || documentoFinanceiro?.tipo === 'nfe'
+      ? documentoFinanceiro.tipo
+      : null);
+  const statusFiscalAtual: StatusDocumentoFiscal = documentoFiscalStatus?.status || 'nao_iniciado';
+  const numeroDocumentoFiscal =
+    documentoFiscalStatus?.numeroDocumento || documentoFinanceiro?.numero || null;
+  const serieDocumentoFiscal = documentoFiscalStatus?.serie || documentoFinanceiro?.serie || null;
+  const chaveDocumentoFiscal =
+    documentoFiscalStatus?.chaveAcesso || documentoFinanceiro?.chaveAcesso || null;
+  const podeGerenciarDocumentoFiscal =
+    tipoDocumentoFiscalAtual === 'nfse' || tipoDocumentoFiscalAtual === 'nfe';
+  const historicoFiscalOrdenado = Array.isArray(documentoFiscalStatus?.historico)
+    ? [...documentoFiscalStatus.historico].sort((a, b) => {
+        const dataA = new Date(a.timestamp || 0).getTime();
+        const dataB = new Date(b.timestamp || 0).getTime();
+        return dataB - dataA;
+      })
+    : [];
+  const podeCancelarDocumentoFiscal = statusFiscalAtual === 'emitida';
+  const podeInutilizarDocumentoFiscal =
+    ['nao_iniciado', 'rascunho', 'pendente_emissao', 'erro'].includes(statusFiscalAtual);
+  const operacaoFiscalEfetiva: OperacaoDocumentoFiscal =
+    operacaoFiscal === 'inutilizar' ? 'inutilizar' : 'cancelar';
+  const operacaoFiscalHabilitada =
+    operacaoFiscalEfetiva === 'cancelar'
+      ? podeCancelarDocumentoFiscal
+      : podeInutilizarDocumentoFiscal;
   const podeEditarFatura =
     Boolean(onEdit) && ![StatusFatura.PAGA, StatusFatura.CANCELADA].includes(fatura.status);
   const podeGerarLinkPagamento =
@@ -269,11 +472,56 @@ export default function ModalDetalhesFatura({
     }
   };
 
+  const handleCriarRascunhoFiscal = () => {
+    if (!onCriarRascunhoFiscal) {
+      return;
+    }
+    const payload: DocumentoFiscalPayload = {
+      tipo: tipoDocumentoFiscalAtual || undefined,
+      ambiente: ambienteFiscal,
+      observacoes: observacaoFiscal.trim() || undefined,
+    };
+    void onCriarRascunhoFiscal(fatura.id, payload);
+  };
+
+  const handleEmitirDocumentoFiscal = () => {
+    if (!onEmitirDocumentoFiscal) {
+      return;
+    }
+    const payload: DocumentoFiscalPayload = {
+      tipo: tipoDocumentoFiscalAtual || undefined,
+      ambiente: ambienteFiscal,
+      observacoes: observacaoFiscal.trim() || undefined,
+      forcarReemissao: statusFiscalAtual === 'emitida',
+    };
+    void onEmitirDocumentoFiscal(fatura.id, payload);
+  };
+
+  const handleCancelarOuInutilizarDocumentoFiscal = () => {
+    if (!onCancelarDocumentoFiscal) {
+      return;
+    }
+    const motivo = motivoOperacaoFiscal.trim();
+    if (!motivo) {
+      return;
+    }
+    void onCancelarDocumentoFiscal(fatura.id, {
+      tipoOperacao: operacaoFiscalEfetiva,
+      motivo,
+      ambiente: ambienteFiscal,
+    });
+  };
+
   return (
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0D1F2A]/45 p-4"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !estornandoPagamentoId && !estornoAlvo) {
+        if (
+          event.target === event.currentTarget &&
+          !estornandoPagamentoId &&
+          !estornoAlvo &&
+          !fiscalActionLoading
+        ) {
           onClose();
         }
       }}
@@ -356,7 +604,7 @@ export default function ModalDetalhesFatura({
             )}
             <button
               onClick={onClose}
-              disabled={Boolean(estornandoPagamentoId || estornoAlvo)}
+              disabled={Boolean(estornandoPagamentoId || estornoAlvo || fiscalActionLoading)}
               className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[#5E7784] transition hover:bg-[#F4F8FA] disabled:cursor-not-allowed disabled:opacity-60"
               aria-label="Fechar detalhes da fatura"
             >
@@ -398,6 +646,24 @@ export default function ModalDetalhesFatura({
                         ? faturamentoService.formatarFormaPagamento(formaPagamentoAtual)
                         : 'Nao definida'}
                     </p>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-gray-500">Documento financeiro:</span>
+                    <p className="font-medium">
+                      {documentoFinanceiro
+                        ? TIPO_DOCUMENTO_LABELS[documentoFinanceiro.tipo]
+                        : 'Fatura comercial'}
+                      {documentoFinanceiro?.numero ? ` #${documentoFinanceiro.numero}` : ''}
+                      {documentoFinanceiro?.serie ? ` (serie ${documentoFinanceiro.serie})` : ''}
+                    </p>
+                    {documentoFinanceiro?.modelo && (
+                      <p className="text-xs text-gray-500">Modelo: {documentoFinanceiro.modelo}</p>
+                    )}
+                    {documentoFinanceiro?.chaveAcesso && (
+                      <p className="text-xs text-gray-500 break-all">
+                        Chave/protocolo: {documentoFinanceiro.chaveAcesso}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -488,6 +754,29 @@ export default function ModalDetalhesFatura({
                       </span>
                     </div>
                   )}
+                  {tributosDetalhados.length > 0 && (
+                    <div className="rounded-md border border-[#DCE8EC] bg-white/80 px-3 py-2 text-xs text-[#46616F]">
+                      {tributosDetalhados.map((tributo) => (
+                        <div key={tributo.codigo} className="flex justify-between py-0.5">
+                          <span>
+                            {tributo.descricao}
+                            {tributo.percentual > 0 ? ` (${tributo.percentual.toFixed(2)}%)` : ''}
+                          </span>
+                          <strong>R$ {formatarValorMonetario(tributo.valor)}</strong>
+                        </div>
+                      ))}
+                      <div className="mt-1 flex justify-between border-t border-[#E4ECEF] pt-1 font-semibold">
+                        <span>Total tributos detalhados</span>
+                        <span>R$ {formatarValorMonetario(totalTributosDetalhados)}</span>
+                      </div>
+                      {ajusteManualImpostos > 0 && (
+                        <div className="mt-1 flex justify-between text-[11px] text-[#6B7F89]">
+                          <span>Ajuste manual/outras taxas</span>
+                          <span>R$ {formatarValorMonetario(ajusteManualImpostos)}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {(percentualJuros > 0 || percentualMulta > 0) && (
                     <div className="rounded-md border border-[#DCE8EC] bg-white/80 px-3 py-2 text-xs text-[#46616F]">
                       <p>
@@ -544,6 +833,251 @@ export default function ModalDetalhesFatura({
                   </a>
                 </div>
               )}
+
+              <div className="rounded-lg border border-[#DCE8EC] bg-white p-4">
+                <h3 className="mb-3 text-sm font-medium text-gray-900">Documento Fiscal</h3>
+                <div className="space-y-2 text-xs text-[#47606C]">
+                  <div className="flex justify-between">
+                    <span>Tipo:</span>
+                    <strong className="text-[#173A4D]">
+                      {tipoDocumentoFiscalAtual === 'nfe'
+                        ? 'NF-e'
+                        : tipoDocumentoFiscalAtual === 'nfse'
+                          ? 'NFS-e'
+                          : 'Nao fiscal'}
+                    </strong>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Status:</span>
+                    <span
+                      className={`inline-flex rounded-md border px-2 py-0.5 text-[11px] font-medium ${STATUS_FISCAL_CLASSES[statusFiscalAtual]}`}
+                    >
+                      {STATUS_FISCAL_LABELS[statusFiscalAtual]}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Ambiente:</span>
+                    <strong className="text-[#173A4D] capitalize">{ambienteFiscal}</strong>
+                  </div>
+                  {documentoFiscalStatus?.provider && (
+                    <div className="flex justify-between">
+                      <span>Provider:</span>
+                      <strong className="text-[#173A4D]">{documentoFiscalStatus.provider}</strong>
+                    </div>
+                  )}
+                  {numeroDocumentoFiscal && (
+                    <div className="flex justify-between">
+                      <span>Numero:</span>
+                      <strong className="text-[#173A4D]">{numeroDocumentoFiscal}</strong>
+                    </div>
+                  )}
+                  {serieDocumentoFiscal && (
+                    <div className="flex justify-between">
+                      <span>Serie:</span>
+                      <strong className="text-[#173A4D]">{serieDocumentoFiscal}</strong>
+                    </div>
+                  )}
+                  {documentoFiscalStatus?.protocolo && (
+                    <div className="flex justify-between">
+                      <span>Protocolo:</span>
+                      <strong className="text-[#173A4D]">{documentoFiscalStatus.protocolo}</strong>
+                    </div>
+                  )}
+                  {documentoFiscalStatus?.resumo && (
+                    <div className="rounded-md border border-[#E2ECEF] bg-[#F8FBFC] px-2 py-1.5 text-[11px]">
+                      <div className="flex justify-between">
+                        <span>Base servicos:</span>
+                        <strong>R$ {formatarValorMonetario(documentoFiscalStatus.resumo.valorServicos)}</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Tributos:</span>
+                        <strong>R$ {formatarValorMonetario(documentoFiscalStatus.resumo.valorTributos)}</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Total fiscal:</span>
+                        <strong>R$ {formatarValorMonetario(documentoFiscalStatus.resumo.valorTotal)}</strong>
+                      </div>
+                    </div>
+                  )}
+                  {chaveDocumentoFiscal && (
+                    <p className="break-all text-[11px] text-[#5E7784]">Chave: {chaveDocumentoFiscal}</p>
+                  )}
+                  {documentoFiscalStatus?.ultimaMensagem && (
+                    <p className="rounded-md border border-[#E4ECEF] bg-[#F8FBFC] p-2 text-[11px] text-[#5E7784]">
+                      {documentoFiscalStatus.ultimaMensagem}
+                    </p>
+                  )}
+                  {documentoFiscalStatus?.atualizadoEm && (
+                    <p className="text-[11px] text-[#6C808A]">
+                      Atualizado em {new Date(documentoFiscalStatus.atualizadoEm).toLocaleString('pt-BR')}
+                    </p>
+                  )}
+                </div>
+
+                {podeGerenciarDocumentoFiscal ? (
+                  <div className="mt-3 space-y-2">
+                    <div>
+                      <label className="mb-1 block text-[11px] font-medium text-[#4A6472]">
+                        Ambiente fiscal
+                      </label>
+                      <select
+                        value={ambienteFiscal}
+                        onChange={(event) =>
+                          setAmbienteFiscal(
+                            event.target.value === 'producao' ? 'producao' : 'homologacao',
+                          )
+                        }
+                        disabled={fiscalActionLoading}
+                        className="h-8 w-full rounded-md border border-[#D4E2E7] bg-white px-2 text-xs text-[#28485A] focus:border-[#159A9C] focus:outline-none"
+                      >
+                        <option value="homologacao">Homologacao</option>
+                        <option value="producao">Producao</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-[11px] font-medium text-[#4A6472]">
+                        Observacao da acao
+                      </label>
+                      <textarea
+                        value={observacaoFiscal}
+                        onChange={(event) => setObservacaoFiscal(event.target.value)}
+                        disabled={fiscalActionLoading}
+                        rows={2}
+                        className="w-full resize-y rounded-md border border-[#D4E2E7] bg-white px-2 py-1.5 text-xs text-[#28485A] focus:border-[#159A9C] focus:outline-none"
+                        placeholder="Opcional. Ex: emissao solicitada apos conferencia fiscal."
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2">
+                      <button
+                        type="button"
+                        onClick={handleCriarRascunhoFiscal}
+                        disabled={!onCriarRascunhoFiscal || fiscalActionLoading || fatura.status === StatusFatura.CANCELADA}
+                        className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-[#D4E2E7] bg-white px-2 text-xs font-medium text-[#28485A] transition hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {fiscalActionLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                        Criar rascunho
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleEmitirDocumentoFiscal}
+                        disabled={!onEmitirDocumentoFiscal || fiscalActionLoading || fatura.status === StatusFatura.CANCELADA}
+                        className="inline-flex h-8 items-center justify-center gap-1 rounded-md bg-[#159A9C] px-2 text-xs font-medium text-white transition hover:bg-[#117C7E] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {fiscalActionLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                        {statusFiscalAtual === 'emitida' ? 'Reemitir documento' : 'Emitir documento'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void onAtualizarStatusFiscal?.(fatura.id)}
+                        disabled={!onAtualizarStatusFiscal || fiscalActionLoading}
+                        className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-[#D4E2E7] bg-white px-2 text-xs font-medium text-[#28485A] transition hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {fiscalActionLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                        Atualizar status
+                      </button>
+                    </div>
+
+                    <div className="rounded-md border border-[#E2ECEF] bg-[#F8FBFC] p-2">
+                      <label className="mb-1 block text-[11px] font-medium text-[#4A6472]">
+                        Operacao final
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setOperacaoFiscal('cancelar')}
+                          disabled={fiscalActionLoading}
+                          className={`h-8 rounded-md border text-xs font-medium transition ${
+                            operacaoFiscalEfetiva === 'cancelar'
+                              ? 'border-[#159A9C] bg-[#E9F8F7] text-[#117C7E]'
+                              : 'border-[#D4E2E7] bg-white text-[#3A5868]'
+                          } disabled:cursor-not-allowed disabled:opacity-60`}
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setOperacaoFiscal('inutilizar')}
+                          disabled={fiscalActionLoading}
+                          className={`h-8 rounded-md border text-xs font-medium transition ${
+                            operacaoFiscalEfetiva === 'inutilizar'
+                              ? 'border-[#159A9C] bg-[#E9F8F7] text-[#117C7E]'
+                              : 'border-[#D4E2E7] bg-white text-[#3A5868]'
+                          } disabled:cursor-not-allowed disabled:opacity-60`}
+                        >
+                          Inutilizar
+                        </button>
+                      </div>
+                      <textarea
+                        value={motivoOperacaoFiscal}
+                        onChange={(event) => setMotivoOperacaoFiscal(event.target.value)}
+                        disabled={fiscalActionLoading}
+                        rows={2}
+                        className="mt-2 w-full resize-y rounded-md border border-[#D4E2E7] bg-white px-2 py-1.5 text-xs text-[#28485A] focus:border-[#159A9C] focus:outline-none"
+                        placeholder="Motivo obrigatorio para a operacao final."
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCancelarOuInutilizarDocumentoFiscal}
+                        disabled={
+                          !onCancelarDocumentoFiscal ||
+                          !motivoOperacaoFiscal.trim() ||
+                          !operacaoFiscalHabilitada ||
+                          fiscalActionLoading
+                        }
+                        className="mt-2 inline-flex h-8 w-full items-center justify-center gap-1 rounded-md border border-[#D4E2E7] bg-white px-2 text-xs font-medium text-[#28485A] transition hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {fiscalActionLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                        {OPERACAO_FISCAL_LABELS[operacaoFiscalEfetiva]}
+                      </button>
+                      {!operacaoFiscalHabilitada && (
+                        <p className="mt-1 text-[11px] text-[#87614A]">
+                          Operacao indisponivel para o status atual ({STATUS_FISCAL_LABELS[statusFiscalAtual]}).
+                        </p>
+                      )}
+                    </div>
+
+                    {historicoFiscalOrdenado.length > 0 && (
+                      <div className="rounded-md border border-[#E2ECEF] bg-white p-2">
+                        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#4A6472]">
+                          Historico fiscal
+                        </p>
+                        <div className="max-h-44 space-y-1.5 overflow-y-auto pr-1">
+                          {historicoFiscalOrdenado.map((evento, index) => {
+                            const statusEvento = STATUS_FISCAL_LABELS[evento.status] || evento.status;
+                            const acaoEvento =
+                              ACAO_HISTORICO_LABELS[evento.acao] ||
+                              String(evento.acao || 'Atualizacao').replace(/_/g, ' ');
+                            return (
+                              <div key={`${evento.timestamp}-${index}`} className="rounded-md border border-[#EDF3F5] bg-[#FBFDFD] px-2 py-1.5">
+                                <div className="flex items-center justify-between gap-2">
+                                  <strong className="text-[11px] text-[#173A4D]">{acaoEvento}</strong>
+                                  <span
+                                    className={`inline-flex rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${STATUS_FISCAL_CLASSES[evento.status]}`}
+                                  >
+                                    {statusEvento}
+                                  </span>
+                                </div>
+                                <p className="text-[10px] text-[#6C808A]">
+                                  {new Date(evento.timestamp).toLocaleString('pt-BR')}
+                                </p>
+                                {evento.mensagem && (
+                                  <p className="text-[11px] text-[#4A6472]">{evento.mensagem}</p>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-[11px] text-[#5E7784]">
+                    Documento atual nao exige emissao fiscal automatizada.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 

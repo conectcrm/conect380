@@ -1,7 +1,13 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+  Logger,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository } from 'typeorm';
-import { Fatura, StatusFatura, TipoFatura } from '../entities/fatura.entity';
+import { Fatura, FormaPagamento, StatusFatura, TipoFatura } from '../entities/fatura.entity';
 import { ItemFatura } from '../entities/item-fatura.entity';
 import { Contrato } from '../../contratos/entities/contrato.entity';
 import { Cliente } from '../../clientes/cliente.entity';
@@ -62,6 +68,26 @@ interface ResumoFinanceiroFatura {
   valorTotal: number;
 }
 
+interface FaturaActorContext {
+  id?: string;
+  role?: string;
+  permissions?: string[];
+  permissoes?: string[];
+}
+
+interface PoliticaDocumentoFiscalResult {
+  detalhes: Record<string, unknown> | null;
+  auditoria?: {
+    acao: string;
+    motivo: string;
+    alteracoes: Array<{
+      campo: string;
+      anterior: string | null;
+      atual: string | null;
+    }>;
+  };
+}
+
 @Injectable()
 export class FaturamentoService {
   private readonly logger = new Logger(FaturamentoService.name);
@@ -86,7 +112,11 @@ export class FaturamentoService {
     private emailService: EmailIntegradoService,
   ) {}
 
-  async criarFatura(createFaturaDto: CreateFaturaDto, empresaId: string): Promise<Fatura> {
+  async criarFatura(
+    createFaturaDto: CreateFaturaDto,
+    empresaId: string,
+    actor?: FaturaActorContext,
+  ): Promise<Fatura> {
     try {
       let contrato: Contrato | null = null;
 
@@ -103,14 +133,37 @@ export class FaturamentoService {
 
       // Gerar nmero nico da fatura
       const numero = await this.gerarNumeroFatura();
+      const politicaDocumentoFiscalCriacao = this.aplicarPoliticaDocumentoFiscal(
+        this.normalizarDetalhesTributarios(createFaturaDto.detalhesTributarios),
+        {
+          contexto: 'criacao',
+          actor,
+        },
+      );
+      const detalhesTributariosNormalizados = politicaDocumentoFiscalCriacao.detalhes;
 
       const resumoFinanceiro = this.calcularResumoFinanceiroFatura(createFaturaDto.itens, {
         valorDescontoGlobal: createFaturaDto.valorDesconto,
         valorImpostos: createFaturaDto.valorImpostos,
         percentualImpostos: createFaturaDto.percentualImpostos,
+        detalhesTributarios: detalhesTributariosNormalizados,
       });
 
       // Criar fatura
+      const metadadosIniciais = politicaDocumentoFiscalCriacao.auditoria
+        ? this.appendAuditoriaOperacaoFatura(undefined, {
+            acao: politicaDocumentoFiscalCriacao.auditoria.acao,
+            origem: 'faturamento.documento_fiscal',
+            usuarioId: actor?.id,
+            motivo: politicaDocumentoFiscalCriacao.auditoria.motivo,
+            alteracoes: politicaDocumentoFiscalCriacao.auditoria.alteracoes.map((item) => ({
+              campo: item.campo,
+              anterior: item.anterior,
+              atual: item.atual,
+            })),
+          })
+        : undefined;
+
       const fatura = this.faturaRepository.create({
         contratoId: createFaturaDto.contratoId,
         clienteId: createFaturaDto.clienteId,
@@ -129,7 +182,8 @@ export class FaturamentoService {
         diasCarenciaJuros: this.normalizarNumeroInteiro(createFaturaDto.diasCarenciaJuros, 0),
         percentualJuros: this.normalizarPercentual(createFaturaDto.percentualJuros),
         percentualMulta: this.normalizarPercentual(createFaturaDto.percentualMulta),
-        detalhesTributarios: this.normalizarDetalhesTributarios(createFaturaDto.detalhesTributarios),
+        detalhesTributarios: detalhesTributariosNormalizados,
+        metadados: metadadosIniciais as any,
         dataEmissao: new Date(),
         status: StatusFatura.PENDENTE,
         empresaId,
@@ -424,6 +478,7 @@ export class FaturamentoService {
     updateFaturaDto: UpdateFaturaDto,
     empresaId: string,
     userId?: string,
+    actor?: FaturaActorContext,
   ): Promise<Fatura> {
     // x" MULTI-TENANCY: Validar empresa_id
     const fatura = await this.buscarFaturaPorId(id, empresaId);
@@ -462,10 +517,24 @@ export class FaturamentoService {
       fatura.percentualMulta = this.normalizarPercentual(updateFaturaDto.percentualMulta);
     }
 
+    const politicaDocumentoFiscalAtualizacao =
+      updateFaturaDto.detalhesTributarios !== undefined
+        ? this.aplicarPoliticaDocumentoFiscal(
+            this.normalizarDetalhesTributarios(updateFaturaDto.detalhesTributarios),
+            {
+              contexto: 'atualizacao',
+              actor,
+              detalhesAtuais: this.normalizarDetalhesTributarios(fatura.detalhesTributarios),
+            },
+          )
+        : {
+            detalhes: this.normalizarDetalhesTributarios(fatura.detalhesTributarios),
+          };
+
+    const detalhesTributariosAtualizados = politicaDocumentoFiscalAtualizacao.detalhes;
+
     if (updateFaturaDto.detalhesTributarios !== undefined) {
-      fatura.detalhesTributarios = this.normalizarDetalhesTributarios(
-        updateFaturaDto.detalhesTributarios,
-      );
+      fatura.detalhesTributarios = detalhesTributariosAtualizados;
     }
 
     // Se alterou itens, recalcular valor total
@@ -507,6 +576,7 @@ export class FaturamentoService {
         updateFaturaDto.percentualImpostos !== undefined
           ? updateFaturaDto.percentualImpostos
           : fatura.percentualImpostos,
+      detalhesTributarios: detalhesTributariosAtualizados,
     });
 
     fatura.valorDesconto = resumoFinanceiro.descontoGlobal;
@@ -531,6 +601,20 @@ export class FaturamentoService {
         origem: 'faturamento.atualizacao',
         usuarioId: userId,
         alteracoes,
+      }) as any;
+    }
+
+    if (politicaDocumentoFiscalAtualizacao.auditoria) {
+      fatura.metadados = this.appendAuditoriaOperacaoFatura(fatura.metadados, {
+        acao: politicaDocumentoFiscalAtualizacao.auditoria.acao,
+        origem: 'faturamento.documento_fiscal',
+        usuarioId: userId,
+        motivo: politicaDocumentoFiscalAtualizacao.auditoria.motivo,
+        alteracoes: politicaDocumentoFiscalAtualizacao.auditoria.alteracoes.map((item) => ({
+          campo: item.campo,
+          anterior: item.anterior,
+          atual: item.atual,
+        })),
       }) as any;
     }
 
@@ -1224,6 +1308,7 @@ export class FaturamentoService {
       valorDescontoGlobal?: number;
       valorImpostos?: number;
       percentualImpostos?: number | null;
+      detalhesTributarios?: Record<string, unknown> | null;
     },
   ): ResumoFinanceiroFatura {
     const listaItens = Array.isArray(itens) ? itens : [];
@@ -1251,6 +1336,13 @@ export class FaturamentoService {
     const baseCalculo = Math.max(subtotalLiquidoItens - descontoGlobal, 0);
     const percentualImpostosEntrada = this.normalizarPercentualNullable(config?.percentualImpostos);
     let valorImpostos = Math.max(0, this.toFiniteNumber(config?.valorImpostos, 0));
+    const valorImpostosDetalhados = this.extrairValorImpostosDosDetalhesTributarios(
+      config?.detalhesTributarios,
+    );
+
+    if (valorImpostos <= 0 && valorImpostosDetalhados > 0) {
+      valorImpostos = this.roundMoney(valorImpostosDetalhados);
+    }
 
     if (valorImpostos <= 0 && percentualImpostosEntrada !== null && percentualImpostosEntrada > 0) {
       valorImpostos = this.roundMoney(baseCalculo * (percentualImpostosEntrada / 100));
@@ -1314,6 +1406,310 @@ export class FaturamentoService {
     return Math.max(0, Math.trunc(parsed));
   }
 
+  private aplicarPoliticaDocumentoFiscal(
+    detalhesInput: Record<string, unknown> | null,
+    options: {
+      contexto: 'criacao' | 'atualizacao';
+      actor?: FaturaActorContext;
+      detalhesAtuais?: Record<string, unknown> | null;
+    },
+  ): PoliticaDocumentoFiscalResult {
+    const detalhes = this.normalizarDetalhesTributarios(detalhesInput);
+    if (!detalhes) {
+      return { detalhes: null };
+    }
+
+    const documentoRaw = detalhes.documento;
+    if (!documentoRaw || typeof documentoRaw !== 'object' || Array.isArray(documentoRaw)) {
+      return { detalhes };
+    }
+
+    const documento = { ...(documentoRaw as Record<string, unknown>) };
+    const tipoDocumento = String(documento.tipo || '')
+      .trim()
+      .toLowerCase();
+    const tipoFiscal = tipoDocumento === 'nfe' || tipoDocumento === 'nfse';
+
+    if (!tipoFiscal) {
+      const documentoSanitizado = {
+        ...documento,
+        geracaoAutomatica: false,
+        emissorEsperado: 'interno',
+      };
+      return {
+        detalhes: {
+          ...detalhes,
+          documento: documentoSanitizado,
+        },
+      };
+    }
+
+    const statusFiscalAtual = this.extrairStatusFiscalDosDetalhes(options.detalhesAtuais);
+    const documentoAnterior = this.extrairSnapshotDocumentoFiscal(options.detalhesAtuais);
+    const geracaoAutomatica = this.normalizarBoolean(documento.geracaoAutomatica, true);
+    const numeroDocumento = this.normalizarTextoDocumento(documento.numero);
+    const serieDocumento = this.normalizarTextoDocumento(documento.serie);
+    const chaveAcessoDocumento = this.normalizarTextoDocumento(documento.chaveAcesso);
+    const motivoManual = this.normalizarTextoDocumento(
+      documento.motivoEdicaoManual || documento.manualReason || documento.motivoManual,
+    );
+
+    const houveMudancaIdentificador =
+      numeroDocumento !== documentoAnterior.numero ||
+      serieDocumento !== documentoAnterior.serie ||
+      chaveAcessoDocumento !== documentoAnterior.chaveAcesso;
+    const houveMudancaModo = geracaoAutomatica !== documentoAnterior.geracaoAutomatica;
+    const houveMudancaMotivoManual = motivoManual !== documentoAnterior.motivoEdicaoManual;
+    const houveMudancaManual = houveMudancaIdentificador || houveMudancaModo || houveMudancaMotivoManual;
+
+    if (
+      statusFiscalAtual &&
+      ['emitida', 'cancelada'].includes(statusFiscalAtual) &&
+      (houveMudancaIdentificador || houveMudancaModo)
+    ) {
+      throw new BadRequestException(
+        'Documento fiscal ja emitido/cancelado. Numero, serie, chave e modo de geracao nao podem ser alterados.',
+      );
+    }
+
+    if (!geracaoAutomatica) {
+      const podeManual = this.usuarioPodeGerenciarDocumentoFiscalManual(options.actor);
+      if (!podeManual && (options.contexto === 'criacao' || houveMudancaManual)) {
+        throw new ForbiddenException(
+          'Modo manual para documento fiscal e restrito a perfis financeiro/admin.',
+        );
+      }
+
+      const motivoManualEfetivo = motivoManual || documentoAnterior.motivoEdicaoManual;
+      const motivoObrigatorio =
+        options.contexto === 'criacao' || houveMudancaIdentificador || houveMudancaModo;
+
+      if (motivoObrigatorio && !motivoManualEfetivo) {
+        throw new BadRequestException(
+          'Informe o motivo da edicao manual para numero/serie/chave do documento fiscal.',
+        );
+      }
+
+      if (!numeroDocumento) {
+        throw new BadRequestException(
+          'Informe o numero do documento fiscal ou habilite a geracao automatica.',
+        );
+      }
+
+      if (tipoDocumento === 'nfe') {
+        const numeroDigitos = String(numeroDocumento).replace(/\D/g, '');
+        const serieDigitos = String(serieDocumento || '').replace(/\D/g, '');
+        const chaveDigitos = String(chaveAcessoDocumento || '').replace(/\D/g, '');
+
+        if (!numeroDigitos || numeroDigitos.length > 9) {
+          throw new BadRequestException('Para NF-e, o numero fiscal deve ter ate 9 digitos.');
+        }
+
+        if (serieDocumento && (!serieDigitos || serieDigitos.length > 3)) {
+          throw new BadRequestException('Para NF-e, a serie fiscal deve ter ate 3 digitos.');
+        }
+
+        if (chaveAcessoDocumento && chaveDigitos.length !== 44) {
+          throw new BadRequestException(
+            'Para NF-e, a chave de acesso manual deve ter exatamente 44 digitos.',
+          );
+        }
+      }
+
+      if (!motivoManual && motivoManualEfetivo) {
+        documento.motivoEdicaoManual = motivoManualEfetivo;
+      }
+    }
+
+    const documentoSanitizado: Record<string, unknown> = {
+      ...documento,
+      modelo: this.normalizarTextoDocumento(documento.modelo),
+      numero: geracaoAutomatica ? null : numeroDocumento,
+      serie: geracaoAutomatica ? null : serieDocumento,
+      chaveAcesso: geracaoAutomatica ? null : chaveAcessoDocumento,
+      geracaoAutomatica,
+      emissorEsperado: tipoDocumento === 'nfe' ? 'sefaz' : 'provedor_municipal',
+      motivoEdicaoManual: geracaoAutomatica
+        ? null
+        : motivoManual || documentoAnterior.motivoEdicaoManual,
+      manualUpdatedAt:
+        geracaoAutomatica || !houveMudancaManual
+          ? documento.manualUpdatedAt || null
+          : new Date().toISOString(),
+      manualUpdatedBy:
+        geracaoAutomatica || !houveMudancaManual ? documento.manualUpdatedBy || null : options.actor?.id || null,
+    };
+
+    const alteracoesManual = this.compararCamposDocumentoFiscal(
+      {
+        numero: documentoAnterior.numero,
+        serie: documentoAnterior.serie,
+        chaveAcesso: documentoAnterior.chaveAcesso,
+        geracaoAutomatica: documentoAnterior.geracaoAutomatica ? 'true' : 'false',
+        motivoEdicaoManual: documentoAnterior.motivoEdicaoManual,
+      },
+      {
+        numero: documentoSanitizado.numero ? String(documentoSanitizado.numero) : null,
+        serie: documentoSanitizado.serie ? String(documentoSanitizado.serie) : null,
+        chaveAcesso: documentoSanitizado.chaveAcesso
+          ? String(documentoSanitizado.chaveAcesso)
+          : null,
+        geracaoAutomatica: documentoSanitizado.geracaoAutomatica ? 'true' : 'false',
+        motivoEdicaoManual: documentoSanitizado.motivoEdicaoManual
+          ? String(documentoSanitizado.motivoEdicaoManual)
+          : null,
+      },
+    );
+
+    const auditoria =
+      (!geracaoAutomatica || alteracoesManual.length > 0) &&
+      (options.contexto === 'atualizacao' || !geracaoAutomatica)
+        ? {
+            acao: geracaoAutomatica
+              ? 'documento_fiscal_modo_automatico'
+              : 'documento_fiscal_edicao_manual',
+            motivo: geracaoAutomatica
+              ? 'Modo automatico habilitado para documento fiscal.'
+              : motivoManual || 'Edicao manual de documento fiscal.',
+            alteracoes: alteracoesManual,
+          }
+        : undefined;
+
+    return {
+      detalhes: {
+        ...detalhes,
+        documento: documentoSanitizado,
+      },
+      auditoria,
+    };
+  }
+
+  private extrairStatusFiscalDosDetalhes(
+    detalhes?: Record<string, unknown> | null,
+  ): string | null {
+    const base = this.normalizarDetalhesTributarios(detalhes);
+    if (!base) {
+      return null;
+    }
+    const fiscalRaw = base.fiscal;
+    if (!fiscalRaw || typeof fiscalRaw !== 'object' || Array.isArray(fiscalRaw)) {
+      return null;
+    }
+    const status = String((fiscalRaw as Record<string, unknown>).status || '')
+      .trim()
+      .toLowerCase();
+    return status || null;
+  }
+
+  private extrairSnapshotDocumentoFiscal(
+    detalhes?: Record<string, unknown> | null,
+  ): {
+    numero: string | null;
+    serie: string | null;
+    chaveAcesso: string | null;
+    geracaoAutomatica: boolean;
+    motivoEdicaoManual: string | null;
+  } {
+    const base = this.normalizarDetalhesTributarios(detalhes);
+    if (!base) {
+      return {
+        numero: null,
+        serie: null,
+        chaveAcesso: null,
+        geracaoAutomatica: true,
+        motivoEdicaoManual: null,
+      };
+    }
+
+    const documentoRaw = base.documento;
+    if (!documentoRaw || typeof documentoRaw !== 'object' || Array.isArray(documentoRaw)) {
+      return {
+        numero: null,
+        serie: null,
+        chaveAcesso: null,
+        geracaoAutomatica: true,
+        motivoEdicaoManual: null,
+      };
+    }
+
+    const documento = documentoRaw as Record<string, unknown>;
+    return {
+      numero: this.normalizarTextoDocumento(documento.numero),
+      serie: this.normalizarTextoDocumento(documento.serie),
+      chaveAcesso: this.normalizarTextoDocumento(documento.chaveAcesso),
+      geracaoAutomatica: this.normalizarBoolean(documento.geracaoAutomatica, true),
+      motivoEdicaoManual: this.normalizarTextoDocumento(
+        documento.motivoEdicaoManual || documento.manualReason || documento.motivoManual,
+      ),
+    };
+  }
+
+  private compararCamposDocumentoFiscal(
+    anterior: Record<string, string | null>,
+    atual: Record<string, string | null>,
+  ): Array<{ campo: string; anterior: string | null; atual: string | null }> {
+    const campos = Array.from(new Set([...Object.keys(anterior), ...Object.keys(atual)]));
+    const alteracoes: Array<{ campo: string; anterior: string | null; atual: string | null }> = [];
+
+    for (const campo of campos) {
+      const valorAnterior = anterior[campo] ?? null;
+      const valorAtual = atual[campo] ?? null;
+      if (valorAnterior !== valorAtual) {
+        alteracoes.push({
+          campo: `documento.${campo}`,
+          anterior: valorAnterior,
+          atual: valorAtual,
+        });
+      }
+    }
+
+    return alteracoes;
+  }
+
+  private usuarioPodeGerenciarDocumentoFiscalManual(actor?: FaturaActorContext): boolean {
+    const role = String(actor?.role || '')
+      .trim()
+      .toLowerCase();
+    if (role === 'superadmin' || role === 'admin' || role === 'financeiro') {
+      return true;
+    }
+
+    const permissoes = new Set(
+      [...(Array.isArray(actor?.permissions) ? actor.permissions : []), ...(Array.isArray(actor?.permissoes) ? actor.permissoes : [])]
+        .map((item) => String(item || '').trim().toLowerCase())
+        .filter(Boolean),
+    );
+
+    return permissoes.has('admin.empresas.manage');
+  }
+
+  private normalizarBoolean(value: unknown, fallback = false): boolean {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    if (typeof value === 'number') {
+      return value !== 0;
+    }
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (['true', '1', 'sim', 'yes'].includes(normalized)) {
+        return true;
+      }
+      if (['false', '0', 'nao', 'no'].includes(normalized)) {
+        return false;
+      }
+    }
+    return fallback;
+  }
+
+  private normalizarTextoDocumento(value: unknown): string | null {
+    if (value === undefined || value === null) {
+      return null;
+    }
+    const normalized = String(value).trim();
+    return normalized.length > 0 ? normalized : null;
+  }
+
   private normalizarDetalhesTributarios(
     value?: Record<string, unknown> | null,
   ): Record<string, unknown> | null {
@@ -1321,6 +1717,43 @@ export class FaturamentoService {
       return null;
     }
     return value;
+  }
+
+  private extrairValorImpostosDosDetalhesTributarios(
+    value?: Record<string, unknown> | null,
+  ): number {
+    const detalhes = this.normalizarDetalhesTributarios(value);
+    if (!detalhes) {
+      return 0;
+    }
+
+    const tributosRaw = detalhes.tributos;
+    if (!tributosRaw || typeof tributosRaw !== 'object' || Array.isArray(tributosRaw)) {
+      return 0;
+    }
+
+    const tributos = tributosRaw as Record<string, unknown>;
+    const totalDireto = this.toFiniteNumber(tributos.total, 0);
+    if (totalDireto > 0) {
+      return this.roundMoney(totalDireto);
+    }
+
+    const totalAplicado = this.toFiniteNumber(tributos.valorImpostosAplicado, 0);
+    if (totalAplicado > 0) {
+      return this.roundMoney(totalAplicado);
+    }
+
+    const ajusteManual = this.toFiniteNumber(tributos.ajusteManual, 0);
+    const itens = Array.isArray(tributos.itens) ? tributos.itens : [];
+    const totalItens = itens.reduce((acc, item) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        return acc;
+      }
+      const valor = this.toFiniteNumber((item as Record<string, unknown>).valor, 0);
+      return acc + Math.max(0, valor);
+    }, 0);
+
+    return this.roundMoney(Math.max(totalItens, 0) + Math.max(ajusteManual, 0));
   }
 
   private async gerarNumeroFatura(): Promise<string> {
@@ -1342,15 +1775,31 @@ export class FaturamentoService {
     return `FT${ano}${proximoNumero.toString().padStart(6, '0')}`;
   }
 
-  private mapearFormaPagamento(formaPagamento?: string): any {
-    const mapeamento: Record<string, any> = {
-      PIX: 'pix',
-      'Carto de Crdito': 'cartao_credito',
-      Boleto: 'boleto',
-      Transferncia: 'transferencia',
+  private mapearFormaPagamento(formaPagamento?: string): FormaPagamento {
+    if (!formaPagamento) {
+      return FormaPagamento.PIX;
+    }
+
+    const normalizado = formaPagamento
+      .trim()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+
+    const mapeamento: Record<string, FormaPagamento> = {
+      pix: FormaPagamento.PIX,
+      cartao_credito: FormaPagamento.CARTAO_CREDITO,
+      'cartao de credito': FormaPagamento.CARTAO_CREDITO,
+      cartao_debito: FormaPagamento.CARTAO_DEBITO,
+      'cartao de debito': FormaPagamento.CARTAO_DEBITO,
+      boleto: FormaPagamento.BOLETO,
+      transferencia: FormaPagamento.TRANSFERENCIA,
+      dinheiro: FormaPagamento.DINHEIRO,
+      a_combinar: FormaPagamento.A_COMBINAR,
+      'a combinar': FormaPagamento.A_COMBINAR,
     };
 
-    return mapeamento[formaPagamento] || 'pix';
+    return mapeamento[normalizado] || FormaPagamento.PIX;
   }
 
   private calcularDataVencimento(contrato: Contrato): string {

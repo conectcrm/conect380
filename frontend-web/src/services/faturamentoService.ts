@@ -24,6 +24,7 @@ export enum FormaPagamento {
   BOLETO = 'boleto',
   TRANSFERENCIA = 'transferencia',
   DINHEIRO = 'dinheiro',
+  A_COMBINAR = 'a_combinar',
 }
 
 export enum StatusPagamento {
@@ -277,6 +278,61 @@ export interface ResultadoCobrancaLote {
   falhas: number;
   ignoradas: number;
   resultados: ResultadoCobrancaLoteItem[];
+}
+
+export type TipoDocumentoFiscal = 'nfse' | 'nfe';
+export type AmbienteDocumentoFiscal = 'homologacao' | 'producao';
+export type StatusDocumentoFiscal =
+  | 'nao_iniciado'
+  | 'rascunho'
+  | 'pendente_emissao'
+  | 'emitida'
+  | 'erro'
+  | 'cancelada';
+export type OperacaoDocumentoFiscal = 'cancelar' | 'inutilizar';
+
+export interface DocumentoFiscalHistoricoEvento {
+  timestamp: string;
+  acao: string;
+  status: StatusDocumentoFiscal;
+  mensagem?: string | null;
+  usuarioId?: string | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface DocumentoFiscalStatus {
+  faturaId: number;
+  faturaNumero: string;
+  tipo: TipoDocumentoFiscal | null;
+  ambiente: AmbienteDocumentoFiscal;
+  status: StatusDocumentoFiscal;
+  provider: string | null;
+  numeroDocumento: string | null;
+  serie: string | null;
+  chaveAcesso: string | null;
+  protocolo: string | null;
+  loteId: string | null;
+  ultimaMensagem: string | null;
+  atualizadoEm: string | null;
+  historico: DocumentoFiscalHistoricoEvento[];
+  resumo: {
+    valorServicos: number;
+    valorTributos: number;
+    valorTotal: number;
+  };
+}
+
+export interface DocumentoFiscalPayload {
+  tipo?: TipoDocumentoFiscal;
+  ambiente?: AmbienteDocumentoFiscal;
+  observacoes?: string;
+  forcarReemissao?: boolean;
+}
+
+export interface DocumentoFiscalCancelamentoPayload {
+  tipoOperacao: OperacaoDocumentoFiscal;
+  motivo: string;
+  ambiente?: AmbienteDocumentoFiscal;
 }
 
 // Serviço
@@ -590,6 +646,57 @@ export const faturamentoService = {
     }
   },
 
+  async criarRascunhoDocumentoFiscal(
+    id: number,
+    payload?: DocumentoFiscalPayload,
+  ): Promise<DocumentoFiscalStatus> {
+    try {
+      const body = payload || {};
+      const response = await api.post(`/faturamento/faturas/${id}/documento-fiscal/rascunho`, body);
+      return response.data?.data || response.data;
+    } catch (error) {
+      console.error('Erro ao criar rascunho fiscal:', error);
+      throw error;
+    }
+  },
+
+  async emitirDocumentoFiscal(
+    id: number,
+    payload?: DocumentoFiscalPayload,
+  ): Promise<DocumentoFiscalStatus> {
+    try {
+      const body = payload || {};
+      const response = await api.post(`/faturamento/faturas/${id}/documento-fiscal/emitir`, body);
+      return response.data?.data || response.data;
+    } catch (error) {
+      console.error('Erro ao emitir documento fiscal:', error);
+      throw error;
+    }
+  },
+
+  async obterStatusDocumentoFiscal(id: number): Promise<DocumentoFiscalStatus> {
+    try {
+      const response = await api.get(`/faturamento/faturas/${id}/documento-fiscal/status`);
+      return response.data?.data || response.data;
+    } catch (error) {
+      console.error('Erro ao consultar status do documento fiscal:', error);
+      throw error;
+    }
+  },
+
+  async cancelarOuInutilizarDocumentoFiscal(
+    id: number,
+    payload: DocumentoFiscalCancelamentoPayload,
+  ): Promise<DocumentoFiscalStatus> {
+    try {
+      const response = await api.post(`/faturamento/faturas/${id}/documento-fiscal/cancelar`, payload);
+      return response.data?.data || response.data;
+    } catch (error) {
+      console.error('Erro ao cancelar/inutilizar documento fiscal:', error);
+      throw error;
+    }
+  },
+
   async gerarLinkPagamento(id: number): Promise<string> {
     try {
       void id;
@@ -820,6 +927,7 @@ export const faturamentoService = {
       [FormaPagamento.BOLETO]: 'Boleto',
       [FormaPagamento.TRANSFERENCIA]: 'Transferência',
       [FormaPagamento.DINHEIRO]: 'Dinheiro',
+      [FormaPagamento.A_COMBINAR]: 'A combinar',
     };
     return formaMap[forma] || forma;
   },

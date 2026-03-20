@@ -39,6 +39,7 @@ export enum FormaPagamento {
   BOLETO = 'boleto',
   TRANSFERENCIA = 'transferencia',
   DINHEIRO = 'dinheiro',
+  A_COMBINAR = 'a_combinar',
 }
 
 @Entity('faturas')

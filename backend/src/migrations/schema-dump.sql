@@ -276,7 +276,8 @@ CREATE TYPE public.faturas_formapagamentopreferida_enum AS ENUM (
     'cartao_debito',
     'boleto',
     'transferencia',
-    'dinheiro'
+    'dinheiro',
+    'a_combinar'
 );
 
 
@@ -3748,4 +3749,3 @@ ALTER TABLE ONLY public.contratos
 --
 -- PostgreSQL database dump complete
 --
-

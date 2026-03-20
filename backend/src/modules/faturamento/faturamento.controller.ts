@@ -24,12 +24,18 @@ import { CurrentUser } from '../../common/decorators/user.decorator';
 import { FaturamentoService } from './services/faturamento.service';
 import { PagamentoService } from './services/pagamento.service';
 import { CobrancaService } from './services/cobranca.service';
+import { DocumentoFiscalService } from './services/documento-fiscal.service';
 import {
   CreateFaturaDto,
   UpdateFaturaDto,
   GerarFaturaAutomaticaDto,
   GerarCobrancaLoteDto,
 } from './dto/fatura.dto';
+import {
+  CancelarDocumentoFiscalDto,
+  CriarRascunhoDocumentoFiscalDto,
+  EmitirDocumentoFiscalDto,
+} from './dto/documento-fiscal.dto';
 import { CreatePagamentoDto, UpdatePagamentoDto, ProcessarPagamentoDto } from './dto/pagamento.dto';
 import { CreatePlanoCobrancaDto, UpdatePlanoCobrancaDto } from './dto/plano-cobranca.dto';
 import { StatusFatura } from './entities/fatura.entity';
@@ -45,15 +51,33 @@ export class FaturamentoController {
     private readonly faturamentoService: FaturamentoService,
     private readonly pagamentoService: PagamentoService,
     private readonly cobrancaService: CobrancaService,
+    private readonly documentoFiscalService: DocumentoFiscalService,
   ) {}
 
   // ==================== FATURAS ====================
 
   @Post('faturas')
   @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
-  async criarFatura(@Body() createFaturaDto: CreateFaturaDto, @EmpresaId() empresaId: string) {
+  async criarFatura(
+    @Body() createFaturaDto: CreateFaturaDto,
+    @EmpresaId() empresaId: string,
+    @CurrentUser()
+    user?: {
+      id?: string;
+      sub?: string;
+      role?: string;
+      permissions?: string[];
+      permissoes?: string[];
+    },
+  ) {
     try {
-      const fatura = await this.faturamentoService.criarFatura(createFaturaDto, empresaId);
+      const actorId = user?.id || user?.sub;
+      const fatura = await this.faturamentoService.criarFatura(createFaturaDto, empresaId, {
+        id: actorId,
+        role: user?.role,
+        permissions: Array.isArray(user?.permissions) ? user?.permissions : [],
+        permissoes: Array.isArray(user?.permissoes) ? user?.permissoes : [],
+      });
       return {
         status: HttpStatus.CREATED,
         message: 'Fatura criada com sucesso',
@@ -209,13 +233,99 @@ export class FaturamentoController {
     };
   }
 
+  @Post('faturas/:id/documento-fiscal/rascunho')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
+  async criarRascunhoDocumentoFiscal(
+    @Param('id', ParseIntPipe) id: number,
+    @EmpresaId() empresaId: string,
+    @Body() payload: CriarRascunhoDocumentoFiscalDto,
+    @CurrentUser() user: { id?: string; sub?: string },
+  ) {
+    const userId = user?.id || user?.sub;
+    const statusFiscal = await this.documentoFiscalService.criarRascunho(
+      id,
+      empresaId,
+      payload,
+      userId,
+    );
+
+    return {
+      status: HttpStatus.OK,
+      message: 'Rascunho fiscal atualizado com sucesso',
+      data: statusFiscal,
+    };
+  }
+
+  @Post('faturas/:id/documento-fiscal/emitir')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
+  async emitirDocumentoFiscal(
+    @Param('id', ParseIntPipe) id: number,
+    @EmpresaId() empresaId: string,
+    @Body() payload: EmitirDocumentoFiscalDto,
+    @CurrentUser() user: { id?: string; sub?: string },
+  ) {
+    const userId = user?.id || user?.sub;
+    const statusFiscal = await this.documentoFiscalService.emitir(id, empresaId, payload, userId);
+
+    return {
+      status: HttpStatus.OK,
+      message: 'Documento fiscal emitido com sucesso',
+      data: statusFiscal,
+    };
+  }
+
+  @Get('faturas/:id/documento-fiscal/status')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_READ)
+  async consultarStatusDocumentoFiscal(
+    @Param('id', ParseIntPipe) id: number,
+    @EmpresaId() empresaId: string,
+  ) {
+    const statusFiscal = await this.documentoFiscalService.consultarStatus(id, empresaId);
+
+    return {
+      status: HttpStatus.OK,
+      message: 'Status fiscal recuperado com sucesso',
+      data: statusFiscal,
+    };
+  }
+
+  @Post('faturas/:id/documento-fiscal/cancelar')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
+  async cancelarOuInutilizarDocumentoFiscal(
+    @Param('id', ParseIntPipe) id: number,
+    @EmpresaId() empresaId: string,
+    @Body() payload: CancelarDocumentoFiscalDto,
+    @CurrentUser() user: { id?: string; sub?: string },
+  ) {
+    const userId = user?.id || user?.sub;
+    const statusFiscal = await this.documentoFiscalService.cancelarOuInutilizar(
+      id,
+      empresaId,
+      payload,
+      userId,
+    );
+
+    return {
+      status: HttpStatus.OK,
+      message: 'Status do documento fiscal atualizado com sucesso',
+      data: statusFiscal,
+    };
+  }
+
   @Put('faturas/:id')
   @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
   async atualizarFatura(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateFaturaDto: UpdateFaturaDto,
     @EmpresaId() empresaId: string,
-    @CurrentUser() user: { id?: string; sub?: string },
+    @CurrentUser()
+    user: {
+      id?: string;
+      sub?: string;
+      role?: string;
+      permissions?: string[];
+      permissoes?: string[];
+    },
   ) {
     const userId = user?.id || user?.sub;
     const fatura = await this.faturamentoService.atualizarFatura(
@@ -223,6 +333,12 @@ export class FaturamentoController {
       updateFaturaDto,
       empresaId,
       userId,
+      {
+        id: userId,
+        role: user?.role,
+        permissions: Array.isArray(user?.permissions) ? user?.permissions : [],
+        permissoes: Array.isArray(user?.permissoes) ? user?.permissoes : [],
+      },
     );
 
     return {
