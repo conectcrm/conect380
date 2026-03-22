@@ -1,4 +1,5 @@
 import { MercadoPagoService } from './mercado-pago.service';
+import { StatusPagamento } from '../faturamento/entities/pagamento.entity';
 
 describe('MercadoPagoService', () => {
   const configService = {
@@ -13,6 +14,17 @@ describe('MercadoPagoService', () => {
     manager: {
       query: jest.fn(),
     },
+  };
+  const faturaRepository = {
+    findOne: jest.fn(),
+  };
+  const pagamentoRepository = {
+    findOne: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn(),
+  };
+  const pagamentoService = {
+    processarPagamento: jest.fn(),
   };
 
   let service: MercadoPagoService;
@@ -29,6 +41,9 @@ describe('MercadoPagoService', () => {
       configService as any,
       assinaturaRepository as any,
       billingEventRepository as any,
+      faturaRepository as any,
+      pagamentoRepository as any,
+      pagamentoService as any,
     );
   });
 
@@ -44,6 +59,7 @@ describe('MercadoPagoService', () => {
     const handleApprovedSpy = jest
       .spyOn(service as any, 'handleApprovedPayment')
       .mockResolvedValue(undefined);
+    pagamentoService.processarPagamento.mockResolvedValue(undefined);
 
     billingEventRepository.insert.mockResolvedValueOnce({});
     await service.processWebhook({
@@ -77,6 +93,7 @@ describe('MercadoPagoService', () => {
     const getPaymentSpy = jest.spyOn(service as any, 'getPayment').mockResolvedValue(payment);
     jest.spyOn(service as any, 'handleApprovedPayment').mockResolvedValue(undefined);
     billingEventRepository.insert.mockResolvedValueOnce({});
+    pagamentoService.processarPagamento.mockResolvedValue(undefined);
 
     await service.processWebhook({
       topic: 'payment',
@@ -214,6 +231,7 @@ describe('MercadoPagoService', () => {
     };
 
     jest.spyOn(service as any, 'getPayment').mockResolvedValue(payment);
+    pagamentoService.processarPagamento.mockResolvedValue(undefined);
     assinaturaRepository.findOne
       .mockResolvedValueOnce(assinaturaTrial)
       .mockResolvedValueOnce({
@@ -261,5 +279,106 @@ describe('MercadoPagoService', () => {
     );
     expect(result.reason).toContain('gateway_unavailable');
     expect(assinaturaRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('processa webhook de fatura e delega atualizacao para PagamentoService', async () => {
+    const payment = {
+      id: 'mp-fatura-001',
+      status: 'approved',
+      external_reference: 'fatura:11111111-1111-1111-1111-111111111111:18',
+      transaction_amount: 350.25,
+    };
+
+    const getPaymentSpy = jest.spyOn(service as any, 'getPayment').mockResolvedValue(payment);
+    const handleApprovedSpy = jest.spyOn(service as any, 'handleApprovedPayment');
+    billingEventRepository.insert.mockResolvedValueOnce({});
+    pagamentoService.processarPagamento.mockResolvedValue(undefined);
+
+    await service.processWebhook({
+      type: 'payment',
+      data: { id: 'mp-fatura-001' },
+      action: 'updated',
+    });
+
+    expect(getPaymentSpy).toHaveBeenCalledWith('mp-fatura-001');
+    expect(pagamentoService.processarPagamento).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gatewayTransacaoId: 'fatura:11111111-1111-1111-1111-111111111111:18',
+        novoStatus: StatusPagamento.APROVADO,
+      }),
+      '11111111-1111-1111-1111-111111111111',
+    );
+    expect(handleApprovedSpy).not.toHaveBeenCalled();
+  });
+
+  it('ignora webhook duplicado de fatura sem reprocessar pagamento', async () => {
+    const payment = {
+      id: 'mp-fatura-duplicado',
+      status: 'approved',
+      external_reference: 'fatura:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:27',
+    };
+
+    jest.spyOn(service as any, 'getPayment').mockResolvedValue(payment);
+    billingEventRepository.insert
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce({ code: '23505' });
+    pagamentoService.processarPagamento.mockResolvedValue(undefined);
+
+    await service.processWebhook({
+      type: 'payment',
+      data: { id: 'mp-fatura-duplicado' },
+      action: 'updated',
+    });
+
+    await service.processWebhook({
+      type: 'payment',
+      data: { id: 'mp-fatura-duplicado' },
+      action: 'updated',
+    });
+
+    expect(pagamentoService.processarPagamento).toHaveBeenCalledTimes(1);
+  });
+
+  it('cria pagamento pendente quando webhook de fatura chega sem registro previo', async () => {
+    const payment = {
+      id: 'mp-fatura-sem-registro',
+      status: 'approved',
+      external_reference: 'fatura:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb:91',
+      transaction_amount: 1200.5,
+    };
+
+    const pagamentoCriado = { id: 99 };
+    jest.spyOn(service as any, 'getPayment').mockResolvedValue(payment);
+    billingEventRepository.insert.mockResolvedValueOnce({});
+    pagamentoService.processarPagamento
+      .mockRejectedValueOnce(new Error('Pagamento no encontrado'))
+      .mockResolvedValueOnce(undefined);
+    pagamentoRepository.findOne.mockResolvedValueOnce(null);
+    faturaRepository.findOne.mockResolvedValueOnce({
+      id: 91,
+      empresaId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      numero: 'FT2026000091',
+      valorTotal: 1200.5,
+      valorPago: 0,
+      formaPagamentoPreferida: 'pix',
+    });
+    pagamentoRepository.create.mockReturnValue(pagamentoCriado);
+    pagamentoRepository.save.mockResolvedValueOnce(pagamentoCriado);
+
+    await service.processWebhook({
+      type: 'payment',
+      data: { id: 'mp-fatura-sem-registro' },
+      action: 'updated',
+    });
+
+    expect(pagamentoRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        empresaId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        faturaId: 91,
+        gatewayTransacaoId: 'fatura:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb:91',
+      }),
+    );
+    expect(pagamentoRepository.save).toHaveBeenCalledWith(pagamentoCriado);
+    expect(pagamentoService.processarPagamento).toHaveBeenCalledTimes(2);
   });
 });

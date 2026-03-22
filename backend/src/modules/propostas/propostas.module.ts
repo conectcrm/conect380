@@ -21,7 +21,7 @@ import { NotificationModule } from '../../notifications/notification.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Proposta, PropostaPortalToken, User, Cliente, Produto, CatalogItem]),
-    EmpresasModule,
+    forwardRef(() => EmpresasModule),
     NotificationModule,
     forwardRef(() => OportunidadesModule),
   ],

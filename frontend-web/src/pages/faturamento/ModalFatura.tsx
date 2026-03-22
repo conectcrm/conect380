@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Calculator, FileText, DollarSign } from 'lucide-react';
 import {
+  faturamentoService,
   NovaFatura,
   ItemFatura,
   TipoFatura,
   FormaPagamento,
   Fatura,
+  TipoDocumentoFinanceiro as TipoDocumentoFinanceiroApi,
 } from '../../services/faturamentoService';
 import ClienteSelect, { ClienteSelectValue } from '../../components/selects/ClienteSelect';
 import ContratoSelect from '../../components/selects/ContratoSelect';
@@ -87,13 +89,7 @@ interface ConfiguracaoFinanceiraAvancada {
   valorImpostos: number;
 }
 
-type TipoDocumentoFinanceiro =
-  | 'fatura'
-  | 'recibo'
-  | 'nfse'
-  | 'nfe'
-  | 'folha_pagamento'
-  | 'outro';
+type TipoDocumentoFinanceiro = TipoDocumentoFinanceiroApi;
 
 type TributoCodigo = 'icms' | 'pis' | 'cofins' | 'iss' | 'ipi' | 'outros';
 
@@ -217,6 +213,20 @@ const normalizarNumero = (valor: unknown, fallback = 0): number => {
 
 const roundMoney = (valor: number): number =>
   Math.round((normalizarNumero(valor, 0) + Number.EPSILON) * 100) / 100;
+
+const extrairMensagemErro = (error: unknown, fallback: string): string => {
+  const responseMessage =
+    typeof (error as { response?: { data?: { message?: unknown } } })?.response?.data?.message ===
+    'string'
+      ? String((error as { response?: { data?: { message?: unknown } } }).response?.data?.message)
+      : '';
+  const errorMessage =
+    typeof (error as { message?: unknown })?.message === 'string'
+      ? String((error as { message?: unknown }).message)
+      : '';
+
+  return responseMessage.trim() || errorMessage.trim() || fallback;
+};
 
 const extrairMetadadosObservacoes = (observacoes?: string): {
   textoLimpo: string;
@@ -445,6 +455,7 @@ export default function ModalFatura({
     DOCUMENTO_FINANCEIRO_PADRAO,
   );
   const [documentoFiscalAuto, setDocumentoFiscalAuto] = useState(true);
+  const [gerandoNumeroDocumento, setGerandoNumeroDocumento] = useState(false);
   const [tributosDetalhados, setTributosDetalhados] = useState<TributosDetalhadosConfig>(
     TRIBUTOS_DETALHADOS_PADRAO,
   );
@@ -694,6 +705,35 @@ export default function ModalFatura({
         chaveAcesso: '',
         motivoEdicaoManual: '',
       }));
+    }
+  };
+
+  const handleGerarNumeroDocumentoFinanceiro = async () => {
+    if (tipoDocumentoFiscalSelecionado || gerandoNumeroDocumento || salvando) {
+      return;
+    }
+
+    setGerandoNumeroDocumento(true);
+    setErros((prev) => ({ ...prev, documentoFinanceiro: undefined }));
+
+    try {
+      const resultado = await faturamentoService.gerarNumeroDocumentoFinanceiro(
+        documentoFinanceiro.tipo,
+      );
+      setDocumentoFinanceiro((prev) => ({
+        ...prev,
+        numero: resultado.numero,
+      }));
+    } catch (error) {
+      setErros((prev) => ({
+        ...prev,
+        documentoFinanceiro: extrairMensagemErro(
+          error,
+          'Nao foi possivel gerar o numero do documento automaticamente.',
+        ),
+      }));
+    } finally {
+      setGerandoNumeroDocumento(false);
     }
   };
 
@@ -1236,9 +1276,21 @@ export default function ModalFatura({
               )}
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Numero do documento
-                </label>
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Numero do documento
+                  </label>
+                  {!tipoDocumentoFiscalSelecionado && (
+                    <button
+                      type="button"
+                      onClick={handleGerarNumeroDocumentoFinanceiro}
+                      disabled={gerandoNumeroDocumento || salvando}
+                      className="inline-flex h-7 items-center rounded-md border border-[#BFD3DB] bg-white px-2.5 text-xs font-medium text-[#173A4D] transition hover:border-[#159A9C] hover:text-[#117C7E] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {gerandoNumeroDocumento ? 'Gerando...' : 'Gerar numero'}
+                    </button>
+                  )}
+                </div>
                 <input
                   type="text"
                   value={documentoFinanceiro.numero}
@@ -1258,6 +1310,11 @@ export default function ModalFatura({
                       : 'Numero da nota/recibo/documento'
                   }
                 />
+                {!tipoDocumentoFiscalSelecionado && (
+                  <p className="mt-1 text-xs text-[#5E7784]">
+                    Gere automaticamente seguindo o padrao por tipo e ano (empresa atual).
+                  </p>
+                )}
               </div>
 
               <div>

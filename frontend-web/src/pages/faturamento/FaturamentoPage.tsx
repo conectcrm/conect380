@@ -35,6 +35,7 @@ import {
   AmbienteDocumentoFiscal,
   DocumentoFiscalCancelamentoPayload,
   DocumentoFiscalPayload,
+  DocumentoFiscalPreflightDiagnostico,
   faturamentoService,
   DocumentoFiscalStatus,
   Fatura,
@@ -47,10 +48,8 @@ import {
 } from '../../services/faturamentoService';
 import ModalFatura from './ModalFatura';
 import ModalDetalhesFatura from './ModalDetalhesFatura';
-import ModalConfigurarCards from './ModalConfigurarCards';
 import ModalPagamentos from './ModalPagamentos';
 import NotificacoesFaturamento from '../../components/notificacoes/NotificacoesFaturamento';
-import SkeletonCard from '../../components/skeleton/SkeletonCard';
 import SkeletonTable from '../../components/skeleton/SkeletonTable';
 import RelatoriosAvancados from '../../components/analytics/RelatoriosAvancados';
 import EmailAutomacao, {
@@ -87,17 +86,6 @@ interface DashboardCards {
   faturasDoMes: number;
 }
 
-interface CardConfig {
-  id: string;
-  title: string;
-  value: string | number;
-  icon: React.ComponentType<{ className?: string }>;
-  color: string;
-  gradient: string;
-  description: string;
-  isActive: boolean;
-}
-
 type WorkflowConfig = Record<string, unknown>;
 
 type PagamentoFormulario = {
@@ -106,6 +94,8 @@ type PagamentoFormulario = {
   metodo: string;
   observacoes?: string;
 };
+
+type StatusProntidao = 'ok' | 'alerta' | 'bloqueio';
 
 export default function FaturamentoPage() {
   const queryClient = useQueryClient();
@@ -117,7 +107,6 @@ export default function FaturamentoPage() {
   const [carregando, setCarregando] = useState(true);
   const [modalAberto, setModalAberto] = useState(false);
   const [modalDetalhesAberto, setModalDetalhesAberto] = useState(false);
-  const [modalConfigurarCardsAberto, setModalConfigurarCardsAberto] = useState(false);
   const [modalPagamentosAberto, setModalPagamentosAberto] = useState(false);
   const [faturaEdicao, setFaturaEdicao] = useState<Fatura | null>(null);
   const [faturaDetalhes, setFaturaDetalhes] = useState<Fatura | null>(null);
@@ -173,14 +162,22 @@ export default function FaturamentoPage() {
   const [mostrarAcoesMassa, setMostrarAcoesMassa] = useState(false);
   const [processandoAcaoMassa, setProcessandoAcaoMassa] = useState(false);
   const [progressoAcaoMassa, setProgressoAcaoMassa] = useState(0);
+  const [mostrarFiltrosAvancados, setMostrarFiltrosAvancados] = useState(false);
 
   // Estado para loading e skeleton
 
   // Estados para funcionalidades avançadas da Semana 2
   const [faturaGateway, setFaturaGateway] = useState<Fatura | null>(null);
   const [visaoAtiva, setVisaoAtiva] = useState<
-    'dashboard' | 'relatorios' | 'email' | 'workflows'
+    'dashboard' | 'prontidao' | 'relatorios' | 'email' | 'workflows'
   >('dashboard');
+  const [preflightFiscalProntidao, setPreflightFiscalProntidao] =
+    useState<DocumentoFiscalPreflightDiagnostico | null>(null);
+  const [carregandoPreflightFiscalProntidao, setCarregandoPreflightFiscalProntidao] =
+    useState(false);
+  const [erroPreflightFiscalProntidao, setErroPreflightFiscalProntidao] = useState<string | null>(
+    null,
+  );
 
   const [dashboardCards, setDashboardCards] = useState<DashboardCards>({
     totalFaturas: 0,
@@ -190,14 +187,6 @@ export default function FaturamentoPage() {
     faturasPagas: 0,
     faturasDoMes: 0,
   });
-
-  // Estado para configuração dos cards
-  const [cardsConfigurados, setCardsConfigurados] = useState<string[]>([
-    'totalFaturas',
-    'valorTotalPendente',
-    'valorTotalPago',
-    'faturasDoMes',
-  ]);
 
   // Hooks para confirmação inteligente
   const confirmacao = useConfirmacaoInteligente();
@@ -217,21 +206,6 @@ export default function FaturamentoPage() {
     sortOrder,
   });
   const { data: respostaPaginada, isLoading, refetch } = faturasQuery;
-
-  useEffect(() => {
-    // Carregar configuração dos cards do localStorage
-    const configSalva = localStorage.getItem('faturamento-cards-config');
-    if (configSalva) {
-      try {
-        const config = JSON.parse(configSalva);
-        if (Array.isArray(config) && config.length >= 1 && config.length <= 4) {
-          setCardsConfigurados(config);
-        }
-      } catch (error) {
-        console.error('Erro ao carregar configuração dos cards:', error);
-      }
-    }
-  }, []);
 
   // Buscar automaticamente ao alterar a busca (debounced) ou filtros/sort/paginação via botão
   useEffect(() => {
@@ -272,126 +246,45 @@ export default function FaturamentoPage() {
     });
   }, [respostaPaginada, isLoading]);
 
-  // Função para obter a classe do grid baseada no número de cards
-  const obterClasseGrid = (numeroCards: number): string => {
-    switch (numeroCards) {
-      case 1:
-        return 'grid-cols-1 max-w-md mx-auto'; // Card único centralizado
-      case 2:
-        return 'grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto'; // 2 cards centralizados
-      case 3:
-        return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3';
-      case 4:
-      default:
-        return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4';
-    }
-  };
-
-  // Função para obter classes adicionais do card baseado na quantidade
-  const obterClassesCard = (numeroCards: number): string => {
-    switch (numeroCards) {
-      case 1:
-        return 'p-8'; // Padding maior para card único
-      case 2:
-        return 'p-7'; // Padding um pouco maior para 2 cards
-      default:
-        return 'p-6'; // Padding padrão para 3+ cards
-    }
-  };
-
-  // Função para salvar configuração dos cards
-  const salvarConfiguracaoCards = (novaConfiguracao: string[]) => {
-    setCardsConfigurados(novaConfiguracao);
-    localStorage.setItem('faturamento-cards-config', JSON.stringify(novaConfiguracao));
-  };
-
-  // Função para obter todas as configurações de cards disponíveis
-  const obterTodasConfiguracoesCards = (): CardConfig[] => {
-    return [
-      {
-        id: 'totalFaturas',
-        title: 'Total de Faturas',
-        value: dashboardCards.totalFaturas,
-        icon: FileText,
-        color: 'text-[#159A9C]',
-        gradient: '',
-        description: 'Visão geral de todas as faturas cadastradas',
-        isActive: cardsConfigurados.includes('totalFaturas'),
-      },
-      {
-        id: 'faturasPagas',
-        title: 'Faturas Pagas',
-        value: dashboardCards.faturasPagas,
-        icon: CheckCircle,
-        color: 'text-green-600',
-        gradient: '',
-        description: 'Faturas finalizadas e quitadas',
-        isActive: cardsConfigurados.includes('faturasPagas'),
-      },
-      {
-        id: 'faturasVencidas',
-        title: 'Faturas Vencidas',
-        value: dashboardCards.faturasVencidas,
-        icon: AlertCircle,
-        color: 'text-red-600',
-        gradient: '',
-        description: 'Faturas atrasadas que requerem atenção',
-        isActive: cardsConfigurados.includes('faturasVencidas'),
-      },
-      {
-        id: 'valorTotalPendente',
-        title: 'Valor Pendente',
-        value: `R$ ${Number(dashboardCards.valorTotalPendente).toLocaleString('pt-BR', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })}`,
-        icon: Clock,
-        color: 'text-yellow-600',
-        gradient: '',
-        description: 'Valor total aguardando recebimento',
-        isActive: cardsConfigurados.includes('valorTotalPendente'),
-      },
-      {
-        id: 'valorTotalPago',
-        title: 'Valor Recebido',
-        value: `R$ ${Number(dashboardCards.valorTotalPago).toLocaleString('pt-BR', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })}`,
-        icon: DollarSign,
-        color: 'text-green-600',
-        gradient: '',
-        description: 'Total de valores já recebidos',
-        isActive: cardsConfigurados.includes('valorTotalPago'),
-      },
-      {
-        id: 'faturasDoMes',
-        title: 'Faturas do mês',
-        value: dashboardCards.faturasDoMes,
-        icon: Calendar,
-        color: 'text-[#159A9C]',
-        gradient: '',
-        description: 'Faturas emitidas no mês atual',
-        isActive: cardsConfigurados.includes('faturasDoMes'),
-      },
-    ];
-  };
 
   const carregarFaturas = async () => {
     try {
-      console.log('Recarregando faturas...');
-
       // Estratégia agressiva de atualização do cache
       await queryClient.removeQueries({ queryKey: ['faturas-paginadas'] }); // Remove completamente do cache
       await queryClient.invalidateQueries({ queryKey: ['faturas-paginadas'] }); // Invalida todas as queries relacionadas
       await queryClient.refetchQueries({ queryKey: ['faturas-paginadas'] }); // Força uma nova busca imediatamente
       await refetch();
-
-      console.log('Faturas recarregadas com sucesso');
     } catch (error) {
       console.error('Erro ao recarregar faturas:', error);
     }
   };
+
+  const carregarPreflightFiscalProntidao = async () => {
+    setErroPreflightFiscalProntidao(null);
+    setCarregandoPreflightFiscalProntidao(true);
+    try {
+      const resultado = await faturamentoService.executarPreflightFiscal();
+      setPreflightFiscalProntidao(resultado);
+    } catch (error) {
+      console.error('Erro ao carregar preflight fiscal:', error);
+      setErroPreflightFiscalProntidao('Nao foi possivel validar a prontidao fiscal oficial.');
+    } finally {
+      setCarregandoPreflightFiscalProntidao(false);
+    }
+  };
+
+  useEffect(() => {
+    if (visaoAtiva !== 'prontidao') {
+      return;
+    }
+
+    if (preflightFiscalProntidao || carregandoPreflightFiscalProntidao) {
+      return;
+    }
+
+    void carregarPreflightFiscalProntidao();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visaoAtiva, preflightFiscalProntidao, carregandoPreflightFiscalProntidao]);
 
   const buscarFaturas = async () => {
     setPage(1);
@@ -443,7 +336,6 @@ export default function FaturamentoPage() {
   };
 
   const marcarNotificacaoComoLida = (notificacaoId: string) => {
-    console.log('Marcar notificação como lida:', notificacaoId);
     // Implementar lógica para marcar notificação como lida
   };
 
@@ -518,17 +410,20 @@ export default function FaturamentoPage() {
 
   const carregarStatusDocumentoFiscal = async (
     faturaId: number,
-    options?: { silencioso?: boolean; usarLoading?: boolean },
+    options?: { silencioso?: boolean; usarLoading?: boolean; sincronizar?: boolean },
   ) => {
     const silencioso = options?.silencioso ?? true;
     const usarLoading = options?.usarLoading ?? false;
+    const sincronizar = options?.sincronizar ?? false;
 
     if (usarLoading) {
       setFiscalActionLoading(true);
     }
 
     try {
-      const status = await faturamentoService.obterStatusDocumentoFiscal(faturaId);
+      const status = await faturamentoService.obterStatusDocumentoFiscal(faturaId, {
+        sincronizar,
+      });
       setDocumentoFiscalStatus(status);
       return status;
     } catch (error) {
@@ -1064,9 +959,7 @@ export default function FaturamentoPage() {
         tipoConfirmacao,
         async () => {
           try {
-            console.log('Excluindo fatura:', id);
             await faturamentoService.excluirFatura(id);
-            console.log('Fatura excluída com sucesso');
 
             // Estratégia agressiva de atualização do cache
             await queryClient.removeQueries({ queryKey: ['faturas-paginadas'] }); // Remove completamente do cache
@@ -1141,6 +1034,8 @@ export default function FaturamentoPage() {
     const ambiente = normalizarAmbienteDocumentoFiscal(
       payload?.ambiente || documentoFiscalStatus?.ambiente,
     );
+    const modoProcessamento = payload?.modoProcessamento || documentoFiscalStatus?.modoProcessamento || 'sincrono';
+    const contingencia = payload?.contingencia ?? documentoFiscalStatus?.contingencia ?? false;
     const forcarReemissao =
       payload?.forcarReemissao === true || documentoFiscalStatus?.status === 'emitida';
     const observacoes =
@@ -1150,6 +1045,8 @@ export default function FaturamentoPage() {
       const status = await faturamentoService.emitirDocumentoFiscal(id, {
         tipo: tipoDocumento,
         ambiente,
+        modoProcessamento,
+        contingencia,
         forcarReemissao,
         observacoes,
       });
@@ -1169,15 +1066,17 @@ export default function FaturamentoPage() {
   };
 
   const atualizarStatusFiscal = async (id: number) => {
-    const status = await carregarStatusDocumentoFiscal(id, { silencioso: false, usarLoading: true });
+    const status = await carregarStatusDocumentoFiscal(id, {
+      silencioso: false,
+      usarLoading: true,
+      sincronizar: true,
+    });
     if (!status) {
       return;
     }
     try {
       await sincronizarFaturaAtualizada(id);
-    } catch (error) {
-      console.warn('Nao foi possivel sincronizar detalhes da fatura apos consulta fiscal:', error);
-    }
+    } catch {}
     notificacao.mostrarSucesso('Status fiscal atualizado', 'Dados fiscais sincronizados.');
   };
 
@@ -1305,15 +1204,11 @@ export default function FaturamentoPage() {
         gatewayTransacaoId: `PAG_${Date.now()}_${faturaPagamentos.id}`, // Para processar depois
       };
 
-      console.log('Registrando pagamento:', dadosPagamento);
-
       // Chamar o serviço real para criar o pagamento
       const pagamentoCreated = await faturamentoService.criarPagamento(dadosPagamento);
-      console.log('Pagamento criado:', pagamentoCreated);
 
       // Processar o pagamento como aprovado automaticamente (para pagamentos manuais)
       if (pagamentoCreated.id) {
-        console.log('Processando pagamento como aprovado...');
         const processarData = {
           gatewayTransacaoId: dadosPagamento.gatewayTransacaoId,
           novoStatus: 'aprovado',
@@ -1325,7 +1220,6 @@ export default function FaturamentoPage() {
         };
 
         await faturamentoService.processarPagamento(pagamentoCreated.id, processarData);
-        console.log('Pagamento processado como aprovado');
       }
 
       notificacao.sucesso.pagamentoRegistrado(pagamento.valor);
@@ -1370,9 +1264,7 @@ export default function FaturamentoPage() {
           setFaturaPagamentos((atual) =>
             atual && atual.id === faturaIdAtualizada ? faturaAtualizada : atual,
           );
-        } catch (errorDetalhes) {
-          console.warn('Nao foi possivel atualizar os detalhes da fatura apos estorno:', errorDetalhes);
-        }
+        } catch {}
       }
     } catch (error) {
       console.error('Erro ao estornar pagamento:', error);
@@ -1406,7 +1298,6 @@ export default function FaturamentoPage() {
 
             for (let i = 0; i < faturasSelecionadas.length; i++) {
               const faturaId = faturasSelecionadas[i];
-              console.log(`Excluindo fatura ${faturaId}...`);
               await faturamentoService.excluirFatura(faturaId);
               setProgressoAcaoMassa(((i + 1) / faturasSelecionadas.length) * 100);
             }
@@ -1439,7 +1330,6 @@ export default function FaturamentoPage() {
         case 'enviar-email':
           for (let i = 0; i < faturasSelecionadasData.length; i++) {
             const fatura = faturasSelecionadasData[i];
-            console.log(`Enviando email da fatura ${fatura.numero}...`);
             await enviarPorEmail(fatura.id);
             setProgressoAcaoMassa(((i + 1) / faturasSelecionadasData.length) * 100);
           }
@@ -1534,7 +1424,6 @@ export default function FaturamentoPage() {
         }
 
         default:
-          console.log('Ação não implementada:', acao);
           notificacao.mostrarAviso(
             'Ação indisponível',
             `A ação "${acao}" ainda não está disponível nesta versão.`,
@@ -1644,8 +1533,6 @@ export default function FaturamentoPage() {
 
   const btnPrimary =
     'inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition hover:bg-[#117C7E] disabled:cursor-not-allowed disabled:opacity-60';
-  const btnSecondary =
-    'inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-60';
 
   const statsResumo = [
     { label: 'Faturas', value: String(dashboardCards.totalFaturas) },
@@ -1703,12 +1590,114 @@ export default function FaturamentoPage() {
     };
   }, [faturas]);
 
+  const painelProntidao = useMemo(() => {
+    const itens: Array<{
+      id: string;
+      titulo: string;
+      detalhe: string;
+      status: StatusProntidao;
+    }> = [
+      {
+        id: 'fiscal-preflight',
+        titulo: 'Preflight fiscal oficial',
+        detalhe: preflightFiscalProntidao
+          ? `Provider ${preflightFiscalProntidao.providerEfetivo}: ${preflightFiscalProntidao.readyForOfficialEmission ? 'pronto para emissao oficial' : preflightFiscalProntidao.conectividade.message}`
+          : carregandoPreflightFiscalProntidao
+            ? 'Validando conectividade e configuracao fiscal oficial...'
+            : erroPreflightFiscalProntidao || 'Preflight fiscal ainda nao executado nesta sessao.',
+        status: preflightFiscalProntidao
+          ? preflightFiscalProntidao.status
+          : erroPreflightFiscalProntidao
+            ? 'alerta'
+            : 'alerta',
+      },
+      {
+        id: 'gateway-online',
+        titulo: 'Gateway online habilitado',
+        detalhe: gatewayUiHabilitada
+          ? 'Pagamento online disponivel para cobranca direta.'
+          : gatewayUiConfig.motivoBloqueio || 'Gateway indisponivel no ambiente atual.',
+        status: gatewayUiHabilitada ? 'ok' : 'alerta',
+      },
+      {
+        id: 'link-pagamento',
+        titulo: 'Geracao de link de pagamento',
+        detalhe: linkPagamentoHabilitado
+          ? 'Link de pagamento liberado para envio ao cliente.'
+          : gatewayUiConfig.motivoBloqueio || 'Link de pagamento desabilitado.',
+        status: linkPagamentoHabilitado ? 'ok' : 'alerta',
+      },
+      {
+        id: 'itens-vs-total',
+        titulo: 'Consistencia dos totais',
+        detalhe:
+          painelDivergencias.itensVsTotal > 0
+            ? `${painelDivergencias.itensVsTotal} fatura(s) com diferenca entre itens e valor total.`
+            : 'Sem divergencias entre itens, descontos, impostos e total final.',
+        status: painelDivergencias.itensVsTotal > 0 ? 'bloqueio' : 'ok',
+      },
+      {
+        id: 'estornos',
+        titulo: 'Estornos pendentes de conciliacao',
+        detalhe:
+          painelDivergencias.estornosPendentesConciliacao > 0
+            ? `${painelDivergencias.estornosPendentesConciliacao} estorno(s) aguardando revisao bancaria.`
+            : 'Nenhum estorno pendente de conciliacao.',
+        status: painelDivergencias.estornosPendentesConciliacao > 0 ? 'alerta' : 'ok',
+      },
+      {
+        id: 'parciais',
+        titulo: 'Pagamentos parciais sem baixa final',
+        detalhe:
+          painelDivergencias.parciaisSemBaixaFinal > 0
+            ? `${painelDivergencias.parciaisSemBaixaFinal} fatura(s) parcialmente paga(s) sem baixa final.`
+            : 'Nao ha pendencia de baixa final em pagamentos parciais.',
+        status: painelDivergencias.parciaisSemBaixaFinal > 0 ? 'alerta' : 'ok',
+      },
+    ];
+
+    const bloqueios = itens.filter((item) => item.status === 'bloqueio').length;
+    const alertas = itens.filter((item) => item.status === 'alerta').length;
+    const statusGeral: StatusProntidao = bloqueios > 0 ? 'bloqueio' : alertas > 0 ? 'alerta' : 'ok';
+
+    return {
+      itens,
+      bloqueios,
+      alertas,
+      statusGeral,
+      prontoParaFechamento: bloqueios === 0 && alertas === 0,
+    };
+  }, [
+    carregandoPreflightFiscalProntidao,
+    erroPreflightFiscalProntidao,
+    gatewayUiConfig.motivoBloqueio,
+    gatewayUiHabilitada,
+    linkPagamentoHabilitado,
+    painelDivergencias.estornosPendentesConciliacao,
+    painelDivergencias.itensVsTotal,
+    painelDivergencias.parciaisSemBaixaFinal,
+    preflightFiscalProntidao,
+  ]);
+
+  const estilosStatusProntidao: Record<StatusProntidao, string> = {
+    ok: 'border-[#CFEADB] bg-[#F2FBF6] text-[#1A7A4B]',
+    alerta: 'border-[#F6D7B2] bg-[#FFF8EE] text-[#9B5A00]',
+    bloqueio: 'border-[#F2CACA] bg-[#FFF5F5] text-[#A12D2D]',
+  };
+
+  const rotulosStatusProntidao: Record<StatusProntidao, string> = {
+    ok: 'OK',
+    alerta: 'Atencao',
+    bloqueio: 'Bloqueio',
+  };
+
   const visoes: Array<{
-    id: 'dashboard' | 'relatorios' | 'email' | 'workflows';
+    id: 'dashboard' | 'prontidao' | 'relatorios' | 'email' | 'workflows';
     label: string;
     icon: React.ComponentType<{ className?: string }>;
   }> = [
-    { id: 'dashboard', label: 'Dashboard e Faturas', icon: FileText },
+    { id: 'dashboard', label: 'Faturas', icon: FileText },
+    { id: 'prontidao', label: 'Prontidão', icon: Activity },
     { id: 'relatorios', label: 'Relatórios', icon: BarChart3 },
     { id: 'email', label: 'Automação de E-mails', icon: Mail },
     { id: 'workflows', label: 'Workflows', icon: Settings },
@@ -1767,6 +1756,15 @@ export default function FaturamentoPage() {
     sortBy !== 'dataVencimento' ||
     sortOrder !== 'DESC';
 
+  const filtrosAvancadosAtivosCount = [
+    Boolean(filtros.tipo),
+    Boolean(filtros.dataInicial),
+    Boolean(filtros.dataFinal),
+    periodoCampoAtual !== 'vencimento',
+    sortBy !== 'dataVencimento',
+    sortOrder !== 'DESC',
+  ].filter(Boolean).length;
+
   const limparFiltros = () => {
     setBusca('');
     setFiltros({ periodoCampo: 'vencimento' });
@@ -1798,14 +1796,6 @@ export default function FaturamentoPage() {
                 onMarcarComoLida={marcarNotificacaoComoLida}
                 onAbrirFatura={abrirFaturaNotificacao}
               />
-              <button
-                onClick={() => setModalConfigurarCardsAberto(true)}
-                className={btnSecondary}
-                title="Configurar cards"
-              >
-                <Settings className="h-4 w-4" />
-                Configurar cards
-              </button>
               <button onClick={abrirModalCriacao} className={btnPrimary}>
                 <Plus className="h-4 w-4" />
                 Nova fatura
@@ -1837,487 +1827,551 @@ export default function FaturamentoPage() {
         })}
       </FiltersBar>
 
-        {/* Conteúdo baseado na visão ativa */}
-        {visaoAtiva === 'dashboard' && (
+        {/* Conteudo baseado na visao ativa */}
+        {(visaoAtiva === 'dashboard' || visaoAtiva === 'prontidao') && (
           <div className="space-y-4">
-            {/* Cards do Dashboard (KPI Cards - Padrão Crevasse) */}
-            <SectionCard className="p-4 sm:p-5">
-              <div className={`grid gap-6 ${obterClasseGrid(cardsConfigurados.length)}`}>
-                {carregando
-                  ? Array.from({ length: 6 }).map((_, index) => <SkeletonCard key={index} />)
-                  : obterTodasConfiguracoesCards()
-                      .filter((card) => card.isActive)
-                      .map((card) => {
-                        const IconComponent = card.icon;
-                        const numeroCards = cardsConfigurados.length;
-                        return (
-                          <div
-                            key={card.id}
-                            className={`rounded-2xl border border-[#DEEFE7] bg-[#FFFFFF] p-5 text-[#002333] shadow-sm ${obterClassesCard(numeroCards)}`}
-                          >
-                            <div className="flex items-start justify-between">
-                              <div>
-                                <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                                  {card.title}
-                                </p>
-                                <p
-                                  className={`${numeroCards <= 2 ? 'text-4xl' : 'text-3xl'} mt-2 font-bold text-[#002333]`}
-                                >
-                                  {card.value}
-                                </p>
-                                <p className="mt-3 text-sm text-[#002333]/70">{card.description}</p>
-                              </div>
-                              <div
-                                className={`${numeroCards <= 2 ? 'h-14 w-14' : 'h-12 w-12'} flex-shrink-0 rounded-2xl bg-[#159A9C]/10 shadow-sm flex items-center justify-center`}
-                              >
-                                <IconComponent
-                                  className={`${numeroCards <= 2 ? 'h-7 w-7' : 'h-6 w-6'} text-[#159A9C]`}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-              </div>
-            </SectionCard>
-
-            <SectionCard className="p-4 sm:p-5">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#476776]">
-                    Painel de divergencias
-                  </p>
-                  <h3 className="mt-1 text-lg font-semibold text-[#173A4D]">
-                    Validacao operacional de fechamento
-                  </h3>
-                </div>
-                <span
-                  className={`inline-flex w-fit items-center rounded-full border px-3 py-1 text-xs font-semibold ${
-                    painelDivergencias.total > 0
-                      ? 'border-[#F6D7B2] bg-[#FFF8EE] text-[#9B5A00]'
-                      : 'border-[#CFEADB] bg-[#F2FBF6] text-[#1A7A4B]'
-                  }`}
-                >
-                  {painelDivergencias.total > 0
-                    ? `${painelDivergencias.total} divergencia(s) identificada(s)`
-                    : 'Nenhuma divergencia detectada'}
-                </span>
-              </div>
-
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
-                  <p className="text-xs font-medium uppercase tracking-wide text-[#5D7A88]">
-                    Itens x total da fatura
-                  </p>
-                  <p className="mt-2 text-2xl font-bold text-[#173A4D]">{painelDivergencias.itensVsTotal}</p>
-                  <p className="mt-1 text-xs text-[#5D7A88]">Validacao de subtotal + desconto + impostos.</p>
-                </div>
-
-                <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
-                  <p className="text-xs font-medium uppercase tracking-wide text-[#5D7A88]">
-                    Estorno pendente de conciliacao
-                  </p>
-                  <p className="mt-2 text-2xl font-bold text-[#173A4D]">
-                    {painelDivergencias.estornosPendentesConciliacao}
-                  </p>
-                  <p className="mt-1 text-xs text-[#5D7A88]">
-                    Pagamentos de estorno para revisao no fluxo bancario.
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
-                  <p className="text-xs font-medium uppercase tracking-wide text-[#5D7A88]">
-                    Parcial sem baixa final
-                  </p>
-                  <p className="mt-2 text-2xl font-bold text-[#173A4D]">
-                    {painelDivergencias.parciaisSemBaixaFinal}
-                  </p>
-                  <p className="mt-1 text-xs text-[#5D7A88]">
-                    Faturas com recebimento parcial ainda abertas.
-                  </p>
-                </div>
-              </div>
-
-              {painelDivergencias.primeiraDivergenciaItens && (
-                <p className="mt-3 text-xs text-[#8A3C00]">
-                  Exemplo: fatura {painelDivergencias.primeiraDivergenciaItens.numero} com diferenca de{' '}
-                  {formatCurrency(painelDivergencias.primeiraDivergenciaItens.diferenca)} no fechamento.
-                </p>
-              )}
-
-              <p className="mt-2 text-xs text-[#5D7A88]">
-                Analise baseada nas faturas carregadas na tela atual.
-              </p>
-            </SectionCard>
-
-            {/* Filtros e Busca */}
-            <FiltersBar className="mb-3 p-4">
-              <div className="flex w-full flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
-                <div className="w-full sm:min-w-[280px] sm:flex-1">
-                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Buscar faturas</label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
-                    <input
-                      type="text"
-                      placeholder="Buscar por numero, cliente ou observacoes..."
-                      value={busca}
-                      onChange={(e) => setBusca(e.target.value)}
-                      onKeyDown={handleSearch}
-                      className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
-                    />
+            {visaoAtiva === 'prontidao' && (
+              <SectionCard className="p-4 sm:p-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#476776]">Prontidao do fluxo</p>
+                    <h3 className="mt-1 text-lg font-semibold text-[#173A4D]">Checklist operacional de faturamento</h3>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void carregarPreflightFiscalProntidao()}
+                      disabled={carregandoPreflightFiscalProntidao}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#159A9C] bg-[#E8F6F6] px-3 text-xs font-semibold text-[#0F7B7D] transition hover:bg-[#DCF1F1] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {carregandoPreflightFiscalProntidao ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Activity className="h-3.5 w-3.5" />
+                      )}
+                      Executar preflight fiscal
+                    </button>
+                    {painelProntidao.bloqueios > 0 && (
+                      <span className="inline-flex w-fit items-center rounded-full border border-[#F2CACA] bg-[#FFF5F5] px-3 py-1 text-xs font-semibold text-[#A12D2D]">
+                        {painelProntidao.bloqueios} bloqueio(s)
+                      </span>
+                    )}
+                    {painelProntidao.alertas > 0 && (
+                      <span className="inline-flex w-fit items-center rounded-full border border-[#F6D7B2] bg-[#FFF8EE] px-3 py-1 text-xs font-semibold text-[#9B5A00]">
+                        {painelProntidao.alertas} alerta(s)
+                      </span>
+                    )}
+                    <span
+                      className={`inline-flex w-fit items-center rounded-full border px-3 py-1 text-xs font-semibold ${
+                        estilosStatusProntidao[painelProntidao.statusGeral]
+                      }`}
+                    >
+                      {painelProntidao.prontoParaFechamento ? 'Pronto para fechamento' : 'Requer ajustes'}
+                    </span>
                   </div>
                 </div>
 
-                <div className="w-full sm:w-auto">
-                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Status</label>
-                  <select
-                    value={filtros.status || ''}
-                    onChange={(e) =>
-                      setFiltros((prev) => ({
-                        ...prev,
-                        status: (e.target.value as StatusFatura) || undefined,
-                      }))
-                    }
-                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[170px]"
-                  >
-                    <option value="">Todos os status</option>
-                    <option value={StatusFatura.PENDENTE}>Pendente</option>
-                    <option value={StatusFatura.ENVIADA}>Enviada</option>
-                    <option value={StatusFatura.PAGA}>Paga</option>
-                    <option value={StatusFatura.VENCIDA}>Vencida</option>
-                    <option value={StatusFatura.CANCELADA}>Cancelada</option>
-                  </select>
-                </div>
+                {erroPreflightFiscalProntidao && (
+                  <p className="mt-3 rounded-lg border border-[#F4D8D8] bg-[#FFF5F5] px-3 py-2 text-xs text-[#A12D2D]">
+                    {erroPreflightFiscalProntidao}
+                  </p>
+                )}
 
-                <div className="w-full sm:w-auto">
-                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Tipo</label>
-                  <select
-                    value={filtros.tipo || ''}
-                    onChange={(e) =>
-                      setFiltros((prev) => ({
-                        ...prev,
-                        tipo: (e.target.value as TipoFatura) || undefined,
-                      }))
-                    }
-                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[170px]"
-                  >
-                    <option value="">Todos os tipos</option>
-                    <option value={TipoFatura.UNICA}>Unica</option>
-                    <option value={TipoFatura.RECORRENTE}>Recorrente</option>
-                    <option value={TipoFatura.PARCELA}>Parcela</option>
-                    <option value={TipoFatura.ADICIONAL}>Adicional</option>
-                  </select>
-                </div>
+                {preflightFiscalProntidao && (
+                  <div className="mt-3 rounded-lg border border-[#DDEAF0] bg-[#F6FBFD] px-3 py-2 text-xs text-[#365567]">
+                    <p>
+                      Ultimo preflight: <strong>{new Date(preflightFiscalProntidao.timestamp).toLocaleString('pt-BR')}</strong>
+                    </p>
+                    <p>
+                      Conectividade: <strong>{preflightFiscalProntidao.conectividade.success ? 'OK' : 'Com alerta'}</strong>
+                      {' '}| Provider: <strong>{preflightFiscalProntidao.providerEfetivo}</strong>
+                    </p>
+                  </div>
+                )}
 
-                <div className="w-full sm:w-auto">
-                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Base periodo</label>
-                  <select
-                    value={periodoCampoAtual}
-                    onChange={(e) =>
-                      setFiltros((prev) => ({
-                        ...prev,
-                        periodoCampo: e.target.value === 'emissao' ? 'emissao' : 'vencimento',
-                      }))
-                    }
-                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[150px]"
-                  >
-                    <option value="vencimento">Vencimento</option>
-                    <option value="emissao">Emissao</option>
-                  </select>
-                </div>
-
-                <div className="w-full sm:w-auto">
-                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Data inicial</label>
-                  <input
-                    type="date"
-                    value={filtros.dataInicial || ''}
-                    onChange={(e) =>
-                      setFiltros((prev) => ({
-                        ...prev,
-                        dataInicial: e.target.value || undefined,
-                      }))
-                    }
-                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[165px]"
-                  />
-                </div>
-
-                <div className="w-full sm:w-auto">
-                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Data final</label>
-                  <input
-                    type="date"
-                    value={filtros.dataFinal || ''}
-                    onChange={(e) =>
-                      setFiltros((prev) => ({
-                        ...prev,
-                        dataFinal: e.target.value || undefined,
-                      }))
-                    }
-                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[165px]"
-                  />
-                </div>
-
-                <div className="w-full sm:w-auto">
-                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Ordenar por</label>
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[170px]"
-                  >
-                    <option value="dataVencimento">Vencimento</option>
-                    <option value="dataEmissao">Emissao</option>
-                    <option value="valorTotal">Valor</option>
-                    <option value="status">Status</option>
-                  </select>
-                </div>
-
-                <div className="w-full sm:w-auto">
-                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Ordem</label>
-                  <select
-                    value={sortOrder}
-                    onChange={(e) => setSortOrder(e.target.value as 'ASC' | 'DESC')}
-                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 sm:w-[110px]"
-                  >
-                    <option value="DESC">Desc</option>
-                    <option value="ASC">Asc</option>
-                  </select>
-                </div>
-
-                <div className="w-full sm:w-auto">
-                  <label className="mb-2 block text-sm font-medium text-[#385A6A]">Acoes</label>
-                  <button
-                    onClick={buscarFaturas}
-                    className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#159A9C] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#0F7B7D] sm:w-auto"
-                    aria-label="Buscar"
-                  >
-                    <Search className="h-4 w-4" />
-                    Buscar
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className="text-xs font-medium text-[#607B89]">Atalhos de periodo:</span>
-                <button
-                  type="button"
-                  onClick={() => aplicarPeriodoRapido('hoje')}
-                  className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
-                >
-                  Hoje
-                </button>
-                <button
-                  type="button"
-                  onClick={() => aplicarPeriodoRapido('7d')}
-                  className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
-                >
-                  Ultimos 7 dias
-                </button>
-                <button
-                  type="button"
-                  onClick={() => aplicarPeriodoRapido('30d')}
-                  className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
-                >
-                  Ultimos 30 dias
-                </button>
-                <button
-                  type="button"
-                  onClick={() => aplicarPeriodoRapido('mesAtual')}
-                  className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
-                >
-                  Este mes
-                </button>
-                <button
-                  type="button"
-                  onClick={() => aplicarPeriodoRapido('mesAnterior')}
-                  className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
-                >
-                  Mes anterior
-                </button>
-              </div>
-
-              {/* Chips de filtros aplicados */}
-              {filtrosAtivos && (
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  {busca && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
-                      Busca: "{busca}"
-                      <button
-                        className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
-                        onClick={() => setBusca('')}
-                        aria-label="Limpar busca"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  )}
-                  {filtros.status && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
-                      Status: {faturamentoService.formatarStatusFatura(filtros.status)}
-                      <button
-                        className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
-                        onClick={() => setFiltros((prev) => ({ ...prev, status: undefined }))}
-                        aria-label="Limpar filtro de status"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  )}
-                  {filtros.tipo && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
-                      Tipo: {faturamentoService.formatarTipoFatura(filtros.tipo)}
-                      <button
-                        className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
-                        onClick={() => setFiltros((prev) => ({ ...prev, tipo: undefined }))}
-                        aria-label="Limpar filtro de tipo"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  )}
-                  {(filtros.dataInicial || filtros.dataFinal) && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
-                      {periodoCampoAtual === 'vencimento' ? 'Vencimento' : 'Emissao'}:{' '}
-                      {filtros.dataInicial
-                        ? new Date(`${filtros.dataInicial}T00:00:00`).toLocaleDateString('pt-BR')
-                        : '...'}{' '}
-                      a{' '}
-                      {filtros.dataFinal
-                        ? new Date(`${filtros.dataFinal}T00:00:00`).toLocaleDateString('pt-BR')
-                        : '...'}
-                      <button
-                        className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
-                        onClick={() =>
-                          setFiltros((prev) => ({
-                            ...prev,
-                            dataInicial: undefined,
-                            dataFinal: undefined,
-                          }))
-                        }
-                        aria-label="Limpar filtro de periodo"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  )}
-                  {!filtros.dataInicial && !filtros.dataFinal && periodoCampoAtual === 'emissao' && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
-                      Base periodo: Emissao
-                      <button
-                        className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
-                        onClick={() =>
-                          setFiltros((prev) => ({
-                            ...prev,
-                            periodoCampo: 'vencimento',
-                          }))
-                        }
-                        aria-label="Voltar base para vencimento"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  )}
-                  {(sortBy !== 'dataVencimento' || sortOrder !== 'DESC') && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
-                      Ordenacao: {sortBy} ({sortOrder})
-                      <button
-                        className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
-                        onClick={() => {
-                          setSortBy('dataVencimento');
-                          setSortOrder('DESC');
-                        }}
-                        aria-label="Resetar ordenacao"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  )}
-                  <button
-                    className="sm:ml-auto inline-flex items-center gap-1.5 rounded-lg border border-[#B4BEC9] bg-white px-3 py-1.5 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
-                    onClick={limparFiltros}
-                  >
-                    Limpar tudo
-                  </button>
-                </div>
-              )}
-            </FiltersBar>
-
-            {/* Barra de Ações em Massa */}
-            {mostrarAcoesMassa && (
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-3 mb-4">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                        <CheckCircle className="w-4 h-4 text-white" />
+                <div className="mt-4 space-y-2 rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
+                  {painelProntidao.itens.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex flex-col gap-2 rounded-lg border border-[#E6EEF2] bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-[#173A4D]">{item.titulo}</p>
+                        <p className="text-xs text-[#5D7A88]">{item.detalhe}</p>
                       </div>
-                      <span className="text-sm font-medium text-blue-900">
-                        {faturasSelecionadas.length} fatura(s) selecionada(s)
+                      <span
+                        className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                          estilosStatusProntidao[item.status]
+                        }`}
+                      >
+                        {rotulosStatusProntidao[item.status]}
                       </span>
                     </div>
-                    <button
-                      onClick={() => setFaturasSelecionadas([])}
-                      className="text-sm text-blue-600 hover:text-blue-800 underline transition-colors"
-                    >
-                      Desmarcar todas
-                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-[#5D7A88]">
+                      Itens x total da fatura
+                    </p>
+                    <p className="mt-2 text-2xl font-bold text-[#173A4D]">{painelDivergencias.itensVsTotal}</p>
+                    <p className="mt-1 text-xs text-[#5D7A88]">Validacao de subtotal + desconto + impostos.</p>
+                  </div>
+
+                  <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-[#5D7A88]">
+                      Estorno pendente de conciliacao
+                    </p>
+                    <p className="mt-2 text-2xl font-bold text-[#173A4D]">
+                      {painelDivergencias.estornosPendentesConciliacao}
+                    </p>
+                    <p className="mt-1 text-xs text-[#5D7A88]">
+                      Pagamentos de estorno para revisao no fluxo bancario.
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-[#E3EDF1] bg-[#FAFCFD] p-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-[#5D7A88]">
+                      Parcial sem baixa final
+                    </p>
+                    <p className="mt-2 text-2xl font-bold text-[#173A4D]">
+                      {painelDivergencias.parciaisSemBaixaFinal}
+                    </p>
+                    <p className="mt-1 text-xs text-[#5D7A88]">
+                      Faturas com recebimento parcial ainda abertas.
+                    </p>
+                  </div>
+                </div>
+
+                {painelDivergencias.primeiraDivergenciaItens && (
+                  <p className="mt-3 text-xs text-[#8A3C00]">
+                    Exemplo: fatura {painelDivergencias.primeiraDivergenciaItens.numero} com diferenca de{' '}
+                    {formatCurrency(painelDivergencias.primeiraDivergenciaItens.diferenca)} no fechamento.
+                  </p>
+                )}
+
+                <p className="mt-2 text-xs text-[#5D7A88]">
+                  Analise baseada nas faturas carregadas na tela atual.
+                </p>
+              </SectionCard>
+            )}
+
+            {visaoAtiva === 'dashboard' && (
+              <>
+                {/* Filtros e Busca */}
+                <FiltersBar className="mb-3 p-4">
+                  <div className="flex w-full flex-col gap-4">
+                    <div className="flex w-full flex-col gap-3 xl:flex-row xl:items-end">
+                      <div className="w-full xl:flex-1">
+                        <label className="mb-2 block text-sm font-medium text-[#385A6A]">Buscar faturas</label>
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
+                          <input
+                            type="text"
+                            placeholder="Buscar por numero, cliente ou observacoes..."
+                            value={busca}
+                            onChange={(e) => setBusca(e.target.value)}
+                            onKeyDown={handleSearch}
+                            className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="w-full xl:w-[220px]">
+                        <label className="mb-2 block text-sm font-medium text-[#385A6A]">Status</label>
+                        <select
+                          value={filtros.status || ''}
+                          onChange={(e) =>
+                            setFiltros((prev) => ({
+                              ...prev,
+                              status: (e.target.value as StatusFatura) || undefined,
+                            }))
+                          }
+                          className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                        >
+                          <option value="">Todos os status</option>
+                          <option value={StatusFatura.PENDENTE}>Pendente</option>
+                          <option value={StatusFatura.ENVIADA}>Enviada</option>
+                          <option value={StatusFatura.PAGA}>Paga</option>
+                          <option value={StatusFatura.VENCIDA}>Vencida</option>
+                          <option value={StatusFatura.CANCELADA}>Cancelada</option>
+                        </select>
+                      </div>
+
+                      <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setMostrarFiltrosAvancados((atual) => !atual)}
+                          className={`inline-flex h-10 items-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors ${
+                            mostrarFiltrosAvancados || filtrosAvancadosAtivosCount > 0
+                              ? 'border-[#159A9C] bg-[#E8F6F6] text-[#0F7B7D]'
+                              : 'border-[#B4BEC9] bg-white text-[#19384C] hover:bg-[#F6FAF9]'
+                          }`}
+                        >
+                          <Settings className="h-4 w-4" />
+                          Filtros avancados
+                          {filtrosAvancadosAtivosCount > 0 && (
+                            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#0F7B7D] px-1.5 text-xs font-semibold text-white">
+                              {filtrosAvancadosAtivosCount}
+                            </span>
+                          )}
+                          <ChevronDown
+                            className={`h-4 w-4 transition-transform ${mostrarFiltrosAvancados ? 'rotate-180' : ''}`}
+                          />
+                        </button>
+
+                        <button
+                          onClick={buscarFaturas}
+                          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#159A9C] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#0F7B7D]"
+                          aria-label="Buscar"
+                        >
+                          <Search className="h-4 w-4" />
+                          Buscar
+                        </button>
+
+                        {filtrosAtivos && (
+                          <button
+                            className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-[#B4BEC9] bg-white px-3 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9]"
+                            onClick={limparFiltros}
+                          >
+                            <X className="h-4 w-4" />
+                            Limpar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {mostrarFiltrosAvancados && (
+                      <div className="rounded-xl border border-[#DCE8EC] bg-[#F8FBFC] p-3 sm:p-4">
+                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                          <div className="w-full">
+                            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                              Tipo
+                            </label>
+                            <select
+                              value={filtros.tipo || ''}
+                              onChange={(e) =>
+                                setFiltros((prev) => ({
+                                  ...prev,
+                                  tipo: (e.target.value as TipoFatura) || undefined,
+                                }))
+                              }
+                              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                            >
+                              <option value="">Todos os tipos</option>
+                              <option value={TipoFatura.UNICA}>Unica</option>
+                              <option value={TipoFatura.RECORRENTE}>Recorrente</option>
+                              <option value={TipoFatura.PARCELA}>Parcela</option>
+                              <option value={TipoFatura.ADICIONAL}>Adicional</option>
+                            </select>
+                          </div>
+
+                          <div className="w-full">
+                            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                              Base periodo
+                            </label>
+                            <select
+                              value={periodoCampoAtual}
+                              onChange={(e) =>
+                                setFiltros((prev) => ({
+                                  ...prev,
+                                  periodoCampo: e.target.value === 'emissao' ? 'emissao' : 'vencimento',
+                                }))
+                              }
+                              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                            >
+                              <option value="vencimento">Vencimento</option>
+                              <option value="emissao">Emissao</option>
+                            </select>
+                          </div>
+
+                          <div className="w-full">
+                            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                              Data inicial
+                            </label>
+                            <input
+                              type="date"
+                              value={filtros.dataInicial || ''}
+                              onChange={(e) =>
+                                setFiltros((prev) => ({
+                                  ...prev,
+                                  dataInicial: e.target.value || undefined,
+                                }))
+                              }
+                              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                            />
+                          </div>
+
+                          <div className="w-full">
+                            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                              Data final
+                            </label>
+                            <input
+                              type="date"
+                              value={filtros.dataFinal || ''}
+                              onChange={(e) =>
+                                setFiltros((prev) => ({
+                                  ...prev,
+                                  dataFinal: e.target.value || undefined,
+                                }))
+                              }
+                              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                            />
+                          </div>
+
+                          <div className="w-full">
+                            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                              Ordenar por
+                            </label>
+                            <select
+                              value={sortBy}
+                              onChange={(e) => setSortBy(e.target.value)}
+                              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                            >
+                              <option value="dataVencimento">Vencimento</option>
+                              <option value="dataEmissao">Emissao</option>
+                              <option value="valorTotal">Valor</option>
+                              <option value="status">Status</option>
+                            </select>
+                          </div>
+
+                          <div className="w-full">
+                            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-[#5E7987]">
+                              Ordem
+                            </label>
+                            <select
+                              value={sortOrder}
+                              onChange={(e) => setSortOrder(e.target.value as 'ASC' | 'DESC')}
+                              className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                            >
+                              <option value="DESC">Desc</option>
+                              <option value="ASC">Asc</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[#DFEAEE] pt-3">
+                          <span className="text-xs font-medium text-[#607B89]">Atalhos de periodo:</span>
+                          <button
+                            type="button"
+                            onClick={() => aplicarPeriodoRapido('hoje')}
+                            className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+                          >
+                            Hoje
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => aplicarPeriodoRapido('7d')}
+                            className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+                          >
+                            Ultimos 7 dias
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => aplicarPeriodoRapido('30d')}
+                            className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+                          >
+                            Ultimos 30 dias
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => aplicarPeriodoRapido('mesAtual')}
+                            className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+                          >
+                            Este mes
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => aplicarPeriodoRapido('mesAnterior')}
+                            className="inline-flex items-center rounded-full border border-[#D4E2E7] bg-white px-2.5 py-1 text-xs font-medium text-[#244455] transition hover:bg-[#F6FAFB]"
+                          >
+                            Mes anterior
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Chips de filtros aplicados */}
+                    {filtrosAtivos && (
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        {busca && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+                            Busca: "{busca}"
+                            <button
+                              className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                              onClick={() => setBusca('')}
+                              aria-label="Limpar busca"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        )}
+                        {filtros.status && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+                            Status: {faturamentoService.formatarStatusFatura(filtros.status)}
+                            <button
+                              className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                              onClick={() => setFiltros((prev) => ({ ...prev, status: undefined }))}
+                              aria-label="Limpar filtro de status"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        )}
+                        {filtros.tipo && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+                            Tipo: {faturamentoService.formatarTipoFatura(filtros.tipo)}
+                            <button
+                              className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                              onClick={() => setFiltros((prev) => ({ ...prev, tipo: undefined }))}
+                              aria-label="Limpar filtro de tipo"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        )}
+                        {(filtros.dataInicial || filtros.dataFinal) && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+                            {periodoCampoAtual === 'vencimento' ? 'Vencimento' : 'Emissao'}:{' '}
+                            {filtros.dataInicial
+                              ? new Date(`${filtros.dataInicial}T00:00:00`).toLocaleDateString('pt-BR')
+                              : '...'}{' '}
+                            a{' '}
+                            {filtros.dataFinal
+                              ? new Date(`${filtros.dataFinal}T00:00:00`).toLocaleDateString('pt-BR')
+                              : '...'}
+                            <button
+                              className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                              onClick={() =>
+                                setFiltros((prev) => ({
+                                  ...prev,
+                                  dataInicial: undefined,
+                                  dataFinal: undefined,
+                                }))
+                              }
+                              aria-label="Limpar filtro de periodo"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        )}
+                        {!filtros.dataInicial && !filtros.dataFinal && periodoCampoAtual === 'emissao' && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+                            Base periodo: Emissao
+                            <button
+                              className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                              onClick={() =>
+                                setFiltros((prev) => ({
+                                  ...prev,
+                                  periodoCampo: 'vencimento',
+                                }))
+                              }
+                              aria-label="Voltar base para vencimento"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        )}
+                        {(sortBy !== 'dataVencimento' || sortOrder !== 'DESC') && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-[#CDE2E8] bg-white px-3 py-1 text-xs text-[#446675]">
+                            Ordenacao: {sortBy} ({sortOrder})
+                            <button
+                              className="rounded-full p-0.5 text-[#7D98A4] hover:bg-[#EEF5F7] hover:text-[#456778]"
+                              onClick={() => {
+                                setSortBy('dataVencimento');
+                                setSortOrder('DESC');
+                              }}
+                              aria-label="Resetar ordenacao"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </FiltersBar>
+              </>
+            )}
+            {/* Barra de Ações em Massa */}
+            {mostrarAcoesMassa && (
+              <div className="mb-4 rounded-xl border border-[#D4E2E7] bg-white p-3 sm:p-4">
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="inline-flex items-center gap-2 rounded-full border border-[#D4E2E7] bg-[#F6FAFB] px-3 py-1 text-sm font-medium text-[#244455]">
+                        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#159A9C] text-white">
+                          <CheckCircle className="h-3.5 w-3.5" />
+                        </span>
+                        {faturasSelecionadas.length} fatura(s) selecionada(s)
+                      </span>
+                      <button
+                        onClick={() => setFaturasSelecionadas([])}
+                        className="text-sm font-medium text-[#1A9E87] underline underline-offset-2 transition-colors hover:text-[#127A6B]"
+                      >
+                        Desmarcar todas
+                      </button>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() => handleAcaoMassa('enviar-email')}
+                        disabled={processandoAcaoMassa}
+                        className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition-colors hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Send className="h-4 w-4" />
+                        Enviar por Email
+                      </button>
+                      <button
+                        onClick={() => handleAcaoMassa('baixar-pdfs')}
+                        disabled={processandoAcaoMassa}
+                        className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition-colors hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Download className="h-4 w-4" />
+                        Baixar PDFs
+                      </button>
+                      <button
+                        onClick={() => handleAcaoMassa('gerar-cobranca')}
+                        disabled={processandoAcaoMassa}
+                        className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#159A9C] px-3 text-sm font-medium text-white transition-colors hover:bg-[#0F7B7D] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <AlertCircle className="h-4 w-4" />
+                        Gerar Cobrança
+                      </button>
+                      <button
+                        onClick={() => handleAcaoMassa('exportar')}
+                        disabled={processandoAcaoMassa}
+                        className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm font-medium text-[#244455] transition-colors hover:bg-[#F6FAFB] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <FileText className="h-4 w-4" />
+                        Exportar
+                      </button>
+                      <button
+                        onClick={() => handleAcaoMassa('excluir')}
+                        disabled={processandoAcaoMassa}
+                        className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#D92D20] px-3 text-sm font-medium text-white transition-colors hover:bg-[#B42318] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Excluir
+                      </button>
+                    </div>
                   </div>
 
                   {processandoAcaoMassa && (
-                    <div className="w-full mb-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                        <span className="text-sm text-blue-700">Processando ação...</span>
+                    <div className="rounded-lg border border-[#D4E2E7] bg-[#F6FAFB] p-3">
+                      <div className="mb-2 flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-[#1A9E87]" />
+                        <span className="text-sm font-medium text-[#446675]">Processando ação...</span>
                       </div>
-                      <div className="w-full bg-blue-200 rounded-full h-2">
+                      <div className="h-2 w-full rounded-full bg-[#DCECF0]">
                         <div
-                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                          className="h-2 rounded-full bg-[#159A9C] transition-all duration-300"
                           style={{ width: `${progressoAcaoMassa}%` }}
                         />
                       </div>
                     </div>
                   )}
-
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <button
-                      onClick={() => handleAcaoMassa('enviar-email')}
-                      disabled={processandoAcaoMassa}
-                      className="px-4 py-2 bg-[#159A9C] text-white rounded-lg text-sm hover:bg-[#0F7B7D] flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                    >
-                      <Send className="w-4 h-4" />
-                      Enviar por Email
-                    </button>
-                    <button
-                      onClick={() => handleAcaoMassa('baixar-pdfs')}
-                      disabled={processandoAcaoMassa}
-                      className="px-4 py-2 bg-[#159A9C] text-white rounded-lg text-sm hover:bg-[#0F7B7D] flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                    >
-                      <Download className="w-4 h-4" />
-                      Baixar PDFs
-                    </button>
-                    <button
-                      onClick={() => handleAcaoMassa('gerar-cobranca')}
-                      disabled={processandoAcaoMassa}
-                      className="px-4 py-2 bg-[#159A9C] text-white rounded-lg text-sm hover:bg-[#0F7B7D] flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                    >
-                      <AlertCircle className="w-4 h-4" />
-                      Gerar Cobrança
-                    </button>
-                    <button
-                      onClick={() => handleAcaoMassa('exportar')}
-                      disabled={processandoAcaoMassa}
-                      className="px-4 py-2 bg-[#159A9C] text-white rounded-lg text-sm hover:bg-[#0F7B7D] flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                    >
-                      <FileText className="w-4 h-4" />
-                      Exportar
-                    </button>
-                    <button
-                      onClick={() => handleAcaoMassa('excluir')}
-                      disabled={processandoAcaoMassa}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Excluir
-                    </button>
-                  </div>
                 </div>
               </div>
             )}
@@ -3227,13 +3281,6 @@ export default function FaturamentoPage() {
         />
       )}
 
-      <ModalConfigurarCards
-        isOpen={modalConfigurarCardsAberto}
-        onClose={() => setModalConfigurarCardsAberto(false)}
-        cardsDisponiveis={obterTodasConfiguracoesCards()}
-        onSave={salvarConfiguracaoCards}
-      />
-
       {faturaPagamentos && (
         <ModalPagamentos
           isOpen={modalPagamentosAberto}
@@ -3282,4 +3329,3 @@ export default function FaturamentoPage() {
     </div>
   );
 }
-

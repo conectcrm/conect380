@@ -15,6 +15,16 @@ class EmailMock {
   }
 }
 
+class MercadoPagoMock {
+  async createPreference() {
+    return {
+      id: 'pref_teste_123',
+      init_point: 'https://pagamento.exemplo.com/checkout/pref_teste_123',
+      sandbox_init_point: 'https://sandbox.pagamento.exemplo.com/checkout/pref_teste_123',
+    };
+  }
+}
+
 // Repositório genérico em memória
 function createInMemoryRepository<T extends { id?: any }>() {
   const data: T[] = [];
@@ -88,9 +98,11 @@ function createInMemoryRepository<T extends { id?: any }>() {
 // Instâncias dos repositórios em memória
 const faturaRepo = createInMemoryRepository<Fatura>();
 const itemRepo = createInMemoryRepository<ItemFatura>();
+const pagamentoRepo = createInMemoryRepository<any>();
 const contratoRepo = createInMemoryRepository<Contrato>();
 const clienteRepo = createInMemoryRepository<any>();
 const propostasServiceMock = {};
+const mercadoPagoMock = new MercadoPagoMock();
 
 describe('FaturamentoService - criar fatura (unitário sem TypeORM)', () => {
   let service: FaturamentoService;
@@ -99,10 +111,12 @@ describe('FaturamentoService - criar fatura (unitário sem TypeORM)', () => {
     service = new FaturamentoService(
       faturaRepo as any,
       itemRepo as any,
+      pagamentoRepo as any,
       contratoRepo as any,
       clienteRepo as any,
       propostasServiceMock as any,
       new EmailMock() as any,
+      mercadoPagoMock as any,
     );
   });
 
@@ -215,6 +229,57 @@ describe('FaturamentoService - criar fatura (unitário sem TypeORM)', () => {
     const totalItens = fatura.itens.reduce((acc, i) => acc + Number(i.valorTotal), 0);
     expect(Number(totalItens.toFixed(2))).toBe(330);
   });
+
+  it('deve gerar link de pagamento e registrar pagamento pendente para conciliacao automatica', async () => {
+    const empresaId = 'empresa-teste';
+    const clienteId = '8a4706bb-2fbf-4ac8-8e2f-c947f591adcb';
+
+    await (clienteRepo as any).save([
+      {
+        id: clienteId,
+        empresaId,
+        nome: 'Cliente Link',
+        email: 'cliente.link@teste.com',
+      },
+    ]);
+
+    const fatura = await service.criarFatura(
+      {
+        clienteId,
+        usuarioResponsavelId: '1a9f9224-b38f-4a28-a7f8-53d1886bc26f',
+        tipo: 'unica' as any,
+        descricao: 'Fatura para link',
+        dataVencimento: new Date().toISOString().split('T')[0],
+        itens: [{ descricao: 'Item link', quantidade: 1, valorUnitario: 250 }],
+      },
+      empresaId,
+    );
+
+    const resultado = await service.gerarLinkPagamentoFatura(fatura.id, empresaId, {
+      frontendBaseUrl: 'https://conect360.com',
+      backendBaseUrl: 'https://api.conect360.com',
+    });
+
+    expect(resultado.link).toContain('pagamento.exemplo.com/checkout');
+    expect(resultado.referenciaGateway).toBe(`fatura:${empresaId}:${fatura.id}`);
+
+    const pagamentos = (pagamentoRepo as any)._all();
+    expect(pagamentos.length).toBeGreaterThan(0);
+    const pagamento = pagamentos.find(
+      (item: any) =>
+        item.faturaId === fatura.id && item.gatewayTransacaoId === resultado.referenciaGateway,
+    );
+    expect(pagamento).toBeDefined();
+    expect(String(pagamento.status)).toBe('pendente');
+    expect(Number(pagamento.valor)).toBe(250);
+
+    const faturas = (faturaRepo as any)._all();
+    const faturaAtualizada = faturas.find((item: any) => item.id === fatura.id);
+    expect(String(faturaAtualizada.linkPagamento || '')).toContain(
+      'pagamento.exemplo.com/checkout',
+    );
+  });
+
   it('deve gerar cobrança em lote apenas para faturas elegíveis', async () => {
     const empresaId = 'empresa-teste';
     const clienteElegivelId = '0f8fad5b-d9cb-469f-a165-70867728950e';

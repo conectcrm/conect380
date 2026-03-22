@@ -7,7 +7,13 @@ import { Repository } from 'typeorm';
 import { UpdateEmpresaConfigDto } from '../dto/update-empresa-config.dto';
 import { EmpresaConfig } from '../entities/empresa-config.entity';
 
-type EmpresaConfigSecretField = 'smtpSenha' | 'whatsappApiToken' | 'smsApiKey' | 'pushApiKey';
+type EmpresaConfigSecretField =
+  | 'smtpSenha'
+  | 'whatsappApiToken'
+  | 'smsApiKey'
+  | 'pushApiKey'
+  | 'fiscalOfficialApiToken'
+  | 'fiscalOfficialWebhookSecret';
 
 type BackupSnapshotInfo = {
   fileName: string;
@@ -31,6 +37,8 @@ export class EmpresaConfigService {
     'whatsappApiToken',
     'smsApiKey',
     'pushApiKey',
+    'fiscalOfficialApiToken',
+    'fiscalOfficialWebhookSecret',
   ];
   private static readonly SECRET_MASK_VALUE = '__CONFIGURED_SECRET__';
   private static readonly SECRET_ENCRYPTED_PREFIX = 'enc:v1:';
@@ -39,6 +47,8 @@ export class EmpresaConfigService {
     whatsappApiToken: 'whatsapp_api_token',
     smsApiKey: 'sms_api_key',
     pushApiKey: 'push_api_key',
+    fiscalOfficialApiToken: 'fiscal_official_api_token',
+    fiscalOfficialWebhookSecret: 'fiscal_official_webhook_secret',
   };
   private readonly logger = new Logger(EmpresaConfigService.name);
 
@@ -103,6 +113,8 @@ export class EmpresaConfigService {
       .addSelect('cfg.whatsapp_api_token', 'whatsapp_api_token')
       .addSelect('cfg.sms_api_key', 'sms_api_key')
       .addSelect('cfg.push_api_key', 'push_api_key')
+      .addSelect('cfg.fiscal_official_api_token', 'fiscal_official_api_token')
+      .addSelect('cfg.fiscal_official_webhook_secret', 'fiscal_official_webhook_secret')
       .where('cfg.id = :id', { id: config.id })
       .getRawOne<Record<string, string | null>>();
 
@@ -404,6 +416,15 @@ export class EmpresaConfigService {
     // Integracoes
     config.apiHabilitada = false;
     config.webhooksAtivos = 0;
+    config.fiscalProvider = null;
+    config.fiscalOfficialHttpEnabled = null;
+    config.fiscalRequireOfficialProvider = null;
+    config.fiscalOfficialBaseUrl = null;
+    config.fiscalOfficialStrictResponse = null;
+    config.fiscalOfficialWebhookAllowInsecure = null;
+    config.fiscalOfficialCorrelationHeader = null;
+    config.fiscalOfficialApiToken = null;
+    config.fiscalOfficialWebhookSecret = null;
 
     // Backup
     config.backupAutomatico = true;

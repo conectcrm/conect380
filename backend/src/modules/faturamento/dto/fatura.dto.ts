@@ -2,6 +2,7 @@ import {
   IsString,
   IsNumber,
   IsEnum,
+  IsIn,
   IsOptional,
   IsDateString,
   IsArray,
@@ -17,6 +18,16 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { TipoFatura, FormaPagamento } from '../entities/fatura.entity';
+
+export const TIPOS_DOCUMENTO_FINANCEIRO = [
+  'fatura',
+  'recibo',
+  'nfse',
+  'nfe',
+  'folha_pagamento',
+  'outro',
+] as const;
+export type TipoDocumentoFinanceiro = (typeof TIPOS_DOCUMENTO_FINANCEIRO)[number];
 
 export class ItemFaturaDto {
   @IsString()
@@ -204,4 +215,17 @@ export class GerarCobrancaLoteDto {
   @IsInt({ each: true })
   @Min(1, { each: true })
   faturaIds: number[];
+}
+
+export class GerarNumeroDocumentoFinanceiroDto {
+  @IsString()
+  @IsIn(TIPOS_DOCUMENTO_FINANCEIRO, { message: 'Tipo de documento financeiro invalido.' })
+  tipoDocumento: TipoDocumentoFinanceiro;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(2000)
+  @Max(9999)
+  anoReferencia?: number;
 }

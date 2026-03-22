@@ -72,6 +72,15 @@ export interface ConfiguracoesEmpresa {
   // Integracoes
   apiHabilitada: boolean;
   webhooksAtivos: number;
+  fiscalProvider?: string | null;
+  fiscalOfficialHttpEnabled?: boolean | null;
+  fiscalRequireOfficialProvider?: boolean | null;
+  fiscalOfficialBaseUrl?: string | null;
+  fiscalOfficialStrictResponse?: boolean | null;
+  fiscalOfficialWebhookAllowInsecure?: boolean | null;
+  fiscalOfficialCorrelationHeader?: string | null;
+  fiscalOfficialApiToken?: string | null;
+  fiscalOfficialWebhookSecret?: string | null;
 
   // Backup
   backupAutomatico: boolean;
@@ -127,6 +136,15 @@ export interface UpdateEmpresaConfigDto {
   // Integracoes
   apiHabilitada?: boolean;
   webhooksAtivos?: number;
+  fiscalProvider?: string;
+  fiscalOfficialHttpEnabled?: boolean;
+  fiscalRequireOfficialProvider?: boolean;
+  fiscalOfficialBaseUrl?: string;
+  fiscalOfficialStrictResponse?: boolean;
+  fiscalOfficialWebhookAllowInsecure?: boolean;
+  fiscalOfficialCorrelationHeader?: string;
+  fiscalOfficialApiToken?: string;
+  fiscalOfficialWebhookSecret?: string;
 
   // Backup
   backupAutomatico?: boolean;

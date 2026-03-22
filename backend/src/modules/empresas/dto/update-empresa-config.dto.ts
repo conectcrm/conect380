@@ -165,6 +165,43 @@ export class UpdateEmpresaConfigDto {
   @Min(0)
   webhooksAtivos?: number;
 
+  // Integracoes fiscais (multi-CNPJ)
+  @IsOptional()
+  @IsString()
+  fiscalProvider?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  fiscalOfficialHttpEnabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  fiscalRequireOfficialProvider?: boolean;
+
+  @IsOptional()
+  @IsString()
+  fiscalOfficialBaseUrl?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  fiscalOfficialStrictResponse?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  fiscalOfficialWebhookAllowInsecure?: boolean;
+
+  @IsOptional()
+  @IsString()
+  fiscalOfficialCorrelationHeader?: string;
+
+  @IsOptional()
+  @IsString()
+  fiscalOfficialApiToken?: string;
+
+  @IsOptional()
+  @IsString()
+  fiscalOfficialWebhookSecret?: string;
+
   // Backup
   @IsOptional()
   @IsBoolean()

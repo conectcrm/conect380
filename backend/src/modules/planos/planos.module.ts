@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Plano } from './entities/plano.entity';
 import { ModuloSistema } from './entities/modulo-sistema.entity';
@@ -26,7 +26,7 @@ import { Empresa } from '../../empresas/entities/empresa.entity';
       Cliente,
       Empresa,
     ]),
-    MercadoPagoModule,
+    forwardRef(() => MercadoPagoModule),
   ],
   controllers: [PlanosController, AssinaturasController],
   providers: [

@@ -13,6 +13,7 @@ import { Logger,
   BadRequestException,
   HttpCode,
   HttpException,
+  Req,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
@@ -30,6 +31,7 @@ import {
   UpdateFaturaDto,
   GerarFaturaAutomaticaDto,
   GerarCobrancaLoteDto,
+  GerarNumeroDocumentoFinanceiroDto,
 } from './dto/fatura.dto';
 import {
   CancelarDocumentoFiscalDto,
@@ -42,6 +44,7 @@ import { StatusFatura } from './entities/fatura.entity';
 import { StatusPagamento } from './entities/pagamento.entity';
 import { StatusPlanoCobranca } from './entities/plano-cobranca.entity';
 import { EnvioFaturaEmailOpcoes, ResultadoCobrancaLote } from './services/faturamento.service';
+import type { Request } from 'express';
 
 @Controller('faturamento')
 @UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
@@ -233,6 +236,49 @@ export class FaturamentoController {
     };
   }
 
+  @Post('faturas/documento/gerar-numero')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
+  async gerarNumeroDocumentoFinanceiro(
+    @Body() payload: GerarNumeroDocumentoFinanceiroDto,
+    @EmpresaId() empresaId: string,
+  ) {
+    const resultado = await this.faturamentoService.gerarNumeroDocumentoFinanceiro(
+      empresaId,
+      payload.tipoDocumento,
+      payload.anoReferencia,
+    );
+
+    return {
+      status: HttpStatus.OK,
+      message: 'Numero do documento gerado com sucesso',
+      data: resultado,
+    };
+  }
+
+  @Post('faturas/:id/link-pagamento')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  async gerarLinkPagamentoFatura(
+    @Param('id', ParseIntPipe) id: number,
+    @EmpresaId() empresaId: string,
+    @Req() req: Request,
+  ) {
+    const originHeader = req.headers?.origin;
+    const frontendBaseUrl =
+      typeof originHeader === 'string' && originHeader.trim() ? originHeader.trim() : undefined;
+    const backendBaseUrl = `${req.protocol}://${req.get('host')}`;
+
+    const resultado = await this.faturamentoService.gerarLinkPagamentoFatura(id, empresaId, {
+      frontendBaseUrl,
+      backendBaseUrl,
+    });
+
+    return {
+      status: HttpStatus.OK,
+      message: 'Link de pagamento gerado com sucesso',
+      data: resultado,
+    };
+  }
+
   @Post('faturas/:id/documento-fiscal/rascunho')
   @Permissions(Permission.FINANCEIRO_FATURAMENTO_MANAGE)
   async criarRascunhoDocumentoFiscal(
@@ -279,13 +325,62 @@ export class FaturamentoController {
   async consultarStatusDocumentoFiscal(
     @Param('id', ParseIntPipe) id: number,
     @EmpresaId() empresaId: string,
+    @Query('sincronizar') sincronizar?: string,
+    @CurrentUser() user?: { id?: string; sub?: string },
   ) {
-    const statusFiscal = await this.documentoFiscalService.consultarStatus(id, empresaId);
+    const sincronizarStatus = ['1', 'true', 'sim', 'yes'].includes(
+      String(sincronizar || '')
+        .trim()
+        .toLowerCase(),
+    );
+    const statusFiscal = await this.documentoFiscalService.consultarStatus(id, empresaId, {
+      sincronizar: sincronizarStatus,
+      userId: user?.id || user?.sub,
+    });
 
     return {
       status: HttpStatus.OK,
       message: 'Status fiscal recuperado com sucesso',
       data: statusFiscal,
+    };
+  }
+
+  @Get('documento-fiscal/configuracao')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_READ)
+  async obterDiagnosticoConfiguracaoDocumentoFiscal(@EmpresaId() empresaId: string) {
+    const diagnostico =
+      await this.documentoFiscalService.obterDiagnosticoConfiguracaoFiscalPorEmpresa(empresaId);
+
+    return {
+      status: HttpStatus.OK,
+      message: 'Diagnostico de configuracao fiscal recuperado com sucesso',
+      data: diagnostico,
+    };
+  }
+
+  @Get('documento-fiscal/conectividade')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_READ)
+  async testarConectividadeDocumentoFiscal(@EmpresaId() empresaId: string) {
+    const diagnostico = await this.documentoFiscalService.testarConectividadeProviderFiscal(
+      empresaId,
+    );
+
+    return {
+      status: HttpStatus.OK,
+      message: 'Teste de conectividade fiscal executado com sucesso',
+      data: diagnostico,
+    };
+  }
+
+  @Get('documento-fiscal/preflight')
+  @Permissions(Permission.FINANCEIRO_FATURAMENTO_READ)
+  async executarPreflightDocumentoFiscal(@EmpresaId() empresaId: string) {
+    const diagnostico = await this.documentoFiscalService.executarPreflightFiscal(empresaId);
+
+    return {
+      status: HttpStatus.OK,
+      message: 'Preflight fiscal executado com sucesso',
+      data: diagnostico,
     };
   }
 

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EmpresasController, MinhasEmpresasController } from './empresas.controller';
 import { EmpresasService } from './empresas.service';
@@ -18,7 +18,7 @@ import { FeatureFlagTenant } from '../modules/dashboard-v2/entities/feature-flag
   imports: [
     TypeOrmModule.forFeature([Empresa, User, EmpresaModulo, EmpresaConfig, FeatureFlagTenant]),
     MailModule,
-    PlanosModule,
+    forwardRef(() => PlanosModule),
   ],
   controllers: [
     // ⚠️ ORDEM CRÍTICA: Rotas específicas ANTES de rotas dinâmicas!

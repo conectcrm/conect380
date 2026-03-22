@@ -197,7 +197,7 @@ const processQueue = (error: any = null, token: string | null = null) => {
 api.interceptors.response.use(
   (response) => {
     // Debug específico para respostas de planos
-    if (response.config.url?.includes('/planos')) {
+    if (DEBUG && response.config.url?.includes('/planos')) {
       console.log('✅ [FRONTEND] Resposta recebida da API:', {
         status: response.status,
         data: response.data,
@@ -232,7 +232,7 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     // Debug específico para erros de planos
-    if (error.config?.url?.includes('/planos')) {
+    if (DEBUG && error.config?.url?.includes('/planos')) {
       console.error('❌ [FRONTEND] Erro na requisição de planos:', {
         status: error.response?.status,
         statusText: error.response?.statusText,
@@ -244,7 +244,7 @@ api.interceptors.response.use(
     }
 
     // Debug específico para erros de contratos
-    if (error.config?.url?.includes('/contratos')) {
+    if (DEBUG && error.config?.url?.includes('/contratos')) {
       console.error('❌ [FRONTEND] Erro na requisição de contratos:', {
         status: error.response?.status,
         statusText: error.response?.statusText,
@@ -301,7 +301,9 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        console.log('🔄 [API] Tentando renovar token automaticamente...');
+        if (DEBUG) {
+          console.log('[API] Tentando renovar token automaticamente...');
+        }
 
         const currentRefreshToken = localStorage.getItem('refreshToken');
         if (!currentRefreshToken) {
@@ -324,8 +326,9 @@ api.interceptors.response.use(
           // Salvar novos tokens
           localStorage.setItem('authToken', newToken);
           localStorage.setItem('refreshToken', newRefreshToken);
-
-          console.log('✅ [API] Token renovado com sucesso!');
+          if (DEBUG) {
+            console.log('[API] Token renovado com sucesso!');
+          }
 
           // Atualizar header da requisição original
           originalRequest.headers.Authorization = `Bearer ${newToken}`;

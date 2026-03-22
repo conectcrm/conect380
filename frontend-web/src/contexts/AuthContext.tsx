@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import {
   User,
   LoginSuccessData,
@@ -66,6 +66,7 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const authInitializedRef = useRef(false);
 
   const isLoginSuccessData = (data: unknown): data is LoginSuccessData => {
     return (
@@ -107,6 +108,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   useEffect(() => {
+    if (authInitializedRef.current) {
+      return;
+    }
+    authInitializedRef.current = true;
+
     const initializeAuth = async () => {
       try {
         const token = authService.getToken();
@@ -126,16 +132,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               syncEmpresaAtiva(savedUser.empresa?.id);
             }
           } catch (profileError: any) {
-            console.warn('[AuthContext] Error loading profile:', profileError.message);
+            if (DEBUG) {
+              console.warn('[AuthContext] Error loading profile:', profileError.message);
+            }
 
             if (profileError.response?.status === 401) {
-              console.warn('[AuthContext] Invalid token (401), performing logout');
+              if (DEBUG) {
+                console.warn('[AuthContext] Invalid token (401), performing logout');
+              }
               authService.logout();
               syncEmpresaAtiva(null);
               dispatchAuthTokenChanged();
               setUser(null);
             } else {
-              console.warn('[AuthContext] Network/server error, keeping saved session data');
+              if (DEBUG) {
+                console.warn('[AuthContext] Network/server error, keeping saved session data');
+              }
               setUser(savedUser);
               syncEmpresaAtiva(savedUser.empresa?.id);
             }

@@ -1,18 +1,28 @@
 import {
   Injectable,
+  Inject,
   NotFoundException,
   BadRequestException,
   ForbiddenException,
   Logger,
+  Optional,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository } from 'typeorm';
 import { Fatura, FormaPagamento, StatusFatura, TipoFatura } from '../entities/fatura.entity';
 import { ItemFatura } from '../entities/item-fatura.entity';
+import { Pagamento, StatusPagamento, TipoPagamento } from '../entities/pagamento.entity';
 import { Contrato } from '../../contratos/entities/contrato.entity';
 import { Cliente } from '../../clientes/cliente.entity';
 import { PropostasService } from '../../propostas/propostas.service';
-import { CreateFaturaDto, UpdateFaturaDto, GerarFaturaAutomaticaDto } from '../dto/fatura.dto';
+import { MercadoPagoService } from '../../mercado-pago/mercado-pago.service';
+import {
+  CreateFaturaDto,
+  UpdateFaturaDto,
+  GerarFaturaAutomaticaDto,
+  TipoDocumentoFinanceiro,
+} from '../dto/fatura.dto';
 import { EmailIntegradoService } from '../../propostas/email-integrado.service';
 
 export interface ResultadoEnvioFaturaEmail {
@@ -48,6 +58,24 @@ export interface ResultadoCobrancaLote {
   falhas: number;
   ignoradas: number;
   resultados: ResultadoCobrancaLoteItem[];
+}
+
+export interface NumeroDocumentoFinanceiroGerado {
+  tipoDocumento: TipoDocumentoFinanceiro;
+  prefixo: string;
+  ano: number;
+  sequencial: number;
+  numero: string;
+}
+
+export interface LinkPagamentoFaturaGerado {
+  faturaId: number;
+  numeroFatura: string;
+  provider: 'mercado_pago';
+  referenciaGateway: string;
+  preferenceId?: string;
+  link: string;
+  expiraEm: string;
 }
 
 interface ItemCalculoFaturaInput {
@@ -98,18 +126,38 @@ export class FaturamentoService {
     StatusFatura.PARCIALMENTE_PAGA,
     StatusFatura.VENCIDA,
   ]);
+  private readonly tiposDocumentoFinanceiro = new Set<TipoDocumentoFinanceiro>([
+    'fatura',
+    'recibo',
+    'nfse',
+    'nfe',
+    'folha_pagamento',
+    'outro',
+  ]);
+  private readonly tiposDocumentoFiscal = new Set<TipoDocumentoFinanceiro>(['nfe', 'nfse']);
+  private readonly prefixosNumeroDocumentoFinanceiro: Record<string, string> = {
+    fatura: 'FAT',
+    recibo: 'REC',
+    folha_pagamento: 'FPG',
+    outro: 'DOC',
+  };
 
   constructor(
     @InjectRepository(Fatura)
     private faturaRepository: Repository<Fatura>,
     @InjectRepository(ItemFatura)
     private itemFaturaRepository: Repository<ItemFatura>,
+    @InjectRepository(Pagamento)
+    private pagamentoRepository: Repository<Pagamento>,
     @InjectRepository(Contrato)
     private contratoRepository: Repository<Contrato>,
     @InjectRepository(Cliente)
     private clienteRepository: Repository<Cliente>,
     private propostasService: PropostasService,
     private emailService: EmailIntegradoService,
+    @Optional()
+    @Inject(forwardRef(() => MercadoPagoService))
+    private readonly mercadoPagoService?: MercadoPagoService,
   ) {}
 
   async criarFatura(
@@ -471,6 +519,197 @@ export class FaturamentoService {
     }
 
     return fatura;
+  }
+
+  async gerarNumeroDocumentoFinanceiro(
+    empresaId: string,
+    tipoDocumentoInput: TipoDocumentoFinanceiro,
+    anoReferencia?: number,
+  ): Promise<NumeroDocumentoFinanceiroGerado> {
+    const tipoDocumento = this.normalizarTipoDocumentoFinanceiro(tipoDocumentoInput);
+    if (this.tiposDocumentoFiscal.has(tipoDocumento)) {
+      throw new BadRequestException(
+        'Para NF-e/NFS-e, use o fluxo de emissao fiscal automatica (SEFAZ/provedor municipal).',
+      );
+    }
+
+    const anoAtual = new Date().getFullYear();
+    const ano =
+      typeof anoReferencia === 'number' && Number.isFinite(anoReferencia)
+        ? Math.trunc(anoReferencia)
+        : anoAtual;
+    if (ano < 2000 || ano > anoAtual + 5) {
+      throw new BadRequestException('Ano de referencia invalido para geracao do documento.');
+    }
+
+    const prefixo = this.obterPrefixoDocumentoFinanceiro(tipoDocumento);
+    const prefixoNumero = `${prefixo}-${ano}-`;
+    const numerosExistentes = await this.faturaRepository
+      .createQueryBuilder('fatura')
+      .select(`"fatura"."detalhesTributarios"->'documento'->>'numero'`, 'numero')
+      .where('fatura.empresaId = :empresaId', { empresaId })
+      .andWhere('fatura.ativo = :ativo', { ativo: true })
+      .andWhere(`"fatura"."detalhesTributarios" IS NOT NULL`)
+      .andWhere(`"fatura"."detalhesTributarios"->'documento'->>'tipo' = :tipoDocumento`, {
+        tipoDocumento,
+      })
+      .andWhere(`"fatura"."detalhesTributarios"->'documento'->>'numero' LIKE :prefixoNumero`, {
+        prefixoNumero: `${prefixoNumero}%`,
+      })
+      .andWhere(`EXTRACT(YEAR FROM fatura."createdAt") = :ano`, { ano })
+      .orderBy('fatura.id', 'DESC')
+      .limit(2000)
+      .getRawMany<{ numero?: string | null }>();
+
+    const maxSequencial = numerosExistentes.reduce((acc, row) => {
+      const numero = String(row?.numero || '').trim();
+      if (!numero.startsWith(prefixoNumero)) {
+        return acc;
+      }
+      const trechoSequencial = numero.slice(prefixoNumero.length);
+      if (!/^\d+$/.test(trechoSequencial)) {
+        return acc;
+      }
+      const valor = Number.parseInt(trechoSequencial, 10);
+      if (!Number.isFinite(valor)) {
+        return acc;
+      }
+      return Math.max(acc, valor);
+    }, 0);
+
+    let sequencial = maxSequencial + 1;
+    let numero = `${prefixoNumero}${String(sequencial).padStart(6, '0')}`;
+
+    // Mitiga colisao quando ha concorrencia de geracao simultanea.
+    while (
+      await this.existeNumeroDocumentoFinanceiro(empresaId, tipoDocumento, numero, ano)
+    ) {
+      sequencial += 1;
+      numero = `${prefixoNumero}${String(sequencial).padStart(6, '0')}`;
+    }
+
+    return {
+      tipoDocumento,
+      prefixo,
+      ano,
+      sequencial,
+      numero,
+    };
+  }
+
+  async gerarLinkPagamentoFatura(
+    faturaId: number,
+    empresaId: string,
+    contexto?: {
+      frontendBaseUrl?: string;
+      backendBaseUrl?: string;
+    },
+  ): Promise<LinkPagamentoFaturaGerado> {
+    if (!this.mercadoPagoService) {
+      throw new BadRequestException(
+        'Gateway de cobranca indisponivel no momento. Configure o Mercado Pago para gerar links.',
+      );
+    }
+
+    const fatura = await this.buscarFaturaPorId(faturaId, empresaId);
+    if (fatura.status === StatusFatura.CANCELADA) {
+      throw new BadRequestException('Nao e possivel gerar link para fatura cancelada.');
+    }
+    if (fatura.status === StatusFatura.PAGA) {
+      throw new BadRequestException('Fatura ja esta paga. Nao e necessario gerar novo link.');
+    }
+
+    const cliente = await this.clienteRepository.findOne({
+      where: { id: fatura.clienteId, empresaId },
+    });
+    if (!cliente) {
+      throw new NotFoundException('Cliente da fatura nao encontrado.');
+    }
+
+    const emailCliente = String(cliente.email || '').trim();
+    if (!emailCliente) {
+      throw new BadRequestException('Cliente sem email cadastrado para envio/cobranca digital.');
+    }
+
+    const nomeCliente = String(cliente.nome || 'Cliente').trim() || 'Cliente';
+    const [primeiroNome, ...sobrenomePartes] = nomeCliente.split(/\s+/).filter(Boolean);
+    const sobrenome = sobrenomePartes.join(' ') || '-';
+
+    const frontendBaseUrl = this.normalizarBaseUrl(
+      contexto?.frontendBaseUrl || process.env.FRONTEND_URL || process.env.APP_FRONTEND_URL || '',
+      'https://conect360.com',
+    );
+    const backendBaseUrl = this.normalizarBaseUrl(
+      contexto?.backendBaseUrl || process.env.BACKEND_URL || process.env.API_URL || '',
+      'http://localhost:3001',
+    );
+
+    const expiraEmDate = this.calcularDataExpiracaoCobranca(fatura.dataVencimento);
+    const expiraEm = expiraEmDate.toISOString();
+    const referenciaGateway = `fatura:${empresaId}:${fatura.id}`;
+
+    const preference = await this.mercadoPagoService.createPreference({
+      items: [
+        {
+          id: String(fatura.id),
+          title: `Fatura ${fatura.numero}`,
+          currency_id: 'BRL',
+          quantity: 1,
+          unit_price: Number(fatura.valorTotal),
+        },
+      ],
+      payer: {
+        name: primeiroNome || 'Cliente',
+        surname: sobrenome,
+        email: emailCliente,
+      },
+      back_urls: {
+        success: `${frontendBaseUrl}/faturamento?status=success&fatura=${fatura.id}`,
+        failure: `${frontendBaseUrl}/faturamento?status=failure&fatura=${fatura.id}`,
+        pending: `${frontendBaseUrl}/faturamento?status=pending&fatura=${fatura.id}`,
+      },
+      auto_return: 'approved',
+      payment_methods: this.construirRestricoesPagamentoMercadoPago(
+        fatura.formaPagamentoPreferida,
+      ),
+      notification_url: `${backendBaseUrl}/mercadopago/webhooks`,
+      statement_descriptor: 'ConectCRM',
+      external_reference: referenciaGateway,
+      expires: true,
+      expiration_date_from: new Date().toISOString(),
+      expiration_date_to: expiraEm,
+    });
+
+    const link = String(preference?.init_point || preference?.sandbox_init_point || '').trim();
+    if (!link) {
+      throw new BadRequestException('Gateway nao retornou URL de pagamento para esta cobranca.');
+    }
+
+    fatura.linkPagamento = link;
+    fatura.metadados = {
+      ...(fatura.metadados || {}),
+      gateway: 'mercadopago',
+      transactionId: String(preference?.id || referenciaGateway),
+      paymentMethod: fatura.formaPagamentoPreferida || FormaPagamento.A_COMBINAR,
+    };
+    await this.faturaRepository.save(fatura);
+    await this.registrarPagamentoPendentePorLink({
+      empresaId,
+      fatura,
+      referenciaGateway,
+      linkPagamento: link,
+      preferenceId: preference?.id ? String(preference.id) : undefined,
+    });
+
+    return {
+      faturaId: fatura.id,
+      numeroFatura: fatura.numero,
+      provider: 'mercado_pago',
+      referenciaGateway,
+      preferenceId: preference?.id ? String(preference.id) : undefined,
+      link,
+      expiraEm,
+    };
   }
 
   async atualizarFatura(
@@ -1773,6 +2012,161 @@ export class FaturamentoService {
     }
 
     return `FT${ano}${proximoNumero.toString().padStart(6, '0')}`;
+  }
+
+  private normalizarTipoDocumentoFinanceiro(
+    tipoDocumentoInput: TipoDocumentoFinanceiro,
+  ): TipoDocumentoFinanceiro {
+    const tipoDocumento = String(tipoDocumentoInput || '')
+      .trim()
+      .toLowerCase() as TipoDocumentoFinanceiro;
+
+    if (!this.tiposDocumentoFinanceiro.has(tipoDocumento)) {
+      throw new BadRequestException('Tipo de documento financeiro invalido.');
+    }
+
+    return tipoDocumento;
+  }
+
+  private obterPrefixoDocumentoFinanceiro(tipoDocumento: TipoDocumentoFinanceiro): string {
+    return this.prefixosNumeroDocumentoFinanceiro[tipoDocumento] || 'DOC';
+  }
+
+  private async existeNumeroDocumentoFinanceiro(
+    empresaId: string,
+    tipoDocumento: TipoDocumentoFinanceiro,
+    numeroDocumento: string,
+    ano: number,
+  ): Promise<boolean> {
+    const total = await this.faturaRepository
+      .createQueryBuilder('fatura')
+      .where('fatura.empresaId = :empresaId', { empresaId })
+      .andWhere('fatura.ativo = :ativo', { ativo: true })
+      .andWhere(`"fatura"."detalhesTributarios" IS NOT NULL`)
+      .andWhere(`"fatura"."detalhesTributarios"->'documento'->>'tipo' = :tipoDocumento`, {
+        tipoDocumento,
+      })
+      .andWhere(`"fatura"."detalhesTributarios"->'documento'->>'numero' = :numeroDocumento`, {
+        numeroDocumento,
+      })
+      .andWhere(`EXTRACT(YEAR FROM fatura."createdAt") = :ano`, { ano })
+      .getCount();
+
+    return total > 0;
+  }
+
+  private normalizarBaseUrl(input: string, fallback: string): string {
+    const valor = String(input || '').trim();
+    if (!valor) {
+      return fallback;
+    }
+    return valor.replace(/\/+$/, '');
+  }
+
+  private calcularDataExpiracaoCobranca(dataVencimento: Date | string): Date {
+    const hoje = new Date();
+    const data = new Date(dataVencimento);
+
+    if (Number.isNaN(data.getTime()) || data < hoje) {
+      const fallback = new Date();
+      fallback.setDate(fallback.getDate() + 7);
+      return fallback;
+    }
+
+    data.setHours(23, 59, 59, 0);
+    return data;
+  }
+
+  private construirRestricoesPagamentoMercadoPago(
+    formaPagamento?: FormaPagamento | null,
+  ): Record<string, unknown> {
+    if (formaPagamento === FormaPagamento.BOLETO) {
+      return {
+        excluded_payment_types: [
+          { id: 'credit_card' },
+          { id: 'debit_card' },
+          { id: 'prepaid_card' },
+          { id: 'account_money' },
+          { id: 'bank_transfer' },
+          { id: 'atm' },
+        ],
+      };
+    }
+
+    return {};
+  }
+
+  private async registrarPagamentoPendentePorLink(params: {
+    empresaId: string;
+    fatura: Fatura;
+    referenciaGateway: string;
+    linkPagamento: string;
+    preferenceId?: string;
+  }): Promise<void> {
+    const { empresaId, fatura, referenciaGateway, linkPagamento, preferenceId } = params;
+
+    const existente = await this.pagamentoRepository.findOne({
+      where: { empresaId, faturaId: fatura.id, gatewayTransacaoId: referenciaGateway },
+    });
+
+    const valorRestante = this.roundMoney(Math.max(Number(fatura.valorTotal) - Number(fatura.valorPago), 0));
+    if (valorRestante <= 0) {
+      return;
+    }
+
+    const dadosCompletos = {
+      ...((existente?.dadosCompletos || {}) as Record<string, unknown>),
+      linkPagamento,
+      preferenceId: preferenceId || null,
+      externalReference: referenciaGateway,
+      origem: 'faturamento.link_pagamento',
+      atualizadoEm: new Date().toISOString(),
+    };
+
+    if (existente) {
+      if (existente.status === StatusPagamento.APROVADO) {
+        return;
+      }
+
+      existente.status = StatusPagamento.PENDENTE;
+      existente.valor = valorRestante;
+      existente.valorLiquido = valorRestante;
+      existente.taxa = 0;
+      existente.metodoPagamento = String(
+        fatura.formaPagamentoPreferida || FormaPagamento.A_COMBINAR,
+      );
+      existente.gateway = 'mercadopago';
+      existente.dadosCompletos = dadosCompletos as any;
+      existente.observacoes =
+        existente.observacoes ||
+        `Pagamento pendente via link para a fatura ${fatura.numero}.`;
+      await this.pagamentoRepository.save(existente);
+      return;
+    }
+
+    const pagamentoPendente = this.pagamentoRepository.create({
+      empresaId,
+      faturaId: fatura.id,
+      transacaoId: this.gerarTransacaoIdPagamentoLink(fatura.id),
+      tipo: TipoPagamento.PAGAMENTO,
+      status: StatusPagamento.PENDENTE,
+      valor: valorRestante,
+      taxa: 0,
+      valorLiquido: valorRestante,
+      metodoPagamento: String(fatura.formaPagamentoPreferida || FormaPagamento.A_COMBINAR),
+      gateway: 'mercadopago',
+      gatewayTransacaoId: referenciaGateway,
+      dadosCompletos: dadosCompletos as any,
+      observacoes: `Pagamento pendente via link para a fatura ${fatura.numero}.`,
+    });
+
+    await this.pagamentoRepository.save(pagamentoPendente);
+  }
+
+  private gerarTransacaoIdPagamentoLink(faturaId: number): string {
+    const timestamp = Date.now().toString(36).toUpperCase();
+    const sufixo = Math.random().toString(36).slice(2, 8).toUpperCase();
+    return `LNK-${faturaId}-${timestamp}-${sufixo}`;
   }
 
   private mapearFormaPagamento(formaPagamento?: string): FormaPagamento {

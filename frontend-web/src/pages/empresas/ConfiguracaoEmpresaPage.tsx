@@ -16,6 +16,7 @@ import {
   Upload,
   X,
   ImageIcon,
+  FileText,
 } from 'lucide-react';
 import { LoadingSkeleton, PageHeader, SectionCard } from '../../components/layout-v2';
 import {
@@ -30,12 +31,19 @@ import { useGlobalConfirmation } from '../../contexts/GlobalConfirmationContext'
 import { userHasPermission } from '../../config/menuConfig';
 import { toastService } from '../../services/toastService';
 import { SalesFeatureFlagsDecision } from '../../types/oportunidades/index';
+import {
+  DocumentoFiscalConectividadeDiagnostico,
+  DocumentoFiscalConfiguracaoDiagnostico,
+  DocumentoFiscalPreflightDiagnostico,
+  faturamentoService,
+} from '../../services/faturamentoService';
 
 const EMPRESA_CONFIG_TABS = [
   { id: 'geral', label: 'Geral', icon: Settings },
   { id: 'seguranca', label: 'Segurança', icon: Shield },
   { id: 'usuarios', label: 'Usuários e Permissões', icon: Users },
   { id: 'email', label: 'Email/SMTP', icon: Mail },
+  { id: 'fiscal', label: 'Fiscal', icon: FileText },
   { id: 'backup', label: 'Snapshot Config.', icon: Database },
 ] as const;
 
@@ -95,10 +103,100 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
   );
   const [backupHistory, setBackupHistory] = useState<BackupSnapshotInfo[]>([]);
   const [showBackupHistory, setShowBackupHistory] = useState(false);
+  const [fiscalConfigDiagnostico, setFiscalConfigDiagnostico] =
+    useState<DocumentoFiscalConfiguracaoDiagnostico | null>(null);
+  const [fiscalConectividadeDiagnostico, setFiscalConectividadeDiagnostico] =
+    useState<DocumentoFiscalConectividadeDiagnostico | null>(null);
+  const [fiscalPreflightDiagnostico, setFiscalPreflightDiagnostico] =
+    useState<DocumentoFiscalPreflightDiagnostico | null>(null);
+  const [fiscalDiagErro, setFiscalDiagErro] = useState<string | null>(null);
+  const [showFiscalRecommendations, setShowFiscalRecommendations] = useState(false);
+  const [loadingFiscalConfigDiagnostico, setLoadingFiscalConfigDiagnostico] = useState(false);
+  const [testingFiscalConectividade, setTestingFiscalConectividade] = useState(false);
+  const [runningFiscalPreflight, setRunningFiscalPreflight] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canUpdateConfig = userHasPermission(user, 'config.empresa.update');
+
+  const extractErrorMessage = (err: unknown, fallback: string): string => {
+    const responseData = (err as any)?.response?.data;
+    const backendMessage = responseData?.message;
+    if (Array.isArray(backendMessage)) {
+      return backendMessage.join(', ');
+    }
+    if (typeof backendMessage === 'string' && backendMessage.trim().length > 0) {
+      return backendMessage;
+    }
+    if (err instanceof Error && err.message.trim().length > 0) {
+      return err.message;
+    }
+    return fallback;
+  };
+
+  const carregarDiagnosticoConfigFiscal = async () => {
+    try {
+      setLoadingFiscalConfigDiagnostico(true);
+      setFiscalDiagErro(null);
+      setShowFiscalRecommendations(false);
+      const diagnostico = await faturamentoService.obterDiagnosticoConfiguracaoFiscal();
+      setFiscalConfigDiagnostico(diagnostico);
+    } catch (err: unknown) {
+      const message = extractErrorMessage(
+        err,
+        'Nao foi possivel carregar o diagnostico da configuracao fiscal.',
+      );
+      setFiscalDiagErro(message);
+      toastService.error(message);
+    } finally {
+      setLoadingFiscalConfigDiagnostico(false);
+    }
+  };
+
+  const testarConectividadeFiscal = async () => {
+    try {
+      setTestingFiscalConectividade(true);
+      setFiscalDiagErro(null);
+      const diagnostico = await faturamentoService.testarConectividadeFiscal();
+      setFiscalConectividadeDiagnostico(diagnostico);
+      toastService.success('Teste de conectividade fiscal concluido.');
+    } catch (err: unknown) {
+      const message = extractErrorMessage(
+        err,
+        'Nao foi possivel testar a conectividade fiscal.',
+      );
+      setFiscalDiagErro(message);
+      toastService.error(message);
+    } finally {
+      setTestingFiscalConectividade(false);
+    }
+  };
+
+  const executarPreflightFiscal = async () => {
+    try {
+      setRunningFiscalPreflight(true);
+      setFiscalDiagErro(null);
+      setShowFiscalRecommendations(false);
+      const diagnostico = await faturamentoService.executarPreflightFiscal();
+      setFiscalPreflightDiagnostico(diagnostico);
+      setFiscalConfigDiagnostico(diagnostico.configuracao);
+      setFiscalConectividadeDiagnostico(diagnostico.conectividade);
+
+      if (diagnostico.status === 'ok') {
+        toastService.success('Preflight fiscal concluido sem bloqueios.');
+      } else if (diagnostico.status === 'alerta') {
+        toastService.warning('Preflight fiscal concluido com alertas.');
+      } else {
+        toastService.error('Preflight fiscal identificou bloqueios de emissao oficial.');
+      }
+    } catch (err: unknown) {
+      const message = extractErrorMessage(err, 'Nao foi possivel executar o preflight fiscal.');
+      setFiscalDiagErro(message);
+      toastService.error(message);
+    } finally {
+      setRunningFiscalPreflight(false);
+    }
+  };
 
   const handleTabChange = (tabId: EmpresaConfigTabId) => {
     setActiveTab(tabId);
@@ -111,7 +209,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
     setSearchParams(nextParams, { replace: true });
   };
 
-  // 🔐 empresaId removido - backend pega do JWT automaticamente
+  // empresaId removido - backend pega do JWT automaticamente
 
   useEffect(() => {
     const tabFromUrl = searchParams.get('tab');
@@ -119,6 +217,13 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
       setActiveTab(tabFromUrl);
     }
   }, [activeTab, searchParams]);
+
+  useEffect(() => {
+    if (activeTab !== 'fiscal' || fiscalConfigDiagnostico || loadingFiscalConfigDiagnostico) {
+      return;
+    }
+    void carregarDiagnosticoConfigFiscal();
+  }, [activeTab, fiscalConfigDiagnostico, loadingFiscalConfigDiagnostico]);
 
   useEffect(() => {
     if (authLoading) {
@@ -205,7 +310,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
       setSaving(true);
       setError(null);
 
-      // 🔐 Pegar empresaId do usuário autenticado
+      // Pegar empresaId do usuario autenticado
       const empresaId = user?.empresa?.id;
       if (!empresaId) {
         throw new Error('Usuário não possui empresa associada');
@@ -237,7 +342,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
       setHasChanges(false);
       toastService.success('Configurações salvas com sucesso!');
     } catch (err: any) {
-      console.error('❌ Erro ao salvar:', err);
+      console.error('Erro ao salvar:', err);
 
       // Extrair mensagem de erro detalhada do backend
       const errorMessage = err?.response?.data?.message;
@@ -267,10 +372,14 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
     try {
       setSaving(true);
       setError(null);
-      // 🔐 empresaId vem do JWT no backend
+      // empresaId vem do JWT no backend
       const reset = await empresaConfigService.resetConfig();
       setConfig(reset);
       setFormData(reset);
+      setFiscalConfigDiagnostico(null);
+      setFiscalConectividadeDiagnostico(null);
+      setFiscalPreflightDiagnostico(null);
+      setFiscalDiagErro(null);
       if (salesFlagsLoaded) {
         const currentSalesFlags = await oportunidadesService.obterSalesFeatureFlags().catch(() => null);
         if (currentSalesFlags) {
@@ -332,7 +441,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
           const sizeInBytes = (compressedBase64.length * 3) / 4;
           const sizeInKB = Math.round(sizeInBytes / 1024);
 
-          console.log(`✅ Imagem comprimida: ${sizeInKB}KB (${width}x${height})`);
+          console.log(`Imagem comprimida: ${sizeInKB}KB (${width}x${height})`);
 
           resolve(compressedBase64);
         };
@@ -376,7 +485,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
 
       // Feedback visual
       const sizeInKB = Math.round((compressedBase64.length * 3) / 4 / 1024);
-      console.log(`✅ Logo processada com sucesso: ${sizeInKB}KB`);
+      console.log(`Logo processada com sucesso: ${sizeInKB}KB`);
     } catch (err) {
       console.error('Erro ao fazer upload da logo:', err);
       toastService.error('Erro ao processar a imagem. Tente novamente ou escolha outra imagem.');
@@ -491,6 +600,100 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
   );
 
   const canUploadLogo = canUpdateConfig && !uploadingLogo;
+  const fiscalBlockers = fiscalPreflightDiagnostico?.blockers || fiscalConfigDiagnostico?.blockers || [];
+  const fiscalWarnings = fiscalPreflightDiagnostico?.warnings || fiscalConfigDiagnostico?.warnings || [];
+  const fiscalRecommendations =
+    fiscalPreflightDiagnostico?.recommendations || fiscalConfigDiagnostico?.recommendations || [];
+  const fiscalStatus: 'ok' | 'alerta' | 'bloqueio' | null = fiscalPreflightDiagnostico
+    ? fiscalPreflightDiagnostico.status
+    : fiscalConfigDiagnostico
+      ? fiscalConfigDiagnostico.readyForOfficialEmission
+        ? 'ok'
+        : fiscalBlockers.length > 0
+          ? 'bloqueio'
+          : 'alerta'
+      : null;
+  const fiscalStatusLabel =
+    fiscalStatus === 'ok'
+      ? 'Pronto para emissao oficial'
+      : fiscalStatus === 'bloqueio'
+        ? 'Bloqueios de configuracao'
+        : fiscalStatus === 'alerta'
+          ? 'Configuracao com alertas'
+          : 'Sem diagnostico executado';
+  const fiscalStatusClasses =
+    fiscalStatus === 'ok'
+      ? 'border-green-200 bg-green-50 text-green-800'
+      : fiscalStatus === 'bloqueio'
+        ? 'border-red-200 bg-red-50 text-red-800'
+        : fiscalStatus === 'alerta'
+          ? 'border-amber-200 bg-amber-50 text-amber-800'
+          : 'border-[#DCE6EA] bg-[#F8FBFC] text-[#355061]';
+  const fiscalProviderEfetivo =
+    fiscalPreflightDiagnostico?.providerEfetivo || fiscalConfigDiagnostico?.providerEfetivo || '';
+  const fiscalProviderConfigurado = String(formData.fiscalProvider || '')
+    .trim()
+    .toLowerCase();
+  const fiscalProviderPersonalizado =
+    fiscalProviderConfigurado.length > 0 &&
+    !['fiscal_oficial', 'fiscal_stub_local'].includes(fiscalProviderConfigurado);
+  const fiscalProviderSelectValue = fiscalProviderPersonalizado
+    ? '__custom__'
+    : fiscalProviderConfigurado || '__fallback__';
+  const fiscalRequireOfficialHabilitado = Boolean(formData.fiscalRequireOfficialProvider);
+  const fiscalConflitoProviderStub =
+    fiscalRequireOfficialHabilitado && fiscalProviderConfigurado === 'fiscal_stub_local';
+  const fiscalDependenciaFallbackGlobal =
+    fiscalRequireOfficialHabilitado && fiscalProviderConfigurado.length === 0;
+  const fiscalProviderEfetivoNormalizado = String(fiscalProviderEfetivo || '')
+    .trim()
+    .toLowerCase();
+  const fiscalProviderForaDeSincronia =
+    fiscalProviderConfigurado.length > 0 &&
+    fiscalProviderEfetivoNormalizado.length > 0 &&
+    fiscalProviderConfigurado !== fiscalProviderEfetivoNormalizado;
+  const fiscalConfigurationSources = fiscalConfigDiagnostico?.configurationSources;
+  const fiscalGlobalFallbackFields = fiscalConfigDiagnostico?.globalFallbackFields || [];
+  const fiscalUsingGlobalFallback = Boolean(
+    fiscalConfigDiagnostico?.usingGlobalFallback ?? fiscalGlobalFallbackFields.length > 0,
+  );
+  const fiscalSourceLabel = (source?: string): string => {
+    if (source === 'tenant') return 'empresa';
+    if (source === 'env') return 'global';
+    if (source === 'state') return 'estado';
+    return 'padrao';
+  };
+  const fiscalFieldLabelMap: Record<string, string> = {
+    provider: 'Provider',
+    requireOfficialProvider: 'Exigir oficial',
+    officialHttpEnabled: 'Integracao HTTP',
+    officialBaseUrl: 'URL base',
+    officialApiToken: 'Token API',
+    officialWebhookSecret: 'Secret webhook',
+    officialStrictResponse: 'Validacao estrita',
+    webhookAllowInsecure: 'Webhook inseguro',
+    officialCorrelationHeader: 'Header correlacao',
+  };
+  const fiscalGlobalFallbackSummary = fiscalGlobalFallbackFields
+    .slice(0, 4)
+    .map((field) => fiscalFieldLabelMap[field] || field)
+    .join(', ');
+  const fiscalGlobalFallbackSummaryText =
+    fiscalGlobalFallbackSummary || 'configuracoes nao detalhadas';
+
+  const formatarMensagemFiscal = (mensagem: string): string => {
+    return String(mensagem || '')
+      .replace(/FISCAL_PROVIDER/g, 'provider fiscal')
+      .replace(/FISCAL_OFFICIAL_HTTP_ENABLED/g, 'integracao HTTP oficial')
+      .replace(/FISCAL_OFFICIAL_BASE_URL/g, 'URL base oficial')
+      .replace(/FISCAL_OFFICIAL_WEBHOOK_SECRET/g, 'segredo do webhook fiscal')
+      .replace(/FISCAL_OFFICIAL_WEBHOOK_ALLOW_INSECURE/g, 'modo webhook inseguro')
+      .replace(/FISCAL_OFFICIAL_STRICT_RESPONSE/g, 'validacao estrita de contrato');
+  };
+
+  const fiscalRecommendationsPreview = showFiscalRecommendations
+    ? fiscalRecommendations
+    : fiscalRecommendations.slice(0, 2);
 
   if (loading || authLoading) {
     return (
@@ -779,12 +982,12 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                               {uploadingLogo ? 'Enviando...' : 'Fazer Upload'}
                             </label>
                             <p className="text-xs text-gray-500 mt-2">
-                              • Formatos aceitos: JPG, PNG, SVG
+                              ⬢ Formatos aceitos: JPG, PNG, SVG
                               <br />
-                              • Tamanho máximo: 10MB (será otimizada automaticamente)
+                              ⬢ Tamanho máximo: 10MB (será otimizada automaticamente)
                               <br />
-                              • Recomendado: Imagens quadradas (1:1)
-                              <br />• A imagem será redimensionada para 500x500px mantendo a
+                              ⬢ Recomendado: Imagens quadradas (1:1)
+                              <br />⬢ A imagem será redimensionada para 500x500px mantendo a
                               proporção
                             </p>
                             <div className="mt-3 p-3 bg-[#DEEFE7] rounded-lg border border-[#B4BEC9]">
@@ -1282,7 +1485,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                             type="password"
                             value={formData.smtpSenha || ''}
                             onChange={(e) => handleInputChange('smtpSenha', e.target.value)}
-                            placeholder="••••••••••••"
+                            placeholder="************"
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C]"
                           />
                           <p className="text-xs text-gray-500 mt-1">Senha ou token de aplicativo</p>
@@ -1362,6 +1565,424 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                       </div>
                     </>
                   )}
+                </div>
+              )}
+
+              {activeTab === 'fiscal' && (
+                <div className="space-y-6">
+                  <h2 className="text-2xl font-bold text-[#002333] flex items-center gap-2">
+                    <FileText className="h-6 w-6 text-[#159A9C]" />
+                    Configuracoes fiscais por empresa
+                  </h2>
+
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                    <div className="space-y-4 rounded-lg border border-gray-200 p-4">
+                      <h3 className="text-base font-semibold text-[#002333]">Configuracao do tenant</h3>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Provider fiscal da empresa
+                        </label>
+                        <select
+                          value={fiscalProviderSelectValue}
+                          onChange={(e) => {
+                            const selected = e.target.value;
+                            if (selected === '__fallback__') {
+                              handleInputChange('fiscalProvider', '');
+                              return;
+                            }
+                            if (selected === '__custom__') {
+                              if (!fiscalProviderPersonalizado) {
+                                handleInputChange('fiscalProvider', 'custom_provider');
+                              }
+                              return;
+                            }
+                            handleInputChange('fiscalProvider', selected);
+                          }}
+                          disabled={!canUpdateConfig}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] disabled:bg-gray-50 disabled:cursor-not-allowed"
+                        >
+                          <option value="__fallback__">Usar fallback global</option>
+                          <option value="fiscal_oficial">Provider oficial</option>
+                          <option value="fiscal_stub_local">Stub local</option>
+                          <option value="__custom__">Provider customizado</option>
+                        </select>
+                        {fiscalProviderPersonalizado && (
+                          <input
+                            type="text"
+                            value={formData.fiscalProvider || ''}
+                            onChange={(e) => handleInputChange('fiscalProvider', e.target.value)}
+                            placeholder="nome_do_provider"
+                            disabled={!canUpdateConfig}
+                            className="mt-2 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] disabled:bg-gray-50 disabled:cursor-not-allowed"
+                          />
+                        )}
+                        <p className="text-xs text-gray-500 mt-1">
+                          Deixe vazio para usar o fallback global do backend.
+                        </p>
+                        {fiscalConflitoProviderStub && (
+                          <p className="text-xs text-red-600 mt-1">
+                            Provider stub nao atende a exigencia de emissao oficial.
+                          </p>
+                        )}
+                        {fiscalDependenciaFallbackGlobal && (
+                          <p className="text-xs text-amber-700 mt-1">
+                            Com exigencia oficial ativa, depender do fallback global pode gerar variacao entre
+                            empresas.
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            Integracao HTTP oficial habilitada
+                          </label>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(formData.fiscalOfficialHttpEnabled)}
+                          onChange={(e) =>
+                            handleInputChange('fiscalOfficialHttpEnabled', e.target.checked)
+                          }
+                          disabled={!canUpdateConfig}
+                          className="h-5 w-5 text-[#159A9C] rounded focus:ring-[#159A9C] cursor-pointer disabled:cursor-not-allowed"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">
+                              Exigir provider oficial
+                            </label>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Bloqueia emissao com stub para esta empresa.
+                            </p>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(formData.fiscalRequireOfficialProvider)}
+                            onChange={(e) =>
+                              handleInputChange('fiscalRequireOfficialProvider', e.target.checked)
+                            }
+                            disabled={!canUpdateConfig}
+                            className="h-5 w-5 text-[#159A9C] rounded focus:ring-[#159A9C] cursor-pointer disabled:cursor-not-allowed"
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">
+                              Validacao estrita de contrato
+                            </label>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Rejeita retorno fora do mapeamento esperado.
+                            </p>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(formData.fiscalOfficialStrictResponse)}
+                            onChange={(e) =>
+                              handleInputChange('fiscalOfficialStrictResponse', e.target.checked)
+                            }
+                            disabled={!canUpdateConfig}
+                            className="h-5 w-5 text-[#159A9C] rounded focus:ring-[#159A9C] cursor-pointer disabled:cursor-not-allowed"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          URL base do provider oficial
+                        </label>
+                        <input
+                          type="url"
+                          value={formData.fiscalOfficialBaseUrl || ''}
+                          onChange={(e) =>
+                            handleInputChange('fiscalOfficialBaseUrl', e.target.value)
+                          }
+                          placeholder="https://api.seu-provedor-fiscal.com"
+                          disabled={!canUpdateConfig}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] disabled:bg-gray-50 disabled:cursor-not-allowed"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">
+                              Webhook sem assinatura (contingencia)
+                            </label>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Usar apenas em ambiente controlado.
+                            </p>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(formData.fiscalOfficialWebhookAllowInsecure)}
+                            onChange={(e) =>
+                              handleInputChange(
+                                'fiscalOfficialWebhookAllowInsecure',
+                                e.target.checked,
+                              )
+                            }
+                            disabled={!canUpdateConfig}
+                            className="h-5 w-5 text-[#159A9C] rounded focus:ring-[#159A9C] cursor-pointer disabled:cursor-not-allowed"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Header de correlacao
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.fiscalOfficialCorrelationHeader || ''}
+                            onChange={(e) =>
+                              handleInputChange('fiscalOfficialCorrelationHeader', e.target.value)
+                            }
+                            placeholder="X-Correlation-Id"
+                            disabled={!canUpdateConfig}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] disabled:bg-gray-50 disabled:cursor-not-allowed"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Token de API oficial
+                          </label>
+                          <input
+                            type="password"
+                            value={formData.fiscalOfficialApiToken || ''}
+                            onChange={(e) =>
+                              handleInputChange('fiscalOfficialApiToken', e.target.value)
+                            }
+                            placeholder="************"
+                            disabled={!canUpdateConfig}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] disabled:bg-gray-50 disabled:cursor-not-allowed"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Segredo do webhook fiscal
+                          </label>
+                          <input
+                            type="password"
+                            value={formData.fiscalOfficialWebhookSecret || ''}
+                            onChange={(e) =>
+                              handleInputChange('fiscalOfficialWebhookSecret', e.target.value)
+                            }
+                            placeholder="************"
+                            disabled={!canUpdateConfig}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] disabled:bg-gray-50 disabled:cursor-not-allowed"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 rounded-lg border border-gray-200 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <h3 className="text-base font-semibold text-[#002333]">Diagnostico fiscal</h3>
+                        <span
+                          className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${fiscalStatusClasses}`}
+                        >
+                          {fiscalStatusLabel}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void carregarDiagnosticoConfigFiscal()}
+                          disabled={loadingFiscalConfigDiagnostico}
+                          className="px-3 py-2 text-sm font-medium border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          {loadingFiscalConfigDiagnostico
+                            ? 'Atualizando diagnostico...'
+                            : 'Atualizar diagnostico'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void testarConectividadeFiscal()}
+                          disabled={testingFiscalConectividade}
+                          className="px-3 py-2 text-sm font-medium border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          {testingFiscalConectividade
+                            ? 'Testando conectividade...'
+                            : 'Testar conectividade'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void executarPreflightFiscal()}
+                          disabled={runningFiscalPreflight}
+                          className="px-3 py-2 text-sm font-medium bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50"
+                        >
+                          {runningFiscalPreflight ? 'Executando preflight...' : 'Executar preflight'}
+                        </button>
+                      </div>
+
+                      {hasChanges && (
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                          Existem alteracoes pendentes. Salve antes de confiar no diagnostico.
+                        </div>
+                      )}
+
+                      {fiscalDiagErro && (
+                        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                          {fiscalDiagErro}
+                        </div>
+                      )}
+
+                      <div className="rounded-lg border border-[#DCE6EA] bg-[#F8FBFC] p-4">
+                        <p className="text-sm font-medium text-[#244455]">Resumo de prontidao</p>
+                        <div className="mt-2 space-y-1 text-xs text-[#355061]">
+                          <p>
+                            Provider efetivo:{' '}
+                            <span className="font-semibold">
+                              {fiscalProviderEfetivo || 'nao informado'}
+                            </span>
+                          </p>
+                          <p>
+                            Integracao HTTP oficial:{' '}
+                            <span className="font-semibold">
+                              {fiscalConfigDiagnostico?.officialHttpEnabled ? 'ativa' : 'inativa'}
+                            </span>
+                          </p>
+                          <p>
+                            Validacao estrita:{' '}
+                            <span className="font-semibold">
+                              {fiscalConfigDiagnostico?.officialStrictResponse ? 'ativa' : 'inativa'}
+                            </span>
+                          </p>
+                          {fiscalConfigurationSources?.provider && (
+                            <p>
+                              Origem do provider:{' '}
+                              <span className="font-semibold">
+                                {fiscalSourceLabel(fiscalConfigurationSources.provider)}
+                              </span>
+                            </p>
+                          )}
+                          {fiscalConfigurationSources?.officialBaseUrl && (
+                            <p>
+                              Origem da URL base:{' '}
+                              <span className="font-semibold">
+                                {fiscalSourceLabel(fiscalConfigurationSources.officialBaseUrl)}
+                              </span>
+                            </p>
+                          )}
+                          {fiscalPreflightDiagnostico?.timestamp && (
+                            <p>
+                              Ultimo preflight:{' '}
+                              <span className="font-semibold">
+                                {new Date(fiscalPreflightDiagnostico.timestamp).toLocaleString('pt-BR')}
+                              </span>
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {fiscalProviderForaDeSincronia && (
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                          O provider do formulario ainda nao bate com o provider efetivo do
+                          diagnostico. Salve e rode o preflight novamente.
+                        </div>
+                      )}
+
+                      {fiscalUsingGlobalFallback && (
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                          Esta empresa ainda depende de fallback global em:{' '}
+                          {fiscalGlobalFallbackSummaryText}
+                          {fiscalGlobalFallbackFields.length > 4
+                            ? ` e mais ${fiscalGlobalFallbackFields.length - 4} campo(s).`
+                            : '.'}
+                        </div>
+                      )}
+
+                      {fiscalConectividadeDiagnostico && (
+                        <div
+                          className={`rounded-lg border px-3 py-2 text-sm ${
+                            fiscalConectividadeDiagnostico.success
+                              ? 'border-green-200 bg-green-50 text-green-800'
+                              : fiscalConectividadeDiagnostico.attempted
+                                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                                : 'border-[#DCE6EA] bg-[#F8FBFC] text-[#355061]'
+                          }`}
+                        >
+                          <p className="font-medium">
+                            {fiscalConectividadeDiagnostico.success
+                              ? 'Conectividade validada'
+                              : 'Conectividade pendente/limitada'}
+                          </p>
+                          <p className="text-xs mt-1">{fiscalConectividadeDiagnostico.message}</p>
+                          <p className="text-xs mt-2">
+                            {fiscalConectividadeDiagnostico.method || '-'} /{' '}
+                            {fiscalConectividadeDiagnostico.httpStatus ?? '-'} |{' '}
+                            {fiscalConectividadeDiagnostico.latencyMs != null
+                              ? `${fiscalConectividadeDiagnostico.latencyMs}ms`
+                              : '-'}
+                          </p>
+                        </div>
+                      )}
+
+                      {fiscalBlockers.length > 0 && (
+                        <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                          <p className="text-sm font-medium text-red-900">Bloqueios</p>
+                          <ul className="mt-1 space-y-1 text-xs text-red-700">
+                            {fiscalBlockers.map((item, index) => (
+                              <li key={`fiscal-blocker-${index}`}>- {formatarMensagemFiscal(item)}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {fiscalWarnings.length > 0 && (
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                          <p className="text-sm font-medium text-amber-900">Alertas</p>
+                          <ul className="mt-1 space-y-1 text-xs text-amber-700">
+                            {fiscalWarnings.map((item, index) => (
+                              <li key={`fiscal-warning-${index}`}>- {formatarMensagemFiscal(item)}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {fiscalRecommendations.length > 0 && (
+                        <div className="rounded-lg border border-[#B4BEC9] bg-[#DEEFE7] p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-medium text-[#002333]">Acoes sugeridas</p>
+                            {fiscalRecommendations.length > 2 && (
+                              <button
+                                type="button"
+                                onClick={() => setShowFiscalRecommendations((prev) => !prev)}
+                                className="text-xs text-[#0F7B7D] hover:underline"
+                              >
+                                {showFiscalRecommendations ? 'Mostrar menos' : 'Mostrar mais'}
+                              </button>
+                            )}
+                          </div>
+                          <ul className="mt-1 space-y-1 text-xs text-[#355061]">
+                            {fiscalRecommendationsPreview.map((item, index) => (
+                              <li key={`fiscal-recommendation-${index}`}>
+                                - {formatarMensagemFiscal(item)}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {fiscalBlockers.length === 0 &&
+                        fiscalWarnings.length === 0 &&
+                        fiscalRecommendations.length === 0 &&
+                        !fiscalConectividadeDiagnostico && (
+                          <div className="rounded-lg border border-[#DCE6EA] bg-[#F8FBFC] p-3 text-xs text-[#607B89]">
+                            Rode o preflight para carregar os apontamentos desta empresa.
+                          </div>
+                        )}
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -1509,6 +2130,7 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                 activeTab !== 'seguranca' &&
                 activeTab !== 'usuarios' &&
                 activeTab !== 'email' &&
+                activeTab !== 'fiscal' &&
                 activeTab !== 'backup' && (
                   <div className="text-center py-12 text-gray-500">
                     <Info className="h-12 w-12 mx-auto mb-4 text-gray-400" />
@@ -1548,3 +2170,4 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
 };
 
 export default ConfiguracaoEmpresaPage;
+

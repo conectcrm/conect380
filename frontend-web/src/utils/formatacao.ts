@@ -344,33 +344,21 @@ export const gerarCorPorTexto = (texto: string): string => {
  * @returns Nome do cliente ou fallback
  */
 export const obterNomeCliente = (cliente: any, clienteId?: number | string): string => {
-  // 🔍 DEBUG: Log dos dados recebidos
-  console.log('🔍 obterNomeCliente DEBUG:', {
-    cliente,
-    clienteId,
-    clienteType: typeof cliente,
-    clienteKeys: cliente && typeof cliente === 'object' ? Object.keys(cliente) : 'N/A',
-  });
-
   // Se cliente é um objeto com propriedade nome
   if (cliente && typeof cliente === 'object' && cliente.nome) {
-    console.log('✅ Cliente encontrado com nome:', cliente.nome);
     return cliente.nome;
   }
 
   // Se cliente é uma string (nome direto)
   if (typeof cliente === 'string' && cliente.trim()) {
-    console.log('✅ Cliente como string:', cliente.trim());
     return cliente.trim();
   }
 
   // Fallback para ID do cliente
   if (clienteId) {
-    console.log('⚠️ Usando fallback para Cliente ID:', clienteId);
     return `Cliente ID: ${clienteId}`;
   }
 
-  console.log('❌ Nenhum cliente encontrado');
   return 'Cliente não informado';
 };
 

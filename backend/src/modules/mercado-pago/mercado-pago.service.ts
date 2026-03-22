@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MercadoPagoConfig, Customer, Preference, Payment } from 'mercadopago';
@@ -12,9 +12,15 @@ import {
 import { canTransitionSubscriptionStatus } from '../planos/subscription-state-machine';
 import { runWithTenant } from '../../common/tenant/tenant-context';
 import { BillingEvent } from '../faturamento/entities/billing-event.entity';
+import { Fatura, FormaPagamento } from '../faturamento/entities/fatura.entity';
+import { Pagamento, StatusPagamento, TipoPagamento } from '../faturamento/entities/pagamento.entity';
+import { PagamentoService } from '../faturamento/services/pagamento.service';
 
 type ReconciliationSource = 'manual' | 'batch' | 'webhook_duplicate';
 type ReconciliationAction = 'updated' | 'aligned' | 'skipped' | 'error';
+type ExternalReferenceResolution =
+  | { kind: 'assinatura'; empresaId: string; assinaturaId: string }
+  | { kind: 'fatura'; empresaId: string; faturaId: number; referenciaGateway: string };
 
 export type PaymentReconciliationResult = {
   paymentId: string;
@@ -42,6 +48,12 @@ export class MercadoPagoService {
     private readonly assinaturaRepository: Repository<AssinaturaEmpresa>,
     @InjectRepository(BillingEvent)
     private readonly billingEventRepository: Repository<BillingEvent>,
+    @InjectRepository(Fatura)
+    private readonly faturaRepository: Repository<Fatura>,
+    @InjectRepository(Pagamento)
+    private readonly pagamentoRepository: Repository<Pagamento>,
+    @Inject(forwardRef(() => PagamentoService))
+    private readonly pagamentoService: PagamentoService,
   ) {
     this.initializeMercadoPago();
   }
@@ -61,6 +73,46 @@ export class MercadoPagoService {
     }
 
     return { empresaId: match[1], assinaturaId: match[2] };
+  }
+
+  private parseFaturaExternalReference(
+    externalReference?: string,
+  ): { empresaId: string; faturaId: number; referenciaGateway: string } | null {
+    if (!externalReference || typeof externalReference !== 'string') {
+      return null;
+    }
+
+    const valorNormalizado = externalReference.trim();
+    const match = /^fatura:([0-9a-f-]{36}):(\d+)$/i.exec(valorNormalizado);
+
+    if (!match) {
+      return null;
+    }
+
+    const faturaId = Number.parseInt(match[2], 10);
+    if (!Number.isInteger(faturaId) || faturaId <= 0) {
+      return null;
+    }
+
+    return {
+      empresaId: match[1],
+      faturaId,
+      referenciaGateway: valorNormalizado,
+    };
+  }
+
+  private resolveExternalReference(externalReference?: string): ExternalReferenceResolution | null {
+    const assinatura = this.parseExternalReference(externalReference);
+    if (assinatura) {
+      return { kind: 'assinatura', ...assinatura };
+    }
+
+    const fatura = this.parseFaturaExternalReference(externalReference);
+    if (fatura) {
+      return { kind: 'fatura', ...fatura };
+    }
+
+    return null;
   }
 
   private resolveWebhookResourceId(webhookData: any): string | undefined {
@@ -92,8 +144,13 @@ export class MercadoPagoService {
     }
   }
 
-  private async registerPaymentWebhookEvent(payment: any, action: string): Promise<boolean> {
-    const resolved = this.parseExternalReference(payment?.external_reference);
+  private async registerPaymentWebhookEvent(
+    payment: any,
+    action: string,
+    resolvedReference?: ExternalReferenceResolution | null,
+  ): Promise<boolean> {
+    const resolved =
+      resolvedReference || this.resolveExternalReference(payment?.external_reference);
     if (!resolved) {
       return false;
     }
@@ -120,7 +177,9 @@ export class MercadoPagoService {
           paymentId: payment?.id || null,
           paymentStatus,
           action: paymentAction,
-          assinaturaId: resolved.assinaturaId,
+          referenciaTipo: resolved.kind,
+          assinaturaId: resolved.kind === 'assinatura' ? resolved.assinaturaId : null,
+          faturaId: resolved.kind === 'fatura' ? resolved.faturaId : null,
         },
         correlationId,
       });
@@ -183,6 +242,182 @@ export class MercadoPagoService {
     }
 
     return undefined;
+  }
+
+  private mapPaymentStatusToInvoicePaymentStatus(
+    paymentStatusRaw: unknown,
+  ): StatusPagamento | undefined {
+    const paymentStatus = String(paymentStatusRaw || '')
+      .trim()
+      .toLowerCase();
+
+    if (!paymentStatus) {
+      return undefined;
+    }
+
+    if (['approved', 'authorized', 'paid', 'succeeded', 'success'].includes(paymentStatus)) {
+      return StatusPagamento.APROVADO;
+    }
+
+    if (['pending'].includes(paymentStatus)) {
+      return StatusPagamento.PENDENTE;
+    }
+
+    if (['in_process', 'in_mediation', 'processing', 'under_review'].includes(paymentStatus)) {
+      return StatusPagamento.PROCESSANDO;
+    }
+
+    if (['rejected', 'refused', 'denied'].includes(paymentStatus)) {
+      return StatusPagamento.REJEITADO;
+    }
+
+    if (['cancelled', 'canceled'].includes(paymentStatus)) {
+      return StatusPagamento.CANCELADO;
+    }
+
+    if (['refunded', 'charged_back', 'chargeback'].includes(paymentStatus)) {
+      return StatusPagamento.ESTORNADO;
+    }
+
+    return undefined;
+  }
+
+  private extractPaymentAmount(payment: any): number {
+    const candidates = [
+      payment?.transaction_amount,
+      payment?.transaction_details?.total_paid_amount,
+      payment?.transaction_details?.net_received_amount,
+    ];
+
+    for (const candidate of candidates) {
+      const parsed = Number(candidate);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        return Number(parsed.toFixed(2));
+      }
+    }
+
+    return 0;
+  }
+
+  private isPagamentoNotFoundError(error: unknown): boolean {
+    if (error instanceof NotFoundException) {
+      return true;
+    }
+    const mensagem = String((error as any)?.message || '').toLowerCase();
+    return mensagem.includes('pagamento') && mensagem.includes('encontr');
+  }
+
+  private gerarTransacaoPagamentoWebhook(paymentId: string): string {
+    const normalizado = String(paymentId || 'mp')
+      .replace(/[^a-z0-9_-]/gi, '')
+      .slice(0, 32)
+      .toUpperCase();
+    const sufixo = Date.now().toString(36).toUpperCase();
+    return `MP-${normalizado || 'WEBHOOK'}-${sufixo}`;
+  }
+
+  private async garantirPagamentoPendenteFatura(params: {
+    empresaId: string;
+    faturaId: number;
+    referenciaGateway: string;
+    payment: any;
+  }): Promise<void> {
+    const { empresaId, faturaId, referenciaGateway, payment } = params;
+    const existente = await this.pagamentoRepository.findOne({
+      where: { empresaId, faturaId, gatewayTransacaoId: referenciaGateway },
+    });
+    if (existente) {
+      return;
+    }
+
+    const fatura = await this.faturaRepository.findOne({
+      where: { id: faturaId, empresaId },
+    });
+    if (!fatura) {
+      throw new NotFoundException(`Fatura ${faturaId} nao encontrada para empresa ${empresaId}`);
+    }
+
+    const valorRestante = Number(
+      Math.max(Number(fatura.valorTotal || 0) - Number(fatura.valorPago || 0), 0).toFixed(2),
+    );
+    const valorGateway = this.extractPaymentAmount(payment);
+    const valorPagamento = valorGateway > 0 ? valorGateway : valorRestante || Number(fatura.valorTotal || 0);
+
+    const pagamento = this.pagamentoRepository.create({
+      empresaId,
+      faturaId,
+      transacaoId: this.gerarTransacaoPagamentoWebhook(payment?.id),
+      tipo: TipoPagamento.PAGAMENTO,
+      status: StatusPagamento.PENDENTE,
+      valor: Number(valorPagamento.toFixed(2)),
+      taxa: 0,
+      valorLiquido: Number(valorPagamento.toFixed(2)),
+      metodoPagamento: String(fatura.formaPagamentoPreferida || FormaPagamento.A_COMBINAR),
+      gateway: 'mercadopago',
+      gatewayTransacaoId: referenciaGateway,
+      gatewayStatusRaw: String(payment?.status || 'pending'),
+      dadosCompletos: {
+        externalReference: referenciaGateway,
+        mercadoPagoPaymentId: String(payment?.id || ''),
+        origem: 'mercadopago.webhook',
+      } as any,
+      observacoes: `Pagamento criado automaticamente via webhook Mercado Pago (${payment?.id || 'n/a'}).`,
+      dataProcessamento: new Date(),
+    });
+
+    await this.pagamentoRepository.save(pagamento);
+  }
+
+  private async reconcileInvoiceFromPayment(
+    payment: any,
+    action: string,
+    resolvedReference: Extract<ExternalReferenceResolution, { kind: 'fatura' }>,
+  ): Promise<void> {
+    const novoStatus = this.mapPaymentStatusToInvoicePaymentStatus(payment?.status);
+    if (!novoStatus) {
+      this.logger.log(
+        `Webhook Mercado Pago payment=${payment?.id} com status nao mapeado para faturamento (${payment?.status || 'unknown'})`,
+      );
+      return;
+    }
+
+    const paymentId = String(payment?.id || '').trim() || 'unknown';
+    const correlationId = `mp:${paymentId}:${String(action || 'updated').trim().toLowerCase()}`.slice(
+      0,
+      180,
+    );
+    const origemId = `mercadopago:webhook:${paymentId}`.slice(0, 180);
+
+    const dto = {
+      gatewayTransacaoId: resolvedReference.referenciaGateway,
+      novoStatus,
+      motivoRejeicao:
+        novoStatus === StatusPagamento.REJEITADO
+          ? String(payment?.status_detail || payment?.status || 'rejeitado')
+          : undefined,
+      webhookData: payment,
+      correlationId,
+      origemId,
+    };
+
+    await runWithTenant(resolvedReference.empresaId, async () => {
+      try {
+        await this.pagamentoService.processarPagamento(dto as any, resolvedReference.empresaId);
+      } catch (error) {
+        if (!this.isPagamentoNotFoundError(error)) {
+          throw error;
+        }
+
+        await this.garantirPagamentoPendenteFatura({
+          empresaId: resolvedReference.empresaId,
+          faturaId: resolvedReference.faturaId,
+          referenciaGateway: resolvedReference.referenciaGateway,
+          payment,
+        });
+
+        await this.pagamentoService.processarPagamento(dto as any, resolvedReference.empresaId);
+      }
+    });
   }
 
   private async appendReconciliationBillingEvent(
@@ -819,9 +1054,25 @@ export class MercadoPagoService {
       }
 
       const payment = await this.getPayment(paymentId);
-      const duplicateWebhook = await this.registerPaymentWebhookEvent(payment, action);
+      const resolvedReference = this.resolveExternalReference(payment?.external_reference);
+      const duplicateWebhook = await this.registerPaymentWebhookEvent(
+        payment,
+        action,
+        resolvedReference,
+      );
       if (duplicateWebhook) {
-        await this.reconcileSubscriptionFromPayment(payment, 'webhook_duplicate');
+        if (resolvedReference?.kind === 'assinatura') {
+          await this.reconcileSubscriptionFromPayment(payment, 'webhook_duplicate');
+        } else if (resolvedReference?.kind === 'fatura') {
+          this.logger.log(
+            `Webhook duplicado de faturamento ignorado payment=${payment?.id} fatura=${resolvedReference.faturaId}`,
+          );
+        }
+        return;
+      }
+
+      if (resolvedReference?.kind === 'fatura') {
+        await this.reconcileInvoiceFromPayment(payment, action, resolvedReference);
         return;
       }
 
@@ -1131,4 +1382,3 @@ export class MercadoPagoService {
     }
   }
 }
-

@@ -298,6 +298,41 @@ export class EmpresaConfig {
   @Column({ name: 'webhooks_ativos', default: 0 })
   webhooksAtivos: number;
 
+  @Column({ name: 'fiscal_provider', nullable: true })
+  fiscalProvider: string | null;
+
+  @Column({ name: 'fiscal_official_http_enabled', nullable: true })
+  fiscalOfficialHttpEnabled: boolean | null;
+
+  @Column({ name: 'fiscal_require_official_provider', nullable: true })
+  fiscalRequireOfficialProvider: boolean | null;
+
+  @Column({ name: 'fiscal_official_base_url', nullable: true })
+  fiscalOfficialBaseUrl: string | null;
+
+  @Column({ name: 'fiscal_official_strict_response', nullable: true })
+  fiscalOfficialStrictResponse: boolean | null;
+
+  @Column({ name: 'fiscal_official_webhook_allow_insecure', nullable: true })
+  fiscalOfficialWebhookAllowInsecure: boolean | null;
+
+  @Column({ name: 'fiscal_official_correlation_header', nullable: true })
+  fiscalOfficialCorrelationHeader: string | null;
+
+  @Column({
+    name: 'fiscal_official_api_token',
+    nullable: true,
+    transformer: encryptedNullableStringTransformer,
+  })
+  fiscalOfficialApiToken: string | null;
+
+  @Column({
+    name: 'fiscal_official_webhook_secret',
+    nullable: true,
+    transformer: encryptedNullableStringTransformer,
+  })
+  fiscalOfficialWebhookSecret: string | null;
+
   // Configurações de Backup
   @Column({ name: 'backup_automatico', default: true })
   backupAutomatico: boolean;

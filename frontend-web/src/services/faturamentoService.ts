@@ -280,6 +280,22 @@ export interface ResultadoCobrancaLote {
   resultados: ResultadoCobrancaLoteItem[];
 }
 
+export type TipoDocumentoFinanceiro =
+  | 'fatura'
+  | 'recibo'
+  | 'nfse'
+  | 'nfe'
+  | 'folha_pagamento'
+  | 'outro';
+
+export interface NumeroDocumentoFinanceiroGerado {
+  tipoDocumento: TipoDocumentoFinanceiro;
+  prefixo: string;
+  ano: number;
+  sequencial: number;
+  numero: string;
+}
+
 export type TipoDocumentoFiscal = 'nfse' | 'nfe';
 export type AmbienteDocumentoFiscal = 'homologacao' | 'producao';
 export type StatusDocumentoFiscal =
@@ -290,6 +306,7 @@ export type StatusDocumentoFiscal =
   | 'erro'
   | 'cancelada';
 export type OperacaoDocumentoFiscal = 'cancelar' | 'inutilizar';
+export type ModoProcessamentoDocumentoFiscal = 'sincrono' | 'lote';
 
 export interface DocumentoFiscalHistoricoEvento {
   timestamp: string;
@@ -314,6 +331,10 @@ export interface DocumentoFiscalStatus {
   loteId: string | null;
   ultimaMensagem: string | null;
   atualizadoEm: string | null;
+  modoProcessamento: ModoProcessamentoDocumentoFiscal;
+  contingencia: boolean;
+  codigoRetorno: string | null;
+  referenciaExterna: string | null;
   historico: DocumentoFiscalHistoricoEvento[];
   resumo: {
     valorServicos: number;
@@ -322,11 +343,85 @@ export interface DocumentoFiscalStatus {
   };
 }
 
+export interface DocumentoFiscalConfiguracaoDiagnostico {
+  configurationSources?: {
+    provider: 'tenant' | 'env' | 'default' | 'state';
+    requireOfficialProvider: 'tenant' | 'env' | 'default' | 'state';
+    officialHttpEnabled: 'tenant' | 'env' | 'default' | 'state';
+    officialBaseUrl: 'tenant' | 'env' | 'default' | 'state';
+    officialApiToken: 'tenant' | 'env' | 'default' | 'state';
+    officialWebhookSecret: 'tenant' | 'env' | 'default' | 'state';
+    officialStrictResponse: 'tenant' | 'env' | 'default' | 'state';
+    webhookAllowInsecure: 'tenant' | 'env' | 'default' | 'state';
+    officialCorrelationHeader: 'tenant' | 'env' | 'default' | 'state';
+  };
+  usingGlobalFallback?: boolean;
+  globalFallbackFields?: string[];
+  providerEfetivo: string;
+  officialProviderSelected: boolean;
+  readyForOfficialEmission: boolean;
+  requireOfficialProvider: boolean;
+  officialHttpEnabled: boolean;
+  officialBaseUrlConfigured: boolean;
+  officialStrictResponse: boolean;
+  webhookSecretConfigured: boolean;
+  webhookAllowInsecure: boolean;
+  officialCorrelationHeader: string;
+  responseRootPaths: string[];
+  blockers: string[];
+  warnings: string[];
+  recommendations: string[];
+  responseAliases: {
+    status: string[];
+    codigo: string[];
+    numero: string[];
+    serie: string[];
+    chaveAcesso: string[];
+    protocolo: string[];
+    lote: string[];
+    mensagem: string[];
+    referenciaExterna: string[];
+  };
+}
+
+export interface DocumentoFiscalConectividadeDiagnostico {
+  providerEfetivo: string;
+  officialProviderSelected: boolean;
+  readyForOfficialEmission: boolean;
+  officialHttpEnabled: boolean;
+  officialBaseUrlConfigured: boolean;
+  attempted: boolean;
+  reachable: boolean;
+  success: boolean;
+  endpoint: string | null;
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | null;
+  httpStatus: number | null;
+  latencyMs: number | null;
+  requestId: string | null;
+  correlationId: string | null;
+  message: string;
+  timestamp: string;
+}
+
+export interface DocumentoFiscalPreflightDiagnostico {
+  providerEfetivo: string;
+  readyForOfficialEmission: boolean;
+  status: 'ok' | 'alerta' | 'bloqueio';
+  blockers: string[];
+  warnings: string[];
+  recommendations: string[];
+  configuracao: DocumentoFiscalConfiguracaoDiagnostico;
+  conectividade: DocumentoFiscalConectividadeDiagnostico;
+  timestamp: string;
+}
+
 export interface DocumentoFiscalPayload {
   tipo?: TipoDocumentoFiscal;
   ambiente?: AmbienteDocumentoFiscal;
   observacoes?: string;
   forcarReemissao?: boolean;
+  modoProcessamento?: ModoProcessamentoDocumentoFiscal;
+  contingencia?: boolean;
 }
 
 export interface DocumentoFiscalCancelamentoPayload {
@@ -417,8 +512,6 @@ export const faturamentoService = {
   async criarFatura(dadosFatura: NovaFatura): Promise<Fatura> {
     let backendData: any;
     try {
-      console.log('💰 [FRONTEND] Dados originais da fatura:', JSON.stringify(dadosFatura, null, 2));
-
       // Transform data to match backend DTO structure
       backendData = {
         clienteId: dadosFatura.clienteId,
@@ -461,11 +554,6 @@ export const faturamentoService = {
       if (dadosFatura.formaPagamento) {
         backendData.formaPagamentoPreferida = dadosFatura.formaPagamento;
       }
-
-      console.log(
-        '💰 [FRONTEND] Dados transformados para backend:',
-        JSON.stringify(backendData, null, 2),
-      );
 
       const response = await api.post('/faturamento/faturas', backendData);
       return response.data.data || response.data;
@@ -646,6 +734,25 @@ export const faturamentoService = {
     }
   },
 
+  async gerarNumeroDocumentoFinanceiro(
+    tipoDocumento: TipoDocumentoFinanceiro,
+    anoReferencia?: number,
+  ): Promise<NumeroDocumentoFinanceiroGerado> {
+    try {
+      const body: { tipoDocumento: TipoDocumentoFinanceiro; anoReferencia?: number } = {
+        tipoDocumento,
+      };
+      if (typeof anoReferencia === 'number' && Number.isFinite(anoReferencia)) {
+        body.anoReferencia = Math.trunc(anoReferencia);
+      }
+      const response = await api.post('/faturamento/faturas/documento/gerar-numero', body);
+      return response.data?.data || response.data;
+    } catch (error) {
+      console.error('Erro ao gerar numero do documento financeiro:', error);
+      throw error;
+    }
+  },
+
   async criarRascunhoDocumentoFiscal(
     id: number,
     payload?: DocumentoFiscalPayload,
@@ -674,9 +781,13 @@ export const faturamentoService = {
     }
   },
 
-  async obterStatusDocumentoFiscal(id: number): Promise<DocumentoFiscalStatus> {
+  async obterStatusDocumentoFiscal(
+    id: number,
+    options?: { sincronizar?: boolean },
+  ): Promise<DocumentoFiscalStatus> {
     try {
-      const response = await api.get(`/faturamento/faturas/${id}/documento-fiscal/status`);
+      const sincronizar = options?.sincronizar === true ? '?sincronizar=true' : '';
+      const response = await api.get(`/faturamento/faturas/${id}/documento-fiscal/status${sincronizar}`);
       return response.data?.data || response.data;
     } catch (error) {
       console.error('Erro ao consultar status do documento fiscal:', error);
@@ -697,12 +808,45 @@ export const faturamentoService = {
     }
   },
 
+  async obterDiagnosticoConfiguracaoFiscal(): Promise<DocumentoFiscalConfiguracaoDiagnostico> {
+    try {
+      const response = await api.get('/faturamento/documento-fiscal/configuracao');
+      return response.data?.data || response.data;
+    } catch (error) {
+      console.error('Erro ao consultar diagnostico de configuracao fiscal:', error);
+      throw error;
+    }
+  },
+
+  async testarConectividadeFiscal(): Promise<DocumentoFiscalConectividadeDiagnostico> {
+    try {
+      const response = await api.get('/faturamento/documento-fiscal/conectividade');
+      return response.data?.data || response.data;
+    } catch (error) {
+      console.error('Erro ao testar conectividade fiscal:', error);
+      throw error;
+    }
+  },
+
+  async executarPreflightFiscal(): Promise<DocumentoFiscalPreflightDiagnostico> {
+    try {
+      const response = await api.get('/faturamento/documento-fiscal/preflight');
+      return response.data?.data || response.data;
+    } catch (error) {
+      console.error('Erro ao executar preflight fiscal:', error);
+      throw error;
+    }
+  },
+
   async gerarLinkPagamento(id: number): Promise<string> {
     try {
-      void id;
-      throw new Error(
-        'Link de pagamento ainda nao esta disponivel na API de faturamento desta versao',
-      );
+      const response = await api.post(`/faturamento/faturas/${id}/link-pagamento`);
+      const payload = response?.data?.data || response?.data || {};
+      const link = typeof payload?.link === 'string' ? payload.link.trim() : '';
+      if (!link) {
+        throw new Error('API nao retornou um link de pagamento valido.');
+      }
+      return link;
     } catch (error) {
       console.error('Erro ao gerar link de pagamento:', error);
       throw error;
