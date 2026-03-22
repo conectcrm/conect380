@@ -3,6 +3,14 @@
 import { spawn } from 'node:child_process';
 import process from 'node:process';
 
+const DEFAULT_E2E_DB_ENV = {
+  DATABASE_HOST: 'localhost',
+  DATABASE_PORT: '5434',
+  DATABASE_NAME: 'conectcrm_test',
+  DATABASE_USERNAME: 'conectcrm',
+  DATABASE_PASSWORD: 'conectcrm123',
+};
+
 const steps = [
   {
     name: 'Release flags (GO Full)',
@@ -42,6 +50,25 @@ const steps = [
   },
 ];
 
+function needsBackendE2eDbEnv(step) {
+  return typeof step?.name === 'string' && step.name.toLowerCase().includes('backend e2e');
+}
+
+function buildStepEnv(step) {
+  const env = { ...process.env };
+  if (!needsBackendE2eDbEnv(step)) {
+    return env;
+  }
+
+  for (const [key, value] of Object.entries(DEFAULT_E2E_DB_ENV)) {
+    if (!env[key]) {
+      env[key] = value;
+    }
+  }
+
+  return env;
+}
+
 function runStep(step) {
   return new Promise((resolve, reject) => {
     // eslint-disable-next-line no-console
@@ -52,7 +79,7 @@ function runStep(step) {
     const child = spawn(step.cmd, step.args, {
       stdio: 'inherit',
       shell: process.platform === 'win32',
-      env: process.env,
+      env: buildStepEnv(step),
     });
 
     child.on('close', (code) => {

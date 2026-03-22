@@ -4,6 +4,7 @@ param(
   [string]$RlsDatabase = "conectcrm_test",
   [string]$RlsUser = "conectcrm",
   [string]$RlsPassword = "conectcrm123",
+  [switch]$SkipAtendimento,
   [switch]$SkipApplyRls,
   [switch]$SkipRls,
   [switch]$SkipIsolationE2E,
@@ -168,9 +169,14 @@ try {
     Add-Result -Step "Validate lint budget" -Status "SKIP" -Details "SkipLintBudget enabled"
   }
 
-  Run-Step -Name "E2E atendimento triagem" -Action {
-    npm --prefix backend run test:e2e -- test/atendimento/triagem.e2e-spec.ts
-    if ($LASTEXITCODE -ne 0) { throw "triagem.e2e-spec.ts failed" }
+  if (-not $SkipAtendimento) {
+    Run-Step -Name "E2E atendimento triagem" -Action {
+      npm --prefix backend run test:e2e -- test/atendimento/triagem.e2e-spec.ts
+      if ($LASTEXITCODE -ne 0) { throw "triagem.e2e-spec.ts failed" }
+    }
+  }
+  else {
+    Add-Result -Step "E2E atendimento triagem" -Status "SKIP" -Details "SkipAtendimento enabled"
   }
 
   if (-not $SkipIsolationE2E) {
