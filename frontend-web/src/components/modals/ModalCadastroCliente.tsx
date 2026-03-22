@@ -7,6 +7,7 @@ import { AlertCircle, Building, Clock, Mail, User, X, Loader2 } from 'lucide-rea
 import { CreateClientePayload } from '../../services/clientesService';
 
 type ClienteTipo = 'pessoa_fisica' | 'pessoa_juridica';
+type ClienteStatus = 'lead' | 'prospect' | 'cliente' | 'inativo';
 type PhoneCountry = {
   iso2: string;
   name: string;
@@ -32,7 +33,7 @@ interface ClienteModalData {
   telefone?: string;
   tipo?: ClienteTipo;
   documento?: string;
-  status?: 'cliente' | 'lead' | 'prospect' | 'inativo';
+  status?: ClienteStatus;
   cep?: string;
   endereco?: string;
   cidade?: string;
@@ -50,6 +51,7 @@ interface ClienteFormData {
   nome: string;
   email?: string;
   telefone?: string;
+  status: ClienteStatus;
   tipo: ClienteTipo;
   cpf?: string;
   cnpj?: string;
@@ -356,6 +358,7 @@ const defaultValues: ClienteFormData = {
   nome: '',
   email: '',
   telefone: '',
+  status: 'prospect',
   tipo: 'pessoa_fisica',
   cpf: '',
   cnpj: '',
@@ -376,6 +379,10 @@ const defaultValues: ClienteFormData = {
 
 const clienteSchema = yup
   .object({
+    status: yup
+      .string()
+      .required('Categoria do cadastro e obrigatoria')
+      .oneOf(['prospect', 'cliente'], 'Categoria do cadastro invalida'),
     tipo: yup.string().required().oneOf(['pessoa_fisica', 'pessoa_juridica']),
     cpf: yup.string().when('tipo', {
       is: 'pessoa_fisica',
@@ -530,6 +537,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
         nome: cliente.nome || '',
         email: cliente.email || '',
         telefone: toE164(parsedPhone.country, parsedPhone.nationalNumber),
+        status: cliente.status === 'cliente' ? 'cliente' : 'prospect',
         tipo: cliente.tipo || 'pessoa_fisica',
         cpf: cliente.tipo === 'pessoa_fisica' ? formatarCPF(cliente.documento || '') : '',
         cnpj: cliente.tipo === 'pessoa_juridica' ? formatarCNPJ(cliente.documento || '') : '',
@@ -619,7 +627,7 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
           data.tipo === 'pessoa_fisica'
             ? data.cpf?.replace(/\D/g, '')
             : data.cnpj?.replace(/\D/g, ''),
-        status: cliente?.status ?? 'lead',
+        status: data.status,
         cep: data.cep ? data.cep.replace(/\D/g, '') : undefined,
         endereco: endereco || undefined,
         cidade: data.cidade?.trim() || undefined,
@@ -723,6 +731,22 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                     <option value="pessoa_fisica">Pessoa fisica</option>
                     <option value="pessoa_juridica">Pessoa juridica</option>
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Categoria do cadastro *
+                  </label>
+                  <select {...register('status')} className={inputClass}>
+                    <option value="prospect">Prospect</option>
+                    <option value="cliente">Cliente</option>
+                  </select>
+                  {errors.status && (
+                    <p className="mt-1 text-xs text-red-600 flex items-center">
+                      <AlertCircle className="w-3 h-3 mr-1" />
+                      {errors.status.message}
+                    </p>
+                  )}
                 </div>
 
                 {watchedTipo === 'pessoa_fisica' ? (

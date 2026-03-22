@@ -18,6 +18,8 @@ import { Atividade, TipoAtividade } from './atividade.entity';
 import { OportunidadeStageEvent } from './oportunidade-stage-event.entity';
 import { DashboardV2JobsService } from '../dashboard-v2/dashboard-v2.jobs.service';
 import { Lead, OrigemLead, StatusLead } from '../leads/lead.entity';
+import { ClientesService } from '../clientes/clientes.service';
+import { StatusCliente } from '../clientes/cliente.entity';
 import {
   CreateOportunidadeDto,
   CreateOportunidadeItemPreliminarDto,
@@ -563,6 +565,7 @@ export class OportunidadesService {
     private readonly leadRepository: Repository<Lead>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private readonly clientesService: ClientesService,
     @Optional()
     private readonly notificationService?: NotificationService,
     @Optional()
@@ -672,6 +675,38 @@ export class OportunidadesService {
     } catch (error) {
       this.logger.warn(
         `Falha ao notificar gestores sobre venda concluida (${input.oportunidade.id}): ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  private async maybePromoteClienteFromWonOpportunity(input: {
+    empresaId: string;
+    oportunidade: Oportunidade;
+  }): Promise<void> {
+    const clienteIdRaw = (input.oportunidade as any).cliente_id;
+    const clienteId = typeof clienteIdRaw === 'string' ? clienteIdRaw.trim() : '';
+    if (!clienteId) {
+      return;
+    }
+
+    try {
+      const cliente = await this.clientesService.findById(clienteId, input.empresaId);
+      if (!cliente) {
+        return;
+      }
+
+      const currentStatus = (cliente as any).status as StatusCliente | undefined;
+      if (currentStatus === StatusCliente.CLIENTE || currentStatus === StatusCliente.INATIVO) {
+        return;
+      }
+
+      await this.clientesService.updateStatus(clienteId, input.empresaId, StatusCliente.CLIENTE);
+    } catch (error) {
+      this.logger.warn(
+        `[OportunidadesService] Nao foi possivel promover cliente ${clienteId} para status cliente apos oportunidade ${input.oportunidade.id} ser marcada como ganha.`,
+      );
+      this.logger.debug(
+        `[OportunidadesService] Detalhes: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -2528,6 +2563,10 @@ export class OportunidadesService {
         actorUserId: actorUserId ?? oportunidade.responsavel_id,
         source: 'update',
       });
+      await this.maybePromoteClienteFromWonOpportunity({
+        empresaId,
+        oportunidade: oportunidadeAtualizada,
+      });
     }
 
     return oportunidadeAtualizada;
@@ -2677,6 +2716,10 @@ export class OportunidadesService {
         oportunidade: oportunidadeAtualizada,
         actorUserId: actorUserId ?? oportunidade.responsavel_id,
         source: 'update_estagio',
+      });
+      await this.maybePromoteClienteFromWonOpportunity({
+        empresaId,
+        oportunidade: oportunidadeAtualizada,
       });
     }
 

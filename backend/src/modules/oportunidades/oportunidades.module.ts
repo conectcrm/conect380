@@ -8,6 +8,7 @@ import { OportunidadeStageEvent } from './oportunidade-stage-event.entity';
 import { OportunidadeItemPreliminar } from './oportunidade-item-preliminar.entity';
 import { DashboardV2Module } from '../dashboard-v2/dashboard-v2.module';
 import { PropostasModule } from '../propostas/propostas.module';
+import { ClientesModule } from '../clientes/clientes.module';
 import { FeatureFlagTenant } from '../dashboard-v2/entities/feature-flag-tenant.entity';
 import { Empresa } from '../../empresas/entities/empresa.entity';
 import { OportunidadesStaleMonitorService } from './oportunidades-stale-monitor.service';
@@ -29,6 +30,7 @@ import { NotificationModule } from '../../notifications/notification.module';
     ]),
     DashboardV2Module,
     NotificationModule,
+    ClientesModule,
     forwardRef(() => PropostasModule),
   ],
   controllers: [OportunidadesController],
