@@ -395,7 +395,11 @@ const clienteSchema = yup
         }),
       otherwise: (schema) => schema.notRequired(),
     }),
-    nome: yup.string().required('Nome e obrigatorio').min(3).max(100),
+    nome: yup.string().when('tipo', {
+      is: 'pessoa_juridica',
+      then: (schema) => schema.required('Razao social e obrigatoria').min(3).max(100),
+      otherwise: (schema) => schema.required('Nome e obrigatorio').min(3).max(100),
+    }),
     email: yup
       .string()
       .transform((value) => {
@@ -474,6 +478,9 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
   const watchedNome = watch('nome') || '';
   const watchedEmail = watch('email') || '';
   const watchedTelefone = watch('telefone') || '';
+  const nomeFieldLabel = watchedTipo === 'pessoa_juridica' ? 'Razao social' : 'Nome completo';
+  const nomeFieldPlaceholder =
+    watchedTipo === 'pessoa_juridica' ? 'Digite a razao social' : 'Digite o nome completo';
   const selectedPhoneCountry = useMemo(
     () => getPhoneCountryByIso(phoneCountryIso),
     [phoneCountryIso],
@@ -766,13 +773,13 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nome completo *
+                    {nomeFieldLabel} *
                   </label>
                   <input
                     {...register('nome')}
                     type="text"
                     className={inputClass}
-                    placeholder="Digite o nome completo"
+                    placeholder={nomeFieldPlaceholder}
                   />
                   {errors.nome && (
                     <p className="mt-1 text-xs text-red-600 flex items-center">
@@ -859,7 +866,9 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                 </div>
 
                 <p className="rounded-md border border-[#DCE8EC] bg-[#F6FBFC] px-3 py-2 text-xs text-[#355061]">
-                  Obrigatorio: tipo, CPF/CNPJ, nome e pelo menos um contato (e-mail ou telefone).
+                  Obrigatorio: tipo, {watchedTipo === 'pessoa_fisica' ? 'CPF' : 'CNPJ'},{' '}
+                  {watchedTipo === 'pessoa_fisica' ? 'nome completo' : 'razao social'} e pelo menos
+                  um contato (e-mail ou telefone).
                 </p>
               </div>
 
@@ -957,21 +966,13 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Ultimo contato
                       </label>
-                      <input
-                        {...register('ultimo_contato')}
-                        type="date"
-                        className={inputClass}
-                      />
+                      <input {...register('ultimo_contato')} type="date" className={inputClass} />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Proximo contato
                       </label>
-                      <input
-                        {...register('proximo_contato')}
-                        type="date"
-                        className={inputClass}
-                      />
+                      <input {...register('proximo_contato')} type="date" className={inputClass} />
                     </div>
                   </div>
                 </div>
@@ -1039,7 +1040,8 @@ const ModalCadastroCliente: React.FC<ModalCadastroClienteProps> = ({
             <div className="sticky bottom-0 border-t border-gray-200 bg-gray-50 px-1 py-4">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-sm text-gray-500 text-center sm:text-left">
-                  Campos permitidos no fluxo atual: identificacao, contato, endereco, follow-up, comercial, tags e observacoes.
+                  Campos permitidos no fluxo atual: identificacao, contato, endereco, follow-up,
+                  comercial, tags e observacoes.
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">

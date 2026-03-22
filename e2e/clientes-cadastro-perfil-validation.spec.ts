@@ -401,6 +401,25 @@ test.describe("Clientes - cadastro e perfil QA complementar", () => {
     await suppressDevServerOverlay(authenticatedPage);
   });
 
+  test("ajusta label do nome para pessoa juridica", async ({ authenticatedPage }) => {
+    await authenticatedPage.getByRole("button", { name: /Novo Cliente/i }).click();
+
+    await expect(authenticatedPage.locator("label", { hasText: "Nome completo *" })).toBeVisible();
+    await expect(authenticatedPage.getByPlaceholder("Digite o nome completo")).toBeVisible();
+
+    await authenticatedPage.locator('select[name="tipo"]').selectOption("pessoa_juridica");
+
+    await expect(authenticatedPage.locator("label", { hasText: "Razao social *" })).toBeVisible();
+    await expect(authenticatedPage.getByPlaceholder("00.000.000/0000-00")).toBeVisible();
+    await expect(authenticatedPage.getByPlaceholder("Digite a razao social")).toBeVisible();
+
+    await authenticatedPage.locator('select[name="tipo"]').selectOption("pessoa_fisica");
+
+    await expect(authenticatedPage.locator("label", { hasText: "Nome completo *" })).toBeVisible();
+    await expect(authenticatedPage.getByPlaceholder("000.000.000-00")).toBeVisible();
+    await expect(authenticatedPage.getByPlaceholder("Digite o nome completo")).toBeVisible();
+  });
+
   test("cria cliente com dados adicionais e valida sucesso", async ({ authenticatedPage }) => {
     await authenticatedPage.getByRole("button", { name: /Novo Cliente/i }).click();
     await authenticatedPage.getByPlaceholder("000.000.000-00").fill("529.982.247-25");
