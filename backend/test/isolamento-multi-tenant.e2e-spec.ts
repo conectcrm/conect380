@@ -85,6 +85,21 @@ describe('Isolamento Multi-Tenant (E2E)', () => {
     empresaAId = await criarEmpresa('A');
     empresaBId = await criarEmpresa('B');
 
+    // JwtStrategy exige assinatura ativa para tenants comuns.
+    // Como este E2E foca em isolamento multi-tenant (RLS + scoping),
+    // marcamos as empresas como platform owner para evitar acoplamento em billing/catalogo.
+    await dataSource.query(
+      `
+        UPDATE empresas
+        SET configuracoes = (
+          COALESCE(configuracoes::jsonb, '{}'::jsonb)
+          || '{"isPlatformOwner": true, "billingExempt": true, "billingMonitorOnly": true, "fullModuleAccess": true}'::jsonb
+        )::json
+        WHERE id = ANY($1::uuid[])
+      `,
+      [[empresaAId, empresaBId]],
+    );
+
     const senhaHash = await bcrypt.hash(testPassword, 10);
 
     await dataSource.query(
@@ -159,7 +174,7 @@ describe('Isolamento Multi-Tenant (E2E)', () => {
         .send({
           nome: 'Cliente A E2E',
           email: `cliente-a-${runId}@teste.com`,
-          telefone: '11999999999',
+          telefone: '+5511999999999',
           tipo: 'pessoa_fisica',
         })
         .expect(201);
@@ -176,7 +191,7 @@ describe('Isolamento Multi-Tenant (E2E)', () => {
         .send({
           nome: 'Cliente B E2E',
           email: `cliente-b-${runId}@teste.com`,
-          telefone: '11988888888',
+          telefone: '+5511988888888',
           tipo: 'pessoa_fisica',
         })
         .expect(201);
@@ -297,6 +312,4 @@ describe('Isolamento Multi-Tenant (E2E)', () => {
     });
   });
 });
-
-
 

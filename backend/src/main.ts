@@ -22,6 +22,23 @@ import { resolveJwtSecret } from './config/jwt.config';
 
 const HTTP_METHOD_KEYS = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head'];
 
+// When this process is spawned from a parent that may close stdout/stderr (e.g. CI runners / detached shells),
+// Node can crash with EPIPE during console writes. Ignore broken pipe errors to keep the API alive.
+const swallowBrokenPipe = (stream: NodeJS.WritableStream | undefined) => {
+  if (!stream || typeof (stream as any).on !== 'function') {
+    return;
+  }
+
+  stream.on('error', (err: any) => {
+    if (err && err.code === 'EPIPE') {
+      return;
+    }
+  });
+};
+
+swallowBrokenPipe(process.stdout);
+swallowBrokenPipe(process.stderr);
+
 const isGuardianOpenApiPath = (path: string): boolean => {
   const normalized = String(path || '').toLowerCase();
   return (
@@ -523,9 +540,14 @@ async function bootstrap() {
       }
     }
 
-    // Porta padrão ajustada para 3001 para alinhar com frontend e documentação
+    // Porta padrão ajustada para 3001 para alinhar com frontend e documentação.
+    //
+    // Em alguns ambientes Windows (principalmente com Docker Desktop / stacks locais),
+    // o bind padrão em IPv6 ("::") pode falhar com EADDRINUSE mesmo quando IPv4 está livre.
+    // Usar host explícito (IPv4) evita esse flake e mantém o serviço acessível em rede.
     const port = process.env.APP_PORT || 3001;
-    await app.listen(port);
+    const host = (process.env.APP_HOST || '0.0.0.0').trim();
+    await app.listen(port, host);
 
     const protocol = sslEnabled && httpsOptions ? 'https' : 'http';
     console.log(`🚀 Conect CRM Backend rodando na porta ${port} (${protocol.toUpperCase()})`);

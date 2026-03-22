@@ -106,6 +106,10 @@ services:
       args:
         REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:3500}
         REACT_APP_WS_URL: ${REACT_APP_WS_URL:-http://localhost:3500}
+        # GO Core (MVP): manter MVP mode ligado para bloquear rotas pos-MVP.
+        REACT_APP_MVP_MODE: ${REACT_APP_MVP_MODE:-true}
+        # Inbox/chat no build de producao depende desta flag.
+        REACT_APP_ENABLE_OMNICHANNEL: ${REACT_APP_ENABLE_OMNICHANNEL:-false}
     container_name: conectcrm-frontend
     restart: unless-stopped
     ports:

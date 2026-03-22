@@ -14,7 +14,6 @@ const MVP_MODE_ENABLED = process.env.REACT_APP_MVP_MODE === 'true';
 
 const MVP_ALLOWED_TOP_LEVEL_MENU_IDS = new Set<string>([
   'dashboard',
-  'atendimento',
   'comercial',
   'financeiro',
   'configuracoes',
@@ -22,11 +21,6 @@ const MVP_ALLOWED_TOP_LEVEL_MENU_IDS = new Set<string>([
 ]);
 
 const MVP_ALLOWED_CHILD_MENU_IDS = new Set<string>([
-  'atendimento-inbox',
-  'atendimento-tickets',
-  'atendimento-automacoes',
-  'atendimento-equipe',
-  'atendimento-configuracoes',
   'comercial-leads',
   'comercial-pipeline',
   'comercial-propostas',
@@ -82,7 +76,22 @@ const BLOCKED_FINANCE_INFO: MvpBlockedRouteInfo = {
   ],
 };
 
+const BLOCKED_SUPPORT_INFO: MvpBlockedRouteInfo = {
+  moduleName: 'Atendimento (Omnichannel)',
+  description:
+    'Este modulo foi removido do MVP inicial para reduzir risco operacional enquanto passa por estabilizacao e ajustes de UX.',
+  estimatedCompletion: 'Pos-MVP',
+  features: [
+    'Inbox/Chat omnichannel',
+    'Tickets + fluxo de triagem completo',
+    'Distribuicao automatica e capacidade por atendente',
+    'SLA tracking e automacoes completas',
+  ],
+};
+
 const BLOCKED_ROUTE_RULES: MvpBlockedRouteRule[] = [
+  { prefix: '/atendimento', info: BLOCKED_SUPPORT_INFO },
+  { prefix: '/nuclei/atendimento', info: BLOCKED_SUPPORT_INFO },
   { prefix: '/billing', info: BLOCKED_FINANCE_INFO },
   { prefix: '/assinaturas', info: BLOCKED_FINANCE_INFO },
   { prefix: '/faturamento', info: BLOCKED_FINANCE_INFO },

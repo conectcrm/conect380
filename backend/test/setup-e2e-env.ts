@@ -12,6 +12,8 @@ process.env.E2E_BOOTSTRAP_LOCK_IN_TEST ??= 'false';
 process.env.JWT_SECRET ??= 'test-jwt-secret';
 process.env.AUTH_ADMIN_MFA_REQUIRED ??= 'false';
 process.env.AUTH_LOGIN_LOCKOUT_ENABLED ??= 'false';
+// Evita flakiness/dep. externa (Puppeteer/Chrome) nas suites E2E que criam contratos.
+process.env.CONTRATOS_PDF_DISABLE ??= 'true';
 process.env.DATABASE_HOST ??= 'localhost';
 process.env.DATABASE_PORT ??= '5433';
 process.env.DATABASE_USERNAME ??= 'postgres';

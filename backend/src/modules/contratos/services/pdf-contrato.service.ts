@@ -24,6 +24,14 @@ export class PdfContratoService {
     this.ensureUploadsDirectory();
   }
 
+  private shouldBypassPdfGeneration(): boolean {
+    const token = String(process.env.CONTRATOS_PDF_DISABLE || '')
+      .trim()
+      .toLowerCase();
+
+    return token === 'true' || token === '1' || token === 'yes';
+  }
+
   async gerarPDFContrato(contrato: Contrato): Promise<string> {
     try {
       this.ensureUploadsDirectory();
@@ -70,6 +78,11 @@ export class PdfContratoService {
   }
 
   private async htmlParaPdf(html: string): Promise<Buffer> {
+    if (this.shouldBypassPdfGeneration()) {
+      // Placeholder suficiente para hash/leitura em testes.
+      return Buffer.from('%PDF-1.4\n% Conect360 contrato placeholder (PDF geracao desabilitada)\n');
+    }
+
     const executablePath = this.resolveBrowserExecutablePath();
 
     let lastError: unknown = null;

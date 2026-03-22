@@ -174,10 +174,12 @@ test.describe('MVP UI Smoke', () => {
       ]);
 
       await assertRouteLoads(page, '/atendimento/analytics', [
+        'atendimento',
         'analytics',
         'tickets',
         'desempenho',
         'sla',
+        'em desenvolvimento',
       ]);
     }
   });
