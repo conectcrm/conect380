@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import ModalNovoContato from '../../components/contatos/ModalNovoContato';
 import ModalCadastroCliente from '../../components/modals/ModalCadastroCliente';
+import ModalPlanoCobranca from '../../components/modals/ModalPlanoCobranca';
 import { AvatarUpload } from '../../components/upload/AvatarUpload';
 import { FileUpload } from '../../components/upload/FileUpload';
 import {
@@ -34,6 +35,7 @@ import {
 } from '../../components/layout-v2';
 import { useGlobalConfirmation } from '../../contexts/GlobalConfirmationContext';
 import { isOmnichannelEnabled } from '../../config/featureFlags';
+import { useAuth } from '../../hooks/useAuth';
 import {
   Cliente,
   ClienteAttachment,
@@ -45,6 +47,12 @@ import {
   clientesService,
 } from '../../services/clientesService';
 import { Contato, contatosService } from '../../services/contatosService';
+import {
+  faturamentoService,
+  PlanoCobranca as PlanoCobrancaApi,
+  StatusPlanoCobranca,
+  TipoRecorrencia,
+} from '../../services/faturamentoService';
 import { UploadResult } from '../../services/uploadService';
 
 type DemandasResumo = {
@@ -62,12 +70,14 @@ type ClientePerfilTab =
   | 'tickets'
   | 'propostas'
   | 'contratos'
+  | 'recorrencias'
   | 'faturas'
   | 'omnichannel';
 
 type TicketsFiltroTab = 'abertos' | 'resolvidos';
 type PropostasFiltroTab = 'pendentes' | 'negociacao' | 'aprovadas' | 'encerradas';
 type ContratosFiltroTab = 'pendentes' | 'assinados' | 'encerrados';
+type RecorrenciasFiltroTab = 'ativas' | 'pausadas' | 'canceladas' | 'expiradas';
 type FaturasFiltroTab = 'pendentes' | 'pagas' | 'vencidas' | 'outras';
 
 const ticketStatusLabelMap: Record<string, string> = {
@@ -232,6 +242,28 @@ const faturaStatusClassMap: Record<string, string> = {
   parcialmente_paga: 'border-cyan-200 bg-cyan-50 text-cyan-700',
 };
 
+const planoStatusLabelMap: Record<string, string> = {
+  [StatusPlanoCobranca.ATIVO]: 'Ativo',
+  [StatusPlanoCobranca.PAUSADO]: 'Pausado',
+  [StatusPlanoCobranca.CANCELADO]: 'Cancelado',
+  [StatusPlanoCobranca.EXPIRADO]: 'Expirado',
+};
+
+const planoStatusClassMap: Record<string, string> = {
+  [StatusPlanoCobranca.ATIVO]: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  [StatusPlanoCobranca.PAUSADO]: 'border-amber-200 bg-amber-50 text-amber-700',
+  [StatusPlanoCobranca.CANCELADO]: 'border-rose-200 bg-rose-50 text-rose-700',
+  [StatusPlanoCobranca.EXPIRADO]: 'border-slate-200 bg-slate-50 text-slate-700',
+};
+
+const tipoRecorrenciaLabelMap: Record<string, string> = {
+  [TipoRecorrencia.MENSAL]: 'Mensal',
+  [TipoRecorrencia.TRIMESTRAL]: 'Trimestral',
+  [TipoRecorrencia.SEMESTRAL]: 'Semestral',
+  [TipoRecorrencia.ANUAL]: 'Anual',
+  [TipoRecorrencia.PERSONALIZADO]: 'Personalizado',
+};
+
 const isTicketResolvidoStatus = (status?: string): boolean => {
   const normalized = (status || '').toUpperCase();
   return normalized === 'CONCLUIDO' || normalized === 'ENCERRADO' || normalized === 'CANCELADO';
@@ -319,11 +351,13 @@ const ClienteDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { confirm } = useGlobalConfirmation();
+  const { user } = useAuth();
 
   const baseClientesPath = useMemo(
     () => resolveBaseClientesPath(location.pathname),
     [location.pathname],
   );
+  const usuarioResponsavelId = String(user?.id || '').trim();
 
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [attachments, setAttachments] = useState<ClienteAttachment[]>([]);
@@ -356,6 +390,16 @@ const ClienteDetailPage: React.FC = () => {
   const [contratosFiltroTab, setContratosFiltroTab] = useState<ContratosFiltroTab>('pendentes');
   const [propostasFiltroTab, setPropostasFiltroTab] = useState<PropostasFiltroTab>('pendentes');
   const [faturasFiltroTab, setFaturasFiltroTab] = useState<FaturasFiltroTab>('pendentes');
+  const [planosCobranca, setPlanosCobranca] = useState<PlanoCobrancaApi[]>([]);
+  const [planosCobrancaLoading, setPlanosCobrancaLoading] = useState(false);
+  const [planosCobrancaTotal, setPlanosCobrancaTotal] = useState<number | null>(null);
+  const [recorrenciasFiltroTab, setRecorrenciasFiltroTab] =
+    useState<RecorrenciasFiltroTab>('ativas');
+  const [isPlanoModalOpen, setIsPlanoModalOpen] = useState(false);
+  const [planoAction, setPlanoAction] = useState<{
+    id: number;
+    action: 'gerar' | 'pausar' | 'reativar' | 'cancelar';
+  } | null>(null);
 
   const loadCliente = useCallback(async (clienteId: string): Promise<Cliente> => {
     return clientesService.getClienteById(clienteId);
@@ -444,6 +488,30 @@ const ClienteDetailPage: React.FC = () => {
     setContextoLoading(false);
   }, []);
 
+  const loadPlanosCobranca = useCallback(
+    async (clienteId: string, silent = false): Promise<PlanoCobrancaApi[]> => {
+      try {
+        setPlanosCobrancaLoading(true);
+        const data = await faturamentoService.listarPlanosCobranca({ clienteId });
+        const lista = Array.isArray(data) ? data : [];
+        setPlanosCobranca(lista);
+        setPlanosCobrancaTotal(lista.length);
+        return lista;
+      } catch (fetchError) {
+        console.error('Erro ao carregar recorrencias do cliente:', fetchError);
+        setPlanosCobranca([]);
+        setPlanosCobrancaTotal(0);
+        if (!silent) {
+          toast.error('Nao foi possivel carregar as recorrencias deste cliente.');
+        }
+        return [];
+      } finally {
+        setPlanosCobrancaLoading(false);
+      }
+    },
+    [],
+  );
+
   const loadPageData = useCallback(async () => {
     if (!id) {
       setLoading(false);
@@ -491,7 +559,18 @@ const ClienteDetailPage: React.FC = () => {
     setContratosFiltroTab('pendentes');
     setPropostasFiltroTab('pendentes');
     setFaturasFiltroTab('pendentes');
+    setRecorrenciasFiltroTab('ativas');
+    setPlanosCobranca([]);
+    setPlanosCobrancaTotal(null);
+    setIsPlanoModalOpen(false);
+    setPlanoAction(null);
   }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    if (activeTab !== 'recorrencias') return;
+    void loadPlanosCobranca(id);
+  }, [activeTab, id, loadPlanosCobranca]);
 
   const handleSaveCliente = async (
     clienteData: Omit<Cliente, 'id' | 'created_at' | 'updated_at'>,
@@ -614,6 +693,92 @@ const ClienteDetailPage: React.FC = () => {
       toast.error('Nao foi possivel remover o contato.');
     } finally {
       setContatoActionId(null);
+    }
+  };
+
+  const handleOpenNovaRecorrencia = () => {
+    if (!id) return;
+    if (!usuarioResponsavelId) {
+      toast.error('Usuario responsavel nao identificado.');
+      return;
+    }
+    setIsPlanoModalOpen(true);
+  };
+
+  const handleGerarFaturaPlano = async (plano: PlanoCobrancaApi) => {
+    if (!id) return;
+
+    try {
+      setPlanoAction({ id: plano.id, action: 'gerar' });
+      const fatura = await faturamentoService.gerarFaturaPlanoCobranca(plano.id);
+      toast.success('Fatura gerada com sucesso.');
+      await loadPlanosCobranca(id, true);
+      const query = `clienteId=${encodeURIComponent(id)}&cliente=${encodeURIComponent(
+        cliente?.nome || '',
+      )}`;
+      navigate(`/financeiro/faturamento?faturaId=${String(fatura.id)}&${query}`);
+    } catch (error) {
+      console.error('Erro ao gerar fatura do plano:', error);
+      toast.error('Nao foi possivel gerar a fatura.');
+    } finally {
+      setPlanoAction(null);
+    }
+  };
+
+  const handlePausarPlano = async (plano: PlanoCobrancaApi) => {
+    if (!id) return;
+
+    const shouldPause = await confirm(`Pausar a recorrencia "${plano.nome}"?`);
+    if (!shouldPause) return;
+
+    try {
+      setPlanoAction({ id: plano.id, action: 'pausar' });
+      await faturamentoService.pausarPlanoCobranca(plano.id);
+      toast.success('Recorrencia pausada.');
+      await loadPlanosCobranca(id, true);
+    } catch (error) {
+      console.error('Erro ao pausar recorrencia:', error);
+      toast.error('Nao foi possivel pausar a recorrencia.');
+    } finally {
+      setPlanoAction(null);
+    }
+  };
+
+  const handleReativarPlano = async (plano: PlanoCobrancaApi) => {
+    if (!id) return;
+
+    const shouldReactivate = await confirm(`Reativar a recorrencia "${plano.nome}"?`);
+    if (!shouldReactivate) return;
+
+    try {
+      setPlanoAction({ id: plano.id, action: 'reativar' });
+      await faturamentoService.reativarPlanoCobranca(plano.id);
+      toast.success('Recorrencia reativada.');
+      await loadPlanosCobranca(id, true);
+    } catch (error) {
+      console.error('Erro ao reativar recorrencia:', error);
+      toast.error('Nao foi possivel reativar a recorrencia.');
+    } finally {
+      setPlanoAction(null);
+    }
+  };
+
+  const handleCancelarPlano = async (plano: PlanoCobrancaApi) => {
+    if (!id) return;
+
+    const shouldCancel = await confirm(`Cancelar a recorrencia "${plano.nome}"?`);
+    if (!shouldCancel) return;
+
+    try {
+      setPlanoAction({ id: plano.id, action: 'cancelar' });
+      await faturamentoService.cancelarPlanoCobranca(plano.id);
+      toast.success('Recorrencia cancelada.');
+      await loadPlanosCobranca(id, true);
+    } catch (error) {
+      console.error('Erro ao cancelar recorrencia:', error);
+      toast.error('Nao foi possivel cancelar a recorrencia.');
+    } finally {
+      setPlanoAction(null);
     }
   };
 
@@ -741,6 +906,36 @@ const ClienteDetailPage: React.FC = () => {
           ? faturasVencidas
           : faturasOutras;
 
+  const sortPlanosDesc = (itens: PlanoCobrancaApi[]): PlanoCobrancaApi[] => {
+    return [...itens].sort((a, b) => {
+      const aKey = String(a.updatedAt || a.createdAt || '');
+      const bKey = String(b.updatedAt || b.createdAt || '');
+      return toTimestamp(bKey) - toTimestamp(aKey);
+    });
+  };
+
+  const planosAtivos = sortPlanosDesc(
+    planosCobranca.filter((plano) => plano.status === StatusPlanoCobranca.ATIVO),
+  );
+  const planosPausados = sortPlanosDesc(
+    planosCobranca.filter((plano) => plano.status === StatusPlanoCobranca.PAUSADO),
+  );
+  const planosCancelados = sortPlanosDesc(
+    planosCobranca.filter((plano) => plano.status === StatusPlanoCobranca.CANCELADO),
+  );
+  const planosExpirados = sortPlanosDesc(
+    planosCobranca.filter((plano) => plano.status === StatusPlanoCobranca.EXPIRADO),
+  );
+
+  const planosExibidos =
+    recorrenciasFiltroTab === 'ativas'
+      ? planosAtivos
+      : recorrenciasFiltroTab === 'pausadas'
+        ? planosPausados
+        : recorrenciasFiltroTab === 'canceladas'
+          ? planosCancelados
+          : planosExpirados;
+
   const profileTabs: Array<{
     key: ClientePerfilTab;
     label: string;
@@ -797,6 +992,13 @@ const ClienteDetailPage: React.FC = () => {
       tone: contratosResumo && contratosResumo.pendentes > 0 ? 'warning' : 'neutral',
     },
     {
+      key: 'recorrencias',
+      label: 'Recorrencias',
+      value: planosCobrancaTotal === null ? '--' : String(planosCobrancaTotal),
+      tone:
+        typeof planosCobrancaTotal === 'number' && planosCobrancaTotal > 0 ? 'accent' : 'neutral',
+    },
+    {
       key: 'faturas',
       label: 'Faturas',
       value: faturasResumo === null ? '--' : String(faturasResumo.total),
@@ -835,6 +1037,7 @@ const ClienteDetailPage: React.FC = () => {
   const showTicketsSection = activeTab === 'tickets';
   const showPropostasSection = activeTab === 'propostas';
   const showContratosSection = activeTab === 'contratos';
+  const showRecorrenciasSection = activeTab === 'recorrencias';
   const showFaturasSection = activeTab === 'faturas';
   const showTagsSection = activeTab === 'tipo';
   const showAnexosCard = activeTab === 'anexos';
@@ -852,6 +1055,7 @@ const ClienteDetailPage: React.FC = () => {
     showTicketsSection ||
     showPropostasSection ||
     showContratosSection ||
+    showRecorrenciasSection ||
     showFaturasSection ||
     showTagsSection;
 
@@ -1773,6 +1977,209 @@ const ClienteDetailPage: React.FC = () => {
                 </section>
               ) : null}
 
+              {showRecorrenciasSection ? (
+                <section className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-base font-semibold text-[#19384C]">Recorrencias</h3>
+                    <button
+                      type="button"
+                      onClick={handleOpenNovaRecorrencia}
+                      className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#0F7B7D]"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Nova
+                    </button>
+                  </div>
+
+                  <div className="inline-flex items-center rounded-lg border border-[#DCE8EC] bg-[#F8FCFD] p-1">
+                    <button
+                      type="button"
+                      onClick={() => setRecorrenciasFiltroTab('ativas')}
+                      className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                        recorrenciasFiltroTab === 'ativas'
+                          ? 'bg-white text-[#0F7B7D] shadow-sm'
+                          : 'text-[#607B89] hover:text-[#355061]'
+                      }`}
+                    >
+                      Ativas
+                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[11px] text-emerald-700">
+                        {planosAtivos.length}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRecorrenciasFiltroTab('pausadas')}
+                      className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                        recorrenciasFiltroTab === 'pausadas'
+                          ? 'bg-white text-[#0F7B7D] shadow-sm'
+                          : 'text-[#607B89] hover:text-[#355061]'
+                      }`}
+                    >
+                      Pausadas
+                      <span className="rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-700">
+                        {planosPausados.length}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRecorrenciasFiltroTab('canceladas')}
+                      className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                        recorrenciasFiltroTab === 'canceladas'
+                          ? 'bg-white text-[#0F7B7D] shadow-sm'
+                          : 'text-[#607B89] hover:text-[#355061]'
+                      }`}
+                    >
+                      Canceladas
+                      <span className="rounded-full border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[11px] text-rose-700">
+                        {planosCancelados.length}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRecorrenciasFiltroTab('expiradas')}
+                      className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                        recorrenciasFiltroTab === 'expiradas'
+                          ? 'bg-white text-[#0F7B7D] shadow-sm'
+                          : 'text-[#607B89] hover:text-[#355061]'
+                      }`}
+                    >
+                      Expiradas
+                      <span className="rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-700">
+                        {planosExpirados.length}
+                      </span>
+                    </button>
+                  </div>
+
+                  {planosCobrancaLoading ? (
+                    <div className="flex items-center gap-2 rounded-xl border border-[#DCE8EC] bg-[#FBFDFE] p-3 text-sm text-[#607B89]">
+                      <Loader2 className="h-4 w-4 animate-spin text-[#159A9C]" />
+                      Carregando recorrencias...
+                    </div>
+                  ) : planosExibidos.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-[#D1E0E5] bg-[#FBFDFE] p-3 text-sm text-[#607B89]">
+                      {recorrenciasFiltroTab === 'ativas'
+                        ? 'Nenhuma recorrencia ativa para este cliente.'
+                        : recorrenciasFiltroTab === 'pausadas'
+                          ? 'Nenhuma recorrencia pausada para este cliente.'
+                          : recorrenciasFiltroTab === 'canceladas'
+                            ? 'Nenhuma recorrencia cancelada para este cliente.'
+                            : 'Nenhuma recorrencia expirada para este cliente.'}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {planosExibidos.map((plano) => {
+                        const statusLabel =
+                          planoStatusLabelMap[plano.status] || plano.status || 'Sem status';
+                        const statusClass =
+                          planoStatusClassMap[plano.status] ||
+                          'border-slate-200 bg-slate-50 text-slate-700';
+                        const periodicidade =
+                          tipoRecorrenciaLabelMap[plano.tipoRecorrencia] ||
+                          plano.tipoRecorrencia ||
+                          'Recorrencia';
+                        const isActing = planoAction?.id === plano.id;
+
+                        return (
+                          <div
+                            key={plano.id}
+                            className="rounded-xl border border-[#DCE8EC] bg-white p-3"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <Link
+                                  to={`/contratos/${String(plano.contratoId)}`}
+                                  className="text-sm font-semibold text-[#159A9C] hover:text-[#0F7B7D]"
+                                >
+                                  {plano.nome || `Recorrencia ${plano.id}`}
+                                </Link>
+                                <p className="mt-1 text-xs text-[#607B89]">
+                                  {periodicidade} • Vence dia {plano.diaVencimento} • Proxima:{' '}
+                                  {formatDate(plano.proximaCobranca || undefined)}
+                                </p>
+                                <p className="mt-1 text-xs font-medium text-[#355061]">
+                                  Valor: {formatCurrency(plano.valorRecorrente)}
+                                </p>
+                              </div>
+                              <span
+                                className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${statusClass}`}
+                              >
+                                {statusLabel}
+                              </span>
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              {plano.status === StatusPlanoCobranca.ATIVO ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      void handleGerarFaturaPlano(plano);
+                                    }}
+                                    className="inline-flex items-center gap-2 rounded-lg border border-[#D4E2E7] px-2.5 py-1 text-xs font-medium text-[#355061] transition-colors hover:bg-[#F6FBFC] disabled:cursor-not-allowed disabled:opacity-60"
+                                    disabled={isActing}
+                                  >
+                                    {isActing && planoAction?.action === 'gerar' ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin text-[#159A9C]" />
+                                    ) : null}
+                                    Gerar fatura
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      void handlePausarPlano(plano);
+                                    }}
+                                    className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                    disabled={isActing}
+                                  >
+                                    {isActing && planoAction?.action === 'pausar' ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-700" />
+                                    ) : null}
+                                    Pausar
+                                  </button>
+                                </>
+                              ) : null}
+
+                              {plano.status === StatusPlanoCobranca.PAUSADO ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    void handleReativarPlano(plano);
+                                  }}
+                                  className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                  disabled={isActing}
+                                >
+                                  {isActing && planoAction?.action === 'reativar' ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-700" />
+                                  ) : null}
+                                  Reativar
+                                </button>
+                              ) : null}
+
+                              {plano.status !== StatusPlanoCobranca.CANCELADO &&
+                              plano.status !== StatusPlanoCobranca.EXPIRADO ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    void handleCancelarPlano(plano);
+                                  }}
+                                  className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-800 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                  disabled={isActing}
+                                >
+                                  {isActing && planoAction?.action === 'cancelar' ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin text-red-700" />
+                                  ) : null}
+                                  Cancelar
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </section>
+              ) : null}
+
               {showFaturasSection ? (
                 <section className="space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2005,6 +2412,16 @@ const ClienteDetailPage: React.FC = () => {
         contato={contatoSelecionado}
         clienteId={id}
         clienteNome={cliente.nome}
+      />
+
+      <ModalPlanoCobranca
+        isOpen={isPlanoModalOpen}
+        onClose={() => setIsPlanoModalOpen(false)}
+        clienteId={id}
+        usuarioResponsavelId={usuarioResponsavelId}
+        onCreated={() => {
+          void loadPlanosCobranca(id, true);
+        }}
       />
     </div>
   );

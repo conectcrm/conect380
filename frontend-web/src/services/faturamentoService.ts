@@ -36,6 +36,21 @@ export enum StatusPagamento {
   ESTORNADO = 'estornado',
 }
 
+export enum StatusPlanoCobranca {
+  ATIVO = 'ativo',
+  PAUSADO = 'pausado',
+  CANCELADO = 'cancelado',
+  EXPIRADO = 'expirado',
+}
+
+export enum TipoRecorrencia {
+  MENSAL = 'mensal',
+  TRIMESTRAL = 'trimestral',
+  SEMESTRAL = 'semestral',
+  ANUAL = 'anual',
+  PERSONALIZADO = 'personalizado',
+}
+
 // Interfaces
 export interface ItemFatura {
   id?: number;
@@ -203,34 +218,65 @@ export interface FiltrosFatura {
 
 export interface PlanoCobranca {
   id: number;
+  codigo?: string;
+  contratoId: number;
+  contrato?: any;
+  clienteId: string;
+  usuarioResponsavelId: string;
+  usuarioResponsavel?: any;
   nome: string;
-  descricao?: string;
-  valor: number;
-  tipo: 'mensal' | 'anual' | 'unico' | 'personalizado';
-  status: 'ativo' | 'inativo' | 'arquivado';
-  clienteId?: number;
-  contratoId?: number;
-  diasVencimento: number;
-  formaPagamento: FormaPagamento;
+  descricao?: string | null;
+  tipoRecorrencia: TipoRecorrencia;
+  intervaloRecorrencia?: number;
+  status: StatusPlanoCobranca;
+  valorRecorrente: number;
+  diaVencimento: number;
   dataInicio: string;
-  dataFim?: string;
-  observacoes?: string;
-  criadoEm: string;
-  atualizadoEm: string;
+  dataFim?: string | null;
+  proximaCobranca?: string | null;
+  limiteCiclos?: number | null;
+  ciclosExecutados?: number;
+  jurosAtraso?: number;
+  multaAtraso?: number;
+  diasTolerancia?: number;
+  enviarLembrete?: boolean;
+  diasAntesLembrete?: number;
+  configuracoes?: {
+    metodoPagamentoPreferido?: string;
+    notificacoesEmail?: boolean;
+    notificacoesSMS?: boolean;
+    tentativasCobranca?: number;
+    webhookUrl?: string;
+  } | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface NovoPlanoCobranca {
+  contratoId: number;
+  clienteId: string; // UUID string
+  usuarioResponsavelId: string;
   nome: string;
   descricao?: string;
-  valor: number;
-  tipo: 'mensal' | 'anual' | 'unico' | 'personalizado';
-  clienteId?: number;
-  contratoId?: number;
-  diasVencimento: number;
-  formaPagamento: FormaPagamento;
+  tipoRecorrencia: TipoRecorrencia;
+  intervaloRecorrencia?: number;
+  valorRecorrente: number;
+  diaVencimento: number;
   dataInicio: string;
   dataFim?: string;
-  observacoes?: string;
+  limiteCiclos?: number;
+  jurosAtraso?: number;
+  multaAtraso?: number;
+  diasTolerancia?: number;
+  enviarLembrete?: boolean;
+  diasAntesLembrete?: number;
+  configuracoes?: {
+    metodoPagamentoPreferido?: string;
+    notificacoesEmail?: boolean;
+    notificacoesSMS?: boolean;
+    tentativasCobranca?: number;
+    webhookUrl?: string;
+  };
 }
 
 // Tipos compartilhados
@@ -918,10 +964,23 @@ export const faturamentoService = {
 
   // ==================== PLANOS DE COBRANÇA ====================
 
-  async listarPlanosCobranca(): Promise<PlanoCobranca[]> {
+  async listarPlanosCobranca(filtros?: {
+    status?: StatusPlanoCobranca;
+    clienteId?: string;
+    contratoId?: number;
+  }): Promise<PlanoCobranca[]> {
     try {
-      const response = await api.get('/faturamento/planos-cobranca');
-      return response.data.data || response.data;
+      const params = new URLSearchParams();
+      if (filtros?.status) params.append('status', String(filtros.status));
+      if (filtros?.clienteId) params.append('clienteId', String(filtros.clienteId));
+      if (typeof filtros?.contratoId === 'number' && Number.isFinite(filtros.contratoId)) {
+        params.append('contratoId', String(filtros.contratoId));
+      }
+
+      const qs = params.toString();
+      const response = await api.get(`/faturamento/planos-cobranca${qs ? `?${qs}` : ''}`);
+      const payload = response.data?.data ?? response.data ?? [];
+      return Array.isArray(payload) ? payload : [];
     } catch (error) {
       console.error('Erro ao listar planos de cobrança:', error);
       throw error;
@@ -939,6 +998,49 @@ export const faturamentoService = {
   },
 
   // ==================== RELATÓRIOS ====================
+
+  async pausarPlanoCobranca(id: number): Promise<PlanoCobranca> {
+    try {
+      const response = await api.put(`/faturamento/planos-cobranca/${id}/pausar`);
+      return response.data?.data || response.data;
+    } catch (error) {
+      console.error('Erro ao pausar plano de cobranÃ§a:', error);
+      throw error;
+    }
+  },
+
+  async reativarPlanoCobranca(id: number): Promise<PlanoCobranca> {
+    try {
+      const response = await api.put(`/faturamento/planos-cobranca/${id}/reativar`);
+      return response.data?.data || response.data;
+    } catch (error) {
+      console.error('Erro ao reativar plano de cobranÃ§a:', error);
+      throw error;
+    }
+  },
+
+  async cancelarPlanoCobranca(id: number, motivo?: string): Promise<PlanoCobranca> {
+    try {
+      const response = await api.put(
+        `/faturamento/planos-cobranca/${id}/cancelar`,
+        motivo ? { motivo } : {},
+      );
+      return response.data?.data || response.data;
+    } catch (error) {
+      console.error('Erro ao cancelar plano de cobranÃ§a:', error);
+      throw error;
+    }
+  },
+
+  async gerarFaturaPlanoCobranca(id: number): Promise<Fatura> {
+    try {
+      const response = await api.post(`/faturamento/planos-cobranca/${id}/gerar-fatura`);
+      return response.data?.data || response.data;
+    } catch (error) {
+      console.error('Erro ao gerar fatura para plano de cobranÃ§a:', error);
+      throw error;
+    }
+  },
 
   async obterEstatisticas(periodo?: { inicio: string; fim: string }) {
     try {

@@ -772,10 +772,15 @@ export class FaturamentoController {
   async buscarPlanosCobranca(
     @EmpresaId() empresaId: string,
     @Query('status') status?: StatusPlanoCobranca,
-    @Query('clienteId') clienteId?: number,
-    @Query('contratoId') contratoId?: number,
+    @Query('clienteId') clienteId?: string,
+    @Query('contratoId') contratoId?: string,
   ) {
-    const filtros = { status, clienteId, contratoId };
+    const contratoIdNumber = contratoId ? Number(contratoId) : undefined;
+    const filtros = {
+      status,
+      clienteId: clienteId?.trim() || undefined,
+      contratoId: Number.isFinite(contratoIdNumber) ? contratoIdNumber : undefined,
+    };
     const planos = await this.cobrancaService.buscarPlanosCobranca(empresaId, filtros);
 
     return {
