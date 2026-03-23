@@ -254,6 +254,114 @@ describe('menuConfig permission filtering', () => {
     expect(withPermissionDetail).toBe(true);
   });
 
+  it('requires CRM read permissions for comercial CRM canonical routes', () => {
+    const clientesWithoutPermission = canUserAccessPath('/crm/clientes', ALL_MODULES, {
+      email: 'agent@empresa.com',
+      role: 'custom',
+      permissions: ['atendimento.tickets.read'],
+    } as any);
+    const clientesWithPermission = canUserAccessPath('/crm/clientes', ALL_MODULES, {
+      email: 'sales@empresa.com',
+      role: 'custom',
+      permissions: ['crm.clientes.read'],
+    } as any);
+    const clienteDetailWithPermission = canUserAccessPath('/crm/clientes/123', ALL_MODULES, {
+      email: 'sales@empresa.com',
+      role: 'custom',
+      permissions: ['crm.clientes.read'],
+    } as any);
+    const leadsWithoutPermission = canUserAccessPath('/crm/leads', ALL_MODULES, {
+      email: 'agent@empresa.com',
+      role: 'custom',
+      permissions: ['crm.clientes.read'],
+    } as any);
+    const leadsWithPermission = canUserAccessPath('/crm/leads', ALL_MODULES, {
+      email: 'sales@empresa.com',
+      role: 'custom',
+      permissions: ['crm.leads.read'],
+    } as any);
+    const pipelineWithoutPermission = canUserAccessPath('/crm/pipeline', ALL_MODULES, {
+      email: 'agent@empresa.com',
+      role: 'custom',
+      permissions: ['crm.leads.read'],
+    } as any);
+    const pipelineWithPermission = canUserAccessPath('/crm/pipeline', ALL_MODULES, {
+      email: 'sales@empresa.com',
+      role: 'custom',
+      permissions: ['crm.oportunidades.read'],
+    } as any);
+    const interacoesWithClientesRead = canUserAccessPath('/crm/interacoes', ALL_MODULES, {
+      email: 'sales@empresa.com',
+      role: 'custom',
+      permissions: ['crm.clientes.read'],
+    } as any);
+
+    expect(clientesWithoutPermission).toBe(false);
+    expect(clientesWithPermission).toBe(true);
+    expect(clienteDetailWithPermission).toBe(true);
+    expect(leadsWithoutPermission).toBe(false);
+    expect(leadsWithPermission).toBe(true);
+    expect(pipelineWithoutPermission).toBe(false);
+    expect(pipelineWithPermission).toBe(true);
+    expect(interacoesWithClientesRead).toBe(true);
+  });
+
+  it('requires comercial.propostas.read for propostas canonical and aliases', () => {
+    const propostasWithoutPermission = canUserAccessPath('/vendas/propostas', ALL_MODULES, {
+      email: 'agent@empresa.com',
+      role: 'custom',
+      permissions: ['crm.clientes.read'],
+    } as any);
+    const propostasWithPermission = canUserAccessPath('/vendas/propostas', ALL_MODULES, {
+      email: 'sales@empresa.com',
+      role: 'custom',
+      permissions: ['comercial.propostas.read'],
+    } as any);
+    const propostaDetailWithPermission = canUserAccessPath('/propostas/123', ALL_MODULES, {
+      email: 'sales@empresa.com',
+      role: 'custom',
+      permissions: ['comercial.propostas.read'],
+    } as any);
+
+    expect(propostasWithoutPermission).toBe(false);
+    expect(propostasWithPermission).toBe(true);
+    expect(propostaDetailWithPermission).toBe(true);
+  });
+
+  it('requires crm.produtos.read and crm.agenda.read for comercial catalog and agenda routes', () => {
+    const produtosWithoutPermission = canUserAccessPath('/vendas/produtos', ALL_MODULES, {
+      email: 'agent@empresa.com',
+      role: 'custom',
+      permissions: ['crm.clientes.read'],
+    } as any);
+    const produtosWithPermission = canUserAccessPath('/vendas/produtos', ALL_MODULES, {
+      email: 'sales@empresa.com',
+      role: 'custom',
+      permissions: ['crm.produtos.read'],
+    } as any);
+    const categoriasWithPermission = canUserAccessPath('/produtos/categorias', ALL_MODULES, {
+      email: 'sales@empresa.com',
+      role: 'custom',
+      permissions: ['crm.produtos.read'],
+    } as any);
+    const agendaWithoutPermission = canUserAccessPath('/crm/agenda', ALL_MODULES, {
+      email: 'agent@empresa.com',
+      role: 'custom',
+      permissions: ['crm.clientes.read'],
+    } as any);
+    const agendaWithPermission = canUserAccessPath('/crm/agenda', ALL_MODULES, {
+      email: 'sales@empresa.com',
+      role: 'custom',
+      permissions: ['crm.agenda.read'],
+    } as any);
+
+    expect(produtosWithoutPermission).toBe(false);
+    expect(produtosWithPermission).toBe(true);
+    expect(categoriasWithPermission).toBe(true);
+    expect(agendaWithoutPermission).toBe(false);
+    expect(agendaWithPermission).toBe(true);
+  });
+
   it('requires atendimento.filas.manage for distribuicao route', () => {
     const withoutManage = canUserAccessPath('/atendimento/distribuicao', ALL_MODULES, {
       email: 'agent@empresa.com',
@@ -268,6 +376,162 @@ describe('menuConfig permission filtering', () => {
 
     expect(withoutManage).toBe(false);
     expect(withManage).toBe(true);
+  });
+
+  it('requires atendimento.chats.read for inbox route', () => {
+    const withoutPermission = canUserAccessPath('/atendimento/inbox', ALL_MODULES, {
+      email: 'agent@empresa.com',
+      role: 'custom',
+      permissions: ['atendimento.tickets.read'],
+    } as any);
+    const withPermission = canUserAccessPath('/atendimento/inbox', ALL_MODULES, {
+      email: 'agent@empresa.com',
+      role: 'custom',
+      permissions: ['atendimento.chats.read'],
+    } as any);
+
+    expect(withoutPermission).toBe(false);
+    expect(withPermission).toBe(true);
+  });
+
+  it('requires atendimento.tickets.read for tickets list route', () => {
+    const withoutPermission = canUserAccessPath('/atendimento/tickets', ALL_MODULES, {
+      email: 'agent@empresa.com',
+      role: 'custom',
+      permissions: ['atendimento.chats.read'],
+    } as any);
+    const withPermission = canUserAccessPath('/atendimento/tickets', ALL_MODULES, {
+      email: 'agent@empresa.com',
+      role: 'custom',
+      permissions: ['atendimento.tickets.read'],
+    } as any);
+
+    expect(withoutPermission).toBe(false);
+    expect(withPermission).toBe(true);
+  });
+
+  it('requires explicit permissions for atendimento automacoes and equipe routes', () => {
+    const automacoesWithoutPermission = canUserAccessPath('/atendimento/automacoes', ALL_MODULES, {
+      email: 'agent@empresa.com',
+      role: 'custom',
+      permissions: ['atendimento.tickets.read'],
+    } as any);
+    const automacoesWithConfig = canUserAccessPath('/atendimento/automacoes', ALL_MODULES, {
+      email: 'coordinator@empresa.com',
+      role: 'custom',
+      permissions: ['config.automacoes.manage'],
+    } as any);
+    const automacoesWithFilas = canUserAccessPath('/atendimento/automacoes', ALL_MODULES, {
+      email: 'coordinator@empresa.com',
+      role: 'custom',
+      permissions: ['atendimento.filas.manage'],
+    } as any);
+    const equipeWithoutPermission = canUserAccessPath('/atendimento/equipe', ALL_MODULES, {
+      email: 'agent@empresa.com',
+      role: 'custom',
+      permissions: ['atendimento.tickets.read'],
+    } as any);
+    const equipeWithUsersRead = canUserAccessPath('/atendimento/equipe', ALL_MODULES, {
+      email: 'manager@empresa.com',
+      role: 'custom',
+      permissions: ['users.read'],
+    } as any);
+    const equipeWithFilas = canUserAccessPath('/atendimento/equipe', ALL_MODULES, {
+      email: 'manager@empresa.com',
+      role: 'custom',
+      permissions: ['atendimento.filas.manage'],
+    } as any);
+    const configuracoesWithoutPermission = canUserAccessPath(
+      '/atendimento/configuracoes',
+      ALL_MODULES,
+      {
+        email: 'agent@empresa.com',
+        role: 'custom',
+        permissions: ['atendimento.tickets.read'],
+      } as any,
+    );
+    const configuracoesWithFilas = canUserAccessPath('/atendimento/configuracoes', ALL_MODULES, {
+      email: 'manager@empresa.com',
+      role: 'custom',
+      permissions: ['atendimento.filas.manage'],
+    } as any);
+    const configuracoesWithSla = canUserAccessPath('/atendimento/configuracoes', ALL_MODULES, {
+      email: 'manager@empresa.com',
+      role: 'custom',
+      permissions: ['atendimento.sla.manage'],
+    } as any);
+
+    expect(automacoesWithoutPermission).toBe(false);
+    expect(automacoesWithConfig).toBe(true);
+    expect(automacoesWithFilas).toBe(true);
+    expect(equipeWithoutPermission).toBe(false);
+    expect(equipeWithUsersRead).toBe(true);
+    expect(equipeWithFilas).toBe(true);
+    expect(configuracoesWithoutPermission).toBe(false);
+    expect(configuracoesWithFilas).toBe(true);
+    expect(configuracoesWithSla).toBe(true);
+  });
+
+  it('requires specific permissions for configuracoes/tickets subroutes', () => {
+    const niveisWithoutPermission = canUserAccessPath('/configuracoes/tickets/niveis', ALL_MODULES, {
+      email: 'agent@empresa.com',
+      role: 'custom',
+      permissions: ['atendimento.filas.manage'],
+    } as any);
+    const niveisWithSla = canUserAccessPath('/configuracoes/tickets/niveis', ALL_MODULES, {
+      email: 'manager@empresa.com',
+      role: 'custom',
+      permissions: ['atendimento.sla.manage'],
+    } as any);
+    const statusWithoutPermission = canUserAccessPath('/configuracoes/tickets/status', ALL_MODULES, {
+      email: 'agent@empresa.com',
+      role: 'custom',
+      permissions: ['atendimento.sla.manage'],
+    } as any);
+    const statusWithFilas = canUserAccessPath('/configuracoes/tickets/status', ALL_MODULES, {
+      email: 'manager@empresa.com',
+      role: 'custom',
+      permissions: ['atendimento.filas.manage'],
+    } as any);
+    const tiposWithFilas = canUserAccessPath('/configuracoes/tickets/tipos', ALL_MODULES, {
+      email: 'manager@empresa.com',
+      role: 'custom',
+      permissions: ['atendimento.filas.manage'],
+    } as any);
+
+    expect(niveisWithoutPermission).toBe(false);
+    expect(niveisWithSla).toBe(true);
+    expect(statusWithoutPermission).toBe(false);
+    expect(statusWithFilas).toBe(true);
+    expect(tiposWithFilas).toBe(true);
+  });
+
+  it('requires proper permissions for atendimento legacy nucleus routes', () => {
+    const canalEmailWithoutPermission = canUserAccessPath('/nuclei/atendimento/canais/email', ALL_MODULES, {
+      email: 'agent@empresa.com',
+      role: 'custom',
+      permissions: ['atendimento.filas.manage'],
+    } as any);
+    const canalEmailWithIntegracoes = canUserAccessPath('/nuclei/atendimento/canais/email', ALL_MODULES, {
+      email: 'manager@empresa.com',
+      role: 'custom',
+      permissions: ['config.integracoes.manage'],
+    } as any);
+    const templatesWithoutPermission = canUserAccessPath('/nuclei/atendimento/templates', ALL_MODULES, {
+      email: 'agent@empresa.com',
+      role: 'custom',
+      permissions: ['atendimento.chats.read'],
+    } as any);
+    const templatesWithReply = canUserAccessPath('/nuclei/atendimento/templates', ALL_MODULES, {
+      email: 'agent@empresa.com',
+      role: 'custom',
+      permissions: ['atendimento.chats.reply'],
+    } as any);
+
+    expect(canalEmailWithoutPermission).toBe(false);
+    expect(canalEmailWithIntegracoes).toBe(true);
+    expect(templatesWithoutPermission).toBe(false);
+    expect(templatesWithReply).toBe(true);
   });
 
   it('requires financeiro.pagamentos.read for cotacoes routes and keeps legacy alias', () => {

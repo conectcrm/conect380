@@ -490,6 +490,66 @@ const FINANCEIRO_SUBMODULOS_POR_PERMISSAO: Record<string, string[]> = {
   'financeiro.aprovacoes.manage': ['Aprovacoes'],
 };
 
+const ATENDIMENTO_SUBMODULOS_POR_PERMISSAO: Record<string, string[]> = {
+  'atendimento.chats.read': ['Inbox'],
+  'atendimento.chats.reply': ['Inbox', 'Templates'],
+  'atendimento.tickets.read': ['Tickets'],
+  'atendimento.tickets.create': ['Tickets'],
+  'atendimento.tickets.update': ['Tickets'],
+  'atendimento.tickets.assign': ['Tickets'],
+  'atendimento.tickets.close': ['Tickets'],
+  'atendimento.filas.manage': [
+    'Automações',
+    'Equipe',
+    'Filas',
+    'Skills',
+    'Distribuição',
+    'Configurações',
+    'Tickets: status/tipos',
+  ],
+  'atendimento.sla.manage': ['SLA', 'Fechamento automático', 'Configurações', 'Tickets: níveis'],
+  'atendimento.dlq.manage': ['DLQ'],
+  'config.automacoes.manage': ['Automações', 'Fluxos', 'Departamentos'],
+  'config.integracoes.manage': ['Canais de e-mail'],
+  'users.read': ['Equipe'],
+  'relatorios.read': ['Analytics', 'Dashboard SLA', 'Dashboard Distribuição'],
+};
+
+const COMERCIAL_SUBMODULOS_POR_PERMISSAO: Record<string, string[]> = {
+  'crm.clientes.read': ['Clientes', 'Contatos', 'Interacoes'],
+  'crm.clientes.create': ['Clientes'],
+  'crm.clientes.update': ['Clientes'],
+  'crm.clientes.delete': ['Clientes'],
+  'crm.leads.read': ['Leads'],
+  'crm.leads.create': ['Leads'],
+  'crm.leads.update': ['Leads'],
+  'crm.leads.delete': ['Leads'],
+  'crm.oportunidades.read': ['Pipeline de vendas'],
+  'crm.oportunidades.create': ['Pipeline de vendas'],
+  'crm.oportunidades.update': ['Pipeline de vendas'],
+  'crm.oportunidades.delete': ['Pipeline de vendas'],
+  'crm.produtos.read': ['Catalogo de itens', 'Estoque de veiculos'],
+  'crm.produtos.create': ['Catalogo de itens'],
+  'crm.produtos.update': ['Catalogo de itens', 'Estoque de veiculos'],
+  'crm.produtos.delete': ['Catalogo de itens'],
+  'crm.agenda.read': ['Agenda comercial'],
+  'crm.agenda.create': ['Agenda comercial'],
+  'crm.agenda.update': ['Agenda comercial'],
+  'crm.agenda.delete': ['Agenda comercial'],
+  'comercial.propostas.read': ['Propostas', 'Contratos'],
+  'comercial.propostas.create': ['Propostas'],
+  'comercial.propostas.update': ['Propostas'],
+  'comercial.propostas.delete': ['Propostas'],
+  'comercial.propostas.send': ['Propostas'],
+  'comercial.propostas.approve.override': ['Propostas'],
+};
+
+const SUBMODULOS_POR_PERMISSAO: Record<string, string[]> = {
+  ...COMERCIAL_SUBMODULOS_POR_PERMISSAO,
+  ...FINANCEIRO_SUBMODULOS_POR_PERMISSAO,
+  ...ATENDIMENTO_SUBMODULOS_POR_PERMISSAO,
+};
+
 const mapPermissionCatalogPayload = (payload: PermissionCatalogResponse): PermissionCatalogState => {
   const groups = Array.isArray(payload.groups)
     ? payload.groups
@@ -2749,17 +2809,13 @@ const GestaoUsuariosPage: React.FC = () => {
                     ).length;
                     const allSelected = groupValues.length > 0 && selectedCount === groupValues.length;
                     const partiallySelected = selectedCount > 0 && !allSelected;
-                    const financeiroSubmodulosDoGrupo =
-                      grupo.id === 'financeiro'
-                        ? Array.from(
-                            new Set(
-                              grupo.options.flatMap(
-                                (option) =>
-                                  FINANCEIRO_SUBMODULOS_POR_PERMISSAO[option.value] || [],
-                              ),
-                            ),
-                          )
-                        : [];
+                    const submodulosDoGrupo = Array.from(
+                      new Set(
+                        grupo.options.flatMap(
+                          (option) => SUBMODULOS_POR_PERMISSAO[option.value] || [],
+                        ),
+                      ),
+                    );
 
                     return (
                       <div key={grupo.id} className="rounded-xl border border-[#E1EBEF] bg-white p-3.5">
@@ -2769,9 +2825,9 @@ const GestaoUsuariosPage: React.FC = () => {
                             {grupo.description && (
                               <p className="text-xs text-gray-500 mt-0.5">{grupo.description}</p>
                             )}
-                            {financeiroSubmodulosDoGrupo.length > 0 && (
+                            {submodulosDoGrupo.length > 0 && (
                               <p className="mt-1 text-xs text-[#5D7785]">
-                                Submodulos: {financeiroSubmodulosDoGrupo.join(' • ')}
+                                Submodulos: {submodulosDoGrupo.join(' • ')}
                               </p>
                             )}
                           </div>
@@ -2811,9 +2867,9 @@ const GestaoUsuariosPage: React.FC = () => {
                               />
                               <span className="ml-2 text-sm text-gray-700">
                                 {permOption.label}
-                                {FINANCEIRO_SUBMODULOS_POR_PERMISSAO[permOption.value] && (
+                                {SUBMODULOS_POR_PERMISSAO[permOption.value] && (
                                   <span className="block text-xs text-[#6C8794]">
-                                    {FINANCEIRO_SUBMODULOS_POR_PERMISSAO[permOption.value].join(
+                                    {SUBMODULOS_POR_PERMISSAO[permOption.value].join(
                                       ' • ',
                                     )}
                                   </span>
