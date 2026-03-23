@@ -15,6 +15,9 @@ import { GuardianEmpresasController } from '../../src/modules/guardian/guardian-
 import { GuardianMfaGuard } from '../../src/modules/guardian/guardian-mfa.guard';
 import { GuardianCriticalAuditService } from '../../src/modules/guardian/services/guardian-critical-audit.service';
 import { GuardianCriticalAuditInterceptor } from '../../src/modules/guardian/interceptors/guardian-critical-audit.interceptor';
+import { GuardianCapabilitiesService } from '../../src/modules/guardian/services/guardian-capabilities.service';
+import { GuardianPolicySnapshotService } from '../../src/modules/guardian/services/guardian-policy-snapshot.service';
+import { GuardianRuntimeAlertService } from '../../src/modules/guardian/services/guardian-runtime-alert.service';
 import { AssinaturasService } from '../../src/modules/planos/assinaturas.service';
 import { AssinaturaDueDateSchedulerService } from '../../src/modules/planos/assinatura-due-date-scheduler.service';
 
@@ -46,6 +49,43 @@ const mockGuardianCriticalAuditService = {
   listForExport: jest.fn().mockResolvedValue([]),
 };
 
+const mockGuardianCapabilitiesService = {
+  getCapabilities: jest.fn().mockReturnValue({
+    allowBreakGlassRequestCreation: true,
+    allowManualBillingDueDateCycle: true,
+    allowPlanDeletion: false,
+    allowDirectAccessRecertification: true,
+    allowCompanyModuleManagement: true,
+  }),
+  getRuntimeContext: jest.fn().mockReturnValue({
+    environment: 'test',
+    policySource: 'environment',
+    releaseVersion: null,
+    adminMfaRequired: false,
+    legacyTransitionMode: 'guardian_only',
+    capabilities: {
+      allowBreakGlassRequestCreation: true,
+      allowManualBillingDueDateCycle: true,
+      allowPlanDeletion: false,
+      allowDirectAccessRecertification: true,
+      allowCompanyModuleManagement: true,
+    },
+  }),
+  assertBreakGlassRequestCreationAllowed: jest.fn(),
+  assertManualBillingDueDateCycleAllowed: jest.fn(),
+  assertPlanDeletionAllowed: jest.fn(),
+  assertDirectAccessRecertificationAllowed: jest.fn(),
+  assertCompanyModuleManagementAllowed: jest.fn(),
+};
+
+const mockGuardianPolicySnapshotService = {
+  list: jest.fn().mockResolvedValue([]),
+};
+
+const mockGuardianRuntimeAlertService = {
+  syncRuntimePolicy: jest.fn().mockResolvedValue(undefined),
+};
+
 const mockAssinaturasService = {
   buscarPorEmpresa: jest.fn().mockResolvedValue(null),
   suspender: jest.fn(),
@@ -63,12 +103,15 @@ const mockAssinaturaDueDateSchedulerService = {
 
 describe('Guardian routes - unauthorized access (E2E)', () => {
   let app: INestApplication;
+  const previousAuthAdminMfaRequired = process.env.AUTH_ADMIN_MFA_REQUIRED;
 
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   beforeAll(async () => {
+    process.env.AUTH_ADMIN_MFA_REQUIRED = 'true';
+
     const moduleRef = await withE2EBootstrapLock(() =>
       Test.createTestingModule({
         controllers: [GuardianBffController, GuardianEmpresasController],
@@ -77,6 +120,9 @@ describe('Guardian routes - unauthorized access (E2E)', () => {
           { provide: AdminEmpresasService, useValue: mockAdminEmpresasService },
           { provide: UserActivitiesService, useValue: mockUserActivitiesService },
           { provide: GuardianCriticalAuditService, useValue: mockGuardianCriticalAuditService },
+          { provide: GuardianCapabilitiesService, useValue: mockGuardianCapabilitiesService },
+          { provide: GuardianPolicySnapshotService, useValue: mockGuardianPolicySnapshotService },
+          { provide: GuardianRuntimeAlertService, useValue: mockGuardianRuntimeAlertService },
           { provide: AssinaturasService, useValue: mockAssinaturasService },
           {
             provide: AssinaturaDueDateSchedulerService,
@@ -132,6 +178,12 @@ describe('Guardian routes - unauthorized access (E2E)', () => {
 
   afterAll(async () => {
     await app.close();
+
+    if (previousAuthAdminMfaRequired === undefined) {
+      delete process.env.AUTH_ADMIN_MFA_REQUIRED;
+    } else {
+      process.env.AUTH_ADMIN_MFA_REQUIRED = previousAuthAdminMfaRequired;
+    }
   });
 
   it('bloqueia guardian/empresas para role vendedor mesmo com permissao', async () => {

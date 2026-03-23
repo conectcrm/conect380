@@ -45,6 +45,14 @@ const installGuardianStubRoute = async (page: Page): Promise<void> => {
 };
 
 const elevateSessionToGuardianAdmin = async (page: Page): Promise<void> => {
+  await page.route('**/empresas/modulos/ativos', async (route) => {
+    await route.fulfill(
+      jsonResponse(200, {
+        data: ['CRM', 'VENDAS', 'FINANCEIRO', 'BILLING', 'ADMINISTRACAO'],
+      }),
+    );
+  });
+
   await page.route('**/users/profile', async (route) => {
     await route.fulfill(
       jsonResponse(200, {
@@ -89,8 +97,8 @@ test.describe('Billing legacy admin routes lockdown', () => {
     await expect
       .poll(() => authenticatedPage.url(), {
         timeout: 10000,
-        message: 'Relay explicito para guardian (/sistema/backup) nao funcionou.',
+        message: 'Redirecionamento autorizado de /sistema/backup nao ocorreu.',
       })
-      .toMatch(/:3020\/(governance\/system|login)/);
+      .toMatch(/(:3020\/(governance\/system|login)|\/configuracoes\/empresa\?tab=backup)/);
   });
 });

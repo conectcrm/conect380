@@ -15,6 +15,9 @@ import { GuardianEmpresasController } from '../../src/modules/guardian/guardian-
 import { GuardianMfaGuard } from '../../src/modules/guardian/guardian-mfa.guard';
 import { GuardianCriticalAuditService } from '../../src/modules/guardian/services/guardian-critical-audit.service';
 import { GuardianCriticalAuditInterceptor } from '../../src/modules/guardian/interceptors/guardian-critical-audit.interceptor';
+import { GuardianCapabilitiesService } from '../../src/modules/guardian/services/guardian-capabilities.service';
+import { GuardianPolicySnapshotService } from '../../src/modules/guardian/services/guardian-policy-snapshot.service';
+import { GuardianRuntimeAlertService } from '../../src/modules/guardian/services/guardian-runtime-alert.service';
 import { AssinaturasService } from '../../src/modules/planos/assinaturas.service';
 import { AssinaturaDueDateSchedulerService } from '../../src/modules/planos/assinatura-due-date-scheduler.service';
 
@@ -130,6 +133,43 @@ const mockGuardianCriticalAuditService = {
   ]),
 };
 
+const mockGuardianCapabilitiesService = {
+  getCapabilities: jest.fn().mockReturnValue({
+    allowBreakGlassRequestCreation: true,
+    allowManualBillingDueDateCycle: true,
+    allowPlanDeletion: false,
+    allowDirectAccessRecertification: true,
+    allowCompanyModuleManagement: true,
+  }),
+  getRuntimeContext: jest.fn().mockReturnValue({
+    environment: 'test',
+    policySource: 'environment',
+    releaseVersion: null,
+    adminMfaRequired: false,
+    legacyTransitionMode: 'guardian_only',
+    capabilities: {
+      allowBreakGlassRequestCreation: true,
+      allowManualBillingDueDateCycle: true,
+      allowPlanDeletion: false,
+      allowDirectAccessRecertification: true,
+      allowCompanyModuleManagement: true,
+    },
+  }),
+  assertBreakGlassRequestCreationAllowed: jest.fn(),
+  assertManualBillingDueDateCycleAllowed: jest.fn(),
+  assertPlanDeletionAllowed: jest.fn(),
+  assertDirectAccessRecertificationAllowed: jest.fn(),
+  assertCompanyModuleManagementAllowed: jest.fn(),
+};
+
+const mockGuardianPolicySnapshotService = {
+  list: jest.fn().mockResolvedValue([]),
+};
+
+const mockGuardianRuntimeAlertService = {
+  syncRuntimePolicy: jest.fn().mockResolvedValue(undefined),
+};
+
 describe('Guardian admin operation suite (E2E)', () => {
   let app: INestApplication;
 
@@ -151,6 +191,9 @@ describe('Guardian admin operation suite (E2E)', () => {
           },
           { provide: UserActivitiesService, useValue: mockUserActivitiesService },
           { provide: GuardianCriticalAuditService, useValue: mockGuardianCriticalAuditService },
+          { provide: GuardianCapabilitiesService, useValue: mockGuardianCapabilitiesService },
+          { provide: GuardianPolicySnapshotService, useValue: mockGuardianPolicySnapshotService },
+          { provide: GuardianRuntimeAlertService, useValue: mockGuardianRuntimeAlertService },
           RolesGuard,
           PermissionsGuard,
           EmpresaGuard,
