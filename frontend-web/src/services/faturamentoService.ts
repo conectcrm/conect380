@@ -1004,7 +1004,7 @@ export const faturamentoService = {
       const response = await api.put(`/faturamento/planos-cobranca/${id}/pausar`);
       return response.data?.data || response.data;
     } catch (error) {
-      console.error('Erro ao pausar plano de cobranÃ§a:', error);
+      console.error('Erro ao pausar plano de cobranca:', error);
       throw error;
     }
   },
@@ -1014,7 +1014,7 @@ export const faturamentoService = {
       const response = await api.put(`/faturamento/planos-cobranca/${id}/reativar`);
       return response.data?.data || response.data;
     } catch (error) {
-      console.error('Erro ao reativar plano de cobranÃ§a:', error);
+      console.error('Erro ao reativar plano de cobranca:', error);
       throw error;
     }
   },
@@ -1027,7 +1027,7 @@ export const faturamentoService = {
       );
       return response.data?.data || response.data;
     } catch (error) {
-      console.error('Erro ao cancelar plano de cobranÃ§a:', error);
+      console.error('Erro ao cancelar plano de cobranca:', error);
       throw error;
     }
   },
@@ -1037,7 +1037,7 @@ export const faturamentoService = {
       const response = await api.post(`/faturamento/planos-cobranca/${id}/gerar-fatura`);
       return response.data?.data || response.data;
     } catch (error) {
-      console.error('Erro ao gerar fatura para plano de cobranÃ§a:', error);
+      console.error('Erro ao gerar fatura para plano de cobranca:', error);
       throw error;
     }
   },
