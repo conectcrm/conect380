@@ -6,22 +6,22 @@ import { Permission } from '../../../common/permissions/permissions.constants';
 describe('ContaPagarController (permissions)', () => {
   it('deve exigir permissao de leitura no controller', () => {
     const permissions = Reflect.getMetadata(PERMISSIONS_KEY, ContaPagarController);
-    expect(permissions).toEqual([Permission.FINANCEIRO_PAGAMENTOS_READ]);
+    expect(permissions).toEqual([Permission.FINANCEIRO_CONTAS_PAGAR_READ]);
   });
 
   it('deve exigir permissao de gestao para criar', () => {
     const permissions = Reflect.getMetadata(PERMISSIONS_KEY, ContaPagarController.prototype.create);
-    expect(permissions).toEqual([Permission.FINANCEIRO_PAGAMENTOS_MANAGE]);
+    expect(permissions).toEqual([Permission.FINANCEIRO_CONTAS_PAGAR_MANAGE]);
   });
 
   it('deve exigir permissao de gestao para atualizar', () => {
     const permissions = Reflect.getMetadata(PERMISSIONS_KEY, ContaPagarController.prototype.update);
-    expect(permissions).toEqual([Permission.FINANCEIRO_PAGAMENTOS_MANAGE]);
+    expect(permissions).toEqual([Permission.FINANCEIRO_CONTAS_PAGAR_MANAGE]);
   });
 
   it('deve exigir permissao de gestao para excluir', () => {
     const permissions = Reflect.getMetadata(PERMISSIONS_KEY, ContaPagarController.prototype.remove);
-    expect(permissions).toEqual([Permission.FINANCEIRO_PAGAMENTOS_MANAGE]);
+    expect(permissions).toEqual([Permission.FINANCEIRO_CONTAS_PAGAR_MANAGE]);
   });
 
   it('deve exigir permissao de gestao para registrar pagamento', () => {
@@ -29,12 +29,12 @@ describe('ContaPagarController (permissions)', () => {
       PERMISSIONS_KEY,
       ContaPagarController.prototype.registrarPagamento,
     );
-    expect(permissions).toEqual([Permission.FINANCEIRO_PAGAMENTOS_MANAGE]);
+    expect(permissions).toEqual([Permission.FINANCEIRO_CONTAS_PAGAR_MANAGE]);
   });
 
   it('deve exigir permissao de gestao para aprovar', () => {
     const permissions = Reflect.getMetadata(PERMISSIONS_KEY, ContaPagarController.prototype.aprovar);
-    expect(permissions).toEqual([Permission.FINANCEIRO_PAGAMENTOS_MANAGE]);
+    expect(permissions).toEqual([Permission.FINANCEIRO_APROVACOES_MANAGE]);
   });
 
   it('deve exigir permissao de gestao para aprovar em lote', () => {
@@ -42,7 +42,15 @@ describe('ContaPagarController (permissions)', () => {
       PERMISSIONS_KEY,
       ContaPagarController.prototype.aprovarLote,
     );
-    expect(permissions).toEqual([Permission.FINANCEIRO_PAGAMENTOS_MANAGE]);
+    expect(permissions).toEqual([Permission.FINANCEIRO_APROVACOES_MANAGE]);
+  });
+
+  it('deve exigir permissao de leitura para listar pendencias de aprovacao', () => {
+    const permissions = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      ContaPagarController.prototype.listarPendenciasAprovacao,
+    );
+    expect(permissions).toEqual([Permission.FINANCEIRO_APROVACOES_READ]);
   });
 
   it('deve manter exportacao no escopo de leitura (sem override de gestao)', () => {
@@ -63,6 +71,6 @@ describe('ContaPagarController (permissions)', () => {
 
   it('deve exigir permissao de gestao para reprovar', () => {
     const permissions = Reflect.getMetadata(PERMISSIONS_KEY, ContaPagarController.prototype.reprovar);
-    expect(permissions).toEqual([Permission.FINANCEIRO_PAGAMENTOS_MANAGE]);
+    expect(permissions).toEqual([Permission.FINANCEIRO_APROVACOES_MANAGE]);
   });
 });

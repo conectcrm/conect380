@@ -90,6 +90,24 @@ describe('permissions governance', () => {
     expect(invalidRoleDefaults).toEqual([]);
   });
 
+  it('garante que permissoes default por role estejam cobertas por grupos visiveis do catalogo', () => {
+    const defaultsWithoutVisibleGroup = Object.entries(ROLE_DEFAULT_PERMISSIONS).flatMap(
+      ([role, permissions]) => {
+        const visiblePermissions = new Set(
+          PERMISSION_CATALOG.groups
+            .filter((group) => group.roles.includes(role as any))
+            .flatMap((group) => group.options.map((option) => option.value)),
+        );
+
+        return permissions
+          .filter((permission) => !visiblePermissions.has(permission))
+          .map((permission) => `${role}:${permission}`);
+      },
+    );
+
+    expect(defaultsWithoutVisibleGroup).toEqual([]);
+  });
+
   it('mantem role admin com escopo operacional de tenant e governanca por default', () => {
     const adminDefaults = new Set(ROLE_DEFAULT_PERMISSIONS.admin);
 
@@ -98,6 +116,7 @@ describe('permissions governance', () => {
     expect(adminDefaults.has(Permission.CRM_CLIENTES_READ)).toBe(true);
     expect(adminDefaults.has(Permission.COMERCIAL_PROPOSTAS_READ)).toBe(true);
     expect(adminDefaults.has(Permission.FINANCEIRO_PAGAMENTOS_READ)).toBe(true);
+    expect(adminDefaults.has(Permission.FINANCEIRO_CONTAS_PAGAR_READ)).toBe(true);
     expect(adminDefaults.has(Permission.ATENDIMENTO_TICKETS_READ)).toBe(true);
   });
 

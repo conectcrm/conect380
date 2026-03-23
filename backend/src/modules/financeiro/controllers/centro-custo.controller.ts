@@ -26,7 +26,7 @@ import { CentroCustoService } from '../services/centro-custo.service';
 
 @Controller('centros-custo')
 @UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
-@Permissions(Permission.FINANCEIRO_PAGAMENTOS_READ)
+@Permissions(Permission.FINANCEIRO_CENTRO_CUSTOS_READ)
 export class CentroCustoController {
   constructor(private readonly centroCustoService: CentroCustoService) {}
 
@@ -46,7 +46,7 @@ export class CentroCustoController {
   }
 
   @Post()
-  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  @Permissions(Permission.FINANCEIRO_CENTRO_CUSTOS_MANAGE)
   async create(
     @EmpresaId() empresaId: string,
     @Body() dto: CreateCentroCustoDto,
@@ -57,7 +57,7 @@ export class CentroCustoController {
   }
 
   @Put(':id')
-  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  @Permissions(Permission.FINANCEIRO_CENTRO_CUSTOS_MANAGE)
   async update(
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
@@ -69,7 +69,7 @@ export class CentroCustoController {
   }
 
   @Patch(':id/desativar')
-  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  @Permissions(Permission.FINANCEIRO_CENTRO_CUSTOS_MANAGE)
   async desativar(
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
@@ -84,7 +84,7 @@ export class CentroCustoController {
   }
 
   @Delete(':id')
-  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  @Permissions(Permission.FINANCEIRO_CENTRO_CUSTOS_MANAGE)
   async remove(@EmpresaId() empresaId: string, @Param('id') id: string) {
     await this.centroCustoService.remove(id, empresaId);
     return {

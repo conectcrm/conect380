@@ -23,6 +23,40 @@ const ROLE_ALIASES: Record<string, string> = {
   operacional: UserRole.SUPORTE,
 };
 
+const FINANCEIRO_PAGAMENTOS_READ_EQUIVALENCES: Permission[] = [
+  Permission.FINANCEIRO_PAGAMENTOS_READ,
+  Permission.FINANCEIRO_CONTAS_PAGAR_READ,
+  Permission.FINANCEIRO_FORNECEDORES_READ,
+  Permission.FINANCEIRO_CONTAS_BANCARIAS_READ,
+  Permission.FINANCEIRO_CONCILIACAO_READ,
+  Permission.FINANCEIRO_CENTRO_CUSTOS_READ,
+  Permission.FINANCEIRO_ALERTAS_READ,
+  Permission.FINANCEIRO_APROVACOES_READ,
+];
+
+const FINANCEIRO_PAGAMENTOS_MANAGE_EQUIVALENCES: Permission[] = [
+  Permission.FINANCEIRO_PAGAMENTOS_MANAGE,
+  Permission.FINANCEIRO_CONTAS_PAGAR_MANAGE,
+  Permission.FINANCEIRO_FORNECEDORES_MANAGE,
+  Permission.FINANCEIRO_CONTAS_BANCARIAS_MANAGE,
+  Permission.FINANCEIRO_CONCILIACAO_MANAGE,
+  Permission.FINANCEIRO_CENTRO_CUSTOS_MANAGE,
+  Permission.FINANCEIRO_ALERTAS_MANAGE,
+  Permission.FINANCEIRO_APROVACOES_MANAGE,
+];
+
+const FINANCEIRO_MANAGE_TO_READ_EQUIVALENCES: Array<[Permission, Permission]> = [
+  [Permission.FINANCEIRO_FATURAMENTO_MANAGE, Permission.FINANCEIRO_FATURAMENTO_READ],
+  [Permission.FINANCEIRO_PAGAMENTOS_MANAGE, Permission.FINANCEIRO_PAGAMENTOS_READ],
+  [Permission.FINANCEIRO_CONTAS_PAGAR_MANAGE, Permission.FINANCEIRO_CONTAS_PAGAR_READ],
+  [Permission.FINANCEIRO_FORNECEDORES_MANAGE, Permission.FINANCEIRO_FORNECEDORES_READ],
+  [Permission.FINANCEIRO_CONTAS_BANCARIAS_MANAGE, Permission.FINANCEIRO_CONTAS_BANCARIAS_READ],
+  [Permission.FINANCEIRO_CONCILIACAO_MANAGE, Permission.FINANCEIRO_CONCILIACAO_READ],
+  [Permission.FINANCEIRO_CENTRO_CUSTOS_MANAGE, Permission.FINANCEIRO_CENTRO_CUSTOS_READ],
+  [Permission.FINANCEIRO_ALERTAS_MANAGE, Permission.FINANCEIRO_ALERTAS_READ],
+  [Permission.FINANCEIRO_APROVACOES_MANAGE, Permission.FINANCEIRO_APROVACOES_READ],
+];
+
 function normalizeRole(role: unknown): string | null {
   if (typeof role !== 'string') {
     return null;
@@ -65,6 +99,25 @@ function addRolePermissions(target: Set<Permission>, role: unknown): void {
   defaults.forEach((permission) => target.add(permission));
 }
 
+function expandEquivalentPermissions(target: Set<Permission>): void {
+  for (const [managePermission, readPermission] of FINANCEIRO_MANAGE_TO_READ_EQUIVALENCES) {
+    if (target.has(managePermission)) {
+      target.add(readPermission);
+    }
+  }
+
+  const hasPagamentosRead = target.has(Permission.FINANCEIRO_PAGAMENTOS_READ);
+  const hasPagamentosManage = target.has(Permission.FINANCEIRO_PAGAMENTOS_MANAGE);
+
+  if (hasPagamentosRead || hasPagamentosManage) {
+    FINANCEIRO_PAGAMENTOS_READ_EQUIVALENCES.forEach((permission) => target.add(permission));
+  }
+
+  if (hasPagamentosManage) {
+    FINANCEIRO_PAGAMENTOS_MANAGE_EQUIVALENCES.forEach((permission) => target.add(permission));
+  }
+}
+
 function* iteratePermissionInputs(rawPermissions: unknown): Generator<unknown> {
   if (!rawPermissions) {
     return;
@@ -78,9 +131,7 @@ function* iteratePermissionInputs(rawPermissions: unknown): Generator<unknown> {
   }
 
   if (typeof rawPermissions === 'string') {
-    const values = rawPermissions.includes(',')
-      ? rawPermissions.split(',')
-      : [rawPermissions];
+    const values = rawPermissions.includes(',') ? rawPermissions.split(',') : [rawPermissions];
     for (const item of values) {
       yield item;
     }
@@ -113,20 +164,19 @@ export function resolveUserPermissions(user?: PermissionUserContext): Set<Permis
   // Role defaults are fallback-only for legacy users without explicit grants.
   if (explicitPermissions.size > 0) {
     explicitPermissions.forEach((permission) => resolved.add(permission));
+    expandEquivalentPermissions(resolved);
     return resolved;
   }
 
-  const roles = Array.isArray(user.roles)
-    ? user.roles
-    : user.role !== undefined
-      ? [user.role]
-      : [];
+  const roles = Array.isArray(user.roles) ? user.roles : user.role !== undefined ? [user.role] : [];
 
   if (roles.length === 0) {
     addRolePermissions(resolved, user.role);
   } else {
     roles.forEach((role) => addRolePermissions(resolved, role));
   }
+
+  expandEquivalentPermissions(resolved);
 
   return resolved;
 }

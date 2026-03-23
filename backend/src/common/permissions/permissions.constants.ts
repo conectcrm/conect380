@@ -61,6 +61,20 @@ export enum Permission {
   FINANCEIRO_FATURAMENTO_MANAGE = 'financeiro.faturamento.manage',
   FINANCEIRO_PAGAMENTOS_READ = 'financeiro.pagamentos.read',
   FINANCEIRO_PAGAMENTOS_MANAGE = 'financeiro.pagamentos.manage',
+  FINANCEIRO_CONTAS_PAGAR_READ = 'financeiro.contas-pagar.read',
+  FINANCEIRO_CONTAS_PAGAR_MANAGE = 'financeiro.contas-pagar.manage',
+  FINANCEIRO_FORNECEDORES_READ = 'financeiro.fornecedores.read',
+  FINANCEIRO_FORNECEDORES_MANAGE = 'financeiro.fornecedores.manage',
+  FINANCEIRO_CONTAS_BANCARIAS_READ = 'financeiro.contas-bancarias.read',
+  FINANCEIRO_CONTAS_BANCARIAS_MANAGE = 'financeiro.contas-bancarias.manage',
+  FINANCEIRO_CONCILIACAO_READ = 'financeiro.conciliacao.read',
+  FINANCEIRO_CONCILIACAO_MANAGE = 'financeiro.conciliacao.manage',
+  FINANCEIRO_CENTRO_CUSTOS_READ = 'financeiro.centro-custos.read',
+  FINANCEIRO_CENTRO_CUSTOS_MANAGE = 'financeiro.centro-custos.manage',
+  FINANCEIRO_ALERTAS_READ = 'financeiro.alertas.read',
+  FINANCEIRO_ALERTAS_MANAGE = 'financeiro.alertas.manage',
+  FINANCEIRO_APROVACOES_READ = 'financeiro.aprovacoes.read',
+  FINANCEIRO_APROVACOES_MANAGE = 'financeiro.aprovacoes.manage',
 
   CONFIG_EMPRESA_READ = 'config.empresa.read',
   CONFIG_EMPRESA_UPDATE = 'config.empresa.update',
@@ -80,10 +94,7 @@ const USER_MANAGEMENT_PERMISSIONS: Permission[] = [
 ];
 
 const BASIC_PROFILE_PERMISSIONS: Permission[] = [Permission.USERS_PROFILE_UPDATE];
-const INSIGHTS_PERMISSIONS: Permission[] = [
-  Permission.DASHBOARD_READ,
-  Permission.RELATORIOS_READ,
-];
+const INSIGHTS_PERMISSIONS: Permission[] = [Permission.DASHBOARD_READ, Permission.RELATORIOS_READ];
 
 const CRM_FULL_PERMISSIONS: Permission[] = [
   Permission.CRM_CLIENTES_READ,
@@ -180,6 +191,20 @@ const FINANCEIRO_DEFAULT_PERMISSIONS: Permission[] = [
   Permission.FINANCEIRO_FATURAMENTO_MANAGE,
   Permission.FINANCEIRO_PAGAMENTOS_READ,
   Permission.FINANCEIRO_PAGAMENTOS_MANAGE,
+  Permission.FINANCEIRO_CONTAS_PAGAR_READ,
+  Permission.FINANCEIRO_CONTAS_PAGAR_MANAGE,
+  Permission.FINANCEIRO_FORNECEDORES_READ,
+  Permission.FINANCEIRO_FORNECEDORES_MANAGE,
+  Permission.FINANCEIRO_CONTAS_BANCARIAS_READ,
+  Permission.FINANCEIRO_CONTAS_BANCARIAS_MANAGE,
+  Permission.FINANCEIRO_CONCILIACAO_READ,
+  Permission.FINANCEIRO_CONCILIACAO_MANAGE,
+  Permission.FINANCEIRO_CENTRO_CUSTOS_READ,
+  Permission.FINANCEIRO_CENTRO_CUSTOS_MANAGE,
+  Permission.FINANCEIRO_ALERTAS_READ,
+  Permission.FINANCEIRO_ALERTAS_MANAGE,
+  Permission.FINANCEIRO_APROVACOES_READ,
+  Permission.FINANCEIRO_APROVACOES_MANAGE,
   Permission.COMERCIAL_PROPOSTAS_READ,
   Permission.CRM_CLIENTES_READ,
 ];
@@ -303,6 +328,7 @@ const ROLE_OPERATIONAL_KEYS: PermissionCatalogRole[] = [
   UserRole.VENDEDOR,
   UserRole.FINANCEIRO,
   ...ROLE_GERENTE_KEYS,
+  UserRole.ADMIN,
   UserRole.SUPERADMIN,
 ];
 
@@ -312,7 +338,9 @@ export const PERMISSION_CATALOG_GROUPS: PermissionCatalogGroup[] = [
     label: 'Conta',
     description: 'Permissoes para ajustes do proprio perfil',
     roles: [...ROLE_ALL_BASE_KEYS],
-    options: [{ value: Permission.USERS_PROFILE_UPDATE, label: 'Perfil: atualizar dados pessoais' }],
+    options: [
+      { value: Permission.USERS_PROFILE_UPDATE, label: 'Perfil: atualizar dados pessoais' },
+    ],
   },
   {
     id: 'insights',
@@ -356,7 +384,13 @@ export const PERMISSION_CATALOG_GROUPS: PermissionCatalogGroup[] = [
     id: 'atendimento',
     label: 'Atendimento',
     description: 'Controle de acesso para chats, tickets e filas',
-    roles: [...ROLE_SUPORTE_KEYS, UserRole.VENDEDOR, ...ROLE_GERENTE_KEYS, UserRole.SUPERADMIN],
+    roles: [
+      ...ROLE_SUPORTE_KEYS,
+      UserRole.VENDEDOR,
+      ...ROLE_GERENTE_KEYS,
+      UserRole.ADMIN,
+      UserRole.SUPERADMIN,
+    ],
     options: [
       { value: Permission.ATENDIMENTO_CHATS_READ, label: 'Chats: visualizar' },
       { value: Permission.ATENDIMENTO_CHATS_REPLY, label: 'Chats: responder' },
@@ -375,7 +409,14 @@ export const PERMISSION_CATALOG_GROUPS: PermissionCatalogGroup[] = [
     id: 'comercial',
     label: 'Comercial',
     description: 'Acesso aos recursos comerciais',
-    roles: [...ROLE_SUPORTE_KEYS, UserRole.VENDEDOR, UserRole.FINANCEIRO, ...ROLE_GERENTE_KEYS, UserRole.SUPERADMIN],
+    roles: [
+      ...ROLE_SUPORTE_KEYS,
+      UserRole.VENDEDOR,
+      UserRole.FINANCEIRO,
+      ...ROLE_GERENTE_KEYS,
+      UserRole.ADMIN,
+      UserRole.SUPERADMIN,
+    ],
     options: [
       { value: Permission.COMERCIAL_PROPOSTAS_READ, label: 'Propostas: visualizar' },
       { value: Permission.COMERCIAL_PROPOSTAS_CREATE, label: 'Propostas: criar' },
@@ -391,13 +432,36 @@ export const PERMISSION_CATALOG_GROUPS: PermissionCatalogGroup[] = [
   {
     id: 'financeiro',
     label: 'Financeiro',
-    description: 'Faturamento e pagamentos',
-    roles: [UserRole.FINANCEIRO, ...ROLE_GERENTE_KEYS, UserRole.SUPERADMIN],
+    description: 'Faturamento, contas a pagar, fornecedores, bancos, conciliacao e alertas',
+    roles: [UserRole.FINANCEIRO, ...ROLE_GERENTE_KEYS, UserRole.ADMIN, UserRole.SUPERADMIN],
     options: [
       { value: Permission.FINANCEIRO_FATURAMENTO_READ, label: 'Faturamento: visualizar' },
       { value: Permission.FINANCEIRO_FATURAMENTO_MANAGE, label: 'Faturamento: gerenciar' },
       { value: Permission.FINANCEIRO_PAGAMENTOS_READ, label: 'Pagamentos: visualizar' },
       { value: Permission.FINANCEIRO_PAGAMENTOS_MANAGE, label: 'Pagamentos: gerenciar' },
+      { value: Permission.FINANCEIRO_CONTAS_PAGAR_READ, label: 'Contas a pagar: visualizar' },
+      { value: Permission.FINANCEIRO_CONTAS_PAGAR_MANAGE, label: 'Contas a pagar: gerenciar' },
+      { value: Permission.FINANCEIRO_FORNECEDORES_READ, label: 'Fornecedores: visualizar' },
+      { value: Permission.FINANCEIRO_FORNECEDORES_MANAGE, label: 'Fornecedores: gerenciar' },
+      {
+        value: Permission.FINANCEIRO_CONTAS_BANCARIAS_READ,
+        label: 'Contas bancarias: visualizar',
+      },
+      {
+        value: Permission.FINANCEIRO_CONTAS_BANCARIAS_MANAGE,
+        label: 'Contas bancarias: gerenciar',
+      },
+      { value: Permission.FINANCEIRO_CONCILIACAO_READ, label: 'Conciliacao bancaria: visualizar' },
+      { value: Permission.FINANCEIRO_CONCILIACAO_MANAGE, label: 'Conciliacao bancaria: gerenciar' },
+      { value: Permission.FINANCEIRO_CENTRO_CUSTOS_READ, label: 'Centro de custos: visualizar' },
+      { value: Permission.FINANCEIRO_CENTRO_CUSTOS_MANAGE, label: 'Centro de custos: gerenciar' },
+      { value: Permission.FINANCEIRO_ALERTAS_READ, label: 'Alertas operacionais: visualizar' },
+      { value: Permission.FINANCEIRO_ALERTAS_MANAGE, label: 'Alertas operacionais: gerenciar' },
+      { value: Permission.FINANCEIRO_APROVACOES_READ, label: 'Aprovacoes financeiras: visualizar' },
+      {
+        value: Permission.FINANCEIRO_APROVACOES_MANAGE,
+        label: 'Aprovacoes financeiras: gerenciar',
+      },
     ],
   },
   {
@@ -443,7 +507,8 @@ const ROLE_DEFAULT_PERMISSION_ALIAS_MAP: Record<string, UserRole> = {
 
 const LEGACY_ASSIGNABLE_PERMISSION_VALUES = ['ATENDIMENTO'];
 
-const toUniquePermissionList = (permissions: Permission[]): string[] => Array.from(new Set(permissions));
+const toUniquePermissionList = (permissions: Permission[]): string[] =>
+  Array.from(new Set(permissions));
 
 const buildRoleDefaultPermissionsWithAliases = (): Record<string, string[]> => {
   const defaultsByRole: Record<string, string[]> = {};
@@ -456,7 +521,7 @@ const buildRoleDefaultPermissionsWithAliases = (): Record<string, string[]> => {
 };
 
 export const PERMISSION_CATALOG: PermissionCatalog = {
-  version: '2026-03-03',
+  version: '2026-03-23',
   groups: PERMISSION_CATALOG_GROUPS,
   defaultsByRole: buildRoleDefaultPermissionsWithAliases(),
   allPermissions: [...ALL_PERMISSIONS],
@@ -472,7 +537,10 @@ export function getPermissionCatalog(): PermissionCatalog {
       options: group.options.map((option) => ({ ...option })),
     })),
     defaultsByRole: Object.fromEntries(
-      Object.entries(PERMISSION_CATALOG.defaultsByRole).map(([role, permissions]) => [role, [...permissions]]),
+      Object.entries(PERMISSION_CATALOG.defaultsByRole).map(([role, permissions]) => [
+        role,
+        [...permissions],
+      ]),
     ),
     allPermissions: [...PERMISSION_CATALOG.allPermissions],
     legacyAssignablePermissions: [...PERMISSION_CATALOG.legacyAssignablePermissions],

@@ -25,7 +25,7 @@ import { ContaBancariaService } from '../services/conta-bancaria.service';
 
 @Controller('contas-bancarias')
 @UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
-@Permissions(Permission.FINANCEIRO_PAGAMENTOS_READ)
+@Permissions(Permission.FINANCEIRO_CONTAS_BANCARIAS_READ)
 export class ContaBancariaController {
   constructor(private readonly contaBancariaService: ContaBancariaService) {}
 
@@ -45,13 +45,13 @@ export class ContaBancariaController {
   }
 
   @Post()
-  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  @Permissions(Permission.FINANCEIRO_CONTAS_BANCARIAS_MANAGE)
   async create(@EmpresaId() empresaId: string, @Body() dto: CreateContaBancariaDto) {
     return this.contaBancariaService.create(dto, empresaId);
   }
 
   @Put(':id')
-  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  @Permissions(Permission.FINANCEIRO_CONTAS_BANCARIAS_MANAGE)
   async update(
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
@@ -61,7 +61,7 @@ export class ContaBancariaController {
   }
 
   @Patch(':id/desativar')
-  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  @Permissions(Permission.FINANCEIRO_CONTAS_BANCARIAS_MANAGE)
   async desativar(@EmpresaId() empresaId: string, @Param('id') id: string) {
     const contaBancaria = await this.contaBancariaService.desativar(id, empresaId);
     return {
@@ -71,7 +71,7 @@ export class ContaBancariaController {
   }
 
   @Delete(':id')
-  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  @Permissions(Permission.FINANCEIRO_CONTAS_BANCARIAS_MANAGE)
   async remove(@EmpresaId() empresaId: string, @Param('id') id: string) {
     await this.contaBancariaService.remove(id, empresaId);
     return {

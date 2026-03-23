@@ -9,7 +9,7 @@ describe('AlertaOperacionalFinanceiroController (permissions)', () => {
       PERMISSIONS_KEY,
       AlertaOperacionalFinanceiroController,
     );
-    expect(permissions).toEqual([Permission.FINANCEIRO_PAGAMENTOS_READ]);
+    expect(permissions).toEqual([Permission.FINANCEIRO_ALERTAS_READ]);
   });
 
   it('deve exigir permissao de gestao para reconhecer alerta', () => {
@@ -17,7 +17,7 @@ describe('AlertaOperacionalFinanceiroController (permissions)', () => {
       PERMISSIONS_KEY,
       AlertaOperacionalFinanceiroController.prototype.ack,
     );
-    expect(permissions).toEqual([Permission.FINANCEIRO_PAGAMENTOS_MANAGE]);
+    expect(permissions).toEqual([Permission.FINANCEIRO_ALERTAS_MANAGE]);
   });
 
   it('deve exigir permissao de gestao para resolver alerta', () => {
@@ -25,7 +25,7 @@ describe('AlertaOperacionalFinanceiroController (permissions)', () => {
       PERMISSIONS_KEY,
       AlertaOperacionalFinanceiroController.prototype.resolver,
     );
-    expect(permissions).toEqual([Permission.FINANCEIRO_PAGAMENTOS_MANAGE]);
+    expect(permissions).toEqual([Permission.FINANCEIRO_ALERTAS_MANAGE]);
   });
 
   it('deve exigir permissao de gestao para recalcular alertas', () => {
@@ -33,7 +33,7 @@ describe('AlertaOperacionalFinanceiroController (permissions)', () => {
       PERMISSIONS_KEY,
       AlertaOperacionalFinanceiroController.prototype.recalcular,
     );
-    expect(permissions).toEqual([Permission.FINANCEIRO_PAGAMENTOS_MANAGE]);
+    expect(permissions).toEqual([Permission.FINANCEIRO_ALERTAS_MANAGE]);
   });
 
   it('deve exigir permissao de gestao para reprocessar alerta', () => {
@@ -41,6 +41,6 @@ describe('AlertaOperacionalFinanceiroController (permissions)', () => {
       PERMISSIONS_KEY,
       AlertaOperacionalFinanceiroController.prototype.reprocessar,
     );
-    expect(permissions).toEqual([Permission.FINANCEIRO_PAGAMENTOS_MANAGE]);
+    expect(permissions).toEqual([Permission.FINANCEIRO_ALERTAS_MANAGE]);
   });
 });

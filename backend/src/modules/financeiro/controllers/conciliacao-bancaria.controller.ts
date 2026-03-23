@@ -30,7 +30,7 @@ import { ConciliacaoBancariaService } from '../services/conciliacao-bancaria.ser
 
 @Controller('conciliacao-bancaria')
 @UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
-@Permissions(Permission.FINANCEIRO_PAGAMENTOS_READ)
+@Permissions(Permission.FINANCEIRO_CONCILIACAO_READ)
 export class ConciliacaoBancariaController {
   constructor(private readonly conciliacaoBancariaService: ConciliacaoBancariaService) {}
 
@@ -61,7 +61,7 @@ export class ConciliacaoBancariaController {
   }
 
   @Post('importacoes')
-  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  @Permissions(Permission.FINANCEIRO_CONCILIACAO_MANAGE)
   @UseInterceptors(FileInterceptor('arquivo'))
   async importarExtrato(
     @EmpresaId() empresaId: string,
@@ -74,7 +74,7 @@ export class ConciliacaoBancariaController {
   }
 
   @Post('importacoes/:id/matching-automatico')
-  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  @Permissions(Permission.FINANCEIRO_CONCILIACAO_MANAGE)
   async executarMatchingAutomatico(
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
@@ -86,7 +86,7 @@ export class ConciliacaoBancariaController {
   }
 
   @Post('itens/:id/conciliar')
-  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  @Permissions(Permission.FINANCEIRO_CONCILIACAO_MANAGE)
   async conciliarItem(
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
@@ -98,7 +98,7 @@ export class ConciliacaoBancariaController {
   }
 
   @Post('itens/:id/desconciliar')
-  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  @Permissions(Permission.FINANCEIRO_CONCILIACAO_MANAGE)
   async desconciliarItem(
     @EmpresaId() empresaId: string,
     @Param('id') id: string,

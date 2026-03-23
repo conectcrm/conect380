@@ -6,7 +6,7 @@ import { ConciliacaoBancariaController } from './conciliacao-bancaria.controller
 describe('ConciliacaoBancariaController (permissions)', () => {
   it('deve exigir permissao de leitura no controller', () => {
     const permissions = Reflect.getMetadata(PERMISSIONS_KEY, ConciliacaoBancariaController);
-    expect(permissions).toEqual([Permission.FINANCEIRO_PAGAMENTOS_READ]);
+    expect(permissions).toEqual([Permission.FINANCEIRO_CONCILIACAO_READ]);
   });
 
   it('deve exigir permissao de gestao para importar extrato', () => {
@@ -14,7 +14,7 @@ describe('ConciliacaoBancariaController (permissions)', () => {
       PERMISSIONS_KEY,
       ConciliacaoBancariaController.prototype.importarExtrato,
     );
-    expect(permissions).toEqual([Permission.FINANCEIRO_PAGAMENTOS_MANAGE]);
+    expect(permissions).toEqual([Permission.FINANCEIRO_CONCILIACAO_MANAGE]);
   });
 
   it('deve exigir permissao de gestao para executar matching automatico', () => {
@@ -22,7 +22,7 @@ describe('ConciliacaoBancariaController (permissions)', () => {
       PERMISSIONS_KEY,
       ConciliacaoBancariaController.prototype.executarMatchingAutomatico,
     );
-    expect(permissions).toEqual([Permission.FINANCEIRO_PAGAMENTOS_MANAGE]);
+    expect(permissions).toEqual([Permission.FINANCEIRO_CONCILIACAO_MANAGE]);
   });
 
   it('deve exigir permissao de gestao para conciliar item manualmente', () => {
@@ -30,7 +30,7 @@ describe('ConciliacaoBancariaController (permissions)', () => {
       PERMISSIONS_KEY,
       ConciliacaoBancariaController.prototype.conciliarItem,
     );
-    expect(permissions).toEqual([Permission.FINANCEIRO_PAGAMENTOS_MANAGE]);
+    expect(permissions).toEqual([Permission.FINANCEIRO_CONCILIACAO_MANAGE]);
   });
 
   it('deve exigir permissao de gestao para desconciliar item', () => {
@@ -38,6 +38,6 @@ describe('ConciliacaoBancariaController (permissions)', () => {
       PERMISSIONS_KEY,
       ConciliacaoBancariaController.prototype.desconciliarItem,
     );
-    expect(permissions).toEqual([Permission.FINANCEIRO_PAGAMENTOS_MANAGE]);
+    expect(permissions).toEqual([Permission.FINANCEIRO_CONCILIACAO_MANAGE]);
   });
 });

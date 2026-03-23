@@ -27,6 +27,7 @@ describe('permissions.utils', () => {
 
       expect(financeiroPerms.has(Permission.FINANCEIRO_FATURAMENTO_MANAGE)).toBe(true);
       expect(financeiroPerms.has(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)).toBe(true);
+      expect(financeiroPerms.has(Permission.FINANCEIRO_CONTAS_PAGAR_MANAGE)).toBe(true);
       expect(financeiroPerms.has(Permission.USERS_CREATE)).toBe(false);
     });
 
@@ -40,6 +41,7 @@ describe('permissions.utils', () => {
       expect(adminPerms.has(Permission.COMERCIAL_PROPOSTAS_READ)).toBe(true);
       expect(adminPerms.has(Permission.ATENDIMENTO_TICKETS_READ)).toBe(true);
       expect(adminPerms.has(Permission.FINANCEIRO_PAGAMENTOS_READ)).toBe(true);
+      expect(adminPerms.has(Permission.FINANCEIRO_FORNECEDORES_READ)).toBe(true);
     });
   });
 
@@ -89,6 +91,42 @@ describe('permissions.utils', () => {
       expect(resolved.has(Permission.COMERCIAL_PROPOSTAS_READ)).toBe(true);
       expect(resolved.has(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)).toBe(false);
       expect(resolved.has(Permission.FINANCEIRO_FATURAMENTO_MANAGE)).toBe(false);
+    });
+
+    it('deve expandir permissao legada de pagamentos para os submodulos de leitura', () => {
+      const resolved = resolveUserPermissions({
+        permissions: ['financeiro.pagamentos.read'],
+      });
+
+      expect(resolved.has(Permission.FINANCEIRO_PAGAMENTOS_READ)).toBe(true);
+      expect(resolved.has(Permission.FINANCEIRO_CONTAS_PAGAR_READ)).toBe(true);
+      expect(resolved.has(Permission.FINANCEIRO_FORNECEDORES_READ)).toBe(true);
+      expect(resolved.has(Permission.FINANCEIRO_CONCILIACAO_READ)).toBe(true);
+      expect(resolved.has(Permission.FINANCEIRO_APROVACOES_READ)).toBe(true);
+      expect(resolved.has(Permission.FINANCEIRO_CONTAS_PAGAR_MANAGE)).toBe(false);
+    });
+
+    it('deve expandir permissao legada de pagamentos.manage para todos os submodulos', () => {
+      const resolved = resolveUserPermissions({
+        permissions: ['financeiro.pagamentos.manage'],
+      });
+
+      expect(resolved.has(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)).toBe(true);
+      expect(resolved.has(Permission.FINANCEIRO_PAGAMENTOS_READ)).toBe(true);
+      expect(resolved.has(Permission.FINANCEIRO_CONTAS_PAGAR_MANAGE)).toBe(true);
+      expect(resolved.has(Permission.FINANCEIRO_CONTAS_PAGAR_READ)).toBe(true);
+      expect(resolved.has(Permission.FINANCEIRO_ALERTAS_MANAGE)).toBe(true);
+      expect(resolved.has(Permission.FINANCEIRO_ALERTAS_READ)).toBe(true);
+    });
+
+    it('deve promover leitura quando permissao explicita de submodulo for manage', () => {
+      const resolved = resolveUserPermissions({
+        permissions: ['financeiro.contas-pagar.manage'],
+      });
+
+      expect(resolved.has(Permission.FINANCEIRO_CONTAS_PAGAR_MANAGE)).toBe(true);
+      expect(resolved.has(Permission.FINANCEIRO_CONTAS_PAGAR_READ)).toBe(true);
+      expect(resolved.has(Permission.FINANCEIRO_PAGAMENTOS_READ)).toBe(false);
     });
   });
 

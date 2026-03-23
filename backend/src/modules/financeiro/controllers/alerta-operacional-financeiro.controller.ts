@@ -24,7 +24,7 @@ import { AlertaOperacionalFinanceiroService } from '../services/alerta-operacion
 
 @Controller('financeiro/alertas-operacionais')
 @UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
-@Permissions(Permission.FINANCEIRO_PAGAMENTOS_READ)
+@Permissions(Permission.FINANCEIRO_ALERTAS_READ)
 export class AlertaOperacionalFinanceiroController {
   constructor(private readonly alertaService: AlertaOperacionalFinanceiroService) {}
 
@@ -37,7 +37,7 @@ export class AlertaOperacionalFinanceiroController {
   }
 
   @Post(':id/ack')
-  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  @Permissions(Permission.FINANCEIRO_ALERTAS_MANAGE)
   async ack(
     @EmpresaId() empresaId: string,
     @Param('id', ParseUUIDPipe) id: string,
@@ -49,7 +49,7 @@ export class AlertaOperacionalFinanceiroController {
   }
 
   @Post(':id/resolver')
-  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  @Permissions(Permission.FINANCEIRO_ALERTAS_MANAGE)
   async resolver(
     @EmpresaId() empresaId: string,
     @Param('id', ParseUUIDPipe) id: string,
@@ -61,14 +61,17 @@ export class AlertaOperacionalFinanceiroController {
   }
 
   @Post('recalcular')
-  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
-  async recalcular(@EmpresaId() empresaId: string, @CurrentUser() user: { id?: string; sub?: string }) {
+  @Permissions(Permission.FINANCEIRO_ALERTAS_MANAGE)
+  async recalcular(
+    @EmpresaId() empresaId: string,
+    @CurrentUser() user: { id?: string; sub?: string },
+  ) {
     const userId = user?.id || user?.sub || 'sistema';
     return this.alertaService.recalcularAlertas(empresaId, userId);
   }
 
   @Post(':id/reprocessar')
-  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  @Permissions(Permission.FINANCEIRO_ALERTAS_MANAGE)
   async reprocessar(
     @EmpresaId() empresaId: string,
     @Param('id', ParseUUIDPipe) id: string,

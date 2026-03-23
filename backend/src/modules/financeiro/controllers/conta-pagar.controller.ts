@@ -33,7 +33,7 @@ import { ContaPagarService } from '../services/conta-pagar.service';
 
 @Controller('contas-pagar')
 @UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
-@Permissions(Permission.FINANCEIRO_PAGAMENTOS_READ)
+@Permissions(Permission.FINANCEIRO_CONTAS_PAGAR_READ)
 export class ContaPagarController {
   constructor(private readonly contaPagarService: ContaPagarService) {}
 
@@ -48,6 +48,7 @@ export class ContaPagarController {
   }
 
   @Get('aprovacoes/pendentes')
+  @Permissions(Permission.FINANCEIRO_APROVACOES_READ)
   async listarPendenciasAprovacao(
     @EmpresaId() empresaId: string,
     @Query() query: QueryContasPagarDto,
@@ -82,7 +83,7 @@ export class ContaPagarController {
   }
 
   @Post('aprovacoes/lote')
-  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  @Permissions(Permission.FINANCEIRO_APROVACOES_MANAGE)
   async aprovarLote(
     @EmpresaId() empresaId: string,
     @Body() dto: AprovarLoteContasPagarDto,
@@ -98,7 +99,7 @@ export class ContaPagarController {
   }
 
   @Post()
-  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  @Permissions(Permission.FINANCEIRO_CONTAS_PAGAR_MANAGE)
   async create(
     @EmpresaId() empresaId: string,
     @Body() dto: CreateContaPagarDto,
@@ -109,7 +110,7 @@ export class ContaPagarController {
   }
 
   @Put(':id')
-  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  @Permissions(Permission.FINANCEIRO_CONTAS_PAGAR_MANAGE)
   async update(
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
@@ -121,7 +122,7 @@ export class ContaPagarController {
   }
 
   @Delete(':id')
-  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  @Permissions(Permission.FINANCEIRO_CONTAS_PAGAR_MANAGE)
   async remove(@EmpresaId() empresaId: string, @Param('id') id: string) {
     await this.contaPagarService.remove(id, empresaId);
     return {
@@ -131,7 +132,7 @@ export class ContaPagarController {
   }
 
   @Post(':id/registrar-pagamento')
-  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  @Permissions(Permission.FINANCEIRO_CONTAS_PAGAR_MANAGE)
   async registrarPagamento(
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
@@ -143,7 +144,7 @@ export class ContaPagarController {
   }
 
   @Post(':id/aprovar')
-  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  @Permissions(Permission.FINANCEIRO_APROVACOES_MANAGE)
   async aprovar(
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
@@ -155,7 +156,7 @@ export class ContaPagarController {
   }
 
   @Post(':id/reprovar')
-  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  @Permissions(Permission.FINANCEIRO_APROVACOES_MANAGE)
   async reprovar(
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
