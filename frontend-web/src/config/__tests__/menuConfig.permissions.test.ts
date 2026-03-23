@@ -1,6 +1,6 @@
 import { canUserAccessPath, getMenuParaEmpresa, type MenuConfig } from '../menuConfig';
 
-const ALL_MODULES = ['ATENDIMENTO', 'CRM', 'VENDAS', 'FINANCEIRO', 'BILLING'];
+const ALL_MODULES = ['ATENDIMENTO', 'CRM', 'VENDAS', 'FINANCEIRO', 'BILLING', 'ADMINISTRACAO'];
 
 const collectIds = (items: MenuConfig[]): string[] => {
   const ids: string[] = [];
@@ -389,6 +389,34 @@ describe('menuConfig permission filtering', () => {
     expect(withManage).toBe(true);
   });
 
+  it('blocks empresas minhas when ADMINISTRACAO module is not active', () => {
+    const withoutAdminModule = canUserAccessPath(
+      '/empresas/minhas',
+      ['ATENDIMENTO', 'CRM', 'VENDAS', 'FINANCEIRO', 'BILLING'],
+      {
+        email: 'superadmin@empresa.com',
+        role: 'super_admin',
+        permissions: ['admin.empresas.manage'],
+      } as any,
+    );
+
+    expect(withoutAdminModule).toBe(false);
+  });
+
+  it('blocks financeiro routes when FINANCEIRO module is not active', () => {
+    const withoutFinanceiroModule = canUserAccessPath(
+      '/financeiro/cotacoes',
+      ['ATENDIMENTO', 'CRM', 'VENDAS', 'BILLING', 'ADMINISTRACAO'],
+      {
+        email: 'finance@empresa.com',
+        role: 'custom',
+        permissions: ['financeiro.pagamentos.read'],
+      } as any,
+    );
+
+    expect(withoutFinanceiroModule).toBe(false);
+  });
+
   it('keeps nested access for leaf routes when permission is present', () => {
     const withRead = canUserAccessPath('/crm/clientes/123', ALL_MODULES, {
       email: 'sales@empresa.com',
@@ -513,6 +541,20 @@ describe('menuConfig permission filtering', () => {
     expect(withPermissionAssinatura).toBe(true);
     expect(withPermissionPlanos).toBe(true);
     expect(withoutPermission).toBe(false);
+  });
+
+  it('blocks billing self-service routes when BILLING module is not active', () => {
+    const withoutBillingModule = canUserAccessPath(
+      '/billing/assinaturas',
+      ['ATENDIMENTO', 'CRM', 'VENDAS', 'FINANCEIRO', 'ADMINISTRACAO'],
+      {
+        email: 'owner@empresa.com',
+        role: 'custom',
+        permissions: ['planos.manage'],
+      } as any,
+    );
+
+    expect(withoutBillingModule).toBe(false);
   });
 
   it('maps legacy billing faturas/pagamentos aliases to billing self-service permission', () => {

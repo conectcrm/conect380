@@ -350,7 +350,10 @@ const AppRoutes: React.FC = () => {
                     element={protegerRota(ModuloEnum.ATENDIMENTO, <FluxoBuilderPage />)}
                   />
                   {/* Gerenciamento de Empresas do Usuário */}
-                  <Route path="/empresas/minhas" element={<MinhasEmpresasPage />} />
+                  <Route
+                    path="/empresas/minhas"
+                    element={protegerRota(ModuloEnum.ADMINISTRACAO, <MinhasEmpresasPage />)}
+                  />
                   <Route
                     path="/empresas/:empresaId/configuracoes"
                     element={<Navigate to="/configuracoes/empresa" replace />}
@@ -383,7 +386,7 @@ const AppRoutes: React.FC = () => {
                   <Route path="/configuracoes/departamentos" element={<DepartamentosPage />} />
                   <Route
                     path="/configuracoes/sistema"
-                    element={<SystemBrandingPage />}
+                    element={protegerRota(ModuloEnum.ADMINISTRACAO, <SystemBrandingPage />)}
                   />
                   <Route
                     path="/configuracoes/seguranca"

@@ -1031,6 +1031,7 @@ export const menuConfig: MenuConfig[] = [
     icon: Building2,
     color: 'blue',
     adminOnly: true,
+    requiredModule: 'ADMINISTRACAO',
     section: 'Administra\u00e7\u00e3o',
     children: [
       {
@@ -1087,6 +1088,14 @@ type RoutePermissionRule = {
   permissions: string[];
   match?: 'any' | 'all';
 };
+
+type LicensedModule =
+  | 'ATENDIMENTO'
+  | 'CRM'
+  | 'VENDAS'
+  | 'FINANCEIRO'
+  | 'BILLING'
+  | 'ADMINISTRACAO';
 
 const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
   {
@@ -1228,6 +1237,49 @@ const ROUTE_PATH_ALIASES: Record<string, string[]> = {
   '/configuracoes/tickets/tipos': ['/nuclei/configuracoes/tickets/tipos'],
 };
 
+const ROUTE_MODULE_REQUIREMENTS: Array<{ pattern: string; module: LicensedModule }> = [
+  { pattern: '/billing', module: 'BILLING' },
+  { pattern: '/assinaturas', module: 'BILLING' },
+  { pattern: '/faturamento', module: 'BILLING' },
+
+  { pattern: '/financeiro', module: 'FINANCEIRO' },
+  { pattern: '/vendas/cotacoes', module: 'FINANCEIRO' },
+  { pattern: '/vendas/aprovacoes', module: 'FINANCEIRO' },
+
+  { pattern: '/atendimento', module: 'ATENDIMENTO' },
+  { pattern: '/nuclei/atendimento', module: 'ATENDIMENTO' },
+  { pattern: '/gestao/atendentes', module: 'ATENDIMENTO' },
+  { pattern: '/gestao/tags', module: 'ATENDIMENTO' },
+  { pattern: '/gestao/atribuicoes', module: 'ATENDIMENTO' },
+  { pattern: '/gestao/departamentos', module: 'ATENDIMENTO' },
+  { pattern: '/gestao/fluxos', module: 'ATENDIMENTO' },
+  { pattern: '/configuracoes/departamentos', module: 'ATENDIMENTO' },
+
+  { pattern: '/clientes', module: 'CRM' },
+  { pattern: '/contatos', module: 'CRM' },
+  { pattern: '/crm', module: 'CRM' },
+  { pattern: '/leads', module: 'CRM' },
+  { pattern: '/pipeline', module: 'CRM' },
+  { pattern: '/oportunidades', module: 'CRM' },
+  { pattern: '/agenda', module: 'CRM' },
+  { pattern: '/veiculos', module: 'CRM' },
+  { pattern: '/produtos', module: 'CRM' },
+
+  { pattern: '/contratos', module: 'VENDAS' },
+  { pattern: '/propostas', module: 'VENDAS' },
+
+  { pattern: '/gestao/permissoes', module: 'ADMINISTRACAO' },
+  { pattern: '/gestao/empresas', module: 'ADMINISTRACAO' },
+  { pattern: '/gestao/nucleos', module: 'ADMINISTRACAO' },
+  { pattern: '/empresas/minhas', module: 'ADMINISTRACAO' },
+  { pattern: '/sistema/backup', module: 'ADMINISTRACAO' },
+  { pattern: '/configuracoes/sistema', module: 'ADMINISTRACAO' },
+  { pattern: '/empresas/:empresaId/configuracoes', module: 'ADMINISTRACAO' },
+  { pattern: '/empresas/:empresaId/relatorios', module: 'ADMINISTRACAO' },
+  { pattern: '/empresas/:empresaId/permissoes', module: 'ADMINISTRACAO' },
+  { pattern: '/empresas/:empresaId/backup', module: 'ADMINISTRACAO' },
+];
+
 const normalizePathname = (pathname: string): string => {
   if (!pathname) {
     return '/';
@@ -1340,6 +1392,29 @@ const buildAliasLookup = (): Record<string, string[]> => {
 
 const ROUTE_ALIAS_LOOKUP = buildAliasLookup();
 
+const resolveRequiredModuleForPath = (pathname: string): LicensedModule | null => {
+  const normalizedPath = normalizePathname(pathname);
+  const candidates = [normalizedPath, ...(ROUTE_ALIAS_LOOKUP[normalizedPath] || [])];
+
+  let bestMatch: { pattern: string; module: LicensedModule } | null = null;
+
+  ROUTE_MODULE_REQUIREMENTS.forEach((rule) => {
+    const hasMatch = candidates.some(
+      (candidate) => matchesPattern(candidate, rule.pattern) || isPathMatch(candidate, rule.pattern),
+    );
+
+    if (!hasMatch) {
+      return;
+    }
+
+    if (!bestMatch || rule.pattern.length > bestMatch.pattern.length) {
+      bestMatch = rule;
+    }
+  });
+
+  return bestMatch?.module ?? null;
+};
+
 const mergePathRules = (rules: PathMatchRule[]): PathMatchRule[] => {
   const merged = new Map<string, boolean>();
   rules.forEach((rule) => {
@@ -1428,6 +1503,11 @@ export const canUserAccessPath = (
     BLOCKED_LEGACY_ROUTE_PREFIXES.some((prefix) => isPathMatch(normalizedPath, prefix)) ||
     isBlockedLegacyNucleusAdministrationPath
   ) {
+    return false;
+  }
+
+  const requiredModule = resolveRequiredModuleForPath(normalizedPath);
+  if (requiredModule && !modulosAtivos.includes(requiredModule)) {
     return false;
   }
 
