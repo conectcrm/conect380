@@ -1,4 +1,4 @@
-import { api } from './api';
+import { api, apiPublic } from './api';
 import { getErrorMessage } from '../utils/errorHandling';
 
 export interface RegistrarEmpresaPayload {
@@ -67,17 +67,30 @@ export interface VerificacaoEmailResponse {
   success: boolean;
 }
 
+export interface EmpresaRegistroResponseData {
+  id: string;
+  nome: string;
+  email: string;
+  plano: string;
+  status?: 'ativa' | 'inativa' | 'trial' | 'suspensa';
+  subdominio?: string;
+  ativo?: boolean;
+  email_verificado?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface RegistrarEmpresaResponse {
   success: boolean;
   message: string;
-  data: EmpresaResponse;
+  data: EmpresaRegistroResponseData;
 }
 
 class EmpresaService {
   // Registrar nova empresa
   async registrarEmpresa(dados: RegistrarEmpresaPayload): Promise<RegistrarEmpresaResponse> {
     try {
-      const response = await api.post<RegistrarEmpresaResponse>('/empresas/registro', dados);
+      const response = await apiPublic.post<RegistrarEmpresaResponse>('/empresas/registro', dados);
       return response.data;
     } catch (error: unknown) {
       console.error('Erro ao registrar empresa:', error);
@@ -88,7 +101,7 @@ class EmpresaService {
   // Verificar disponibilidade de CNPJ
   async verificarCNPJ(cnpj: string): Promise<{ disponivel: boolean; message?: string }> {
     try {
-      const response = await api.get(`/empresas/verificar-cnpj/${cnpj.replace(/\D/g, '')}`);
+      const response = await apiPublic.get(`/empresas/verificar-cnpj/${cnpj.replace(/\D/g, '')}`);
       return response.data;
     } catch (error: unknown) {
       console.error('Erro ao verificar CNPJ:', error);
@@ -102,7 +115,7 @@ class EmpresaService {
   // Verificar disponibilidade de email
   async verificarEmail(email: string): Promise<{ disponivel: boolean; message?: string }> {
     try {
-      const response = await api.get(`/empresas/verificar-email/${encodeURIComponent(email)}`);
+      const response = await apiPublic.get(`/empresas/verificar-email/${encodeURIComponent(email)}`);
       return response.data;
     } catch (error: unknown) {
       console.error('Erro ao verificar email:', error);
@@ -116,7 +129,7 @@ class EmpresaService {
   // Verificar email de ativação
   async verificarEmailAtivacao(token: string): Promise<VerificacaoEmailResponse> {
     try {
-      const response = await api.post('/empresas/verificar-email', { token });
+      const response = await apiPublic.post('/empresas/verificar-email', { token });
       return response.data;
     } catch (error: unknown) {
       console.error('Erro ao verificar email de ativação:', error);
@@ -127,7 +140,7 @@ class EmpresaService {
   // Reenviar email de ativação
   async reenviarEmailAtivacao(email: string): Promise<{ message: string }> {
     try {
-      const response = await api.post('/empresas/reenviar-ativacao', { email });
+      const response = await apiPublic.post('/empresas/reenviar-ativacao', { email });
       return response.data;
     } catch (error: unknown) {
       console.error('Erro ao reenviar email:', error);
@@ -138,7 +151,7 @@ class EmpresaService {
   // Obter informações da empresa pelo subdomínio
   async obterEmpresaPorSubdominio(subdominio: string): Promise<EmpresaResponse> {
     try {
-      const response = await api.get(`/empresas/subdominio/${subdominio}`);
+      const response = await apiPublic.get(`/empresas/subdominio/${subdominio}`);
       return response.data;
     } catch (error: unknown) {
       console.error('Erro ao obter empresa:', error);
@@ -162,7 +175,7 @@ class EmpresaService {
     }>
   > {
     try {
-      const response = await api.get('/empresas/planos');
+      const response = await apiPublic.get('/empresas/planos');
       return response.data;
     } catch (error: unknown) {
       console.error('Erro ao obter planos:', error);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FieldPath, useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
@@ -44,7 +44,11 @@ const registroSchema = yup.object({
     email: yup.string().email('E-mail inválido').required('E-mail é obrigatório'),
     senha: yup
       .string()
-      .min(6, 'Senha deve ter pelo menos 6 caracteres')
+      .min(8, 'Senha deve ter pelo menos 8 caracteres')
+      .matches(
+        /^(?=.*[A-Za-z])(?=.*\d).+$/,
+        'Senha deve conter pelo menos 1 letra e 1 número',
+      )
       .required('Senha é obrigatória'),
     confirmarSenha: yup
       .string()
@@ -80,8 +84,17 @@ interface RegistroFormData {
   aceitarTermos: boolean;
 }
 
-// Planos disponíveis
-const PLANOS = [
+interface PlanoCadastro {
+  id: string;
+  nome: string;
+  preco: number;
+  descricao: string;
+  recursos: string[];
+  popular: boolean;
+}
+
+// Fallback local para bootstrap
+const FALLBACK_PLANOS: PlanoCadastro[] = [
   {
     id: 'starter',
     nome: 'Starter',
@@ -134,22 +147,80 @@ export const RegistroEmpresaPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [planosDisponiveis, setPlanosDisponiveis] = useState<PlanoCadastro[]>(FALLBACK_PLANOS);
+  const [planosLoading, setPlanosLoading] = useState(false);
 
   const {
     register,
     handleSubmit,
     watch,
+    getValues,
     setValue,
     trigger,
     formState: { errors },
   } = useForm<RegistroFormData>({
     resolver: yupResolver(registroSchema),
     defaultValues: {
-      plano: 'business', // Plano padrão
+      plano: '',
     },
   });
 
   const watchedPlano = watch('plano');
+
+  useEffect(() => {
+    let mounted = true;
+
+    const carregarPlanos = async () => {
+      setPlanosLoading(true);
+
+      try {
+        const planos = await empresaService.obterPlanos();
+        if (!mounted) return;
+
+        const normalizados: PlanoCadastro[] = Array.isArray(planos)
+          ? planos
+              .map((plano, index) => ({
+                id: String(plano?.id || '').trim(),
+                nome: String(plano?.nome || '').trim(),
+                preco: Number(plano?.preco || 0),
+                descricao: String(plano?.descricao || '').trim(),
+                recursos: Array.isArray(plano?.recursos)
+                  ? plano.recursos.map((item) => String(item || '').trim()).filter(Boolean)
+                  : [],
+                popular: String(plano?.id || '').trim().toLowerCase() === 'business' || index === 1,
+              }))
+              .filter((plano) => Boolean(plano.id) && Boolean(plano.nome))
+          : [];
+
+        const fonte = normalizados.length > 0 ? normalizados : FALLBACK_PLANOS;
+        setPlanosDisponiveis(fonte);
+
+        const planoAtual = getValues('plano');
+        if (!planoAtual || !fonte.some((plano) => plano.id === planoAtual)) {
+          const planoPadrao =
+            fonte.find((plano) => plano.id.toLowerCase() === 'business')?.id || fonte[0].id;
+          setValue('plano', planoPadrao, { shouldValidate: true });
+        }
+      } catch {
+        if (!mounted) return;
+        setPlanosDisponiveis(FALLBACK_PLANOS);
+        const planoAtual = getValues('plano');
+        if (!planoAtual) {
+          setValue('plano', 'business', { shouldValidate: true });
+        }
+      } finally {
+        if (mounted) {
+          setPlanosLoading(false);
+        }
+      }
+    };
+
+    void carregarPlanos();
+
+    return () => {
+      mounted = false;
+    };
+  }, [getValues, setValue]);
 
   // Função para buscar CEP
   const buscarCep = async (cep: string) => {
@@ -223,13 +294,18 @@ export const RegistroEmpresaPage: React.FC = () => {
       };
 
       const response = await empresaService.registrarEmpresa(payload);
+      const precisaVerificarEmail = response?.data?.email_verificado === false;
 
       toastService.success(response.message || 'Empresa registrada com sucesso!');
-      toastService.success('Verifique seu e-mail para ativar a conta.');
+      if (precisaVerificarEmail) {
+        toastService.success('Verifique seu e-mail para ativar a conta.');
+      }
 
       navigate('/login', {
         state: {
-          message: 'Conta criada com sucesso! Faça login para continuar.',
+          message: precisaVerificarEmail
+            ? 'Conta criada! Verifique seu e-mail para ativar o acesso.'
+            : 'Conta criada com sucesso! Faça login para continuar.',
           email: data.usuario.email,
         },
       });
@@ -499,8 +575,14 @@ export const RegistroEmpresaPage: React.FC = () => {
         <p className="text-gray-600 mt-2">Selecione o plano ideal para sua empresa</p>
       </div>
 
+      {planosLoading && (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-600">
+          Carregando planos disponíveis...
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {PLANOS.map((plano) => (
+        {planosDisponiveis.map((plano) => (
           <div
             key={plano.id}
             className={`relative rounded-lg border-2 p-5 shadow-sm cursor-pointer transition-all ${
@@ -508,7 +590,7 @@ export const RegistroEmpresaPage: React.FC = () => {
                 ? 'border-[#159A9C] bg-[#DEEFE7]'
                 : 'border-gray-200 hover:border-gray-300'
             } ${plano.popular ? 'ring-2 ring-[#159A9C] ring-opacity-50' : ''}`}
-            onClick={() => setValue('plano', plano.id)}
+            onClick={() => setValue('plano', plano.id, { shouldValidate: true })}
           >
             {plano.popular && (
               <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
@@ -522,7 +604,9 @@ export const RegistroEmpresaPage: React.FC = () => {
               <h3 className="text-xl font-bold text-gray-900">{plano.nome}</h3>
               <p className="text-gray-600 mt-2">{plano.descricao}</p>
               <div className="mt-3">
-                <span className="text-3xl font-bold text-gray-900">R$ {plano.preco}</span>
+                <span className="text-3xl font-bold text-gray-900">
+                  {plano.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </span>
                 <span className="text-gray-600">/mês</span>
               </div>
             </div>

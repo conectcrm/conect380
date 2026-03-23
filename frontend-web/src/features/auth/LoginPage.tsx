@@ -222,8 +222,12 @@ const LoginPage: React.FC = () => {
         return;
       }
 
-      toastService.error('Credenciais inválidas. Tente novamente.');
-      setErrors({ email: 'E-mail ou senha incorretos' });
+      const mensagemAutenticacao =
+        backendMessage ||
+        (errorMessage && errorMessage !== 'Authentication failed' ? errorMessage : null) ||
+        'Credenciais inválidas. Tente novamente.';
+      toastService.error(mensagemAutenticacao);
+      setErrors({ email: mensagemAutenticacao });
     } finally {
       setIsLoading(false);
     }

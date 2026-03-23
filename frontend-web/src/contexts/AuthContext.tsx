@@ -201,7 +201,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           throw new Error('Authentication failed');
         }
       } else {
-        throw new Error('Authentication failed');
+        throw new Error(response.message || 'Authentication failed');
       }
     } catch (error: unknown) {
       const isExpectedActionError =
