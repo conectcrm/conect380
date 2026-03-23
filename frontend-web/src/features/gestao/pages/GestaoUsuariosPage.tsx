@@ -395,6 +395,20 @@ const getRecommendedPermissionsByRole = (
 const getGroupPermissionValues = (group: PermissaoModalGroup): string[] =>
   Array.from(new Set(group.options.map((option) => option.value)));
 
+const arePermissionSetsEqual = (left: Set<string>, right: Set<string>): boolean => {
+  if (left.size !== right.size) {
+    return false;
+  }
+
+  for (const value of left) {
+    if (!right.has(value)) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
 const mapPermissionCatalogPayload = (payload: PermissionCatalogResponse): PermissionCatalogState => {
   const groups = Array.isArray(payload.groups)
     ? payload.groups
@@ -847,7 +861,9 @@ const GestaoUsuariosPage: React.FC = () => {
         email: usuario.email,
         telefone: usuario.telefone || '',
         role: roleInicial,
-        permissoes: normalizePermissionsForRole(roleInicial, usuario.permissoes || []),
+        permissoes: normalizePermissionsForRole(roleInicial, usuario.permissoes || [], {
+          applyRecommendedFallback: false,
+        }),
         ativo: usuario.ativo,
         avatar_url: usuario.avatar_url,
         idioma_preferido: usuario.idioma_preferido || 'pt-BR',
@@ -1125,11 +1141,20 @@ const GestaoUsuariosPage: React.FC = () => {
 
   const catalogoPermissoes = permissionCatalog ?? DEFAULT_PERMISSION_CATALOG;
 
-  const normalizePermissionsForRole = (role: UserRole, currentPermissions: string[] = []): string[] => {
+  const normalizePermissionsForRole = (
+    role: UserRole,
+    currentPermissions: string[] = [],
+    options?: { applyRecommendedFallback?: boolean },
+  ): string[] => {
     const visibleValues = getVisiblePermissionValuesByRole(catalogoPermissoes, role);
     const retainedPermissions = currentPermissions.filter(
       (permission) => visibleValues.has(permission) || permission === 'ATENDIMENTO',
     );
+    const applyRecommendedFallback = options?.applyRecommendedFallback ?? false;
+    if (!applyRecommendedFallback) {
+      return Array.from(new Set(retainedPermissions));
+    }
+
     const recommendedPermissions = getRecommendedPermissionsByRole(catalogoPermissoes, role);
     const nextPermissions =
       retainedPermissions.length > 0 ? retainedPermissions : [...recommendedPermissions];
@@ -1141,7 +1166,9 @@ const GestaoUsuariosPage: React.FC = () => {
     setFormData((prev) => ({
       ...prev,
       role,
-      permissoes: normalizePermissionsForRole(role, prev.permissoes || []),
+      permissoes: normalizePermissionsForRole(role, prev.permissoes || [], {
+        applyRecommendedFallback: !editingUsuario,
+      }),
     }));
   };
 
@@ -1373,6 +1400,43 @@ const GestaoUsuariosPage: React.FC = () => {
     roleOptionsForForm.find((option) => option.value === formData.role)?.value ??
     roleOptionsForForm[0]?.value ??
     defaultRoleForForm;
+  const permissoesSelecionadasNormalizadas = normalizePermissionsForRole(
+    roleSelecionadoFormulario,
+    formData.permissoes || [],
+    { applyRecommendedFallback: false },
+  );
+  const permissoesPadraoDoPerfil = normalizePermissionsForRole(
+    roleSelecionadoFormulario,
+    getRecommendedPermissionsByRole(catalogoPermissoes, roleSelecionadoFormulario),
+    { applyRecommendedFallback: false },
+  );
+  const permissoesSelecionadasSet = new Set(permissoesSelecionadasNormalizadas);
+  const permissoesPadraoSet = new Set(permissoesPadraoDoPerfil);
+  const permissoesSeguemPadrao =
+    permissoesPadraoSet.size > 0 &&
+    arePermissionSetsEqual(permissoesSelecionadasSet, permissoesPadraoSet);
+  const perfilSelecionadoLabel =
+    ROLE_LABELS[roleSelecionadoFormulario] ?? roleSelecionadoFormulario;
+  const statusPermissoesLabel =
+    permissoesSelecionadasSet.size === 0
+      ? 'Sem permissoes'
+      : permissoesSeguemPadrao
+        ? 'Padrao do perfil'
+        : 'Customizado';
+  const statusPermissoesTone =
+    permissoesSelecionadasSet.size === 0
+      ? 'bg-[#FFF4E9] text-[#A06213]'
+      : permissoesSeguemPadrao
+        ? 'bg-[#E8F6F4] text-[#166A6B]'
+        : 'bg-[#EEF3FF] text-[#2F4C9B]';
+  const statusPermissoesDescricao =
+    permissoesPadraoSet.size === 0
+      ? `Perfil ${perfilSelecionadoLabel} sem template padrao definido.`
+      : permissoesSelecionadasSet.size === 0
+        ? `Nenhuma permissao selecionada para ${perfilSelecionadoLabel}.`
+        : permissoesSeguemPadrao
+          ? `Conjunto atual igual ao padrao de ${perfilSelecionadoLabel}.`
+          : `Conjunto atual diferente do padrao de ${perfilSelecionadoLabel}.`;
   const gruposPermissaoDoFormulario = getPermissionGroupsByRole(
     catalogoPermissoes,
     roleSelecionadoFormulario,
@@ -2561,9 +2625,19 @@ const GestaoUsuariosPage: React.FC = () => {
                     <span className="text-xs font-semibold uppercase tracking-wide text-[#607B89]">
                       Selecionadas
                     </span>
-                    <span className="rounded-full bg-[#EEF7F5] px-2.5 py-1 text-xs font-semibold text-[#0F7B7D]">
-                      {(formData.permissoes || []).length}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-[#EEF7F5] px-2.5 py-1 text-xs font-semibold text-[#0F7B7D]">
+                        {(formData.permissoes || []).length}
+                      </span>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusPermissoesTone}`}
+                      >
+                        {statusPermissoesLabel}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mb-3 rounded-lg border border-[#E5EEF2] bg-white px-3 py-2">
+                    <p className="text-xs text-[#607B89]">{statusPermissoesDescricao}</p>
                   </div>
                   <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
                     <div className="relative flex-1">
