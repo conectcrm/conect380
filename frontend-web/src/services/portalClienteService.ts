@@ -8,23 +8,34 @@ import { API_BASE_URL } from './api';
 
 const api = {
   get: async (url: string) => {
-    const response = await fetch(`${API_BASE_URL}${url}`);
+    const token = localStorage.getItem('authToken');
+    const response = await fetch(`${API_BASE_URL}${url}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
     if (!response.ok) throw new Error('Request failed');
     return { data: await response.json() };
   },
   post: async (url: string, data?: any) => {
+    const token = localStorage.getItem('authToken');
     const response = await fetch(`${API_BASE_URL}${url}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: data ? JSON.stringify(data) : undefined,
     });
     if (!response.ok) throw new Error('Request failed');
     return { data: await response.json() };
   },
   put: async (url: string, data?: any) => {
+    const token = localStorage.getItem('authToken');
     const response = await fetch(`${API_BASE_URL}${url}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: data ? JSON.stringify(data) : undefined,
     });
     if (!response.ok) throw new Error('Request failed');
@@ -36,14 +47,21 @@ export interface PropostaPublica {
   id: string;
   numero: string;
   titulo: string;
-  status: 'enviada' | 'visualizada' | 'aprovada' | 'rejeitada' | 'expirada';
+  status: 'rascunho' | 'enviada' | 'visualizada' | 'negociacao' | 'aprovada' | 'rejeitada' | 'expirada';
   dataEnvio: Date;
   dataValidade: Date;
+  criadaEm: Date;
+  subtotal: number;
+  descontoGlobal: number;
+  impostos: number;
+  total: number;
   valorTotal: number;
   token: string; // Token único para acesso público
   empresa: {
     nome: string;
     logo?: string;
+    corPrimaria?: string;
+    site?: string;
     endereco: string;
     telefone: string;
     email: string;
@@ -58,10 +76,13 @@ export interface PropostaPublica {
     telefone: string;
   };
   produtos: Array<{
+    id?: string;
     nome: string;
     descricao: string;
     quantidade: number;
     valorUnitario: number;
+    desconto: number;
+    subtotal: number;
     valorTotal: number;
   }>;
   condicoes: {
@@ -81,7 +102,7 @@ interface LogVisualizacao {
 
 interface LogAcao {
   propostaId: string;
-  acao: 'visualizada' | 'aprovada' | 'rejeitada' | 'download';
+  acao: 'visualizada' | 'aprovada' | 'rejeitada' | 'negociacao' | 'download';
   ip: string;
   userAgent: string;
   timestamp: Date;
@@ -89,6 +110,142 @@ interface LogAcao {
 }
 
 class PortalClienteService {
+  private mapStatusPortal(status: unknown): PropostaPublica['status'] {
+    const normalized = String(status || '').toLowerCase();
+    if (normalized === 'rascunho') return 'rascunho';
+    if (normalized === 'visualizada') return 'visualizada';
+    if (normalized === 'negociacao' || normalized === 'em_negociacao') return 'negociacao';
+    if (normalized === 'aprovada') return 'aprovada';
+    if (normalized === 'rejeitada') return 'rejeitada';
+    if (normalized === 'expirada') return 'expirada';
+    return 'enviada';
+  }
+
+  private toFiniteNumber(value: unknown, fallback = 0): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  private normalizePercent(value: unknown): number {
+    const parsed = this.toFiniteNumber(value, 0);
+    return Math.min(100, Math.max(0, parsed));
+  }
+
+  private mapPropostaPortal(raw: any): PropostaPublica {
+    const clienteRaw =
+      raw?.cliente && typeof raw.cliente === 'object'
+        ? raw.cliente
+        : { nome: String(raw?.cliente || 'Cliente'), email: '' };
+
+    const vendedorRaw =
+      raw?.vendedor && typeof raw.vendedor === 'object'
+        ? raw.vendedor
+        : { nome: 'Vendedor', email: '', telefone: '' };
+
+    const empresaRaw =
+      raw?.empresa && typeof raw.empresa === 'object'
+        ? raw.empresa
+        : { nome: 'Conect360', endereco: 'Goiânia/GO', telefone: '', email: '' };
+
+    const produtos = Array.isArray(raw?.produtos)
+      ? raw.produtos.map((produto: any, index: number) => {
+          const quantidade = this.toFiniteNumber(produto?.quantidade, 1) || 1;
+          const valorUnitario = this.toFiniteNumber(
+            produto?.valorUnitario ?? produto?.precoUnitario ?? produto?.preco,
+            0,
+          );
+          const desconto = this.normalizePercent(produto?.desconto);
+          const subtotalCalculado = quantidade * valorUnitario * (1 - desconto / 100);
+          const subtotal = this.toFiniteNumber(produto?.subtotal ?? produto?.valorTotal, subtotalCalculado);
+          return {
+            id: typeof produto?.id === 'string' ? produto.id : undefined,
+            nome: String(produto?.nome || `Item ${index + 1}`),
+            descricao: String(produto?.descricao || ''),
+            quantidade,
+            valorUnitario,
+            desconto,
+            subtotal,
+            valorTotal: this.toFiniteNumber(produto?.valorTotal, subtotal),
+          };
+        })
+      : [];
+
+    const subtotalItens = produtos.reduce(
+      (acc, produto) => acc + this.toFiniteNumber(produto?.subtotal, 0),
+      0,
+    );
+    const subtotal = this.toFiniteNumber(raw?.subtotal, subtotalItens);
+    const descontoGlobal = this.normalizePercent(
+      raw?.descontoGlobal ?? raw?.percentualDesconto ?? raw?.descontoGeral,
+    );
+    const impostos = this.normalizePercent(raw?.impostos ?? raw?.percentualImpostos);
+    const totalCalculado = subtotal * (1 - descontoGlobal / 100) * (1 + impostos / 100);
+    const total = this.toFiniteNumber(raw?.total ?? raw?.valor ?? raw?.valorTotal, totalCalculado);
+
+    const dataEnvio = raw?.emailDetails?.sentAt || raw?.criadaEm || raw?.createdAt || new Date();
+    const criadaEm = raw?.criadaEm || raw?.createdAt || dataEnvio;
+    const dataValidade =
+      raw?.dataValidade ||
+      raw?.dataVencimento ||
+      new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString();
+
+    return {
+      id: String(raw?.id || ''),
+      numero: String(raw?.numero || ''),
+      titulo: String(raw?.titulo || 'Proposta Comercial'),
+      status: this.mapStatusPortal(raw?.status),
+      dataEnvio: new Date(dataEnvio),
+      dataValidade: new Date(dataValidade),
+      criadaEm: new Date(criadaEm),
+      subtotal,
+      descontoGlobal,
+      impostos,
+      total,
+      valorTotal: total,
+      token: String(raw?.token || ''),
+      empresa: {
+        nome: String(empresaRaw?.nome || 'Conect360'),
+        logo: typeof empresaRaw?.logo === 'string' ? empresaRaw.logo : undefined,
+        corPrimaria:
+          typeof empresaRaw?.corPrimaria === 'string'
+            ? empresaRaw.corPrimaria
+            : typeof raw?.corPrimaria === 'string'
+              ? raw.corPrimaria
+              : undefined,
+        site:
+          typeof empresaRaw?.site === 'string'
+            ? empresaRaw.site
+            : typeof raw?.site === 'string'
+              ? raw.site
+              : undefined,
+        endereco: String(empresaRaw?.endereco || 'Goiânia/GO'),
+        telefone: String(empresaRaw?.telefone || ''),
+        email: String(empresaRaw?.email || ''),
+      },
+      cliente: {
+        nome: String(clienteRaw?.nome || 'Cliente'),
+        email: String(clienteRaw?.email || ''),
+      },
+      vendedor: {
+        nome: String(vendedorRaw?.nome || 'Vendedor'),
+        email: String(vendedorRaw?.email || ''),
+        telefone: String(vendedorRaw?.telefone || ''),
+      },
+      produtos,
+      condicoes: {
+        formaPagamento: String(raw?.formaPagamento || raw?.condicoes?.formaPagamento || 'A combinar'),
+        prazoEntrega: String(raw?.prazoEntrega || raw?.condicoes?.prazoEntrega || 'A combinar'),
+        garantia: String(raw?.garantia || raw?.condicoes?.garantia || 'Conforme contrato'),
+        observacoes:
+          typeof raw?.observacoes === 'string'
+            ? raw.observacoes
+            : typeof raw?.condicoes?.observacoes === 'string'
+              ? raw.condicoes.observacoes
+              : undefined,
+      },
+    };
+  }
+
   /**
    * Obtém uma proposta pelo token público ou número da proposta
    * Inclui fallback para tokens armazenados localmente
@@ -99,8 +256,7 @@ class PortalClienteService {
     const isNumeroPropostaPossivel = /^\d{7,}$/.test(identificador);
 
     try {
-      let endpoint = `/api/portal/proposta/${identificador}`;
-
+      const endpoint = `${API_BASE_URL}/api/portal/proposta/${encodeURIComponent(identificador)}`;
       const response = await fetch(endpoint, {
         method: 'GET',
         headers: {
@@ -116,25 +272,64 @@ class PortalClienteService {
       }
 
       const data = await response.json();
+      const propostaRaw = data?.proposta || data;
+      const proposta = this.mapPropostaPortal(propostaRaw);
 
       // Registrar visualização
       await this.registrarVisualizacao(identificador);
 
-      return {
-        ...data,
-        dataEnvio: new Date(data.dataEnvio),
-        dataValidade: new Date(data.dataValidade),
-      };
+      return proposta;
     } catch (error) {
       console.warn('API não disponível, verificando tokens locais:', error);
 
       // Fallback: buscar em dados mock baseado no identificador
+      if (process.env.NODE_ENV === 'production') {
+        throw error instanceof Error ? error : new Error('Erro ao carregar proposta do portal');
+      }
+
       return this.obterPropostaMock(identificador);
     }
   }
 
   /**
-   * Gera dados mock para desenvolvimento quando a API não está disponível
+   * Baixa o PDF da proposta pelo endpoint publico do portal (sem exigir login)
+   */
+  async baixarPdfPublico(token: string, tipo: 'comercial' | 'simples' = 'comercial'): Promise<Blob> {
+    const endpoint = `${API_BASE_URL}/api/portal/proposta/${encodeURIComponent(token)}/pdf?tipo=${encodeURIComponent(tipo)}`;
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/pdf',
+      },
+    });
+
+    if (!response.ok) {
+      let mensagemErro = 'Nao foi possivel baixar o PDF da proposta.';
+
+      try {
+        const payload = await response.json();
+        if (typeof payload?.error === 'string' && payload.error.trim()) {
+          mensagemErro = payload.error;
+        } else if (typeof payload?.message === 'string' && payload.message.trim()) {
+          mensagemErro = payload.message;
+        }
+      } catch {
+        // Ignorar erro de parse e manter mensagem padrao
+      }
+
+      throw new Error(mensagemErro);
+    }
+
+    const blob = await response.blob();
+    if (blob.size === 0) {
+      throw new Error('PDF vazio retornado pelo servidor.');
+    }
+
+    return blob;
+  }
+
+  /**
+   * Gera dados mock para desenvolvimento quando a API nao esta disponivel
    */
   private obterPropostaMock(identificador: string): PropostaPublica | null {
     // Simular dados baseados no identificador
@@ -153,6 +348,7 @@ class PortalClienteService {
         endereco: 'Goiânia/GO',
         telefone: '(62) 99668-9991',
         email: 'conectcrm@gmail.com',
+        corPrimaria: '#159A9C',
       },
       vendedor: {
         nome: 'Vendedor Demo',
@@ -161,20 +357,31 @@ class PortalClienteService {
       },
       produtos: [
         {
+          id: 'item-1',
           nome: 'Sistema CRM Premium',
           descricao: 'Solução completa de gestão de relacionamento com cliente',
           quantidade: 1,
           valorUnitario: 2500.0,
+          desconto: 0,
+          subtotal: 2500.0,
           valorTotal: 2500.0,
         },
         {
+          id: 'item-2',
           nome: 'Treinamento e Suporte',
           descricao: 'Capacitação da equipe e suporte técnico por 12 meses',
           quantidade: 1,
           valorUnitario: 800.0,
+          desconto: 0,
+          subtotal: 800.0,
           valorTotal: 800.0,
         },
       ],
+      criadaEm: new Date(),
+      subtotal: 3000.0,
+      descontoGlobal: 0,
+      impostos: 0,
+      total: 3000.0,
       valorTotal: 3000.0,
       status: 'enviada',
       dataEnvio: new Date(Date.now() - 24 * 60 * 60 * 1000), // Ontem
@@ -202,6 +409,10 @@ class PortalClienteService {
       console.warn('API não disponível, gerando token local:', error);
 
       // Fallback: gera token numérico de 6 dígitos localmente
+      if (process.env.NODE_ENV === 'production') {
+        throw error instanceof Error ? error : new Error('Erro ao gerar token publico');
+      }
+
       const tokenLocal = gerarTokenNumerico();
 
       // Simula armazenamento local para desenvolvimento
@@ -225,14 +436,20 @@ class PortalClienteService {
   /**
    * Atualiza o status de uma proposta através do portal
    */
-  async atualizarStatus(token: string, novoStatus: 'aprovada' | 'rejeitada'): Promise<void> {
-    console.log('🔄 Iniciando atualização de status:', { token, novoStatus });
+  async atualizarStatus(
+    token: string,
+    novoStatus: 'aprovada' | 'rejeitada' | 'negociacao',
+    motivoAjustes?: string,
+  ): Promise<void> {
+    console.log('Iniciando atualizacao de status:', { token, novoStatus });
 
     try {
       const API_URL = API_BASE_URL;
+      const motivoNormalizado =
+        typeof motivoAjustes === 'string' && motivoAjustes.trim() ? motivoAjustes.trim() : '';
 
-      // 1. Atualizar via endpoint do portal
-      console.log('📡 Atualizando via portal endpoint...');
+      // Atualizar somente via endpoint do portal.
+      // O backend ja aplica as atualizacoes no processo principal.
       const portalResponse = await fetch(`${API_URL}/api/portal/proposta/${token}/status`, {
         method: 'PUT',
         headers: {
@@ -243,48 +460,24 @@ class PortalClienteService {
           timestamp: new Date().toISOString(),
           ip: await this.obterIP(),
           userAgent: navigator.userAgent,
+          motivoAjustes: motivoNormalizado || undefined,
         }),
       });
 
-      // 2. Atualizar também no CRM principal usando o token como ID
-      console.log('📡 Sincronizando com CRM principal...');
-      const crmResponse = await fetch(`${API_URL}/propostas/${token}/status`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          status: novoStatus,
-          observacoes: `Proposta ${novoStatus} via portal do cliente`,
-          dataAceite: new Date().toISOString(),
-          fonte: 'portal',
+      if (!portalResponse.ok) {
+        throw new Error('Falha ao atualizar status no endpoint do portal');
+      }
+
+      console.log('Status atualizado pelo portal');
+
+      // Emitir evento para atualizar o grid em tempo real
+      window.dispatchEvent(
+        new CustomEvent('propostaAtualizada', {
+          detail: { propostaId: token, novoStatus, fonte: 'portal' },
         }),
-      });
-
-      if (portalResponse.ok && crmResponse.ok) {
-        console.log('✅ Status sincronizado com portal e CRM principal');
-        // Registrar ação
-        await this.registrarAcao(token, novoStatus);
-
-        // Emitir evento para atualizar o grid em tempo real
-        window.dispatchEvent(
-          new CustomEvent('propostaAtualizada', {
-            detail: { propostaId: token, novoStatus, fonte: 'portal' },
-          }),
-        );
-
-        return;
-      }
-
-      if (!portalResponse.ok && !crmResponse.ok) {
-        throw new Error('Ambos endpoints falharam');
-      }
-
-      // Se pelo menos um funcionou, considerar sucesso parcial
-      console.warn('⚠️ Sincronização parcial - alguns endpoints falharam');
-      await this.registrarAcao(token, novoStatus);
+      );
     } catch (error) {
-      console.warn('❌ Erro na API, usando fallback local:', error);
+      console.warn('Erro na API, usando fallback local:', error);
       await this.atualizarStatusLocal(token, novoStatus);
     }
   }
@@ -294,7 +487,7 @@ class PortalClienteService {
    */
   private async atualizarStatusLocal(
     token: string,
-    novoStatus: 'aprovada' | 'rejeitada',
+    novoStatus: 'aprovada' | 'rejeitada' | 'negociacao',
   ): Promise<void> {
     try {
       // Atualizar no localStorage como simulação
@@ -428,12 +621,20 @@ class PortalClienteService {
         observacoes,
       };
 
-      await fetch('/api/portal/log/acao', {
+      await fetch(`${API_BASE_URL}/api/portal/proposta/${encodeURIComponent(token)}/acao`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(log),
+        body: JSON.stringify({
+          acao,
+          timestamp: log.timestamp.toISOString(),
+          ip: log.ip,
+          userAgent: log.userAgent,
+          dados: {
+            observacoes: log.observacoes,
+          },
+        }),
       });
     } catch (error) {
       console.warn('Erro ao registrar ação:', error);
@@ -445,7 +646,7 @@ class PortalClienteService {
    */
   private async obterIP(): Promise<string> {
     try {
-      const response = await fetch('/api/portal/ip');
+      const response = await fetch('https://api.ipify.org?format=json');
       const data = await response.json();
       return data.ip || 'unknown';
     } catch (error) {

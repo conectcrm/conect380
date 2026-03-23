@@ -77,11 +77,33 @@ $env:REACT_APP_MVP_MODE = "true"
 # registro de evidencias durante a janela
 .\.production\scripts\record-mvp-pilot-evidence.ps1 -RunDir ".production\pilot-runs\<sessao>" -Cliente "Cliente X" -Cenario "Criacao de lead" -Resultado PASS
 
+# registro padronizado dos 5 cenarios funcionais
+.\.production\scripts\record-mvp-pilot-functional-result.ps1 -RunDir ".production\pilot-runs\<sessao>" -Cliente "Cliente X" -Cenario CriacaoLead -Resultado PASS
+
+# gerar planilha funcional da janela (5 cenarios x cliente)
+.\.production\scripts\prepare-mvp-pilot-functional-sheet.ps1 -RunDir ".production\pilot-runs\<sessao>" -Force
+
+# importar resultados preenchidos em lote
+.\.production\scripts\import-mvp-pilot-functional-sheet.ps1 -RunDir ".production\pilot-runs\<sessao>" -SheetPath ".production\pilot-runs\<sessao>\functional-sheet.csv" -SkipIfAlreadyRecorded
+
+# validacao final (falha se ainda houver linha pendente)
+.\.production\scripts\import-mvp-pilot-functional-sheet.ps1 -RunDir ".production\pilot-runs\<sessao>" -SheetPath ".production\pilot-runs\<sessao>\functional-sheet.csv" -SkipIfAlreadyRecorded -Strict
+
 # ciclo tecnico automatizado (monitoramento intensivo)
 .\.production\scripts\run-mvp-pilot-cycle.ps1 -RunDir ".production\pilot-runs\<sessao>"
+# se usar -SkipCoreSmoke/-SkipUiSmoke para diagnostico, rerodar sem skip antes do readiness final
+
+# execucao automatizada dos cenarios funcionais (registra evidencias + roda coverage)
+.\.production\scripts\run-mvp-pilot-functional-scenarios.ps1 -RunDir ".production\pilot-runs\<sessao>" -ProvisionMissingUsers
+# quando API usa outro Postgres local, alinhar DB com parametros explicitos:
+# .\.production\scripts\run-mvp-pilot-functional-scenarios.ps1 -RunDir ".production\pilot-runs\<sessao>" -DbContainerName conectsuite-postgres -DbUser postgres -DbName conectcrm -ProvisionMissingUsers
+
+# cobertura funcional por cliente (fluxos core do piloto)
+.\.production\scripts\check-mvp-pilot-functional-coverage.ps1 -RunDir ".production\pilot-runs\<sessao>"
 
 # avaliacao objetiva de readiness do piloto
 .\.production\scripts\assess-mvp-pilot-readiness.ps1 -RunDir ".production\pilot-runs\<sessao>" -BranchProtectionStatus Unknown
+# por padrao, a cobertura funcional eh lida automaticamente do ultimo functional-coverage-*.md
 ```
 
 ## 6) Checklist de go-live
@@ -101,6 +123,11 @@ $env:REACT_APP_MVP_MODE = "true"
 - [ ] `review-mvp-pilot-profiles.ps1` executado para zerar pendencias de perfil
 - [ ] `prepare-mvp-pilot-outreach.ps1` executado e `outreach.csv` publicado ao comercial
 - [ ] `run-mvp-pilot-cycle.ps1` executado e `cycles/<timestamp>/summary.md` validado
+- [ ] `record-mvp-pilot-functional-result.ps1` usado para registrar os 5 cenarios por cliente
+- [ ] `prepare-mvp-pilot-functional-sheet.ps1` executado e planilha funcional distribuida
+- [ ] `import-mvp-pilot-functional-sheet.ps1` executado apos preenchimento da planilha
+- [ ] `run-mvp-pilot-functional-scenarios.ps1` executado (ou evidencias manuais equivalentes registradas)
+- [ ] `check-mvp-pilot-functional-coverage.ps1` executado sem gaps (PASS em todos os cenarios por cliente)
 - [ ] `assess-mvp-pilot-readiness.ps1` executado e relatorio sem blockers tecnicos
 - [ ] Branch protection aplicada (`configure-branch-protection.ps1` ou UI)
 - [ ] Health endpoint OK

@@ -19,14 +19,19 @@ import { Tag } from '../entities/tag.entity';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permission } from '../../../common/permissions/permissions.constants';
 
 @ApiTags('Tags')
 @Controller('tags')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.ATENDIMENTO_CHATS_READ)
 export class TagsController {
   constructor(private readonly tagsService: TagsService) {}
 
   @Post()
+  @Permissions(Permission.ATENDIMENTO_CHATS_REPLY)
   @ApiOperation({ summary: 'Criar nova tag' })
   @ApiResponse({ status: 201, description: 'Tag criada com sucesso', type: Tag })
   @ApiResponse({ status: 400, description: 'Dados inválidos ou tag duplicada' })
@@ -90,6 +95,7 @@ export class TagsController {
   }
 
   @Put(':id')
+  @Permissions(Permission.ATENDIMENTO_CHATS_REPLY)
   @ApiOperation({ summary: 'Atualizar tag' })
   @ApiResponse({ status: 200, description: 'Tag atualizada com sucesso', type: Tag })
   @ApiResponse({ status: 404, description: 'Tag não encontrada' })
@@ -108,6 +114,7 @@ export class TagsController {
   }
 
   @Delete(':id')
+  @Permissions(Permission.ATENDIMENTO_CHATS_REPLY)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Deletar tag (soft delete)' })
   @ApiResponse({ status: 200, description: 'Tag deletada com sucesso' })

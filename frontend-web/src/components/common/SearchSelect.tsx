@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import clsx from 'clsx';
 import { Search, ChevronDown, X, Loader2, User, FileText } from 'lucide-react';
 
 interface SearchSelectOption {
@@ -21,6 +22,8 @@ interface SearchSelectProps {
   icon?: 'user' | 'file' | React.ReactNode;
   emptyMessage?: string;
   className?: string;
+  inputClassName?: string;
+  dropdownClassName?: string;
   error?: string;
 }
 
@@ -37,12 +40,26 @@ export default function SearchSelect({
   icon = 'user',
   emptyMessage = 'Nenhum item encontrado',
   className = '',
+  inputClassName = '',
+  dropdownClassName = '',
   error,
 }: SearchSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredOptions, setFilteredOptions] = useState<SearchSelectOption[]>(options);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const filteredOptions = useMemo<SearchSelectOption[]>(() => {
+    if (!searchQuery.trim()) {
+      return options;
+    }
+
+    const query = searchQuery.toLowerCase();
+    return options.filter(
+      (option) =>
+        option.label.toLowerCase().includes(query) ||
+        option.subtitle?.toLowerCase().includes(query) ||
+        option.extra?.toLowerCase().includes(query),
+    );
+  }, [options, searchQuery]);
 
   // Renderizar ícone
   const renderIcon = () => {
@@ -61,22 +78,6 @@ export default function SearchSelect({
   };
 
   // Filtrar opções localmente
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredOptions(options);
-      return;
-    }
-
-    const query = searchQuery.toLowerCase();
-    const filtered = options.filter(
-      (option) =>
-        option.label.toLowerCase().includes(query) ||
-        option.subtitle?.toLowerCase().includes(query) ||
-        option.extra?.toLowerCase().includes(query),
-    );
-    setFilteredOptions(filtered);
-  }, [options, searchQuery]);
-
   // Busca externa (para buscar no servidor)
   useEffect(() => {
     if (onSearch && searchQuery.trim()) {
@@ -124,7 +125,7 @@ export default function SearchSelect({
   };
 
   return (
-    <div className={`relative ${className}`} ref={dropdownRef}>
+    <div className={clsx('relative', className)} ref={dropdownRef}>
       {label && (
         <label className="block text-sm font-medium text-gray-700 mb-1">
           {label} {required && <span className="text-red-500">*</span>}
@@ -144,7 +145,14 @@ export default function SearchSelect({
           onFocus={handleInputFocus}
           placeholder={value ? value.label : placeholder}
           disabled={disabled}
-          className={`w-full pl-10 pr-10 py-2 border ${error ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-blue-500 focus:border-transparent'} rounded-md focus:outline-none focus:ring-2 ${disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
+          className={clsx(
+            'w-full rounded-md border py-2 pl-10 pr-10 focus:outline-none focus:ring-2',
+            error
+              ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+              : 'border-gray-300 focus:border-transparent focus:ring-blue-500',
+            disabled ? 'cursor-not-allowed bg-gray-100' : 'bg-white',
+            inputClassName,
+          )}
         />
 
         {/* Botões laterais */}
@@ -177,7 +185,12 @@ export default function SearchSelect({
 
       {/* Dropdown */}
       {isOpen && !disabled && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+        <div
+          className={clsx(
+            'absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-gray-300 bg-white shadow-lg',
+            dropdownClassName,
+          )}
+        >
           {loading ? (
             <div className="p-4 text-center">
               <Loader2 className="w-6 h-6 text-gray-400 animate-spin mx-auto mb-2" />

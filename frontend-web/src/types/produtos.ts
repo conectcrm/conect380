@@ -5,6 +5,7 @@ export interface ConfiguracaoProduto {
   nome: string;
   multiplicador: number;
   descricao: string;
+  ordem?: number;
   ativo?: boolean;
   created_at?: string;
   updated_at?: string;
@@ -18,6 +19,7 @@ export interface SubcategoriaProduto {
   unidade: string;
   categoria_id: string;
   configuracoes: ConfiguracaoProduto[];
+  ordem?: number;
   camposPersonalizados?: {
     duracao?: boolean;
     usuarios?: boolean;
@@ -121,6 +123,8 @@ export interface CriarSubcategoriaProdutoRequest {
     modalidade?: boolean;
     recursos?: boolean;
   };
+  ordem?: number;
+  ativo?: boolean;
 }
 
 export interface CriarConfiguracaoProdutoRequest {
@@ -128,6 +132,8 @@ export interface CriarConfiguracaoProdutoRequest {
   multiplicador: number;
   descricao: string;
   subcategoria_id: string;
+  ordem?: number;
+  ativo?: boolean;
 }
 
 export interface AtualizarCategoriaProdutoRequest extends Partial<CriarCategoriaProdutoRequest> {

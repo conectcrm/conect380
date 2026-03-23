@@ -1,0 +1,71 @@
+﻿{
+    "started_at":  "2026-03-02T14:25:57",
+    "base_url":  "https://api.conect360.com",
+    "request_id":  null,
+    "target_user_id":  null,
+    "target_status_before":  403,
+    "target_status_during":  403,
+    "target_status_after":  403,
+    "results":  [
+                    {
+                        "Step":  "Listar usuarios (resolver target)",
+                        "Status":  "FAIL",
+                        "Details":  "Referência de objeto não definida para uma instância de um objeto.",
+                        "Timestamp":  "2026-03-02T14:25:54"
+                    },
+                    {
+                        "Step":  "Acesso alvo antes (esperado 403)",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T14:25:54"
+                    },
+                    {
+                        "Step":  "Criar solicitacao break-glass",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 400 em POST https://api.conect360.com/admin/bff/break-glass/requests. ",
+                        "Timestamp":  "2026-03-02T14:25:55"
+                    },
+                    {
+                        "Step":  "Aprovar solicitacao",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 404 em POST https://api.conect360.com/admin/bff/break-glass/requests//approve. ",
+                        "Timestamp":  "2026-03-02T14:25:55"
+                    },
+                    {
+                        "Step":  "Validar ativo apos aprovacao",
+                        "Status":  "FAIL",
+                        "Details":  "Referência de objeto não definida para uma instância de um objeto.",
+                        "Timestamp":  "2026-03-02T14:25:55"
+                    },
+                    {
+                        "Step":  "Acesso alvo durante vigencia (esperado 200)",
+                        "Status":  "FAIL",
+                        "Details":  "Status inesperado com elevacao ativa: 403",
+                        "Timestamp":  "2026-03-02T14:25:55"
+                    },
+                    {
+                        "Step":  "Revogar acesso break-glass",
+                        "Status":  "FAIL",
+                        "Details":  "HTTP 404 em POST https://api.conect360.com/admin/bff/break-glass//revoke. ",
+                        "Timestamp":  "2026-03-02T14:25:56"
+                    },
+                    {
+                        "Step":  "Validar remocao de ativo",
+                        "Status":  "FAIL",
+                        "Details":  "Referência de objeto não definida para uma instância de um objeto.",
+                        "Timestamp":  "2026-03-02T14:25:56"
+                    },
+                    {
+                        "Step":  "Acesso alvo apos revogacao (esperado 403)",
+                        "Status":  "PASS",
+                        "Details":  "",
+                        "Timestamp":  "2026-03-02T14:25:56"
+                    },
+                    {
+                        "Step":  "Auditoria admin_break_glass",
+                        "Status":  "FAIL",
+                        "Details":  "Referência de objeto não definida para uma instância de um objeto.",
+                        "Timestamp":  "2026-03-02T14:25:57"
+                    }
+                ]
+}

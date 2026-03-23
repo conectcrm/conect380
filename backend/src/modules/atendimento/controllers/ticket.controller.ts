@@ -16,6 +16,9 @@ import {
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { Permission } from '../../../common/permissions/permissions.constants';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { TicketService } from '../services/ticket.service';
 import { MensagemService } from '../services/mensagem.service';
@@ -28,7 +31,8 @@ import { EscalarTicketDto, DesescalarTicketDto, ReatribuirTicketDto } from '../d
  * 🔐 SEGURANÇA: Todos os endpoints protegidos com JWT - empresa_id extraído do token
  */
 @Controller('api/atendimento/tickets')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.ATENDIMENTO_TICKETS_READ)
 export class TicketController {
   private readonly logger = new Logger(TicketController.name);
 
@@ -162,6 +166,7 @@ export class TicketController {
    * Body: { status: 'ABERTO' | 'EM_ATENDIMENTO' | 'AGUARDANDO_CLIENTE' | 'RESOLVIDO' | 'FECHADO' }
    */
   @Patch(':id/status')
+  @Permissions(Permission.ATENDIMENTO_TICKETS_UPDATE)
   async atualizarStatus(
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
@@ -224,6 +229,7 @@ export class TicketController {
    * }
    */
   @Patch(':id')
+  @Permissions(Permission.ATENDIMENTO_TICKETS_UPDATE)
   async atualizarTicket(
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
@@ -242,7 +248,15 @@ export class TicketController {
     }>,
   ) {
     this.logger.log(
-      `📝 [PATCH /tickets/${id}] empresaId=${empresaId} dados=${JSON.stringify(dados)}`,
+      `[PATCH /tickets/${id}] empresaId=${empresaId} dados(resumo)=${JSON.stringify({
+        keys: dados ? Object.keys(dados) : [],
+        status: dados?.status ?? null,
+        prioridade: dados?.prioridade ?? null,
+        tipo: dados?.tipo ?? null,
+        responsavelId: dados?.responsavel_id ?? dados?.responsavelId ?? null,
+        hasTitulo: Boolean(dados?.titulo),
+        hasDescricao: Boolean(dados?.descricao),
+      })}`,
     );
 
     try {
@@ -275,6 +289,7 @@ export class TicketController {
    * Body: { atendenteId: string }
    */
   @Patch(':id/atribuir')
+  @Permissions(Permission.ATENDIMENTO_TICKETS_ASSIGN)
   async atribuir(
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
@@ -317,6 +332,7 @@ export class TicketController {
    * Body: { prioridade: 'BAIXA' | 'MEDIA' | 'ALTA' | 'URGENTE' }
    */
   @Patch(':id/prioridade')
+  @Permissions(Permission.ATENDIMENTO_TICKETS_UPDATE)
   async atualizarPrioridade(
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
@@ -371,6 +387,7 @@ export class TicketController {
    * Body: CriarTicketDto
    */
   @Post()
+  @Permissions(Permission.ATENDIMENTO_TICKETS_CREATE)
   async criar(@EmpresaId() empresaId: string, @Body() dadosTicket: any) {
     this.logger.log(`📝 [POST /tickets] Criando novo ticket`);
 
@@ -405,6 +422,7 @@ export class TicketController {
    * Escalona ticket para nível N1/N2/N3
    */
   @Post(':id/escalar')
+  @Permissions(Permission.ATENDIMENTO_TICKETS_UPDATE)
   async escalar(
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
@@ -441,6 +459,7 @@ export class TicketController {
    * Remove escalonamento (retorna para N1)
    */
   @Post(':id/desescalar')
+  @Permissions(Permission.ATENDIMENTO_TICKETS_UPDATE)
   async desescalar(
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
@@ -475,6 +494,7 @@ export class TicketController {
    * Reatribui ticket para fila/atendente e/ou ajusta nível/severidade
    */
   @Patch(':id/reatribuir')
+  @Permissions(Permission.ATENDIMENTO_TICKETS_ASSIGN)
   async reatribuir(
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
@@ -513,6 +533,7 @@ export class TicketController {
    * Body: TransferirTicketDto
    */
   @Post(':id/transferir')
+  @Permissions(Permission.ATENDIMENTO_TICKETS_ASSIGN)
   async transferir(
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
@@ -552,6 +573,7 @@ export class TicketController {
    * Body: EncerrarTicketDto
    */
   @Post(':id/encerrar')
+  @Permissions(Permission.ATENDIMENTO_TICKETS_CLOSE)
   async encerrar(
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
@@ -590,6 +612,7 @@ export class TicketController {
    * Reabre um ticket encerrado
    */
   @Post(':id/reabrir')
+  @Permissions(Permission.ATENDIMENTO_TICKETS_CLOSE)
   async reabrir(@EmpresaId() empresaId: string, @Param('id') id: string) {
     this.logger.log(`🔓 [POST /tickets/${id}/reabrir]`);
 
@@ -622,6 +645,7 @@ export class TicketController {
    * Envia mensagem para um ticket (rota nested para compatibilidade com frontend)
    */
   @Post(':id/mensagens')
+  @Permissions(Permission.ATENDIMENTO_CHATS_REPLY)
   @UseInterceptors(FilesInterceptor('anexos', 5))
   async enviarMensagem(
     @EmpresaId() empresaId: string,
@@ -630,7 +654,15 @@ export class TicketController {
     @UploadedFiles() arquivos?: Express.Multer.File[],
   ) {
     this.logger.log(`📤 [POST /tickets/${ticketId}/mensagens]`);
-    this.logger.debug(`📋 Body recebido: ${JSON.stringify(dados)}`);
+    this.logger.debug(
+      `Body recebido (resumo): ${JSON.stringify({
+        keys: dados ? Object.keys(dados) : [],
+        tipo: dados?.tipo ?? null,
+        remetente: dados?.remetente ?? null,
+        conteudoLength: typeof dados?.conteudo === 'string' ? dados.conteudo.length : 0,
+        hasMidia: Boolean(dados?.midia),
+      })}`,
+    );
     this.logger.debug(`📎 Arquivos: ${arquivos?.length || 0}`);
 
     try {
@@ -649,7 +681,7 @@ export class TicketController {
       }
       const ticket = await this.ticketService.buscarPorId(ticketId, empresaId);
 
-      // Adicionar ticketId do par�metro da URL
+      // Adicionar ticketId do parâmetro da URL
       const dadosCompletos = {
         ...dados,
         ticketId,
@@ -683,4 +715,3 @@ export class TicketController {
     }
   }
 }
-

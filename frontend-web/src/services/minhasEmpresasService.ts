@@ -176,7 +176,7 @@ export interface EmpresaCompleta {
   };
   plano: {
     id: string;
-    nome: 'Starter' | 'Professional' | 'Enterprise';
+    nome: 'Starter' | 'Business' | 'Professional' | 'Enterprise';
     preco: number;
     features: string[];
     limitesUsuarios: number;

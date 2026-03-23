@@ -27,10 +27,14 @@ import { ClientesService } from './clientes.service';
 import { Cliente, StatusCliente } from './cliente.entity';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { Permission } from '../../common/permissions/permissions.constants';
 import { EmpresaId } from '../../common/decorators/empresa.decorator';
 import { PaginationParams } from '../../common/interfaces/common.interface';
 import { CacheInterceptor, CacheTTL } from '../../common/interceptors/cache.interceptor';
 import { CacheService } from '../../common/services/cache.service';
+import { CreateClienteDto, UpdateClienteDto } from './dto/cliente.dto';
 
 const CLIENTES_UPLOADS_SUBDIR = 'clientes';
 const CLIENTES_AVATAR_SUBDIR = 'avatar';
@@ -53,7 +57,7 @@ const ALLOWED_ATTACHMENT_MIME_TYPES = [
 ];
 
 const ensureClientesUploadDirectory = (subdir: string): string => {
-  const uploadDir = path.resolve(__dirname, '../../../uploads', CLIENTES_UPLOADS_SUBDIR, subdir);
+  const uploadDir = path.resolve(process.cwd(), 'uploads', CLIENTES_UPLOADS_SUBDIR, subdir);
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
   }
@@ -62,7 +66,8 @@ const ensureClientesUploadDirectory = (subdir: string): string => {
 
 @ApiTags('clientes')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.CRM_CLIENTES_READ)
 @UseInterceptors(CacheInterceptor)
 @Controller('clientes')
 export class ClientesController {
@@ -155,6 +160,10 @@ export class ClientesController {
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'status', required: false, type: String })
   @ApiQuery({ name: 'tipo', required: false, type: String })
+  @ApiQuery({ name: 'followup', required: false, enum: ['pendente', 'vencido'] })
+  @ApiQuery({ name: 'tag', required: false, type: String })
+  @ApiQuery({ name: 'origem', required: false, type: String })
+  @ApiQuery({ name: 'responsavelId', required: false, type: String })
   @ApiQuery({ name: 'sortBy', required: false, type: String })
   @ApiQuery({ name: 'sortOrder', required: false, enum: ['ASC', 'DESC'] })
   @ApiResponse({ status: 200, description: 'Lista de clientes retornada com sucesso' })
@@ -180,6 +189,10 @@ export class ClientesController {
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'status', required: false, type: String })
   @ApiQuery({ name: 'tipo', required: false, type: String })
+  @ApiQuery({ name: 'followup', required: false, enum: ['pendente', 'vencido'] })
+  @ApiQuery({ name: 'tag', required: false, type: String })
+  @ApiQuery({ name: 'origem', required: false, type: String })
+  @ApiQuery({ name: 'responsavelId', required: false, type: String })
   @ApiResponse({ status: 200, description: 'CSV de clientes gerado com sucesso' })
   async exportClientes(
     @EmpresaId() empresaId: string,
@@ -248,11 +261,124 @@ export class ClientesController {
     };
   }
 
+  @Get(':id/tickets/resumo')
+  @ApiOperation({ summary: 'Obter resumo de tickets e atendimentos do cliente' })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'Resumo de tickets retornado com sucesso' })
+  @ApiResponse({ status: 404, description: 'Cliente nao encontrado' })
+  async getTicketsResumo(
+    @EmpresaId() empresaId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('limit') limit?: string,
+  ) {
+    const cliente = await this.clientesService.findById(id, empresaId);
+
+    if (!cliente) {
+      throw new NotFoundException('Cliente nao encontrado');
+    }
+
+    const resumo = await this.clientesService.getTicketsResumo(
+      id,
+      empresaId,
+      limit ? Number(limit) : undefined,
+    );
+
+    return {
+      success: true,
+      data: resumo,
+    };
+  }
+
+  @Get(':id/propostas/resumo')
+  @ApiOperation({ summary: 'Obter resumo de propostas do cliente' })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'Resumo de propostas retornado com sucesso' })
+  @ApiResponse({ status: 404, description: 'Cliente nao encontrado' })
+  async getPropostasResumo(
+    @EmpresaId() empresaId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('limit') limit?: string,
+  ) {
+    const cliente = await this.clientesService.findById(id, empresaId);
+
+    if (!cliente) {
+      throw new NotFoundException('Cliente nao encontrado');
+    }
+
+    const resumo = await this.clientesService.getPropostasResumo(
+      id,
+      empresaId,
+      limit ? Number(limit) : undefined,
+    );
+
+    return {
+      success: true,
+      data: resumo,
+    };
+  }
+
+  @Get(':id/contratos/resumo')
+  @ApiOperation({ summary: 'Obter resumo de contratos do cliente' })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'Resumo de contratos retornado com sucesso' })
+  @ApiResponse({ status: 404, description: 'Cliente nao encontrado' })
+  async getContratosResumo(
+    @EmpresaId() empresaId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('limit') limit?: string,
+  ) {
+    const cliente = await this.clientesService.findById(id, empresaId);
+
+    if (!cliente) {
+      throw new NotFoundException('Cliente nao encontrado');
+    }
+
+    const resumo = await this.clientesService.getContratosResumo(
+      id,
+      empresaId,
+      limit ? Number(limit) : undefined,
+    );
+
+    return {
+      success: true,
+      data: resumo,
+    };
+  }
+
+  @Get(':id/faturas/resumo')
+  @ApiOperation({ summary: 'Obter resumo de faturas do cliente' })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'Resumo de faturas retornado com sucesso' })
+  @ApiResponse({ status: 404, description: 'Cliente nao encontrado' })
+  async getFaturasResumo(
+    @EmpresaId() empresaId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('limit') limit?: string,
+  ) {
+    const cliente = await this.clientesService.findById(id, empresaId);
+
+    if (!cliente) {
+      throw new NotFoundException('Cliente nao encontrado');
+    }
+
+    const resumo = await this.clientesService.getFaturasResumo(
+      id,
+      empresaId,
+      limit ? Number(limit) : undefined,
+    );
+
+    return {
+      success: true,
+      data: resumo,
+    };
+  }
+
   @Post()
+  @Permissions(Permission.CRM_CLIENTES_CREATE)
   @ApiOperation({ summary: 'Criar novo cliente' })
   @ApiResponse({ status: 201, description: 'Cliente criado com sucesso' })
   @ApiResponse({ status: 400, description: 'Dados invalidos' })
-  async create(@EmpresaId() empresaId: string, @Body() clienteData: Partial<Cliente>) {
+  async create(@EmpresaId() empresaId: string, @Body() clienteData: CreateClienteDto) {
     const cliente = await this.clientesService.create({
       ...clienteData,
       empresaId,
@@ -268,13 +394,14 @@ export class ClientesController {
   }
 
   @Put(':id')
+  @Permissions(Permission.CRM_CLIENTES_UPDATE)
   @ApiOperation({ summary: 'Atualizar cliente' })
   @ApiResponse({ status: 200, description: 'Cliente atualizado com sucesso' })
   @ApiResponse({ status: 404, description: 'Cliente nao encontrado' })
   async update(
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
-    @Body() updateData: Partial<Cliente>,
+    @Body() updateData: UpdateClienteDto,
   ) {
     const cliente = await this.clientesService.update(id, empresaId, updateData);
 
@@ -295,6 +422,7 @@ export class ClientesController {
   }
 
   @Put(':id/status')
+  @Permissions(Permission.CRM_CLIENTES_UPDATE)
   @ApiOperation({ summary: 'Atualizar status do cliente' })
   @ApiResponse({ status: 200, description: 'Status atualizado com sucesso' })
   async updateStatus(
@@ -314,10 +442,12 @@ export class ClientesController {
   }
 
   @Post(':id/avatar')
+  @Permissions(Permission.CRM_CLIENTES_UPDATE)
   @UseInterceptors(
     FileInterceptor('avatar', {
       storage: diskStorage({
-        destination: () => ensureClientesUploadDirectory(CLIENTES_AVATAR_SUBDIR),
+        destination: (_req, _file, cb) =>
+          cb(null, ensureClientesUploadDirectory(CLIENTES_AVATAR_SUBDIR)),
         filename: (req: any, file, cb) => {
           const clienteId = req?.params?.id || 'cliente';
           const ext = path.extname(file.originalname)?.toLowerCase() || '.png';
@@ -410,10 +540,12 @@ export class ClientesController {
   }
 
   @Post(':id/anexos')
+  @Permissions(Permission.CRM_CLIENTES_UPDATE)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: () => ensureClientesUploadDirectory(CLIENTES_ANEXOS_SUBDIR),
+        destination: (_req, _file, cb) =>
+          cb(null, ensureClientesUploadDirectory(CLIENTES_ANEXOS_SUBDIR)),
         filename: (req: any, file, cb) => {
           const clienteId = req?.params?.id || 'cliente';
           const originalExt = path.extname(file.originalname)?.toLowerCase() || '';
@@ -490,6 +622,7 @@ export class ClientesController {
   }
 
   @Delete(':id/anexos/:anexoId')
+  @Permissions(Permission.CRM_CLIENTES_DELETE)
   @ApiOperation({ summary: 'Remover anexo do cliente' })
   @ApiResponse({ status: 200, description: 'Anexo removido com sucesso' })
   async removeAnexo(
@@ -528,6 +661,7 @@ export class ClientesController {
   }
 
   @Delete(':id')
+  @Permissions(Permission.CRM_CLIENTES_DELETE)
   @ApiOperation({ summary: 'Excluir cliente' })
   @ApiResponse({ status: 200, description: 'Cliente excluido com sucesso' })
   async delete(@EmpresaId() empresaId: string, @Param('id') id: string) {

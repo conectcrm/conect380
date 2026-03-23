@@ -5,12 +5,13 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, In } from 'typeorm';
 import { Plano } from './entities/plano.entity';
 import { ModuloSistema } from './entities/modulo-sistema.entity';
 import { PlanoModulo } from './entities/plano-modulo.entity';
 import { CriarPlanoDto } from './dto/criar-plano.dto';
 import { AtualizarPlanoDto } from './dto/atualizar-plano.dto';
+import { DEFAULT_MODULOS_SISTEMA, DEFAULT_PLANOS_SISTEMA } from './planos.defaults';
 
 @Injectable()
 export class PlanosService {
@@ -27,9 +28,12 @@ export class PlanosService {
     private dataSource: DataSource,
   ) {}
 
-  async listarTodos(): Promise<Plano[]> {
+  async listarTodos(includeInactive = false): Promise<Plano[]> {
+    await this.seedDefaultsIfEmpty();
+    const where = includeInactive ? undefined : { ativo: true };
+
     return this.planoRepository.find({
-      where: { ativo: true },
+      where,
       relations: ['modulosInclusos', 'modulosInclusos.modulo'],
       order: { ordem: 'ASC', preco: 'ASC' },
     });
@@ -42,34 +46,63 @@ export class PlanosService {
     });
 
     if (!plano) {
-      throw new NotFoundException(`Plano com ID ${id} não encontrado`);
+      throw new NotFoundException(`Plano com ID ${id} nao encontrado`);
     }
 
     return plano;
   }
 
   async buscarPorCodigo(codigo: string): Promise<Plano> {
-    const plano = await this.planoRepository.findOne({
+    const codigoNormalizado = String(codigo || '').trim().toLowerCase();
+    const codigosCanonicos = new Set(
+      DEFAULT_PLANOS_SISTEMA.map((planoDefault) => String(planoDefault.codigo).toLowerCase()),
+    );
+
+    let plano = await this.planoRepository.findOne({
       where: { codigo },
       relations: ['modulosInclusos', 'modulosInclusos.modulo'],
     });
 
     if (!plano) {
-      throw new NotFoundException(`Plano com código ${codigo} não encontrado`);
+      await this.seedDefaultsIfEmpty();
+      plano = await this.planoRepository.findOne({
+        where: { codigo },
+        relations: ['modulosInclusos', 'modulosInclusos.modulo'],
+      });
+    }
+
+    if (!plano) {
+      throw new NotFoundException(`Plano com codigo ${codigo} nao encontrado`);
+    }
+
+    if (
+      codigosCanonicos.has(codigoNormalizado) &&
+      (!plano.modulosInclusos || plano.modulosInclusos.length === 0)
+    ) {
+      await this.bootstrapDefaults({ overwrite: false });
+      plano = await this.planoRepository.findOne({
+        where: { codigo },
+        relations: ['modulosInclusos', 'modulosInclusos.modulo'],
+      });
+    }
+
+    if (!plano || !plano.modulosInclusos || plano.modulosInclusos.length === 0) {
+      throw new NotFoundException(`Plano com codigo ${codigo} sem modulos vinculados`);
     }
 
     return plano;
   }
 
   async criar(dados: CriarPlanoDto): Promise<Plano> {
-    // Verificar se código já existe
     const planoExistente = await this.planoRepository.findOne({
       where: { codigo: dados.codigo },
     });
 
     if (planoExistente) {
-      throw new ConflictException(`Plano com código ${dados.codigo} já existe`);
+      throw new ConflictException(`Plano com codigo ${dados.codigo} ja existe`);
     }
+
+    const modulosInclusos = await this.validarModulosInclusos(dados.modulosInclusos);
 
     const plano = this.planoRepository.create({
       nome: dados.nome,
@@ -87,11 +120,7 @@ export class PlanosService {
     });
 
     const planoSalvo = await this.planoRepository.save(plano);
-
-    // Associar módulos se fornecidos
-    if (dados.modulosInclusos && dados.modulosInclusos.length > 0) {
-      await this.associarModulos(planoSalvo.id, dados.modulosInclusos);
-    }
+    await this.associarModulos(planoSalvo.id, modulosInclusos);
 
     return this.buscarPorId(planoSalvo.id);
   }
@@ -99,31 +128,24 @@ export class PlanosService {
   async atualizar(id: string, dados: AtualizarPlanoDto): Promise<Plano> {
     const plano = await this.buscarPorId(id);
 
-    // Verificar conflito de código se estiver sendo alterado
     if (dados.codigo && dados.codigo !== plano.codigo) {
       const planoExistente = await this.planoRepository.findOne({
         where: { codigo: dados.codigo },
       });
 
       if (planoExistente) {
-        throw new ConflictException(`Plano com código ${dados.codigo} já existe`);
+        throw new ConflictException(`Plano com codigo ${dados.codigo} ja existe`);
       }
     }
 
-    // Atualizar campos
-    Object.assign(plano, dados);
+    const modulosInclusos = await this.validarModulosInclusos(dados.modulosInclusos);
+    const { modulosInclusos: _ignored, ...dadosPlano } = dados;
+
+    Object.assign(plano, dadosPlano);
     const planoAtualizado = await this.planoRepository.save(plano);
 
-    // Atualizar módulos se fornecidos
-    if (dados.modulosInclusos !== undefined) {
-      // Remover associações existentes
-      await this.planoModuloRepository.delete({ plano: { id } });
-
-      // Adicionar novas associações
-      if (dados.modulosInclusos.length > 0) {
-        await this.associarModulos(id, dados.modulosInclusos);
-      }
-    }
+    await this.planoModuloRepository.delete({ plano: { id } });
+    await this.associarModulos(id, modulosInclusos);
 
     return this.buscarPorId(planoAtualizado.id);
   }
@@ -131,11 +153,10 @@ export class PlanosService {
   async remover(id: string): Promise<void> {
     const plano = await this.buscarPorId(id);
 
-    // Verificar se há assinaturas ativas vinculadas a este plano
     const assinaturasAtivas = await this.dataSource.query(
       `
-      SELECT COUNT(*) as total 
-      FROM assinaturas_empresas 
+      SELECT COUNT(*) as total
+      FROM assinaturas_empresas
       WHERE plano_id = $1 AND status = 'ativa'
     `,
       [id],
@@ -143,7 +164,7 @@ export class PlanosService {
 
     if (assinaturasAtivas[0]?.total > 0) {
       throw new BadRequestException(
-        `Não é possível excluir este plano pois existem ${assinaturasAtivas[0].total} empresa(s) com assinatura ativa. Desative o plano ao invés de excluí-lo.`,
+        `Nao e possivel excluir este plano pois existem ${assinaturasAtivas[0].total} empresa(s) com assinatura ativa. Desative o plano ao inves de exclui-lo.`,
       );
     }
 
@@ -162,26 +183,49 @@ export class PlanosService {
     return this.planoRepository.save(plano);
   }
 
-  private async associarModulos(planoId: string, modulosIds: string[]): Promise<void> {
-    for (const moduloId of modulosIds) {
-      // Verificar se módulo existe
-      const modulo = await this.moduloSistemaRepository.findOne({
-        where: { id: moduloId },
-      });
+  private async validarModulosInclusos(modulosIds: string[]): Promise<string[]> {
+    const moduloIdsNormalizados = Array.from(
+      new Set((modulosIds || []).map((id) => String(id).trim()).filter(Boolean)),
+    );
 
-      if (modulo) {
-        const planoModulo = this.planoModuloRepository.create({
-          plano: { id: planoId },
-          modulo: { id: moduloId },
-        });
-
-        await this.planoModuloRepository.save(planoModulo);
-      }
+    if (moduloIdsNormalizados.length === 0) {
+      throw new BadRequestException('Plano deve possuir ao menos um modulo vinculado');
     }
+
+    const modulosExistentes = await this.moduloSistemaRepository.find({
+      where: { id: In(moduloIdsNormalizados) },
+      select: ['id'],
+    });
+
+    const existentes = new Set(modulosExistentes.map((modulo) => modulo.id));
+    const modulosInvalidos = moduloIdsNormalizados.filter((id) => !existentes.has(id));
+
+    if (modulosInvalidos.length > 0) {
+      throw new BadRequestException(
+        `Modulos informados nao existem no catalogo: ${modulosInvalidos.join(', ')}`,
+      );
+    }
+
+    return moduloIdsNormalizados;
   }
 
-  // Métodos para gerenciar módulos do sistema
+  private async associarModulos(planoId: string, modulosIds: string[]): Promise<void> {
+    if (modulosIds.length === 0) {
+      return;
+    }
+
+    const vinculos = modulosIds.map((moduloId) =>
+      this.planoModuloRepository.create({
+        plano: { id: planoId },
+        modulo: { id: moduloId },
+      }),
+    );
+
+    await this.planoModuloRepository.save(vinculos);
+  }
+
   async listarModulosDisponiveis(): Promise<ModuloSistema[]> {
+    await this.seedDefaultsIfEmpty();
     return this.moduloSistemaRepository.find({
       where: { ativo: true },
       order: { ordem: 'ASC', nome: 'ASC' },
@@ -191,5 +235,161 @@ export class PlanosService {
   async criarModuloSistema(dados: Partial<ModuloSistema>): Promise<ModuloSistema> {
     const modulo = this.moduloSistemaRepository.create(dados);
     return this.moduloSistemaRepository.save(modulo);
+  }
+
+  async bootstrapDefaults(options?: { overwrite?: boolean }): Promise<{
+    modulosCriados: number;
+    modulosAtualizados: number;
+    planosCriados: number;
+    planosAtualizados: number;
+    overwrite: boolean;
+  }> {
+    const overwrite = Boolean(options?.overwrite);
+    let modulosCriados = 0;
+    let modulosAtualizados = 0;
+    let planosCriados = 0;
+    let planosAtualizados = 0;
+
+    const modulosByCode = new Map<string, ModuloSistema>();
+
+    for (const moduloDefault of DEFAULT_MODULOS_SISTEMA) {
+      let modulo = await this.moduloSistemaRepository.findOne({
+        where: { codigo: moduloDefault.codigo },
+      });
+
+      if (!modulo) {
+        modulo = this.moduloSistemaRepository.create({
+          ...moduloDefault,
+          ativo: true,
+          essencial: Boolean(moduloDefault.essencial),
+        });
+        modulo = await this.moduloSistemaRepository.save(modulo);
+        modulosCriados += 1;
+      } else if (overwrite) {
+        Object.assign(modulo, {
+          ...moduloDefault,
+          ativo: true,
+          essencial: Boolean(moduloDefault.essencial),
+        });
+        modulo = await this.moduloSistemaRepository.save(modulo);
+        modulosAtualizados += 1;
+      }
+
+      modulosByCode.set(moduloDefault.codigo, modulo);
+    }
+
+    for (const planoDefault of DEFAULT_PLANOS_SISTEMA) {
+      let plano = await this.planoRepository.findOne({
+        where: { codigo: planoDefault.codigo },
+      });
+      let convertedLegacyProfessional = false;
+
+      if (!plano && planoDefault.codigo === 'business') {
+        const legacyProfessional = await this.planoRepository.findOne({
+          where: { codigo: 'professional' },
+        });
+
+        if (legacyProfessional) {
+          plano = legacyProfessional;
+          convertedLegacyProfessional = true;
+        }
+      }
+
+      const payload = {
+        nome: planoDefault.nome,
+        codigo: planoDefault.codigo,
+        descricao: planoDefault.descricao,
+        preco: planoDefault.preco,
+        limiteUsuarios: planoDefault.limiteUsuarios,
+        limiteClientes: planoDefault.limiteClientes,
+        limiteStorage: planoDefault.limiteStorage,
+        limiteApiCalls: planoDefault.limiteApiCalls,
+        whiteLabel: planoDefault.whiteLabel,
+        suportePrioritario: planoDefault.suportePrioritario,
+        ativo: true,
+        ordem: planoDefault.ordem,
+      };
+      let shouldSyncModules = false;
+      let existingModuleLinks = 0;
+
+      if (!plano) {
+        plano = this.planoRepository.create(payload);
+        plano = await this.planoRepository.save(plano);
+        planosCriados += 1;
+        shouldSyncModules = true;
+      } else if (overwrite || convertedLegacyProfessional) {
+        const updatePayload = convertedLegacyProfessional && !overwrite
+          ? {
+              codigo: planoDefault.codigo,
+              nome: planoDefault.nome,
+              ativo: true,
+              ordem: plano.ordem || planoDefault.ordem,
+            }
+          : payload;
+
+        Object.assign(plano, updatePayload);
+        plano = await this.planoRepository.save(plano);
+        planosAtualizados += 1;
+        shouldSyncModules = true;
+      }
+
+      if (plano && !shouldSyncModules) {
+        existingModuleLinks = await this.planoModuloRepository.count({
+          where: { plano: { id: plano.id } },
+        });
+
+        if (existingModuleLinks === 0) {
+          shouldSyncModules = true;
+        }
+      }
+
+      const moduleIds = planoDefault.modulosCodigos
+        .map((codigo) => modulosByCode.get(codigo)?.id)
+        .filter((id): id is string => Boolean(id));
+
+      if (moduleIds.length === 0) {
+        throw new BadRequestException(
+          `Plano ${planoDefault.codigo} sem modulos validos para vinculo.`,
+        );
+      }
+
+      if (shouldSyncModules) {
+        await this.planoModuloRepository.delete({ plano: { id: plano.id } });
+        await this.associarModulos(plano.id, moduleIds);
+      }
+    }
+
+    return {
+      modulosCriados,
+      modulosAtualizados,
+      planosCriados,
+      planosAtualizados,
+      overwrite,
+    };
+  }
+
+  private async seedDefaultsIfEmpty(): Promise<void> {
+    const planosExistentes = await this.planoRepository.find({
+      select: ['codigo'],
+    });
+
+    if (planosExistentes.length === 0) {
+      await this.bootstrapDefaults({ overwrite: false });
+      return;
+    }
+
+    const codigosExistentes = new Set(
+      planosExistentes.map((plano) => String(plano.codigo || '').trim().toLowerCase()),
+    );
+
+    const faltamPlanosCanonicos = DEFAULT_PLANOS_SISTEMA.some(
+      (planoDefault) => !codigosExistentes.has(String(planoDefault.codigo).toLowerCase()),
+    );
+
+    if (!faltamPlanosCanonicos) {
+      return;
+    }
+
+    await this.bootstrapDefaults({ overwrite: false });
   }
 }

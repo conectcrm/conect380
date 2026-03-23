@@ -1,11 +1,38 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MercadoPagoConfig, Customer, Preference, Payment } from 'mercadopago';
 import * as crypto from 'crypto';
 import { Repository } from 'typeorm';
-import { AssinaturaEmpresa } from '../planos/entities/assinatura-empresa.entity';
+import {
+  AssinaturaEmpresa,
+  CanonicalAssinaturaStatus,
+  toCanonicalAssinaturaStatus,
+} from '../planos/entities/assinatura-empresa.entity';
+import { canTransitionSubscriptionStatus } from '../planos/subscription-state-machine';
 import { runWithTenant } from '../../common/tenant/tenant-context';
+import { BillingEvent } from '../faturamento/entities/billing-event.entity';
+import { Fatura, FormaPagamento } from '../faturamento/entities/fatura.entity';
+import { Pagamento, StatusPagamento, TipoPagamento } from '../faturamento/entities/pagamento.entity';
+import { PagamentoService } from '../faturamento/services/pagamento.service';
+
+type ReconciliationSource = 'manual' | 'batch' | 'webhook_duplicate';
+type ReconciliationAction = 'updated' | 'aligned' | 'skipped' | 'error';
+type ExternalReferenceResolution =
+  | { kind: 'assinatura'; empresaId: string; assinaturaId: string }
+  | { kind: 'fatura'; empresaId: string; faturaId: number; referenciaGateway: string };
+
+export type PaymentReconciliationResult = {
+  paymentId: string;
+  source: ReconciliationSource;
+  action: ReconciliationAction;
+  paymentStatus?: string;
+  empresaId?: string;
+  assinaturaId?: string;
+  fromStatus?: CanonicalAssinaturaStatus;
+  toStatus?: CanonicalAssinaturaStatus;
+  reason?: string;
+};
 
 @Injectable()
 export class MercadoPagoService {
@@ -19,6 +46,14 @@ export class MercadoPagoService {
     private configService: ConfigService,
     @InjectRepository(AssinaturaEmpresa)
     private readonly assinaturaRepository: Repository<AssinaturaEmpresa>,
+    @InjectRepository(BillingEvent)
+    private readonly billingEventRepository: Repository<BillingEvent>,
+    @InjectRepository(Fatura)
+    private readonly faturaRepository: Repository<Fatura>,
+    @InjectRepository(Pagamento)
+    private readonly pagamentoRepository: Repository<Pagamento>,
+    @Inject(forwardRef(() => PagamentoService))
+    private readonly pagamentoService: PagamentoService,
   ) {
     this.initializeMercadoPago();
   }
@@ -38,6 +73,627 @@ export class MercadoPagoService {
     }
 
     return { empresaId: match[1], assinaturaId: match[2] };
+  }
+
+  private parseFaturaExternalReference(
+    externalReference?: string,
+  ): { empresaId: string; faturaId: number; referenciaGateway: string } | null {
+    if (!externalReference || typeof externalReference !== 'string') {
+      return null;
+    }
+
+    const valorNormalizado = externalReference.trim();
+    const match = /^fatura:([0-9a-f-]{36}):(\d+)$/i.exec(valorNormalizado);
+
+    if (!match) {
+      return null;
+    }
+
+    const faturaId = Number.parseInt(match[2], 10);
+    if (!Number.isInteger(faturaId) || faturaId <= 0) {
+      return null;
+    }
+
+    return {
+      empresaId: match[1],
+      faturaId,
+      referenciaGateway: valorNormalizado,
+    };
+  }
+
+  private resolveExternalReference(externalReference?: string): ExternalReferenceResolution | null {
+    const assinatura = this.parseExternalReference(externalReference);
+    if (assinatura) {
+      return { kind: 'assinatura', ...assinatura };
+    }
+
+    const fatura = this.parseFaturaExternalReference(externalReference);
+    if (fatura) {
+      return { kind: 'fatura', ...fatura };
+    }
+
+    return null;
+  }
+
+  private resolveWebhookResourceId(webhookData: any): string | undefined {
+    const directId = webhookData?.data?.id ?? webhookData?.id;
+    if (directId !== undefined && directId !== null) {
+      return String(directId);
+    }
+
+    const resource = webhookData?.resource;
+    if (typeof resource !== 'string' || !resource.trim()) {
+      return undefined;
+    }
+
+    const candidate = resource
+      .trim()
+      .split('?')[0]
+      .split('/')
+      .filter(Boolean)
+      .pop();
+
+    if (!candidate) {
+      return undefined;
+    }
+
+    try {
+      return decodeURIComponent(candidate);
+    } catch {
+      return candidate;
+    }
+  }
+
+  private async registerPaymentWebhookEvent(
+    payment: any,
+    action: string,
+    resolvedReference?: ExternalReferenceResolution | null,
+  ): Promise<boolean> {
+    const resolved =
+      resolvedReference || this.resolveExternalReference(payment?.external_reference);
+    if (!resolved) {
+      return false;
+    }
+
+    const paymentStatus = String(payment?.status || 'unknown')
+      .trim()
+      .toLowerCase();
+    const paymentAction = String(action || 'updated')
+      .trim()
+      .toLowerCase();
+
+    const aggregateId = `${payment?.id || 'unknown'}:${paymentStatus}:${paymentAction}`.slice(0, 120);
+    const correlationId = `mp:${payment?.id || 'unknown'}:${paymentAction}`.slice(0, 120);
+
+    try {
+      await this.billingEventRepository.insert({
+        empresaId: resolved.empresaId,
+        aggregateType: 'mercadopago.payment.webhook',
+        aggregateId,
+        eventType: 'received',
+        source: 'mercadopago',
+        status: 'processed',
+        payload: {
+          paymentId: payment?.id || null,
+          paymentStatus,
+          action: paymentAction,
+          referenciaTipo: resolved.kind,
+          assinaturaId: resolved.kind === 'assinatura' ? resolved.assinaturaId : null,
+          faturaId: resolved.kind === 'fatura' ? resolved.faturaId : null,
+        },
+        correlationId,
+      });
+
+      return false;
+    } catch (error) {
+      if ((error as any)?.code === '23505') {
+        this.logger.warn(
+          `Webhook duplicado ignorado payment=${payment?.id} status=${paymentStatus} action=${paymentAction}`,
+        );
+        return true;
+      }
+
+      throw error;
+    }
+  }
+
+  private toBoundedInteger(value: unknown, fallback: number, min: number, max: number): number {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return fallback;
+    }
+    const rounded = Math.floor(parsed);
+    return Math.min(Math.max(rounded, min), max);
+  }
+
+  private mapPaymentStatusToSubscriptionStatus(
+    paymentStatusRaw: unknown,
+  ): CanonicalAssinaturaStatus | undefined {
+    const paymentStatus = String(paymentStatusRaw || '')
+      .trim()
+      .toLowerCase();
+
+    if (!paymentStatus) {
+      return undefined;
+    }
+
+    if (
+      [
+        'approved',
+        'authorized',
+        'paid',
+        'succeeded',
+        'success',
+      ].includes(paymentStatus)
+    ) {
+      return 'active';
+    }
+
+    if (
+      ['rejected', 'refused', 'denied', 'cancelled', 'canceled'].includes(
+        paymentStatus,
+      )
+    ) {
+      return 'past_due';
+    }
+
+    if (['refunded', 'charged_back', 'chargeback'].includes(paymentStatus)) {
+      return 'suspended';
+    }
+
+    return undefined;
+  }
+
+  private mapPaymentStatusToInvoicePaymentStatus(
+    paymentStatusRaw: unknown,
+  ): StatusPagamento | undefined {
+    const paymentStatus = String(paymentStatusRaw || '')
+      .trim()
+      .toLowerCase();
+
+    if (!paymentStatus) {
+      return undefined;
+    }
+
+    if (['approved', 'authorized', 'paid', 'succeeded', 'success'].includes(paymentStatus)) {
+      return StatusPagamento.APROVADO;
+    }
+
+    if (['pending'].includes(paymentStatus)) {
+      return StatusPagamento.PENDENTE;
+    }
+
+    if (['in_process', 'in_mediation', 'processing', 'under_review'].includes(paymentStatus)) {
+      return StatusPagamento.PROCESSANDO;
+    }
+
+    if (['rejected', 'refused', 'denied'].includes(paymentStatus)) {
+      return StatusPagamento.REJEITADO;
+    }
+
+    if (['cancelled', 'canceled'].includes(paymentStatus)) {
+      return StatusPagamento.CANCELADO;
+    }
+
+    if (['refunded', 'charged_back', 'chargeback'].includes(paymentStatus)) {
+      return StatusPagamento.ESTORNADO;
+    }
+
+    return undefined;
+  }
+
+  private extractPaymentAmount(payment: any): number {
+    const candidates = [
+      payment?.transaction_amount,
+      payment?.transaction_details?.total_paid_amount,
+      payment?.transaction_details?.net_received_amount,
+    ];
+
+    for (const candidate of candidates) {
+      const parsed = Number(candidate);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        return Number(parsed.toFixed(2));
+      }
+    }
+
+    return 0;
+  }
+
+  private isPagamentoNotFoundError(error: unknown): boolean {
+    if (error instanceof NotFoundException) {
+      return true;
+    }
+    const mensagem = String((error as any)?.message || '').toLowerCase();
+    return mensagem.includes('pagamento') && mensagem.includes('encontr');
+  }
+
+  private gerarTransacaoPagamentoWebhook(paymentId: string): string {
+    const normalizado = String(paymentId || 'mp')
+      .replace(/[^a-z0-9_-]/gi, '')
+      .slice(0, 32)
+      .toUpperCase();
+    const sufixo = Date.now().toString(36).toUpperCase();
+    return `MP-${normalizado || 'WEBHOOK'}-${sufixo}`;
+  }
+
+  private async garantirPagamentoPendenteFatura(params: {
+    empresaId: string;
+    faturaId: number;
+    referenciaGateway: string;
+    payment: any;
+  }): Promise<void> {
+    const { empresaId, faturaId, referenciaGateway, payment } = params;
+    const existente = await this.pagamentoRepository.findOne({
+      where: { empresaId, faturaId, gatewayTransacaoId: referenciaGateway },
+    });
+    if (existente) {
+      return;
+    }
+
+    const fatura = await this.faturaRepository.findOne({
+      where: { id: faturaId, empresaId },
+    });
+    if (!fatura) {
+      throw new NotFoundException(`Fatura ${faturaId} nao encontrada para empresa ${empresaId}`);
+    }
+
+    const valorRestante = Number(
+      Math.max(Number(fatura.valorTotal || 0) - Number(fatura.valorPago || 0), 0).toFixed(2),
+    );
+    const valorGateway = this.extractPaymentAmount(payment);
+    const valorPagamento = valorGateway > 0 ? valorGateway : valorRestante || Number(fatura.valorTotal || 0);
+
+    const pagamento = this.pagamentoRepository.create({
+      empresaId,
+      faturaId,
+      transacaoId: this.gerarTransacaoPagamentoWebhook(payment?.id),
+      tipo: TipoPagamento.PAGAMENTO,
+      status: StatusPagamento.PENDENTE,
+      valor: Number(valorPagamento.toFixed(2)),
+      taxa: 0,
+      valorLiquido: Number(valorPagamento.toFixed(2)),
+      metodoPagamento: String(fatura.formaPagamentoPreferida || FormaPagamento.A_COMBINAR),
+      gateway: 'mercadopago',
+      gatewayTransacaoId: referenciaGateway,
+      gatewayStatusRaw: String(payment?.status || 'pending'),
+      dadosCompletos: {
+        externalReference: referenciaGateway,
+        mercadoPagoPaymentId: String(payment?.id || ''),
+        origem: 'mercadopago.webhook',
+      } as any,
+      observacoes: `Pagamento criado automaticamente via webhook Mercado Pago (${payment?.id || 'n/a'}).`,
+      dataProcessamento: new Date(),
+    });
+
+    await this.pagamentoRepository.save(pagamento);
+  }
+
+  private async reconcileInvoiceFromPayment(
+    payment: any,
+    action: string,
+    resolvedReference: Extract<ExternalReferenceResolution, { kind: 'fatura' }>,
+  ): Promise<void> {
+    const novoStatus = this.mapPaymentStatusToInvoicePaymentStatus(payment?.status);
+    if (!novoStatus) {
+      this.logger.log(
+        `Webhook Mercado Pago payment=${payment?.id} com status nao mapeado para faturamento (${payment?.status || 'unknown'})`,
+      );
+      return;
+    }
+
+    const paymentId = String(payment?.id || '').trim() || 'unknown';
+    const correlationId = `mp:${paymentId}:${String(action || 'updated').trim().toLowerCase()}`.slice(
+      0,
+      180,
+    );
+    const origemId = `mercadopago:webhook:${paymentId}`.slice(0, 180);
+
+    const dto = {
+      gatewayTransacaoId: resolvedReference.referenciaGateway,
+      novoStatus,
+      motivoRejeicao:
+        novoStatus === StatusPagamento.REJEITADO
+          ? String(payment?.status_detail || payment?.status || 'rejeitado')
+          : undefined,
+      webhookData: payment,
+      correlationId,
+      origemId,
+    };
+
+    await runWithTenant(resolvedReference.empresaId, async () => {
+      try {
+        await this.pagamentoService.processarPagamento(dto as any, resolvedReference.empresaId);
+      } catch (error) {
+        if (!this.isPagamentoNotFoundError(error)) {
+          throw error;
+        }
+
+        await this.garantirPagamentoPendenteFatura({
+          empresaId: resolvedReference.empresaId,
+          faturaId: resolvedReference.faturaId,
+          referenciaGateway: resolvedReference.referenciaGateway,
+          payment,
+        });
+
+        await this.pagamentoService.processarPagamento(dto as any, resolvedReference.empresaId);
+      }
+    });
+  }
+
+  private async appendReconciliationBillingEvent(
+    result: PaymentReconciliationResult,
+  ): Promise<void> {
+    if (!result.empresaId) {
+      return;
+    }
+
+    const aggregateId = `${result.assinaturaId || 'unknown'}:${result.paymentId}:${result.action}`.slice(
+      0,
+      120,
+    );
+
+    await this.billingEventRepository.insert({
+      empresaId: result.empresaId,
+      aggregateType: 'mercadopago.payment.reconciliation',
+      aggregateId,
+      eventType: result.action,
+      source: 'mercadopago.reconcile',
+      status: result.action === 'error' ? 'failed' : 'processed',
+      payload: {
+        paymentId: result.paymentId,
+        paymentStatus: result.paymentStatus || null,
+        assinaturaId: result.assinaturaId || null,
+        fromStatus: result.fromStatus || null,
+        toStatus: result.toStatus || null,
+        reason: result.reason || null,
+        trigger: result.source,
+      },
+      correlationId: `mp-reconcile:${result.paymentId}`.slice(0, 120),
+    });
+  }
+
+  private async reconcileSubscriptionFromPayment(
+    payment: any,
+    source: ReconciliationSource,
+  ): Promise<PaymentReconciliationResult> {
+    const paymentId = String(payment?.id || '').trim();
+    const paymentStatus = String(payment?.status || '')
+      .trim()
+      .toLowerCase();
+    const resolved = this.parseExternalReference(payment?.external_reference);
+
+    if (!paymentId) {
+      return {
+        paymentId: 'unknown',
+        source,
+        action: 'skipped',
+        paymentStatus,
+        reason: 'payment_without_id',
+      };
+    }
+
+    if (!resolved) {
+      return {
+        paymentId,
+        source,
+        action: 'skipped',
+        paymentStatus,
+        reason: 'external_reference_unrecognized',
+      };
+    }
+
+    const { empresaId, assinaturaId } = resolved;
+    const targetStatus = this.mapPaymentStatusToSubscriptionStatus(paymentStatus);
+
+    if (!targetStatus) {
+      const unsupportedResult: PaymentReconciliationResult = {
+        paymentId,
+        source,
+        action: 'skipped',
+        paymentStatus,
+        empresaId,
+        assinaturaId,
+        reason: 'payment_status_without_subscription_mapping',
+      };
+
+      await this.appendReconciliationBillingEvent(unsupportedResult);
+      return unsupportedResult;
+    }
+
+    let result: PaymentReconciliationResult = {
+      paymentId,
+      source,
+      action: 'skipped',
+      paymentStatus,
+      empresaId,
+      assinaturaId,
+      toStatus: targetStatus,
+      reason: 'subscription_not_found',
+    };
+
+    await runWithTenant(empresaId, async () => {
+      const assinatura = await this.assinaturaRepository.findOne({
+        where: { id: assinaturaId },
+      });
+
+      if (!assinatura) {
+        result = {
+          paymentId,
+          source,
+          action: 'skipped',
+          paymentStatus,
+          empresaId,
+          assinaturaId,
+          toStatus: targetStatus,
+          reason: 'subscription_not_found',
+        };
+        return;
+      }
+
+      const currentStatus = toCanonicalAssinaturaStatus(assinatura.status);
+
+      if (currentStatus === targetStatus) {
+        result = {
+          paymentId,
+          source,
+          action: 'aligned',
+          paymentStatus,
+          empresaId,
+          assinaturaId,
+          fromStatus: currentStatus,
+          toStatus: targetStatus,
+          reason: 'already_aligned',
+        };
+        return;
+      }
+
+      if (!canTransitionSubscriptionStatus(currentStatus, targetStatus)) {
+        result = {
+          paymentId,
+          source,
+          action: 'skipped',
+          paymentStatus,
+          empresaId,
+          assinaturaId,
+          fromStatus: currentStatus,
+          toStatus: targetStatus,
+          reason: 'invalid_transition',
+        };
+        return;
+      }
+
+      const now = new Date();
+      if (targetStatus === 'active') {
+        const proximoVencimento = new Date(now);
+        proximoVencimento.setMonth(proximoVencimento.getMonth() + 1);
+
+        assinatura.dataInicio = now;
+        assinatura.dataFim = null;
+        assinatura.proximoVencimento = proximoVencimento;
+        assinatura.renovacaoAutomatica = true;
+      }
+
+      assinatura.status = targetStatus;
+
+      const observacao = `Reconciliada via ${source} (MP payment ${paymentId}) ${currentStatus} -> ${targetStatus} em ${now.toISOString()}`;
+      assinatura.observacoes = assinatura.observacoes
+        ? `${assinatura.observacoes}\n${observacao}`
+        : observacao;
+
+      await this.assinaturaRepository.save(assinatura);
+
+      result = {
+        paymentId,
+        source,
+        action: 'updated',
+        paymentStatus,
+        empresaId,
+        assinaturaId,
+        fromStatus: currentStatus,
+        toStatus: targetStatus,
+      };
+    });
+
+    await this.appendReconciliationBillingEvent(result);
+    return result;
+  }
+
+  async reconcilePaymentById(
+    paymentIdRaw: string,
+    source: ReconciliationSource = 'manual',
+  ): Promise<PaymentReconciliationResult> {
+    const paymentId = String(paymentIdRaw || '').trim();
+    if (!paymentId) {
+      return {
+        paymentId: 'unknown',
+        source,
+        action: 'skipped',
+        reason: 'missing_payment_id',
+      };
+    }
+
+    try {
+      const payment = await this.getPayment(paymentId);
+      return await this.reconcileSubscriptionFromPayment(payment, source);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'failed_to_fetch_payment_from_provider';
+      this.logger.warn(`Reconciliacao falhou para payment ${paymentId}: ${message}`);
+      return {
+        paymentId,
+        source,
+        action: 'error',
+        reason: message,
+      };
+    }
+  }
+
+  async reconcileRecentPayments(options?: { lookbackHours?: number; limit?: number }) {
+    const lookbackHours = this.toBoundedInteger(options?.lookbackHours, 72, 1, 24 * 30);
+    const limit = this.toBoundedInteger(options?.limit, 100, 1, 500);
+
+    const rows = await this.billingEventRepository.manager.query(
+      `
+        WITH candidates AS (
+          SELECT
+            payload->>'paymentId' AS payment_id,
+            MAX(created_at) AS last_seen_at
+          FROM billing_events
+          WHERE aggregate_type = $1
+            AND event_type = $2
+            AND created_at >= NOW() - ($3::int * INTERVAL '1 hour')
+          GROUP BY payload->>'paymentId'
+        )
+        SELECT payment_id
+        FROM candidates
+        WHERE payment_id IS NOT NULL
+          AND payment_id <> ''
+        ORDER BY last_seen_at DESC
+        LIMIT $4
+      `,
+      ['mercadopago.payment.webhook', 'received', lookbackHours, limit],
+    );
+
+    const paymentIds = Array.from(
+      new Set(
+        (Array.isArray(rows) ? rows : [])
+          .map((item: any) => String(item?.payment_id || '').trim())
+          .filter(Boolean),
+      ),
+    );
+
+    const results: PaymentReconciliationResult[] = [];
+    let updated = 0;
+    let aligned = 0;
+    let skipped = 0;
+    let errors = 0;
+
+    for (const paymentId of paymentIds) {
+      const result = await this.reconcilePaymentById(paymentId, 'batch');
+      results.push(result);
+
+      if (result.action === 'updated') {
+        updated += 1;
+      } else if (result.action === 'aligned') {
+        aligned += 1;
+      } else if (result.action === 'error') {
+        errors += 1;
+      } else {
+        skipped += 1;
+      }
+    }
+
+    return {
+      lookbackHours,
+      limit,
+      candidates: paymentIds.length,
+      processed: results.length,
+      updated,
+      aligned,
+      skipped,
+      errors,
+      results,
+    };
   }
 
   private initializeMercadoPago() {
@@ -356,29 +1012,33 @@ export class MercadoPagoService {
 
   async processWebhook(webhookData: any) {
     try {
-      const { type, data, action } = webhookData;
+      const typeRaw = String(webhookData?.type || webhookData?.topic || '')
+        .trim()
+        .toLowerCase();
+      const action = String(webhookData?.action || 'updated');
+      const resourceId = this.resolveWebhookResourceId(webhookData);
 
-      this.logger.log(`Processando webhook: ${type} - ${action}`);
+      this.logger.log(`Processando webhook: ${typeRaw || 'unknown'} - ${action}`);
 
-      switch (type) {
+      switch (typeRaw) {
         case 'payment':
-          await this.handlePaymentWebhook(data.id, action);
+          await this.handlePaymentWebhook(resourceId || '', action);
           break;
 
         case 'plan':
-          await this.handlePlanWebhook(data.id, action);
+          await this.handlePlanWebhook(resourceId || '', action);
           break;
 
         case 'subscription':
-          await this.handleSubscriptionWebhook(data.id, action);
+          await this.handleSubscriptionWebhook(resourceId || '', action);
           break;
 
         case 'invoice':
-          await this.handleInvoiceWebhook(data.id, action);
+          await this.handleInvoiceWebhook(resourceId || '', action);
           break;
 
         default:
-          this.logger.log(`Tipo de webhook não tratado: ${type}`);
+          this.logger.log(`Tipo de webhook nao tratado: ${typeRaw || 'unknown'}`);
       }
     } catch (error) {
       this.logger.error('Erro ao processar webhook:', error);
@@ -388,7 +1048,33 @@ export class MercadoPagoService {
 
   private async handlePaymentWebhook(paymentId: string, action: string) {
     try {
+      if (!paymentId) {
+        this.logger.warn(`Webhook de pagamento sem identificador (action=${action})`);
+        return;
+      }
+
       const payment = await this.getPayment(paymentId);
+      const resolvedReference = this.resolveExternalReference(payment?.external_reference);
+      const duplicateWebhook = await this.registerPaymentWebhookEvent(
+        payment,
+        action,
+        resolvedReference,
+      );
+      if (duplicateWebhook) {
+        if (resolvedReference?.kind === 'assinatura') {
+          await this.reconcileSubscriptionFromPayment(payment, 'webhook_duplicate');
+        } else if (resolvedReference?.kind === 'fatura') {
+          this.logger.log(
+            `Webhook duplicado de faturamento ignorado payment=${payment?.id} fatura=${resolvedReference.faturaId}`,
+          );
+        }
+        return;
+      }
+
+      if (resolvedReference?.kind === 'fatura') {
+        await this.reconcileInvoiceFromPayment(payment, action, resolvedReference);
+        return;
+      }
 
       this.logger.log(`Webhook pagamento ${paymentId}: ${payment.status} - ${action}`);
 
@@ -449,8 +1135,17 @@ export class MercadoPagoService {
         return;
       }
 
-      if (assinatura.status === 'ativa') {
+      const currentStatus = toCanonicalAssinaturaStatus(assinatura.status);
+
+      if (currentStatus === 'active') {
         this.logger.log(`Assinatura ${assinatura.id} já está ativa (idempotente)`);
+        return;
+      }
+
+      if (!canTransitionSubscriptionStatus(currentStatus, 'active')) {
+        this.logger.warn(
+          `Transicao invalida de assinatura ${assinatura.id}: ${currentStatus} -> active`,
+        );
         return;
       }
 
@@ -458,7 +1153,7 @@ export class MercadoPagoService {
       const proximoVencimento = new Date(hoje);
       proximoVencimento.setMonth(proximoVencimento.getMonth() + 1);
 
-      assinatura.status = 'ativa';
+      assinatura.status = 'active';
       assinatura.dataInicio = hoje;
       assinatura.proximoVencimento = proximoVencimento;
       assinatura.renovacaoAutomatica = true;
@@ -568,7 +1263,9 @@ export class MercadoPagoService {
         return;
       }
 
-      if (assinatura.status !== 'ativa') {
+      const currentStatus = toCanonicalAssinaturaStatus(assinatura.status);
+
+      if (currentStatus !== 'active') {
         const linha = `Estorno recebido (MP ${payment.id}) com assinatura não-ativa em ${new Date().toISOString()}`;
         assinatura.observacoes = assinatura.observacoes
           ? `${assinatura.observacoes}\n${linha}`
@@ -577,7 +1274,14 @@ export class MercadoPagoService {
         return;
       }
 
-      assinatura.status = 'suspensa';
+      if (!canTransitionSubscriptionStatus(currentStatus, 'suspended')) {
+        this.logger.warn(
+          `Transicao invalida de assinatura ${assinatura.id}: ${currentStatus} -> suspended`,
+        );
+        return;
+      }
+
+      assinatura.status = 'suspended';
       const linha = `Assinatura suspensa por estorno (MP ${payment.id}) em ${new Date().toISOString()}`;
       assinatura.observacoes = assinatura.observacoes
         ? `${assinatura.observacoes}\n${linha}`

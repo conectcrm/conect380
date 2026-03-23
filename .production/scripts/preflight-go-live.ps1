@@ -115,6 +115,11 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "validate:multi-tenant failed" }
   }
 
+  Run-Step -Name "Permissions governance" -Action {
+    npm --prefix backend run validate:permissions-governance
+    if ($LASTEXITCODE -ne 0) { throw "validate:permissions-governance failed" }
+  }
+
   if (-not $SkipApplyRls) {
     Run-Step -Name "Apply RLS baseline" -Action {
       Invoke-WithDbEnv -DbHost $RlsHost -Port $RlsPort -Database $RlsDatabase -Username $RlsUser -Password $RlsPassword -Action {
@@ -167,7 +172,7 @@ Write-Host ""
 Write-Host "Preflight summary:"
 $results | Format-Table -AutoSize
 
-$failed = $results | Where-Object { $_.Status -eq "FAIL" }
+$failed = @($results | Where-Object { $_.Status -eq "FAIL" })
 if ($failed.Count -gt 0) {
   Write-Host ""
   Write-Host "Preflight result: FAIL"

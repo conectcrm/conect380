@@ -1,8 +1,34 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { KeyRound, Eye, EyeOff, AlertCircle, CheckCircle2 } from 'lucide-react';
-import toast from 'react-hot-toast';
 import api from '../services/api';
+import Conect360Logo from '../components/ui/Conect360Logo';
+import { toastService } from '../services/toastService';
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null;
+};
+
+const normalizeApiErrorMessage = (err: unknown): string | undefined => {
+  const errRecord = isRecord(err) ? err : undefined;
+  const response = errRecord && isRecord(errRecord['response']) ? errRecord['response'] : undefined;
+  const data = response && isRecord(response['data']) ? response['data'] : undefined;
+  const responseMessage = data ? data['message'] : undefined;
+
+  if (Array.isArray(responseMessage)) {
+    const joined = responseMessage
+      .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+      .join('. ');
+    return joined || undefined;
+  }
+
+  if (typeof responseMessage === 'string' && responseMessage.trim()) {
+    return responseMessage;
+  }
+
+  const message = err instanceof Error ? err.message : undefined;
+  return message?.trim() ? message : undefined;
+};
 
 interface LocationState {
   userId: string;
@@ -48,12 +74,12 @@ const TrocarSenhaPage: React.FC = () => {
     e.preventDefault();
 
     if (!formularioValido) {
-      toast.error('Preencha todos os campos corretamente');
+      toastService.error('Preencha todos os campos corretamente');
       return;
     }
 
     if (!state?.userId) {
-      toast.error('Dados de sessão inválidos. Faça login novamente.');
+      toastService.error('Dados de sessão inválidos. Faça login novamente.');
       navigate('/login');
       return;
     }
@@ -69,7 +95,7 @@ const TrocarSenhaPage: React.FC = () => {
       });
 
       if (response.data.success) {
-        toast.success('✅ Senha alterada com sucesso! Redirecionando...');
+        toastService.success('Senha alterada com sucesso! Redirecionando...');
 
         // Aguardar 2 segundos e redirecionar para login
         setTimeout(() => {
@@ -84,10 +110,9 @@ const TrocarSenhaPage: React.FC = () => {
     } catch (err: unknown) {
       console.error('Erro ao trocar senha:', err);
       const errorMessage =
-        (err as any)?.response?.data?.message ||
-        (err instanceof Error ? err.message : 'Erro ao trocar senha');
+        normalizeApiErrorMessage(err) || (err instanceof Error ? err.message : 'Erro ao trocar senha');
       setErro(errorMessage);
-      toast.error(errorMessage);
+      toastService.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -96,18 +121,21 @@ const TrocarSenhaPage: React.FC = () => {
   // Se não tiver dados na navegação, redirecionar
   if (!state?.userId) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-6">
-        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
-          <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Sessão Inválida</h2>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-10">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 max-w-md w-full text-center">
+          <div className="flex items-center justify-center mb-6">
+            <Conect360Logo size="lg" variant="full" className="w-auto" />
+          </div>
+          <AlertCircle className="h-14 w-14 text-red-600 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Sessão inválida</h2>
           <p className="text-gray-600 mb-6">
             Não foi possível identificar sua sessão. Por favor, faça login novamente.
           </p>
           <button
             onClick={() => navigate('/login')}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+            className="w-full bg-[#159A9C] text-white px-4 py-2 rounded-lg hover:bg-[#0F7B7D] transition-colors text-sm font-medium"
           >
-            Ir para Login
+            Ir para login
           </button>
         </div>
       </div>
@@ -115,18 +143,21 @@ const TrocarSenhaPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-6">
-      <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-10">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 max-w-md w-full">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="bg-blue-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-            <KeyRound className="h-8 w-8 text-blue-600" />
+          <div className="flex items-center justify-center mb-6">
+            <Conect360Logo size="lg" variant="full" className="w-auto" />
           </div>
-          <h1 className="text-3xl font-bold text-[#002333] mb-2">Trocar Senha</h1>
-          <p className="text-gray-600">
+          <div className="bg-[#DEEFE7] rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+            <KeyRound className="h-8 w-8 text-[#159A9C]" />
+          </div>
+          <h1 className="text-3xl font-bold text-[#002333] mb-2">Trocar senha</h1>
+          <p className="text-[#002333]/70">
             Olá, <strong>{nomeUsuario}</strong>! Este é seu primeiro acesso.
           </p>
-          <p className="text-sm text-gray-500 mt-1">Por segurança, troque sua senha temporária.</p>
+          <p className="text-sm text-[#002333]/60 mt-1">Por segurança, troque sua senha temporária.</p>
         </div>
 
         {/* Erro */}
@@ -141,14 +172,14 @@ const TrocarSenhaPage: React.FC = () => {
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Senha Temporária */}
           {senhaTemporariaRecebida ? (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-900 font-medium">
+            <div className="bg-[#159A9C]/10 border border-[#159A9C]/20 rounded-lg p-4">
+              <p className="text-sm text-[#002333] font-medium">
                 Sua senha temporária foi aplicada automaticamente para concluir a troca.
               </p>
               <button
                 type="button"
                 onClick={() => setMostrarSenhaAntiga(!mostrarSenhaAntiga)}
-                className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700"
+                className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-[#159A9C] hover:text-[#0F7B7D] transition-colors"
               >
                 {mostrarSenhaAntiga ? (
                   <>
@@ -163,7 +194,7 @@ const TrocarSenhaPage: React.FC = () => {
                 )}
               </button>
               {mostrarSenhaAntiga && (
-                <div className="mt-2 px-3 py-2 bg-white border border-blue-200 rounded-md font-mono text-sm text-blue-900">
+                <div className="mt-2 px-3 py-2 bg-white border border-[#DEEFE7] rounded-md font-mono text-sm text-[#002333]">
                   {senhaAntiga}
                 </div>
               )}
@@ -178,14 +209,14 @@ const TrocarSenhaPage: React.FC = () => {
                   type={mostrarSenhaAntiga ? 'text' : 'password'}
                   value={senhaAntiga}
                   onChange={(e) => setSenhaAntiga(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-12"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent pr-12"
                   placeholder="Digite a senha temporária"
                   disabled={loading}
                 />
                 <button
                   type="button"
                   onClick={() => setMostrarSenhaAntiga(!mostrarSenhaAntiga)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#B4BEC9] hover:text-[#159A9C] transition-colors"
                 >
                   {mostrarSenhaAntiga ? (
                     <EyeOff className="h-5 w-5" />
@@ -205,14 +236,14 @@ const TrocarSenhaPage: React.FC = () => {
                 type={mostrarSenhaNova ? 'text' : 'password'}
                 value={senhaNova}
                 onChange={(e) => setSenhaNova(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-12"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent pr-12"
                 placeholder="Digite sua nova senha"
                 disabled={loading}
               />
               <button
                 type="button"
                 onClick={() => setMostrarSenhaNova(!mostrarSenhaNova)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#B4BEC9] hover:text-[#159A9C] transition-colors"
               >
                 {mostrarSenhaNova ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
               </button>
@@ -249,14 +280,14 @@ const TrocarSenhaPage: React.FC = () => {
                 type={mostrarSenhaConfirmacao ? 'text' : 'password'}
                 value={senhaConfirmacao}
                 onChange={(e) => setSenhaConfirmacao(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-12"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent pr-12"
                 placeholder="Confirme sua nova senha"
                 disabled={loading}
               />
               <button
                 type="button"
                 onClick={() => setMostrarSenhaConfirmacao(!mostrarSenhaConfirmacao)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#B4BEC9] hover:text-[#159A9C] transition-colors"
               >
                 {mostrarSenhaConfirmacao ? (
                   <EyeOff className="h-5 w-5" />
@@ -290,11 +321,11 @@ const TrocarSenhaPage: React.FC = () => {
             disabled={!formularioValido || loading}
             className={`w-full py-3 rounded-lg font-semibold transition-all ${
               formularioValido && !loading
-                ? 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-lg'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                ? 'bg-[#159A9C] text-white hover:bg-[#0F7B7D] shadow-sm'
+                : 'bg-gray-200 text-[#002333]/50 cursor-not-allowed'
             }`}
           >
-            {loading ? 'Alterando senha...' : 'Trocar Senha'}
+            {loading ? 'Alterando senha...' : 'Trocar senha'}
           </button>
         </form>
 
@@ -302,7 +333,7 @@ const TrocarSenhaPage: React.FC = () => {
         <div className="mt-6 text-center">
           <button
             onClick={() => navigate('/login')}
-            className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
+            className="text-sm text-[#159A9C] hover:text-[#0F7B7D] hover:underline transition-colors"
           >
             ← Voltar para login
           </button>

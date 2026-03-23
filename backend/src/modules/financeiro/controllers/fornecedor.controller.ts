@@ -14,19 +14,24 @@ import {
 } from '@nestjs/common';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permission } from '../../../common/permissions/permissions.constants';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { CreateFornecedorDto, UpdateFornecedorDto } from '../dto/fornecedor.dto';
 import { FornecedorRemovalResponse } from '../dto/fornecedor-response.dto';
 import { FornecedorService } from '../services/fornecedor.service';
 
 @Controller('fornecedores')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.FINANCEIRO_PAGAMENTOS_READ)
 export class FornecedorController {
   private readonly logger = new Logger(FornecedorController.name);
 
   constructor(private readonly fornecedorService: FornecedorService) {}
 
   @Post()
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   async create(@Body() createFornecedorDto: CreateFornecedorDto, @EmpresaId() empresaId: string) {
     this.logger.log('[FornecedorController] Criacao de fornecedor', createFornecedorDto);
     return this.fornecedorService.create(createFornecedorDto, empresaId);
@@ -62,6 +67,7 @@ export class FornecedorController {
   }
 
   @Put(':id')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   async update(
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
@@ -71,6 +77,7 @@ export class FornecedorController {
   }
 
   @Delete(':id')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   async remove(
     @EmpresaId() empresaId: string,
     @Param('id') id: string,
@@ -101,6 +108,7 @@ export class FornecedorController {
   }
 
   @Patch(':id/desativar')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   async desativar(@EmpresaId() empresaId: string, @Param('id') id: string) {
     const fornecedor = await this.fornecedorService.desativar(id, empresaId);
     return {
@@ -110,6 +118,7 @@ export class FornecedorController {
   }
 
   @Post(':id/limpar-contas-pagas')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   async limparContasPagas(@EmpresaId() empresaId: string, @Param('id') id: string) {
     try {
       const result = await this.fornecedorService.limparContasPagas(id, empresaId);

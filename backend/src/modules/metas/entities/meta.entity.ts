@@ -29,8 +29,8 @@ export class Meta {
   @Column({ type: 'decimal', precision: 15, scale: 2 })
   valor: number;
 
-  @Column({ type: 'int', name: 'vendedor_id', nullable: true })
-  vendedorId?: number;
+  @Column({ type: 'uuid', name: 'vendedor_id', nullable: true })
+  vendedorId?: string;
 
   @Column({ type: 'varchar', length: 120, nullable: true })
   regiao?: string;

@@ -11,6 +11,7 @@ import {
 import { User } from '../users/user.entity';
 import { Cliente } from '../clientes/cliente.entity';
 import { Atividade } from './atividade.entity';
+import { OportunidadeStageEvent } from './oportunidade-stage-event.entity';
 import { Empresa } from '../../empresas/entities/empresa.entity';
 
 export enum EstagioOportunidade {
@@ -38,6 +39,25 @@ export enum OrigemOportunidade {
   EVENTO = 'evento',
   PARCEIRO = 'parceiro',
   CAMPANHA = 'campanha',
+}
+
+export enum MotivoPerdaOportunidade {
+  PRECO = 'preco',
+  CONCORRENTE = 'concorrente',
+  TIMING = 'timing',
+  ORCAMENTO = 'orcamento',
+  PRODUTO = 'produto',
+  PROJETO_CANCELADO = 'projeto_cancelado',
+  SEM_RESPOSTA = 'sem_resposta',
+  OUTRO = 'outro',
+}
+
+export enum LifecycleStatusOportunidade {
+  OPEN = 'open',
+  WON = 'won',
+  LOST = 'lost',
+  ARCHIVED = 'archived',
+  DELETED = 'deleted',
 }
 
 @Entity('oportunidades')
@@ -120,8 +140,54 @@ export class Oportunidade {
   @Column({ type: 'varchar', name: 'empresaContato', length: 255, nullable: true })
   empresaContato: string;
 
+  @Column({
+    type: 'enum',
+    enum: MotivoPerdaOportunidade,
+    name: 'motivo_perda',
+    nullable: true,
+  })
+  motivoPerda?: MotivoPerdaOportunidade;
+
+  @Column({ type: 'text', name: 'motivo_perda_detalhes', nullable: true })
+  motivoPerdaDetalhes?: string;
+
+  @Column({ type: 'varchar', name: 'concorrente_nome', length: 100, nullable: true })
+  concorrenteNome?: string;
+
+  @Column({ type: 'timestamp', name: 'data_revisao', nullable: true })
+  dataRevisao?: Date;
+
+  @Column({
+    name: 'lifecycle_status',
+    type: 'varchar',
+    length: 20,
+    default: LifecycleStatusOportunidade.OPEN,
+  })
+  lifecycle_status?: LifecycleStatusOportunidade;
+
+  @Column({ name: 'archived_at', type: 'timestamptz', nullable: true })
+  archived_at?: Date | null;
+
+  @Column({ name: 'archived_by', type: 'uuid', nullable: true })
+  archived_by?: string | null;
+
+  @Column({ name: 'deleted_at', type: 'timestamptz', nullable: true })
+  deleted_at?: Date | null;
+
+  @Column({ name: 'deleted_by', type: 'uuid', nullable: true })
+  deleted_by?: string | null;
+
+  @Column({ name: 'reopened_at', type: 'timestamptz', nullable: true })
+  reopened_at?: Date | null;
+
+  @Column({ name: 'reopened_by', type: 'uuid', nullable: true })
+  reopened_by?: string | null;
+
   @OneToMany(() => Atividade, (atividade) => atividade.oportunidade)
   atividades: Atividade[];
+
+  @OneToMany(() => OportunidadeStageEvent, (event) => event.oportunidade)
+  stageEvents: OportunidadeStageEvent[];
 
   @CreateDateColumn({ name: 'createdAt' })
   createdAt: Date;
@@ -130,4 +196,8 @@ export class Oportunidade {
   updatedAt: Date;
 
   valorFormatado?: string;
+  is_stale?: boolean;
+  stale_days?: number;
+  last_interaction_at?: Date | string | null;
+  stale_since?: Date | string | null;
 }

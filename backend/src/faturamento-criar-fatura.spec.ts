@@ -9,6 +9,20 @@ class EmailMock {
   async enviarEmailGenerico() {
     return true;
   }
+
+  async enviarEmailGenericoDetalhado() {
+    return { sucesso: true, simulado: false };
+  }
+}
+
+class MercadoPagoMock {
+  async createPreference() {
+    return {
+      id: 'pref_teste_123',
+      init_point: 'https://pagamento.exemplo.com/checkout/pref_teste_123',
+      sandbox_init_point: 'https://sandbox.pagamento.exemplo.com/checkout/pref_teste_123',
+    };
+  }
 }
 
 // Repositório genérico em memória
@@ -73,6 +87,10 @@ function createInMemoryRepository<T extends { id?: any }>() {
         }),
       }),
     }),
+    query: async () => [],
+    manager: {
+      query: async () => [],
+    },
     _all: () => data,
   };
 }
@@ -80,7 +98,11 @@ function createInMemoryRepository<T extends { id?: any }>() {
 // Instâncias dos repositórios em memória
 const faturaRepo = createInMemoryRepository<Fatura>();
 const itemRepo = createInMemoryRepository<ItemFatura>();
+const pagamentoRepo = createInMemoryRepository<any>();
 const contratoRepo = createInMemoryRepository<Contrato>();
+const clienteRepo = createInMemoryRepository<any>();
+const propostasServiceMock = {};
+const mercadoPagoMock = new MercadoPagoMock();
 
 describe('FaturamentoService - criar fatura (unitário sem TypeORM)', () => {
   let service: FaturamentoService;
@@ -89,8 +111,12 @@ describe('FaturamentoService - criar fatura (unitário sem TypeORM)', () => {
     service = new FaturamentoService(
       faturaRepo as any,
       itemRepo as any,
+      pagamentoRepo as any,
       contratoRepo as any,
+      clienteRepo as any,
+      propostasServiceMock as any,
       new EmailMock() as any,
+      mercadoPagoMock as any,
     );
   });
 
@@ -110,6 +136,32 @@ describe('FaturamentoService - criar fatura (unitário sem TypeORM)', () => {
     expect(fatura.itens.length).toBe(1);
     const item = fatura.itens[0];
     expect(Number(item.valorTotal)).toBe(90); // 2 * 50 - 10
+  });
+
+  it('deve persistir impostos estruturados e compor o valor total da fatura', async () => {
+    const dto: CreateFaturaDto = {
+      clienteId: 'a96cb5f6-0688-4ec1-9f29-e43f5bb8e3f2',
+      usuarioResponsavelId: 'f47ac10b-58cc-4372-a567-0e02b2c3d489',
+      tipo: 'unica' as any,
+      descricao: 'Fatura com tributacao estruturada',
+      dataVencimento: new Date().toISOString().split('T')[0],
+      itens: [{ descricao: 'Item tributavel', quantidade: 1, valorUnitario: 100 }],
+      valorDesconto: 10,
+      valorImpostos: 18,
+      percentualImpostos: 20,
+      diasCarenciaJuros: 5,
+      percentualJuros: 2,
+      percentualMulta: 1,
+      detalhesTributarios: { origem: 'teste_unitario' },
+    };
+
+    const fatura = await service.criarFatura(dto, 'empresa-teste');
+    expect(Number(fatura.valorDesconto)).toBe(10);
+    expect(Number(fatura.valorImpostos)).toBe(18);
+    expect(Number(fatura.valorTotal)).toBe(108); // (100 - 10) + 18
+    expect(Number(fatura.diasCarenciaJuros)).toBe(5);
+    expect(Number(fatura.percentualJuros)).toBe(2);
+    expect(Number(fatura.percentualMulta)).toBe(1);
   });
 
   it('deve aplicar percentualDesconto corretamente', async () => {
@@ -176,5 +228,107 @@ describe('FaturamentoService - criar fatura (unitário sem TypeORM)', () => {
     const fatura = await service.criarFatura(dto, 'empresa-teste');
     const totalItens = fatura.itens.reduce((acc, i) => acc + Number(i.valorTotal), 0);
     expect(Number(totalItens.toFixed(2))).toBe(330);
+  });
+
+  it('deve gerar link de pagamento e registrar pagamento pendente para conciliacao automatica', async () => {
+    const empresaId = 'empresa-teste';
+    const clienteId = '8a4706bb-2fbf-4ac8-8e2f-c947f591adcb';
+
+    await (clienteRepo as any).save([
+      {
+        id: clienteId,
+        empresaId,
+        nome: 'Cliente Link',
+        email: 'cliente.link@teste.com',
+      },
+    ]);
+
+    const fatura = await service.criarFatura(
+      {
+        clienteId,
+        usuarioResponsavelId: '1a9f9224-b38f-4a28-a7f8-53d1886bc26f',
+        tipo: 'unica' as any,
+        descricao: 'Fatura para link',
+        dataVencimento: new Date().toISOString().split('T')[0],
+        itens: [{ descricao: 'Item link', quantidade: 1, valorUnitario: 250 }],
+      },
+      empresaId,
+    );
+
+    const resultado = await service.gerarLinkPagamentoFatura(fatura.id, empresaId, {
+      frontendBaseUrl: 'https://conect360.com',
+      backendBaseUrl: 'https://api.conect360.com',
+    });
+
+    expect(resultado.link).toContain('pagamento.exemplo.com/checkout');
+    expect(resultado.referenciaGateway).toBe(`fatura:${empresaId}:${fatura.id}`);
+
+    const pagamentos = (pagamentoRepo as any)._all();
+    expect(pagamentos.length).toBeGreaterThan(0);
+    const pagamento = pagamentos.find(
+      (item: any) =>
+        item.faturaId === fatura.id && item.gatewayTransacaoId === resultado.referenciaGateway,
+    );
+    expect(pagamento).toBeDefined();
+    expect(String(pagamento.status)).toBe('pendente');
+    expect(Number(pagamento.valor)).toBe(250);
+
+    const faturas = (faturaRepo as any)._all();
+    const faturaAtualizada = faturas.find((item: any) => item.id === fatura.id);
+    expect(String(faturaAtualizada.linkPagamento || '')).toContain(
+      'pagamento.exemplo.com/checkout',
+    );
+  });
+
+  it('deve gerar cobrança em lote apenas para faturas elegíveis', async () => {
+    const empresaId = 'empresa-teste';
+    const clienteElegivelId = '0f8fad5b-d9cb-469f-a165-70867728950e';
+    const clienteIgnoradoId = '7d444840-9dc0-11d1-b245-5ffdce74fad2';
+
+    await (clienteRepo as any).save([
+      { id: clienteElegivelId, empresaId, email: 'cliente.elegivel@teste.com' },
+      { id: clienteIgnoradoId, empresaId, email: 'cliente.ignorado@teste.com' },
+    ]);
+
+    const faturaElegivel = await service.criarFatura(
+      {
+        clienteId: clienteElegivelId,
+        usuarioResponsavelId: 'e47ac10b-58cc-4372-a567-0e02b2c3d484',
+        tipo: 'unica' as any,
+        descricao: 'Fatura elegivel para cobranca',
+        dataVencimento: new Date().toISOString().split('T')[0],
+        itens: [{ descricao: 'Item elegivel', quantidade: 1, valorUnitario: 100 }],
+      },
+      empresaId,
+    );
+
+    const faturaIgnorada = await service.criarFatura(
+      {
+        clienteId: clienteIgnoradoId,
+        usuarioResponsavelId: 'f47ac10b-58cc-4372-a567-0e02b2c3d485',
+        tipo: 'unica' as any,
+        descricao: 'Fatura que sera ignorada',
+        dataVencimento: new Date().toISOString().split('T')[0],
+        itens: [{ descricao: 'Item ignorado', quantidade: 1, valorUnitario: 80 }],
+      },
+      empresaId,
+    );
+
+    const armazenadas = (faturaRepo as any)._all();
+    const registroIgnorado = armazenadas.find((item: any) => item.id === faturaIgnorada.id);
+    registroIgnorado.status = 'cancelada';
+
+    const resultado = await service.gerarCobrancaEmLote(
+      [faturaElegivel.id, faturaIgnorada.id],
+      empresaId,
+    );
+
+    expect(resultado.processadas).toBe(2);
+    expect(resultado.sucesso).toBe(1);
+    expect(resultado.ignoradas).toBe(1);
+    expect(resultado.falhas).toBe(0);
+
+    const itemIgnorado = resultado.resultados.find((item) => item.faturaId === faturaIgnorada.id);
+    expect(itemIgnorado?.motivo).toBe('status_nao_elegivel');
   });
 });

@@ -1,8 +1,15 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+﻿import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { Suspense } from 'react';
 import { Toaster } from 'react-hot-toast';
-import { Navigate, Route, BrowserRouter as Router, Routes, useLocation } from 'react-router-dom';
+import {
+  Navigate,
+  Route,
+  BrowserRouter as Router,
+  Routes,
+  useLocation,
+} from 'react-router-dom';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+import PermissionPathGuard from './components/licensing/PermissionPathGuard';
 import { AuthProvider } from './contexts/AuthContext';
 import { EmpresaProvider } from './contexts/EmpresaContextAPIReal';
 import { I18nProvider } from './contexts/I18nContext';
@@ -10,24 +17,30 @@ import { MenuProvider } from './contexts/MenuContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { ProfileProvider } from './contexts/ProfileContext';
 import { SidebarProvider } from './contexts/SidebarContext';
+import { SystemBrandingProvider } from './contexts/SystemBrandingContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { GlobalConfirmationProvider } from './contexts/GlobalConfirmationContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';
 import { ModuloEnum } from './services/modulosService';
-import { protegerRota, protegerRotaSuperadmin } from './utils/routeGuardHelper';
+import { protegerRota } from './utils/routeGuardHelper';
 // Importar páginas de núcleos
 import ModuleUnderConstruction from './components/common/ModuleUnderConstruction';
+import SalesCelebrationHost from './components/feedback/SalesCelebrationHost';
+import Conect360Logo from './components/ui/Conect360Logo';
 // Sistema de Filas - ETAPA 5 (Núcleo Atendimento)
 // Sistema de Distribuição Automática - Núcleo Atendimento
 // Sistema de Templates de Mensagens - Núcleo Atendimento
 // Sistema de SLA Tracking - Núcleo Atendimento
 // Sistema de Fechamento Automático - Núcleo Atendimento
-// Chat Omnichannel - ETAPA 2 (Evolução Chat → Omnichannel)
+// Chat Omnichannel - ETAPA 2 (Evolucao Chat para Omnichannel)
 // ETAPA 3: Páginas Consolidadas com Abas
 // Importar novas páginas do sistema de empresas
 import ScrollToTop from './components/common/ScrollToTop';
+import GlobalModalScrollLock from './components/common/GlobalModalScrollLock';
 import { useAuth } from './hooks/useAuth';
 import { getMvpBlockedRouteInfo } from './config/mvpScope';
-// ⚠️ Demandas agora são Tickets - imports removidos (apenas redirects mantidos)
+import { isOmnichannelEnabled } from './config/featureFlags';
+// Demandas agora sao Tickets - imports removidos (apenas redirects mantidos)
 // Sprint 2 - Fase 3e: Admin Console Tickets Configuráveis
 // (code splitting) imports estáticos removidos
 
@@ -47,27 +60,24 @@ const LoginPage = React.lazy(() => import('./features/auth/LoginPage'));
 const RegistroEmpresaPage = React.lazy(() => import('./features/auth/RegistroEmpresaPage'));
 const ResetPasswordPage = React.lazy(() => import('./features/auth/ResetPasswordPage'));
 const VerificacaoEmailPage = React.lazy(() => import('./features/auth/VerificacaoEmailPage'));
+const TermosUsoPage = React.lazy(() => import('./pages/public/TermosUsoPage'));
+const PoliticaPrivacidadePage = React.lazy(() => import('./pages/public/PoliticaPrivacidadePage'));
 
 const ClientesPage = React.lazy(() => import('./features/clientes/ClientesPage'));
+const ClienteDetailPage = React.lazy(() => import('./features/clientes/ClienteDetailPage'));
 const ContatosPage = React.lazy(() => import('./features/contatos/ContatosPage'));
 const LeadsPage = React.lazy(() => import('./pages/LeadsPage'));
-const InteracoesPage = React.lazy(() => import('./pages/InteracoesPage'));
 
 const DashboardRouter = React.lazy(() => import('./features/dashboard/DashboardRouter'));
+const DashboardHomeRoute = React.lazy(() => import('./features/dashboard/DashboardHomeRoute'));
 const NotificationsPage = React.lazy(() => import('./pages/NotificationsPage'));
 const ContratosPage = React.lazy(() => import('./features/contratos/ContratosPage'));
 
-const AdministracaoNucleusPage = React.lazy(
-  () => import('./pages/nuclei/AdministracaoNucleusPage'),
-);
 const CrmNucleusPage = React.lazy(() => import('./pages/nuclei/CrmNucleusPage'));
 const VendasNucleusPage = React.lazy(() => import('./pages/nuclei/VendasNucleusPage'));
 const FinanceiroNucleusPage = React.lazy(() => import('./pages/nuclei/FinanceiroNucleusPage'));
 
-const ConfiguracoesPage = React.lazy(() => import('./features/configuracoes/ConfiguracoesPage'));
 const ConfiguracoesWrapper = React.lazy(() => import('./pages/ConfiguracoesWrapper'));
-const GestaoModulosPage = React.lazy(() => import('./pages/GestaoModulosPage'));
-const AdminConsolePage = React.lazy(() => import('./pages/AdminConsolePage'));
 const GestaoUsuariosPage = React.lazy(() => import('./features/gestao/pages/GestaoUsuariosPage'));
 
 const AtendimentoDashboard = React.lazy(
@@ -84,6 +94,7 @@ const DashboardDistribuicaoPage = React.lazy(() => import('./pages/DashboardDist
 const GestaoSkillsPage = React.lazy(() => import('./pages/GestaoSkillsPage'));
 const ConfiguracaoSLAPage = React.lazy(() => import('./pages/ConfiguracaoSLAPage'));
 const DashboardAnalyticsPage = React.lazy(() => import('./pages/DashboardAnalyticsPage'));
+const AnalyticsPage = React.lazy(() => import('./pages/AnalyticsPage'));
 const FechamentoAutomaticoPage = React.lazy(() => import('./pages/FechamentoAutomaticoPage'));
 const GestaoTicketsPage = React.lazy(() => import('./pages/GestaoTicketsPage'));
 const TicketCreatePage = React.lazy(() => import('./pages/TicketCreatePage'));
@@ -93,6 +104,7 @@ const GestaoTiposServicoPage = React.lazy(() => import('./pages/GestaoTiposServi
 
 const PipelinePage = React.lazy(() => import('./pages/PipelinePage'));
 const PropostasPage = React.lazy(() => import('./features/propostas/PropostasPage'));
+const PropostaDetalhePage = React.lazy(() => import('./features/propostas/PropostaDetalhePage'));
 const CotacaoPage = React.lazy(() => import('./features/comercial/pages/CotacaoPage'));
 const MinhasAprovacoesPage = React.lazy(
   () => import('./features/comercial/pages/MinhasAprovacoesPage'),
@@ -101,18 +113,31 @@ const ProdutosPage = React.lazy(() => import('./features/produtos/ProdutosPage')
 const CategoriasProdutosPage = React.lazy(
   () => import('./features/produtos/CategoriasProdutosPage'),
 );
-const CombosPage = React.lazy(() => import('./features/combos/CombosPage'));
-const NovoComboPage = React.lazy(() => import('./features/combos/NovoComboPage'));
+const VehicleInventoryPage = React.lazy(
+  () => import('./features/veiculos/VehicleInventoryPage'),
+);
 
-const FinanceiroPage = React.lazy(() => import('./features/financeiro/FinanceiroPage'));
-const ContasReceberPage = React.lazy(() => import('./features/financeiro/ContasReceberPage'));
 const ContasPagarPage = React.lazy(() => import('./pages/gestao/financeiro/ContasPagarPage'));
-const FluxoCaixaPage = React.lazy(() => import('./pages/financeiro/FluxoCaixa'));
 const FornecedoresPage = React.lazy(
   () => import('./features/financeiro/fornecedores/FornecedoresPage'),
 );
+const FornecedorPerfilPage = React.lazy(
+  () => import('./features/financeiro/fornecedores/FornecedorPerfilPage'),
+);
+const ContasBancariasPage = React.lazy(
+  () => import('./pages/gestao/financeiro/ContasBancariasPage'),
+);
+const AprovacoesFinanceirasPage = React.lazy(
+  () => import('./pages/gestao/financeiro/AprovacoesFinanceirasPage'),
+);
+const ConciliacaoBancariaPage = React.lazy(
+  () => import('./pages/gestao/financeiro/ConciliacaoBancariaPage'),
+);
+const CentrosCustoPage = React.lazy(
+  () => import('./pages/gestao/financeiro/CentrosCustoPage'),
+);
 
-const PerfilPage = React.lazy(() => import('./features/perfil/PerfilPage'));
+const PerfilPage = React.lazy(() => import('./features/perfil'));
 const PortalClientePage = React.lazy(() => import('./pages/PortalClientePage'));
 const FaturamentoPage = React.lazy(() => import('./pages/faturamento/FaturamentoPage'));
 const TrocarSenhaPage = React.lazy(() => import('./pages/TrocarSenhaPage'));
@@ -138,19 +163,10 @@ const GestaoStatusCustomizadosPage = React.lazy(
 const AgendaPage = React.lazy(() =>
   import('./features/agenda/AgendaPage').then((m) => ({ default: m.AgendaPage })),
 );
-
-const EmpresasListPage = React.lazy(() =>
-  import('./features/admin/empresas/EmpresasListPage').then((m) => ({
-    default: m.EmpresasListPage,
+const AgendaEventDetailsPage = React.lazy(() =>
+  import('./features/agenda/AgendaEventDetailsPage').then((m) => ({
+    default: m.AgendaEventDetailsPage,
   })),
-);
-const EmpresaDetailPage = React.lazy(() =>
-  import('./features/admin/empresas/EmpresaDetailPage').then((m) => ({
-    default: m.EmpresaDetailPage,
-  })),
-);
-const MinhasEmpresasPage = React.lazy(() =>
-  import('./features/empresas/MinhasEmpresasPage').then((m) => ({ default: m.MinhasEmpresasPage })),
 );
 
 const BillingPage = React.lazy(() =>
@@ -163,21 +179,10 @@ const MetasConfiguracao = React.lazy(() => import('./pages/configuracoes/MetasCo
 const ConfiguracaoEmpresaPage = React.lazy(
   () => import('./pages/empresas/ConfiguracaoEmpresaPage'),
 );
-const RelatoriosAnalyticsPage = React.lazy(() =>
-  import('./pages/empresas/RelatoriosAnalyticsPage').then((m) => ({
-    default: m.RelatoriosAnalyticsPage,
-  })),
+const MinhasEmpresasPage = React.lazy(() =>
+  import('./features/empresas/MinhasEmpresasPage').then((m) => ({ default: m.MinhasEmpresasPage })),
 );
-const SistemaPermissoesPage = React.lazy(() =>
-  import('./pages/empresas/SistemaPermissoesPage').then((m) => ({
-    default: m.SistemaPermissoesPage,
-  })),
-);
-const BackupSincronizacaoPage = React.lazy(() =>
-  import('./pages/empresas/BackupSincronizacaoPage').then((m) => ({
-    default: m.BackupSincronizacaoPage,
-  })),
-);
+const SystemBrandingPage = React.lazy(() => import('./pages/configuracoes/SystemBrandingPage'));
 
 // Componente principal de rotas
 const AppRoutes: React.FC = () => {
@@ -189,10 +194,10 @@ const AppRoutes: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="bg-white p-8 rounded-xl shadow-lg text-center max-w-md w-full mx-4">
-          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-2xl shadow-lg mx-auto mb-4">
-            C
+          <div className="mx-auto mb-4 inline-flex h-16 w-16 items-center justify-center rounded-xl border border-[#D8E4E8] bg-[#F8FCFD]">
+            <Conect360Logo variant="loading" size="lg" className="h-10 w-10" />
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Conect CRM</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Conect360</h2>
           <p className="text-gray-600 mb-6">Carregando aplicação...</p>
 
           {/* Loading spinner */}
@@ -221,29 +226,65 @@ const AppRoutes: React.FC = () => {
 
     return (
       <>
-        {/* Rotas Fullscreen (sem DashboardLayout) */}
+        {/* Todas as rotas autenticadas usam App Shell canônico */}
         <Routes>
-          {/* Nova Inbox - Tela cheia estilo Zendesk/Intercom */}
           <Route
-            path="/atendimento/inbox"
-            element={protegerRota(ModuloEnum.ATENDIMENTO, <InboxAtendimentoPage />)}
+            path="/dashboard"
+            element={
+              <PermissionPathGuard>
+                <DashboardLayout>
+                  <DashboardHomeRoute />
+                </DashboardLayout>
+              </PermissionPathGuard>
+            }
           />
 
-          {/* Redirect: Chat antigo → Nova Inbox */}
-          <Route path="/atendimento/chat" element={<Navigate to="/atendimento/inbox" replace />} />
+          <Route
+            path="/atendimento/inbox"
+            element={
+              <PermissionPathGuard>
+                <DashboardLayout>
+                  {isOmnichannelEnabled ? (
+                    protegerRota(ModuloEnum.ATENDIMENTO, <InboxAtendimentoPage />)
+                  ) : (
+                    <Navigate to="/atendimento/tickets" replace />
+                  )}
+                </DashboardLayout>
+              </PermissionPathGuard>
+            }
+          />
+
+          {/* Redirect: Chat antigo para Nova Inbox */}
+          <Route
+            path="/atendimento/chat"
+            element={
+              <Navigate
+                to={isOmnichannelEnabled ? '/atendimento/inbox' : '/atendimento/tickets'}
+                replace
+              />
+            }
+          />
 
           {/* Todas as outras rotas renderizam dentro do DashboardLayout */}
           <Route
             path="*"
             element={
-              <DashboardLayout>
-                <Routes>
+              <PermissionPathGuard>
+                <DashboardLayout>
+                  <Routes>
                   <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard" element={<DashboardRouter />} />
                   {/* Página de Notificações */}
                   <Route path="/notifications" element={<NotificationsPage />} />
                   {/* Página de Contratos */}
-                  <Route path="/contratos/:id" element={<ContratosPage />} />
+                  <Route
+                    path="/contratos"
+                    element={protegerRota(ModuloEnum.VENDAS, <ContratosPage />)}
+                  />
+                  <Route
+                    path="/contratos/:id"
+                    element={protegerRota(ModuloEnum.VENDAS, <ContratosPage />)}
+                  />
                   {/* Rotas das páginas de núcleos - Protegidas por licença */}
                   <Route
                     path="/nuclei/crm"
@@ -260,41 +301,15 @@ const AppRoutes: React.FC = () => {
                   <Route path="/nuclei/comercial" element={<Navigate to="/nuclei/crm" replace />} />
                   <Route
                     path="/nuclei/configuracoes"
-                    element={<Navigate to="/configuracoes" replace />}
+                    element={<Navigate to="/configuracoes/empresa" replace />}
                   />{' '}
                   {/* Configurações: base platform */}
-                  <Route
-                    path="/nuclei/administracao"
-                    element={protegerRotaSuperadmin(<AdministracaoNucleusPage />)}
-                  />
-                  {/* Rotas administrativas do sistema - Protegidas */}
-                  <Route
-                    path="/admin/empresas"
-                    element={protegerRotaSuperadmin(<EmpresasListPage />)}
-                  />
-                  <Route
-                    path="/admin/empresas/:id"
-                    element={protegerRotaSuperadmin(<EmpresaDetailPage />)}
-                  />
-                  <Route
-                    path="/admin/empresas/:empresaId/modulos"
-                    element={protegerRotaSuperadmin(<GestaoModulosPage />)}
-                  />
-                  <Route
-                    path="/admin/console"
-                    element={protegerRotaSuperadmin(<AdminConsolePage />)}
-                  />
-                  <Route
-                    path="/admin/usuarios"
-                    element={<Navigate to="/configuracoes/usuarios" replace />}
-                  />
-                  <Route path="/admin/sistema" element={<Navigate to="/configuracoes" replace />} />
                   {/* ⭐ NOVA ROTA: Configurações de Atendimento com Abas (com redirects automáticos) */}
                   <Route
                     path="/atendimento/configuracoes"
                     element={protegerRota(ModuloEnum.ATENDIMENTO, <ConfiguracoesWrapper />)}
                   />
-                  {/* 🔄 REDIRECTS: Rotas antigas redirecionam para abas específicas */}
+                  {/* Redirects: rotas antigas redirecionam para abas especificas */}
                   <Route
                     path="/gestao/nucleos"
                     element={<Navigate to="/atendimento/configuracoes?tab=nucleos" replace />}
@@ -311,17 +326,17 @@ const AppRoutes: React.FC = () => {
                     path="/gestao/tags"
                     element={<Navigate to="/atendimento/configuracoes?tab=tags" replace />}
                   />
-                  {/* ❌ REMOVIDO: Apenas Atribuições descontinuadas (absorvidas por Distribuição) */}
+                  {/* Removido: apenas atribuicoes descontinuadas (absorvidas por distribuicao) */}
                   <Route
                     path="/gestao/atribuicoes"
                     element={<Navigate to="/atendimento/distribuicao" replace />}
                   />
-                  {/* ⚠️ REDIRECT ANTIGO: Departamentos permanecem ativos em /nuclei/configuracoes/departamentos */}
+                  {/* Redirect antigo: departamentos permanecem ativos em /nuclei/configuracoes/departamentos */}
                   <Route
                     path="/gestao/departamentos"
                     element={<Navigate to="/configuracoes/departamentos" replace />}
                   />
-                  {/* ✅ Fluxos consolidados em Automações > Bot (mantém rotas builder separadas) */}
+                  {/* Fluxos consolidados em Automacoes > Bot (mantem rotas builder separadas) */}
                   <Route
                     path="/gestao/fluxos"
                     element={<Navigate to="/atendimento/automacoes?tab=bot" replace />}
@@ -334,124 +349,28 @@ const AppRoutes: React.FC = () => {
                     path="/gestao/fluxos/novo/builder"
                     element={protegerRota(ModuloEnum.ATENDIMENTO, <FluxoBuilderPage />)}
                   />
-                  {/* Rotas do módulo de Administração */}
-                  <Route
-                    path="/admin/relatorios"
-                    element={protegerRotaSuperadmin(
-                      <ModuleUnderConstruction
-                        moduleName="Relatórios Avançados"
-                        description="Analytics empresarial, dashboards executivos e KPIs estratégicos"
-                        estimatedCompletion="Q2 2025"
-                        features={[
-                          'Dashboards executivos',
-                          'KPIs estratégicos',
-                          'Analytics de vendas',
-                          'Relatórios customizados',
-                          'Exportação avançada',
-                        ]}
-                      />,
-                    )}
-                  />
-                  <Route
-                    path="/admin/auditoria"
-                    element={protegerRotaSuperadmin(
-                      <ModuleUnderConstruction
-                        moduleName="Auditoria & Logs"
-                        description="Rastreamento de ações, logs de sistema e conformidade"
-                        estimatedCompletion="Q3 2025"
-                        features={[
-                          'Log de atividades',
-                          'Auditoria de acessos',
-                          'Histórico de alterações',
-                          'Relatórios de conformidade',
-                          'Monitoramento em tempo real',
-                        ]}
-                      />,
-                    )}
-                  />
-                  <Route
-                    path="/admin/monitoramento"
-                    element={protegerRotaSuperadmin(
-                      <ModuleUnderConstruction
-                        moduleName="Monitoramento de Sistema"
-                        description="Status do sistema, performance e alertas de infraestrutura"
-                        estimatedCompletion="Q3 2025"
-                        features={[
-                          'Monitor de performance',
-                          'Alertas em tempo real',
-                          'Status de serviços',
-                          'Métricas de uso',
-                          'Dashboard de infraestrutura',
-                        ]}
-                      />,
-                    )}
-                  />
-                  <Route
-                    path="/admin/analytics"
-                    element={protegerRotaSuperadmin(
-                      <ModuleUnderConstruction
-                        moduleName="Dados & Analytics"
-                        description="Análise de dados, métricas de uso e inteligência de negócios"
-                        estimatedCompletion="Q4 2025"
-                        features={[
-                          'Análise de dados',
-                          'Métricas de uso',
-                          'Business Intelligence',
-                          'Dashboards interativos',
-                          'Relatórios estatísticos',
-                        ]}
-                      />,
-                    )}
-                  />
-                  <Route
-                    path="/admin/conformidade"
-                    element={protegerRotaSuperadmin(
-                      <ModuleUnderConstruction
-                        moduleName="Políticas & Conformidade"
-                        description="Gestão de políticas internas, LGPD e compliance regulatório"
-                        estimatedCompletion="Q4 2025"
-                        features={[
-                          'Gestão de políticas',
-                          'Compliance LGPD',
-                          'Controle de consentimento',
-                          'Auditoria de conformidade',
-                          'Relatórios regulatórios',
-                        ]}
-                      />,
-                    )}
-                  />
-                  <Route
-                    path="/admin/acesso"
-                    element={protegerRotaSuperadmin(
-                      <ModuleUnderConstruction
-                        moduleName="Controle de Acesso"
-                        description="Configuração de roles, permissões e políticas de segurança avançadas"
-                        estimatedCompletion="Q2 2025"
-                        features={[
-                          'Gestão de roles',
-                          'Permissões granulares',
-                          'Políticas de segurança',
-                          'Autenticação 2FA',
-                          'Controle de sessões',
-                        ]}
-                      />,
-                    )}
-                  />
                   {/* Gerenciamento de Empresas do Usuário */}
                   <Route path="/empresas/minhas" element={<MinhasEmpresasPage />} />
                   <Route
                     path="/empresas/:empresaId/configuracoes"
-                    element={<ConfiguracaoEmpresaPage />}
+                    element={<Navigate to="/configuracoes/empresa" replace />}
                   />
                   <Route
                     path="/empresas/:empresaId/relatorios"
-                    element={<RelatoriosAnalyticsPage />}
+                    element={<Navigate to="/dashboard" replace />}
                   />
                   <Route
                     path="/empresas/:empresaId/permissoes"
-                    element={<SistemaPermissoesPage />}
+                    element={<Navigate to="/configuracoes/usuarios" replace />}
                   />
-                  <Route path="/empresas/:empresaId/backup" element={<BackupSincronizacaoPage />} />
+                  <Route
+                    path="/empresas/:empresaId/usuarios"
+                    element={<Navigate to="/configuracoes/usuarios" replace />}
+                  />
+                  <Route
+                    path="/empresas/:empresaId/backup"
+                    element={<Navigate to="/configuracoes/empresa?tab=backup" replace />}
+                  />
                   {/* Configurações globais da empresa ativa - Padrão consolidado */}
                   <Route path="/configuracoes/usuarios" element={<GestaoUsuariosPage />} />
                   <Route path="/configuracoes/empresa" element={<ConfiguracaoEmpresaPage />} />
@@ -464,13 +383,13 @@ const AppRoutes: React.FC = () => {
                   <Route path="/configuracoes/departamentos" element={<DepartamentosPage />} />
                   <Route
                     path="/configuracoes/sistema"
-                    element={<Navigate to="/configuracoes" replace />}
+                    element={<SystemBrandingPage />}
                   />
                   <Route
                     path="/configuracoes/seguranca"
-                    element={<Navigate to="/configuracoes" replace />}
+                    element={<Navigate to="/configuracoes/empresa" replace />}
                   />
-                  {/* ROTAS DO NÚCLEO ATENDIMENTO */}
+                  {/* Rotas do nucleo atendimento */}
                   <Route
                     path="/nuclei/atendimento/canais/email"
                     element={<ConfigurarCanalEmail />}
@@ -503,7 +422,7 @@ const AppRoutes: React.FC = () => {
                     path="/atendimento/tickets/:id"
                     element={protegerRota(ModuloEnum.ATENDIMENTO, <TicketDetailPage />)}
                   />
-                  {/* ⚠️ DEPRECATED: Demandas agora são Tickets (tipo='suporte') - Redirects para compatibilidade */}
+                  {/* Deprecated: demandas agora sao tickets (tipo='suporte') - redirects para compatibilidade */}
                   <Route
                     path="/nuclei/atendimento/demandas"
                     element={<Navigate to="/atendimento/tickets?tipo=suporte" replace />}
@@ -552,9 +471,13 @@ const AppRoutes: React.FC = () => {
                   {/* Rotas legadas - Redirects para compatibilidade */}
                   <Route
                     path="/gestao/empresas"
-                    element={<Navigate to="/admin/empresas" replace />}
+                    element={<Navigate to="/empresas/minhas" replace />}
                   />{' '}
-                  {/* Redirect para gestão admin */}
+                  <Route path="/admin/empresas" element={<MinhasEmpresasPage />} />
+                  <Route path="/admin/empresas/:id" element={<Navigate to="/empresas/minhas" replace />} />
+                  <Route path="/admin/usuarios" element={<GestaoUsuariosPage />} />
+                  <Route path="/admin/sistema" element={<SystemBrandingPage />} />
+                  {/* Redirect legado para rota operacional */}
                   <Route
                     path="/nuclei/configuracoes/empresas"
                     element={<Navigate to="/configuracoes/empresa" replace />}
@@ -599,13 +522,25 @@ const AppRoutes: React.FC = () => {
                     path="/nuclei/configuracoes/tickets/tipos"
                     element={<Navigate to="/configuracoes/tickets/tipos" replace />}
                   />
-                  <Route path="/relatorios/analytics" element={<RelatoriosAnalyticsPage />} />
-                  <Route path="/gestao/permissoes" element={<SistemaPermissoesPage />} />
-                  <Route path="/sistema/backup" element={<BackupSincronizacaoPage />} />
+                  <Route path="/relatorios/analytics" element={<AnalyticsPage />} />
+                  <Route
+                    path="/gestao/permissoes"
+                    element={<Navigate to="/configuracoes/usuarios" replace />}
+                  />
+                  <Route
+                    path="/sistema/backup"
+                    element={<Navigate to="/configuracoes/empresa?tab=backup" replace />}
+                  />
                   {/* Atendimento Omnichannel - Protegido */}
                   <Route
                     path="/atendimento"
-                    element={protegerRota(ModuloEnum.ATENDIMENTO, <AtendimentoDashboard />)}
+                    element={
+                      isOmnichannelEnabled ? (
+                        protegerRota(ModuloEnum.ATENDIMENTO, <AtendimentoDashboard />)
+                      ) : (
+                        <Navigate to="/atendimento/tickets" replace />
+                      )
+                    }
                   />
                   {/* ETAPA 3: Páginas Consolidadas */}
                   <Route
@@ -676,7 +611,12 @@ const AppRoutes: React.FC = () => {
                   {/* Sistema de Billing e Assinaturas - Protegido */}
                   <Route
                     path="/billing"
-                    element={protegerRota(ModuloEnum.BILLING, <BillingPage />)}
+                    element={
+                      protegerRota(
+                        ModuloEnum.BILLING,
+                        <Navigate to="/billing/assinaturas" replace />,
+                      )
+                    }
                   />
                   <Route
                     path="/billing/assinaturas"
@@ -688,15 +628,15 @@ const AppRoutes: React.FC = () => {
                   />
                   <Route
                     path="/billing/faturas"
-                    element={protegerRota(ModuloEnum.BILLING, <BillingPage />)}
+                    element={<Navigate to="/billing/assinaturas" replace />}
                   />
                   <Route
                     path="/billing/pagamentos"
-                    element={protegerRota(ModuloEnum.BILLING, <BillingPage />)}
+                    element={<Navigate to="/billing/assinaturas" replace />}
                   />
                   <Route
                     path="/assinaturas"
-                    element={protegerRota(ModuloEnum.BILLING, <BillingPage />)}
+                    element={<Navigate to="/billing/assinaturas" replace />}
                   />
                   {/* Sistema de Faturamento - Protegido */}
                   <Route
@@ -712,12 +652,16 @@ const AppRoutes: React.FC = () => {
                     element={protegerRota(ModuloEnum.CRM, <ClientesPage />)}
                   />
                   <Route
+                    path="/clientes/:id"
+                    element={protegerRota(ModuloEnum.CRM, <ClienteDetailPage />)}
+                  />
+                  <Route
                     path="/contatos"
                     element={protegerRota(ModuloEnum.CRM, <ContatosPage />)}
                   />
                   <Route
                     path="/interacoes"
-                    element={protegerRota(ModuloEnum.CRM, <InteracoesPage />)}
+                    element={<Navigate to="/pipeline" replace />}
                   />
                   <Route
                     path="/pipeline"
@@ -731,28 +675,44 @@ const AppRoutes: React.FC = () => {
                     element={protegerRota(ModuloEnum.VENDAS, <PropostasPage />)}
                   />
                   <Route
+                    path="/propostas/:id"
+                    element={protegerRota(ModuloEnum.VENDAS, <PropostaDetalhePage />)}
+                  />
+                  <Route
                     path="/vendas/propostas"
                     element={protegerRota(ModuloEnum.VENDAS, <PropostasPage />)}
                   />
                   <Route
+                    path="/vendas/propostas/:id"
+                    element={protegerRota(ModuloEnum.VENDAS, <PropostaDetalhePage />)}
+                  />
+                  <Route
+                    path="/financeiro/cotacoes"
+                    element={protegerRota(ModuloEnum.FINANCEIRO, <CotacaoPage />)}
+                  />
+                  <Route
+                    path="/financeiro/compras/aprovacoes"
+                    element={protegerRota(ModuloEnum.FINANCEIRO, <MinhasAprovacoesPage />)}
+                  />
+                  <Route
                     path="/cotacoes"
-                    element={protegerRota(ModuloEnum.VENDAS, <CotacaoPage />)}
+                    element={<Navigate to="/financeiro/cotacoes" replace />}
                   />
                   <Route
                     path="/vendas/cotacoes"
-                    element={protegerRota(ModuloEnum.VENDAS, <CotacaoPage />)}
+                    element={<Navigate to="/financeiro/cotacoes" replace />}
                   />
                   <Route
                     path="/orcamentos"
-                    element={protegerRota(ModuloEnum.VENDAS, <CotacaoPage />)}
+                    element={<Navigate to="/financeiro/cotacoes" replace />}
                   />
                   <Route
                     path="/aprovacoes/pendentes"
-                    element={protegerRota(ModuloEnum.VENDAS, <MinhasAprovacoesPage />)}
+                    element={<Navigate to="/financeiro/compras/aprovacoes" replace />}
                   />
                   <Route
                     path="/vendas/aprovacoes"
-                    element={protegerRota(ModuloEnum.VENDAS, <MinhasAprovacoesPage />)}
+                    element={<Navigate to="/financeiro/compras/aprovacoes" replace />}
                   />
                   <Route
                     path="/produtos"
@@ -763,39 +723,37 @@ const AppRoutes: React.FC = () => {
                     element={protegerRota(ModuloEnum.VENDAS, <ProdutosPage />)}
                   />
                   <Route
+                    path="/veiculos"
+                    element={protegerRota(ModuloEnum.VENDAS, <VehicleInventoryPage />)}
+                  />
+                  <Route
+                    path="/vendas/veiculos"
+                    element={protegerRota(ModuloEnum.VENDAS, <VehicleInventoryPage />)}
+                  />
+                  <Route
                     path="/produtos/categorias"
                     element={protegerRota(ModuloEnum.VENDAS, <CategoriasProdutosPage />)}
                   />
-                  {/* Rotas dos Combos - Protegidas */}
-                  <Route path="/combos" element={protegerRota(ModuloEnum.VENDAS, <CombosPage />)} />
-                  <Route
-                    path="/vendas/combos"
-                    element={protegerRota(ModuloEnum.VENDAS, <CombosPage />)}
-                  />
-                  <Route
-                    path="/combos/novo"
-                    element={protegerRota(ModuloEnum.VENDAS, <NovoComboPage />)}
-                  />
-                  <Route
-                    path="/vendas/combos/novo"
-                    element={protegerRota(ModuloEnum.VENDAS, <NovoComboPage />)}
-                  />
-                  <Route
-                    path="/combos/:id/editar"
-                    element={protegerRota(ModuloEnum.VENDAS, <NovoComboPage />)}
-                  />
-                  <Route
-                    path="/vendas/combos/:id/editar"
-                    element={protegerRota(ModuloEnum.VENDAS, <NovoComboPage />)}
-                  />
                   <Route path="/agenda" element={protegerRota(ModuloEnum.CRM, <AgendaPage />)} />
+                  <Route
+                    path="/agenda/eventos/:id"
+                    element={protegerRota(ModuloEnum.CRM, <AgendaEventDetailsPage />)}
+                  />
                   <Route
                     path="/crm/agenda"
                     element={protegerRota(ModuloEnum.CRM, <AgendaPage />)}
                   />
                   <Route
+                    path="/crm/agenda/eventos/:id"
+                    element={protegerRota(ModuloEnum.CRM, <AgendaEventDetailsPage />)}
+                  />
+                  <Route
                     path="/crm/clientes"
                     element={protegerRota(ModuloEnum.CRM, <ClientesPage />)}
+                  />
+                  <Route
+                    path="/crm/clientes/:id"
+                    element={protegerRota(ModuloEnum.CRM, <ClienteDetailPage />)}
                   />
                   <Route
                     path="/crm/contatos"
@@ -804,7 +762,7 @@ const AppRoutes: React.FC = () => {
                   <Route path="/crm/leads" element={protegerRota(ModuloEnum.CRM, <LeadsPage />)} />
                   <Route
                     path="/crm/interacoes"
-                    element={protegerRota(ModuloEnum.CRM, <InteracoesPage />)}
+                    element={<Navigate to="/crm/pipeline" replace />}
                   />
                   <Route
                     path="/crm/pipeline"
@@ -815,11 +773,27 @@ const AppRoutes: React.FC = () => {
                   {/* Rotas do Núcleo Financeiro - Protegidas */}
                   <Route
                     path="/financeiro"
-                    element={protegerRota(ModuloEnum.FINANCEIRO, <FinanceiroPage />)}
+                    element={protegerRota(
+                      ModuloEnum.FINANCEIRO,
+                      <Navigate to="/nuclei/financeiro" replace />,
+                    )}
                   />
                   <Route
                     path="/financeiro/contas-receber"
-                    element={protegerRota(ModuloEnum.FINANCEIRO, <ContasReceberPage />)}
+                    element={protegerRota(
+                      ModuloEnum.FINANCEIRO,
+                      <ModuleUnderConstruction
+                        moduleName="Contas a Receber"
+                        description="Este fluxo ainda esta em desenvolvimento para a versao atual do financeiro."
+                        estimatedCompletion="Q2 2026"
+                        features={[
+                          'Controle de inadimplencia por cliente',
+                          'Reguas de cobranca',
+                          'Consolidado de recebiveis por periodo',
+                          'Relatorio de aging de recebimentos',
+                        ]}
+                      />,
+                    )}
                   />
                   <Route
                     path="/financeiro/contas-pagar"
@@ -827,11 +801,36 @@ const AppRoutes: React.FC = () => {
                   />
                   <Route
                     path="/financeiro/fluxo-caixa"
-                    element={protegerRota(ModuloEnum.FINANCEIRO, <FluxoCaixaPage />)}
+                    element={protegerRota(
+                      ModuloEnum.FINANCEIRO,
+                      <ModuleUnderConstruction
+                        moduleName="Fluxo de Caixa"
+                        description="Painel consolidado de entradas, saidas e projecoes de caixa."
+                        estimatedCompletion="Q2 2026"
+                        features={[
+                          'Projecao diaria de caixa',
+                          'Comparativo realizado vs previsto',
+                          'Alertas de saldo minimo',
+                          'Exportacao de relatorio gerencial',
+                        ]}
+                      />,
+                    )}
                   />
                   <Route
                     path="/financeiro/fornecedores"
                     element={protegerRota(ModuloEnum.FINANCEIRO, <FornecedoresPage />)}
+                  />
+                  <Route
+                    path="/financeiro/fornecedores/:fornecedorId"
+                    element={protegerRota(ModuloEnum.FINANCEIRO, <FornecedorPerfilPage />)}
+                  />
+                  <Route
+                    path="/financeiro/contas-bancarias"
+                    element={protegerRota(ModuloEnum.FINANCEIRO, <ContasBancariasPage />)}
+                  />
+                  <Route
+                    path="/financeiro/aprovacoes"
+                    element={protegerRota(ModuloEnum.FINANCEIRO, <AprovacoesFinanceirasPage />)}
                   />
                   {/* Módulos financeiros - Protegidos */}
                   <Route
@@ -857,37 +856,11 @@ const AppRoutes: React.FC = () => {
                   />
                   <Route
                     path="/financeiro/conciliacao"
-                    element={
-                      <ModuleUnderConstruction
-                        moduleName="Conciliação Bancária"
-                        description="Conciliação automática de extratos bancários"
-                        estimatedCompletion="Q2 2025"
-                        features={[
-                          'Importação de extratos OFX/CSV',
-                          'Conciliação automática',
-                          'Lançamentos pendentes',
-                          'Reconciliação manual',
-                          'Múltiplas contas bancárias',
-                        ]}
-                      />
-                    }
+                    element={protegerRota(ModuloEnum.FINANCEIRO, <ConciliacaoBancariaPage />)}
                   />
                   <Route
                     path="/financeiro/centro-custos"
-                    element={
-                      <ModuleUnderConstruction
-                        moduleName="Centro de Custos"
-                        description="Organização e controle detalhado de custos"
-                        estimatedCompletion="Q1 2025"
-                        features={[
-                          'Hierarquia de centros de custo',
-                          'Rateio automático',
-                          'Análise de custos',
-                          'Orçamento vs realizado',
-                          'Relatórios por centro',
-                        ]}
-                      />
-                    }
+                    element={protegerRota(ModuloEnum.FINANCEIRO, <CentrosCustoPage />)}
                   />
                   <Route
                     path="/financeiro/tesouraria"
@@ -906,10 +879,11 @@ const AppRoutes: React.FC = () => {
                       />
                     }
                   />
-                  <Route path="/configuracoes" element={<ConfiguracoesPage />} />
+                  <Route path="/configuracoes" element={<Navigate to="/configuracoes/empresa" replace />} />
                   <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                </Routes>
-              </DashboardLayout>
+                  </Routes>
+                </DashboardLayout>
+              </PermissionPathGuard>
             }
           />
         </Routes>
@@ -931,11 +905,13 @@ const AppRoutes: React.FC = () => {
       {/* Rotas de autenticação */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/registro" element={<RegistroEmpresaPage />} />
+      <Route path="/termos" element={<TermosUsoPage />} />
+      <Route path="/privacidade" element={<PoliticaPrivacidadePage />} />
       <Route path="/verificar-email" element={<VerificacaoEmailPage />} />
       <Route path="/esqueci-minha-senha" element={<ForgotPasswordPage />} />
       <Route path="/recuperar-senha" element={<ResetPasswordPage />} />
       <Route path="/trocar-senha" element={<TrocarSenhaPage />} />{' '}
-      {/* ✅ Troca de senha (primeiro acesso) */}
+      {/* Troca de senha (primeiro acesso) */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
@@ -946,49 +922,84 @@ const App: React.FC = () => {
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
         <ThemeProvider>
-          <AuthProvider>
-            <ProfileProvider>
-              <NotificationProvider>
-                <EmpresaProvider>
-                  <WebSocketProvider>
-                    <ErrorBoundary>
-                      <SidebarProvider>
-                        <MenuProvider>
-                          {/* SocketProvider temporariamente desabilitado - usando useWebSocket do chat */}
-                          {/* <SocketProvider> */}
-                          <Router
-                            future={{
-                              v7_startTransition: true,
-                              v7_relativeSplatPath: true,
-                            }}
-                          >
-                            <ScrollToTop />
-                            <div className="App">
-                              <Suspense
-                                fallback={
-                                  <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-                                    <div className="bg-white p-6 rounded-xl shadow-lg text-center max-w-md w-full mx-4">
-                                      <p className="text-gray-600">Carregando...</p>
+          <SystemBrandingProvider>
+            <AuthProvider>
+              <ProfileProvider>
+                <NotificationProvider>
+                  <EmpresaProvider>
+                    <WebSocketProvider>
+                      <ErrorBoundary>
+                        <SidebarProvider>
+                          <MenuProvider>
+                            <GlobalConfirmationProvider>
+                            {/* SocketProvider temporariamente desabilitado - usando useWebSocket do chat */}
+                            {/* <SocketProvider> */}
+                            <Router
+                              future={{
+                                v7_startTransition: true,
+                                v7_relativeSplatPath: true,
+                              }}
+                            >
+                              <GlobalModalScrollLock />
+                              <ScrollToTop />
+                              <div className="App">
+                                <Suspense
+                                  fallback={
+                                    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+                                      <div className="bg-white p-6 rounded-xl shadow-lg text-center max-w-md w-full mx-4">
+                                        <p className="text-gray-600">Carregando...</p>
+                                      </div>
                                     </div>
-                                  </div>
-                                }
-                              >
-                                <AppRoutes />
-                              </Suspense>
+                                  }
+                                >
+                                  <AppRoutes />
+                                </Suspense>
 
-                              {/* Toast Notifications */}
-                              <Toaster position="top-right" />
-                            </div>
-                          </Router>
-                          {/* </SocketProvider> */}
-                        </MenuProvider>
-                      </SidebarProvider>
-                    </ErrorBoundary>
-                  </WebSocketProvider>
-                </EmpresaProvider>
-              </NotificationProvider>
-            </ProfileProvider>
-          </AuthProvider>
+                                <SalesCelebrationHost />
+
+                                {/* Toast Notifications */}
+                                <Toaster
+                                  position="top-right"
+                                  toastOptions={{
+                                    duration: 3000,
+                                    className:
+                                      'rounded-xl border border-[#D7E4E8] bg-white px-4 py-3 text-sm text-[#002333] shadow-lg',
+                                    success: {
+                                      duration: 3000,
+                                      iconTheme: {
+                                        primary: '#159A9C',
+                                        secondary: '#FFFFFF',
+                                      },
+                                    },
+                                    error: {
+                                      duration: 5000,
+                                      iconTheme: {
+                                        primary: '#DC2626',
+                                        secondary: '#FFFFFF',
+                                      },
+                                    },
+                                    loading: {
+                                      duration: Infinity,
+                                      iconTheme: {
+                                        primary: '#159A9C',
+                                        secondary: '#FFFFFF',
+                                      },
+                                    },
+                                  }}
+                                />
+                              </div>
+                            </Router>
+                            {/* </SocketProvider> */}
+                            </GlobalConfirmationProvider>
+                          </MenuProvider>
+                        </SidebarProvider>
+                      </ErrorBoundary>
+                    </WebSocketProvider>
+                  </EmpresaProvider>
+                </NotificationProvider>
+              </ProfileProvider>
+            </AuthProvider>
+          </SystemBrandingProvider>
         </ThemeProvider>
       </I18nProvider>
     </QueryClientProvider>

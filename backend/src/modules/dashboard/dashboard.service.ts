@@ -4,9 +4,9 @@ import { Repository, Between } from 'typeorm';
 import { Proposta as PropostaEntity } from '../propostas/proposta.entity';
 import { User, UserRole } from '../users/user.entity';
 import { Cliente } from '../clientes/cliente.entity';
-import { Evento } from '../eventos/evento.entity';
 import { MetasService } from '../metas/metas.service';
 import { EventosService } from '../eventos/eventos.service';
+import { SessaoTriagem } from '../triagem/entities/sessao-triagem.entity';
 
 export interface DashboardKPIs {
   faturamentoTotal: {
@@ -42,9 +42,26 @@ export interface DashboardKPIs {
     valor: number;
     variacao: number;
   };
+  cicloMedio: {
+    dias: number;
+    variacao: number;
+  };
+  tempoEtapa: {
+    dias: number;
+    variacao: number;
+  };
+  followUpsPendentes: {
+    quantidade: number;
+    variacao: number;
+  };
   taxaSucessoGeral: {
     percentual: number;
     variacao: number;
+  };
+  satisfacaoCliente?: {
+    valor: number | null;
+    amostra: number;
+    fonte: 'triagem_csat_vendedor' | 'triagem_csat_empresa' | 'indisponivel';
   };
   agenda: {
     totalEventos: number;
@@ -60,6 +77,39 @@ export interface DashboardKPIs {
       outro: number;
     };
     produtividade: number;
+    resumoHoje?: {
+      totalEventos: number;
+      estatisticasPorTipo: {
+        reuniao: number;
+        ligacao: number;
+        apresentacao: number;
+        visita: number;
+        'follow-up': number;
+        outro: number;
+      };
+    };
+    resumoSemana?: {
+      totalEventos: number;
+      estatisticasPorTipo: {
+        reuniao: number;
+        ligacao: number;
+        apresentacao: number;
+        visita: number;
+        'follow-up': number;
+        outro: number;
+      };
+    };
+    metasAtividade?: {
+      callsDiarias: number;
+      reunioesSemana: number;
+      followupsDiarios: number;
+      amostraEventos: number;
+      fonte: 'historico_eventos_periodo_anterior' | 'indisponivel';
+      periodoBase: {
+        inicio: string;
+        fim: string;
+      };
+    };
   };
 }
 
@@ -90,8 +140,30 @@ export interface AlertaInteligente {
   lido: boolean;
 }
 
+export interface DashboardChartsData {
+  vendasMensais: Array<{ mes: string; valor: number; meta: number }>;
+  propostasPorStatus: Array<{ status: string; valor: number; color: string }>;
+  atividadesTimeline: Array<{ mes: string; reunioes: number; ligacoes: number; emails: number }>;
+  funilVendas: Array<{ etapa: string; quantidade: number; valor: number }>;
+}
+
+interface EventStatsSnapshot {
+  totalEventos?: number;
+  estatisticasPorTipo?: {
+    reuniao?: number;
+    ligacao?: number;
+    apresentacao?: number;
+    visita?: number;
+    'follow-up'?: number;
+    outro?: number;
+  };
+}
+
 @Injectable()
 export class DashboardService {
+  private readonly statusAprovadaAliases = ['aprovada', 'aceita'];
+  private readonly statusEmNegociacaoAliases = ['enviada', 'visualizada'];
+
   constructor(
     @InjectRepository(PropostaEntity)
     private propostaRepository: Repository<PropostaEntity>,
@@ -99,9 +171,15 @@ export class DashboardService {
     private userRepository: Repository<User>,
     @InjectRepository(Cliente)
     private clienteRepository: Repository<Cliente>,
+    @InjectRepository(SessaoTriagem)
+    private sessaoTriagemRepository: Repository<SessaoTriagem>,
     private metasService: MetasService,
     private eventosService: EventosService,
   ) {}
+
+  private isStatusAprovada(status?: string): boolean {
+    return !!status && this.statusAprovadaAliases.includes(status);
+  }
 
   /**
    * Obter KPIs principais do dashboard
@@ -110,17 +188,20 @@ export class DashboardService {
     periodo: string = 'mensal',
     vendedorId?: string,
     regiao?: string,
-    empresaId?: number,
+    empresaId?: string,
   ): Promise<DashboardKPIs> {
     const { dataInicio, dataFim } = this.getDateRange(periodo);
-    const periodoAnterior = this.getDateRange(this.getPeriodoAnterior(periodo));
+    const periodoAnterior = this.getPreviousDateRange(periodo, { dataInicio, dataFim });
 
     // Buscar meta atual para o vendedor/região específica
-    const metaAtual = await this.metasService.getMetaAtual(
-      vendedorId ? parseInt(vendedorId) : undefined,
+    const metaNoPeriodo = await this.metasService.getMetaValorParaRange(
+      dataInicio,
+      dataFim,
+      vendedorId,
       regiao,
+      empresaId,
     );
-    const valorMeta = metaAtual?.valor || 450000; // Meta padrão se não encontrar
+    const valorMeta = Math.max(0, Number(metaNoPeriodo || 0));
 
     // Faturamento Total
     const faturamentoAtual = await this.calculateFaturamento(
@@ -128,12 +209,14 @@ export class DashboardService {
       dataFim,
       vendedorId,
       regiao,
+      empresaId,
     );
     const faturamentoAnterior = await this.calculateFaturamento(
       periodoAnterior.dataInicio,
       periodoAnterior.dataFim,
       vendedorId,
       regiao,
+      empresaId,
     );
     const variacaoFaturamento =
       faturamentoAnterior > 0
@@ -146,12 +229,14 @@ export class DashboardService {
       dataFim,
       vendedorId,
       regiao,
+      empresaId,
     );
     const ticketMedioAnterior = await this.calculateTicketMedio(
       periodoAnterior.dataInicio,
       periodoAnterior.dataFim,
       vendedorId,
       regiao,
+      empresaId,
     );
     const variacaoTicketMedio =
       ticketMedioAnterior > 0
@@ -164,12 +249,14 @@ export class DashboardService {
       dataFim,
       vendedorId,
       regiao,
+      empresaId,
     );
     const vendasFechadasAnterior = await this.calculateVendasFechadas(
       periodoAnterior.dataInicio,
       periodoAnterior.dataFim,
       vendedorId,
       regiao,
+      empresaId,
     );
     const variacaoVendasFechadas =
       vendasFechadasAnterior > 0
@@ -177,14 +264,20 @@ export class DashboardService {
         : 0;
 
     // Em Negociação
-    const emNegociacao = await this.calculateEmNegociacao(vendedorId, regiao);
+    const emNegociacao = await this.calculateEmNegociacao(vendedorId, regiao, empresaId);
 
     // Novos Clientes
-    const novosClientesAtual = await this.calculateNovosClientes(dataInicio, dataFim, regiao);
+    const novosClientesAtual = await this.calculateNovosClientes(
+      dataInicio,
+      dataFim,
+      regiao,
+      empresaId,
+    );
     const novosClientesAnterior = await this.calculateNovosClientes(
       periodoAnterior.dataInicio,
       periodoAnterior.dataFim,
       regiao,
+      empresaId,
     );
     const variacaoNovosClientes =
       novosClientesAnterior > 0
@@ -197,12 +290,14 @@ export class DashboardService {
       dataFim,
       vendedorId,
       regiao,
+      empresaId,
     );
     const leadsAnterior = await this.calculateLeadsQualificados(
       periodoAnterior.dataInicio,
       periodoAnterior.dataFim,
       vendedorId,
       regiao,
+      empresaId,
     );
     const variacaoLeads =
       leadsAnterior > 0 ? ((leadsAtual - leadsAnterior) / leadsAnterior) * 100 : 0;
@@ -213,16 +308,73 @@ export class DashboardService {
       dataFim,
       vendedorId,
       regiao,
+      empresaId,
     );
     const propostasEnviadasAnterior = await this.calculatePropostasEnviadas(
       periodoAnterior.dataInicio,
       periodoAnterior.dataFim,
       vendedorId,
       regiao,
+      empresaId,
     );
     const variacaoPropostasEnviadas =
       propostasEnviadasAnterior > 0
         ? ((propostasEnviadasAtual - propostasEnviadasAnterior) / propostasEnviadasAnterior) * 100
+        : 0;
+
+    // Ciclo Médio de venda (dias)
+    const cicloMedioAtual = await this.calculateCicloMedio(
+      dataInicio,
+      dataFim,
+      vendedorId,
+      regiao,
+      empresaId,
+    );
+    const cicloMedioAnterior = await this.calculateCicloMedio(
+      periodoAnterior.dataInicio,
+      periodoAnterior.dataFim,
+      vendedorId,
+      regiao,
+      empresaId,
+    );
+    const variacaoCicloMedio = cicloMedioAnterior > 0 ? cicloMedioAtual - cicloMedioAnterior : 0;
+
+    // Tempo médio por etapa ativa (dias)
+    const tempoEtapaAtual = await this.calculateTempoEtapa(
+      dataInicio,
+      dataFim,
+      vendedorId,
+      regiao,
+      empresaId,
+    );
+    const tempoEtapaAnterior = await this.calculateTempoEtapa(
+      periodoAnterior.dataInicio,
+      periodoAnterior.dataFim,
+      vendedorId,
+      regiao,
+      empresaId,
+    );
+    const variacaoTempoEtapa = tempoEtapaAnterior > 0 ? tempoEtapaAtual - tempoEtapaAnterior : 0;
+
+    // Follow-ups pendentes
+    const followUpsPendentesAtual = await this.calculateFollowUpsPendentes(
+      dataInicio,
+      dataFim,
+      vendedorId,
+      regiao,
+      empresaId,
+    );
+    const followUpsPendentesAnterior = await this.calculateFollowUpsPendentes(
+      periodoAnterior.dataInicio,
+      periodoAnterior.dataFim,
+      vendedorId,
+      regiao,
+      empresaId,
+    );
+    const variacaoFollowUpsPendentes =
+      followUpsPendentesAnterior > 0
+        ? ((followUpsPendentesAtual - followUpsPendentesAnterior) / followUpsPendentesAnterior) *
+          100
         : 0;
 
     // Taxa de Sucesso
@@ -231,25 +383,57 @@ export class DashboardService {
       dataFim,
       vendedorId,
       regiao,
+      empresaId,
     );
     const taxaSucessoAnterior = await this.calculateTaxaSucesso(
       periodoAnterior.dataInicio,
       periodoAnterior.dataFim,
       vendedorId,
       regiao,
+      empresaId,
     );
     const variacaoTaxaSucesso =
       taxaSucessoAnterior > 0 ? taxaSucessoAtual - taxaSucessoAnterior : 0;
 
     // Estatísticas da Agenda - filtrar por empresa do usuário logado
-    // empresaId deve ser string UUID, não number
-    const empresaIdString = empresaId ? empresaId.toString() : undefined;
     const eventStats = await this.eventosService.getEventStatsByPeriod(
       dataInicio.toISOString().split('T')[0],
       dataFim.toISOString().split('T')[0],
       vendedorId,
-      empresaIdString,
+      empresaId,
     );
+    const [satisfacaoCliente, metasAtividade] = await Promise.all([
+      this.calculateSatisfacaoCliente(dataInicio, dataFim, empresaId, vendedorId),
+      this.calculateMetasAtividade(periodoAnterior.dataInicio, periodoAnterior.dataFim, vendedorId, empresaId),
+    ]);
+
+    const hoje = new Date();
+    const inicioHoje = new Date(hoje);
+    inicioHoje.setHours(0, 0, 0, 0);
+    const fimHoje = new Date(hoje);
+    fimHoje.setHours(23, 59, 59, 999);
+
+    const diaSemana = (hoje.getDay() + 6) % 7;
+    const inicioSemana = new Date(inicioHoje);
+    inicioSemana.setDate(inicioSemana.getDate() - diaSemana);
+    const fimSemana = new Date(inicioSemana);
+    fimSemana.setDate(fimSemana.getDate() + 6);
+    fimSemana.setHours(23, 59, 59, 999);
+
+    const [eventStatsHoje, eventStatsSemana] = await Promise.all([
+      this.eventosService.getEventStatsByPeriod(
+        inicioHoje.toISOString().split('T')[0],
+        fimHoje.toISOString().split('T')[0],
+        vendedorId,
+        empresaId,
+      ),
+      this.eventosService.getEventStatsByPeriod(
+        inicioSemana.toISOString().split('T')[0],
+        fimSemana.toISOString().split('T')[0],
+        vendedorId,
+        empresaId,
+      ),
+    ]);
 
     return {
       faturamentoTotal: {
@@ -285,10 +469,23 @@ export class DashboardService {
         valor: propostasEnviadasAtual,
         variacao: Number(variacaoPropostasEnviadas.toFixed(1)),
       },
+      cicloMedio: {
+        dias: Number(cicloMedioAtual.toFixed(1)),
+        variacao: Number(variacaoCicloMedio.toFixed(1)),
+      },
+      tempoEtapa: {
+        dias: Number(tempoEtapaAtual.toFixed(1)),
+        variacao: Number(variacaoTempoEtapa.toFixed(1)),
+      },
+      followUpsPendentes: {
+        quantidade: followUpsPendentesAtual,
+        variacao: Number(variacaoFollowUpsPendentes.toFixed(1)),
+      },
       taxaSucessoGeral: {
         percentual: Number(taxaSucessoAtual.toFixed(1)),
         variacao: Number(variacaoTaxaSucesso.toFixed(1)),
       },
+      satisfacaoCliente,
       agenda: {
         totalEventos: eventStats.totalEventos,
         eventosConcluidos: eventStats.eventosConcluidos,
@@ -296,6 +493,29 @@ export class DashboardService {
         eventosHoje: eventStats.eventosHoje,
         estatisticasPorTipo: eventStats.estatisticasPorTipo,
         produtividade: eventStats.produtividade,
+        resumoHoje: {
+          totalEventos: Number(eventStatsHoje?.totalEventos || 0),
+          estatisticasPorTipo: {
+            reuniao: Number(eventStatsHoje?.estatisticasPorTipo?.reuniao || 0),
+            ligacao: Number(eventStatsHoje?.estatisticasPorTipo?.ligacao || 0),
+            apresentacao: Number(eventStatsHoje?.estatisticasPorTipo?.apresentacao || 0),
+            visita: Number(eventStatsHoje?.estatisticasPorTipo?.visita || 0),
+            'follow-up': Number(eventStatsHoje?.estatisticasPorTipo?.['follow-up'] || 0),
+            outro: Number(eventStatsHoje?.estatisticasPorTipo?.outro || 0),
+          },
+        },
+        resumoSemana: {
+          totalEventos: Number(eventStatsSemana?.totalEventos || 0),
+          estatisticasPorTipo: {
+            reuniao: Number(eventStatsSemana?.estatisticasPorTipo?.reuniao || 0),
+            ligacao: Number(eventStatsSemana?.estatisticasPorTipo?.ligacao || 0),
+            apresentacao: Number(eventStatsSemana?.estatisticasPorTipo?.apresentacao || 0),
+            visita: Number(eventStatsSemana?.estatisticasPorTipo?.visita || 0),
+            'follow-up': Number(eventStatsSemana?.estatisticasPorTipo?.['follow-up'] || 0),
+            outro: Number(eventStatsSemana?.estatisticasPorTipo?.outro || 0),
+          },
+        },
+        metasAtividade,
       },
     };
   }
@@ -303,38 +523,58 @@ export class DashboardService {
   /**
    * Obter ranking de vendedores
    */
-  async getVendedoresRanking(periodo: string = 'mensal'): Promise<VendedorRanking[]> {
+  async getVendedoresRanking(
+    periodo: string = 'mensal',
+    empresaId?: string,
+    vendedorIdFiltro?: string,
+  ): Promise<VendedorRanking[]> {
     const { dataInicio, dataFim } = this.getDateRange(periodo);
-    const periodoAnterior = this.getDateRange(this.getPeriodoAnterior(periodo));
+    const periodoAnterior = this.getPreviousDateRange(periodo, { dataInicio, dataFim });
     const dataInicioAnterior = periodoAnterior.dataInicio;
     const dataFimAnterior = periodoAnterior.dataFim;
 
     // Buscar todos os vendedores
     const vendedores = await this.userRepository.find({
-      where: { role: UserRole.VENDEDOR, ativo: true },
+      where: empresaId
+        ? { role: UserRole.VENDEDOR, ativo: true, empresa_id: empresaId }
+        : { role: UserRole.VENDEDOR, ativo: true },
     });
 
     const ranking: VendedorRanking[] = [];
 
     for (const vendedor of vendedores) {
       // Vendas do período
-      const vendasAtual = await this.calculateFaturamento(dataInicio, dataFim, vendedor.id);
+      const vendasAtual = await this.calculateFaturamento(
+        dataInicio,
+        dataFim,
+        vendedor.id,
+        undefined,
+        empresaId,
+      );
       const vendasAnterior = await this.calculateFaturamento(
         dataInicioAnterior,
         dataFimAnterior,
         vendedor.id,
+        undefined,
+        empresaId,
       );
       const variacao =
         vendasAnterior > 0 ? ((vendasAtual - vendasAnterior) / vendasAnterior) * 100 : 0;
 
-      // Meta do vendedor (exemplo: 20% da meta total)
-      const meta = this.getMeta(periodo) * 0.2;
+      const metaNoPeriodo = await this.metasService.getMetaValorParaRange(
+        dataInicio,
+        dataFim,
+        vendedor.id,
+        undefined,
+        empresaId,
+      );
+      const meta = Math.max(0, Number(metaNoPeriodo || 0));
 
       // Badges baseados na performance
       const badges = this.calculateBadges(vendasAtual, meta, variacao);
 
       // Cor baseada na performance
-      const progressoMeta = (vendasAtual / meta) * 100;
+      const progressoMeta = meta > 0 ? (vendasAtual / meta) * 100 : 0;
       const cor = this.getVendedorCor(progressoMeta);
 
       ranking.push({
@@ -355,6 +595,10 @@ export class DashboardService {
       vendedor.posicao = index + 1;
     });
 
+    if (vendedorIdFiltro) {
+      return ranking.filter((vendedor) => vendedor.id === vendedorIdFiltro);
+    }
+
     return ranking;
   }
 
@@ -363,17 +607,21 @@ export class DashboardService {
    */
   async getAlertasInteligentes(
     periodo: string = 'mensal',
+    empresaId?: string,
     precomputed?: {
       ranking?: VendedorRanking[];
       kpis?: DashboardKPIs;
     },
+    vendedorId?: string,
   ): Promise<AlertaInteligente[]> {
     const alertas: AlertaInteligente[] = [];
     const agora = new Date();
 
     // Verificar metas em risco
-    const ranking = precomputed?.ranking ?? (await this.getVendedoresRanking(periodo));
-    const vendedoresEmRisco = ranking.filter((v) => v.vendas / v.meta < 0.7);
+    const ranking =
+      precomputed?.ranking ??
+      (await this.getVendedoresRanking(periodo, empresaId, vendedorId));
+    const vendedoresEmRisco = ranking.filter((v) => v.meta > 0 && v.vendas / v.meta < 0.7);
 
     for (const vendedor of vendedoresEmRisco) {
       alertas.push({
@@ -395,6 +643,8 @@ export class DashboardService {
     // Verificar propostas próximas do vencimento
     const propostas = await this.propostaRepository.find({
       where: {
+        ...(empresaId ? { empresaId } : {}),
+        ...(vendedorId ? { vendedor_id: vendedorId } : {}),
         status: 'enviada',
         dataVencimento: Between(agora, new Date(agora.getTime() + 3 * 24 * 60 * 60 * 1000)),
       },
@@ -420,8 +670,9 @@ export class DashboardService {
     }
 
     // Verificar conquistas
-    const kpis = precomputed?.kpis ?? (await this.getKPIs(periodo));
-    if (kpis.faturamentoTotal.valor >= kpis.faturamentoTotal.meta) {
+    const kpis =
+      precomputed?.kpis ?? (await this.getKPIs(periodo, vendedorId, undefined, empresaId));
+    if (kpis.faturamentoTotal.meta > 0 && kpis.faturamentoTotal.valor >= kpis.faturamentoTotal.meta) {
       alertas.push({
         id: 'meta-superada',
         tipo: 'conquista',
@@ -441,50 +692,191 @@ export class DashboardService {
   }
 
   // Métodos auxiliares privados
-  private getDateRange(periodo: string): { dataInicio: Date; dataFim: Date } {
-    const agora = new Date();
-    let dataInicio: Date;
-    const dataFim: Date = new Date(agora);
+  private getRangeDaysInclusive(dataInicio: Date, dataFim: Date): number {
+    const oneDay = 1000 * 60 * 60 * 24;
+    const inicio = new Date(dataInicio);
+    const fim = new Date(dataFim);
+    inicio.setHours(0, 0, 0, 0);
+    fim.setHours(0, 0, 0, 0);
+    const diffDays = Math.floor((fim.getTime() - inicio.getTime()) / oneDay) + 1;
+    return Math.max(1, diffDays);
+  }
 
-    switch (periodo) {
-      case 'mensal':
-        dataInicio = new Date(agora.getFullYear(), agora.getMonth(), 1);
-        break;
-      case 'trimestral':
-        const trimestre = Math.floor(agora.getMonth() / 3);
-        dataInicio = new Date(agora.getFullYear(), trimestre * 3, 1);
-        break;
-      case 'semestral':
-        const semestre = Math.floor(agora.getMonth() / 6);
-        dataInicio = new Date(agora.getFullYear(), semestre * 6, 1);
-        break;
-      case 'anual':
-        dataInicio = new Date(agora.getFullYear(), 0, 1);
-        break;
-      default:
-        dataInicio = new Date(agora.getFullYear(), agora.getMonth(), 1);
+  private async calculateMetasAtividade(
+    dataInicioBase: Date,
+    dataFimBase: Date,
+    vendedorId?: string,
+    empresaId?: string,
+  ): Promise<NonNullable<DashboardKPIs['agenda']['metasAtividade']>> {
+    const stats = (await this.eventosService.getEventStatsByPeriod(
+      dataInicioBase.toISOString().split('T')[0],
+      dataFimBase.toISOString().split('T')[0],
+      vendedorId,
+      empresaId,
+    )) as EventStatsSnapshot;
+
+    const diasNoRange = this.getRangeDaysInclusive(dataInicioBase, dataFimBase);
+    const semanasNoRange = Math.max(1, diasNoRange / 7);
+    const estatisticasPorTipo = stats?.estatisticasPorTipo || {};
+
+    const totalLigacoes = Number(estatisticasPorTipo?.ligacao || 0);
+    const totalFollowups = Number(estatisticasPorTipo?.['follow-up'] || 0);
+    const totalReunioes =
+      Number(estatisticasPorTipo?.reuniao || 0) +
+      Number(estatisticasPorTipo?.apresentacao || 0) +
+      Number(estatisticasPorTipo?.visita || 0);
+
+    return {
+      callsDiarias: Math.max(0, Math.round(totalLigacoes / diasNoRange)),
+      reunioesSemana: Math.max(0, Math.round(totalReunioes / semanasNoRange)),
+      followupsDiarios: Math.max(0, Math.round(totalFollowups / diasNoRange)),
+      amostraEventos: Number(stats?.totalEventos || 0),
+      fonte:
+        Number(stats?.totalEventos || 0) > 0
+          ? 'historico_eventos_periodo_anterior'
+          : 'indisponivel',
+      periodoBase: {
+        inicio: dataInicioBase.toISOString().split('T')[0],
+        fim: dataFimBase.toISOString().split('T')[0],
+      },
+    };
+  }
+
+  private async calculateSatisfacaoCliente(
+    dataInicio: Date,
+    dataFim: Date,
+    empresaId?: string,
+    vendedorId?: string,
+  ): Promise<NonNullable<DashboardKPIs['satisfacaoCliente']>> {
+    if (!empresaId) {
+      return { valor: null, amostra: 0, fonte: 'indisponivel' };
     }
 
+    const buscarMedia = async (
+      vendedorEscopo?: string,
+    ): Promise<{ valor: number | null; amostra: number }> => {
+      const query = this.sessaoTriagemRepository
+        .createQueryBuilder('sessao')
+        .select('AVG(sessao.satisfacaoNota)', 'media')
+        .addSelect('COUNT(sessao.id)', 'total')
+        .where('sessao.empresaId = :empresaId', { empresaId })
+        .andWhere('sessao.satisfacaoNota IS NOT NULL')
+        .andWhere('COALESCE(sessao.concluidoEm, sessao.updatedAt) BETWEEN :dataInicio AND :dataFim', {
+          dataInicio,
+          dataFim,
+        });
+
+      if (vendedorEscopo) {
+        query.andWhere('sessao.atendenteId = :vendedorId', { vendedorId: vendedorEscopo });
+      }
+
+      const result = await query.getRawOne<{ media?: string | null; total?: string | null }>();
+      const total = Number(result?.total || 0);
+      const mediaBruta = Number(result?.media);
+      if (total <= 0 || !Number.isFinite(mediaBruta)) {
+        return { valor: null, amostra: 0 };
+      }
+
+      const valorEscalaCinco = Number(Math.max(0, Math.min(5, mediaBruta / 2)).toFixed(1));
+      return { valor: valorEscalaCinco, amostra: total };
+    };
+
+    if (vendedorId) {
+      const vendedorCsat = await buscarMedia(vendedorId);
+      if (vendedorCsat.valor !== null && vendedorCsat.amostra > 0) {
+        return {
+          valor: vendedorCsat.valor,
+          amostra: vendedorCsat.amostra,
+          fonte: 'triagem_csat_vendedor',
+        };
+      }
+    }
+
+    const empresaCsat = await buscarMedia();
+    if (empresaCsat.valor !== null && empresaCsat.amostra > 0) {
+      return {
+        valor: empresaCsat.valor,
+        amostra: empresaCsat.amostra,
+        fonte: 'triagem_csat_empresa',
+      };
+    }
+
+    return { valor: null, amostra: 0, fonte: 'indisponivel' };
+  }
+
+  private getDateRange(periodo: string): { dataInicio: Date; dataFim: Date } {
+    const dataFim = new Date();
+    const dataInicio = this.getRangeStart(periodo, dataFim);
     return { dataInicio, dataFim };
   }
 
-  private getPeriodoAnterior(periodo: string): string {
+  private getPreviousDateRange(
+    periodo: string,
+    currentRange: { dataInicio: Date; dataFim: Date },
+  ): { dataInicio: Date; dataFim: Date } {
+    const currentStart = currentRange.dataInicio;
+    const previousEnd = new Date(currentStart.getTime() - 1);
+    let previousStart: Date;
+
     switch (periodo) {
+      case 'semanal':
+        previousStart = new Date(previousEnd);
+        previousStart.setDate(previousStart.getDate() - 6);
+        previousStart.setHours(0, 0, 0, 0);
+        break;
       case 'mensal':
-        return 'mensal_anterior';
+        previousStart = new Date(currentStart);
+        previousStart.setMonth(previousStart.getMonth() - 1);
+        break;
       case 'trimestral':
-        return 'trimestral_anterior';
+        previousStart = new Date(currentStart);
+        previousStart.setMonth(previousStart.getMonth() - 3);
+        break;
       case 'semestral':
-        return 'semestral_anterior';
+        previousStart = new Date(currentStart);
+        previousStart.setMonth(previousStart.getMonth() - 6);
+        break;
       case 'anual':
-        return 'anual_anterior';
+        previousStart = new Date(currentStart);
+        previousStart.setFullYear(previousStart.getFullYear() - 1);
+        break;
       default:
-        return 'mensal_anterior';
+        previousStart = new Date(currentStart);
+        previousStart.setMonth(previousStart.getMonth() - 1);
+    }
+
+    return { dataInicio: previousStart, dataFim: previousEnd };
+  }
+
+  private getRangeStart(periodo: string, referenceDate: Date): Date {
+    switch (periodo) {
+      case 'semanal': {
+        const start = new Date(referenceDate);
+        start.setDate(start.getDate() - 6);
+        start.setHours(0, 0, 0, 0);
+        return start;
+      }
+      case 'mensal':
+        return new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
+      case 'trimestral': {
+        const trimestre = Math.floor(referenceDate.getMonth() / 3);
+        return new Date(referenceDate.getFullYear(), trimestre * 3, 1);
+      }
+      case 'semestral': {
+        const semestre = Math.floor(referenceDate.getMonth() / 6);
+        return new Date(referenceDate.getFullYear(), semestre * 6, 1);
+      }
+      case 'anual':
+        return new Date(referenceDate.getFullYear(), 0, 1);
+      default:
+        return new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
     }
   }
 
   private getPeriodoLabel(periodo: string): string {
     switch (periodo) {
+      case 'semanal':
+        return 'vs semana anterior';
       case 'mensal':
         return 'vs mês anterior';
       case 'trimestral':
@@ -498,42 +890,30 @@ export class DashboardService {
     }
   }
 
-  private getMeta(periodo: string): number {
-    // Metas exemplo - em produção, viriam do banco
-    switch (periodo) {
-      case 'mensal':
-        return 450000;
-      case 'trimestral':
-        return 1350000;
-      case 'semestral':
-        return 2700000;
-      case 'anual':
-        return 5400000;
-      default:
-        return 450000;
-    }
-  }
-
   private async calculateFaturamento(
     dataInicio: Date,
     dataFim: Date,
     vendedorId?: string,
     regiao?: string,
+    empresaId?: string,
   ): Promise<number> {
-    const whereConditions: any = {
-      status: 'aprovada',
-      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString()),
-    };
-
-    if (vendedorId) {
-      whereConditions.vendedor_id = vendedorId;
-    }
-
-    const result = await this.propostaRepository
+    const query = this.propostaRepository
       .createQueryBuilder('proposta')
       .select('SUM(proposta.total)', 'total')
-      .where(whereConditions)
-      .getRawOne();
+      .where('proposta.status::text IN (:...statusAprovada)', {
+        statusAprovada: this.statusAprovadaAliases,
+      })
+      .andWhere('proposta.criadaEm BETWEEN :dataInicio AND :dataFim', { dataInicio, dataFim });
+
+    if (empresaId) {
+      query.andWhere('proposta.empresaId = :empresaId', { empresaId });
+    }
+
+    if (vendedorId) {
+      query.andWhere('proposta.vendedor_id = :vendedorId', { vendedorId });
+    }
+
+    const result = await query.getRawOne();
 
     return Number(result?.total || 0);
   }
@@ -543,21 +923,25 @@ export class DashboardService {
     dataFim: Date,
     vendedorId?: string,
     regiao?: string,
+    empresaId?: string,
   ): Promise<number> {
-    const whereConditions: any = {
-      status: 'aprovada',
-      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString()),
-    };
-
-    if (vendedorId) {
-      whereConditions.vendedor_id = vendedorId;
-    }
-
-    const result = await this.propostaRepository
+    const query = this.propostaRepository
       .createQueryBuilder('proposta')
       .select('AVG(proposta.total)', 'media')
-      .where(whereConditions)
-      .getRawOne();
+      .where('proposta.status::text IN (:...statusAprovada)', {
+        statusAprovada: this.statusAprovadaAliases,
+      })
+      .andWhere('proposta.criadaEm BETWEEN :dataInicio AND :dataFim', { dataInicio, dataFim });
+
+    if (empresaId) {
+      query.andWhere('proposta.empresaId = :empresaId', { empresaId });
+    }
+
+    if (vendedorId) {
+      query.andWhere('proposta.vendedor_id = :vendedorId', { vendedorId });
+    }
+
+    const result = await query.getRawOne();
 
     return Number(result?.media || 0);
   }
@@ -567,41 +951,67 @@ export class DashboardService {
     dataFim: Date,
     vendedorId?: string,
     regiao?: string,
+    empresaId?: string,
   ): Promise<number> {
-    const whereConditions: any = {
-      status: 'aprovada',
-      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString()),
-    };
+    const query = this.propostaRepository
+      .createQueryBuilder('proposta')
+      .where('proposta.criadaEm BETWEEN :dataInicio AND :dataFim', { dataInicio, dataFim })
+      .andWhere('proposta.status::text IN (:...statusAprovada)', {
+        statusAprovada: this.statusAprovadaAliases,
+      });
 
-    if (vendedorId) {
-      whereConditions.vendedor_id = vendedorId;
+    if (empresaId) {
+      query.andWhere('proposta.empresaId = :empresaId', { empresaId });
     }
 
-    return await this.propostaRepository.count({ where: whereConditions });
+    if (vendedorId) {
+      query.andWhere('proposta.vendedor_id = :vendedorId', { vendedorId });
+    }
+
+    return await query.getCount();
   }
 
   private async calculateEmNegociacao(
     vendedorId?: string,
     regiao?: string,
+    empresaId?: string,
   ): Promise<{ valor: number; quantidade: number; propostas: string[] }> {
-    const whereConditions: any = {
-      status: 'enviada',
-    };
+    const aggregateQuery = this.propostaRepository
+      .createQueryBuilder('proposta')
+      .select('COUNT(proposta.id)', 'quantidade')
+      // Usa "valor" para compatibilidade com schema legado (sem depender de colunas JSON).
+      .addSelect('COALESCE(SUM(proposta.valor), 0)', 'valor')
+      .where('proposta.status = :status', { status: 'enviada' });
 
-    if (vendedorId) {
-      whereConditions.vendedor_id = vendedorId;
+    if (empresaId) {
+      aggregateQuery.andWhere('proposta.empresaId = :empresaId', { empresaId });
     }
 
-    const propostas = await this.propostaRepository.find({ where: whereConditions });
+    if (vendedorId) {
+      aggregateQuery.andWhere('proposta.vendedor_id = :vendedorId', { vendedorId });
+    }
 
-    // Correção: validar e converter total para number, evitando valores quebrados
-    const valor = propostas.reduce((acc, p) => {
-      const total = parseFloat(p.total?.toString() || '0') || 0;
-      return acc + total;
-    }, 0);
+    const aggregate = await aggregateQuery.getRawOne<{ quantidade?: string; valor?: string }>();
+    const quantidade = Number(aggregate?.quantidade || 0);
+    const valor = Number(aggregate?.valor || 0);
 
-    const quantidade = propostas.length;
-    const propostasIds = propostas.slice(0, 5).map((p) => p.numero);
+    const rowsQuery = this.propostaRepository
+      .createQueryBuilder('proposta')
+      .select('proposta.numero', 'numero')
+      .where('proposta.status = :status', { status: 'enviada' })
+      .orderBy('proposta.criadaEm', 'DESC')
+      .limit(5);
+
+    if (empresaId) {
+      rowsQuery.andWhere('proposta.empresaId = :empresaId', { empresaId });
+    }
+
+    if (vendedorId) {
+      rowsQuery.andWhere('proposta.vendedor_id = :vendedorId', { vendedorId });
+    }
+
+    const propostasRows = await rowsQuery.getRawMany<{ numero?: string }>();
+    const propostasIds = propostasRows.map((row) => row?.numero).filter(Boolean) as string[];
 
     return { valor, quantidade, propostas: propostasIds };
   }
@@ -610,9 +1020,11 @@ export class DashboardService {
     dataInicio: Date,
     dataFim: Date,
     regiao?: string,
+    empresaId?: string,
   ): Promise<number> {
     const whereConditions: any = {
-      created_at: Between(dataInicio.toISOString(), dataFim.toISOString()),
+      created_at: Between(dataInicio, dataFim),
+      ...(empresaId ? { empresaId } : {}),
     };
 
     return await this.clienteRepository.count({ where: whereConditions });
@@ -623,10 +1035,12 @@ export class DashboardService {
     dataFim: Date,
     vendedorId?: string,
     regiao?: string,
+    empresaId?: string,
   ): Promise<number> {
     const whereConditions: any = {
       status: 'enviada',
-      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString()),
+      criadaEm: Between(dataInicio, dataFim),
+      ...(empresaId ? { empresaId } : {}),
     };
 
     if (vendedorId) {
@@ -641,21 +1055,23 @@ export class DashboardService {
     dataFim: Date,
     vendedorId?: string,
     regiao?: string,
+    empresaId?: string,
   ): Promise<number> {
-    const whereConditions: any = {
-      status: 'enviada',
-      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString()),
-    };
-
-    if (vendedorId) {
-      whereConditions.vendedor_id = vendedorId;
-    }
-
-    const result = await this.propostaRepository
+    const query = this.propostaRepository
       .createQueryBuilder('proposta')
       .select('SUM(proposta.total)', 'total')
-      .where(whereConditions)
-      .getRawOne();
+      .where('proposta.status = :status', { status: 'enviada' })
+      .andWhere('proposta.criadaEm BETWEEN :dataInicio AND :dataFim', { dataInicio, dataFim });
+
+    if (empresaId) {
+      query.andWhere('proposta.empresaId = :empresaId', { empresaId });
+    }
+
+    if (vendedorId) {
+      query.andWhere('proposta.vendedor_id = :vendedorId', { vendedorId });
+    }
+
+    const result = await query.getRawOne();
 
     return Number(result?.total || 0);
   }
@@ -665,30 +1081,112 @@ export class DashboardService {
     dataFim: Date,
     vendedorId?: string,
     regiao?: string,
+    empresaId?: string,
   ): Promise<number> {
-    const whereConditionsTotal: any = {
-      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString()),
-    };
+    const totalQuery = this.propostaRepository
+      .createQueryBuilder('proposta')
+      .where('proposta.criadaEm BETWEEN :dataInicio AND :dataFim', { dataInicio, dataFim });
 
-    const whereConditionsAprovadas: any = {
-      status: 'aprovada',
-      criadaEm: Between(dataInicio.toISOString(), dataFim.toISOString()),
-    };
-
-    if (vendedorId) {
-      whereConditionsTotal.vendedorId = vendedorId;
-      whereConditionsAprovadas.vendedorId = vendedorId;
+    if (empresaId) {
+      totalQuery.andWhere('proposta.empresaId = :empresaId', { empresaId });
     }
 
-    const total = await this.propostaRepository.count({ where: whereConditionsTotal });
-    const aprovadas = await this.propostaRepository.count({ where: whereConditionsAprovadas });
+    if (vendedorId) {
+      totalQuery.andWhere('proposta.vendedor_id = :vendedorId', { vendedorId });
+    }
+
+    const total = await totalQuery.getCount();
+    const aprovadas = await totalQuery
+      .clone()
+      .andWhere('proposta.status::text IN (:...statusAprovada)', {
+        statusAprovada: this.statusAprovadaAliases,
+      })
+      .getCount();
 
     return total > 0 ? (aprovadas / total) * 100 : 0;
   }
 
+  private async calculateCicloMedio(
+    dataInicio: Date,
+    dataFim: Date,
+    vendedorId?: string,
+    regiao?: string,
+    empresaId?: string,
+  ): Promise<number> {
+    const statusFinalizadas = [...this.statusAprovadaAliases, 'rejeitada', 'expirada'];
+    const query = this.propostaRepository
+      .createQueryBuilder('proposta')
+      .select(
+        'AVG(EXTRACT(EPOCH FROM (COALESCE(proposta.atualizadaEm, proposta.criadaEm) - proposta.criadaEm)) / 86400)',
+        'dias',
+      )
+      .where('proposta.criadaEm BETWEEN :dataInicio AND :dataFim', { dataInicio, dataFim })
+      .andWhere('proposta.status::text IN (:...statusFinalizadas)', {
+        statusFinalizadas,
+      });
+
+    if (empresaId) {
+      query.andWhere('proposta.empresaId = :empresaId', { empresaId });
+    }
+
+    if (vendedorId) {
+      query.andWhere('proposta.vendedor_id = :vendedorId', { vendedorId });
+    }
+
+    const result = await query.getRawOne();
+    return Number(result?.dias || 0);
+  }
+
+  private async calculateTempoEtapa(
+    dataInicio: Date,
+    dataFim: Date,
+    vendedorId?: string,
+    regiao?: string,
+    empresaId?: string,
+  ): Promise<number> {
+    const query = this.propostaRepository
+      .createQueryBuilder('proposta')
+      .select('AVG(EXTRACT(EPOCH FROM (:dataFim - proposta.criadaEm)) / 86400)', 'dias')
+      .where('proposta.criadaEm BETWEEN :dataInicio AND :dataFim', { dataInicio, dataFim })
+      .andWhere('proposta.status::text IN (:...statusEmNegociacao)', {
+        statusEmNegociacao: this.statusEmNegociacaoAliases,
+      });
+
+    if (empresaId) {
+      query.andWhere('proposta.empresaId = :empresaId', { empresaId });
+    }
+
+    if (vendedorId) {
+      query.andWhere('proposta.vendedor_id = :vendedorId', { vendedorId });
+    }
+
+    const result = await query.getRawOne();
+    return Number(result?.dias || 0);
+  }
+
+  private async calculateFollowUpsPendentes(
+    dataInicio: Date,
+    dataFim: Date,
+    vendedorId?: string,
+    regiao?: string,
+    empresaId?: string,
+  ): Promise<number> {
+    const whereConditions: any = {
+      criadaEm: Between(dataInicio, dataFim),
+      status: 'enviada',
+      ...(empresaId ? { empresaId } : {}),
+    };
+
+    if (vendedorId) {
+      whereConditions.vendedor_id = vendedorId;
+    }
+
+    return await this.propostaRepository.count({ where: whereConditions });
+  }
+
   private calculateBadges(vendas: number, meta: number, variacao: number): string[] {
     const badges: string[] = [];
-    const progressoMeta = (vendas / meta) * 100;
+    const progressoMeta = meta > 0 ? (vendas / meta) * 100 : 0;
 
     if (progressoMeta >= 110) badges.push('top_performer');
     if (progressoMeta >= 100) badges.push('goal_crusher');
@@ -703,6 +1201,228 @@ export class DashboardService {
     if (progressoMeta >= 90) return '#3B82F6'; // Azul
     if (progressoMeta >= 70) return '#F59E0B'; // Amarelo
     return '#EF4444'; // Vermelho
+  }
+
+  async getChartsData(
+    periodo: string = 'mensal',
+    vendedorId?: string,
+    regiao?: string,
+    empresaId?: string,
+  ): Promise<DashboardChartsData> {
+    const { dataInicio, dataFim } = this.getDateRange(periodo);
+
+    const whereConditions: any = {
+      criadaEm: Between(dataInicio, dataFim),
+      ...(empresaId ? { empresaId } : {}),
+    };
+
+    if (vendedorId) {
+      whereConditions.vendedor_id = vendedorId;
+    }
+
+    const propostas = await this.propostaRepository.find({
+      where: whereConditions,
+      select: ['status', 'total', 'criadaEm'],
+    });
+
+    const metaNoPeriodo = await this.metasService.getMetaValorParaRange(
+      dataInicio,
+      dataFim,
+      vendedorId,
+      regiao,
+      empresaId,
+    );
+    const mesesNoRange = Math.max(1, this.getMonthKeys(dataInicio, dataFim).length);
+    const metaMensal =
+      metaNoPeriodo > 0
+        ? Number((metaNoPeriodo / mesesNoRange).toFixed(2))
+        : 0;
+
+    const vendasMensais = this.buildVendasMensais(propostas, dataInicio, dataFim, metaMensal);
+    const propostasPorStatus = this.buildPropostasPorStatus(propostas);
+    const funilVendas = this.buildFunilVendas(propostas);
+
+    let atividadesTimeline: DashboardChartsData['atividadesTimeline'] = [];
+    try {
+      atividadesTimeline = await this.buildAtividadesTimeline(
+        dataInicio,
+        dataFim,
+        vendedorId,
+        empresaId,
+      );
+    } catch {
+      atividadesTimeline = [];
+    }
+
+    return {
+      vendasMensais,
+      propostasPorStatus,
+      atividadesTimeline,
+      funilVendas,
+    };
+  }
+
+  private buildVendasMensais(
+    propostas: Pick<PropostaEntity, 'status' | 'total' | 'criadaEm'>[],
+    dataInicio: Date,
+    dataFim: Date,
+    metaMensal: number,
+  ): DashboardChartsData['vendasMensais'] {
+    const monthKeys = this.getMonthKeys(dataInicio, dataFim);
+    const totals = new Map<string, number>(monthKeys.map((key) => [key, 0]));
+
+    propostas.forEach((proposta) => {
+      if (!this.isStatusAprovada(proposta.status)) return;
+      const key = this.toMonthKey(proposta.criadaEm);
+      const total = Number(proposta.total || 0);
+      totals.set(key, (totals.get(key) || 0) + total);
+    });
+
+    return monthKeys.map((key) => ({
+      mes: this.getMonthLabel(key),
+      valor: Number((totals.get(key) || 0).toFixed(2)),
+      meta: Number(metaMensal.toFixed(2)),
+    }));
+  }
+
+  private buildPropostasPorStatus(
+    propostas: Pick<PropostaEntity, 'status'>[],
+  ): DashboardChartsData['propostasPorStatus'] {
+    const statusConfig: Array<{ statuses: string[]; label: string; color: string }> = [
+      { statuses: ['rascunho'], label: 'Rascunho', color: '#6B7280' },
+      { statuses: ['enviada'], label: 'Enviada', color: '#3B82F6' },
+      { statuses: ['visualizada'], label: 'Visualizada', color: '#06B6D4' },
+      { statuses: this.statusAprovadaAliases, label: 'Aprovada', color: '#10B981' },
+      { statuses: ['rejeitada'], label: 'Rejeitada', color: '#F59E0B' },
+      { statuses: ['expirada'], label: 'Expirada', color: '#EF4444' },
+    ];
+
+    if (propostas.length === 0) {
+      return [];
+    }
+
+    const counts = new Map<string, number>();
+    propostas.forEach((proposta) => {
+      counts.set(proposta.status, (counts.get(proposta.status) || 0) + 1);
+    });
+
+    const total = propostas.length;
+    return statusConfig
+      .map((config) => {
+        const quantidade = config.statuses.reduce(
+          (acc, status) => acc + (counts.get(status) || 0),
+          0,
+        );
+        const percentual = total > 0 ? (quantidade / total) * 100 : 0;
+        return {
+          status: config.label,
+          valor: Number(percentual.toFixed(1)),
+          color: config.color,
+        };
+      })
+      .filter((item) => item.valor > 0);
+  }
+
+  private buildFunilVendas(
+    propostas: Pick<PropostaEntity, 'status' | 'total'>[],
+  ): DashboardChartsData['funilVendas'] {
+    const etapas: Array<{ etapa: string; statuses: string[] }> = [
+      { etapa: 'Rascunho', statuses: ['rascunho'] },
+      { etapa: 'Enviadas', statuses: this.statusEmNegociacaoAliases },
+      { etapa: 'Aprovadas', statuses: this.statusAprovadaAliases },
+      { etapa: 'Perdidas', statuses: ['rejeitada', 'expirada'] },
+    ];
+
+    return etapas
+      .map(({ etapa, statuses }) => {
+        const propostasEtapa = propostas.filter((proposta) => statuses.includes(proposta.status));
+        const valor = propostasEtapa.reduce(
+          (acc, proposta) => acc + Number(proposta.total || 0),
+          0,
+        );
+
+        return {
+          etapa,
+          quantidade: propostasEtapa.length,
+          valor: Number(valor.toFixed(2)),
+        };
+      })
+      .filter((item) => item.quantidade > 0);
+  }
+
+  private async buildAtividadesTimeline(
+    dataInicio: Date,
+    dataFim: Date,
+    vendedorId?: string,
+    empresaId?: string,
+  ): Promise<DashboardChartsData['atividadesTimeline']> {
+    const monthKeys = this.getMonthKeys(dataInicio, dataFim);
+
+    const timeline = await Promise.all(
+      monthKeys.map(async (monthKey) => {
+        const [year, month] = monthKey.split('-').map(Number);
+        const startDate = new Date(year, month - 1, 1);
+        const endDate = new Date(year, month, 0);
+
+        const stats = await this.eventosService.getEventStatsByPeriod(
+          startDate.toISOString().split('T')[0],
+          endDate.toISOString().split('T')[0],
+          vendedorId,
+          empresaId,
+        );
+
+        const reunioes = Number(stats?.estatisticasPorTipo?.reuniao || 0);
+        const ligacoes = Number(stats?.estatisticasPorTipo?.ligacao || 0);
+        const followUps = Number(stats?.estatisticasPorTipo?.['follow-up'] || 0);
+        const outros = Number(stats?.estatisticasPorTipo?.outro || 0);
+
+        return {
+          mes: this.getMonthLabel(monthKey),
+          reunioes,
+          ligacoes,
+          emails: followUps + outros,
+        };
+      }),
+    );
+
+    return timeline;
+  }
+
+  private getMonthKeys(dataInicio: Date, dataFim: Date): string[] {
+    const keys: string[] = [];
+    const cursor = new Date(dataInicio.getFullYear(), dataInicio.getMonth(), 1);
+    const end = new Date(dataFim.getFullYear(), dataFim.getMonth(), 1);
+
+    while (cursor <= end) {
+      keys.push(this.toMonthKey(cursor));
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    return keys;
+  }
+
+  private toMonthKey(date: Date): string {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  private getMonthLabel(monthKey: string): string {
+    const monthNames = [
+      'Jan',
+      'Fev',
+      'Mar',
+      'Abr',
+      'Mai',
+      'Jun',
+      'Jul',
+      'Ago',
+      'Set',
+      'Out',
+      'Nov',
+      'Dez',
+    ];
+    const [year, month] = monthKey.split('-').map(Number);
+    const monthName = monthNames[Math.max(0, Math.min(11, month - 1))];
+    return `${monthName}/${String(year).slice(-2)}`;
   }
 
   getPeriodosDisponiveis(): string[] {

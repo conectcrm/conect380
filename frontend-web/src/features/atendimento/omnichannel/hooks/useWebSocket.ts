@@ -20,6 +20,7 @@ import { Ticket, Mensagem } from '../types';
 import { normalizarMensagemPayload } from '../services/atendimentoService';
 import { useAtendimentoStore } from '../../../../stores/atendimentoStore';
 import { resolveSocketBaseUrl } from '../../../../utils/network';
+import { apiPublic } from '../../../../services/api';
 
 interface WebSocketEvents {
   onNovoTicket?: (ticket: Ticket) => void;
@@ -68,6 +69,29 @@ const WEBSOCKET_URL = SOCKET_BASE_URL.endsWith('/')
   ? `${SOCKET_BASE_URL}atendimento`
   : `${SOCKET_BASE_URL}/atendimento`;
 const DEBUG = false; // 🔍 DEBUG ATIVADO para diagnosticar indicador de digitação
+const AUTH_TOKEN_EVENT_NAME = 'authTokenChanged';
+
+const parseJwtExpMs = (token: string | null): number | null => {
+  if (!token) return null;
+
+  try {
+    const payloadBase64 = token.split('.')[1];
+    if (!payloadBase64) return null;
+    const normalized = payloadBase64.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+    const payload = JSON.parse(atob(padded));
+    if (!payload?.exp || typeof payload.exp !== 'number') return null;
+    return payload.exp * 1000;
+  } catch {
+    return null;
+  }
+};
+
+const tokenExpirado = (token: string | null, margemSegundos = 5): boolean => {
+  const expMs = parseJwtExpMs(token);
+  if (!expMs) return false;
+  return Date.now() + margemSegundos * 1000 >= expMs;
+};
 
 // 🔒 SINGLETON: Garantir apenas 1 instância WebSocket em toda aplicação
 let globalSocket: Socket | null = null;
@@ -153,6 +177,45 @@ export const useWebSocket = (options: UseWebSocketOptions = {}): UseWebSocketRet
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
       });
+      let authExpiradaNotificada = false;
+      let refreshEmAndamento = false;
+
+      const renovarTokenEReconectar = async () => {
+        if (refreshEmAndamento) return;
+        refreshEmAndamento = true;
+
+        try {
+          const refreshToken = localStorage.getItem('refreshToken');
+          if (!refreshToken) throw new Error('Refresh token ausente');
+
+          const refreshResponse = await apiPublic.post('/auth/refresh', { refreshToken });
+          const success = refreshResponse.data?.success === true;
+          const newToken = refreshResponse.data?.data?.access_token;
+          const newRefreshToken = refreshResponse.data?.data?.refresh_token;
+
+          if (!success || !newToken || !newRefreshToken) {
+            throw new Error('Resposta invalida do refresh');
+          }
+
+          localStorage.setItem('authToken', newToken);
+          localStorage.setItem('refreshToken', newRefreshToken);
+          window.dispatchEvent(new CustomEvent(AUTH_TOKEN_EVENT_NAME));
+
+          authExpiradaNotificada = false;
+          socket.auth = { token: newToken } as any;
+
+          if (!socket.connected) {
+            socket.connect();
+          }
+        } catch (refreshError) {
+          console.error('❌ Falha ao renovar token do WebSocket:', refreshError);
+          setError('Sessao expirada. Faca login novamente.');
+          socket.io.opts.reconnection = false;
+          socket.disconnect();
+        } finally {
+          refreshEmAndamento = false;
+        }
+      };
 
       // Guardar como instância global
       globalSocket = socket;
@@ -184,7 +247,13 @@ export const useWebSocket = (options: UseWebSocketOptions = {}): UseWebSocketRet
         setConnecting(false);
 
         if (reason === 'io server disconnect') {
-          // Reconectar se servidor desconectou
+          const tokenAtual = localStorage.getItem('authToken');
+          if (authExpiradaNotificada || tokenExpirado(tokenAtual)) {
+            void renovarTokenEReconectar();
+            return;
+          }
+
+          // Reconectar se servidor desconectou por outro motivo
           socket.connect();
         }
       });
@@ -195,26 +264,8 @@ export const useWebSocket = (options: UseWebSocketOptions = {}): UseWebSocketRet
 
         // 🔄 Se erro for de autenticação (token expirado), tentar obter novo token e reconectar
         if (err.message.includes('jwt expired') || err.message.includes('TokenExpiredError')) {
-          console.warn('⚠️ Token JWT expirado no WebSocket. Aguardando renovação...');
-
-          // Aguardar 2 segundos e tentar novamente (dar tempo para interceptor renovar)
-          setTimeout(() => {
-            const newToken = localStorage.getItem('authToken');
-            if (newToken && newToken !== token) {
-              console.log('🔄 Novo token detectado! Reconectando WebSocket...');
-              // Desconectar socket antigo
-              if (socketRef.current) {
-                socketRef.current.disconnect();
-                socketRef.current = null;
-                globalSocket = null;
-              }
-              // Reconectar com novo token
-              connect();
-            } else {
-              console.warn('⚠️ Token não foi renovado. WebSocket permanecerá desconectado.');
-              setError('Token expirado. Faça login novamente.');
-            }
-          }, 2000);
+          authExpiradaNotificada = true;
+          void renovarTokenEReconectar();
         } else {
           setError(err.message);
         }
@@ -229,6 +280,8 @@ export const useWebSocket = (options: UseWebSocketOptions = {}): UseWebSocketRet
       socket.off('ticket_transferido');
       socket.off('ticket_encerrado');
       socket.off('mensagem:digitando');
+      socket.off('auth:token-expired');
+      socket.off('auth:token-invalid');
 
       // Eventos de negócio
       socket.on('novo_ticket', (ticket: Ticket) => {
@@ -291,6 +344,17 @@ export const useWebSocket = (options: UseWebSocketOptions = {}): UseWebSocketRet
         if (events.onUsuarioDigitando) {
           events.onUsuarioDigitando(data);
         }
+      });
+
+      socket.on('auth:token-expired', () => {
+        authExpiradaNotificada = true;
+        void renovarTokenEReconectar();
+      });
+
+      socket.on('auth:token-invalid', () => {
+        setError('Token invalido para o WebSocket. Faca login novamente.');
+        socket.io.opts.reconnection = false;
+        socket.disconnect();
       });
 
       // Eventos de erro

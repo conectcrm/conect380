@@ -1,0 +1,17 @@
+services:
+  guardian-web:
+    build:
+      context: ./guardian-web
+      dockerfile: Dockerfile
+      args:
+        VITE_GUARDIAN_API_URL: ${GUARDIAN_WEB_API_URL:-http://localhost:3001}
+    container_name: conect360-guardian-web
+    restart: unless-stopped
+    ports:
+      - "${GUARDIAN_WEB_PORT:-3020}:80"
+    healthcheck:
+      test: ['CMD', 'wget', '--quiet', '--tries=1', '--spider', 'http://127.0.0.1/']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+

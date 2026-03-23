@@ -171,7 +171,7 @@ class EmpresaService {
         {
           id: 'starter',
           nome: 'Starter',
-          preco: 99,
+          preco: 149,
           descricao: 'Ideal para pequenas empresas',
           recursos: [
             'Até 3 usuários',
@@ -187,9 +187,9 @@ class EmpresaService {
           },
         },
         {
-          id: 'professional',
-          nome: 'Professional',
-          preco: 299,
+          id: 'business',
+          nome: 'Business',
+          preco: 549,
           descricao: 'Para empresas em crescimento',
           recursos: [
             'Até 10 usuários',
@@ -208,7 +208,7 @@ class EmpresaService {
         {
           id: 'enterprise',
           nome: 'Enterprise',
-          preco: 899,
+          preco: 1790,
           descricao: 'Para grandes operações',
           recursos: [
             'Usuários ilimitados',
@@ -326,7 +326,7 @@ class EmpresaService {
   ): Promise<EmpresaResponse> {
     try {
       const response = await api.put(`/empresas/${id}`, dados);
-      return response.data;
+      return response.data?.data || response.data;
     } catch (error: unknown) {
       console.error('Erro ao atualizar empresa:', error);
       throw new Error(getErrorMessage(error, 'Erro ao atualizar dados da empresa'));

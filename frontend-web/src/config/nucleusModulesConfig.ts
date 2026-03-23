@@ -15,13 +15,9 @@ import {
   Calendar,
   Zap,
   Globe,
-  PackageOpen,
   Target,
-  MessageSquare,
   Home,
-  AlertTriangle,
-  ClipboardList,
-  Mail,
+  ListChecks,
 } from 'lucide-react';
 import menuConfig, { MenuConfig } from './menuConfig';
 import { ModuleItem, NucleusModulesData } from '../components/navigation/ModulesScreen';
@@ -64,12 +60,12 @@ const resolveModule = (descriptor: ModuleDescriptor): ModuleItem => {
   const menuItem = descriptor.menuId ? findMenuItemById(descriptor.menuId) : undefined;
 
   if (descriptor.menuId && !menuItem) {
-    throw new Error(`Menu item "${descriptor.menuId}" não encontrado para o módulo do núcleo.`);
+    throw new Error(`Menu item "${descriptor.menuId}" n?o encontrado para o m?dulo do n?cleo.`);
   }
 
   return {
     id: descriptor.id ?? menuItem?.id ?? descriptor.menuId ?? 'module-without-id',
-    name: descriptor.name ?? menuItem?.title ?? 'Módulo',
+    name: descriptor.name ?? menuItem?.title ?? 'M?dulo',
     description: descriptor.description,
     href: descriptor.href ?? menuItem?.href ?? '#',
     icon: descriptor.icon ?? menuItem?.icon ?? Home,
@@ -84,13 +80,13 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
   principal: {
     id: 'principal',
     title: 'Principal',
-    description: 'Dashboard e visão geral do sistema',
+    description: 'Dashboard e vis?o geral do sistema',
     icon: Home,
     color: 'blue',
     modules: [
       {
         menuId: 'dashboard',
-        description: 'Visão geral com KPIs, gráficos e métricas principais do negócio.',
+        description: 'Vis?o geral com KPIs, gr?ficos e m?tricas principais do neg?cio.',
         notifications: 1,
       },
     ],
@@ -98,51 +94,41 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
   crm: {
     id: 'crm',
     title: 'CRM',
-    description: 'Gestão completa de relacionamento com clientes e contatos',
+    description: 'Gest?o completa de relacionamento com clientes e contatos',
     icon: Users,
     color: 'blue',
     modules: [
       {
         menuId: 'comercial-clientes',
         description:
-          'Cadastro e gestão completa de clientes, histórico de interações e segmentação avançada.',
+          'Cadastro e gest?o completa de clientes, hist?rico de intera??es e segmenta??o avan?ada.',
         notifications: 3,
         badge: 'Ativo',
         badgeColor: 'green',
       },
       {
         menuId: 'comercial-contatos',
-        description: 'Gestão de contatos e relacionamentos dentro das empresas clientes.',
+        description: 'Gest?o de contatos e relacionamentos dentro das empresas clientes.',
         badge: 'Ativo',
         badgeColor: 'green',
       },
       {
         menuId: 'comercial-leads',
-        description: 'Captura, qualificação e conversão de leads em oportunidades de negócio.',
+        description: 'Captura, qualifica??o e convers?o de leads em oportunidades de neg?cio.',
         badge: 'Novo',
         badgeColor: 'blue',
       },
       {
         menuId: 'comercial-pipeline',
         name: 'Pipeline de Vendas',
-        description: 'Visualização Kanban do funil de oportunidades com drag-and-drop entre etapas.',
+        description: 'Visualiza??o Kanban do funil de oportunidades com drag-and-drop entre etapas.',
         badge: 'Novo',
         badgeColor: 'blue',
       },
       {
-        id: 'interacoes',
-        name: 'Interações',
-        description: 'Histórico completo de interações, chamadas, e-mails e reuniões.',
-        href: '/interacoes',
-        icon: MessageSquare,
-        status: 'coming_soon',
-        badge: 'Em Breve',
-        badgeColor: 'yellow',
-      },
-      {
         id: 'agenda',
         name: 'Agenda',
-        description: 'Agendamento de reuniões, follow-ups e lembretes de contato.',
+        description: 'Agendamento de reuni?es, follow-ups e lembretes de contato.',
         href: '/agenda',
         icon: Calendar,
         notifications: 2,
@@ -154,23 +140,22 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
   vendas: {
     id: 'vendas',
     title: 'Vendas',
-    description: 'Gestão completa do pipeline de vendas, propostas e produtos',
+    description: 'Gest?o completa do pipeline de vendas, propostas e produtos',
     icon: TrendingUp,
     color: 'green',
     modules: [
       {
         menuId: 'comercial-propostas',
         description:
-          'Criação e acompanhamento de propostas comerciais com funil de vendas interativo.',
+          'Cria??o e acompanhamento de propostas comerciais com funil de vendas interativo.',
         notifications: 2,
         badge: 'Ativo',
         badgeColor: 'blue',
       },
       {
-        menuId: 'comercial-cotacoes',
-        description:
-          'Sistema completo de cotações com geração de PDF, envio por e-mail e controle de status.',
-        badge: 'Novo',
+        menuId: 'comercial-contratos',
+        description: 'Acompanhamento dos contratos gerados a partir de propostas aprovadas.',
+        badge: 'Ativo',
         badgeColor: 'green',
       },
       {
@@ -178,7 +163,7 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
         id: 'funil-vendas',
         name: 'Funil de Vendas',
         description:
-          'Pipeline visual de oportunidades com Kanban drag-and-drop e gestão completa do ciclo.',
+          'Pipeline visual de oportunidades com Kanban drag-and-drop e gest?o completa do ciclo.',
         href: '/funil-vendas',
         badge: 'Novo',
         badgeColor: 'green',
@@ -186,20 +171,13 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
       {
         menuId: 'comercial-produtos',
         description:
-          'Catálogo de produtos e serviços com preços dinâmicos e configurações personalizadas.',
-      },
-      {
-        menuId: 'comercial-combos',
-        description: 'Criação e gestão de combos e pacotes de produtos com descontos especiais.',
-        icon: PackageOpen,
-        badge: 'Novo',
-        badgeColor: 'green',
+          'Cat?logo de produtos e servi?os com pre?os din?micos e configura??es personalizadas.',
       },
       {
         menuId: 'comercial-leads',
         id: 'oportunidades',
         name: 'Oportunidades',
-        description: 'Gestão completa de oportunidades com estatísticas e pipeline consolidado.',
+        description: 'Gest?o completa de oportunidades com estat?sticas e pipeline consolidado.',
         href: '/oportunidades',
         icon: Target,
         badge: 'Ativo',
@@ -207,8 +185,8 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
       },
       {
         id: 'relatorios-vendas',
-        name: 'Relatórios',
-        description: 'Análises e relatórios detalhados de performance de vendas.',
+        name: 'Relat?rios',
+        description: 'An?lises e relat?rios detalhados de performance de vendas.',
         href: '/relatorios/vendas',
         icon: TrendingUp,
         status: 'coming_soon',
@@ -220,24 +198,46 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
   financeiro: {
     id: 'financeiro',
     title: 'Financeiro',
-    description: 'Controle financeiro completo com fluxo de caixa, contas e relatórios',
+    description: 'Controle financeiro completo com fluxo de caixa, contas e relat?rios',
     icon: TrendingUp,
     color: 'orange',
     modules: [
       {
-        menuId: 'financeiro-contas-receber',
-        description: 'Gestão de recebimentos, controle de inadimplência e relatórios de cobrança.',
-        notifications: 5,
+        id: 'financeiro-contas-receber',
+        name: 'Contas a Receber',
+        description: 'Gest?o de recebimentos, controle de inadimpl?ncia e relat?rios de cobran?a.',
+        href: '/financeiro/contas-receber',
+        icon: TrendingUp,
+        badge: 'Em desenvolvimento',
+        badgeColor: 'yellow',
+        status: 'coming_soon',
       },
       {
         menuId: 'financeiro-contas-pagar',
-        description: 'Controle de despesas, agendamento de pagamentos e análise de gastos.',
+        description: 'Controle de despesas, agendamento de pagamentos e an?lise de gastos.',
         notifications: 2,
       },
       {
-        menuId: 'financeiro-fluxo-caixa',
-        description: 'Visão completa do fluxo financeiro com projeções e análises detalhadas.',
+        menuId: 'comercial-cotacoes',
+        description:
+          'Gestao de cotacoes de compras com geracao de PDF, envio por email e controle de status.',
+        badge: 'Novo',
+        badgeColor: 'green',
+      },
+      {
+        menuId: 'comercial-aprovacoes',
+        description: 'Fila de aprovacoes das cotacoes de compras pendentes por responsavel.',
+        icon: ListChecks,
+      },
+      {
+        id: 'financeiro-fluxo-caixa',
+        name: 'Fluxo de Caixa',
+        description: 'Vis?o completa do fluxo financeiro com proje??es e an?lises detalhadas.',
+        href: '/financeiro/fluxo-caixa',
         icon: PiggyBank,
+        badge: 'Em desenvolvimento',
+        badgeColor: 'yellow',
+        status: 'coming_soon',
       },
       {
         menuId: 'financeiro-fornecedores',
@@ -245,15 +245,25 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
         icon: Users,
       },
       {
+        menuId: 'financeiro-contas-bancarias',
+        description: 'Cadastro e gestao das contas bancarias usadas no fluxo de pagamentos.',
+        icon: Building2,
+      },
+      {
+        menuId: 'financeiro-aprovacoes',
+        description: 'Fila de pendencias para aprovacao financeira individual e em lote.',
+        icon: ListChecks,
+      },
+      {
         menuId: 'financeiro-faturamento',
-        description: 'Gestão completa de faturas, cobranças e recebimentos.',
+        description: 'Gest?o completa de faturas, cobran?as e recebimentos.',
         icon: FileText,
         notifications: 3,
       },
       {
         id: 'relatorios-financeiros',
-        name: 'Relatórios Financeiros',
-        description: 'Relatórios gerenciais, DRE, balanço patrimonial e análises financeiras.',
+        name: 'Relat?rios Financeiros',
+        description: 'Relat?rios gerenciais, DRE, balan?o patrimonial e an?lises financeiras.',
         href: '/financeiro/relatorios',
         icon: BarChart3,
         badge: 'Q2 2025',
@@ -261,29 +271,20 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
         status: 'coming_soon',
       },
       {
-        id: 'conciliacao',
-        name: 'Conciliação Bancária',
-        description: 'Conciliação automática de extratos bancários e controle de divergências.',
-        href: '/financeiro/conciliacao',
+        menuId: 'financeiro-conciliacao',
+        description: 'Importacao de extratos OFX/CSV e preparacao de lancamentos para conciliacao.',
         icon: Building2,
-        badge: 'Q2 2025',
-        badgeColor: 'blue',
-        status: 'coming_soon',
       },
       {
-        id: 'centro-custos',
-        name: 'Centro de Custos',
-        description: 'Organização e controle de custos por departamento, projeto ou categoria.',
-        href: '/financeiro/centro-custos',
+        menuId: 'financeiro-centro-custos',
+        description:
+          'Cadastro estruturado de centros de custo com ativacao, desativacao e uso no contas a pagar.',
         icon: Calculator,
-        badge: 'Q1 2025',
-        badgeColor: 'purple',
-        status: 'coming_soon',
       },
       {
         id: 'tesouraria',
         name: 'Tesouraria',
-        description: 'Gestão de caixa, movimentações bancárias e controle de liquidez.',
+        description: 'Gest?o de caixa, movimenta??es banc?rias e controle de liquidez.',
         href: '/financeiro/tesouraria',
         icon: Repeat,
         badge: 'Q3 2025',
@@ -294,33 +295,24 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
   },
   configuracoes: {
     id: 'configuracoes',
-    title: 'Configurações',
-    description: 'Central de configurações do sistema, integrações e preferências',
+    title: 'Configura??es',
+    description: 'Central de configura??es do sistema, integra??es e prefer?ncias',
     icon: Settings,
     color: 'purple',
     modules: [
       {
-        menuId: 'configuracoes-sistema',
-        description: 'Configurações gerais do sistema, tema, idioma e preferências pessoais.',
-      },
-      {
         menuId: 'configuracoes-empresa',
-        description: 'Dados cadastrais, CNPJ, endereço e informações fiscais.',
+        description: 'Dados cadastrais, CNPJ, endere?o e informa??es fiscais.',
       },
       {
         menuId: 'configuracoes-usuarios',
-        description: 'Gestão de usuários, permissões e controle de acesso.',
+        description: 'Gest?o de usu?rios, permiss?es e controle de acesso.',
       },
       {
         menuId: 'configuracoes-metas',
-        description: 'Definição de metas de vendas por período, vendedor e região.',
+        description: 'Defini??o de metas de vendas por per?odo, vendedor e regi?o.',
         badge: 'Essencial',
         badgeColor: 'green',
-      },
-      {
-        menuId: 'configuracoes-email',
-        description: 'Configuração de SMTP, templates de e-mail e notificações.',
-        icon: Mail,
       },
       {
         menuId: 'configuracoes-integracoes',
@@ -330,102 +322,48 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
       },
       {
         menuId: 'configuracoes-backup',
-        description: 'Gestão de backups automáticos e sincronização entre empresas.',
-      },
-      {
-        menuId: 'configuracoes-seguranca',
-        description: 'Configurações de segurança, 2FA e políticas de acesso.',
-        badge: 'Crítico',
-        badgeColor: 'red',
+        description: 'Gest?o de backups autom?ticos e sincroniza??o entre empresas.',
       },
     ],
   },
   administracao: {
     id: 'administracao',
-    title: 'Administração',
-    description: 'Gestão empresarial e controle administrativo avançado',
+    title: 'Administra??o',
+    description: 'Gest?o empresarial e controle administrativo avan?ado',
     icon: Building2,
     color: 'blue',
     modules: [
       {
         menuId: 'admin-empresas',
-        description: 'Administração de empresas, contratos e planos do sistema.',
+        description: 'Administra??o de empresas, contratos e planos do sistema.',
         notifications: 3,
-        badge: 'Crítico',
+        badge: 'Cr?tico',
         badgeColor: 'red',
       },
       {
         menuId: 'admin-usuarios',
-        name: 'Usuários & Permissões',
-        description: 'Controle de acesso, perfis de usuário e permissões granulares.',
-        href: '/gestao/usuarios',
+        name: 'Usu?rios & Permiss?es',
+        description: 'Controle de acesso, perfis de usu?rio e permiss?es granulares.',
+        href: '/configuracoes/usuarios',
         icon: UserCheck,
         notifications: 1,
       },
       {
-        id: 'relatorios-avancados',
-        name: 'Relatórios Avançados',
-        description: 'Analytics empresarial, dashboards executivos e KPIs estratégicos.',
-        href: '/admin/relatorios',
-        icon: BarChart3,
-        badge: 'Premium',
-        badgeColor: 'purple',
-      },
-      {
-        id: 'auditoria-logs',
-        name: 'Auditoria & Logs',
-        description: 'Rastreamento de ações, logs de sistema e conformidade.',
-        href: '/admin/auditoria',
-        icon: FileText,
-      },
-      {
-        id: 'monitoramento-sistema',
-        name: 'Monitoramento',
-        description: 'Status do sistema, performance e alertas de infraestrutura.',
-        href: '/admin/monitoramento',
-        icon: AlertTriangle,
-        notifications: 2,
-        badge: 'Ativo',
-        badgeColor: 'yellow',
-      },
-      {
-        id: 'dados-analytics',
-        name: 'Dados & Analytics',
-        description: 'Análise de dados, métricas de uso e inteligência de negócios.',
-        href: '/admin/analytics',
-        icon: Database,
-        badge: 'Beta',
-        badgeColor: 'yellow',
-        status: 'beta',
-      },
-      {
-        id: 'politicas-conformidade',
-        name: 'Políticas & Conformidade',
-        description: 'Gestão de políticas internas, LGPD e compliance regulatório.',
-        href: '/admin/conformidade',
-        icon: ClipboardList,
-      },
-      {
-        id: 'controle-acesso',
-        name: 'Controle de Acesso',
-        description: 'Configuração de roles, permissões e políticas de segurança avançadas.',
-        href: '/admin/acesso',
-        icon: Shield,
-        badge: 'Seguro',
-        badgeColor: 'green',
+        menuId: 'admin-sistema',
+        description: 'Definicao de branding global e identidade visual do sistema.',
       },
     ],
   },
   gestao: {
     id: 'gestao',
-    title: 'Gestão',
-    description: 'Administração empresarial e controle operacional',
+    title: 'Gest?o',
+    description: 'Administra??o empresarial e controle operacional',
     icon: Building2,
     color: 'blue',
     modules: [
       {
         id: 'gestao-empresas',
-        name: 'Gestão de Empresas',
+        name: 'Gest?o de Empresas',
         description: 'Gerenciamento completo de empresas, contratos e planos no sistema.',
         href: '/gestao/empresas',
         icon: Building2,
@@ -435,8 +373,8 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
       },
       {
         id: 'gestao-usuarios',
-        name: 'Gestão de Usuários',
-        description: 'Administração de usuários, permissões e perfis de acesso.',
+        name: 'Gest?o de Usu?rios',
+        description: 'Administra??o de usu?rios, permiss?es e perfis de acesso.',
         href: '/gestao/usuarios',
         icon: Users,
         notifications: 1,
@@ -445,7 +383,7 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
       {
         id: 'controle-acesso',
         name: 'Controle de Acesso',
-        description: 'Configuração de roles, permissões e políticas de segurança.',
+        description: 'Configura??o de roles, permiss?es e pol?ticas de seguran?a.',
         href: '/gestao/acesso',
         icon: Shield,
         status: 'beta',
@@ -453,7 +391,7 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
       {
         id: 'portal-cliente',
         name: 'Portal do Cliente',
-        description: 'Gestão e configuração do portal de acesso dos clientes às propostas.',
+        description: 'Gest?o e configura??o do portal de acesso dos clientes ?s propostas.',
         href: '/portal',
         icon: Globe,
         badge: 'Ativo',
@@ -469,7 +407,7 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
       },
       {
         id: 'metricas-operacionais',
-        name: 'Métricas Operacionais',
+        name: 'M?tricas Operacionais',
         description: 'Dashboard executivo com KPIs e indicadores de performance.',
         href: '/gestao/metricas',
         icon: BarChart3,
@@ -478,7 +416,7 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
       {
         id: 'backup-restore',
         name: 'Backup e Restore',
-        description: 'Gestão de backups automáticos e restauração de dados.',
+        description: 'Gest?o de backups autom?ticos e restaura??o de dados.',
         href: '/gestao/backup',
         icon: Database,
         status: 'coming_soon',
@@ -486,7 +424,7 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
       {
         id: 'compliance',
         name: 'Compliance',
-        description: 'Conformidade com LGPD, ISO e outras regulamentações.',
+        description: 'Conformidade com LGPD, ISO e outras regulamenta??es.',
         href: '/gestao/compliance',
         icon: UserCheck,
         badge: 'LGPD',
@@ -495,16 +433,16 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
       },
       {
         id: 'manutencao',
-        name: 'Manutenção',
-        description: 'Agendamento de manutenções, atualizações e downtime planejado.',
+        name: 'Manuten??o',
+        description: 'Agendamento de manuten??es, atualiza??es e downtime planejado.',
         href: '/gestao/manutencao',
         icon: Calendar,
         status: 'coming_soon',
       },
       {
         id: 'automacao',
-        name: 'Automação',
-        description: 'Configuração de workflows automáticos e regras de negócio.',
+        name: 'Automa??o',
+        description: 'Configura??o de workflows autom?ticos e regras de neg?cio.',
         href: '/gestao/automacao',
         icon: Zap,
         status: 'coming_soon',
@@ -514,15 +452,15 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
   sistema: {
     id: 'sistema',
     title: 'Sistema',
-    description: 'Configurações e administração do sistema',
+    description: 'Configura??es e administra??o do sistema',
     icon: Settings,
     color: 'purple',
     modules: [
       {
         id: 'configuracoes',
-        name: 'Configurações',
-        description: 'Configurações gerais do sistema, permissões e preferências.',
-        href: '/configuracoes',
+        name: 'Configura??es',
+        description: 'Configura??es gerais do sistema, permiss?es e prefer?ncias.',
+        href: '/configuracoes/empresa',
         icon: Settings,
         notifications: 1,
       },
@@ -534,7 +472,7 @@ export const getNucleusModulesData = (nucleusId: string): NucleusModulesData => 
   const descriptor = nucleusDescriptors[nucleusId];
 
   if (!descriptor) {
-    throw new Error(`Núcleo "${nucleusId}" não configurado.`);
+    throw new Error(`N?cleo "${nucleusId}" n?o configurado.`);
   }
 
   return {

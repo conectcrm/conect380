@@ -89,16 +89,13 @@ export class NucleoService {
 
       const result = await query.getMany();
 
-      console.log('[DEBUG NUCLEO] Query executada com sucesso!');
-      console.log('[DEBUG NUCLEO] Resultados encontrados:', result.length);
-      console.log('[DEBUG NUCLEO] ========== FIM findAll ==========');
+      this.logger.debug('[NUCLEO] Query executada com sucesso');
+      this.logger.debug(`[NUCLEO] Resultados encontrados: ${result.length}`);
+      this.logger.debug('[NUCLEO] Fim findAll');
 
       return result;
     } catch (error) {
-      console.error('[DEBUG NUCLEO] ❌ ERRO CAPTURADO:');
-      console.error('[DEBUG NUCLEO] Mensagem:', error.message);
-      console.error('[DEBUG NUCLEO] Stack:', error.stack);
-      console.error('[DEBUG NUCLEO] ========== FIM COM ERRO ==========');
+      this.logger.error(`[NUCLEO] Erro no findAll: ${error.message}`, error.stack);
       throw error;
     }
   }
@@ -301,7 +298,7 @@ export class NucleoService {
    * Filtra por horário de funcionamento e disponibilidade
    */
   async findOpcoesParaBot(empresaId: string): Promise<any[]> {
-    console.log('🔍 [NUCLEO DEBUG] Buscando núcleos para empresaId:', empresaId);
+    this.logger.debug(`[NUCLEO] Buscando núcleos para empresaId: ${empresaId}`);
     const nucleos = await this.nucleoRepository
       .createQueryBuilder('nucleo')
       .leftJoinAndSelect('nucleo.empresa', 'empresa')
@@ -312,19 +309,19 @@ export class NucleoService {
       .addOrderBy('nucleo.nome', 'ASC')
       .getMany();
 
-    console.log('🔍 [NUCLEO DEBUG] Núcleos encontrados:', nucleos.length);
-    console.log(
+    this.logger.debug(`[NUCLEO] Núcleos encontrados: ${nucleos.length}`);
+    this.logger.debug(
       '🔍 [NUCLEO DEBUG] Núcleos:',
       nucleos.map((n) => ({ id: n.id, nome: n.nome, empresaId: n.empresaId })),
     );
 
     // Para cada núcleo, buscar departamentos visíveis e verificar horário
-    console.log('🔍 [NUCLEO DEBUG] Processando núcleos e verificando disponibilidade...');
+    this.logger.debug('[NUCLEO] Processando núcleos e verificando disponibilidade');
     const dataAtual = new Date();
 
     const resultado = await Promise.all(
       nucleos.map(async (nucleo) => {
-        console.log('🔍 [NUCLEO DEBUG] Processando núcleo:', nucleo.nome, 'ID:', nucleo.id);
+        this.logger.debug(`[NUCLEO] Processando núcleo: ${nucleo.nome} (${nucleo.id})`);
 
         // Verificar horário de funcionamento
         const verificacaoHorario = HorarioUtil.verificarDisponibilidade(
@@ -332,7 +329,7 @@ export class NucleoService {
           dataAtual,
         );
 
-        console.log('⏰ [NUCLEO DEBUG] Verificação horário:', {
+        this.logger.debug('[NUCLEO] Verificação horário', {
           nucleo: nucleo.nome,
           estaAberto: verificacaoHorario.estaAberto,
           motivo: verificacaoHorario.motivoFechado,
@@ -340,7 +337,7 @@ export class NucleoService {
 
         // ✅ ATUALIZADO: Núcleos agora são a estrutura principal (não mais departamentos)
         // Núcleos substituíram os departamentos na nova arquitetura
-        console.log('✅ [NUCLEO DEBUG] Núcleo processado:', nucleo.nome);
+        this.logger.debug(`[NUCLEO] Núcleo processado: ${nucleo.nome}`);
 
         return {
           id: nucleo.id,
@@ -361,15 +358,15 @@ export class NucleoService {
       }),
     );
 
-    console.log('🔍 [NUCLEO DEBUG] Total de núcleos processados:', resultado.length);
-    console.log(
+    this.logger.debug(`[NUCLEO] Total de núcleos processados: ${resultado.length}`);
+    this.logger.debug(
       '🔍 [NUCLEO DEBUG] Núcleos disponíveis:',
       resultado.filter((n) => n.disponivel).length,
     );
 
     // ✅ ATUALIZADO: Retornar TODOS os núcleos visíveis no bot (não filtrar por departamentos)
     // Na nova arquitetura, os núcleos são a entidade principal
-    console.log('✅ [NUCLEO DEBUG] Retornando todos os', resultado.length, 'núcleos visíveis');
+    this.logger.debug(`[NUCLEO] Retornando ${resultado.length} núcleos visíveis`);
 
     return resultado;
   }

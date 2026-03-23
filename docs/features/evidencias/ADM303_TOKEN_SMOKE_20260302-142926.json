@@ -1,0 +1,18 @@
+﻿{
+    "executed_at":  "2026-03-02T14:29:26",
+    "base_url":  "https://api.conect360.com",
+    "validation_mode":  "token_signed_with_jwt_secret",
+    "reason":  "Login administrativo bloqueado por MFA email com SMTP sem credenciais",
+    "request_id":  "1899c25c-b944-49ad-af38-2fd2a84f2371",
+    "statuses":  {
+                     "target_before":  403,
+                     "target_during_break_glass":  200,
+                     "target_after_revoke":  403
+                 },
+    "audit_break_glass_detected":  true,
+    "result":  "PASS",
+    "notes":  [
+                  "Fluxo funcional validado: create -\u003e approve -\u003e active -\u003e revoke",
+                  "Usuarios tecnicos temporarios removidos apos validacao"
+              ]
+}

@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 260" role="img" aria-labelledby="title desc" shape-rendering="geometricPrecision">
+  <title id="title">Conect360 Logo Horizontal</title>
+  <desc id="desc">Logo horizontal com icone a esquerda e wordmark Conect360.</desc>
+  <defs>
+    <linearGradient id="h-base" x1="34" y1="24" x2="224" y2="224" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E8F6F0" />
+      <stop offset="0.42" stop-color="#BEE8E1" />
+      <stop offset="1" stop-color="#159A9C" />
+    </linearGradient>
+    <linearGradient id="h-ribbon-light" x1="8" y1="86" x2="246" y2="208" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#DEEFE7" />
+      <stop offset="0.55" stop-color="#6CCBC2" />
+      <stop offset="1" stop-color="#159A9C" />
+    </linearGradient>
+    <linearGradient id="h-ribbon-mid" x1="20" y1="212" x2="242" y2="104" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#159A9C" />
+      <stop offset="1" stop-color="#0D7F96" />
+    </linearGradient>
+    <linearGradient id="h-ribbon-dark" x1="78" y1="52" x2="218" y2="196" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0A3E74" />
+      <stop offset="0.6" stop-color="#064B83" />
+      <stop offset="1" stop-color="#002333" />
+    </linearGradient>
+    <linearGradient id="h-ribbon-deep" x1="58" y1="182" x2="202" y2="78" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0C5A9A" />
+      <stop offset="0.45" stop-color="#0A3E74" />
+      <stop offset="1" stop-color="#002333" />
+    </linearGradient>
+    <linearGradient id="h-gloss" x1="34" y1="30" x2="132" y2="114" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.6" />
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0" />
+    </linearGradient>
+    <clipPath id="h-hex-clip">
+      <path d="M128 10 L204 54 Q214 60 214 72 L214 184 Q214 196 204 202 L128 246 Q118 252 108 246 L32 202 Q22 196 22 184 L22 72 Q22 60 32 54 L108 10 Q118 4 128 10 Z" />
+    </clipPath>
+  </defs>
+
+  <g transform="translate(0,0) scale(0.88)">
+    <g clip-path="url(#h-hex-clip)">
+      <rect x="0" y="0" width="256" height="256" fill="url(#h-base)" />
+      <path d="M-26 188 C34 132 86 110 146 100 C192 92 226 76 274 34 L274 278 L-26 278 Z" fill="url(#h-ribbon-light)" opacity="0.95"/>
+      <path d="M-30 218 C28 150 82 130 144 126 C192 123 230 106 282 66 L282 142 C234 176 190 192 144 194 C94 196 48 214 -10 274 Z" fill="url(#h-ribbon-mid)" opacity="0.96"/>
+      <path d="M52 74 C77 45 116 35 154 40 C183 44 211 62 226 88 C205 80 186 78 167 82 C133 89 109 113 106 145 C104 168 114 188 132 201 C100 199 69 186 49 162 C26 133 27 100 52 74 Z" fill="url(#h-ribbon-dark)"/>
+      <path d="M159 46 C188 53 214 74 227 97 C239 120 239 151 224 174 C213 190 196 201 178 206 C194 188 201 164 196 141 C190 113 171 90 143 80 C131 75 118 74 104 76 C120 54 142 42 159 46 Z" fill="url(#h-ribbon-deep)" opacity="0.92"/>
+      <path d="M22 72 Q22 60 32 54 L108 10 Q118 4 128 10 L66 76 C59 82 51 90 44 100 L22 128 Z" fill="url(#h-gloss)"/>
+    </g>
+    <path d="M128 10 L204 54 Q214 60 214 72 L214 184 Q214 196 204 202 L128 246 Q118 252 108 246 L32 202 Q22 196 22 184 L22 72 Q22 60 32 54 L108 10 Q118 4 128 10 Z" fill="none" stroke="#002333" stroke-opacity="0.16" stroke-width="2"/>
+    <path d="M97 86 L97 170 L171 128 Z" fill="#FFFFFF" stroke="#0D3D70" stroke-width="8" stroke-linejoin="round"/>
+  </g>
+
+  <text
+    x="250"
+    y="154"
+    fill="#082C54"
+    font-family="Poppins, Montserrat, 'Segoe UI', Arial, sans-serif"
+    font-size="98"
+    font-weight="700"
+    letter-spacing="-1.2"
+  >
+    Conect360
+  </text>
+</svg>

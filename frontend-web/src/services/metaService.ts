@@ -7,7 +7,7 @@ export interface Meta {
   tipo: MetaTipo;
   periodo: string;
   valor: number;
-  vendedorId?: number;
+  vendedorId?: string;
   regiao?: string;
   descricao?: string;
   ativa: boolean;
@@ -20,7 +20,7 @@ export interface CreateMetaDto {
   tipo: MetaTipo;
   periodo: string;
   valor: number;
-  vendedorId?: number;
+  vendedorId?: string;
   regiao?: string;
   descricao?: string;
   empresaId?: string;
@@ -33,7 +33,7 @@ export interface UpdateMetaDto extends Partial<CreateMetaDto> {
 export interface ListMetasParams {
   tipo?: MetaTipo;
   periodo?: string;
-  vendedorId?: number;
+  vendedorId?: string;
   regiao?: string;
 }
 
@@ -64,7 +64,7 @@ export const metaService = {
     await api.delete(`${basePath}/${id}`);
   },
 
-  async buscarMetaAtual(vendedorId?: number, regiao?: string): Promise<Meta | null> {
+  async buscarMetaAtual(vendedorId?: string, regiao?: string): Promise<Meta | null> {
     const response = await api.get(`${basePath}/atual`, { params: { vendedorId, regiao } });
     return response.data;
   },

@@ -4,10 +4,144 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  ValueTransformer,
   // ManyToOne,
   // JoinColumn,
 } from 'typeorm';
+import * as crypto from 'crypto';
 // import { Empresa } from '../../../../empresas/entities/empresa.entity';
+
+const ENCRYPTED_PREFIX = 'enc:v1:';
+let invalidEncryptionKeyWarned = false;
+
+const getEncryptionKey = (): Buffer | null => {
+  const rawKey = (process.env.ENCRYPTION_KEY || '').trim();
+
+  if (!rawKey) {
+    return null;
+  }
+
+  const isHex64 = /^[a-fA-F0-9]{64}$/.test(rawKey);
+  if (!isHex64) {
+    if (!invalidEncryptionKeyWarned) {
+      invalidEncryptionKeyWarned = true;
+      // Warning sem expor segredo; fallback mantém compatibilidade de ambiente.
+      // eslint-disable-next-line no-console
+      console.warn('[EmpresaConfig] ENCRYPTION_KEY inválida. Segredos serão mantidos em texto puro.');
+    }
+    return null;
+  }
+
+  return Buffer.from(rawKey, 'hex');
+};
+
+const encryptSecret = (value: string): string => {
+  const key = getEncryptionKey();
+  if (!key) {
+    return value;
+  }
+
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+  let encrypted = cipher.update(value, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+
+  return `${ENCRYPTED_PREFIX}${iv.toString('hex')}:${encrypted}`;
+};
+
+const decryptSecret = (value: string): string => {
+  if (!value.startsWith(ENCRYPTED_PREFIX)) {
+    return value;
+  }
+
+  const key = getEncryptionKey();
+  if (!key) {
+    return value;
+  }
+
+  try {
+    const payload = value.slice(ENCRYPTED_PREFIX.length);
+    const [ivHex, encryptedHex] = payload.split(':');
+    if (!ivHex || !encryptedHex) {
+      return value;
+    }
+
+    const iv = Buffer.from(ivHex, 'hex');
+    const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+    let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
+  } catch {
+    return value;
+  }
+};
+
+const encryptedNullableStringTransformer: ValueTransformer = {
+  to: (value: string | null | undefined) => {
+    if (typeof value !== 'string' || value.length === 0) {
+      return value ?? null;
+    }
+
+    if (value.startsWith(ENCRYPTED_PREFIX)) {
+      return value;
+    }
+
+    return encryptSecret(value);
+  },
+  from: (value: string | null | undefined) => {
+    if (typeof value !== 'string' || value.length === 0) {
+      return value ?? null;
+    }
+
+    return decryptSecret(value);
+  },
+};
+
+const ipWhitelistTransformer: ValueTransformer = {
+  to: (value: string[] | string | null | undefined) => {
+    if (value == null) {
+      return null;
+    }
+
+    if (Array.isArray(value)) {
+      const normalized = value.map((ip) => ip.trim()).filter(Boolean);
+      return normalized.length > 0 ? JSON.stringify(normalized) : null;
+    }
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : null;
+    }
+
+    return null;
+  },
+  from: (value: string | null | undefined) => {
+    if (!value) {
+      return null;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((ip) => (typeof ip === 'string' ? ip.trim() : ''))
+          .filter((ip) => ip.length > 0);
+      }
+    } catch {
+      // Legacy fallback: aceita dados antigos separados por linha/virgula.
+    }
+
+    return trimmed
+      .split(/[\r\n,]+/)
+      .map((ip) => ip.trim())
+      .filter((ip) => ip.length > 0);
+  },
+};
 
 @Entity('empresa_configuracoes')
 export class EmpresaConfig {
@@ -60,8 +194,8 @@ export class EmpresaConfig {
   @Column({ name: 'force_ssl', default: false })
   forceSsl: boolean;
 
-  @Column({ name: 'ip_whitelist', type: 'text', nullable: true })
-  ipWhitelist: string;
+  @Column({ name: 'ip_whitelist', type: 'text', nullable: true, transformer: ipWhitelistTransformer })
+  ipWhitelist: string[] | null;
 
   // Configurações de Usuários
   @Column({ name: 'limite_usuarios', default: 10 })
@@ -72,6 +206,30 @@ export class EmpresaConfig {
 
   @Column({ name: 'convite_expiracao_horas', default: 48 })
   conviteExpiracaoHoras: number;
+
+  @Column({
+    name: 'alcada_aprovacao_financeira',
+    type: 'decimal',
+    precision: 15,
+    scale: 2,
+    nullable: true,
+  })
+  alcadaAprovacaoFinanceira: number | null;
+
+  @Column({
+    name: 'comercial_limite_desconto_percentual',
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    default: 10,
+  })
+  comercialLimiteDescontoPercentual: number;
+
+  @Column({
+    name: 'comercial_aprovacao_interna_habilitada',
+    default: true,
+  })
+  comercialAprovacaoInternaHabilitada: boolean;
 
   // Configurações de Email/SMTP
   @Column({ name: 'emails_habilitados', default: true })
@@ -86,7 +244,7 @@ export class EmpresaConfig {
   @Column({ name: 'smtp_usuario', nullable: true })
   smtpUsuario: string;
 
-  @Column({ name: 'smtp_senha', nullable: true })
+  @Column({ name: 'smtp_senha', nullable: true, transformer: encryptedNullableStringTransformer })
   smtpSenha: string;
 
   // Configurações de Comunicação (WhatsApp, SMS, Push)
@@ -96,7 +254,11 @@ export class EmpresaConfig {
   @Column({ name: 'whatsapp_numero', nullable: true })
   whatsappNumero: string;
 
-  @Column({ name: 'whatsapp_api_token', nullable: true })
+  @Column({
+    name: 'whatsapp_api_token',
+    nullable: true,
+    transformer: encryptedNullableStringTransformer,
+  })
   whatsappApiToken: string;
 
   @Column({ name: 'sms_habilitado', default: false })
@@ -111,7 +273,7 @@ export class EmpresaConfig {
   })
   smsProvider: 'twilio' | 'nexmo' | 'sinch' | null;
 
-  @Column({ name: 'sms_api_key', nullable: true })
+  @Column({ name: 'sms_api_key', nullable: true, transformer: encryptedNullableStringTransformer })
   smsApiKey: string;
 
   @Column({ name: 'push_habilitado', default: false })
@@ -126,7 +288,7 @@ export class EmpresaConfig {
   })
   pushProvider: 'fcm' | 'apns' | 'onesignal' | null;
 
-  @Column({ name: 'push_api_key', nullable: true })
+  @Column({ name: 'push_api_key', nullable: true, transformer: encryptedNullableStringTransformer })
   pushApiKey: string;
 
   // Configurações de Integrações
@@ -135,6 +297,41 @@ export class EmpresaConfig {
 
   @Column({ name: 'webhooks_ativos', default: 0 })
   webhooksAtivos: number;
+
+  @Column({ name: 'fiscal_provider', nullable: true })
+  fiscalProvider: string | null;
+
+  @Column({ name: 'fiscal_official_http_enabled', nullable: true })
+  fiscalOfficialHttpEnabled: boolean | null;
+
+  @Column({ name: 'fiscal_require_official_provider', nullable: true })
+  fiscalRequireOfficialProvider: boolean | null;
+
+  @Column({ name: 'fiscal_official_base_url', nullable: true })
+  fiscalOfficialBaseUrl: string | null;
+
+  @Column({ name: 'fiscal_official_strict_response', nullable: true })
+  fiscalOfficialStrictResponse: boolean | null;
+
+  @Column({ name: 'fiscal_official_webhook_allow_insecure', nullable: true })
+  fiscalOfficialWebhookAllowInsecure: boolean | null;
+
+  @Column({ name: 'fiscal_official_correlation_header', nullable: true })
+  fiscalOfficialCorrelationHeader: string | null;
+
+  @Column({
+    name: 'fiscal_official_api_token',
+    nullable: true,
+    transformer: encryptedNullableStringTransformer,
+  })
+  fiscalOfficialApiToken: string | null;
+
+  @Column({
+    name: 'fiscal_official_webhook_secret',
+    nullable: true,
+    transformer: encryptedNullableStringTransformer,
+  })
+  fiscalOfficialWebhookSecret: string | null;
 
   // Configurações de Backup
   @Column({ name: 'backup_automatico', default: true })

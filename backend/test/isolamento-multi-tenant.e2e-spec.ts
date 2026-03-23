@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
+import { createE2EApp, withE2EBootstrapLock } from './_support/e2e-app.helper';
 import * as request from 'supertest';
 import * as bcrypt from 'bcryptjs';
 import { DataSource } from 'typeorm';
@@ -31,13 +32,11 @@ describe('Isolamento Multi-Tenant (E2E)', () => {
   jest.setTimeout(120000);
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
+    const moduleFixture: TestingModule = await withE2EBootstrapLock(() => Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    }).compile());
 
-    app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-    await app.init();
+    app = await createE2EApp(moduleFixture);
 
     dataSource = app.get(DataSource);
 
@@ -85,6 +84,21 @@ describe('Isolamento Multi-Tenant (E2E)', () => {
   async function criarEmpresasEUsuarios() {
     empresaAId = await criarEmpresa('A');
     empresaBId = await criarEmpresa('B');
+
+    // JwtStrategy exige assinatura ativa para tenants comuns.
+    // Como este E2E foca em isolamento multi-tenant (RLS + scoping),
+    // marcamos as empresas como platform owner para evitar acoplamento em billing/catalogo.
+    await dataSource.query(
+      `
+        UPDATE empresas
+        SET configuracoes = (
+          COALESCE(configuracoes::jsonb, '{}'::jsonb)
+          || '{"isPlatformOwner": true, "billingExempt": true, "billingMonitorOnly": true, "fullModuleAccess": true}'::jsonb
+        )::json
+        WHERE id = ANY($1::uuid[])
+      `,
+      [[empresaAId, empresaBId]],
+    );
 
     const senhaHash = await bcrypt.hash(testPassword, 10);
 
@@ -160,7 +174,7 @@ describe('Isolamento Multi-Tenant (E2E)', () => {
         .send({
           nome: 'Cliente A E2E',
           email: `cliente-a-${runId}@teste.com`,
-          telefone: '11999999999',
+          telefone: '+5511999999999',
           tipo: 'pessoa_fisica',
         })
         .expect(201);
@@ -177,7 +191,7 @@ describe('Isolamento Multi-Tenant (E2E)', () => {
         .send({
           nome: 'Cliente B E2E',
           email: `cliente-b-${runId}@teste.com`,
-          telefone: '11988888888',
+          telefone: '+5511988888888',
           tipo: 'pessoa_fisica',
         })
         .expect(201);
@@ -298,3 +312,4 @@ describe('Isolamento Multi-Tenant (E2E)', () => {
     });
   });
 });
+

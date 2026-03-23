@@ -91,3 +91,4 @@ if ($violations.Count -gt 0) {
 }
 
 Write-Host "Lint budget check passed."
+exit 0

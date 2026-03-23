@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Clock,
   Plus,
   Edit2,
   Trash2,
@@ -8,7 +7,6 @@ import {
   X,
   Settings,
   AlertCircle,
-  CheckCircle,
   Bell,
 } from 'lucide-react';
 import { BackToNucleus } from '../components/navigation/BackToNucleus';
@@ -18,8 +16,11 @@ import slaService, {
   UpdateSlaConfigDto,
   HorarioFuncionamento,
 } from '../services/slaService';
+import { useGlobalConfirmation } from '../contexts/GlobalConfirmationContext';
+import { FiltersBar, InlineStats, PageHeader, SectionCard } from '../components/layout-v2';
 
 const ConfiguracaoSLAPage: React.FC = () => {
+  const { confirm } = useGlobalConfirmation();
   const [configs, setConfigs] = useState<SlaConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -196,7 +197,7 @@ const ConfiguracaoSLAPage: React.FC = () => {
 
   // Deletar
   const handleDeletar = async (id: string) => {
-    if (!window.confirm('Tem certeza que deseja deletar esta configuração SLA?')) {
+    if (!(await confirm('Tem certeza que deseja deletar esta configuração SLA?'))) {
       return;
     }
 
@@ -235,153 +236,122 @@ const ConfiguracaoSLAPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="space-y-4 pt-1 sm:pt-2">
       {/* Header com BackToNucleus */}
-      <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus nucleusName="Atendimento" nucleusPath="/nuclei/atendimento" />
+      <div className="px-2 sm:px-0">
+        <SectionCard className="px-4 py-3">
+          <BackToNucleus nucleusName="Atendimento" nucleusPath="/nuclei/atendimento" />
+        </SectionCard>
       </div>
 
-      <div className="p-6">
+      <div className="px-2 sm:px-0">
         <div className="max-w-7xl mx-auto">
           {/* Header da página */}
-          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-[#002333] flex items-center">
-                  <Settings className="h-8 w-8 mr-3 text-[#159A9C]" />
-                  Configurações de SLA
-                </h1>
-                <p className="text-[#002333]/70 mt-2">
-                  Gerencie configurações de SLA por prioridade e canal
-                </p>
-              </div>
-              <button
-                onClick={abrirModalCriar}
-                className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors flex items-center gap-2 text-sm font-medium"
-              >
-                <Plus className="h-4 w-4" />
-                Nova Configuração
-              </button>
-            </div>
-          </div>
-
-          {/* KPI Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                    Total de Configurações
-                  </p>
-                  <p className="mt-2 text-3xl font-bold text-[#002333]">{totalConfigs}</p>
-                  <p className="mt-3 text-sm text-[#002333]/70">
-                    Configurações cadastradas no sistema
-                  </p>
-                </div>
-                <div className="h-12 w-12 rounded-2xl bg-[#159A9C]/10 flex items-center justify-center shadow-sm">
-                  <Settings className="h-6 w-6 text-[#159A9C]" />
-                </div>
-              </div>
-            </div>
-
-            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                    Configurações Ativas
-                  </p>
-                  <p className="mt-2 text-3xl font-bold text-[#002333]">{configsAtivas}</p>
-                  <p className="mt-3 text-sm text-[#002333]/70">
-                    {totalConfigs > 0 ? Math.round((configsAtivas / totalConfigs) * 100) : 0}% do
-                    total
-                  </p>
-                </div>
-                <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center shadow-sm">
-                  <CheckCircle className="h-6 w-6 text-green-600" />
-                </div>
-              </div>
-            </div>
-
-            <div className="p-5 rounded-2xl border border-[#DEEFE7] shadow-sm text-[#002333] bg-[#FFFFFF]">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#002333]/60">
-                    Mais Restritiva
-                  </p>
-                  <p className="mt-2 text-3xl font-bold text-[#002333]">
-                    {configMaisRestritiva
+          <SectionCard className="mb-6 space-y-4 p-4 sm:p-5">
+            <PageHeader
+              title={
+                <span className="inline-flex items-center gap-2">
+                  <Settings className="h-5 w-5 text-[#159A9C]" />
+                  <span>Configurações de SLA</span>
+                </span>
+              }
+              description="Gerencie configurações de SLA por prioridade e canal."
+              actions={
+                <button
+                  onClick={abrirModalCriar}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#0F7B7D]"
+                >
+                  <Plus className="h-4 w-4" />
+                  Nova Configuração
+                </button>
+              }
+            />
+            {!loading && (
+              <InlineStats
+                compact
+                stats={[
+                  { label: 'Total de configurações', value: String(totalConfigs), tone: 'neutral' },
+                  { label: 'Configurações ativas', value: String(configsAtivas), tone: 'accent' },
+                  {
+                    label: 'Mais restritiva',
+                    value: configMaisRestritiva
                       ? formatarTempo(configMaisRestritiva.tempoResolucaoMinutos)
-                      : '-'}
-                  </p>
-                  <p className="mt-3 text-sm text-[#002333]/70">
-                    {configMaisRestritiva
-                      ? configMaisRestritiva.nome
-                      : 'Nenhuma configuração ativa'}
-                  </p>
-                </div>
-                <div className="h-12 w-12 rounded-2xl bg-red-500/10 flex items-center justify-center shadow-sm">
-                  <Clock className="h-6 w-6 text-red-600" />
-                </div>
-              </div>
-            </div>
-          </div>
+                      : '-',
+                    tone: 'warning',
+                  },
+                ]}
+              />
+            )}
+          </SectionCard>
 
           {/* Barra de busca e filtros */}
-          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-[#B4BEC9]" />
-                <input
-                  type="text"
-                  placeholder="Buscar por nome..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-all text-sm"
-                />
+          <FiltersBar className="mb-6 p-4">
+            <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#385A6A]">Buscar</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
+                  <input
+                    type="text"
+                    placeholder="Buscar por nome..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                  />
+                </div>
               </div>
 
-              <select
-                value={filterPrioridade}
-                onChange={(e) => setFilterPrioridade(e.target.value)}
-                className="px-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-all text-sm"
-              >
-                <option value="todas">Todas as Prioridades</option>
-                <option value="baixa">Baixa</option>
-                <option value="normal">Normal</option>
-                <option value="alta">Alta</option>
-                <option value="urgente">Urgente</option>
-              </select>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#385A6A]">Prioridade</label>
+                <select
+                  value={filterPrioridade}
+                  onChange={(e) => setFilterPrioridade(e.target.value)}
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                >
+                  <option value="todas">Todas as Prioridades</option>
+                  <option value="baixa">Baixa</option>
+                  <option value="normal">Normal</option>
+                  <option value="alta">Alta</option>
+                  <option value="urgente">Urgente</option>
+                </select>
+              </div>
 
-              <select
-                value={filterCanal}
-                onChange={(e) => setFilterCanal(e.target.value)}
-                className="px-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-all text-sm"
-              >
-                <option value="todos">Todos os Canais</option>
-                <option value="whatsapp">WhatsApp</option>
-                <option value="email">Email</option>
-                <option value="chat">Chat</option>
-                <option value="telefone">Telefone</option>
-              </select>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#385A6A]">Canal</label>
+                <select
+                  value={filterCanal}
+                  onChange={(e) => setFilterCanal(e.target.value)}
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                >
+                  <option value="todos">Todos os Canais</option>
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="email">Email</option>
+                  <option value="chat">Chat</option>
+                  <option value="telefone">Telefone</option>
+                </select>
+              </div>
 
-              <select
-                value={filterAtivo}
-                onChange={(e) => setFilterAtivo(e.target.value)}
-                className="px-4 py-2 border border-[#B4BEC9] rounded-lg focus:ring-2 focus:ring-[#159A9C] focus:border-transparent transition-all text-sm"
-              >
-                <option value="todos">Todos os Status</option>
-                <option value="ativo">Ativos</option>
-                <option value="inativo">Inativos</option>
-              </select>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#385A6A]">Status</label>
+                <select
+                  value={filterAtivo}
+                  onChange={(e) => setFilterAtivo(e.target.value)}
+                  className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                >
+                  <option value="todos">Todos os Status</option>
+                  <option value="ativo">Ativos</option>
+                  <option value="inativo">Inativos</option>
+                </select>
+              </div>
             </div>
-          </div>
+          </FiltersBar>
 
           {/* Estados: Loading, Error, Empty */}
           {loading && (
-            <div className="bg-white rounded-lg shadow-sm border p-12 text-center">
+            <SectionCard className="p-12 text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#159A9C] mx-auto"></div>
               <p className="mt-4 text-[#002333]/70">Carregando configurações...</p>
-            </div>
+            </SectionCard>
           )}
 
           {error && (
@@ -394,7 +364,7 @@ const ConfiguracaoSLAPage: React.FC = () => {
           )}
 
           {!loading && !error && configsFiltradas.length === 0 && (
-            <div className="bg-white rounded-lg shadow-sm border p-12 text-center">
+            <SectionCard className="p-12 text-center">
               <Settings className="h-16 w-16 text-[#B4BEC9] mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-[#002333] mb-2">
                 {configs.length === 0
@@ -415,16 +385,16 @@ const ConfiguracaoSLAPage: React.FC = () => {
                   Criar Primeira Configuração
                 </button>
               )}
-            </div>
+            </SectionCard>
           )}
 
           {/* Grid de Configurações */}
           {!loading && !error && configsFiltradas.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {configsFiltradas.map((config) => (
-                <div
+                <SectionCard
                   key={config.id}
-                  className="bg-white rounded-lg shadow-sm border p-6 hover:shadow-lg transition-shadow"
+                  className="p-6 hover:shadow-lg transition-shadow"
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
@@ -498,7 +468,7 @@ const ConfiguracaoSLAPage: React.FC = () => {
                       )}
                     </div>
                   </div>
-                </div>
+                </SectionCard>
               ))}
             </div>
           )}

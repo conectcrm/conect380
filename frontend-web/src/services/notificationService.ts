@@ -7,7 +7,7 @@ export interface NotificationData {
   title: string;
   message: string;
   read: boolean;
-  data: Record<string, any>;
+  data?: Record<string, unknown> | null;
   createdAt: string;
   readAt: string | null;
 }

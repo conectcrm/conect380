@@ -206,7 +206,7 @@ $results | Format-Table -AutoSize
 Write-Host ""
 Write-Host "Pilot run directory: $runDir"
 
-$failed = $results | Where-Object { $_.Status -eq "FAIL" }
+$failed = @($results | Where-Object { $_.Status -eq "FAIL" })
 if ($failed.Count -gt 0) {
   Write-Host "Pilot kickoff result: FAIL"
   exit 1

@@ -10,6 +10,9 @@ import { Repository } from 'typeorm';
 import { EmpresaModulo, ModuloEnum, PlanoEnum } from '../entities/empresa-modulo.entity';
 import { CreateEmpresaModuloDto } from '../dto/create-empresa-modulo.dto';
 import { UpdateEmpresaModuloDto } from '../dto/update-empresa-modulo.dto';
+import { TenantBillingPolicyService } from '../../planos/tenant-billing-policy.service';
+
+const ALL_PLATFORM_MODULES = Object.values(ModuloEnum) as ModuloEnum[];
 
 @Injectable()
 export class EmpresaModuloService {
@@ -18,7 +21,127 @@ export class EmpresaModuloService {
   constructor(
     @InjectRepository(EmpresaModulo)
     private readonly empresaModuloRepository: Repository<EmpresaModulo>,
+    private readonly tenantBillingPolicyService: TenantBillingPolicyService,
   ) {}
+
+  private async tenantHasFullModuleAccess(empresaId: string): Promise<boolean> {
+    if (!empresaId) {
+      return false;
+    }
+
+    try {
+      const policy = await this.tenantBillingPolicyService.resolveForEmpresa(empresaId);
+      return Boolean(policy.fullModuleAccess);
+    } catch (error) {
+      this.logger.warn(
+        `Nao foi possivel resolver politica de modulos para empresa ${empresaId}: ${(error as Error).message}`,
+      );
+      return false;
+    }
+  }
+
+  private normalizeModuloCode(value: string): string {
+    return String(value || '')
+      .trim()
+      .toUpperCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^A-Z0-9]+/g, '_');
+  }
+
+  private mapearPlanoCodigoParaEnum(plano?: string | null): PlanoEnum | null {
+    const normalized = String(plano || '').trim().toUpperCase();
+    if (!normalized) {
+      return null;
+    }
+
+    const aliases: Record<string, PlanoEnum> = {
+      STARTER: PlanoEnum.STARTER,
+      BASIC: PlanoEnum.STARTER,
+      BASICO: PlanoEnum.STARTER,
+      BUSINESS: PlanoEnum.BUSINESS,
+      PROFESSIONAL: PlanoEnum.BUSINESS,
+      PRO: PlanoEnum.BUSINESS,
+      ENTERPRISE: PlanoEnum.ENTERPRISE,
+      PREMIUM: PlanoEnum.ENTERPRISE,
+      EMPRESARIAL: PlanoEnum.ENTERPRISE,
+    };
+
+    return aliases[normalized] || null;
+  }
+
+  async sincronizarModulosPlano(
+    empresa_id: string,
+    modulosCodigos: string[],
+    planoCodigo?: string | null,
+  ): Promise<void> {
+    const codigosNormalizados = Array.from(
+      new Set(
+        (modulosCodigos || [])
+          .map((codigo) => this.normalizeModuloCode(codigo))
+          .filter(Boolean),
+      ),
+    );
+
+    if (codigosNormalizados.length === 0) {
+      throw new BadRequestException('Plano sem modulos validos para sincronizacao');
+    }
+
+    const planoEnum = this.mapearPlanoCodigoParaEnum(planoCodigo);
+    const existentes = await this.empresaModuloRepository.find({
+      where: { empresaId: empresa_id },
+    });
+
+    const existentesPorCodigo = new Map<string, EmpresaModulo>();
+    for (const registro of existentes) {
+      const codigoNormalizado = this.normalizeModuloCode(String(registro.modulo || ''));
+      if (codigoNormalizado) {
+        existentesPorCodigo.set(codigoNormalizado, registro);
+      }
+    }
+
+    for (const codigo of codigosNormalizados) {
+      const existente = existentesPorCodigo.get(codigo);
+
+      if (existente) {
+        const precisaAtualizar =
+          !existente.ativo ||
+          existente.plano !== (planoEnum ?? existente.plano) ||
+          Boolean(existente.data_expiracao);
+
+        if (precisaAtualizar) {
+          await this.empresaModuloRepository.update(existente.id, {
+            ativo: true,
+            data_ativacao: new Date(),
+            data_expiracao: null,
+            plano: planoEnum ?? existente.plano,
+          });
+        }
+        continue;
+      }
+
+      const novoModulo = this.empresaModuloRepository.create({
+        empresaId: empresa_id,
+        modulo: codigo as ModuloEnum,
+        ativo: true,
+        data_ativacao: new Date(),
+        data_expiracao: null,
+        plano: planoEnum,
+      });
+      await this.empresaModuloRepository.save(novoModulo);
+    }
+
+    for (const registro of existentes) {
+      const codigoRegistro = this.normalizeModuloCode(String(registro.modulo || ''));
+      if (registro.ativo && !codigosNormalizados.includes(codigoRegistro)) {
+        await this.empresaModuloRepository.update(registro.id, { ativo: false });
+      }
+    }
+
+    this.logger.log(
+      `Sincronizacao de modulos concluida para empresa ${empresa_id}: ${codigosNormalizados.join(', ')}`,
+    );
+  }
 
   /**
    * Verifica se empresa tem módulo ativo
@@ -28,6 +151,11 @@ export class EmpresaModuloService {
    */
   async isModuloAtivo(empresa_id: string, modulo: ModuloEnum): Promise<boolean> {
     try {
+      const hasFullModuleAccess = await this.tenantHasFullModuleAccess(empresa_id);
+      if (hasFullModuleAccess) {
+        return true;
+      }
+
       const registro = await this.empresaModuloRepository.findOne({
         where: { empresaId: empresa_id, modulo, ativo: true },
       });
@@ -56,19 +184,20 @@ export class EmpresaModuloService {
    */
   async listarModulosAtivos(empresa_id: string): Promise<ModuloEnum[]> {
     try {
+      const hasFullModuleAccess = await this.tenantHasFullModuleAccess(empresa_id);
+      if (hasFullModuleAccess) {
+        return [...ALL_PLATFORM_MODULES];
+      }
+
       const modulos = await this.empresaModuloRepository.find({
         where: { empresaId: empresa_id, ativo: true },
-        select: ['modulo'],
+        select: ['id', 'modulo', 'data_expiracao'],
       });
 
       // Filtrar expirados
       const modulosValidos: ModuloEnum[] = [];
-      for (const m of modulos) {
-        const registro = await this.empresaModuloRepository.findOne({
-          where: { empresaId: empresa_id, modulo: m.modulo },
-        });
-
-        if (registro && registro.data_expiracao) {
+      for (const registro of modulos) {
+        if (registro.data_expiracao) {
           const agora = new Date();
           if (agora > registro.data_expiracao) {
             await this.empresaModuloRepository.update(registro.id, { ativo: false });
@@ -76,7 +205,7 @@ export class EmpresaModuloService {
           }
         }
 
-        modulosValidos.push(m.modulo);
+        modulosValidos.push(registro.modulo);
       }
 
       return modulosValidos;
@@ -211,26 +340,9 @@ export class EmpresaModuloService {
       return;
     }
 
-    // Ativar módulos do plano
-    for (const modulo of modulos) {
-      await this.ativar(empresa_id, { modulo, ativo: true, plano });
-    }
+    await this.sincronizarModulosPlano(empresa_id, modulos, plano);
 
     this.logger.log(`Plano ${plano} ativado para empresa ${empresa_id}: ${modulos.length} módulos`);
-
-    // Desativar módulos que não estão no plano
-    const todosModulos = Object.values(ModuloEnum);
-    for (const modulo of todosModulos) {
-      if (!modulos.includes(modulo)) {
-        try {
-          await this.desativar(empresa_id, modulo);
-        } catch (error) {
-          // Ignora se módulo não existe
-        }
-      }
-    }
-
-    console.log(`  ✅ [EmpresaModuloService] ativarPlano() concluído\n`);
   }
 
   /**

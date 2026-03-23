@@ -126,7 +126,17 @@ export class FluxoTriagemService {
    */
   async update(empresaId: string, id: string, dto: UpdateFluxoDto): Promise<FluxoTriagem> {
     this.logger.log(`🔍 [UPDATE] Iniciando atualização do fluxo ${id}`);
-    this.logger.log(`🔍 [UPDATE] DTO recebido:`, JSON.stringify(dto, null, 2));
+    this.logger.log(
+      `[UPDATE] DTO recebido (resumo): ${JSON.stringify({
+        keys: dto ? Object.keys(dto) : [],
+        nome: dto?.nome ? String(dto.nome).slice(0, 80) : null,
+        publicado: (dto as any)?.publicado ?? null,
+        hasEstrutura: Boolean((dto as any)?.estrutura),
+        estruturaTipo: Array.isArray((dto as any)?.estrutura)
+          ? 'array'
+          : typeof (dto as any)?.estrutura,
+      })}`,
+    );
 
     const fluxo = await this.findOne(empresaId, id);
     this.logger.log(`🔍 [UPDATE] Fluxo encontrado: ${fluxo.nome}, publicado: ${fluxo.publicado}`);

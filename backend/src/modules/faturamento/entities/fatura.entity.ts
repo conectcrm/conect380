@@ -38,6 +38,7 @@ export enum FormaPagamento {
   BOLETO = 'boleto',
   TRANSFERENCIA = 'transferencia',
   DINHEIRO = 'dinheiro',
+  A_COMBINAR = 'a_combinar',
 }
 
 @Entity('faturas')
@@ -112,6 +113,21 @@ export class Fatura {
   valorDesconto: number;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  valorImpostos: number;
+
+  @Column({ type: 'decimal', precision: 7, scale: 4, nullable: true })
+  percentualImpostos: number | null;
+
+  @Column({ type: 'integer', default: 0 })
+  diasCarenciaJuros: number;
+
+  @Column({ type: 'decimal', precision: 7, scale: 4, default: 0 })
+  percentualJuros: number;
+
+  @Column({ type: 'decimal', precision: 7, scale: 4, default: 0 })
+  percentualMulta: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   valorJuros: number;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
@@ -145,6 +161,9 @@ export class Fatura {
     paymentMethod?: string;
     installments?: number;
   };
+
+  @Column({ type: 'jsonb', nullable: true })
+  detalhesTributarios?: Record<string, unknown> | null;
 
   // Removido cascade para garantir criação explícita dos itens (cálculo de valorTotal controlado)
   @OneToMany(() => ItemFatura, (item) => item.fatura)

@@ -9,63 +9,20 @@ import {
   CheckCircle,
   XCircle,
   Download,
-  Eye,
   FileText,
+  MessageSquare,
   Building,
-  User,
-  Calendar,
-  DollarSign,
   Package,
   Shield,
   Clock,
+  AlertTriangle,
 } from 'lucide-react';
-import { portalClienteService } from '../../services/portalClienteService';
-import { emailService } from '../../services/emailService';
-import { pdfPropostasService } from '../../services/pdfPropostasService';
-import { formatarTokenParaExibicao, validarTokenNumerico } from '../../utils/tokenUtils';
+import { portalClienteService, type PropostaPublica } from '../../services/portalClienteService';
+import { formatarTokenParaExibicao } from '../../utils/tokenUtils';
 import { StatusSyncIndicator } from './components/StatusSyncIndicator';
 import { API_BASE_URL } from '../../services/api';
 
 const PORTAL_API_BASE = `${API_BASE_URL}/api/portal`;
-
-interface PropostaPublica {
-  id: string;
-  numero: string;
-  titulo: string;
-  status: 'enviada' | 'visualizada' | 'aprovada' | 'rejeitada' | 'expirada';
-  dataEnvio: Date;
-  dataValidade: Date;
-  valorTotal: number;
-  empresa: {
-    nome: string;
-    logo?: string;
-    endereco: string;
-    telefone: string;
-    email: string;
-  };
-  cliente: {
-    nome: string;
-    email: string;
-  };
-  vendedor: {
-    nome: string;
-    email: string;
-    telefone: string;
-  };
-  produtos: Array<{
-    nome: string;
-    descricao: string;
-    quantidade: number;
-    valorUnitario: number;
-    valorTotal: number;
-  }>;
-  condicoes: {
-    formaPagamento: string;
-    prazoEntrega: string;
-    garantia: string;
-    observacoes?: string;
-  };
-}
 
 const PortalClienteProposta: React.FC = () => {
   const { propostaId, propostaNumero, token } = useParams<{
@@ -87,8 +44,10 @@ const PortalClienteProposta: React.FC = () => {
   const [erro, setErro] = useState<string | null>(null);
   const [aceiteRealizado, setAceiteRealizado] = useState(false);
   const [showConfirmReject, setShowConfirmReject] = useState(false);
+  const [showSolicitarAjustes, setShowSolicitarAjustes] = useState(false);
+  const [motivoAjustes, setMotivoAjustes] = useState('');
+  const [processandoNegociacao, setProcessandoNegociacao] = useState(false);
   const [tempoVisualizacao, setTempoVisualizacao] = useState<number>(0);
-  const [acoes, setAcoes] = useState<Array<{ acao: string; timestamp: string }>>([]);
 
   useEffect(() => {
     if (identificadorProposta) {
@@ -159,7 +118,7 @@ const PortalClienteProposta: React.FC = () => {
   }, [tempoVisualizacao, tokenParaAceite]);
 
   // ✅ Função para registrar ações do cliente
-  const registrarAcao = async (tipoAcao: string, dados?: any) => {
+  const registrarAcao = async (tipoAcao: string, dados?: unknown) => {
     if (!tokenParaAceite) return;
 
     const acao = {
@@ -167,9 +126,6 @@ const PortalClienteProposta: React.FC = () => {
       timestamp: new Date().toISOString(),
       dados,
     };
-
-    // Adicionar à lista local
-    setAcoes((prev) => [...prev, acao]);
 
     try {
       // ✅ Enviar para backend via portal API
@@ -211,7 +167,14 @@ const PortalClienteProposta: React.FC = () => {
   const carregarProposta = async () => {
     try {
       setLoading(true);
-      const dados = await portalClienteService.obterPropostaPublica(identificadorProposta!);
+      const chaveAcesso = tokenParaAceite || identificadorProposta;
+
+      if (!chaveAcesso) {
+        setErro('Token da proposta ausente ou inválido.');
+        return;
+      }
+
+      const dados = await portalClienteService.obterPropostaPublica(chaveAcesso);
 
       if (!dados) {
         setErro('Proposta não encontrada ou link inválido.');
@@ -290,31 +253,7 @@ const PortalClienteProposta: React.FC = () => {
         metodoPagamento: 'pendente',
       });
 
-      // 2. Tentar sincronizar com o CRM principal
-      try {
-        const syncResult = await portalClienteService.sincronizarComCRM(
-          identificadorProposta!,
-          'aprovada',
-        );
-
-        if (syncResult.success) {
-          console.log('✅ Status sincronizado com CRM principal');
-        } else {
-          console.log('⏳ Sincronização pendente - será realizada posteriormente');
-        }
-      } catch (syncError) {
-        console.warn('⚠️ Erro na sincronização, continuando com processo local:', syncError);
-      }
-
-      // 3. Enviar notificação de aprovação
-      try {
-        await emailService.notificarAprovacaoProposta(proposta.id, proposta);
-        console.log('✅ Notificação de aprovação enviada');
-      } catch (emailError) {
-        console.warn('⚠️ Erro no envio de email, continuando:', emailError);
-      }
-
-      // 4. Iniciar processo de geração de contrato
+      // 2. Iniciar processo de geracao de contrato
       try {
         await iniciarGeracaoContrato(proposta);
         console.log('✅ Processo de contrato iniciado');
@@ -322,43 +261,9 @@ const PortalClienteProposta: React.FC = () => {
         console.warn('⚠️ Erro na geração de contrato, continuando:', contratoError);
       }
 
-      // 5. Atualizar estado local - SEMPRE funciona
+      // 3. Atualizar estado local - SEMPRE funciona
       setProposta((prev) => (prev ? { ...prev, status: 'aprovada' } : null));
       setAceiteRealizado(true);
-
-      // 6. Simular atualização no "CRM" local (localStorage)
-      try {
-        const propostas = JSON.parse(localStorage.getItem('propostas') || '[]');
-        const index = propostas.findIndex(
-          (p: any) => p.numero === identificadorProposta || p.id === identificadorProposta,
-        );
-
-        if (index >= 0) {
-          propostas[index].status = 'aprovada';
-          propostas[index].updatedAt = new Date().toISOString();
-          propostas[index].approvedViaPortal = true;
-          localStorage.setItem('propostas', JSON.stringify(propostas));
-          console.log('✅ Status atualizado no CRM local (localStorage)');
-        } else {
-          // Criar uma nova entrada se não existir
-          const novaProposta = {
-            id: identificadorProposta,
-            numero: identificadorProposta,
-            status: 'aprovada',
-            cliente: proposta.cliente,
-            valor: proposta.valorTotal,
-            updatedAt: new Date().toISOString(),
-            approvedViaPortal: true,
-            createdAt: proposta.dataEnvio || new Date().toISOString(),
-          };
-          propostas.push(novaProposta);
-          localStorage.setItem('propostas', JSON.stringify(propostas));
-          console.log('✅ Nova proposta aprovada criada no CRM local');
-        }
-      } catch (localError) {
-        console.warn('⚠️ Erro na atualização local:', localError);
-      }
-
       console.log('🎉 Proposta aprovada com sucesso! Verifique o CRM principal.');
     } catch (error) {
       console.error('❌ Erro ao aceitar proposta:', error);
@@ -378,6 +283,50 @@ const PortalClienteProposta: React.FC = () => {
     });
 
     setShowConfirmReject(true);
+  };
+
+  const handleSolicitarAjustes = async () => {
+    if (!proposta || !tokenParaAceite) return;
+
+    await registrarAcao('negociacao_iniciada', {
+      statusAtual: proposta.status,
+      valorProposta: proposta.valorTotal,
+      tempoVisualizacao: tempoVisualizacao,
+    });
+
+    setMotivoAjustes('');
+    setShowSolicitarAjustes(true);
+  };
+
+  const confirmarSolicitacaoAjustes = async () => {
+    if (!proposta || !tokenParaAceite) return;
+
+    const motivoNormalizado = motivoAjustes.trim();
+    if (motivoNormalizado.length < 8) {
+      setErro('Descreva com mais detalhes o ajuste desejado (minimo de 8 caracteres).');
+      return;
+    }
+
+    try {
+      setProcessandoNegociacao(true);
+      setErro(null);
+
+      await portalClienteService.atualizarStatus(tokenParaAceite, 'negociacao', motivoNormalizado);
+
+      await registrarAcao('negociacao_solicitada', {
+        novoStatus: 'negociacao',
+        motivoAjustes: motivoNormalizado,
+      });
+
+      setProposta((prev) => (prev ? { ...prev, status: 'negociacao' } : null));
+      setShowSolicitarAjustes(false);
+      setMotivoAjustes('');
+    } catch (error) {
+      console.error('Erro ao solicitar ajustes:', error);
+      setErro('Nao foi possivel registrar a solicitacao de ajustes. Tente novamente.');
+    } finally {
+      setProcessandoNegociacao(false);
+    }
   };
 
   const confirmarRejeicao = async () => {
@@ -408,46 +357,65 @@ const PortalClienteProposta: React.FC = () => {
   };
 
   const handleDownloadPDF = async () => {
-    if (!proposta) return;
+    if (!proposta || !tokenParaAceite) return;
 
     try {
-      // Simular download do PDF por enquanto
-      console.log('Solicitando download de PDF da proposta:', proposta);
-      alert('Funcionalidade de download será implementada em breve!');
+      const pdfBlob = await portalClienteService.baixarPdfPublico(tokenParaAceite, 'comercial');
+      const fileUrl = window.URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = fileUrl;
+      link.download = `proposta-${proposta.numero || 'portal'}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(fileUrl);
     } catch (error) {
       console.error('Erro ao baixar PDF:', error);
-      setErro('Erro ao gerar PDF. Tente novamente.');
+      const message =
+        error instanceof Error && error.message ? error.message : 'Erro ao gerar PDF. Tente novamente.';
+      setErro(message);
     }
   };
 
   const iniciarGeracaoContrato = async (proposta: PropostaPublica) => {
-    // Esta função será implementada no próximo módulo
-    console.log('Iniciando geração de contrato para proposta:', proposta.id);
+    await registrarAcao('solicitacao_contrato', {
+      propostaId: proposta.id,
+      propostaNumero: proposta.numero,
+      valor: proposta.valorTotal,
+    });
+    console.log('Solicitacao de contrato registrada para proposta:', proposta.id);
   };
-
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'rascunho':
+        return 'border border-[#D1D5DB] bg-[#F3F4F6] text-[#374151]';
       case 'enviada':
-        return 'bg-blue-100 text-blue-800';
+        return 'border border-[#BFDBFE] bg-[#DBEAFE] text-[#1D4ED8]';
       case 'visualizada':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'border border-[#FDE68A] bg-[#FEF3C7] text-[#92400E]';
+      case 'negociacao':
+        return 'border border-[#FCD34D] bg-[#FEF3C7] text-[#92400E]';
       case 'aprovada':
-        return 'bg-green-100 text-green-800';
+        return 'border border-[#BBF7D0] bg-[#DCFCE7] text-[#166534]';
       case 'rejeitada':
-        return 'bg-red-100 text-red-800';
+        return 'border border-[#FECACA] bg-[#FEE2E2] text-[#991B1B]';
       case 'expirada':
-        return 'bg-gray-100 text-gray-800';
+        return 'border border-[#D1D5DB] bg-[#E5E7EB] text-[#374151]';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'border border-[#D1D5DB] bg-[#F3F4F6] text-[#374151]';
     }
   };
 
   const getStatusText = (status: string) => {
     switch (status) {
+      case 'rascunho':
+        return 'Rascunho';
       case 'enviada':
         return 'Enviada';
       case 'visualizada':
         return 'Visualizada';
+      case 'negociacao':
+        return 'Negociacao';
       case 'aprovada':
         return 'Aprovada';
       case 'rejeitada':
@@ -467,12 +435,43 @@ const PortalClienteProposta: React.FC = () => {
     return Math.max(0, Math.ceil(diferenca / (1000 * 60 * 60 * 24)));
   };
 
+  const formatCurrency = (valor: number) =>
+    new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(Number(valor || 0));
+
+  const formatPercent = (valor: number) => `${Number(valor || 0).toFixed(2)}%`;
+
+  const normalizeHexColor = (value?: string, fallback = '#159A9C') => {
+    const candidate = String(value || '').trim();
+    const normalized = candidate.startsWith('#') ? candidate : `#${candidate}`;
+    return /^#[0-9a-fA-F]{6}$/.test(normalized) ? normalized : fallback;
+  };
+
+  const hexToRgb = (hex: string): [number, number, number] => {
+    const sanitized = hex.replace('#', '');
+    const r = Number.parseInt(sanitized.slice(0, 2), 16);
+    const g = Number.parseInt(sanitized.slice(2, 4), 16);
+    const b = Number.parseInt(sanitized.slice(4, 6), 16);
+    return [r, g, b];
+  };
+
+  const colorWithAlpha = (hex: string, alpha: number) => {
+    const [r, g, b] = hexToRgb(hex);
+    return `rgba(${r}, ${g}, ${b}, ${Math.min(1, Math.max(0, alpha))})`;
+  };
+
+  const resolvedPrimaryColor = normalizeHexColor(proposta?.empresa?.corPrimaria, '#159A9C');
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando proposta...</p>
+      <div className="min-h-screen bg-[#F3F6F7] px-4">
+        <div className="mx-auto flex min-h-screen max-w-5xl items-center justify-center">
+          <div className="w-full max-w-md rounded-[18px] border border-[#DEE8EC] bg-white p-8 text-center shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)]">
+            <div className="mx-auto mb-4 h-11 w-11 animate-spin rounded-full border-4 border-[#D4E2E7] border-t-[#159A9C]" />
+            <p className="text-sm font-medium text-[#607B89]">Carregando proposta...</p>
+          </div>
         </div>
       </div>
     );
@@ -480,61 +479,17 @@ const PortalClienteProposta: React.FC = () => {
 
   if (erro || !proposta) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="max-w-md text-center bg-white p-8 rounded-lg shadow-lg">
-          <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Ops!</h2>
-          <p className="text-gray-600 mb-6">{erro}</p>
-          <button
-            onClick={() => navigate('/')}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Ir para Home
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (aceiteRealizado) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="max-w-lg text-center bg-white p-8 rounded-lg shadow-lg">
-          <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Proposta Aceita!</h2>
-          <p className="text-gray-600 mb-6">
-            Sua proposta foi aceita com sucesso. Em breve você receberá o contrato para assinatura.
-          </p>
-
-          {/* Status de sincronização */}
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-            <div className="space-y-2 text-sm mb-4">
-              <div className="flex items-center justify-center text-green-700">
-                <CheckCircle className="h-4 w-4 mr-2" />
-                <span>✅ Aprovação registrada no portal</span>
-              </div>
-              <div className="flex items-center justify-center text-green-700">
-                <CheckCircle className="h-4 w-4 mr-2" />
-                <span>✅ Notificação enviada por email</span>
-              </div>
-            </div>
-
-            {/* Indicador de sincronização */}
-            <StatusSyncIndicator propostaId={identificadorProposta || proposta?.numero || ''} />
-
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
-              <strong>Próximos passos:</strong> Nossa equipe entrará em contato em até 2 horas úteis
-              para iniciar o processo de contrato e definir os próximos passos do projeto.
-            </div>
-          </div>
-
-          <div className="space-y-3">
+      <div className="min-h-screen bg-[#F3F6F7] px-4">
+        <div className="mx-auto flex min-h-screen max-w-5xl items-center justify-center">
+          <div className="w-full max-w-md rounded-[18px] border border-[#FECACA] bg-white p-8 text-center shadow-[0_16px_30px_-24px_rgba(127,29,29,0.25)]">
+            <XCircle className="mx-auto mb-4 h-12 w-12 text-[#DC2626]" />
+            <h2 className="text-2xl font-semibold tracking-[-0.02em] text-[#19384C]">Ops!</h2>
+            <p className="mt-2 text-sm text-[#607B89]">{erro}</p>
             <button
-              onClick={handleDownloadPDF}
-              className="w-full bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
+              onClick={() => navigate('/')}
+              className="mt-6 inline-flex h-10 items-center justify-center rounded-lg bg-[#159A9C] px-5 text-sm font-medium text-white transition hover:bg-[#117C7E]"
             >
-              <Download className="h-4 w-4 mr-2" />
-              Baixar Proposta
+              Ir para Home
             </button>
           </div>
         </div>
@@ -542,197 +497,331 @@ const PortalClienteProposta: React.FC = () => {
     );
   }
 
+  if (aceiteRealizado) {
+    return (
+      <div className="min-h-screen bg-[#F3F6F7] px-4 py-8">
+        <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-2xl items-center">
+          <div className="w-full rounded-[18px] border border-[#BBF7D0] bg-white p-8 shadow-[0_16px_30px_-24px_rgba(22,101,52,0.28)]">
+            <div className="mb-5 flex justify-center">
+              <div className="rounded-full bg-[#DCFCE7] p-3">
+                <CheckCircle className="h-10 w-10 text-[#166534]" />
+              </div>
+            </div>
+            <h2 className="text-center text-2xl font-semibold tracking-[-0.02em] text-[#19384C]">
+              Proposta aceita com sucesso
+            </h2>
+            <p className="mt-2 text-center text-sm text-[#607B89]">
+              Recebemos seu aceite. Nosso time vai seguir com a geracao do contrato.
+            </p>
+
+            <div className="mt-6 rounded-xl border border-[#CFE6D9] bg-[#F4FBF7] p-4">
+              <div className="space-y-2 text-sm text-[#166534]">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4" />
+                  <span>Aprovacao registrada no portal</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4" />
+                  <span>Time comercial notificado</span>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <StatusSyncIndicator propostaId={identificadorProposta || proposta?.numero || ''} />
+              </div>
+
+              <div className="mt-4 rounded-lg border border-[#C7DDF8] bg-[#EFF6FF] p-3 text-sm text-[#1E3A8A]">
+                <strong>Proximos passos:</strong> nossa equipe entra em contato em ate 2 horas uteis
+                para iniciar a etapa de contrato.
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <button
+                onClick={handleDownloadPDF}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium text-white transition"
+                style={{ backgroundColor: resolvedPrimaryColor }}
+              >
+                <Download className="h-4 w-4" />
+                Baixar proposta
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const diasRestantes = calcularDiasRestantes();
-  const podeAceitar = proposta.status === 'visualizada' && diasRestantes > 0;
+  const subtotalItens = proposta.produtos.reduce((acc, item) => acc + Number(item.subtotal || 0), 0);
+  const subtotalProposta = Number(proposta.subtotal || subtotalItens || 0);
+  const descontoGlobalPercentual = Math.min(100, Math.max(0, Number(proposta.descontoGlobal || 0)));
+  const impostosPercentual = Math.min(100, Math.max(0, Number(proposta.impostos || 0)));
+  const valorDescontoItens = proposta.produtos.reduce((acc, item) => {
+    const quantidade = Number(item.quantidade || 0);
+    const valorUnitario = Number(item.valorUnitario || 0);
+    const descontoItem = Math.min(100, Math.max(0, Number(item.desconto || 0)));
+    return acc + quantidade * valorUnitario * (descontoItem / 100);
+  }, 0);
+  const valorDescontoGlobal = subtotalProposta * (descontoGlobalPercentual / 100);
+  const valorTotalDescontos = valorDescontoItens + valorDescontoGlobal;
+  const baseImpostos = Math.max(0, subtotalProposta - valorDescontoGlobal);
+  const valorImpostos = baseImpostos * (impostosPercentual / 100);
+  const totalProposta = Number(proposta.total || proposta.valorTotal || 0);
+  const divergenciaSubtotal = subtotalItens - subtotalProposta;
+  const exibirDivergenciaSubtotal =
+    proposta.produtos.length > 0 &&
+    Number.isFinite(divergenciaSubtotal) &&
+    Math.abs(divergenciaSubtotal) > 0.01;
+
+  const statusesComAceite = new Set(['enviada', 'visualizada']);
+  const podeAceitar = statusesComAceite.has(String(proposta.status || '').toLowerCase()) && diasRestantes > 0;
+  const negociacaoAtiva = String(proposta.status || '').toLowerCase() === 'negociacao';
+
+  const primaryColor = resolvedPrimaryColor;
+  const primaryTintSoft = colorWithAlpha(primaryColor, 0.1);
+  const primaryTintStrong = colorWithAlpha(primaryColor, 0.16);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-6xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
+    <div className="min-h-screen bg-[#F3F6F7] text-[#1E3A4B]">
+      <header className="border-b border-[#D6E2E6] bg-white/95">
+        <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
               {proposta.empresa.logo && (
                 <img
                   src={proposta.empresa.logo}
                   alt={proposta.empresa.nome}
-                  className="h-12 w-auto mr-4"
+                  className="h-11 w-auto rounded-md border border-[#E0EBEF] bg-white p-1"
                 />
               )}
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">{proposta.empresa.nome}</h1>
-                <p className="text-gray-600">Proposta Comercial</p>
+                <h1 className="text-2xl font-semibold tracking-[-0.02em] text-[#19384C]">
+                  {proposta.empresa.nome}
+                </h1>
+                <p className="text-sm text-[#607B89]">Proposta comercial</p>
+                <p className="text-xs text-[#6D8694]">
+                  Registro no sistema: {new Date(proposta.criadaEm).toLocaleString('pt-BR')}
+                </p>
               </div>
             </div>
-            <div className="text-right">
+
+            <div className="sm:text-right">
               <span
-                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(proposta.status)}`}
+                className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${getStatusColor(proposta.status)}`}
               >
                 {getStatusText(proposta.status)}
               </span>
               {diasRestantes > 0 &&
                 proposta.status !== 'aprovada' &&
                 proposta.status !== 'rejeitada' && (
-                  <p className="text-sm text-gray-500 mt-1">
-                    <Clock className="h-4 w-4 inline mr-1" />
+                  <p className="mt-1 text-sm text-[#607B89]">
+                    <Clock className="mr-1 inline h-4 w-4" />
                     {diasRestantes} dias restantes
                   </p>
                 )}
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Conteúdo Principal */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Informações da Proposta */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                <FileText className="h-5 w-5 mr-2" />
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="space-y-6 lg:col-span-2">
+            <section className="rounded-[18px] border border-[#DEE8EC] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)] sm:p-6">
+              <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold tracking-[-0.02em] text-[#19384C]">
+                <FileText className="h-5 w-5" style={{ color: primaryColor }} />
                 Proposta {proposta.numero}
               </h2>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div>
-                  <h3 className="font-medium text-gray-900 mb-2">Informações Gerais</h3>
-                  <div className="space-y-2 text-sm">
+                  <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-[#607B89]">
+                    Informacoes gerais
+                  </h3>
+                  <div className="space-y-2 text-sm text-[#244455]">
                     <div>
-                      <strong>Título:</strong> {proposta.titulo}
+                      <span className="font-semibold text-[#19384C]">Titulo:</span>{' '}
+                      {proposta.titulo}
                     </div>
                     <div>
-                      <strong>Data de Envio:</strong>{' '}
+                      <span className="font-semibold text-[#19384C]">Data de envio:</span>{' '}
                       {new Date(proposta.dataEnvio).toLocaleDateString('pt-BR')}
                     </div>
                     <div>
-                      <strong>Validade:</strong>{' '}
+                      <span className="font-semibold text-[#19384C]">Validade:</span>{' '}
                       {new Date(proposta.dataValidade).toLocaleDateString('pt-BR')}
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <h3 className="font-medium text-gray-900 mb-2">Vendedor Responsável</h3>
-                  <div className="space-y-2 text-sm">
+                  <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-[#607B89]">
+                    Vendedor responsavel
+                  </h3>
+                  <div className="space-y-2 text-sm text-[#244455]">
                     <div>
-                      <strong>Nome:</strong> {proposta.vendedor.nome}
+                      <span className="font-semibold text-[#19384C]">Nome:</span>{' '}
+                      {proposta.vendedor.nome}
                     </div>
                     <div>
-                      <strong>Email:</strong> {proposta.vendedor.email}
+                      <span className="font-semibold text-[#19384C]">Email:</span>{' '}
+                      {proposta.vendedor.email}
                     </div>
                     <div>
-                      <strong>Telefone:</strong> {proposta.vendedor.telefone}
+                      <span className="font-semibold text-[#19384C]">Telefone:</span>{' '}
+                      {proposta.vendedor.telefone}
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </section>
 
-            {/* Produtos e Serviços */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                <Package className="h-5 w-5 mr-2" />
-                Produtos e Serviços
+            <section className="rounded-[18px] border border-[#DEE8EC] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)] sm:p-6">
+              <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold tracking-[-0.02em] text-[#19384C]">
+                <Package className="h-5 w-5" style={{ color: primaryColor }} />
+                Produtos e servicos
               </h2>
 
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="min-w-full">
                   <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-3 font-medium text-gray-900">Item</th>
-                      <th className="text-center py-3 font-medium text-gray-900">Qtd</th>
-                      <th className="text-right py-3 font-medium text-gray-900">Valor Unit.</th>
-                      <th className="text-right py-3 font-medium text-gray-900">Total</th>
+                    <tr className="border-y border-[#E1EBEF] bg-[#F8FBFC]">
+                      <th className="py-3 text-left text-sm font-semibold text-[#19384C]">Item</th>
+                      <th className="py-3 text-center text-sm font-semibold text-[#19384C]">Qtd</th>
+                      <th className="py-3 text-right text-sm font-semibold text-[#19384C]">
+                        Valor unit.
+                      </th>
+                      <th className="py-3 text-right text-sm font-semibold text-[#19384C]">
+                        Desconto
+                      </th>
+                      <th className="py-3 text-right text-sm font-semibold text-[#19384C]">
+                        Subtotal
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {proposta.produtos.map((produto, index) => (
-                      <tr key={index} className="border-b border-gray-100">
+                      <tr key={index} className="border-b border-[#EEF3F6]">
                         <td className="py-4">
                           <div>
-                            <div className="font-medium text-gray-900">{produto.nome}</div>
-                            <div className="text-sm text-gray-500">{produto.descricao}</div>
+                            <div className="font-medium text-[#19384C]">{produto.nome}</div>
+                            <div className="text-sm text-[#607B89]">{produto.descricao}</div>
                           </div>
                         </td>
-                        <td className="py-4 text-center">{produto.quantidade}</td>
-                        <td className="py-4 text-right">
-                          {new Intl.NumberFormat('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL',
-                          }).format(produto.valorUnitario)}
+                        <td className="py-4 text-center text-[#244455]">{produto.quantidade}</td>
+                        <td className="py-4 text-right text-[#244455]">
+                          {formatCurrency(produto.valorUnitario)}
                         </td>
-                        <td className="py-4 text-right font-medium">
-                          {new Intl.NumberFormat('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL',
-                          }).format(produto.valorTotal)}
+                        <td className="py-4 text-right text-[#244455]">
+                          {formatPercent(produto.desconto || 0)}
+                        </td>
+                        <td className="py-4 text-right font-semibold text-[#19384C]">
+                          {formatCurrency(produto.subtotal || produto.valorTotal)}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr className="border-t-2 border-gray-300">
-                      <td colSpan={3} className="py-4 text-right font-semibold text-lg">
-                        Total Geral:
+                    <tr className="border-t border-[#D9E5EA]">
+                      <td colSpan={4} className="py-3 text-right text-sm font-medium text-[#607B89]">
+                        Subtotal:
                       </td>
-                      <td className="py-4 text-right font-bold text-lg text-green-600">
-                        {new Intl.NumberFormat('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL',
-                        }).format(proposta.valorTotal)}
+                      <td className="py-3 text-right text-sm font-semibold text-[#19384C]">
+                        {formatCurrency(subtotalProposta)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colSpan={4} className="py-2 text-right text-sm font-medium text-[#607B89]">
+                        Desconto global:
+                      </td>
+                      <td className="py-2 text-right text-sm font-semibold text-[#B45309]">
+                        - {formatCurrency(valorDescontoGlobal)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colSpan={4} className="py-2 text-right text-sm font-medium text-[#607B89]">
+                        Desconto por item (ja aplicado no subtotal):
+                      </td>
+                      <td className="py-2 text-right text-sm font-semibold text-[#B45309]">
+                        {formatCurrency(valorDescontoItens)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colSpan={4} className="py-2 text-right text-sm font-medium text-[#607B89]">
+                        Impostos:
+                      </td>
+                      <td className="py-2 text-right text-sm font-semibold text-[#19384C]">
+                        {formatCurrency(valorImpostos)}
+                      </td>
+                    </tr>
+                    <tr className="border-t-2 border-[#D9E5EA]">
+                      <td colSpan={4} className="py-4 text-right text-lg font-semibold text-[#19384C]">
+                        Total geral:
+                      </td>
+                      <td className="py-4 text-right text-lg font-bold" style={{ color: primaryColor }}>
+                        {formatCurrency(totalProposta)}
                       </td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
-            </div>
+            </section>
 
-            {/* Condições */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                <Shield className="h-5 w-5 mr-2" />
-                Condições Comerciais
+            <section className="rounded-[18px] border border-[#DEE8EC] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)] sm:p-6">
+              <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold tracking-[-0.02em] text-[#19384C]">
+                <Shield className="h-5 w-5" style={{ color: primaryColor }} />
+                Condicoes comerciais
               </h2>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div>
-                  <h3 className="font-medium text-gray-900 mb-2">Pagamento e Entrega</h3>
-                  <div className="space-y-2 text-sm">
+                  <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-[#607B89]">
+                    Pagamento e entrega
+                  </h3>
+                  <div className="space-y-2 text-sm text-[#244455]">
                     <div>
-                      <strong>Forma de Pagamento:</strong> {proposta.condicoes.formaPagamento}
+                      <span className="font-semibold text-[#19384C]">Forma de pagamento:</span>{' '}
+                      {proposta.condicoes.formaPagamento}
                     </div>
                     <div>
-                      <strong>Prazo de Entrega:</strong> {proposta.condicoes.prazoEntrega}
+                      <span className="font-semibold text-[#19384C]">Prazo de entrega:</span>{' '}
+                      {proposta.condicoes.prazoEntrega}
                     </div>
                     <div>
-                      <strong>Garantia:</strong> {proposta.condicoes.garantia}
+                      <span className="font-semibold text-[#19384C]">Garantia:</span>{' '}
+                      {proposta.condicoes.garantia}
                     </div>
                   </div>
                 </div>
 
                 {proposta.condicoes.observacoes && (
                   <div>
-                    <h3 className="font-medium text-gray-900 mb-2">Observações</h3>
-                    <p className="text-sm text-gray-600">{proposta.condicoes.observacoes}</p>
+                    <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-[#607B89]">
+                      Observacoes
+                    </h3>
+                    <p className="text-sm leading-6 text-[#355166]">
+                      {proposta.condicoes.observacoes}
+                    </p>
                   </div>
                 )}
               </div>
-            </div>
+            </section>
           </div>
 
-          {/* Sidebar - Ações */}
-          <div className="space-y-6">
-            {/* Card de Ações */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Ações</h3>
+          <aside className="space-y-5 lg:sticky lg:top-6 lg:self-start">
+            <section className="rounded-[18px] border border-[#DEE8EC] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)]">
+              <h3 className="mb-4 text-lg font-semibold tracking-[-0.01em] text-[#19384C]">
+                Acoes
+              </h3>
 
               <div className="space-y-3">
                 <button
                   onClick={handleDownloadPDF}
-                  className="w-full bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center justify-center"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white transition"
+                  style={{ backgroundColor: primaryColor }}
                 >
-                  <Download className="h-4 w-4 mr-2" />
+                  <Download className="h-4 w-4" />
                   Baixar PDF
                 </button>
 
@@ -741,96 +830,232 @@ const PortalClienteProposta: React.FC = () => {
                     <button
                       onClick={handleAceitarProposta}
                       disabled={processandoAceite}
-                      className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#159A52] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#128045] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {processandoAceite ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                       ) : (
-                        <CheckCircle className="h-4 w-4 mr-2" />
+                        <CheckCircle className="h-4 w-4" />
                       )}
-                      {processandoAceite ? 'Processando...' : 'Aceitar Proposta'}
+                      {processandoAceite ? 'Processando...' : 'Aceitar proposta'}
+                    </button>
+
+                    <button
+                      onClick={handleSolicitarAjustes}
+                      disabled={processandoNegociacao}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#B45309] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#92400E] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {processandoNegociacao ? (
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      ) : (
+                        <MessageSquare className="h-4 w-4" />
+                      )}
+                      {processandoNegociacao ? 'Processando...' : 'Solicitar ajustes'}
                     </button>
 
                     <button
                       onClick={handleRejeitarProposta}
-                      className="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#DC2626] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#B91C1C]"
                     >
-                      <XCircle className="h-4 w-4 mr-2" />
-                      Rejeitar Proposta
+                      <XCircle className="h-4 w-4" />
+                      Rejeitar proposta
                     </button>
                   </>
                 )}
 
+                {negociacaoAtiva && (
+                  <div className="rounded-lg border border-[#FDE68A] bg-[#FFFBEB] p-3 text-sm text-[#92400E]">
+                    Sua solicitacao de ajustes foi registrada. Nosso time comercial vai retornar com uma nova proposta.
+                  </div>
+                )}
+
                 {proposta.status === 'expirada' && (
-                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-sm text-yellow-800">
-                      Esta proposta expirou. Entre em contato conosco para uma nova proposta.
+                  <div className="rounded-lg border border-[#FDE68A] bg-[#FFFBEB] p-3">
+                    <p className="text-sm text-[#92400E]">
+                      Esta proposta expirou. Entre em contato para uma nova emissao.
                     </p>
                   </div>
                 )}
-              </div>
-            </div>
 
-            {/* Token de Acesso */}
-            {tokenParaAceite && (
-              <div className="bg-blue-50 border-2 border-blue-200 rounded-lg shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-blue-900 mb-4 flex items-center">
-                  <Shield className="h-5 w-5 mr-2" />
-                  Token de Acesso
-                </h3>
-                <div className="text-center">
-                  <div className="bg-white border-2 border-blue-300 rounded-lg p-4 mb-3">
-                    <div className="text-3xl font-mono font-bold text-blue-800 tracking-wider">
-                      {formatarTokenParaExibicao(tokenParaAceite)}
+                {!podeAceitar &&
+                  proposta.status !== 'expirada' &&
+                  proposta.status !== 'aprovada' &&
+                  proposta.status !== 'rejeitada' && (
+                    <div className="rounded-lg border border-[#D4E2E7] bg-[#F8FBFC] p-3 text-sm text-[#5A768C]">
+                      O aceite fica disponivel quando a proposta estiver em etapa comercial ativa e
+                      dentro da validade.
                     </div>
-                  </div>
-                  <p className="text-sm text-blue-700">
-                    Este é o seu código de acesso único para esta proposta
+                  )}
+              </div>
+            </section>
+
+            <section className="rounded-[18px] border border-[#DEE8EC] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)]">
+              <h3 className="mb-4 text-lg font-semibold tracking-[-0.01em] text-[#19384C]">
+                Detalhes financeiros
+              </h3>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-md bg-[#F8FBFC] px-3 py-2 ring-1 ring-[#E7EFF3]">
+                  <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Subtotal</p>
+                  <p className="mt-1 text-sm font-semibold text-[#19384C]">
+                    {formatCurrency(subtotalProposta)}
+                  </p>
+                </div>
+                <div className="rounded-md bg-[#F8FBFC] px-3 py-2 ring-1 ring-[#E7EFF3]">
+                  <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Descontos</p>
+                  <p className="mt-1 text-sm font-semibold text-[#19384C]">
+                    {formatPercent(descontoGlobalPercentual)}
+                  </p>
+                  <p className="mt-1 text-xs text-[#607B89]">Itens: {formatCurrency(valorDescontoItens)}</p>
+                  <p className="text-xs text-[#607B89]">Global: {formatCurrency(valorDescontoGlobal)}</p>
+                </div>
+                <div className="rounded-md bg-[#F8FBFC] px-3 py-2 ring-1 ring-[#E7EFF3]">
+                  <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Impostos</p>
+                  <p className="mt-1 text-sm font-semibold text-[#19384C]">
+                    {formatPercent(impostosPercentual)}
+                  </p>
+                  <p className="mt-1 text-xs text-[#607B89]">Valor: {formatCurrency(valorImpostos)}</p>
+                </div>
+                <div
+                  className="rounded-md px-3 py-2 ring-1"
+                  style={{ backgroundColor: primaryTintSoft, borderColor: primaryTintStrong }}
+                >
+                  <p className="text-[11px] uppercase tracking-wide text-[#607B89]">Total</p>
+                  <p className="mt-1 text-lg font-bold" style={{ color: primaryColor }}>
+                    {formatCurrency(totalProposta)}
                   </p>
                 </div>
               </div>
+
+              {exibirDivergenciaSubtotal && (
+                <div className="mt-4 rounded-md border border-[#F7C78A] bg-[#FFF7EB] p-3">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 text-[#B45309]" />
+                    <div>
+                      <p className="text-xs font-semibold text-[#92400E]">Conferencia financeira</p>
+                      <p className="mt-1 text-xs text-[#92400E]">
+                        Soma dos itens: {formatCurrency(subtotalItens)} | Subtotal da proposta:{' '}
+                        {formatCurrency(subtotalProposta)} | Diferenca: {formatCurrency(divergenciaSubtotal)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </section>
+
+            {tokenParaAceite && (
+              <section
+                className="rounded-[18px] border p-5 shadow-[0_16px_30px_-24px_rgba(30,64,175,0.2)]"
+                style={{ borderColor: primaryTintStrong, backgroundColor: primaryTintSoft }}
+              >
+                <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold" style={{ color: primaryColor }}>
+                  <Shield className="h-5 w-5" />
+                  Token de acesso
+                </h3>
+                <div className="text-center">
+                  <div
+                    className="mb-3 rounded-lg border bg-white p-4"
+                    style={{ borderColor: primaryTintStrong }}
+                  >
+                    <div className="break-all font-mono text-2xl font-bold tracking-[0.14em]" style={{ color: primaryColor }}>
+                      {formatarTokenParaExibicao(tokenParaAceite)}
+                    </div>
+                  </div>
+                  <p className="text-xs font-medium" style={{ color: primaryColor }}>
+                    Codigo unico desta proposta para rastreio de acesso
+                  </p>
+                </div>
+              </section>
             )}
 
-            {/* Informações de Contato */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <Building className="h-5 w-5 mr-2" />
+            <section className="rounded-[18px] border border-[#DEE8EC] bg-white p-5 shadow-[0_16px_30px_-24px_rgba(16,57,74,0.28)]">
+              <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold tracking-[-0.01em] text-[#19384C]">
+                <Building className="h-5 w-5" style={{ color: primaryColor }} />
                 Contato
               </h3>
 
-              <div className="space-y-3 text-sm">
+              <div className="space-y-2.5 text-sm text-[#355166]">
                 <div>
-                  <strong>{proposta.empresa.nome}</strong>
+                  <strong className="text-[#19384C]">{proposta.empresa.nome}</strong>
                 </div>
-                <div className="text-gray-600">{proposta.empresa.endereco}</div>
-                <div className="text-gray-600">{proposta.empresa.telefone}</div>
-                <div className="text-gray-600">{proposta.empresa.email}</div>
+                <div>{proposta.empresa.endereco}</div>
+                <div>{proposta.empresa.telefone}</div>
+                <div>{proposta.empresa.email}</div>
               </div>
+            </section>
+          </aside>
+        </div>
+      </main>
+
+      {showSolicitarAjustes && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B1A2B]/55 p-4">
+          <div className="w-full max-w-lg rounded-[18px] border border-[#F7C78A] bg-white p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold text-[#19384C]">Solicitar ajustes</h3>
+            <p className="mt-2 text-sm text-[#607B89]">
+              Descreva o que voce gostaria de ajustar nesta proposta para nosso time comercial revisar.
+            </p>
+
+            <div className="mt-4">
+              <label htmlFor="motivo-ajustes" className="mb-2 block text-sm font-medium text-[#355166]">
+                Motivo dos ajustes
+              </label>
+              <textarea
+                id="motivo-ajustes"
+                value={motivoAjustes}
+                onChange={(event) => setMotivoAjustes(event.target.value)}
+                rows={5}
+                maxLength={600}
+                className="w-full rounded-lg border border-[#D4E2E7] px-3 py-2 text-sm text-[#19384C] outline-none transition focus:border-[#B45309] focus:ring-2 focus:ring-[#FDE68A]"
+                placeholder="Ex.: preciso de ajuste de prazo, condicao de pagamento ou composicao dos itens..."
+              />
+              <p className="mt-1 text-right text-xs text-[#607B89]">{motivoAjustes.length}/600</p>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  if (!processandoNegociacao) {
+                    setShowSolicitarAjustes(false);
+                    setMotivoAjustes('');
+                  }
+                }}
+                disabled={processandoNegociacao}
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-[#D4E2E7] px-4 text-sm font-medium text-[#355166] transition hover:bg-[#F4F8FA] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarSolicitacaoAjustes}
+                disabled={processandoNegociacao}
+                className="inline-flex h-10 items-center justify-center rounded-lg bg-[#B45309] px-4 text-sm font-semibold text-white transition hover:bg-[#92400E] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {processandoNegociacao ? 'Enviando...' : 'Enviar solicitacao'}
+              </button>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Modal de Confirmação de Rejeição */}
       {showConfirmReject && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Confirmar Rejeição</h3>
-            <p className="text-gray-600 mb-6">
-              Tem certeza que deseja rejeitar esta proposta? Esta ação não pode ser desfeita.
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B1A2B]/55 p-4">
+          <div className="w-full max-w-md rounded-[18px] border border-[#FECACA] bg-white p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold text-[#19384C]">Confirmar rejeicao</h3>
+            <p className="mt-2 text-sm text-[#607B89]">
+              Tem certeza que deseja rejeitar esta proposta? Essa acao nao pode ser desfeita.
             </p>
-            <div className="flex gap-3 justify-end">
+
+            <div className="mt-6 flex justify-end gap-3">
               <button
                 onClick={() => setShowConfirmReject(false)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-[#D4E2E7] px-4 text-sm font-medium text-[#355166] transition hover:bg-[#F4F8FA]"
               >
                 Cancelar
               </button>
               <button
                 onClick={confirmarRejeicao}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                className="inline-flex h-10 items-center justify-center rounded-lg bg-[#DC2626] px-4 text-sm font-semibold text-white transition hover:bg-[#B91C1C]"
               >
-                Rejeitar Proposta
+                Rejeitar proposta
               </button>
             </div>
           </div>

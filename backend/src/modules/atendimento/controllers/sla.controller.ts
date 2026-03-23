@@ -14,13 +14,17 @@ import {
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { Permission } from '../../../common/permissions/permissions.constants';
 import { SlaService } from '../services/sla.service';
 import { CreateSlaConfigDto } from '../dto/sla/create-sla-config.dto';
 import { UpdateSlaConfigDto } from '../dto/sla/update-sla-config.dto';
 import { SlaMetricasFilterDto } from '../dto/sla/sla-metricas-filter.dto';
 
 @Controller('atendimento/sla')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.ATENDIMENTO_SLA_MANAGE)
 export class SlaController {
   constructor(private readonly slaService: SlaService) {}
 

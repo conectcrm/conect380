@@ -10,10 +10,14 @@ WORKDIR /app
 # Build args para variáveis de ambiente do React (ANTES de copiar código)
 ARG REACT_APP_API_URL=http://localhost:3001
 ARG REACT_APP_WS_URL=ws://localhost:3001
+ARG REACT_APP_MVP_MODE=false
+ARG REACT_APP_ENABLE_OMNICHANNEL=
 
 # Expor variáveis como ambiente em tempo de build
 ENV REACT_APP_API_URL=${REACT_APP_API_URL}
 ENV REACT_APP_WS_URL=${REACT_APP_WS_URL}
+ENV REACT_APP_MVP_MODE=${REACT_APP_MVP_MODE}
+ENV REACT_APP_ENABLE_OMNICHANNEL=${REACT_APP_ENABLE_OMNICHANNEL}
 
 # Copiar arquivos de dependências
 COPY package*.json ./

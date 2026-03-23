@@ -1,44 +1,29 @@
 import api from './api';
 
-/**
- * Enum para nível de complexidade de senha
- */
 export enum SenhaComplexidadeEnum {
   BAIXA = 'baixa',
   MEDIA = 'media',
   ALTA = 'alta',
 }
 
-/**
- * Enum para frequência de backup
- */
 export enum BackupFrequenciaEnum {
   DIARIO = 'diario',
   SEMANAL = 'semanal',
   MENSAL = 'mensal',
 }
 
-/**
- * Enum para provedores de SMS
- */
 export enum SmsProviderEnum {
   TWILIO = 'twilio',
   NEXMO = 'nexmo',
   SINCH = 'sinch',
 }
 
-/**
- * Enum para provedores de Push Notification
- */
 export enum PushProviderEnum {
   FCM = 'fcm',
   APNS = 'apns',
   ONESIGNAL = 'onesignal',
 }
 
-/**
- * Interface para configurações de empresa
- */
 export interface ConfiguracoesEmpresa {
   id: string;
   empresaId: string;
@@ -47,85 +32,119 @@ export interface ConfiguracoesEmpresa {
   descricao?: string | null;
   site?: string | null;
   logoUrl?: string | null;
-  corPrimaria: string; // Default: #159A9C
-  corSecundaria: string; // Default: #002333
+  corPrimaria: string;
+  corSecundaria: string;
 
-  // Segurança
-  autenticacao2FA: boolean; // Default: false
-  sessaoExpiracaoMinutos: number; // Default: 30 (range: 5-480)
-  senhaComplexidade: SenhaComplexidadeEnum; // Default: media
-  auditoria: boolean; // Default: true
-  forceSsl: boolean; // Default: true
-  ipWhitelist?: string[] | null; // Lista de IPs permitidos
+  // Seguranca
+  autenticacao2FA: boolean;
+  sessaoExpiracaoMinutos: number;
+  senhaComplexidade: SenhaComplexidadeEnum;
+  auditoria: boolean;
+  forceSsl: boolean;
+  ipWhitelist?: string[] | null;
 
-  // Usuários
-  limiteUsuarios: number; // Default: 10 (range: 1-1000)
-  aprovacaoNovoUsuario: boolean; // Default: false
-  conviteExpiracaoHoras: number; // Default: 48 (range: 24-168)
+  // Usuarios
+  limiteUsuarios: number;
+  aprovacaoNovoUsuario: boolean;
+  conviteExpiracaoHoras: number;
+  alcadaAprovacaoFinanceira?: number | null;
+  comercialLimiteDescontoPercentual: number;
+  comercialAprovacaoInternaHabilitada: boolean;
 
   // Email/SMTP
-  emailsHabilitados: boolean; // Default: true
+  emailsHabilitados: boolean;
   servidorSMTP?: string | null;
-  portaSMTP: number; // Default: 587
+  portaSMTP: number;
   smtpUsuario?: string | null;
   smtpSenha?: string | null;
 
-  // Comunicação (WhatsApp, SMS, Push)
-  whatsappHabilitado: boolean; // Default: false
+  // Comunicacao
+  whatsappHabilitado: boolean;
   whatsappNumero?: string | null;
   whatsappApiToken?: string | null;
-  smsHabilitado: boolean; // Default: false
+  smsHabilitado: boolean;
   smsProvider?: SmsProviderEnum | null;
   smsApiKey?: string | null;
-  pushHabilitado: boolean; // Default: false
+  pushHabilitado: boolean;
   pushProvider?: PushProviderEnum | null;
   pushApiKey?: string | null;
 
-  // Integrações
-  apiHabilitada: boolean; // Default: false
-  webhooksAtivos: number; // Default: 0
+  // Integracoes
+  apiHabilitada: boolean;
+  webhooksAtivos: number;
+  fiscalProvider?: string | null;
+  fiscalOfficialHttpEnabled?: boolean | null;
+  fiscalRequireOfficialProvider?: boolean | null;
+  fiscalOfficialBaseUrl?: string | null;
+  fiscalOfficialStrictResponse?: boolean | null;
+  fiscalOfficialWebhookAllowInsecure?: boolean | null;
+  fiscalOfficialCorrelationHeader?: string | null;
+  fiscalOfficialApiToken?: string | null;
+  fiscalOfficialWebhookSecret?: string | null;
 
   // Backup
-  backupAutomatico: boolean; // Default: true
-  backupFrequencia: BackupFrequenciaEnum; // Default: diario
-  backupRetencaoDias: number; // Default: 30 (range: 7-365)
+  backupAutomatico: boolean;
+  backupFrequencia: BackupFrequenciaEnum;
+  backupRetencaoDias: number;
 
-  // Auditoria
   createdAt: string;
   updatedAt: string;
 }
 
-/**
- * DTO para atualizar configurações de empresa (partial update)
- */
 export interface UpdateEmpresaConfigDto {
   // Geral
   descricao?: string;
   site?: string;
-  logoUrl?: string;
+  logoUrl?: string | null;
   corPrimaria?: string;
   corSecundaria?: string;
 
-  // Segurança
+  // Seguranca
   autenticacao2FA?: boolean;
   sessaoExpiracaoMinutos?: number;
   senhaComplexidade?: SenhaComplexidadeEnum;
   auditoria?: boolean;
+  forceSsl?: boolean;
+  ipWhitelist?: string[] | null;
 
-  // Usuários
+  // Usuarios
   limiteUsuarios?: number;
   aprovacaoNovoUsuario?: boolean;
+  conviteExpiracaoHoras?: number;
+  alcadaAprovacaoFinanceira?: number | null;
+  comercialLimiteDescontoPercentual?: number;
+  comercialAprovacaoInternaHabilitada?: boolean;
 
-  // Notificações
+  // Email/SMTP
   emailsHabilitados?: boolean;
   servidorSMTP?: string;
   portaSMTP?: number;
   smtpUsuario?: string;
   smtpSenha?: string;
 
-  // Integrações
+  // Comunicacao
+  whatsappHabilitado?: boolean;
+  whatsappNumero?: string;
+  whatsappApiToken?: string;
+  smsHabilitado?: boolean;
+  smsProvider?: SmsProviderEnum;
+  smsApiKey?: string;
+  pushHabilitado?: boolean;
+  pushProvider?: PushProviderEnum;
+  pushApiKey?: string;
+
+  // Integracoes
   apiHabilitada?: boolean;
   webhooksAtivos?: number;
+  fiscalProvider?: string;
+  fiscalOfficialHttpEnabled?: boolean;
+  fiscalRequireOfficialProvider?: boolean;
+  fiscalOfficialBaseUrl?: string;
+  fiscalOfficialStrictResponse?: boolean;
+  fiscalOfficialWebhookAllowInsecure?: boolean;
+  fiscalOfficialCorrelationHeader?: string;
+  fiscalOfficialApiToken?: string;
+  fiscalOfficialWebhookSecret?: string;
 
   // Backup
   backupAutomatico?: boolean;
@@ -133,38 +152,58 @@ export interface UpdateEmpresaConfigDto {
   backupRetencaoDias?: number;
 }
 
-/**
- * Service para gerenciar configurações de empresa
- */
+export interface TestSmtpRequest {
+  servidorSMTP?: string | null;
+  portaSMTP?: number | null;
+  smtpUsuario?: string | null;
+  smtpSenha?: string | null;
+}
+
+export interface TestSmtpResponse {
+  success: boolean;
+  message: string;
+}
+
+export interface BackupSnapshotInfo {
+  fileName: string;
+  generatedAt: string;
+  sizeBytes: number;
+}
+
+export interface ExecuteBackupResponse {
+  success: boolean;
+  message: string;
+  backup: BackupSnapshotInfo;
+}
+
 export const empresaConfigService = {
-  /**
-   * Busca configurações da empresa autenticada
-   * 🔐 empresaId extraído automaticamente do JWT no backend
-   * @returns Configurações da empresa (auto-cria se não existir)
-   */
   async getConfig(): Promise<ConfiguracoesEmpresa> {
-    const response = await api.get(`/empresas/config`);
+    const response = await api.get('/empresas/config');
     return response.data;
   },
 
-  /**
-   * Atualiza configurações da empresa autenticada (partial update)
-   * 🔐 empresaId extraído automaticamente do JWT no backend
-   * @param data - Configurações a atualizar
-   * @returns Configurações atualizadas
-   */
   async updateConfig(data: UpdateEmpresaConfigDto): Promise<ConfiguracoesEmpresa> {
-    const response = await api.put(`/empresas/config`, data);
+    const response = await api.put('/empresas/config', data);
     return response.data;
   },
 
-  /**
-   * Restaura configurações da empresa autenticada para os valores padrão
-   * 🔐 empresaId extraído automaticamente do JWT no backend
-   * @returns Configurações restauradas
-   */
   async resetConfig(): Promise<ConfiguracoesEmpresa> {
-    const response = await api.post(`/empresas/config/reset`);
+    const response = await api.post('/empresas/config/reset');
     return response.data;
+  },
+
+  async testSMTP(data: TestSmtpRequest): Promise<TestSmtpResponse> {
+    const response = await api.post('/empresas/config/smtp/test', data);
+    return response.data;
+  },
+
+  async executeBackup(): Promise<ExecuteBackupResponse> {
+    const response = await api.post('/empresas/config/backup/execute');
+    return response.data;
+  },
+
+  async getBackupHistory(limit = 20): Promise<BackupSnapshotInfo[]> {
+    const response = await api.get('/empresas/config/backup/history', { params: { limit } });
+    return Array.isArray(response.data) ? response.data : [];
   },
 };

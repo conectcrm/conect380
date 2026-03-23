@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
+import { Repository, Between, In } from 'typeorm';
 import { Ticket, StatusTicket } from '../entities/ticket.entity';
 import { Mensagem } from '../entities/mensagem.entity';
 import { User } from '../../users/user.entity';
@@ -29,6 +29,15 @@ export interface TendenciasDto {
   metrica: string;
   periodo: string;
   granularidade: string;
+}
+
+interface DailyMetricsAccumulator {
+  data: string;
+  tickets: number;
+  respostaTotalMinutos: number;
+  respostaCount: number;
+  resolvidosTotal: number;
+  resolvidosSla: number;
 }
 
 /**
@@ -75,6 +84,57 @@ export class AnalyticsService {
     }
 
     return { dataInicio, dataFim };
+  }
+
+  private toDateKey(date: Date): string {
+    return date.toISOString().split('T')[0];
+  }
+
+  private clamp(value: number, min: number, max: number): number {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  /**
+   * Proxy deterministico de satisfacao (1..5) enquanto nao existe tabela de avaliacao.
+   * Baseado em tempo de resposta (40%) e SLA (60%).
+   */
+  private calcularSatisfacaoProxy(
+    tempoMedioRespostaMinutos: number,
+    slaAtingidoPercentual: number,
+  ): number {
+    const respostaNormalizada = this.clamp(1 - tempoMedioRespostaMinutos / 120, 0, 1);
+    const slaNormalizado = this.clamp(slaAtingidoPercentual / 100, 0, 1);
+
+    const score = 1 + (respostaNormalizada * 0.4 + slaNormalizado * 0.6) * 4;
+    return parseFloat(score.toFixed(1));
+  }
+
+  private construirAcumuladoresDiarios(
+    dataInicio: Date,
+    dataFim: Date,
+  ): Map<string, DailyMetricsAccumulator> {
+    const buckets = new Map<string, DailyMetricsAccumulator>();
+
+    const cursor = new Date(dataInicio);
+    cursor.setHours(0, 0, 0, 0);
+
+    const fim = new Date(dataFim);
+    fim.setHours(23, 59, 59, 999);
+
+    while (cursor <= fim) {
+      const key = this.toDateKey(cursor);
+      buckets.set(key, {
+        data: key,
+        tickets: 0,
+        respostaTotalMinutos: 0,
+        respostaCount: 0,
+        resolvidosTotal: 0,
+        resolvidosSla: 0,
+      });
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    return buckets;
   }
 
   /**
@@ -168,8 +228,8 @@ export class AnalyticsService {
         slaAtingido = (ticketsDentroSLA.length / ticketsResolvidosComTempo.length) * 100;
       }
 
-      // Satisfação do cliente - Mock (TODO: implementar sistema de avaliação)
-      const satisfacaoCliente = 4.2;
+      // Proxy determinístico de satisfação enquanto não há tabela de avaliação.
+      const satisfacaoCliente = this.calcularSatisfacaoProxy(tempoMedioResposta, slaAtingido);
 
       // Tendências - dados diários para gráficos
       const tendenciaTickets = await this.calcularTendenciaDiaria(
@@ -229,12 +289,11 @@ export class AnalyticsService {
    * Retorna desempenho por atendente
    */
   async getDesempenhoAtendentes(params: DesempenhoAtendentesDto) {
-    this.logger.log(`👥 Calculando desempenho de atendentes para empresa ${params.empresaId}`);
+    this.logger.log(`Calculando desempenho de atendentes para empresa ${params.empresaId}`);
 
     const { dataInicio, dataFim } = this.calcularPeriodo(params.periodo);
 
     try {
-      // Buscar tickets do período
       const tickets = await this.ticketRepository.find({
         where: {
           empresaId: params.empresaId,
@@ -242,7 +301,28 @@ export class AnalyticsService {
         },
       });
 
-      // Agrupar por atendente
+      const atendenteIds = Array.from(
+        new Set(
+          tickets
+            .map((ticket) => ticket.atendenteId)
+            .filter((atendenteId): atendenteId is string => Boolean(atendenteId)),
+        ),
+      );
+
+      const atendentes = atendenteIds.length
+        ? await this.userRepository.find({
+            where: {
+              empresa_id: params.empresaId,
+              id: In(atendenteIds),
+            },
+            select: ['id', 'nome'],
+          })
+        : [];
+
+      const nomesAtendentes = new Map(
+        atendentes.map((atendente) => [atendente.id, atendente.nome]),
+      );
+
       const desempenhoPorAtendente = new Map<
         string,
         {
@@ -250,7 +330,6 @@ export class AnalyticsService {
           nome: string;
           ticketsAtendidos: number;
           temposResposta: number[];
-          satisfacoes: number[];
           ticketsResolvidosSLA: number;
           ticketsResolvidosTotal: number;
         }
@@ -263,10 +342,9 @@ export class AnalyticsService {
         if (!desempenhoPorAtendente.has(atendenteId)) {
           desempenhoPorAtendente.set(atendenteId, {
             atendenteId,
-            nome: `Atendente ${atendenteId.substring(0, 8)}`, // TODO: buscar nome real do atendente
+            nome: nomesAtendentes.get(atendenteId) || `Atendente ${atendenteId.substring(0, 8)}`,
             ticketsAtendidos: 0,
             temposResposta: [],
-            satisfacoes: [],
             ticketsResolvidosSLA: 0,
             ticketsResolvidosTotal: 0,
           });
@@ -275,13 +353,11 @@ export class AnalyticsService {
         const desempenho = desempenhoPorAtendente.get(atendenteId)!;
         desempenho.ticketsAtendidos++;
 
-        // Calcular tempo de resposta (usando data_primeira_resposta)
         if (ticket.data_primeira_resposta && ticket.data_abertura) {
           const diff = ticket.data_primeira_resposta.getTime() - ticket.data_abertura.getTime();
-          desempenho.temposResposta.push(diff / (1000 * 60)); // Minutos
+          desempenho.temposResposta.push(diff / (1000 * 60));
         }
 
-        // SLA (tickets resolvidos dentro de 24h)
         if (ticket.status === StatusTicket.CONCLUIDO || ticket.status === StatusTicket.ENCERRADO) {
           desempenho.ticketsResolvidosTotal++;
 
@@ -293,34 +369,19 @@ export class AnalyticsService {
             }
           }
         }
-
-        // Satisfação - Mock (TODO: implementar sistema de avaliação)
-        desempenho.satisfacoes.push(4.0 + Math.random()); // 4.0 - 5.0
       });
 
-      // Converter para array e calcular médias
       const resultado = Array.from(desempenhoPorAtendente.values())
-        .map((desempenho) => ({
-          atendenteId: desempenho.atendenteId,
-          nome: desempenho.nome,
-          ticketsAtendidos: desempenho.ticketsAtendidos,
-          tempoMedioResposta:
+        .map((desempenho) => {
+          const tempoMedioResposta =
             desempenho.temposResposta.length > 0
               ? Math.round(
                   desempenho.temposResposta.reduce((a, b) => a + b, 0) /
                     desempenho.temposResposta.length,
                 )
-              : 0,
-          satisfacaoMedia:
-            desempenho.satisfacoes.length > 0
-              ? parseFloat(
-                  (
-                    desempenho.satisfacoes.reduce((a, b) => a + b, 0) /
-                    desempenho.satisfacoes.length
-                  ).toFixed(1),
-                )
-              : 0,
-          slaAtingido:
+              : 0;
+
+          const slaAtingido =
             desempenho.ticketsResolvidosTotal > 0
               ? parseFloat(
                   (
@@ -328,24 +389,30 @@ export class AnalyticsService {
                     100
                   ).toFixed(1),
                 )
-              : 0,
-        }))
+              : 0;
+
+          return {
+            atendenteId: desempenho.atendenteId,
+            nome: desempenho.nome,
+            ticketsAtendidos: desempenho.ticketsAtendidos,
+            tempoMedioResposta,
+            satisfacaoMedia: this.calcularSatisfacaoProxy(tempoMedioResposta, slaAtingido),
+            slaAtingido,
+          };
+        })
         .sort((a, b) => b.ticketsAtendidos - a.ticketsAtendidos)
         .slice(0, params.limite);
 
-      this.logger.log(`✅ Desempenho de ${resultado.length} atendentes calculado`);
+      this.logger.log(`Desempenho de ${resultado.length} atendentes calculado`);
       return resultado;
     } catch (error) {
-      this.logger.error(
-        `❌ Erro ao calcular desempenho de atendentes: ${error.message}`,
-        error.stack,
-      );
+      this.logger.error(`Erro ao calcular desempenho de atendentes: ${error.message}`, error.stack);
       throw error;
     }
   }
 
   /**
-   * Retorna estatísticas por canal
+   * Retorna estatisticas por canal
    */
   async getEstatisticasCanais(params: EstatisticasCanaisDto) {
     this.logger.log(`📱 Calculando estatísticas de canais para empresa ${params.empresaId}`);
@@ -432,50 +499,88 @@ export class AnalyticsService {
    * Retorna tendências ao longo do tempo
    */
   async getTendencias(params: TendenciasDto) {
-    this.logger.log(
-      `📈 Calculando tendências de ${params.metrica} para empresa ${params.empresaId}`,
-    );
+    this.logger.log(`Calculando tendencias de ${params.metrica} para empresa ${params.empresaId}`);
 
     const { dataInicio, dataFim } = this.calcularPeriodo(params.periodo);
 
     try {
-      // Por enquanto, implementação simplificada apenas para 'tickets'
-      // TODO: Expandir para outras métricas (tempo_resposta, satisfacao, sla)
+      const tickets = await this.ticketRepository.find({
+        where: {
+          empresaId: params.empresaId,
+          createdAt: Between(dataInicio, dataFim),
+        },
+        select: [
+          'createdAt',
+          'data_abertura',
+          'data_primeira_resposta',
+          'data_fechamento',
+          'status',
+        ],
+      });
 
-      if (params.metrica === 'tickets') {
-        return await this.calcularTendenciaDiaria(params.empresaId, dataInicio, dataFim);
-      }
+      const buckets = this.construirAcumuladoresDiarios(dataInicio, dataFim);
 
-      // Retornar dados mock para outras métricas (temporário)
-      const dias = Math.floor((dataFim.getTime() - dataInicio.getTime()) / (1000 * 60 * 60 * 24));
-      const resultado = [];
+      tickets.forEach((ticket) => {
+        const key = this.toDateKey(ticket.createdAt);
+        const bucket = buckets.get(key);
+        if (!bucket) return;
 
-      for (let i = 0; i <= dias; i++) {
-        const data = new Date(dataInicio);
-        data.setDate(data.getDate() + i);
+        bucket.tickets += 1;
+
+        if (ticket.data_primeira_resposta && ticket.data_abertura) {
+          const diff = ticket.data_primeira_resposta.getTime() - ticket.data_abertura.getTime();
+          if (diff > 0) {
+            bucket.respostaTotalMinutos += diff / (1000 * 60);
+            bucket.respostaCount += 1;
+          }
+        }
+
+        if (ticket.status === StatusTicket.CONCLUIDO || ticket.status === StatusTicket.ENCERRADO) {
+          bucket.resolvidosTotal += 1;
+
+          if (ticket.data_fechamento) {
+            const diff = ticket.data_fechamento.getTime() - ticket.createdAt.getTime();
+            const horas = diff / (1000 * 60 * 60);
+            if (horas <= 24) {
+              bucket.resolvidosSla += 1;
+            }
+          }
+        }
+      });
+
+      return Array.from(buckets.values()).map((bucket) => {
+        const tempoMedioResposta =
+          bucket.respostaCount > 0 ? bucket.respostaTotalMinutos / bucket.respostaCount : 0;
+
+        const slaAtingido =
+          bucket.resolvidosTotal > 0 ? (bucket.resolvidosSla / bucket.resolvidosTotal) * 100 : 0;
 
         let valor = 0;
         switch (params.metrica) {
-          case 'tempo_resposta':
-            valor = 15 + Math.random() * 20; // 15-35 minutos
+          case 'tickets':
+            valor = bucket.tickets;
             break;
-          case 'satisfacao':
-            valor = 4.0 + Math.random(); // 4.0-5.0
+          case 'tempo_resposta':
+            valor = tempoMedioResposta;
             break;
           case 'sla':
-            valor = 85 + Math.random() * 10; // 85-95%
+            valor = slaAtingido;
+            break;
+          case 'satisfacao':
+            valor = this.calcularSatisfacaoProxy(tempoMedioResposta, slaAtingido);
+            break;
+          default:
+            valor = 0;
             break;
         }
 
-        resultado.push({
-          data: data.toISOString().split('T')[0],
+        return {
+          data: bucket.data,
           valor: parseFloat(valor.toFixed(1)),
-        });
-      }
-
-      return resultado;
+        };
+      });
     } catch (error) {
-      this.logger.error(`❌ Erro ao calcular tendências: ${error.message}`, error.stack);
+      this.logger.error(`Erro ao calcular tendencias: ${error.message}`, error.stack);
       throw error;
     }
   }

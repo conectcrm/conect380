@@ -22,6 +22,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
+import { useGlobalConfirmation } from '../../../contexts/GlobalConfirmationContext';
 import { useAuth } from '../../../hooks/useAuth';
 import { useFilaStore } from '../../../stores/filaStore';
 import {
@@ -31,7 +32,12 @@ import {
   EstrategiaDistribuicao,
 } from '../../../services/filaService';
 
-const GestaoFilasPage: React.FC = () => {
+interface GestaoFilasPageProps {
+  hideBackButton?: boolean;
+}
+
+const GestaoFilasPage: React.FC<GestaoFilasPageProps> = ({ hideBackButton = false }) => {
+  const { confirm } = useGlobalConfirmation();
   const { user } = useAuth();
   // ⚠️ Obter empresaId do JWT token
   const empresaId = user?.empresa?.id || '';
@@ -168,7 +174,7 @@ const GestaoFilasPage: React.FC = () => {
   };
 
   const handleDeleteFila = async (id: string) => {
-    if (!window.confirm('Tem certeza que deseja excluir esta fila?')) {
+    if (!(await confirm('Tem certeza que deseja excluir esta fila?'))) {
       return;
     }
 
@@ -205,7 +211,7 @@ const GestaoFilasPage: React.FC = () => {
   };
 
   const handleRemoveAtendente = async (filaId: string, atendenteId: string) => {
-    if (!window.confirm('Tem certeza que deseja remover este atendente da fila?')) {
+    if (!(await confirm('Tem certeza que deseja remover este atendente da fila?'))) {
       return;
     }
 
@@ -221,10 +227,11 @@ const GestaoFilasPage: React.FC = () => {
   if (!empresaId) {
     return (
       <div className="min-h-screen bg-gray-50">
-        {/* Header com BackToNucleus */}
-        <div className="bg-white border-b px-6 py-4">
-          <BackToNucleus nucleusName="Atendimento" nucleusPath="/atendimento" />
-        </div>
+        {!hideBackButton && (
+          <div className="bg-white border-b px-6 py-4">
+            <BackToNucleus nucleusName="Atendimento" nucleusPath="/atendimento" />
+          </div>
+        )}
 
         {/* Aviso de Empresa Não Selecionada */}
         <div className="p-6">
@@ -264,10 +271,11 @@ const GestaoFilasPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header com BackToNucleus */}
-      <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus nucleusName="Atendimento" nucleusPath="/atendimento" />
-      </div>
+      {!hideBackButton && (
+        <div className="bg-white border-b px-6 py-4">
+          <BackToNucleus nucleusName="Atendimento" nucleusPath="/atendimento" />
+        </div>
+      )}
 
       {/* Container Principal */}
       <div className="p-6">

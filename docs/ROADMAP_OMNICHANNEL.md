@@ -1,5 +1,15 @@
 # 🚀 Roadmap de Evolução - Módulo Omnichannel
 
+> Escopo do documento
+>
+> Este roadmap descreve apenas a evolução do módulo Atendimento (Omnichannel).
+> Não deve ser usado como roadmap oficial do produto inteiro nem como contrato funcional completo do Conect360.
+> Para a hierarquia de fonte de verdade, consulte [docs/README.md](README.md), [docs/handbook/MATRIZ_COBERTURA_REQUISITOS_2026-03.md](handbook/MATRIZ_COBERTURA_REQUISITOS_2026-03.md) e [README.md](../README.md).
+
+> Status documental
+>
+> Documento histórico/setorial de 2025. Útil como contexto de evolução e baseline técnico do módulo, mas insuficiente para orientar sozinho novas implementações de requisitos futuros.
+
 **Data**: 11 de dezembro de 2025  
 **Status Atual**: ✅ Core funcional (webhook → fila → chat → mensagens)  
 **Objetivo**: Evolução estruturada do atendimento omnichannel para produção

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import toast from 'react-hot-toast';
 import {
   RefreshCw,
   Plus,
@@ -18,11 +17,13 @@ import {
 } from 'lucide-react';
 import { BackToNucleus } from '../../../components/navigation/BackToNucleus';
 import { KPICard } from '../../../components/common/KPICard';
+import { useGlobalConfirmation } from '../../../contexts/GlobalConfirmationContext';
 import atendenteService, {
   Atendente,
   CreateAtendenteDto,
   StatusAtendente,
 } from '../../../services/atendenteService';
+import { toastService } from '../../../services/toastService';
 import { getErrorMessage } from '../../../utils/errorHandling';
 
 const formatTelefone = (valor: string): string => {
@@ -52,6 +53,7 @@ interface GestaoAtendentesPageProps {
 }
 
 const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackButton = false }) => {
+  const { confirm } = useGlobalConfirmation();
   // Estados principais
   const [atendentes, setAtendentes] = useState<Atendente[]>([]);
   const [loading, setLoading] = useState(true);
@@ -175,7 +177,7 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
     e.preventDefault();
 
     if (!validateForm()) {
-      toast.error('Por favor, corrija os erros no formulário');
+      toastService.error('Por favor, corrija os erros no formulário');
       return;
     }
 
@@ -184,7 +186,7 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
 
       if (editingAtendente) {
         await atendenteService.atualizar(editingAtendente.id, formData);
-        toast.success('Atendente atualizado com sucesso!');
+        toastService.success('Atendente atualizado com sucesso!');
       } else {
         const response = await atendenteService.criar(formData);
 
@@ -194,7 +196,7 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
           setShowSenhaModal(true);
         }
 
-        toast.success('Atendente cadastrado com sucesso!');
+        toastService.success('Atendente cadastrado com sucesso!');
       }
 
       await carregarAtendentes();
@@ -203,12 +205,12 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
       console.error('Erro ao salvar atendente:', err);
       const errorMsg = getErrorMessage(err, 'Erro ao salvar atendente');
       setError(errorMsg);
-      toast.error(errorMsg);
+      toastService.error(errorMsg);
     }
   };
 
   const handleDelete = async (id: string): Promise<void> => {
-    const confirmed = window.confirm('Deseja realmente desativar este atendente?');
+    const confirmed = await confirm('Deseja realmente desativar este atendente?');
     if (!confirmed) {
       return;
     }
@@ -216,13 +218,13 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
     try {
       setError(null);
       await atendenteService.deletar(id);
-      toast.success('Atendente desativado com sucesso!');
+      toastService.success('Atendente desativado com sucesso!');
       await carregarAtendentes();
     } catch (err: unknown) {
       console.error('Erro ao deletar atendente:', err);
       const errorMsg = getErrorMessage(err, 'Erro ao deletar atendente');
       setError(errorMsg);
-      toast.error(errorMsg);
+      toastService.error(errorMsg);
     }
   };
 
@@ -601,7 +603,7 @@ const GestaoAtendentesPage: React.FC<GestaoAtendentesPageProps> = ({ hideBackBut
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(senhaTemporaria);
-                      toast.success('Senha copiada!');
+                      toastService.success('Senha copiada!');
                     }}
                     className="ml-4 p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
                     title="Copiar senha"

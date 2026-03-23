@@ -1,6 +1,7 @@
-﻿import { INestApplication } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import * as request from 'supertest';
+import { createE2EApp, withE2EBootstrapLock } from '../_support/e2e-app.helper';
 import { AdminEmpresasController } from '../../src/modules/admin/controllers/admin-empresas.controller';
 import { AdminEmpresasService } from '../../src/modules/admin/services/admin-empresas.service';
 import { RolesGuard } from '../../src/common/guards/roles.guard';
@@ -17,7 +18,7 @@ describe('AdminEmpresasController - Guards (E2E)', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({
+    const moduleRef = await withE2EBootstrapLock(() => Test.createTestingModule({
       controllers: [AdminEmpresasController],
       providers: [{ provide: AdminEmpresasService, useValue: mockAdminService }, RolesGuard],
     })
@@ -32,10 +33,9 @@ describe('AdminEmpresasController - Guards (E2E)', () => {
           return true;
         },
       })
-      .compile();
+      .compile());
 
-    app = moduleRef.createNestApplication();
-    await app.init();
+    app = await createE2EApp(moduleRef, { validationPipe: false });
   });
 
   afterAll(async () => {
@@ -44,6 +44,13 @@ describe('AdminEmpresasController - Guards (E2E)', () => {
 
   it('permite acesso quando role e admin', async () => {
     await request(app.getHttpServer()).get('/admin/empresas').set('x-test-role', 'admin').expect(200);
+  });
+
+  it('permite acesso quando role e superadmin', async () => {
+    await request(app.getHttpServer())
+      .get('/admin/empresas')
+      .set('x-test-role', 'superadmin')
+      .expect(200);
   });
 
   it('nega acesso quando usuario nao possui role', async () => {
@@ -57,3 +64,5 @@ describe('AdminEmpresasController - Guards (E2E)', () => {
       .expect(403);
   });
 });
+
+

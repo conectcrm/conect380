@@ -2,11 +2,15 @@ import { Logger, Controller, Get, Post, Put, Delete, Body, Param, UseGuards } fr
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { Permission } from '../../../common/permissions/permissions.constants';
 import { AtendenteService } from '../services/atendente.service';
 import { CriarAtendenteDto, AtualizarAtendenteDto, AtualizarStatusAtendenteDto } from '../dto';
 
 @Controller('atendimento/atendentes')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
+@Permissions(Permission.ATENDIMENTO_FILAS_MANAGE)
 export class AtendentesController {
   private readonly logger = new Logger(AtendentesController.name);
   constructor(private atendenteService: AtendenteService) {

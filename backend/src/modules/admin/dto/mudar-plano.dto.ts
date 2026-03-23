@@ -3,9 +3,10 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class MudarPlanoDto {
   @ApiProperty({
-    description: 'Nome do novo plano',
-    example: 'Professional',
-    enum: ['Starter', 'Professional', 'Enterprise', 'Custom'],
+    description:
+      'Identificador do plano no catalogo de assinaturas (codigo ou alias comum). Ex.: starter, business, enterprise.',
+    example: 'business',
+    enum: ['starter', 'business', 'enterprise', 'custom'],
   })
   @IsString()
   plano: string;
@@ -19,7 +20,8 @@ export class MudarPlanoDto {
   motivo?: string;
 
   @ApiPropertyOptional({
-    description: 'Valor mensal do novo plano',
+    description:
+      'Campo legado. Quando informado, eh ignorado e o valor aplicado sera sempre o preco do catalogo de planos.',
     example: 297.0,
   })
   @IsOptional()

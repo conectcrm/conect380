@@ -3,7 +3,8 @@ param(
   [int]$DbPort = 5434,
   [string]$DbDatabase = "conectcrm_test",
   [string]$DbUser = "conectcrm",
-  [string]$DbPassword = "conectcrm123"
+  [string]$DbPassword = "conectcrm123",
+  [switch]$SkipAtendimento
 )
 
 $ErrorActionPreference = "Stop"
@@ -101,11 +102,16 @@ try {
     }
   }
 
-  Run-Step -Name "Smoke E2E: atendimento inbox/triagem" -Action {
-    Invoke-WithDbEnv -DbHostName $DbHost -DbPortNumber $DbPort -DbName $DbDatabase -DbUsername $DbUser -DbUserPassword $DbPassword -Action {
-      npm --prefix backend run test:e2e -- test/atendimento/triagem.e2e-spec.ts
-      if ($LASTEXITCODE -ne 0) { throw "triagem.e2e-spec.ts failed" }
+  if (-not $SkipAtendimento) {
+    Run-Step -Name "Smoke E2E: atendimento inbox/triagem" -Action {
+      Invoke-WithDbEnv -DbHostName $DbHost -DbPortNumber $DbPort -DbName $DbDatabase -DbUsername $DbUser -DbUserPassword $DbPassword -Action {
+        npm --prefix backend run test:e2e -- test/atendimento/triagem.e2e-spec.ts
+        if ($LASTEXITCODE -ne 0) { throw "triagem.e2e-spec.ts failed" }
+      }
     }
+  }
+  else {
+    Add-Result -Step "Smoke E2E: atendimento inbox/triagem" -Status "SKIP" -Details "SkipAtendimento enabled"
   }
 }
 finally {
@@ -116,7 +122,7 @@ Write-Host ""
 Write-Host "MVP smoke summary:"
 $results | Format-Table -AutoSize
 
-$failed = $results | Where-Object { $_.Status -eq "FAIL" }
+$failed = @($results | Where-Object { $_.Status -eq "FAIL" })
 if ($failed.Count -gt 0) {
   Write-Host ""
   Write-Host "MVP smoke result: FAIL"

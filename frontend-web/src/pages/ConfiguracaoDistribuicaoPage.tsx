@@ -15,7 +15,6 @@ import {
   Settings,
   Shuffle,
   AlertCircle,
-  CheckCircle,
 } from 'lucide-react';
 import { BackToNucleus } from '../components/navigation/BackToNucleus';
 import {
@@ -25,6 +24,8 @@ import {
   AlgoritmoDistribuicao,
 } from '../services/distribuicaoAvancadaService';
 import api from '../services/api';
+import { useGlobalConfirmation } from '../contexts/GlobalConfirmationContext';
+import { FiltersBar, InlineStats, PageHeader, SectionCard } from '../components/layout-v2';
 
 interface Fila {
   id: string;
@@ -33,6 +34,7 @@ interface Fila {
 }
 
 const ConfiguracaoDistribuicaoPage: React.FC = () => {
+  const { confirm } = useGlobalConfirmation();
   // Estados principais
   const [configuracoes, setConfiguracoes] = useState<DistribuicaoConfig[]>([]);
   const [filas, setFilas] = useState<Fila[]>([]);
@@ -132,7 +134,7 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Deseja realmente deletar esta configuração?')) {
+    if (!(await confirm('Deseja realmente deletar esta configuração?'))) {
       return;
     }
 
@@ -198,61 +200,92 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
     return colors[algoritmo];
   };
 
+  const totalConfiguracoes = configuracoes.length;
+  const configuracoesAtivas = configuracoes.filter((config) => config.ativo).length;
+  const algoritmosEmUso = new Set(configuracoes.map((config) => config.algoritmo)).size;
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="space-y-4 pt-1 sm:pt-2">
       {/* Header com BackToNucleus */}
-      <div className="bg-white border-b px-6 py-4">
-        <BackToNucleus nucleusName="Atendimento" nucleusPath="/atendimento" />
+      <div className="px-2 sm:px-0">
+        <SectionCard className="px-4 py-3">
+          <BackToNucleus nucleusName="Atendimento" nucleusPath="/atendimento" />
+        </SectionCard>
       </div>
 
       {/* Container principal */}
-      <div className="p-6">
+      <div className="px-2 sm:px-0">
         <div className="max-w-7xl mx-auto">
           {/* Header da página */}
-          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-[#002333] flex items-center gap-3">
-                  <Settings className="h-8 w-8 text-[#159A9C]" />
-                  Configuração de Distribuição
-                </h1>
-                <p className="text-[#002333]/70 mt-2">
-                  Configure algoritmos de distribuição automática por fila
-                </p>
-              </div>
-              <button
-                onClick={() => setShowDialog(true)}
-                className="px-4 py-2 bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] transition-colors flex items-center gap-2 text-sm font-medium"
-              >
-                <Plus className="h-4 w-4" />
-                Nova Configuração
-              </button>
-            </div>
-          </div>
+          <SectionCard className="mb-6 space-y-4 p-4 sm:p-5">
+            <PageHeader
+              title={
+                <span className="inline-flex items-center gap-2">
+                  <Settings className="h-5 w-5 text-[#159A9C]" />
+                  <span>Configuração de Distribuição</span>
+                </span>
+              }
+              description="Configure algoritmos de distribuição automática por fila."
+              actions={
+                <button
+                  onClick={() => setShowDialog(true)}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#0F7B7D]"
+                >
+                  <Plus className="h-4 w-4" />
+                  Nova Configuração
+                </button>
+              }
+            />
+            {!loading && (
+              <InlineStats
+                compact
+                stats={[
+                  {
+                    label: 'Total de configurações',
+                    value: String(totalConfiguracoes),
+                    tone: 'neutral',
+                  },
+                  {
+                    label: 'Configurações ativas',
+                    value: String(configuracoesAtivas),
+                    tone: 'accent',
+                  },
+                  {
+                    label: 'Algoritmos em uso',
+                    value: String(algoritmosEmUso),
+                    tone: 'warning',
+                  },
+                ]}
+              />
+            )}
+          </SectionCard>
 
           {/* Barra de busca e ações */}
-          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-            <div className="flex items-center gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#B4BEC9]" />
-                <input
-                  type="text"
-                  value={busca}
-                  onChange={(e) => setBusca(e.target.value)}
-                  placeholder="Buscar por fila ou algoritmo..."
-                  className="w-full pl-10 pr-4 py-2 border border-[#B4BEC9] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C] focus:border-transparent text-sm"
-                />
+          <FiltersBar className="mb-6 p-4">
+            <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-end">
+              <div className="w-full sm:flex-1">
+                <label className="mb-2 block text-sm font-medium text-[#385A6A]">Buscar</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9AAEB8]" />
+                  <input
+                    type="text"
+                    value={busca}
+                    onChange={(e) => setBusca(e.target.value)}
+                    placeholder="Buscar por fila ou algoritmo..."
+                    className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white pl-10 pr-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
+                  />
+                </div>
               </div>
               <button
                 onClick={carregarDados}
                 disabled={loading}
-                className="px-4 py-2 bg-white text-[#002333] border border-[#B4BEC9] rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm font-medium"
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#B4BEC9] bg-white px-4 text-sm font-medium text-[#19384C] transition-colors hover:bg-[#F6FAF9] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                 Atualizar
               </button>
             </div>
-          </div>
+          </FiltersBar>
 
           {/* Mensagens de erro */}
           {error && (
@@ -270,12 +303,12 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
 
           {/* Loading */}
           {loading && configuracoes.length === 0 ? (
-            <div className="bg-white rounded-lg shadow-sm border p-12 text-center">
+            <SectionCard className="p-12 text-center">
               <RefreshCw className="h-8 w-8 text-[#159A9C] animate-spin mx-auto mb-4" />
               <p className="text-[#002333]/70">Carregando configurações...</p>
-            </div>
+            </SectionCard>
           ) : configsFiltradas.length === 0 ? (
-            <div className="bg-white rounded-lg shadow-sm border p-12 text-center">
+            <SectionCard className="p-12 text-center">
               <Shuffle className="h-12 w-12 text-[#B4BEC9] mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-[#002333] mb-2">
                 Nenhuma configuração encontrada
@@ -294,13 +327,13 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
                   Nova Configuração
                 </button>
               )}
-            </div>
+            </SectionCard>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {configsFiltradas.map((config) => (
-                <div
+                <SectionCard
                   key={config.id}
-                  className="bg-white rounded-lg shadow-sm border p-6 hover:shadow-lg transition-shadow"
+                  className="p-6 hover:shadow-lg transition-shadow"
                 >
                   {/* Header do card */}
                   <div className="flex items-start justify-between mb-4">
@@ -376,7 +409,7 @@ const ConfiguracaoDistribuicaoPage: React.FC = () => {
                       Deletar
                     </button>
                   </div>
-                </div>
+                </SectionCard>
               ))}
             </div>
           )}

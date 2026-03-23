@@ -1,20 +1,76 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class MailService {
+  private readonly logger = new Logger(MailService.name);
   private transporter: nodemailer.Transporter;
 
-  constructor() {
-    this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: false,
+  private maskEmail(email?: string | null): string {
+    if (!email) return '[email-vazio]';
+    const [local, domain] = email.split('@');
+    if (!domain) return '[email-invalido]';
+    if (local.length <= 2) return `${local[0] ?? '*'}*@${domain}`;
+    return `${local.slice(0, 2)}***@${domain}`;
+  }
+
+  private resolveGlobalSmtpUser(): string {
+    return String(process.env.SMTP_USER || '').trim();
+  }
+
+  private resolveGlobalSmtpPassword(): string {
+    return String(process.env.SMTP_PASS || process.env.SMTP_PASSWORD || '').trim();
+  }
+
+  private resolveGlobalSmtpHost(): string {
+    const host = String(process.env.SMTP_HOST || 'smtp.gmail.com').trim();
+    return host || 'smtp.gmail.com';
+  }
+
+  private resolveGlobalSmtpPort(): number {
+    const parsed = parseInt(String(process.env.SMTP_PORT || '587'), 10);
+    if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 65535) {
+      return 587;
+    }
+    return parsed;
+  }
+
+  public isGlobalSmtpReady(): boolean {
+    return Boolean(this.resolveGlobalSmtpUser() && this.resolveGlobalSmtpPassword());
+  }
+
+  private ensureGlobalSmtpReadyForAuth(flow: 'forgot_password' | 'mfa_login'): void {
+    if (this.isGlobalSmtpReady()) {
+      return;
+    }
+
+    this.logger.error(
+      `SMTP global nao configurado para fluxo critico de autenticacao (${flow}). Defina SMTP_USER e SMTP_PASS/SMTP_PASSWORD.`,
+    );
+    throw new Error('SMTP global nao configurado para autenticacao');
+  }
+
+  private createTransporterFromGlobalEnv(): nodemailer.Transporter {
+    const smtpPort = this.resolveGlobalSmtpPort();
+    return nodemailer.createTransport({
+      host: this.resolveGlobalSmtpHost(),
+      port: smtpPort,
+      secure: smtpPort === 465,
       auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+        user: this.resolveGlobalSmtpUser() || undefined,
+        pass: this.resolveGlobalSmtpPassword() || undefined,
       },
     });
+  }
+
+  constructor() {
+    this.transporter = this.createTransporterFromGlobalEnv();
+
+    if (!this.isGlobalSmtpReady()) {
+      this.logger.warn(
+        'SMTP global incompleto no bootstrap. Fluxos de autenticacao por e-mail (MFA/recuperacao) ficarao indisponiveis ate configurar SMTP_USER e SMTP_PASS/SMTP_PASSWORD.',
+      );
+    }
   }
 
   async enviarEmailVerificacao(dados: {
@@ -102,9 +158,12 @@ export class MailService {
 
     try {
       await this.transporter.sendMail(mailOptions);
-      console.log(`✅ Email de verificação enviado para: ${to}`);
+      this.logger.log(`Email de verificacao enviado para ${this.maskEmail(to)}`);
     } catch (error) {
-      console.error('❌ Erro ao enviar email:', error);
+      this.logger.error(
+        `Erro ao enviar email de verificacao para ${this.maskEmail(to)}`,
+        error instanceof Error ? error.stack : String(error),
+      );
       throw error;
     }
   }
@@ -196,9 +255,12 @@ export class MailService {
 
     try {
       await this.transporter.sendMail(mailOptions);
-      console.log(`✅ Email de boas-vindas enviado para: ${to}`);
+      this.logger.log(`Email de boas-vindas enviado para ${this.maskEmail(to)}`);
     } catch (error) {
-      console.error('❌ Erro ao enviar email de boas-vindas:', error);
+      this.logger.error(
+        `Erro ao enviar email de boas-vindas para ${this.maskEmail(to)}`,
+        error instanceof Error ? error.stack : String(error),
+      );
       throw error;
     }
   }
@@ -210,6 +272,8 @@ export class MailService {
     resetLink: string;
     expiracaoHoras: number;
   }): Promise<void> {
+    this.ensureGlobalSmtpReadyForAuth('forgot_password');
+
     const { to, usuario, empresa, resetLink, expiracaoHoras } = dados;
 
     const htmlContent = `
@@ -277,9 +341,159 @@ export class MailService {
 
     try {
       await this.transporter.sendMail(mailOptions);
-      console.log(`✅ Email de recuperação de senha enviado para: ${to}`);
+      this.logger.log(`Email de recuperacao de senha enviado para ${this.maskEmail(to)}`);
     } catch (error) {
-      console.error('❌ Erro ao enviar email de recuperação de senha:', error);
+      this.logger.error(
+        `Erro ao enviar email de recuperacao de senha para ${this.maskEmail(to)}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw error;
+    }
+  }
+
+  async enviarEmailCodigoMfa(dados: {
+    to: string;
+    usuario: string;
+    codigo: string;
+    expiracaoMinutos: number;
+  }): Promise<void> {
+    this.ensureGlobalSmtpReadyForAuth('mfa_login');
+
+    const { to, usuario, codigo, expiracaoMinutos } = dados;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Codigo de verificacao - Conect CRM</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #002333; background: #f4f7fb; }
+          .container { max-width: 560px; margin: 0 auto; padding: 24px; }
+          .card { background: #ffffff; border-radius: 12px; box-shadow: 0 12px 40px rgba(21, 154, 156, 0.12); overflow: hidden; }
+          .header { background: linear-gradient(135deg, #159A9C, #0F7B7D); color: #ffffff; padding: 24px; text-align: center; }
+          .content { padding: 28px; }
+          .code { letter-spacing: 8px; font-size: 32px; font-weight: bold; text-align: center; margin: 20px 0; color: #159A9C; }
+          .footer { padding: 18px 28px 24px 28px; background: #DEEFE7; color: #002333; font-size: 13px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="card">
+            <div class="header">
+              <h1>Verificacao em duas etapas</h1>
+            </div>
+            <div class="content">
+              <p>Ola <strong>${usuario}</strong>,</p>
+              <p>Para concluir seu login administrativo no Conect CRM, informe o codigo abaixo:</p>
+              <div class="code">${codigo}</div>
+              <p>Este codigo expira em <strong>${expiracaoMinutos} minuto${expiracaoMinutos > 1 ? 's' : ''}</strong>.</p>
+              <p>Se voce nao solicitou este acesso, ignore este e-mail e revise sua senha imediatamente.</p>
+            </div>
+            <div class="footer">
+              Conect CRM • Codigo de uso unico para autenticacao administrativa.
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const mailOptions = {
+      from: `"Conect CRM" <${process.env.SMTP_USER}>`,
+      to,
+      subject: 'Codigo de verificacao de login - Conect CRM',
+      html: htmlContent,
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+      this.logger.log(`Email de MFA enviado para ${this.maskEmail(to)}`);
+    } catch (error) {
+      this.logger.error(
+        `Erro ao enviar email de MFA para ${this.maskEmail(to)}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw error;
+    }
+  }
+
+  async enviarEmailStatusEmpresa(dados: {
+    to: string | string[];
+    empresa: string;
+    status: 'suspended' | 'active';
+    reason?: string;
+  }): Promise<void> {
+    const recipients = (Array.isArray(dados.to) ? dados.to : [dados.to])
+      .map((email) => String(email || '').trim())
+      .filter(Boolean);
+
+    if (recipients.length === 0) {
+      this.logger.warn('Notificacao de status ignorada: nenhum destinatario informado.');
+      return;
+    }
+
+    const isSuspended = dados.status === 'suspended';
+    const statusLabel = isSuspended ? 'suspensa' : 'reativada';
+    const subject = isSuspended
+      ? `[Conect CRM] Empresa ${dados.empresa} suspensa`
+      : `[Conect CRM] Empresa ${dados.empresa} reativada`;
+    const reasonBlock =
+      isSuspended && dados.reason
+        ? `<p><strong>Motivo:</strong> ${dados.reason}</p>`
+        : '';
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Status da empresa atualizado</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #002333; background: #f4f7fb; }
+          .container { max-width: 640px; margin: 0 auto; padding: 24px; }
+          .card { background: #ffffff; border-radius: 12px; box-shadow: 0 12px 40px rgba(21, 154, 156, 0.12); overflow: hidden; }
+          .header { background: linear-gradient(135deg, #159A9C, #0F7B7D); color: #ffffff; padding: 24px; text-align: center; }
+          .content { padding: 24px; }
+          .footer { padding: 16px 24px 24px 24px; background: #DEEFE7; color: #002333; font-size: 13px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="card">
+            <div class="header">
+              <h1>Status da empresa atualizado</h1>
+            </div>
+            <div class="content">
+              <p>O status da empresa <strong>${dados.empresa}</strong> foi alterado para <strong>${statusLabel}</strong>.</p>
+              ${reasonBlock}
+              <p>Data da alteracao: <strong>${new Date().toISOString()}</strong></p>
+            </div>
+            <div class="footer">
+              Conect CRM - Notificacao automatica de governanca guardian.
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const mailOptions = {
+      from: `"Conect CRM" <${process.env.SMTP_USER || 'no-reply@conectcrm.com'}>`,
+      to: recipients.join(', '),
+      subject,
+      html: htmlContent,
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+      const masked = recipients.map((email) => this.maskEmail(email)).join(', ');
+      this.logger.log(`Email de status da empresa enviado para ${masked}`);
+    } catch (error) {
+      this.logger.error(
+        `Erro ao enviar email de status da empresa para ${recipients.map((email) => this.maskEmail(email)).join(', ')}`,
+        error instanceof Error ? error.stack : String(error),
+      );
       throw error;
     }
   }

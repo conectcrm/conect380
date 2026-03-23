@@ -1,4 +1,14 @@
-import { IsNotEmpty, IsString, IsNumber, IsOptional, IsArray, IsEnum, Min } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  IsNumber,
+  IsOptional,
+  IsArray,
+  IsEnum,
+  Min,
+  IsBoolean,
+  IsUUID,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 import { PartialType } from '@nestjs/mapped-types';
 
@@ -11,6 +21,18 @@ export class CreateProdutoDto {
   @IsString()
   categoria: string;
 
+  @IsOptional()
+  @IsUUID()
+  categoriaId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  subcategoriaId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  configuracaoId?: string;
+
   @IsNotEmpty()
   @IsNumber()
   @Min(0)
@@ -20,22 +42,35 @@ export class CreateProdutoDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
-  @Transform(({ value }) => (value ? parseFloat(value) : 0))
+  @Transform(({ value }) =>
+    value === undefined || value === null || value === '' ? undefined : parseFloat(value),
+  )
   custoUnitario?: number;
 
   @IsOptional()
   @IsString()
-  @IsEnum(['produto', 'servico', 'licenca', 'modulo', 'plano', 'aplicativo'])
+  @IsEnum([
+    'produto',
+    'servico',
+    'licenca',
+    'modulo',
+    'plano',
+    'aplicativo',
+    'peca',
+    'acessorio',
+    'pacote',
+    'garantia',
+  ])
   tipoItem?: string;
 
   @IsOptional()
   @IsString()
-  @IsEnum(['unico', 'mensal', 'anual'])
+  @IsEnum(['unico', 'mensal', 'anual', 'trimestral', 'sob_consulta'])
   frequencia?: string;
 
   @IsOptional()
   @IsString()
-  @IsEnum(['unidade', 'saca', 'hectare', 'pacote', 'licenca'])
+  @IsEnum(['unidade', 'saca', 'hectare', 'pacote', 'licenca', 'hora', 'dia', 'mensal', 'assinatura'])
   unidadeMedida?: string;
 
   @IsOptional()
@@ -79,6 +114,26 @@ export class CreateProdutoDto {
   @IsArray()
   @IsString({ each: true })
   variacoes?: string[];
+
+  @IsOptional()
+  @IsString()
+  tipoLicenciamento?: string;
+
+  @IsOptional()
+  @IsString()
+  periodicidadeLicenca?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  renovacaoAutomatica?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Transform(({ value }) =>
+    value === undefined || value === null || value === '' ? undefined : Number(value),
+  )
+  quantidadeLicencas?: number;
 }
 
 export class UpdateProdutoDto extends PartialType(CreateProdutoDto) {}

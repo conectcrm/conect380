@@ -1,12 +1,29 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class CotacaoEmailService {
+  private readonly logger = new Logger(CotacaoEmailService.name);
   private transporter: nodemailer.Transporter;
 
   constructor() {
     this.setupTransporter();
+  }
+
+  private maskEmail(email?: string | null): string {
+    if (!email) return '[email]';
+    const [local, domain] = String(email).split('@');
+    if (!domain) return '[email]';
+    const localMasked =
+      local.length <= 2 ? `${local[0] || '*'}*` : `${local.slice(0, 2)}***${local.slice(-1)}`;
+    return `${localMasked}@${domain}`;
+  }
+
+  private summarizeText(text?: string | null, max = 60): string {
+    if (!text) return '[vazio]';
+    const normalized = String(text).replace(/\s+/g, ' ').trim();
+    if (!normalized) return '[vazio]';
+    return normalized.length > max ? `${normalized.slice(0, max)}...` : normalized;
   }
 
   private setupTransporter() {
@@ -19,7 +36,7 @@ export class CotacaoEmailService {
       },
     });
 
-    console.log('📧 Serviço de email de cotações configurado');
+    this.logger.log('Servico de email de cotacoes configurado');
   }
 
   /**
@@ -34,21 +51,23 @@ export class CotacaoEmailService {
       // Email do criador da cotação
       const emailDestino = cotacao.criadoPorUser?.email;
 
-      console.log('🔍 DEBUG - Dados da cotação:', {
-        numero: cotacao.numero,
-        criadoPor: cotacao.criadoPor,
-        criadoPorUserEmail: cotacao.criadoPorUser?.email,
-        criadoPorUserNome: cotacao.criadoPorUser?.nome,
-        emailDestino,
-      });
+      this.logger.debug(
+        `Dados da cotacao (aprovacao, resumo): ${JSON.stringify({
+          numero: cotacao?.numero || null,
+          criadoPor: cotacao?.criadoPor || null,
+          criadoPorUserEmail: this.maskEmail(cotacao?.criadoPorUser?.email),
+          criadoPorUserNome: this.summarizeText(cotacao?.criadoPorUser?.nome, 40),
+          emailDestino: this.maskEmail(emailDestino),
+        })}`,
+      );
 
       if (!emailDestino) {
-        console.warn('⚠️ Email do criador não encontrado, notificação não enviada');
+        this.logger.warn('Email do criador nao encontrado, notificacao nao enviada');
         return false;
       }
 
-      console.log(
-        `📤 Enviando notificação de aprovação da cotação #${cotacao.numero} para ${emailDestino}`,
+      this.logger.log(
+        `Enviando notificacao de aprovacao da cotacao #${cotacao.numero} para ${this.maskEmail(emailDestino)}`,
       );
 
       const mailOptions = {
@@ -62,10 +81,10 @@ export class CotacaoEmailService {
       };
 
       const result = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Email de aprovação enviado:', result.messageId);
+      this.logger.log(`Email de aprovacao enviado: ${result.messageId}`);
       return true;
     } catch (error) {
-      console.error('❌ Erro ao enviar email de aprovação:', error);
+      this.logger.error('Erro ao enviar email de aprovacao', error?.stack || String(error));
       return false;
     }
   }
@@ -82,21 +101,23 @@ export class CotacaoEmailService {
       // Email do criador da cotação
       const emailDestino = cotacao.criadoPorUser?.email;
 
-      console.log('🔍 DEBUG - Dados da cotação (reprovação):', {
-        numero: cotacao.numero,
-        criadoPor: cotacao.criadoPor,
-        criadoPorUserEmail: cotacao.criadoPorUser?.email,
-        criadoPorUserNome: cotacao.criadoPorUser?.nome,
-        emailDestino,
-      });
+      this.logger.debug(
+        `Dados da cotacao (reprovacao, resumo): ${JSON.stringify({
+          numero: cotacao?.numero || null,
+          criadoPor: cotacao?.criadoPor || null,
+          criadoPorUserEmail: this.maskEmail(cotacao?.criadoPorUser?.email),
+          criadoPorUserNome: this.summarizeText(cotacao?.criadoPorUser?.nome, 40),
+          emailDestino: this.maskEmail(emailDestino),
+        })}`,
+      );
 
       if (!emailDestino) {
-        console.warn('⚠️ Email do criador não encontrado, notificação não enviada');
+        this.logger.warn('Email do criador nao encontrado, notificacao nao enviada');
         return false;
       }
 
-      console.log(
-        `📤 Enviando notificação de reprovação da cotação #${cotacao.numero} para ${emailDestino}`,
+      this.logger.log(
+        `Enviando notificacao de reprovacao da cotacao #${cotacao.numero} para ${this.maskEmail(emailDestino)}`,
       );
 
       const mailOptions = {
@@ -110,10 +131,10 @@ export class CotacaoEmailService {
       };
 
       const result = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Email de reprovação enviado:', result.messageId);
+      this.logger.log(`Email de reprovacao enviado: ${result.messageId}`);
       return true;
     } catch (error) {
-      console.error('❌ Erro ao enviar email de reprovação:', error);
+      this.logger.error('Erro ao enviar email de reprovacao', error?.stack || String(error));
       return false;
     }
   }

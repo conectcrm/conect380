@@ -1,4 +1,19 @@
-# 📚 ÍNDICE DE DOCUMENTAÇÃO - SISTEMA DE TICKETS WHATSAPP
+# Indice de Documentacao - Subsistema de Tickets e WhatsApp
+
+## Aviso de escopo
+
+Este arquivo NAO e o indice principal do produto Conect360.
+
+Ele documenta principalmente o subsistema de Tickets, WhatsApp e partes do modulo de Atendimento.
+
+Para a visao oficial da suite e para requisitos vigentes, use primeiro:
+
+1. `../README.md`
+2. `../docs/INDICE_DOCUMENTACAO.md`
+3. `../docs/handbook/MAPA_MODULOS_TECNICOS.md`
+4. `../docs/handbook/MATRIZ_COBERTURA_REQUISITOS_2026-03.md`
+
+---
 
 ## 🎯 Início Rápido
 

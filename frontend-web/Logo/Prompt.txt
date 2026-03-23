@@ -1,0 +1,47 @@
+Create a modern, professional vector logo for a technology SaaS company named "Conect360".
+
+The logo must feature a geometric symbol composed of three interlocking ribbon-like shapes forming a rounded triangular play-button structure. The symbol should communicate connectivity, integration, flow and 360-degree movement.
+
+STYLE
+- Clean vector design
+- Subtle depth using smooth gradients (premium, not overly 3D)
+- Corporate / SaaS branding aesthetic
+- Balanced spacing, consistent stroke thickness
+- No mockup, no perspective, no shadows, no background objects
+- Must be scalable and readable at small sizes (app icon)
+
+TYPOGRAPHY
+- Modern geometric sans-serif
+- Wordmark: "Conect360" (no space)
+- Clean kerning, semi-bold to bold weight
+- Text aligned horizontally with the icon
+- Icon on the left, text on the right
+
+OFFICIAL COLOR PALETTE (Crevasse)
+Use ONLY these colors:
+- Primary dark: #002333
+- Primary teal: #159A9C
+- Light neutral: #DEEFE7
+- Mid neutral: #B4BEC9
+- White: #FFFFFF
+
+COLOR APPLICATION (IMPORTANT)
+- Wordmark color: #002333
+- Background: #FFFFFF or #DEEFE7
+- Icon must use a professional gradient blend based on the palette:
+  - Ribbon/shape 1: gradient #159A9C → #DEEFE7
+  - Ribbon/shape 2: gradient #002333 → #159A9C
+  - Ribbon/shape 3: gradient #B4BEC9 → #159A9C
+- Inner play-button negative space: #FFFFFF
+- Optional thin outline for separation: #002333 at low opacity
+
+COMPOSITION
+- Horizontal layout (primary)
+- Provide also a version with icon-only (for favicon/app)
+- Provide monochrome version (single color #002333)
+
+OUTPUT
+- Vector style
+- High resolution
+- Transparent background version
+- Crisp edges, no raster artifacts

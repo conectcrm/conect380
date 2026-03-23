@@ -61,7 +61,7 @@ export class CobrancaService {
     empresaId: string,
     filtros?: {
     status?: StatusPlanoCobranca;
-    clienteId?: number;
+    clienteId?: string;
     contratoId?: number;
   },
   ): Promise<PlanoCobranca[]> {
@@ -76,8 +76,8 @@ export class CobrancaService {
       query.andWhere('plano.status = :status', { status: filtros.status });
     }
 
-    if (filtros?.clienteId) {
-      query.andWhere('plano.clienteId = :clienteId', { clienteId: filtros.clienteId });
+    if (typeof filtros?.clienteId === 'string' && filtros.clienteId.trim()) {
+      query.andWhere('plano.clienteId = :clienteId', { clienteId: filtros.clienteId.trim() });
     }
 
     if (filtros?.contratoId) {

@@ -15,6 +15,9 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Public } from '../auth/decorators/public.decorator';
 import { EmpresaGuard } from '../../common/guards/empresa.guard';
 import { SkipEmpresaValidation } from '../../common/decorators/empresa.decorator';
+import { Permissions } from '../../common/decorators/permissions.decorator';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { Permission } from '../../common/permissions/permissions.constants';
 
 export interface CreateCustomerDto {
   email: string;
@@ -111,14 +114,20 @@ export interface CreateCardPaymentDto {
   notification_url: string;
 }
 
+export interface ReconcilePaymentsDto {
+  lookbackHours?: number;
+  limit?: number;
+}
+
 @Controller('mercadopago')
-@UseGuards(JwtAuthGuard, EmpresaGuard)
+@UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
 export class MercadoPagoController {
   private readonly logger = new Logger(MercadoPagoController.name);
 
   constructor(private readonly mercadoPagoService: MercadoPagoService) {}
 
   @Post('customers')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   async createCustomer(@Body() createCustomerDto: CreateCustomerDto) {
     try {
       this.logger.log('Criando cliente no Mercado Pago');
@@ -133,6 +142,7 @@ export class MercadoPagoController {
   }
 
   @Get('customers/:id')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_READ)
   async getCustomer(@Param('id') customerId: string) {
     try {
       return await this.mercadoPagoService.getCustomer(customerId);
@@ -143,6 +153,7 @@ export class MercadoPagoController {
   }
 
   @Post('preferences')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   async createPreference(@Body() createPreferenceDto: CreatePreferenceDto) {
     try {
       this.logger.log('Criando preferência no Mercado Pago');
@@ -157,6 +168,7 @@ export class MercadoPagoController {
   }
 
   @Post('payments/pix')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   async createPixPayment(@Body() createPixPaymentDto: CreatePixPaymentDto) {
     try {
       this.logger.log('Criando pagamento PIX');
@@ -171,6 +183,7 @@ export class MercadoPagoController {
   }
 
   @Post('payments/card')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   async createCardPayment(@Body() createCardPaymentDto: CreateCardPaymentDto) {
     try {
       this.logger.log('Criando pagamento com cartão');
@@ -185,6 +198,7 @@ export class MercadoPagoController {
   }
 
   @Get('payments/:id')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_READ)
   async getPayment(@Param('id') paymentId: string) {
     try {
       return await this.mercadoPagoService.getPayment(paymentId);
@@ -195,12 +209,48 @@ export class MercadoPagoController {
   }
 
   @Post('payments/:id/refund')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
   async refundPayment(@Param('id') paymentId: string, @Body() body: { amount?: number }) {
     try {
       this.logger.log(`Estornando pagamento: ${paymentId}`);
       return await this.mercadoPagoService.refundPayment(paymentId, body.amount);
     } catch (error) {
       this.logger.error('Erro ao estornar pagamento:', error);
+      throw new HttpException(
+        error.message || 'Erro interno do servidor',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('reconciliation/payments/:id')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  async reconcilePaymentById(@Param('id') paymentId: string) {
+    try {
+      return await this.mercadoPagoService.reconcilePaymentById(paymentId, 'manual');
+    } catch (error) {
+      this.logger.error(`Erro ao reconciliar pagamento ${paymentId}:`, error);
+      throw new HttpException(
+        error.message || 'Erro interno do servidor',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('reconciliation/payments')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_MANAGE)
+  async reconcileRecentPayments(@Body() body: ReconcilePaymentsDto = {}) {
+    try {
+      const lookbackHours =
+        body.lookbackHours !== undefined ? Number(body.lookbackHours) : undefined;
+      const limit = body.limit !== undefined ? Number(body.limit) : undefined;
+
+      return await this.mercadoPagoService.reconcileRecentPayments({
+        lookbackHours,
+        limit,
+      });
+    } catch (error) {
+      this.logger.error('Erro ao reconciliar pagamentos recentes:', error);
       throw new HttpException(
         error.message || 'Erro interno do servidor',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -217,7 +267,8 @@ export class MercadoPagoController {
     @Headers('x-request-id') requestId: string,
   ) {
     try {
-      this.logger.log(`Webhook recebido: ${body.type} - ID: ${requestId}`);
+      const webhookType = body?.type || body?.topic || 'unknown';
+      this.logger.log(`Webhook recebido: ${webhookType} - ID: ${requestId || 'n/a'}`);
 
       // Validar assinatura do webhook
       const isValid = await this.mercadoPagoService.validateWebhookSignature(
@@ -236,6 +287,10 @@ export class MercadoPagoController {
 
       return { status: 'success' };
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
       this.logger.error('Erro ao processar webhook:', error);
       throw new HttpException(
         error.message || 'Erro interno do servidor',
@@ -245,6 +300,7 @@ export class MercadoPagoController {
   }
 
   @Get('payment-methods')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_READ)
   async getPaymentMethods() {
     try {
       return await this.mercadoPagoService.getPaymentMethods();
@@ -258,6 +314,7 @@ export class MercadoPagoController {
   }
 
   @Get('installments')
+  @Permissions(Permission.FINANCEIRO_PAGAMENTOS_READ)
   async getInstallments(
     @Param('amount') amount: number,
     @Param('paymentMethodId') paymentMethodId: string,

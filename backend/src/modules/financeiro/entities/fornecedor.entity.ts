@@ -6,9 +6,11 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  Unique,
 } from 'typeorm';
 import { Empresa } from '../../../empresas/entities/empresa.entity';
 
+@Unique('uk_fornecedores_cnpj_cpf_empresa', ['cnpjCpf', 'empresaId'])
 @Entity('fornecedores')
 export class Fornecedor {
   @PrimaryGeneratedColumn('uuid')
@@ -17,7 +19,7 @@ export class Fornecedor {
   @Column({ length: 255 })
   nome: string;
 
-  @Column({ name: 'cnpj_cpf', length: 20, unique: true })
+  @Column({ name: 'cnpj_cpf', length: 20 })
   cnpjCpf: string;
 
   @Column({ length: 255, nullable: true })

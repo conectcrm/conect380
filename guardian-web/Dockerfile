@@ -1,0 +1,15 @@
+FROM node:22-alpine AS build
+WORKDIR /app
+# Build context no deploy contabo é a raiz do monorepo.
+COPY guardian-web/package*.json ./
+RUN npm ci
+COPY guardian-web/ ./
+ARG VITE_GUARDIAN_API_URL=http://localhost:3001
+ENV VITE_GUARDIAN_API_URL=$VITE_GUARDIAN_API_URL
+RUN npm run build
+
+FROM nginx:alpine
+COPY guardian-web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/build /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
