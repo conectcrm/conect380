@@ -4,17 +4,22 @@ import {
   Body,
   Get,
   Param,
-  Query,
   HttpStatus,
   HttpException,
   Put,
   UseGuards,
   Request,
+  ValidationPipe,
+  UsePipes,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { EmpresasService } from './empresas.service';
-import { CreateEmpresaDto, VerificarEmailDto } from './dto/empresas.dto';
+import {
+  CreateEmpresaDto,
+  ReenviarEmailAtivacaoDto,
+  VerificarEmailDto,
+} from './dto/empresas.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
@@ -22,11 +27,33 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Permission } from '../common/permissions/permissions.constants';
 import { JwtAuthGuard } from '../modules/auth/jwt-auth.guard';
 import { UserRole } from '../modules/users/user.entity';
+import { Empresa } from './entities/empresa.entity';
+
+const strictBodyValidationPipe = new ValidationPipe({
+  transform: true,
+  whitelist: true,
+  forbidNonWhitelisted: true,
+});
 
 @ApiTags('empresas')
 @Controller('empresas')
 export class EmpresasController {
   constructor(private readonly empresasService: EmpresasService) {}
+
+  private buildPublicEmpresaPayload(empresa: Partial<Empresa>) {
+    return {
+      id: empresa.id,
+      nome: empresa.nome,
+      email: empresa.email,
+      plano: empresa.plano,
+      status: empresa.status,
+      subdominio: empresa.subdominio,
+      ativo: empresa.ativo,
+      email_verificado: empresa.email_verificado,
+      created_at: empresa.created_at,
+      updated_at: empresa.updated_at,
+    };
+  }
 
   private extractRequestIp(req: any): string | null {
     const forwardedFor = req?.headers?.['x-forwarded-for'];
@@ -50,6 +77,7 @@ export class EmpresasController {
 
   @Post('registro')
   @Throttle({ default: { limit: 3, ttl: 60 * 60 * 1000 } })
+  @UsePipes(strictBodyValidationPipe)
   @ApiOperation({ summary: 'Registrar nova empresa' })
   @ApiResponse({ status: 201, description: 'Empresa registrada com sucesso' })
   @ApiResponse({ status: 400, description: 'Dados inválidos' })
@@ -66,7 +94,7 @@ export class EmpresasController {
         message: empresa.email_verificado
           ? 'Empresa registrada com sucesso.'
           : 'Empresa registrada com sucesso. Verifique seu email para ativar a conta.',
-        data: empresa,
+        data: this.buildPublicEmpresaPayload(empresa),
       };
     } catch (error) {
       throw new HttpException(
@@ -115,13 +143,14 @@ export class EmpresasController {
   @Post('verificar-email')
   @Throttle({ default: { limit: 10, ttl: 60 * 1000 } })
   @ApiOperation({ summary: 'Verificar email de ativação' })
+  @UsePipes(strictBodyValidationPipe)
   async verificarEmailAtivacao(@Body() verificarEmailDto: VerificarEmailDto) {
     try {
       const resultado = await this.empresasService.verificarEmailAtivacao(verificarEmailDto.token);
       return {
         success: true,
         message: 'Email verificado com sucesso!',
-        data: resultado,
+        data: this.buildPublicEmpresaPayload(resultado),
       };
     } catch (error) {
       throw new HttpException(
@@ -134,16 +163,24 @@ export class EmpresasController {
   @Post('reenviar-ativacao')
   @Throttle({ default: { limit: 3, ttl: 5 * 60 * 1000 } })
   @ApiOperation({ summary: 'Reenviar email de ativação' })
-  async reenviarEmailAtivacao(@Body() body: { email: string }) {
+  @UsePipes(strictBodyValidationPipe)
+  async reenviarEmailAtivacao(@Body() body: ReenviarEmailAtivacaoDto) {
     try {
       await this.empresasService.reenviarEmailAtivacao(body.email);
-      return {
-        success: true,
-        message: 'Email de ativação reenviado com sucesso!',
-      };
     } catch (error) {
-      throw new HttpException(error.message || 'Erro ao reenviar email', HttpStatus.BAD_REQUEST);
+      if (!(error instanceof HttpException) || error.getStatus() >= HttpStatus.INTERNAL_SERVER_ERROR) {
+        throw new HttpException(
+          'Erro ao processar reenvio de ativacao',
+          HttpStatus.INTERNAL_SERVER_ERROR,
+        );
+      }
     }
+
+    return {
+      success: true,
+      message:
+        'Se o email estiver cadastrado e pendente de ativacao, um novo link sera enviado.',
+    };
   }
 
   @Get('subdominio/:subdominio')

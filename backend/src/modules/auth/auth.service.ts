@@ -789,7 +789,7 @@ export class AuthService {
       if (lockoutEnabled) {
         await this.clearLoginAttempts(identity);
       }
-      // Do not block login when ativo=false so first access can change password.
+      // Keep inactive users at this stage; login() applies first-access and activation rules.
       const { senha, ...result } = user;
       return result;
     }
@@ -802,7 +802,7 @@ export class AuthService {
   }
 
   async login(user: User & { deve_trocar_senha?: boolean }, metadata?: AuthRequestMetadata) {
-    if (!user.ativo || user.deve_trocar_senha) {
+    if (user.deve_trocar_senha) {
       return {
         success: false,
         action: 'TROCAR_SENHA',
@@ -813,6 +813,12 @@ export class AuthService {
         },
         message: 'Por seguranca, e necessario cadastrar uma nova senha antes de continuar.',
       };
+    }
+
+    if (!user.ativo) {
+      throw new UnauthorizedException(
+        'Conta inativa ou pendente de ativacao por e-mail. Verifique sua caixa de entrada.',
+      );
     }
 
     const shouldRequireMfa = await this.shouldRequireAdminMfa(user);

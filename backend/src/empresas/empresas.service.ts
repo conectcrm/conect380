@@ -44,6 +44,7 @@ export class EmpresasService {
   })();
   private static readonly AUTO_VERIFICAR_EMAIL_CADASTRO =
     String(process.env.SELF_SIGNUP_AUTO_VERIFY_EMAIL || 'true').trim().toLowerCase() !== 'false';
+  private static readonly EMAIL_VERIFICACAO_TOKEN_TTL_HOURS = 24;
   private static readonly BLOQUEAR_EMAIL_DESCARTAVEL =
     String(process.env.SELF_SIGNUP_BLOCK_DISPOSABLE_EMAIL || 'false')
       .trim()
@@ -120,6 +121,28 @@ export class EmpresasService {
     };
 
     return aliases[normalized] || normalized;
+  }
+
+  private createEmailVerificationToken(referenceDate: Date = new Date()): string {
+    return `${referenceDate.getTime().toString(36)}.${crypto.randomBytes(32).toString('hex')}`;
+  }
+
+  private resolveEmailVerificationTokenIssuedAt(
+    token: string,
+    fallbackDate: Date,
+  ): Date {
+    const [timestampPart] = String(token || '').split('.');
+    if (!timestampPart) {
+      return fallbackDate;
+    }
+
+    const parsedTimestamp = Number.parseInt(timestampPart, 36);
+    if (!Number.isFinite(parsedTimestamp) || parsedTimestamp <= 0) {
+      return fallbackDate;
+    }
+
+    const issuedAt = new Date(parsedTimestamp);
+    return Number.isNaN(issuedAt.getTime()) ? fallbackDate : issuedAt;
   }
 
   private validarUF(uf: string): string {
@@ -422,7 +445,7 @@ export class EmpresasService {
       const emailVerificadoInicial = EmpresasService.AUTO_VERIFICAR_EMAIL_CADASTRO;
       const tokenVerificacao = emailVerificadoInicial
         ? null
-        : crypto.randomBytes(32).toString('hex');
+        : this.createEmailVerificationToken();
       const planoCodigo = planoCatalogo.codigo;
       const valorMensalPlano = this.toMoney(planoCatalogo.preco);
 
@@ -587,11 +610,11 @@ export class EmpresasService {
     }
 
     // Verificar se token nÃ£o expirou (24 horas)
-    const tokenCreatedAt = empresa.created_at;
+    const tokenCreatedAt = this.resolveEmailVerificationTokenIssuedAt(token, empresa.created_at);
     const now = new Date();
     const diffHours = (now.getTime() - tokenCreatedAt.getTime()) / (1000 * 60 * 60);
 
-    if (diffHours > 24) {
+    if (diffHours > EmpresasService.EMAIL_VERIFICACAO_TOKEN_TTL_HOURS) {
       throw new HttpException('Token expirado', HttpStatus.BAD_REQUEST);
     }
 
@@ -627,7 +650,7 @@ export class EmpresasService {
     }
 
     // Gerar novo token
-    empresa.token_verificacao = crypto.randomBytes(32).toString('hex');
+    empresa.token_verificacao = this.createEmailVerificationToken();
     await this.empresaRepository.save(empresa);
 
     // Buscar usuÃ¡rio admin

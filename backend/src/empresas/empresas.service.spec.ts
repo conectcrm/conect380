@@ -10,6 +10,7 @@ describe('EmpresasService - normalizacao em atualizarEmpresa', () => {
   };
 
   const userRepository = {
+    save: jest.fn(),
     createQueryBuilder: jest.fn(),
   };
 
@@ -94,5 +95,43 @@ describe('EmpresasService - normalizacao em atualizarEmpresa', () => {
         slug: 'meu-slug-especial',
       }),
     );
+  });
+
+  it('aceita token recente de verificacao mesmo quando a empresa e antiga', async () => {
+    const tokenRecente = `${Date.now().toString(36)}.${'a'.repeat(64)}`;
+    const empresa = {
+      id: 'empresa-2',
+      token_verificacao: tokenRecente,
+      created_at: new Date(Date.now() - 1000 * 60 * 60 * 72),
+      email_verificado: false,
+      usuarios: [],
+    };
+
+    empresaRepository.findOne.mockResolvedValue(empresa);
+    empresaRepository.save.mockImplementation(async (payload: any) => payload);
+
+    await service.verificarEmailAtivacao(tokenRecente);
+
+    expect(empresaRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email_verificado: true,
+        token_verificacao: null,
+      }),
+    );
+  });
+
+  it('rejeita token expirado com base no timestamp embutido no token', async () => {
+    const tokenAntigo = `${(Date.now() - 1000 * 60 * 60 * 25).toString(36)}.${'b'.repeat(64)}`;
+    const empresa = {
+      id: 'empresa-3',
+      token_verificacao: tokenAntigo,
+      created_at: new Date(),
+      email_verificado: false,
+      usuarios: [],
+    };
+
+    empresaRepository.findOne.mockResolvedValue(empresa);
+
+    await expect(service.verificarEmailAtivacao(tokenAntigo)).rejects.toThrow('Token expirado');
   });
 });

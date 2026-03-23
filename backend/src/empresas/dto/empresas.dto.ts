@@ -144,3 +144,11 @@ export class VerificarEmailDto {
   @IsNotEmpty()
   token: string;
 }
+
+export class ReenviarEmailAtivacaoDto {
+  @ApiProperty({ description: 'Email da empresa para reenvio do link de ativacao' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+}
