@@ -46,6 +46,7 @@ export interface MenuConfig {
   children?: MenuConfig[];
   permissions?: string[];
   adminOnly?: boolean;
+  superAdminOnly?: boolean;
   requiredModule?: string; // Novo: modulo necessario para exibir item
   section?: string;
 }
@@ -606,9 +607,24 @@ const isAdminLike = (
   return false;
 };
 
+const isSuperAdminLike = (user: PermissionAwareUser | null | undefined): boolean => {
+  if (!user) {
+    return false;
+  }
+
+  const roleInputs = Array.isArray(user.roles)
+    ? user.roles
+    : user.role !== undefined
+      ? [user.role]
+      : [];
+
+  return roleInputs.some((role) => normalizeRole(role) === 'superadmin');
+};
+
 type PermissionFilterContext = {
   resolvedPermissions: Set<string>;
   isAdmin: boolean;
+  isSuperAdmin: boolean;
 };
 
 const canAccessMenuItem = (item: MenuConfig, context: PermissionFilterContext): boolean => {
@@ -627,6 +643,10 @@ const filterMenuByPermissionsInternal = (
 ): MenuConfig[] => {
   return items.reduce<MenuConfig[]>((acc, item) => {
     if (item.adminOnly && !context.isAdmin) {
+      return acc;
+    }
+
+    if (item.superAdminOnly && !context.isSuperAdmin) {
       return acc;
     }
 
@@ -672,6 +692,7 @@ const filterMenuByPermissions = (
   const context: PermissionFilterContext = {
     resolvedPermissions,
     isAdmin: isAdminLike(user, resolvedPermissions),
+    isSuperAdmin: isSuperAdminLike(user),
   };
 
   const filteredMenu = filterMenuByPermissionsInternal(items, context);
@@ -1154,6 +1175,7 @@ export const menuConfig: MenuConfig[] = [
         href: '/configuracoes/sistema',
         color: 'blue',
         permissions: ['admin.empresas.manage'],
+        superAdminOnly: true,
         group: 'Governan\u00e7a',
       },
     ],

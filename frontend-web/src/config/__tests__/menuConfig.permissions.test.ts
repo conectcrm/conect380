@@ -98,7 +98,7 @@ describe('menuConfig permission filtering', () => {
 
     const ids = collectIds(menu);
     expect(ids).toContain('administracao');
-    expect(ids).toContain('admin-sistema');
+    expect(ids).not.toContain('admin-sistema');
     expect(ids).not.toContain('configuracoes-branding');
   });
 
@@ -124,6 +124,23 @@ describe('menuConfig permission filtering', () => {
     const ids = collectIds(menu);
     expect(ids).toContain('administracao');
     expect(ids).toContain('admin-sistema');
+  });
+
+  it('shows branding global only for superadmin role and blocks admin role', () => {
+    const adminAccess = canUserAccessPath('/configuracoes/sistema', ALL_MODULES, {
+      email: 'admin@empresa.com',
+      role: 'admin',
+      permissions: ['admin.empresas.manage'],
+    } as any);
+
+    const superAdminAccess = canUserAccessPath('/configuracoes/sistema', ALL_MODULES, {
+      email: 'superadmin@empresa.com',
+      role: 'superadmin',
+      permissions: ['admin.empresas.manage'],
+    } as any);
+
+    expect(adminAccess).toBe(false);
+    expect(superAdminAccess).toBe(true);
   });
 
   it('keeps compatibility without user context (no permission pruning)', () => {
