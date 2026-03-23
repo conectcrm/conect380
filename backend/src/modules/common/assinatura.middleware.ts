@@ -19,23 +19,30 @@ type EntitlementModule =
   | 'ATENDIMENTO'
   | 'VENDAS'
   | 'FINANCEIRO'
+  | 'BILLING'
   | 'ADMINISTRACAO'
   | 'DASHBOARD'
   | 'IA';
 
 const PATH_PREFIX_TO_MODULE: Array<{ prefix: string; module: EntitlementModule }> = [
+  { prefix: '/crm', module: 'CRM' },
   { prefix: '/clientes', module: 'CRM' },
+  { prefix: '/contatos', module: 'CRM' },
   { prefix: '/leads', module: 'CRM' },
   { prefix: '/oportunidades', module: 'CRM' },
   { prefix: '/produtos', module: 'CRM' },
   { prefix: '/categorias-produtos', module: 'CRM' },
+  { prefix: '/configuracoes-produtos', module: 'CRM' },
   { prefix: '/subcategorias-produtos', module: 'CRM' },
+  { prefix: '/eventos', module: 'CRM' },
+  { prefix: '/vehicle-inventory', module: 'CRM' },
   { prefix: '/agenda-eventos', module: 'CRM' },
   { prefix: '/interacoes', module: 'CRM' },
 
   { prefix: '/propostas', module: 'VENDAS' },
   { prefix: '/contratos', module: 'VENDAS' },
   { prefix: '/metas', module: 'VENDAS' },
+  { prefix: '/email', module: 'VENDAS' },
 
   { prefix: '/financeiro', module: 'FINANCEIRO' },
   { prefix: '/faturamento', module: 'FINANCEIRO' },
@@ -43,11 +50,16 @@ const PATH_PREFIX_TO_MODULE: Array<{ prefix: string; module: EntitlementModule }
   { prefix: '/mercadopago', module: 'FINANCEIRO' },
   { prefix: '/fornecedores', module: 'FINANCEIRO' },
   { prefix: '/contas-pagar', module: 'FINANCEIRO' },
+  { prefix: '/centros-custo', module: 'FINANCEIRO' },
   { prefix: '/contas-bancarias', module: 'FINANCEIRO' },
   { prefix: '/conciliacao-bancaria', module: 'FINANCEIRO' },
+  { prefix: '/billing', module: 'BILLING' },
 
   { prefix: '/atendimento', module: 'ATENDIMENTO' },
+  { prefix: '/filas', module: 'ATENDIMENTO' },
   { prefix: '/triagem', module: 'ATENDIMENTO' },
+  { prefix: '/distribuicao-avancada', module: 'ATENDIMENTO' },
+  { prefix: '/configuracoes-tickets', module: 'ATENDIMENTO' },
   { prefix: '/nucleos', module: 'ATENDIMENTO' },
   { prefix: '/fluxos', module: 'ATENDIMENTO' },
   { prefix: '/equipes', module: 'ATENDIMENTO' },
@@ -84,6 +96,7 @@ const MODULE_ACCEPTED_CODES: Record<EntitlementModule, string[]> = {
   ATENDIMENTO: ['ATENDIMENTO', 'SUPORTE', 'WHATSAPP', 'CHAT', 'TRIAGEM'],
   VENDAS: ['VENDAS', 'PROPOSTAS', 'CONTRATOS', 'METAS'],
   FINANCEIRO: ['FINANCEIRO', 'FATURAMENTO', 'PAGAMENTOS', 'BILLING'],
+  BILLING: ['BILLING', 'ASSINATURAS', 'PLANOS', 'COBRANCAS'],
   ADMINISTRACAO: ['ADMINISTRACAO', 'ADMIN', 'USUARIOS', 'USERS', 'EMPRESAS'],
   DASHBOARD: ['DASHBOARD', 'ANALYTICS', 'CRM', 'VENDAS', 'FINANCEIRO', 'ATENDIMENTO'],
   IA: ['IA', 'CRM', 'ATENDIMENTO'],

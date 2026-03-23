@@ -56,6 +56,37 @@ describe('AssinaturaMiddleware', () => {
     expect(next).toHaveBeenCalledTimes(1);
   });
 
+  it('permite rota CRM legada quando plano inclui CRM', async () => {
+    assinaturasService.buscarPorEmpresa.mockResolvedValueOnce({
+      status: 'active',
+      usuariosAtivos: 1,
+      clientesCadastrados: 10,
+      storageUtilizado: 1024,
+      apiCallsHoje: 2,
+      plano: {
+        nome: 'Starter',
+        limiteUsuarios: 3,
+        limiteClientes: 1000,
+        limiteStorage: 1024 * 1024 * 1024,
+        limiteApiCalls: 5000,
+        modulosInclusos: [{ modulo: { codigo: 'CRM' } }],
+      },
+    });
+
+    const next = jest.fn();
+    await middleware.use(
+      {
+        path: '/eventos',
+        method: 'GET',
+        user: { empresaId: '11111111-1111-1111-1111-111111111111' },
+      } as any,
+      {} as any,
+      next,
+    );
+
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
   it('bloqueia modulo sensivel nao incluido no plano', async () => {
     assinaturasService.buscarPorEmpresa.mockResolvedValueOnce({
       status: 'active',
@@ -89,6 +120,39 @@ describe('AssinaturaMiddleware', () => {
       expect(error).toBeInstanceOf(HttpException);
       expect((error as HttpException).getStatus()).toBe(HttpStatus.FORBIDDEN);
     }
+  });
+
+  it('bloqueia rota de vendas nao incluida no plano', async () => {
+    assinaturasService.buscarPorEmpresa.mockResolvedValueOnce({
+      status: 'active',
+      usuariosAtivos: 1,
+      clientesCadastrados: 10,
+      storageUtilizado: 1024,
+      apiCallsHoje: 2,
+      plano: {
+        nome: 'Starter',
+        limiteUsuarios: 3,
+        limiteClientes: 1000,
+        limiteStorage: 1024 * 1024 * 1024,
+        limiteApiCalls: 5000,
+        modulosInclusos: [{ modulo: { codigo: 'CRM' } }],
+      },
+    });
+
+    const next = jest.fn();
+    await expect(
+      middleware.use(
+        {
+          path: '/email',
+          method: 'POST',
+          user: { empresaId: '11111111-1111-1111-1111-111111111111' },
+        } as any,
+        {} as any,
+        next,
+      ),
+    ).rejects.toMatchObject({
+      status: HttpStatus.FORBIDDEN,
+    });
   });
 
   it('nao bloqueia consulta de modulos ativos da propria empresa', async () => {
