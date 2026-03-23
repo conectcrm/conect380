@@ -12,7 +12,6 @@ import {
   Target,
   BarChart3,
   FileText,
-  Shield,
   Database,
   UserCog,
   Car,
@@ -21,12 +20,9 @@ import {
   Receipt,
   Calculator,
   Wallet,
-  Mail,
   Shuffle,
-  Clock,
   CheckCircle,
   Calendar,
-  ClipboardList,
   Ticket,
   Layers,
   ListChecks,
@@ -142,6 +138,7 @@ const ALL_PERMISSION_VALUES: string[] = [
   'comercial.propostas.update',
   'comercial.propostas.delete',
   'comercial.propostas.send',
+  'comercial.propostas.approve.override',
   'atendimento.chats.read',
   'atendimento.chats.reply',
   'atendimento.tickets.read',
@@ -156,6 +153,20 @@ const ALL_PERMISSION_VALUES: string[] = [
   'financeiro.faturamento.manage',
   'financeiro.pagamentos.read',
   'financeiro.pagamentos.manage',
+  'financeiro.contas-pagar.read',
+  'financeiro.contas-pagar.manage',
+  'financeiro.fornecedores.read',
+  'financeiro.fornecedores.manage',
+  'financeiro.contas-bancarias.read',
+  'financeiro.contas-bancarias.manage',
+  'financeiro.conciliacao.read',
+  'financeiro.conciliacao.manage',
+  'financeiro.centro-custos.read',
+  'financeiro.centro-custos.manage',
+  'financeiro.alertas.read',
+  'financeiro.alertas.manage',
+  'financeiro.aprovacoes.read',
+  'financeiro.aprovacoes.manage',
   'config.empresa.read',
   'config.empresa.update',
   'config.integracoes.manage',
@@ -206,6 +217,7 @@ const COMERCIAL_FULL_PERMISSIONS = [
   'comercial.propostas.update',
   'comercial.propostas.delete',
   'comercial.propostas.send',
+  'comercial.propostas.approve.override',
 ];
 
 const ATENDIMENTO_MANAGER_PERMISSIONS = [
@@ -271,6 +283,20 @@ const FINANCEIRO_DEFAULT_PERMISSIONS = [
   'financeiro.faturamento.manage',
   'financeiro.pagamentos.read',
   'financeiro.pagamentos.manage',
+  'financeiro.contas-pagar.read',
+  'financeiro.contas-pagar.manage',
+  'financeiro.fornecedores.read',
+  'financeiro.fornecedores.manage',
+  'financeiro.contas-bancarias.read',
+  'financeiro.contas-bancarias.manage',
+  'financeiro.conciliacao.read',
+  'financeiro.conciliacao.manage',
+  'financeiro.centro-custos.read',
+  'financeiro.centro-custos.manage',
+  'financeiro.alertas.read',
+  'financeiro.alertas.manage',
+  'financeiro.aprovacoes.read',
+  'financeiro.aprovacoes.manage',
   'comercial.propostas.read',
   'crm.clientes.read',
 ];
@@ -359,6 +385,40 @@ const ROLE_ALIASES: Record<string, string> = {
   operacional: 'suporte',
 };
 
+const FINANCEIRO_PAGAMENTOS_READ_EQUIVALENCES = [
+  'financeiro.pagamentos.read',
+  'financeiro.contas-pagar.read',
+  'financeiro.fornecedores.read',
+  'financeiro.contas-bancarias.read',
+  'financeiro.conciliacao.read',
+  'financeiro.centro-custos.read',
+  'financeiro.alertas.read',
+  'financeiro.aprovacoes.read',
+];
+
+const FINANCEIRO_PAGAMENTOS_MANAGE_EQUIVALENCES = [
+  'financeiro.pagamentos.manage',
+  'financeiro.contas-pagar.manage',
+  'financeiro.fornecedores.manage',
+  'financeiro.contas-bancarias.manage',
+  'financeiro.conciliacao.manage',
+  'financeiro.centro-custos.manage',
+  'financeiro.alertas.manage',
+  'financeiro.aprovacoes.manage',
+];
+
+const FINANCEIRO_MANAGE_TO_READ_EQUIVALENCES: Array<[string, string]> = [
+  ['financeiro.faturamento.manage', 'financeiro.faturamento.read'],
+  ['financeiro.pagamentos.manage', 'financeiro.pagamentos.read'],
+  ['financeiro.contas-pagar.manage', 'financeiro.contas-pagar.read'],
+  ['financeiro.fornecedores.manage', 'financeiro.fornecedores.read'],
+  ['financeiro.contas-bancarias.manage', 'financeiro.contas-bancarias.read'],
+  ['financeiro.conciliacao.manage', 'financeiro.conciliacao.read'],
+  ['financeiro.centro-custos.manage', 'financeiro.centro-custos.read'],
+  ['financeiro.alertas.manage', 'financeiro.alertas.read'],
+  ['financeiro.aprovacoes.manage', 'financeiro.aprovacoes.read'],
+];
+
 const normalizeRole = (role: unknown): string | null => {
   if (typeof role !== 'string') {
     return null;
@@ -399,6 +459,25 @@ const addRolePermissions = (target: Set<string>, role: unknown): void => {
 
   const defaults = ROLE_DEFAULT_PERMISSIONS[normalizedRole] ?? [];
   defaults.forEach((permission) => target.add(permission));
+};
+
+const expandEquivalentPermissions = (target: Set<string>): void => {
+  for (const [managePermission, readPermission] of FINANCEIRO_MANAGE_TO_READ_EQUIVALENCES) {
+    if (target.has(managePermission)) {
+      target.add(readPermission);
+    }
+  }
+
+  const hasPagamentosRead = target.has('financeiro.pagamentos.read');
+  const hasPagamentosManage = target.has('financeiro.pagamentos.manage');
+
+  if (hasPagamentosRead || hasPagamentosManage) {
+    FINANCEIRO_PAGAMENTOS_READ_EQUIVALENCES.forEach((permission) => target.add(permission));
+  }
+
+  if (hasPagamentosManage) {
+    FINANCEIRO_PAGAMENTOS_MANAGE_EQUIVALENCES.forEach((permission) => target.add(permission));
+  }
 };
 
 function* iteratePermissionInputs(rawPermissions: unknown): Generator<unknown> {
@@ -447,6 +526,7 @@ export const resolveUserPermissions = (user?: PermissionAwareUser | null): Set<s
   // Role defaults are only used for users without explicit assignments.
   if (explicitPermissions.size > 0) {
     explicitPermissions.forEach((permission) => resolved.add(permission));
+    expandEquivalentPermissions(resolved);
     return resolved;
   }
 
@@ -461,6 +541,8 @@ export const resolveUserPermissions = (user?: PermissionAwareUser | null): Set<s
   } else {
     roleInputs.forEach((role) => addRolePermissions(resolved, role));
   }
+
+  expandEquivalentPermissions(resolved);
 
   return resolved;
 };
@@ -820,7 +902,17 @@ export const menuConfig: MenuConfig[] = [
     icon: DollarSign,
     href: '/nuclei/financeiro',
     color: 'orange',
-    permissions: ['financeiro.faturamento.read', 'financeiro.pagamentos.read'],
+    permissions: [
+      'financeiro.faturamento.read',
+      'financeiro.pagamentos.read',
+      'financeiro.contas-pagar.read',
+      'financeiro.fornecedores.read',
+      'financeiro.contas-bancarias.read',
+      'financeiro.conciliacao.read',
+      'financeiro.centro-custos.read',
+      'financeiro.alertas.read',
+      'financeiro.aprovacoes.read',
+    ],
     requiredModule: 'FINANCEIRO', //  Requer licenca de Financeiro
     section: 'Opera\u00e7\u00f5es',
     children: [
@@ -841,7 +933,7 @@ export const menuConfig: MenuConfig[] = [
         icon: Calculator,
         href: '/financeiro/contas-pagar',
         color: 'orange',
-        permissions: ['financeiro.pagamentos.read'],
+        permissions: ['financeiro.contas-pagar.read'],
         group: 'Fluxo Financeiro',
       },
       {
@@ -851,7 +943,7 @@ export const menuConfig: MenuConfig[] = [
         icon: Calculator,
         href: '/financeiro/cotacoes',
         color: 'orange',
-        permissions: ['financeiro.pagamentos.read'],
+        permissions: ['financeiro.contas-pagar.read'],
         requiredModule: 'FINANCEIRO',
         group: 'Compras',
       },
@@ -862,7 +954,7 @@ export const menuConfig: MenuConfig[] = [
         icon: CheckCircle,
         href: '/financeiro/compras/aprovacoes',
         color: 'orange',
-        permissions: ['financeiro.pagamentos.manage'],
+        permissions: ['financeiro.aprovacoes.manage'],
         requiredModule: 'FINANCEIRO',
         group: 'Compras',
       },
@@ -872,7 +964,7 @@ export const menuConfig: MenuConfig[] = [
         icon: Building2,
         href: '/financeiro/fornecedores',
         color: 'orange',
-        permissions: ['financeiro.pagamentos.read'],
+        permissions: ['financeiro.fornecedores.read'],
         group: 'Cadastros',
       },
       {
@@ -882,7 +974,7 @@ export const menuConfig: MenuConfig[] = [
         icon: Wallet,
         href: '/financeiro/contas-bancarias',
         color: 'orange',
-        permissions: ['financeiro.pagamentos.read'],
+        permissions: ['financeiro.contas-bancarias.read'],
         group: 'Cadastros',
       },
       {
@@ -892,7 +984,7 @@ export const menuConfig: MenuConfig[] = [
         icon: Layers,
         href: '/financeiro/centro-custos',
         color: 'orange',
-        permissions: ['financeiro.pagamentos.read'],
+        permissions: ['financeiro.centro-custos.read'],
         group: 'Cadastros',
       },
       {
@@ -902,7 +994,7 @@ export const menuConfig: MenuConfig[] = [
         icon: ListChecks,
         href: '/financeiro/aprovacoes',
         color: 'orange',
-        permissions: ['financeiro.pagamentos.manage'],
+        permissions: ['financeiro.aprovacoes.manage'],
         group: 'Fluxo Financeiro',
       },
       {
@@ -912,7 +1004,7 @@ export const menuConfig: MenuConfig[] = [
         icon: Shuffle,
         href: '/financeiro/conciliacao',
         color: 'orange',
-        permissions: ['financeiro.pagamentos.read'],
+        permissions: ['financeiro.conciliacao.read'],
         group: 'Fluxo Financeiro',
       },
     ],
@@ -1125,19 +1217,19 @@ const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
   { pattern: '/nuclei/atendimento/skills', permissions: ['atendimento.filas.manage'] },
   {
     pattern: '/financeiro/cotacoes',
-    permissions: ['financeiro.pagamentos.read'],
+    permissions: ['financeiro.contas-pagar.read'],
   },
   {
     pattern: '/financeiro/compras/aprovacoes',
-    permissions: ['financeiro.pagamentos.manage'],
+    permissions: ['financeiro.aprovacoes.manage'],
   },
   {
     pattern: '/vendas/cotacoes',
-    permissions: ['financeiro.pagamentos.read'],
+    permissions: ['financeiro.contas-pagar.read'],
   },
   {
     pattern: '/vendas/aprovacoes',
-    permissions: ['financeiro.pagamentos.manage'],
+    permissions: ['financeiro.aprovacoes.manage'],
   },
   {
     pattern: '/veiculos',
@@ -1147,12 +1239,25 @@ const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
     pattern: '/vendas/veiculos',
     permissions: ['crm.produtos.read'],
   },
-  { pattern: '/financeiro', permissions: ['financeiro.faturamento.read', 'financeiro.pagamentos.read'] },
+  {
+    pattern: '/financeiro',
+    permissions: [
+      'financeiro.faturamento.read',
+      'financeiro.pagamentos.read',
+      'financeiro.contas-pagar.read',
+      'financeiro.fornecedores.read',
+      'financeiro.contas-bancarias.read',
+      'financeiro.conciliacao.read',
+      'financeiro.centro-custos.read',
+      'financeiro.alertas.read',
+      'financeiro.aprovacoes.read',
+    ],
+  },
   { pattern: '/financeiro/faturamento', permissions: ['financeiro.faturamento.read'] },
-  { pattern: '/financeiro/contas-pagar', permissions: ['financeiro.pagamentos.read'] },
-  { pattern: '/financeiro/fornecedores', permissions: ['financeiro.pagamentos.read'] },
-  { pattern: '/financeiro/fornecedores/:fornecedorId', permissions: ['financeiro.pagamentos.read'] },
-  { pattern: '/financeiro/contas-bancarias', permissions: ['financeiro.pagamentos.read'] },
+  { pattern: '/financeiro/contas-pagar', permissions: ['financeiro.contas-pagar.read'] },
+  { pattern: '/financeiro/fornecedores', permissions: ['financeiro.fornecedores.read'] },
+  { pattern: '/financeiro/fornecedores/:fornecedorId', permissions: ['financeiro.fornecedores.read'] },
+  { pattern: '/financeiro/contas-bancarias', permissions: ['financeiro.contas-bancarias.read'] },
   {
     pattern: '/financeiro/relatorios',
     permissions: ['financeiro.faturamento.read', 'relatorios.read'],
@@ -1160,9 +1265,9 @@ const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
   },
   { pattern: '/financeiro/contas-receber', permissions: ['financeiro.faturamento.read'] },
   { pattern: '/financeiro/fluxo-caixa', permissions: ['financeiro.faturamento.read'] },
-  { pattern: '/financeiro/conciliacao', permissions: ['financeiro.pagamentos.read'] },
-  { pattern: '/financeiro/aprovacoes', permissions: ['financeiro.pagamentos.manage'] },
-  { pattern: '/financeiro/centro-custos', permissions: ['financeiro.pagamentos.read'] },
+  { pattern: '/financeiro/conciliacao', permissions: ['financeiro.conciliacao.read'] },
+  { pattern: '/financeiro/aprovacoes', permissions: ['financeiro.aprovacoes.manage'] },
+  { pattern: '/financeiro/centro-custos', permissions: ['financeiro.centro-custos.read'] },
   { pattern: '/financeiro/tesouraria', permissions: ['financeiro.faturamento.read'] },
   { pattern: '/configuracoes/departamentos', permissions: ['config.automacoes.manage'] },
   { pattern: '/relatorios/analytics', permissions: ['relatorios.read'] },

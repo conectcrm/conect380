@@ -154,6 +154,7 @@ const ATENDIMENTO_GROUP_ROLES: string[] = [
   UserRole.SUPORTE,
   UserRole.VENDEDOR,
   UserRole.GERENTE,
+  UserRole.ADMIN,
   UserRole.SUPERADMIN,
 ];
 
@@ -164,6 +165,20 @@ const ATENDIMENTO_ANALYTICS_OPTION: PermissaoModalOption = {
 
 const PERMISSOES_MODAL_GROUPS_FALLBACK: PermissaoModalGroup[] = [
   {
+    id: 'perfil',
+    label: 'Conta',
+    description: 'Permissoes para ajustes do proprio perfil',
+    roles: [
+      UserRole.SUPORTE,
+      UserRole.VENDEDOR,
+      UserRole.FINANCEIRO,
+      UserRole.GERENTE,
+      UserRole.ADMIN,
+      UserRole.SUPERADMIN,
+    ],
+    options: [{ value: 'users.profile.update', label: 'Perfil: atualizar dados pessoais' }],
+  },
+  {
     id: 'insights',
     label: 'Dashboards e Relatorios',
     description: 'Visualizacao de indicadores e analises',
@@ -172,6 +187,7 @@ const PERMISSOES_MODAL_GROUPS_FALLBACK: PermissaoModalGroup[] = [
       UserRole.VENDEDOR,
       UserRole.FINANCEIRO,
       UserRole.GERENTE,
+      UserRole.ADMIN,
       UserRole.SUPERADMIN,
     ],
     options: [
@@ -251,18 +267,36 @@ const PERMISSOES_MODAL_GROUPS_FALLBACK: PermissaoModalGroup[] = [
       { value: 'comercial.propostas.update', label: 'Propostas: editar' },
       { value: 'comercial.propostas.delete', label: 'Propostas: excluir' },
       { value: 'comercial.propostas.send', label: 'Propostas: enviar' },
+      {
+        value: 'comercial.propostas.approve.override',
+        label: 'Propostas: override aprovar rascunho',
+      },
     ],
   },
   {
     id: 'financeiro',
     label: 'Financeiro',
-    description: 'Faturamento e pagamentos',
-    roles: [UserRole.FINANCEIRO, UserRole.GERENTE, UserRole.SUPERADMIN],
+    description: 'Faturamento, recebiveis, tesouraria e pagamentos',
+    roles: [UserRole.FINANCEIRO, UserRole.GERENTE, UserRole.ADMIN, UserRole.SUPERADMIN],
     options: [
       { value: 'financeiro.faturamento.read', label: 'Faturamento: visualizar' },
       { value: 'financeiro.faturamento.manage', label: 'Faturamento: gerenciar' },
       { value: 'financeiro.pagamentos.read', label: 'Pagamentos: visualizar' },
       { value: 'financeiro.pagamentos.manage', label: 'Pagamentos: gerenciar' },
+      { value: 'financeiro.contas-pagar.read', label: 'Contas a pagar: visualizar' },
+      { value: 'financeiro.contas-pagar.manage', label: 'Contas a pagar: gerenciar' },
+      { value: 'financeiro.fornecedores.read', label: 'Fornecedores: visualizar' },
+      { value: 'financeiro.fornecedores.manage', label: 'Fornecedores: gerenciar' },
+      { value: 'financeiro.contas-bancarias.read', label: 'Contas bancarias: visualizar' },
+      { value: 'financeiro.contas-bancarias.manage', label: 'Contas bancarias: gerenciar' },
+      { value: 'financeiro.conciliacao.read', label: 'Conciliacao bancaria: visualizar' },
+      { value: 'financeiro.conciliacao.manage', label: 'Conciliacao bancaria: gerenciar' },
+      { value: 'financeiro.centro-custos.read', label: 'Centro de custos: visualizar' },
+      { value: 'financeiro.centro-custos.manage', label: 'Centro de custos: gerenciar' },
+      { value: 'financeiro.alertas.read', label: 'Alertas operacionais: visualizar' },
+      { value: 'financeiro.alertas.manage', label: 'Alertas operacionais: gerenciar' },
+      { value: 'financeiro.aprovacoes.read', label: 'Aprovacoes financeiras: visualizar' },
+      { value: 'financeiro.aprovacoes.manage', label: 'Aprovacoes financeiras: gerenciar' },
     ],
   },
   {
@@ -407,6 +441,53 @@ const arePermissionSetsEqual = (left: Set<string>, right: Set<string>): boolean 
   }
 
   return true;
+};
+
+const FINANCEIRO_SUBMODULOS_POR_PERMISSAO: Record<string, string[]> = {
+  'financeiro.faturamento.read': [
+    'Faturamento',
+    'Contas a receber',
+    'Fluxo de caixa',
+    'Tesouraria',
+  ],
+  'financeiro.faturamento.manage': [
+    'Faturamento',
+    'Contas a receber',
+    'Fluxo de caixa',
+    'Tesouraria',
+  ],
+  'financeiro.pagamentos.read': [
+    'Contas a pagar',
+    'Fornecedores',
+    'Contas bancarias',
+    'Conciliacao bancaria',
+    'Aprovacoes',
+    'Centro de custos',
+    'Alertas operacionais',
+  ],
+  'financeiro.pagamentos.manage': [
+    'Contas a pagar',
+    'Fornecedores',
+    'Contas bancarias',
+    'Conciliacao bancaria',
+    'Aprovacoes',
+    'Centro de custos',
+    'Alertas operacionais',
+  ],
+  'financeiro.contas-pagar.read': ['Contas a pagar'],
+  'financeiro.contas-pagar.manage': ['Contas a pagar'],
+  'financeiro.fornecedores.read': ['Fornecedores'],
+  'financeiro.fornecedores.manage': ['Fornecedores'],
+  'financeiro.contas-bancarias.read': ['Contas bancarias'],
+  'financeiro.contas-bancarias.manage': ['Contas bancarias'],
+  'financeiro.conciliacao.read': ['Conciliacao bancaria'],
+  'financeiro.conciliacao.manage': ['Conciliacao bancaria'],
+  'financeiro.centro-custos.read': ['Centro de custos'],
+  'financeiro.centro-custos.manage': ['Centro de custos'],
+  'financeiro.alertas.read': ['Alertas operacionais'],
+  'financeiro.alertas.manage': ['Alertas operacionais'],
+  'financeiro.aprovacoes.read': ['Aprovacoes'],
+  'financeiro.aprovacoes.manage': ['Aprovacoes'],
 };
 
 const mapPermissionCatalogPayload = (payload: PermissionCatalogResponse): PermissionCatalogState => {
@@ -2668,6 +2749,17 @@ const GestaoUsuariosPage: React.FC = () => {
                     ).length;
                     const allSelected = groupValues.length > 0 && selectedCount === groupValues.length;
                     const partiallySelected = selectedCount > 0 && !allSelected;
+                    const financeiroSubmodulosDoGrupo =
+                      grupo.id === 'financeiro'
+                        ? Array.from(
+                            new Set(
+                              grupo.options.flatMap(
+                                (option) =>
+                                  FINANCEIRO_SUBMODULOS_POR_PERMISSAO[option.value] || [],
+                              ),
+                            ),
+                          )
+                        : [];
 
                     return (
                       <div key={grupo.id} className="rounded-xl border border-[#E1EBEF] bg-white p-3.5">
@@ -2676,6 +2768,11 @@ const GestaoUsuariosPage: React.FC = () => {
                             <p className="text-sm font-semibold text-[#002333]">{grupo.label}</p>
                             {grupo.description && (
                               <p className="text-xs text-gray-500 mt-0.5">{grupo.description}</p>
+                            )}
+                            {financeiroSubmodulosDoGrupo.length > 0 && (
+                              <p className="mt-1 text-xs text-[#5D7785]">
+                                Submodulos: {financeiroSubmodulosDoGrupo.join(' • ')}
+                              </p>
                             )}
                           </div>
                           <label className="inline-flex items-center cursor-pointer select-none rounded-lg border border-[#E1EBEF] bg-[#FAFCFD] px-2.5 py-1.5">
@@ -2712,7 +2809,16 @@ const GestaoUsuariosPage: React.FC = () => {
                                 onChange={() => handleTogglePermissao(permOption.value)}
                                 className={modalCheckboxClass}
                               />
-                              <span className="ml-2 text-sm text-gray-700">{permOption.label}</span>
+                              <span className="ml-2 text-sm text-gray-700">
+                                {permOption.label}
+                                {FINANCEIRO_SUBMODULOS_POR_PERMISSAO[permOption.value] && (
+                                  <span className="block text-xs text-[#6C8794]">
+                                    {FINANCEIRO_SUBMODULOS_POR_PERMISSAO[permOption.value].join(
+                                      ' • ',
+                                    )}
+                                  </span>
+                                )}
+                              </span>
                             </label>
                           ))}
                         </div>
