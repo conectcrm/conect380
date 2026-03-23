@@ -7,6 +7,7 @@ type KpiTrendCardProps = {
   title: string;
   value: string;
   valueSuffix?: string;
+  featureHint?: string;
   trendPercent?: number;
   trendLabel?: string;
   sparkline?: number[];
@@ -50,6 +51,7 @@ const KpiTrendCard: React.FC<KpiTrendCardProps> = ({
   title,
   value,
   valueSuffix,
+  featureHint,
   trendPercent = 0,
   trendLabel = 'no período selecionado',
   sparkline = [],
@@ -91,6 +93,7 @@ const KpiTrendCard: React.FC<KpiTrendCardProps> = ({
             'aria-label': ariaLabel || title,
           }
         : {})}
+      title={featureHint}
       className={`${baseClass}${clickableClass}`}
     >
       <div className="mb-4 flex items-center justify-between gap-2.5">

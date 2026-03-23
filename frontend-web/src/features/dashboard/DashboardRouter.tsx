@@ -1,12 +1,6 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useProfile, type PerfilUsuario } from '../../contexts/ProfileContext';
-import OperacionalDashboard from './OperacionalDashboard';
-import SuporteDashboard from './SuporteDashboard';
-import VendedorDashboard from './VendedorDashboard';
-import DashboardLegacyFallback from './DashboardLegacyFallback';
-import DashboardV2Page from '../dashboard-v2/DashboardV2Page';
-import FinanceiroDashboardV2 from '../dashboard-v2/FinanceiroDashboardV2';
 import { useDashboardV2Flag } from '../dashboard-v2/useDashboardV2';
 
 type UserRecord =
@@ -17,6 +11,24 @@ type UserRecord =
     }
   | null
   | undefined;
+
+const OperacionalDashboard = React.lazy(() => import('./OperacionalDashboard'));
+const SuporteDashboard = React.lazy(() => import('./SuporteDashboard'));
+const VendedorDashboard = React.lazy(() => import('./VendedorDashboard'));
+const DashboardLegacyFallback = React.lazy(() => import('./DashboardLegacyFallback'));
+const DashboardV2Page = React.lazy(() => import('../dashboard-v2/DashboardV2Page'));
+const FinanceiroDashboardV2 = React.lazy(() => import('../dashboard-v2/FinanceiroDashboardV2'));
+
+const DashboardLoadingState: React.FC = () => (
+  <div className="space-y-3">
+    <div className="h-9 w-56 animate-pulse rounded-xl bg-[#E6EFF0]" />
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={index} className="h-32 animate-pulse rounded-[14px] bg-[#E6EFF0]" />
+      ))}
+    </div>
+  </div>
+);
 
 const normalizeProfile = (value: unknown): PerfilUsuario | undefined => {
   if (typeof value !== 'string') return undefined;
@@ -97,16 +109,7 @@ const DashboardRouter: React.FC = () => {
   } = useDashboardV2Flag(perfilExigeDashboardV2);
 
   if (perfilExigeDashboardV2 && dashboardV2FlagLoading) {
-    return (
-      <div className="space-y-3">
-        <div className="h-9 w-56 animate-pulse rounded-xl bg-[#E6EFF0]" />
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="h-32 animate-pulse rounded-[14px] bg-[#E6EFF0]" />
-          ))}
-        </div>
-      </div>
-    );
+    return <DashboardLoadingState />;
   }
 
   const renderDashboard = (): React.ReactNode => {
@@ -148,7 +151,7 @@ const DashboardRouter: React.FC = () => {
     }
   };
 
-  return <div>{renderDashboard()}</div>;
+  return <Suspense fallback={<DashboardLoadingState />}>{renderDashboard()}</Suspense>;
 };
 
 export default DashboardRouter;

@@ -562,6 +562,7 @@ const FinanceiroDashboardV2: React.FC = () => {
       <section className="grid grid-cols-1 gap-3.5 lg:grid-cols-2 xl:grid-cols-5">
         <KpiTrendCard
           title="Faturado"
+          featureHint="Mostra o total faturado no recorte e o ticket medio por fatura."
           value={formatCurrency(valorFaturado)}
           sparkline={sparkFaturado}
           progressPercent={clampPercent(
@@ -577,6 +578,7 @@ const FinanceiroDashboardV2: React.FC = () => {
         />
         <KpiTrendCard
           title="Recebido"
+          featureHint="Mostra o valor ja recebido e a taxa de conversao financeira do periodo."
           value={formatCurrency(valorRecebido)}
           progressPercent={taxaRecebimento}
           sparkline={sparkRecebido}
@@ -586,6 +588,7 @@ const FinanceiroDashboardV2: React.FC = () => {
         />
         <KpiTrendCard
           title="Em aberto"
+          featureHint="Mostra o saldo ainda em aberto, incluindo volume vencido no periodo."
           value={formatCurrency(valorEmAberto)}
           progressPercent={clampPercent(100 - taxaRecebimento)}
           progressTone="amber"
@@ -600,6 +603,7 @@ const FinanceiroDashboardV2: React.FC = () => {
         />
         <KpiTrendCard
           title="Fila de aprovações"
+          featureHint="Mostra quantos itens aguardam aprovacao e o impacto financeiro da fila."
           value={formatNumber(pendenciasAprovacao.length)}
           valueSuffix="itens"
           progressPercent={clampPercent(pendenciasAprovacao.length * 12)}
@@ -614,6 +618,7 @@ const FinanceiroDashboardV2: React.FC = () => {
         />
         <GoalProgressCard
           title="Posicao de caixa"
+          featureHint="Compara o saldo bancario atual com o desembolso mensal estimado."
           primaryValue={formatCurrency(saldoBancarioTotal)}
           primaryLabel="Saldo bancário"
           secondaryValue={formatCurrency(totalMes)}

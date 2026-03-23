@@ -436,6 +436,7 @@ const VendedorDashboard: React.FC = () => {
       <section className="mb-8 grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
         <KpiTrendCard
           title="Meta atual"
+          featureHint="Mostra o progresso da meta no periodo e quanto ainda falta para bater o objetivo."
           value={formatCurrency(kpis.meta?.atual || 0)}
           trendPercent={ritmoDiarioTrendPercent}
           trendLabel="ritmo diario vs meta diaria"
@@ -453,6 +454,7 @@ const VendedorDashboard: React.FC = () => {
 
         <KpiTrendCard
           title="Pipeline em negociacao"
+          featureHint="Mostra o valor em negociacao, volume de propostas ativas e chance media de conversao."
           value={formatCurrency(kpis.pipeline?.valor || 0)}
           trendPercent={taxaConversao}
           trendLabel="chance media de conversao"
@@ -465,6 +467,7 @@ const VendedorDashboard: React.FC = () => {
 
         <KpiTrendCard
           title="Ranking"
+          featureHint="Mostra sua posicao no ranking comercial, variacao e comparativo com a meta."
           value={`#${formatNumber(kpis.ranking?.posicao || 0)}`}
           trendPercent={kpis.ranking?.variacao || 0}
           trendLabel={kpis.ranking?.nivel || 'sem badge'}
@@ -481,6 +484,7 @@ const VendedorDashboard: React.FC = () => {
 
         <KpiTrendCard
           title="Atividades hoje"
+          featureHint="Mostra execucao diaria de atividades comerciais versus meta definida."
           value={formatNumber(totalAtividadesHoje)}
           valueSuffix="acoes"
           trendPercent={hasMetaAtividade ? atividadeExecutionPercent - 100 : 0}
@@ -494,6 +498,7 @@ const VendedorDashboard: React.FC = () => {
 
         <GoalProgressCard
           title="Performance semanal"
+          featureHint="Resume nota semanal, taxa de conversao e ticket medio para acompanhar qualidade comercial."
           primaryValue={(kpis.performance?.nota || 0).toFixed(1)}
           primaryLabel="Nota"
           secondaryValue={`${(kpis.performance?.taxaConversao || 0).toFixed(1)}%`}

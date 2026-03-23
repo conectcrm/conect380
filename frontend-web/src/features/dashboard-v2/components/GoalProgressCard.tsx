@@ -7,6 +7,7 @@ type GoalProgressCardProps = {
   primaryLabel?: string;
   secondaryValue: string;
   secondaryLabel?: string;
+  featureHint?: string;
   trendPercent?: number;
   progressPercent: number;
   projectionLabel?: string;
@@ -20,6 +21,7 @@ const GoalProgressCard: React.FC<GoalProgressCardProps> = ({
   primaryValue,
   primaryLabel = 'Principal',
   secondaryValue,
+  featureHint,
   secondaryLabel = 'Secundário',
   trendPercent = 0,
   progressPercent,
@@ -41,7 +43,10 @@ const GoalProgressCard: React.FC<GoalProgressCardProps> = ({
       : 'text-[#607C89]';
 
   return (
-    <article className="min-h-[214px] md:min-h-[232px] rounded-[20px] border border-[#DCE7EB] bg-white px-5 py-5 shadow-[0_16px_30px_-24px_rgba(15,57,74,0.28)]">
+    <article
+      title={featureHint}
+      className="min-h-[214px] md:min-h-[232px] rounded-[20px] border border-[#DCE7EB] bg-white px-5 py-5 shadow-[0_16px_30px_-24px_rgba(15,57,74,0.28)]"
+    >
       <div className="mb-4 flex items-center justify-between gap-2.5">
         <h3 className="text-[17px] font-semibold leading-tight tracking-[-0.01em] text-[#19384C]">
           {title}

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Activity, BadgeCheck, Clock3, DollarSign, RefreshCw, Target } from 'lucide-react';
 import {
@@ -11,7 +11,6 @@ import GoalProgressCard from './components/GoalProgressCard';
 import ConversionFunnel from './components/ConversionFunnel';
 import InsightsPanel from './components/InsightsPanel';
 import PipelineStageSummary from './components/PipelineStageSummary';
-import api from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 
 type ChartWindow = '3m' | '6m' | '12m';
@@ -222,44 +221,26 @@ const DashboardV2Page: React.FC = () => {
   const { data, loading, error, filters, activeRange, setFilters, refresh, refreshing } =
     useDashboardV2(true);
   const [chartWindow, setChartWindow] = useState<ChartWindow>('3m');
-  const [vendedorOptions, setVendedorOptions] = useState<VendedorOption[]>([]);
+  const vendedorOptions = useMemo<VendedorOption[]>(() => {
+    const vendedores = data?.salesActivities?.porVendedor ?? [];
+    if (!vendedores.length) {
+      return [];
+    }
 
-  useEffect(() => {
-    let mounted = true;
+    const uniqueById = new Map<string, VendedorOption>();
+    vendedores.forEach((vendedor) => {
+      const id = String(vendedor?.vendedorId || '').trim();
+      const nome = String(vendedor?.nome || '').trim();
 
-    const loadVendedores = async (): Promise<void> => {
-      try {
-        const response = await api.get('/dashboard/resumo', {
-          params: { periodo: 'mensal' },
-        });
-
-        if (!mounted) return;
-
-        const metadata = response?.data?.metadata;
-        const vendedores = Array.isArray(metadata?.vendedoresDisponiveis)
-          ? metadata.vendedoresDisponiveis
-          : [];
-
-        const normalized = vendedores
-          .map((vendedor: { id?: unknown; nome?: unknown }) => ({
-            id: String(vendedor?.id || ''),
-            nome: String(vendedor?.nome || ''),
-          }))
-          .filter((vendedor: VendedorOption) => vendedor.id && vendedor.nome);
-
-        setVendedorOptions(normalized);
-      } catch {
-        if (!mounted) return;
-        setVendedorOptions([]);
+      if (id && nome && !uniqueById.has(id)) {
+        uniqueById.set(id, { id, nome });
       }
-    };
+    });
 
-    void loadVendedores();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    return Array.from(uniqueById.values()).sort((a, b) =>
+      a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }),
+    );
+  }, [data?.salesActivities?.porVendedor]);
 
   const trendPoints = useMemo(() => data?.trends?.points ?? [], [data?.trends?.points]);
 
@@ -711,6 +692,7 @@ const DashboardV2Page: React.FC = () => {
       <section className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 min-[1850px]:grid-cols-5">
         <KpiTrendCard
           title="Faturamento"
+          featureHint="Mostra a receita fechada no periodo selecionado. Clique para abrir contas a receber."
           value={formatCurrency(data.overview.receitaFechada)}
           trendPercent={receitaTrendPercent}
           trendLabel={trendPeriodLabel}
@@ -726,6 +708,7 @@ const DashboardV2Page: React.FC = () => {
 
         <KpiTrendCard
           title="Ticket Medio"
+          featureHint="Mostra o valor medio por venda no periodo. Clique para abrir as propostas."
           value={formatCurrency(data.overview.ticketMedio)}
           trendPercent={ticketTrendPercent}
           trendLabel={trendPeriodLabel}
@@ -747,6 +730,7 @@ const DashboardV2Page: React.FC = () => {
 
         <KpiTrendCard
           title="Ganhos no período"
+          featureHint="Mostra quantas vendas foram ganhas e como esta a conversao no periodo."
           value={formatNumber(Number(wonStage?.quantidade || 0))}
           valueSuffix="vendas"
           trendPercent={vendasFechadasTrendPercent}
@@ -763,6 +747,7 @@ const DashboardV2Page: React.FC = () => {
 
         <KpiTrendCard
           title="Pipeline em negociação"
+          featureHint="Mostra o valor em negociacao e a participacao dessas oportunidades no pipeline."
           value={formatCurrency(Number(negotiationStage?.valor || 0))}
           trendPercent={negociacaoTrendPercent}
           trendLabel={`estoque em negociação ${trendPeriodLabel}`}
@@ -797,6 +782,7 @@ const DashboardV2Page: React.FC = () => {
 
         <GoalProgressCard
           title="Meta e carteira ativa"
+          featureHint="Compara a meta de receita com oportunidades ativas e a projecao do pipeline."
           primaryValue={formatCurrency(metaTotal)}
           primaryLabel="Meta"
           secondaryValue={formatNumber(data.overview.oportunidadesAtivas)}
