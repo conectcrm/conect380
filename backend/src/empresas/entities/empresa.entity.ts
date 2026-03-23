@@ -114,10 +114,10 @@ export class Empresa {
   @Column({ type: 'integer', nullable: true })
   health_score: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'criado_em' })
   created_at: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'atualizado_em' })
   updated_at: Date;
 
   @OneToMany(() => User, (user) => user.empresa)
