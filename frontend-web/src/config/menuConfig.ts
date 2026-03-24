@@ -12,7 +12,6 @@ import {
   Target,
   BarChart3,
   FileText,
-  Database,
   UserCog,
   Car,
   Phone,
@@ -1095,16 +1094,6 @@ export const menuConfig: MenuConfig[] = [
         group: 'Comercial',
       },
       {
-        id: 'configuracoes-backup',
-        title: 'Backup e Dados',
-        shortTitle: 'Backup',
-        icon: Database,
-        href: '/configuracoes/empresa?tab=backup',
-        color: 'purple',
-        permissions: ['admin.empresas.manage'],
-        group: 'Governan\u00e7a',
-      },
-      {
         id: 'configuracoes-tickets',
         title: 'Tickets',
         icon: Settings,
@@ -1358,7 +1347,6 @@ const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
   { pattern: '/agenda/eventos/:id', permissions: ['crm.agenda.read'] },
   { pattern: '/crm/agenda/eventos/:id', permissions: ['crm.agenda.read'] },
   { pattern: '/empresas/minhas', permissions: ['admin.empresas.manage'] },
-  { pattern: '/sistema/backup', permissions: ['admin.empresas.manage'] },
   { pattern: '/empresas/:empresaId/configuracoes', permissions: ['admin.empresas.manage'] },
   { pattern: '/empresas/:empresaId/relatorios', permissions: ['admin.empresas.manage'] },
   {
@@ -1366,7 +1354,6 @@ const ROUTE_PERMISSION_RULES: RoutePermissionRule[] = [
     permissions: ['users.read', 'admin.empresas.manage'],
     match: 'all',
   },
-  { pattern: '/empresas/:empresaId/backup', permissions: ['admin.empresas.manage'] },
 ];
 
 const ROUTE_PATH_ALIASES: Record<string, string[]> = {
@@ -1446,12 +1433,10 @@ const ROUTE_MODULE_REQUIREMENTS: Array<{ pattern: string; module: LicensedModule
   { pattern: '/gestao/empresas', module: 'ADMINISTRACAO' },
   { pattern: '/gestao/nucleos', module: 'ADMINISTRACAO' },
   { pattern: '/empresas/minhas', module: 'ADMINISTRACAO' },
-  { pattern: '/sistema/backup', module: 'ADMINISTRACAO' },
   { pattern: '/configuracoes/sistema', module: 'ADMINISTRACAO' },
   { pattern: '/empresas/:empresaId/configuracoes', module: 'ADMINISTRACAO' },
   { pattern: '/empresas/:empresaId/relatorios', module: 'ADMINISTRACAO' },
   { pattern: '/empresas/:empresaId/permissoes', module: 'ADMINISTRACAO' },
-  { pattern: '/empresas/:empresaId/backup', module: 'ADMINISTRACAO' },
 ];
 
 const normalizePathname = (pathname: string): string => {

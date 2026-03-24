@@ -20,7 +20,7 @@ const routeRules: RouteTemplateRule[] = [
   },
   {
     pattern:
-      /^\/(atendimento\/tickets\/[^/]+|empresas\/[^/]+\/(configuracoes|relatorios|permissoes|backup)|contratos\/[^/]+|clientes\/[^/]+|crm\/clientes\/[^/]+|propostas\/[^/]+|vendas\/propostas\/[^/]+)$/,
+      /^\/(atendimento\/tickets\/[^/]+|empresas\/[^/]+\/(configuracoes|relatorios|permissoes)|contratos\/[^/]+|clientes\/[^/]+|crm\/clientes\/[^/]+|propostas\/[^/]+|vendas\/propostas\/[^/]+)$/,
     type: 'DETAIL',
   },
   {

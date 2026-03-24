@@ -10,7 +10,6 @@ import {
   Users,
   Settings,
   Shield,
-  Database,
   UserCheck,
   Calendar,
   Zap,
@@ -320,10 +319,6 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
         badge: 'Novo',
         badgeColor: 'green',
       },
-      {
-        menuId: 'configuracoes-backup',
-        description: 'Gest?o de backups autom?ticos e sincroniza??o entre empresas.',
-      },
     ],
   },
   administracao: {
@@ -411,14 +406,6 @@ const nucleusDescriptors: Record<string, NucleusDescriptor> = {
         description: 'Dashboard executivo com KPIs e indicadores de performance.',
         href: '/gestao/metricas',
         icon: BarChart3,
-        status: 'coming_soon',
-      },
-      {
-        id: 'backup-restore',
-        name: 'Backup e Restore',
-        description: 'Gest?o de backups autom?ticos e restaura??o de dados.',
-        href: '/gestao/backup',
-        icon: Database,
         status: 'coming_soon',
       },
       {

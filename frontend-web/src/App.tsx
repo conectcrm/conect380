@@ -370,10 +370,6 @@ const AppRoutes: React.FC = () => {
                     path="/empresas/:empresaId/usuarios"
                     element={<Navigate to="/configuracoes/usuarios" replace />}
                   />
-                  <Route
-                    path="/empresas/:empresaId/backup"
-                    element={<Navigate to="/configuracoes/empresa?tab=backup" replace />}
-                  />
                   {/* Configurações globais da empresa ativa - Padrão consolidado */}
                   <Route path="/configuracoes/usuarios" element={<GestaoUsuariosPage />} />
                   <Route path="/configuracoes/empresa" element={<ConfiguracaoEmpresaPage />} />
@@ -529,10 +525,6 @@ const AppRoutes: React.FC = () => {
                   <Route
                     path="/gestao/permissoes"
                     element={<Navigate to="/configuracoes/usuarios" replace />}
-                  />
-                  <Route
-                    path="/sistema/backup"
-                    element={<Navigate to="/configuracoes/empresa?tab=backup" replace />}
                   />
                   {/* Atendimento Omnichannel - Protegido */}
                   <Route

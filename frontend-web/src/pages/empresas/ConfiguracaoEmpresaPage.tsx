@@ -8,7 +8,6 @@ import {
   Shield,
   Users,
   Mail,
-  Database,
   Building2,
   Send,
   CheckCircle,
@@ -19,11 +18,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { LoadingSkeleton, PageHeader, SectionCard } from '../../components/layout-v2';
-import {
-  BackupSnapshotInfo,
-  ConfiguracoesEmpresa,
-  empresaConfigService,
-} from '../../services/empresaConfigService';
+import { ConfiguracoesEmpresa, empresaConfigService } from '../../services/empresaConfigService';
 import { oportunidadesService } from '../../services/oportunidadesService';
 import { empresaService, EmpresaResponse } from '../../services/empresaService';
 import { useAuth } from '../../hooks/useAuth';
@@ -44,7 +39,6 @@ const EMPRESA_CONFIG_TABS = [
   { id: 'usuarios', label: 'Usuários e Permissões', icon: Users },
   { id: 'email', label: 'Email/SMTP', icon: Mail },
   { id: 'fiscal', label: 'Fiscal', icon: FileText },
-  { id: 'backup', label: 'Snapshot Config.', icon: Database },
 ] as const;
 
 type EmpresaConfigTabId = (typeof EMPRESA_CONFIG_TABS)[number]['id'];
@@ -97,12 +91,6 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
     success: boolean;
     message: string;
   } | null>(null);
-  const [executingBackup, setExecutingBackup] = useState(false);
-  const [backupResult, setBackupResult] = useState<{ success: boolean; message: string } | null>(
-    null,
-  );
-  const [backupHistory, setBackupHistory] = useState<BackupSnapshotInfo[]>([]);
-  const [showBackupHistory, setShowBackupHistory] = useState(false);
   const [fiscalConfigDiagnostico, setFiscalConfigDiagnostico] =
     useState<DocumentoFiscalConfiguracaoDiagnostico | null>(null);
   const [fiscalConectividadeDiagnostico, setFiscalConectividadeDiagnostico] =
@@ -213,10 +201,17 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
 
   useEffect(() => {
     const tabFromUrl = searchParams.get('tab');
+    if (tabFromUrl === 'backup') {
+      setActiveTab('seguranca');
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.set('tab', 'seguranca');
+      setSearchParams(nextParams, { replace: true });
+      return;
+    }
     if (isValidEmpresaConfigTab(tabFromUrl) && tabFromUrl !== activeTab) {
       setActiveTab(tabFromUrl);
     }
-  }, [activeTab, searchParams]);
+  }, [activeTab, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (activeTab !== 'fiscal' || fiscalConfigDiagnostico || loadingFiscalConfigDiagnostico) {
@@ -245,10 +240,9 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      const [configData, empresaInfo, snapshots, salesFeatureFlagsData] = await Promise.all([
+      const [configData, empresaInfo, salesFeatureFlagsData] = await Promise.all([
         empresaConfigService.getConfig(),
         empresaService.obterEmpresaPorId(empresaId),
-        empresaConfigService.getBackupHistory().catch(() => [] as BackupSnapshotInfo[]),
         oportunidadesService.obterSalesFeatureFlags().catch(() => null),
       ]);
 
@@ -256,7 +250,6 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
       setFormData(configData);
       setEmpresa(empresaInfo);
       setEmpresaData(empresaInfo);
-      setBackupHistory(snapshots);
       if (salesFeatureFlagsData) {
         setSalesFlagsForm(mapSalesFeatureFlagsDecisionToForm(salesFeatureFlagsData));
         setSalesFlagsLoaded(true);
@@ -396,6 +389,26 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
     }
   };
 
+  const canvasHasTransparency = (
+    context: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+  ): boolean => {
+    try {
+      const imageData = context.getImageData(0, 0, width, height);
+      for (let i = 3; i < imageData.data.length; i += 4) {
+        if (imageData.data[i] < 255) {
+          return true;
+        }
+      }
+    } catch {
+      // Se o navegador bloquear leitura de pixels, usa fallback sem transparência.
+      return false;
+    }
+
+    return false;
+  };
+
   const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -434,14 +447,20 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
           // Desenhar imagem redimensionada
           ctx.drawImage(img, 0, 0, width, height);
 
-          // Converter para base64 com compressão (0.8 = 80% qualidade)
-          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+          // Converter para base64 preservando transparência quando necessário.
+          const hasTransparency = canvasHasTransparency(ctx, width, height);
+          const outputMimeType = hasTransparency ? 'image/png' : 'image/jpeg';
+          const compressedBase64 = hasTransparency
+            ? canvas.toDataURL(outputMimeType)
+            : canvas.toDataURL(outputMimeType, 0.82);
 
           // Verificar tamanho final (base64 ~= 1.37x o tamanho em bytes)
           const sizeInBytes = (compressedBase64.length * 3) / 4;
           const sizeInKB = Math.round(sizeInBytes / 1024);
 
-          console.log(`Imagem comprimida: ${sizeInKB}KB (${width}x${height})`);
+          console.log(
+            `Imagem processada: ${sizeInKB}KB (${width}x${height}) [${hasTransparency ? 'PNG' : 'JPEG'}]`,
+          );
 
           resolve(compressedBase64);
         };
@@ -534,71 +553,6 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
       setTestingSMTP(false);
     }
   };
-
-  const handleExecutarBackup = async () => {
-    if (!canUpdateConfig) {
-      return;
-    }
-
-    setExecutingBackup(true);
-    setBackupResult(null);
-
-    try {
-      const result = await empresaConfigService.executeBackup();
-      setBackupResult({ success: result.success, message: result.message });
-
-      const history = await empresaConfigService.getBackupHistory();
-      setBackupHistory(history);
-      setShowBackupHistory(history.length > 0);
-    } catch (err: any) {
-      console.error('Erro ao executar backup:', err);
-      setBackupResult({
-        success: false,
-        message:
-          err?.response?.data?.message ||
-          (err instanceof Error ? err.message : 'Erro ao executar backup'),
-      });
-    } finally {
-      setExecutingBackup(false);
-    }
-  };
-
-  const handleVerHistoricoBackups = async () => {
-    try {
-      const latestHistory = await empresaConfigService.getBackupHistory();
-      setBackupHistory(latestHistory);
-
-      if (latestHistory.length === 0) {
-        toastService.info('Nenhum snapshot disponível para esta empresa.');
-        setShowBackupHistory(false);
-        return;
-      }
-
-      toastService.info(
-        `Histórico atualizado: ${latestHistory.length} snapshot${latestHistory.length > 1 ? 's' : ''}.`,
-      );
-      setShowBackupHistory(true);
-    } catch (err) {
-      console.error('Erro ao carregar histórico de backups:', err);
-      toastService.error('Não foi possível carregar o histórico de snapshots.');
-      setShowBackupHistory(false);
-    }
-  };
-
-  const ultimoBackup = backupHistory[0];
-  const ultimoBackupDescricao = ultimoBackup
-    ? `${new Date(ultimoBackup.generatedAt).toLocaleString('pt-BR')} - ${Math.max(
-        1,
-        Math.round(ultimoBackup.sizeBytes / 1024),
-      )} KB`
-    : 'Nenhum snapshot executado ainda.';
-
-  const ultimoBackupIcon = ultimoBackup ? (
-    <CheckCircle className="h-6 w-6 text-[#159A9C]" />
-  ) : (
-    <Info className="h-6 w-6 text-gray-500" />
-  );
-
   const canUploadLogo = canUpdateConfig && !uploadingLogo;
   const fiscalBlockers = fiscalPreflightDiagnostico?.blockers || fiscalConfigDiagnostico?.blockers || [];
   const fiscalWarnings = fiscalPreflightDiagnostico?.warnings || fiscalConfigDiagnostico?.warnings || [];
@@ -1986,152 +1940,11 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
                 </div>
               )}
 
-              {activeTab === 'backup' && (
-                <div className="space-y-6">
-                  <h2 className="text-2xl font-bold text-[#002333] flex items-center gap-2">
-                    <Database className="h-6 w-6 text-[#159A9C]" />
-                    Snapshot de Configurações
-                  </h2>
-
-                  {/* Status do Último Snapshot */}
-                  <div className="p-4 bg-[#DEEFE7] rounded-lg border border-[#B4BEC9]">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-[#002333]">Último Snapshot</p>
-                        <p className="text-xs text-[#002333] mt-1">{ultimoBackupDescricao}</p>
-                      </div>
-                      {ultimoBackupIcon}
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg border border-[#DCE6EA] bg-[#F8FBFC] p-4">
-                    <p className="text-sm font-medium text-[#244455]">Escopo desta aba</p>
-                    <p className="mt-1 text-xs text-[#607B89]">
-                      Esta tela opera snapshots manuais das configurações da empresa e consulta de
-                      histórico. Regras automáticas de agenda e retenção ficam no nível de
-                      infraestrutura e não são configuradas aqui.
-                    </p>
-                  </div>
-
-                  {/* Ações de Snapshot */}
-                  <div className="border-t pt-6 space-y-4">
-                    <div className="flex flex-col sm:flex-row gap-3">
-                      <button
-                        onClick={handleExecutarBackup}
-                        disabled={executingBackup || !canUpdateConfig}
-                        className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-[#159A9C] text-white rounded-lg hover:bg-[#0F7B7D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        <Database className="h-4 w-4" />
-                        {executingBackup ? 'Gerando Snapshot...' : 'Gerar Snapshot Agora'}
-                      </button>
-
-                      <button
-                        onClick={handleVerHistoricoBackups}
-                        className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        <Info className="h-4 w-4" />
-                        Ver Histórico
-                      </button>
-                    </div>
-
-                    {/* Resultado do Backup */}
-                    {backupResult && (
-                      <div
-                        className={`p-4 rounded-lg flex items-start gap-3 ${
-                          backupResult.success
-                            ? 'bg-green-50 border border-green-200'
-                            : 'bg-red-50 border border-red-200'
-                        }`}
-                      >
-                        {backupResult.success ? (
-                          <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                        ) : (
-                          <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-                        )}
-                        <div>
-                          <p
-                            className={`text-sm font-medium ${
-                              backupResult.success ? 'text-green-900' : 'text-red-900'
-                            }`}
-                          >
-                            {backupResult.success ? 'Snapshot Concluído' : 'Falha no Snapshot'}
-                          </p>
-                          <p
-                            className={`text-xs mt-1 ${
-                              backupResult.success ? 'text-green-700' : 'text-red-700'
-                            }`}
-                          >
-                            {backupResult.message}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {showBackupHistory && backupHistory.length > 0 && (
-                      <div className="rounded-lg border border-[#B4BEC9] bg-white">
-                        <div className="border-b border-[#DCE6EA] px-4 py-3">
-                          <p className="text-sm font-medium text-[#002333]">
-                            Histórico de Snapshots
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">Exibindo os 10 mais recentes.</p>
-                        </div>
-                        <ul className="divide-y divide-[#EEF3F5]">
-                          {backupHistory.slice(0, 10).map((item) => (
-                            <li
-                              key={`${item.fileName}-${item.generatedAt}`}
-                              className="flex items-center justify-between gap-3 px-4 py-3"
-                            >
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium text-[#002333] truncate">
-                                  {item.fileName}
-                                </p>
-                                <p className="text-xs text-gray-500 mt-0.5">
-                                  {new Date(item.generatedAt).toLocaleString('pt-BR')}
-                                </p>
-                              </div>
-                              <span className="text-xs font-medium text-[#355061] whitespace-nowrap">
-                                {Math.max(1, Math.round(item.sizeBytes / 1024))} KB
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Cards Informativos */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex items-start gap-3 p-4 bg-[#DEEFE7] rounded-lg border border-[#B4BEC9]">
-                      <Info className="h-5 w-5 text-[#159A9C] flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-sm font-medium text-[#002333]">Operação disponível hoje</p>
-                        <p className="text-xs text-[#355061] mt-1">
-                          O recurso atual foi validado para geração manual de snapshot e consulta do
-                          histórico mais recente.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-3 p-4 bg-green-50 rounded-lg border border-green-200">
-                      <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-sm font-medium text-green-900">Recuperação</p>
-                        <p className="text-xs text-green-700 mt-1">
-                          Em caso de necessidade, acione o suporte com o nome do arquivo do snapshot
-                          para conduzir a restauração.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {activeTab !== 'geral' &&
                 activeTab !== 'seguranca' &&
                 activeTab !== 'usuarios' &&
                 activeTab !== 'email' &&
-                activeTab !== 'fiscal' &&
-                activeTab !== 'backup' && (
+                activeTab !== 'fiscal' && (
                   <div className="text-center py-12 text-gray-500">
                     <Info className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                     <p>
@@ -2170,4 +1983,3 @@ const ConfiguracaoEmpresaPage: React.FC = () => {
 };
 
 export default ConfiguracaoEmpresaPage;
-

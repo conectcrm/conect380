@@ -164,18 +164,6 @@ export interface TestSmtpResponse {
   message: string;
 }
 
-export interface BackupSnapshotInfo {
-  fileName: string;
-  generatedAt: string;
-  sizeBytes: number;
-}
-
-export interface ExecuteBackupResponse {
-  success: boolean;
-  message: string;
-  backup: BackupSnapshotInfo;
-}
-
 export const empresaConfigService = {
   async getConfig(): Promise<ConfiguracoesEmpresa> {
     const response = await api.get('/empresas/config');
@@ -195,15 +183,5 @@ export const empresaConfigService = {
   async testSMTP(data: TestSmtpRequest): Promise<TestSmtpResponse> {
     const response = await api.post('/empresas/config/smtp/test', data);
     return response.data;
-  },
-
-  async executeBackup(): Promise<ExecuteBackupResponse> {
-    const response = await api.post('/empresas/config/backup/execute');
-    return response.data;
-  },
-
-  async getBackupHistory(limit = 20): Promise<BackupSnapshotInfo[]> {
-    const response = await api.get('/empresas/config/backup/history', { params: { limit } });
-    return Array.isArray(response.data) ? response.data : [];
   },
 };

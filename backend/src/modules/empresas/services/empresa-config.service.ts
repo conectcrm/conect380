@@ -1,8 +1,6 @@
-import { BadRequestException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { promises as fs } from 'fs';
 import * as nodemailer from 'nodemailer';
-import * as path from 'path';
 import { Repository } from 'typeorm';
 import { UpdateEmpresaConfigDto } from '../dto/update-empresa-config.dto';
 import { EmpresaConfig } from '../entities/empresa-config.entity';
@@ -14,12 +12,6 @@ type EmpresaConfigSecretField =
   | 'pushApiKey'
   | 'fiscalOfficialApiToken'
   | 'fiscalOfficialWebhookSecret';
-
-type BackupSnapshotInfo = {
-  fileName: string;
-  generatedAt: string;
-  sizeBytes: number;
-};
 
 type SmtpTestPayload = Pick<UpdateEmpresaConfigDto, 'servidorSMTP' | 'portaSMTP' | 'smtpUsuario' | 'smtpSenha'>;
 type SmtpRuntimeConfig = {
@@ -60,27 +52,6 @@ export class EmpresaConfigService {
   private hasValidEncryptionKey(): boolean {
     const rawKey = (process.env.ENCRYPTION_KEY || '').trim();
     return /^[a-fA-F0-9]{64}$/.test(rawKey);
-  }
-
-  private getBackupDirectory(empresaId: string): string {
-    return path.resolve(process.cwd(), 'backups', 'empresa-configuracoes', empresaId);
-  }
-
-  private sanitizeBackupLimit(limit?: number): number {
-    if (!Number.isFinite(limit)) {
-      return 20;
-    }
-
-    const normalized = Math.trunc(limit as number);
-    if (normalized < 1) {
-      return 1;
-    }
-
-    if (normalized > 100) {
-      return 100;
-    }
-
-    return normalized;
   }
 
   private resolveSecretInput(
@@ -291,82 +262,6 @@ export class EmpresaConfigService {
       user: config.smtpUsuario?.trim() || null,
       pass: config.smtpSenha || null,
     };
-  }
-
-  async executeBackupSnapshot(empresaId: string): Promise<{
-    success: boolean;
-    message: string;
-    backup: BackupSnapshotInfo;
-  }> {
-    const generatedAt = new Date().toISOString();
-    const safeTimestamp = generatedAt.replace(/[:.]/g, '-');
-    const fileName = `snapshot-${safeTimestamp}.json`;
-    const backupDir = this.getBackupDirectory(empresaId);
-    const backupFilePath = path.join(backupDir, fileName);
-
-    try {
-      const config = await this.getByEmpresaId(empresaId);
-
-      const snapshotPayload = {
-        empresaId,
-        type: 'empresa-configuracoes',
-        generatedAt,
-        config,
-      };
-
-      await fs.mkdir(backupDir, { recursive: true });
-      await fs.writeFile(backupFilePath, JSON.stringify(snapshotPayload, null, 2), 'utf8');
-
-      const stats = await fs.stat(backupFilePath);
-
-      return {
-        success: true,
-        message: `Snapshot criado com sucesso em ${new Date(generatedAt).toLocaleString('pt-BR')}.`,
-        backup: {
-          fileName,
-          generatedAt,
-          sizeBytes: stats.size,
-        },
-      };
-    } catch (error) {
-      this.logger.error(
-        `Falha ao criar snapshot de configuracoes (empresaId=${empresaId})`,
-        error instanceof Error ? error.stack : String(error),
-      );
-      throw new InternalServerErrorException(
-        'Nao foi possivel executar o backup das configuracoes da empresa.',
-      );
-    }
-  }
-
-  async listBackupSnapshots(empresaId: string, limit = 20): Promise<BackupSnapshotInfo[]> {
-    const backupDir = this.getBackupDirectory(empresaId);
-    const normalizedLimit = this.sanitizeBackupLimit(limit);
-
-    let entries: import('fs').Dirent[];
-    try {
-      entries = await fs.readdir(backupDir, { withFileTypes: true });
-    } catch {
-      return [];
-    }
-
-    const files = entries.filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.json'));
-
-    const snapshots = await Promise.all(
-      files.map(async (entry) => {
-        const filePath = path.join(backupDir, entry.name);
-        const stats = await fs.stat(filePath);
-        return {
-          fileName: entry.name,
-          generatedAt: stats.mtime.toISOString(),
-          sizeBytes: stats.size,
-        } as BackupSnapshotInfo;
-      }),
-    );
-
-    return snapshots
-      .sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))
-      .slice(0, normalizedLimit);
   }
 
   async resetToDefaults(empresaId: string): Promise<EmpresaConfig> {

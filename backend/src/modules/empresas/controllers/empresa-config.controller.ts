@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, UseGuards } from '@nestjs/common';
 import { EmpresaId } from '../../../common/decorators/empresa.decorator';
 import { EmpresaGuard } from '../../../common/guards/empresa.guard';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
@@ -42,18 +42,5 @@ export class EmpresaConfigController {
   @Permissions(Permission.CONFIG_EMPRESA_UPDATE)
   async testSmtp(@EmpresaId() empresaId: string, @Body() smtpDto: TestSmtpDto) {
     return this.configService.testSmtpConnection(empresaId, smtpDto);
-  }
-
-  @Post('backup/execute')
-  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
-  @Permissions(Permission.CONFIG_EMPRESA_UPDATE)
-  async executeBackup(@EmpresaId() empresaId: string) {
-    return this.configService.executeBackupSnapshot(empresaId);
-  }
-
-  @Get('backup/history')
-  async getBackupHistory(@EmpresaId() empresaId: string, @Query('limit') limit?: string) {
-    const parsedLimit = limit ? Number(limit) : undefined;
-    return this.configService.listBackupSnapshots(empresaId, parsedLimit);
   }
 }
