@@ -13,10 +13,18 @@ import { EmpresaConfigService } from '../modules/empresas/services/empresa-confi
 import { EmpresaConfigController } from '../modules/empresas/controllers/empresa-config.controller';
 import { PlanosModule } from '../modules/planos/planos.module';
 import { FeatureFlagTenant } from '../modules/dashboard-v2/entities/feature-flag-tenant.entity';
+import { Cliente } from '../modules/clientes/cliente.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Empresa, User, EmpresaModulo, EmpresaConfig, FeatureFlagTenant]),
+    TypeOrmModule.forFeature([
+      Empresa,
+      User,
+      Cliente,
+      EmpresaModulo,
+      EmpresaConfig,
+      FeatureFlagTenant,
+    ]),
     MailModule,
     forwardRef(() => PlanosModule),
   ],

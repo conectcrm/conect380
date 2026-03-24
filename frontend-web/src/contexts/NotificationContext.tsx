@@ -102,7 +102,63 @@ const NotificationContext = createContext<NotificationContextData | undefined>(u
 type AddNotificationInput = Omit<Notification, 'id' | 'timestamp' | 'read' | 'priority'> &
   Partial<Pick<Notification, 'id' | 'timestamp' | 'read' | 'priority'>> & {
     silent?: boolean;
+    browser?: boolean;
   };
+
+const normalizeBrowserText = (value: unknown): string =>
+  String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const shouldAutoShowBrowserNotification = (notification: Notification): boolean => {
+  if (notification.type === 'reminder') {
+    return notification.priority === 'high' || notification.priority === 'urgent';
+  }
+
+  const normalizedContent = normalizeBrowserText(`${notification.title} ${notification.message}`);
+  const omnichannelTextHints = [
+    'omnichannel',
+    'chat',
+    'inbox',
+    'nova mensagem',
+    'mensagem recebida',
+  ];
+  const isOmnichannelByText = omnichannelTextHints.some((hint) =>
+    normalizedContent.includes(hint),
+  );
+
+  let isOmnichannelByData = false;
+  if (isRecord(notification.data)) {
+    const normalizedData = [
+      notification.data.modulo,
+      notification.data.module,
+      notification.data.channel,
+      notification.data.canal,
+      notification.data.context,
+      notification.data.contexto,
+      notification.data.feature,
+      notification.data.origin,
+      notification.data.origem,
+    ]
+      .map((value) => normalizeBrowserText(value))
+      .join(' ');
+
+    isOmnichannelByData =
+      normalizedData.includes('omnichannel') ||
+      normalizedData.includes('chat') ||
+      normalizedData.includes('inbox');
+  }
+
+  const isUrgentOperationalAlert =
+    notification.priority === 'urgent' &&
+    (notification.type === 'error' || notification.type === 'warning');
+
+  return isOmnichannelByText || isOmnichannelByData || isUrgentOperationalAlert;
+};
 
 export const useNotifications = () => {
   const context = useContext(NotificationContext);
@@ -296,7 +352,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   }, [reminders, settings.reminderInterval]);
 
   const addNotification = useCallback((notification: AddNotificationInput) => {
-    const { silent = false, ...notificationData } = notification;
+    const { silent = false, browser, ...notificationData } = notification;
     const currentNotifications = Array.isArray(notificationsRef.current)
       ? notificationsRef.current
       : [];
@@ -416,8 +472,16 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         break;
     }
 
+    const shouldShowBrowserNotification =
+      browser === true
+        ? true
+        : browser === false
+          ? false
+          : shouldAutoShowBrowserNotification(newNotification);
+
     // Notificação do navegador
     if (
+      shouldShowBrowserNotification &&
       settings.browserNotifications &&
       'Notification' in window &&
       Notification.permission === 'granted'

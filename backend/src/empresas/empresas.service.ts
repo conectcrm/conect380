@@ -3,7 +3,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Empresa } from './entities/empresa.entity';
 import { User, UserRole } from '../modules/users/user.entity';
+import { Cliente } from '../modules/clientes/cliente.entity';
 import { CreateEmpresaDto } from './dto/empresas.dto';
+import { AssinaturaEmpresa } from '../modules/planos/entities/assinatura-empresa.entity';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { MailService } from '../mail/mail.service';
@@ -12,6 +14,12 @@ import { PlanosService } from '../modules/planos/planos.service';
 import { AssinaturasService } from '../modules/planos/assinaturas.service';
 import { FeatureFlagTenant } from '../modules/dashboard-v2/entities/feature-flag-tenant.entity';
 import { DEFAULT_PLANOS_SISTEMA } from '../modules/planos/planos.defaults';
+
+export interface EmpresaCardEstatisticasResumo {
+  usuariosAtivos: number;
+  totalUsuarios: number;
+  clientesCadastrados: number;
+}
 
 type RegistroEmpresaConsentAuditMeta = {
   ip?: string | null;
@@ -325,6 +333,8 @@ export class EmpresasService {
     private empresaRepository: Repository<Empresa>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(Cliente)
+    private readonly clienteRepository: Repository<Cliente>,
     @InjectRepository(FeatureFlagTenant)
     private readonly featureFlagTenantRepository: Repository<FeatureFlagTenant>,
     private mailService: MailService,
@@ -890,6 +900,159 @@ export class EmpresasService {
         ? Math.ceil((empresa.data_expiracao.getTime() - agora.getTime()) / (1000 * 60 * 60 * 24))
         : null,
     };
+  }
+
+  async obterEstatisticasCardEmpresas(
+    empresaIds: string[],
+  ): Promise<Record<string, EmpresaCardEstatisticasResumo>> {
+    const ids = Array.from(
+      new Set(
+        (Array.isArray(empresaIds) ? empresaIds : [])
+          .map((value) => String(value || '').trim())
+          .filter(Boolean),
+      ),
+    );
+
+    if (ids.length === 0) {
+      return {};
+    }
+
+    const estatisticas: Record<string, EmpresaCardEstatisticasResumo> = {};
+    for (const empresaId of ids) {
+      estatisticas[empresaId] = {
+        usuariosAtivos: 0,
+        totalUsuarios: 0,
+        clientesCadastrados: 0,
+      };
+    }
+
+    type RawUsuariosRow = {
+      empresaId: string;
+      totalUsuarios: string | number | null;
+      usuariosAtivos: string | number | null;
+    };
+
+    type RawClientesRow = {
+      empresaId: string;
+      clientesCadastrados: string | number | null;
+    };
+
+    const parseCounter = (value: string | number | null | undefined): number => {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        return 0;
+      }
+      return Math.trunc(parsed);
+    };
+
+    const [usuariosRows, clientesRows] = await Promise.all([
+      this.userRepository
+        .createQueryBuilder('user')
+        .select('user.empresa_id', 'empresaId')
+        .addSelect('COUNT(user.id)', 'totalUsuarios')
+        .addSelect('SUM(CASE WHEN user.ativo = true THEN 1 ELSE 0 END)', 'usuariosAtivos')
+        .where('user.empresa_id IN (:...empresaIds)', { empresaIds: ids })
+        .groupBy('user.empresa_id')
+        .getRawMany<RawUsuariosRow>(),
+      this.clienteRepository
+        .createQueryBuilder('cliente')
+        .select('cliente.empresa_id', 'empresaId')
+        .addSelect('COUNT(cliente.id)', 'clientesCadastrados')
+        .where('cliente.empresa_id IN (:...empresaIds)', { empresaIds: ids })
+        .andWhere('cliente.ativo = :ativo', { ativo: true })
+        .groupBy('cliente.empresa_id')
+        .getRawMany<RawClientesRow>(),
+    ]);
+
+    for (const row of usuariosRows) {
+      const empresaId = String(row.empresaId || '').trim();
+      if (!empresaId || !estatisticas[empresaId]) {
+        continue;
+      }
+
+      estatisticas[empresaId].totalUsuarios = parseCounter(row.totalUsuarios);
+      estatisticas[empresaId].usuariosAtivos = parseCounter(row.usuariosAtivos);
+    }
+
+    for (const row of clientesRows) {
+      const empresaId = String(row.empresaId || '').trim();
+      if (!empresaId || !estatisticas[empresaId]) {
+        continue;
+      }
+
+      estatisticas[empresaId].clientesCadastrados = parseCounter(row.clientesCadastrados);
+    }
+
+    return estatisticas;
+  }
+
+  async suspenderEmpresa(empresaId: string, motivo?: string): Promise<Empresa> {
+    const empresa = await this.obterPorId(empresaId);
+    const motivoNormalizado = this.normalizeText(motivo);
+    const anotacao = `[${new Date().toISOString()}] SUSPENSA: ${
+      motivoNormalizado || 'Suspensao manual'
+    }`;
+
+    empresa.status = 'suspended';
+    empresa.ativo = false;
+    empresa.notas_internas = empresa.notas_internas
+      ? `${empresa.notas_internas}\n\n${anotacao}`
+      : anotacao;
+
+    return this.empresaRepository.save(empresa);
+  }
+
+  async reativarEmpresa(empresaId: string): Promise<Empresa> {
+    const empresa = await this.obterPorId(empresaId);
+    const anotacao = `[${new Date().toISOString()}] REATIVADA`;
+
+    empresa.status = 'active';
+    empresa.ativo = true;
+    empresa.notas_internas = empresa.notas_internas
+      ? `${empresa.notas_internas}\n\n${anotacao}`
+      : anotacao;
+
+    return this.empresaRepository.save(empresa);
+  }
+
+  async cancelarServicoEmpresa(empresaId: string, dataFim?: Date): Promise<AssinaturaEmpresa> {
+    await this.obterPorId(empresaId);
+    return this.assinaturasService.cancelar(empresaId, dataFim);
+  }
+
+  async listarTodasEmpresasParaGestao(): Promise<Empresa[]> {
+    return this.empresaRepository.find({
+      order: {
+        created_at: 'DESC',
+      },
+    });
+  }
+
+  async atualizarEmpresaDoUsuario(userId: string, empresaId: string): Promise<void> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new HttpException('Usuario nao encontrado', HttpStatus.NOT_FOUND);
+    }
+
+    user.empresa_id = empresaId;
+    await this.userRepository.save(user);
+  }
+
+  async marcarAdminEmpresaComoSenhaTemporaria(empresaId: string): Promise<void> {
+    const adminUser = await this.userRepository.findOne({
+      where: { empresa_id: empresaId, role: UserRole.ADMIN },
+      order: { created_at: 'DESC' as const },
+    });
+
+    if (!adminUser) {
+      return;
+    }
+
+    adminUser.deve_trocar_senha = true;
+    await this.userRepository.save(adminUser);
   }
 
   private async gerarSubdominioUnico(nomeEmpresa: string): Promise<string> {

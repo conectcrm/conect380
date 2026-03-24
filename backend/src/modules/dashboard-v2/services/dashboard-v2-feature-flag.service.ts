@@ -14,6 +14,8 @@ export type DashboardV2FlagDecision = {
 export class DashboardV2FeatureFlagService {
   private readonly logger = new Logger(DashboardV2FeatureFlagService.name);
   private readonly flagKey = 'dashboard_v2_enabled';
+  private readonly defaultEnabledWhenMissing =
+    String(process.env.DASHBOARD_V2_DEFAULT_ENABLED || 'true').trim().toLowerCase() !== 'false';
 
   constructor(
     @InjectRepository(FeatureFlagTenant)
@@ -29,6 +31,10 @@ export class DashboardV2FeatureFlagService {
     });
 
     if (!flag) {
+      if (this.defaultEnabledWhenMissing) {
+        return { enabled: true, source: 'enabled', rolloutPercentage: 100 };
+      }
+
       return { enabled: false, source: 'disabled', rolloutPercentage: 0 };
     }
 

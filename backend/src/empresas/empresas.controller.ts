@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Patch,
   Body,
   Get,
   Param,
@@ -14,12 +15,13 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { EmpresasService } from './empresas.service';
+import { EmpresaCardEstatisticasResumo, EmpresasService } from './empresas.service';
 import {
   CreateEmpresaDto,
   ReenviarEmailAtivacaoDto,
   VerificarEmailDto,
 } from './dto/empresas.dto';
+import { CreateMinhaEmpresaDto } from './dto/minhas-empresas.dto';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
@@ -278,6 +280,39 @@ export class EmpresasController {
 export class MinhasEmpresasController {
   constructor(private readonly empresasService: EmpresasService) {}
 
+  private static readonly SWITCH_BLOCKED_STATUS = new Set([
+    'suspended',
+    'suspensa',
+    'inactive',
+    'inativa',
+    'canceled',
+    'cancelada',
+  ]);
+
+  private buildCardPermissions(user: { role?: string; permissions?: unknown } | null | undefined) {
+    const isSuperadmin = this.isSuperadmin(user);
+
+    return {
+      podeEditarConfiguracoes:
+        isSuperadmin || this.hasPermission(user, Permission.CONFIG_EMPRESA_UPDATE),
+      podeGerenciarUsuarios:
+        isSuperadmin ||
+        this.hasPermission(user, Permission.USERS_READ) ||
+        this.hasPermission(user, Permission.USERS_CREATE) ||
+        this.hasPermission(user, Permission.USERS_UPDATE),
+      podeVerRelatorios:
+        isSuperadmin ||
+        this.hasPermission(user, Permission.RELATORIOS_READ) ||
+        this.hasPermission(user, Permission.DASHBOARD_READ),
+      podeExportarDados:
+        isSuperadmin ||
+        this.hasPermission(user, Permission.RELATORIOS_READ) ||
+        this.hasPermission(user, Permission.DASHBOARD_READ),
+      podeAlterarPlano: isSuperadmin || this.hasPermission(user, Permission.PLANOS_MANAGE),
+      podeGerenciarEmpresas: this.canManageEmpresas(user),
+    };
+  }
+
   private mapPlano(planoRaw: string, valorMensal: number | null, limites?: Record<string, any>) {
     const plano = (planoRaw || 'starter').toString().toLowerCase();
 
@@ -344,10 +379,149 @@ export class MinhasEmpresasController {
 
   private mapStatus(statusRaw: string | null | undefined, ativo: boolean): string {
     const status = (statusRaw || '').toLowerCase();
+    if (status === 'ativa' || status === 'active') {
+      return 'ativa';
+    }
+
+    if (status === 'trial') {
+      return 'trial';
+    }
+
+    if (status === 'suspensa' || status === 'suspended' || status === 'past_due') {
+      return 'suspensa';
+    }
+
+    if (
+      status === 'inativa' ||
+      status === 'inactive' ||
+      status === 'cancelada' ||
+      status === 'canceled'
+    ) {
+      return 'inativa';
+    }
+
     if (status === 'ativa' || status === 'trial' || status === 'suspensa' || status === 'inativa') {
       return status;
     }
     return ativo ? 'ativa' : 'inativa';
+  }
+
+  private isSuperadmin(user: { role?: string } | null | undefined): boolean {
+    return String(user?.role || '').toLowerCase() === UserRole.SUPERADMIN;
+  }
+
+  private hasPermission(
+    user: { permissions?: unknown } | null | undefined,
+    permission: Permission,
+  ): boolean {
+    const permissions = Array.isArray(user?.permissions) ? user.permissions : [];
+    return permissions.some(
+      (value) => String(value || '').trim().toLowerCase() === String(permission).toLowerCase(),
+    );
+  }
+
+  private canManageEmpresas(user: { role?: string; permissions?: unknown } | null | undefined): boolean {
+    return this.isSuperadmin(user) || this.hasPermission(user, Permission.ADMIN_EMPRESAS_MANAGE);
+  }
+
+  private normalizeText(value: unknown, fallback = 'Nao informado'): string {
+    const normalized = typeof value === 'string' ? value.trim() : '';
+    return normalized.length > 0 ? normalized : fallback;
+  }
+
+  private normalizeUf(value: unknown): string {
+    const normalized = typeof value === 'string' ? value.trim().toUpperCase() : '';
+    return /^[A-Z]{2}$/.test(normalized) ? normalized : 'SP';
+  }
+
+  private normalizeCep(value: unknown): string {
+    const raw = typeof value === 'string' ? value.trim() : '';
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length === 8) {
+      return `${digits.slice(0, 5)}-${digits.slice(5)}`;
+    }
+
+    return '00000-000';
+  }
+
+  private composeEndereco(value: CreateMinhaEmpresaDto['endereco']): string {
+    if (!value || typeof value !== 'object') {
+      return 'Nao informado';
+    }
+
+    const rua = this.normalizeText(value.rua, '');
+    const numero = this.normalizeText(value.numero, '');
+    const complemento = this.normalizeText(value.complemento, '');
+    const bairro = this.normalizeText(value.bairro, '');
+
+    const linhaPrincipal = [rua, numero].filter(Boolean).join(', ');
+    const linhaSecundaria = [complemento, bairro].filter(Boolean).join(' - ');
+    const enderecoComposto = [linhaPrincipal, linhaSecundaria].filter(Boolean).join(' | ');
+
+    return enderecoComposto || 'Nao informado';
+  }
+
+  private gerarSenhaTemporaria(): string {
+    const blocoAleatorio = Math.random().toString(36).slice(2, 8);
+    return `Tmp#${Date.now().toString(36)}${blocoAleatorio}1A`;
+  }
+
+  private mapEmpresaCard(
+    empresa: Empresa,
+    isActive: boolean,
+    cardPermissions?: ReturnType<MinhasEmpresasController['buildCardPermissions']>,
+    cardStats?: EmpresaCardEstatisticasResumo,
+  ) {
+    const dataCriacao = empresa.created_at ? empresa.created_at.toISOString() : new Date().toISOString();
+    const dataVencimento = empresa.data_expiracao ? empresa.data_expiracao.toISOString() : dataCriacao;
+    const ultimoAcesso = empresa.ultimo_acesso ? empresa.ultimo_acesso.toISOString() : dataCriacao;
+    const plano = this.mapPlano(empresa.plano, empresa.valor_mensal, empresa.limites || {});
+    const status = this.mapStatus(empresa.status, empresa.ativo);
+    const resolvedCardPermissions = cardPermissions ?? {
+      podeEditarConfiguracoes: true,
+      podeGerenciarUsuarios: true,
+      podeVerRelatorios: true,
+      podeExportarDados: true,
+      podeAlterarPlano: true,
+      podeGerenciarEmpresas: true,
+    };
+    const resolvedCardStats = cardStats ?? {
+      usuariosAtivos: 0,
+      totalUsuarios: 0,
+      clientesCadastrados: 0,
+    };
+
+    return {
+      id: empresa.id,
+      nome: empresa.nome,
+      descricao: null,
+      cnpj: empresa.cnpj,
+      email: empresa.email,
+      telefone: empresa.telefone,
+      endereco: empresa.endereco,
+      plano,
+      status,
+      isActive,
+      dataVencimento,
+      dataCriacao,
+      ultimoAcesso,
+      configuracoes: (empresa.configuracoes as Record<string, unknown>) || {},
+      estatisticas: {
+        usuariosAtivos: resolvedCardStats.usuariosAtivos,
+        totalUsuarios: resolvedCardStats.totalUsuarios,
+        clientesCadastrados: resolvedCardStats.clientesCadastrados,
+        propostasEsteAno: 0,
+        propostasEsteMes: 0,
+        faturaAcumulada: 0,
+        crescimentoMensal: 0,
+        armazenamentoUsado: '0GB',
+        armazenamentoTotal: plano.limitesArmazenamento,
+        ultimasAtividades: [],
+      },
+      permissoes: {
+        ...resolvedCardPermissions,
+      },
+    };
   }
 
   @Get()
@@ -357,63 +531,186 @@ export class MinhasEmpresasController {
   async getMinhasEmpresas(@Request() req) {
     try {
       const empresaId = req.user?.empresa_id;
+      const cardPermissions = this.buildCardPermissions(req.user);
       if (!empresaId) {
         throw new HttpException('empresa_id ausente no token', HttpStatus.UNAUTHORIZED);
       }
 
-      const empresa = await this.empresasService.obterPorId(empresaId);
+      if (this.canManageEmpresas(req.user)) {
+        const empresas = await this.empresasService.listarTodasEmpresasParaGestao();
+        const estatisticasByEmpresa = await this.empresasService.obterEstatisticasCardEmpresas(
+          empresas.map((empresa) => empresa.id),
+        );
+        return {
+          success: true,
+          empresas: empresas.map((empresa) =>
+            this.mapEmpresaCard(
+              empresa,
+              empresa.id === empresaId,
+              cardPermissions,
+              estatisticasByEmpresa[empresa.id],
+            ),
+          ),
+        };
+      }
 
-      const dataCriacao = empresa.created_at ? empresa.created_at.toISOString() : new Date().toISOString();
-      const dataVencimento = empresa.data_expiracao
-        ? empresa.data_expiracao.toISOString()
-        : dataCriacao;
-      const ultimoAcesso = empresa.ultimo_acesso ? empresa.ultimo_acesso.toISOString() : dataCriacao;
-      const plano = this.mapPlano(empresa.plano, empresa.valor_mensal, empresa.limites || {});
-      const status = this.mapStatus(empresa.status, empresa.ativo);
+      const empresa = await this.empresasService.obterPorId(empresaId);
+      const estatisticasByEmpresa =
+        await this.empresasService.obterEstatisticasCardEmpresas([empresa.id]);
 
       return {
         success: true,
-        empresas: [
-          {
-            id: empresa.id,
-            nome: empresa.nome,
-            descricao: null,
-            cnpj: empresa.cnpj,
-            email: empresa.email,
-            telefone: empresa.telefone,
-            endereco: empresa.endereco,
-            plano,
-            status,
-            isActive: true,
-            dataVencimento,
-            dataCriacao,
-            ultimoAcesso,
-            configuracoes: (empresa.configuracoes as Record<string, unknown>) || {},
-            estatisticas: {
-              usuariosAtivos: 0,
-              totalUsuarios: 0,
-              clientesCadastrados: 0,
-              propostasEsteAno: 0,
-              propostasEsteMes: 0,
-              faturaAcumulada: 0,
-              crescimentoMensal: 0,
-              armazenamentoUsado: '0GB',
-              armazenamentoTotal: plano.limitesArmazenamento,
-              ultimasAtividades: [],
-            },
-            permissoes: {
-              podeEditarConfiguracoes: true,
-              podeGerenciarUsuarios: true,
-              podeVerRelatorios: true,
-              podeExportarDados: true,
-              podeAlterarPlano: true,
-            },
-          },
-        ],
+        empresas: [this.mapEmpresaCard(empresa, true, cardPermissions, estatisticasByEmpresa[empresa.id])],
       };
     } catch (error) {
       throw new HttpException(
         error.message || 'Erro ao buscar empresas',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
+  @Permissions(Permission.ADMIN_EMPRESAS_MANAGE)
+  @UsePipes(strictBodyValidationPipe)
+  @ApiOperation({ summary: 'Criar nova empresa via area administrativa' })
+  @ApiResponse({ status: 201, description: 'Empresa criada com sucesso' })
+  async criarEmpresa(@Body() body: CreateMinhaEmpresaDto) {
+    try {
+      const endereco = body.endereco;
+      const senhaTemporaria =
+        body.usuarioAdmin?.senha?.trim() || this.gerarSenhaTemporaria();
+
+      const payload: CreateEmpresaDto = {
+        empresa: {
+          nome: body.nome,
+          cnpj: body.cnpj,
+          email: body.email,
+          telefone: body.telefone,
+          endereco: this.composeEndereco(endereco),
+          cidade: this.normalizeText(endereco?.cidade),
+          estado: this.normalizeUf(endereco?.estado),
+          cep: this.normalizeCep(endereco?.cep),
+        },
+        usuario: {
+          nome: this.normalizeText(body.usuarioAdmin?.nome, body.nome),
+          email: this.normalizeText(body.usuarioAdmin?.email, body.email).toLowerCase(),
+          senha: senhaTemporaria,
+          telefone: this.normalizeText(body.usuarioAdmin?.telefone, body.telefone),
+        },
+        plano: this.normalizeText(body.planoId, 'starter').toLowerCase(),
+        aceitarTermos: true,
+      };
+
+      const empresaCriada = await this.empresasService.registrarEmpresa(payload);
+      await this.empresasService.marcarAdminEmpresaComoSenhaTemporaria(empresaCriada.id);
+      const estatisticasByEmpresa =
+        await this.empresasService.obterEstatisticasCardEmpresas([empresaCriada.id]);
+
+      return {
+        ...this.mapEmpresaCard(empresaCriada, false, undefined, estatisticasByEmpresa[empresaCriada.id]),
+        credenciaisAdmin: {
+          email: payload.usuario.email,
+          senhaTemporaria,
+          deveTrocarSenhaNoPrimeiroAcesso: true,
+        },
+      };
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Erro ao criar empresa',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Patch(':empresaId([0-9a-fA-F-]{36})/suspender')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
+  @Permissions(Permission.ADMIN_EMPRESAS_MANAGE)
+  @ApiOperation({ summary: 'Suspender empresa pelo painel de minhas empresas' })
+  async suspenderEmpresa(
+    @Request() req,
+    @Param('empresaId') empresaId: string,
+    @Body() body: { motivo?: string },
+  ) {
+    try {
+      const motivo = typeof body?.motivo === 'string' ? body.motivo.trim() : '';
+      const empresa = await this.empresasService.suspenderEmpresa(
+        empresaId,
+        motivo || 'Suspensao manual',
+      );
+
+      return {
+        success: true,
+        message: 'Empresa suspensa com sucesso',
+        empresa: this.mapEmpresaCard(
+          empresa,
+          empresa.id === req.user?.empresa_id,
+          this.buildCardPermissions(req.user),
+        ),
+      };
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Erro ao suspender empresa',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Patch(':empresaId([0-9a-fA-F-]{36})/reativar')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
+  @Permissions(Permission.ADMIN_EMPRESAS_MANAGE)
+  @ApiOperation({ summary: 'Reativar empresa pelo painel de minhas empresas' })
+  async reativarEmpresa(@Request() req, @Param('empresaId') empresaId: string) {
+    try {
+      const empresa = await this.empresasService.reativarEmpresa(empresaId);
+
+      return {
+        success: true,
+        message: 'Empresa reativada com sucesso',
+        empresa: this.mapEmpresaCard(
+          empresa,
+          empresa.id === req.user?.empresa_id,
+          this.buildCardPermissions(req.user),
+        ),
+      };
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Erro ao reativar empresa',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Patch(':empresaId([0-9a-fA-F-]{36})/cancelar-servico')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles(UserRole.SUPERADMIN, UserRole.ADMIN)
+  @Permissions(Permission.PLANOS_MANAGE)
+  @ApiOperation({ summary: 'Cancelar servico da empresa (assinatura)' })
+  async cancelarServicoEmpresa(
+    @Param('empresaId') empresaId: string,
+    @Body() body: { dataFim?: string },
+  ) {
+    try {
+      const dataFimRaw = typeof body?.dataFim === 'string' ? body.dataFim.trim() : '';
+      const dataFim = dataFimRaw ? new Date(dataFimRaw) : undefined;
+      if (dataFim && Number.isNaN(dataFim.getTime())) {
+        throw new HttpException('dataFim invalida', HttpStatus.BAD_REQUEST);
+      }
+
+      const assinatura = await this.empresasService.cancelarServicoEmpresa(empresaId, dataFim);
+
+      return {
+        success: true,
+        message: 'Servico cancelado com sucesso',
+        assinatura,
+      };
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Erro ao cancelar servico',
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -436,9 +733,9 @@ export class MinhasEmpresasController {
         throw new HttpException('empresaId é obrigatório', HttpStatus.BAD_REQUEST);
       }
 
-      // O modelo atual é 1 usuário -> 1 empresa.
-      // Mantemos a troca apenas para o próprio contexto do usuário.
-      if (empresaIdSolicitada !== empresaIdUsuario) {
+      // Usuarios comuns permanecem no proprio contexto.
+      // Perfis com permissao de gestao podem alternar entre empresas.
+      if (!this.canManageEmpresas(req.user) && empresaIdSolicitada !== empresaIdUsuario) {
         throw new HttpException(
           'Usuário não possui acesso à empresa informada',
           HttpStatus.FORBIDDEN,
@@ -446,6 +743,29 @@ export class MinhasEmpresasController {
       }
 
       const empresa = await this.empresasService.obterPorId(empresaIdSolicitada);
+      const empresaStatus = String(empresa.status || '')
+        .trim()
+        .toLowerCase();
+      const agora = Date.now();
+      const trialExpirado =
+        empresaStatus === 'trial' &&
+        ((empresa.trial_end_date && new Date(empresa.trial_end_date).getTime() < agora) ||
+          (empresa.data_expiracao && new Date(empresa.data_expiracao).getTime() < agora));
+
+      if (
+        !empresa.ativo ||
+        MinhasEmpresasController.SWITCH_BLOCKED_STATUS.has(empresaStatus) ||
+        trialExpirado
+      ) {
+        throw new HttpException(
+          'A empresa informada esta indisponivel para acesso no momento',
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      if (this.canManageEmpresas(req.user) && empresaIdSolicitada !== empresaIdUsuario) {
+        await this.empresasService.atualizarEmpresaDoUsuario(req.user.id, empresaIdSolicitada);
+      }
 
       return {
         success: true,

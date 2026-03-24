@@ -17,6 +17,7 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
     cnpj: '',
     email: '',
     telefone: '',
+    senhaAdmin: '',
     planoSelecionado: 'Business' as 'Starter' | 'Business' | 'Enterprise',
   });
 
@@ -85,6 +86,12 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
       newErrors.telefone = 'Telefone é obrigatório';
     }
 
+    if (!formData.senhaAdmin.trim()) {
+      newErrors.senhaAdmin = 'Senha inicial do administrador e obrigatoria';
+    } else if (!/^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(formData.senhaAdmin)) {
+      newErrors.senhaAdmin = 'Use pelo menos 8 caracteres com letra e numero';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -120,6 +127,7 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
           nome: formData.nome,
           email: formData.email,
           telefone: formData.telefone,
+          senha: formData.senhaAdmin,
         },
       });
 
@@ -129,6 +137,7 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
         cnpj: '',
         email: '',
         telefone: '',
+        senhaAdmin: '',
         planoSelecionado: 'Business',
       });
       setStep(1);
@@ -288,6 +297,32 @@ export const ModalNovaEmpresa: React.FC<ModalNovaEmpresaProps> = ({ isOpen, onCl
                   <div className="flex items-center gap-1 mt-1 text-red-600 text-sm">
                     <AlertCircle className="w-3 h-3" />
                     {errors.telefone}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Senha inicial do administrador *
+                </label>
+                <div className="relative">
+                  <CreditCard className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="password"
+                    value={formData.senhaAdmin}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, senhaAdmin: e.target.value }))
+                    }
+                    className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#159A9C] focus:border-[#159A9C] ${
+                      errors.senhaAdmin ? 'border-red-300' : 'border-[#B4BEC9]'
+                    }`}
+                    placeholder="Minimo 8 caracteres com letra e numero"
+                  />
+                </div>
+                {errors.senhaAdmin && (
+                  <div className="flex items-center gap-1 mt-1 text-red-600 text-sm">
+                    <AlertCircle className="w-3 h-3" />
+                    {errors.senhaAdmin}
                   </div>
                 )}
               </div>
