@@ -278,7 +278,7 @@ describe('UsersController Security', () => {
       expect.objectContaining({
         permissoes: expect.arrayContaining([
           'users.create',
-          'ATENDIMENTO',
+          'atendimento.tickets.read',
           'comercial.propostas.read',
         ]),
       }),

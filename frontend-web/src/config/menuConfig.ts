@@ -501,6 +501,9 @@ function* iteratePermissionInputs(rawPermissions: unknown): Generator<unknown> {
   }
 }
 
+const hasExplicitPermissionInput = (rawPermissions: unknown): boolean =>
+  rawPermissions !== undefined && rawPermissions !== null;
+
 export const resolveUserPermissions = (user?: PermissionAwareUser | null): Set<string> => {
   const resolved = new Set<string>();
 
@@ -523,9 +526,12 @@ export const resolveUserPermissions = (user?: PermissionAwareUser | null): Set<s
     }
   }
 
+  const hasExplicitPermissionSource =
+    hasExplicitPermissionInput(user.permissoes) || hasExplicitPermissionInput(user.permissions);
+
   // Explicit permissions override role defaults.
   // Role defaults are only used for users without explicit assignments.
-  if (explicitPermissions.size > 0) {
+  if (explicitPermissions.size > 0 || hasExplicitPermissionSource) {
     explicitPermissions.forEach((permission) => resolved.add(permission));
     expandEquivalentPermissions(resolved);
     return resolved;

@@ -287,6 +287,7 @@ export const LEGACY_PERMISSION_ALIASES: Record<string, Permission> = {
   DASHBOARD: Permission.DASHBOARD_READ,
   RELATORIOS: Permission.RELATORIOS_READ,
   USUARIOS: Permission.USERS_READ,
+  ATENDIMENTO: Permission.ATENDIMENTO_TICKETS_READ,
 };
 
 export type PermissionCatalogRole = UserRole | 'manager' | 'user';

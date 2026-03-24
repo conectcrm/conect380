@@ -81,6 +81,28 @@ describe('permissions.utils', () => {
       expect(resolved.has(Permission.CRM_CLIENTES_READ)).toBe(true);
     });
 
+    it('deve tratar lista explicita vazia como override sem fallback de role', () => {
+      const resolved = resolveUserPermissions({
+        role: UserRole.ADMIN,
+        permissions: [],
+      });
+
+      expect(resolved.size).toBe(0);
+      expect(resolved.has(Permission.USERS_CREATE)).toBe(false);
+      expect(resolved.has(Permission.CRM_CLIENTES_READ)).toBe(false);
+    });
+
+    it('deve tratar string explicita vazia como override sem fallback de role', () => {
+      const resolved = resolveUserPermissions({
+        role: UserRole.ADMIN,
+        permissoes: '',
+      });
+
+      expect(resolved.size).toBe(0);
+      expect(resolved.has(Permission.USERS_CREATE)).toBe(false);
+      expect(resolved.has(Permission.CRM_CLIENTES_READ)).toBe(false);
+    });
+
     it('deve tratar permissoes explicitas como override mesmo para role financeiro', () => {
       const resolved = resolveUserPermissions({
         role: UserRole.FINANCEIRO,

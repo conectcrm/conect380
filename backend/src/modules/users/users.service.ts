@@ -193,8 +193,11 @@ export class UsersService {
 
   private mapRawUser(raw: any): User {
     const permissoes =
-      raw.permissoes && typeof raw.permissoes === 'string'
-        ? raw.permissoes.split(',').filter(Boolean)
+      typeof raw.permissoes === 'string'
+        ? raw.permissoes
+            .split(',')
+            .map((permission: string) => permission.trim())
+            .filter(Boolean)
         : raw.permissoes ?? null;
 
     const empresa =
@@ -892,7 +895,7 @@ export class UsersService {
         .map((item) => item.trim())
         .filter(Boolean);
 
-      return values.length > 0 ? values.join(',') : null;
+      return values.length > 0 ? values.join(',') : '';
     }
 
     if (typeof permissoes === 'string') {
@@ -901,7 +904,7 @@ export class UsersService {
         .map((item) => item.trim())
         .filter(Boolean);
 
-      return values.length > 0 ? values.join(',') : null;
+      return values.length > 0 ? values.join(',') : '';
     }
 
     return null;

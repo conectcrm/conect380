@@ -29,6 +29,20 @@ describe('menuConfig permission filtering', () => {
     expect(ids).not.toContain('comercial');
   });
 
+  it('hides atendimento gestao entries when explicit permissions are scoped to chat only', () => {
+    const menu = getMenuParaEmpresa(ALL_MODULES, {
+      email: 'lucas@empresa.com',
+      role: 'gerente',
+      permissions: ['atendimento.chats.read'],
+    } as any);
+
+    const ids = collectIds(menu);
+    expect(ids).toContain('atendimento');
+    expect(ids).toContain('atendimento-inbox');
+    expect(ids).not.toContain('atendimento-automacoes');
+    expect(ids).not.toContain('atendimento-equipe');
+  });
+
   it('uses explicit permissions as override even when role has broader defaults', () => {
     const menu = getMenuParaEmpresa(ALL_MODULES, {
       email: 'scoped-user@empresa.com',
@@ -106,7 +120,6 @@ describe('menuConfig permission filtering', () => {
     const menu = getMenuParaEmpresa(ALL_MODULES, {
       email: 'admin@empresa.com',
       role: 'admin',
-      permissions: [],
     } as any);
 
     const ids = collectIds(menu);
@@ -166,27 +179,33 @@ describe('menuConfig permission filtering', () => {
     const hasAccess = canUserAccessPath('/configuracoes/usuarios', ALL_MODULES, {
       email: 'manager@empresa.com',
       role: 'manager',
-      permissions: [],
     } as any);
 
     expect(hasAccess).toBe(true);
+  });
+
+  it('treats explicit empty permissions as override and blocks role defaults', () => {
+    const hasAccess = canUserAccessPath('/configuracoes/usuarios', ALL_MODULES, {
+      email: 'admin@empresa.com',
+      role: 'admin',
+      permissions: [],
+    } as any);
+
+    expect(hasAccess).toBe(false);
   });
 
   it('keeps admin role with tenant operational + governance defaults', () => {
     const adminUsers = canUserAccessPath('/configuracoes/usuarios', ALL_MODULES, {
       email: 'admin@empresa.com',
       role: 'admin',
-      permissions: [],
     } as any);
     const adminComercial = canUserAccessPath('/propostas', ALL_MODULES, {
       email: 'admin@empresa.com',
       role: 'admin',
-      permissions: [],
     } as any);
     const adminFinanceiro = canUserAccessPath('/financeiro/contas-pagar', ALL_MODULES, {
       email: 'admin@empresa.com',
       role: 'admin',
-      permissions: [],
     } as any);
 
     expect(adminUsers).toBe(true);

@@ -138,6 +138,9 @@ function* iteratePermissionInputs(rawPermissions: unknown): Generator<unknown> {
   }
 }
 
+const hasExplicitPermissionInput = (rawPermissions: unknown): boolean =>
+  rawPermissions !== undefined && rawPermissions !== null;
+
 export function resolveUserPermissions(user?: PermissionUserContext): Set<Permission> {
   const resolved = new Set<Permission>();
 
@@ -160,9 +163,13 @@ export function resolveUserPermissions(user?: PermissionUserContext): Set<Permis
     }
   }
 
-  // When explicit permissions are present, treat them as the final source of truth.
+  const hasExplicitPermissionSource =
+    hasExplicitPermissionInput(user.permissoes) || hasExplicitPermissionInput(user.permissions);
+
+  // When explicit permissions are provided (including explicit-empty assignments),
+  // treat them as the final source of truth.
   // Role defaults are fallback-only for legacy users without explicit grants.
-  if (explicitPermissions.size > 0) {
+  if (explicitPermissions.size > 0 || hasExplicitPermissionSource) {
     explicitPermissions.forEach((permission) => resolved.add(permission));
     expandEquivalentPermissions(resolved);
     return resolved;

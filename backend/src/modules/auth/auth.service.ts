@@ -13,6 +13,7 @@ import { AuthRefreshToken } from './entities/auth-refresh-token.entity';
 import { EmpresaConfig } from '../empresas/entities/empresa-config.entity';
 import { MailService } from '../../mail/mail.service';
 import { securityLogger } from '../../config/logger.config';
+import { resolveUserPermissions } from '../../common/permissions/permissions.utils';
 
 const RESET_TOKEN_EXPIRATION_MINUTES = 60;
 const MFA_LOGIN_CODE_EXPIRATION_MINUTES = 10;
@@ -673,7 +674,7 @@ export class AuthService {
   ) {
     await this.usersService.updateLastLogin(user.id);
 
-    const normalizedPermissions = Array.isArray(user.permissoes) ? user.permissoes : [];
+    const normalizedPermissions = Array.from(resolveUserPermissions(user));
     const { sessionId, accessToken, refreshToken } = await this.issueSessionTokens(
       user,
       context,
