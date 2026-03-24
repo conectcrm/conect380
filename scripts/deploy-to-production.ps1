@@ -118,7 +118,7 @@ if (-not $DryRun) {
   Invoke-Step "Testar conexao do backend com banco de producao" {
     Push-Location backend
     try {
-      node scripts\test-db-connection.js
+      node scripts\check-db-connection.js
       if ($LASTEXITCODE -ne 0) {
         Write-Fail "Falha na conexao com banco."
         exit 1
