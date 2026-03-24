@@ -101,7 +101,7 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
 
   // Fechar painel ao clicar fora
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent): void => {
       const target = event.target as HTMLElement;
       const isClickInsideAnySubmenuPanel = Boolean(target.closest('[data-submenu-panel="true"]'));
 
@@ -165,7 +165,7 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
     });
   };
 
-  const renderMenuItem = (item: MenuConfig) => {
+  const renderMenuItem = (item: MenuConfig): React.ReactNode => {
     // Filtrar itens admin-only
     if (item.adminOnly && !isAdmin) {
       return null;
@@ -183,8 +183,8 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
     // Mas não os dois ao mesmo tempo para evitar duplicação visual
     const shouldHighlight = isPanelOpen || hasActiveChild;
     const itemBaseStateClass = shouldHighlight
-      ? 'bg-white border-[#8FCFC4]/80 shadow-[0_10px_18px_-15px_rgba(15,123,125,0.65)]'
-      : 'hover:bg-[#F4FBF8] hover:border-[#CFE2E5]';
+      ? 'bg-[#EBF7F9] border-[#A8D9D2] shadow-[0_8px_16px_-16px_rgba(15,123,125,0.45)]'
+      : 'hover:bg-[#F6FAFB] hover:border-[#D5E5E8]';
     const iconColorClass = shouldHighlight
       ? 'text-[#159A9C]'
       : 'text-[#5B7382] group-hover:text-[#0F7B7D]';
@@ -201,10 +201,10 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
           data-sidebar-item
           onClick={() => toggleSubmenuPanel(item.id)}
           className={`
-            sidebar-nav-link premium-sidebar-item group relative flex w-full min-h-11 items-center justify-start gap-3 rounded-xl border border-transparent px-3 py-3
+            sidebar-nav-link premium-sidebar-item group relative flex h-12 w-full items-center justify-start gap-3 rounded-xl border border-transparent px-4 py-2.5
             transition-all duration-200 ease-out
             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white md:focus-visible:ring-offset-[#002333]
-            md:min-h-0 md:flex-col md:items-center md:justify-center md:gap-0 md:px-1 md:py-2.5
+            md:h-[72px] md:min-h-[72px] md:flex-col md:items-center md:justify-center md:gap-1.5 md:px-1.5 md:py-2
             ${itemBaseStateClass}
           `}
           title={item.title}
@@ -213,13 +213,14 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
         >
           <Icon
             className={`
-            h-5 w-5 transition-colors duration-200 mb-0 md:mb-1.5
+            h-5 w-5 shrink-0 transition-colors duration-200
             ${iconColorClass}
           `}
+            strokeWidth={1.75}
           />
           <span
             className={`
-            text-xs md:text-[9px] font-semibold text-left md:text-center leading-tight max-w-full px-0 md:px-1 truncate uppercase tracking-wide
+            max-w-full truncate text-left text-xs font-semibold uppercase leading-tight tracking-[0.08em] md:px-1 md:text-center md:text-[10px]
             ${titleColorClass}
           `}
           >
@@ -237,8 +238,8 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
     // ✅ Não destacar se houver um painel aberto (prioridade visual para o painel)
     const shouldBeActive = isActive && !activeSubmenuPanel;
     const linkBaseStateClass = shouldBeActive
-      ? 'bg-white border-[#8FCFC4]/80 shadow-[0_10px_18px_-15px_rgba(15,123,125,0.65)]'
-      : 'hover:bg-[#F4FBF8] hover:border-[#CFE2E5]';
+      ? 'bg-[#EBF7F9] border-[#A8D9D2] shadow-[0_8px_16px_-16px_rgba(15,123,125,0.45)]'
+      : 'hover:bg-[#F6FAFB] hover:border-[#D5E5E8]';
     const linkIconColorClass = shouldBeActive
       ? 'text-[#159A9C]'
       : 'text-[#5B7382] group-hover:text-[#0F7B7D]';
@@ -251,10 +252,10 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
         key={item.id}
         to={item.href || '#'}
         className={`
-          sidebar-nav-link premium-sidebar-item group relative flex w-full min-h-11 items-center justify-start gap-3 rounded-xl border border-transparent px-3 py-3
+          sidebar-nav-link premium-sidebar-item group relative flex h-12 w-full items-center justify-start gap-3 rounded-xl border border-transparent px-4 py-2.5
           transition-all duration-200 ease-out
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white md:focus-visible:ring-offset-[#002333]
-          md:min-h-0 md:flex-col md:items-center md:justify-center md:gap-0 md:px-1 md:py-2.5
+          md:h-[72px] md:min-h-[72px] md:flex-col md:items-center md:justify-center md:gap-1.5 md:px-1.5 md:py-2
           ${linkBaseStateClass}
         `}
         title={item.title}
@@ -262,13 +263,14 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
       >
         <Icon
           className={`
-          h-5 w-5 transition-colors duration-200 mb-0 md:mb-1.5
+          h-5 w-5 shrink-0 transition-colors duration-200
           ${linkIconColorClass}
         `}
+          strokeWidth={1.75}
         />
         <span
           className={`
-          text-xs md:text-[9px] font-semibold text-left md:text-center leading-tight max-w-full px-0 md:px-1 truncate uppercase tracking-wide
+          max-w-full truncate text-left text-xs font-semibold uppercase leading-tight tracking-[0.08em] md:px-1 md:text-center md:text-[10px]
           ${linkTitleColorClass}
         `}
         >
@@ -347,24 +349,36 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
     return sections;
   }, [activeItem]);
 
-  const renderSubmenuChild = (child: MenuConfig, itemIndex: number) => {
+  const renderSubmenuChild = (child: MenuConfig, itemIndex: number): React.ReactNode => {
     const isChildActive = isMenuItemActive(child);
     const ChildIcon = child.icon;
     const childHref = child.href ?? child.children?.[0]?.href;
+    const normalizedChildTitle = child.title.trim();
+    const childLabel =
+      normalizedChildTitle.length > 22 && child.shortTitle ? child.shortTitle : child.title;
+    const longLabelClass =
+      childLabel.length >= 20
+        ? 'text-[13.5px]'
+        : childLabel.length >= 16
+          ? 'text-[14px]'
+          : 'text-[15px]';
+    const childLayoutClass = child.badge
+      ? 'grid-cols-[20px_minmax(0,1fr)_auto_16px]'
+      : 'grid-cols-[20px_minmax(0,1fr)_16px]';
     const itemAnimationStyle = {
       animationDelay: `${Math.min(itemIndex * 22, 220)}ms`,
     };
     const childClassName = `
-      sidebar-nav-link premium-submenu-item submenu-child-item submenu-item-reveal group relative flex min-h-10 items-center gap-3 rounded-xl border px-3 py-2.5 text-left md:min-h-11 md:px-4 md:py-3
+      sidebar-nav-link premium-submenu-item submenu-child-item submenu-item-reveal group relative grid min-h-[48px] ${childLayoutClass} items-center gap-3 rounded-xl border border-transparent px-4 py-0 text-left
       transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35
-      ${isChildActive ? 'text-[#002333] font-semibold' : 'border-transparent text-[#334155] font-medium'}
+      ${isChildActive ? 'text-[#1C3246]' : 'text-[#334155]'}
     `;
     const activeItemStyle = isChildActive
       ? {
           borderColor: 'var(--submenu-accent-border)',
           background:
-            'linear-gradient(90deg, var(--submenu-accent-soft) 0%, var(--submenu-accent-soft-alt) 45%, #F9FCFB 100%)',
-          boxShadow: '0 14px 24px -20px var(--submenu-accent-shadow)',
+            'linear-gradient(90deg, var(--submenu-accent-soft) 0%, var(--submenu-accent-soft-alt) 40%, #F8FCFC 100%)',
+          boxShadow: '0 10px 20px -20px var(--submenu-accent-shadow)',
         }
       : undefined;
     const itemStyle = {
@@ -384,7 +398,7 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
           />
         )}
         <div
-          className={`submenu-child-icon flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg transition-all duration-200 ${
+          className={`submenu-child-icon flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md transition-all duration-200 ${
             isChildActive
               ? 'text-[color:var(--submenu-accent)] shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]'
               : 'text-[#94A3B8]'
@@ -398,30 +412,36 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
           }
         >
           <ChildIcon
-            className={`h-4 w-4 transition-transform duration-200 ${
+            className={`h-5 w-5 transition-transform duration-200 ${
               isChildActive ? 'scale-105' : 'group-hover:scale-110'
             }`}
+            strokeWidth={1.75}
           />
         </div>
-        <span className="truncate text-[14px] leading-5">{child.title}</span>
-        <div className="ml-auto flex items-center gap-2 pl-2">
-          {child.badge && (
-            <span
-              className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm"
-              style={{ backgroundColor: 'var(--submenu-accent)' }}
-            >
-              {child.badge}
-            </span>
-          )}
-          <ChevronRight
-            className={`submenu-child-chevron h-4 w-4 transition-all duration-200 ${
-              isChildActive
-                ? 'translate-x-0 opacity-100'
-                : 'translate-x-0.5 opacity-45 text-[#8FA4AD] group-hover:translate-x-0 group-hover:opacity-100'
-            }`}
-            style={isChildActive ? { color: 'var(--submenu-accent)' } : undefined}
-          />
-        </div>
+        <span
+          className={`submenu-child-label truncate leading-[1.35] ${longLabelClass} ${
+            isChildActive ? 'font-semibold text-[#183347]' : 'font-medium text-[#334155]'
+          }`}
+        >
+          {childLabel}
+        </span>
+        {child.badge ? (
+          <span
+            className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm"
+            style={{ backgroundColor: 'var(--submenu-accent)' }}
+          >
+            {child.badge}
+          </span>
+        ) : null}
+        <ChevronRight
+          className={`submenu-child-chevron h-4 w-4 justify-self-end transition-all duration-200 ${
+            isChildActive
+              ? 'translate-x-0 opacity-100'
+              : 'translate-x-0.5 opacity-55 text-[#8FA4AD] group-hover:translate-x-0 group-hover:opacity-100'
+          }`}
+          style={isChildActive ? { color: 'var(--submenu-accent)' } : undefined}
+          strokeWidth={1.75}
+        />
       </>
     );
 
@@ -432,6 +452,7 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
           to={childHref}
           className={childClassName}
           style={itemStyle}
+          title={child.title}
           aria-current={isChildActive ? 'page' : undefined}
         >
           {childContent}
@@ -445,6 +466,7 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
         type="button"
         className={childClassName}
         style={itemStyle}
+        title={child.title}
         onClick={() => setActiveSubmenuPanel(null)}
       >
         {childContent}
@@ -477,7 +499,7 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
           ref={submenuPanelRef}
           id={getSubmenuPanelId(activeItem.id)}
           data-submenu-panel="true"
-          className={`premium-submenu-panel fixed inset-y-0 left-0 ${UI_LAYERS.SUBMENU_PANEL} w-[min(90vw,332px)] overflow-y-auto border-r border-[#cfe1e5]/90 bg-white/95 shadow-2xl backdrop-blur-sm animate-slide-in md:left-[75px] md:w-[264px]`}
+          className={`premium-submenu-panel fixed inset-y-0 left-0 ${UI_LAYERS.SUBMENU_PANEL} w-[min(92vw,352px)] overflow-y-auto border-r border-[#D5E5E8] bg-white/95 shadow-2xl backdrop-blur-sm animate-slide-in md:left-[75px] md:w-[308px]`}
           style={{
             animation: 'slideIn 0.24s cubic-bezier(0.22, 1, 0.36, 1)',
             pointerEvents: 'auto',
@@ -498,19 +520,20 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
             />
             <div className="flex items-center gap-3">
               <div
-                className="flex h-9 w-9 items-center justify-center rounded-xl border shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]"
+                className="flex h-10 w-10 items-center justify-center rounded-xl border shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]"
                 style={{
                   borderColor: 'var(--submenu-accent-border)',
                   backgroundColor: 'var(--submenu-accent-soft-alt)',
                 }}
               >
                 {React.createElement(activeItem.icon, {
-                  className: 'h-4 w-4',
+                  className: 'h-5 w-5',
                   style: { color: 'var(--submenu-accent)' },
+                  strokeWidth: 1.75,
                 })}
               </div>
               <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7B8794]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#607786]">
                   Modulos
                 </p>
                 <h3 className="truncate text-[18px] font-semibold leading-tight text-[#002333]">
@@ -523,22 +546,22 @@ const HierarchicalNavGroup: React.FC<HierarchicalNavGroupProps> = ({
               className="submenu-close-btn min-h-11 min-w-11 rounded-xl border border-transparent p-2 transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/35 md:min-h-0 md:min-w-0 md:p-1.5"
               title="Fechar painel"
             >
-              <X className="h-4 w-4 text-gray-500" />
+              <X className="h-4 w-4 text-gray-500" strokeWidth={1.75} />
             </button>
           </div>
 
           {/* Lista de submenus */}
-          <div className="space-y-3 p-2.5 md:p-3">
+          <div className="space-y-3 p-3">
             {groupedChildren.map((section) => (
               <section
                 key={section.id}
-                className="rounded-2xl border border-[#DFE9EC]/80 bg-white/72 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]"
+                className="submenu-section-card rounded-[16px] border border-[#DDE8EC] bg-white/82 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]"
               >
                 {section.title && (
                   <div className="mb-2 px-2">
                     <div className="flex items-center gap-2">
                       <span className="h-px flex-1 bg-gradient-to-r from-transparent via-[#d5e5e8] to-[#d5e5e8]" />
-                      <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-[#7B8794] md:text-[10px]">
+                      <span className="submenu-section-title text-[11px] font-semibold uppercase tracking-[0.12em] text-[#607786]">
                         {section.title}
                       </span>
                       <span className="h-px flex-1 bg-gradient-to-l from-transparent via-[#d5e5e8] to-[#d5e5e8]" />

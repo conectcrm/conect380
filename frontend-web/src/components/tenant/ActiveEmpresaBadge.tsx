@@ -1,6 +1,6 @@
 import React from 'react';
 import clsx from 'clsx';
-import { Building2, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useEmpresaAtiva } from '../../hooks/useEmpresaAtiva';
 
 type ActiveEmpresaBadgeProps = {
@@ -10,10 +10,7 @@ type ActiveEmpresaBadgeProps = {
 };
 
 const initialsFromName = (value: string): string => {
-  const parts = value
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
+  const parts = value.trim().split(/\s+/).filter(Boolean);
 
   if (parts.length === 0) {
     return 'EMP';
@@ -32,6 +29,57 @@ const ActiveEmpresaBadge: React.FC<ActiveEmpresaBadgeProps> = ({
   className,
 }) => {
   const empresaAtiva = useEmpresaAtiva();
+  const initials = initialsFromName(empresaAtiva.nomeCurto);
+
+  const renderAvatar = (
+    shapeClass: string,
+    sizeClass: string,
+    textClass: string,
+  ): React.ReactNode => {
+    if (empresaAtiva.isLoading) {
+      return (
+        <span
+          className={clsx(
+            'inline-flex items-center justify-center overflow-hidden border border-[#D4E3E8] bg-[#F2F8FA] text-[#159A9C]',
+            shapeClass,
+            sizeClass,
+          )}
+          aria-hidden="true"
+        >
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        </span>
+      );
+    }
+
+    if (empresaAtiva.logoUrl) {
+      return (
+        <span
+          className={clsx(
+            'inline-flex items-center justify-center overflow-hidden border border-[#D4E3E8] bg-white',
+            shapeClass,
+            sizeClass,
+          )}
+          aria-hidden="true"
+        >
+          <img src={empresaAtiva.logoUrl} alt="" className="h-full w-full object-cover" />
+        </span>
+      );
+    }
+
+    return (
+      <span
+        className={clsx(
+          'inline-flex items-center justify-center border border-[#D4E3E8] bg-[#F2F8FA] font-semibold text-[#4A6777]',
+          shapeClass,
+          sizeClass,
+          textClass,
+        )}
+        aria-hidden="true"
+      >
+        {initials}
+      </span>
+    );
+  };
 
   if (variant === 'page') {
     return (
@@ -43,11 +91,7 @@ const ActiveEmpresaBadge: React.FC<ActiveEmpresaBadgeProps> = ({
         title={empresaAtiva.nome}
         aria-label={`Empresa ativa: ${empresaAtiva.nome}`}
       >
-        {empresaAtiva.isLoading ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin text-[#159A9C]" />
-        ) : (
-          <Building2 className="h-3.5 w-3.5 text-[#159A9C]" />
-        )}
+        {renderAvatar('rounded-md', 'h-5 w-5', 'text-[9px]')}
         <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#6A8693]">
           Empresa ativa
         </span>
@@ -68,14 +112,8 @@ const ActiveEmpresaBadge: React.FC<ActiveEmpresaBadgeProps> = ({
         title={empresaAtiva.nome}
         aria-label={`Empresa ativa: ${empresaAtiva.nome}`}
       >
-        {empresaAtiva.isLoading ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin text-[#159A9C]" />
-        ) : (
-          <Building2 className="h-3.5 w-3.5 text-[#159A9C]" />
-        )}
-        <span className="text-[10px] font-bold tracking-[0.04em]">
-          {initialsFromName(empresaAtiva.nomeCurto)}
-        </span>
+        {renderAvatar('rounded-full', 'h-5 w-5', 'text-[8px]')}
+        <span className="text-[10px] font-bold tracking-[0.04em]">{initials}</span>
       </div>
     );
   }
@@ -83,18 +121,14 @@ const ActiveEmpresaBadge: React.FC<ActiveEmpresaBadgeProps> = ({
   return (
     <div
       className={clsx(
-        'inline-flex h-8 max-w-[190px] items-center gap-1.5 rounded-full border border-[#D2E0E6] bg-[#F8FCFD] px-2.5',
+        'inline-flex h-8 max-w-[220px] items-center gap-2 rounded-lg border border-[#D7E4E9] bg-white px-2.5',
         className,
       )}
       title={empresaAtiva.nome}
       aria-label={`Empresa ativa: ${empresaAtiva.nome}`}
     >
-      {empresaAtiva.isLoading ? (
-        <Loader2 className="h-3.5 w-3.5 animate-spin text-[#159A9C]" />
-      ) : (
-        <Building2 className="h-3.5 w-3.5 text-[#159A9C]" />
-      )}
-      <span className="max-w-[152px] truncate text-[11px] font-semibold text-[#1E3F50]">
+      {renderAvatar('rounded-md', 'h-5 w-5', 'text-[9px]')}
+      <span className="max-w-[176px] truncate text-[12px] font-medium leading-none text-[#24485C]">
         {empresaAtiva.nomeCurto}
       </span>
     </div>

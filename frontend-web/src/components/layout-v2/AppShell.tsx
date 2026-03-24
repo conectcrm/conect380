@@ -10,7 +10,7 @@ import HierarchicalNavGroup from '../navigation/HierarchicalNavGroup';
 import GlobalSearchCommand, { type GlobalSearchEntry } from '../navigation/GlobalSearchCommand';
 import NotificationCenter from '../notifications/NotificationCenter';
 import Conect360Logo from '../ui/Conect360Logo';
-import ActiveEmpresaBadge from '../tenant/ActiveEmpresaBadge';
+import CompanySelector from '../tenant/CompanySelector';
 import RouteTemplateFrame from './RouteTemplateFrame';
 import SystemMaintenanceBanner from './SystemMaintenanceBanner';
 import { shellSpacing, shellTokens } from './tokens';
@@ -362,26 +362,23 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2" data-testid="topbar-actions-tray">
+              <div className="flex items-center gap-2.5 md:gap-3" data-testid="topbar-actions-tray">
                 <GlobalSearchCommand entries={globalSearchEntries} />
 
+                <CompanySelector className="hidden sm:inline-flex" />
+                <CompanySelector compact className="sm:hidden" />
+
                 {isSuperAdmin ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={handleOpenGuardianCompanies}
-                      className="hidden rounded-full outline-none transition-transform hover:-translate-y-[1px] focus-visible:ring-2 focus-visible:ring-[#159A9C]/30 sm:inline-flex"
-                      title="Abrir painel Guardian"
-                      aria-label="Abrir painel Guardian"
-                    >
-                      <ActiveEmpresaBadge variant="header" />
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <ActiveEmpresaBadge variant="header" className="hidden sm:inline-flex" />
-                  </>
-                )}
+                  <button
+                    type="button"
+                    onClick={handleOpenGuardianCompanies}
+                    className="hidden h-8 w-8 items-center justify-center rounded-lg border border-[#D7E4E9] bg-white text-[#5E7887] transition-colors hover:bg-[#F4FAFC] hover:text-[#234A5F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#159A9C]/30 sm:inline-flex"
+                    title="Abrir painel Guardian"
+                    aria-label="Abrir painel Guardian"
+                  >
+                    <Shield className="h-4 w-4" />
+                  </button>
+                ) : null}
                 <NotificationCenter />
 
                 <div className="relative" data-user-menu>

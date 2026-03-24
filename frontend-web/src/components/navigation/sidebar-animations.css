@@ -4,6 +4,12 @@
   --premium-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --premium-fast: 180ms;
   --premium-base: 240ms;
+  --sidebar-row-height: 48px;
+  --sidebar-icon-size: 20px;
+  --sidebar-chevron-size: 16px;
+  --sidebar-row-gap: 12px;
+  --sidebar-row-padding: 16px;
+  --sidebar-card-radius: 16px;
 }
 
 /* Animação de slide-in para painel suspenso */
@@ -73,7 +79,7 @@
 
 .premium-sidebar-item:hover {
   transform: translateY(-1px);
-  box-shadow: 0 10px 18px -16px rgba(0, 35, 51, 0.6);
+  box-shadow: 0 8px 16px -16px rgba(0, 35, 51, 0.45);
 }
 
 @media (max-width: 767px) {
@@ -90,8 +96,8 @@
 .premium-submenu-panel {
   background: linear-gradient(180deg, #ffffff 0%, #fbfefe 100%);
   box-shadow:
-    0 30px 56px -38px rgba(0, 35, 51, 0.6),
-    12px 0 30px -26px rgba(0, 35, 51, 0.35);
+    0 26px 48px -38px rgba(0, 35, 51, 0.52),
+    10px 0 24px -26px rgba(0, 35, 51, 0.28);
 }
 
 .premium-submenu-panel::before {
@@ -117,7 +123,7 @@
 .premium-submenu-item:hover {
   border-color: rgba(21, 154, 156, 0.2);
   transform: translateX(1px);
-  box-shadow: 0 10px 20px -16px rgba(0, 35, 51, 0.45);
+  box-shadow: 0 8px 16px -18px rgba(0, 35, 51, 0.35);
 }
 
 .premium-submenu-item:active {
@@ -128,6 +134,38 @@
   outline: 2px solid #159a9c;
   outline-offset: 2px;
   box-shadow: 0 0 0 3px rgba(21, 154, 156, 0.12);
+}
+
+.submenu-section-card {
+  border-radius: var(--sidebar-card-radius);
+}
+
+.submenu-section-title {
+  color: #607786;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+}
+
+.submenu-child-item {
+  min-height: var(--sidebar-row-height);
+  column-gap: var(--sidebar-row-gap);
+  padding-left: var(--sidebar-row-padding);
+  padding-right: var(--sidebar-row-padding);
+}
+
+.submenu-child-item .submenu-child-icon {
+  width: var(--sidebar-icon-size);
+  height: var(--sidebar-icon-size);
+  border-radius: 6px;
+}
+
+.submenu-child-item .submenu-child-label {
+  line-height: 1.35;
+}
+
+.submenu-child-item .submenu-child-chevron {
+  width: var(--sidebar-chevron-size);
+  height: var(--sidebar-chevron-size);
 }
 
 .submenu-child-item:hover {
