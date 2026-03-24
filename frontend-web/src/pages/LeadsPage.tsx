@@ -5,6 +5,8 @@ import * as yup from 'yup';
 import { useNavigate } from 'react-router-dom';
 import { NumericFormat } from 'react-number-format';
 import { toastService } from '../services/toastService';
+import { useAuth } from '../hooks/useAuth';
+import { userHasPermission } from '../config/menuConfig';
 import {
   RefreshCw,
   Plus,
@@ -149,6 +151,20 @@ const readLeadsSavedViews = (): LeadsSavedView[] => {
 const LeadsPage: React.FC = () => {
   const { confirm } = useGlobalConfirmation();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canCreateLead = userHasPermission(user, 'crm.leads.create');
+  const canUpdateLead = userHasPermission(user, 'crm.leads.update');
+  const canDeleteLead = userHasPermission(user, 'crm.leads.delete');
+  const canManageLeadLifecycle = canUpdateLead;
+  const canAssignLead = canUpdateLead;
+  const canConvertLead = canUpdateLead && userHasPermission(user, 'crm.oportunidades.create');
+  const hasBulkLeadActions = canAssignLead || canManageLeadLifecycle;
+  const hasDetailActionPermissions =
+    canManageLeadLifecycle || canConvertLead || canUpdateLead || canDeleteLead;
+
+  const notifyPermissionDenied = (actionLabel: string) => {
+    toastService.error(`Você não tem permissão para ${actionLabel}.`);
+  };
   // Estados principais
   const [leads, setLeads] = useState<Lead[]>([]);
   const [estatisticas, setEstatisticas] = useState<LeadEstatisticas | null>(null);
@@ -373,6 +389,16 @@ const LeadsPage: React.FC = () => {
   }, [leads, leadDetalhesAberto]);
 
   const handleOpenDialog = (lead?: Lead) => {
+    if (lead && !canUpdateLead) {
+      notifyPermissionDenied('editar leads');
+      return;
+    }
+
+    if (!lead && !canCreateLead) {
+      notifyPermissionDenied('criar leads');
+      return;
+    }
+
     if (lead) {
       setEditingLead(lead);
       const safeOrigin =
@@ -402,6 +428,16 @@ const LeadsPage: React.FC = () => {
   };
 
   const onSubmitLead = async (data: CreateLeadDto) => {
+    if (editingLead && !canUpdateLead) {
+      notifyPermissionDenied('editar leads');
+      return;
+    }
+
+    if (!editingLead && !canCreateLead) {
+      notifyPermissionDenied('criar leads');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setError(null);
@@ -440,6 +476,11 @@ const LeadsPage: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
+    if (!canDeleteLead) {
+      notifyPermissionDenied('excluir leads');
+      return;
+    }
+
     if (!(await confirm('Tem certeza que deseja excluir este lead?'))) {
       return;
     }
@@ -463,6 +504,11 @@ const LeadsPage: React.FC = () => {
   };
 
   const handleQualificar = async (id: string) => {
+    if (!canManageLeadLifecycle) {
+      notifyPermissionDenied('qualificar leads');
+      return;
+    }
+
     try {
       setProcessingLeadId(id);
       setError(null);
@@ -485,6 +531,11 @@ const LeadsPage: React.FC = () => {
   };
 
   const handleRegistrarContato = async (id: string, observacoes?: string): Promise<boolean> => {
+    if (!canManageLeadLifecycle) {
+      notifyPermissionDenied('registrar interação em leads');
+      return false;
+    }
+
     try {
       setProcessingLeadId(id);
       setError(null);
@@ -510,6 +561,11 @@ const LeadsPage: React.FC = () => {
   };
 
   const handleDesqualificar = async (id: string) => {
+    if (!canManageLeadLifecycle) {
+      notifyPermissionDenied('desqualificar leads');
+      return;
+    }
+
     if (!(await confirm('Tem certeza que deseja desqualificar este lead?'))) {
       return;
     }
@@ -536,6 +592,11 @@ const LeadsPage: React.FC = () => {
   };
 
   const handleAtribuirResponsavel = async (lead: Lead, responsavelId: string | null) => {
+    if (!canAssignLead) {
+      notifyPermissionDenied('atribuir responsável aos leads');
+      return;
+    }
+
     const normalizeResponsavelId = (value?: string | null): string | null => {
       if (typeof value !== 'string') return null;
       const normalized = value.trim();
@@ -588,6 +649,11 @@ const LeadsPage: React.FC = () => {
   };
 
   const handleOpenInteracaoDialog = (lead: Lead) => {
+    if (!canManageLeadLifecycle) {
+      notifyPermissionDenied('registrar interação em leads');
+      return;
+    }
+
     setLeadParaInteracao(lead);
     setInteracaoObservacao('');
     setShowInteracaoDialog(true);
@@ -627,6 +693,11 @@ const LeadsPage: React.FC = () => {
   };
 
   const handleOpenConvertDialog = (lead: Lead) => {
+    if (!canConvertLead) {
+      notifyPermissionDenied('converter lead em oportunidade');
+      return;
+    }
+
     setLeadToConvert(lead);
     resetConvertForm({
       titulo_oportunidade: `Oportunidade - ${lead.nome}`,
@@ -656,6 +727,11 @@ const LeadsPage: React.FC = () => {
   };
 
   const onSubmitConvert = async (data: any) => {
+    if (!canConvertLead) {
+      notifyPermissionDenied('converter lead em oportunidade');
+      return;
+    }
+
     if (!leadToConvert) return;
 
     try {
@@ -720,6 +796,11 @@ const LeadsPage: React.FC = () => {
 
   // Handlers de import CSV
   const handleOpenImportDialog = () => {
+    if (!canCreateLead) {
+      notifyPermissionDenied('importar leads');
+      return;
+    }
+
     setShowImportDialog(true);
     setImportFile(null);
     setImportResult(null);
@@ -746,6 +827,11 @@ const LeadsPage: React.FC = () => {
   };
 
   const handleImport = async () => {
+    if (!canCreateLead) {
+      notifyPermissionDenied('importar leads');
+      return;
+    }
+
     if (!importFile) {
       setError('Selecione um arquivo CSV');
       return;
@@ -970,12 +1056,22 @@ const LeadsPage: React.FC = () => {
   };
 
   const handleBulkQualificar = async () => {
+    if (!canManageLeadLifecycle) {
+      notifyPermissionDenied('qualificar leads');
+      return;
+    }
+
     await executeBulkAction('qualificar', 'Qualificação em lote', (leadId) =>
       leadsService.qualificar(leadId, 'Lead qualificado em lote'),
     );
   };
 
   const handleBulkDesqualificar = async () => {
+    if (!canManageLeadLifecycle) {
+      notifyPermissionDenied('desqualificar leads');
+      return;
+    }
+
     if (!(await confirm('Deseja desqualificar os leads selecionados?'))) {
       return;
     }
@@ -986,6 +1082,11 @@ const LeadsPage: React.FC = () => {
   };
 
   const handleBulkAtribuirResponsavel = async () => {
+    if (!canAssignLead) {
+      notifyPermissionDenied('atribuir responsável aos leads');
+      return;
+    }
+
     if (!bulkResponsavelId) {
       toastService.error('Selecione um responsável para aplicar em lote.');
       return;
@@ -1086,20 +1187,24 @@ const LeadsPage: React.FC = () => {
               >
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               </button>
-              <button
-                onClick={handleOpenImportDialog}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#159A9C] bg-white px-4 py-2 text-sm font-medium text-[#159A9C] transition-colors hover:bg-[#F4FBF9]"
-              >
-                <Upload className="h-4 w-4" />
-                Importar CSV
-              </button>
-              <button
-                onClick={() => handleOpenDialog()}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#0F7B7D]"
-              >
-                <Plus className="h-4 w-4" />
-                Novo Lead
-              </button>
+              {canCreateLead && (
+                <button
+                  onClick={handleOpenImportDialog}
+                  className="inline-flex items-center gap-2 rounded-lg border border-[#159A9C] bg-white px-4 py-2 text-sm font-medium text-[#159A9C] transition-colors hover:bg-[#F4FBF9]"
+                >
+                  <Upload className="h-4 w-4" />
+                  Importar CSV
+                </button>
+              )}
+              {canCreateLead && (
+                <button
+                  onClick={() => handleOpenDialog()}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#159A9C] px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#0F7B7D]"
+                >
+                  <Plus className="h-4 w-4" />
+                  Novo Lead
+                </button>
+              )}
             </div>
           }
         />
@@ -1370,7 +1475,7 @@ const LeadsPage: React.FC = () => {
           </div>
         </FiltersBar>
 
-        {leadsFiltrados.length > 0 && (
+        {leadsFiltrados.length > 0 && hasBulkLeadActions && (
           <div className="flex flex-col gap-3 rounded-xl border border-[#D4E2E7] bg-white p-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-3">
               <label className="inline-flex items-center gap-2 text-sm font-medium text-[#244455]">
@@ -1387,45 +1492,53 @@ const LeadsPage: React.FC = () => {
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={bulkResponsavelId}
-                onChange={(e) => setBulkResponsavelId(e.target.value)}
-                disabled={loadingResponsaveis || bulkActionLoading !== null}
-                className="h-9 min-w-[220px] rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <option value="">Atribuir responsável em lote</option>
-                {responsaveis.map((responsavel) => (
-                  <option key={responsavel.id} value={responsavel.id}>
-                    {responsavel.nome || responsavel.username}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={handleBulkAtribuirResponsavel}
-                disabled={!bulkSelectedCount || !bulkResponsavelId || bulkActionLoading !== null}
-                className="inline-flex h-9 items-center rounded-lg border border-[#D4E2E7] px-3 text-xs font-medium text-[#244455] transition-colors hover:bg-[#F8FCFC] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {bulkActionLoading === 'atribuir' ? 'Aplicando...' : 'Aplicar responsável'}
-              </button>
-              <button
-                type="button"
-                onClick={handleBulkQualificar}
-                disabled={!bulkSelectedCount || bulkActionLoading !== null}
-                className="inline-flex h-9 items-center rounded-lg bg-green-600 px-3 text-xs font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {bulkActionLoading === 'qualificar' ? 'Processando...' : 'Qualificar em lote'}
-              </button>
-              <button
-                type="button"
-                onClick={handleBulkDesqualificar}
-                disabled={!bulkSelectedCount || bulkActionLoading !== null}
-                className="inline-flex h-9 items-center rounded-lg border border-[#F3CFD1] bg-[#FFF5F5] px-3 text-xs font-medium text-[#B03A48] transition-colors hover:bg-[#FFE9EA] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {bulkActionLoading === 'desqualificar'
-                  ? 'Processando...'
-                  : 'Desqualificar em lote'}
-              </button>
+              {canAssignLead && (
+                <>
+                  <select
+                    value={bulkResponsavelId}
+                    onChange={(e) => setBulkResponsavelId(e.target.value)}
+                    disabled={loadingResponsaveis || bulkActionLoading !== null}
+                    className="h-9 min-w-[220px] rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <option value="">Atribuir responsável em lote</option>
+                    {responsaveis.map((responsavel) => (
+                      <option key={responsavel.id} value={responsavel.id}>
+                        {responsavel.nome || responsavel.username}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={handleBulkAtribuirResponsavel}
+                    disabled={!bulkSelectedCount || !bulkResponsavelId || bulkActionLoading !== null}
+                    className="inline-flex h-9 items-center rounded-lg border border-[#D4E2E7] px-3 text-xs font-medium text-[#244455] transition-colors hover:bg-[#F8FCFC] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {bulkActionLoading === 'atribuir' ? 'Aplicando...' : 'Aplicar responsável'}
+                  </button>
+                </>
+              )}
+              {canManageLeadLifecycle && (
+                <button
+                  type="button"
+                  onClick={handleBulkQualificar}
+                  disabled={!bulkSelectedCount || bulkActionLoading !== null}
+                  className="inline-flex h-9 items-center rounded-lg bg-green-600 px-3 text-xs font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {bulkActionLoading === 'qualificar' ? 'Processando...' : 'Qualificar em lote'}
+                </button>
+              )}
+              {canManageLeadLifecycle && (
+                <button
+                  type="button"
+                  onClick={handleBulkDesqualificar}
+                  disabled={!bulkSelectedCount || bulkActionLoading !== null}
+                  className="inline-flex h-9 items-center rounded-lg border border-[#F3CFD1] bg-[#FFF5F5] px-3 text-xs font-medium text-[#B03A48] transition-colors hover:bg-[#FFE9EA] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {bulkActionLoading === 'desqualificar'
+                    ? 'Processando...'
+                    : 'Desqualificar em lote'}
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -1450,7 +1563,7 @@ const LeadsPage: React.FC = () => {
                   ? 'Tente ajustar os filtros de busca'
                   : 'Crie seu primeiro lead para começar'}
               </p>
-              {!hasFilters && (
+              {!hasFilters && canCreateLead && (
                 <button
                   onClick={() => handleOpenDialog()}
                   className="bg-[#159A9C] hover:bg-[#0F7B7D] text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm mx-auto text-sm font-medium"
@@ -1537,26 +1650,30 @@ const LeadsPage: React.FC = () => {
                         className="h-4 w-4 rounded border-[#BFD2DB] text-[#159A9C] focus:ring-[#159A9C]/30"
                       />
                     </label>
-                    <button
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleOpenDialog(lead);
-                      }}
-                      className="rounded-lg p-2 transition-colors hover:bg-[#EEF3F6]"
-                      title="Editar"
-                    >
-                      <Edit2 className="h-4 w-4 text-[#5D7887]" />
-                    </button>
-                    <button
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleDelete(lead.id);
-                      }}
-                      className="rounded-lg p-2 transition-colors hover:bg-red-50"
-                      title="Excluir"
-                    >
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </button>
+                    {canUpdateLead && (
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleOpenDialog(lead);
+                        }}
+                        className="rounded-lg p-2 transition-colors hover:bg-[#EEF3F6]"
+                        title="Editar"
+                      >
+                        <Edit2 className="h-4 w-4 text-[#5D7887]" />
+                      </button>
+                    )}
+                    {canDeleteLead && (
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleDelete(lead.id);
+                        }}
+                        className="rounded-lg p-2 transition-colors hover:bg-red-50"
+                        title="Excluir"
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1627,7 +1744,11 @@ const LeadsPage: React.FC = () => {
                           )
                         }
                         onClick={(event) => event.stopPropagation()}
-                        disabled={loadingResponsaveis || atribuindoLeadId === lead.id}
+                        disabled={
+                          !canAssignLead ||
+                          loadingResponsaveis ||
+                          atribuindoLeadId === lead.id
+                        }
                         data-testid={`lead-card-responsavel-${lead.id}`}
                         className="h-9 w-full rounded-lg border border-[#D4E2E7] bg-white px-3 text-xs text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 disabled:cursor-not-allowed disabled:opacity-60"
                       >
@@ -1669,7 +1790,8 @@ const LeadsPage: React.FC = () => {
                 </div>
 
                 <div className="mt-3">
-                  {(lead.status === StatusLead.NOVO || lead.status === StatusLead.CONTATADO) && (
+                  {canManageLeadLifecycle &&
+                    (lead.status === StatusLead.NOVO || lead.status === StatusLead.CONTATADO) && (
                     <button
                       type="button"
                       onClick={(event) => {
@@ -1683,7 +1805,7 @@ const LeadsPage: React.FC = () => {
                     </button>
                   )}
 
-                  {lead.status === StatusLead.QUALIFICADO && (
+                  {canConvertLead && lead.status === StatusLead.QUALIFICADO && (
                     <button
                       type="button"
                       onClick={(event) => {
@@ -1709,7 +1831,7 @@ const LeadsPage: React.FC = () => {
                     </button>
                   )}
 
-                  {lead.status === StatusLead.DESQUALIFICADO && (
+                  {canUpdateLead && lead.status === StatusLead.DESQUALIFICADO && (
                     <button
                       type="button"
                       onClick={(event) => {
@@ -1724,7 +1846,7 @@ const LeadsPage: React.FC = () => {
 
                   {isDetailedCardView && (
                     <div className="mt-2 grid grid-cols-2 gap-2">
-                      {lead.status === StatusLead.NOVO && (
+                      {canManageLeadLifecycle && lead.status === StatusLead.NOVO && (
                         <button
                           type="button"
                           onClick={(event) => {
@@ -1739,7 +1861,8 @@ const LeadsPage: React.FC = () => {
                         </button>
                       )}
 
-                      {lead.status !== StatusLead.DESQUALIFICADO &&
+                      {canManageLeadLifecycle &&
+                        lead.status !== StatusLead.DESQUALIFICADO &&
                         lead.status !== StatusLead.CONVERTIDO && (
                           <button
                             type="button"
@@ -1839,7 +1962,11 @@ const LeadsPage: React.FC = () => {
                           : event.target.value,
                       )
                     }
-                    disabled={loadingResponsaveis || atribuindoLeadId === leadDetalhesAberto.id}
+                    disabled={
+                      !canAssignLead ||
+                      loadingResponsaveis ||
+                      atribuindoLeadId === leadDetalhesAberto.id
+                    }
                     data-testid={`lead-card-responsavel-${leadDetalhesAberto.id}`}
                     className="h-10 w-full rounded-lg border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15 disabled:cursor-not-allowed disabled:opacity-60"
                   >
@@ -1902,8 +2029,9 @@ const LeadsPage: React.FC = () => {
                 <div className="rounded-xl border border-[#DCE8EC] p-4">
                   <h4 className="mb-3 text-sm font-semibold text-[#1A3E52]">Ações</h4>
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {(leadDetalhesAberto.status === StatusLead.NOVO ||
-                      leadDetalhesAberto.status === StatusLead.CONTATADO) && (
+                    {canManageLeadLifecycle &&
+                      (leadDetalhesAberto.status === StatusLead.NOVO ||
+                        leadDetalhesAberto.status === StatusLead.CONTATADO) && (
                       <button
                         type="button"
                         onClick={() => handleQualificar(leadDetalhesAberto.id)}
@@ -1916,7 +2044,7 @@ const LeadsPage: React.FC = () => {
                       </button>
                     )}
 
-                    {leadDetalhesAberto.status === StatusLead.QUALIFICADO && (
+                    {canConvertLead && leadDetalhesAberto.status === StatusLead.QUALIFICADO && (
                       <button
                         type="button"
                         onClick={() => handleOpenConvertDialog(leadDetalhesAberto)}
@@ -1936,7 +2064,7 @@ const LeadsPage: React.FC = () => {
                       </button>
                     )}
 
-                    {leadDetalhesAberto.status === StatusLead.DESQUALIFICADO && (
+                    {canUpdateLead && leadDetalhesAberto.status === StatusLead.DESQUALIFICADO && (
                       <button
                         type="button"
                         onClick={() => handleOpenDialog(leadDetalhesAberto)}
@@ -1946,7 +2074,7 @@ const LeadsPage: React.FC = () => {
                       </button>
                     )}
 
-                    {leadDetalhesAberto.status === StatusLead.NOVO && (
+                    {canManageLeadLifecycle && leadDetalhesAberto.status === StatusLead.NOVO && (
                       <button
                         type="button"
                         onClick={() => handleOpenInteracaoDialog(leadDetalhesAberto)}
@@ -1958,7 +2086,8 @@ const LeadsPage: React.FC = () => {
                       </button>
                     )}
 
-                    {leadDetalhesAberto.status !== StatusLead.DESQUALIFICADO &&
+                    {canManageLeadLifecycle &&
+                      leadDetalhesAberto.status !== StatusLead.DESQUALIFICADO &&
                       leadDetalhesAberto.status !== StatusLead.CONVERTIDO && (
                         <button
                           type="button"
@@ -1970,7 +2099,7 @@ const LeadsPage: React.FC = () => {
                         </button>
                       )}
 
-                    {leadDetalhesAberto.status !== StatusLead.DESQUALIFICADO && (
+                    {canUpdateLead && leadDetalhesAberto.status !== StatusLead.DESQUALIFICADO && (
                       <button
                         type="button"
                         onClick={() => handleOpenDialog(leadDetalhesAberto)}
@@ -1980,14 +2109,21 @@ const LeadsPage: React.FC = () => {
                       </button>
                     )}
 
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(leadDetalhesAberto.id)}
-                      className="rounded-lg border border-[#F3CFD1] bg-[#FFF5F5] px-3 py-2 text-sm font-medium text-[#B03A48] transition-colors hover:bg-[#FFE9EA]"
-                    >
-                      Excluir lead
-                    </button>
+                    {canDeleteLead && (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(leadDetalhesAberto.id)}
+                        className="rounded-lg border border-[#F3CFD1] bg-[#FFF5F5] px-3 py-2 text-sm font-medium text-[#B03A48] transition-colors hover:bg-[#FFE9EA]"
+                      >
+                        Excluir lead
+                      </button>
+                    )}
                   </div>
+                  {!hasDetailActionPermissions && (
+                    <p className="mt-2 text-xs text-[#5E7A88]">
+                      Este perfil possui acesso somente leitura para este módulo.
+                    </p>
+                  )}
                 </div>
               </div>
             </aside>
