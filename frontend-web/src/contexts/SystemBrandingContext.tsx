@@ -3,7 +3,6 @@ import systemBrandingService, {
   DEFAULT_SYSTEM_BRANDING,
   type SystemBrandingEffectiveConfig,
 } from '../services/systemBrandingService';
-import { buildScopedStorageKey } from '../utils/storageScope';
 
 interface SystemBrandingContextValue {
   branding: SystemBrandingEffectiveConfig;
@@ -13,10 +12,12 @@ interface SystemBrandingContextValue {
 }
 
 const STORAGE_KEY = 'conect_system_branding_cache_v2';
+const GLOBAL_STORAGE_KEY = `${STORAGE_KEY}::global`;
 const BRANDING_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const AUTH_TOKEN_EVENT_NAME = 'authTokenChanged';
 const EMPRESA_EVENT_NAME = 'empresaAtivaChanged';
 const BRANDING_CACHE_PREFIX = `${STORAGE_KEY}::`;
+const LEGACY_BRANDING_CACHE_KEY = 'conect_system_branding_cache_v1';
 const MAX_CACHEABLE_URL_LENGTH = 2048;
 let brandingCacheDisabled = false;
 const isQuotaExceededError = (error: unknown): boolean => {
@@ -81,7 +82,7 @@ const buildMinimalBrandingCache = (
   };
 };
 
-const removeScopedBrandingCacheEntries = (): void => {
+const removeLegacyBrandingCacheEntries = (): void => {
   if (typeof window === 'undefined') {
     return;
   }
@@ -95,15 +96,17 @@ const removeScopedBrandingCacheEntries = (): void => {
   }
 
   keysToRemove.forEach((key) => window.localStorage.removeItem(key));
+
+  window.localStorage.removeItem(LEGACY_BRANDING_CACHE_KEY);
 };
 
-const readCachedBranding = (storageKey: string): Partial<SystemBrandingEffectiveConfig> | null => {
+const readCachedBranding = (): Partial<SystemBrandingEffectiveConfig> | null => {
   if (typeof window === 'undefined') {
     return null;
   }
 
   try {
-    const cached = window.localStorage.getItem(storageKey);
+    const cached = window.localStorage.getItem(GLOBAL_STORAGE_KEY);
     if (!cached) {
       return null;
     }
@@ -112,7 +115,7 @@ const readCachedBranding = (storageKey: string): Partial<SystemBrandingEffective
   } catch (error) {
     console.warn('[SystemBranding] Cache invalido, descartando entrada atual.', error);
     try {
-      window.localStorage.removeItem(storageKey);
+      window.localStorage.removeItem(GLOBAL_STORAGE_KEY);
     } catch (removeError) {
       console.warn('[SystemBranding] Nao foi possivel limpar cache invalido.', removeError);
     }
@@ -121,7 +124,6 @@ const readCachedBranding = (storageKey: string): Partial<SystemBrandingEffective
 };
 
 const persistBrandingCache = (
-  storageKey: string,
   value: SystemBrandingEffectiveConfig,
 ): void => {
   if (typeof window === 'undefined' || brandingCacheDisabled) {
@@ -132,7 +134,7 @@ const persistBrandingCache = (
   const serializedPayload = JSON.stringify(safePayload);
 
   try {
-    window.localStorage.setItem(storageKey, serializedPayload);
+    window.localStorage.setItem(GLOBAL_STORAGE_KEY, serializedPayload);
     return;
   } catch (error) {
     if (!isQuotaExceededError(error)) {
@@ -142,14 +144,14 @@ const persistBrandingCache = (
   }
 
   try {
-    removeScopedBrandingCacheEntries();
+    removeLegacyBrandingCacheEntries();
   } catch (cleanupError) {
     console.warn('[SystemBranding] Falha ao limpar cache de branding apos quota excedida.', cleanupError);
   }
 
   try {
     const minimalPayload = JSON.stringify(buildMinimalBrandingCache(safePayload));
-    window.localStorage.setItem(storageKey, minimalPayload);
+    window.localStorage.setItem(GLOBAL_STORAGE_KEY, minimalPayload);
   } catch (retryError) {
     brandingCacheDisabled = true;
     console.warn('[SystemBranding] Quota excedida ao persistir cache minimo de branding.', retryError);
@@ -166,21 +168,6 @@ const hasAuthToken = (): boolean => {
   } catch {
     return false;
   }
-};
-
-const getScopedStorageKey = (): string => {
-  if (typeof window === 'undefined') {
-    return `${STORAGE_KEY}::public`;
-  }
-
-  if (hasAuthToken()) {
-    return buildScopedStorageKey(STORAGE_KEY, {
-      includeEmpresa: true,
-      includeUser: true,
-    });
-  }
-
-  return `${STORAGE_KEY}::public`;
 };
 
 const resolveAssetUrl = (url: string): string => {
@@ -264,16 +251,14 @@ export const SystemBrandingProvider: React.FC<SystemBrandingProviderProps> = ({ 
         : await systemBrandingService.getPublicBranding();
       const normalized = systemBrandingService.normalizeBranding(data);
       setBranding(normalized);
-      const scopedStorageKey = getScopedStorageKey();
-      persistBrandingCache(scopedStorageKey, normalized);
+      persistBrandingCache(normalized);
     } catch (error) {
       console.warn('[SystemBranding] Nao foi possivel atualizar branding publico.', error);
 
       if (hasAuthToken()) {
         const fallback = systemBrandingService.normalizeBranding(DEFAULT_SYSTEM_BRANDING);
         setBranding(fallback);
-        const scopedStorageKey = getScopedStorageKey();
-        persistBrandingCache(scopedStorageKey, fallback);
+        persistBrandingCache(fallback);
       }
     } finally {
       if (!silent) {
@@ -284,8 +269,7 @@ export const SystemBrandingProvider: React.FC<SystemBrandingProviderProps> = ({ 
   }, []);
 
   useEffect(() => {
-    const scopedStorageKey = getScopedStorageKey();
-    const parsed = readCachedBranding(scopedStorageKey);
+    const parsed = readCachedBranding();
     if (parsed) {
       setBranding(systemBrandingService.normalizeBranding(parsed));
     }
@@ -295,8 +279,7 @@ export const SystemBrandingProvider: React.FC<SystemBrandingProviderProps> = ({ 
 
   useEffect(() => {
     const handleScopeChanged = () => {
-      const scopedStorageKey = getScopedStorageKey();
-      const parsed = readCachedBranding(scopedStorageKey);
+      const parsed = readCachedBranding();
       if (parsed) {
         setBranding(systemBrandingService.normalizeBranding(parsed));
       } else {

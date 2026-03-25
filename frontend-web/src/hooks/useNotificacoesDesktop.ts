@@ -1,6 +1,9 @@
 import { useEffect, useRef, useCallback } from 'react';
 
-const BRANDING_CACHE_KEY = 'conect_system_branding_cache_v1';
+const BRANDING_CACHE_KEYS = [
+  'conect_system_branding_cache_v2::global',
+  'conect_system_branding_cache_v1',
+];
 const DEFAULT_NOTIFICATION_ICON = '/favicon.svg';
 
 const resolveRuntimeAssetUrl = (url: string): string => {
@@ -27,13 +30,19 @@ const resolveRuntimeAssetUrl = (url: string): string => {
 
 const getCachedBrandingIcon = (): string => {
   try {
-    const raw = localStorage.getItem(BRANDING_CACHE_KEY);
-    if (!raw) {
-      return resolveRuntimeAssetUrl(DEFAULT_NOTIFICATION_ICON);
-    }
+    for (const cacheKey of BRANDING_CACHE_KEYS) {
+      const raw = localStorage.getItem(cacheKey);
+      if (!raw) {
+        continue;
+      }
 
-    const parsed = JSON.parse(raw) as { logoIconUrl?: string; faviconUrl?: string };
-    return resolveRuntimeAssetUrl(parsed.logoIconUrl || parsed.faviconUrl || DEFAULT_NOTIFICATION_ICON);
+      const parsed = JSON.parse(raw) as { logoIconUrl?: string; faviconUrl?: string };
+      const cachedIcon = parsed.logoIconUrl || parsed.faviconUrl || '';
+      if (cachedIcon) {
+        return resolveRuntimeAssetUrl(cachedIcon);
+      }
+    }
+    return resolveRuntimeAssetUrl(DEFAULT_NOTIFICATION_ICON);
   } catch {
     return resolveRuntimeAssetUrl(DEFAULT_NOTIFICATION_ICON);
   }
