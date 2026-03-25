@@ -68,6 +68,7 @@ import {
 import NotificacaoSucesso from '../../components/common/NotificacaoSucesso';
 import { useNotificacaoFinanceira } from '../../hooks/useNotificacao';
 import { getPagamentosGatewayUiConfig } from '../../config/pagamentosGatewayFlags';
+import { getFinanceiroFeatureFlags } from '../../config/financeiroFeatureFlags';
 import {
   DataTableCard,
   FiltersBar,
@@ -195,6 +196,8 @@ export default function FaturamentoPage() {
   const gatewayUiConfig = getPagamentosGatewayUiConfig();
   const gatewayUiHabilitada = gatewayUiConfig.onlineGatewayUiEnabled;
   const linkPagamentoHabilitado = gatewayUiConfig.paymentLinkEnabled;
+  const financeiroFeatureFlags = getFinanceiroFeatureFlags();
+  const fiscalFeatureEnabled = financeiroFeatureFlags.fiscalDocumentsEnabled;
 
   // Dados paginados com aggregates (React Query)
   const faturasQuery = useFaturasPaginadas({
@@ -260,6 +263,14 @@ export default function FaturamentoPage() {
   };
 
   const carregarPreflightFiscalProntidao = async () => {
+    if (!fiscalFeatureEnabled) {
+      setPreflightFiscalProntidao(null);
+      setErroPreflightFiscalProntidao(
+        financeiroFeatureFlags.fiscalDisabledReason || 'Preflight fiscal desabilitado neste ambiente.',
+      );
+      return;
+    }
+
     setErroPreflightFiscalProntidao(null);
     setCarregandoPreflightFiscalProntidao(true);
     try {
@@ -274,7 +285,17 @@ export default function FaturamentoPage() {
   };
 
   useEffect(() => {
+    if (!fiscalFeatureEnabled && visaoAtiva === 'prontidao') {
+      setVisaoAtiva('dashboard');
+    }
+  }, [fiscalFeatureEnabled, visaoAtiva]);
+
+  useEffect(() => {
     if (visaoAtiva !== 'prontidao') {
+      return;
+    }
+
+    if (!fiscalFeatureEnabled) {
       return;
     }
 
@@ -284,7 +305,7 @@ export default function FaturamentoPage() {
 
     void carregarPreflightFiscalProntidao();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visaoAtiva, preflightFiscalProntidao, carregandoPreflightFiscalProntidao]);
+  }, [visaoAtiva, preflightFiscalProntidao, carregandoPreflightFiscalProntidao, fiscalFeatureEnabled]);
 
   const buscarFaturas = async () => {
     setPage(1);
@@ -412,6 +433,11 @@ export default function FaturamentoPage() {
     faturaId: number,
     options?: { silencioso?: boolean; usarLoading?: boolean; sincronizar?: boolean },
   ) => {
+    if (!fiscalFeatureEnabled) {
+      setDocumentoFiscalStatus(null);
+      return null;
+    }
+
     const silencioso = options?.silencioso ?? true;
     const usarLoading = options?.usarLoading ?? false;
     const sincronizar = options?.sincronizar ?? false;
@@ -503,6 +529,11 @@ export default function FaturamentoPage() {
       return;
     }
 
+    if (!fiscalFeatureEnabled) {
+      setDocumentoFiscalStatus(null);
+      return;
+    }
+
     let ativo = true;
 
     (async () => {
@@ -521,7 +552,7 @@ export default function FaturamentoPage() {
     return () => {
       ativo = false;
     };
-  }, [modalDetalhesAberto, faturaDetalhes?.id]);
+  }, [modalDetalhesAberto, faturaDetalhes?.id, fiscalFeatureEnabled]);
 
   // Handlers para funcionalidades avançadas da Semana 2
   const abrirModalGateway = (fatura: Fatura) => {
@@ -999,6 +1030,15 @@ export default function FaturamentoPage() {
   };
 
   const criarRascunhoFiscal = async (id: number, payload?: DocumentoFiscalPayload) => {
+    if (!fiscalFeatureEnabled) {
+      notificacao.mostrarAviso(
+        'Fluxo fiscal desabilitado',
+        financeiroFeatureFlags.fiscalDisabledReason ||
+          'Emissao fiscal (NF-e/NFS-e) desabilitada neste ambiente.',
+      );
+      return;
+    }
+
     const tipoDocumento = payload?.tipo || obterTipoDocumentoFiscalDaFatura(faturaDetalhes);
     const ambiente = normalizarAmbienteDocumentoFiscal(
       payload?.ambiente || documentoFiscalStatus?.ambiente,
@@ -1030,6 +1070,15 @@ export default function FaturamentoPage() {
   };
 
   const emitirDocumentoFiscal = async (id: number, payload?: DocumentoFiscalPayload) => {
+    if (!fiscalFeatureEnabled) {
+      notificacao.mostrarAviso(
+        'Fluxo fiscal desabilitado',
+        financeiroFeatureFlags.fiscalDisabledReason ||
+          'Emissao fiscal (NF-e/NFS-e) desabilitada neste ambiente.',
+      );
+      return;
+    }
+
     const tipoDocumento = payload?.tipo || obterTipoDocumentoFiscalDaFatura(faturaDetalhes);
     const ambiente = normalizarAmbienteDocumentoFiscal(
       payload?.ambiente || documentoFiscalStatus?.ambiente,
@@ -1066,6 +1115,15 @@ export default function FaturamentoPage() {
   };
 
   const atualizarStatusFiscal = async (id: number) => {
+    if (!fiscalFeatureEnabled) {
+      notificacao.mostrarAviso(
+        'Fluxo fiscal desabilitado',
+        financeiroFeatureFlags.fiscalDisabledReason ||
+          'Emissao fiscal (NF-e/NFS-e) desabilitada neste ambiente.',
+      );
+      return;
+    }
+
     const status = await carregarStatusDocumentoFiscal(id, {
       silencioso: false,
       usarLoading: true,
@@ -1084,6 +1142,15 @@ export default function FaturamentoPage() {
     id: number,
     payload: DocumentoFiscalCancelamentoPayload,
   ) => {
+    if (!fiscalFeatureEnabled) {
+      notificacao.mostrarAviso(
+        'Fluxo fiscal desabilitado',
+        financeiroFeatureFlags.fiscalDisabledReason ||
+          'Emissao fiscal (NF-e/NFS-e) desabilitada neste ambiente.',
+      );
+      return;
+    }
+
     const tipoOperacao = payload?.tipoOperacao === 'inutilizar' ? 'inutilizar' : 'cancelar';
     const motivo = String(payload?.motivo || '').trim();
     if (!motivo) {
@@ -1598,20 +1665,6 @@ export default function FaturamentoPage() {
       status: StatusProntidao;
     }> = [
       {
-        id: 'fiscal-preflight',
-        titulo: 'Preflight fiscal oficial',
-        detalhe: preflightFiscalProntidao
-          ? `Provider ${preflightFiscalProntidao.providerEfetivo}: ${preflightFiscalProntidao.readyForOfficialEmission ? 'pronto para emissao oficial' : preflightFiscalProntidao.conectividade.message}`
-          : carregandoPreflightFiscalProntidao
-            ? 'Validando conectividade e configuracao fiscal oficial...'
-            : erroPreflightFiscalProntidao || 'Preflight fiscal ainda nao executado nesta sessao.',
-        status: preflightFiscalProntidao
-          ? preflightFiscalProntidao.status
-          : erroPreflightFiscalProntidao
-            ? 'alerta'
-            : 'alerta',
-      },
-      {
         id: 'gateway-online',
         titulo: 'Gateway online habilitado',
         detalhe: gatewayUiHabilitada
@@ -1656,6 +1709,23 @@ export default function FaturamentoPage() {
       },
     ];
 
+    if (fiscalFeatureEnabled) {
+      itens.unshift({
+        id: 'fiscal-preflight',
+        titulo: 'Preflight fiscal oficial',
+        detalhe: preflightFiscalProntidao
+          ? `Provider ${preflightFiscalProntidao.providerEfetivo}: ${preflightFiscalProntidao.readyForOfficialEmission ? 'pronto para emissao oficial' : preflightFiscalProntidao.conectividade.message}`
+          : carregandoPreflightFiscalProntidao
+            ? 'Validando conectividade e configuracao fiscal oficial...'
+            : erroPreflightFiscalProntidao || 'Preflight fiscal ainda nao executado nesta sessao.',
+        status: preflightFiscalProntidao
+          ? preflightFiscalProntidao.status
+          : erroPreflightFiscalProntidao
+            ? 'alerta'
+            : 'alerta',
+      });
+    }
+
     const bloqueios = itens.filter((item) => item.status === 'bloqueio').length;
     const alertas = itens.filter((item) => item.status === 'alerta').length;
     const statusGeral: StatusProntidao = bloqueios > 0 ? 'bloqueio' : alertas > 0 ? 'alerta' : 'ok';
@@ -1670,6 +1740,7 @@ export default function FaturamentoPage() {
   }, [
     carregandoPreflightFiscalProntidao,
     erroPreflightFiscalProntidao,
+    fiscalFeatureEnabled,
     gatewayUiConfig.motivoBloqueio,
     gatewayUiHabilitada,
     linkPagamentoHabilitado,
@@ -1697,7 +1768,7 @@ export default function FaturamentoPage() {
     icon: React.ComponentType<{ className?: string }>;
   }> = [
     { id: 'dashboard', label: 'Faturas', icon: FileText },
-    { id: 'prontidao', label: 'Prontidão', icon: Activity },
+    ...(fiscalFeatureEnabled ? [{ id: 'prontidao' as const, label: 'Prontidão', icon: Activity }] : []),
     { id: 'relatorios', label: 'Relatórios', icon: BarChart3 },
     { id: 'email', label: 'Automação de E-mails', icon: Mail },
     { id: 'workflows', label: 'Workflows', icon: Settings },
@@ -1828,9 +1899,9 @@ export default function FaturamentoPage() {
       </FiltersBar>
 
         {/* Conteudo baseado na visao ativa */}
-        {(visaoAtiva === 'dashboard' || visaoAtiva === 'prontidao') && (
+        {(visaoAtiva === 'dashboard' || (fiscalFeatureEnabled && visaoAtiva === 'prontidao')) && (
           <div className="space-y-4">
-            {visaoAtiva === 'prontidao' && (
+            {fiscalFeatureEnabled && visaoAtiva === 'prontidao' && (
               <SectionCard className="p-4 sm:p-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -3264,12 +3335,15 @@ export default function FaturamentoPage() {
           isOpen={modalDetalhesAberto}
           onClose={fecharModalDetalhes}
           fatura={faturaDetalhes}
-          documentoFiscalStatus={documentoFiscalStatus}
-          fiscalActionLoading={fiscalActionLoading}
-          onCriarRascunhoFiscal={criarRascunhoFiscal}
-          onEmitirDocumentoFiscal={emitirDocumentoFiscal}
-          onAtualizarStatusFiscal={atualizarStatusFiscal}
-          onCancelarDocumentoFiscal={cancelarOuInutilizarDocumentoFiscal}
+          fiscalFeatureEnabled={fiscalFeatureEnabled}
+          documentoFiscalStatus={fiscalFeatureEnabled ? documentoFiscalStatus : null}
+          fiscalActionLoading={fiscalFeatureEnabled ? fiscalActionLoading : false}
+          onCriarRascunhoFiscal={fiscalFeatureEnabled ? criarRascunhoFiscal : undefined}
+          onEmitirDocumentoFiscal={fiscalFeatureEnabled ? emitirDocumentoFiscal : undefined}
+          onAtualizarStatusFiscal={fiscalFeatureEnabled ? atualizarStatusFiscal : undefined}
+          onCancelarDocumentoFiscal={
+            fiscalFeatureEnabled ? cancelarOuInutilizarDocumentoFiscal : undefined
+          }
           onEstornarPagamento={estornarPagamento}
           onEdit={() => {
             abrirModalEdicao(faturaDetalhes);

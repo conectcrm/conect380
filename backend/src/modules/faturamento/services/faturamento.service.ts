@@ -24,6 +24,7 @@ import {
   TipoDocumentoFinanceiro,
 } from '../dto/fatura.dto';
 import { EmailIntegradoService } from '../../propostas/email-integrado.service';
+import { getFinanceiroFeatureFlags } from '../financeiro-feature-flags';
 
 export interface ResultadoEnvioFaturaEmail {
   enviado: boolean;
@@ -119,6 +120,7 @@ interface PoliticaDocumentoFiscalResult {
 @Injectable()
 export class FaturamentoService {
   private readonly logger = new Logger(FaturamentoService.name);
+  private readonly financeiroFeatureFlags = getFinanceiroFeatureFlags();
   private propostaRelationEnabled: boolean | null = null;
   private readonly statusElegiveisCobranca = new Set<StatusFatura>([
     StatusFatura.PENDENTE,
@@ -189,6 +191,10 @@ export class FaturamentoService {
         },
       );
       const detalhesTributariosNormalizados = politicaDocumentoFiscalCriacao.detalhes;
+      const formaPagamentoPreferida = this.validarFormaPagamentoDisponivel(
+        createFaturaDto.formaPagamentoPreferida,
+        'criacao de fatura',
+      );
 
       const resumoFinanceiro = this.calcularResumoFinanceiroFatura(createFaturaDto.itens, {
         valorDescontoGlobal: createFaturaDto.valorDesconto,
@@ -218,7 +224,7 @@ export class FaturamentoService {
         usuarioResponsavelId: createFaturaDto.usuarioResponsavelId,
         tipo: createFaturaDto.tipo,
         descricao: createFaturaDto.descricao,
-        formaPagamentoPreferida: createFaturaDto.formaPagamentoPreferida,
+        formaPagamentoPreferida,
         dataVencimento: createFaturaDto.dataVencimento,
         observacoes: createFaturaDto.observacoes,
         numero,
@@ -741,7 +747,10 @@ export class FaturamentoService {
     }
 
     if (updateFaturaDto.formaPagamentoPreferida !== undefined) {
-      fatura.formaPagamentoPreferida = updateFaturaDto.formaPagamentoPreferida;
+      fatura.formaPagamentoPreferida = this.validarFormaPagamentoDisponivel(
+        updateFaturaDto.formaPagamentoPreferida,
+        'atualizacao de fatura',
+      );
     }
 
     if (updateFaturaDto.diasCarenciaJuros !== undefined) {
@@ -1669,6 +1678,13 @@ export class FaturamentoService {
       .toLowerCase();
     const tipoFiscal = tipoDocumento === 'nfe' || tipoDocumento === 'nfse';
 
+    if (tipoFiscal && !this.financeiroFeatureFlags.fiscalDocumentsEnabled) {
+      throw new BadRequestException(
+        this.financeiroFeatureFlags.fiscalDisabledReason ||
+          'Emissao fiscal (NF-e/NFS-e) desabilitada neste ambiente.',
+      );
+    }
+
     if (!tipoFiscal) {
       const documentoSanitizado = {
         ...documento,
@@ -2025,6 +2041,13 @@ export class FaturamentoService {
       throw new BadRequestException('Tipo de documento financeiro invalido.');
     }
 
+    if (this.tiposDocumentoFiscal.has(tipoDocumento) && !this.financeiroFeatureFlags.fiscalDocumentsEnabled) {
+      throw new BadRequestException(
+        this.financeiroFeatureFlags.fiscalDisabledReason ||
+          'Emissao fiscal (NF-e/NFS-e) desabilitada neste ambiente.',
+      );
+    }
+
     return tipoDocumento;
   }
 
@@ -2193,7 +2216,43 @@ export class FaturamentoService {
       'a combinar': FormaPagamento.A_COMBINAR,
     };
 
-    return mapeamento[normalizado] || FormaPagamento.PIX;
+    const formaMapeada = mapeamento[normalizado] || FormaPagamento.PIX;
+    return this.normalizarFormaPagamentoComFallback(formaMapeada);
+  }
+
+  private validarFormaPagamentoDisponivel(
+    formaPagamento?: FormaPagamento | null,
+    contexto?: string,
+  ): FormaPagamento | undefined {
+    if (!formaPagamento) {
+      return undefined;
+    }
+
+    if (formaPagamento === FormaPagamento.BOLETO && !this.financeiroFeatureFlags.boletoEnabled) {
+      const prefixo = contexto ? `${contexto}: ` : '';
+      throw new BadRequestException(
+        `${prefixo}${
+          this.financeiroFeatureFlags.boletoDisabledReason ||
+          'Boleto desabilitado neste ambiente para foco no fluxo financeiro essencial.'
+        }`,
+      );
+    }
+
+    return formaPagamento;
+  }
+
+  private normalizarFormaPagamentoComFallback(
+    formaPagamento?: FormaPagamento | null,
+  ): FormaPagamento {
+    if (!formaPagamento) {
+      return FormaPagamento.PIX;
+    }
+
+    if (formaPagamento === FormaPagamento.BOLETO && !this.financeiroFeatureFlags.boletoEnabled) {
+      return FormaPagamento.PIX;
+    }
+
+    return formaPagamento;
   }
 
   private calcularDataVencimento(contrato: Contrato): string {

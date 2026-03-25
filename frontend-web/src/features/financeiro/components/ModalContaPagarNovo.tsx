@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import clsx from 'clsx';
 import {
   X,
@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import SearchSelect from '../../../components/common/SearchSelect';
 import { shellFieldTokens } from '../../../components/layout-v2';
+import { getFinanceiroFeatureFlags } from '../../../config/financeiroFeatureFlags';
 import {
   ContaBancaria,
   ContaPagar,
@@ -62,6 +63,26 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
   onClose,
   onSave,
 }) => {
+  const financeiroFeatureFlags = useMemo(() => getFinanceiroFeatureFlags(), []);
+  const normalizarTipoPagamento = useCallback(
+    (value?: FormaPagamento): FormaPagamento => {
+      if (!value) {
+        return FormaPagamento.PIX;
+      }
+      if (!financeiroFeatureFlags.boletoEnabled && value === FormaPagamento.BOLETO) {
+        return FormaPagamento.PIX;
+      }
+      return value;
+    },
+    [financeiroFeatureFlags.boletoEnabled],
+  );
+  const opcoesFormaPagamento = useMemo(
+    () =>
+      (Object.entries(FORMA_PAGAMENTO_LABELS) as Array<[FormaPagamento, string]>).filter(
+        ([valor]) => financeiroFeatureFlags.boletoEnabled || valor !== FormaPagamento.BOLETO,
+      ),
+    [financeiroFeatureFlags.boletoEnabled],
+  );
   const [etapaAtual, setEtapaAtual] = useState(0);
   const [formData, setFormData] = useState<NovaContaPagar>({
     fornecedorId: '',
@@ -133,7 +154,7 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
         valorDesconto: conta.valorDesconto,
         categoria: conta.categoria,
         centroCustoId: conta.centroCustoId || '',
-        tipoPagamento: conta.tipoPagamento,
+        tipoPagamento: normalizarTipoPagamento(conta.tipoPagamento),
         contaBancariaId: conta.contaBancariaId || '',
         observacoes: conta.observacoes || '',
         tags: conta.tags || [],
@@ -143,7 +164,16 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
         necessitaAprovacao: conta.necessitaAprovacao,
       });
     }
-  }, [conta]);
+  }, [conta, normalizarTipoPagamento]);
+
+  useEffect(() => {
+    if (formData.tipoPagamento === FormaPagamento.BOLETO && !financeiroFeatureFlags.boletoEnabled) {
+      setFormData((prev) => ({
+        ...prev,
+        tipoPagamento: FormaPagamento.PIX,
+      }));
+    }
+  }, [financeiroFeatureFlags.boletoEnabled, formData.tipoPagamento]);
 
   useEffect(() => {
     closeButtonRef.current?.focus();
@@ -405,6 +435,7 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
     try {
       const dadosParaSalvar = {
         ...formData,
+        tipoPagamento: normalizarTipoPagamento(formData.tipoPagamento),
         anexos: anexos,
       };
 
@@ -699,16 +730,25 @@ const ModalContaPagar: React.FC<ModalContaPagarProps> = ({
                   <select
                     value={formData.tipoPagamento}
                     onChange={(e) =>
-                      handleInputChange('tipoPagamento', e.target.value as FormaPagamento)
+                      handleInputChange(
+                        'tipoPagamento',
+                        normalizarTipoPagamento(e.target.value as FormaPagamento),
+                      )
                     }
                     className={fieldWithIconClass}
                   >
-                    {Object.entries(FORMA_PAGAMENTO_LABELS).map(([valor, label]) => (
+                    {opcoesFormaPagamento.map(([valor, label]) => (
                       <option key={valor} value={valor}>
                         {label}
                       </option>
                     ))}
                   </select>
+                  {!financeiroFeatureFlags.boletoEnabled &&
+                  financeiroFeatureFlags.boletoDisabledReason ? (
+                    <p className="mt-2 text-xs text-[#607B89]">
+                      {financeiroFeatureFlags.boletoDisabledReason}
+                    </p>
+                  ) : null}
                 </div>
               </div>
 

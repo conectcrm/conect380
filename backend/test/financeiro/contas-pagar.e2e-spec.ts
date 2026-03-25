@@ -122,6 +122,7 @@ describe('ContasPagar (E2E)', () => {
     await ensureContasPagarExportacoes();
 
     await criarEmpresa();
+    await criarAssinaturaAtiva();
     await criarUsuarios();
     await criarFornecedor();
     await criarContaBancaria();
@@ -147,7 +148,7 @@ describe('ContasPagar (E2E)', () => {
         descricao,
         numeroDocumento: `NF-E2E-${runId.slice(-6)}`,
         dataEmissao: '2026-02-01',
-        dataVencimento: '2026-03-10',
+        dataVencimento: '2099-03-10',
         valorOriginal: 1200,
         valorDesconto: 100,
         categoria: 'fornecedores',
@@ -198,9 +199,9 @@ describe('ContasPagar (E2E)', () => {
       `NF-E2E-${runId.slice(-6)}-02/03`,
       `NF-E2E-${runId.slice(-6)}-03/03`,
     ]);
-    expect(rows[0].data_vencimento_fmt).toBe('2026-03-10');
-    expect(rows[1].data_vencimento_fmt).toBe('2026-04-10');
-    expect(rows[2].data_vencimento_fmt).toBe('2026-05-10');
+    expect(rows[0].data_vencimento_fmt).toBe('2099-03-10');
+    expect(rows[1].data_vencimento_fmt).toBe('2099-04-10');
+    expect(rows[2].data_vencimento_fmt).toBe('2099-05-10');
     expect(Number(rows[0].valor_total)).toBeCloseTo(1100, 2);
     expect(Number(rows[0].valor_restante)).toBeCloseTo(1100, 2);
 
@@ -228,7 +229,7 @@ describe('ContasPagar (E2E)', () => {
       .send({
         fornecedorId,
         descricao,
-        dataVencimento: '2026-03-20',
+        dataVencimento: '2099-03-20',
         valorOriginal: 350,
         categoria: 'fornecedores',
         prioridade: 'media',
@@ -279,7 +280,7 @@ describe('ContasPagar (E2E)', () => {
       .send({
         fornecedorId,
         descricao: `Conta negada ${runId}`,
-        dataVencimento: '2026-03-25',
+        dataVencimento: '2099-03-25',
         valorOriginal: 10,
       })
       .expect(403);
@@ -293,7 +294,7 @@ describe('ContasPagar (E2E)', () => {
       .send({
         fornecedorId,
         descricao,
-        dataVencimento: '2026-04-01',
+        dataVencimento: '2099-04-01',
         valorOriginal: 222,
         categoria: 'fornecedores',
       })
@@ -368,6 +369,63 @@ describe('ContasPagar (E2E)', () => {
         'SP',
         '01000-000',
         slug,
+      ],
+    );
+  }
+
+  async function criarAssinaturaAtiva() {
+    const [plano] = await dataSource.query(
+      `
+        SELECT id, preco
+        FROM planos
+        WHERE ativo = true
+        ORDER BY
+          CASE
+            WHEN lower(codigo) = 'starter' THEN 0
+            ELSE 1
+          END,
+          "criadoEm" ASC
+        LIMIT 1
+      `,
+    );
+
+    if (!plano?.id) {
+      throw new Error('Plano ativo nao encontrado para setup E2E de contas a pagar');
+    }
+
+    const hojeIso = new Date().toISOString().slice(0, 10);
+    const proximoVencimento = new Date();
+    proximoVencimento.setDate(proximoVencimento.getDate() + 30);
+    const proximoVencimentoIso = proximoVencimento.toISOString().slice(0, 10);
+
+    await dataSource.query(
+      `
+        INSERT INTO assinaturas_empresas (
+          id,
+          empresa_id,
+          plano_id,
+          status,
+          "dataInicio",
+          "proximoVencimento",
+          "valorMensal",
+          "usuariosAtivos",
+          "clientesCadastrados",
+          "storageUtilizado",
+          "apiCallsHoje",
+          "ultimaContabilizacaoApi",
+          "renovacaoAutomatica"
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 0, 0, 0, 0, $8, true)
+      `,
+      [
+        randomUUID(),
+        empresaId,
+        plano.id,
+        'active',
+        hojeIso,
+        proximoVencimentoIso,
+        Number(plano.preco ?? 0),
+        hojeIso,
       ],
     );
   }
@@ -549,6 +607,7 @@ describe('ContasPagar (E2E)', () => {
       await dataSource.query(`DELETE FROM contas_bancarias WHERE id = $1`, [contaBancariaId]);
       await dataSource.query(`DELETE FROM fornecedores WHERE id = $1`, [fornecedorId]);
       await dataSource.query(`DELETE FROM users WHERE id = ANY($1::uuid[])`, [[superadminId, vendedorId]]);
+      await dataSource.query(`DELETE FROM assinaturas_empresas WHERE empresa_id = $1`, [empresaId]);
       await dataSource.query(`DELETE FROM empresas WHERE id = $1`, [empresaId]);
     } catch {
       // best effort
@@ -570,4 +629,3 @@ describe('ContasPagar (E2E)', () => {
     return value;
   }
 });
-

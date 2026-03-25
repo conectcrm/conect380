@@ -8,6 +8,7 @@ import {
 } from '../../services/faturamentoService';
 import MoneyInputNoPrefix from '../../components/inputs/MoneyInputNoPrefix';
 import ModalMotivoEstorno from './ModalMotivoEstorno';
+import { getFinanceiroFeatureFlags } from '../../config/financeiroFeatureFlags';
 
 interface PagamentoHistorico {
   id: number;
@@ -49,11 +50,27 @@ export default function ModalPagamentos({
   onRegistrarPagamento,
   onEstornarPagamento,
 }: ModalPagamentosProps) {
+  const financeiroFeatureFlags = getFinanceiroFeatureFlags();
+  const metodosDisponiveis = [
+    { value: 'pix', label: 'PIX' },
+    { value: 'cartao_credito', label: 'Cartao de Credito' },
+    { value: 'cartao_debito', label: 'Cartao de Debito' },
+    ...(financeiroFeatureFlags.boletoEnabled ? [{ value: 'boleto', label: 'Boleto' }] : []),
+    { value: 'transferencia', label: 'Transferencia' },
+    { value: 'dinheiro', label: 'Dinheiro' },
+  ];
+
+  const normalizarMetodoPagamento = (value: string): string => {
+    return metodosDisponiveis.some((item) => item.value === value)
+      ? value
+      : metodosDisponiveis[0]?.value || 'pix';
+  };
+
   const [pagamentos, setPagamentos] = useState<PagamentoHistorico[]>([]);
   const [novoPagamento, setNovoPagamento] = useState<NovoPagamentoFormulario>({
     valor: 0,
     data: new Date().toISOString().split('T')[0],
-    metodo: 'pix',
+    metodo: normalizarMetodoPagamento('pix'),
     observacoes: '',
   });
   const [carregando, setCarregando] = useState(false);
@@ -93,6 +110,10 @@ export default function ModalPagamentos({
 
   useEffect(() => {
     if (!isOpen) return;
+    setNovoPagamento((prev) => ({
+      ...prev,
+      metodo: normalizarMetodoPagamento(prev.metodo),
+    }));
     carregarHistoricoPagamentos();
   }, [isOpen, carregarHistoricoPagamentos]);
 
@@ -124,7 +145,7 @@ export default function ModalPagamentos({
       setNovoPagamento({
         valor: 0,
         data: new Date().toISOString().split('T')[0],
-        metodo: 'pix',
+        metodo: normalizarMetodoPagamento('pix'),
         observacoes: '',
       });
 
@@ -385,18 +406,22 @@ export default function ModalPagamentos({
                     onChange={(e) =>
                       setNovoPagamento((prev) => ({
                         ...prev,
-                        metodo: e.target.value,
+                        metodo: normalizarMetodoPagamento(e.target.value),
                       }))
                     }
                     className="w-full rounded-lg border border-[#D4E2E7] px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-[#159A9C]"
                   >
-                    <option value="pix">PIX</option>
-                    <option value="cartao_credito">Cartao de Credito</option>
-                    <option value="cartao_debito">Cartao de Debito</option>
-                    <option value="boleto">Boleto</option>
-                    <option value="transferencia">Transferencia</option>
-                    <option value="dinheiro">Dinheiro</option>
+                    {metodosDisponiveis.map((metodo) => (
+                      <option key={metodo.value} value={metodo.value}>
+                        {metodo.label}
+                      </option>
+                    ))}
                   </select>
+                  {!financeiroFeatureFlags.boletoEnabled && (
+                    <p className="mt-1 text-xs text-[#5E7784]">
+                      {financeiroFeatureFlags.boletoDisabledReason}
+                    </p>
+                  )}
                 </div>
 
                 <div>

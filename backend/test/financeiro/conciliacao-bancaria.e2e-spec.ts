@@ -79,6 +79,7 @@ describe('ConciliacaoBancaria (E2E)', () => {
     await ensureExtratosBancarios();
 
     await criarEmpresa();
+    await criarAssinaturaAtiva();
     await criarUsuarioSuperadmin();
     await criarContaBancaria();
 
@@ -178,6 +179,63 @@ describe('ConciliacaoBancaria (E2E)', () => {
         'SP',
         '01000-000',
         slug,
+      ],
+    );
+  }
+
+  async function criarAssinaturaAtiva() {
+    const [plano] = await dataSource.query(
+      `
+        SELECT id, preco
+        FROM planos
+        WHERE ativo = true
+        ORDER BY
+          CASE
+            WHEN lower(codigo) = 'starter' THEN 0
+            ELSE 1
+          END,
+          "criadoEm" ASC
+        LIMIT 1
+      `,
+    );
+
+    if (!plano?.id) {
+      throw new Error('Plano ativo nao encontrado para setup E2E de conciliacao');
+    }
+
+    const hojeIso = new Date().toISOString().slice(0, 10);
+    const proximoVencimento = new Date();
+    proximoVencimento.setDate(proximoVencimento.getDate() + 30);
+    const proximoVencimentoIso = proximoVencimento.toISOString().slice(0, 10);
+
+    await dataSource.query(
+      `
+        INSERT INTO assinaturas_empresas (
+          id,
+          empresa_id,
+          plano_id,
+          status,
+          "dataInicio",
+          "proximoVencimento",
+          "valorMensal",
+          "usuariosAtivos",
+          "clientesCadastrados",
+          "storageUtilizado",
+          "apiCallsHoje",
+          "ultimaContabilizacaoApi",
+          "renovacaoAutomatica"
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 0, 0, 0, 0, $8, true)
+      `,
+      [
+        randomUUID(),
+        empresaId,
+        plano.id,
+        'active',
+        hojeIso,
+        proximoVencimentoIso,
+        Number(plano.preco ?? 0),
+        hojeIso,
       ],
     );
   }
@@ -284,6 +342,7 @@ describe('ConciliacaoBancaria (E2E)', () => {
       await dataSource.query(`DELETE FROM extratos_bancarios_importacoes WHERE empresa_id = $1`, [empresaId]);
       await dataSource.query(`DELETE FROM contas_bancarias WHERE id = $1`, [contaBancariaId]);
       await dataSource.query(`DELETE FROM users WHERE id = $1`, [superadminId]);
+      await dataSource.query(`DELETE FROM assinaturas_empresas WHERE empresa_id = $1`, [empresaId]);
       await dataSource.query(`DELETE FROM empresas WHERE id = $1`, [empresaId]);
     } catch {
       // best effort

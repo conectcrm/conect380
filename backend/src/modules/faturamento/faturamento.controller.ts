@@ -44,18 +44,32 @@ import { StatusFatura } from './entities/fatura.entity';
 import { StatusPagamento } from './entities/pagamento.entity';
 import { StatusPlanoCobranca } from './entities/plano-cobranca.entity';
 import { EnvioFaturaEmailOpcoes, ResultadoCobrancaLote } from './services/faturamento.service';
+import { getFinanceiroFeatureFlags } from './financeiro-feature-flags';
 import type { Request } from 'express';
 
 @Controller('faturamento')
 @UseGuards(JwtAuthGuard, EmpresaGuard, PermissionsGuard)
 export class FaturamentoController {
   private readonly logger = new Logger(FaturamentoController.name);
+  private readonly financeiroFeatureFlags = getFinanceiroFeatureFlags();
+
   constructor(
     private readonly faturamentoService: FaturamentoService,
     private readonly pagamentoService: PagamentoService,
     private readonly cobrancaService: CobrancaService,
     private readonly documentoFiscalService: DocumentoFiscalService,
   ) {}
+
+  private garantirDocumentoFiscalHabilitado(): void {
+    if (this.financeiroFeatureFlags.fiscalDocumentsEnabled) {
+      return;
+    }
+
+    throw new BadRequestException(
+      this.financeiroFeatureFlags.fiscalDisabledReason ||
+        'Emissao fiscal (NF-e/NFS-e) desabilitada neste ambiente.',
+    );
+  }
 
   // ==================== FATURAS ====================
 
@@ -287,6 +301,7 @@ export class FaturamentoController {
     @Body() payload: CriarRascunhoDocumentoFiscalDto,
     @CurrentUser() user: { id?: string; sub?: string },
   ) {
+    this.garantirDocumentoFiscalHabilitado();
     const userId = user?.id || user?.sub;
     const statusFiscal = await this.documentoFiscalService.criarRascunho(
       id,
@@ -310,6 +325,7 @@ export class FaturamentoController {
     @Body() payload: EmitirDocumentoFiscalDto,
     @CurrentUser() user: { id?: string; sub?: string },
   ) {
+    this.garantirDocumentoFiscalHabilitado();
     const userId = user?.id || user?.sub;
     const statusFiscal = await this.documentoFiscalService.emitir(id, empresaId, payload, userId);
 
@@ -328,6 +344,7 @@ export class FaturamentoController {
     @Query('sincronizar') sincronizar?: string,
     @CurrentUser() user?: { id?: string; sub?: string },
   ) {
+    this.garantirDocumentoFiscalHabilitado();
     const sincronizarStatus = ['1', 'true', 'sim', 'yes'].includes(
       String(sincronizar || '')
         .trim()
@@ -348,6 +365,7 @@ export class FaturamentoController {
   @Get('documento-fiscal/configuracao')
   @Permissions(Permission.FINANCEIRO_FATURAMENTO_READ)
   async obterDiagnosticoConfiguracaoDocumentoFiscal(@EmpresaId() empresaId: string) {
+    this.garantirDocumentoFiscalHabilitado();
     const diagnostico =
       await this.documentoFiscalService.obterDiagnosticoConfiguracaoFiscalPorEmpresa(empresaId);
 
@@ -361,6 +379,7 @@ export class FaturamentoController {
   @Get('documento-fiscal/conectividade')
   @Permissions(Permission.FINANCEIRO_FATURAMENTO_READ)
   async testarConectividadeDocumentoFiscal(@EmpresaId() empresaId: string) {
+    this.garantirDocumentoFiscalHabilitado();
     const diagnostico = await this.documentoFiscalService.testarConectividadeProviderFiscal(
       empresaId,
     );
@@ -375,6 +394,7 @@ export class FaturamentoController {
   @Get('documento-fiscal/preflight')
   @Permissions(Permission.FINANCEIRO_FATURAMENTO_READ)
   async executarPreflightDocumentoFiscal(@EmpresaId() empresaId: string) {
+    this.garantirDocumentoFiscalHabilitado();
     const diagnostico = await this.documentoFiscalService.executarPreflightFiscal(empresaId);
 
     return {
@@ -392,6 +412,7 @@ export class FaturamentoController {
     @Body() payload: CancelarDocumentoFiscalDto,
     @CurrentUser() user: { id?: string; sub?: string },
   ) {
+    this.garantirDocumentoFiscalHabilitado();
     const userId = user?.id || user?.sub;
     const statusFiscal = await this.documentoFiscalService.cancelarOuInutilizar(
       id,

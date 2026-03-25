@@ -37,6 +37,7 @@ import {
 } from '../../services/faturamentoService';
 import { formatarValorMonetario } from '../../utils/formatacao';
 import ModalMotivoEstorno from './ModalMotivoEstorno';
+import { getFinanceiroFeatureFlags } from '../../config/financeiroFeatureFlags';
 
 interface EstornoAlvo {
   id: number;
@@ -48,6 +49,7 @@ interface ModalDetalhesFaturaProps {
   isOpen: boolean;
   onClose: () => void;
   fatura: Fatura;
+  fiscalFeatureEnabled?: boolean;
   onEdit?: () => void;
   onGeneratePaymentLink?: (id: number) => void;
   onSendEmail?: (id: number) => void;
@@ -249,6 +251,7 @@ export default function ModalDetalhesFatura({
   isOpen,
   onClose,
   fatura,
+  fiscalFeatureEnabled = true,
   onEdit,
   onGeneratePaymentLink,
   onSendEmail,
@@ -261,6 +264,10 @@ export default function ModalDetalhesFatura({
   onCancelarDocumentoFiscal,
   fiscalActionLoading = false,
 }: ModalDetalhesFaturaProps) {
+  const financeiroFeatureFlags = getFinanceiroFeatureFlags();
+  const fiscalFeatureAtiva =
+    fiscalFeatureEnabled && financeiroFeatureFlags.fiscalDocumentsEnabled;
+
   const [estornandoPagamentoId, setEstornandoPagamentoId] = React.useState<number | null>(null);
   const [estornoAlvo, setEstornoAlvo] = React.useState<EstornoAlvo | null>(null);
   const [motivoEstorno, setMotivoEstorno] = React.useState('');
@@ -440,7 +447,7 @@ export default function ModalDetalhesFatura({
   const chaveDocumentoFiscal =
     documentoFiscalStatus?.chaveAcesso || documentoFinanceiro?.chaveAcesso || null;
   const podeGerenciarDocumentoFiscal =
-    tipoDocumentoFiscalAtual === 'nfse' || tipoDocumentoFiscalAtual === 'nfe';
+    fiscalFeatureAtiva && (tipoDocumentoFiscalAtual === 'nfse' || tipoDocumentoFiscalAtual === 'nfe');
   const historicoFiscalOrdenado = Array.isArray(documentoFiscalStatus?.historico)
     ? [...documentoFiscalStatus.historico].sort((a, b) => {
         const dataA = new Date(a.timestamp || 0).getTime();
@@ -558,7 +565,7 @@ export default function ModalDetalhesFatura({
   };
 
   const handleCriarRascunhoFiscal = () => {
-    if (!onCriarRascunhoFiscal) {
+    if (!fiscalFeatureAtiva || !onCriarRascunhoFiscal) {
       return;
     }
     const payload: DocumentoFiscalPayload = {
@@ -570,7 +577,7 @@ export default function ModalDetalhesFatura({
   };
 
   const handleEmitirDocumentoFiscal = () => {
-    if (!onEmitirDocumentoFiscal) {
+    if (!fiscalFeatureAtiva || !onEmitirDocumentoFiscal) {
       return;
     }
     const payload: DocumentoFiscalPayload = {
@@ -585,7 +592,7 @@ export default function ModalDetalhesFatura({
   };
 
   const handleCancelarOuInutilizarDocumentoFiscal = () => {
-    if (!onCancelarDocumentoFiscal) {
+    if (!fiscalFeatureAtiva || !onCancelarDocumentoFiscal) {
       return;
     }
     const motivo = motivoOperacaoFiscal.trim();
@@ -600,6 +607,10 @@ export default function ModalDetalhesFatura({
   };
 
   const handleCarregarDiagnosticoFiscal = async () => {
+    if (!fiscalFeatureAtiva) {
+      return;
+    }
+
     setErroDiagnosticoFiscal(null);
     setCarregandoDiagnosticoFiscal(true);
     try {
@@ -614,6 +625,10 @@ export default function ModalDetalhesFatura({
   };
 
   const handleTestarConectividadeFiscal = async () => {
+    if (!fiscalFeatureAtiva) {
+      return;
+    }
+
     setErroConectividadeFiscal(null);
     setCarregandoConectividadeFiscal(true);
     try {
@@ -628,6 +643,10 @@ export default function ModalDetalhesFatura({
   };
 
   const handleExecutarPreflightFiscal = async () => {
+    if (!fiscalFeatureAtiva) {
+      return;
+    }
+
     setErroPreflightFiscal(null);
     setCarregandoPreflightFiscal(true);
     try {
@@ -984,7 +1003,14 @@ export default function ModalDetalhesFatura({
 
               <div className="rounded-xl border border-[#DCE8EC] bg-white p-4">
                 <h3 className="mb-3 text-sm font-semibold text-[#173A4D]">Documento Fiscal</h3>
-                <div className="space-y-2 text-xs text-[#47606C]">
+                {!fiscalFeatureAtiva ? (
+                  <p className="rounded-md border border-[#E2ECEF] bg-[#F8FBFC] p-2 text-[11px] text-[#5E7784]">
+                    {financeiroFeatureFlags.fiscalDisabledReason ||
+                      'Emissao fiscal (NF-e/NFS-e) desabilitada neste ambiente.'}
+                  </p>
+                ) : (
+                  <>
+                    <div className="space-y-2 text-xs text-[#47606C]">
                   <div className="flex justify-between">
                     <span>Tipo:</span>
                     <strong className="text-[#173A4D]">
@@ -1078,24 +1104,26 @@ export default function ModalDetalhesFatura({
                       Atualizado em {new Date(documentoFiscalStatus.atualizadoEm).toLocaleString('pt-BR')}
                     </p>
                   )}
-                </div>
+                    </div>
 
-                {podeGerenciarDocumentoFiscal ? (
-                  <div className="mt-3">
-                    <button
-                      type="button"
-                      onClick={() => setMostrarGestaoFiscalAvancada((prev) => !prev)}
-                      className="inline-flex h-8 items-center justify-center rounded-md border border-[#D4E2E7] bg-white px-3 text-xs font-medium text-[#2A4D5F] transition hover:bg-[#F6FAFB]"
-                    >
-                      {mostrarGestaoFiscalAvancada
-                        ? 'Ocultar gestao fiscal avancada'
-                        : 'Mostrar gestao fiscal avancada'}
-                    </button>
-                  </div>
-                ) : (
-                  <p className="mt-3 text-[11px] text-[#5E7784]">
-                    Documento atual nao exige emissao fiscal automatizada.
-                  </p>
+                    {podeGerenciarDocumentoFiscal ? (
+                      <div className="mt-3">
+                        <button
+                          type="button"
+                          onClick={() => setMostrarGestaoFiscalAvancada((prev) => !prev)}
+                          className="inline-flex h-8 items-center justify-center rounded-md border border-[#D4E2E7] bg-white px-3 text-xs font-medium text-[#2A4D5F] transition hover:bg-[#F6FAFB]"
+                        >
+                          {mostrarGestaoFiscalAvancada
+                            ? 'Ocultar gestao fiscal avancada'
+                            : 'Mostrar gestao fiscal avancada'}
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-[11px] text-[#5E7784]">
+                        Documento atual nao exige emissao fiscal automatizada.
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             </div>

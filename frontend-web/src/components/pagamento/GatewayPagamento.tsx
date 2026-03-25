@@ -1,24 +1,18 @@
-import React, { useState } from 'react';
-import {
-  CreditCard,
-  Smartphone,
-  QrCode,
-  Building,
-  Check,
-  X,
-} from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Building, Check, CreditCard, QrCode, Smartphone, X } from 'lucide-react';
+import { getFinanceiroFeatureFlags } from '../../config/financeiroFeatureFlags';
 import { Fatura } from '../../services/faturamentoService';
-import { formatarValorCompletoBRL, converterParaNumero } from '../../utils/formatacao';
+import { converterParaNumero, formatarValorCompletoBRL } from '../../utils/formatacao';
 
 interface MetodoPagamento {
   id: string;
   nome: string;
   tipo: 'cartao' | 'pix' | 'boleto' | 'transferencia';
   icone: React.ReactNode;
-  taxa: number; // percentual
-  prazoCompensacao: number; // dias
+  taxa: number;
+  prazoCompensacao: number;
   ativo: boolean;
-  configuracao: any;
+  configuracao: Record<string, unknown>;
 }
 
 interface TransacaoPagamento {
@@ -43,9 +37,9 @@ interface GatewayPagamentoProps {
 const METODOS_PAGAMENTO: MetodoPagamento[] = [
   {
     id: 'cartao',
-    nome: 'Cartão de Crédito/Débito',
+    nome: 'Cartao de credito/debito',
     tipo: 'cartao',
-    icone: <CreditCard className="w-6 h-6" />,
+    icone: <CreditCard className="h-6 w-6" />,
     taxa: 3.5,
     prazoCompensacao: 1,
     ativo: true,
@@ -59,19 +53,19 @@ const METODOS_PAGAMENTO: MetodoPagamento[] = [
     id: 'pix',
     nome: 'PIX',
     tipo: 'pix',
-    icone: <Smartphone className="w-6 h-6" />,
+    icone: <Smartphone className="h-6 w-6" />,
     taxa: 0.5,
     prazoCompensacao: 0,
     ativo: true,
     configuracao: {
-      tempoExpiracao: 30, // minutos
+      tempoExpiracao: 30,
     },
   },
   {
     id: 'boleto',
-    nome: 'Boleto Bancário',
+    nome: 'Boleto bancario',
     tipo: 'boleto',
-    icone: <Building className="w-6 h-6" />,
+    icone: <Building className="h-6 w-6" />,
     taxa: 2.5,
     prazoCompensacao: 3,
     ativo: true,
@@ -86,6 +80,7 @@ export default function GatewayPagamento({
   onPagamentoConcluido,
   onFechar,
 }: GatewayPagamentoProps) {
+  const financeiroFeatureFlags = useMemo(() => getFinanceiroFeatureFlags(), []);
   const [metodoSelecionado, setMetodoSelecionado] = useState<MetodoPagamento | null>(null);
   const [processandoPagamento, setProcessandoPagamento] = useState(false);
   const [transacaoAtual, setTransacaoAtual] = useState<TransacaoPagamento | null>(null);
@@ -97,18 +92,43 @@ export default function GatewayPagamento({
     parcelas: 1,
   });
 
-  const valorTotal = converterParaNumero(fatura.valorTotal);
-  const valorComTaxa = metodoSelecionado
-    ? valorTotal * (1 + metodoSelecionado.taxa / 100)
-    : valorTotal;
+  const metodosDisponiveis = useMemo(
+    () =>
+      METODOS_PAGAMENTO.filter((metodo) => {
+        if (!metodo.ativo) {
+          return false;
+        }
+        if (!financeiroFeatureFlags.boletoEnabled && metodo.tipo === 'boleto') {
+          return false;
+        }
+        return true;
+      }),
+    [financeiroFeatureFlags.boletoEnabled],
+  );
 
-  // Simula processamento de pagamento
+  useEffect(() => {
+    if (!metodoSelecionado) {
+      return;
+    }
+    const metodoAindaDisponivel = metodosDisponiveis.some((metodo) => metodo.id === metodoSelecionado.id);
+    if (!metodoAindaDisponivel) {
+      setMetodoSelecionado(null);
+    }
+  }, [metodoSelecionado, metodosDisponiveis]);
+
+  const valorTotal = converterParaNumero(fatura.valorTotal);
+  const valorComTaxa = metodoSelecionado ? valorTotal * (1 + metodoSelecionado.taxa / 100) : valorTotal;
+
   const processarPagamento = async () => {
-    if (!metodoSelecionado) return;
+    if (!metodoSelecionado) {
+      return;
+    }
+    if (!financeiroFeatureFlags.boletoEnabled && metodoSelecionado.tipo === 'boleto') {
+      setMetodoSelecionado(null);
+      return;
+    }
 
     setProcessandoPagamento(true);
-
-    // Simula delay do processamento
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
     const novaTransacao: TransacaoPagamento = {
@@ -116,22 +136,22 @@ export default function GatewayPagamento({
       faturaId: fatura.id,
       metodoPagamento: metodoSelecionado.id,
       valor: valorComTaxa,
-      status: Math.random() > 0.1 ? 'aprovado' : 'rejeitado', // 90% de aprovação
+      status: Math.random() > 0.1 ? 'aprovado' : 'rejeitado',
       dataTransacao: new Date(),
-      codigoTransacao: `TXN${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+      codigoTransacao: `TXN${Math.random().toString(36).slice(2, 11).toUpperCase()}`,
     };
 
-    // Adiciona dados específicos por método
     if (metodoSelecionado.tipo === 'pix') {
       novaTransacao.qrCode = `00020126580014br.gov.bcb.pix013665e3b5b3-7b5f-4a5b-8b7f-2e4d8f9c1a0b52040000530398654${valorComTaxa.toFixed(2)}`;
       novaTransacao.linkPagamento = `https://pix.exemplo.com/pay/${novaTransacao.id}`;
     } else if (metodoSelecionado.tipo === 'boleto') {
-      novaTransacao.codigoBarras = `23793.33120 60000.000000 00000.000000 1 90900000${(valorComTaxa * 100).toFixed(0).padStart(10, '0')}`;
+      novaTransacao.codigoBarras = `23793.33120 60000.000000 00000.000000 1 90900000${(valorComTaxa * 100)
+        .toFixed(0)
+        .padStart(10, '0')}`;
       novaTransacao.linkPagamento = `https://boleto.exemplo.com/print/${novaTransacao.id}`;
     }
 
     setTransacaoAtual(novaTransacao);
-
     if (novaTransacao.status === 'aprovado') {
       setTimeout(() => {
         onPagamentoConcluido(novaTransacao);
@@ -149,7 +169,7 @@ export default function GatewayPagamento({
   const formatarValidade = (valor: string) => {
     const validade = valor.replace(/\D/g, '');
     if (validade.length >= 2) {
-      return validade.substring(0, 2) + '/' + validade.substring(2, 4);
+      return `${validade.substring(0, 2)}/${validade.substring(2, 4)}`;
     }
     return validade;
   };
@@ -168,10 +188,9 @@ export default function GatewayPagamento({
         role="dialog"
         aria-modal="true"
       >
-        {/* Header */}
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#E1EAEE] bg-white p-6">
           <div>
-            <h2 className="text-xl font-semibold text-[#173A4D]">Pagamento da Fatura</h2>
+            <h2 className="text-xl font-semibold text-[#173A4D]">Pagamento da fatura</h2>
             <p className="text-gray-600">
               #{fatura.numero} - {formatarValorCompletoBRL(fatura.valorTotal)}
             </p>
@@ -185,67 +204,64 @@ export default function GatewayPagamento({
           </button>
         </div>
 
-        <div className="p-6 space-y-6">
+        <div className="space-y-6 p-6">
           {!transacaoAtual ? (
             <>
-              {/* Seleção de Método de Pagamento */}
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">
-                  Escolha o método de pagamento
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {METODOS_PAGAMENTO.filter((m) => m.ativo).map((metodo) => (
-                    <button
-                      key={metodo.id}
-                      onClick={() => setMetodoSelecionado(metodo)}
-                      className={`rounded-xl border-2 p-4 text-left transition-all ${
-                        metodoSelecionado?.id === metodo.id
-                          ? 'border-[#159A9C] bg-[#E8F6F6]'
-                          : 'border-[#D4E2E7] hover:border-[#BFD3DA]'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 mb-2">
-                        <div
-                          className={`${metodoSelecionado?.id === metodo.id ? 'text-[#159A9C]' : 'text-gray-400'}`}
-                        >
-                          {metodo.icone}
+                <h3 className="mb-4 text-lg font-medium text-gray-900">Escolha o metodo de pagamento</h3>
+                {metodosDisponiveis.length === 0 ? (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                    Nenhum metodo de pagamento online esta disponivel no ambiente atual.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    {metodosDisponiveis.map((metodo) => (
+                      <button
+                        key={metodo.id}
+                        onClick={() => setMetodoSelecionado(metodo)}
+                        className={`rounded-xl border-2 p-4 text-left transition-all ${
+                          metodoSelecionado?.id === metodo.id
+                            ? 'border-[#159A9C] bg-[#E8F6F6]'
+                            : 'border-[#D4E2E7] hover:border-[#BFD3DA]'
+                        }`}
+                      >
+                        <div className="mb-2 flex items-center gap-3">
+                          <div className={metodoSelecionado?.id === metodo.id ? 'text-[#159A9C]' : 'text-gray-400'}>
+                            {metodo.icone}
+                          </div>
+                          <span className="font-medium text-gray-900">{metodo.nome}</span>
                         </div>
-                        <span className="font-medium text-gray-900">{metodo.nome}</span>
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        <div>Taxa: {metodo.taxa}%</div>
-                        <div>
-                          Compensação:{' '}
-                          {metodo.prazoCompensacao === 0
-                            ? 'Imediata'
-                            : `${metodo.prazoCompensacao} dia(s)`}
+                        <div className="text-sm text-gray-600">
+                          <div>Taxa: {metodo.taxa}%</div>
+                          <div>
+                            Compensacao:{' '}
+                            {metodo.prazoCompensacao === 0 ? 'Imediata' : `${metodo.prazoCompensacao} dia(s)`}
+                          </div>
                         </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {!financeiroFeatureFlags.boletoEnabled && financeiroFeatureFlags.boletoDisabledReason ? (
+                  <p className="mt-3 text-xs text-[#6E8794]">{financeiroFeatureFlags.boletoDisabledReason}</p>
+                ) : null}
               </div>
 
-              {/* Formulário específico do método selecionado */}
               {metodoSelecionado && (
                 <div className="rounded-xl border border-[#D4E2E7] bg-[#F8FCFC] p-6">
-                  <h4 className="font-medium text-gray-900 mb-4">
-                    Dados para {metodoSelecionado.nome}
-                  </h4>
+                  <h4 className="mb-4 font-medium text-gray-900">Dados para {metodoSelecionado.nome}</h4>
 
                   {metodoSelecionado.tipo === 'cartao' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Número do Cartão
-                        </label>
+                        <label className="mb-2 block text-sm font-medium text-gray-700">Numero do cartao</label>
                         <input
                           type="text"
                           value={dadosCartao.numero}
-                          onChange={(e) =>
+                          onChange={(event) =>
                             setDadosCartao((prev) => ({
                               ...prev,
-                              numero: formatarNumeroCartao(e.target.value),
+                              numero: formatarNumeroCartao(event.target.value),
                             }))
                           }
                           placeholder="1234 5678 9012 3456"
@@ -255,34 +271,30 @@ export default function GatewayPagamento({
                       </div>
 
                       <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Nome no Cartão
-                        </label>
+                        <label className="mb-2 block text-sm font-medium text-gray-700">Nome no cartao</label>
                         <input
                           type="text"
                           value={dadosCartao.nome}
-                          onChange={(e) =>
+                          onChange={(event) =>
                             setDadosCartao((prev) => ({
                               ...prev,
-                              nome: e.target.value.toUpperCase(),
+                              nome: event.target.value.toUpperCase(),
                             }))
                           }
-                          placeholder="NOME COMO NO CARTÃO"
+                          placeholder="NOME COMO NO CARTAO"
                           className="w-full rounded-lg border border-[#D4E2E7] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Validade
-                        </label>
+                        <label className="mb-2 block text-sm font-medium text-gray-700">Validade</label>
                         <input
                           type="text"
                           value={dadosCartao.validade}
-                          onChange={(e) =>
+                          onChange={(event) =>
                             setDadosCartao((prev) => ({
                               ...prev,
-                              validade: formatarValidade(e.target.value),
+                              validade: formatarValidade(event.target.value),
                             }))
                           }
                           placeholder="MM/AA"
@@ -292,14 +304,14 @@ export default function GatewayPagamento({
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">CVV</label>
+                        <label className="mb-2 block text-sm font-medium text-gray-700">CVV</label>
                         <input
                           type="text"
                           value={dadosCartao.cvv}
-                          onChange={(e) =>
+                          onChange={(event) =>
                             setDadosCartao((prev) => ({
                               ...prev,
-                              cvv: e.target.value.replace(/\D/g, ''),
+                              cvv: event.target.value.replace(/\D/g, ''),
                             }))
                           }
                           placeholder="123"
@@ -309,28 +321,24 @@ export default function GatewayPagamento({
                       </div>
 
                       <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Parcelas
-                        </label>
+                        <label className="mb-2 block text-sm font-medium text-gray-700">Parcelas</label>
                         <select
                           value={dadosCartao.parcelas}
-                          onChange={(e) =>
+                          onChange={(event) =>
                             setDadosCartao((prev) => ({
                               ...prev,
-                              parcelas: parseInt(e.target.value),
+                              parcelas: parseInt(event.target.value, 10),
                             }))
                           }
                           className="w-full rounded-lg border border-[#D4E2E7] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#159A9C]"
                         >
                           {Array.from(
-                            { length: metodoSelecionado.configuracao.maxParcelas },
+                            { length: Number(metodoSelecionado.configuracao.maxParcelas) || 1 },
                             (_, i) => i + 1,
                           ).map((parcela) => (
                             <option key={parcela} value={parcela}>
                               {parcela}x de {formatarValorCompletoBRL(valorComTaxa / parcela)}
-                              {parcela === 1
-                                ? ' à vista'
-                                : ` (Total: ${formatarValorCompletoBRL(valorComTaxa)})`}
+                              {parcela === 1 ? ' a vista' : ` (Total: ${formatarValorCompletoBRL(valorComTaxa)})`}
                             </option>
                           ))}
                         </select>
@@ -340,100 +348,86 @@ export default function GatewayPagamento({
 
                   {metodoSelecionado.tipo === 'pix' && (
                     <div className="text-center">
-                      <QrCode className="w-24 h-24 mx-auto mb-4 text-gray-400" />
-                      <p className="text-gray-600">
-                        Após confirmar, será gerado um QR Code para pagamento instantâneo
-                      </p>
+                      <QrCode className="mx-auto mb-4 h-24 w-24 text-gray-400" />
+                      <p className="text-gray-600">Apos confirmar, sera gerado um QR Code para pagamento instantaneo.</p>
                     </div>
                   )}
 
                   {metodoSelecionado.tipo === 'boleto' && (
                     <div className="text-center">
-                      <Building className="w-24 h-24 mx-auto mb-4 text-gray-400" />
+                      <Building className="mx-auto mb-4 h-24 w-24 text-gray-400" />
                       <p className="text-gray-600">
-                        Será gerado um boleto bancário com vencimento em{' '}
-                        {metodoSelecionado.configuracao.diasVencimento} dias
+                        Sera gerado um boleto bancario com vencimento em{' '}
+                        {String(metodoSelecionado.configuracao.diasVencimento || 3)} dias.
                       </p>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Resumo do Pagamento */}
               {metodoSelecionado && (
                 <div className="rounded-xl border border-[#D4E2E7] bg-white p-6">
-                  <h4 className="font-medium text-gray-900 mb-4">Resumo do Pagamento</h4>
+                  <h4 className="mb-4 font-medium text-gray-900">Resumo do pagamento</h4>
                   <div className="space-y-2">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Valor da Fatura:</span>
+                      <span className="text-gray-600">Valor da fatura:</span>
                       <span className="font-medium">{formatarValorCompletoBRL(valorTotal)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">
-                        Taxa do método ({metodoSelecionado.taxa}%):
-                      </span>
+                      <span className="text-gray-600">Taxa do metodo ({metodoSelecionado.taxa}%):</span>
                       <span className="font-medium">
                         {formatarValorCompletoBRL((valorTotal * metodoSelecionado.taxa) / 100)}
                       </span>
                     </div>
-                    <div className="border-t pt-2 flex justify-between">
-                      <span className="font-semibold">Total a Pagar:</span>
-                      <span className="font-semibold text-lg">
-                        {formatarValorCompletoBRL(valorComTaxa)}
-                      </span>
+                    <div className="flex justify-between border-t pt-2">
+                      <span className="font-semibold">Total a pagar:</span>
+                      <span className="text-lg font-semibold">{formatarValorCompletoBRL(valorComTaxa)}</span>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Botão de Processamento */}
               {metodoSelecionado && (
                 <button
                   onClick={processarPagamento}
                   disabled={
                     processandoPagamento ||
                     (metodoSelecionado.tipo === 'cartao' &&
-                      (!dadosCartao.numero ||
-                        !dadosCartao.nome ||
-                        !dadosCartao.validade ||
-                        !dadosCartao.cvv))
+                      (!dadosCartao.numero || !dadosCartao.nome || !dadosCartao.validade || !dadosCartao.cvv))
                   }
                   className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#159A9C] py-3 font-medium text-white transition hover:bg-[#117C7E] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {processandoPagamento ? (
                     <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      Processando Pagamento...
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Processando pagamento...
                     </>
                   ) : (
                     <>
-                      <CreditCard className="w-5 h-5" />
-                      Confirmar Pagamento
+                      <CreditCard className="h-5 w-5" />
+                      Confirmar pagamento
                     </>
                   )}
                 </button>
               )}
             </>
           ) : (
-            /* Resultado da Transação */
             <div className="text-center">
               {transacaoAtual.status === 'aprovado' ? (
                 <div className="space-y-4">
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-                    <Check className="w-8 h-8 text-green-600" />
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+                    <Check className="h-8 w-8 text-green-600" />
                   </div>
-                  <h3 className="text-xl font-semibold text-green-900">Pagamento Aprovado!</h3>
-                  <p className="text-gray-600">Transação: {transacaoAtual.codigoTransacao}</p>
+                  <h3 className="text-xl font-semibold text-green-900">Pagamento aprovado</h3>
+                  <p className="text-gray-600">Transacao: {transacaoAtual.codigoTransacao}</p>
 
                   {transacaoAtual.qrCode && (
-                    <div className="bg-gray-50 p-6 rounded-lg">
-                      <h4 className="font-medium mb-4">QR Code PIX</h4>
-                      <div className="bg-white p-4 rounded-lg inline-block">
-                        <QrCode className="w-32 h-32 text-gray-400" />
+                    <div className="rounded-lg bg-gray-50 p-6">
+                      <h4 className="mb-4 font-medium">QR Code PIX</h4>
+                      <div className="inline-block rounded-lg bg-white p-4">
+                        <QrCode className="h-32 w-32 text-gray-400" />
                       </div>
-                      <p className="text-sm text-gray-600 mt-2">
-                        Escaneie o código ou use o link abaixo
-                      </p>
+                      <p className="mt-2 text-sm text-gray-600">Escaneie o codigo ou use o link abaixo.</p>
                       {transacaoAtual.linkPagamento && (
                         <a
                           href={transacaoAtual.linkPagamento}
@@ -448,11 +442,9 @@ export default function GatewayPagamento({
                   )}
 
                   {transacaoAtual.codigoBarras && (
-                    <div className="bg-gray-50 p-6 rounded-lg">
-                      <h4 className="font-medium mb-4">Código de Barras</h4>
-                      <div className="font-mono text-sm bg-white p-4 rounded border">
-                        {transacaoAtual.codigoBarras}
-                      </div>
+                    <div className="rounded-lg bg-gray-50 p-6">
+                      <h4 className="mb-4 font-medium">Codigo de barras</h4>
+                      <div className="rounded border bg-white p-4 font-mono text-sm">{transacaoAtual.codigoBarras}</div>
                       {transacaoAtual.linkPagamento && (
                         <a
                           href={transacaoAtual.linkPagamento}
@@ -460,7 +452,7 @@ export default function GatewayPagamento({
                           target="_blank"
                           rel="noopener noreferrer"
                         >
-                          Imprimir Boleto
+                          Imprimir boleto
                         </a>
                       )}
                     </div>
@@ -468,13 +460,11 @@ export default function GatewayPagamento({
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
-                    <X className="w-8 h-8 text-red-600" />
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
+                    <X className="h-8 w-8 text-red-600" />
                   </div>
-                  <h3 className="text-xl font-semibold text-red-900">Pagamento Rejeitado</h3>
-                  <p className="text-gray-600">
-                    Verifique os dados e tente novamente ou escolha outro método de pagamento.
-                  </p>
+                  <h3 className="text-xl font-semibold text-red-900">Pagamento rejeitado</h3>
+                  <p className="text-gray-600">Verifique os dados e tente novamente com outro metodo.</p>
                   <button
                     onClick={() => {
                       setTransacaoAtual(null);
@@ -482,7 +472,7 @@ export default function GatewayPagamento({
                     }}
                     className="rounded-lg bg-[#159A9C] px-6 py-2 text-white transition hover:bg-[#117C7E]"
                   >
-                    Tentar Novamente
+                    Tentar novamente
                   </button>
                 </div>
               )}

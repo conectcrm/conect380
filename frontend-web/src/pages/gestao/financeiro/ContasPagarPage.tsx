@@ -26,6 +26,7 @@ import {
 } from '../../../components/layout-v2';
 import ModalConfirmacao from '../../../components/common/ModalConfirmacao';
 import ModalJustificativa from '../../../components/common/ModalJustificativa';
+import { getFinanceiroFeatureFlags } from '../../../config/financeiroFeatureFlags';
 import { useConfirmacaoInteligente } from '../../../hooks/useConfirmacaoInteligente';
 import ModalContaPagar from '../../../features/financeiro/components/ModalContaPagarNovo';
 import contaBancariaService from '../../../services/contaBancariaService';
@@ -84,6 +85,20 @@ const sameDay = (a: Date, b: Date) =>
 const formasPagamento = Object.values(FormaPagamento);
 const isFormaPagamento = (value?: string): value is FormaPagamento =>
   Boolean(value && formasPagamento.includes(value as FormaPagamento));
+const normalizarTipoPagamento = (
+  value: string | undefined,
+  boletoEnabled: boolean,
+): FormaPagamento => {
+  if (!isFormaPagamento(value)) {
+    return FormaPagamento.PIX;
+  }
+
+  if (!boletoEnabled && value === FormaPagamento.BOLETO) {
+    return FormaPagamento.PIX;
+  }
+
+  return value;
+};
 
 const getApiErrorMessage = (error: unknown, fallback: string): string => {
   if (!error || typeof error !== 'object') return fallback;
@@ -168,6 +183,14 @@ const getAprovacaoBadge = () => (
 );
 
 const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
+  const financeiroFeatureFlags = useMemo(() => getFinanceiroFeatureFlags(), []);
+  const opcoesFormaPagamento = useMemo(
+    () =>
+      (Object.entries(FORMA_PAGAMENTO_LABELS) as Array<[FormaPagamento, string]>).filter(
+        ([valor]) => financeiroFeatureFlags.boletoEnabled || valor !== FormaPagamento.BOLETO,
+      ),
+    [financeiroFeatureFlags.boletoEnabled],
+  );
   const confirmacao = useConfirmacaoInteligente();
   const selectAllRef = useRef<HTMLInputElement | null>(null);
 
@@ -336,7 +359,7 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
     setContaSelecionada(conta);
     setComprovantePagamentoArquivo(null);
     setTipoPagamentoSelecionado(
-      isFormaPagamento(conta.tipoPagamento) ? conta.tipoPagamento : FormaPagamento.PIX,
+      normalizarTipoPagamento(conta.tipoPagamento, financeiroFeatureFlags.boletoEnabled),
     );
     setContaBancariaPagamentoId(conta.contaBancariaId || '');
     setModalPagamentoAberto(true);
@@ -465,7 +488,10 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
         valorPago:
           pagamento.valorPago || contaSelecionada.valorRestante || contaSelecionada.valorTotal,
         dataPagamento: pagamento.dataPagamento || new Date().toISOString().slice(0, 10),
-        tipoPagamento: pagamento.tipoPagamento || tipoPagamentoSelecionado || FormaPagamento.PIX,
+        tipoPagamento: normalizarTipoPagamento(
+          pagamento.tipoPagamento || tipoPagamentoSelecionado || FormaPagamento.PIX,
+          financeiroFeatureFlags.boletoEnabled,
+        ),
         contaBancariaId: contaBancariaIdSelecionada || undefined,
         observacoes: pagamento.observacoes,
         comprovante: pagamento.comprovante || comprovantePagamentoArquivo || undefined,
@@ -1446,12 +1472,18 @@ const ContasPagarPage: React.FC<ContasPagarPageProps> = ({ className }) => {
                     onChange={(e) => setTipoPagamentoSelecionado(e.target.value as FormaPagamento)}
                     className="h-10 w-full rounded-xl border border-[#D4E2E7] bg-white px-3 text-sm text-[#244455] outline-none transition focus:border-[#1A9E87]/45 focus:ring-2 focus:ring-[#1A9E87]/15"
                   >
-                    {Object.entries(FORMA_PAGAMENTO_LABELS).map(([valor, label]) => (
+                    {opcoesFormaPagamento.map(([valor, label]) => (
                       <option key={valor} value={valor}>
                         {label}
                       </option>
                     ))}
                   </select>
+                  {!financeiroFeatureFlags.boletoEnabled &&
+                  financeiroFeatureFlags.boletoDisabledReason ? (
+                    <p className="mt-2 text-xs text-[#64808E]">
+                      {financeiroFeatureFlags.boletoDisabledReason}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="rounded-xl border border-[#E8EFF2] bg-white p-4">
                   <label className="mb-2 block text-sm font-medium text-[#244455]">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Plus, Trash2, Calculator, FileText, DollarSign } from 'lucide-react';
 import {
   faturamentoService,
@@ -17,6 +17,7 @@ import NumberInput from '../../components/inputs/NumberInput';
 import PercentInput from '../../components/inputs/PercentInput';
 import { formatarValorMonetario } from '../../utils/formatacao';
 import { useAuth } from '../../hooks/useAuth';
+import { getFinanceiroFeatureFlags } from '../../config/financeiroFeatureFlags';
 
 interface ModalFaturaProps {
   isOpen: boolean;
@@ -425,6 +426,63 @@ export default function ModalFatura({
     roleNormalizado === 'admin' ||
     roleNormalizado === 'financeiro' ||
     permissoesNormalizadas.has('admin.empresas.manage');
+  const financeiroFeatureFlags = getFinanceiroFeatureFlags();
+  const tiposDocumentoFiscal = useMemo(
+    () =>
+      financeiroFeatureFlags.fiscalDocumentsEnabled
+        ? TIPOS_DOCUMENTO_FISCAL
+        : new Set<TipoDocumentoFinanceiro>(),
+    [financeiroFeatureFlags.fiscalDocumentsEnabled],
+  );
+  const tiposDocumentoDisponiveis = useMemo(
+    () =>
+      financeiroFeatureFlags.fiscalDocumentsEnabled
+        ? TIPOS_DOCUMENTO_FINANCEIRO
+        : TIPOS_DOCUMENTO_FINANCEIRO.filter((option) => !TIPOS_DOCUMENTO_FISCAL.has(option.value)),
+    [financeiroFeatureFlags.fiscalDocumentsEnabled],
+  );
+  const opcoesFormaPagamento = useMemo(() => {
+    const opcoes: Array<{ value: FormaPagamento; label: string }> = [
+      { value: FormaPagamento.PIX, label: 'PIX' },
+      { value: FormaPagamento.CARTAO_CREDITO, label: 'Cartao de Credito' },
+      { value: FormaPagamento.CARTAO_DEBITO, label: 'Cartao de Debito' },
+      { value: FormaPagamento.TRANSFERENCIA, label: 'Transferencia' },
+      { value: FormaPagamento.DINHEIRO, label: 'Dinheiro' },
+      { value: FormaPagamento.A_COMBINAR, label: 'A combinar' },
+    ];
+
+    if (financeiroFeatureFlags.boletoEnabled) {
+      opcoes.splice(3, 0, { value: FormaPagamento.BOLETO, label: 'Boleto' });
+    }
+
+    return opcoes;
+  }, [financeiroFeatureFlags.boletoEnabled]);
+
+  const normalizarFormaPagamento = (formaPagamento?: FormaPagamento | null): FormaPagamento => {
+    const valor = formaPagamento || FormaPagamento.PIX;
+    if (!financeiroFeatureFlags.boletoEnabled && valor === FormaPagamento.BOLETO) {
+      return FormaPagamento.PIX;
+    }
+    return valor;
+  };
+
+  const normalizarDocumentoFinanceiroPorEscopo = (
+    documento: DocumentoFinanceiroConfig,
+  ): DocumentoFinanceiroConfig => {
+    if (
+      !financeiroFeatureFlags.fiscalDocumentsEnabled &&
+      (documento.tipo === 'nfe' || documento.tipo === 'nfse')
+    ) {
+      return {
+        ...documento,
+        tipo: 'fatura',
+        chaveAcesso: '',
+        motivoEdicaoManual: '',
+      };
+    }
+
+    return documento;
+  };
 
   const [formData, setFormData] = useState<NovaFatura>(() => criarFaturaPadrao(''));
   const [novoItem, setNovoItem] = useState<ItemFormulario>(() => criarNovoItemPadrao());
@@ -492,7 +550,7 @@ export default function ModalFatura({
   const jurosEstimado = Math.max(0, (totalComImpostos * configFinanceira.percentualJuros) / 100);
   const multaEstimada = Math.max(0, (totalComImpostos * configFinanceira.percentualMulta) / 100);
   const totalProjetadoAtraso = totalComImpostos + jurosEstimado + multaEstimada;
-  const tipoDocumentoFiscalSelecionado = TIPOS_DOCUMENTO_FISCAL.has(documentoFinanceiro.tipo);
+  const tipoDocumentoFiscalSelecionado = tiposDocumentoFiscal.has(documentoFinanceiro.tipo);
   const previewDocumentoFiscal = React.useMemo(
     () =>
       documentoFiscalAuto
@@ -543,7 +601,9 @@ export default function ModalFatura({
         usuarioResponsavelId: fatura.usuarioResponsavelId || usuarioResponsavelId,
         tipo: fatura.tipo,
         dataVencimento: fatura.dataVencimento.split('T')[0],
-        formaPagamento: fatura.formaPagamento || fatura.formaPagamentoPreferida || FormaPagamento.PIX,
+        formaPagamento: normalizarFormaPagamento(
+          fatura.formaPagamento || fatura.formaPagamentoPreferida || FormaPagamento.PIX,
+        ),
         observacoes: textoLimpo || '',
         percentualDesconto: fatura.percentualDesconto || 0,
         valorDesconto: fatura.valorDesconto || 0,
@@ -593,12 +653,15 @@ export default function ModalFatura({
 
       setConfigTipo(configTipoEstruturada ?? metadados?.tipo ?? CONFIG_TIPO_PADRAO);
       setConfigFinanceira(configFinanceiraEstruturada);
-      setDocumentoFinanceiro(documentoFinanceiroEstruturado);
-      if (TIPOS_DOCUMENTO_FISCAL.has(documentoFinanceiroEstruturado.tipo)) {
+      const documentoFinanceiroEscopo = normalizarDocumentoFinanceiroPorEscopo(
+        documentoFinanceiroEstruturado,
+      );
+      setDocumentoFinanceiro(documentoFinanceiroEscopo);
+      if (tiposDocumentoFiscal.has(documentoFinanceiroEscopo.tipo)) {
         const possuiIdentificadoresManuais = Boolean(
-          documentoFinanceiroEstruturado.numero.trim() ||
-            documentoFinanceiroEstruturado.serie.trim() ||
-            documentoFinanceiroEstruturado.chaveAcesso.trim(),
+          documentoFinanceiroEscopo.numero.trim() ||
+            documentoFinanceiroEscopo.serie.trim() ||
+            documentoFinanceiroEscopo.chaveAcesso.trim(),
         );
         setDocumentoFiscalAuto(!possuiIdentificadoresManuais);
       } else {
@@ -636,13 +699,13 @@ export default function ModalFatura({
   }, [isOpen, onClose, salvando]);
 
   useEffect(() => {
-    if (TIPOS_DOCUMENTO_FISCAL.has(documentoFinanceiro.tipo)) {
+    if (tiposDocumentoFiscal.has(documentoFinanceiro.tipo)) {
       return;
     }
     if (!documentoFiscalAuto) {
       setDocumentoFiscalAuto(true);
     }
-  }, [documentoFinanceiro.tipo, documentoFiscalAuto]);
+  }, [documentoFinanceiro.tipo, documentoFiscalAuto, tiposDocumentoFiscal]);
 
   // Handlers para mudança dos selects
   const handleClienteChange = (cliente: typeof clienteSelecionado) => {
@@ -681,7 +744,12 @@ export default function ModalFatura({
     campo: K,
     valor: DocumentoFinanceiroConfig[K],
   ) => {
-    setDocumentoFinanceiro((prev) => ({ ...prev, [campo]: valor }));
+    setDocumentoFinanceiro((prev) =>
+      normalizarDocumentoFinanceiroPorEscopo({
+        ...prev,
+        [campo]: valor,
+      } as DocumentoFinanceiroConfig),
+    );
     setErros((prev) => ({ ...prev, documentoFinanceiro: undefined }));
   };
 
@@ -891,7 +959,7 @@ export default function ModalFatura({
       }
     }
 
-    const tipoDocumentoFiscal = TIPOS_DOCUMENTO_FISCAL.has(documentoFinanceiro.tipo);
+    const tipoDocumentoFiscal = tiposDocumentoFiscal.has(documentoFinanceiro.tipo);
     if (tipoDocumentoFiscal && !documentoFiscalAuto) {
       const numeroDocumento = documentoFinanceiro.numero.trim();
       const serieDocumento = documentoFinanceiro.serie.trim();
@@ -981,7 +1049,7 @@ export default function ModalFatura({
         totais.total > 0 && valorImpostos > 0
           ? Number(((valorImpostos / totais.total) * 100).toFixed(4))
           : null;
-      const tipoDocumentoFiscal = TIPOS_DOCUMENTO_FISCAL.has(documentoFinanceiro.tipo);
+      const tipoDocumentoFiscal = tiposDocumentoFiscal.has(documentoFinanceiro.tipo);
       const modeloDocumento =
         documentoFinanceiro.modelo.trim() ||
         (documentoFinanceiro.tipo === 'nfe'
@@ -1185,19 +1253,22 @@ export default function ModalFatura({
                 onChange={(e) =>
                   setFormData((prev) => ({
                     ...prev,
-                    formaPagamento: e.target.value as FormaPagamento,
+                    formaPagamento: normalizarFormaPagamento(e.target.value as FormaPagamento),
                   }))
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1A9E87]/15"
               >
-                <option value={FormaPagamento.PIX}>PIX</option>
-                <option value={FormaPagamento.CARTAO_CREDITO}>Cartão de Crédito</option>
-                <option value={FormaPagamento.CARTAO_DEBITO}>Cartão de Débito</option>
-                <option value={FormaPagamento.BOLETO}>Boleto</option>
-                <option value={FormaPagamento.TRANSFERENCIA}>Transferência</option>
-                <option value={FormaPagamento.DINHEIRO}>Dinheiro</option>
-                <option value={FormaPagamento.A_COMBINAR}>A combinar</option>
+                {opcoesFormaPagamento.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
+              {!financeiroFeatureFlags.boletoEnabled && (
+                <p className="mt-1 text-xs text-[#5E7784]">
+                  {financeiroFeatureFlags.boletoDisabledReason}
+                </p>
+              )}
             </div>
           </div>
 
@@ -1205,6 +1276,11 @@ export default function ModalFatura({
             <h3 className="text-sm font-semibold uppercase tracking-wide text-[#173A4D]">
               Documento financeiro
             </h3>
+            {!financeiroFeatureFlags.fiscalDocumentsEnabled && (
+              <p className="rounded-md border border-[#DCE8EC] bg-white px-3 py-2 text-xs text-[#5E7784]">
+                {financeiroFeatureFlags.fiscalDisabledReason}
+              </p>
+            )}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -1220,7 +1296,7 @@ export default function ModalFatura({
                   }
                   className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1A9E87]/15"
                 >
-                  {TIPOS_DOCUMENTO_FINANCEIRO.map((option) => (
+                  {tiposDocumentoDisponiveis.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
